@@ -131,6 +131,7 @@ const dbCollections = {
     INSTANCE_SETTINGS: "instance_settings",
     AGENT_SESSIONS: "agent_sessions",
     AGENT_SESSION_ENDPOINTS: "agent_session_endpoints",
+    ASK_THREADS: "ask_threads",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/

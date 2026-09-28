@@ -12,6 +12,7 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import AgentIdentity from "./AgentIdentity.vue";
 import { projectScopeOf } from "./agentFit";
+import { autonomyName } from "./plainLabels";
 
 // The agent row for the Members table (13b). It lives here rather than in
 // Settings/Members so the members list, the Team board and the picker all draw
@@ -29,7 +30,7 @@ const { t } = useI18n();
 const ownerLine = computed(() => {
     const bits = [];
     if (props.ownerName) bits.push(t("Parity.owned_by", { name: props.ownerName }));
-    bits.push(`L${Number(props.agent.autonomy || 0)}`);
+    bits.push(autonomyName(t, props.agent.autonomy));
     if (!props.agent.paused) bits.push(t("Parity.assignable"));
     return bits.join(" · ");
 });

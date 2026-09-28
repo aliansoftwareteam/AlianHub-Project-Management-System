@@ -342,6 +342,8 @@ agentSessionsSchema.index({ state: 1, deliveredAt: 1 });
 agentSessionsSchema.index({ grantId: 1, state: 1 });
 const agentSessionEndpointsSchema = new Schema(schema.agentSessionEndpoints, {strict: true, timestamps: false});
 agentSessionEndpointsSchema.index({ clientId: 1 }, { unique: true, name: 'client_id' });
+const askThreadsSchema = new Schema(schema.askThreads, {strict: true, timestamps: true});
+askThreadsSchema.index({ ownerId: 1, lastTurnAt: -1 });
 
 const oauthClientsSchema = new Schema(schema.oauthClients, {strict: true, timestamps: false});
 oauthClientsSchema.index({ clientId: 1 }, { unique: true, name: 'client_id' });
@@ -508,6 +510,7 @@ module.exports = {
     instructionPatternsSchema,
     agentSessionsSchema,
     agentSessionEndpointsSchema,
+    askThreadsSchema,
     secretsSchema,
     oauthClientsSchema,
     oauthGrantsSchema,

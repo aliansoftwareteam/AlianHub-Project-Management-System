@@ -5,6 +5,7 @@ const scrum = require('./scrum');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { READ, WRITE, requireProjectAccess, projectIdsFrom } = require('../../Config/projectAccess');
 const { requireSprintAccess } = require('./helpers/sprintVisibility');
+const { sprintUpdateFrom, sprintWriteKinds, folderUpdateFrom, writtenStatus } = require('./helpers/listWrites');
 const { withActingUser } = require('./helpers/actingUser');
 const { newSprintNamesOnlyMembers, sprintPatchNamesOnlyMembers } = require('./helpers/sprintPeople');
 const { CHAT_CHANNEL, CHAT_CATEGORY, isChatSpace, requireChatAccess } = require('./helpers/chatAccess');
@@ -20,7 +21,8 @@ const ALLOWED_FOLDER_TYPES = ['editFolderName', 'updateFolder'];
 // exists for new companies only and would deny every existing one.
 const SPRINT_CREATE = 'project.project_sprint_create';
 const SPRINT_EDIT = ['project.project_sprint_name_edit', 'project.sprint_type_change', SPRINT_CREATE];
-const SPRINT_STATUS = { 0: 'project.sprint_restore', 1: 'project.sprint_delete', 2: 'project.sprint_archive' };
+const SPRINT_SHARE = 'project.sprint_type_change';
+const SPRINT_STATUS = { 0: 'project.sprint_restore', 1: 'project.sprint_delete', 2: 'project.sprint_archive', 5: 'project.sprint_archive' };
 const FOLDER_RENAME = 'project.project_folder_name_edit';
 const FOLDER_STATUS = { 0: 'project.folder_restore', 1: 'project.folder_delete', 2: 'project.folder_archive' };
 
@@ -37,17 +39,35 @@ const guard = (mode, projectIds, permissions = () => [], chatPermission = () => 
     ? [requireProjectAccess({ mode, projectIds, permissions })]
     : [requireProjectAccess({ mode, projectIds, permissions, passMissing: isChatSpace }), requireChatAccess({ containers: projectIds, permission: chatPermission })]);
 
+// An update the handler will refuse still has to pass a permission first.
+const orRefused = (build, fallback) => {
+    try {
+        return build();
+    } catch (error) {
+        return [fallback];
+    }
+};
+
+const sprintUpdatePermissions = (req) => orRefused(() => {
+    const { status, moves, shares } = sprintWriteKinds(sprintUpdateFrom(bodyOf(req).updateObject), req.uid);
+    return [
+        ...(status === undefined ? [] : [SPRINT_STATUS[status]]),
+        ...(moves ? [SPRINT_EDIT] : []),
+        ...(shares ? [SPRINT_SHARE] : []),
+    ];
+}, SPRINT_EDIT);
+
 const sprintPatchPermissions = (req) => {
-    const { type, updatedValueDeleteStatusKey } = bodyOf(req);
+    const { type } = bodyOf(req);
     if (type === 'editSprintName') return ['project.project_sprint_name_edit'];
     if (type === 'deleteChannel') return [SPRINT_STATUS[1]];
-    return [SPRINT_STATUS[updatedValueDeleteStatusKey] || SPRINT_EDIT];
+    return sprintUpdatePermissions(req);
 };
 
 const folderPatchPermissions = (req) => {
-    const { type, updatedValueDeleteStatusKey } = bodyOf(req);
+    const { type, updateObject } = bodyOf(req);
     if (type === 'editFolderName') return [FOLDER_RENAME];
-    return [FOLDER_STATUS[updatedValueDeleteStatusKey] || FOLDER_RENAME];
+    return orRefused(() => [FOLDER_STATUS[writtenStatus(folderUpdateFrom(updateObject))]], FOLDER_RENAME);
 };
 
 exports.init = (app) => {

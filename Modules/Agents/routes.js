@@ -15,6 +15,7 @@ exports.init = (app) => {
     app.get('/api/v2/agents/manifest', skillsCtrl.agentManifest);
     app.get('/api/v2/agents/spend', ctrl.spend);
     app.get('/api/v2/agents/team', ctrl.teamBoard);
+    app.get('/api/v2/agents/team/standup', ctrl.myStandup);
     app.get('/api/v2/agents/routable', ctrl.routableTasks);
     app.get('/api/v2/agents/pipeline', ctrl.pipelineTasks);
     app.get('/api/v2/agents/release', ctrl.releaseCandidate);

@@ -3,6 +3,7 @@ const sessions = require('./sessions');
 const onboarding = require('./onboarding');
 const navPreferences = require('./navPreferences');
 const favourites = require('./favourites');
+const homeCards = require('./homeCards');
 
 exports.init = (app) => {
     app.put('/api/v1/user', ctrl.updateUserStatus);
@@ -16,4 +17,5 @@ exports.init = (app) => {
     app.get('/api/v2/users/favourites', favourites.listOwnFavourites);
     app.put('/api/v2/users/favourites', favourites.setOwnFavourite);
     app.put('/api/v2/users/favourites/order', favourites.reorderOwnFavourites);
+    app.put('/api/v2/users/home-cards', homeCards.updateOwnHomeCards);
 };

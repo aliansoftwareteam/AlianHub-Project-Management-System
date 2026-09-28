@@ -17,12 +17,17 @@
         </div>
         <button v-if="active" type="button" class="hc-setup__cta" @click="$emit('action', active.key)">{{ $t(active.cta) }}</button>
         <button type="button" class="hc-setup__dismiss" @click="$emit('dismiss')">{{ $t('Home.dismiss') }}</button>
+        <WorkspaceImportDialog v-if="workspaceImport.open" @close="closeWorkspaceImport" @imported="markImported" />
     </section>
 </template>
 
 <script setup>
-import { computed, defineEmits, defineProps } from "vue";
+import { computed, defineAsyncComponent, defineEmits, defineProps } from "vue";
+import { workspaceImport, closeWorkspaceImport } from "@/components/organisms/WorkspaceImport/workspaceImportState";
+import { saveOnboarding } from "@/composable/onboardingState";
 import "./style.css";
+
+const WorkspaceImportDialog = defineAsyncComponent(() => import("@/components/organisms/WorkspaceImport/WorkspaceImportDialog.vue"));
 
 defineOptions({ name: "SetupChecklist" });
 
@@ -35,4 +40,5 @@ defineEmits(["action", "dismiss"]);
 
 const doneCount = computed(() => props.steps.filter((s) => s.done).length);
 const active = computed(() => props.steps.find((s) => !s.done) || null);
+const markImported = () => saveOnboarding({ importedWork: true });
 </script>

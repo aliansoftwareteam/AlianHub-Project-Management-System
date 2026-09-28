@@ -8,6 +8,7 @@ jest.mock('../Modules/Project/controller/updateProject', () => ({ updateProjectI
 jest.mock('../Modules/Sprints/controller', () => ({ updateSprintFun: jest.fn(async () => ({ status: true })) }));
 jest.mock('../Modules/Tasks/helpers/task_class_Mongo', () => ({ taskMongo: { bulkRestore: jest.fn(async () => ({ totals: { updated: 1 } })) } }));
 jest.mock('../Modules/Pages/controller', () => ({ restorePage: jest.fn((req, res) => res.send({ status: true, statusText: 'page' })) }));
+jest.mock('../Modules/Trash/listAccess', () => ({ visibleTrash: jest.fn(async (companyId, uid, kind, docs) => docs) }));
 jest.mock('../Modules/Tasks/helpers/taskWriteFields', () => ({ sessionActor: jest.fn(async (req) => ({ id: String(req.uid), Employee_Name: 'Me' })) }));
 
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');

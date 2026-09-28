@@ -14,7 +14,20 @@ export function rowEditRights(check, { archived = false } = {}) {
     };
 }
 
-export const projectHasApp = (project, key) => (project?.apps || []).some((app) => app === key || app?.key === key);
+/* task_estimated_hours is a selection permission: true, 1 (own) and 2 (everyone) all write. */
+export const writesSelection = (value) => value === true || value === 1 || value === 2;
+
+export function fieldEditRights(check, { archived = false, customFields = false } = {}) {
+    const open = !archived && check("task.task_list") === true;
+    const estimates = writesSelection(check("task.task_estimated_hours"));
+    return {
+        estimate: open && estimates,
+        points: open && estimates,
+        customField: open && customFields && check("task.task_custom_field") === true
+    };
+}
+
+export const projectHasApp =(project, key) => (project?.apps || []).some((app) => app === key || app?.key === key);
 
 export function priorityAppOn(project, planFeature) {
     return projectHasApp(project, "Priority") && Boolean(planFeature?.projectProjectApp);

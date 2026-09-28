@@ -123,6 +123,7 @@ import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
 import { useShipping, runElapsed } from "./useShipping";
 import { reasonOf } from "./useAgents";
+import { skillLabel } from "./plainLabels";
 
 // 28a — one task through five stages. Stages 4 and 5 are not written here: the
 // gate and the hard stop are read from the registry manifest, so removing
@@ -192,7 +193,7 @@ const stages = computed(() => {
         title: t("Pipeline.s2_title"),
         body: t("Pipeline.s2_body"),
         actor: t("Pipeline.actor_agent"),
-        actorDetail: workRuns.value[0]?.skill || "",
+        actorDetail: workRuns.value[0]?.skill ? skillLabel(t, workRuns.value[0].skill) : "",
         reached: workRuns.value.length > 0,
         beyondRegistry: false,
         none: t("Pipeline.s2_none"),

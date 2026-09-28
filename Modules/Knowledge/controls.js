@@ -7,6 +7,7 @@ const embeddings = require('./embeddings');
 const { INDEXED_SOURCES } = require('./sources');
 const indexer = require('./ingest/indexer');
 const erase = require('./ingest/erase');
+const askThreads = require('../AI/askThreads');
 
 // The instance console's writes on a workspace's index. Each answers counts, never text, so the
 // caller can audit what it did without holding anything it removed.
@@ -97,7 +98,7 @@ const personExists = async (companyId, userId) => {
         type: SCHEMA_TYPE.COMPANY_USERS,
         data: [{ userId: { $in: [userId, new mongoose.Types.ObjectId(userId)] } }, '_id', { lean: true }],
     }, 'findOne');
-    return Boolean(seat) || hasChunks(company, { createdBy: userId });
+    return Boolean(seat) || (await hasChunks(company, { createdBy: userId })) || askThreads.hasThreads(company, userId);
 };
 
 const totalOf = (removed) => Object.values(removed).reduce((sum, n) => sum + n, 0);
@@ -163,6 +164,8 @@ const erasePerson = async (companyId, userId, progress = { removed: {} }, { by =
     const counts = await countsBySource(company, erase.personWhere(userId));
     await erase.erasePerson(company, userId, eraseOptions(progress, by));
     Object.assign(progress.removed, counts);
+    const threads = await askThreads.eraseOwner(company, userId);
+    if (threads) progress.removed.ask_thread = threads;
     return { removed: progress.removed, total: totalOf(progress.removed) };
 };
 

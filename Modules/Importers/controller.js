@@ -9,6 +9,9 @@ const { validateCsvInput, validateCsvRows, transformCsvRows, TARGETS } = require
 const { validateTrelloInput, parseTrelloBoard } = require('./helpers/trelloRules');
 const { validateAsanaInput, parseAsanaExport } = require('./helpers/asanaRules');
 const { validateMondayInput, parseMondayExport } = require('./helpers/mondayRules');
+const { validateClickUpInput, validateClickUpRows, transformClickUpRows, previewClickUpRows, clickUpStatuses, resolveStatuses, DEFAULT_LIST } = require('./helpers/clickupRules');
+const { STATUS_FALLBACK_TYPE, appendStatuses, applyImportTags } = require('./helpers/projectDetails');
+const { mapStatusName } = require('./helpers/jiraRules');
 const { importTargetAccess, previewAccess, refuseImport } = require('./helpers/importAccess');
 const { findCompanyMembers, activeMemberIdSet } = require('./helpers/companyMembers');
 const { sessionActor } = require('../Tasks/helpers/taskWriteFields');
@@ -70,10 +73,6 @@ exports.listImports = async (req, res) => {
         return res.send({ status: false, statusText: error.message });
     }
 };
-
-// ── Shared pipeline for the CSV + Trello importers (mirrors importFromJira) ──
-
-const STATUS_FALLBACK_TYPE = 'default_active';
 
 /* Load the project + a usable task-status list. Prefer the PROJECT's own
  * taskStatusData (it matches the board, including any custom statuses); fall back
@@ -150,6 +149,7 @@ const enrichImportTasks = async (companyId, tasks) => {
         }
     });
     await keepMemberAssignees(companyId, tasks);
+    const unmatchedEmails = emails.filter((email) => !emailToId[String(email).toLowerCase()]);
 
     tasks.forEach((task) => {
         if (Array.isArray(task.checklists) && task.checklists.length) {
@@ -175,6 +175,7 @@ const enrichImportTasks = async (companyId, tasks) => {
             }
         }
     });
+    return { unmatchedEmails };
 };
 
 /* The people a comment written in the app counts for: the task's watchers and assignees, other than its author. */
@@ -231,7 +232,7 @@ const createImportComments = async (companyId, projectData, sprintId, folderId, 
 
 /* Record the job, feed the bulk-create pipeline, update the job. Returns the
  * response envelope. Identical create path to the Jira importer. */
-const finishImport = async (companyId, { source, project, sprint, actor, statusArray, tasks, skipped }) => {
+const finishImport = async (companyId, { source, project, sprint, actor, statusArray, tasks, skipped, addsTags = false, report = null }) => {
     const userId = actor.id;
     const sprintId = sprint.id;
     const job = await MongoDbCrudOpration(companyId, {
@@ -258,7 +259,8 @@ const finishImport = async (companyId, { source, project, sprint, actor, statusA
     };
     // S3-01: fold Trello rich data (checklists, attachments, members, labels)
     // onto each task before creation; comments are added after (they need ids).
-    await enrichImportTasks(companyId, tasks);
+    const { unmatchedEmails } = await enrichImportTasks(companyId, tasks);
+    await applyImportTags(companyId, project, tasks, { create: addsTags });
     const tasksWithSprint = tasks.map((task) => ({ ...task, sprintId, sprintArray: sprint }));
 
     try {
@@ -277,7 +279,8 @@ const finishImport = async (companyId, { source, project, sprint, actor, statusA
             type: SCHEMA_TYPE.IMPORT_JOBS,
             data: [{ _id: job._id }, { $set: { status: 'done', processed: tasks.length, created: createdCount } }],
         }, 'updateOne');
-        return { status: true, statusText: `Imported ${createdCount} tasks from ${source} (${skipped} skipped).`, data: { jobId: job._id, created: createdCount, skipped } };
+        const detail = report ? { skippedRows: report.skippedRows, unmatchedAssignees: [...unmatchedEmails, ...report.unnamedAssignees] } : {};
+        return { status: true, statusText: `Imported ${createdCount} tasks from ${source} (${skipped} skipped).`, data: { jobId: job._id, projectId: String(project._id), created: createdCount, skipped, ...detail } };
     } catch (creationError) {
         logger.error(`[importers] ${source} job ${job._id} failed: ${creationError.message}`);
         await MongoDbCrudOpration(companyId, {
@@ -320,7 +323,7 @@ exports.importFromCsv = async (req, res) => {
         });
         if (!tasks.length) return res.send({ status: false, statusText: 'No importable rows found (a task-name column is required).' });
 
-        const out = await finishImport(companyId, { source: 'csv', project: ctx.project, sprint: target.sprint, actor: await sessionActor(req), statusArray, tasks, skipped });
+        const out = await finishImport(companyId, { source: 'csv', project: ctx.project, sprint: target.sprint, actor: await sessionActor(req), statusArray, tasks, skipped, addsTags: Boolean(options.createMissingStatuses) });
         return res.send(out);
     } catch (error) {
         logger.error(`ERROR in csv import: ${error.message}`);
@@ -479,28 +482,177 @@ exports.previewCsv = async (req, res) => {
  * the first one. Returns the status list to import against. */
 const createMissingStatuses = async (companyId, project, statusArray, rows, mapping) => {
     const column = mapping && mapping.status;
-    const known = new Set(statusArray.map((status) => String(status.name).trim().toLowerCase()));
-    const missing = [];
-    (rows || []).forEach((row) => {
+    const wanted = (rows || []).map((row) => {
         const raw = column ? row[column] : (row.Status || row.status);
-        const value = raw === undefined || raw === null ? '' : String(raw).trim();
-        if (!value || known.has(value.toLowerCase())) return;
-        known.add(value.toLowerCase());
-        missing.push(value);
+        return { name: raw === undefined || raw === null ? '' : String(raw).trim(), type: STATUS_FALLBACK_TYPE };
     });
-    if (!missing.length) return statusArray;
-
-    let nextKey = statusArray.reduce((highest, status) => Math.max(highest, Number(status.key) || 0), 0);
-    const added = missing.map((name) => ({ name, key: ++nextKey, type: STATUS_FALLBACK_TYPE }));
-    const merged = statusArray.concat(added);
     try {
-        await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.PROJECTS,
-            data: [{ _id: project._id }, { $set: { taskStatusData: merged } }],
-        }, 'updateOne');
+        return await appendStatuses(companyId, project, statusArray, wanted);
     } catch (error) {
         logger.error(`[importers] could not add statuses to project ${project._id}: ${error.message}`);
         return statusArray;
     }
-    return merged;
+};
+
+const lowerName = (value) => String(value === undefined || value === null ? '' : value).trim().toLowerCase();
+
+/* The project statuses a ClickUp file lands on, adding the missing ones when allowed. */
+const clickUpStatusContext = async (companyId, project, statusArray, rows, addsStatuses) => {
+    const { mapping, missing } = resolveStatuses({ wanted: clickUpStatuses(rows), existing: statusArray });
+    let statuses = statusArray;
+    if (missing.length && addsStatuses) {
+        try {
+            statuses = await appendStatuses(companyId, project, statusArray, missing);
+        } catch (error) {
+            logger.error(`[importers] could not add statuses to project ${project._id}: ${error.message}`);
+        }
+    }
+    const names = statuses.map((status) => status.name);
+    const statusFor = (raw) => {
+        const mapped = mapping[lowerName(raw)];
+        return names.includes(mapped) ? mapped : mapStatusName(raw, names);
+    };
+    return { statusArray: statuses, statusFor };
+};
+
+const runClickUpImport = async (req, { companyId, userId, project, sprint, statusArray, rows, addsDetails }) => {
+    const context = await clickUpStatusContext(companyId, project, statusArray, rows, addsDetails);
+    const { tasks, skipped, skippedRows, unnamedAssignees } = transformClickUpRows({ rows, statusFor: context.statusFor, leaderId: userId });
+    if (!tasks.length) return { status: false, statusText: 'No importable tasks found (every row needs a task name).' };
+    return finishImport(companyId, {
+        source: 'clickup',
+        project,
+        sprint,
+        actor: await sessionActor(req),
+        statusArray: context.statusArray,
+        tasks,
+        skipped,
+        addsTags: addsDetails,
+        report: { skippedRows, unnamedAssignees },
+    });
+};
+
+/* POST /api/v2/imports/clickup
+ * body: { rows, projectId, sprintId, options: { createMissingStatuses } } */
+exports.importFromClickUp = async (req, res) => {
+    try {
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
+        const { rows, projectId, sprintId } = req.body || {};
+        const options = (req.body && req.body.options) || {};
+        const userId = String(req.uid || '');
+        const check = validateClickUpInput({ companyId, projectId, sprintId, rows, userId });
+        if (!check.valid) return res.send({ status: false, statusText: check.reason });
+
+        const addsDetails = Boolean(options.createMissingStatuses);
+        const target = await importTargetAccess(companyId, userId, { projectId, sprintId, addsStatuses: addsDetails });
+        if (!target.allowed) return refuseImport(res, target);
+
+        const ctx = await loadImportContext(companyId, projectId);
+        if (ctx.error) return res.send({ status: false, statusText: ctx.error });
+
+        const out = await runClickUpImport(req, { companyId, userId, project: ctx.project, sprint: target.sprint, statusArray: ctx.statusArray, rows, addsDetails });
+        return res.send(out);
+    } catch (error) {
+        logger.error(`ERROR in clickup import: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+// Required at call time: the orchestrator pulls in the agent engine.
+const orchestrator = () => require('../AIProjectGenerator/orchestrator');
+const sprints = () => require('../Sprints/controller');
+
+const createListProject = async ({ companyId, userId, actor, name }) => {
+    const plan = {
+        project: {
+            ProjectName: name,
+            description: 'Imported from ClickUp.',
+            projectIcon: { type: 'color', data: '#7B68EE' },
+            isPrivateSpace: false,
+            source: 'other',
+            skills: [],
+            LeadUserId: [userId],
+            taskTypeCounts: [{ name: 'Task', value: 'task', key: 1 }],
+            projectStatusData: [],
+            taskStatusData: [],
+        },
+        sprints: [],
+    };
+    const created = await orchestrator().executePlan({ plan, companyId, uid: userId, userData: actor, jobId: `import_clickup_${companyId}_${Date.now()}` });
+    if (!created || !created.ok || !created.projectId) throw new Error((created && created.error) || 'The project could not be created.');
+
+    const sprint = await sprints().addSprintFun({
+        body: { companyId, projectId: String(created.projectId), sprintName: name, userData: actor, projectName: name, isPreCompany: true, mainChat: false, private: false, sendMessage: false },
+    });
+    if (!sprint || !sprint.data || !sprint.data._id) throw new Error('The list could not be created in the new project.');
+    return { projectId: String(created.projectId), sprint: { id: String(sprint.data._id), name } };
+};
+
+/* POST /api/v2/imports/clickup/project
+ * body: { rows, listName } — one ClickUp list becomes a new project with one sprint. */
+exports.importClickUpAsProject = async (req, res) => {
+    try {
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
+        const { rows } = req.body || {};
+        const userId = String(req.uid || '');
+        if (!userId) return res.status(401).send({ status: false, statusText: 'A signed-in user is required.' });
+        const check = validateClickUpRows(rows);
+        if (!check.valid) return res.send({ status: false, statusText: check.reason });
+        const name = String((req.body && req.body.listName) || '').trim().slice(0, 100) || DEFAULT_LIST;
+
+        const actor = await sessionActor(req);
+        const { projectId, sprint } = await createListProject({ companyId, userId, actor, name });
+        const ctx = await loadImportContext(companyId, projectId);
+        if (ctx.error) return res.send({ status: false, statusText: ctx.error });
+
+        const out = await runClickUpImport(req, { companyId, userId, project: ctx.project, sprint, statusArray: ctx.statusArray, rows, addsDetails: true });
+        return res.send(out.status ? out : { ...out, data: { projectId } });
+    } catch (error) {
+        logger.error(`ERROR in clickup project import: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* POST /api/v2/imports/clickup/preview
+ * body: { rows, projectId? } — what the file holds, per list, with nothing written. */
+exports.previewClickUp = async (req, res) => {
+    try {
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
+        const { rows, projectId } = req.body || {};
+        const check = validateClickUpRows(rows);
+        if (!check.valid) return res.send({ status: false, statusText: check.reason });
+
+        const preview = previewClickUpRows(rows);
+        let project = null;
+        if (projectId) {
+            const access = await previewAccess(companyId, req.uid, projectId);
+            if (!access.allowed) return refuseImport(res, access);
+            project = await loadImportContext(companyId, projectId);
+            if (project.error) return res.send({ status: false, statusText: project.error });
+        }
+
+        const members = preview.assigneeEmails.length
+            ? await findCompanyMembers(companyId, { Employee_Email: { $in: preview.assigneeEmails } }, { _id: 1, Employee_Email: 1 }).catch(() => [])
+            : [];
+        const matched = new Set(members.map((member) => lowerName(member.Employee_Email)));
+        const knownTags = new Set(((project && project.project.tagsArray) || []).map((tag) => lowerName(tag && tag.tagName)));
+
+        return res.send({
+            status: true,
+            statusText: 'Preview ready.',
+            data: {
+                ...preview,
+                newStatuses: project ? resolveStatuses({ wanted: preview.statuses, existing: project.statusArray }).missing : preview.statuses,
+                newTags: preview.tags.filter((tag) => !knownTags.has(lowerName(tag))),
+                matchedAssignees: preview.assigneeEmails.filter((email) => matched.has(email)),
+                unmatchedAssignees: [...preview.assigneeEmails.filter((email) => !matched.has(email)), ...preview.unnamedAssignees],
+            },
+        });
+    } catch (error) {
+        logger.error(`ERROR in clickup preview: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
 };

@@ -1,6 +1,6 @@
 const ONBOARDING_FLAGS = [
     'dismissed', 'openedProject', 'completedTask', 'loggedTime',
-    'reviewedPermissions', 'chosenApps', 'viewedBoard', 'viewedNotifications',
+    'reviewedPermissions', 'chosenApps', 'viewedBoard', 'viewedNotifications', 'importedWork',
 ];
 const TOURS = ['shell', 'project', 'board', 'list'];
 
