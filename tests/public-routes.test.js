@@ -51,6 +51,19 @@ const NEEDS_SESSION_AND_COMPANY = [
     ['post', '/api/v1/checkSendInviatation'],
     ['put', '/api/v1/notifications'],
     ['get', '/api/v1/notifications/n1'],
+    ['get', '/api/v1/ai/memory'],
+    ['put', '/api/v1/ai/memory'],
+    ['delete', '/api/v1/ai/memory'],
+    ['post', '/api/v1/ai/memory/import/preview'],
+    ['post', '/api/v1/ai/memory/import/confirm'],
+    ['put', '/api/v1/ai/feedback'],
+    ['get', '/api/v1/ai/feedback/mine'],
+    ['delete', '/api/v1/ai/feedback/f1'],
+    ['get', '/api/v1/ai/quality'],
+    ['post', '/api/v1/ai/quality/held-out'],
+    ['post', '/api/v1/ai/notes-to-tasks/propose'],
+    ['post', '/api/v1/ai/notes-to-tasks'],
+    ['post', '/api/v1/ai/notes-to-tasks/undo'],
 ];
 
 const NEEDS_SESSION = [
