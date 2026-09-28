@@ -3,6 +3,7 @@
         class="hc-row"
         :class="{ 'hc-row--dim': dim, 'hc-row--done': done }"
         :draggable="draggable"
+        v-bind="taskNavAttrs(task)"
         @dragstart="onDragStart"
     >
         <input
@@ -38,6 +39,7 @@ import { computed, defineEmits, defineProps } from "vue";
 import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { dueBucket, dueLabel, priorityMeta } from "./homeFormat";
+import { taskNavAttrs } from "@/components/organisms/TaskDetailOverlay/taskNavigation";
 
 defineOptions({ name: "TaskRow" });
 

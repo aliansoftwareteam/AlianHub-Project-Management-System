@@ -1,6 +1,6 @@
-/* Task 037 slice 1: group-by, "Me" and the search text are remembered per user per
-   project and come back on reload; search, "Me" and a saved filter all reach the query
-   the views render from. */
+/* Task 037 slice 1 kept group-by, "Me" and the search text per browser; task 042 slice 4
+   moved them onto the saved view, so the browser copy is only read (and cleared) now.
+   Search, "Me" and a saved filter all reach the query the views render from. */
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
@@ -10,7 +10,7 @@ vi.mock('@/composable', () => ({
     useCustomComposable: () => ({ checkPermission: () => true, debounce: (fn) => fn })
 }));
 
-import { loadViewPrefs, saveViewPrefs, viewPrefsKey } from '@/views/Projects/composables/projectViewPrefs';
+import { loadViewPrefs, clearViewPrefs, viewPrefsKey } from '@/views/Projects/composables/projectViewPrefs';
 import { useProjectSearch } from '@/views/Projects/composables/useProjectSearch';
 import { clearFilterSignal } from '@/views/Projects/composables/taskFilterSignal';
 
@@ -35,18 +35,20 @@ describe('view preferences storage', () => {
         expect(viewPrefsKey(IDS)).not.toBe(viewPrefsKey({ ...IDS, projectId: 'p2' }));
     });
 
-    test('what is saved is what is loaded', () => {
+    test('what an older build stored is what is loaded', () => {
         const storage = memoryStorage();
-        saveViewPrefs(IDS, { groupBy: 1, me: true, search: 'invoice' }, storage);
+        storage.setItem(viewPrefsKey(IDS), JSON.stringify({ groupBy: 1, me: true, search: 'invoice' }));
         expect(loadViewPrefs(IDS, storage)).toEqual({ groupBy: 1, me: true, search: 'invoice', doneBy: 'all' });
         expect(loadViewPrefs({ ...IDS, projectId: 'p2' }, storage)).toEqual({ groupBy: 0, me: false, search: '', doneBy: 'all' });
     });
 
-    test('defaults leave nothing behind in storage', () => {
+    test('clearing removes the project\'s entry only', () => {
         const storage = memoryStorage();
-        saveViewPrefs(IDS, { groupBy: 2, me: false, search: '' }, storage);
-        saveViewPrefs(IDS, { groupBy: 0, me: false, search: '' }, storage);
-        expect(storage.data.size).toBe(0);
+        storage.setItem(viewPrefsKey(IDS), JSON.stringify({ groupBy: 1 }));
+        storage.setItem(viewPrefsKey({ ...IDS, projectId: 'p2' }), JSON.stringify({ groupBy: 2 }));
+        clearViewPrefs(IDS, storage);
+        expect(storage.data.has(viewPrefsKey(IDS))).toBe(false);
+        expect(storage.data.size).toBe(1);
     });
 
     test('corrupt or foreign values fall back to the defaults', () => {
@@ -60,12 +62,12 @@ describe('view preferences storage', () => {
     test('a storage that throws (private window, blocked site data) never breaks the view', () => {
         const throwing = { getItem: () => { throw new Error('denied'); }, setItem: () => { throw new Error('denied'); }, removeItem: () => { throw new Error('denied'); } };
         expect(loadViewPrefs(IDS, throwing)).toEqual({ groupBy: 0, me: false, search: '', doneBy: 'all' });
-        expect(() => saveViewPrefs(IDS, { groupBy: 1, me: true, search: 'x' }, throwing)).not.toThrow();
+        expect(() => clearViewPrefs(IDS, throwing)).not.toThrow();
         expect(loadViewPrefs({ ...IDS, userId: '' }, memoryStorage())).toEqual({ groupBy: 0, me: false, search: '', doneBy: 'all' });
     });
 });
 
-describe('useProjectSearch remembers the view', () => {
+describe('useProjectSearch', () => {
     let dispatch;
     let api;
 
@@ -91,20 +93,7 @@ describe('useProjectSearch remembers the view', () => {
 
     const lastMatch = () => dispatch.mock.calls.at(-1)[0].query[0].$match.$and;
 
-    test('group, "Me" and search are restored for the project on reload', async () => {
-        saveViewPrefs(IDS, { groupBy: 2, me: true, search: 'invoice' });
-        const project = ref({ _id: 'p1', isGlobalPermission: true });
-        mountSearch(project);
-        api.resetFilters();
-        await nextTick();
-        expect(api.groupBy.value).toBe(2);
-        expect(api.filterUsers.value).toEqual(['user-1']);
-        expect(api.taskSearch.value).toBe('invoice');
-        expect(api.searchTask.value).toBe(true);
-        expect(lastMatch()).toContainEqual({ AssigneeUserId: { $in: ['user-1'] } });
-    });
-
-    test('changing group, "Me" or search is saved for this user and project only', async () => {
+    test('changing group, "Me" or search no longer writes to the browser', async () => {
         const project = ref({ _id: 'p1', isGlobalPermission: true });
         mountSearch(project);
         api.resetFilters();
@@ -112,23 +101,31 @@ describe('useProjectSearch remembers the view', () => {
         api.manageFilterUsers('user-1');
         api.taskSearch.value = 'roadmap';
         await nextTick();
-        expect(loadViewPrefs(IDS)).toEqual({ groupBy: 1, me: true, search: 'roadmap', doneBy: 'all' });
-        expect(loadViewPrefs({ ...IDS, projectId: 'p2' })).toEqual({ groupBy: 0, me: false, search: '', doneBy: 'all' });
+        expect(window.localStorage.getItem(viewPrefsKey(IDS))).toBe(null);
     });
 
-    test('another project starts from its own saved state, not the last one\'s', async () => {
-        saveViewPrefs(IDS, { groupBy: 2, me: true, search: 'invoice' });
+    test('reset starts from the defaults, whatever the browser still holds', async () => {
+        window.localStorage.setItem(viewPrefsKey(IDS), JSON.stringify({ groupBy: 2, me: true, search: 'invoice' }));
         const project = ref({ _id: 'p1', isGlobalPermission: true });
         mountSearch(project);
-        api.resetFilters();
-        project.value = { _id: 'p2', isGlobalPermission: true };
+        api.groupBy.value = 3;
         api.resetFilters();
         await nextTick();
         expect(api.groupBy.value).toBe(0);
         expect(api.filterUsers.value).toEqual([]);
         expect(api.taskSearch.value).toBe('');
         expect(api.searchTask.value).toBe(false);
-        expect(loadViewPrefs(IDS)).toEqual({ groupBy: 2, me: true, search: 'invoice', doneBy: 'all' });
+    });
+
+    test('a view\'s state goes out and comes back whole', async () => {
+        const project = ref({ _id: 'p1', isGlobalPermission: true });
+        mountSearch(project);
+        const state = { groupBy: 2, me: true, assignees: ['user-2'], search: 'x', searchIn: { name: true, key: true, description: false }, doneBy: 'agent', subtasks: 'expanded', filters: [] };
+        api.applyViewState(state);
+        await nextTick();
+        expect(api.viewState()).toEqual(state);
+        expect(api.filterUsers.value).toEqual(['user-1', 'user-2']);
+        expect(lastMatch()).toContainEqual({ AssigneeUserId: { $in: ['user-1', 'user-2'] } });
     });
 
     test('search text, "Me" and a saved filter each narrow the query', async () => {

@@ -16,6 +16,7 @@
                         <CommandPalette v-if="!$route.meta.preventAdvanceSearch" :open="isAdvanceSearch" @close="isAdvanceSearch = false"/>
                         <QuickCreateTask />
                         <KeyboardShortcuts />
+                        <TaskTemplateDialogHost />
                         <div class="ah-app__view billing__history-wrapper style-scroll">
                             <AiOffPage v-if="aiGated"/>
                             <router-view v-else/>
@@ -72,6 +73,7 @@ import CommandPalette from '@/components/molecules/AdvanceSearch/CommandPalette.
 import QuickCreateTask from '@/components/organisms/QuickCreateTask/QuickCreateTask.vue'
 import KeyboardShortcuts from '@/components/organisms/KeyboardShortcuts/KeyboardShortcuts.vue'
 import SkipLink from '@/components/atom/SkipLink/SkipLink.vue'
+import TaskTemplateDialogHost from '@/components/molecules/TaskTemplates/TaskTemplateDialogHost.vue'
 import { PALETTE_OPEN_EVENT, isPaletteShortcut } from '@/components/molecules/AdvanceSearch/paletteKeys'
 import { useStore } from 'vuex';
 import axios from 'axios'

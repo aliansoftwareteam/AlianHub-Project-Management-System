@@ -121,6 +121,15 @@ export default [
                 component: () => import(/* webpackChunkName: Template */ '@/views/Settings/Template/Template.vue')
             },
             {
+                path: "task-templates",
+                name: "TaskTemplates",
+                meta: {
+                    title: "Task templates",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: TaskTemplates */ '@/views/Settings/TaskTemplates/TaskTemplates.vue')
+            },
+            {
                 path: "security-permissions",
                 name: "Security & Permissions",
                 meta: {

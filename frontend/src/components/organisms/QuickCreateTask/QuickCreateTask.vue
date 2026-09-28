@@ -41,6 +41,13 @@
                             <option v-for="l in lists" :key="l.id" :value="l.id">{{ l.folderName ? `${l.folderName} / ${l.name}` : l.name }}</option>
                         </select>
                     </label>
+                    <label v-if="templates.length" class="qct__field">
+                        <span class="qct__label">{{ $t('QuickCreate.template') }}</span>
+                        <select v-model="templateId" class="qct__select" data-field="template">
+                            <option value="">{{ $t('QuickCreate.no_template') }}</option>
+                            <option v-for="tpl in templates" :key="tpl._id" :value="tpl._id">{{ tpl.name }}</option>
+                        </select>
+                    </label>
                 </div>
 
                 <div v-if="project" class="qct__row" role="group" :aria-label="$t('QuickCreate.properties')">
@@ -118,6 +125,7 @@ import { usePersonalList } from "@/components/molecules/Home/usePersonalList";
 import { openTask } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 import { isMacPlatform } from "@/components/molecules/AdvanceSearch/paletteKeys";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import { applyContext, applyTemplate, defaultTemplateOf, dayFromOffset, listTemplates, localDay, renderTitle } from "@/components/molecules/TaskTemplates/taskTemplates";
 import {
     closeQuickCreate,
     creatableProjects,
@@ -168,6 +176,9 @@ const error = ref("");
 const preparing = ref(false);
 const created = ref(null);
 const personalSprint = ref(null);
+const templates = ref([]);
+const templateId = ref("");
+const prefilled = reactive({ name: "", due: "", priority: "" });
 const projectRules = reactive({});
 
 let prepared = Promise.resolve();
@@ -226,6 +237,7 @@ const members = computed(() => {
     return everyone.filter(Boolean).map((id) => ({ id, name: getUser(id)?.Employee_Name || "" })).filter((m) => m.name);
 });
 const selectedList = computed(() => lists.value.find((l) => l.id === sprintId.value) || null);
+const template = computed(() => templates.value.find((tpl) => tpl._id === templateId.value) || null);
 
 const routeProjectId = () => {
     const routeName = String(route?.name || "");
@@ -272,13 +284,45 @@ function resetFields(p) {
     if (!priorities.value.some((x) => x.value === priority.value)) priority.value = priorities.value[0]?.value || "MEDIUM";
 }
 
+function loadTemplates(pid) {
+    listTemplates(pid)
+        .then((found) => {
+            if (String(projectId.value) !== pid) return;
+            templates.value = found;
+            templateId.value = defaultTemplateOf(found)?._id || "";
+        })
+        .catch((e) => console.error("ERROR in quick create templates: ", e));
+}
+
+/* A value the template put in is taken back when the template changes; anything the user typed stays. */
+function prefill(tpl) {
+    if (!name.value.trim() || name.value === prefilled.name) {
+        name.value = tpl?.titlePattern ? renderTitle(tpl.titlePattern, { date: localDay() }) : "";
+        prefilled.name = name.value;
+    }
+    if (!due.value || due.value === prefilled.due) {
+        due.value = tpl ? dayFromOffset(tpl.dueOffsetDays) : "";
+        prefilled.due = due.value;
+    }
+    const wanted = tpl?.Task_Priority && priorities.value.some((x) => x.value === tpl.Task_Priority) ? tpl.Task_Priority : "";
+    if (wanted || (prefilled.priority && priority.value === prefilled.priority)) {
+        priority.value = wanted || "MEDIUM";
+        prefilled.priority = wanted;
+    }
+}
+
+watch(template, (tpl) => prefill(tpl));
+
 watch(project, (p, was) => {
     if (p && was && String(p._id) === String(was._id)) return;
     lists.value = [];
     sprintId.value = "";
+    templates.value = [];
+    templateId.value = "";
     if (!p) return;
     resetFields(p);
     const pid = String(p._id);
+    loadTemplates(pid);
     listsLoaded = loadLists(p).then((found) => {
         if (String(projectId.value) !== pid) return;
         lists.value = found;
@@ -295,6 +339,7 @@ watch(() => quickCreate.open, (on) => {
     name.value = readDraft();
     due.value = "";
     priority.value = "MEDIUM";
+    Object.assign(prefilled, { name: "", due: "", priority: "" });
     projectId.value = "";
     prepared = prepare();
     focusTitle();
@@ -321,7 +366,9 @@ function openCreated() {
 function taskPayload(p, list, status, title) {
     const assignees = assigneeId.value ? [assigneeId.value] : [];
     const dueDate = due.value ? moment(due.value, "YYYY-MM-DD").endOf("day").toDate() : "";
-    const type = (p.taskTypeCounts || [])[0] || {};
+    const types = p.taskTypeCounts || [];
+    const tpl = template.value;
+    const type = (tpl && types.find((x) => Number(x.key) === Number(tpl.TaskTypeKey))) || types[0] || {};
     const sprintArray = { id: list.id, name: list.name, value: list.value };
     if (list.folderId) Object.assign(sprintArray, { folderId: list.folderId, folderName: list.folderName });
     const data = {
@@ -340,13 +387,15 @@ function taskPayload(p, list, status, title) {
         isParentTask: true,
         Task_Leader: me.value,
         sprintArray,
-        Task_Priority: showPriority.value ? priority.value : "MEDIUM",
+        Task_Priority: showPriority.value ? priority.value : (tpl?.Task_Priority || "MEDIUM"),
         deletedStatusKey: 0,
         sprintId: list.id,
         statusType: status.type,
         statusKey: status.key
     };
     if (list.folderId) data.folderObjId = list.folderId;
+    const startDay = tpl ? dayFromOffset(tpl.startOffsetDays) : "";
+    if (startDay) data.startDate = moment(startDay, "YYYY-MM-DD").startOf("day").toDate();
     return data;
 }
 
@@ -395,11 +444,16 @@ async function submit(intent) {
             error.value = t("QuickCreate.create_failed");
             return;
         }
+        if (template.value) {
+            await applyTemplate(template.value._id, { taskId: String(result.id), overwrite: [], ...applyContext() })
+                .catch((e) => console.error("ERROR in quick create template: ", e));
+        }
         rememberLastProject(cid.value, me.value, p._id);
         bumpListCount(p, list);
         const task = { companyId: cid.value, projectId: String(p._id), sprintId: list.id, folderId: list.folderId, taskId: String(result.id) };
         name.value = "";
         saveDraft("");
+        prefill(template.value);
         if (intent === "open") {
             closeQuickCreate();
             openTask(task);
