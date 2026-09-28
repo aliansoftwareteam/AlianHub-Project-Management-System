@@ -2,7 +2,7 @@
     <div class="d-flex justify-content-between w-100 save-filter-wrapper">
         <div class="save-filter-section d-flex align-items-center cursor-pointer" v-if="from === ''">
             <span class="text">
-                <DropDown v-if="!isEdit" mode="dialog" :aria-label="$t('Filters.save_this_filters')" :bodyClass="{'save-thisfilters-dropdown' : true}" z-index="999">
+                <DropDown v-if="!isEdit" mode="dialog" head-dismisses :aria-label="$t('Filters.save_this_filters')" :bodyClass="{'save-thisfilters-dropdown' : true}" z-index="999">
                     <template #head>
                         <div class="d-flex align-items-center justify-content-between mobile__field-actions" v-if="clientWidth <=767">
                             <a href="#" class="mr-10px" @click.stop.prevent="$refs.saveFilterRef.click(), inputName='', isInvalid=false" :class="{'font-size-16' : clientWidth <=767 }" :style="{color : clientWidth <=767 ? '#646464' : '#2F3990'}">{{$t('Projects.cancel')}}</a>
@@ -40,7 +40,7 @@
                 <span v-if="isEdit" @click="$emit('update', $event)">{{$t('Filters.update_filter')}}</span>
             </span>
             <span class="drop-icon">
-                <DropDown mode="listbox" :bodyClass="{'update-searchfilter-dropdown' : true}" z-index="999">
+                <DropDown mode="listbox" head-dismisses :bodyClass="{'update-searchfilter-dropdown' : true}" z-index="999">
                     <template #head>
                         <div class="d-flex align-items-center justify-content-between mobile__field-actions" v-if="clientWidth <=767" >
                             <a href="#" class="mr-10px blue" @click.stop.prevent="$refs.saveFilterRef.click(), inputName='', isInvalid=false" :class="{'font-size-16' : clientWidth <=767 }" :style="{color : clientWidth <=767 ? '#646464' : '#2F3990'}">{{$t('Projects.cancel')}}</a>

@@ -223,6 +223,7 @@ module.exports.AGENT_MANIFEST = '/api/v2/agents/manifest';
 module.exports.AGENT_SPEND = '/api/v2/agents/spend';
 module.exports.AGENT_ACCOUNT = '/api/v2/agents/account';
 module.exports.AGENT_PAUSE_ALL = '/api/v2/agents/pause-all';
+module.exports.AGENT_DRAFT = '/api/v2/agents/draft';
 module.exports.AGENT_POLICY = '/api/v2/agents/policy';
 module.exports.WORKFLOW_RUNS = '/api/v2/workflows/runs';
 module.exports.WORKFLOW_APPROVALS = '/api/v2/workflows/approvals';
