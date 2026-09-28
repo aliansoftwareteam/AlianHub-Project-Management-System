@@ -64,6 +64,7 @@ exports.insertCustomFieldPromise = (updateObject, type, companyId) => {
             MongoDbCrudOpration(companyId, query, type)
                 .then((response) => {
                     removeCache(`customField:${companyId}`);
+                    removeCache(`aiFieldAutoRefill:${companyId}`);
                     resolve(response);
                 })
                 .catch((error) => {
@@ -123,6 +124,7 @@ exports.updateCustomField = async (req, res) => {
         };
         const response = await MongoDbCrudOpration(companyId, query, type);
         removeCache(`customField:${companyId}`);
+        removeCache(`aiFieldAutoRefill:${companyId}`);
         if (previous) {
             recordFieldRenamed({ companyId, previous, next: updateObject, actorId: req.uid })
                 .catch((error) => logger.error(`custom field renamed history: ${error && error.message}`));

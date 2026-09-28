@@ -204,6 +204,11 @@ const schema = {
             type: Object,
             required: false
         },
+        // Per AI custom field: when and by whom it was last filled by AI, and the hash of the task parts it read.
+        aiFieldFills: {
+            type: Object,
+            required: false
+        },
         lastMessage: {
             type: Date,
             required:false
@@ -441,6 +446,21 @@ const schema = {
         errorList: { type: Array, default: [], required: false },
         mapping: { type: Object, required: false },
         fileName: { type: String, required: false },
+    },
+    aiFieldJobs: {
+        userId: { type: String, required: true },
+        fieldId: { type: String, required: true },
+        taskIds: { type: Array, default: [], required: false },
+        proposalIds: { type: Array, default: [], required: false },
+        status: { type: String, required: true },
+        total: { type: Number, default: 0, required: false },
+        processed: { type: Number, default: 0, required: false },
+        filled: { type: Number, default: 0, required: false },
+        skipped: { type: Number, default: 0, required: false },
+        failed: { type: Number, default: 0, required: false },
+        stopReason: { type: String, default: '', required: false },
+        startedAt: { type: Date, required: false },
+        finishedAt: { type: Date, required: false },
     },
     // Epics: a grouping layer above tasks with progress roll-up
     epics: {
@@ -4276,6 +4296,10 @@ const schema = {
             type:String,
             required: false,
             default:''
+        },
+        fieldAi:{
+            type:Object,
+            required: false
         }
     },
     sprints: {

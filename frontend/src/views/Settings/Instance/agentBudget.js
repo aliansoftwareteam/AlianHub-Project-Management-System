@@ -3,7 +3,7 @@ export const ALERT_THRESHOLDS = [80, 100];
 /* Mirrors Modules/AICore/features.js; anything else is shown as untagged. */
 export const KNOWN_FEATURES = [
     "agent_run", "project_plan", "project_tasks", "clarifier", "meeting_notes", "task_summary", "description", "task_category",
-    "task_estimate", "workload_summary", "ask", "assist", "project_template", "portfolio_summary", "page_compose", "guide", "mcp_brief",
+    "task_estimate", "workload_summary", "ask", "assist", "project_template", "portfolio_summary", "page_compose", "guide", "mcp_brief", "ai_field",
 ];
 
 export const featureLabelKey = (feature) => (KNOWN_FEATURES.includes(feature) ? `Instance.feature_${feature}` : "Instance.feature_unknown");
