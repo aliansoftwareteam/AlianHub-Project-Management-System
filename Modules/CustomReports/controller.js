@@ -75,7 +75,7 @@ const viewerScope = async (companyId, viewer, isLogs) => {
     if (!uid) return null;
     if (await access.isPrivilegedUser(companyId, uid)) return null;
     const projects = await visibleProjectIds(companyId, uid);
-    if (isLogs) return { ProjectId: { $in: asObjectIds(projects) } };
+    if (isLogs) return { ProjectId: { $in: R.idForms(projects) } };
     return { ProjectID: { $in: asObjectIds(projects) }, ...(await hiddenSprintFilter(companyId, uid, projects)) };
 };
 

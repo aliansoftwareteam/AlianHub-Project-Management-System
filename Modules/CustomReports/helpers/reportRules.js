@@ -1,4 +1,5 @@
 const { Types } = require('mongoose');
+const { HEX_ID } = require('../../../utils/mongo-handler/objectIdKeys');
 // REP-02 — pure custom-report config validation + Mongo pipeline builder.
 // SAFETY: only allow-listed dimensions / metrics / filter-fields ever reach the
 // database. The user's config supplies KEYS (validated against these maps) and
@@ -96,11 +97,13 @@ const validateConfig = (cfg = {}) => {
     };
 };
 
-// Tasks hold ProjectID as an ObjectId while the report sends ids as strings; match either form.
+/* Tasks hold ids as ObjectIds and time logs hold their project id as text, the report sends ids as
+   text, and an aggregate casts neither side, so every id is matched in each stored form. */
+const idForms = (ids) => [].concat(ids === undefined || ids === null ? [] : ids)
+    .flatMap((id) => (HEX_ID.test(String(id)) ? [String(id), new Types.ObjectId(String(id))] : [id]));
+
 const ID_FILTERS = new Set(['project', 'sprint']);
-const eitherIdForm = (value) => (typeof value === 'string' && /^[0-9a-fA-F]{24}$/.test(value)
-    ? { $in: [value, new Types.ObjectId(value)] }
-    : value);
+const eitherIdForm = (value) => (typeof value === 'string' && HEX_ID.test(value) ? { $in: idForms(value) } : value);
 
 const monthsAgoSeconds = (months, nowMs) => {
     const d = new Date(nowMs);
@@ -126,7 +129,7 @@ const buildTaskPipeline = (cfg) => {
 const buildLogPipeline = (cfg, nowMs) => {
     const match = {};
     const filters = (cfg && cfg.filters) || {};
-    if (filters.project) match.ProjectId = filters.project;
+    if (filters.project) match.ProjectId = eitherIdForm(filters.project);
     if (filters.billable === 'yes') match.billable = { $ne: false };
     if (filters.billable === 'no') match.billable = false;
     const months = RANGES[filters.range];
@@ -154,5 +157,5 @@ const buildPipeline = (cfg, { nowMs = Date.now() } = {}) => (
 module.exports = {
     SOURCES, DIMENSIONS, METRICS, FILTERS, CHART_TYPES,
     LOG_DIMENSIONS, LOG_METRICS, LOG_FILTERS, RANGES, SOURCE_SPEC,
-    validateConfig, buildPipeline,
+    validateConfig, buildPipeline, idForms,
 };
