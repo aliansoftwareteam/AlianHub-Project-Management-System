@@ -55,7 +55,7 @@ describe('agent release proposals and agent project lists show only projects the
         const proposal = (key, project, task) => {
             marker[key] = `${tag} proposal ${key}`;
             return {
-                agentId: String(new ObjectId()), agentName: `${tag} agent`, taskId: task ? String(task._id) : undefined, projectId: String(project._id),
+                agentId: String(new ObjectId()), agentName: `${tag} agent`, taskId: task ? String(task._id) : undefined, projectId: new ObjectId(String(project._id)),
                 what: marker[key], why: `${marker[key]} because`, changes: [], status: 'pending', gate: 'owner_admin', createdAt: new Date(), updatedAt: new Date(),
             };
         };
