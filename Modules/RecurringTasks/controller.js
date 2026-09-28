@@ -77,6 +77,7 @@ exports.createDefinition = async (req, res) => {
         };
         def.nextRunAt = helper.computeNextRun(def, new Date());
         const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.RECURRING_TASKS, data: def }, 'save');
+        helper.announce(companyId, def, 'insert');
         res.send({ status: true, statusText: 'Recurring task created', data: saved });
     } catch (error) {
         logger.error(`[recurringTasks] create failed: ${error.message}`);
@@ -123,6 +124,7 @@ exports.updateDefinition = async (req, res) => {
             }
         }
         await helper.updateDef(companyId, id, patch);
+        helper.announce(companyId, { _id: id });
         res.send({ status: true, statusText: 'Updated' });
     } catch (error) {
         logger.error(`[recurringTasks] update failed: ${error.message}`);
@@ -135,6 +137,7 @@ exports.deleteDefinition = async (req, res) => {
         const companyId = req.headers['companyid'];
         const id = req.params.id;
         await helper.updateDef(companyId, id, { deletedStatusKey: 1, enabled: false });
+        helper.announce(companyId, { _id: id }, 'delete');
         res.send({ status: true, statusText: 'Deleted' });
     } catch (error) {
         logger.error(`[recurringTasks] delete failed: ${error.message}`);
@@ -155,6 +158,7 @@ exports.runNow = async (req, res) => {
         const out = await helper.instantiateOne(companyId, def);
         const patch = { lastRunAt: new Date(), runCount: (Number(def.runCount) || 0) + (out.created ? 1 : 0) };
         if (out.id) patch.lastInstanceTaskId = String(out.id);
+        if (rules.hasEnded({ maxRuns: def.maxRuns, runCount: patch.runCount })) patch.enabled = false;
         await helper.updateDef(companyId, id, patch);
         res.send({
             status: !!(out.created || out.skipped),
@@ -182,3 +186,4 @@ exports.runDueForCompany = async (req, res) => {
 
 // Cron entry (all companies) — consumed by cron.js.
 exports.runRecurringForAllCompanies = helper.runRecurringForAllCompanies;
+exports.buildTemplateFromBody = buildTemplateFromBody;

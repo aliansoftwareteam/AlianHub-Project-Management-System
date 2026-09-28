@@ -5,6 +5,7 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { taskMongo } = require('../Tasks/helpers/task_class_Mongo');
 const logger = require('../../Config/loggerConfig');
+const socketEmitter = require('../../event/socketEventEmitter');
 const rules = require('./recurrenceRules');
 
 const COMPANY_CONCURRENCY = 5;
@@ -86,6 +87,15 @@ async function updateDef(companyId, id, patch) {
     }, 'updateOne');
 }
 
+function announce(companyId, def, type = 'update') {
+    socketEmitter.emit('update', {
+        type,
+        module: 'recurringTasks',
+        companyId: String(companyId),
+        data: { _id: String(def._id), ProjectID: String(def.ProjectID || ''), sourceTaskId: def.sourceTaskId ? String(def.sourceTaskId) : '' },
+    });
+}
+
 // Process every due, enabled definition for one company.
 async function processDueForCompany(companyId, now) {
     const ref = now ? new Date(now) : new Date();
@@ -102,7 +112,7 @@ async function processDueForCompany(companyId, now) {
     let created = 0;
     for (const def of (defs || [])) {
         try {
-            if (def.until && new Date(def.until) < ref) {
+            if ((def.until && new Date(def.until) < ref) || rules.hasEnded(def)) {
                 await updateDef(companyId, def._id, { enabled: false });
                 continue;
             }
@@ -115,7 +125,7 @@ async function processDueForCompany(companyId, now) {
                 nextRunAt: next,
             };
             if (out.id) patch.lastInstanceTaskId = String(out.id);
-            if (def.until && next > new Date(def.until)) patch.enabled = false;
+            if (rules.hasEnded({ maxRuns: def.maxRuns, until: def.until, runCount: patch.runCount }, next)) patch.enabled = false;
             await updateDef(companyId, def._id, patch);
         } catch (e) {
             logger.error(`${LOG_PREFIX} instantiate failed (${companyId}/${def._id}): ${e.message}`);
@@ -150,5 +160,6 @@ module.exports = {
     instantiateOne,
     processDueForCompany,
     updateDef,
+    announce,
     runRecurringForAllCompanies,
 };

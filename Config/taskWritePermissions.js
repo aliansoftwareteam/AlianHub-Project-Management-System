@@ -150,6 +150,8 @@ const TASK_WRITE_ROUTES = Object.freeze({
     'PATCH /api/v1/recurring-tasks/:id': judgedBy('requireProjectAccess on the definition\'s project'),
     'DELETE /api/v1/recurring-tasks/:id': judgedBy('requireProjectAccess on the definition\'s project'),
     'POST /api/v1/recurring-tasks/:id/run-now': judgedBy('requireProjectAccess with task.task_create on the route'),
+    'PUT /api/v1/recurring-tasks/task/:taskId': judgedBy('requireProjectAccess with task.task_due_date and task.task_create on the task\'s project'),
+    'DELETE /api/v1/recurring-tasks/task/:taskId': judgedBy('requireProjectAccess with task.task_due_date on the task\'s project'),
     'POST /api/v1/recurring-tasks/run-due': judgedBy('runs the workspace\'s stored definitions; its key is a follow-up'),
     'POST /api/v1/ai/project/:projectId/tasks/execute': judgedBy('guardTaskTarget in Modules/AIProjectGenerator/controller.js'),
     'POST /api/v1/ai/project/:projectId/tasks/plan': notATaskWrite('generates a plan; execute writes it'),

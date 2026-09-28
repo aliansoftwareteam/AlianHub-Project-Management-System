@@ -13,9 +13,15 @@ const billingctrl = require('./controller/billing');
 const weekctrl = require('./controller/weekTimesheet');
 const gridctrl = require('./controller/workloadGrid');
 const hoursctrl = require('./controller/hoursBySource');
+const taskentriesctrl = require('./controller/taskEntries');
+const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { READ, requireProjectAccess, projectIdsFrom } = require('../../Config/projectAccess');
+
+const ofTask = projectIdsFrom({ records: [[SCHEMA_TYPE.TASKS, (req) => req.params.taskId]] });
 exports.init = (app) => {
     app.post('/api/v1/timesheet/user',userctrl.getUserTimeSheet);
     app.get('/api/v1/timesheet/week', weekctrl.getWeekTimesheet);
+    app.get('/api/v1/timesheet/task/:taskId', requireProjectAccess({ mode: READ, projectIds: ofTask }), taskentriesctrl.getTaskEntries);
     app.get('/api/v1/timesheet/hours-by-source', hoursctrl.getHoursBySource);
     app.put('/api/v1/timesheet/entries/billable', weekctrl.setEntriesBillable);
     app.post('/api/v1/timesheet/workload-grid', gridctrl.getWorkloadGrid);
