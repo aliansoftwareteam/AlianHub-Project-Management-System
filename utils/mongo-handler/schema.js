@@ -1767,6 +1767,25 @@ const schema = {
         turnCount: { type: Number, required: false, default: 0 },
         lastTurnAt: { type: Date, required: false },
     },
+    // One person's AI memory (Modules/AI/aiProfile): private to ownerId, admins included, and read only into
+    // prompts that person starts.
+    aiProfiles: {
+        ownerId: { type: String, required: true },
+        enabled: { type: Boolean, required: false, default: true },
+        nickname: { type: String, required: false, default: '' },
+        role: { type: String, required: false, default: '' },
+        preferences: { type: String, required: false, default: '' },
+        facts: {
+            type: [{
+                _id: false,
+                id: { type: String, required: true },
+                text: { type: String, required: true },
+                source: { type: String, required: false, default: 'manual' },
+                createdAt: { type: Date, required: false },
+            }],
+            required: false,
+        },
+    },
     // Client invoices raised against a project (handoff 19c). Distinct from the
     // global `invoices` collection, which is AlianHub's own subscription billing.
     // Every line keeps the ids it was drafted from so a client question about a

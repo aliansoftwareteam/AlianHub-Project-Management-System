@@ -148,6 +148,7 @@
 <script setup>
 import { computed, inject, nextTick, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { proposalTitle } from "@/views/Ai/plainLabels";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import ProvenanceBadge from "@/components/molecules/Provenance/ProvenanceBadge.vue";
 import { fmtEstimate } from "@/components/molecules/Home/homeFormat";
@@ -231,7 +232,7 @@ const timerText = computed(() => {
 });
 
 const agentLine = computed(() => {
-    if (props.proposal) return `${props.proposal.agentName}: ${props.proposal.what}`;
+    if (props.proposal) return `${props.proposal.agentName}: ${proposalTitle(t, props.proposal)}`;
     if (props.run) return `${props.run.agentName}: ${t("List.agent_working")}`;
     return "";
 });

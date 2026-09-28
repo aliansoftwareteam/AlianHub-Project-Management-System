@@ -208,6 +208,8 @@ export function useAgents() {
         return out.data;
     };
 
+    const draftAgent = async (description) => (await request("post", env.AGENT_DRAFT, { description }, "AgentCatalogue.draft_failed")).data;
+
     const deleteAgent = async (agentId) => {
         await request("delete", `${env.AGENTS}/${agentId}`, undefined, "Ai.delete_failed");
         await loadAgents();
@@ -233,7 +235,7 @@ export function useAgents() {
         waiting, AUTONOMY,
         loadAll, loadAgents, loadProposals, loadSummary, loadSpend, loadRegistry,
         loadSkills, loadCatalogues, loadSkill, createSkill, updateSkill, retireSkill, dryRunSkill,
-        decide, setPaused, pauseAll, runNow, saveAgent, deleteAgent, activeRuns, loadActiveRuns, stopActive,
+        decide, setPaused, pauseAll, runNow, saveAgent, draftAgent, deleteAgent, activeRuns, loadActiveRuns, stopActive,
         loadRun, revertRun, loadRunReplay, loadRevisions, promoteRevision, rollbackRevision
     };
 }

@@ -7,6 +7,7 @@ const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { visibleProjectIds } = require('../Modules/Agents/scope');
 const { evaluatePermission } = require('../Config/permissionGuard');
 const { getActivityLog } = require('../Modules/History/controller');
+const { idForms } = require('../utils/mongo-handler/objectIdKeys');
 
 const C = '6f0000000000000000000c01';
 const VISIBLE = '6f0000000000000000000a01';
@@ -69,7 +70,7 @@ describe('TSK-06 the activity log follows project visibility', () => {
         const res = await readLog({ fromProject: 'true', projectId: VISIBLE });
         expect(res.statusCode).toBe(200);
         expect(res.body).toEqual([{ Message: 'renamed' }]);
-        expect(matchOf()).toEqual([{ Type: 'project' }, { ProjectId: VISIBLE }]);
+        expect(matchOf()).toEqual([{ Type: 'project' }, { ProjectId: { $in: idForms(VISIBLE) } }]);
     });
 
     it('returns a task log and treats an operator in the query as a plain value', async () => {
