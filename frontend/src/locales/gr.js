@@ -5372,6 +5372,7 @@ export default {
         "minimum_limit_type_not_allowed_value": "Η εισαγόμενη τιμή για τον τύπο ελάχιστου ορίου δεν είναι επιτρεπτή.",
         "minimum_value_should_not_be_greater_than_maximum_value": "Η ελάχιστη τιμή δεν πρέπει να είναι μεγαλύτερη από τη μέγιστη τιμή",
         "no_country_found": "Δεν βρέθηκε χώρα",
+        "country_code": "Country code",
         "enter_maximum_limit_type": "Εισάγετε τον Τύπο Μέγιστου Ορίου",
         "enter_minimum_limit_type": "Εισάγετε τον Τύπο Ελάχιστου Ορίου",
         "limit_minimum_or_maximum_text_allowed": "Περιορίστε την ελάχιστη ή μέγιστη ποσότητα κειμένου που επιτρέπεται σε αυτό το πεδίο",

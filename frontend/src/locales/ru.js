@@ -5372,6 +5372,7 @@ export default {
         "minimum_limit_type_not_allowed_value": "Введенное значение для минимального лимита является недопустимым.",
         "minimum_value_should_not_be_greater_than_maximum_value": "Минимальное значение не должно быть больше максимального",
         "no_country_found": "Страна не найдена",
+        "country_code": "Country code",
         "enter_maximum_limit_type": "Введите тип максимального лимита",
         "enter_minimum_limit_type": "Введите тип минимального лимита",
         "limit_minimum_or_maximum_text_allowed": "Ограничьте минимальное или максимальное количество текста, которое может быть введено в этом поле",

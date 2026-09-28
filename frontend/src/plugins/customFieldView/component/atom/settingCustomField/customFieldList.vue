@@ -59,9 +59,9 @@
                                     </div>
                                 </td>
                                 <td :class="[{'pointer-event-none':!item.isDelete}]">
-                                    <DropDown @isVisible="handleOutsideClick" :bodyClass="{'custom__field__dropdown':true}">
-                                        <template #button>
-                                            <div class="project_bg d-flex GunPowder font-size-13" @click="handelSubmit(index)">
+                                    <DropDown mode="listbox" @isVisible="handelSubmit(index), handleOutsideClick($event)" :bodyClass="{'custom__field__dropdown':true}">
+                                        <template #button="{ triggerAttrs }">
+                                            <button type="button" class="dropdown-trigger project_bg d-flex GunPowder font-size-13" v-bind="triggerAttrs" :disabled="!item.isDelete">
                                                 <span v-if="item?.global" class="project_ellipsis">{{ $t('CustomField.all_projects') }}</span>
                                                 <span v-else-if="item?.projectId && item?.projectId?.length" class="project_ellipsis">
                                                     <template
@@ -72,8 +72,8 @@
                                                     </template>
                                                 </span>
                                                 <span class="project_ellipsis" v-else>N/A</span>
-                                                <img :src="selectArrowMobile" alt="addIconmilestoneSvg" class="cursor-pointer ml_1" />
-                                            </div>
+                                                <img :src="selectArrowMobile" alt="" class="cursor-pointer ml_1" />
+                                            </button>
                                         </template>
                                         <template #options v-if="item.isDelete">
                                             <div class="d-flex align-items-center pb-7px">
@@ -90,9 +90,11 @@
                                                 <DropDownOption
                                                     v-for="(project, indexs) in projectListSearch"
                                                     :key="'project'+indexs"
+                                                    :selected="finalCustomFieldDataTest[index].global || !!finalCustomFieldDataTest[index].projectId?.includes(project._id)"
                                                     style="padding: 0px !important;"
+                                                    @click="selectSingleCheckbox(index,project._id)"
                                                 >
-                                                    <CheckboxComponent class="p-7px" :customClass="`custom_field_checkbox`" labelClass="text-ellipsis pl-1 cursor-pointer project__name_ellipsis" :id="'project'+indexs" @click.capture="selectSingleCheckbox(index,project._id)" :modelValue="!finalCustomFieldDataTest[index].global ? finalCustomFieldDataTest[index].projectId?.includes(project._id) : true" :customClasses="!finalCustomFieldDataTest[index].global ? finalCustomFieldDataTest[index].projectId?.includes(project._id) ? 'is_checked' : 'remove_checked' : 'is_checked'"  :text="project?.ProjectName" />
+                                                    <CheckboxComponent class="p-7px" :customClass="`custom_field_checkbox`" labelClass="text-ellipsis pl-1 cursor-pointer project__name_ellipsis" :id="'project'+indexs" :modelValue="!finalCustomFieldDataTest[index].global ? finalCustomFieldDataTest[index].projectId?.includes(project._id) : true" :customClasses="!finalCustomFieldDataTest[index].global ? finalCustomFieldDataTest[index].projectId?.includes(project._id) ? 'is_checked' : 'remove_checked' : 'is_checked'"  :text="project?.ProjectName" />
                                                 </DropDownOption>
                                             </div>
                                             <div v-else>
@@ -109,18 +111,18 @@
                                     </span>
                                 </td>
                                 <td :class="[{'pointer-event-none':!item.isDelete}]">
-                                    <DropDown>
-                                        <template #button>
-                                            <div class="project_bg project_type d-flex GunPowder font-size-13" :ref="customFieldType">
+                                    <DropDown mode="listbox">
+                                        <template #button="{ triggerAttrs }">
+                                            <button type="button" class="dropdown-trigger project_bg project_type d-flex GunPowder font-size-13" :ref="customFieldType" v-bind="triggerAttrs" :disabled="!item.isDelete">
                                                 <span class="field__title field__title__type text-capitalize">{{ item?.type || 'Na' }}</span>
-                                                <img :src="selectArrowMobile" alt="addIconmilestoneSvg" class="cursor-pointer ml_1">
-                                            </div>
+                                                <img :src="selectArrowMobile" alt="" class="cursor-pointer ml_1">
+                                            </button>
                                         </template>
                                         <template #options v-if="item.isDelete">
-                                            <DropDownOption @click="emit('updateCustomFieldType',item,'project'),$refs[customFieldType][index].click()">
+                                            <DropDownOption :selected="item?.type === 'project'" @click="emit('updateCustomFieldType',item,'project'),$refs[customFieldType][index].click()">
                                                 {{$t('Projects.Project')}}
                                             </DropDownOption>
-                                            <DropDownOption @click="emit('updateCustomFieldType',item,'task'),$refs[customFieldType][index].click()">
+                                            <DropDownOption :selected="item?.type === 'task'" @click="emit('updateCustomFieldType',item,'task'),$refs[customFieldType][index].click()">
                                                 {{$t('subProjectRulesNames.Task')}}
                                             </DropDownOption>
                                         </template>

@@ -31,18 +31,18 @@
                 :className="'custom__field-required'"
                 :name="'fieldDescription'"
             />
-            <DropDown :zIndex="10" v-if="isType">
+            <DropDown mode="listbox" :zIndex="10" v-if="isType">
                 <template #button>
                     <div class="formkit__form-wrapper" :ref="customFieldTypeUniqueId">
                         <div class="custom__field-required">
                             <div class="formkit-wrapper">
-                                <label class="formkit-label" for="text">{{$t('Billing.type')}}</label>
+                                <span class="formkit-label">{{$t('Billing.type')}}</span>
                                 <div class="d-flex border-gray border-radius-5-px align-items-center justify-content-between">
                                     <div class="d-flex align-items-center">
                                         <span class="formkit-input text-capitalize">{{type?.toLowerCase()}}</span>
                                     </div>
                                     <div class="mr-8px">
-                                        <img class="rotate-z-90" :src="dropDownArrow" alt="triangleBlack">
+                                        <img class="rotate-z-90" :src="dropDownArrow" alt="">
                                     </div>
                                 </div>
                             </div>
@@ -50,10 +50,10 @@
                     </div>
                 </template>
                 <template #options>
-                    <DropDownOption @click="$refs[customFieldTypeUniqueId].click(),handleType('project')">
+                    <DropDownOption :selected="type === 'project'" @click="$refs[customFieldTypeUniqueId].click(),handleType('project')">
                         {{$t('Projects.Project')}}
                     </DropDownOption>
-                    <DropDownOption @click="$refs[customFieldTypeUniqueId].click(),handleType('task')">
+                    <DropDownOption :selected="type === 'task'" @click="$refs[customFieldTypeUniqueId].click(),handleType('task')">
                         {{$t('subProjectRulesNames.Task')}}
                     </DropDownOption>
                 </template>
@@ -77,9 +77,10 @@
             <div class="formkit__form-wrapper">
                 <label class="formkit-label">{{$t('Company.select_default_country')}}</label>
             </div>
-            <DropDown @isVisible="search='',allCountriesArray = allCountries" :zIndex="10" :id="customFieldUniqueId" :keepSameWidth="true">
+            <DropDown mode="listbox" @isVisible="search='',allCountriesArray = allCountries" :zIndex="10" :id="customFieldUniqueId" :keepSameWidth="true">
                 <template #button>
                     <div class="formkit__form-wrapper" :ref="customFieldUniqueId">
+                        <span class="ah-sr-only">{{$t('Company.select_default_country')}}</span>
                         <div class="d-flex border-gray border-radius-5-px align-items-center p-4px justify-content-between">
                             <div class="d-flex align-items-center">
                                 <div :class="`vti__flag ${flag?.toLowerCase()}`" ></div>
@@ -94,7 +95,7 @@
                 <template #options>
                     <input type="text" class="customfield__form-control" :placeHolder="$t('PlaceHolder.search')" v-model="search" @input="handleInput">
                     <div v-if="allCountriesArray && allCountriesArray.length">
-                        <DropDownOption v-for="(Country,index) in allCountriesArray" :key="index" @click="$refs[customFieldUniqueId].click(),handleUpdate(Country)">
+                        <DropDownOption v-for="(Country,index) in allCountriesArray" :key="index" :selected="Country.code === flag" @click="$refs[customFieldUniqueId].click(),handleUpdate(Country)">
                             <div class="d-flex align-items-center">
                                 <div :class="`vti__flag ${Country.code.toLowerCase()}`" ></div>
                                 <span class="ownEveryone">{{Country.en}}</span>

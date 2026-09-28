@@ -5372,6 +5372,7 @@ export default {
         "minimum_limit_type_not_allowed_value": "ન્યૂનતમ મર્યાદા પ્રકાર માટે દાખલ કરેલ મૂલ્ય માન્ય મૂલ્ય નથી.",
         "minimum_value_should_not_be_greater_than_maximum_value": "ન્યૂનતમ મૂલ્ય મહત્તમ મૂલ્ય કરતાં વધુ ન હોવું જોઈએ",
         "no_country_found": "કોઈ દેશ મળ્યો નથી",
+        "country_code": "Country code",
         "enter_maximum_limit_type": "મહત્તમ મર્યાદા પ્રકાર દાખલ કરો",
         "enter_minimum_limit_type": "ન્યૂનતમ મર્યાદા પ્રકાર દાખલ કરો",
         "limit_minimum_or_maximum_text_allowed": "આ ફીલ્ડમાં લઘુત્તમ અથવા મહત્તમ ટેક્સ્ટની મંજૂરી આપો",

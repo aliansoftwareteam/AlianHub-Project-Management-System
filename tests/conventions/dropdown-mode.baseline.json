@@ -1,20 +1,6 @@
 {
     "frontend/src/components/molecules/TaskFilter/FieldsActions.vue": 1,
     "frontend/src/components/molecules/TaskFilter/TaskFilter.vue": 1,
-    "frontend/src/plugins/customFieldView/component/atom/customFieldSidebar/customFieldSidebarComponent/checkboxCustomFields.vue": 1,
-    "frontend/src/plugins/customFieldView/component/atom/customFieldSidebar/customFieldSidebarComponent/dateComponent.vue": 1,
-    "frontend/src/plugins/customFieldView/component/atom/customFieldSidebar/customFieldSidebarComponent/dropdownCustomField/dropdownCustomField.vue": 1,
-    "frontend/src/plugins/customFieldView/component/atom/customFieldSidebar/customFieldSidebarComponent/emailComponent.vue": 1,
-    "frontend/src/plugins/customFieldView/component/atom/customFieldSidebar/customFieldSidebarComponent/formulaComponent.vue": 1,
-    "frontend/src/plugins/customFieldView/component/atom/customFieldSidebar/customFieldSidebarComponent/moneyComponent.vue": 2,
-    "frontend/src/plugins/customFieldView/component/atom/customFieldSidebar/customFieldSidebarComponent/numberComponent.vue": 1,
-    "frontend/src/plugins/customFieldView/component/atom/customFieldSidebar/customFieldSidebarComponent/phoneComponent.vue": 2,
-    "frontend/src/plugins/customFieldView/component/atom/customFieldSidebar/customFieldSidebarComponent/rollupComponent.vue": 3,
-    "frontend/src/plugins/customFieldView/component/atom/customFieldSidebar/customFieldSidebarComponent/textComponents.vue": 1,
-    "frontend/src/plugins/customFieldView/component/atom/customFieldSidebar/customFieldSidebarComponent/textareaComponent.vue": 1,
-    "frontend/src/plugins/customFieldView/component/atom/customFieldTaskView/phoneComponentListing.vue": 2,
-    "frontend/src/plugins/customFieldView/component/atom/customFieldViewColumn/phoneComponentViewColumn.vue": 2,
-    "frontend/src/plugins/customFieldView/component/atom/settingCustomField/customFieldList.vue": 2,
     "frontend/src/views/Projects/Projects.vue": 1,
     "frontend/src/views/Projects/components/ProjectBottomModals.vue": 1
 }

@@ -2354,6 +2354,7 @@
     "CustomField.allow_time_with_date": "Allow users to specify a time with date.",
     "CustomField.choose_ready_made_list": "Choose a ready-made list of option (e.g., days, months, etc.)",
     "CustomField.countryCode": "Turn it on to modify the country code.",
+    "CustomField.country_code": "Country code",
     "CustomField.create_custom_field": "Create Custom Field",
     "CustomField.custom_field": "Custom Field",
     "CustomField.date_created": "Date Created",
