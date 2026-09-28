@@ -30,6 +30,7 @@ vi.mock('@/views/Projects/TableView/useTaskCategories.js', () => ({
 
 import ListRow from '@/views/Projects/ListView/ListRow.vue';
 import TableRow from '@/views/Projects/TableView/TableRow.vue';
+import { defaultColumns, gridTracks, listColumnClass } from '@/views/Projects/composables/viewColumns';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.resolve(HERE, '../../src');
@@ -180,20 +181,23 @@ describe('the tags have a column of their own', () => {
     it('List: the row has a tags cell under a Tags header', async () => {
         const wrapper = await mountRow(ListRow, { tagsArray: ['tag-ux'] });
         expect(wrapper.find('[role="cell"].lv2__c-tags .tagname').exists()).toBe(true);
+        const tags = defaultColumns('list').find((column) => column.id === 'tags');
+        expect(tags.labelKey).toBe('List.col_tags');
+        expect(listColumnClass(tags)).toBe('lv2__c-tags');
         const view = fs.readFileSync(path.join(SRC, 'views/Projects/ListView/ListView.vue'), 'utf8');
-        expect(view).toMatch(/class="lv2__c-tags" role="columnheader">.*List\.col_tags/);
+        expect(view).toMatch(/:class="listColumnClass\(column\)"\s+role="columnheader"/);
     });
 
     it('Table: the row has a tags cell under a Tags header, one grid track per header', async () => {
         const wrapper = await mountRow(TableRow, { tagsArray: ['tag-ux'] });
         expect(wrapper.find('[role="cell"].tv2__tags .tagname').exists()).toBe(true);
-        const view = fs.readFileSync(path.join(SRC, 'views/Projects/TableView/TableView.vue'), 'utf8');
-        const head = view.match(/<div class="tv2__head" role="row">([\s\S]*?)\n {16}<\/div>/)[1];
-        expect(head).toContain("$t('List.col_tags')");
-        const headers = (head.match(/role="columnheader"/g) || []).length;
+        const columns = defaultColumns('table');
+        expect(columns.find((column) => column.id === 'tags').labelKey).toBe('List.col_tags');
+        const headers = columns.length + 2;
+        const count = (tracks) => tracks.trim().replace(/minmax\([^)]*\)/g, 'x').split(/\s+/).length;
+        expect(count(gridTracks('table', columns))).toBe(headers);
         const css = fs.readFileSync(path.join(SRC, 'views/Projects/TableView/style.css'), 'utf8');
-        const tracks = css.match(/--tv2-cols:([^;]+);/)[1].trim().replace(/minmax\([^)]*\)/g, 'x').split(/\s+/).length;
-        expect(tracks).toBe(headers);
+        expect(count(css.match(/--tv2-cols:([^;]+);/)[1])).toBe(headers);
         expect(wrapper.findAll('[role="row"] > [role="cell"]')).toHaveLength(headers);
     });
 });

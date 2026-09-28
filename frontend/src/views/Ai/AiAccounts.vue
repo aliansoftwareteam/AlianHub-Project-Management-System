@@ -505,6 +505,7 @@ import { oauthAvailable } from "@/views/OAuth/oauthShared";
 import { useAccounts, MODES, PROVIDERS } from "./useAccounts";
 import { EXPIRY_OVER_MAX, TOKEN_SCOPES, expiryChoicesFor, tokenFormProblem } from "./tokenPolicy";
 import { reasonOf } from "./useAgents";
+import { skillLabel } from "./plainLabels";
 import { mcpUrlFor } from "./mcpUrl";
 import { isOwnerOrAdmin } from "@/utils/roles";
 
@@ -651,7 +652,7 @@ const attributionRows = computed(() => (runs.value || []).slice(0, 8).map((run) 
     },
     sub: [
         t(`Accounts.mode_${run.viaAccount || "workspace"}`),
-        run.skill || "",
+        run.skill ? skillLabel(t, run.skill) : "",
         run.elapsedMs ? t("Accounts.elapsed", { n: Math.max(1, Math.round(Number(run.elapsedMs) / 60000)) }) : "",
         run.spend && run.spend.billedToWorkspace ? `$${Number(run.spend.usd || 0).toFixed(2)}` : "$0"
     ].filter(Boolean).join(" · ")

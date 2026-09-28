@@ -6,11 +6,50 @@ const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { visibleProjectIds } = require('../Agents/scope');
 const { canSeeSprintById, hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
-const { validateExportInput, buildFileName, taskToRow, rowsToCsv } = require('./helpers/exportRules');
+const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
+const { pinSessionTenant } = require('../../Config/tenant');
+const { FORMATS, WORKSPACE, validateExportInput, buildFileName, taskToRow, workspaceTaskRow, rowsToCsv } = require('./helpers/exportRules');
 
 // Files stay on the server and only stream back through the download endpoint,
 // so a job's path is never handed to the client.
 const EXPORT_DIR = path.join(process.cwd(), 'wasabiUploadsLocal', 'exports');
+
+const TASK_FIELDS = 'TaskKey TaskName status statusType Task_Priority AssigneeUserId DueDate totalEstimatedTime createdAt updatedAt';
+
+async function projectRows(companyId, job) {
+    const filter = {
+        ProjectID: new mongoose.Types.ObjectId(job.filters.projectId),
+        deletedStatusKey: { $ne: 1 },
+    };
+    if (job.filters.sprintId) {
+        filter.sprintId = new mongoose.Types.ObjectId(job.filters.sprintId);
+    } else {
+        /* The job runs detached from the request, so the private sprints are excluded
+         * again here against the person the export belongs to. */
+        Object.assign(filter, await hiddenSprintFilter(companyId, job.userId, [String(job.filters.projectId)]));
+    }
+    const tasks = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS,
+        data: [filter, TASK_FIELDS],
+    }, 'find');
+    return (tasks || []).map(taskToRow);
+}
+
+/* The job runs detached from the request: a person who lost the owner or admin role since starting it gets nothing. */
+async function workspaceRows(companyId, userId) {
+    if (!isPrivileged(await getRoleType(companyId, userId))) throw new Error('Only an owner or admin can export the workspace.');
+    const projects = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PROJECTS,
+        data: [{ deletedStatusKey: { $nin: [1] } }, 'ProjectName ProjectCode'],
+    }, 'find');
+    const byId = new Map((projects || []).map((project) => [String(project._id), project]));
+    if (!byId.size) return [];
+    const tasks = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS,
+        data: [{ ProjectID: { $in: [...byId.keys()].map((id) => new mongoose.Types.ObjectId(id)) }, deletedStatusKey: { $ne: 1 } }, `ProjectID ${TASK_FIELDS}`],
+    }, 'find');
+    return (tasks || []).map((task) => workspaceTaskRow(task, byId.get(String(task.ProjectID))));
+}
 
 async function processJob(companyId, jobId) {
     const jobObjId = new mongoose.Types.ObjectId(jobId);
@@ -27,23 +66,7 @@ async function processJob(companyId, jobId) {
         if (!job) return;
         await setStatus({ status: 'processing' });
 
-        const filter = {
-            ProjectID: new mongoose.Types.ObjectId(job.filters.projectId),
-            deletedStatusKey: { $ne: 1 },
-        };
-        if (job.filters.sprintId) {
-            filter.sprintId = new mongoose.Types.ObjectId(job.filters.sprintId);
-        } else {
-            /* The job runs detached from the request, so the private sprints are excluded
-             * again here against the person the export belongs to. */
-            Object.assign(filter, await hiddenSprintFilter(companyId, job.userId, [String(job.filters.projectId)]));
-        }
-        const tasks = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.TASKS,
-            data: [filter, 'TaskKey TaskName status statusType Task_Priority AssigneeUserId DueDate totalEstimatedTime createdAt updatedAt'],
-        }, 'find');
-
-        const rows = (tasks || []).map(taskToRow);
+        const rows = job.type === WORKSPACE ? await workspaceRows(companyId, job.userId) : await projectRows(companyId, job);
         await fs.promises.mkdir(EXPORT_DIR, { recursive: true });
         const filePath = path.join(EXPORT_DIR, `${jobId}.${job.format}`);
 
@@ -69,6 +92,7 @@ async function processJob(companyId, jobId) {
 
 const sessionUid = (req) => (req.uid ? String(req.uid) : '');
 const asksForAnotherUser = (req) => Boolean(req.query && req.query.uid) && String(req.query.uid) !== sessionUid(req);
+const stampNow = () => new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
 
 exports.createExport = async (req, res) => {
     try {
@@ -87,7 +111,6 @@ exports.createExport = async (req, res) => {
             return res.status(404).send({ status: false, statusText: 'Sprint not found.' });
         }
 
-        const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
         const job = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.EXPORT_JOBS,
             data: {
@@ -96,7 +119,7 @@ exports.createExport = async (req, res) => {
                 format,
                 filters: { projectId, sprintId: sprintId || null },
                 status: 'queued',
-                fileName: buildFileName({ projectName, format, stamp }),
+                fileName: buildFileName({ projectName, format, stamp: stampNow() }),
                 total: 0,
                 processed: 0,
             },
@@ -106,6 +129,41 @@ exports.createExport = async (req, res) => {
         return res.send({ status: true, statusText: 'Export started.', data: job });
     } catch (error) {
         logger.error(`ERROR in create export: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* POST /api/v2/exports/workspace — every project's tasks, for an owner or admin. */
+exports.createWorkspaceExport = async (req, res) => {
+    try {
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
+        const userId = sessionUid(req);
+        if (!userId) return res.status(401).send({ status: false, statusText: 'A signed-in user is required.' });
+        const format = (req.body && req.body.format) || 'xlsx';
+        if (!FORMATS.includes(format)) return res.status(400).send({ status: false, statusText: `format must be one of: ${FORMATS.join(', ')}.` });
+        if (!isPrivileged(await getRoleType(companyId, userId))) {
+            return res.status(403).send({ status: false, statusText: 'Only an owner or admin can export the workspace.' });
+        }
+
+        const job = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.EXPORT_JOBS,
+            data: {
+                userId,
+                type: WORKSPACE,
+                format,
+                filters: {},
+                status: 'queued',
+                fileName: buildFileName({ projectName: 'workspace', format, stamp: stampNow() }),
+                total: 0,
+                processed: 0,
+            },
+        }, 'save');
+
+        setImmediate(() => { processJob(companyId, String(job._id)); });
+        return res.send({ status: true, statusText: 'Export started.', data: { _id: job._id, type: job.type, format: job.format, status: job.status, fileName: job.fileName, createdAt: job.createdAt } });
+    } catch (error) {
+        logger.error(`ERROR in create workspace export: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
 };
@@ -122,7 +180,7 @@ exports.listExports = async (req, res) => {
         }
         const jobs = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.EXPORT_JOBS,
-            data: [{ userId }, 'format status fileName total processed error createdAt', { sort: { createdAt: -1 }, limit: 20 }],
+            data: [{ userId }, 'type format status fileName total processed error createdAt', { sort: { createdAt: -1 }, limit: 20 }],
         }, 'find');
         return res.send({ status: true, statusText: 'Exports fetched.', data: jobs || [] });
     } catch (error) {
@@ -144,6 +202,9 @@ exports.downloadExport = async (req, res) => {
             data: [{ _id: new mongoose.Types.ObjectId(id), userId }],
         }, 'findOne');
         if (!job || job.status !== 'done' || !job.filePath) {
+            return res.status(404).send({ status: false, statusText: 'Export not ready.' });
+        }
+        if (job.type === WORKSPACE && !isPrivileged(await getRoleType(companyId, userId))) {
             return res.status(404).send({ status: false, statusText: 'Export not ready.' });
         }
         return res.download(job.filePath, job.fileName);

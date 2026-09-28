@@ -21,14 +21,77 @@
                     </div>
 
                     <template v-if="tab === 'ask'">
-                        <div class="land__composer" :class="{ 'land__composer--off': !modelReady }">
+                        <p class="ah-sr-only" aria-live="polite" data-test="ask-live">{{ announcement }}</p>
+
+                        <div class="ask-bar">
+                            <button
+                                type="button"
+                                class="ah-btn ah-btn--ghost ah-btn--sm"
+                                aria-controls="ask-history"
+                                :aria-expanded="historyOpen ? 'true' : 'false'"
+                                data-test="ask-history-toggle"
+                                @click="historyOpen = !historyOpen"
+                            >
+                                <ShellIcon name="clock" :size="13" />{{ $t('Ask.history_title') }}
+                                <span class="parity-count">{{ threads.length }}</span>
+                            </button>
+                            <span class="ah-toolbar__spacer"></span>
+                            <button v-if="turns.length" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="ask-new" @click="startOver">
+                                <ShellIcon name="plus" :size="13" />{{ $t('Ask.new_question') }}
+                            </button>
+                        </div>
+
+                        <section v-if="historyOpen" id="ask-history" class="ah-card ask-history" :aria-label="$t('Ask.history_title')">
+                            <div class="ah-card__body">
+                                <p v-if="threadsLoading && !threads.length" class="ah-small">{{ $t('Parity.loading') }}</p>
+                                <p v-else-if="!threads.length" class="ah-small">{{ $t('Ask.history_empty') }}</p>
+                                <ul v-else class="ask-history__list">
+                                    <li v-for="item in threads" :key="item.id" class="ask-history__row" :class="{ 'is-active': item.id === threadId }">
+                                        <button
+                                            type="button"
+                                            class="ask-history__open"
+                                            :aria-current="item.id === threadId ? 'true' : undefined"
+                                            data-test="ask-history-open"
+                                            @click="openFromHistory(item.id)"
+                                        >
+                                            <span class="ask-history__title">{{ item.title || $t('Ask.history_untitled') }}</span>
+                                            <span class="ah-small">{{ $t('Ask.thread_turns', { n: item.turns }, Number(item.turns) || 0) }}</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="ah-btn ah-btn--ghost ah-btn--sm"
+                                            :aria-label="$t('Ask.thread_delete', { title: item.title || $t('Ask.history_untitled') })"
+                                            data-test="ask-history-delete"
+                                            @click="deleteFromHistory(item)"
+                                        >
+                                            <ShellIcon name="trash" :size="13" />
+                                        </button>
+                                    </li>
+                                </ul>
+                                <p class="ah-small ask-history__note">{{ $t('Ask.history_note', { threads: THREAD_LIMIT, turns: TURN_LIMIT }) }}</p>
+                            </div>
+                        </section>
+                        <p v-if="threadError" class="ah-field__error">{{ threadError }}</p>
+
+                        <ol v-if="turns.length" class="ask-thread" :aria-label="$t('Ask.conversation_label')">
+                            <li v-for="turn in turns" :key="turn.key" class="ask-thread__turn" data-test="ask-turn">
+                                <p class="ask-thread__q"><span class="ah-sr-only">{{ $t('Ask.you_asked') }}</span>{{ turn.question }}</p>
+                                <AskAnswer v-if="showsAnswer(turn)" :answer="turn" :streaming="turn.status === 'streaming'" />
+                                <p v-if="turn.status === 'stopped'" class="ah-small" data-test="ask-stopped">{{ $t('Ask.stopped') }}</p>
+                                <p v-else-if="turn.status === 'error'" class="ah-field__error" data-test="ask-turn-error">{{ turn.error }}</p>
+                                <p v-else-if="turn.status === 'empty' || turn.status === 'unconfigured'" class="ah-empty">{{ turn.error }}</p>
+                            </li>
+                        </ol>
+
+                        <div class="land__composer" :class="{ 'land__composer--off': !providerReady }">
                             <label class="ah-sr-only" for="land-q">{{ $t('AiLanding.question_label') }}</label>
                             <textarea
                                 id="land-q"
+                                ref="questionBox"
                                 v-model="question"
                                 class="land__input"
-                                :placeholder="$t('AiLanding.placeholder')"
-                                @keydown.enter.exact.prevent="submit"
+                                :placeholder="turns.length ? $t('Ask.follow_up_placeholder') : $t('AiLanding.placeholder')"
+                                @keydown.enter.exact="onEnter"
                             ></textarea>
 
                             <div class="land__controls" @click.stop>
@@ -87,8 +150,11 @@
 
                                 <span class="land__spacer"></span>
 
-                                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="!question.trim() || busy || !modelReady" @click="submit">
-                                    {{ busy ? $t('AiLanding.sending') : (mode === 'research' ? $t('AiLanding.send_research') : $t('AiLanding.send')) }}
+                                <button v-if="streaming" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="ask-stop" @click="stopAnswer">
+                                    <ShellIcon name="stop" :size="13" />{{ $t('Ask.stop') }}
+                                </button>
+                                <button v-else type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="ask-send" :disabled="!question.trim()" @click="submit">
+                                    {{ mode === 'research' ? $t('AiLanding.send_research') : $t('AiLanding.send') }}
                                 </button>
                             </div>
 
@@ -97,13 +163,9 @@
 
                         <p class="land__note">
                             <span>{{ coded(sources.noteCode, sources.note) || $t('Ask.note_scope') }}</span>
-                            <span v-if="!modelReady" class="ah-chip ah-chip--warn ah-chip--sm">{{ $t('AiLanding.no_model_note') }}</span>
+                            <span v-if="!providerReady" class="ah-chip ah-chip--warn ah-chip--sm">{{ $t('AiLanding.no_model_note') }}</span>
                         </p>
                         <p v-if="error" class="ah-field__error">{{ error }}</p>
-
-                        <AskAnswer v-if="answer.answer" :answer="answer" />
-                        <p v-else-if="answer.configured === false" class="ah-empty">{{ $t('AiLanding.no_model_note') }}</p>
-                        <p v-else-if="answer.empty || answer.emptyCode" class="ah-empty">{{ coded(answer.emptyCode, answer.empty) }}</p>
 
                         <div v-if="loading" class="ah-empty">{{ $t('Parity.loading') }}</div>
 
@@ -252,7 +314,7 @@
 
 <script setup>
 import AiModelNotice from '@/components/molecules/AiUnavailable/AiModelNotice.vue';
-import { computed, inject, onMounted, ref } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { useToast } from "vue-toast-notification";
@@ -270,6 +332,7 @@ import { refusalText } from "./fitText";
 import { backlogRead, readLineKey, skillReach } from "./backlogRead";
 import { messageKey } from "./askWhy";
 import { takeAskHandoff } from "@/components/molecules/AdvanceSearch/askHandoff";
+import { useAskConversation } from "./useAskConversation";
 
 defineOptions({ name: "AskPage" });
 
@@ -277,6 +340,9 @@ const PANEL_LIMIT = 8;
 /* The server caps /routable at 100, so a full page is a window on the backlog
  * rather than the whole of it, and the headline has to say which it is. */
 const BACKLOG_LIMIT = 100;
+/* The server's Ask thread limits (Modules/AI/askThreads LIMITS), stated beside the history. */
+const THREAD_LIMIT = 50;
+const TURN_LIMIT = 30;
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -284,15 +350,22 @@ const companyId = inject("$companyId");
 const { agents, registryManifest, runs, routable, loadAgents, loadRegistry, loadRuns, loadRoutable, startRun } = useParity();
 const { spend, skillManifest, loadSkills, loadSpend } = useAgents();
 const { canManage } = useAgentAccess();
+const { turns, threadId, threads, threadsLoading, streaming, announcement, send, stop, newQuestion, loadThreads, openThread, removeThread, seed } = useAskConversation({ t });
 
 const route = useRoute();
 const tab = ref("ask");
 const question = ref(typeof route?.query?.q === "string" ? route.query.q : "");
 const mode = ref("ask");
 const projectId = ref("");
-const busy = ref(false);
 const error = ref("");
-const answer = ref(takeAskHandoff(question.value) || {});
+const questionBox = ref(null);
+const historyOpen = ref(false);
+const threadError = ref("");
+const handedOff = takeAskHandoff(question.value);
+if (handedOff) {
+    seed(question.value, handedOff);
+    question.value = "";
+}
 const sources = ref({});
 const models = ref([]);
 const loading = ref(true);
@@ -309,9 +382,9 @@ const read = computed(() => backlogRead(routable.value));
 const reach = computed(() => skillReach(skillManifest.value, routable.value));
 
 const providerReady = computed(() => sources.value.configured !== false);
-/* A model the pricing table does not cover is refused by name when a run starts
- * (Agents/runs canStart), so the composer refuses it here too rather than
- * letting the button promise something the engine will not do. */
+/* A model the pricing table does not cover is refused by name when an agent run starts
+ * (Agents/runs canStart), so the model chip warns. Asking still sends: the server says
+ * whether it will answer, and a missing price never hides the screen. */
 const unpriced = computed(() => providerReady.value && models.value.length > 0 && !models.value.some((m) => m.priced));
 const modelReady = computed(() => providerReady.value && !unpriced.value);
 
@@ -398,21 +471,45 @@ const acceptToggle = (row) => {
         : accepted.value.concat(row.taskId);
 };
 
+const focusQuestion = () => nextTick(() => questionBox.value && questionBox.value.focus());
+
+const showsAnswer = (turn) => turn.status === "streaming" || ((turn.status === "done" || turn.status === "stopped") && Boolean(turn.answer));
+
 const submit = async () => {
-    if (!question.value.trim() || !modelReady.value) return;
-    busy.value = true;
+    const asked = question.value.trim();
+    if (!asked || streaming.value) return;
     error.value = "";
-    try {
-        const body = { question: question.value.trim(), mode: mode.value };
-        if (projectId.value) body.projectId = projectId.value;
-        const res = await apiRequest("post", env.AI_ASK, body);
-        if (!res?.data?.status) { error.value = coded(res?.data?.code, res?.data?.statusText) || t("Parity.ask_failed"); return; }
-        answer.value = res.data.data || {};
-    } catch (e) {
-        error.value = reasonOf(e, "Parity.ask_failed");
-    } finally {
-        busy.value = false;
-    }
+    question.value = "";
+    await send({ question: asked, mode: mode.value, projectId: projectId.value });
+};
+
+const onEnter = (event) => {
+    if (event.isComposing) return;
+    event.preventDefault();
+    submit();
+};
+
+const stopAnswer = () => {
+    stop();
+    focusQuestion();
+};
+
+const startOver = () => {
+    newQuestion();
+    threadError.value = "";
+    question.value = "";
+    focusQuestion();
+};
+
+const openFromHistory = async (id) => {
+    threadError.value = await openThread(id);
+    if (!threadError.value) focusQuestion();
+};
+
+const deleteFromHistory = async (item) => {
+    if (!window.confirm(t("Ask.thread_delete_confirm"))) return;
+    threadError.value = await removeThread(item.id);
+    if (!threadError.value) $toast.success(t("Ask.thread_deleted"), { position: "top-right" });
 };
 
 const startAll = async () => {
@@ -455,7 +552,10 @@ const onRecorded = async (file) => {
     }
 };
 
+onBeforeUnmount(stop);
+
 onMounted(async () => {
+    loadThreads();
     const [sourceRes, modelRes] = await Promise.all([
         apiRequest("get", env.AI_ASK_SOURCES).catch(() => null),
         apiRequest("get", `${env.AGENT_MODELS}?configured=true`).catch(() => null)
@@ -476,4 +576,19 @@ onMounted(async () => {
 @import "./style.css";
 @import "./parity.css";
 @import "./landing.css";
+
+.ask-bar { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+.ask-history__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
+.ask-history__row { display: flex; align-items: center; gap: var(--sp-2); border-radius: var(--r-input); }
+.ask-history__row.is-active { background: var(--brand-tint); }
+.ask-history__open { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: var(--sp-3); border: 0; border-radius: var(--r-input); background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.ask-history__open:hover { background: var(--surface-hover); }
+.ask-history__title { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.ask-history__note { margin-top: var(--sp-3); }
+.ask-thread { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-7); }
+.ask-thread__turn { display: flex; flex-direction: column; gap: var(--sp-3); }
+.ask-thread__q { align-self: flex-end; max-width: 85%; margin: 0; padding: var(--sp-3) var(--sp-5); border-radius: var(--r-card); background: var(--brand-tint); color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+    .ask-thread__q { max-width: 100%; }
+}
 </style>
