@@ -79,17 +79,17 @@
                                 </td>
                                 <td>
                                     <div class="d-flex Rename_Delete_wrapper justify-content-end" id="modelComponent0">
-                                        <DropDown class="mr-1" v-if="!item.isDefault && props.editPermission ==true">
+                                        <DropDown class="mr-1" mode="menu" v-if="!item.isDefault && props.editPermission ==true">
                                             <template #button>
-                                                <img :src=addIcon alt="addIconmilestoneSvg" class="cursor-pointer" :ref="item.value">
+                                                <img :src=addIcon :alt="$t('Milestone.status_actions', { name: item.name })" class="cursor-pointer">
                                             </template>
                                             <template #options>
-                                                <DropDownOption @click="$refs[item.value][0].click(), EditData(index)">
-                                                    <img :src='renameicon' alt="Editmilestone">
+                                                <DropDownOption @click="EditData(index)">
+                                                    <img :src='renameicon' alt="">
                                                     <label class="dropRename">{{$t('Projects.rename')}}</label>
                                                 </DropDownOption>
-                                                <DropDownOption @click="$refs[item.value][0].click(), deletetask(index)" v-if="item.isCount == 0">
-                                                    <img :src='deleteicon' alt="Deletemilestone">
+                                                <DropDownOption @click="deletetask(index)" v-if="item.isCount == 0">
+                                                    <img :src='deleteicon' alt="">
                                                     <label class="dropDelete">{{ $t('Projects.delete') }}</label>
                                                 </DropDownOption>
                                             </template>

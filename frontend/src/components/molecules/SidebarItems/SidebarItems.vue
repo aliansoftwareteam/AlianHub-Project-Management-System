@@ -47,9 +47,9 @@
                 </template>
             </div>
             <div v-if="isDisable === true" class="ml-15px position-re d-none status__change-wrapper">
-                <DropDown class="status_change_dropdown"  :bodyClass="{'status__renamecolordelete-dropdown' : true}">
+                <DropDown mode="menu" class="status_change_dropdown"  :bodyClass="{'status__renamecolordelete-dropdown' : true}">
                     <template #button>
-                        <img :src="addIcon" alt="addIconmilestoneSvg" class="cursor-pointer">
+                        <img :src="addIcon" :alt="$t('Projects.status_actions')" class="cursor-pointer">
                     </template>
                     <template #options>
                         <DropDownOption>

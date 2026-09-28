@@ -1,7 +1,7 @@
 <template>
     <div class="p-15px">
         <div class="d-flex justify-content-between" v-if="!isSubTask">
-            <DropDown @isVisible="(val) => isOpend = val">
+            <DropDown mode="listbox" @isVisible="(val) => isOpend = val">
                 <template #button>
                     <div ref="sprintName" class="align-items-center cursor-pointer">
                         <span class="font-size-13" >{{selectedSprint.name}}</span>
@@ -12,8 +12,8 @@
                 <template #options>
                     <div v-for="(item,index) in taskOption" :key="index" class="task__option">
                         <div v-if="item.isFolderSprint">
-                            <DropDownOption>
-                                <div @click="() => item.isFolderExpand = !item.isFolderExpand">
+                            <DropDownOption @click="item.isFolderExpand = !item.isFolderExpand">
+                                <div>
                                     <span>
                                         <span class="mr-5px"><img src="@/assets/images/table_arrow.png" alt="" :style="`transform: rotateZ(${item.isFolderExpand ? '90' : '0'}deg);`"/></span>
                                         <span class="m-5px">
@@ -25,16 +25,16 @@
                             </DropDownOption>
                         </div>
                         <div v-if="!item.isFolderSprint">
-                            <DropDownOption>
-                                <div @click="() => {selectedSprint = item,$refs.sprintName.click()}">
+                            <DropDownOption :selected="item.id === selectedSprint.id" @click="selectedSprint = item; $refs.sprintName.click()">
+                                <div>
                                     {{item.name}}
                                 </div>
                             </DropDownOption>
                         </div>
                         <div v-if="item.isFolderSprint && item.isFolderExpand">
                             <div v-for="(foldSprint,index) in item.sprints" :key="index" class="ml-32px">
-                                <DropDownOption>
-                                    <div @click="() => {selectedSprint = foldSprint,$refs.sprintName.click()}">
+                                <DropDownOption :selected="foldSprint.id === selectedSprint.id" @click="selectedSprint = foldSprint; $refs.sprintName.click()">
+                                    <div>
                                         {{foldSprint.name}}
                                     </div>
                                 </DropDownOption>

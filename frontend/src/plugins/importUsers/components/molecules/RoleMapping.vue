@@ -14,10 +14,12 @@
                 </div>
                 <div class="ml-10px mr-30px">→</div>
                 <div class="min-width">
-                    <DropDown z-index="9">
-                        <template #button>
+                    <DropDown mode="listbox" z-index="9">
+                        <template #button="{ triggerAttrs }">
                             <button
+                                type="button"
                                 class="bg-white border-radius-5-px border-groupBy cursor-pointer font-size-14 dark-gray w-100"
+                                v-bind="triggerAttrs"
                                 ref="expand_collapse_status">
                                 <div class="d-flex justify-content-between align-items-center m-5px">
                                     <p class="m-0 color94">
@@ -28,12 +30,12 @@
                             </button>
                         </template>
                         <template #options>
-                            <DropDownOption>
-                                <input type="text" :placeholder="$t('PlaceHolder.search')" v-model="search[roleIndex]"
+                            <div class="d-flex align-items-center hover-bg-lighter-gray-dropdown hover-purple cursor-pointer text-nowrap drop-down-item gray81 p-7px border-radius-4-px">
+                                <input type="text" :placeholder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" v-model="search[roleIndex]"
                                     class="p6px-8px border-gray-blue border-radius-4-px font-size-14" />
-                            </DropDownOption>
+                            </div>
                             <DropDownOption v-for="(sysRole, sysIndex) in filteredRoles(roleIndex)" :key="sysIndex"
-                                :item="sysRole"
+                                :item="sysRole" :selected="sysRole === selectedRole[roleIndex]"
                                 @click="createRoleMap(roleIndex, sysRole), $refs?.expand_collapse_status[roleIndex]?.click()">
                                 <span>{{ sysRole }}</span>
                             </DropDownOption>

@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn() }));
 jest.mock('../Config/knownCompany', () => ({ isKnownCompany: jest.fn(async () => true) }));
@@ -37,7 +38,7 @@ const response = () => {
     res.send = jest.fn((body) => { res.body = body; return res; });
     return res;
 };
-const request = ({ body = {}, params = {}, companyId = COMPANY, uid = USER } = {}) => ({ body, params, headers: { companyid: companyId }, uid });
+const request = ({ body = {}, params = {}, companyId = COMPANY, uid = USER } = {}) => verified({ body, params, headers: { companyid: companyId }, uid });
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 beforeEach(() => {

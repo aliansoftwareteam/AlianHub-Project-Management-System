@@ -39,6 +39,7 @@ const startApp = async (trustProxy) => {
     app.post('/login', (req, res, next) => finalizeSession(req, res, UID, next, () => res.json({ ok: true })), (req, res) => res.json({ ok: false }));
     app.post('/sso', (req, res) => finalizeSsoSession(req, res, UID, '/'));
     app.post('/audit', (req, res) => {
+        req.aud = COMPANY_ID;
         recordAuditFromReq(req, { action: 'address.test', entityType: 'test' });
         res.json({ ok: true });
     });

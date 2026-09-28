@@ -91,6 +91,7 @@ const session = (uid, { method = 'POST', route = '/api/v1/createproject', body =
     url: `${route}?probe=${QUERY_MARKER}`,
     query: { probe: QUERY_MARKER },
     headers: { companyid: CID },
+    aud: CID,
     body,
 });
 const token = (uid, options) => ({ ...session(uid, options), apiToken: { _id: 't' } });
@@ -583,7 +584,7 @@ describe('the stored route', () => {
         setInstanceMode('report');
         const app = express();
         app.use(express.json());
-        app.use((req, res, next) => { req.uid = MEMBER; next(); });
+        app.use((req, res, next) => { req.uid = MEMBER; req.aud = CID; next(); });
         app.put('/api/v1/x/:id', createProject(), (req, res) => res.json({ status: true }));
         const router = express.Router();
         router.patch('/items/:itemId/notes/:noteId', createProject(), (req, res) => res.json({ status: true }));

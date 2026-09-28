@@ -9,6 +9,7 @@ const skillIndex = require('../skills');
 const skillRecord = require('../skillRecord');
 const { narrowChanges } = require('../skills/effectiveActions');
 const taint = require('../taint');
+const confidence = require('./confidence');
 
 // A deterministic pipeline, not a free-roaming agent loop:
 //
@@ -39,10 +40,12 @@ const rank = (s) => { const i = SEVERITY.indexOf(String(s).toLowerCase()); retur
 
 /* PHASE 4 — verify. The gate that makes this trustworthy.
  *  - evidence: a finding must name a fact id that actually failed
+ *  - confidence: a finding the model is unsure of stays out, checked before
+ *    dedup so an unsure finding cannot take a fact from a confident one
  *  - dedup: one finding per fact
  *  - cap: bounded volume, worst-first
  * Anything dropped is counted and reported, so a silent filter cannot hide a bug. */
-function verify(findings, auditResult, skill) {
+function verify(findings, auditResult, skill, { floor = confidence.floorFor(skill) } = {}) {
     const failingIds = new Set(auditResult.facts.filter((f) => !f.ok).map((f) => f.id));
     const seen = new Set();
     const kept = [];
@@ -53,6 +56,8 @@ function verify(findings, auditResult, skill) {
         if (!failingIds.has(factId)) { dropped.push({ title: f?.title || '(untitled)', reason: `no failing fact "${factId}"` }); continue; }
         if (seen.has(factId)) { dropped.push({ title: f?.title || '(untitled)', reason: `duplicate of ${factId}` }); continue; }
         if (!f.title || !String(f.title).trim()) { dropped.push({ title: '(untitled)', reason: 'no title' }); continue; }
+        const sure = confidence.confidenceOf(f.confidence);
+        if (sure !== null && sure < floor) { dropped.push({ title: String(f.title).trim(), reason: `confidence ${sure} is below the ${floor} floor` }); continue; }
         seen.add(factId);
         const fact = auditResult.facts.find((x) => x.id === factId);
         kept.push({
@@ -62,6 +67,7 @@ function verify(findings, auditResult, skill) {
             why: String(f.why || '').trim().slice(0, 400),
             fix: String(f.fix || '').trim().slice(0, 600),
             evidence: fact ? fact.detail : null,
+            confidence: sure,
         });
     }
 
@@ -153,7 +159,7 @@ async function analyseAudit(skill, { task, context, budget, spend, companyId, ag
 
     const proposed = raw?.findings ?? findingsWithoutModel(auditResult, skill);
     const { findings, dropped } = raw
-        ? verify(proposed, auditResult, skill)
+        ? verify(proposed, auditResult, skill, { floor: confidence.floorFor(skill, agent) })
         : { findings: proposed, dropped: [] };
 
     const passing = auditResult.facts.filter((f) => f.ok).length;

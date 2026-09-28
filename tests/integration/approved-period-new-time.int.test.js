@@ -147,7 +147,7 @@ describe('the desktop tracker in an approved period', () => {
     it('refuses to stop a timer that started in the approved period, leaving it as it was', async () => {
         const start = at(LOCKED_DAY, '08:00');
         const { insertedId } = await db().collection('timesheets').insertOne({
-            Loggeduser: member.uid, TicketID: String(task._id), ProjectId: String(project._id), LogDescription: `APL running ${uniqueSuffix()}`,
+            Loggeduser: member.uid, TicketID: String(task._id), ProjectId: new ObjectId(String(project._id)), LogDescription: `APL running ${uniqueSuffix()}`,
             LogStartTime: start, LogEndTime: start, LogTimeDuration: 0, logAddType: 1, trackShots: [], startTimeTracker: start,
         });
 

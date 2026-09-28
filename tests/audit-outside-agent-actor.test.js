@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...args) => mockDb.crud(...args) }));
@@ -31,7 +32,7 @@ const list = async (query) => {
     res.status = (c) => { res.code = c; return res; };
     res.json = (b) => { res.body = b; return res; };
     res.send = (b) => { res.body = b; return res; };
-    await ctrl.listAuditLogs({ uid: OWNER, headers: { companyid: CID }, query, body: {} }, res);
+    await ctrl.listAuditLogs(verified({ uid: OWNER, headers: { companyid: CID }, query, body: {} }), res);
     return res.body;
 };
 
@@ -44,7 +45,7 @@ const exportCsv = async (query) => {
     res.setHeader = (k, v) => { res.headers[k] = v; };
     res.write = (b) => { chunks.push(String(b)); return true; };
     res.end = (b) => { if (b) chunks.push(String(b)); };
-    await ctrl.exportAuditCsv({ uid: OWNER, headers: { companyid: CID }, query, body: {} }, res);
+    await ctrl.exportAuditCsv(verified({ uid: OWNER, headers: { companyid: CID }, query, body: {} }), res);
     return chunks.join('');
 };
 

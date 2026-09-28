@@ -1,13 +1,14 @@
 <template lang="">
     <div class="d-flex taglist__dropdown-mobile__margin" @click="(e)=>{e.stopPropagation()}" :class="[{'pointer-none' : (tagChipArray.length >= 3 && isTaskList) || !checkApps('tags') }]">
-        <DropDown @isVisible="tagClosed">   
-        <template  #button>
+        <DropDown mode="listbox" @isVisible="tagClosed">
+        <template  #button="{ triggerAttrs }">
             <button
                 v-show="(tagChipArray.length < 3 || !isTaskList) && checkApps('tags') && checkPermission('task.task_tag',project?.isGlobalPermission) === true"
                 type="button"
                 class="d-flex taglist__add-btn"
                 :aria-label="$t('Tags.add_tag')"
                 ref="clickDropDown"
+                v-bind="triggerAttrs"
             >
                 <svg v-if="!isTaskList" id="openTagDropdown" class="cursor-pointer tag-div" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                     <path class="taglist__add-disc taglist__add-ring" d="M12 23.5C18.3513 23.5 23.5 18.3513 23.5 12C23.5 5.64873 18.3513 0.5 12 0.5C5.64873 0.5 0.5 5.64873 0.5 12C0.5 18.3513 5.64873 23.5 12 23.5Z"/>
@@ -65,27 +66,27 @@
                                 <img :src="saveimage" class="saveTagColorImage cursor-pointer" @click="()=>HandleColors('save',index,item)"/>
                                 <img :src="cancelimage" class="deleteTagImage cursor-pointer ml-5px" @click="()=>HandleColors('cancel',index)"/>
                             </div>
-                            <div class="d-flex justify-content-between w-100" v-else @click="addTag(item.uid)">
+                            <div class="d-flex justify-content-between w-100" v-else role="option" aria-selected="false" @click="addTag(item.uid)">
                                 <span class="tag_name"  :title="item.tagName" :style="{color: tagChipColors(item).color}" >{{item.tagName}}</span>
                                 <span @click.stop="()=>dropdown(item)"><img  :src="threedots" class="cursor-pointer p0x-5px ml-auto mt-7px tagname__threedots" :class="[{'threedots': clientWidth > 767}]" alt=""/> </span> 
                             </div>
 
-                            <DropDown :id="Did" v-if="checkPermission('task.task_tag',project?.isGlobalPermission) === true">
-                                <template #button>
-                                    <button id="EditTag" hidden :ref="Did"></button>
+                            <DropDown mode="menu" :id="Did" v-if="checkPermission('task.task_tag',project?.isGlobalPermission) === true">
+                                <template #button="{ triggerAttrs }">
+                                    <button type="button" hidden :aria-label="$t('Tags.tag_actions', { name: item.tagName })" v-bind="triggerAttrs"></button>
                                 </template>
                                 <template #options>
                                     <div class="">
-                                        <ul class="tag-edit-option justify-content-start">
-                                            <li class="mainDiv justify-content-start" @click=" $refs[Did][0].click(),EditChips('isRename')">
+                                        <ul class="tag-edit-option justify-content-start" role="none">
+                                            <li class="mainDiv justify-content-start" role="menuitem" @click="EditChips('isRename')">
                                                 <img :src="renameimage" class="inner-tagedit-list-item"/>
                                                 <span>{{$t("Projects.rename")}}</span>
                                             </li>
-                                            <li class="mainDiv justify-content-start" @click=" $refs[Did][0].click(),EditChips('isColor')">
+                                            <li class="mainDiv justify-content-start" role="menuitem" @click="EditChips('isColor')">
                                                 <img :src="colorimage" class="inner-tagedit-list-item"/>
                                                 <span>{{$t("Tags.change_color")}}</span>
                                             </li>
-                                            <li class="mainDiv justify-content-start" @click=" $refs[Did][0].click(),EditChips('isDelete'),showSidebar = true,sendMethod()">
+                                            <li class="mainDiv justify-content-start" role="menuitem" @click="EditChips('isDelete'),showSidebar = true,sendMethod()">
                                                 <img :src="deleteimage" class="inner-tagedit-list-item"/>
                                                 <span class="red">{{$t("Projects.delete")}}</span>
                                             </li>
@@ -231,7 +232,7 @@ const EditChips = (key) => {
 }
 
 const dropdown = (item) => {
-    document.getElementById("EditTag").click();
+    document.getElementById(`${Did.value}_trigger`).click();
     dataItem.value = item
 }
 

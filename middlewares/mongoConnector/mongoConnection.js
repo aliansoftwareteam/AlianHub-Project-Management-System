@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { checkConnectionExists, createConnection, updateConnectionRecord, connections, closeConnection } = require("./helper");
 const { isRetiring, retiringRefusal } = require("./retiring");
+const { isDatabaseName, invalidDatabaseRefusal } = require("./databaseName");
 const { dbCollections } = require("../../Config/collections");
 
 const COMPANY_DB = /^[a-f0-9]{24}$/i;
@@ -128,6 +129,7 @@ const deletingElsewhere = async (db) => {
 };
 
 exports.handleConnection = async (companyId) => {
+    if (!isDatabaseName(companyId)) throw invalidDatabaseRefusal();
     if (isRetiring(companyId) || await deletingElsewhere(companyId)) throw retiringRefusal();
     const opened = await openConnection(companyId);
     // A connection that was still opening when the deletion started must not outlive the drop.

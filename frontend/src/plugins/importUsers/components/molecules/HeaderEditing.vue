@@ -18,34 +18,30 @@
                             </th>
                             <!-- Dropdown for selecting system header -->
                             <th class="p8px-12px font-size-14 text-left dark-gray border-left-0">
-                                <DropDown z-index="9">
-                                    <template #button>
-                                        <div class="d-flex flex-row justify-content-between align-items-center">
-                                            <div>
-                                                <button
-                                                    class="text-nowrap btn-white border-0 cursor-pointer font-size-14 dark-gray"
-                                                    ref="expand_collapse">
-                                                    {{ header?.systemHeader }} ▼
-                                                </button>
-                                            </div>
-                                            <div v-if="header?.systemHeader !== $t('headerMapping.no_match_title')">
-                                                <button class="bg-transparent border-0 cursor-pointer"
-                                                    @click.stop="clearDropdown">
-                                                    <img :src=cross_svg alt="cross" class="w-15">
-                                                </button>
-                                            </div>
+                                <DropDown mode="listbox" z-index="9" :bodyClassHeader="{'d-flex': true, 'flex-row': true, 'justify-content-between': true, 'align-items-center': true}">
+                                    <template #button="{ triggerAttrs }">
+                                        <button
+                                            type="button"
+                                            class="text-nowrap btn-white border-0 cursor-pointer font-size-14 dark-gray"
+                                            v-bind="triggerAttrs"
+                                            ref="expand_collapse">
+                                            {{ header?.systemHeader }} ▼
+                                        </button>
+                                        <div v-if="header?.systemHeader !== $t('headerMapping.no_match_title')">
+                                            <button type="button" class="bg-transparent border-0 cursor-pointer"
+                                                @click.stop="clearDropdown">
+                                                <img :src=cross_svg :alt="$t('headerMapping.clear_selection')" class="w-15">
+                                            </button>
                                         </div>
                                     </template>
                                     <template #options>
-                                        <!-- Search Box -->
-                                        <DropDownOption>
-                                            <input type="text" :placeholder="$t('PlaceHolder.search')" v-model="search[index]"
+                                        <div class="d-flex align-items-center hover-bg-lighter-gray-dropdown hover-purple cursor-pointer text-nowrap drop-down-item gray81 p-7px border-radius-4-px">
+                                            <input type="text" :placeholder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" v-model="search[index]"
                                                 class="p6px-8px border-gray border-radius-4-px font-size-14" />
-                                        </DropDownOption>
-                                        <!-- Filtered Options -->
+                                        </div>
                                         <DropDownOption
                                             v-for="(systemHeader, systemHeaderIndex) in filteredSystemHeaders(index)"
-                                            :key="systemHeaderIndex" :item="systemHeader"
+                                            :key="systemHeaderIndex" :item="systemHeader" :selected="systemHeader === header?.systemHeader"
                                             @click="emitSelectHeader(index, systemHeader), $refs?.expand_collapse?.click()">
                                             <span>{{ systemHeader }}</span>
                                         </DropDownOption>

@@ -26,6 +26,7 @@ jest.mock('../Config/jwt', () => {
         const uid = who(req);
         if (!uid) return res.status(401).json({ status: false, error: 'Unauthorized' });
         req.uid = uid;
+        req.aud = req.headers.companyid;
         if (req.headers['x-test-api-token']) req.apiToken = { _id: 'pat' };
         return next();
     };

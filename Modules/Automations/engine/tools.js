@@ -73,14 +73,14 @@ const emitAutomationUpdate = (doc, updatedFields, depth) => {
 /* Apply a $set to a task and announce it. `context` carries the run and the
  * originating event's depth so the audit row can point back at the rule and the
  * loop guard keeps counting. */
-const updateTask = async (companyId, taskId, set, context = {}) => {
+const updateTask = async (companyId, taskId, set, context = {}, unset = null) => {
     const _id = oid(taskId);
     if (!_id) throw new DeterministicError(`invalid task id "${taskId}"`);
     if (!set || !Object.keys(set).length) return { changed: false };
 
     const updated = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS,
-        data: [{ _id }, { $set: set }, { returnDocument: 'after' }],
+        data: [{ _id }, unset ? { $set: set, $unset: unset } : { $set: set }, { returnDocument: 'after' }],
     }, 'findOneAndUpdate');
 
     if (!updated || !updated._id) throw new DeterministicError(`task ${taskId} not found`);
@@ -125,15 +125,9 @@ const addComment = async (companyId, taskId, body, context = {}) => {
     const access = await canPostToThread(companyId, context.actingUserId, commentThreadOf(task));
     if (!access.allowed) throw new DeterministicError(THREAD_REFUSED);
 
-    // Field names follow the comments schema exactly: `message` (not Comment),
-    // `taskId` / `projectId` lowercase, and `project:false` marking this as a task
-    // comment rather than a project-level one.
-    //
-    // taskId MUST be an ObjectId, not a string. The schema types it as Mixed so a
-    // string writes without complaint, but every read path casts
-    // (`{ taskId: new mongoose.Types.ObjectId(taskId) }` in Comments/controller.js),
-    // and in Mongo a string never equals an ObjectId — so a string-keyed comment is
-    // stored successfully and is then invisible in the task's Comments tab forever.
+    // comments.taskId is Mixed, so Mongoose stores whatever form it is given. Reads match
+    // both forms (Comments/helpers/taskIdMatch), but ObjectId is the canonical form task 040
+    // migrates to, so new rows are written that way.
     const saved = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.COMMENTS,
         data: {

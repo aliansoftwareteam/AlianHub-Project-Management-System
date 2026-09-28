@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const mockDbs = {};
 const mockDbFor = (companyId) => {
     const id = String(companyId);
@@ -423,7 +424,7 @@ describe('redacting a person under AUDIT_CHAIN', () => {
         res.setHeader = (k, v) => { res.headers[k] = v; };
         res.write = (b) => { chunks.push(String(b)); return true; };
         res.end = (b) => { if (b) chunks.push(String(b)); };
-        await ctrl.exportAuditCsv({ uid: ADMIN, headers: { companyid: CID }, query: {}, body: {} }, res);
+        await ctrl.exportAuditCsv(verified({ uid: ADMIN, headers: { companyid: CID }, query: {}, body: {} }), res);
         const csv = chunks.join('');
         const alias = redact.pseudonymOf(ALICE);
         expect(res.body).toBeUndefined();

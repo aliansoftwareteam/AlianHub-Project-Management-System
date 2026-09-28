@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const mongoose = require('mongoose');
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn() }));
@@ -21,7 +22,7 @@ const ID = new mongoose.Types.ObjectId();
 const PROJECT = new mongoose.Types.ObjectId();
 
 const mockRes = () => ({ status: jest.fn().mockReturnThis(), send: jest.fn() });
-const req = (over = {}) => ({ headers: { companyid: COMPANY }, query: {}, params: {}, body: {}, ...over });
+const req = (over = {}) => verified({ headers: { companyid: COMPANY }, query: {}, params: {}, body: {}, ...over });
 
 beforeEach(() => jest.clearAllMocks());
 

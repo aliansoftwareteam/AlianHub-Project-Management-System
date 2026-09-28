@@ -78,10 +78,10 @@ describe('GET /api/v2/agents/team shows task names and logged hours only where t
             deletedStatusKey: 0,
         });
         sprintId = sprint.insertedId;
-        await db.collection('tasks').updateOne({ _id: new ObjectId(sprintTask._id) }, { $set: { sprintId, sprintArray: { id: String(sprintId), name: 'private' }, updatedAt: new Date() } });
+        await db.collection('tasks').updateOne({ _id: new ObjectId(sprintTask._id) }, { $set: { sprintId, sprintArray: { id: sprintId, name: 'private' }, updatedAt: new Date() } });
 
         const logged = (userId, task, project, minutes) => ({
-            LogDescription: '[QA team] log', Loggeduser: userId, TicketID: task._id, ProjectId: String(project._id),
+            LogDescription: '[QA team] log', Loggeduser: userId, TicketID: task._id, ProjectId: new ObjectId(String(project._id)),
             LogStartTime: nowSec() - 2 * MINUTE, LogEndTime: nowSec() - 2 * MINUTE + minutes * MINUTE, LogTimeDuration: minutes, logAddType: 1, trackShots: [],
         });
         await db.collection('timesheets').insertMany([
@@ -89,7 +89,7 @@ describe('GET /api/v2/agents/team shows task names and logged hours only where t
             logged(owner.uid, privateTask, hidden, 60),
             logged(member.uid, sharedTask, shared, 30),
             {
-                LogDescription: '[QA team] timer', Loggeduser: owner.uid, TicketID: privateTask._id, ProjectId: String(hidden._id),
+                LogDescription: '[QA team] timer', Loggeduser: owner.uid, TicketID: privateTask._id, ProjectId: new ObjectId(String(hidden._id)),
                 LogStartTime: nowSec(), LogEndTime: null, startTimeTracker: nowSec(), logAddType: 1, trackShots: [],
             },
         ]);
@@ -209,7 +209,7 @@ describe('the agent pipeline and release screens leave out tasks in a private sp
         ({ insertedId: sprintId } = await db.collection('sprints').insertOne({
             name: `[QA ship] private ${suffix}`, projectId: new ObjectId(String(project._id)), private: true, AssigneeUserId: [owner.uid], deletedStatusKey: 0,
         }));
-        await db.collection('tasks').updateOne({ _id: new ObjectId(hiddenTask._id) }, { $set: { sprintId, sprintArray: { id: String(sprintId), name: 'private' } } });
+        await db.collection('tasks').updateOne({ _id: new ObjectId(hiddenTask._id) }, { $set: { sprintId, sprintArray: { id: sprintId, name: 'private' } } });
         await db.collection('tasks').updateMany({ _id: { $in: taskIds.map((id) => new ObjectId(id)) } }, { $set: { statusType: 'done', updatedAt: new Date() } });
         await db.collection('agent_runs').insertMany(taskIds.map((taskId) => ({
             agentId: String(new ObjectId()), agentName: '[QA ship] agent', taskId: String(taskId), projectId: String(project._id), status: 'done', startedAt: new Date(), finishedAt: new Date(),

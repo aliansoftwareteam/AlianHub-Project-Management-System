@@ -31,7 +31,7 @@
                     :class="[{'selected-blue-border-img border-radius-10-px': usersFilterIDsArray.includes(user.id)}]"
                     @click="usersFilter(user)"
                 />
-                <DropDown :id="'timeloguser_'+makeUniqueId(6)" v-if="userData.length > 4" :bodyClass="{'timelog-usercount-dropdown' : true}">
+                <DropDown :id="'timeloguser_'+makeUniqueId(6)" v-if="userData.length > 4" mode="listbox" :bodyClass="{'timelog-usercount-dropdown' : true}">
                     <template #button>
                         <div class="d-flex align-items-center justify-content-center profile-image GunPowder blue text-nowrap border-2px-blue" :style="{width: '30px', height: '30px'}">
                             +{{userData.length - 4}}
@@ -41,10 +41,11 @@
                         <DropDownOption
                             v-for="(user, index) in userData.filter((x, index) => index >= 4).map((x) => ({...x,label: x.Employee_Name, image: x.profileImage}))"
                             :key="'user'+index"
+                            :selected="usersFilterIDsArray.includes(user.id)"
                             @click="usersFilter(user)"
                         >
                             <div class="d-flex align-items-center" :title="user.label">
-                                <input type="checkbox" :id="'checkbox'+user.id" v-model="user.isChecked" :class="[{'checkboxBlue' : user.isChecked}]"/>
+                                <input type="checkbox" :id="'checkbox'+user.id" v-model="user.isChecked" tabindex="-1" aria-hidden="true" :class="[{'checkboxBlue' : user.isChecked}]"/>
                                 <UserProfile
                                     :showDot="false"
                                     :data="{
@@ -55,7 +56,6 @@
                                     class="cursor-pointer profile-image"
                                     :class="[{'selected-blue-border-img border-radius-10-px': usersFilterIDsArray.includes(user.id)}]"
                                 />
-                                <!-- <img :src="user.image" class="profile-image" alt="user image" :class="[{'selected-blue-border-img border-radius-10-px': usersFilterIDsArray.includes(user.id)}]"> -->
                                 <span  class="userfilter-list" :class="{'font-size-16' : clientWidth <=767}">{{ user.label }}</span>
                             </div>
                         </DropDownOption>

@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
@@ -29,7 +30,7 @@ const res = () => {
     r.json = r.send;
     return r;
 };
-const req = (over = {}) => ({ headers: { companyid: C }, params: { id: INV }, query: { projectId: P }, body: {}, uid: OWNER, ...over });
+const req = (over = {}) => verified({ headers: { companyid: C }, params: { id: INV }, query: { projectId: P }, body: {}, uid: OWNER, ...over });
 const seedInvoice = (fields = {}) => mockDb.seed(SCHEMA_TYPE.PROJECT_INVOICES, { _id: INV, ProjectID: P, number: 'INV-2026-001', status: 'draft', totalMinor: 1000, currency: 'USD', deletedStatusKey: 0, ...fields });
 const invoiceRow = () => mockDb.store[SCHEMA_TYPE.PROJECT_INVOICES][0];
 

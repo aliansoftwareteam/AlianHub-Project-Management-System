@@ -58,7 +58,7 @@ describe('performance.read over MCP', () => {
         project = await createProject(owner.api, { assigneeIds: everyone, createdBy: owner.uid });
         task = await createTask(owner.api, { project, user: state.users.owner, companyOwnerId: state.users.owner.userId });
         const row = (userId, minutes, billable) => ({
-            LogDescription: '[QA perf] log', Loggeduser: userId, TicketID: task._id, ProjectId: String(project._id),
+            LogDescription: '[QA perf] log', Loggeduser: userId, TicketID: task._id, ProjectId: new ObjectId(String(project._id)),
             LogStartTime: LOGGED_AT, LogEndTime: LOGGED_AT + minutes * 60, LogTimeDuration: minutes, logAddType: 1, trackShots: [], billable,
         });
         await db.collection('timesheets').insertMany([
@@ -69,7 +69,7 @@ describe('performance.read over MCP', () => {
 
     afterAll(async () => {
         for (const { session, id } of tokens) await session.api.delete(`/api/v2/api-tokens/${id}`);
-        await db.collection('timesheets').deleteMany({ ProjectId: String(project._id) });
+        await db.collection('timesheets').deleteMany({ ProjectId: new ObjectId(String(project._id)) });
         await client.close();
     });
 
@@ -164,10 +164,10 @@ describe('performance.read over MCP keeps a private sprint to the people it is s
             commitment: { points: 3, tasks: 1, at: new Date(Date.now() - 5 * DAY_MS) }, closeReport: { at: closedAt },
         });
         sprintId = inserted.insertedId;
-        await db.collection('tasks').updateOne({ _id: new ObjectId(hidden._id) }, { $set: { sprintId, sprintArray: { id: String(sprintId), name: 'private' } } });
+        await db.collection('tasks').updateOne({ _id: new ObjectId(hidden._id) }, { $set: { sprintId, sprintArray: { id: sprintId, name: 'private' } } });
 
         const row = (userId, taskId, minutes) => ({
-            LogDescription: '[QA perf] log', Loggeduser: userId, TicketID: taskId, ProjectId: String(project._id),
+            LogDescription: '[QA perf] log', Loggeduser: userId, TicketID: taskId, ProjectId: new ObjectId(String(project._id)),
             LogStartTime: LOGGED_AT, LogEndTime: LOGGED_AT + minutes * 60, LogTimeDuration: minutes, logAddType: 1, trackShots: [], billable: true,
         });
         await db.collection('timesheets').insertMany([
@@ -178,7 +178,7 @@ describe('performance.read over MCP keeps a private sprint to the people it is s
 
     afterAll(async () => {
         for (const { session, id } of tokens) await session.api.delete(`/api/v2/api-tokens/${id}`);
-        await db.collection('timesheets').deleteMany({ ProjectId: String(project._id) });
+        await db.collection('timesheets').deleteMany({ ProjectId: new ObjectId(String(project._id)) });
         await db.collection('sprints').deleteOne({ _id: sprintId });
         await client.close();
     });

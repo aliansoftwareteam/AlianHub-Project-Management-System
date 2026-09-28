@@ -11,10 +11,9 @@ const path = require('path');
 require('../Config/applyEnv').loadDotEnv(path.join(__dirname, '..', '.env'));
 if (!process.env.STORAGE_TYPE) process.env.STORAGE_TYPE = 'server';
 
-const args = process.argv.slice(2);
-const flags = new Set(args.filter((a) => a.startsWith('--')));
-const positional = args.filter((a) => !a.startsWith('--'));
-const command = positional[0] || 'status';
+const { parseMigrateArgs } = require('./migrateArgs');
+
+const { flags, positional, command } = parseMigrateArgs(process.argv.slice(2));
 
 async function main() {
     if (!process.env.MONGODB_URL) throw new Error('MONGODB_URL is not set.');

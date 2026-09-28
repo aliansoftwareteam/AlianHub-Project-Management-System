@@ -4,6 +4,7 @@ const sendMailRef = require('../../Modules/service.js');
 const config = require('../../Config/config.js');
 const { mongoTimeoutOptions } = require('../../Modules/Agents/engine/timeouts');
 const { onFatal } = require('../../Config/processGuards');
+const { isDatabaseName } = require('../../middlewares/mongoConnector/databaseName');
 
 // A connection closes asynchronously, so its last lifecycle events land after
 // the Jest suite that opened it has torn down; a console write there fails the
@@ -37,6 +38,10 @@ onFatal('crash-report-mail', exports.crashReport);
 
 exports.connect = (db) => {
     return new Promise(async (resolve, reject) => {
+        if (!isDatabaseName(db)) {
+            reject(new Error('Invalid database name'));
+            return;
+        }
         const MONGODB_URL = process.env.MONGODB_URL;
         if (!MONGODB_URL) {
             reject(new Error('No database configured. Set MONGODB_URL in .env or the environment and restart.'));

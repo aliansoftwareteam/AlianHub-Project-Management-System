@@ -74,9 +74,9 @@
                             </template>
                         </draggable>
                         <span class="span_wrapper task_right cursor-pointer custom_sticky" v-if="!projectData?.deletedStatusKey && checkPermission('task.list_view_column',project?.isGlobalPermission) == true">
-                            <DropDown>
+                            <DropDown mode="listbox" v-if="props.statusIndex === 0">
                                 <template #button>
-                                    <img :src="addCustomField" :alt="addCustomField" v-if="props.statusIndex === 0" />
+                                    <img :src="addCustomField" :alt="$t('ProjectDetails.show_hide_columns')" />
                                 </template>
                                 <template #options>
                                     <DropDownOption>
@@ -89,6 +89,7 @@
                                         <DropDownOption
                                             v-for="(obj, index) in headerHideShow.filter((head)=> (head.funcPermission ? checkPermission(head.funcPermission,projectData.isGlobalPermission) !== null : true ) && (head.appPermission ? checkApps(head.appPermission) : true ))"
                                             :key="index"
+                                            :selected="Boolean(obj.show)"
                                         >
                                             <div class="d-flex align-items-center justify-content-between w-100">
                                                 <span class="font-weight-400 line-height-19 font-ui">
@@ -252,9 +253,9 @@
                         </template>
                     </draggable>
                     <span class="span_wrapper task_right cursor-pointer" v-if="!projectData?.deletedStatusKey && checkPermission('task.list_view_column',project?.isGlobalPermission) == true">
-                        <DropDown>
+                        <DropDown mode="listbox" v-if="props.statusIndex === 0">
                             <template #button>
-                                <img :src="addCustomField" :alt="addCustomField" v-if="props.statusIndex === 0" />
+                                <img :src="addCustomField" :alt="$t('ProjectDetails.show_hide_columns')" />
                             </template>
                             <template #options>
                                 <DropDownOption>
@@ -267,6 +268,7 @@
                                     <DropDownOption
                                         v-for="(obj, index) in headerHideShow.filter((head)=> (head.funcPermission ? checkPermission(head.funcPermission,projectData.isGlobalPermission) !== null : true ) && (head.appPermission ? checkApps(head.appPermission) : true ))"
                                         :key="index"
+                                        :selected="Boolean(obj.show)"
                                     >
                                         <div class="d-flex align-items-center justify-content-between w-100">
                                             <span class="font-weight-400 line-height-19 font-ui">

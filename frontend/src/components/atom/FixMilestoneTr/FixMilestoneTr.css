@@ -54,11 +54,12 @@
 .dropdown_span {
     padding-bottom: 5px;
 }
-#dd_fix_milestone_status_dropdown {
+/* #my-dropdown (the teleport target) keeps the id-level weight these panel rules had, so they still beat the mobile sheet's width and radius. */
+#my-dropdown .milestone_status_panel {
     width: 295px;
     border-radius: 6px!important;
 }
- #dd_fix_milestone_status_dropdown .dropdown_option {
+#my-dropdown .milestone_status_panel .dropdown_option {
     padding: 0 !important;
 }
 .border_bottom_status {
@@ -68,10 +69,10 @@
     margin-bottom: 0 !important;
     justify-content: space-between;
 }
-#dd_fix_milestone_status_dropdown .drop-down-options {
+#my-dropdown .milestone_status_panel .drop-down-options {
     max-height: 166px !important;
 }
-#dd_amonut_history .drop-down-options {
+#my-dropdown .milestone_refund_panel .drop-down-options {
     max-height: 159px !important;
 }
 .currency {
@@ -98,7 +99,7 @@
     width: 86px;
     display: block;
 }
-#dd_user_detail .dropdown_option {
+#my-dropdown .milestone_members_panel .dropdown_option {
     padding: 0 !important;
 }
 .user_detail_mil {

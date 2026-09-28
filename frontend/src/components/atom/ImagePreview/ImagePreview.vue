@@ -53,26 +53,25 @@
                     </button>
                 </template>
                 <template v-else>
-                    <DropDown :zIndex="999">
-                        <template #button>
-                            <button class="close button-style">
-                                <img :ref="`my_dd_options`" src="@/assets/images/svg/verticalDropdownthreedots.svg" alt="options" :title="$t('Attachments.actions')" width="10px" class="verticalDots">
+                    <DropDown :zIndex="999" mode="menu">
+                        <template #button="{ triggerAttrs }">
+                            <button type="button" class="close button-style" v-bind="triggerAttrs">
+                                <img src="@/assets/images/svg/verticalDropdownthreedots.svg" :alt="$t('Attachments.actions')" :title="$t('Attachments.actions')" width="10px" class="verticalDots">
                             </button>
                         </template>
                         <template #options>
-                            <DropDownOption @click="$refs[`my_dd_options`].click(), openFile(image)">
-                                
-                                <button class="close button-style mr-10px">
-                                    <img src="@/assets/images/png/open.png" alt="open" :title="$t('Attachments.open_in_new_tab')" width="16px">
-                                </button>
+                            <DropDownOption @click="openFile(image)">
+                                <span class="close button-style mr-10px">
+                                    <img src="@/assets/images/png/open.png" alt="" :title="$t('Attachments.open_in_new_tab')" width="16px">
+                                </span>
                                 {{ $t('Attachments.open_in_new_tab') }}
                             </DropDownOption>
                             <DropDownOption
-                                @click="$refs[`my_dd_options`].click(), downloadFile(image?.path, `${image?.name}`)"
+                                @click="downloadFile(image?.path, `${image?.name}`)"
                                 style="margin-bottom:0px !important;">
-                                <button class="close button-style mr-10px">
-                                    <img src="@/assets/images/svg/download_bottom_wrapper.svg" class="download_icon" alt="download" :title="$t('Attachments.download')" width="16px">
-                                </button>
+                                <span class="close button-style mr-10px">
+                                    <img src="@/assets/images/svg/download_bottom_wrapper.svg" class="download_icon" alt="" :title="$t('Attachments.download')" width="16px">
+                                </span>
                                 {{ $t('Attachments.download') }}
                             </DropDownOption>
                         </template>

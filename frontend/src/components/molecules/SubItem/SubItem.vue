@@ -35,7 +35,7 @@
                         {{showCounts({project, key: 'sprint', sprints: [data], showArchived}).count > 99 ? "+99" : showCounts({project, key: 'sprint', sprints: [data], showArchived}).count}}
                     </div>
                 </template>
-                <DropDown :id="itemId" @isVisible="(val)=> isOpened = val" :title="folder? data.name : data.name" v-if="
+                <DropDown mode="menu" :id="itemId" @isVisible="(val)=> isOpened = val" :title="folder? data.name : data.name" v-if="
                     (
                         (folder && checkPermission('project.project_sprint_create',project.isGlobalPermission) === true)
                         || (folder && checkPermission('project.project_folder_name_edit',project.isGlobalPermission) === true)
@@ -50,30 +50,30 @@
                     && (showArchived ? data.deletedStatusKey === 2 : !data.deletedStatusKey)
                 ">
                     <template #button>
-                        <img src="@/assets/images/svg/horizontalDots.svg" alt="dots" class="project__three-dot ml-6px vertical-middle"  :class="{'project-option': clientWidth > 767 && !isOpened, 'project-option-mobile': clientWidth <= 767}" :ref="itemId">
+                        <img src="@/assets/images/svg/horizontalDots.svg" :alt="$t('Projects.actions_for_item', { name: data.name })" class="project__three-dot ml-6px vertical-middle"  :class="{'project-option': clientWidth > 767 && !isOpened, 'project-option-mobile': clientWidth <= 767}">
                     </template>
 
                     <template #options>
                         <template v-if="!showArchived">
-                            <DropDownOption v-if="folder && checkPermission('project.project_sprint_create',project.isGlobalPermission) === true" @click="createSprint = true, $refs[itemId]?.click(), $emit('change', {...data, isNewClicked: true })">
+                            <DropDownOption v-if="folder && checkPermission('project.project_sprint_create',project.isGlobalPermission) === true" @click="createSprint = true, $emit('change', {...data, isNewClicked: true })">
                                 <div class="d-flex align-items-center project-mobile-desc">
                                     <img :src="listIcon" alt="listIcon" class="mr-10px">
                                     {{$t('Projects.create_new_list')}}
                                 </div>
                             </DropDownOption>
-                            <DropDownOption v-if="folder ? checkPermission('project.project_folder_name_edit',project.isGlobalPermission) === true : checkPermission('project.project_sprint_name_edit',project.isGlobalPermission) === true" @click="$refs[itemId]?.click(), rename()">
+                            <DropDownOption v-if="folder ? checkPermission('project.project_folder_name_edit',project.isGlobalPermission) === true : checkPermission('project.project_sprint_name_edit',project.isGlobalPermission) === true" @click="rename()">
                                 <div class="d-flex align-items-center project-mobile-desc">
                                     <img :src="editIcon" alt="editIcon" class="mr-10px">
                                     {{$t('Projects.rename')}}
                                 </div>
                             </DropDownOption>
-                            <DropDownOption v-if="(folder ? checkPermission('project.folder_archive',project.isGlobalPermission) === true : checkPermission('project.sprint_archive',project.isGlobalPermission) === true) && !showArchived" @click="$refs[itemId]?.click(), showSidebar = true, archive = true">
+                            <DropDownOption v-if="(folder ? checkPermission('project.folder_archive',project.isGlobalPermission) === true : checkPermission('project.sprint_archive',project.isGlobalPermission) === true) && !showArchived" @click="showSidebar = true, archive = true">
                                 <div class="d-flex align-items-center project-mobile-desc">
                                     <img :src="inventoryIcon" alt="inventoryIcon" class="mr-10px">
                                     {{$t('Projects.archive')}}
                                 </div>
                             </DropDownOption>
-                            <DropDownOption v-if="!folder && folderList.length" @click="$refs[itemId]?.click(), showMoveToFolder = true">
+                            <DropDownOption v-if="!folder && folderList.length" @click="showMoveToFolder = true">
                                 <div class="d-flex align-items-center project-mobile-desc">
                                     <img :src="folderIcon" alt="folderIcon" class="mr-10px" style="width: 16px;">
                                     {{$t('Projects.move_to_folder')}}
@@ -81,13 +81,13 @@
                             </DropDownOption>
 
                         </template>
-                        <DropDownOption v-if="(folder ? checkPermission('project.folder_restore',project.isGlobalPermission) === true : checkPermission('project.sprint_restore',project.isGlobalPermission) === true) && showArchived == true" @click="$refs[itemId]?.click(), updateItem(0)">
+                        <DropDownOption v-if="(folder ? checkPermission('project.folder_restore',project.isGlobalPermission) === true : checkPermission('project.sprint_restore',project.isGlobalPermission) === true) && showArchived == true" @click="updateItem(0)">
                             <div class="d-flex align-items-center project-mobile-desc">
                                 <img :src="inventoryIcon" alt="restoreInventoryIcon" class="mr-10px">
                                 {{$t('Projects.restore')}}
                             </div>
                         </DropDownOption>
-                        <DropDownOption v-if="(folder ? checkPermission('project.folder_delete',project.isGlobalPermission) === true : checkPermission('project.sprint_delete',project.isGlobalPermission) === true) && checkPermission('project.project_list',project.isGlobalPermission) === true" @click="$refs[itemId]?.click(), showSidebar = true, archive = false">
+                        <DropDownOption v-if="(folder ? checkPermission('project.folder_delete',project.isGlobalPermission) === true : checkPermission('project.sprint_delete',project.isGlobalPermission) === true) && checkPermission('project.project_list',project.isGlobalPermission) === true" @click="showSidebar = true, archive = false">
                             <div class="d-flex align-items-center project-mobile-desc mobile-deleteIcon red">
                                 <img :src="deleteIcon" alt="deleteIcon" class="mr-10px">
                                 {{$t('Projects.delete')}}
@@ -555,5 +555,9 @@ function markFavourite() {
 .drop__arrow-div{
     min-width: 10px;
     left: 10px;
+}
+/* The dots only show on hover, so a keyboard user focusing the menu button would land on nothing. */
+.project-item .dropdown-trigger:focus-visible .project-option{
+    display: flex;
 }
 </style>

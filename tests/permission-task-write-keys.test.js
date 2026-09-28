@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const fs = require('fs');
 const path = require('path');
 
@@ -144,7 +145,7 @@ describe('every task write route and action has a permission mapping', () => {
             spy.mockRestore();
         }
         const res = response();
-        await handler({ headers: { companyid: CID }, body: { action: 'constructor' } }, Object.assign(res, { send: (body) => { res.body = body; } }));
+        await handler(verified({ headers: { companyid: CID }, body: { action: 'constructor' } }), Object.assign(res, { send: (body) => { res.body = body; } }));
         expect(res.body).toMatchObject({ status: false, statusText: 'Invalid relation action' });
     });
 

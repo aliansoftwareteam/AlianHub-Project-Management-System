@@ -54,9 +54,11 @@
                                     'invalid-email': staticHeaders[colIndex] === 'User Email' && !isValidEmail(col)
                                 }" type="text" />
                             <div v-else-if="staticHeaders[colIndex] === 'Role'">
-                                <DropDown :zIndex="8">
-                                    <template #button>
+                                <DropDown mode="listbox" :zIndex="8">
+                                    <template #button="{ triggerAttrs }">
                                         <button
+                                            type="button"
+                                            v-bind="triggerAttrs"
                                             class="bg-white border-0 cursor-pointer font-size-14 dark-gray w-100 drop-down-icon"
                                             :style="{ backgroundImage: `url(${dropDownSvg})` }" :class="{
                                                 'highlight-gray': isEmailMatched(row),
@@ -70,12 +72,12 @@
                                         </button>
                                     </template>
                                     <template #options>
-                                        <DropDownOption>
-                                            <input type="text" :placeholder="$t('PlaceHolder.search')" v-model="search[colIndex]"
+                                        <div class="d-flex align-items-center hover-bg-lighter-gray-dropdown hover-purple cursor-pointer text-nowrap drop-down-item gray81 p-7px border-radius-4-px">
+                                            <input type="text" :placeholder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" v-model="search[colIndex]"
                                                 class="p6px-8px border-gray-blue border-radius-4-px font-size-14" />
-                                        </DropDownOption>
+                                        </div>
                                         <DropDownOption v-for="(sysRole, sysIndex) in filteredRoles(colIndex)"
-                                            :key="sysIndex" :item="sysRole"
+                                            :key="sysIndex" :item="sysRole" :selected="sysRole === col"
                                             @click="updateRole(sysRole, rowIndex, colIndex,), $refs?.expand_collapse_role[rowIndex]?.click()">
                                             <span>{{ sysRole }}</span>
                                         </DropDownOption>
@@ -83,9 +85,11 @@
                                 </DropDown>
                             </div>
                             <div v-else-if="staticHeaders[colIndex] === 'Designation'">
-                                <DropDown :zIndex="8">
-                                    <template #button>
+                                <DropDown mode="listbox" :zIndex="8">
+                                    <template #button="{ triggerAttrs }">
                                         <button
+                                            type="button"
+                                            v-bind="triggerAttrs"
                                             class="bg-white border-0 cursor-pointer font-size-14 dark-gray w-100 drop-down-icon"
                                             :style="{ backgroundImage: `url(${dropDownSvg})` }" :class="{
                                                 'highlight-gray': isEmailMatched(row),
@@ -98,13 +102,13 @@
                                         </button>
                                     </template>
                                     <template #options>
-                                        <DropDownOption>
-                                            <input type="text" :placeholder="$t('PlaceHolder.search')" v-model="search[colIndex]"
+                                        <div class="d-flex align-items-center hover-bg-lighter-gray-dropdown hover-purple cursor-pointer text-nowrap drop-down-item gray81 p-7px border-radius-4-px">
+                                            <input type="text" :placeholder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" v-model="search[colIndex]"
                                                 class="p6px-8px border-gray-blue border-radius-4-px font-size-14" />
-                                        </DropDownOption>
+                                        </div>
                                         <DropDownOption
                                             v-for="(sysDesignation, sysIndex) in filteredDesignations(colIndex)"
-                                            :key="sysIndex" :item="sysDesignation"
+                                            :key="sysIndex" :item="sysDesignation" :selected="sysDesignation === col"
                                             @click="updateDesignation(sysDesignation, rowIndex, colIndex), $refs?.expand_collapse_designation[rowIndex]?.click()">
                                             <span>{{ sysDesignation }}</span>
                                         </DropDownOption>

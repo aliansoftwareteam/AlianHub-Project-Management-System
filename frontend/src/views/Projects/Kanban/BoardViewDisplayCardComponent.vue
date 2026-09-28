@@ -36,12 +36,12 @@
                     </div>
                     <Transition>
                         <div class="option-list" id="modelListComponent">
-                            <DropDown :title="element.TaskName" v-if="showArchiveVar ? element.deletedStatusKey === 2 : element.deletedStatusKey === 0">
-                                <template #button>
+                            <DropDown mode="menu" :title="element.TaskName" v-if="showArchiveVar ? element.deletedStatusKey === 2 : element.deletedStatusKey === 0">
+                                <template #button="{ triggerAttrs }">
                                     <button
                                         type="button"
                                         class="option-list__trigger"
-                                        :ref="element.id+'options'"
+                                        v-bind="triggerAttrs"
                                         :title="$t('Projects.task_actions')"
                                         :aria-label="$t('Projects.task_actions')"
                                     >
@@ -49,65 +49,65 @@
                                     </button>
                                 </template>
                                 <template #options>
-                                    <DropDownOption @click="$refs[element.id+`options`].click(),copyTaskLink()">
+                                    <DropDownOption @click="copyTaskLink()">
                                         <div class="d-flex align-items-center">
-                                            <img :src="linkIcon" alt="inventoryIcon" class="mr-10px">
+                                            <img :src="linkIcon" alt="" class="mr-10px">
                                             {{$t('ProjectDetails.copy_task_link')}}
                                         </div>
                                     </DropDownOption>
-                                    <DropDownOption @click="$refs[element.id+`options`].click(),copyTaskKey()">
+                                    <DropDownOption @click="copyTaskKey()">
                                         <div class="d-flex align-items-center">
-                                            <img :src="splitScreen" alt="inventoryIcon" class="mr-10px">
+                                            <img :src="splitScreen" alt="" class="mr-10px">
                                             {{$t('ProjectDetails.copy_task_key')}}
                                         </div>
                                     </DropDownOption>
-                                    <DropDownOption v-if="element.deletedStatusKey === undefined || element.deletedStatusKey === 0 && checkPermission('task.task_archive',projectData.isGlobalPermission) == true" @click="$refs[element.id+`options`].click(), showSidebar = true, archive = true">
+                                    <DropDownOption v-if="element.deletedStatusKey === undefined || element.deletedStatusKey === 0 && checkPermission('task.task_archive',projectData.isGlobalPermission) == true" @click="showSidebar = true, archive = true">
                                         <div class="d-flex align-items-center">
-                                            <img :src="inventoryIcon" alt="inventoryIcon" class="mr-10px">
+                                            <img :src="inventoryIcon" alt="" class="mr-10px">
                                             {{$t('Projects.archive')}}
                                         </div>
                                     </DropDownOption>
-                                    <DropDownOption v-if="element.deletedStatusKey === 2" @click="$refs[element.id+`options`].click(), updateTask(0)">
+                                    <DropDownOption v-if="element.deletedStatusKey === 2" @click="updateTask(0)">
                                         <div class="d-flex align-items-center">
-                                            <img :src="inventoryIcon" alt="restoreInventoryIcon" class="mr-10px">
+                                            <img :src="inventoryIcon" alt="" class="mr-10px">
                                             {{$t('Projects.restore')}}
                                         </div>
                                     </DropDownOption>
                                     <DropDownOption
-                                        @click="$refs[element.id+`options`].click(), showSidebar = true, archive = false"
+                                        @click="showSidebar = true, archive = false"
                                         v-if="checkPermission('task.task_delete',projectData.isGlobalPermission) == true">
                                         <div class="d-flex align-items-center">
-                                            <img :src="deleteIcon" alt="deleteIcon" class="mr-10px">
+                                            <img :src="deleteIcon" alt="" class="mr-10px">
                                             {{$t("Projects.delete")}}
                                         </div>
                                     </DropDownOption>
-                                    <DropDownOption @click="$refs[element.id+`options`].click(),convertToSubTask()" v-if="checkPermission('task.sub_task_create',projectData.isGlobalPermission) === true && !showArchiveVar && task?.isParentTask && checkPermission('task.task_convert_to_subtask',projectData.isGlobalPermission) === true">
+                                    <DropDownOption @click="convertToSubTask()" v-if="checkPermission('task.sub_task_create',projectData.isGlobalPermission) === true && !showArchiveVar && task?.isParentTask && checkPermission('task.task_convert_to_subtask',projectData.isGlobalPermission) === true">
                                         <div class="d-flex align-items-center">
-                                            <img :src="subTaskIcon" alt="deleteIcon" class="mr-10px">
+                                            <img :src="subTaskIcon" alt="" class="mr-10px">
                                             {{$t('ProjectDetails.convert_subtask')}}
                                         </div>
                                     </DropDownOption>
-                                    <DropDownOption @click="$refs[element.id+`options`].click(),convertToList()" v-if="checkPermission('project.project_sprint_create',projectData.isGlobalPermission) === true && !showArchiveVar && checkPermission('task.task_convert_to_list',projectData.isGlobalPermission) === true">
+                                    <DropDownOption @click="convertToList()" v-if="checkPermission('project.project_sprint_create',projectData.isGlobalPermission) === true && !showArchiveVar && checkPermission('task.task_convert_to_list',projectData.isGlobalPermission) === true">
                                         <div>
-                                            <img :src="combinedIcon" />
+                                            <img :src="combinedIcon" alt="" />
                                             <span class="dropdown-label">{{$t('ProjectDetails.convert_list')}}</span>
                                         </div>
                                     </DropDownOption>
-                                    <DropDownOption @click="$refs[element.id+`options`].click(),duplicateTask()" v-if="!showArchiveVar && checkPermission('task.task_duplicate',projectData.isGlobalPermission) == true">
+                                    <DropDownOption @click="duplicateTask()" v-if="!showArchiveVar && checkPermission('task.task_duplicate',projectData.isGlobalPermission) == true">
                                         <div>
-                                            <img :src="copyIcon" class="copyIcon"/>
+                                            <img :src="copyIcon" alt="" class="copyIcon"/>
                                             <span class="dropdown-label">{{$t('Projects.duplicate')}}</span>
                                         </div>
                                     </DropDownOption>
-                                    <DropDownOption @click="$refs[element.id+`options`].click(),moveTask()" v-if="!showArchiveVar && checkPermission('task.task_move',projectData.isGlobalPermission) == true">
+                                    <DropDownOption @click="moveTask()" v-if="!showArchiveVar && checkPermission('task.task_move',projectData.isGlobalPermission) == true">
                                         <div>
-                                            <img :src="moveIcon" />
+                                            <img :src="moveIcon" alt="" />
                                             <span class="dropdown-label">{{$t('ProjectDetails.move')}}</span>
                                         </div>
                                     </DropDownOption>
-                                    <DropDownOption @click="$refs[element.id+`options`].click(),mergeTask()" v-if="!showArchiveVar && checkPermission('task.task_merge',projectData.isGlobalPermission) == true">
+                                    <DropDownOption @click="mergeTask()" v-if="!showArchiveVar && checkPermission('task.task_merge',projectData.isGlobalPermission) == true">
                                         <div>
-                                            <img :src="mergeIcon" />
+                                            <img :src="mergeIcon" alt="" />
                                             <span class="dropdown-label">{{$t('ProjectDetails.merge')}}</span>
                                         </div>
                                     </DropDownOption>
