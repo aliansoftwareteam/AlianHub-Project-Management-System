@@ -1,5 +1,5 @@
 <template>
-    <AiMobileNav />
+    <AiMobileNav :primary="everyday" :extra="setup" />
     <aside class="ai-side">
         <div class="ai-side__head">
             <ShellIcon name="ai" :size="16" />

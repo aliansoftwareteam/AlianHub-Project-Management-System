@@ -46,16 +46,18 @@
 import { computed, inject, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
-import { useAgents } from "./useAgents";
-import { useAgentAccess } from "./agentAccess";
 
 defineOptions({ name: "AiMobileNav" });
+
+/* AiSidebar hands over its own everyday and Setup lists, so the phone bar never drifts from the sidebar. */
+const props = defineProps({
+    primary: { type: Array, default: () => [] },
+    extra: { type: Array, default: () => [] }
+});
 
 const router = useRouter();
 const route = useRoute();
 const companyId = inject("$companyId");
-const { waiting } = useAgents();
-const { canManage } = useAgentAccess();
 
 const root = ref(null);
 const moreButton = ref(null);
@@ -63,24 +65,8 @@ const moreOpen = ref(false);
 
 const available = (items) => items.filter((item) => !router || router.hasRoute(item.name));
 
-const primary = computed(() => available([
-    { name: "AiAsk", label: "Parity.nav_ask", icon: "ai" },
-    { name: "AiInbox", label: "Ai.inbox", icon: "inbox", count: waiting.value },
-    { name: "AiHub", label: "Ai.agents", icon: "agent" },
-    { name: "AiSkills", label: "Ai.skills", icon: "docs" }
-]));
-
-const extra = computed(() => available([
-    { name: "Connections", label: "Parity.nav_connections", icon: "integrations" },
-    { name: "AgentTeammates", label: "Parity.nav_teammates", icon: "members" },
-    { name: "AgentRouting", label: "Parity.nav_routing", icon: "automations" },
-    ...(canManage.value ? [{ name: "WorkflowBuilder", label: "WorkflowBuilder.nav", icon: "layout" }] : []),
-    { name: "AiAccounts", label: "Accounts.nav", icon: "key" },
-    { name: "AiPipeline", label: "Pipeline.nav_pipeline", icon: "layout" },
-    { name: "AiRelease", label: "Pipeline.nav_release", icon: "share" },
-    { name: "AiHealth", label: "AiHealth.nav", icon: "reports" },
-    { name: "AuditLog", label: "Ai.audit", icon: "audit" }
-]));
+const primary = computed(() => available(props.primary));
+const extra = computed(() => available(props.extra));
 
 const closeMore = (refocus) => {
     moreOpen.value = false;
@@ -100,8 +86,6 @@ onUnmounted(() => document.removeEventListener("click", onDocumentClick));
 .ai-mnav { display: none; }
 
 @media (max-width: 767px) {
-    /* The sidebar hides at this width, so its page stacks this bar above the content instead of beside it. */
-    :has(> .ai-mnav) { flex-direction: column; }
     .ai-mnav {
         display: flex; align-items: center; gap: 4px; flex: none; position: relative; z-index: 5;
         padding: 4px 8px; border-bottom: 1px solid var(--hairline); background: var(--surface);
