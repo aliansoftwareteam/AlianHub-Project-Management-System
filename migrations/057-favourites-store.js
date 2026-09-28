@@ -1,7 +1,8 @@
 /* Task 042 slice 8: stars move from each project, sprint and task (favouriteTasks) into one list on
  * the user record, where each entry names the company it came from. A company's stars are read
  * only through that company's scope. Each push is guarded by the entry it adds, so a second run,
- * or a star the user already made in the new store, adds nothing. favouriteTasks is left in place. */
+ * or a star the user already made in the new store, adds nothing. favouriteTasks is left in place,
+ * and the legacy routes may still write it, so there is no verify: a later legacy star is not a gap. */
 
 const { HEX_ID } = require('../utils/mongo-handler/objectIdKeys');
 const mongoose = require('mongoose');
@@ -64,19 +65,5 @@ module.exports = {
             ctx.logger.info(`[migrations] 057 ${companyId}: ${JSON.stringify(counts)}`);
             return counts;
         });
-    },
-    async verify(ctx) {
-        const problems = [];
-        await ctx.forEachCompany(async (companyId) => {
-            const stars = await starsOf(ctx, companyId);
-            const userIds = [...new Set(stars.map((star) => star.userId))].map((id) => new mongoose.Types.ObjectId(id));
-            const users = userIds.length ? await ctx.global({ type: ctx.SCHEMA_TYPE.USERS, data: [{ _id: { $in: userIds } }, { favourites: 1 }, { lean: true }] }, 'find') || [] : [];
-            const held = new Map(users.map((user) => [String(user._id), new Set((user.favourites || [])
-                .filter((entry) => String(entry.companyId) === String(companyId))
-                .map((entry) => `${entry.type}:${entry.id}`))]));
-            const missing = stars.filter((star) => held.has(star.userId) && !held.get(star.userId).has(`${star.type}:${star.id}`)).length;
-            if (missing) problems.push(`${companyId} ${missing} ${missing === 1 ? 'star is' : 'stars are'} not in the favourites store`);
-        });
-        return problems;
     },
 };

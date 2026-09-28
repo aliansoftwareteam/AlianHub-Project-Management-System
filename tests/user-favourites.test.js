@@ -296,11 +296,4 @@ describe('057-favourites-store', () => {
             expect(op.updateOne.update.$push.favourites.companyId).toBe(JSON.stringify(op.updateOne.filter).includes(C1) ? C1 : C2);
         });
     });
-
-    it('reports nothing left to move once it has run', async () => {
-        seedLegacy();
-        const ctx = contextFor([C1, C2]);
-        await migration.up(ctx);
-        expect(await migration.verify(contextFor([C1, C2]))).toEqual([]);
-    });
 });
