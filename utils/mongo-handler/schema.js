@@ -2123,6 +2123,15 @@ const schema = {
         accessibilityPreferences: {
             singleKeyShortcuts: { type: Boolean, required: false }
         },
+        // Written by Settings > Language (frontend/src/views/Settings/Language/localePrefs.js).
+        localePreferences: {
+            language: { type: String, required: false },
+            numerals: { type: String, required: false },
+            dateFormat: { type: String, required: false },
+            numberFormat: { type: String, required: false },
+            weekStart: { type: String, required: false },
+            currency: { type: String, required: false }
+        },
         // Stars across companies live on the global user record, so each entry names its company.
         favourites: {
             type: [new mongoose.Schema({
