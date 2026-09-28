@@ -109,6 +109,18 @@ const ACTION_LISTBOX = `
         </template>
     </DropDown>`;
 
+const REMOVABLE_LISTBOX = `
+    <DropDown mode="listbox" id="people" title="People" multiselectable>
+        <template #button>People</template>
+        <template #options>
+            <DropDownOption v-for="name in people" :key="name" @click="picked.push(name)">
+                {{ name }}
+                <button type="button" class="remove" data-option-action :aria-label="'Remove ' + name" @click.stop="removePerson(name)"></button>
+                <button v-if="!dropped.includes(name)" type="button" class="drop" data-option-action :aria-label="'Drop ' + name" @click.stop="dropped.push(name)"></button>
+            </DropDownOption>
+        </template>
+    </DropDown>`;
+
 let width = 1280;
 const setWidth = (value) => { width = value; };
 Object.defineProperty(document.documentElement, 'clientWidth', { configurable: true, get: () => width });
@@ -123,7 +135,10 @@ const mountUsage = async (template) => {
             const toggle = (name) => {
                 chosen.value = chosen.value.includes(name) ? chosen.value.filter((n) => n !== name) : [...chosen.value, name];
             };
-            return { picked: ref([]), status: ref('Doing'), statuses: ['To do', 'Doing', 'Done'], query: ref(''), chosen, toggle };
+            const people = ref(['Ann', 'Bob', 'Cy']);
+            const dropped = ref([]);
+            const removePerson = (name) => { people.value = people.value.filter((n) => n !== name); };
+            return { picked: ref([]), status: ref('Doing'), statuses: ['To do', 'Doing', 'Done'], query: ref(''), chosen, toggle, people, dropped, removePerson };
         },
         template: `<div>${template}</div>`,
     }), { attachTo: '#app' });
@@ -744,6 +759,47 @@ describe('an option holding its own action, marked data-option-action', () => {
         expect(active()).toBe(trigger());
         await settle();
         expect(isOpen()).toBe(false);
+    });
+
+    describe('when an action takes itself or its option out of the list', () => {
+        const option = (name) => items().find((el) => el.textContent.includes(name));
+        const removeFocusedOption = async () => {
+            await press(active(), 'ArrowRight');
+            expect(active().className).toBe('remove');
+            await press(active(), 'Enter');
+            await flushPromises();
+        };
+
+        it('moves focus to the next option, else the previous, else the trigger, and the list stays open', async () => {
+            await mountUsage(REMOVABLE_LISTBOX);
+            await press(trigger(), 'Enter');
+            await settle();
+            await press(active(), 'ArrowDown');
+            expect(active()).toBe(option('Bob'));
+            await removeFocusedOption();
+            expect(active()).toBe(option('Cy'));
+            await removeFocusedOption();
+            expect(active()).toBe(option('Ann'));
+            await removeFocusedOption();
+            expect(items()).toHaveLength(0);
+            expect(active()).toBe(trigger());
+            await settle();
+            expect(isOpen()).toBe(true);
+        });
+
+        it('hands focus back to its option when only the action itself goes away', async () => {
+            await mountUsage(REMOVABLE_LISTBOX);
+            await press(trigger(), 'Enter');
+            await settle();
+            await press(active(), 'ArrowDown');
+            await press(active(), 'ArrowRight');
+            await press(active(), 'ArrowRight');
+            expect(active().className).toBe('drop');
+            await press(active(), 'Enter');
+            await flushPromises();
+            expect(option('Bob').querySelector('.drop')).toBeNull();
+            expect(active()).toBe(option('Bob'));
+        });
     });
 
     it('leaves an option with no marked action alone on ArrowRight', async () => {

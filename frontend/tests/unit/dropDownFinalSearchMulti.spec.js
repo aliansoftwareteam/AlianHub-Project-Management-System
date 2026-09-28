@@ -272,12 +272,13 @@ describe('the list view column picker', () => {
 
 describe('the sprint watchers picker', () => {
     const mountWatchers = async () => {
+        const watchers = [
+            { _id: 'user-1', Employee_Name: 'Me', isWatcher: true, isLoggedUser: true },
+            { _id: 'user-2', Employee_Name: 'Sam', isWatcher: true, isLoggedUser: false },
+        ];
         const scope = {
             sprint: { watchers: ['user-1'] }, eyeIcon: '', searchWatcher: ref(''), clientWidth: 1280,
-            filteredWatchers: [
-                { _id: 'user-1', Employee_Name: 'Me', isWatcher: true, isLoggedUser: true },
-                { _id: 'user-2', Employee_Name: 'Sam', isWatcher: true, isLoggedUser: false },
-            ],
+            filteredWatchers: ref(watchers),
             getUser: () => ({ Employee_profileImageURL: '' }), updateWatchers: vi.fn(),
         };
         await mountMarkup(dropDownMarkup('components/organisms/SprinstList/SprintsList.vue', 'eyeIcon'), scope, { WasabiIamgeCompp: Blank });
@@ -311,6 +312,20 @@ describe('the sprint watchers picker', () => {
         expect(scope.updateWatchers.mock.calls).toEqual([['user-1', 'remove']]);
         await press(document.activeElement, 'ArrowLeft');
         expect(document.activeElement).toBe(mine);
+    });
+
+    it('keeps focus in the list when stopping watching takes your own option away', async () => {
+        const { scope, list } = await mountWatchers();
+        scope.updateWatchers.mockImplementation((id) => {
+            scope.filteredWatchers.value = scope.filteredWatchers.value.filter((user) => user._id !== id);
+        });
+        const mine = optionNamed(list, 'Me');
+        mine.focus();
+        await press(mine, 'ArrowRight');
+        await press(document.activeElement, 'Enter');
+        await flushPromises();
+        expect(optionNamed(list, 'Me')).toBeUndefined();
+        expect(document.activeElement).toBe(optionNamed(list, 'Sam'));
     });
 
     it('stops watching when Delete is pressed on your own option', async () => {
