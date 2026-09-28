@@ -82,6 +82,7 @@ test.describe('projects and planning — folder deep link (PRJ-07)', () => {
         await go(page, `/#/${state.companyId}/project/${state.projects.shared._id}/f/${folderId}`);
         await page.waitForTimeout(1000);
         expect(errors).toEqual([]);
-        await expect(page.getByText(sprintName, { exact: false })).toBeVisible();
+        await expect(page.locator('.section-right').getByText(sprintName, { exact: false })).toBeVisible();
+        await expect(page.getByRole('tree').getByRole('treeitem', { name: new RegExp(sprintName) })).toBeVisible();
     });
 });
