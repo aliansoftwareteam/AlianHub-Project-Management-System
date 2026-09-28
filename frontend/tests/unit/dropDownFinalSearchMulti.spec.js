@@ -301,6 +301,18 @@ describe('the sprint watchers picker', () => {
         expect(optionNamed(list, 'Sam').querySelector('button')).toBeNull();
     });
 
+    it('reaches "stop watching" with ArrowRight from your own option and runs it on Enter', async () => {
+        const { scope, list } = await mountWatchers();
+        const mine = optionNamed(list, 'Me');
+        mine.focus();
+        await press(mine, 'ArrowRight');
+        expect(document.activeElement).toBe(mine.querySelector('button'));
+        await press(document.activeElement, 'Enter');
+        expect(scope.updateWatchers.mock.calls).toEqual([['user-1', 'remove']]);
+        await press(document.activeElement, 'ArrowLeft');
+        expect(document.activeElement).toBe(mine);
+    });
+
     it('stops watching when Delete is pressed on your own option', async () => {
         const { scope, list } = await mountWatchers();
         await press(optionNamed(list, 'Me'), 'Delete');
@@ -332,5 +344,17 @@ describe('the per-tag actions in the tag picker', () => {
         const menu = await openList(actions[1]);
         expect(menu.getAttribute('role')).toBe('menu');
         expect(actions[1].getAttribute('aria-expanded')).toBe('true');
+    });
+
+    it('reach the dots button with ArrowRight from its tag and open the menu on Enter', async () => {
+        await mountSite(CreateTagPopup, props, { stubs });
+        await openList(document.querySelector('[aria-haspopup="listbox"]'));
+        const beta = [...document.querySelectorAll('#my-dropdown [role="option"]')].find((el) => el.textContent.includes('Beta'));
+        const dots = beta.querySelector('[aria-haspopup="menu"]');
+        beta.focus();
+        await press(beta, 'ArrowRight');
+        expect(document.activeElement).toBe(dots);
+        await press(dots, 'Enter');
+        expect(dots.getAttribute('aria-expanded')).toBe('true');
     });
 });
