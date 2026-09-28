@@ -8,8 +8,12 @@ const askStream = require('./askStream');
 const askThreads = require('./askThreads');
 const aiProfile = require('./aiProfile');
 const aiProfileImport = require('./aiProfileImport');
+const askBuild = require('./askBuild');
+const { requireTaskWritePermission } = require('../../Config/permissionGuard');
+const { TASK_WRITE_ROUTES } = require('../../Config/taskWritePermissions');
 const { chatSummaryHandler } = require('./chatSummary');
 const notesToTasks = require('./notesToTasks');
+const { chatAskHandler, chatAskPostHandler } = require('./chatAsk');
 
 exports.init = (app) => {
     app.post('/api/v1/generatePrompt', ctrl.generatePrompt);
@@ -45,6 +49,8 @@ exports.init = (app) => {
     app.delete('/api/v1/ai/memory', aiProfile.clearProfile);
     app.post('/api/v1/ai/memory/import/preview', aiProfileImport.previewImport);
     app.post('/api/v1/ai/memory/import/confirm', aiProfileImport.confirmImport);
+    app.get('/api/v1/ai/ask/build/:projectId', askBuild.buildTarget);
+    app.post('/api/v1/ai/ask/create-tasks', requireTaskWritePermission(TASK_WRITE_ROUTES['POST /api/v1/ai/ask/create-tasks'].entry), askBuild.createTasks);
     // Talk to Text — audio → text via OpenAI Whisper (multipart, field "file").
     app.post('/api/v1/ai/transcribe', ...transcribe.transcribe);
     app.post('/api/v1/ai/meeting-notes', meetingNotes.meetingNotesHandler);
@@ -52,6 +58,8 @@ exports.init = (app) => {
     app.post('/api/v1/ai/notes-to-tasks/propose', notesToTasks.proposeHandler);
     app.post('/api/v1/ai/notes-to-tasks', notesToTasks.createHandler);
     app.post('/api/v1/ai/notes-to-tasks/undo', notesToTasks.undoHandler);
+    app.post('/api/v1/ai/chat-ask', chatAskHandler);
+    app.post('/api/v1/ai/chat-ask/post', chatAskPostHandler);
     app.get('/api/v1/generatePrompt/events/:id', (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');

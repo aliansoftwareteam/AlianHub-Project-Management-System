@@ -6,6 +6,7 @@ const runs = require('./runs');
 const proposals = require('./proposals');
 const engine = require('../Automations/engine');
 const alerts = require('./alerts');
+const schedules = require('./schedules/scheduler');
 
 const REAP_PROPOSALS_JOB = 'agent.reap-stuck-proposals';
 const REAP_PROPOSALS_EVERY_MS = 5 * 60 * 1000;
@@ -39,6 +40,7 @@ exports.init = (app) => {
     reapStaleRuns().catch((e) => logger.error(`[agents] reap failed: ${e.message}`));
     engine.defineRecurring(REAP_PROPOSALS_JOB, REAP_PROPOSALS_EVERY_MS, reapStuckProposals).catch((e) => logger.error(`[agents] ${REAP_PROPOSALS_JOB}: ${e.message}`));
     engine.defineRecurring(alerts.JOB_NAME, alerts.intervalMs(), () => alerts.evaluateAll()).catch((e) => logger.error(`[agents] ${alerts.JOB_NAME}: ${e.message}`));
+    engine.defineRecurring(schedules.JOB_NAME, schedules.intervalMs(), () => schedules.tickAll()).catch((e) => logger.error(`[agents] ${schedules.JOB_NAME}: ${e.message}`));
 };
 
 exports.reapStaleRuns = reapStaleRuns;

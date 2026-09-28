@@ -98,6 +98,7 @@ const SCHEMA_TYPE = {
     AGENTS: "agents",
     AGENT_RUNS: "agent_runs",
     AGENT_REVISIONS: "agent_revisions",
+    AGENT_SCHEDULES: "agent_schedules",
     AI_USAGE: "ai_usage",
     AI_REPLAYS: "ai_replays",
     AI_RESERVATIONS: "ai_reservations",
@@ -133,6 +134,8 @@ const SCHEMA_TYPE = {
     AGENT_SESSIONS: "agent_sessions",
     AGENT_SESSION_ENDPOINTS: "agent_session_endpoints",
     ASK_THREADS: "ask_threads",
+    ASSIGNMENT_RULES: "assignment_rules",
+    ASSIGNMENT_DECISIONS: "assignment_decisions",
     AI_PROFILES: "ai_profiles",
 }
 

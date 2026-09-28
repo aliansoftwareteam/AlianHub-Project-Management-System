@@ -122,6 +122,15 @@
                         <p v-if="spendRow" class="ai-ladder__rule ah-mono">{{ $t('Ai.spent_this_month', { usd: spendRow.usd.toFixed(2), runs: spendRow.runs }) }}</p>
                     </section>
 
+                    <AgentSchedules
+                        :agent-id="String(route.params.id)"
+                        :autonomy="Number(saved.autonomy) || 0"
+                        :can-manage="canManage"
+                        :agent-owner-id="String(agent.ownerId || '')"
+                        :project-ids="(agent.projectIds || []).map(String)"
+                        :projects="projects"
+                    />
+
                     <section class="ah-card ai-agent">
                         <div class="ah-label">{{ $t('Ai.recent_audit') }}</div>
                         <div v-if="!recentRuns.length" class="ah-empty" style="margin-top:8px">{{ $t('Ai.no_runs') }}</div>
@@ -178,6 +187,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AiSidebar from "./AiSidebar.vue";
 import AgentRunDetail from "./AgentRunDetail.vue";
 import AgentRevisionHistory from "./AgentRevisionHistory.vue";
+import AgentSchedules from "./AgentSchedules.vue";
 import { useAgents, refusalCount } from "./useAgents";
 import { splitPreview } from "./policyPreview";
 import { changedFields, formFromAgent, skillsPayload } from "./agentSavePatch";

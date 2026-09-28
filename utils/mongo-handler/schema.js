@@ -1041,6 +1041,40 @@ const schema = {
         tainted: { type: Boolean, required: false },
         // [{ kind: fetch | email | form | webhook | file | passage | client | instruction, ref, at }] — where it came from, never the content
         taintSources: { type: Array, default: undefined, required: false },
+        // 'report' for a scheduled report run (no task); absent on a task run
+        kind: { type: String, required: false },
+        scheduleId: { type: String, required: false },
+        slotAt: { type: Date, required: false },
+        // { key, title, summary, sections, counts, text, delivered: { inbox, email, comment, page }, shared: { comment, page: { projectId, counts } }, notes }
+        report: { type: Object, required: false },
+    },
+    // Modules/Agents/schedules — when an L3 agent runs a report, and as whom
+    agentSchedules: {
+        agentId: { type: String, required: true },
+        // the person whose access the run reads with and who receives the report
+        ownerId: { type: String, required: true },
+        createdBy: { type: String, required: false },
+        // daily_briefing | deadline_watch | mentions_digest | weekly_status
+        report: { type: String, required: true },
+        // daily | weekdays | weekly
+        every: { type: String, required: true },
+        // HH:MM in `timezone`
+        at: { type: String, required: true },
+        // 0 (Sunday) to 6, weekly only
+        weekday: { type: Number, required: false },
+        timezone: { type: String, default: 'UTC', required: false },
+        // { days } for deadline_watch
+        options: { type: Object, required: false },
+        // { email, taskId, pageProjectId }
+        deliver: { type: Object, required: false },
+        enabled: { type: Boolean, default: true, required: false },
+        // slots at or before this never fire, so saving a schedule does not fire the slot just gone
+        since: { type: Date, required: false },
+        lastSlotAt: { type: Date, required: false },
+        // { status: done | failed | skipped | missed, reason, code, slot, runId, at }
+        lastResult: { type: Object, required: false },
+        nextRunAt: { type: Date, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
     },
     agentRevisions: {
         agentId: { type: String, required: true },
@@ -1793,6 +1827,47 @@ const schema = {
         },
         turnCount: { type: Number, required: false, default: 0 },
         lastTurnAt: { type: Date, required: false },
+    },
+    // Who a project's AI assignment rules name, and when (Modules/AssignmentRules). One row per project.
+    assignmentRules: {
+        projectId: { type: String, required: true },
+        entries: {
+            type: [{
+                _id: false,
+                userId: { type: String, required: true },
+                when: { type: String, required: true },
+            }],
+            default: [],
+            required: false,
+        },
+        fallbackUserId: { type: String, required: false, default: null },
+        onCreate: { type: Boolean, required: false, default: true },
+        onChange: { type: Boolean, required: false, default: false },
+        mode: { type: String, required: false, default: 'suggest' },
+        revision: { type: Number, required: false, default: 1 },
+        updatedBy: { type: String, required: false },
+        updatedAt: { type: Date, required: false },
+    },
+    // One decision per task revision: what the rules chose, why, and what became of it. `inputHash` covers the task text
+    // and the rule revision, so the same task is never decided twice for the same input.
+    assignmentDecisions: {
+        taskId: { type: String, required: true },
+        projectId: { type: String, required: true },
+        inputHash: { type: String, required: true },
+        trigger: { type: String, required: false, default: 'create' },
+        state: { type: String, required: true },
+        mode: { type: String, required: false, default: 'suggest' },
+        userId: { type: String, required: false, default: null },
+        source: { type: String, required: false, default: null },
+        rejectedUserId: { type: String, required: false, default: null },
+        reason: { type: String, required: false, default: '' },
+        model: { type: String, required: false, default: '' },
+        rulesRevision: { type: Number, required: false, default: 0 },
+        rulesBy: { type: String, required: false, default: '' },
+        resolvedBy: { type: String, required: false, default: '' },
+        resolvedAt: { type: Date, required: false },
+        createdAt: { type: Date, required: false },
+        updatedAt: { type: Date, required: false },
     },
     // One person's AI memory (Modules/AI/aiProfile): private to ownerId, admins included, and read only into
     // prompts that person starts.
@@ -3980,7 +4055,12 @@ const schema = {
         assignedAt: { type: Date, required: false },
         resolved: { type: Boolean, required: false },
         resolvedBy: { type: String, required: false },
-        resolvedAt: { type: Date, required: false }
+        resolvedAt: { type: Date, required: false },
+        // @ai: the question's { state, askerId, at, answerId, code }, and on the AI's answer who asked, which comment and what it cites.
+        aiAsk: { type: Object, required: false },
+        aiAskerId: { type: String, required: false },
+        aiQuestionId: { type: String, required: false },
+        aiCitations: { type: Array, required: false }
     },
     mainChat: {
         ProjectCode: {

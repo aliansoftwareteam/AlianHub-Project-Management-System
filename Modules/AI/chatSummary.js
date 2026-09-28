@@ -51,7 +51,7 @@ async function loadMessages(companyId, { projectId, sprintId, taskId }, accessMa
             { $sort: { createdAt: -1 } },
             { $limit: MAX_MESSAGES },
             { $sort: { createdAt: 1 } },
-            { $project: { message: 1, userId: 1, agentName: 1, createdAt: 1 } },
+            { $project: { message: 1, userId: 1, agentName: 1, actorType: 1, createdAt: 1 } },
         ]],
     }, 'aggregate');
 }
@@ -115,4 +115,4 @@ async function chatSummaryHandler(req, res) {
     }
 }
 
-module.exports = { summarizeChat, chatSummaryHandler, _internal: { plainMessage } };
+module.exports = { summarizeChat, chatSummaryHandler, loadMessages, namesOf, _internal: { plainMessage } };
