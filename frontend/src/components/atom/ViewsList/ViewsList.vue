@@ -244,6 +244,11 @@ defineEmits(['click']);
 .wrapper:focus-within .dots{
     visibility: visible;
 }
+/* Focus sits in the teleported menu while it is open, so focus-within no longer
+   holds; a hidden ⋯ would refuse the focus the menu hands back on Escape. */
+.dots[aria-expanded="true"]{
+    visibility: visible;
+}
 /* "Default view" home marker — in-flow after the name (not an absolute corner
    badge) so it never overlaps the label. */
 .list__default-home{
