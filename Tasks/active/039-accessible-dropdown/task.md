@@ -1,7 +1,7 @@
 ---
 id: 039
 title: Make the shared DropDown keyboard and screen-reader accessible
-status: backlog
+status: active
 priority: medium
 depends_on: []
 created: 2026-09-26

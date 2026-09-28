@@ -1,7 +1,7 @@
 ---
 id: 021
 title: Maintainability leftovers verified 2026-09-10
-status: backlog
+status: done
 priority: medium
 depends_on: []
 created: 2026-09-10

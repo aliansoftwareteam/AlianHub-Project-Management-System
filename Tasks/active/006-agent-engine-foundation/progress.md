@@ -11,7 +11,7 @@
 - [x] Verifier: evidence gate, confidence floor (#1080), dedup, volume cap
 - [x] Budgets enforced pre-call + usage accounting — done in 024 (#571, #572)
 - [x] `run_agent` action (synchronous, so `waitForResult` is implicit)
-- [ ] Review inbox + `AGENT_REVIEW_ITEMS`
+- [x] Review inbox + `AGENT_REVIEW_ITEMS` — covered by the AI Inbox (task 010) on `AGENT_PROPOSALS`: pending, done and declined tabs, approve with changes dropped, decline with reasons, undo; one proposal per run, verifier drops as text only, no acceptance-rate metric yet (checked 2026-09-28)
 - [ ] Two-week trial on a real sprint — folds into 019 (evals)
 - [x] Prompt-injection regression test on the agent run path — #1079
 - [x] Evaluate `run.spendCapUsd` before the model call — done in 024 (#571)
