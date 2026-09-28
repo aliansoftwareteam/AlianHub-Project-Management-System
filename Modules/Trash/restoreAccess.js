@@ -14,14 +14,14 @@ const storedRecord = (companyId, type, id, fields) => MongoDbCrudOpration(compan
     data: [{ _id: new mongoose.Types.ObjectId(id) }, fields],
 }, 'findOne');
 
-/* Each kind needs what deleting it needed, in the project the stored record belongs to. */
+/* Each kind needs what deleting it needed, in the project the stored record belongs to; a list also takes the list view's own restore key. */
 const RESTORABLE = {
     projects: {
         permission: DELETE_OR_CLOSE,
         locate: async (companyId, id) => ({ projectId: id }),
     },
     lists: {
-        permission: ['project.sprint_delete'],
+        permission: ['project.sprint_restore', 'project.sprint_delete'],
         locate: async (companyId, id) => {
             const sprint = await storedRecord(companyId, SCHEMA_TYPE.SPRINTS, id, { projectId: 1 });
             return sprint && { projectId: sprint.projectId, sprintId: id };
