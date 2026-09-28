@@ -45,6 +45,8 @@
                     <li v-for="(e, i) in errors" :key="i">{{ e }}</li>
                 </ul>
 
+                <AutomationAiDraft :key="aiKey" :sentence="sentence" :failed="sentenceFailed" @drafted="applyAiDraft" />
+
                 <div class="au__compiled">
                     <div class="ah-label">{{ $t('Parity.compiled_rule') }}</div>
 
@@ -213,6 +215,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import RunHistoryDrawer from './RunHistoryDrawer.vue';
+import AutomationAiDraft from './AutomationAiDraft.vue';
 import { assignPeopleText, assignSkippedText } from './assignText';
 import { choicesFor, refsFor } from './statusChoices';
 
@@ -247,6 +250,13 @@ const tryTasks = ref([]);
 const dryRunning = ref(false);
 const dryRunResult = ref(null);
 const dryRunError = ref('');
+const sentenceFailed = ref(false);
+const aiKey = ref(0);
+
+/* The sentence the server last wrote or read. Recompiling it on blur would
+ * re-parse a canonical sentence that cannot express every drafted condition
+ * (a person, say) and quietly widen the rule. */
+let settledSentence = '';
 
 const scopeChoice = ref('all');
 const conditions = ref([]);
@@ -382,28 +392,50 @@ const applyRule = (rule) => {
     scopeChoice.value = rule.scope?.allProjects === false && rule.scope.projectIds?.length ? String(rule.scope.projectIds[0]) : 'all';
 };
 
+const clearAiDraft = () => {
+    sentenceFailed.value = false;
+    aiKey.value += 1;
+};
+
 /* sentence → rule */
 const compileSentence = async () => {
-    if (!sentence.value.trim()) return;
+    if (!sentence.value.trim() || sentence.value === settledSentence) return;
     backtest.value = null;
-    const body = (await apiRequest('post', env.AUTOMATIONS_COMPILE, { sentence: sentence.value, scope: currentRule().scope }))?.data;
+    const asked = sentence.value;
+    const body = (await apiRequest('post', env.AUTOMATIONS_COMPILE, { sentence: asked, scope: currentRule().scope }))?.data;
     if (!body?.status) { errors.value = [body?.statusText || 'Could not read that sentence.']; return; }
     errors.value = body.data.errors || [];
     ambiguities.value = body.data.ambiguities || [];
     grammar.value = body.data.grammar || {};
+    if (errors.value.length) sentenceFailed.value = true;
+    else clearAiDraft();
     if (body.data.rule) {
         applyRule(body.data.rule);
         sentence.value = body.data.sentence;
     }
+    settledSentence = body.data.rule ? body.data.sentence : asked;
+};
+
+/* The draft only fills the builder: saving stays the person's own step. */
+const applyAiDraft = ({ rule, sentence: drafted }) => {
+    applyRule(rule);
+    sentence.value = drafted;
+    settledSentence = drafted;
+    errors.value = [];
+    ambiguities.value = [];
+    backtest.value = null;
+    sentenceFailed.value = false;
 };
 
 /* rule → sentence, so editing a slot rewrites the sentence above it. */
 const onRuleEdit = async () => {
     backtest.value = null;
+    sentenceFailed.value = false;
     const body = (await apiRequest('post', env.AUTOMATIONS_COMPILE, { rule: currentRule() }))?.data;
     if (!body?.status) return;
     errors.value = body.data.errors || [];
     sentence.value = body.data.sentence;
+    settledSentence = body.data.sentence;
 };
 
 const resolve = (item, option) => {
@@ -466,6 +498,7 @@ const shownParam = (value) => (value !== null && typeof value === 'object' ? JSO
 
 const startNew = async () => {
     resetDryRun();
+    clearAiDraft();
     errors.value = [];
     ambiguities.value = [];
     backtest.value = null;
@@ -475,6 +508,7 @@ const startNew = async () => {
     conditions.value = [];
     scopeChoice.value = 'all';
     sentence.value = '';
+    settledSentence = '';
     stepSeq = 0;
     addStep();
     building.value = true;
@@ -485,16 +519,18 @@ const startNew = async () => {
 
 const edit = (rule) => {
     resetDryRun();
+    clearAiDraft();
     errors.value = [];
     ambiguities.value = [];
     backtest.value = null;
     editingId.value = rule._id;
     applyRule(rule);
     sentence.value = rule.sentence || '';
+    settledSentence = sentence.value;
     building.value = true;
 };
 
-const cancel = () => { building.value = false; errors.value = []; };
+const cancel = () => { building.value = false; errors.value = []; clearAiDraft(); };
 
 const save = async (enabled) => {
     saving.value = true;
@@ -510,6 +546,7 @@ const save = async (enabled) => {
             return;
         }
         building.value = false;
+        clearAiDraft();
         await loadRules();
     } catch (e) {
         errors.value = [e?.message || 'Could not save.'];

@@ -92,7 +92,7 @@ export function useAskConversation({ t }) {
         return live.error;
     };
 
-    const send = async ({ question, mode = "ask", projectId = "" }) => {
+    const send = async ({ question, mode = "ask", projectId = "", skill = "", context = [] }) => {
         const asked = String(question || "").trim();
         if (!asked || streaming.value) return false;
         seq += 1;
@@ -101,6 +101,8 @@ export function useAskConversation({ t }) {
         const body = { question: asked, mode };
         if (projectId) body.projectId = projectId;
         if (threadId.value) body.threadId = threadId.value;
+        if (skill) body.skill = skill;
+        if (Array.isArray(context) && context.length) body.context = context;
         announcement.value = "";
         streaming.value = true;
         controller = new AbortController();
