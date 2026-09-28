@@ -72,12 +72,21 @@
                 :can-rename="rights.rename"
                 :can-subtask="rights.subtask"
                 :can-template="rights.template"
+                :can-archive="menuRights.archive"
+                :can-delete="menuRights.delete"
+                :can-move="menuRights.move"
+                :can-duplicate="menuRights.duplicate"
                 @rename="startRename"
                 @add-subtask="$emit('add-subtask', data)"
                 @copy-link="edit.copyLink(data)"
                 @copy-key="edit.copyKey && edit.copyKey(data)"
                 @open="open"
                 @save-template="openTemplateDialog({ mode: 'save', task: data })"
+                @archive="menu.archive(data)"
+                @delete="menu.remove(data)"
+                @move="menu.startMove(data)"
+                @duplicate="menu.duplicate(data)"
+                @duplicate-subtasks="menu.duplicate(data, { withSubtasks: true })"
             />
         </div>
 
@@ -177,6 +186,8 @@ const { t } = useI18n();
 const NO_RIGHTS = { status: false, assignee: false, due: false, priority: false, rename: false, subtask: false, estimate: false, points: false, customField: false, template: false };
 const edit = inject("listRowEdit", null);
 const rights = computed(() => edit?.rights.value || NO_RIGHTS);
+const menu = inject("listRowMenu", null);
+const menuRights = computed(() => menu?.rights.value || {});
 const statuses = computed(() => edit?.statuses.value || []);
 const showPriority = computed(() => (edit ? edit.showPriority.value : true));
 const rowEl = ref(null);

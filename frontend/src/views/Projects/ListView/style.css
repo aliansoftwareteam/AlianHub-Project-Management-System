@@ -279,7 +279,8 @@ button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status
 .lv2__row:hover .lv2__act,
 .lv2__row:focus-within .lv2__act,
 .lv2__act[aria-expanded="true"] { opacity: 1; }
-.lv2__menu { position: fixed; z-index: 30; }
+.lv2__menu { position: fixed; z-index: 30; max-height: calc(100vh - 16px); overflow-y: auto; }
+.lv2__menu .lv2__menu-danger, .lv2__menu .lv2__menu-danger:hover { color: var(--danger); }
 .lv2__create--sub { padding-left: 50px; }
 
 /* Handoff 29b — who did the work, who checked it, who closed it. */
