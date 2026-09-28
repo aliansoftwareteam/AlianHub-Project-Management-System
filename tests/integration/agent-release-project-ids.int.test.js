@@ -50,7 +50,7 @@ describe('agent release proposals and agent project lists show only projects the
         ({ insertedId: sprintId } = await db.collection('sprints').insertOne({
             name: `${tag} private`, projectId: new ObjectId(String(open._id)), private: true, AssigneeUserId: [owner.uid], deletedStatusKey: 0,
         }));
-        await db.collection('tasks').updateOne({ _id: new ObjectId(sprintTask._id) }, { $set: { sprintId, sprintArray: { id: String(sprintId), name: 'private' } } });
+        await db.collection('tasks').updateOne({ _id: new ObjectId(sprintTask._id) }, { $set: { sprintId, sprintArray: { id: sprintId, name: 'private' } } });
 
         const proposal = (key, project, task) => {
             marker[key] = `${tag} proposal ${key}`;

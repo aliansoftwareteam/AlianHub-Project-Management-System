@@ -1,5 +1,6 @@
 <template>
     <DropDown 
+        mode="listbox"
         :id="props.id" 
         @isVisible="handleClose()" 
         maxHeight="20dvh" 
@@ -166,6 +167,7 @@
                     <DropDownOption 
                         v-for="(item, i) in filteredItems" 
                         :key="`item-${i}`"
+                        :selected="isSelected(item)"
                         @click="handleItemSelect(item),!isMultiSelect? $refs[props.id].click() : null"
                     >
                         <div 

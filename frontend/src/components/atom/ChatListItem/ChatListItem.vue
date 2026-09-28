@@ -106,18 +106,20 @@
                                 v-if="canManageChannel"
                                 :id="`channel_${chat.id}`"
                                 :title="chat.name"
+                                mode="menu"
                                 class="mcs-menu"
                             >
                                 <template #button>
-                                    <span :ref="`channel_${chat.id}Ref`" class="mcs-menu-btn" :title="$t('MainChat.more')">
+                                    <span class="mcs-menu-btn" :title="$t('MainChat.more')">
                                         <MainChatIcon name="more" :size="16" />
+                                        <span class="ah-sr-only">{{ $t('MainChat.more') }}</span>
                                     </span>
                                 </template>
                                 <template #options>
-                                    <DropDownOption @click="closeChannelMenu(chat.id), $emit('edit', chat)">
+                                    <DropDownOption @click="$emit('edit', chat)">
                                         <span class="mcs-menu-item">{{ $t('Channel.edit_channel') }}</span>
                                     </DropDownOption>
-                                    <DropDownOption @click="closeChannelMenu(chat.id), $emit('delete', chat)">
+                                    <DropDownOption @click="$emit('delete', chat)">
                                         <span class="mcs-menu-item mcs-menu-item--danger">{{ $t('Channel.delete_channel') }}</span>
                                     </DropDownOption>
                                 </template>
@@ -132,7 +134,7 @@
 
 <script setup>
 // PACKAGES
-import { computed, getCurrentInstance, inject, onMounted, ref, watch } from "vue";
+import { computed, inject, onMounted, ref, watch } from "vue";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { useStore } from "vuex";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
@@ -154,7 +156,6 @@ const {getters} = useStore();
 const {checkPermission} = useCustomComposable();
 const userId = inject("$userId")
 const selectedChat = inject("selectedChat")
-const instance = getCurrentInstance();
 
 // IMAGES
 const triangleBlack = require("@/assets/images/svg/triangleBlack.svg");
@@ -186,13 +187,6 @@ const myCounts = computed(() => getters["users/myCounts"]?.data || {})
 
 // Same gate as "Create channel" on the category row above.
 const canManageChannel = computed(() => checkPermission('chat.chat_channel') === true);
-
-// DropDown has no close method; the app's idiom is to re-click the trigger.
-function closeChannelMenu(chatId) {
-    const trigger = instance && instance.refs && instance.refs[`channel_${chatId}Ref`];
-    const node = Array.isArray(trigger) ? trigger[0] : trigger;
-    if (node && node.click) node.click();
-}
 
 function getImage(arr = []) {
     if(!arr.length) return null;

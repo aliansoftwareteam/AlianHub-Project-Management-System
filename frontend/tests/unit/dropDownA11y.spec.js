@@ -47,6 +47,53 @@ const LEGACY = `
         </template>
     </DropDown>`;
 
+const HEAD_SEARCH_LISTBOX = `
+    <DropDown mode="listbox" id="assignee" title="Assignee">
+        <template #button>{{ status }}</template>
+        <template #head><input type="text" class="search" v-model="query"></template>
+        <template #options>
+            <DropDownOption v-for="name in statuses" :key="name" :selected="name === status" @click="status = name">{{ name }}</DropDownOption>
+        </template>
+    </DropDown>`;
+
+const SEARCH_SLOT_LISTBOX = `
+    <DropDown mode="listbox" id="skills" title="Skills">
+        <template #button>{{ status }}</template>
+        <template #search><input type="search" class="search" v-model="query"></template>
+        <template #options>
+            <DropDownOption v-for="name in statuses" :key="name" :selected="name === status" @click="status = name">{{ name }}</DropDownOption>
+        </template>
+    </DropDown>`;
+
+const MARKED_FIELD_MENU = `
+    <DropDown mode="menu" id="marked" title="Tags">
+        <template #button>Tags</template>
+        <template #head><input type="text" class="first"><input type="text" class="marked" data-dropdown-autofocus></template>
+        <template #options>
+            <DropDownOption @click="picked.push('edit')">Edit</DropDownOption>
+        </template>
+    </DropDown>`;
+
+const MULTI_LISTBOX = `
+    <DropDown mode="listbox" id="labels" title="Labels" multiselectable>
+        <template #button>Labels</template>
+        <template #options>
+            <DropDownOption v-for="name in statuses" :key="name" :selected="chosen.includes(name)" @click="toggle(name)">
+                <input type="checkbox" :checked="chosen.includes(name)">{{ name }}
+            </DropDownOption>
+        </template>
+    </DropDown>`;
+
+const FORM_DIALOG = `
+    <DropDown mode="dialog" id="savefilter" title="Save filter">
+        <template #button>Save filters</template>
+        <template #options>
+            <input type="text" class="name">
+            <select class="scope"><option>Me</option><option>Team</option></select>
+            <button type="button" class="save" @click="picked.push('save')">Save</button>
+        </template>
+    </DropDown>`;
+
 let width = 1280;
 const setWidth = (value) => { width = value; };
 Object.defineProperty(document.documentElement, 'clientWidth', { configurable: true, get: () => width });
@@ -56,7 +103,13 @@ let wrapper;
 const mountUsage = async (template) => {
     wrapper = mount(defineComponent({
         components: { DropDown, DropDownOption },
-        setup: () => ({ picked: ref([]), status: ref('Doing'), statuses: ['To do', 'Doing', 'Done'] }),
+        setup: () => {
+            const chosen = ref([]);
+            const toggle = (name) => {
+                chosen.value = chosen.value.includes(name) ? chosen.value.filter((n) => n !== name) : [...chosen.value, name];
+            };
+            return { picked: ref([]), status: ref('Doing'), statuses: ['To do', 'Doing', 'Done'], query: ref(''), chosen, toggle };
+        },
         template: `<div>${template}</div>`,
     }), { attachTo: '#app' });
     await flushPromises();
@@ -78,6 +131,11 @@ const settle = async () => {
     await flushPromises();
 };
 const isOpen = () => document.querySelector('#my-dropdown .drop-down-menu') !== null;
+const search = () => document.querySelector('#my-dropdown .search');
+const mouseClick = async (el) => {
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+    await flushPromises();
+};
 
 beforeEach(() => {
     vi.useFakeTimers();
@@ -377,5 +435,217 @@ describe('the outside-click listener', () => {
         window.removeEventListener('error', onError);
         expect(errors).toEqual([]);
         expect(isOpen()).toBe(false);
+    });
+});
+
+describe('a search field in the panel', () => {
+    const PLACES = [['#head', HEAD_SEARCH_LISTBOX], ['#search', SEARCH_SLOT_LISTBOX]];
+
+    it.each(PLACES)('in %s takes focus when the listbox opens from the keyboard', async (_, template) => {
+        await mountUsage(template);
+        await press(trigger(), 'Enter');
+        expect(active()).toBe(search());
+    });
+
+    it.each(PLACES)('in %s takes focus when the listbox opens from the mouse', async (_, template) => {
+        await mountUsage(template);
+        await mouseClick(trigger());
+        expect(active()).toBe(search());
+    });
+
+    it('keeps typed keys, Space, Home and End in the field', async () => {
+        await mountUsage(HEAD_SEARCH_LISTBOX);
+        await press(trigger(), 'Enter');
+        for (const key of ['a', ' ', 'Home', 'End']) {
+            const event = await press(search(), key);
+            expect(event.defaultPrevented).toBe(false);
+            expect(active()).toBe(search());
+        }
+        expect(isOpen()).toBe(true);
+    });
+
+    it('ArrowDown moves into the first option and ArrowUp into the last', async () => {
+        await mountUsage(SEARCH_SLOT_LISTBOX);
+        await press(trigger(), 'Enter');
+        await press(search(), 'ArrowDown');
+        expect(active()).toBe(items()[0]);
+        search().focus();
+        await press(search(), 'ArrowUp');
+        expect(active()).toBe(items()[2]);
+    });
+
+    it('is part of the arrow-key ring: up from the first option and down from the last return to it', async () => {
+        await mountUsage(HEAD_SEARCH_LISTBOX);
+        await press(trigger(), 'Enter');
+        await press(search(), 'ArrowDown');
+        await press(active(), 'ArrowUp');
+        expect(active()).toBe(search());
+        await press(search(), 'ArrowUp');
+        await press(active(), 'ArrowDown');
+        expect(active()).toBe(search());
+    });
+
+    it('Escape from the field closes and returns focus to the trigger', async () => {
+        await mountUsage(HEAD_SEARCH_LISTBOX);
+        await press(trigger(), 'Enter');
+        await press(search(), 'Escape');
+        expect(active()).toBe(trigger());
+        await settle();
+        expect(isOpen()).toBe(false);
+    });
+
+    it('from the #search slot sits above the list, outside its role element', async () => {
+        await mountUsage(SEARCH_SLOT_LISTBOX);
+        await press(trigger(), 'Enter');
+        const list = popup();
+        expect(list.getAttribute('role')).toBe('listbox');
+        expect(list.contains(search())).toBe(false);
+        expect(search().compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(list.parentElement.contains(search())).toBe(true);
+    });
+
+    it('gives way to an element marked data-dropdown-autofocus', async () => {
+        await mountUsage(MARKED_FIELD_MENU);
+        await press(trigger(), 'ArrowDown');
+        expect(active()).toBe(document.querySelector('#my-dropdown .marked'));
+    });
+
+    it.each(PLACES)('in %s takes focus on the mobile sheet and ArrowDown still reaches the options', async (_, template) => {
+        setWidth(390);
+        await mountUsage(template);
+        trigger().click();
+        await flushPromises();
+        expect(active()).toBe(search());
+        await press(search(), 'ArrowDown');
+        expect(active()).toBe(items()[0]);
+    });
+});
+
+describe('a multiselect listbox', () => {
+    it('announces aria-multiselectable', async () => {
+        await mountUsage(MULTI_LISTBOX);
+        await press(trigger(), 'Enter');
+        expect(popup().getAttribute('aria-multiselectable')).toBe('true');
+    });
+
+    it('is not what a single-select listbox announces', async () => {
+        await mountUsage(STATUS_LISTBOX);
+        await press(trigger(), 'Enter');
+        expect(popup().hasAttribute('aria-multiselectable')).toBe(false);
+    });
+
+    it('stays open while several options are picked from the keyboard and the mouse', async () => {
+        await mountUsage(MULTI_LISTBOX);
+        await press(trigger(), 'Enter');
+        // Vue skips a handler attached at the same instant the event started, and fake timers freeze Date.now().
+        await settle();
+        await press(active(), 'Enter');
+        await press(active(), 'ArrowDown');
+        await press(active(), ' ');
+        await mouseClick(items()[2]);
+        await settle();
+        expect(isOpen()).toBe(true);
+        expect(wrapper.vm.chosen).toEqual(['To do', 'Doing', 'Done']);
+        expect(items().map((item) => item.getAttribute('aria-selected'))).toEqual(['true', 'true', 'true']);
+    });
+
+    it('makes a checkbox inside an option presentational, so focus stays on the option', async () => {
+        await mountUsage(MULTI_LISTBOX);
+        await press(trigger(), 'Enter');
+        const boxes = [...document.querySelectorAll('#my-dropdown input[type="checkbox"]')];
+        expect(boxes).toHaveLength(3);
+        boxes.forEach((box) => {
+            expect(box.getAttribute('tabindex')).toBe('-1');
+            expect(box.getAttribute('aria-hidden')).toBe('true');
+        });
+    });
+});
+
+describe('a dialog dropdown holding a form', () => {
+    const panel = () => document.querySelector('#my-dropdown .drop-down-menu');
+    const field = (name) => document.querySelector(`#my-dropdown .${name}`);
+
+    it('announces a dialog on the trigger and labels the panel with it', async () => {
+        await mountUsage(FORM_DIALOG);
+        const button = trigger();
+        expect(button.tagName).toBe('BUTTON');
+        expect(button.getAttribute('aria-haspopup')).toBe('dialog');
+        expect(button.getAttribute('aria-expanded')).toBe('false');
+        button.click();
+        await flushPromises();
+        expect(button.getAttribute('aria-expanded')).toBe('true');
+        expect(popup()).toBe(panel());
+        expect(panel().getAttribute('role')).toBe('dialog');
+        expect(panel().getAttribute('aria-labelledby')).toBe(button.id);
+        expect(document.querySelector('#my-dropdown .drop-down-options').hasAttribute('role')).toBe(false);
+    });
+
+    it('takes an aria-label instead of the trigger when one is given', async () => {
+        await mountUsage(FORM_DIALOG.replace('mode="dialog"', 'mode="dialog" aria-label="Name this filter"'));
+        trigger().click();
+        await flushPromises();
+        expect(panel().getAttribute('aria-label')).toBe('Name this filter');
+        expect(panel().hasAttribute('aria-labelledby')).toBe(false);
+    });
+
+    it.each([['keyboard', (el) => press(el, 'Enter')], ['mouse', mouseClick]])('focuses the first field when opened from the %s', async (_, openWith) => {
+        await mountUsage(FORM_DIALOG);
+        await openWith(trigger());
+        expect(active()).toBe(field('name'));
+    });
+
+    it('keeps Tab and Shift+Tab inside the panel across the fields and the button', async () => {
+        await mountUsage(FORM_DIALOG);
+        await press(trigger(), 'Enter');
+        const order = [];
+        for (let i = 0; i < 3; i++) {
+            const event = await press(active(), 'Tab');
+            expect(event.defaultPrevented).toBe(true);
+            order.push(active().className);
+        }
+        expect(order).toEqual(['scope', 'save', 'name']);
+        const event = await press(active(), 'Tab', { shiftKey: true });
+        expect(event.defaultPrevented).toBe(true);
+        expect(active()).toBe(field('save'));
+        expect(isOpen()).toBe(true);
+    });
+
+    it('leaves arrow keys, Space and Enter to the fields and buttons', async () => {
+        await mountUsage(FORM_DIALOG);
+        await press(trigger(), 'Enter');
+        await settle();
+        for (const key of ['ArrowDown', 'ArrowUp', 'Home', ' ', 'Enter']) {
+            const event = await press(field('name'), key);
+            expect(event.defaultPrevented).toBe(false);
+            expect(active()).toBe(field('name'));
+        }
+        field('save').focus();
+        field('save').click();
+        await settle();
+        expect(wrapper.vm.picked).toEqual(['save']);
+        expect(isOpen()).toBe(true);
+    });
+
+    it('Escape closes and returns focus to the trigger', async () => {
+        await mountUsage(FORM_DIALOG);
+        await press(trigger(), 'Enter');
+        await press(field('scope'), 'Escape');
+        expect(active()).toBe(trigger());
+        await settle();
+        expect(isOpen()).toBe(false);
+    });
+
+    it('is a modal dialog with the same trap on the mobile sheet', async () => {
+        setWidth(390);
+        await mountUsage(FORM_DIALOG);
+        trigger().click();
+        await flushPromises();
+        expect(panel().getAttribute('role')).toBe('dialog');
+        expect(panel().getAttribute('aria-modal')).toBe('true');
+        expect(active()).toBe(field('name'));
+        field('save').focus();
+        const event = await press(field('save'), 'Tab');
+        expect(event.defaultPrevented).toBe(true);
+        expect(panel().contains(active())).toBe(true);
     });
 });

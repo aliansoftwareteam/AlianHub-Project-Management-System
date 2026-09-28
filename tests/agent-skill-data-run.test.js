@@ -130,7 +130,7 @@ describe('a data skill runs through the engine like a code skill', () => {
         await execute(run);
         const prompt = chat.mock.calls[0][0].messages[0].content;
         expect(prompt).not.toContain('DATA VERSION');
-        expect(prompt).toMatch(/^TASK: Magic-link login\n/);
+        expect(prompt).toMatch(/^<workspace_data>\nTASK: Magic-link login\n/);
     });
 
     it('an unknown key fails the run deterministically', async () => {

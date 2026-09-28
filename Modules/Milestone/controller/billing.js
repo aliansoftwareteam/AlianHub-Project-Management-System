@@ -11,6 +11,7 @@ const { ROLE_GUEST } = require('../../../Config/roleTypes');
 const { resolveRate } = require('../../TimeSheet/helpers/billingRules');
 const math = require('../helpers/billingMath');
 const { memberProfiles, activeMemberIds } = require('../../../utils/companyMembers');
+const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 
 // Billing contract + milestone rollups (handoff 19a / 19b).
 //
@@ -110,7 +111,7 @@ const loadProject = (companyId, projectId) => MongoDbCrudOpration(companyId, {
 
 const loadMilestones = (companyId, projectId) => MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.MILESTONE,
-    data: [{ projectId: String(projectId) }, null, { sort: { order: 1, startDate: 1 } }],
+    data: [{ projectId: { $in: idForms(projectId) } }, null, { sort: { order: 1, startDate: 1 } }],
 }, 'find');
 
 const loadProjectTasks = (companyId, projectId) => MongoDbCrudOpration(companyId, {
@@ -510,7 +511,7 @@ exports.updateBillingMilestone = async (req, res) => {
 
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.MILESTONE,
-            data: [{ _id: id, projectId }, { $set: set }, { returnDocument: 'after' }],
+            data: [{ _id: id, projectId: { $in: idForms(projectId) } }, { $set: set }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
         if (!saved) return res.send({ status: false, statusText: 'Milestone not found.' });
 

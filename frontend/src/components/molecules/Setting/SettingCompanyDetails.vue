@@ -133,8 +133,7 @@
 
                                         <div class="con-select selectExample autocompletex">
                                             <div class="input-select-con">
-                                                <DropDown :id="formatdate"
-                                                    :style="{ 'pointer-events': !props.editPermission ? 'none' : '' }">
+                                                <DropDown v-if="props.editPermission" :id="formatdate" mode="listbox">
                                                     <template #button>
                                                         <div class=" cursor-pointer text-capitalize" :ref="formatdate">
                                                             {{ formData.format_date }}
@@ -144,10 +143,14 @@
                                                         <DropDownOption
                                                             @click="formData.format_date = date, $refs[formatdate].click()"
                                                             v-for="(date, index) in dateArray" :key="index"
+                                                            :selected="date === formData.format_date"
                                                             :item="{ label: date }">
                                                         </DropDownOption>
                                                     </template>
                                                 </DropDown>
+                                                <div v-else class="text-capitalize">
+                                                    {{ formData.format_date }}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

@@ -26,10 +26,10 @@
                     <img :src="saveData" class="cursor-pointer"  v-if="element.isEditable" @click="$emit('click:updateFieldValue', element,categoryTytpe),$emit('disbaleButton',false)">
                     <img :src="deletered" class="cursor-pointer ml-10px" v-if="element.isEditable" @click="element.isEditable = false, element.name = taskTypeName,$emit('disbaleButton',false),$emit('resetTaskTypeErr')">
                     <span class="taskInnerData task-dropdown" v-if="props.from === 'task_type' && itemData.length > 1">
-                        <DropDown id="" class="status_change_dropdown" :bodyClass="{'taskstatus-dropdown' : true}" v-if="isDeletable && element.default ? false : true">
-                            <template #button>
-                                <button class="btn-white border cursor-pointer dot-btn">
-                                    <img :src="dotcolor">
+                        <DropDown mode="menu" id="" class="status_change_dropdown" :bodyClass="{'taskstatus-dropdown' : true}" v-if="isDeletable && element.default ? false : true">
+                            <template #button="{ triggerAttrs }">
+                                <button type="button" class="btn-white border cursor-pointer dot-btn" v-bind="triggerAttrs">
+                                    <img :src="dotcolor" :alt="$t('Templates.item_actions', { name: element.name })">
                                 </button>
                             </template>
                             <template #options>
@@ -40,10 +40,10 @@
                         </DropDown>
                     </span>
                     <span class="taskInnerData task-dropdown" v-if="!element.isEditable && element.default ? false : true && props.from !== 'task_type'">
-                        <DropDown class="status_change_dropdown" :bodyClass="{'taskstatus-dropdown' : true}" v-if="isDeletable && element.default ? false : true">
-                            <template #button>
-                                <button class="btn-white border cursor-pointer dot-btn">
-                                    <img :src="dotcolor">
+                        <DropDown mode="menu" class="status_change_dropdown" :bodyClass="{'taskstatus-dropdown' : true}" v-if="isDeletable && element.default ? false : true">
+                            <template #button="{ triggerAttrs }">
+                                <button type="button" class="btn-white border cursor-pointer dot-btn" v-bind="triggerAttrs">
+                                    <img :src="dotcolor" :alt="$t('Templates.item_actions', { name: element.name })">
                                 </button>
                             </template>
                             <template #options>
