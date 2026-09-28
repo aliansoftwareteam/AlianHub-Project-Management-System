@@ -27,6 +27,7 @@
                             @handleEdit="handleEdit(item)"
                             @handleUpdate="handleUpdate"
                         />
+                        <AiFieldMark v-if="isAiField(item)" class="custom-field__ai" :def="item" :task="props.task" :canFill="Boolean(props.editPermission)" show-text />
                     </div>
                 </template>
             </template>
@@ -49,6 +50,8 @@
     import ComputedComponentListing from '../../atom/customFieldTaskView/computedComponentListing.vue';
     import { computeCustomFieldValue, recomputeCustomFields } from '@/plugins/customFieldView/formulaEngine.js';
     import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
+    import AiFieldMark from '@/components/atom/AiFieldMark/AiFieldMark.vue';
+    import { isAiField } from '@/views/Projects/composables/aiFields';
 
 
     const { getters } = useStore();

@@ -46,6 +46,12 @@
 .au__x:hover { color: var(--danger-ink); }
 .au__warn { margin: 0; font: var(--text-small); color: var(--warn-ink); background: var(--warn-bg); border-radius: 6px; padding: 7px 10px; }
 .au__save { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.au-assign { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.au-assign__people { display: inline-block; min-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.au-assign__search { width: 100%; box-sizing: border-box; padding: 5px 8px; border: 1px solid var(--border); border-radius: var(--r-chip); background: var(--surface); color: var(--ink); font: var(--text-small); }
+.au-assign__option { display: inline-flex; align-items: center; gap: 8px; }
+.au-assign__empty { margin: 6px 4px; color: var(--ink-2); }
+.au-assign__turns { display: inline-flex; align-items: center; gap: 4px; font: var(--text-small); color: var(--ink-2); cursor: pointer; }
 
 .au__rule {
     display: flex; align-items: center; gap: 10px;

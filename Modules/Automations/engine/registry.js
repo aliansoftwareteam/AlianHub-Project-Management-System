@@ -3,6 +3,7 @@ const setPriority = require('./actions/setPriority');
 const addComment = require('./actions/addComment');
 const createSubtaskAction = require('./actions/createSubtask');
 const runAgent = require('./actions/runAgent');
+const assignTask = require('./actions/assignTask');
 const { COMPARISON_OPS, CHANGE_OPS, LOGICAL_OPS } = require('./expression');
 const timeTrigger = require('../../Workflows/timeTrigger');
 const workflowEngine = require('../../Workflows/flag');
@@ -14,7 +15,7 @@ const workflowEngine = require('../../Workflows/flag');
 // frontend changes. If instead each action needs a hand-written form, the action
 // library stops growing at about a dozen — which is the state the old stub was in.
 
-const ACTIONS = [setStatus, setPriority, addComment, createSubtaskAction, runAgent];
+const ACTIONS = [setStatus, setPriority, addComment, createSubtaskAction, assignTask, runAgent];
 const ACTIONS_BY_KEY = new Map(ACTIONS.map((a) => [a.key, a]));
 
 /* Event types the bus can emit today, with whether they carry a field diff.

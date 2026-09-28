@@ -376,4 +376,4 @@ const createTask = async (companyId, projectId, { title, description = '', sprin
     return { changed: true, taskId: String(task._id), key: task.TaskKey || '', title: name };
 };
 
-module.exports = { DeterministicError, getTask, updateTask, addComment, commentThreadOf, ruleOwner, createSubtask, createTask, resolveStatus, oid };
+module.exports = { DeterministicError, getTask, updateTask, recordAutomationAudit, addComment, commentThreadOf, ruleOwner, createSubtask, createTask, resolveStatus, oid };

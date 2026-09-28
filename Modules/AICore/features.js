@@ -21,6 +21,7 @@ const FEATURES = Object.freeze({
     MCP_BRIEF: 'mcp_brief',
     KNOWLEDGE_EMBED: 'knowledge_embed',
     ACTION_ITEMS: 'action_items',
+    AI_FIELD: 'ai_field',
     AGENT_BUILDER: 'agent_builder',
 });
 
