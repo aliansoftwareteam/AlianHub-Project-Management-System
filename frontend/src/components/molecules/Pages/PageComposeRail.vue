@@ -13,7 +13,26 @@
                 >{{ $t(item.label) }}</button>
             </div>
         </div>
-        <form class="pcr__form" @submit.prevent="compose">
+        <AiResultPreview
+            v-if="result"
+            :text="result.text"
+            :busy="busy"
+            :title="result.action === 'ask' ? $t('Projects.pages_ai_answer') : ''"
+            :show-replace="result.action !== 'ask'"
+            :show-insert="result.action !== 'ask'"
+            :show-copy="result.action === 'ask'"
+            :insert-label="$t('Projects.pages_ai_insert_below')"
+            :return-focus="() => inputRef"
+            @replace="apply('replace')"
+            @insert="apply('append')"
+            @retry="compose(result.request)"
+            @cancel="result = null"
+        />
+        <div v-else-if="applied" class="pcr__applied" role="status">
+            <span>{{ applied === 'replace' ? $t('Projects.pages_ai_replaced') : $t('Projects.pages_ai_added') }}</span>
+            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm pcr__undo" @click="undo">{{ $t('UndoToast.undo') }}</button>
+        </div>
+        <form class="pcr__form" @submit.prevent="compose()">
             <input
                 ref="inputRef"
                 v-model="instruction"
@@ -37,6 +56,7 @@ import { useToast } from 'vue-toast-notification';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import AiResultPreview from '@/components/molecules/AiPreview/AiResultPreview.vue';
 
 defineOptions({ name: 'PageComposeRail' });
 
@@ -49,7 +69,7 @@ const props = defineProps({
     currentText: { type: String, default: '' },
 });
 
-const emit = defineEmits(['apply']);
+const emit = defineEmits(['apply', 'undo']);
 
 const actions = [
     { key: 'draft', label: 'Projects.pages_compose_draft' },
@@ -65,6 +85,8 @@ const instruction = ref('');
 const busy = ref(false);
 const notice = ref('');
 const inputRef = ref(null);
+const result = ref(null);
+const applied = ref('');
 
 onMounted(() => {
     apiRequest('get', `${env.PAGES}/ai-status`)
@@ -81,21 +103,23 @@ function focusAsk() {
 
 defineExpose({ focusAsk });
 
-function compose() {
+function compose(previous = null) {
     if (busy.value) return;
-    if (action.value === 'ask' && !instruction.value.trim()) {
-        notice.value = t('Projects.pages_compose_placeholder');
-        return;
-    }
-    busy.value = true;
-    notice.value = '';
-    apiRequest('post', `${env.PAGES}/ai`, {
+    const request = previous || {
         action: action.value,
         title: props.title,
         instruction: instruction.value,
         currentText: props.currentText,
         pageId: props.pageId || undefined,
-    }).then((response) => {
+    };
+    if (request.action === 'ask' && !String(request.instruction || '').trim()) {
+        notice.value = t('Projects.pages_compose_placeholder');
+        return;
+    }
+    busy.value = true;
+    notice.value = '';
+    applied.value = '';
+    apiRequest('post', `${env.PAGES}/ai`, request).then((response) => {
         if (response.data?.isNotAi || (response.data && response.data.status === false && /not integrated/i.test(response.data.statusText || ''))) {
             notice.value = t('Projects.pages_ai_missing');
             return;
@@ -105,18 +129,31 @@ function compose() {
             return;
         }
         const payload = response.data.data || {};
-        if (action.value === 'ask') {
-            notice.value = payload.previewText || payload.markdown || t('Projects.pages_ai_applied');
-            return;
-        }
-        emit('apply', { mode: action.value === 'expand' ? 'append' : 'replace', blocks: payload.blocks });
-        $toast.success(t('Projects.pages_ai_applied'), { position: 'top-right' });
+        result.value = {
+            action: request.action,
+            request,
+            text: payload.markdown || payload.previewText || '',
+            blocks: payload.blocks,
+        };
     }).catch((error) => {
         console.error('ERROR in page compose: ', error);
         $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
     }).finally(() => {
         busy.value = false;
     });
+}
+
+function apply(mode) {
+    if (!result.value) return;
+    emit('apply', { mode, blocks: result.value.blocks });
+    result.value = null;
+    applied.value = mode;
+}
+
+function undo() {
+    applied.value = '';
+    emit('undo');
+    nextTick(() => inputRef.value && inputRef.value.focus());
 }
 </script>
 
@@ -138,6 +175,13 @@ function compose() {
 }
 .pcr__form { display: flex; gap: 8px; }
 .pcr__input { flex: 1 1 auto; min-width: 0; height: 36px; }
+.pcr__applied {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font: var(--text-small);
+    color: var(--ink-2);
+}
 .pcr__notice {
     margin: 0;
     font: var(--text-small);

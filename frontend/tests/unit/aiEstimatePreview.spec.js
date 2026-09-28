@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { config, flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { ref } from 'vue';
 
@@ -33,6 +33,9 @@ for (const [path, name] of [
 
 import { apiRequest } from '@/services';
 import { undoToast, runUndo, dismissUndoToast } from '@/composable/useUndoToast';
+import en from '@/locales/en.js';
+
+config.global.plugins[0].global.setLocaleMessage('en', en);
 
 const PROPOSAL = { status: true, data: { minutes: 210, optimistic: 150, pessimistic: 300, reasoning: 'Two endpoints and a form', previousMinutes: 120 } };
 
@@ -50,6 +53,7 @@ async function mountSide(value = task()) {
         props: { task: value, clientWidth: 1280 },
         global: {
             plugins: [store],
+            mocks: { $t: config.global.plugins[0].global.t },
             provide: {
                 $userId: ref('u1'),
                 $dateFormat: ref('DD/MM/YYYY'),
@@ -77,7 +81,7 @@ describe('the AI estimate', () => {
     it('labels the trigger in words', async () => {
         const wrapper = await mountSide();
         const trigger = wrapper.get('button.ai-estimate-btn');
-        expect(trigger.text()).toContain('TaskPanel.ai_estimate_suggest');
+        expect(trigger.text()).toContain('Suggest');
         expect(trigger.attributes('aria-label')).toBeTruthy();
         expect(trigger.attributes('title')).toBeTruthy();
     });
@@ -88,7 +92,7 @@ describe('the AI estimate', () => {
         expect(proposeCalls()).toHaveLength(1);
         expect(apiRequest.mock.calls.some(([method, url]) => method === 'post' && String(url).endsWith('/ai/task-1'))).toBe(false);
         const preview = wrapper.get('.aip');
-        expect(preview.text()).toContain('TaskPanel.ai_estimate_suggests');
+        expect(preview.text()).toContain('AI suggests 3h 30m');
         expect(preview.text()).toContain('Two endpoints and a form');
         expect(ops.updateTotalEstimatedTime).not.toHaveBeenCalled();
     });

@@ -146,6 +146,7 @@ describe('/ai in a task comment', () => {
         await click('.aip__cancel');
         expect(preview()).toBeNull();
         expect(box.element.value).toBe('Hi team,\n/ai ask for a review');
+        expect(document.activeElement).toBe(box.element);
     });
 
     it('puts the text where the /ai line was on Insert and keeps the rest of the draft', async () => {
