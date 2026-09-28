@@ -19,6 +19,7 @@ const { updateUserFun } = require("../Users/controller.js");
 const { storeRefferalCode, checkAndStoreRefferalCode } = require("../Affiliate/controller.js");
 const { handleCreateCompanyDataStorageFunForUpload, handleCreateCompanyDataStorageFun } = require(`../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
 const { seedSampleProject } = require("../createProject/sampleProject.js");
+const { ensureViewCatalogue } = require("../projectTabs/catalogue.js");
 const { normaliseFocus, FOCUS_LABELS } = require("../createProject/sampleTasks.js");
 const { pinSessionTenant } = require("../../Config/tenant.js");
 const { getRoleType, ROLE_OWNER } = require("../../Config/permissionGuard.js");
@@ -581,6 +582,8 @@ exports.createCompanyV2 = async (req, res) => {
                 serviceFunctionCtr.allSettledWithRetry(3, allProcess)
                 .then(async(allSettledRes) => {
                     await handleCreateCompanyDataStorageFunForUpload(req.body, companyId)
+                    // A preset company may have been seeded before the catalogue import stopped wiping and refilling.
+                    await ensureViewCatalogue(companyId).catch((error) => logger.error(`project view catalogue for ${companyId} failed: ${error.message}`));
                     if (bodyData.teamFocus && bodyData.seedSampleProject !== false) {
                         emitListener(bodyData?.eventId, {step: 2});
                         await seedSampleProject({ companyId, uid: bodyData.userId, teamFocus: bodyData.teamFocus });

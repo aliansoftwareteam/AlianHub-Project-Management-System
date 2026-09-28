@@ -8,6 +8,8 @@ const { taskMongo } = require('../Tasks/helpers/task_class_Mongo');
 const pages = require('../Pages/controller');
 const rules = require('./rules');
 const { tenantOf, TenantError } = require('../../Config/tenant');
+const { visibleTrash } = require('./listAccess');
+const { sessionActor } = require('../Tasks/helpers/taskWriteFields');
 
 const ObjectId = mongoose.Types.ObjectId;
 
@@ -31,7 +33,8 @@ exports.list = async (req, res) => {
     try {
         const q = rules.listQuery(kind);
         const docs = await MongoDbCrudOpration(companyId, { type: q.type, data: [q.filter, q.fields, q.options] }, 'find');
-        return res.send({ status: true, statusText: 'Trash fetched.', data: (docs || []).map((doc) => rules.toRow(kind, doc)) });
+        const visible = await visibleTrash(companyId, req.uid, kind, docs || []);
+        return res.send({ status: true, statusText: 'Trash fetched.', data: visible.map((doc) => rules.toRow(kind, doc)) });
     } catch (error) {
         logger.error(`ERROR in list trash (${kind}): ${error.message}`);
         return fail(res, error.message, 500);
@@ -78,16 +81,15 @@ exports.restore = async (req, res) => {
     const { kind, id } = req.params;
     if (!rules.isKind(kind)) return fail(res, `kind must be one of ${rules.KINDS.join(', ')}.`);
     if (!mongoose.isValidObjectId(id)) return fail(res, 'id must be a valid id.');
-    const userData = (req.body && req.body.userData) || { id: String(req.uid || ''), Employee_Name: '' };
     try {
         if (kind === 'docs') return pages.restorePage(req, res);
         if (kind === 'projects') await restoreProject(companyId, id);
-        else if (kind === 'lists') await restoreList(companyId, id, userData);
-        else await taskMongo.bulkRestore({ companyId, userData, taskIds: [id] });
+        else if (kind === 'lists') await restoreList(companyId, id, await sessionActor(req));
+        else await taskMongo.bulkRestore({ companyId, userData: await sessionActor(req), taskIds: [id] });
         return res.send({ status: true, statusText: 'Restored.', data: { kind, id } });
     } catch (error) {
         logger.error(`ERROR in restore ${kind}/${id}: ${error.message}`);
-        return fail(res, error.message, 500);
+        return fail(res, error.message, error.statusCode || 500);
     }
 };
 

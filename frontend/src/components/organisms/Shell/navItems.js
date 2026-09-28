@@ -37,7 +37,7 @@ export function useNavItems(companyId) {
         { key: "inbox", label: "Inbox.title", icon: "inbox", to: to("inbox"), match: (r) => r.name === "inbox", show: ready.value },
         { key: "planner", label: "Shell.planner", icon: "planner", to: to("Planner"), match: (r) => r.name === "Planner", show: exists("Planner") },
         { key: "chat", label: "Shell.chat", icon: "chat", to: to("chats"), match: (r) => String(r.name || "").startsWith("chat"), show: allowed("chat") },
-        { key: "ai", label: "Shell.ai", icon: "ai", to: to("AiHome"), match: (r) => isAiSectionRoute(r.name), show: exists("AiHome") },
+        { key: "ai", label: "Shell.ai", icon: "ai", to: to("AiAsk"), match: (r) => isAiSectionRoute(r.name), show: exists("AiAsk") },
         { key: "docs", label: "Shell.docs", icon: "docs", to: to("Pages"), match: (r) => r.name === "Pages", show: ready.value },
         { key: "dash", label: "Shell.dash", icon: "dash", to: to("Dashboards"), match: (r) => r.name === "Dashboards", show: exists("Dashboards") && allowed("project.project_list") },
         { key: "time", label: "Shell.time", icon: "time", to: timesheetRoute.value ? to(timesheetRoute.value) : null, match: (r) => String(r.name || "").includes("Timesheet"), show: !!timesheetRoute.value }

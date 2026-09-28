@@ -227,6 +227,7 @@
 }
 .kanban-board .card-tags { flex-wrap: wrap; row-gap: 4px; }
 .kanban-board .card-key { font: 600 9.5px/1 var(--font-mono); color: var(--ink-2); margin-right: 5px; }
+.kanban-board .card-points { font: 500 10px/1 var(--font-mono); color: var(--ink-2); padding: 3px 6px; border-radius: 999px; background: var(--surface-2); white-space: nowrap; }
 .kanban-board .card-timer { font: 500 10px/1 var(--font-mono); color: var(--ok-ink); white-space: nowrap; }
 .kanban-board .card-progress { height: 4px; border-radius: 99px; background: rgba(0, 0, 0, .07); margin-top: 7px; overflow: hidden; }
 .kanban-board .card-progress > span { display: block; height: 100%; border-radius: 99px; background: var(--brand); }

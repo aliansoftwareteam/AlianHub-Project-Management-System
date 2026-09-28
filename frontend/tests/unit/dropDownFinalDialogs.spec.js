@@ -158,7 +158,7 @@ describe('dropdowns on pages too large to mount here', () => {
     };
 
     it('the project "Add view" picker is a labelled dialog whose own button is the trigger', () => {
-        const page = src('views/Projects/Projects.vue');
+        const page = src('components/molecules/ProjectViews/AddViewMenu.vue');
         const tag = tagOf(page, 'id="embeddropdown"');
         expect(tag).toMatch(/\bmode="dialog"/);
         expect(tag).toMatch(/:aria-label="\$t\('Projects\.add_view'\)"/);

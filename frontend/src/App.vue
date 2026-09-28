@@ -16,7 +16,7 @@
                         <QuickCreateTask />
                         <TaskTemplateDialogHost />
                         <div class="ah-app__view billing__history-wrapper style-scroll">
-                            <AiUnavailable v-if="aiGated"/>
+                            <AiOffPage v-if="aiGated"/>
                             <router-view v-else/>
                         </div>
                         <TourCom ref="mainTour"/>
@@ -54,7 +54,7 @@
 </template>
 <script setup>
 // PACKAGES
-import { computed, defineComponent, onMounted, provide, ref, watch, inject} from 'vue'
+import { computed, defineAsyncComponent, defineComponent, onMounted, provide, ref, watch, inject} from 'vue'
 // COMPONENTS
 import TourCom from "@/components/organisms/Tour/TourComponet.vue"
 import MaintenanceBanner from "@/views/Settings/Instance/MaintenanceBanner.vue"
@@ -93,7 +93,7 @@ import OfflineBanner from '@/components/offline/OfflineBanner.vue';
 import { initOffline } from '@/offline';
 import * as env from '@/config/env';
 import {tabSyncHelper} from '@/utils/tabSyncs.js';
-import AiUnavailable from '@/components/molecules/AiUnavailable/AiUnavailable.vue';
+const AiOffPage = defineAsyncComponent(() => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiOffPage.vue'));
 import { aiAvailability, loadAiAvailability } from '@/composable/aiAvailability';
 import { AI_GATE, aiGateFor } from '@/router/ai/gate';
 const {tabSync} = tabSyncHelper();

@@ -43,6 +43,11 @@
     justify-items: end;
 }
 .lv2__cols .lv2__c-risk { color: var(--brand); }
+.lv2__cols > [role="columnheader"] { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv2__cols > .lv2__head-title { display: flex; align-items: center; gap: 6px; overflow: visible; }
+.lv2__chooser { margin-left: auto; }
+.lv2__c-field { justify-self: stretch; min-width: 0; }
+.lv2__group-points::before { content: "\00b7"; margin-right: 6px; }
 
 .lv2__sprint { display: flex; flex-direction: column; gap: 12px; }
 .lv2__sprint-head {
@@ -288,7 +293,7 @@ button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status
 }
 @media (max-width: 1024px) {
     .lv2 { --lv2-cols: 28px minmax(0, 1fr) minmax(0, .45fr) 56px 64px 72px; }
-    .lv2__c-est, .lv2__c-risk { display: none; }
+    .lv2__c-est, .lv2__c-risk, .lv2__c-extra { display: none; }
 }
 /* At phone width the title takes the whole first line and assignee, due date and priority
    fold into a meta line under it, one max-content track each, with the tags in what is left. */

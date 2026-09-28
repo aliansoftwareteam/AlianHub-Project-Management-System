@@ -6,6 +6,7 @@
             <span class="lv2__swatch" :style="{ background: swatch }"></span>
             <span class="lv2__group-name">{{ groupName }}</span>
             <span class="lv2__group-meta">{{ headMeta }}</span>
+            <span v-if="groupPoints" class="lv2__group-meta lv2__group-points">{{ $t('ViewColumns.points_total', { n: groupPoints }) }}</span>
             <span v-if="wip" class="lv2__wip" :class="{ 'lv2__wip--over': wip.over }">{{ $t('List.wip', { used: wip.used, limit: wip.limit }) }}</span>
         </button>
         </div></div>
@@ -111,6 +112,7 @@ import { apiRequest } from "@/services";
 import { subtaskCreateAssignees } from "@/utils/assigneeOptions";
 import * as env from "@/config/env";
 import { applyContext, applyTemplate, defaultTemplateOf, listTemplates } from "@/components/molecules/TaskTemplates/taskTemplates";
+import { pointsTotal } from "@/views/Projects/composables/taskPoints";
 
 defineOptions({ name: "ListGroup" });
 
@@ -171,6 +173,8 @@ const estimateHours = computed(() => {
     const minutes = rows.value.reduce((total, task) => total + (Number(task.totalEstimatedTime) || 0), 0);
     return minutes ? Math.round(minutes / 60) : 0;
 });
+const listColumns = inject("listColumns", null);
+const groupPoints = computed(() => (listColumns?.value?.some((column) => column.id === "points") ? pointsTotal(rows.value) : 0));
 const headMeta = computed(() => {
     const count = found.value === null ? rows.value.length : found.value;
     return estimateHours.value ? `${count} · ${estimateHours.value}H` : String(count);

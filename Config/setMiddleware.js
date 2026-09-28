@@ -237,6 +237,7 @@ const verifyJWTTokenWithCRoute = [
     // only authenticated users can spend the STT quota.
     '/api/v1/ai/transcribe',
     '/api/v1/ai/meeting-notes',
+    '/api/v1/ai/chat-summary',
     '/api/v1/ai/task-summary',
     '/api/v1/ai/task-category',
     // Ask (handoff 13i) — retrieval is scoped to req.uid's own visible projects,

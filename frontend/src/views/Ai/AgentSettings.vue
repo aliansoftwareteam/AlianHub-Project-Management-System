@@ -25,20 +25,19 @@
                         <div v-for="skill in skills" :key="skill.key" class="ai-skill">
                             <div class="ai-skill__head">
                                 <input :id="`sk-${skill.key}`" v-model="skill.enabled" type="checkbox" class="ah-check" :disabled="!canManage" />
-                                <label :for="`sk-${skill.key}`" class="ai-skill__name">{{ skill.name }}</label>
-                                <span class="ah-chip ah-chip--mono ah-chip--sm">{{ skill.key }}</span>
+                                <label :for="`sk-${skill.key}`" class="ai-skill__name" :title="skill.key">{{ skillLabel(t, skill) }}</label>
                                 <span v-if="skill.source === 'data'" class="ah-chip ah-chip--brand ah-chip--sm">{{ $t('Ai.skill_source_yours') }}</span>
                                 <span v-if="skill.model" class="ah-chip ah-chip--mono ah-chip--sm">{{ skill.model }}</span>
                                 <span v-if="!skill.enabled" class="ah-chip">{{ $t('Ai.off') }}</span>
                                 <span v-else-if="!skill.resolved" class="ah-chip ah-chip--danger ah-chip--sm">{{ $t('Ai.skill_unresolved') }}</span>
                             </div>
                             <div class="ai-skill__actions">
-                                <span v-for="a in effectiveOf(skill)" :key="a" class="ah-chip ah-chip--mono">{{ a }}</span>
-                                <span v-for="a in outsideOf(skill)" :key="`x-${a}`" class="ah-chip ah-chip--mono ai-skill__outside">{{ a }}</span>
+                                <span v-for="a in effectiveOf(skill)" :key="a" class="ah-chip" :title="a">{{ nameOfAction(a) }}</span>
+                                <span v-for="a in outsideOf(skill)" :key="`x-${a}`" class="ah-chip ai-skill__outside" :title="a">{{ nameOfAction(a) }}</span>
                             </div>
                             <p v-if="skill.enabled" class="ah-small ai-skill__needs">
                                 {{ $t('Ai.skill_needs', { what: $t(`Ai.req_${skill.requires ? skill.requires.code : 'task'}`) }) }}
-                                <span v-if="outsideOf(skill).length">· {{ $t('Ai.skill_outside_agent', { list: outsideOf(skill).join(', ') }) }}</span>
+                                <span v-if="outsideOf(skill).length">· {{ $t('Ai.skill_outside_agent', { list: outsideOf(skill).map(nameOfAction).join(', ') }) }}</span>
                             </p>
                         </div>
                         <p class="ah-small">{{ $t('Ai.skills_effective_note') }}</p>
@@ -48,7 +47,7 @@
 
                         <p class="ai-never">
                             <strong>{{ $t('Ai.never_label') }}</strong>
-                            <span class="ah-mono">{{ never }}</span>
+                            <span>{{ never }}</span>
                             <span class="ah-small">{{ $t('Ai.never_note') }}</span>
                         </p>
                     </section>
@@ -68,29 +67,29 @@
                     <section class="ah-card ai-agent">
                         <div class="ah-label">{{ $t('Ai.autonomy') }}</div>
                         <div class="ai-radios">
-                            <label v-for="step in AUTONOMY.slice(0, 4)" :key="step.level" class="ai-radio" :class="{ 'is-on': form.autonomy === step.level }">
-                                <input v-model.number="form.autonomy" type="radio" :value="step.level" class="ah-check" :disabled="!canManage" />
-                                <span><strong>{{ step.key }}</strong> · {{ $t(`Ai.autonomy_${step.level}`) }}</span>
+                            <label v-for="level in AUTONOMY_LEVELS" :key="level" class="ai-radio" :class="{ 'is-on': form.autonomy === level }" :title="autonomyTip(t, level)">
+                                <input v-model.number="form.autonomy" type="radio" :value="level" class="ah-check" :disabled="!canManage" />
+                                <span class="ai-radio__level"><strong>{{ autonomyName(t, level) }}</strong><span class="ah-small">{{ autonomyAbout(t, level) }}</span></span>
                             </label>
                         </div>
                         <p class="ai-ladder__rule">{{ $t('Ai.low_risk_note') }}</p>
 
                         <div class="ai-preview" data-test="l2-preview">
-                            <div class="ah-label">{{ $t('Ai.l2_preview_title') }}</div>
+                            <div class="ah-label">{{ $t('Ai.acts_preview_title') }}</div>
                             <p class="ai-lead" style="margin:6px 0 10px">{{ $t('Ai.l2_preview_lead') }}</p>
                             <div class="ai-preview__cols">
                                 <div class="ai-preview__col" data-test="l2-acts">
                                     <span class="ah-chip ah-chip--ok">{{ $t('Ai.l2_acts') }}</span>
                                     <p v-if="!preview.acts.length" class="ah-small ai-preview__none">{{ $t('Ai.l2_none_act') }}</p>
                                     <ul v-else class="ai-preview__list">
-                                        <li v-for="item in preview.acts" :key="item.key"><span class="ah-mono">{{ item.key }}</span><span class="ah-small">{{ $t(`Ai.l2_reason_${item.reason}`) }}</span></li>
+                                        <li v-for="item in preview.acts" :key="item.key"><span :title="item.key">{{ nameOfAction(item.key) }}</span><span class="ah-small">{{ $t(`Ai.l2_reason_${item.reason}`) }}</span></li>
                                     </ul>
                                 </div>
                                 <div class="ai-preview__col" data-test="l2-proposes">
                                     <span class="ah-chip ah-chip--warn">{{ $t('Ai.l2_proposes') }}</span>
                                     <p v-if="!preview.proposes.length" class="ah-small ai-preview__none">{{ $t('Ai.l2_none_propose') }}</p>
                                     <ul v-else class="ai-preview__list">
-                                        <li v-for="item in preview.proposes" :key="item.key"><span class="ah-mono">{{ item.key }}</span><span class="ah-small">{{ $t(`Ai.l2_reason_${item.reason}`) }}</span></li>
+                                        <li v-for="item in preview.proposes" :key="item.key"><span :title="item.key">{{ nameOfAction(item.key) }}</span><span class="ah-small">{{ $t(`Ai.l2_reason_${item.reason}`) }}</span></li>
                                     </ul>
                                 </div>
                             </div>
@@ -130,7 +129,7 @@
                             <li v-for="run in recentRuns" :key="run._id" class="ai-audit__item">
                                 <div class="ai-audit__row">
                                     <span class="ah-mono ai-audit__at">{{ time(run.startedAt) }}</span>
-                                    <span class="ai-audit__what">{{ run.skill || run.trigger || $t('Ai.run') }}</span>
+                                    <span class="ai-audit__what">{{ run.skill ? skillLabel(t, run.skill) : run.trigger || $t('Ai.run') }}</span>
                                     <span class="ah-chip" :class="runChip(run)" data-test="run-status">{{ runStatus(run) }}</span>
                                     <span v-if="run.revertedAt" class="ah-chip ah-chip--dark">{{ $t('Ai.reverted_chip') }}</span>
                                     <span v-if="refusalCount(run)" class="ah-chip ah-chip--warn">{{ $t('Ai.refused_n', { n: refusalCount(run) }) }}</span>
@@ -151,7 +150,7 @@
 
                     <section v-if="canManage" class="ah-card ai-agent ai-danger" data-test="danger">
                         <div class="ah-label">{{ $t('Ai.delete_agent') }}</div>
-                        <p class="ai-lead" style="margin:6px 0 10px">{{ openRunCount ? $t('Ai.delete_blocked_running', { n: openRunCount }) : $t('Ai.delete_body') }}</p>
+                        <p class="ai-lead" style="margin:6px 0 10px">{{ openRunCount ? t('Ai.delete_blocked_open_runs', { n: openRunCount }, openRunCount) : $t('Ai.delete_body') }}</p>
                         <div v-if="!openRunCount" class="ai-fields">
                             <div class="ah-field">
                                 <label class="ah-field__label" for="del-confirm">{{ $t('Ai.delete_confirm_label', { name: agent.name }) }}</label>
@@ -183,6 +182,7 @@ import { useAgents, refusalCount } from "./useAgents";
 import { splitPreview } from "./policyPreview";
 import { changedFields, formFromAgent, skillsPayload } from "./agentSavePatch";
 import { useAgentAccess } from "./agentAccess";
+import { actionLabel, autonomyAbout, autonomyName, autonomyTip, skillLabel } from "./plainLabels";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 
@@ -211,8 +211,9 @@ const projects = computed(() => (getters["projectData/projects"]?.data || []).fi
 const pinnableModels = ref([]);
 const openRunCount = computed(() => (activeRuns.value[String(route.params.id)] || []).length);
 
-const AUTONOMY = computed(() => (registryManifest.value.autonomy || []).map((a) => ({ level: a.level, key: `L${a.level}` })));
-const never = computed(() => (registryManifest.value.never || []).join(" · "));
+const AUTONOMY_LEVELS = computed(() => (registryManifest.value.autonomy || []).map((a) => a.level).slice(0, 4));
+const nameOfAction = (key) => actionLabel(t, key, registryManifest.value.actions);
+const never = computed(() => (registryManifest.value.never || []).map(nameOfAction).join(" · "));
 const spendRow = computed(() => (spend.value.agents || []).find((a) => a.agentId === String(route.params.id)));
 const expandedRun = ref("");
 const revisionsKey = ref(0);
@@ -342,6 +343,7 @@ onMounted(load);
 .ai-skill:last-of-type { border-bottom: 0; }
 .ai-skill__head { display: flex; align-items: center; gap: 9px; }
 .ai-skill__name { font: 600 13px/1.2 var(--font-ui); cursor: pointer; }
+.ai-radio__level { display: flex; flex-direction: column; gap: 2px; }
 .ai-skill__actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 7px 0 0 24px; }
 .ai-skill__outside { opacity: .5; text-decoration: line-through; }
 .ai-skill__needs { margin: 6px 0 0 24px; }

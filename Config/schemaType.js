@@ -131,6 +131,7 @@ const SCHEMA_TYPE = {
     INSTANCE_SETTINGS: "instance_settings",
     AGENT_SESSIONS: "agent_sessions",
     AGENT_SESSION_ENDPOINTS: "agent_session_endpoints",
+    ASK_THREADS: "ask_threads",
 }
 
 module.exports = {
