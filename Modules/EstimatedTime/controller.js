@@ -3,13 +3,15 @@ const loggerConfig = require("../../Config/loggerConfig");
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const { replaceObjectKey } = require("../Auth/helper");
-const { estimateAndPersist: estimateTaskTimeWithAI, _internal: aiEstimatorInternal } = require("./aiTaskEstimator");
+const { estimateAndPersist: estimateTaskTimeWithAI, proposeEstimate, _internal: aiEstimatorInternal } = require("./aiTaskEstimator");
 const { updateRemainingTime } = require("../LogTime/controllerV2/helpers");
 const { resolveSheetScope, SHEET_PERMISSION, scopedEstimateMatch } = require("../TimeSheet/helpers/timeScope");
 const { scopeEstimatePipeline, TimesheetQueryRefused } = require("../TimeSheet/helpers/timesheetQueryScope");
 const { buildEstimateWrite, EstimateWriteRefused } = require("./helpers/estimateWriteScope");
 const { previousPlanOf, recordPlanChange } = require("./helpers/planHistory");
 const { idForms } = require("../../utils/mongo-handler/objectIdKeys");
+const { evaluatePermission, isWritable } = require("../../Config/permissionGuard");
+const { visibleTask, TASK_NOT_FOUND } = require("../AI/taskAccess");
 
 /* The same grant that decides who may plan another person's time decides who may read it. */
 const ESTIMATE_SCOPE_PERMISSIONS = [SHEET_PERMISSION.workload, SHEET_PERMISSION.project];
@@ -84,144 +86,116 @@ exports.updateEstimatedTime = async(req,res) => {
     }
 }
 
-// Manual AI estimate trigger — invoked from the task detail sidebar's
-// "Generate estimate using AI" icon button. Unlike the post-create
-// auto-estimate (which silently no-ops if a value already exists), this
-// endpoint always recalculates because the user explicitly asked for it.
-// The estimator helper does the LLM call, clamping, persistence, and
-// Socket.io emit, so this controller just orchestrates and returns.
+const ESTIMATE_PERMISSION = 'task.task_estimated_hours';
+const ESTIMATE_TASK_FIELDS = {
+    TaskName: 1,
+    Task_Priority: 1,
+    TaskType: 1,
+    isParentTask: 1,
+    rawDescription: 1,
+    descriptionBlock: 1,
+    totalEstimatedTime: 1,
+    ProjectID: 1,
+    tagsArray: 1,
+};
+
+const refusal = (code, statusText) => ({ refused: { code, body: { status: false, statusText } } });
+
+/* The task as the estimator should see it, once the caller may open it and edit its estimate. The
+ * description is read from the stored task, not the client's copy, which can lag behind a save. */
+async function estimateInput(req) {
+    const companyId = req.headers['companyid'];
+    const taskId = req.params.tid;
+    if (!companyId) return refusal(400, 'companyId header required');
+    if (!taskId || !mongoose.Types.ObjectId.isValid(taskId)) return refusal(400, 'valid taskId required');
+
+    const found = await visibleTask({ companyId, uid: req.uid, taskId, projection: ESTIMATE_TASK_FIELDS });
+    if (!found || !found._id) return refusal(404, TASK_NOT_FOUND);
+    const permission = await evaluatePermission(companyId, req.uid, ESTIMATE_PERMISSION, { projectId: String(found.ProjectID) });
+    if (!isWritable(permission)) return refusal(403, 'You do not have permission to change this estimate.');
+
+    // A plain object: a Mongoose document drops the subtaskTitles attached below.
+    const task = typeof found.toObject === 'function' ? found.toObject() : { ...found };
+
+    const description = (aiEstimatorInternal && typeof aiEstimatorInternal.extractDescription === 'function')
+        ? aiEstimatorInternal.extractDescription(task)
+        : null;
+    if (description !== null && !String(description).trim()) {
+        return { refused: { code: 200, body: { status: false, statusText: 'Please add a task description before generating an AI estimate' } } };
+    }
+
+    if (task.isParentTask !== false) {
+        const subs = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [{ ParentTaskId: String(taskId), deletedStatusKey: { $in: [0, undefined] } }, { TaskName: 1 }, { limit: 50 }],
+        }, 'find').catch(() => []);
+        if (Array.isArray(subs) && subs.length) {
+            task.subtaskTitles = subs.map((s) => (s && s.TaskName ? String(s.TaskName) : '')).filter(Boolean);
+        }
+    }
+    return { companyId, taskId, task };
+}
+
+const estimateData = (result) => ({
+    minutes: result.minutes,
+    optimistic: result.optimistic,
+    likely: result.likely,
+    pessimistic: result.pessimistic,
+    confidence: result.confidence,
+    work_items: result.work_items,
+    reasoning: result.reasoning,
+    basedOnSamples: result.basedOnSamples,
+});
+
+const estimateFailed = (res, name, error) => {
+    loggerConfig.error(`${name} error: ${error && error.message ? error.message : error}`);
+    return res.status(500).json({
+        status: false,
+        statusText: 'An error occurred while generating the AI estimate.',
+        error: error && error.message ? error.message : String(error),
+    });
+};
+
+/* Writes the estimate straight away. The task sidebar now proposes first and applies through the normal
+ * estimate update; this stays for any caller that still asks for the direct write. */
 exports.generateAiEstimate = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'];
-        const taskId = req.params.tid;
+        const input = await estimateInput(req);
+        if (input.refused) return res.status(input.refused.code).json(input.refused.body);
 
-        if (!companyId) {
-            return res.status(400).json({ status: false, statusText: 'companyId header required' });
-        }
-        if (!taskId || !mongoose.Types.ObjectId.isValid(taskId)) {
-            return res.status(400).json({ status: false, statusText: 'valid taskId required' });
-        }
-
-        // Fetch the task with just the fields the estimator needs so the
-        // payload to the LLM is built from the canonical DB state — not
-        // from whatever stale shape the client happened to send. ProjectID +
-        // tagsArray feed the historical-actuals grounding/calibration; the
-        // rest feed the prompt.
-        const taskObj = {
-            type: SCHEMA_TYPE.TASKS,
-            data: [
-                { _id: new mongoose.Types.ObjectId(taskId) },
-                {
-                    TaskName: 1,
-                    Task_Priority: 1,
-                    TaskType: 1,
-                    isParentTask: 1,
-                    rawDescription: 1,
-                    descriptionBlock: 1,
-                    totalEstimatedTime: 1,
-                    ProjectID: 1,
-                    tagsArray: 1,
-                },
-            ],
-        };
-        const taskDocRaw = await MongoDbCrudOpration(companyId, taskObj, 'findOne');
-        if (!taskDocRaw || !taskDocRaw._id) {
-            return res.status(404).json({ status: false, statusText: 'task not found' });
-        }
-        // Work with a plain object so we can attach derived fields (e.g.
-        // subtaskTitles) that aren't part of the task schema — a Mongoose doc
-        // would silently drop unknown-path assignments.
-        const taskDoc = (typeof taskDocRaw.toObject === 'function')
-            ? taskDocRaw.toObject()
-            : taskDocRaw;
-
-        // A description is required for a meaningful AI estimate. Check the
-        // CANONICAL DB state (the client's task can be stale — descriptions save
-        // async over the socket), using the same extraction the estimator uses.
-        // This gates only the AI trigger; manual estimate/planning is untouched.
-        // Fail OPEN: if the extractor helper is ever unavailable, skip the gate
-        // (never wrongly block a valid estimate) rather than failing closed.
-        const descForEstimate = (aiEstimatorInternal && typeof aiEstimatorInternal.extractDescription === 'function')
-            ? aiEstimatorInternal.extractDescription(taskDoc)
-            : null;
-        if (descForEstimate !== null && !String(descForEstimate).trim()) {
-            return res.status(200).json({ status: false, statusText: 'Please add a task description before generating an AI estimate' });
-        }
-
-        // Subtask rollup (richer input): if this is a parent task, attach its
-        // subtasks' titles so the model accounts for the work they represent.
-        // Best-effort and capped — a failure here must not block the estimate.
-        if (taskDoc.isParentTask !== false) {
-            try {
-                const subs = await MongoDbCrudOpration(companyId, {
-                    type: SCHEMA_TYPE.TASKS,
-                    data: [
-                        {
-                            ParentTaskId: String(taskId),
-                            deletedStatusKey: { $in: [0, undefined] },
-                        },
-                        { TaskName: 1 },
-                        { limit: 50 },
-                    ],
-                }, 'find').catch(() => []);
-                if (Array.isArray(subs) && subs.length) {
-                    taskDoc.subtaskTitles = subs
-                        .map((s) => (s && s.TaskName ? String(s.TaskName) : ''))
-                        .filter(Boolean);
-                }
-            } catch (_e) { /* subtask rollup is best-effort */ }
-        }
-
-        // Actor for the activity-log entry the estimator writes. The client
-        // sends the logged-in user so the "updated estimated time" history row
-        // is attributed to whoever clicked the AI trigger (and so HISTORY.UserId
-        // — a required String — is never blank). Falls back to undefined when
-        // absent, in which case the estimator skips the log rather than failing.
         const { userName, userId } = req.body || {};
-        const userData = userId
-            ? { id: String(userId), Employee_Name: userName || 'AlianHub AI' }
-            : undefined;
-
-        const result = await estimateTaskTimeWithAI({
-            companyId,
-            taskId,
-            task: taskDoc,
-            force: true,
-            userData,
-        });
-
+        const userData = userId ? { id: String(userId), Employee_Name: userName || 'AlianHub AI' } : undefined;
+        const result = await estimateTaskTimeWithAI({ companyId: input.companyId, taskId: input.taskId, task: input.task, force: true, userData });
         if (!result.status) {
-            return res.status(400).json({
-                status: false,
-                statusText: result.reason || 'estimate not generated',
-            });
+            return res.status(400).json({ status: false, statusText: result.reason || 'estimate not generated' });
         }
-        // Return the full ranged estimate so the UI can surface the
-        // optimistic/likely/pessimistic range + confidence. `totalEstimatedTime`
-        // (the persisted point estimate) is kept exactly as before for any
-        // existing consumer of this response.
         return res.status(200).json({
             status: true,
             statusText: 'Estimate generated successfully',
-            data: {
-                totalEstimatedTime: result.minutes,
-                minutes: result.minutes,
-                optimistic: result.optimistic,
-                likely: result.likely,
-                pessimistic: result.pessimistic,
-                confidence: result.confidence,
-                work_items: result.work_items,
-                reasoning: result.reasoning,
-                basedOnSamples: result.basedOnSamples,
-            },
+            data: { totalEstimatedTime: result.minutes, ...estimateData(result) },
         });
     } catch (error) {
-        loggerConfig.error(`generateAiEstimate error: ${error && error.message ? error.message : error}`);
-        return res.status(500).json({
-            status: false,
-            statusText: 'An error occurred while generating the AI estimate.',
-            error: error && error.message ? error.message : String(error),
+        return estimateFailed(res, 'generateAiEstimate', error);
+    }
+};
+
+exports.proposeAiEstimate = async (req, res) => {
+    try {
+        const input = await estimateInput(req);
+        if (input.refused) return res.status(input.refused.code).json(input.refused.body);
+
+        const result = await proposeEstimate({ companyId: input.companyId, task: input.task });
+        if (!result.status) {
+            return res.status(400).json({ status: false, statusText: result.reason || 'estimate not generated' });
+        }
+        const previous = Number(input.task.totalEstimatedTime);
+        return res.status(200).json({
+            status: true,
+            statusText: 'Estimate proposed',
+            data: { ...estimateData(result), previousMinutes: Number.isFinite(previous) ? previous : 0 },
         });
+    } catch (error) {
+        return estimateFailed(res, 'proposeAiEstimate', error);
     }
 };
 

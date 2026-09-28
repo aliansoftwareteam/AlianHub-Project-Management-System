@@ -1,6 +1,6 @@
 <template>
-    <div ref="rowRef" class="tv2__row" :class="{ 'is-selected': selected }" role="row" v-bind="taskNavAttrs(data)" @click="$emit('open', data)">
-        <span role="cell" @click.stop>
+    <div ref="rowRef" class="tv2__row" :class="{ 'is-selected': selected }" role="row" :data-row="data._id" v-bind="taskNavAttrs(data)" @click="$emit('open', data)">
+        <span role="cell" data-col="select" tabindex="-1" @click.stop>
             <input
                 v-if="canSelect"
                 type="checkbox"
@@ -12,77 +12,86 @@
             />
         </span>
 
-        <span role="cell" class="tv2__name-cell">
+        <span role="cell" class="tv2__name-cell" data-col="name" tabindex="-1">
             <button type="button" class="tv2__name" :title="data.TaskName" @click.stop="$emit('open', data)">{{ data.TaskName }}</button>
         </span>
 
-        <span role="cell" class="ah-chip tv2__status ah-status-ink" :style="statusStyle">{{ status.name }}</span>
-
-        <span role="cell">
-            <span v-if="owner" class="ah-avatar" :title="owner.Employee_Name">
-                <img v-if="owner.Employee_profileImageURL" :src="owner.Employee_profileImageURL" :alt="owner.Employee_Name" />
-                <template v-else>{{ initial(owner.Employee_Name) }}</template>
+        <template v-for="column in shownColumns" :key="column.id">
+            <span v-if="column.id === 'status'" role="cell" :data-col="column.id" tabindex="-1" class="tv2__status-cell">
+                <ListStatusCircle
+                    v-if="edit && rights.status"
+                    chip
+                    :task="data"
+                    :statuses="edit.statuses.value"
+                    editable
+                    @change="(next) => edit.setStatus(data, next, { row: rowRef })"
+                />
+                <span v-else class="ah-chip tv2__status ah-status-ink" :style="statusStyle">{{ status.name }}</span>
             </span>
-        </span>
 
-        <span role="cell" class="tv2__tags">
-            <TaskTagCell :task="data" />
-        </span>
-
-        <span role="cell" class="tv2__cell-ai" @click.stop>
-            <span v-if="summary.state === 'ready'" class="tv2__summary" :title="summary.summary">{{ summary.summary }}</span>
-            <span v-else-if="summary.state === 'loading'" class="tv2__summary tv2__summary--empty">{{ $t('List.ai_loading') }}</span>
-            <span v-else-if="summary.state === 'empty'" class="tv2__summary tv2__summary--empty">{{ $t('List.ai_nothing_to_summarise') }}</span>
-            <span v-else-if="summary.state === 'unavailable'" class="tv2__summary tv2__summary--empty">{{ $t('List.ai_not_configured') }}</span>
-            <button v-else type="button" class="tv2__gen" @click="generate">✦ {{ $t('List.ai_generate') }}</button>
-
-            <span v-if="summary.state === 'ready'" class="tv2__source" :class="{ 'is-pinned': summary.pinned }">
-                <span>{{ sourceLabel }}</span>
-                <button
-                    type="button"
-                    class="tv2__pin"
-                    :class="{ 'is-on': summary.pinned }"
-                    :title="summary.pinned ? $t('List.ai_unpin') : $t('List.ai_pin')"
-                    @click="togglePin"
-                >
-                    <ShellIcon name="pin" :size="11" />{{ summary.pinned ? $t('List.ai_pinned') : $t('List.ai_pin') }}
-                </button>
+            <span v-else-if="column.id === 'tags'" role="cell" :data-col="column.id" tabindex="-1" class="tv2__tags">
+                <TaskTagCell :task="data" />
             </span>
-        </span>
 
-        <span role="cell" class="tv2__risk" :class="`tv2__risk--${risk.level}`" :title="riskTitle">
-            <span class="tv2__risk-dot"></span>{{ $t(`List.risk_${risk.level}`) }} · {{ risk.score }}
-        </span>
+            <span v-else-if="column.id === 'summary'" role="cell" :data-col="column.id" tabindex="-1" class="tv2__cell-ai" @click.stop>
+                <span v-if="summary.state === 'ready'" class="tv2__summary" :title="summary.summary">{{ summary.summary }}</span>
+                <span v-else-if="summary.state === 'loading'" class="tv2__summary tv2__summary--empty">{{ $t('List.ai_loading') }}</span>
+                <span v-else-if="summary.state === 'empty'" class="tv2__summary tv2__summary--empty">{{ $t('List.ai_nothing_to_summarise') }}</span>
+                <span v-else-if="summary.state === 'unavailable'" class="tv2__summary tv2__summary--empty">{{ $t('List.ai_not_configured') }}</span>
+                <button v-else type="button" class="tv2__gen" @click="generate">✦ {{ $t('List.ai_generate') }}</button>
 
-        <span role="cell" class="tv2__cell-ai" @click.stop>
-            <span v-if="category.state === 'ready'" class="ah-chip tv2__area" :title="categoryTitle">{{ category.category }}</span>
-            <span v-else-if="category.state === 'loading'" class="tv2__area-empty">{{ $t('Category.loading') }}</span>
-            <span v-else-if="category.state === 'empty'" class="tv2__area-empty" :title="categoryTitle">{{ $t(`Category.empty_${category.reason === 'no-vocabulary' ? 'no_vocabulary' : 'no_fit'}`) }}</span>
-            <span v-else-if="category.state === 'unavailable'" class="tv2__area-empty">{{ $t('List.ai_not_configured') }}</span>
-            <button v-else type="button" class="tv2__gen" @click="generateCategory">✦ {{ $t('List.ai_generate') }}</button>
-
-            <span v-if="category.state === 'ready'" class="tv2__source" :class="{ 'is-pinned': category.pinned }">
-                <span>{{ categorySource }}</span>
-                <button
-                    type="button"
-                    class="tv2__pin"
-                    :class="{ 'is-on': category.pinned }"
-                    :title="category.pinned ? $t('List.ai_unpin') : $t('List.ai_pin')"
-                    @click="toggleCategoryPin"
-                >
-                    <ShellIcon name="pin" :size="11" />{{ category.pinned ? $t('List.ai_pinned') : $t('List.ai_pin') }}
-                </button>
+                <span v-if="summary.state === 'ready'" class="tv2__source" :class="{ 'is-pinned': summary.pinned }">
+                    <span>{{ sourceLabel }}</span>
+                    <button
+                        type="button"
+                        class="tv2__pin"
+                        :class="{ 'is-on': summary.pinned }"
+                        :title="summary.pinned ? $t('List.ai_unpin') : $t('List.ai_pin')"
+                        @click="togglePin"
+                    >
+                        <ShellIcon name="pin" :size="11" />{{ summary.pinned ? $t('List.ai_pinned') : $t('List.ai_pin') }}
+                    </button>
+                </span>
             </span>
-        </span>
 
-        <span role="cell" class="tv2__done">
-            <ProvenanceBadge :task="data" />
-        </span>
+            <span v-else-if="column.id === 'risk'" role="cell" :data-col="column.id" tabindex="-1" class="tv2__risk" :class="`tv2__risk--${risk.level}`" :title="riskTitle">
+                <span class="tv2__risk-dot"></span>{{ $t(`List.risk_${risk.level}`) }} · {{ risk.score }}
+            </span>
+
+            <span v-else-if="column.id === 'area'" role="cell" :data-col="column.id" tabindex="-1" class="tv2__cell-ai" @click.stop>
+                <span v-if="category.state === 'ready'" class="ah-chip tv2__area" :title="categoryTitle">{{ category.category }}</span>
+                <span v-else-if="category.state === 'loading'" class="tv2__area-empty">{{ $t('Category.loading') }}</span>
+                <span v-else-if="category.state === 'empty'" class="tv2__area-empty" :title="categoryTitle">{{ $t(`Category.empty_${category.reason === 'no-vocabulary' ? 'no_vocabulary' : 'no_fit'}`) }}</span>
+                <span v-else-if="category.state === 'unavailable'" class="tv2__area-empty">{{ $t('List.ai_not_configured') }}</span>
+                <button v-else type="button" class="tv2__gen" @click="generateCategory">✦ {{ $t('List.ai_generate') }}</button>
+
+                <span v-if="category.state === 'ready'" class="tv2__source" :class="{ 'is-pinned': category.pinned }">
+                    <span>{{ categorySource }}</span>
+                    <button
+                        type="button"
+                        class="tv2__pin"
+                        :class="{ 'is-on': category.pinned }"
+                        :title="category.pinned ? $t('List.ai_unpin') : $t('List.ai_pin')"
+                        @click="toggleCategoryPin"
+                    >
+                        <ShellIcon name="pin" :size="11" />{{ category.pinned ? $t('List.ai_pinned') : $t('List.ai_pin') }}
+                    </button>
+                </span>
+            </span>
+
+            <span v-else-if="column.id === 'doneBy'" role="cell" :data-col="column.id" tabindex="-1" class="tv2__done">
+                <ProvenanceBadge :task="data" />
+            </span>
+
+            <span v-else role="cell" :data-col="column.id" tabindex="-1" class="tv2__cell" :class="{ 'tv2__cell--field': column.field }">
+                <TaskColumnCell :column="column" :task="data" :rowEl="rowRef" />
+            </span>
+        </template>
     </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import moment from "moment";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
@@ -94,6 +103,9 @@ import { useTaskSummaries } from "./useTaskSummaries.js";
 import { useTaskCategories } from "./useTaskCategories.js";
 import { taskNavAttrs } from "@/components/organisms/TaskDetailOverlay/taskNavigation";
 import { statusChipStyle } from "@/utils/statusChipColors";
+import ListStatusCircle from "@/views/Projects/ListView/ListStatusCircle.vue";
+import TaskColumnCell from "@/views/Projects/components/columns/TaskColumnCell.vue";
+import { defaultColumns } from "@/views/Projects/composables/viewColumns";
 
 defineOptions({ name: "TableRow" });
 
@@ -105,20 +117,20 @@ const props = defineProps({
 defineEmits(["open", "select"]);
 
 const { t } = useI18n();
-const { getUser, getTaskStatus } = useGetterFunctions();
+const { getTaskStatus } = useGetterFunctions();
 const summaries = useTaskSummaries();
 const categories = useTaskCategories();
 const rowRef = ref(null);
 let observer = null;
 
+const edit = inject("listRowEdit", null);
+const rights = computed(() => edit?.rights.value || {});
+const injectedColumns = inject("tableColumns", null);
+const shownColumns = computed(() => injectedColumns?.value || defaultColumns("table"));
+const shows = (id) => shownColumns.value.some((column) => column.id === id);
+
 const status = computed(() => getTaskStatus(props.data.statusKey) || { name: props.data.status?.text || "" });
 const statusStyle = computed(() => (status.value.bgColor ? statusChipStyle(status.value) : {}));
-
-const owner = computed(() => {
-    const id = props.data.AssigneeUserId?.[0];
-    return id ? getUser(id) : null;
-});
-const initial = (name) => String(name || "?").trim().charAt(0).toUpperCase();
 
 const summary = computed(() => summaries.get(props.data._id));
 const sourceLabel = computed(() => t("List.ai_source", {
@@ -168,8 +180,8 @@ onMounted(() => {
     if (!rowRef.value || typeof IntersectionObserver === "undefined") return;
     observer = new IntersectionObserver((entries) => {
         if (!entries[0]?.isIntersecting) return;
-        summaries.ensure(props.data._id);
-        categories.ensure(props.data._id);
+        if (shows("summary")) summaries.ensure(props.data._id);
+        if (shows("area")) categories.ensure(props.data._id);
         observer.disconnect();
         observer = null;
     }, { rootMargin: "120px" });

@@ -147,14 +147,23 @@ function initEditor() {
     });
 }
 
+/* Editor.js keeps no undo history across render(), so the content an AI result
+ * replaces is handed back for the caller to restore. */
 async function applyBlocks(payload) {
-    if (!editor.value || !payload) return;
-    const incoming = contentToEditorData({ blocks: payload.blocks || payload });
+    if (!editor.value || !payload) return null;
+    const previous = await editor.value.save();
+    const incoming = { ...contentToEditorData({ blocks: payload.blocks || payload }) };
     if (payload.mode === 'append') {
-        const current = await editor.value.save();
-        incoming.blocks = [...(current.blocks || []), ...(incoming.blocks || [])];
+        incoming.blocks = [...(previous.blocks || []), ...(incoming.blocks || [])];
     }
     await editor.value.render(incoming.blocks && incoming.blocks.length ? incoming : emptyEditorData());
+    await emitChange();
+    return previous;
+}
+
+async function restore(data) {
+    if (!editor.value || !data) return;
+    await editor.value.render(data.blocks && data.blocks.length ? data : emptyEditorData());
     await emitChange();
 }
 
@@ -163,7 +172,7 @@ function scrollToBlock(blockId) {
     if (node) node.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-defineExpose({ applyBlocks, emitChange, scrollToBlock });
+defineExpose({ applyBlocks, restore, emitChange, scrollToBlock });
 
 onMounted(initEditor);
 

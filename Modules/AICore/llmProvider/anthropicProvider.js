@@ -136,6 +136,12 @@ const anthropicProvider = {
         let response;
         try {
             const stream = client.messages.stream(params);
+            if (typeof opts.onText === 'function' && typeof stream.on === 'function') {
+                stream.on('text', (delta) => {
+                    // A listener that throws must not fail a call whose answer is already paid for.
+                    try { opts.onText(delta); } catch (_e) { /* ignore */ }
+                });
+            }
             response = await stream.finalMessage();
         } catch (err) {
             throw toProviderError(err, request.model);
