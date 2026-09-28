@@ -1,8 +1,8 @@
 <template>
-    <div class="task-assigneesearch-groupbywrapper pft" :class="{ 'pft--search-open': searchOpen }">
+    <div class="task-assigneesearch-groupbywrapper pft" :class="{ 'pft--search-open': searchOpen, 'pft--phone': sheetMode }">
         <div class="d-flex align-items-center justify-content-between flex-wrap task-filtersearchassignee-wrapper" :class="{'w-545' : clientWidth <=767 }" v-if="['ProjectListView', 'Calendar', 'ProjectKanban','TableView'].includes(activeTab)">
             <div class="d-flex align-items-center justify-content-start task-filtersearch" :class="[{ 'mb-10px': clientWidth <= 767 }]">
-                <TaskFilter :projectData="projectData" @apply="(q) => $emit('applyFilter', q)" @clear="$emit('clearFilter')" v-if="Object.keys(projectData).length > 0"/>
+                <TaskFilter :projectData="projectData" @apply="onApplyFilter" @clear="onClearFilter" v-if="!sheetMode && Object.keys(projectData).length > 0"/>
                 <button type="button" class="pft__search-toggle" :aria-label="$t('PlaceHolder.search')" :aria-expanded="searchOpen" @click="searchOpen = !searchOpen">
                     <ShellIcon name="search" :size="15" />
                 </button>
@@ -43,6 +43,19 @@
                         </template>
                     </DropDown>
                 </div>
+                <button
+                    v-if="sheetMode"
+                    type="button"
+                    class="pft__filters-btn"
+                    data-test="filters-button"
+                    aria-haspopup="dialog"
+                    :aria-expanded="String(filtersOpen)"
+                    :aria-label="activeFilterCount ? $t('Projects.filters_active', { n: activeFilterCount }) : $t('Projects.filters')"
+                    @click="filtersOpen = true"
+                >
+                    <span>{{ $t('Projects.filters') }}</span>
+                    <span v-if="activeFilterCount" class="pft__filters-count" aria-hidden="true">{{ activeFilterCount }}</span>
+                </button>
                 <Assignee
                     :tourId="'projectviewassignee_driver'"
                     v-if="clientWidth > 767 && projectData?.isPrivateSpace"
@@ -58,7 +71,9 @@
                     :isDisplayTeam="true"
                 />
             </div>
-            <div v-if="['ProjectListView', 'ProjectKanban','TableView'].includes(activeTab)" class="d-flex align-items-center justify-content-end task-filter-assignee" :class="clientWidth <= 767 ? 'justify-content-start' : ''">
+            <component :is="sheetMode ? ProjectFiltersSheet : InPlace" v-model:open="filtersOpen">
+            <div v-if="isListLike" class="d-flex align-items-center justify-content-end task-filter-assignee" :class="clientWidth <= 767 ? 'justify-content-start' : ''">
+                <TaskFilter :projectData="projectData" @apply="onApplyFilter" @clear="onClearFilter" v-if="sheetMode && Object.keys(projectData).length > 0"/>
                 <template v-if="!showArchived">
                     <button
                         type="button"
@@ -70,7 +85,7 @@
                     >
                         <ShellIcon name="ai" :size="15" />
                     </button>
-                    <DropDown mode="listbox" id="group_by" class="group_by">
+                    <DropDown mode="listbox" id="group_by" class="group_by" :zIndex="sheetMode ? SHEET_MENU_Z : 7">
                         <template #button="{ triggerAttrs }">
                             <button type="button" class="text-nowrap btn-white border-groupBy pft__pill cursor-pointer" ref="group_by_status" :title="$t('Projects.group_by')" :aria-label="$t('Projects.group_by')" v-bind="triggerAttrs">
                                 <ShellIcon name="layout" :size="14" />
@@ -110,7 +125,7 @@
                         <button
                             type="button"
                             v-if="projectData?.isGlobalPermission === false ? checkPermission('task.show_tasks',projectData.isGlobalPermission) === 2 || checkPermission('task.show_tasks',projectData.isGlobalPermission) === true : true"
-                            @click="$emit('update:userSidebar', !userSidebar)"
+                            @click="filtersOpen = false; $emit('update:userSidebar', !userSidebar)"
                             class="cursor-pointer assignee-status"
                             :class="{'is-active' : assigneeFilterCount}"
                             :title="assigneeFilterCount ? $t('Projects.assignee_count', { n: assigneeFilterCount }) : $t('ProjectDetails.assignee')"
@@ -123,7 +138,7 @@
                     <ProvenanceFilter :modelValue="doneBy" @update:modelValue="(v) => $emit('update:doneBy', v)" />
                 </template>
                 <span v-else class="pft__mode-chip">{{ $t('ProjectSlider.archived_list') }}</span>
-                <DropDown mode="menu" id="more_features" :zIndex="10">
+                <DropDown mode="menu" id="more_features" :zIndex="sheetMode ? SHEET_MENU_Z : 10">
                     <template #button="{ triggerAttrs }">
                         <button type="button" class="border-groupBy pft__icon-btn cursor-pointer" :title="$t('Projects.more_features')" :aria-label="$t('Projects.more_features')" v-bind="triggerAttrs">
                             <ShellIcon name="dots" :size="15" />
@@ -133,23 +148,14 @@
                         <template v-for="(group, gi) in moreGroups" :key="group.key">
                             <div v-if="gi" class="ah-pop__sep" role="separator"></div>
                             <div class="ah-label ah-pop__label">{{ $t(`Projects.menu_${group.key}`) }}</div>
-                            <DropDownOption v-for="item in group.items" :key="item.key" @click="item.open()">
+                            <DropDownOption v-for="item in group.items" :key="item.key" @click="filtersOpen = false; item.open()">
                                 <div><span class="dropdown-label">{{ $t(item.label) }}</span></div>
                             </DropDownOption>
                         </template>
                     </template>
                 </DropDown>
-                <GlobalSearchModal v-model="showGlobalSearch" />
-                <RecentVisitsDropdown v-model="showRecent" />
-                <BurndownModal v-model="showBurndown" :projectData="projectData" />
-                <EpicsPanel v-model="showEpics" :projectData="projectData" />
-                <PagesPanel v-model="showPages" :projectData="projectData" />
-                <ExportTasksDropdown v-model="showExport" :projectData="projectData" />
-                <PublicShareModal v-model="showPublicShare" :projectData="projectData" />
-                <ImportDialog v-model="showImport" :projectData="projectData" :users="users" :sprint="importSprint" />
-                <AutoArchiveModal v-model="showAutoArchive" :projectData="projectData" />
-                <EstimationScaleModal v-model="showEstimationScale" :projectData="projectData" />
             </div>
+            </component>
             <div v-if="['Calendar'].includes(activeTab)" class="d-flex align-items-center justify-content-end task-filter-assignee" :class="clientWidth <= 767 ? 'justify-content-start' : ''">
                 <div class="border-groupBy d-flex align-items-center assignee-filter manage__filter-users">
                     <button
@@ -199,6 +205,18 @@
                 </div>
             </div>
         </div>
+        <template v-if="isListLike">
+            <GlobalSearchModal v-model="showGlobalSearch" />
+            <RecentVisitsDropdown v-model="showRecent" />
+            <BurndownModal v-model="showBurndown" :projectData="projectData" />
+            <EpicsPanel v-model="showEpics" :projectData="projectData" />
+            <PagesPanel v-model="showPages" :projectData="projectData" />
+            <ExportTasksDropdown v-model="showExport" :projectData="projectData" />
+            <PublicShareModal v-model="showPublicShare" :projectData="projectData" />
+            <ImportDialog v-model="showImport" :projectData="projectData" :users="users" :sprint="importSprint" />
+            <AutoArchiveModal v-model="showAutoArchive" :projectData="projectData" />
+            <EstimationScaleModal v-model="showEstimationScale" :projectData="projectData" />
+        </template>
     </div>
 </template>
 
@@ -224,6 +242,18 @@ import PublicShareModal from '@/components/molecules/PublicShare/PublicShareModa
 import ImportDialog from '@/components/organisms/ImportDialog/ImportDialog.vue';
 import AutoArchiveModal from '@/components/molecules/AutoArchive/AutoArchiveModal.vue';
 import EstimationScaleModal from '@/components/molecules/EstimationScale/EstimationScaleModal.vue';
+import { ALL as DONE_BY_ALL } from '@/components/molecules/Provenance/doneByQuery';
+import { clearFilterSignal } from '@/views/Projects/composables/taskFilterSignal';
+import ProjectFiltersSheet from './ProjectFiltersSheet.vue';
+
+const PHONE_MAX = 767;
+const LIST_LIKE_TABS = ['ProjectListView', 'ProjectKanban', 'TableView'];
+// Menus opened from the sheet have to stack above its backdrop.
+const SHEET_MENU_Z = 70;
+
+const InPlace = (_, { slots }) => slots.default?.();
+InPlace.props = ['open'];
+InPlace.inheritAttrs = false;
 
 const showBurndown = ref(false);
 const showGlobalSearch = ref(false);
@@ -307,6 +337,29 @@ const emit = defineEmits([
 ]);
 
 const assigneeFilterCount = computed(() => props.filterUsers.filter((x) => x !== props.userId).length);
+
+const isListLike = computed(() => LIST_LIKE_TABS.includes(props.activeTab));
+const sheetMode = computed(() => props.clientWidth <= PHONE_MAX && isListLike.value);
+const filtersOpen = ref(false);
+watch(sheetMode, (on) => { if (!on) filtersOpen.value = false; });
+
+const advancedApplied = ref(false);
+watch(clearFilterSignal, () => { advancedApplied.value = false; });
+const onApplyFilter = (query) => {
+    advancedApplied.value = true;
+    emit('applyFilter', query);
+};
+const onClearFilter = () => {
+    advancedApplied.value = false;
+    emit('clearFilter');
+};
+
+const activeFilterCount = computed(() => [
+    props.filterUsers.includes(props.userId),
+    assigneeFilterCount.value > 0,
+    props.doneBy !== DONE_BY_ALL,
+    advancedApplied.value,
+].filter(Boolean).length);
 
 // Show/Hide Archive is a mode switch, not a filter, so it lives in the overflow menu
 // and the menu stays mounted in archive mode — it is the only way back out.

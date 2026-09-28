@@ -436,3 +436,4 @@
     .ah-tray { right: 10px; bottom: calc(var(--tabbar-h) + 10px); }
     .ah-tray__name { max-width: 140px; }
 }
+.ah-detail__ai-draft { order: -1; align-self: stretch; width: 100%; margin-bottom: 8px; }

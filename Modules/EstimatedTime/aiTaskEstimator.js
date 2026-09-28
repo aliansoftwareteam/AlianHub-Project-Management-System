@@ -627,18 +627,20 @@ async function runEstimate(companyId, task) {
     };
 }
 
-async function persistEstimate(companyId, taskId, minutes, opts = {}) {
-    const { userData, previousMinutes, maxMinutes } = opts;
-    // The company cap, applied at the single point every estimate is written.
-    // Prompting the model to stay under a limit is a request; this is where the
-    // limit actually holds — including when the model ignores it, when the
-    // calibration multiplier pushes a value back over, and on any future caller
-    // that forgets the rule exists.
-    let finalMinutes = minutes;
+/* The company cap. Prompting the model to stay under a limit is a request; this
+ * is where the limit holds, including when the calibration multiplier pushes a
+ * value back over. Both the written estimate and a proposal pass through it. */
+function capMinutes(minutes, maxMinutes) {
     if (Number.isFinite(Number(maxMinutes)) && Number(maxMinutes) > 0
         && Number.isFinite(Number(minutes)) && Number(minutes) > Number(maxMinutes)) {
-        finalMinutes = Math.round(Number(maxMinutes));
+        return Math.round(Number(maxMinutes));
     }
+    return minutes;
+}
+
+async function persistEstimate(companyId, taskId, minutes, opts = {}) {
+    const { userData, previousMinutes, maxMinutes } = opts;
+    const finalMinutes = capMinutes(minutes, maxMinutes);
     const updateQuery = {
         type: SCHEMA_TYPE.TASKS,
         data: [
@@ -776,8 +778,38 @@ async function estimateAndPersist({ companyId, taskId, task, force = false, user
     }
 }
 
+/* The same estimate estimateAndPersist would write, returned for the person to
+ * review; nothing is stored, broadcast or logged. Never throws. */
+async function proposeEstimate({ companyId, task, maxMinutes } = {}) {
+    try {
+        if (!companyId || !task) return { status: false, reason: 'missing required input' };
+        if (!providerFactory
+            || typeof providerFactory.isAnyProviderConfigured !== 'function'
+            || !providerFactory.isAnyProviderConfigured()) {
+            return { status: false, reason: 'no LLM provider configured' };
+        }
+        const estimate = await runEstimate(companyId, task);
+        if (!estimate || estimate.minutes == null) return { status: false, reason: 'no estimate returned' };
+        return {
+            status: true,
+            minutes: capMinutes(estimate.minutes, maxMinutes),
+            optimistic: estimate.optimistic,
+            likely: estimate.likely,
+            pessimistic: estimate.pessimistic,
+            confidence: estimate.confidence,
+            work_items: estimate.work_items,
+            reasoning: estimate.reasoning,
+            basedOnSamples: estimate.basedOnSamples,
+        };
+    } catch (error) {
+        logger.error(`AI task estimate proposal failed: ${error && error.message ? error.message : error}`);
+        return { status: false, reason: (error && error.message) || 'estimator error' };
+    }
+}
+
 module.exports = {
     estimateAndPersist,
+    proposeEstimate,
     // Exposed for unit tests / debugging — not part of the runtime contract.
     _internal: {
         clampMinutes,
