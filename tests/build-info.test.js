@@ -2,7 +2,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { deriveBuildInfo, renderLog } = require('../scripts/build-info');
+const { deriveBuildInfo, deriveBuildInfoAsync, renderLog } = require('../scripts/build-info');
 const { resolveBuildInfo } = require('../Config/buildInfo');
 
 const GIT_ENV = {
@@ -40,6 +40,17 @@ function makeRepo({ tag = true } = {}) {
 }
 
 describe('build info derived from git', () => {
+    it('reads a history since the tag larger than the default 1 MB output buffer', async () => {
+        const { dir, commit } = makeRepo();
+        const body = 'x'.repeat(400 * 1024);
+        commit('fix: one', body);
+        commit('fix: two', body);
+        commit('fix: three', body);
+
+        expect(deriveBuildInfo({ cwd: dir })).toMatchObject({ version: '1.2.4-beta.3', build: 3 });
+        await expect(deriveBuildInfoAsync({ cwd: dir })).resolves.toMatchObject({ version: '1.2.4-beta.3', build: 3 });
+    });
+
     it('numbers every first-parent commit since the release tag and reads PRs from merges and squashes', () => {
         const { dir, git, commit } = makeRepo();
         commit('feat(x): add thing (#12)');
