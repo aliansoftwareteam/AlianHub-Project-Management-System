@@ -11,6 +11,8 @@ const mcp = require('../Modules/Mcp/tools');
 const CID = '6a8ee973d625fca52e519a12';
 const PID = '6a9954186dd786246031e47b';
 const OWNER = '6a8ee972d625fca52e519a05';
+const SPRINT = '6a9954316dd786246031e551';
+const { ObjectId } = require('mongoose').Types;
 const project = {
     _id: PID, CompanyId: CID, ProjectCode: 'AR', userId: OWNER,
     taskStatusData: [{ name: 'Done', key: 9, type: 'close' }, { name: 'To Do', key: 1, type: 'default_active' }],
@@ -96,12 +98,12 @@ describe('task.create — an agent can file what it found', () => {
         const saved = {};
         MongoDbCrudOpration
             .mockResolvedValueOnce(project)
-            .mockResolvedValueOnce([{ _id: 's1', sprintName: 'List' }])
+            .mockResolvedValueOnce([{ _id: SPRINT, name: 'List' }])
             .mockImplementationOnce(async (_c, q) => { Object.assign(saved, q.data); return { _id: q.data._id }; })
             .mockResolvedValueOnce({ _id: 'tid', CompanyId: CID, TaskKey: 'AR-30' });
         await tools.createTask(CID, PID, { title: 'Filed somewhere', sprintId: '' });
-        expect(saved.sprintId).toBe('s1');
-        expect(saved.sprintArray).toEqual({ id: 's1', name: 'List' });
+        expect(String(saved.sprintId)).toBe(SPRINT);
+        expect(saved.sprintArray).toEqual({ id: new ObjectId(SPRINT), name: 'List' });
         const listQuery = MongoDbCrudOpration.mock.calls[1][1];
         expect(listQuery.data[0].deletedStatusKey).toEqual({ $in: [0, null] });
     });
