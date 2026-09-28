@@ -94,7 +94,7 @@
                                                             <img class="ml-20px activeTab-tick" v-if="activeTab === view.keyName" :src="viewDefaultActive"/>
                                                         </div>
                                                     </DropDownOption>
-                                                    <DropDownOption class="position-sti border d-flex justify-content-center addview__dropdown" @click="$refs[projectView].click(), $refs.all_views_dd.click()">
+                                                    <DropDownOption class="position-sti border d-flex justify-content-center addview__dropdown" @click="$refs[projectView].click(), $refs.bottomModals.openAllViews()">
                                                         <div class="blue font-size-18 font-weight-700">
                                                             + {{ $t('Projects.add_view') }}
                                                         </div>
@@ -392,6 +392,7 @@
         </template>
 
         <ProjectBottomModals
+            ref="bottomModals"
             :clientWidth="clientWidth"
             :projectAddView="projectAddView"
             :projectData="projectData"
