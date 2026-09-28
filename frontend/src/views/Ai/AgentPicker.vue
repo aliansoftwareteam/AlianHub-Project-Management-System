@@ -131,6 +131,7 @@ import AgentIdentity from "./AgentIdentity.vue";
 import { rankAgents } from "./agentFit";
 import { fitReasonText, workLabelText } from "./fitText";
 import { requirementsOf } from "./skillInputs";
+import { autonomyName } from "./plainLabels";
 
 // The fit-ranked assignee picker (handoff 30a). Ranking is the pure helper in
 // agentFit.js; this component only draws it and states what it is about to do
@@ -189,7 +190,7 @@ const badgeOf = (row) => {
     const account = agent.account === "personal" || agent.account === "local"
         ? t("Parity.badge_personal")
         : t("Parity.badge_workspace");
-    return `${account} · L${Number(agent.autonomy || 0)}`;
+    return `${account} · ${autonomyName(t, agent.autonomy)}`;
 };
 
 const fitLabel = (row) => {

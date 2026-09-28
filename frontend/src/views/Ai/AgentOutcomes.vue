@@ -55,7 +55,7 @@
                 <span class="outcome__run-body">
                     <strong>{{ run.agentName }}</strong>
                     <span class="ah-mono"> · {{ minutes(run) }} · {{ money(run) }}{{ capOf(run) }}</span>
-                    <span v-if="run.skill"> · {{ run.skill }}</span>
+                    <span v-if="run.skill"> · {{ skillLabel(t, run.skill) }}</span>
                 </span>
                 <button v-if="canStop(run)" type="button" class="ah-btn ah-btn--danger ah-btn--sm" data-test="stop-run" :disabled="stopping === run._id" @click="$emit('stop', run)">
                     {{ stopping === run._id ? $t('Parity.stopping') : $t('Parity.stop') }}
@@ -72,8 +72,10 @@
 
 <script setup>
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AgentRunDetail from "./AgentRunDetail.vue";
+import { skillLabel } from "./plainLabels";
 
 // The three ways an assignment ends badly (30c), read off the real run list:
 // declined before starting, handed back partway, or going wrong and stopped.
@@ -88,6 +90,8 @@ const props = defineProps({
 });
 
 defineEmits(["stop", "reverted"]);
+
+const { t } = useI18n();
 
 const OPEN = ["queued", "running", "waiting_approval"];
 const expanded = ref("");

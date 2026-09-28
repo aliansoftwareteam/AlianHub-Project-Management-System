@@ -80,9 +80,9 @@
             </ul>
 
             <div v-if="result" class="run-detail__result">
-                <span>{{ $t('Ai.reverted_n', { n: result.reverted }) }}</span>
+                <span>{{ t('Ai.reverted_count', { n: result.reverted }, result.reverted) }}</span>
                 <template v-if="result.failed.length">
-                    <span>{{ $t('Ai.revert_partial', { n: result.failed.length }) }}</span>
+                    <span>{{ t('Ai.revert_partial_count', { n: result.failed.length }, result.failed.length) }}</span>
                     <ul class="run-detail__failed">
                         <li v-for="f in result.failed" :key="f.action"><span class="ah-mono">{{ f.action }}</span> · {{ f.reason }}</li>
                     </ul>
@@ -185,7 +185,7 @@ const revert = async () => {
     try {
         const out = await revertRun(props.runId);
         result.value = { reverted: Number(out?.reverted || 0), failed: Array.isArray(out?.failed) ? out.failed : [] };
-        $toast.success(t("Ai.reverted_n", { n: result.value.reverted }), { position: "top-right" });
+        $toast.success(t("Ai.reverted_count", { n: result.value.reverted }, result.value.reverted), { position: "top-right" });
         await load();
         emit("reverted", result.value);
     } catch (e) {
