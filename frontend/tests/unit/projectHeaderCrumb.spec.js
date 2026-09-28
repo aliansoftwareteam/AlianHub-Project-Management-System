@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createMemoryHistory, createRouter } from 'vue-router';
 
-const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn(() => Promise.resolve({ data: { status: true, data: [] } })) }));
+const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn((method) => Promise.resolve({ data: method === 'get' ? { status: true, data: [] } : { status: true } })) }));
 vi.mock('@/services', () => ({ apiRequest, apiRequestWithoutCompnay: vi.fn() }));
 
 import * as env from '@/config/env';

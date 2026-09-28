@@ -2,7 +2,7 @@
     <div class="projectInfoDiv bg-white" :class="[{'opacity-5 pointer-event-none' : item?.isRestrict === true}]">
         <div class="projectInfoTopLine d-flex align-items-center justify-content-between font-ui">
             <div class="d-flex align-items-center project__inToplinetextimg-wrapper">
-                <img :class="[{'cursor-pointer' : activeTab === 0}]" :src="item?.favouriteTasks?.filter((x) => x.userId === userId)?.length ? projectStar : blankStar" @click="!item.isRestrict ? updateFavourite(item) : ''" :title="$t('Projects.favourite')"/>
+                <img :class="[{'cursor-pointer' : activeTab === 0}]" :src="isStarred('project', item?._id) ? projectStar : blankStar" @click="!item.isRestrict ? updateFavourite(item) : ''" :title="$t('Projects.favourite')"/>
                 <span class="ProjectFirstLatter light-purple d-flex align-items-center justify-content-center font-weight-400 font-ui white font-size-13 text-uppercase" v-if="item.projectIcon.type === 'color'" :style="[{'background-color': item.projectIcon.type === 'color' ? item.projectIcon.data : ''}]">{{item.ProjectName ? item.ProjectName.charAt(0) : ''}}</span>
                 <WasabiImage
                     v-else
@@ -157,6 +157,7 @@
 import { defineProps, inject, computed, ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useProjects } from '@/composable/projects';
+import { useFavourites } from '@/composable/favourites';
 import Assignee from "@/components/molecules/Assignee/Assignee.vue";
 import ProjectSettingSidebar from '@/components/atom/ProjectSettingSidebar/ProjectSettingSidebar.vue'
 import { useStore } from 'vuex';
@@ -164,7 +165,6 @@ import { useToast } from 'vue-toast-notification';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue'
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
 const companyId = inject('$companyId');
-const userId = inject("$userId");
 import { useCustomComposable } from "@/composable";
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
 import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
@@ -185,7 +185,7 @@ const props = defineProps({
         type: Number
     }
 });
-const {markFavourite} = useProjects();
+const { isFavourite: isStarred, toggleFavourite } = useFavourites();
 const {getters,commit} = useStore();
 const {checkPermission} = useCustomComposable();
 const router = useRouter();
@@ -231,22 +231,7 @@ function updateFavourite(projectData) {
     if(props.activeTab === 1){
         return;
     }
-    if(!projectData.favouriteTasks || !projectData.favouriteTasks.find((x) => x.userId === userId.value)) {
-        markFavourite({
-            cid: companyId.value,
-            projectId: projectData._id,
-            userId: userId.value
-        })
-        commit('projectData/projectLocalUpdate', {itemData:projectData,key:'MarkAsFavourite',subKey:"add",userId: userId.value});
-    } else {
-        markFavourite({
-            cid: companyId.value,
-            projectId: projectData._id,
-            userId: userId.value,
-            data: projectData.favouriteTasks.find((x) => x.userId === userId.value)
-        })
-        commit('projectData/projectLocalUpdate', {itemData:projectData,key:'MarkAsFavourite',subKey:"remove",userId: userId.value});
-    }
+    toggleFavourite({ type: 'project', id: String(projectData._id), name: projectData.ProjectName || '' });
 }
 const changeAssignee = async (type, user,projectData) => {
     try {

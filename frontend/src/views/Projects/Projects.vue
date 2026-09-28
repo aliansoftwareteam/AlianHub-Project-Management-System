@@ -3,23 +3,22 @@
         <template v-if="!loadingProjects && !isRuleData">
             <template v-if="projects?.length && projectData && !isFilterHasData">
                 <template v-if="isRuleData === false ? checkPermission('task.task_list',projectData.isGlobalPermission) !== null && !projectData.isRestrict : !projectData.isRestrict">
+                    <ProjectTreePanel />
                     <div class="section-right bg-white position-re">
                         <ProjectHeader
                             ref="projectHeader"
                             :project="projectData"
                             :projects="projects"
                             :sprint="headerSprint"
-                            :favourite="isProjectFavourite"
                             :agentSummary="agentSummary"
                             :showAiAssist="canAiAssist"
                             :showAddTask="canAddTask"
-                            @toggle-favourite="markProjectFavourite()"
                             @select-project="selectProject({ _id: $event }, true)"
                             @ai-assist="openAiTaskCreator()"
                             @add-task="addTaskRequest++"
                         >
                             <template #title>
-                                    <img :src="projectData?.favouriteTasks?.filter((x) => x.userId === userId)?.length ? projectStar : blankStar" alt="projectStar" class="cursor-pointer mark__project-favourite" @click="markProjectFavourite()"/>
+                                    <FavouriteStar type="project" :id="projectData?._id || ''" :name="projectData?.ProjectName || ''" />
                                     <div v-if="clientWidth > 767">
                                         <span v-if="projectData?.projectIcon && projectData?.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center ml-9px" :class="{'inital-box' : clientWidth > 767 , 'project-firtsleeter-box' : clientWidth <=767}" :style="[{'background-color': projectData?.projectIcon.data}]">{{ projectData?.ProjectName.charAt(0).toUpperCase()}}</span>
                                         <template v-else-if="projectData?.projectIcon && projectData?.projectIcon?.type === 'image'">
@@ -474,6 +473,8 @@ import NotFound from '../NotFound.vue';
 // EXTRACTED PIECES
 import ProjectActionsBar from './components/ProjectActionsBar.vue';
 import ProjectHeader from './components/ProjectHeader.vue';
+import ProjectTreePanel from './components/ProjectTreePanel.vue';
+import FavouriteStar from '@/components/atom/FavouriteStar/FavouriteStar.vue';
 import NewInProjectMenu from './components/NewInProjectMenu.vue';
 import ProjectFiltersToolbar from './components/ProjectFiltersToolbar.vue';
 import { useProjectAgents } from './Kanban/useProjectAgents';
@@ -652,8 +653,6 @@ const filterFavorites = ref(localStorage.getItem('favoriteFilter') == 'true');
 const clientWidth = inject('$clientWidth');
 const route = useRoute();
 const router = useRouter();
-const projectStar = require('@/assets/images/svg/start13.svg');
-const blankStar = require('@/assets/images/svg/blankStar.svg');
 const viewDefaultIcon = require('@/assets/images/svg/list_home_icon.svg');
 const viewDefaultActive = require('@/assets/images/svg/blue_tick.svg');
 
@@ -683,7 +682,7 @@ const { calendartoggle, rangeObject, calendarDate, calenderSelectDate, prevMonth
 const { isRuleData, rulePermission, getProjectRule } = useProjectRules();
 const { editProject, projectName, updateProjectName } = useProjectNameEdit(projectData);
 const { changeAssignee } = useProjectAssignee(projectData);
-const { archive, showSidebar, showSpinner, updateProject, markProjectFavourite } = useProjectLifecycle(projectData);
+const { archive, showSidebar, showSpinner, updateProject } = useProjectLifecycle(projectData);
 const { showColorAvatar, savingAvatar, formData, resetFormData, assignAvatarData, updateImageValue, saveProjectAvatar } = useProjectAvatar(projectData);
 const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, searchTask, collapsed, groupBy, userSidebar, resetFilters, clearAllFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter, doneBy, setDoneBy } = useProjectSearch(projectData, showArchived);
 const { sprintLoading, loadSprintFolderData, selectProject } = useProjectTree(projectData);
@@ -1005,7 +1004,6 @@ const sprints = ref([]);
 // Header (10b): the sprint in view, the star, the agent chip and the "+ Task"
 // request the views listen for.
 const headerSprint = computed(() => (sprints.value.length === 1 && !sprints.value[0]?.isFolder ? sprints.value[0] : null));
-const isProjectFavourite = computed(() => Boolean((projectData.value?.favouriteTasks || []).find((x) => x.userId === userId.value)));
 const canAiAssist = computed(() => checkApps('AI', projectData.value) && checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true);
 // Only shown where a view actually answers the request (the board injects
 // `addTaskRequest`); other views opt in by injecting it too.
@@ -1323,10 +1321,6 @@ function closeModal() {
 }
 .project__components li{
     list-style: none !important;
-}
-.mark__project-favourite{
-    width: 13.6px;
-    height: 13px;
 }
 .mobile-projectlist-icon{
     margin-left: 6px;

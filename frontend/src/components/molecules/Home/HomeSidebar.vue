@@ -38,12 +38,7 @@
 
         <nav v-if="!hidden.includes('favorites')" class="hs-group" :aria-label="$t('Home.favorites')">
             <div class="hs-label">{{ $t('Home.favorites') }}</div>
-            <div v-for="fav in pinned" :key="fav.id" class="hs-item hs-row">
-                <span class="hs-item__star">★</span>
-                <router-link class="hs-item__text hs-row__link" :to="fav.to">{{ fav.label }}</router-link>
-                <button type="button" class="hs-item__action" :title="$t('Home.unpin')" @click="unpin(fav.id)"><ShellIcon name="x" :size="12" /></button>
-            </div>
-            <div v-if="!pinned.length" class="hs-empty">{{ $t('Home.no_favorites') }}</div>
+            <FavouritesList />
         </nav>
 
         <nav v-if="!hidden.includes('projects')" class="hs-group" :aria-label="$t('Home.projects')">
@@ -51,24 +46,8 @@
                 {{ $t('Home.projects') }}
                 <button v-if="canCreate" type="button" class="hs-label__btn" :title="$t('Home.new_project')" @click="$emit('create-project')"><ShellIcon name="plus" :size="13" /></button>
             </div>
-            <template v-for="project in projects" :key="project._id">
-                <div class="hs-item hs-row" :class="{ 'is-active': isProjectActive(project) }">
-                    <span class="hs-item__dot" :style="{ background: projectColor(project) }"></span>
-                    <router-link class="hs-item__text hs-row__link" :to="projectTo(project)">{{ project.ProjectName }}</router-link>
-                    <button type="button" class="hs-item__action" :class="{ 'is-on': isPinned(project._id) }" :title="isPinned(project._id) ? $t('Home.unpin') : $t('Home.pin')" @click="togglePin(project)">
-                        <ShellIcon name="star" :size="12" />
-                    </button>
-                    <button type="button" class="hs-item__chev" :class="{ 'is-open': expanded[project._id] }" :aria-expanded="!!expanded[project._id]" :aria-label="$t('Home.show_lists', { project: project.ProjectName })" @click="toggleExpand(project)">
-                        <ShellIcon name="chevronDown" :size="12" />
-                    </button>
-                </div>
-                <template v-if="expanded[project._id]">
-                    <router-link v-for="sprint in sprintsOf(project._id)" :key="sprint.id" class="hs-item hs-item--child" :to="sprintTo(project, sprint)">
-                        <span class="hs-item__text">{{ sprint.name }}</span>
-                    </router-link>
-                </template>
-            </template>
-            <div v-if="!projects.length" class="hs-empty">{{ $t('Home.no_projects') }}</div>
+            <ProjectTree v-if="projects.length" :projects="projects" :label="$t('Home.projects')" />
+            <div v-else class="hs-empty">{{ $t('Home.no_projects') }}</div>
         </nav>
 
         <div class="hs-foot__wrap" @click.stop>
@@ -88,18 +67,19 @@
 </template>
 
 <script setup>
-import { computed, defineEmits, defineProps, inject, onMounted, onUnmounted, reactive, ref } from "vue";
+import { computed, defineEmits, defineProps, inject, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import ContextSidebar from "@/components/organisms/Shell/ContextSidebar.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import ProjectTree from "@/components/molecules/ProjectTree/ProjectTree.vue";
+import FavouritesList from "@/components/molecules/FavouritesList/FavouritesList.vue";
 import { shellState, toggleTheme } from "@/components/organisms/Shell/shellState";
 import { useCustomComposable } from "@/composable";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { homeState } from "./homeState";
 import { isMacPlatform, openPalette } from "@/components/molecules/AdvanceSearch/paletteKeys";
-import { projectColor } from "./homeFormat";
 import { wakeTimer } from "@/views/Inbox/snoozeWake";
 
 defineOptions({ name: "HomeSidebar" });
@@ -111,51 +91,20 @@ defineEmits(["create-project"]);
 
 const route = useRoute();
 const router = useRouter();
-const { getters, dispatch } = useStore();
+const { getters } = useStore();
 const { checkPermission } = useCustomComposable();
 const companyId = inject("$companyId");
 
 const counts = ref({ all: 0, mentions: 0, notifications: 0 });
-const expanded = reactive({});
-const sprintsByProject = reactive({});
 const customizeOpen = ref(false);
 
 const projects = computed(() => (getters["projectData/projects"]?.data || []).filter((p) => !p.deletedStatusKey));
 const personalProject = computed(() => getters["projectData/personalProject"]);
 const canCreate = computed(() => checkPermission("project.project_create") === true);
-const pinned = computed(() => shellState.nav.pinned || []);
 const hidden = computed(() => shellState.nav.hidden || []);
 
 const mac = isMacPlatform();
 const to = (name, query) => ({ name, params: { cid: companyId.value }, query });
-const isProjectActive = (project) => String(route.params.id || "") === project._id;
-const projectTo = (project) => ({ name: "Project", params: { cid: companyId.value, id: project._id } });
-const sprintTo = (project, sprint) => (sprint.folderId
-    ? { name: "ProjectFolderSprint", params: { cid: companyId.value, id: project._id, folderId: sprint.folderId, sprintId: sprint.id } }
-    : { name: "ProjectSprint", params: { cid: companyId.value, id: project._id, sprintId: sprint.id } });
-const sprintsOf = (pid) => sprintsByProject[pid] || [];
-
-function toggleExpand(project) {
-    expanded[project._id] = !expanded[project._id];
-    if (expanded[project._id] && !sprintsByProject[project._id]) {
-        dispatch("projectData/setSprints", { projectId: project._id })
-            .then((list) => {
-                sprintsByProject[project._id] = (Array.isArray(list) ? list : [])
-                    .filter((s) => Number(s.deletedStatusKey || 0) === 0)
-                    .map((s) => ({ id: s._id || s.id, name: s.name, folderId: s.folderId || null }));
-            })
-            .catch((error) => console.error("sprints load failed", error));
-    }
-}
-
-const isPinned = (id) => pinned.value.some((f) => f.id === id);
-function togglePin(project) {
-    if (isPinned(project._id)) return unpin(project._id);
-    shellState.nav.pinned = [...pinned.value, { id: project._id, type: "project", label: project.ProjectName, to: projectTo(project) }];
-}
-function unpin(id) {
-    shellState.nav.pinned = pinned.value.filter((f) => f.id !== id);
-}
 function toggleSection(key) {
     shellState.nav.hidden = hidden.value.includes(key) ? hidden.value.filter((k) => k !== key) : [...hidden.value, key];
 }

@@ -9868,5 +9868,21 @@ export default {
         "revoke": "Revoke",
         "revoke_confirm": "Revoke {name}? It loses access at once.",
         "revoke_failed": "The app could not be revoked."
+    },
+    "Favourites": {
+        "add": "Add to favourites",
+        "remove": "Remove from favourites",
+        "toggle": "Favourite {name}",
+        "remove_named": "Remove {name} from favourites",
+        "reorder_named": "Move {name}",
+        "reorder_hint": "Drag, or use the up and down arrow keys, to reorder.",
+        "moved": "{name} moved to position {n} of {total}"
+    },
+    "ProjectTree": {
+        "label": "Projects and lists",
+        "show": "Show the project tree",
+        "hide": "Hide the project tree",
+        "close": "Close the project tree",
+        "tasks": "{n} tasks"
     }
 };

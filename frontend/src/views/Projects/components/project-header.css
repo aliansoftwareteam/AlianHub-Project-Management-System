@@ -56,7 +56,26 @@
 .ph2:has(.project-titlerename-input) .ph2__switch,
 .ph2:has(.project-titlerename-input) .ph2__project { display: none; }
 
-.ph2__sprint { white-space: nowrap; }
+.ph2__sprint { white-space: nowrap; color: inherit; text-decoration: none; border-radius: 4px; }
+a.ph2__sprint:hover { color: var(--brand); text-decoration: underline; }
+a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
+.ph2__tree {
+    border: 0;
+    background: none;
+    color: var(--ink-2);
+    padding: 4px;
+    margin-left: -6px;
+    min-width: 28px;
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    cursor: pointer;
+    flex: none;
+}
+.ph2__tree:hover, .ph2__tree.is-on { color: var(--ink); background: var(--surface-hover); }
+.ph2__tree:focus-visible { outline: none; box-shadow: var(--focus); }
 
 .ph2__range {
     font: var(--text-label);

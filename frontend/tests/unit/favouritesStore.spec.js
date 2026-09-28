@@ -66,8 +66,9 @@ describe('one favourites store behind every star', () => {
 
     it('turns the star on before the server answers and back off when it refuses', async () => {
         let refuse;
-        apiRequest.mockImplementationOnce(() => new Promise((resolve, reject) => { refuse = reject; }));
         const wrapper = star({ type: 'task', id: 't9', name: 'Pending' });
+        await flushPromises();
+        apiRequest.mockImplementationOnce(() => new Promise((resolve, reject) => { refuse = reject; }));
         await wrapper.find('button').trigger('click');
         expect(wrapper.find('button').attributes('aria-pressed')).toBe('true');
         refuse(new Error('offline'));

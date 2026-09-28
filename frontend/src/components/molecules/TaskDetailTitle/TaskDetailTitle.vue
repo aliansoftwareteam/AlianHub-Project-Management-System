@@ -67,9 +67,8 @@
 
     const { checkPermission } = useCustomComposable();
 
-    const emit = defineEmits(["update:taskName", "update:favourite", "update:taskType"])
+    const emit = defineEmits(["update:taskName", "update:taskType"])
     const props = defineProps({
-        favourites: Array,
         taskType: Number,
         taskName: String,
         isSupport: {

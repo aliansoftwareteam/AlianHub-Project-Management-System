@@ -126,7 +126,7 @@ describe('Home sidebar favorite rows', () => {
         const row = rowOf(group(wrapper, 'Home.favorites'), 'Alpha');
         expect(nestedControls(row)).toEqual([]);
 
-        const unstar = [...row.querySelectorAll('button')].find((b) => nameOf(b) === 'Favourites.remove');
+        const unstar = [...row.querySelectorAll('button')].find((b) => nameOf(b) === 'Favourites.remove_named');
         expect(unstar).toBeTruthy();
         unstar.click();
         await flushPromises();
@@ -138,7 +138,7 @@ describe('Home sidebar favorite rows', () => {
     it('move an item with the keyboard from its handle', async () => {
         const { wrapper } = await open();
         const row = rowOf(group(wrapper, 'Home.favorites'), 'Sprint 1');
-        const handle = [...row.querySelectorAll('button')].find((b) => nameOf(b) === 'Favourites.reorder');
+        const handle = [...row.querySelectorAll('button')].find((b) => nameOf(b) === 'Favourites.reorder_named');
         expect(handle).toBeTruthy();
         handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
         await flushPromises();
