@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { canEditProject, canReadProject, DETAILS } = require('../../../Config/projectAccess');
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { canSeeSprint, sprintIdentities } = require('../../Sprints/helpers/sprintVisibility');
+const { sprintPlacementOf } = require('../../Tasks/helpers/sprintPlacement');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const CREATE_TASKS = ['task.task_create'];
@@ -26,11 +27,7 @@ const importTargetAccess = async (companyId, uid, { projectId, sprintId, addsSta
     if (!sprint || String(sprint.projectId) !== String(projectId)) return NOT_FOUND;
     if (!isPrivileged(await getRoleType(companyId, uid)) && !canSeeSprint(sprint, await sprintIdentities(companyId, uid))) return NOT_FOUND;
 
-    const folder = OBJECT_ID.test(String(sprint.folderId || '')) ? await findById(companyId, SCHEMA_TYPE.FOLDERS, sprint.folderId, { name: 1 }) : null;
-    return {
-        allowed: true,
-        sprint: { id: String(sprint._id), name: sprint.name || '', ...(folder ? { folderId: String(folder._id), folderName: folder.name || '' } : {}) },
-    };
+    return { allowed: true, sprint: (await sprintPlacementOf(companyId, sprint)).set.sprintArray };
 };
 
 const previewAccess = (companyId, uid, projectId) => canReadProject(companyId, uid, projectId);

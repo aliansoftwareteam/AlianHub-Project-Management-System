@@ -8,7 +8,7 @@
             </div>
         </div>
         <div class="editor-container description_componenet" v-show="!noDescription">
-            <div v-if="editPermission && checkAiProject && checkAiDescription && aiUsable" class="ai-write-desc-bar">
+            <div v-if="editPermission && aiAllowed" class="ai-write-desc-bar">
                 <div class="d-flex align-items-center cursor-pointer" @click="openAiWriteDescription()">
                     <img :src="aiIcon" class="mr-3px" alt="ai" />
                     <span class="font-size-14 font-weight-500 ai-color ai-border-bottom">{{ $t('AI.ai_write_description') }}</span>
@@ -50,7 +50,7 @@ import { useRoute, useRouter } from "vue-router";
 import markdownit from 'markdown-it'
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from "vue-i18n";
-import { aiUsable } from "@/composable/aiAvailability";
+import { canUseAi } from "@/composable/aiAvailability";
 const { t } = useI18n();
 const mardownInit = markdownit({
     html: true
@@ -114,7 +114,7 @@ const pendingAiSave = ref(false);
 
 const contentLoaded = ref(false)
 
-const { checkPermission,checkApps, debounce } = useCustomComposable();
+const { checkPermission, debounce } = useCustomComposable();
 
 const props = defineProps({
     description: {
@@ -155,8 +155,8 @@ const companyId = inject('$companyId');
 const project = inject("selectedProject");
 const clientWidth = inject('$clientWidth');
 
-const checkAiProject = computed(() => checkApps('AI',props.projectData));
 const checkAiDescription = props.from === 'project' ? computed(() => checkPermission("project.project_description", props.projectData?.isGlobalPermission, {gettersVal: getters})) : computed(() => checkPermission("task.task_description", props.projectData?.isGlobalPermission, {gettersVal: getters}));
+const aiAllowed = computed(() => canUseAi({ project: props.projectData, permitted: Boolean(checkAiDescription.value) }));
 
 // Inputs handed to the lightweight "Write with AI" popover. Title + type come
 // from the task when editing a task, or the project name when from==='project'
@@ -180,7 +180,7 @@ const editorTools = {
         class:writeWithAi,
         config: {
             openSidebar : openDescriptionWithAi,
-            isShowAi: checkAiProject.value && checkAiDescription.value
+            isShowAi: aiAllowed.value
         },
     },
     header: {

@@ -11,7 +11,7 @@ vi.mock('@/composable', () => ({
         checkApps: () => true,
     }),
 }));
-vi.mock('@/composable/aiAvailability', () => ({ aiUsable: false }));
+vi.mock('@/composable/aiAvailability', () => ({ aiUsable: false, canUseAi: () => false }));
 vi.mock('vue-router', () => ({ useRoute: () => ({ params: {} }) }));
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key) => key }) }));
 vi.mock('@/components/atom/AlertBox/helper', () => ({ showAlertModal: vi.fn() }));

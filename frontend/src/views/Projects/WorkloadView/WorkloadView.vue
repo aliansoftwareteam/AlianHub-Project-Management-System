@@ -52,7 +52,7 @@
                 <button type="button" class="ah-tab" :class="{ 'is-on': mode === 'logged' }" @click="mode = 'logged'">{{ $t('Views.by_logged') }}</button>
             </div>
             <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="suggestBalance">
-                <span class="wv__spark">✦</span> {{ $t('Views.balance') }}
+                <ShellIcon name="users" :size="13" class="wv__spark" /> {{ $t('Views.balance') }}
             </button>
         </div>
 
@@ -127,7 +127,7 @@
                     <span><i class="wv__key wv__key--over"></i>{{ $t('Views.legend_over') }}</span>
                 </div>
                 <div v-if="hint" class="wv__hint">
-                    <span class="wv__spark">✦</span>
+                    <ShellIcon name="info" :size="13" class="wv__spark" />
                     <span>{{ hint.text }}</span>
                     <button v-if="hint.apply" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" @click="applyHint">
                         {{ $t('Views.apply') }}
@@ -142,6 +142,7 @@
 
 <script setup>
     import { onMounted, ref, computed, inject, watch } from "vue";
+    import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
     import { useStore } from "vuex";
     import { useI18n } from "vue-i18n";
     import moment from 'moment';
