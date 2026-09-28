@@ -16,8 +16,9 @@
 
         <div class="mc-msg-stack">
             <div v-if="!continuation" class="mc-msg-meta">
-                <span class="mc-msg-name">{{ displayName }}</span>
-                <span v-if="isAgent" class="mc-agent-tag">{{ $t('Chat.agent') }}</span>
+                <span class="mc-msg-name" :data-test="isAi ? 'ai-author' : undefined">{{ isAi ? $t('AiMention.author') : displayName }}</span>
+                <span v-if="isAi" class="mc-agent-tag mc-ai-for" data-test="ai-for">{{ $t('AiMention.answered_for', { name: askerName }) }}</span>
+                <span v-else-if="isAgent" class="mc-agent-tag">{{ $t('Chat.agent') }}</span>
                 <span class="mc-msg-time">· {{ shortTime }}</span>
                 <span v-if="message.pinnedMessage" class="mc-msg-pin"><MainChatIcon name="pin" :size="10" />{{ $t('MainChat.pinned') }}</span>
             </div>
@@ -122,6 +123,7 @@ import MainChatAvatar from './MainChatAvatar.vue';
 import MainChatIcon from './MainChatIcon.vue';
 import MainChatMessageBody from './MainChatMessageBody.vue';
 import { isAgentComment } from '@/utils/commentSide';
+import { AI_MENTION_NAME, aiAuthorOf } from '@/utils/aiMention';
 
 const props = defineProps({
     message: { type: Object, required: true },
@@ -131,6 +133,7 @@ const props = defineProps({
     continued: { type: Boolean, default: false },
     senderName: { type: String, default: '' },
     senderSrc: { type: String, default: '' },
+    askerName: { type: String, default: '' },
     hour12: { type: Boolean, default: true },
 });
 
@@ -172,9 +175,13 @@ onBeforeUnmount(() => {
     document.removeEventListener('keydown', onKeydown);
 });
 
-const isAgent = computed(() => isAgentComment(props.message) || !!props.message.agentName);
+const isAi = computed(() => !!aiAuthorOf(props.message));
+const isAgent = computed(() => isAgentComment(props.message) || !!props.message.agentName || isAi.value);
 const onMySide = computed(() => props.message.sent && !isAgent.value);
-const displayName = computed(() => (isAgent.value ? (props.message.agentName || props.senderName) : props.senderName) || '—');
+const displayName = computed(() => {
+    if (isAi.value) return AI_MENTION_NAME;
+    return (isAgent.value ? (props.message.agentName || props.senderName) : props.senderName) || '—';
+});
 const isText = computed(() => ['text', 'link'].includes(props.message.type) && !props.message.isDeleted);
 const actionable = computed(() => !props.message.isDeleted && !props.message.isSending);
 const hasReactions = computed(() => Array.isArray(props.message.reactions) && props.message.reactions.length > 0);
