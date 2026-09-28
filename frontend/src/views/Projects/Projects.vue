@@ -200,9 +200,9 @@
                                             </div>
                                         </div>
                                         <div class="d-flex align-items-center text-nowrap border-top-radius-10-px cursor-pointer view-list-wrapper h-100">
-                                            <DropDown v-if="checkPermission('project.view_list',projectData.isGlobalPermission) === true" maxHeight="80vh" :bodyClass="{'embed__dropdown':true}" id="embeddropdown">
-                                                <template #button>
-                                                    <button type="button" ref="embeddropdown" id="embeddropdown_button" class="ph2__tab ph2__tab--add d-flex align-items-center justify-content-center">
+                                            <DropDown v-if="checkPermission('project.view_list',projectData.isGlobalPermission) === true" mode="dialog" :aria-label="$t('Projects.add_view')" maxHeight="80vh" :bodyClass="{'embed__dropdown':true}" id="embeddropdown">
+                                                <template #button="{ triggerAttrs }">
+                                                    <button type="button" v-bind="triggerAttrs" ref="embeddropdown" class="ph2__tab ph2__tab--add d-flex align-items-center justify-content-center">
                                                         <img :src="addIcon" alt="" aria-hidden="true" class="mr-10px">
                                                         <span>{{ $t('Projects.add_view') }}</span>
                                                     </button>

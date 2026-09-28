@@ -24,10 +24,11 @@
                         width="25px" class="cursor-pointer converted__subtask-image"
                         :thumbnail="'25x25'"
                     />
-                    <DropDown mode="menu" :id="`timeloguser_${data._id}`" v-if="getAssignes.length > 1">
+                    <DropDown mode="dialog" :aria-label="$t('Common.more_assignees', { count: getAssignes.length - 1 })" :id="`timeloguser_${data._id}`" v-if="getAssignes.length > 1">
                         <template #button>
                             <div class="d-flex align-items-center justify-content-center profile-image GunPowder black text-nowrap font-size-12 border-2px-blue ml--5px bg-colorlightgray">
-                                +{{getAssignes.length - 1}}
+                                <span aria-hidden="true">+{{getAssignes.length - 1}}</span>
+                                <span class="ah-sr-only">{{ $t('Common.more_assignees', { count: getAssignes.length - 1 }) }}</span>
                             </div>
                         </template>
                         <template #options>

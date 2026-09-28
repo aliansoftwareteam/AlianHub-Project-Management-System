@@ -4,7 +4,7 @@
 -->
 <template>
     <div class="d-flex align-items-center position-re" :class="{'mr-15' : clientWidth > 767 , 'mr-010' : clientWidth <= 767}">
-        <DropDown maxHeight="47dvh" zIndex="99" :bodyClass="{'main-filter-dropdown-wrapper' : true}">
+        <DropDown mode="dialog" :aria-label="$t('Filters.filter')" maxHeight="47dvh" zIndex="99" :bodyClass="{'main-filter-dropdown-wrapper' : true}" :bodyClassHeader="{'top-filter-section' : true}">
             <template #head>
                 <div class="d-flex align-items-center justify-content-between filter-title" v-if="clientWidth <= 767">
                     <h3 class="m-0">{{$t('Filters.filter')}}</h3>
@@ -16,16 +16,14 @@
                     </div>
                 </div>
             </template>
-            <template #button>
-                <div class="top-filter-section">
-                    <button type="button" id="projectviewfilter_driver" ref="closeFilterRef" class="task-filter-trigger" :title="$t('Projects.filter')" :aria-label="$t('Projects.filter')">
-                        <img :src="editIcon" alt="" aria-hidden="true" class="task-filter-icon"/>
-                    </button>
-                    <span v-if="isApplyed" class="task-filter-count">{{inputs.length}}</span>
-                    <button v-if="isApplyed" type="button" class="task-filter-clear" :title="$t('Filters.clearall')" :aria-label="$t('Filters.clearall')" @click.stop.prevent="clearFilter">
-                        <img src="@/assets/images/svg/deletered.svg" alt="" aria-hidden="true" class="task-filter-close"/>
-                    </button>
-                </div>
+            <template #button="{ triggerAttrs }">
+                <button type="button" v-bind="triggerAttrs" ref="closeFilterRef" class="task-filter-trigger" :title="$t('Projects.filter')" :aria-label="$t('Projects.filter')">
+                    <img :src="editIcon" alt="" aria-hidden="true" class="task-filter-icon"/>
+                </button>
+                <span v-if="isApplyed" class="task-filter-count">{{inputs.length}}</span>
+                <button v-if="isApplyed" type="button" class="task-filter-clear" :title="$t('Filters.clearall')" :aria-label="$t('Filters.clearall')" @click.stop.prevent="clearFilter">
+                    <img src="@/assets/images/svg/deletered.svg" alt="" aria-hidden="true" class="task-filter-close"/>
+                </button>
             </template>
             <template #options>
                 <div class="bottom-filter-section bg-white" >
