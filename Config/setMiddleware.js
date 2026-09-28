@@ -79,6 +79,7 @@ const verifyJWTTokenWithCRoute = [
     // they record comes from req.uid, which this is what sets. The PUBLIC submission
     // endpoint is deliberately not under this prefix.
     "/api/v2/forms",
+    "/api/v2/task-templates",
     "/api/v1/removeCache",
     // Found by walking the Express stack for routes no guard list reached (task 034).
     // /api/v1/generatePrompt is exact on purpose: its /events/:id stream is an

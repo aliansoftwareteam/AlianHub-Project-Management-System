@@ -33,6 +33,7 @@
                 <button v-if="taskKey" type="button" class="ah-pop__item" role="menuitem" data-item="copy-key" @click="choose('copy-key')">{{ t('List.menu_copy_key') }}</button>
                 <a class="ah-pop__item" role="menuitem" data-item="new-tab" :href="href" target="_blank" rel="noopener" @click="close(false)">{{ t('List.menu_new_tab') }}</a>
                 <button type="button" class="ah-pop__item" role="menuitem" data-item="open" @click="choose('open')">{{ t('List.menu_open') }}</button>
+                <button v-if="canTemplate" type="button" class="ah-pop__item" role="menuitem" data-item="save-template" @click="choose('save-template')">{{ t('TaskTemplates.save_as') }}</button>
             </div>
         </span>
     </span>
@@ -50,9 +51,10 @@ const props = defineProps({
     task: { type: Object, required: true },
     href: { type: String, default: "" },
     canRename: { type: Boolean, default: false },
-    canSubtask: { type: Boolean, default: false }
+    canSubtask: { type: Boolean, default: false },
+    canTemplate: { type: Boolean, default: false }
 });
-const emit = defineEmits(["rename", "add-subtask", "copy-link", "copy-key", "open"]);
+const emit = defineEmits(["rename", "add-subtask", "copy-link", "copy-key", "open", "save-template"]);
 
 const { t } = useI18n();
 const open = ref(false);
@@ -104,7 +106,7 @@ function close(returnFocus) {
     if (returnFocus) nextTick(() => menuButton.value?.focus());
 }
 
-const MOVES_FOCUS = ["rename", "add-subtask", "open"];
+const MOVES_FOCUS = ["rename", "add-subtask", "open", "save-template"];
 
 function choose(action) {
     close(!MOVES_FOCUS.includes(action));

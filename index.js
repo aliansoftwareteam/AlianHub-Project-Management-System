@@ -159,6 +159,7 @@ function initializeControllers() {
     require('./Modules/EstimatedTime/init').init(app);
     require('./Modules/CustomField/init').init(app);
     require('./Modules/ProjectTemplates/init').init(app);
+    require('./Modules/TaskTemplates/init').init(app);
     require('./Modules/settings/templates/init').init(app);
     require('./Modules/settings/ProjectStatusTemplate/init').init(app);
     require('./Modules/settings/securityPermissions/init').init(app);

@@ -25,6 +25,7 @@ vi.mock('@/views/Projects/TableView/useTaskCategories.js', () => ({ useTaskCateg
 import {
     columnCatalogue, defaultColumns, gridTracks, listColumnsAt, resolveColumns, useViewColumns, withMove, withVisibility, columnStorageKey
 } from '@/views/Projects/composables/viewColumns';
+import { provideViewSettings } from '@/views/Projects/composables/viewSettingsContext';
 import { customFieldPayload, customFieldText, projectFieldDefs } from '@/views/Projects/composables/projectCustomFields';
 import { parseEstimate, pointsTotal } from '@/views/Projects/composables/taskPoints';
 import { fieldEditRights } from '@/views/Projects/ListView/listRowEdit';
@@ -37,11 +38,6 @@ import { dismissUndoToast, runUndo, undoToast } from '@/composable/useUndoToast'
 
 const i18n = createI18n({ legacy: false, locale: 'en', messages: { en }, missingWarn: false, fallbackWarn: false });
 config.global.plugins = [i18n];
-
-const memoryStorage = () => {
-    const data = new Map();
-    return { getItem: (k) => (data.has(k) ? data.get(k) : null), setItem: (k, v) => data.set(k, String(v)), removeItem: (k) => data.delete(k), data };
-};
 
 const FIELDS = {
     text: { _id: 'f-text', fieldType: 'text', fieldTitle: 'Customer', isDelete: true, type: 'task', projectId: ['p1'] },
@@ -88,12 +84,16 @@ describe('the column chooser', () => {
         expect(resolveColumns('list', columnCatalogue('list'), state).map((c) => c.id).slice(0, 3)).toEqual(['assignee', 'due', 'tags']);
     });
 
-    it('shows, hides and reorders from the panel and remembers it per user and project', async () => {
-        const storage = memoryStorage();
+    it('shows, hides and reorders from the panel into the open view\'s state, without the browser', async () => {
+        const storage = window.localStorage;
+        storage.clear();
         let api;
-        const Host = defineComponent({
+        const settings = { sort: ref(null), columns: ref({ order: [], shown: [], hidden: [] }) };
+        settings.setSort = (value) => { settings.sort.value = value; };
+        settings.setColumns = (value) => { settings.columns.value = value; };
+        const Chooser = defineComponent({
             setup() {
-                api = useViewColumns(ref('p1'), 'table', computed(() => catalogue), { storage });
+                api = useViewColumns(ref('p1'), 'table', computed(() => catalogue));
                 return () => h(ViewColumnChooser, {
                     columns: api.columns.value,
                     onToggle: api.setVisible,
@@ -102,8 +102,8 @@ describe('the column chooser', () => {
                 });
             }
         });
-        const provide = { $companyId: ref('c1'), $userId: ref('u1') };
-        const wrapper = mount(Host, { attachTo: document.body, global: { provide } });
+        const Host = defineComponent({ setup() { provideViewSettings(settings); return () => h(Chooser); } });
+        const wrapper = mount(Host, { attachTo: document.body });
 
         await wrapper.get('.vcc__trigger').trigger('click');
         expect(wrapper.get('[role="dialog"]').attributes('aria-label')).toBe('ViewColumns.title');
@@ -116,19 +116,16 @@ describe('the column chooser', () => {
         expect(api.columns.value.map((c) => c.id).slice(0, 3)).toEqual(['status', 'due', 'assignee']);
         await item('start').get('input').setValue(true);
 
-        const saved = JSON.parse(storage.getItem(columnStorageKey({ companyId: 'c1', userId: 'u1', projectId: 'p1' }, 'table')));
-        expect(saved.shown).toEqual({ tags: false, start: true });
-        expect(saved.order.slice(0, 3)).toEqual(['status', 'due', 'assignee']);
+        expect(settings.columns.value.hidden).toEqual(['tags']);
+        expect(settings.columns.value.shown).toEqual(['start']);
+        expect(settings.columns.value.order.slice(0, 3)).toEqual(['status', 'due', 'assignee']);
+        expect(storage.getItem(columnStorageKey({ companyId: 'company-1', userId: 'user-1', projectId: 'p1' }, 'table'))).toBe(null);
+        expect(api.visibleColumns.value.map((c) => c.id).slice(0, 4)).toEqual(['status', 'due', 'assignee', 'start']);
+
+        api.reset();
+        expect(api.isVisible('tags')).toBe(true);
+        expect(settings.columns.value).toEqual({ order: [], shown: [], hidden: [] });
         wrapper.unmount();
-
-        let again;
-        mount(defineComponent({ setup() { again = useViewColumns(ref('p1'), 'table', computed(() => catalogue), { storage }); return () => null; } }), { global: { provide } });
-        expect(again.visibleColumns.value.map((c) => c.id).slice(0, 4)).toEqual(['status', 'due', 'assignee', 'start']);
-        expect(again.isVisible('tags')).toBe(false);
-
-        again.reset();
-        expect(storage.data.size).toBe(0);
-        expect(again.isVisible('tags')).toBe(true);
     });
 
     it('Esc closes the panel and gives focus back to its button', async () => {

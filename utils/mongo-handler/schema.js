@@ -477,6 +477,33 @@ const schema = {
         createdBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0 },
     },
+    // Task templates (Modules/TaskTemplates). Dates are day offsets from the day a template is applied;
+    // checklist is [{ key, name, parentKey }] and subtasks [{ title, startOffsetDays, dueOffsetDays, assigneeIds }].
+    task_templates: {
+        name: { type: String, required: true },
+        // 'project' | 'workspace'; a workspace template has no ProjectID.
+        scope: { type: String, default: 'project', required: true },
+        ProjectID: { type: mongoose.Schema.Types.ObjectId, default: null, required: false },
+        defaultForProjects: { type: Array, default: [], required: false },
+        sourceTaskId: { type: String, default: '', required: false },
+        titlePattern: { type: String, default: '', required: false },
+        rawDescription: { type: String, default: '', required: false },
+        descriptionBlock: { type: Object, default: {}, required: false },
+        TaskType: { type: String, default: '', required: false },
+        TaskTypeKey: { type: Number, default: null, required: false },
+        Task_Priority: { type: String, default: '', required: false },
+        tagsArray: { type: Array, default: [], required: false },
+        totalEstimatedTime: { type: Number, default: null, required: false },
+        points: { type: Number, default: null, required: false },
+        customField: { type: Object, default: {}, required: false },
+        startOffsetDays: { type: Number, default: null, required: false },
+        dueOffsetDays: { type: Number, default: null, required: false },
+        checklist: { type: Array, default: [], required: false },
+        subtasks: { type: Array, default: [], required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Personal reminders (COLLAB-03) — one-shot, per-user. A node-schedule cron
     // (every minute) fires any reminder whose reminderAt has passed and that
     // hasn't fired yet, delivering an in-app notification to userId. Managed by
