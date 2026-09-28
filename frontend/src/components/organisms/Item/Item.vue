@@ -44,7 +44,7 @@
                                 && (showArchivedProjects ? item.deletedStatusKey === 2 : !item.deletedStatusKey)
                             ">
                                 <template #button>
-                                    <img src="@/assets/images/svg/horizontalDots.svg" class="project__three-dot ml-6px vertical-middle" :class="{'project-option': clientWidth > 767 && !isOpened, 'project-option-mobile': clientWidth <= 767 }" :alt="$t('Projects.project_actions')">
+                                    <img src="@/assets/images/svg/horizontalDots.svg" class="project__three-dot ml-6px vertical-middle" :class="{'project-option': clientWidth > 767 && !isOpened, 'project-option-mobile': clientWidth <= 767 }" :alt="$t('Projects.project_actions', { name: item.ProjectName })">
                                 </template>
                                 <template #options>
                                     <template v-if="!showArchivedProjects">

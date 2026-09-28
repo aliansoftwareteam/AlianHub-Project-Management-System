@@ -4187,7 +4187,6 @@ export default {
         "copy_link": "Copia Link",
         "watchers": "Osservatori",
         "watchers_count": "{n} watcher | {n} watchers",
-        "project_actions": "Project actions",
         "list_actions": "List actions",
         "active_members": "People active in this project",
         "files_links": "File & Link",
