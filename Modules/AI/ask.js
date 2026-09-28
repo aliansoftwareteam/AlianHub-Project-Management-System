@@ -304,3 +304,4 @@ const sources = async (req, res) => {
 };
 
 module.exports = { ask, sources, gather, searchTerms, promptFor };
+Object.assign(module.exports, { SYSTEM, RESEARCH_SYSTEM, openProjects, tokenProjectIdsOf, MAX_PER_TYPE, ASK_TOKENS, RESEARCH_TOKENS });
