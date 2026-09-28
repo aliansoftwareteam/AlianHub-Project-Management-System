@@ -881,7 +881,7 @@ const schema = {
     // truncation" the next), so title-based dedup silently fails and the board
     // fills with the same six defects again and again.
     agentFindings: {
-        projectId: { type: String, required: true },
+        projectId: { type: mongoose.Schema.Types.Mixed, required: true, set: objectIdIfHex },
         taskId: { type: String, required: true },
         factId: { type: String, required: true },
         skill: { type: String, required: false },
@@ -930,7 +930,7 @@ const schema = {
         agentId: { type: String, required: true },
         agentName: { type: String, required: false },
         taskId: { type: String, required: false },
-        projectId: { type: String, required: false },
+        projectId: { type: mongoose.Schema.Types.Mixed, required: false, set: objectIdIfHex },
         skill: { type: String, required: false },
         trigger: { type: String, required: false },
         // Depth of the domain event that started a rule-triggered run; its actions emit at depth + 1
@@ -1145,7 +1145,7 @@ const schema = {
         agentName: { type: String, required: false },
         runId: { type: String, required: false },
         taskId: { type: String, required: false },
-        projectId: { type: String, required: false },
+        projectId: { type: mongoose.Schema.Types.Mixed, required: false, set: objectIdIfHex },
         what: { type: String, required: true },
         why: { type: String, required: false },
         // [{ action, params, label, reversible }] — every action a registry key
@@ -1664,7 +1664,7 @@ const schema = {
     // completed, failed, revoked or unresponsive; the handle is stored only as a hash and dies with the offer.
     agentSessions: {
         taskId: { type: String, required: true },
-        projectId: { type: String, required: false },
+        projectId: { type: mongoose.Schema.Types.Mixed, required: false, set: objectIdIfHex },
         sprintId: { type: String, required: false },
         taskKey: { type: String, required: false },
         taskName: { type: String, required: false },
@@ -3952,10 +3952,11 @@ const schema = {
             type:Boolean,
             required : false
         },
-        projectId : {
-            type : String,
-            required : true,
-            default : ''
+        projectId: {
+            type: mongoose.Schema.Types.Mixed,
+            required: true,
+            default: '',
+            set: objectIdIfHex,
         }
     },
     planFeatureDisplay:{
@@ -4281,7 +4282,7 @@ const schema = {
     calls: {
         callId: { type: String, required: true },
         chatId: { type: String, required: false },
-        projectId: { type: String, required: false },
+        projectId: { type: mongoose.Schema.Types.Mixed, required: false, set: objectIdIfHex },
         sprintId: { type: String, required: false },
         media: { type: String, required: false },
         title: { type: String, required: false },
@@ -4636,8 +4637,9 @@ const schema = {
             required: false
         },
         projectId: {
-            type: String,
-            required: false
+            type: mongoose.Schema.Types.Mixed,
+            required: false,
+            set: objectIdIfHex,
         },
         sharedWith: {
             type: Array,
