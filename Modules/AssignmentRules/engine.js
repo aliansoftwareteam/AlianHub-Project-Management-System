@@ -18,6 +18,7 @@ const DAILY_DECISION_LIMIT = 500;
 const PER_COMPANY = 2;
 const MAX_WAITING = 200;
 const ACTOR_NAME = 'Assignment rules';
+/* No assignee or watcher field: those are all the rules ever write, so their own writes cannot wake them again. */
 const WATCHED_FIELDS = Object.freeze(['TaskName', 'rawDescription', 'descriptionBlock', 'TaskType', 'TaskTypeKey', 'tagsArray']);
 const TASK_FIELDS = {
     TaskName: 1, TaskKey: 1, rawDescription: 1, TaskType: 1, TaskTypeKey: 1, tagsArray: 1, AssigneeUserId: 1,
@@ -153,7 +154,7 @@ const taskDataOf = (task) => ({
 });
 
 /* The normal assignee path, so history, watchers, notifications and sockets behave as for a person. */
-const changeAssignee = ({ companyId, project, task, userId, name, type, userData }) => require('../Tasks/helpers/task_class_Mongo').taskMongo.updateAssignee({
+const changeAssignee = ({ companyId, project, task, userId, name, type, userData, actor, depth }) => require('../Tasks/helpers/task_class_Mongo').taskMongo.updateAssignee({
     firebaseObj: { AssigneeUserId: userId },
     projectData: projectDataOf(companyId, project, task),
     taskData: taskDataOf(task),
@@ -161,6 +162,8 @@ const changeAssignee = ({ companyId, project, task, userId, name, type, userData
     type,
     userData: { companyOwnerId: '', ...userData },
     isUpdateTask: true,
+    actor,
+    depth,
 });
 
 async function eligibleCandidates(companyId, task, entries) {
@@ -190,7 +193,7 @@ async function pickWithModel(companyId, input, candidates) {
  * rules, a trigger the rules switched off, or while AI is off or no model is configured — not even the fallback,
  * which answers "the model matched nobody" and is not a replacement for the model.
  */
-async function decide({ companyId, taskId, trigger = 'create' }) {
+async function decide({ companyId, taskId, trigger = 'create', depth = 0 }) {
     const task = await readTask(companyId, taskId);
     if (!task || task.mainChat === true || !task.ProjectID) return skip('no_task');
     if (hasAssignee(task)) return skip('assigned');
@@ -246,6 +249,8 @@ async function decide({ companyId, taskId, trigger = 'create' }) {
             await changeAssignee({
                 companyId, project, task: fresh, userId: fields.userId, name, type: 'assigneeAdd',
                 userData: { id: rules.updatedBy || fields.userId, Employee_Name: ACTOR_NAME },
+                actor: { kind: 'automation', userId: rules.updatedBy || null },
+                depth: (Number(depth) || 0) + 1,
             });
             state = 'applied';
         }
@@ -269,7 +274,7 @@ const queued = new Set();
 const running = new Set();
 
 /* A few decisions per company at a time, so a bulk import cannot hold every model slot. */
-function enqueue(companyId, taskId, trigger) {
+function enqueue(companyId, taskId, trigger, depth) {
     const key = `${companyId}:${taskId}`;
     if (queued.has(key)) return;
     const lane = lanes.get(companyId) || { active: 0, waiting: [] };
@@ -281,7 +286,7 @@ function enqueue(companyId, taskId, trigger) {
     queued.add(key);
     const begin = () => {
         lane.active += 1;
-        const job = decide({ companyId, taskId, trigger })
+        const job = decide({ companyId, taskId, trigger, depth })
             .catch((error) => logger.error(`${LOG_PREFIX} task ${taskId} in company ${companyId}: ${failureText(error)}`))
             .finally(() => {
                 queued.delete(key);
@@ -302,8 +307,9 @@ function onEvent(envelope) {
         const trigger = triggerOf(envelope);
         if (!trigger) return;
         const assignees = envelope.data && Array.isArray(envelope.data.AssigneeUserId) ? envelope.data.AssigneeUserId : [];
-        if (assignees.length) return;
-        enqueue(String(envelope.companyId), String(envelope.entity.id), trigger);
+        const depth = Number(envelope.depth) || 0;
+        if (assignees.length || depth >= domainEventBus.MAX_DEPTH) return;
+        enqueue(String(envelope.companyId), String(envelope.entity.id), trigger, depth);
     } catch (error) {
         logger.error(`${LOG_PREFIX} event handling failed: ${failureText(error)}`);
     }

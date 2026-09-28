@@ -16,8 +16,8 @@ exports.init = (app) => {
     app.put('/api/v2/assignment-rules/project/:projectId', editsRules, controller.saveProjectRules);
     app.post('/api/v2/assignment-rules/project/:projectId/draft', editsRules, controller.draftProjectRules);
     app.get('/api/v2/assignment-rules/task/:taskId', readsTask, controller.getTaskDecision);
-    ['accept', 'dismiss', 'undo'].forEach((action) => {
-        app.post(`/api/v2/assignment-rules/task/:taskId/decisions/:decisionId/${action}`, assignsTask, controller.actOnDecision(action));
-    });
+    app.post('/api/v2/assignment-rules/task/:taskId/decisions/:decisionId/accept', assignsTask, controller.actOnDecision('accept'));
+    app.post('/api/v2/assignment-rules/task/:taskId/decisions/:decisionId/dismiss', assignsTask, controller.actOnDecision('dismiss'));
+    app.post('/api/v2/assignment-rules/task/:taskId/decisions/:decisionId/undo', assignsTask, controller.actOnDecision('undo'));
     logger.info('AssignmentRules routes initialised');
 };

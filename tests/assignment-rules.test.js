@@ -440,6 +440,7 @@ describe('assignment rules: apply mode', () => {
         });
         expect(String(assign.taskData._id)).toBe(String(task._id));
         expect(assign.userData).toMatchObject({ id: EDITOR, Employee_Name: 'Assignment rules' });
+        expect(assign).toMatchObject({ actor: { kind: 'automation', userId: EDITOR }, depth: 1 });
         expect(taskRow(task).AssigneeUserId).toEqual([PRIYA]);
 
         const read = await call('GET', TASK_ROUTE, { uid: SAM, params: { taskId: String(task._id) } });
@@ -448,7 +449,7 @@ describe('assignment rules: apply mode', () => {
         const undo = await call('POST', decisionRoute('undo'), { uid: SAM, params: { taskId: String(task._id), decisionId: String(decisions()[0]._id) } });
         expect(undo.body.status).toBe(true);
         expect(mockUpdateAssignee).toHaveBeenCalledTimes(2);
-        expect(mockUpdateAssignee.mock.calls[1][0]).toMatchObject({ firebaseObj: { AssigneeUserId: PRIYA }, type: 'assigneRemove', userData: { id: SAM } });
+        expect(mockUpdateAssignee.mock.calls[1][0]).toMatchObject({ firebaseObj: { AssigneeUserId: PRIYA }, type: 'assigneRemove', userData: { id: SAM }, actor: { kind: 'user', userId: SAM } });
         expect(taskRow(task).AssigneeUserId).toEqual([]);
         expect(decisions()[0]).toMatchObject({ state: 'undone', resolvedBy: SAM });
     });
@@ -481,7 +482,7 @@ describe('assignment rules: acting on a suggestion', () => {
         const res = await call('POST', decisionRoute('accept'), { uid: SAM, params });
         expect(res.body.status).toBe(true);
         expect(mockUpdateAssignee).toHaveBeenCalledTimes(1);
-        expect(mockUpdateAssignee.mock.calls[0][0]).toMatchObject({ firebaseObj: { AssigneeUserId: PRIYA }, type: 'assigneeAdd', userData: { id: SAM, Employee_Name: 'Sam' } });
+        expect(mockUpdateAssignee.mock.calls[0][0]).toMatchObject({ firebaseObj: { AssigneeUserId: PRIYA }, type: 'assigneeAdd', userData: { id: SAM, Employee_Name: 'Sam' }, actor: { kind: 'user', userId: SAM } });
         expect(taskRow(task).AssigneeUserId).toEqual([PRIYA]);
         expect(decisions()[0]).toMatchObject({ state: 'accepted', resolvedBy: SAM });
     });
@@ -569,6 +570,33 @@ describe('assignment rules: the task events that wake the engine', () => {
         domainEventBus.bus.emit('domain.event', envelope(task, 'task.priority_changed', ['Task_Priority']));
         await engine.idle();
         expect(adapter.chat).toHaveBeenCalledTimes(1);
+    });
+
+    it('writes one level deeper than the event it answers, and never wakes on its own assignee write', async () => {
+        seedRules(GRANTS);
+        const project = seedProject();
+        await saveRules(project, { mode: 'apply', onChange: true });
+        const task = seedTask(project);
+
+        domainEventBus.bus.emit('domain.event', { ...envelope(task, 'task.created'), depth: 1 });
+        await engine.idle();
+        expect(mockUpdateAssignee.mock.calls[0][0]).toMatchObject({ actor: { kind: 'automation' }, depth: 2 });
+
+        const ownWrite = { ...envelope({ ...task, AssigneeUserId: [] }, 'task.assignee_changed', ['AssigneeUserId']), actor: { kind: 'automation', userId: EDITOR }, depth: 2 };
+        domainEventBus.bus.emit('domain.event', ownWrite);
+        await engine.idle();
+        expect(adapter.chat).toHaveBeenCalledTimes(1);
+    });
+
+    it('stays out of an event chain that has reached the loop guard', async () => {
+        seedRules(GRANTS);
+        const project = seedProject();
+        await saveRules(project);
+        const task = seedTask(project);
+
+        domainEventBus.bus.emit('domain.event', { ...envelope(task, 'task.created'), depth: domainEventBus.MAX_DEPTH });
+        await engine.idle();
+        expect(adapter.chat).not.toHaveBeenCalled();
     });
 });
 

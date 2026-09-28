@@ -27,7 +27,9 @@ module.exports = {
 
     /* -------------- UPDATE ASSIGNEE ADD OR ASSIGNEE REMOVE FUNCTION FOR TASK -----------------*/
 
-    updateAssignee({firebaseObj,projectData ,taskData,employeeName: sentName,type,userData,isUpdateTask}) {
+    /* `actor` and `depth` reach the domain event bus with the emit; only server callers pass them (the route's
+     * field spec drops both), so an automated write is marked as such and its own listeners cannot loop on it. */
+    updateAssignee({firebaseObj,projectData ,taskData,employeeName: sentName,type,userData,isUpdateTask,actor,depth}) {
         return new Promise((resolve,reject) => {
             try {
                 const employeeName = shownName(sentName);
@@ -147,7 +149,7 @@ module.exports = {
                                 ]
                             }
                             MongoDbCrudOpration(projectData.CompanyId,object, "findOneAndUpdate").then((result) => {
-                                socketEmitter.emit('update', { type: "update", data: result , updatedFields: mongoUpdateObj, module: 'task' });
+                                socketEmitter.emit('update', { type: "update", data: result , updatedFields: mongoUpdateObj, module: 'task', ...(actor ? { actor } : {}), ...(depth !== undefined ? { depth } : {}) });
                                 resolve({status: true, statusText: "Assignee updated successfully"});
                                 try {
                                     this.updateWatcher({companyId : projectData.CompanyId, projectId: projectData._id, sprintId: taskData.sprintId, taskId: taskData._id, userId: uid, add: type === "assigneeAdd", type: type,userData:userData,employeeName:sentName})
