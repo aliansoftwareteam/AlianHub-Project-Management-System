@@ -2060,6 +2060,9 @@ const schema = {
         navPreferences: {
             pinned: { type: [String], required: false, default: undefined }
         },
+        accessibilityPreferences: {
+            singleKeyShortcuts: { type: Boolean, required: false }
+        },
         languageCode: {
             type: String,
             required: false,

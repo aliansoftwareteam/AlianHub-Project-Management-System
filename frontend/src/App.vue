@@ -1,5 +1,6 @@
 <template>
 	<div>
+		<SkipLink/>
 		<OfflineBanner/>
 		<DemoBanner/>
 		<MaintenanceBanner/>
@@ -14,6 +15,7 @@
                     <main class="ah-app__main" id="ah-main">
                         <CommandPalette v-if="!$route.meta.preventAdvanceSearch" :open="isAdvanceSearch" @close="isAdvanceSearch = false"/>
                         <QuickCreateTask />
+                        <KeyboardShortcuts />
                         <div class="ah-app__view billing__history-wrapper style-scroll">
                             <AiUnavailable v-if="aiGated"/>
                             <router-view v-else/>
@@ -68,6 +70,8 @@ import '@/components/organisms/Shell/style.css'
 import CallOverlay from '@/components/organisms/CallOverlay/CallOverlay.vue'
 import CommandPalette from '@/components/molecules/AdvanceSearch/CommandPalette.vue'
 import QuickCreateTask from '@/components/organisms/QuickCreateTask/QuickCreateTask.vue'
+import KeyboardShortcuts from '@/components/organisms/KeyboardShortcuts/KeyboardShortcuts.vue'
+import SkipLink from '@/components/atom/SkipLink/SkipLink.vue'
 import { PALETTE_OPEN_EVENT, isPaletteShortcut } from '@/components/molecules/AdvanceSearch/paletteKeys'
 import { useStore } from 'vuex';
 import axios from 'axios'

@@ -40,6 +40,8 @@
 }
 .ms__theme-opt.is-active { border: 1.5px solid var(--brand); color: var(--brand); font-weight: 600; }
 .ms__theme-opt:focus-visible { outline: none; box-shadow: var(--focus); }
+.ms__theme--contrast { border-top: 1px solid var(--hairline); }
+.ms__keyboard { display: flex; flex-direction: column; gap: 10px; }
 .ms__sessions { display: flex; flex-direction: column; gap: 8px; }
 .ms__session { display: flex; align-items: center; gap: 8px; min-height: 28px; }
 .ms__dot-idle { background: var(--border); }

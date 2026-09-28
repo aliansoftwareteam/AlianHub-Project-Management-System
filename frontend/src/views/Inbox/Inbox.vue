@@ -293,6 +293,7 @@ import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useHelper } from '@/components/organisms/Header/helper';
 import { openPanel } from '@/components/organisms/Shell/shellState';
+import { shortcutPrefs } from '@/composable/shortcuts';
 import { onTaskClosed, openTask, overlayState } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { noticeTextOf } from '@/views/Ai/rateAlerts';
 import { escapeHtml } from '@/utils/notificationHtml';
@@ -810,6 +811,7 @@ const moveCursor = (step) => {
 // Row keys act only from inside the list, so a key pressed on a tab or a filter never clears a row out of sight.
 const onKey = (e) => {
     if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!shortcutPrefs.singleKeys && /^[a-z]$/.test(e.key)) return;
     if (e.target?.closest?.('.ibx__snooze')) return;
     const it = rows.value[cursor.value];
     if (e.key === 'j' || e.key === 'ArrowDown') { e.preventDefault(); moveCursor(1); return; }
@@ -826,7 +828,7 @@ const onKey = (e) => {
 
 // With focus on <body> the page's own keydown never fires, so j and k are caught here to enter the list.
 const onDocumentKey = (e) => {
-    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || overlayState.open) return;
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || overlayState.open || !shortcutPrefs.singleKeys) return;
     if (e.target !== document.body && e.target !== document.documentElement) return;
     if ((e.key !== 'j' && e.key !== 'k') || !rows.value.length) return;
     e.preventDefault();

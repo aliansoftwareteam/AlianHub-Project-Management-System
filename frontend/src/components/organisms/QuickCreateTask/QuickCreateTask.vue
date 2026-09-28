@@ -112,6 +112,7 @@ import taskClass from "@/utils/TaskOperations";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { taskPlanPermission } from "@/composable/commonFunction";
 import { useFocusTrap } from "@/composable/useFocusTrap";
+import { bindShortcut } from "@/composable/shortcuts";
 import { mutateArrangeProjectRules } from "@/store/Settings/mutations";
 import { usePersonalList } from "@/components/molecules/Home/usePersonalList";
 import { openTask } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
@@ -121,9 +122,7 @@ import {
     closeQuickCreate,
     creatableProjects,
     defaultStatus,
-    hasOpenDialog,
     hasPriorityApp,
-    isCreateTaskShortcut,
     listsOf,
     openQuickCreate,
     pickDefaultProject,
@@ -432,15 +431,15 @@ function onKey(e) {
     submit(intent);
 }
 
-function onShortcut(e) {
-    if (quickCreate.open || !isCreateTaskShortcut(e, { dialogOpen: hasOpenDialog() })) return;
-    e.preventDefault();
-    openQuickCreate();
-}
-
-onMounted(() => document.addEventListener("keydown", onShortcut));
+let unbindShortcut = () => {};
+onMounted(() => {
+    unbindShortcut = bindShortcut("create-task", () => {
+        if (quickCreate.open) return false;
+        openQuickCreate();
+    });
+});
 onBeforeUnmount(() => {
-    document.removeEventListener("keydown", onShortcut);
+    unbindShortcut();
     clearTimeout(doneTimer);
 });
 </script>

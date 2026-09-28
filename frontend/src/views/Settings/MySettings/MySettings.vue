@@ -114,6 +114,44 @@
                     </button>
                 </div>
             </div>
+            <div class="ah-card__body ms__theme ms__theme--contrast">
+                <div>
+                    <h2 class="ah-h3" id="ms-contrast-label">{{ $t('Settings.contrast') }}</h2>
+                    <div class="ah-small">{{ $t('Settings.contrast_hint') }}</div>
+                </div>
+                <div class="ms__theme-opts" role="radiogroup" aria-labelledby="ms-contrast-label" data-test="contrast">
+                    <button
+                        v-for="opt in contrastOptions"
+                        :key="opt.value"
+                        type="button"
+                        class="ms__theme-opt"
+                        :class="{ 'is-active': shellState.contrast === opt.value }"
+                        role="radio"
+                        :aria-checked="shellState.contrast === opt.value"
+                        :data-value="opt.value"
+                        @click="applyContrast(opt.value)"
+                    >
+                        <ShellIcon :name="opt.icon" :size="14" />{{ $t(opt.label) }}
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section class="ah-card" data-test="keyboard-prefs">
+            <div class="ah-card__head">
+                <h2 class="ah-h3">{{ $t('Settings.keyboard_title') }}</h2>
+                <span class="ah-small">{{ $t('Settings.keyboard_hint') }}</span>
+            </div>
+            <div class="ah-card__body ms__keyboard">
+                <div class="ms__agents-row">
+                    <span class="ms__agents-label">{{ $t('Settings.single_keys') }}</span>
+                    <AhSwitch :model-value="shortcutPrefs.singleKeys" :label="$t('Settings.single_keys')" :disabled="savingShortcuts" data-test="single-keys" @update:model-value="toggleSingleKeys" />
+                    <span class="ah-small">{{ $t('Settings.single_keys_hint') }}</span>
+                </div>
+                <div>
+                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="show-shortcuts" @click="openShortcutSheet()">{{ $t('Settings.show_shortcuts') }}</button>
+                </div>
+            </div>
         </section>
 
         <section class="ah-card" data-test="agent-prefs">
@@ -207,7 +245,9 @@ import languageOptions from "@/utils/languagesName.json";
 import { useGetterFunctions, languageTranslateHelper } from "@/composable";
 import { apiRequestWithoutCompnay } from "@/services";
 import { storageQueryBuilder, generateFileName } from "@/utils/storageQueryBuild.js";
-import { shellState, applyTheme } from "@/components/organisms/Shell/shellState.js";
+import { shellState, applyTheme, applyContrast } from "@/components/organisms/Shell/shellState.js";
+import { openShortcutSheet, shortcutPrefs } from "@/composable/shortcuts";
+import { saveSingleKeyShortcuts } from "@/composable/shortcutPreferences";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import SpinnerComp from "@/components/atom/SpinnerComp/SpinnerComp.vue";
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
@@ -250,6 +290,25 @@ const themeOptions = [
     { value: "dark", label: "Settings.theme_dark", icon: "moon" },
     { value: "system", label: "Settings.theme_system", icon: "monitor" }
 ];
+
+const contrastOptions = [
+    { value: "auto", label: "Settings.contrast_auto", icon: "monitor" },
+    { value: "standard", label: "Settings.contrast_standard", icon: "sun" },
+    { value: "high", label: "Settings.contrast_high", icon: "eye" }
+];
+
+const savingShortcuts = ref(false);
+async function toggleSingleKeys(on) {
+    savingShortcuts.value = true;
+    try {
+        const response = await saveSingleKeyShortcuts(userId.value, on);
+        if (response?.data?.data) commit("users/mutateUsers", { data: response.data.data, op: "modified" });
+    } catch (error) {
+        $toast.error(error?.response?.data?.message || t("Settings.single_keys_failed"), { position: "top-right" });
+    } finally {
+        savingShortcuts.value = false;
+    }
+}
 
 const dayOptions = computed(() => {
     const letters = t("Settings.days_letters").split(" ");

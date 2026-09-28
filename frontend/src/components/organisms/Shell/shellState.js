@@ -3,6 +3,8 @@ import { apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
 
 const THEME_KEY = "ah.theme";
+const CONTRAST_KEY = "ah.contrast";
+const CONTRAST_CHOICES = ["auto", "standard", "high"];
 const NAV_KEY = "ah.nav";
 const NAV_SAVE_DELAY_MS = 800;
 
@@ -30,6 +32,7 @@ export const shellState = reactive({
     profileOpen: false,
     sidebarCollapsed: false,
     theme: localStorage.getItem(THEME_KEY) || "light",
+    contrast: CONTRAST_CHOICES.includes(localStorage.getItem(CONTRAST_KEY)) ? localStorage.getItem(CONTRAST_KEY) : "auto",
     nav: { pinned: localPinsOf(signedInUserId()) },
     agentsRunning: 0
 });
@@ -51,13 +54,34 @@ export function toggleTheme() {
     applyTheme(resolveTheme(shellState.theme) === "dark" ? "light" : "dark");
 }
 
+const contrastQuery = () => (typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(prefers-contrast: more)") : null);
+
+export function resolveContrast(choice) {
+    if (choice === "high" || choice === "standard") return choice;
+    const query = contrastQuery();
+    return query && query.matches ? "high" : "standard";
+}
+
+function paintContrast() {
+    document.documentElement.classList.toggle("ah-high-contrast", resolveContrast(shellState.contrast) === "high");
+}
+
+export function applyContrast(choice) {
+    shellState.contrast = CONTRAST_CHOICES.includes(choice) ? choice : "auto";
+    localStorage.setItem(CONTRAST_KEY, shellState.contrast);
+    paintContrast();
+}
+
 export function initTheme() {
     document.documentElement.setAttribute("data-theme", resolveTheme(shellState.theme));
+    paintContrast();
     if (systemDark && systemDark.addEventListener) {
         systemDark.addEventListener("change", () => {
             if (shellState.theme === "system") document.documentElement.setAttribute("data-theme", resolveTheme("system"));
         });
     }
+    const contrast = contrastQuery();
+    if (contrast && contrast.addEventListener) contrast.addEventListener("change", paintContrast);
 }
 
 const navSync = { userId: null, saved: null, timer: null };
