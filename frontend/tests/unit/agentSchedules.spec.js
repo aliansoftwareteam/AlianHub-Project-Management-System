@@ -4,6 +4,7 @@ import { flushPromises, mount, RouterLinkStub } from '@vue/test-utils';
 const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }));
 
 vi.mock('@/services', () => ({ apiRequest }));
+vi.mock('@/locales/main', () => ({ i18n: { global: { t: (key) => key } } }));
 
 import AgentSchedules from '@/views/Ai/AgentSchedules.vue';
 import { blankSchedule, nextRunText, scheduleError, schedulePayload, scheduleForm, describeSchedule, REPORT_KEYS } from '@/views/Ai/agentSchedule';
