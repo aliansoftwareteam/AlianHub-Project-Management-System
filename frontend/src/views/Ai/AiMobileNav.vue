@@ -61,7 +61,7 @@ const root = ref(null);
 const moreButton = ref(null);
 const moreOpen = ref(false);
 
-const available = (items) => items.filter((item) => router.hasRoute(item.name));
+const available = (items) => items.filter((item) => !router || router.hasRoute(item.name));
 
 const primary = computed(() => available([
     { name: "AiAsk", label: "Parity.nav_ask", icon: "ai" },
