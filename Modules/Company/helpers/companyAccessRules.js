@@ -35,9 +35,6 @@ const scopeCompanyPipeline = (findQuery, own) => {
     return { ok: true, pipeline: [{ $match: { _id: { $in: own } } }, ...stages] };
 };
 
-const PROJECT_TYPE_FIELDS = ['projectCount.privateCount', 'projectCount.publicCount'];
-const SEAT_FIELD = 'companyData.$[elementIndex].users';
-const SEAT_ARRAY_FILTERS = JSON.stringify([{ 'elementIndex.users': { $exists: true } }]);
 const COMPANY_DETAIL_FIELDS = ['Cst_profileImage', 'Cst_CompanyName', 'Cst_Phone', 'Cst_Country', 'Cst_DialCode', 'Cst_State', 'Cst_City',
     'Cst_LogTimeDays', 'Cst_countryCode', 'Cst_stateCode', 'trackerEstimateLimit', 'updatedAt'];
 
@@ -57,28 +54,13 @@ const isOwnerClaim = ({ key, updateObject, arrayFilters }) => {
         && typeof claim.userId === 'string' && OBJECT_ID_PATTERN.test(claim.userId);
 };
 
-const countUpdateKind = ({ key, updateObject, arrayFilters }) => {
-    if (key !== '$inc') return null;
-    const entries = Object.entries(updateObject);
-    const fields = entries.map(([field]) => field).sort();
-    if (hasNoArrayFilters(arrayFilters) && entries.length === 2 && fields.join() === [...PROJECT_TYPE_FIELDS].sort().join()
-        && entries.every(([, step]) => step === 1 || step === -1) && entries[0][1] + entries[1][1] === 0) {
-        return 'projectType';
-    }
-    if (entries.length !== 1 || entries[0][1] !== -1) return null;
-    if (fields[0] === 'trackerUsers' && hasNoArrayFilters(arrayFilters)) return 'seatRelease';
-    if (fields[0] === SEAT_FIELD && JSON.stringify(arrayFilters) === SEAT_ARRAY_FILTERS) return 'seatRelease';
-    return null;
-};
-
-// Every company write a client may send, whatever its role: the Settings > Company form, the
-// private/public project count swap, a seat release after removing a member, and an invited owner
-// recording themselves. Plan, billing, seat, storage, usage and ownership fields stay server-side.
+// Every company write a client may send: the Settings > Company form and an invited owner recording
+// themselves. Plan, billing, seat, project count, storage, usage and ownership fields stay server-side.
 const companyUpdateKind = (body) => {
     if (!body || !isPlainObject(body.updateObject)) return null;
     if (isDetailsUpdate(body)) return 'details';
     if (isOwnerClaim(body)) return 'ownerClaim';
-    return countUpdateKind(body);
+    return null;
 };
 
 // Invitation.vue records an invited owner while they accept, so only that write takes the caller's own pending row.

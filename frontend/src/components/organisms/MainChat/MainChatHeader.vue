@@ -16,7 +16,9 @@
                 type="button"
                 class="mc-head-ai"
                 :disabled="summarizing"
+                :aria-busy="summarizing"
                 :title="$t('Chat.summarize')"
+                :aria-label="$t('Chat.summarize')"
                 @click="$emit('summarize')"
             >
                 <ShellIcon name="ai" :size="13" />
@@ -30,6 +32,8 @@
                 class="mc-icon-btn"
                 :class="{ 'mc-icon-btn--on': activePane === 'search' }"
                 :title="$t('MainChat.search')"
+                :aria-label="$t('MainChat.search')"
+                :aria-pressed="activePane === 'search'"
                 @click="$emit('search')"
             ><MainChatIcon name="search" /></button>
 
@@ -38,6 +42,8 @@
                 class="mc-icon-btn"
                 :class="{ 'mc-icon-btn--on': detailsOpen }"
                 :title="detailsOpen ? $t('Chat.close_details') : $t('Chat.open_details')"
+                :aria-label="detailsOpen ? $t('Chat.close_details') : $t('Chat.open_details')"
+                :aria-expanded="detailsOpen"
                 @click="$emit('info')"
             ><MainChatIcon name="info" /></button>
 
