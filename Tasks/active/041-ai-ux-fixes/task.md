@@ -1,7 +1,7 @@
 # 041 — AI UX fixes from the ClickUp AI comparison
 
 ## Goal
-Fix the broken AI buttons and make Ask the way into AI. This covers recommendations 1–5 of `Tasks/active/034-end-to-end-qa-programme/findings/ai-ux-comparison-clickup-2026-09-28.md`. The owner asked on 2026-09-28 to start 1 and 2, then 3 to 5.
+Fix the broken AI buttons and make Ask the way into AI. This covers recommendations 1–10 of `Tasks/active/034-end-to-end-qa-programme/findings/ai-ux-comparison-clickup-2026-09-28.md`. The owner asked on 2026-09-28 to start 1 and 2, then 3 to 5, then 6 to 10.
 
 ## Scope (one slice and one PR each)
 1. **Chat AI buttons do something.**
@@ -31,8 +31,32 @@ Fix the broken AI buttons and make Ask the way into AI. This covers recommendati
    - Answers stream in and render as sanitised Markdown with citations.
    - "Make a task" and "Copy" act on an answer.
 
+7. **Plain-language agents** (recommendation 8).
+   - Skills are named in words in the UI ("Summarise a pull request", not `pr.summary`).
+   - Autonomy reads "Suggests changes", "Acts, you approve" or "Acts" instead of L0–L2, SUGGEST or GATED.
+   - Counts are pluralised ("1 change", "7 changes").
+   - A proposal waiting more than 3 days is marked as waiting, and the AI Inbox can sort by age.
+8. **Preview, then apply, for every AI write** (recommendation 7).
+   - The AI estimate, docs compose and `/ai` in a comment show their result first, with Replace, Insert, Try again and Cancel, before anything is written.
+   - Undo is offered after applying.
+   - The description writer's flow is the model.
+9. **Agents where people work** (recommendation 6).
+   - Agents the user may run appear in the task assignee picker, marked as agents; assigning one starts a run at the agent's own autonomy level.
+   - `@agent` in a task comment or a chat message starts a run on that task or thread.
+   - The task's agent strip links to the run and its proposal.
+   - Every existing trigger and access rule still applies.
+10. **AI on Home** (recommendation 10).
+    - Home has a "Waiting on you" card (proposals and approvals) and a standup card built from the user's own activity without a model.
+    - The dashboard's At-risk and Agent spend cards are built.
+    - On phones, the AI tab reaches the AI Inbox.
+11. **One AI availability state** (recommendation 9).
+    - `aiAvailability` answers off, unconfigured, usable or not permitted, and every AI entry point reads it.
+    - With AI off, every entry point is hidden, including the rail tile, the estimate, the checklist, docs Ask and AI assist.
+    - An unpriced model doesn't block Ask.
+    - ✦ marks only features that call a model.
+
 ## Out of scope
-- Agents in pickers and comments (6), preview for every AI action (7), plain-language copy (8), merging the AI gates (9), and Home AI cards (10).
+- A meeting notetaker and a desktop hotkey app (see the findings).
 
 ## Acceptance
 - Failing-first tests for each slice (vitest for components; e2e where a route changes).
