@@ -324,6 +324,20 @@ describe('the streamed answer', () => {
     });
 });
 
+describe('a structured question', () => {
+    it('sends the task filter the question reads to the model and returns its intent', async () => {
+        db().seed(SCHEMA_TYPE.PROJECTS, { _id: OPS, ProjectName: 'Ops', isPrivateSpace: false, deletedStatusKey: 0,
+            taskStatusData: [{ type: 'default_active', name: 'To Do', key: 1 }, { type: 'done', name: 'Done', key: 2 }] });
+        seedTask(OPS, { TaskName: 'Late thing', statusKey: 1, statusType: 'default_active', status: { text: 'To Do', key: 1, type: 'default_active' }, DueDate: new Date('2020-01-01T00:00:00Z') });
+        const chat = answering('One is late [OPS-1].');
+
+        const done = eventsOf(await stream({ body: { question: 'Which tasks in Ops are overdue?' } })).pop();
+
+        expect(chat.mock.calls[0][0].messages.slice(-1)[0].content).toContain('TASK FILTER');
+        expect(done.intent).toMatchObject({ due: 'overdue', total: 1 });
+    });
+});
+
 describe('follow-ups', () => {
     it('sends the thread id, rebuilds the context from earlier turns and appends the turn', async () => {
         seedTask(OPS);

@@ -59,22 +59,27 @@ const askStream = async (req, res) => {
 
         const research = mode === 'research';
         const modeName = research ? 'research' : 'ask';
-        const previous = threads.lastQuestionOf(thread);
-        const gathered = await gather(companyId, uid, {
-            question: previous ? `${asked} ${previous}` : asked,
+        const gatherFor = (text) => gather(companyId, uid, {
+            question: text,
             projectId,
             limit: research ? MAX_PER_TYPE * 2 : MAX_PER_TYPE,
             tokenProjectIds: tokenProjectIdsOf(req),
         });
+        // The follow-up is read on its own first, so its filter is its own; a bare "who owns it" borrows the words
+        // of the question before it.
+        const previous = threads.lastQuestionOf(thread);
+        let gathered = await gatherFor(asked);
+        if (!gathered.sources.length && previous) gathered = await gatherFor(`${asked} ${previous}`);
         const roleType = await getRoleType(companyId, uid).catch(() => null);
         const scope = { projects: gathered.projects.length, privileged: isPrivileged(roleType) };
         const threadIdOut = thread ? String(thread._id) : '';
+        const found = gathered.intent ? { intent: gathered.intent } : {};
 
         if (!isAnyProviderConfigured()) {
-            return res.send({ status: true, statusText: 'No model configured.', data: { configured: false, answer: '', sources: gathered.sources, scope, mode: modeName, threadId: threadIdOut } });
+            return res.send({ status: true, statusText: 'No model configured.', data: { configured: false, answer: '', sources: gathered.sources, scope, mode: modeName, threadId: threadIdOut, ...found } });
         }
         if (!gathered.sources.length) {
-            return res.send({ status: true, data: { configured: true, answer: '', sources: [], mode: modeName, empty: EMPTY, emptyCode: 'no_match', scope, threadId: threadIdOut } });
+            return res.send({ status: true, data: { configured: true, answer: '', sources: [], mode: modeName, empty: EMPTY, emptyCode: 'no_match', scope, threadId: threadIdOut, ...found } });
         }
 
         const stream = openStream(req, res);
@@ -82,7 +87,7 @@ const askStream = async (req, res) => {
         try {
             const result = await getProvider().chat({
                 systemPrompt: `${research ? RESEARCH_SYSTEM : SYSTEM}${thread ? FOLLOW_UP : ''}`,
-                messages: [...threads.historyOf(thread), { role: 'user', content: promptFor(asked, gathered.sources) }],
+                messages: [...threads.historyOf(thread), { role: 'user', content: promptFor(asked, gathered.sources, gathered.intent) }],
                 maxTokens: research ? RESEARCH_TOKENS : ASK_TOKENS,
                 temperature: 0.2,
                 spend: { feature: FEATURES.ASK, companyId, userId: uid },
@@ -117,6 +122,7 @@ const askStream = async (req, res) => {
                 sources: gathered.sources,
                 scope,
                 usage: { tokens: result.totalTokens, model: result.model },
+                ...found,
             });
         } catch (error) {
             logger.error(`ai ask stream: ${error.message}`);
