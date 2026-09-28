@@ -25,6 +25,20 @@
                 <span>{{ summarizing ? $t('Chat.summarizing') : $t('Chat.summarize') }}</span>
             </button>
 
+            <button
+                v-if="canUseAi() && isChannel"
+                type="button"
+                class="mc-head-ai"
+                data-test="ask-channel"
+                :aria-expanded="asking ? 'true' : 'false'"
+                :title="$t('AiMention.ask_channel')"
+                :aria-label="$t('AiMention.ask_channel')"
+                @click="$emit('ask')"
+            >
+                <ShellIcon name="ai" :size="13" />
+                <span>{{ $t('AiMention.ask_channel') }}</span>
+            </button>
+
             <slot name="call-actions"></slot>
 
             <button
@@ -68,7 +82,8 @@ defineProps({
     activePane: { type: String, default: '' },
     detailsOpen: { type: Boolean, default: false },
     summarizing: { type: Boolean, default: false },
+    asking: { type: Boolean, default: false },
 });
 
-defineEmits(['search', 'info', 'summarize']);
+defineEmits(['search', 'info', 'summarize', 'ask']);
 </script>

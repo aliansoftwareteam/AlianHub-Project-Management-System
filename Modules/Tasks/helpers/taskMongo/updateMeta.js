@@ -78,7 +78,7 @@ module.exports = {
                         reject(taskNotFound());
                         return;
                     }
-                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: { tagsArray: response.tagsArray }, module: 'task' });
                     resolve({status: true, statusText: `Tag updated successfully`});
                     if (storedTask && userData) {
                         recordTaskTag({ companyId, task: storedTask, tagId, operation, actor: userData })

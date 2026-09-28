@@ -102,6 +102,7 @@ const {
     agentsSchema,
     agentRunsSchema,
     agentRevisionsSchema,
+    agentSchedulesSchema,
     aiUsageSchema,
     aiReservationsSchema,
     aiReplaysSchema,
@@ -132,6 +133,8 @@ const {
     askThreadsSchema,
     aiFeedbackSchema,
     aiEvalRunsSchema,
+    assignmentRulesSchema,
+    assignmentDecisionsSchema,
     aiProfilesSchema,
     secretsSchema,
     oauthClientsSchema,
@@ -339,6 +342,8 @@ exports.checkType = (type) => {
             return agentRunsSchema
         case SCHEMA_TYPE.AGENT_REVISIONS:
             return agentRevisionsSchema
+        case SCHEMA_TYPE.AGENT_SCHEDULES:
+            return agentSchedulesSchema
         case SCHEMA_TYPE.AI_USAGE:
             return aiUsageSchema
         case SCHEMA_TYPE.AI_REPLAYS:
@@ -399,6 +404,10 @@ exports.checkType = (type) => {
             return aiFeedbackSchema
         case SCHEMA_TYPE.AI_EVAL_RUNS:
             return aiEvalRunsSchema
+        case SCHEMA_TYPE.ASSIGNMENT_RULES:
+            return assignmentRulesSchema
+        case SCHEMA_TYPE.ASSIGNMENT_DECISIONS:
+            return assignmentDecisionsSchema
         case SCHEMA_TYPE.AI_PROFILES:
             return aiProfilesSchema
         case SCHEMA_TYPE.SECRETS:
@@ -615,6 +624,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.AGENT_RUNS}`
         case SCHEMA_TYPE.AGENT_REVISIONS:
                 return `${dbCollections.AGENT_REVISIONS}`
+        case SCHEMA_TYPE.AGENT_SCHEDULES:
+                return `${dbCollections.AGENT_SCHEDULES}`
         case SCHEMA_TYPE.AI_USAGE:
                 return `${dbCollections.AI_USAGE}`
         case SCHEMA_TYPE.AI_REPLAYS:
@@ -675,6 +686,10 @@ exports.tableType = (type) => {
                 return `${dbCollections.AI_FEEDBACK}`
         case SCHEMA_TYPE.AI_EVAL_RUNS:
                 return `${dbCollections.AI_EVAL_RUNS}`
+        case SCHEMA_TYPE.ASSIGNMENT_RULES:
+                return `${dbCollections.ASSIGNMENT_RULES}`
+        case SCHEMA_TYPE.ASSIGNMENT_DECISIONS:
+                return `${dbCollections.ASSIGNMENT_DECISIONS}`
         case SCHEMA_TYPE.AI_PROFILES:
                 return `${dbCollections.AI_PROFILES}`
         case SCHEMA_TYPE.SECRETS:

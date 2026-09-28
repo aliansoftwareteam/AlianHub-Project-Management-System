@@ -13,7 +13,9 @@
             :active-pane="rightPane"
             :details-open="rightPane === 'info'"
             :summarizing="summarizing"
+            :asking="askOpen"
             @summarize="summarize"
+            @ask="toggleAsk"
             @search="toggleRightPane('search')"
             @pinned="toggleRightPane('pinned')"
             @info="toggleRightPane('info')"
@@ -130,6 +132,14 @@
         @create-task="(item) => openTaskSheet(item.title, item)"
     />
 
+    <MainChatAsk
+        v-if="askOpen"
+        :project-id="projectId"
+        :sprint-id="sprintId"
+        :task-id="effectiveTaskId"
+        @close="askOpen = false"
+    />
+
     <MakeTaskSheet
         v-if="taskDraft"
         :initial-title="taskDraft.title"
@@ -190,6 +200,7 @@ import { useGetterFunctions } from '@/composable';
 import { storageHelper, taskPlanPermission } from '@/composable/commonFunction';
 import ImagesPreviewer from '@/components/organisms/ImagePreviewer/ImagesPreviewer.vue';
 import MainChatHeader from './MainChatHeader.vue';
+import MainChatAsk from './MainChatAsk.vue';
 import MainChatMessageList from './MainChatMessageList.vue';
 import MainChatComposer from './MainChatComposer.vue';
 import MainChatInfo from './MainChatInfo.vue';
@@ -815,6 +826,13 @@ async function onSaveLater(message) {
     $toast.success(t(saved ? 'Chat.saved_later' : 'Chat.unsaved_later'), { position: 'top-right' });
 }
 
+const askOpen = ref(false);
+function toggleAsk() {
+    if (!askOpen.value) closeSummary();
+    askOpen.value = !askOpen.value;
+}
+watch(conversationKey, () => { askOpen.value = false; });
+
 const summarizing = ref(false);
 const summaryState = ref(null);
 // Bumped on every run and close, so an answer for a conversation left behind is dropped.
@@ -828,6 +846,7 @@ function closeSummary() {
 
 async function summarize() {
     if (!canUseAi() || summarizing.value) return;
+    askOpen.value = false;
     summaryRun += 1;
     const run = summaryRun;
     summaryState.value = { summary: '', items: [], error: '' };

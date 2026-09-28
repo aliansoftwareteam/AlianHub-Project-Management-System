@@ -72,7 +72,7 @@ const escapeText = (text) => String(text)
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
-export const sendReply = async (parent, text) => {
+export const sendReply = async (parent, text, { onAi = null } = {}) => {
     const message = String(text || "").trim();
     if (!message) return null;
     const response = await apiRequest("post", env.API_COMMENTS, {
@@ -93,6 +93,7 @@ export const sendReply = async (parent, text) => {
     if (!response?.data?.status) throw new Error(response?.data?.statusText || response?.data?.message || "reply");
     const saved = response.data.data;
     applyCommentEvent(saved, { inserted: true });
+    if (onAi && response.data.ai) onAi(response.data.ai);
     return saved;
 };
 

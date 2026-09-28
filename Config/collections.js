@@ -99,6 +99,7 @@ const dbCollections = {
     AGENTS: "agents",
     AGENT_RUNS: "agent_runs",
     AGENT_REVISIONS: "agent_revisions",
+    AGENT_SCHEDULES: "agent_schedules",
     AI_USAGE: "ai_usage",
     AI_REPLAYS: "ai_replays",
     AI_RESERVATIONS: "ai_reservations",
@@ -136,6 +137,8 @@ const dbCollections = {
     ASK_THREADS: "ask_threads",
     AI_FEEDBACK: "ai_feedback",
     AI_EVAL_RUNS: "ai_eval_runs",
+    ASSIGNMENT_RULES: "assignment_rules",
+    ASSIGNMENT_DECISIONS: "assignment_decisions",
     AI_PROFILES: "ai_profiles",
 }
 

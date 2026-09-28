@@ -111,7 +111,7 @@ const existingRun = async (companyId, { agent, taskId, idempotencyKey }) => {
 
 /* Insert and let the unique indexes arbitrate: the loser of a race gets the
  * winner's run back instead of a second model bill. */
-const start = async (companyId, { agent, taskId, projectId, skill, trigger, startedBy, viaAccount, note, spendCapUsd, notifyMe, triggerDepth, triggerEventId, idempotencyKey, ref, traceId }) => {
+const start = async (companyId, { agent, taskId, projectId, skill, trigger, startedBy, viaAccount, note, spendCapUsd, notifyMe, triggerDepth, triggerEventId, idempotencyKey, ref, traceId, kind, scheduleId, slotAt }) => {
     const key = idempotencyKey ? String(idempotencyKey) : idempotencyKeyFor({ agent, taskId, trigger, ref });
     const via = viaAccount || agent.account || 'workspace';
     const pinned = await require('./revisions').pinFor(companyId, agent, skill);
@@ -130,6 +130,7 @@ const start = async (companyId, { agent, taskId, projectId, skill, trigger, star
                 ...(Number(spendCapUsd) > 0 ? { spendCapUsd: Number(spendCapUsd) } : {}),
                 notifyMe: Boolean(notifyMe),
                 ...(key ? { idempotencyKey: key } : {}),
+                ...(kind ? { kind: String(kind), scheduleId: scheduleId ? String(scheduleId) : null, slotAt: slotAt || null } : {}),
                 agentRevision: pinned.agentRevision, skillRevision: pinned.skillRevision,
                 ...(pinned.skillSource ? { skillSource: pinned.skillSource } : {}),
                 traceId: traceId || telemetry.traceIdNow() || telemetry.newTraceId(),

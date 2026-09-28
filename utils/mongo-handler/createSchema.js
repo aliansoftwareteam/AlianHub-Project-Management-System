@@ -262,10 +262,16 @@ agentRunsSchema.index({ 'failure.type': 1, startedAt: -1 }, { partialFilterExpre
 // hits the index instead of starting a second run.
 agentRunsSchema.index({ agentId: 1, taskId: 1, status: 1 }, { unique: true, partialFilterExpression: { taskId: { $type: 'string' }, status: { $in: ['queued', 'running', 'waiting_approval'] } } });
 agentRunsSchema.index({ idempotencyKey: 1 }, { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } });
+agentRunsSchema.index({ startedBy: 1, kind: 1, startedAt: -1 }, { partialFilterExpression: { kind: { $type: 'string' } } });
 
 const agentRevisionsSchema = new Schema(schema.agentRevisions, {strict: true, timestamps: true});
 agentRevisionsSchema.index({ agentId: 1, n: 1 }, { unique: true });
 agentRevisionsSchema.index({ agentId: 1, state: 1 });
+
+const agentSchedulesSchema = new Schema(schema.agentSchedules, {strict: true, timestamps: true});
+agentSchedulesSchema.index({ enabled: 1, nextRunAt: 1 });
+agentSchedulesSchema.index({ agentId: 1 });
+agentSchedulesSchema.index({ ownerId: 1 });
 
 const aiUsageSchema = new Schema(schema.aiUsage, {strict: true, timestamps: true});
 aiUsageSchema.index({ at: -1 });
@@ -355,6 +361,12 @@ aiFeedbackSchema.index({ userId: 1, feature: 1, itemId: 1 }, { unique: true, nam
 aiFeedbackSchema.index({ createdAt: -1 });
 const aiEvalRunsSchema = new Schema(schema.aiEvalRuns, {strict: true, timestamps: false});
 aiEvalRunsSchema.index({ suite: 1, ranAt: -1 });
+const assignmentRulesSchema = new Schema(schema.assignmentRules, {strict: true, timestamps: false});
+assignmentRulesSchema.index({ projectId: 1 }, { unique: true, name: 'project_id' });
+const assignmentDecisionsSchema = new Schema(schema.assignmentDecisions, {strict: true, timestamps: true});
+assignmentDecisionsSchema.index({ taskId: 1, inputHash: 1 }, { unique: true, name: 'task_revision' });
+assignmentDecisionsSchema.index({ taskId: 1, createdAt: -1 });
+assignmentDecisionsSchema.index({ createdAt: -1 });
 const aiProfilesSchema = new Schema(schema.aiProfiles, {strict: true, timestamps: true});
 aiProfilesSchema.index({ ownerId: 1 }, { unique: true, name: 'owner_id' });
 
@@ -500,6 +512,7 @@ module.exports = {
     agentsSchema,
     agentRunsSchema,
     agentRevisionsSchema,
+    agentSchedulesSchema,
     aiUsageSchema,
     aiReservationsSchema,
     aiReplaysSchema,
@@ -530,6 +543,8 @@ module.exports = {
     askThreadsSchema,
     aiFeedbackSchema,
     aiEvalRunsSchema,
+    assignmentRulesSchema,
+    assignmentDecisionsSchema,
     aiProfilesSchema,
     secretsSchema,
     oauthClientsSchema,

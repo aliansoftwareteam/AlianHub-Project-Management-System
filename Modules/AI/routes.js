@@ -14,6 +14,7 @@ const askBuild = require('./askBuild');
 const { requireTaskWritePermission } = require('../../Config/permissionGuard');
 const { TASK_WRITE_ROUTES } = require('../../Config/taskWritePermissions');
 const { chatSummaryHandler } = require('./chatSummary');
+const { chatAskHandler, chatAskPostHandler } = require('./chatAsk');
 
 exports.init = (app) => {
     app.post('/api/v1/generatePrompt', ctrl.generatePrompt);
@@ -60,6 +61,8 @@ exports.init = (app) => {
     app.post('/api/v1/ai/transcribe', ...transcribe.transcribe);
     app.post('/api/v1/ai/meeting-notes', meetingNotes.meetingNotesHandler);
     app.post('/api/v1/ai/chat-summary', chatSummaryHandler);
+    app.post('/api/v1/ai/chat-ask', chatAskHandler);
+    app.post('/api/v1/ai/chat-ask/post', chatAskPostHandler);
     app.get('/api/v1/generatePrompt/events/:id', (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
