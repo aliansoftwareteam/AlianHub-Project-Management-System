@@ -196,7 +196,7 @@ import MainChatInfo from './MainChatInfo.vue';
 import MainChatSearch from './MainChatSearch.vue';
 import MainChatSummary from './MainChatSummary.vue';
 import MakeTaskSheet from './MakeTaskSheet.vue';
-import { aiUsable, loadAiAvailability } from '@/composable/aiAvailability';
+import { canUseAi, loadAiAvailability } from '@/composable/aiAvailability';
 import { useClipRecorder } from '@/composables/useClipRecorder';
 import { shellState } from '@/components/organisms/Shell/shellState';
 import CallIcon from '@/components/organisms/CallOverlay/CallIcon.vue';
@@ -827,7 +827,7 @@ function closeSummary() {
 }
 
 async function summarize() {
-    if (!aiUsable.value || summarizing.value) return;
+    if (!canUseAi() || summarizing.value) return;
     summaryRun += 1;
     const run = summaryRun;
     summaryState.value = { summary: '', items: [], error: '' };
@@ -895,7 +895,7 @@ function onCommand({ name, text } = {}) {
     if (name === 'summarize') summarize();
     else if (name === 'task') openTaskSheet(text || (replyTo.value && replyTo.value.message));
     else if (name === 'clip') openRecorder({ type: 'chat', conversationKey: conversationKey.value }, postClip);
-    else if (name === 'talk' && aiUsable.value) shellState.talkToText = true;
+    else if (name === 'talk' && canUseAi()) shellState.talkToText = true;
 }
 
 async function onPin(message) {

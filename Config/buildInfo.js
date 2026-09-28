@@ -63,7 +63,7 @@ function resolveBuildInfo({ root = ROOT, derive = deriveBuildInfo, onWarning = w
  * may be wrong (seen under heavy load), and a failed read retries with backoff.
  * Only start() reads git: a getter that did would leave the read running after
  * whichever script or jest file first asked for the version had finished. */
-function createResolver({ root = ROOT, run, delays = RETRY_DELAYS_MS, onWarning = warn, onInfo = info } = {}) {
+function createResolver({ root = ROOT, run, delays = RETRY_DELAYS_MS, waitMs = GIT_TIMEOUT_MS, onWarning = warn, onInfo = info } = {}) {
     let current = null;
     let pending = null;
     let failures = 0;
@@ -101,6 +101,22 @@ function createResolver({ root = ROOT, run, delays = RETRY_DELAYS_MS, onWarning 
 
     const get = () => current || (current = hasGit(root) ? unresolved(root, 'not-started') : withoutGit());
 
+    /* For callers that persist the version: waits for the read in flight, but never
+     * longer than waitMs, and never for a scheduled retry. */
+    async function ready() {
+        let timeout;
+        const gaveUp = new Promise((resolve) => {
+            timeout = setTimeout(resolve, waitMs);
+            if (timeout.unref) timeout.unref();
+        });
+        try {
+            await Promise.race([start(), gaveUp]);
+        } finally {
+            clearTimeout(timeout);
+        }
+        return get();
+    }
+
     const summary = () => {
         const result = { ...get() };
         delete result.entries;
@@ -109,13 +125,14 @@ function createResolver({ root = ROOT, run, delays = RETRY_DELAYS_MS, onWarning 
 
     const stop = () => clearTimeout(timer);
 
-    return { start, get, summary, stop };
+    return { start, ready, get, summary, stop };
 }
 
 const resolver = createResolver();
 
 module.exports = {
     start: resolver.start,
+    ready: resolver.ready,
     get: resolver.get,
     summary: resolver.summary,
     resolveBuildInfo,

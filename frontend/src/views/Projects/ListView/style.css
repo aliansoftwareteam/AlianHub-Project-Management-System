@@ -42,7 +42,6 @@
     color: var(--ink-label);
     justify-items: end;
 }
-.lv2__cols .lv2__c-risk { color: var(--brand); }
 .lv2__cols > [role="columnheader"] { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv2__cols > .lv2__head-title { display: flex; align-items: center; gap: 6px; overflow: visible; }
 .lv2__chooser { margin-left: auto; }
