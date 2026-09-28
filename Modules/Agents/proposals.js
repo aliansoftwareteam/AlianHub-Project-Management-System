@@ -13,6 +13,7 @@ const persistence = require('../AICore/persistence');
 const logger = require('../../Config/loggerConfig');
 const access = require('./access');
 const taint = require('./taint');
+const aiFeedback = require('../AI/feedback');
 
 // AI Inbox proposals (9b). A proposal says what, why and exactly which registry
 // actions it would run. Approving applies them through perform() — so they are
@@ -287,6 +288,7 @@ const decline = async (companyId, id, { decider, ip, reason }) => {
         await quietly(`preference candidate for ${decider.userId}`, () => memory.preferenceCandidate({ companyId, userId: decider.userId, reasonKey: declineReason }));
     }
     await settleRun(companyId, p, { decision: STATUS.DECLINED, applied: [], reason: declineReason || null, outcome: 'declined by a person' });
+    await quietly(`decline feedback for ${id}`, () => aiFeedback.fromDecline(companyId, decider.userId, { proposalId: id, runId: p.runId, reason: declineReason }));
     return { proposal: updated };
 };
 

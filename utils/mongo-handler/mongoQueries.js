@@ -131,6 +131,8 @@ const {
     agentSessionsSchema,
     agentSessionEndpointsSchema,
     askThreadsSchema,
+    aiFeedbackSchema,
+    aiEvalRunsSchema,
     assignmentRulesSchema,
     assignmentDecisionsSchema,
     aiProfilesSchema,
@@ -398,6 +400,10 @@ exports.checkType = (type) => {
             return agentSessionEndpointsSchema
         case SCHEMA_TYPE.ASK_THREADS:
             return askThreadsSchema
+        case SCHEMA_TYPE.AI_FEEDBACK:
+            return aiFeedbackSchema
+        case SCHEMA_TYPE.AI_EVAL_RUNS:
+            return aiEvalRunsSchema
         case SCHEMA_TYPE.ASSIGNMENT_RULES:
             return assignmentRulesSchema
         case SCHEMA_TYPE.ASSIGNMENT_DECISIONS:
@@ -676,6 +682,10 @@ exports.tableType = (type) => {
                 return `${dbCollections.AGENT_SESSION_ENDPOINTS}`
         case SCHEMA_TYPE.ASK_THREADS:
                 return `${dbCollections.ASK_THREADS}`
+        case SCHEMA_TYPE.AI_FEEDBACK:
+                return `${dbCollections.AI_FEEDBACK}`
+        case SCHEMA_TYPE.AI_EVAL_RUNS:
+                return `${dbCollections.AI_EVAL_RUNS}`
         case SCHEMA_TYPE.ASSIGNMENT_RULES:
                 return `${dbCollections.ASSIGNMENT_RULES}`
         case SCHEMA_TYPE.ASSIGNMENT_DECISIONS:

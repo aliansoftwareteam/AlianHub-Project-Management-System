@@ -10,7 +10,7 @@ jest.mock('../Modules/Knowledge/flag', () => ({ enabledFor: jest.fn(async () => 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { visibleProjects } = require('../Modules/Agents/scope');
 const { gather } = require('../Modules/AI/ask');
-const SET = require('./fixtures/askIntent.cases.json');
+const SET = require('../Modules/AI/evals/askIntent.cases.json');
 
 const C = '6f0000000000000000000c01';
 const NOW = new Date(SET.now);

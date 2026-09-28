@@ -36,6 +36,7 @@
             :show-copy="result.kind !== 'compose'"
             :insert-label="result.kind === 'summary' ? $t('Projects.pages_ai_insert_top') : $t('Projects.pages_ai_insert_below')"
             :return-focus="() => inputRef"
+            :feedback="{ feature: 'page_compose' }"
             @replace="apply('replace')"
             @insert="apply(result.kind === 'summary' ? 'prepend' : 'append')"
             @retry="compose(result.request, result.kind)"

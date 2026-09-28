@@ -64,6 +64,12 @@ export default [
         meta: { title: 'AI health', requiresAuth: true }
     },
     {
+        path: '/:cid/ai/quality',
+        name: 'AiQuality',
+        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiQuality.vue'),
+        meta: { title: 'AI quality', requiresAuth: true }
+    },
+    {
         path: '/:cid/ai/workflows/runs/:id',
         name: 'WorkflowRun',
         component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/WorkflowRunView.vue'),

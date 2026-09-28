@@ -356,6 +356,11 @@ const agentSessionEndpointsSchema = new Schema(schema.agentSessionEndpoints, {st
 agentSessionEndpointsSchema.index({ clientId: 1 }, { unique: true, name: 'client_id' });
 const askThreadsSchema = new Schema(schema.askThreads, {strict: true, timestamps: true});
 askThreadsSchema.index({ ownerId: 1, lastTurnAt: -1 });
+const aiFeedbackSchema = new Schema(schema.aiFeedback, {strict: true, timestamps: false});
+aiFeedbackSchema.index({ userId: 1, feature: 1, itemId: 1 }, { unique: true, name: 'one_per_person_item' });
+aiFeedbackSchema.index({ createdAt: -1 });
+const aiEvalRunsSchema = new Schema(schema.aiEvalRuns, {strict: true, timestamps: false});
+aiEvalRunsSchema.index({ suite: 1, ranAt: -1 });
 const assignmentRulesSchema = new Schema(schema.assignmentRules, {strict: true, timestamps: false});
 assignmentRulesSchema.index({ projectId: 1 }, { unique: true, name: 'project_id' });
 const assignmentDecisionsSchema = new Schema(schema.assignmentDecisions, {strict: true, timestamps: true});
@@ -536,6 +541,8 @@ module.exports = {
     agentSessionsSchema,
     agentSessionEndpointsSchema,
     askThreadsSchema,
+    aiFeedbackSchema,
+    aiEvalRunsSchema,
     assignmentRulesSchema,
     assignmentDecisionsSchema,
     aiProfilesSchema,
