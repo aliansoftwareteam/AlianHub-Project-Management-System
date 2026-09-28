@@ -65,7 +65,7 @@ const exportCsv = async (companyId) => {
     res.setHeader = (k, v) => { res.headers[k] = v; };
     res.write = (b) => { chunks.push(String(b)); return true; };
     res.end = (b) => { if (b) chunks.push(String(b)); };
-    await ctrl.exportAuditCsv({ uid: ADMIN, headers: { companyid: companyId }, query: {}, body: {} }, res);
+    await ctrl.exportAuditCsv({ uid: ADMIN, aud: companyId, headers: { companyid: companyId }, query: {}, body: {} }, res);
     return chunks.join('');
 };
 

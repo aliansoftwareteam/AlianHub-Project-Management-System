@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn() }));
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
@@ -14,7 +15,7 @@ const USER = '6a9954186dd786246031e47c';
 const call = async (roleType) => {
     getRoleType.mockResolvedValueOnce(roleType);
     const res = { send: jest.fn() };
-    const refused = await refuseGuest({ headers: { companyid: COMPANY }, uid: USER, body: {}, query: {} }, res);
+    const refused = await refuseGuest(verified({ headers: { companyid: COMPANY }, uid: USER, body: {}, query: {} }), res);
     return { refused, res };
 };
 

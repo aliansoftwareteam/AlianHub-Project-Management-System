@@ -40,7 +40,7 @@ const isScalar = (value) => value === null || ['string', 'number', 'boolean'].in
 
 const escapeText = (value) => sanitizeInput(String(value === undefined || value === null ? '' : value));
 
-/* tenantOf would fall back to a body company and trusts a request with no audience; a task write needs both the header and a token, so a route mounted without verifyJWTTokenWithCV2 never trusts a bare header. */
+/* tenantOf would fall back to a body company; a task write needs both the header and a token, so a route mounted without verifyJWTTokenWithCV2 never trusts a bare header. */
 const validatedCompanyOf = (req) => {
     const header = String((req && req.headers && req.headers.companyid) || '').trim();
     if (!OBJECT_ID.test(header) || !req.aud) refuse(400, 'A valid company is required for this request.');

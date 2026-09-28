@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
@@ -26,7 +27,7 @@ const res = () => {
     r.json = r.send;
     return r;
 };
-const req = (over = {}) => ({ headers: { companyid: C }, query: {}, body: {}, params: {}, uid: ME, ...over });
+const req = (over = {}) => verified({ headers: { companyid: C }, query: {}, body: {}, params: {}, uid: ME, ...over });
 
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });

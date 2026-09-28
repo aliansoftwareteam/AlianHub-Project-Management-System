@@ -52,7 +52,7 @@ const run = async (middleware, req) => {
 };
 
 const session = (uid, body, route = '/api/v2/tasks', method = 'PATCH') => ({
-    uid, method, baseUrl: '', route: { path: route }, originalUrl: route, url: route, query: {}, headers: { companyid: CID }, body,
+    uid, method, baseUrl: '', route: { path: route }, originalUrl: route, url: route, query: {}, headers: { companyid: CID }, aud: CID, body,
 });
 const token = (uid, body, route, method) => ({ ...session(uid, body, route, method), apiToken: { _id: 't' } });
 
