@@ -1,7 +1,7 @@
 # 041 — AI UX fixes from the ClickUp AI comparison
 
 ## Goal
-Fix the broken AI buttons and make Ask the way into AI. This covers recommendations 1 and 2 of `Tasks/active/034-end-to-end-qa-programme/findings/ai-ux-comparison-clickup-2026-09-28.md`. The owner asked on 2026-09-28 to start both.
+Fix the broken AI buttons and make Ask the way into AI. This covers recommendations 1–5 of `Tasks/active/034-end-to-end-qa-programme/findings/ai-ux-comparison-clickup-2026-09-28.md`. The owner asked on 2026-09-28 to start 1 and 2, then 3 to 5.
 
 ## Scope (one slice and one PR each)
 1. **Chat AI buttons do something.**
@@ -16,9 +16,22 @@ Fix the broken AI buttons and make Ask the way into AI. This covers recommendati
    - The "Coming next" AI Home stub and the Analytics stub leave the navigation.
    - The sidebar's running count uses the same source as the LIVE strip, so it can't say "No agents running" while agents run.
    - Old `/ai/home` and `/ai/analytics` links redirect instead of breaking.
+4. **Ask answers inside ⌘K.**
+   - Enter on the palette's Ask row sends the question and shows the answer in the palette: a short answer, with cited tasks and docs as rows you can open.
+   - "Continue in Ask" opens the Ask page with the question and answer.
+   - While the answer loads, Esc cancels it.
+5. **Ask understands structure.**
+   - Before retrieval, the question is read for a project, status, assignee ("me" or a name), due or overdue, and sprint.
+   - The matching tasks, visible to the asker only, go to the model as sources beside the text passages.
+   - "Which tasks in Local Smoke are overdue?" lists those tasks.
+   - A held-out question set covers the structured cases.
+6. **Ask is a conversation.**
+   - Follow-up questions keep the thread's context.
+   - The user's own threads are listed on the Ask page, private to them, and removed by erasure-by-person.
+   - Answers stream in and render as sanitised Markdown with citations.
+   - "Make a task" and "Copy" act on an answer.
 
 ## Out of scope
-- Answering inside ⌘K, structured Ask, and Ask threads (recommendations 3–5).
 - Agents in pickers and comments (6), preview for every AI action (7), plain-language copy (8), merging the AI gates (9), and Home AI cards (10).
 
 ## Acceptance
