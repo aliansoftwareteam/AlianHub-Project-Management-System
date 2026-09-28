@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn() }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn() }));
@@ -30,7 +31,7 @@ const BOB = '6f00000000000000000000b2';
 const PROJECT = '6f0000000000000000000d01';
 const JOB = '6f0000000000000000000e01';
 
-const fakeReq = ({ uid, query = {}, body = {}, params = {} } = {}) => ({ uid, headers: { companyid: COMPANY }, query, body, params });
+const fakeReq = ({ uid, query = {}, body = {}, params = {} } = {}) => verified({ uid, headers: { companyid: COMPANY }, query, body, params });
 
 const fakeRes = () => {
     const res = { statusCode: 200 };

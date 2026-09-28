@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...args) => mockDb.crud(...args) }));
@@ -28,7 +29,7 @@ const exportCsv = async (query, uid = OWNER) => {
     res.setHeader = (k, v) => { res.headers[k] = v; };
     res.write = (b) => { chunks.push(String(b)); return true; };
     res.end = (b) => { if (b) chunks.push(String(b)); res.ended = true; };
-    await ctrl.exportAuditCsv({ uid, headers: { companyid: CID }, query, body: {} }, res);
+    await ctrl.exportAuditCsv(verified({ uid, headers: { companyid: CID }, query, body: {} }), res);
     return { ...res, text: chunks.join('') };
 };
 
@@ -77,7 +78,7 @@ describe('INS-08 audit CSV export', () => {
 describe('INS-09 audit actor and CSV cells', () => {
     it('records the signed-in actor, not a name from the request body', async () => {
         recordAuditFromReq(
-            { uid: OWNER, headers: { companyid: CID }, body: { userData: { id: MEMBER, name: '=HYPERLINK("http://example.invalid","Rahul")' } } },
+            verified({ uid: OWNER, headers: { companyid: CID }, body: { userData: { id: MEMBER, name: '=HYPERLINK("http://example.invalid","Rahul")' } } }),
             { action: 'member.update', entityType: 'member', entityId: ENTITY },
         );
         for (let i = 0; i < 20 && !(mockDb.store[SCHEMA_TYPE.AUDIT_LOGS] || []).length; i += 1) await new Promise(setImmediate);

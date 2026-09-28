@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const mockCrud = jest.fn();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockCrud(...a) }));
@@ -26,7 +27,7 @@ const call = async (body, uid = ME) => {
     r.status = (c) => { r.code = c; return r; };
     r.send = (b) => { r.body = b; return r; };
     r.json = r.send;
-    await ctrl.updateUnReadCommentsCount({ headers: { companyid: C }, body, query: {}, params: {}, uid }, r);
+    await ctrl.updateUnReadCommentsCount(verified({ headers: { companyid: C }, body, query: {}, params: {}, uid }), r);
     await settle();
     return r;
 };

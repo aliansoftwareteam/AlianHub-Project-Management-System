@@ -13,9 +13,23 @@ describe('tenantOf', () => {
     });
 
     it('falls back to params, query, then body', () => {
-        expect(tenantOf({ headers: {}, params: { companyId: COMPANY } })).toBe(COMPANY);
-        expect(tenantOf({ headers: {}, query: { companyId: COMPANY } })).toBe(COMPANY);
-        expect(tenantOf({ headers: {}, body: { CompanyId: COMPANY } })).toBe(COMPANY);
+        expect(tenantOf({ headers: {}, params: { companyId: COMPANY }, aud: COMPANY })).toBe(COMPANY);
+        expect(tenantOf({ headers: {}, query: { companyId: COMPANY }, aud: COMPANY })).toBe(COMPANY);
+        expect(tenantOf({ headers: {}, body: { CompanyId: COMPANY }, aud: COMPANY })).toBe(COMPANY);
+    });
+
+    it.each([undefined, null, ''])('refuses a request whose audience is %p', (aud) => {
+        expect(() => tenantOf({ headers: { companyid: COMPANY }, aud })).toThrow(TenantError);
+        expect(() => tenantOf({ headers: {}, body: { companyId: COMPANY }, aud })).toThrow(TenantError);
+    });
+
+    it('takes the named company for the instance admin key, which carries no token', () => {
+        expect(tenantOf({ headers: { companyid: COMPANY }, instanceAdmin: 'key' })).toBe(COMPANY);
+    });
+
+    it('holds the instance owner to the companies in their token', () => {
+        expect(() => tenantOf({ headers: { companyid: OTHER }, aud: COMPANY, instanceAdmin: 'owner' })).toThrow(TenantError);
+        expect(() => tenantOf({ headers: { companyid: COMPANY }, instanceAdmin: 'owner' })).toThrow(TenantError);
     });
 
     it('rejects a company outside the audience', () => {
@@ -86,6 +100,14 @@ describe('pinSessionTenant', () => {
         expect(res.statusCode).toBe(403);
         expect(res.payload.status).toBe(false);
         expect(req.body).toEqual(body);
+    });
+
+    it('answers 403 to a request that carries no audience', () => {
+        const req = { headers: { companyid: COMPANY }, body: { companyId: COMPANY } };
+        const res = spyRes();
+        expect(pinSessionTenant(req, res)).toBe('');
+        expect(res.statusCode).toBe(403);
+        expect(() => sessionTenantOf({ headers: { companyid: COMPANY }, body: {} })).toThrow(TenantError);
     });
 
     it('answers 403 when the body carries an object instead of a company id', () => {

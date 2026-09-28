@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const mockDb = require('./fixtures/fakeMongo').create();
 const mockCache = new Map();
 
@@ -29,7 +30,7 @@ const listAuditLogs = async (uid) => {
     res.status = (c) => { res.code = c; return res; };
     res.json = (b) => { res.body = b; return res; };
     res.send = (b) => { res.body = b; return res; };
-    await audit.listAuditLogs({ uid, headers: { companyid: CID }, query: {}, body: {} }, res);
+    await audit.listAuditLogs(verified({ uid, headers: { companyid: CID }, query: {}, body: {} }), res);
     return res;
 };
 
@@ -38,7 +39,7 @@ const runCompanyAdmin = async (uid) => {
     res.status = (c) => { res.code = c; return res; };
     res.json = (b) => { res.body = b; return res; };
     let passed = false;
-    await requireCompanyAdmin()({ uid, headers: { companyid: CID }, body: {} }, res, () => { passed = true; });
+    await requireCompanyAdmin()(verified({ uid, headers: { companyid: CID }, body: {} }), res, () => { passed = true; });
     return { passed, code: res.code, body: res.body };
 };
 

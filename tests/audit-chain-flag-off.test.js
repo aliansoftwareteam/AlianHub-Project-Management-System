@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
@@ -129,7 +130,7 @@ describe('with AUDIT_CHAIN off and a key set', () => {
         mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
         mockDb.seed(SCHEMA_TYPE.AUDIT_LOGS, { action: 'member.update', actorId: OWNER, entityType: 'member', entityId: 'm1', createdAt: new Date(), meta: {} });
         mockDb.seed(SCHEMA_TYPE.AUDIT_LOGS, { action: 'permission.refused', actorId: OWNER, entityType: 'permission', entityId: 'task.task_priority', createdAt: new Date(), meta: { reason: 'denied' } });
-        const req = (query) => ({ uid: OWNER, headers: { companyid: CID }, query, body: {} });
+        const req = (query) => verified({ uid: OWNER, headers: { companyid: CID }, query, body: {} });
 
         for (const query of [{}, { undone: 'true' }, { q: 'member' }, { refused: 'true' }]) {
             mockDb.calls.length = 0;

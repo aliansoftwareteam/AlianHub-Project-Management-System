@@ -32,7 +32,7 @@ let client;
 let task;
 
 const req = ({ uid = OWNER, params = {}, body = {}, query = {} } = {}) => ({
-    headers: { companyid: COMPANY }, uid, params, query, body, ip: '127.0.0.1',
+    headers: { companyid: COMPANY }, aud: COMPANY, uid, params, query, body, ip: '127.0.0.1',
 });
 
 const res = () => {

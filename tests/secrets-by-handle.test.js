@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const crypto = require('crypto');
 const mockDb = require('./fixtures/fakeMongo').create();
 
@@ -69,7 +70,7 @@ const response = () => {
 };
 const call = async (handler, uid, { body = {}, params = {}, headers = {} } = {}) => {
     const res = response();
-    await handler({ headers: { companyid: COMPANY, ...headers }, uid, body, params, query: {}, ip: '10.0.0.1' }, res);
+    await handler(verified({ headers: { companyid: COMPANY, ...headers }, uid, body, params, query: {}, ip: '10.0.0.1' }), res);
     return res;
 };
 

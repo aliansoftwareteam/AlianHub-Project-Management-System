@@ -51,7 +51,7 @@ let skillOutcome = { status: runs.STATUS.DONE, outcome: 'reviewed' };
 let executed = [];
 
 const req = ({ companyId = COMPANY, uid = OWNER, params = {}, body = {}, query = {}, headers = {} } = {}) => ({
-    headers: { companyid: companyId, ...headers }, uid, params, query, body, ip: '127.0.0.1',
+    headers: { companyid: companyId, ...headers }, aud: companyId, uid, params, query, body, ip: '127.0.0.1',
 });
 
 const res = () => {
