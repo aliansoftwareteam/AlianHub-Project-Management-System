@@ -3,6 +3,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries.
 const { evaluatePermission } = require("../../Config/permissionGuard");
 const logger = require("../../Config/loggerConfig");
 const { visibleProjectIds } = require("../Agents/scope");
+const { idForms } = require("../../utils/mongo-handler/objectIdKeys");
 
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const DEFAULT_LIMIT = 20;
@@ -33,8 +34,8 @@ exports.getActivityLog = async (req, res) => {
         }
 
         const match = forTask
-            ? { $and: [{ Type: { $ne: "project" } }, { ProjectId: String(projectId) }, { TaskId: String(taskId) }] }
-            : { $and: [{ Type: "project" }, { ProjectId: String(projectId) }] };
+            ? { $and: [{ Type: { $ne: "project" } }, { ProjectId: { $in: idForms(String(projectId)) } }, { TaskId: String(taskId) }] }
+            : { $and: [{ Type: "project" }, { ProjectId: { $in: idForms(String(projectId)) } }] };
         const pipeline = [
             { $match: match },
             { $sort: { createdAt: -1, _id: 1 } },
