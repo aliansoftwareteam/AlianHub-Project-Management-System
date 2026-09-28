@@ -41,11 +41,16 @@ function makeRepo({ tag = true } = {}) {
 
 describe('build info derived from git', () => {
     it('reads a history since the tag larger than the default 1 MB output buffer', async () => {
-        const { dir, commit } = makeRepo();
+        const { dir, git } = makeRepo();
         const body = 'x'.repeat(400 * 1024);
-        commit('fix: one', body);
-        commit('fix: two', body);
-        commit('fix: three', body);
+        // Linux caps a single argv string at 128 KB, so the message goes through a file.
+        const message = path.join(tempDir(), 'message.txt');
+        for (const subject of ['fix: one', 'fix: two', 'fix: three']) {
+            fs.appendFileSync(path.join(dir, 'changes.txt'), `${subject}\n`);
+            fs.writeFileSync(message, `${subject}\n\n${body}`);
+            git('add', '.');
+            git('commit', '-q', '-F', message);
+        }
 
         expect(deriveBuildInfo({ cwd: dir })).toMatchObject({ version: '1.2.4-beta.3', build: 3 });
         await expect(deriveBuildInfoAsync({ cwd: dir })).resolves.toMatchObject({ version: '1.2.4-beta.3', build: 3 });
