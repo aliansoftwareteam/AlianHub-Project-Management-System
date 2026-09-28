@@ -13,9 +13,12 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({
 }));
 jest.mock('../Config/config', () => ({ myCache: { get: () => undefined, set: () => {}, del: () => {}, keys: () => [], getTtl: () => 0 } }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
-jest.mock('../Config/tenant', () => ({ pinSessionTenant: (req) => req.headers.companyid }));
+jest.mock('../Config/tenant', () => ({ ...jest.requireActual('../Config/tenant'), pinSessionTenant: (req) => req.headers.companyid }));
 jest.mock('../Config/projectAccess', () => ({ canEditProject: jest.fn(), canReadProject: jest.fn(), DETAILS: 'project.project_details' }));
-jest.mock('../Modules/Tasks/helpers/taskWriteFields', () => ({ sessionActor: async (req) => ({ id: String(req.uid), Employee_Name: 'Member' }) }));
+jest.mock('../Modules/Tasks/helpers/taskWriteFields', () => ({
+    ...jest.requireActual('../Modules/Tasks/helpers/taskWriteFields'),
+    sessionActor: async (req) => ({ id: String(req.uid), Employee_Name: 'Member' }),
+}));
 const mockStub = () => new Proxy({}, {
     get: (target, name) => {
         if (name === 'then' || name === '__esModule') return undefined;
@@ -94,7 +97,8 @@ const call = async (handler, body) => {
     res.status = (code) => { res.code = code; return res; };
     res.send = (payload) => { res.body = payload; return res; };
     res.json = res.send;
-    await handler({ uid: MEMBER, headers: { companyid: COMPANY }, body }, res);
+    await handler({ uid: MEMBER, aud: COMPANY, headers: { companyid: COMPANY }, body }, res);
+    for (let i = 0; i < 30 && res.body === undefined; i += 1) await new Promise((resolve) => setImmediate(resolve));
     return res;
 };
 
@@ -182,6 +186,43 @@ describe('an import refuses a sprint the caller may not import into', () => {
 
         expect(res.code).toBe(403);
         expect(canEditProject).toHaveBeenCalledWith(COMPANY, MEMBER, PROJECT, ['task.task_create']);
+        expect(created).toHaveLength(0);
+    });
+});
+
+describe('the web app\'s spreadsheet import (PATCH /api/v1/importTasks)', () => {
+    const routes = {};
+    const register = (method) => (routePath, ...handlers) => { routes[`${method} ${routePath}`] = handlers[handlers.length - 1]; };
+    require('../Modules/Tasks/routes').init({ get: register('GET'), post: register('POST'), put: register('PUT'), patch: register('PATCH'), delete: register('DELETE'), use: register('USE') });
+
+    const importSheet = (sprint) => call(routes['PATCH /api/v1/importTasks'], {
+        action: 'createMultipleTasks',
+        tasks: [{ TaskName: 'Write the brief', status: 'To Do', Task_Leader: MEMBER }],
+        userData: { id: MEMBER, Employee_Name: 'Member' },
+        projectData: { _id: PROJECT, CompanyId: COMPANY, ProjectName: 'Web', ProjectCode: 'WEB', lastTaskId: 0 },
+        indexObj: {},
+        statusArray: STATUSES,
+        sprint,
+        eventId: 'e1',
+    });
+
+    it('places the tasks by the stored sprint the body names, not the element it sends', async () => {
+        const res = await importSheet({ id: SPRINT, name: 'Hijacked', value: 'x', folderId: GONE_FOLDER, folderName: 'Elsewhere', isAccessible: true });
+
+        expect(res.body.status).toBe(true);
+        expect(created).toHaveLength(1);
+        expect({ sprintId: created[0].sprintId, sprintArray: created[0].sprintArray, folderObjId: created[0].folderObjId }).toEqual(await placementOf(SPRINT));
+    });
+
+    test.each([
+        ['a sprint of another project', OTHER_PROJECT_SPRINT],
+        ['a private sprint the caller is not on', PRIVATE_SPRINT],
+        ['a sprint of another company', FOREIGN_SPRINT],
+        ['no sprint id', undefined],
+    ])('refuses %s', async (_, sprintId) => {
+        const res = await importSheet({ id: sprintId, name: 'Sprint' });
+
+        expect(res.code).toBe(404);
         expect(created).toHaveLength(0);
     });
 });
