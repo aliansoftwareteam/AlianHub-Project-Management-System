@@ -158,6 +158,7 @@
                             @toggle="(emoji) => toggleCommentReaction(emoji)"
                         />
                     </div>
+                    <slot name="thread" />
                 </div>
             </div>
             <DropDown mode="menu" v-if="showOptions && !message?.isDeleted" class="align-self-start"  :bodyClass="{'comments__message--dropdown' : true}">

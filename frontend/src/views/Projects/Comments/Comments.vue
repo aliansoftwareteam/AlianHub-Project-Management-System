@@ -78,7 +78,11 @@
                         @reply="replyMessage(data)"
                         @pin="pinMessage(data)"
                         @markUnread="updateCount(true, messages.length - index), resetUnread = false"
-                    />
+                    >
+                        <template v-if="threadsOn && data._id && !data.isDeleted && !data.isSending" #thread>
+                            <CommentThread :message="data" :people="users" />
+                        </template>
+                    </Comment>
                 </div>
             </template>
         </div>
@@ -245,6 +249,8 @@ import ImagesPreviewer from "@/components/organisms/ImagePreviewer/ImagesPreview
 import { storageHelper } from "@/composable/commonFunction";
 import { ROLE_ADMIN } from "@/utils/roles";
 import { isOnViewerSide } from "@/utils/commentSide";
+import CommentThread from "@/components/molecules/CommentThread/CommentThread.vue";
+import { applyCommentEvent, isTaskThread } from "@/composable/commentThreads";
 
 const { t } = useI18n();
 
@@ -372,6 +378,8 @@ const props = defineProps({
         default : () => {}
     }
 })
+
+const threadsOn = computed(() => !props.mainChat && isTaskThread(props.taskId));
 
 const fileExtentions = computed(() => {
     return getters['settings/fileExtentions'];
@@ -1350,12 +1358,14 @@ function handleSocketData() {
 
     socket.value.on("commentInsert",(data)=> {
         let docData = data.fullDocument;
+        if (applyCommentEvent(docData, { inserted: true })) return;
         upsertIncomingComment(docData, {replaceSending: true, incrementTotal: true});
     })
 
 
     socket.value.on("commentUpdate",(data)=> {
         let docData = data.fullDocument;
+        if (applyCommentEvent(docData)) return;
         upsertIncomingComment(docData);
     })
 
