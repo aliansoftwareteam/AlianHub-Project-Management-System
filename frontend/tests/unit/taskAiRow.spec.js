@@ -35,7 +35,7 @@ config.global.plugins[0].global.setLocaleMessage('en', en);
 const t = config.global.plugins[0].global.t;
 
 const TASK = { _id: 'task-1', TaskName: 'Launch pricing', TaskKey: 'AH-1', ProjectID: 'proj-1', sprintId: 'sprint-1', sprintArray: { id: 'sprint-1', name: 'Sprint 1' }, checklistArray: [] };
-const PROJECT = { _id: 'proj-1', CompanyId: 'company-1', ProjectName: 'Growth', ProjectCode: 'GR', lastTaskId: 3, isGlobalPermission: false };
+const PROJECT = { _id: 'proj-1', CompanyId: 'company-1', ProjectName: 'Growth', ProjectCode: 'GR', lastTaskId: 3, isGlobalPermission: false, apps: ['AI'] };
 
 const ok = (data) => ({ data: { status: true, data } });
 
@@ -55,7 +55,7 @@ function mountRow(props = {}) {
 beforeEach(() => {
     resetAiAvailability();
     resetTaskAiCapabilities();
-    applyAiAvailability({ state: AI_STATE.ON });
+    applyAiAvailability({ state: AI_STATE.ON, planAllowsAi: true, loaded: true });
     perms.value = true;
     api.replies = { [env.AI_TASK_ASSIST]: ok({ research: false }) };
     Object.values(ops).forEach((fn) => fn.mockClear());
@@ -80,6 +80,19 @@ describe('the AI row under the task title', () => {
             expect(wrapper.find('[data-test="task-ai-row"]').exists()).toBe(false);
             wrapper.unmount();
         }
+    });
+
+    it('is not there when the plan allows no AI or the project has the AI app off', async () => {
+        applyAiAvailability({ state: AI_STATE.ON, planAllowsAi: false });
+        const noPlan = mountRow();
+        await flushPromises();
+        expect(noPlan.find('[data-test="task-ai-row"]').exists()).toBe(false);
+        noPlan.unmount();
+
+        applyAiAvailability({ planAllowsAi: true });
+        const noApp = mountRow({ project: { ...PROJECT, apps: [] } });
+        await flushPromises();
+        expect(noApp.find('[data-test="task-ai-row"]').exists()).toBe(false);
     });
 
     it('offers Research this only when the instance allows web research', async () => {

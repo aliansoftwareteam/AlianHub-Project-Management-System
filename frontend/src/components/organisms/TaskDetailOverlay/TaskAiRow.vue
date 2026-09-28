@@ -70,7 +70,7 @@ import AiResultPreview from "@/components/molecules/AiPreview/AiResultPreview.vu
 import TaskAskPanel from "./TaskAskPanel.vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
-import { aiUsable } from "@/composable/aiAvailability";
+import { canUseAi } from "@/composable/aiAvailability";
 import { showUndoToast } from "@/composable/useUndoToast";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { addStepsAsChecklist, createTasksFromTitles, postTaskComment } from "@/utils/aiApply";
@@ -89,7 +89,7 @@ const props = defineProps({
 const { t } = useI18n();
 const $toast = useToast();
 const { getters } = useStore();
-const { checkPermission, checkApps } = useCustomComposable();
+const { checkPermission } = useCustomComposable();
 const { getUser } = useGetterFunctions();
 const companyId = inject("$companyId");
 const userId = inject("$userId");
@@ -102,7 +102,7 @@ const error = ref("");
 const steps = ref([]);
 const research = ref({ summary: "", sources: [] });
 
-const shown = computed(() => aiUsable.value && Boolean(checkApps("AI", props.project)));
+const shown = computed(() => canUseAi({ project: props.project }));
 const canChecklist = computed(() => checkPermission("task.task_checklist", props.project?.isGlobalPermission) === true);
 const canSubtasks = computed(() => checkPermission("task.sub_task_create", props.project?.isGlobalPermission) === true);
 const chosenSteps = computed(() => steps.value.filter((step) => step.on).map((step) => step.text));

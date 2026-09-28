@@ -23,7 +23,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import pageContent from '@pageContent';
-import { aiUsable } from '@/composable/aiAvailability';
+import { canUseAi } from '@/composable/aiAvailability';
 import AiSelectionPanel from '@/components/molecules/AiSelection/AiSelectionPanel.vue';
 import { createSelectionTools } from '@/components/molecules/AiSelection/selectionTools';
 import { listsOfProject } from '@/utils/aiTargets';
@@ -140,7 +140,7 @@ const selectionTarget = computed(() => {
 });
 
 function selectionTools() {
-    if (props.readOnly || !aiUsable.value) return {};
+    if (props.readOnly || !canUseAi()) return {};
     return createSelectionTools({ t, onPick: (pick) => selectionPanel.value?.open(pick), canSplit: Boolean(selectionTarget.value) });
 }
 

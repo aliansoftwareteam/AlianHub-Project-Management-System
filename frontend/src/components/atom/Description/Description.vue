@@ -264,7 +264,7 @@ const selectionTarget = computed(() => {
 });
 
 function selectionTools() {
-    if (!aiUsable.value || !checkAiProject.value) return {};
+    if (!aiAllowed.value) return {};
     return createSelectionTools({ t, onPick: (pick) => selectionPanel.value?.open(pick), canSplit: Boolean(selectionTarget.value) });
 }
 

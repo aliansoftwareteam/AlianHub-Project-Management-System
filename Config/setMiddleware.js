@@ -241,6 +241,10 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/ai/chat-summary',
     '/api/v1/ai/task-summary',
     '/api/v1/ai/task-category',
+    '/api/v1/ai/task-assist',
+    '/api/v1/ai/task-next-steps',
+    '/api/v1/ai/task-research',
+    '/api/v1/ai/selection',
     // Ask (handoff 13i) — retrieval is scoped to req.uid's own visible projects,
     // so the handler is only correct when this populates req.uid.
     '/api/v1/ai/ask',
