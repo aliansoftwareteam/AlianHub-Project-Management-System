@@ -4,6 +4,7 @@ const { handleEvents } = require('./eventController');
 const transcribe = require('./transcribe');
 const meetingNotes = require('./meetingNotes');
 const askController = require('./ask');
+const { chatSummaryHandler } = require('./chatSummary');
 
 exports.init = (app) => {
     app.post('/api/v1/generatePrompt', ctrl.generatePrompt);
@@ -32,6 +33,7 @@ exports.init = (app) => {
     // Talk to Text — audio → text via OpenAI Whisper (multipart, field "file").
     app.post('/api/v1/ai/transcribe', ...transcribe.transcribe);
     app.post('/api/v1/ai/meeting-notes', meetingNotes.meetingNotesHandler);
+    app.post('/api/v1/ai/chat-summary', chatSummaryHandler);
     app.get('/api/v1/generatePrompt/events/:id', (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');

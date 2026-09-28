@@ -2,7 +2,6 @@ import { computed, ref } from "vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { i18n } from "@/locales/main";
-import { shellState } from "@/components/organisms/Shell/shellState";
 
 // The server clamps autonomy to L3; a fourth rung would promise a level no agent can reach.
 const AUTONOMY = [
@@ -102,7 +101,6 @@ export function autonomyOf(level) {
 }
 
 export function useAgents() {
-    const running = computed(() => Number(runSummary.value.running || 0));
     const waiting = computed(() => Number(counts.value.waiting || 0));
 
     const loadAgents = async () => {
@@ -122,7 +120,6 @@ export function useAgents() {
         const res = await apiRequest("get", `${env.AGENT_RUNS}/summary`);
         if (!ok(res)) return;
         runSummary.value = res.data.data || {};
-        shellState.agentsRunning = Number(runSummary.value.running || 0);
     };
 
     const loadSpend = async () => {
@@ -233,7 +230,7 @@ export function useAgents() {
 
     return {
         agents, proposals, counts, runSummary, spend, registryManifest, skillManifest, loading, lastError,
-        running, waiting, AUTONOMY,
+        waiting, AUTONOMY,
         loadAll, loadAgents, loadProposals, loadSummary, loadSpend, loadRegistry,
         loadSkills, loadCatalogues, loadSkill, createSkill, updateSkill, retireSkill, dryRunSkill,
         decide, setPaused, pauseAll, runNow, saveAgent, deleteAgent, activeRuns, loadActiveRuns, stopActive,

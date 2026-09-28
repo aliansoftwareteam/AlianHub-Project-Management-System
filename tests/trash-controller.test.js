@@ -9,6 +9,7 @@ jest.mock('../Modules/Sprints/controller', () => ({ updateSprintFun: jest.fn(asy
 jest.mock('../Modules/Tasks/helpers/task_class_Mongo', () => ({ taskMongo: { bulkRestore: jest.fn(async () => ({ totals: { updated: 1 } })) } }));
 jest.mock('../Modules/Pages/controller', () => ({ restorePage: jest.fn((req, res) => res.send({ status: true, statusText: 'page' })) }));
 jest.mock('../Modules/Trash/listAccess', () => ({ visibleTrash: jest.fn(async (companyId, uid, kind, docs) => docs) }));
+jest.mock('../Modules/Tasks/helpers/taskWriteFields', () => ({ sessionActor: jest.fn(async (req) => ({ id: String(req.uid), Employee_Name: 'Me' })) }));
 
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { updateProjectInternal } = require('../Modules/Project/controller/updateProject');
@@ -21,9 +22,10 @@ const ctrl = require('../Modules/Trash/controller');
 const COMPANY = '6f00000000000000000000c1';
 const ID = new mongoose.Types.ObjectId();
 const PROJECT = new mongoose.Types.ObjectId();
+const USER = '6f00000000000000000000a1';
 
 const mockRes = () => ({ status: jest.fn().mockReturnThis(), send: jest.fn() });
-const req = (over = {}) => verified({ headers: { companyid: COMPANY }, query: {}, params: {}, body: {}, ...over });
+const req = (over = {}) => verified({ uid: USER, headers: { companyid: COMPANY }, query: {}, params: {}, body: {}, ...over });
 
 beforeEach(() => jest.clearAllMocks());
 
@@ -115,10 +117,10 @@ describe('PUT /api/v2/trash/:kind/:id/restore', () => {
         expect(res.send).toHaveBeenCalledWith(expect.objectContaining({ status: false }));
     });
 
-    test('tasks: goes through bulkRestore', async () => {
+    test('tasks: goes through bulkRestore as the signed-in user', async () => {
         const res = mockRes();
         await ctrl.restore(req({ params: { kind: 'tasks', id: String(ID) }, body: { userData: { id: 'u' } } }), res);
-        expect(taskMongo.bulkRestore).toHaveBeenCalledWith({ companyId: COMPANY, userData: { id: 'u' }, taskIds: [String(ID)] });
+        expect(taskMongo.bulkRestore).toHaveBeenCalledWith({ companyId: COMPANY, userData: { id: USER, Employee_Name: 'Me' }, taskIds: [String(ID)] });
     });
 
     test('docs: hands the request to restorePage', async () => {
