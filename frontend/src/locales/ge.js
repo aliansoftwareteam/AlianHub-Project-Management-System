@@ -2483,6 +2483,26 @@ export default {
         "menu_new_tab": "Open in new tab",
         "menu_open": "Open task"
     },
+    "ViewColumns": {
+        "title": "Columns",
+        "card_fields": "Card fields",
+        "none": "There are no columns to choose from.",
+        "field_badge": "Field",
+        "move_up": "Move {name} up",
+        "move_down": "Move {name} down",
+        "reset": "Reset to default",
+        "col_start": "Start",
+        "col_points": "Points",
+        "col_created": "Created",
+        "col_updated": "Updated",
+        "points_total": "{n} pts",
+        "points_none": "–",
+        "field_none": "None",
+        "field_invalid": "That is not a valid value for {field}.",
+        "estimate_label": "Estimate",
+        "estimate_placeholder": "1h 30m",
+        "estimate_undo_reason": "Undid an estimate change from the task list."
+    },
     "Views": {
         "desktop_only_title": "Open this on a desktop",
         "desktop_only_gantt": "The Gantt chart needs a wider screen. Open the project on a desktop to plan dates and dependencies.",

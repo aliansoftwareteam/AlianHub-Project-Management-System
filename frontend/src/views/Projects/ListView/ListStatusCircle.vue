@@ -1,6 +1,17 @@
 <template>
     <button
-        v-if="editable"
+        v-if="editable && chip"
+        type="button"
+        class="ah-chip ah-status-ink lv2__status-chip"
+        :style="chipStyle"
+        :aria-label="t('List.cell_change', { field: t('List.status'), value: name })"
+        aria-haspopup="dialog"
+        :aria-expanded="open ? 'true' : 'false'"
+        @click.stop="open = true"
+    >{{ name }}</button>
+    <span v-else-if="chip" class="ah-chip ah-status-ink lv2__status-chip" :style="chipStyle">{{ name }}</span>
+    <button
+        v-else-if="editable"
         type="button"
         class="lv2__status"
         :class="{ 'is-done': done }"
@@ -39,13 +50,15 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import Sidebar from "@/components/molecules/Sidebar/Sidebar.vue";
 import { isDoneStatus, statusOptions } from "./listRowEdit";
+import { statusChipStyle } from "@/utils/statusChipColors";
 
 defineOptions({ name: "ListStatusCircle" });
 
 const props = defineProps({
     task: { type: Object, required: true },
     statuses: { type: Array, default: () => [] },
-    editable: { type: Boolean, default: false }
+    editable: { type: Boolean, default: false },
+    chip: { type: Boolean, default: false }
 });
 const emit = defineEmits(["change"]);
 
@@ -56,6 +69,7 @@ const current = computed(() => props.statuses.find((s) => s.key === props.task.s
 const name = computed(() => current.value?.name || props.task.status?.text || "");
 const color = computed(() => current.value?.textColor || "var(--ink-2)");
 const done = computed(() => (current.value ? isDoneStatus(current.value) : props.task.statusType === "close"));
+const chipStyle = computed(() => (current.value?.bgColor ? statusChipStyle(current.value) : {}));
 const options = computed(() => statusOptions(props.statuses, (id) => t(`List.status_group_${id}`)));
 
 function pick(option) {
