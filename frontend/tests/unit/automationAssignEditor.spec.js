@@ -13,6 +13,7 @@ vi.mock('@/components/organisms/TaskDetailOverlay/useTaskOverlay', () => ({ open
 
 import AssignActionEditor from '@/views/Automations/AssignActionEditor.vue';
 import AutomationsPage from '@/views/Automations/AutomationsPage.vue';
+import RunHistoryDrawer from '@/views/Automations/RunHistoryDrawer.vue';
 
 const PRIYA = 'u-priya';
 const SAM = 'u-sam';
@@ -194,7 +195,7 @@ const openPage = async () => {
 };
 
 describe('AutomationsPage with an assign step', () => {
-    beforeEach(() => apiRequest.mockReset());
+    beforeEach(() => { apiRequest.mockReset(); });
 
     it('draws the assign editor in place of plain fields when the step assigns', async () => {
         await openPage();
@@ -238,5 +239,30 @@ describe('AutomationsPage with an assign step', () => {
         const text = wrapper.find('[data-test="backtest-assign"]').text();
         expect(text).toContain('Priya Shah');
         expect(text).toContain('Sam Lee');
+    });
+});
+
+describe('RunHistoryDrawer with an assign step', () => {
+    beforeEach(() => { apiRequest.mockReset(); });
+
+    it('says who a run assigned and who it skipped, and why', async () => {
+        apiRequest.mockResolvedValue({ data: { status: true, data: [{
+            _id: 'run1', status: 'success', eventType: 'task.created', startedAt: new Date().toISOString(),
+            entity: { kind: 'task', id: 't1', key: 'WEB-7' }, envelope: { scope: {}, data: { TaskName: 'Fix login' } },
+            steps: [{ id: 's1', type: 'action', action: 'assign', output: {
+                changed: true,
+                assigned: [{ userId: PRIYA, name: 'Priya Shah' }],
+                skipped: [{ userId: 'form_submitter', name: null, reason: 'no_submitter' }],
+            } }],
+        }] } });
+        wrapper = mount(RunHistoryDrawer, {
+            props: { rule: RULE, triggers: MANIFEST.triggers, actions: MANIFEST.actions },
+            global: { mocks: { $t: echo } },
+        });
+        await flushPromises();
+        const text = wrapper.find('[data-test="run-outcome"]').text();
+        expect(text).toContain('Priya Shah');
+        expect(wrapper.find('[data-test="run-skipped"]').text()).toContain('Automations.assign_form_submitter');
+        expect(wrapper.find('[data-test="run-skipped"]').text()).toContain('Automations.assign_skip_no_submitter');
     });
 });

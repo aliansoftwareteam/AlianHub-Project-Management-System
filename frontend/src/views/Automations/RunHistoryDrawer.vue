@@ -35,6 +35,8 @@
                                 <ul v-if="actionSteps(run).length" class="au-runs__steps">
                                     <li v-for="step in actionSteps(run)" :key="step.id">
                                         {{ actionLabel(step.action) }}<template v-if="step.output && step.output.changed === false"> · {{ $t('Automations.step_no_change') }}</template>
+                                        <template v-if="step.output && step.output.assigned && step.output.assigned.length"> · {{ $t('Automations.assign_assigned', { people: assignPeopleText(step.output.assigned, $t) }) }}</template>
+                                        <template v-if="step.output && step.output.skipped && step.output.skipped.length"> · <span data-test="run-skipped">{{ assignSkippedText(step.output.skipped, $t) }}</span></template>
                                         <span v-if="step.error" class="au-runs__error"> · {{ step.error }}</span>
                                     </li>
                                 </ul>
@@ -55,6 +57,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
+import { assignPeopleText, assignSkippedText } from './assignText';
 
 defineOptions({ name: 'RunHistoryDrawer' });
 
