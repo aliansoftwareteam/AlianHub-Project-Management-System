@@ -273,7 +273,7 @@ module.exports = {
         })
     },
 
-    updateTaskCustomField({companyId,taskId,updateDetail,customFieldId,userData,storedTask}) {
+    updateTaskCustomField({companyId,taskId,updateDetail,customFieldId,userData,storedTask,filledByAi = false}) {
         return new Promise((resolve,reject) => {
             try {
                 const query = {
@@ -292,7 +292,7 @@ module.exports = {
                     socketEmitter.emit('update', { type: "update", data: result , updatedFields: {[`customField.${customFieldId}`]: updateDetail}, module: 'task' });
                     resolve({status: true,data: result, statusText: "Custom Field Update Successfully"});
                     if (result && storedTask && userData) {
-                        recordCustomFieldValue({ companyId, task: storedTask, customFieldId, updateDetail, actor: userData })
+                        recordCustomFieldValue({ companyId, task: storedTask, customFieldId, updateDetail, actor: userData, viaAi: filledByAi })
                             .catch((error) => logger.error(`custom field value history: ${error && error.message}`));
                     }
                 })
