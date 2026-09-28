@@ -372,7 +372,7 @@ onMounted(() => Promise.all([reload(), loadApprovals()]));
 @import "./style.css";
 @import "./workflow.css";
 .ai-back { display: none; }
-.ai-inbox__sort { width: auto; height: 28px; margin-top: 8px; }
+.ah-input.ai-inbox__sort { width: auto; height: 28px; margin-top: 8px; }
 @media (max-width: 900px) { .ai-back { display: inline-flex; margin-bottom: 10px; } }
 .ai-decline { margin-top: 18px; padding: 12px 14px; border: 1px solid var(--hairline); border-radius: 9px; background: var(--surface); display: flex; flex-direction: column; gap: 8px; }
 .ai-decline__lead { margin: 0; }
