@@ -10,7 +10,7 @@ import AiModelNotice from '@/components/molecules/AiUnavailable/AiModelNotice.vu
 import aiRoutes from '@/router/ai';
 
 const STATES = ['unknown', 'on', 'unconfigured', 'off_instance', 'off_workspace'];
-const CONFIG_ONLY = ['AiHome', 'AiAnalytics', 'AiSkills', 'AiAgent', 'AgentTeammates', 'AgentRouting', 'AiHealth', 'AiAccounts', 'WorkflowRun', 'WorkflowLineage', 'WorkflowBuilder', 'Connections'];
+const CONFIG_ONLY = ['AiSkills', 'AiAgent', 'AgentTeammates', 'AgentRouting', 'AiHealth', 'AiAccounts', 'WorkflowRun', 'WorkflowLineage', 'WorkflowBuilder', 'Connections'];
 
 const expected = (route, state) => {
     if (!MODEL_DRIVEN_ROUTES.includes(route)) return null;
@@ -25,7 +25,7 @@ describe('the AI gate, per state and route', () => {
     });
 
     it('classifies every AI-section route as model-driven or configuration', () => {
-        const names = aiRoutes.map((r) => r.name);
+        const names = aiRoutes.filter((r) => !r.redirect).map((r) => r.name);
         expect(names.filter((n) => !MODEL_DRIVEN_ROUTES.includes(n) && !CONFIG_ONLY.includes(n))).toEqual([]);
     });
 
