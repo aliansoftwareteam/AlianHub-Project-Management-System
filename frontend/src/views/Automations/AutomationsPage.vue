@@ -85,11 +85,14 @@
                             <select v-model="s.action" class="au__slot" @change="resetConfig(s)">
                                 <option v-for="a in manifest.actions" :key="a.key" :value="a.key">{{ a.label }}</option>
                             </select>
-                            <template v-for="(spec, field) in schemaOf(s.action)" :key="field">
-                                <select v-if="spec.options" v-model="s.config[field]" class="au__slot" @change="onRuleEdit">
-                                    <option v-for="o in spec.options" :key="o" :value="o">{{ o }}</option>
-                                </select>
-                                <input v-else v-model="s.config[field]" class="au__slot au__slot--text" :placeholder="spec.label" @change="onRuleEdit" />
+                            <AssignActionEditor v-if="s.action === 'assign'" v-model="s.config" :trigger="draft.trigger.event" @change="onRuleEdit" />
+                            <template v-else>
+                                <template v-for="(spec, field) in schemaOf(s.action)" :key="field">
+                                    <select v-if="spec.options" v-model="s.config[field]" class="au__slot" @change="onRuleEdit">
+                                        <option v-for="o in spec.options" :key="o" :value="o">{{ o }}</option>
+                                    </select>
+                                    <input v-else v-model="s.config[field]" class="au__slot au__slot--text" :placeholder="spec.label" @change="onRuleEdit" />
+                                </template>
                             </template>
                             <button type="button" class="au__x" :title="$t('Automations.remove')" @click="draft.steps.splice(i, 1); onRuleEdit()">×</button>
                         </template>
@@ -108,6 +111,12 @@
                         </button>
                     </div>
                     <p v-if="backtest" class="ah-small">{{ backtest.basis }}</p>
+                    <ul v-if="backtest && backtest.assignments && backtest.assignments.length" class="au__plan-reasons" data-test="backtest-assign">
+                        <li v-for="a in backtest.assignments" :key="a.stepId">
+                            {{ $t(a.roundRobin ? 'Automations.assign_backtest_turns' : 'Automations.assign_backtest_people', { people: peopleText(a.people, $t) }) }}
+                            <template v-if="a.skipped.length"> · {{ skippedText(a.skipped, $t) }}</template>
+                        </li>
+                    </ul>
 
                     <div v-if="editingId" class="au__try">
                         <div class="au__slots">
@@ -141,12 +150,17 @@
                                     <span class="ah-chip" :class="step.wouldRun ? 'ah-chip--ok' : ''">
                                         {{ step.wouldRun ? $t('Automations.dry_run_would_run') : $t('Automations.dry_run_would_not_run') }}
                                     </span>
-                                    <dl v-if="step.params && Object.keys(step.params).length" class="au__plan-params">
+                                    <dl v-if="step.params && Object.keys(step.params).length && !step.assign" class="au__plan-params">
                                         <template v-for="(value, key) in step.params" :key="key">
                                             <dt>{{ paramLabel(step.action, key) }}</dt>
                                             <dd>{{ shownParam(value) }}</dd>
                                         </template>
                                     </dl>
+                                    <div v-if="step.assign" class="ah-small au__plan-note" data-test="dry-run-assign">
+                                        <p>{{ step.assign.wouldAssign.length ? $t('Automations.assign_would_assign', { people: peopleText(step.assign.wouldAssign, $t) }) : $t('Automations.assign_would_assign_nobody') }}</p>
+                                        <p v-if="step.assign.wouldRemove && step.assign.wouldRemove.length">{{ $t('Automations.assign_would_remove', { people: peopleText(step.assign.wouldRemove, $t) }) }}</p>
+                                        <p v-if="step.assign.skipped.length">{{ skippedText(step.assign.skipped, $t) }}</p>
+                                    </div>
                                     <p v-if="step.note" class="ah-small au__plan-note">{{ step.note }}</p>
                                 </li>
                             </ol>
@@ -187,7 +201,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, nextTick, onMounted } from 'vue';
+import { ref, reactive, computed, nextTick, onMounted, defineAsyncComponent } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
@@ -195,6 +209,10 @@ import * as env from '@/config/env';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import RunHistoryDrawer from './RunHistoryDrawer.vue';
 import AutomationAiDraft from './AutomationAiDraft.vue';
+import { assignPeopleText, assignSkippedText } from './assignText';
+
+// Loaded on first use: most rules never assign, and the people picker pulls in the shared DropDown.
+const AssignActionEditor = defineAsyncComponent(() => import('./AssignActionEditor.vue'));
 
 // Automations (handoff 13d). You describe the rule in a sentence; the compiled
 // rule sits beside it and either can be edited. The compiler is a deterministic
@@ -285,9 +303,12 @@ const addCondition = () => {
 
 const resetConfig = (step) => {
     step.config = {};
-    Object.entries(schemaOf(step.action)).forEach(([field, spec]) => {
-        step.config[field] = spec.options ? spec.options[0] : '';
-    });
+    if (step.action === 'assign') step.config = { mode: 'add', userIds: [] };
+    else {
+        Object.entries(schemaOf(step.action)).forEach(([field, spec]) => {
+            step.config[field] = spec.options ? spec.options[0] : '';
+        });
+    }
     onRuleEdit();
 };
 
@@ -439,6 +460,8 @@ const runDryRun = async () => {
 };
 
 const paramLabel = (actionKey, key) => schemaOf(actionKey)[key]?.label || key;
+const peopleText = assignPeopleText;
+const skippedText = assignSkippedText;
 const shownParam = (value) => (value !== null && typeof value === 'object' ? JSON.stringify(value) : String(value ?? ''));
 
 const startNew = async () => {

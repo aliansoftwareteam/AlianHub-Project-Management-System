@@ -13,6 +13,7 @@ const sentences = require('./helpers/sentenceRules');
 const access = require('./helpers/ruleAccess');
 const { canEditProject } = require('../AIProjectGenerator/projectAccess');
 const dryRunPlan = require('./helpers/dryRun');
+const assignees = require('./engine/assignees');
 
 const NOT_FOUND = 'Not found.';
 const APPLY_REFUSED = 'You cannot edit every task this automation targets.';
@@ -191,9 +192,9 @@ const V1_APPLY_FIELDS = ['lastRunAt', 'lastRunCount'];
 /* Those two belong to the v1 bulk apply and are dropped here: the schema default
  * would otherwise report "never run, 0 tasks" for a rule the engine has been firing
  * on every matching event. */
-const v2Summary = (r) => {
+const v2Summary = (r, people = []) => {
     const raw = r.toObject ? r.toObject() : r;
-    const summarised = { ...raw, summary: V2.describeV2(raw), sentence: sentences.describeRule(raw) };
+    const summarised = { ...raw, summary: V2.describeV2(raw), sentence: sentences.describeRule(raw, { people }) };
     V1_APPLY_FIELDS.forEach((field) => delete summarised[field]);
     return summarised;
 };
@@ -223,11 +224,12 @@ exports.listRulesV2 = async (req, res) => {
         }, 'aggregate').catch(() => []);
         const byRule = {};
         (fired || []).forEach((f) => { byRule[String(f._id)] = f; });
+        const people = await assignees.peopleNamedIn(rows || []);
         return res.send({
             status: true,
             data: (rows || []).map((r) => {
                 const stats = byRule[String(r._id)] || {};
-                return { ...v2Summary(r), firedCount: Number(stats.runs || 0), failedCount: Number(stats.failures || 0), lastFiredAt: stats.lastAt || null };
+                return { ...v2Summary(r, people), firedCount: Number(stats.runs || 0), failedCount: Number(stats.failures || 0), lastFiredAt: stats.lastAt || null };
             }),
         });
     } catch (e) { logger.error(`listRulesV2: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
@@ -238,7 +240,8 @@ exports.createRuleV2 = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return refuse(res, 400, 'companyId is required.');
-        const check = V2.validateRuleV2(req.body || {});
+        const people = await assignees.peopleNamedIn([req.body || {}]);
+        const check = V2.validateRuleV2(req.body || {}, { people });
         if (!check.valid) return res.send({ status: false, statusText: check.errors[0], errors: check.errors });
         const denied = await access.refuseRuleWrite({ companyId, uid: req.uid, rule: check.value });
         if (denied) return refuse(res, denied.code, denied.statusText);
@@ -253,7 +256,7 @@ exports.createRuleV2 = async (req, res) => {
         };
         const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUTOMATION_RULES, data }, 'save');
         rulesChanged(companyId);
-        return res.send({ status: true, statusText: 'Automation created.', data: v2Summary(saved) });
+        return res.send({ status: true, statusText: 'Automation created.', data: v2Summary(saved, people) });
     } catch (e) { logger.error(`createRuleV2: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
@@ -262,7 +265,8 @@ exports.updateRuleV2 = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return refuse(res, 400, 'companyId is required.');
-        const check = V2.validateRuleV2(req.body || {});
+        const people = await assignees.peopleNamedIn([req.body || {}]);
+        const check = V2.validateRuleV2(req.body || {}, { people });
         if (!check.valid) return res.send({ status: false, statusText: check.errors[0], errors: check.errors });
         const target = await ruleForWrite(req, res, companyId, check.value);
         if (!target) return undefined;
@@ -272,7 +276,7 @@ exports.updateRuleV2 = async (req, res) => {
         }, 'findOneAndUpdate');
         if (!updated) return refuse(res, 404, NOT_FOUND);
         rulesChanged(companyId);
-        return res.send({ status: true, statusText: 'Automation updated.', data: v2Summary(updated) });
+        return res.send({ status: true, statusText: 'Automation updated.', data: v2Summary(updated, people) });
     } catch (e) { logger.error(`updateRuleV2: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
@@ -292,7 +296,7 @@ exports.setRuleEnabled = async (req, res) => {
         }, 'findOneAndUpdate');
         if (!updated) return refuse(res, 404, NOT_FOUND);
         rulesChanged(companyId);
-        return res.send({ status: true, statusText: enabled ? 'Automation on.' : 'Automation off.', data: v2Summary(updated) });
+        return res.send({ status: true, statusText: enabled ? 'Automation on.' : 'Automation off.', data: v2Summary(updated, await assignees.peopleNamedIn([updated])) });
     } catch (e) { logger.error(`setRuleEnabled: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
@@ -321,7 +325,7 @@ const runStep = (step = {}) => {
         action: step.action || undefined,
         error: step.error || undefined,
         durationMs: step.durationMs,
-        output: step.output ? definedOnly({ changed: output.changed, passed: output.passed }) : undefined,
+        output: step.output ? definedOnly({ changed: output.changed, passed: output.passed, assigned: output.assigned, removed: output.removed, skipped: output.skipped }) : undefined,
     });
 };
 
@@ -362,6 +366,19 @@ exports.listRuns = async (req, res) => {
     } catch (e) { logger.error(`listRuns: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
+/* Who each assign step would add or skip on the task, from the turn the rule has reached. Reads only. */
+const previewAssignments = async (companyId, rule, task, plan) => {
+    const action = registry.getAction('assign');
+    for (const entry of plan.actions.filter((a) => a.action === 'assign' && a.params)) {
+        // eslint-disable-next-line no-await-in-loop
+        entry.assign = await action.preview({
+            companyId, task, config: entry.params,
+            context: { stepId: entry.id, eventType: plan.rule.trigger, actor: { kind: 'user', userId: null } },
+            cursor: assignees.storedCursor(rule, entry.id),
+        });
+    }
+};
+
 /* POST /api/v2/automations/:id/dry-run  body: { taskId }
  * What the saved rule would do to one stored task. Gated like an edit, because
  * the answer shows the rule's resolved action params; the task must be one the
@@ -385,29 +402,35 @@ exports.dryRun = async (req, res) => {
         const visible = (await access.visibleProjectIds(companyId, req.uid)).map(String);
         if (!task || !visible.includes(String(task.ProjectID))) return refuse(res, 404, NOT_FOUND);
         const plan = dryRunPlan.plan({ rule, task: task.toObject ? task.toObject() : task, uid: req.uid, triggerLabel: trigger.label });
+        await previewAssignments(companyId, rule, task, plan);
         return res.send({ status: true, statusText: plan.matched ? 'The rule would run.' : 'The rule would not run.', data: plan });
     } catch (e) { logger.error(`dryRun: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
+
+const NAMES_PEOPLE = /\b(?:assign|reassign|unassign|rotate|take turns)\b/i;
 
 /* POST /api/v2/automations/compile  body: { sentence?, rule?, name? }
  * Deterministic, no model call: what the user reads is what the engine will run. */
 exports.compileSentence = async (req, res) => {
     try {
         const { sentence, rule, name } = req.body || {};
+        const companyId = companyOf(req);
         if (rule && !sentence) {
             const check = V2.validateRuleV2({ name: name || 'Automation', ...rule });
+            const people = await assignees.peopleNamedIn([rule]);
             return res.send({
                 status: true,
-                data: { sentence: sentences.describeRule(rule), rule, errors: check.errors, ambiguities: [], grammar: sentences.grammar() },
+                data: { sentence: sentences.describeRule(rule, { people }), rule, errors: check.errors, ambiguities: [], grammar: sentences.grammar() },
             });
         }
         if (!String(sentence || '').trim()) return res.send({ status: false, statusText: 'A sentence is required.' });
-        const parsed = sentences.parseSentence(sentence, { name });
-        const check = parsed.rule ? V2.validateRuleV2(parsed.rule) : { valid: false, errors: [] };
+        const people = companyId && NAMES_PEOPLE.test(String(sentence)) ? await assignees.activePeople(companyId) : [];
+        const parsed = sentences.parseSentence(sentence, { name, people });
+        const check = parsed.rule ? V2.validateRuleV2(parsed.rule, { people }) : { valid: false, errors: [] };
         return res.send({
             status: true,
             data: {
-                sentence: parsed.rule ? sentences.describeRule(parsed.rule) : String(sentence),
+                sentence: parsed.rule ? sentences.describeRule(parsed.rule, { people }) : String(sentence),
                 rule: parsed.rule,
                 errors: parsed.errors.concat(check.errors || []),
                 ambiguities: parsed.ambiguities,
@@ -463,11 +486,18 @@ exports.backtest = async (req, res) => {
             MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [scoped] }, 'countDocuments').catch(() => 0),
             MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [scoped, 'TaskName TaskKey', { limit: 5, sort: { updatedAt: -1 } }] }, 'find').catch(() => []),
         ]);
+        const assignments = [];
+        for (const step of assignees.assignStepsOf(rule)) {
+            // eslint-disable-next-line no-await-in-loop
+            const named = await assignees.describePeople(companyId, step.config || {});
+            assignments.push({ stepId: step.id, mode: (step.config || {}).mode, roundRobin: assignees.rotates(step.config || {}), ...named });
+        }
         return res.send({
             status: true,
             data: {
                 windowDays: WINDOW_DAYS,
                 matched: Number(count) || 0,
+                assignments,
                 sample: (sample || []).map((t) => ({ id: String(t._id), key: t.TaskKey || '', name: t.TaskName || '' })),
                 basis: `tasks touched in the last ${WINDOW_DAYS} days whose current state matches these conditions`,
             },

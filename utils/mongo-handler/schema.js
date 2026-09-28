@@ -1,6 +1,9 @@
 const mongoose = require('mongoose');
 const { objectIdKeys, objectIdIfHex } = require('./objectIdKeys');
 
+/* A Mixed path's required check lets '' through, where the String path it replaced refused it. */
+const notEmpty = { validator: (value) => value !== '', message: 'Path `{PATH}` is required.' };
+
 const schema = {
     tasks: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.
@@ -323,8 +326,10 @@ const schema = {
             required: true,
         },
         ProjectId: {
-            type: String,
+            type: mongoose.Schema.Types.Mixed,
             required: true,
+            validate: notEmpty,
+            set: objectIdIfHex,
         },
         TaskId: {
             type: String,
@@ -876,6 +881,8 @@ const schema = {
         // Opt-in to reacting to automation-authored events. Off by default: this
         // is the switch that stops rule A and rule B triggering each other forever.
         reactToAutomation: { type: Boolean, default: false, required: false },
+        // Round-robin turn per assign step id, advanced atomically by Modules/Automations/engine/assignees.
+        assignCursors: { type: Object, default: {}, required: false },
         enabled: { type: Boolean, default: true, required: false },
         // The v1 on-demand bulk apply only: when it last ran and how many tasks it
         // changed. A v2 rule is fired by events, never applied, so these stay unset
@@ -3525,8 +3532,10 @@ const schema = {
             required: true,
         },
         projectId: {
-            type: String,
+            type: mongoose.Schema.Types.Mixed,
             required: true,
+            validate: notEmpty,
+            set: objectIdIfHex,
         },
         taskId: {
             type: String,
@@ -3545,8 +3554,9 @@ const schema = {
             required: true,
         },
         folderId: {
-            type: String,
+            type: mongoose.Schema.Types.Mixed,
             required: false,
+            set: objectIdIfHex,
         },
         isSelected: {
             type: Boolean,
@@ -3558,8 +3568,9 @@ const schema = {
             default: []
         },
         sprintId: {
-            type: String,
+            type: mongoose.Schema.Types.Mixed,
             required: false,
+            set: objectIdIfHex,
         },
         companyId: {
             type: String,
@@ -3763,8 +3774,9 @@ const schema = {
             required: true
         },
         folderId: {
-            type: String,
-            required: false
+            type: mongoose.Schema.Types.Mixed,
+            required: false,
+            set: objectIdIfHex,
         },
         mentionIds: {
             type: Array,
@@ -3775,12 +3787,15 @@ const schema = {
             required: false
         },
         projectId: {
-            type: String,
-            required: true
+            type: mongoose.Schema.Types.Mixed,
+            required: true,
+            validate: notEmpty,
+            set: objectIdIfHex,
         },
         sprintId: {
-            type: String,
-            required: false
+            type: mongoose.Schema.Types.Mixed,
+            required: false,
+            set: objectIdIfHex,
         },
         taskId: {
             type: String,

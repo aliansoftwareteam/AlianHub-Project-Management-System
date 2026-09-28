@@ -48,7 +48,40 @@ const ACTION_PATTERNS = [
     { re: /^post a comment saying\s+(.+)$/i, build: (m) => ({ action: 'add_comment', config: { body: unquote(m[1]) } }) },
     { re: /^create a subtask called\s+(.+)$/i, build: (m) => ({ action: 'create_subtask', config: { title: unquote(m[1]) } }) },
     { re: /^run the\s+([a-z0-9.-]+)\s+agent(?:\s+as\s+(.+))?$/i, build: (m) => ({ action: 'run_agent', config: m[2] ? { skill: m[1], agent: unquote(m[2]) } : { skill: m[1] } }) },
+    { re: /^(?:unassign (?:everyone|everybody)|clear the assignees)$/i, build: () => assignStep('clear') },
+    { re: /^reassign in turn to\s+(.+)$/i, build: (m) => assignStep('replace', m[1], true) },
+    { re: /^reassign to\s+(.+)$/i, build: (m) => assignStep('replace', m[1]) },
+    { re: /^unassign\s+(.+)$/i, build: (m) => assignStep('remove', m[1]) },
+    { re: /^(?:rotate|take turns) (?:between|among)\s+(.+)$/i, build: (m) => assignStep('add', m[1], true) },
+    { re: /^assign in turn to\s+(.+)$/i, build: (m) => assignStep('add', m[1], true) },
+    { re: /^assign (?:it |the task )?to\s+(.+)$/i, build: (m) => assignStep('add', m[1]) },
 ];
+
+/* An assign step names people, which the parser only holds as words until resolvePeople turns them into ids. */
+function assignStep(mode, who, roundRobin = false) {
+    return { action: 'assign', config: { mode, userIds: [], ...(roundRobin ? { roundRobin: true } : {}) }, names: who ? [who] : [] };
+}
+
+const ROLE_PHRASES = [
+    { role: 'task_creator', phrase: 'the task creator', re: /^(?:the )?(?:task )?creator$/i },
+    { role: 'form_submitter', phrase: 'the form submitter', re: /^(?:the )?(?:form )?submitter$/i },
+];
+
+const folded = (s) => unquote(s).replace(/\s+/g, ' ').toLowerCase();
+
+/* A full name, or a first name only one person has. Anything else is an error naming the choices. */
+const resolvePerson = (raw, people) => {
+    const wanted = folded(raw);
+    const role = ROLE_PHRASES.find((r) => r.re.test(wanted));
+    if (role) return { id: role.role };
+    const exact = people.filter((p) => folded(p.name) === wanted);
+    const matches = exact.length ? exact : people.filter((p) => folded(p.name).split(' ')[0] === wanted);
+    if (matches.length === 1) return { id: String(matches[0].id) };
+    if (matches.length > 1) return { error: `"${unquote(raw)}" could be ${joinWords(matches.map((p) => p.name), 'or')} — use the full name.` };
+    return { error: `I do not know anyone called "${unquote(raw)}" in this workspace.` };
+};
+
+const joinWords = (words, last = 'and') => (words.length < 2 ? words.join('') : `${words.slice(0, -1).join(', ')} ${last} ${words[words.length - 1]}`);
 
 const trim = (s) => String(s == null ? '' : s).trim();
 const unquote = (s) => trim(s).replace(/^["“”'‘’]+/, '').replace(/["“”'‘’]+$/, '').trim();
@@ -130,8 +163,9 @@ const sections = (sentence) => {
 };
 
 /* sentence → v2 rule. Returns every problem it found rather than the first, so
- * the builder can underline each slot it could not read. */
-const parseSentence = (sentence, { name } = {}) => {
+ * the builder can underline each slot it could not read. `people` ({ id, name }) are
+ * the members a name may resolve to; the caller supplies them, so this stays pure. */
+const parseSentence = (sentence, { name, people = [] } = {}) => {
     const errors = [];
     const ambiguities = [];
     const parts = sections(sentence);
@@ -182,13 +216,26 @@ const parseSentence = (sentence, { name } = {}) => {
     const steps = [];
     const actionTexts = splitClauses(parts.actionText);
     if (!actionTexts.length) errors.push('The rule does not say what to do.');
-    actionTexts.forEach((raw, i) => {
+    let naming = null;
+    actionTexts.forEach((raw) => {
         const text = phrase(raw).replace(/^then\s+/i, '');
         const pattern = ACTION_PATTERNS.find((p) => p.re.test(text));
+        // "assign to Priya and Sam": the clause after "and" is another name, not another action.
+        if (!pattern && naming) { naming.names.push(text); return; }
         if (!pattern) { errors.push(`I do not know the action "${trim(raw)}".`); return; }
         const built = pattern.build(pattern.re.exec(text));
         if (!registry.getAction(built.action)) { errors.push(`This workspace has no "${built.action}" action.`); return; }
-        steps.push({ id: `s${i + 1}`, type: 'action', ...built });
+        const step = { id: `s${steps.length + 1}`, type: 'action', ...built };
+        naming = built.names && built.names.length ? step : null;
+        steps.push(step);
+    });
+    steps.filter((step) => step.names).forEach((step) => {
+        step.names.forEach((who) => {
+            const found = resolvePerson(who, people);
+            if (found.error) errors.push(found.error);
+            else if (!step.config.userIds.includes(found.id)) step.config.userIds.push(found.id);
+        });
+        delete step.names;
     });
 
     if (errors.length) return { ok: false, errors, ambiguities, rule: null };
@@ -226,9 +273,32 @@ const conditionSentence = (node) => {
     }
 };
 
-const actionSentence = (step) => {
+const ROLE_BY_ID = Object.fromEntries(ROLE_PHRASES.map((r) => [r.role, r.phrase]));
+
+/* Names for the people an assign step holds. Without a name for someone the sentence still reads, as a count. */
+const peopleSentence = (ids, people) => {
+    const byId = new Map(people.map((p) => [String(p.id), p.name]));
+    const named = ids.map((id) => ROLE_BY_ID[id] || byId.get(String(id))).filter(Boolean);
+    const unnamed = ids.length - named.length;
+    if (unnamed) named.push(named.length ? `${unnamed} other ${unnamed === 1 ? 'person' : 'people'}` : `${unnamed} ${unnamed === 1 ? 'person' : 'people'}`);
+    return joinWords(named);
+};
+
+const assignSentence = (config, people) => {
+    const who = peopleSentence(Array.isArray(config.userIds) ? config.userIds.map(String) : [], people);
+    const turns = config.roundRobin === true;
+    switch (config.mode) {
+        case 'clear': return 'unassign everyone';
+        case 'remove': return `unassign ${who}`;
+        case 'replace': return turns ? `reassign in turn to ${who}` : `reassign to ${who}`;
+        default: return turns ? `rotate between ${who}` : `assign to ${who}`;
+    }
+};
+
+const actionSentence = (step, people = []) => {
     const config = step.config || {};
     switch (step.action) {
+        case 'assign': return assignSentence(config, people);
         case 'set_status': return `set the status to ${config.status}`;
         case 'set_priority': return `set the priority to ${config.priority}`;
         case 'add_comment': return `post a comment saying "${config.body}"`;
@@ -240,7 +310,7 @@ const actionSentence = (step) => {
 
 /* rule → sentence. The output is always in the canonical form parseSentence
  * accepts, so sentence → rule → sentence is a fixed point. */
-const describeRule = (rule = {}) => {
+const describeRule = (rule = {}, { people = [] } = {}) => {
     const nodes = unfoldConditions(rule.conditions);
     const changeNode = nodes.find((n) => n && n.op === 'changedTo' && CHANGE_FIELD_PHRASE[n.field]);
     const rest = nodes.filter((n) => n !== changeNode);
@@ -249,7 +319,7 @@ const describeRule = (rule = {}) => {
     if (changeNode) when = `${CHANGE_FIELD_PHRASE[changeNode.field]} ${changeNode.value}`;
 
     const conditionText = rest.map(conditionSentence).filter(Boolean).join(' and ');
-    const actionText = (rule.steps || []).filter((s) => s.type === 'action').map(actionSentence).filter(Boolean).join(' and ');
+    const actionText = (rule.steps || []).filter((s) => s.type === 'action').map((step) => actionSentence(step, people)).filter(Boolean).join(' and ');
     const head = conditionText ? `When ${when}, if ${conditionText},` : `When ${when},`;
     return `${head} ${actionText || 'do nothing'}.`;
 };
@@ -269,6 +339,9 @@ const grammar = () => ({
         'set the status to <status>', 'set the priority to <priority>',
         'post a comment saying "<text>"', 'create a subtask called "<text>"',
         'run the <skill> agent as "<agent name>"',
+        'assign to <person> and <person>', 'assign to the task creator', 'assign to the form submitter',
+        'rotate between <person> and <person>', 'reassign to <person>', 'reassign in turn to <person> and <person>',
+        'unassign <person>', 'unassign everyone',
     ],
     shape: 'When <event>, if <condition> and <condition>, <action> and <action>.',
 });

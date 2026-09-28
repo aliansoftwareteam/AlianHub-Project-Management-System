@@ -11,7 +11,7 @@ let owner;
 let member;
 
 const db = () => client.db(state.companyId);
-const historyOf = (name) => db().collection('history').find({ ProjectId: String(PROJECT._id), Message: { $regex: name } }).toArray();
+const historyOf = (name) => db().collection('history').find({ ProjectId: new ObjectId(String(PROJECT._id)), Message: { $regex: name } }).toArray();
 
 const addBody = (session, overrides = {}) => {
     const milestoneName = `Milestone ${uniqueSuffix()}`;
