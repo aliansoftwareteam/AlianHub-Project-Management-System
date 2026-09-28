@@ -31,8 +31,6 @@
     "frontend/src/components/molecules/TaskDetailAction/TaskDetailAction.vue": 2,
     "frontend/src/components/molecules/TaskFilter/FieldsActions.vue": 2,
     "frontend/src/components/molecules/TaskFilter/TaskFilter.vue": 1,
-    "frontend/src/components/organisms/Header/Header.vue": 4,
-    "frontend/src/components/organisms/NavLinks/NavLinks.vue": 1,
     "frontend/src/plugins/customFieldView/component/atom/customFieldSidebar/customFieldSidebarComponent/checkboxCustomFields.vue": 1,
     "frontend/src/plugins/customFieldView/component/atom/customFieldSidebar/customFieldSidebarComponent/dateComponent.vue": 1,
     "frontend/src/plugins/customFieldView/component/atom/customFieldSidebar/customFieldSidebarComponent/dropdownCustomField/dropdownCustomField.vue": 1,
