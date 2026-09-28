@@ -292,7 +292,7 @@ describe('build from an answer', () => {
     });
 
     it('previews a checklist and creates only the ticked items, with Undo', async () => {
-        const created = [{ taskId: 'n1', title: 'Draft the budget' }, { taskId: 'n3', title: 'Send the invites' }];
+        const created = [{ index: 0, taskId: 'n1', title: 'Draft the budget' }, { index: 1, taskId: 'n3', title: 'Send the invites' }];
         serve((kind, url) => {
             if (kind === 'post' && url === env.AI_ASK_CREATE_TASKS) return Promise.resolve({ data: { status: true, data: { created, failed: [] } } });
             if (kind === 'post' && url === env.V2_TASKS_BULK) return Promise.resolve({ data: { status: true } });
@@ -332,7 +332,7 @@ describe('build from an answer', () => {
     it('keeps the rows that failed in the preview with the reason', async () => {
         serve((kind, url) => {
             if (kind === 'post' && url === env.AI_ASK_CREATE_TASKS) {
-                return Promise.resolve({ data: { status: true, data: { created: [{ taskId: 'n1', title: 'Draft the budget' }], failed: [{ index: 1, code: 'assignee_not_allowed' }] } } });
+                return Promise.resolve({ data: { status: true, data: { created: [{ index: 0, taskId: 'n1', title: 'Draft the budget' }], failed: [{ index: 1, code: 'assignee_not_allowed' }] } } });
             }
             return undefined;
         });

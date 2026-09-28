@@ -8,6 +8,7 @@ const {
     gather, promptFor, tokenProjectIdsOf, SYSTEM, RESEARCH_SYSTEM, MAX_PER_TYPE, ASK_TOKENS, RESEARCH_TOKENS,
 } = require('./ask');
 const threads = require('./askThreads');
+const askContext = require('./askContext');
 
 const FOLLOW_UP = `
 - Earlier turns of this conversation come before the QUESTION. Use them to understand what the
@@ -38,7 +39,7 @@ const openStream = (req, res) => {
     return stream;
 };
 
-/* POST /api/v1/ai/ask/stream  body: { question, mode?, projectId?, threadId? }
+/* POST /api/v1/ai/ask/stream  body: { question, mode?, projectId?, threadId?, context?: [{ kind, id }], skill? }
  * Refusals and answers that need no model come back as JSON, as /ask sends them. A model answer comes
  * as server-sent events: `token` pieces, then one `done` with the citations, model and turn, or one
  * `error`. A turn is stored only when the answer finished and the asker was still there. */
@@ -47,7 +48,7 @@ const askStream = async (req, res) => {
         const caller = threads.callerOf(req, res);
         if (!caller) return undefined;
         const { companyId, uid } = caller;
-        const { question, mode, projectId, threadId } = req.body || {};
+        const { question, mode, projectId, threadId, context } = req.body || {};
         const asked = String(question || '').trim();
         if (!asked) return res.send({ status: false, statusText: 'Ask a question first.', code: 'question_required' });
 
@@ -61,7 +62,7 @@ const askStream = async (req, res) => {
         const modeName = research ? 'research' : 'ask';
         const gatherFor = (text) => gather(companyId, uid, {
             question: text,
-            projectId,
+            projectId: projectId || askContext.pinnedProjectId(context),
             limit: research ? MAX_PER_TYPE * 2 : MAX_PER_TYPE,
             tokenProjectIds: tokenProjectIdsOf(req),
         });
@@ -70,6 +71,8 @@ const askStream = async (req, res) => {
         const previous = threads.lastQuestionOf(thread);
         let gathered = await gatherFor(asked);
         if (!gathered.sources.length && previous) gathered = await gatherFor(`${asked} ${previous}`);
+        const explicit = await askContext.pin(companyId, uid, gathered, req.body || {});
+        gathered = explicit.gathered;
         const roleType = await getRoleType(companyId, uid).catch(() => null);
         const scope = { projects: gathered.projects.length, privileged: isPrivileged(roleType) };
         const threadIdOut = thread ? String(thread._id) : '';
@@ -86,7 +89,7 @@ const askStream = async (req, res) => {
         let streamed = false;
         try {
             const result = await getProvider().chat({
-                systemPrompt: `${research ? RESEARCH_SYSTEM : SYSTEM}${thread ? FOLLOW_UP : ''}`,
+                systemPrompt: `${research ? RESEARCH_SYSTEM : SYSTEM}${thread ? FOLLOW_UP : ''}${explicit.system}`,
                 messages: [...threads.historyOf(thread), { role: 'user', content: promptFor(asked, gathered.sources, gathered.intent) }],
                 maxTokens: research ? RESEARCH_TOKENS : ASK_TOKENS,
                 temperature: 0.2,
