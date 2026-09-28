@@ -1194,6 +1194,7 @@ export default {
         skip_to_content: "Skip to content",
         palette_esc: "ESC",
         primary_nav: "Primary",
+        inbox_unread: "Inbox, {n} unread",
     },
     Docs: {
         docs: "Docs",
@@ -3965,6 +3966,8 @@ export default {
         live: "LIVE",
         live_on: "is on {what}",
         live_running: "is running",
+        live_agents: "{n} agent working | {n} agents working",
+        live_mixed: "{n} working now",
         pause_all: "Pause all agents",
         toast_finished: "{agent} finished",
         now: "now",
@@ -4237,6 +4240,9 @@ export default {
         no_activity_log_found: "No activity log found",
     },
     Projects: {
+        filters: "Filters",
+        filters_active: "Filters, {n} active",
+        filters_close: "Close filters",
         actions_for_item: "Actions for {name}",
         status_actions: "Status actions",
         select_source: "Select Source",

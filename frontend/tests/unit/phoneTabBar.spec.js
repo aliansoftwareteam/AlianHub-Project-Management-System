@@ -37,7 +37,7 @@ const mountTabBar = async (counts = {}) => {
     return wrapper;
 };
 
-const tabLabels = () => wrapper.findAll('.ah-tabbar > .ah-tabbar__item').map((el) => el.find('span').text());
+const tabLabels = () => wrapper.findAll('.ah-tabbar > .ah-tabbar__item').map((el) => el.text().trim());
 
 afterEach(() => wrapper?.unmount());
 
@@ -53,17 +53,17 @@ describe('the phone tab bar', () => {
     it('shows the unread count on the Inbox tab, capped at 99+', async () => {
         await mountTabBar({ notification_counts: 3, mention_counts: 2 });
         const inbox = wrapper.find('[data-test="tab-inbox"]');
-        expect(inbox.find('.ah-tabbar__badge').text()).toBe('5');
+        expect(inbox.find('.ah-unread-badge').text()).toBe('5');
         expect(inbox.attributes('aria-label')).toBe('Shell.inbox_unread');
         wrapper.unmount();
 
         await mountTabBar({ notification_counts: 120, mention_counts: 0 });
-        expect(wrapper.find('[data-test="tab-inbox"] .ah-tabbar__badge').text()).toBe('99+');
+        expect(wrapper.find('[data-test="tab-inbox"] .ah-unread-badge').text()).toBe('99+');
     });
 
     it('shows no badge when nothing is unread', async () => {
         await mountTabBar({ notification_counts: 0, mention_counts: -1 });
-        expect(wrapper.find('[data-test="tab-inbox"] .ah-tabbar__badge').exists()).toBe(false);
+        expect(wrapper.find('[data-test="tab-inbox"] .ah-unread-badge').exists()).toBe(false);
         expect(wrapper.find('[data-test="tab-inbox"]').attributes('aria-label')).toBeUndefined();
     });
 
