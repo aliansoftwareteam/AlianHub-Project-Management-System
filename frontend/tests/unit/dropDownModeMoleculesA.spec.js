@@ -20,7 +20,6 @@ import ProjectSourceSelect from '@/components/molecules/ProjectSourceSelect/Proj
 import PhoneCountry from '@/components/molecules/CountryPhoneNumberDropdown/PhoneCountry.vue';
 import SettingMilestoneStatus from '@/components/molecules/Setting/SettingMilestoneStatus.vue';
 import SettingMilestoneWeeklyRange from '@/components/molecules/Setting/SettingMilestoneWeeklyRange.vue';
-import allCountries from '@/components/molecules/CountryPhoneNumberDropdown/allCountry.js';
 
 const settle = async (ms = 20) => {
     await new Promise((resolve) => setTimeout(resolve, ms));
