@@ -113,7 +113,9 @@ describe('MCP_TOOLS_V2 over a real database', () => {
         expect(comments).toHaveLength(0);
 
         const filed = await proposals.get(COMPANY, out.proposalId);
-        expect(filed).toMatchObject({ status: 'pending', source: 'mcp', requestedBy: String(OWNER), tokenId: TOKEN, taskId: taskIds[0], projectId: String(PROJECT) });
+        expect(filed).toMatchObject({ status: 'pending', source: 'mcp', requestedBy: String(OWNER), tokenId: TOKEN, taskId: taskIds[0] });
+        expect(filed.projectId._bsontype).toBe('ObjectId');
+        expect(String(filed.projectId)).toBe(String(PROJECT));
         expect(filed.changes).toEqual([expect.objectContaining({ action: 'task.comment', params: { taskId: taskIds[0], body: 'Retire this task' } })]);
         const inbox = await proposals.list(COMPANY, { status: 'pending', projectIds: [String(PROJECT)] });
         expect(inbox.proposals.map((p) => String(p._id))).toContain(out.proposalId);

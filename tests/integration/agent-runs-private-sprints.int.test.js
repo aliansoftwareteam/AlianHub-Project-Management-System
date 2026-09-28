@@ -1,4 +1,4 @@
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 const { resolveMongoUrl } = require('../../e2e/support/env');
 const { createProject, createTask, firstSprint, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
 
@@ -53,7 +53,7 @@ async function seed(agent, { task, projectId }, { startedAt }) {
     try {
         await client.connect();
         const db = client.db(state.companyId);
-        const common = { agentId: String(agent._id), agentName: agent.name, taskId: task ? String(task._id) : null, projectId: String(task ? task.projectId : projectId) };
+        const common = { agentId: String(agent._id), agentName: agent.name, taskId: task ? String(task._id) : null, projectId: new ObjectId(String(task ? task.projectId : projectId)) };
         const run = await db.collection('agent_runs').insertOne({
             ...common, status: 'waiting_approval', trigger: 'manual', startedBy: state.users.owner.userId, startedAt, createdAt: startedAt, updatedAt: startedAt, steps: [],
         });
