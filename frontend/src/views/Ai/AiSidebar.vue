@@ -1,4 +1,5 @@
 <template>
+    <AiMobileNav :primary="everyday" :extra="setup" />
     <aside class="ai-side">
         <div class="ai-side__head">
             <ShellIcon name="ai" :size="16" />
@@ -55,6 +56,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import AiMobileNav from "./AiMobileNav.vue";
 import { useAgents } from "./useAgents";
 import { useAgentAccess } from "./agentAccess";
 import { useLiveAgents } from "./useLiveAgents";

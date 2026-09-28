@@ -81,6 +81,12 @@ export const CARD_CATALOG = [
         emptyKey: 'Dash.empty_free_capacity',
         emptyActionKey: 'Dash.action_open_capacity',
     }),
+    card('AtRiskTodayCard', 'team', true, {
+        size: { w: 6, h: 10, minW: 4, maxW: 12, minH: 7, maxH: 22 },
+        link: { name: 'Projects', labelKey: 'Dash.link_projects' },
+        emptyKey: 'Dash.empty_at_risk',
+        emptyActionKey: 'Dash.action_open_projects',
+    }),
     card('LiveWorkTableCard', 'team', false),
     card('OnLeaveCard', 'team', false),
     card('TeamCategoryBreakdownCard', 'team', false),
@@ -100,8 +106,12 @@ export const CARD_CATALOG = [
     card('MilestoneReportCard', 'charts', false),
     card('TasksByAssigneeCard', 'charts', false),
 
-    card('AtRiskTodayCard', 'ai', false),
-    card('AgentSpendCard', 'ai', false),
+    card('AgentSpendCard', 'ai', true, {
+        size: { w: 6, h: 9, minW: 4, maxW: 12, minH: 6, maxH: 22 },
+        link: { name: 'AiHub', labelKey: 'Dash.link_agents' },
+        emptyKey: 'Dash.empty_agent_spend',
+        emptyActionKey: 'Dash.action_open_agents',
+    }),
     card('AskAQuestionCard', 'ai', false),
 ];
 
