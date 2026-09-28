@@ -11,8 +11,13 @@ import { showUndoToast } from "@/composable/useUndoToast";
 import { taskDueDateAdd, taskDueDateChange } from "@/utils/NotificationTemplate";
 import { permittedAssignees, sprintOf } from "@/utils/assigneeOptions";
 import {
-    assigneeInverse, dueChange, dueRestore, dueSnapshot, nextAssignees, priorityAppOn, projectHasApp, rowEditRights
+    assigneeInverse, dueChange, dueRestore, dueSnapshot, fieldEditRights, nextAssignees, priorityAppOn, projectHasApp, rowEditRights
 } from "./listRowEdit";
+import { taskPoints } from "@/views/Projects/composables/taskPoints";
+import {
+    COMPUTED_TYPES, customFieldPayload, emptyFieldDetail, projectFieldDefs, storedEntry, useProjectCustomFields
+} from "@/views/Projects/composables/projectCustomFields";
+import { recomputeCustomFields } from "@/plugins/customFieldView/formulaEngine.js";
 
 const ASSIGNEE_OPERATION = { add: "assigneeAdd", remove: "assigneRemove", replace: "replace" };
 const TOAST = { position: "top-right" };
@@ -26,6 +31,7 @@ export function useListInlineEdit(projectRef) {
     const { getUser } = useGetterFunctions();
     const { getWasabiImageLink } = useCustomComposable();
     const userId = inject("$userId", ref(""));
+    const companyId = inject("$companyId", ref(""));
     const dateFormat = inject("$dateFormat", ref("DD/MM/YYYY"));
     const searched = inject("searchedTask", ref(false));
     const refreshSearch = inject("refreshTaskSearch", null);
@@ -57,6 +63,16 @@ export function useListInlineEdit(projectRef) {
         commit("projectData/mutateUpdateFirebaseTasks", {
             snap: null, op: "modified", pid: String(task.ProjectID), sprintId: String(task.sprintId), data: { ...task, ...fields }, updatedFields: fields
         });
+        reflectTable(task, fields);
+    }
+
+    /* taskClass only writes the List's copy and the actor's socket gets no echo, so a
+     * Table row would keep the old value until a reload. */
+    function reflectTable(task, fields) {
+        const pid = String(task.ProjectID || project()._id || "");
+        const sprintId = String(task.sprintId || "");
+        const stored = getters["projectData/tableTasks"]?.[pid]?.[sprintId]?.tasks?.find((x) => String(x._id) === String(task._id));
+        if (stored) commit("projectData/mutateTypesenseTableTasks", { pid, sprintId, data: { ...stored, ...fields } });
     }
 
     /* A change can move the row into another group or out of the filter; focus then goes to
@@ -78,6 +94,7 @@ export function useListInlineEdit(projectRef) {
     }
 
     function settle(promise, { task, fields, before, undoing, message, undo, failure }) {
+        reflectTable(task, fields);
         return promise.then(() => {
             reflectSearch(task, fields);
             if (undoing) $toast.success(t("TaskPanel.change_undone"), TOAST);
@@ -238,7 +255,92 @@ export function useListInlineEdit(projectRef) {
         });
     }
 
-    return { setStatus, setAssignee, setDue, setPriority, rename };
+    function setPoints(task, value, { row = null, undoing = false } = {}) {
+        const next = value === null || value === undefined || value === "" ? null : Number(value);
+        const previous = taskPoints(task);
+        if (next === previous || (next !== null && !Number.isFinite(next))) return Promise.resolve();
+        const fields = { points: next };
+        const promise = taskClass.updatePoints({
+            firebaseObj: fields,
+            projectData: { _id: project()._id || "", ProjectName: project().ProjectName, CompanyId: project().CompanyId },
+            taskData: { ...task },
+            userData: actor()
+        });
+        keepFocus(row);
+        return settle(promise, {
+            task, fields, before: { points: previous }, undoing,
+            message: t("TaskPanel.story_points_updated"),
+            undo: () => setPoints({ ...task, ...fields }, previous, { undoing: true }),
+            failure: "TaskPanel.story_points_not_updated"
+        });
+    }
+
+    function setEstimate(task, minutes, { row = null, undoing = false, reason = "" } = {}) {
+        const previous = Number(task.totalEstimatedTime) || 0;
+        const next = Math.max(0, Math.round(Number(minutes) || 0));
+        if (next === previous) return Promise.resolve();
+        const user = actor();
+        const fields = { totalEstimatedTime: next };
+        const promise = taskClass.updateTotalEstimatedTime({
+            firebaseObj: fields,
+            projectData: projectSlice(),
+            taskData: { ...task },
+            obj: { previousEstimatedTime: task.totalEstimatedTime, userName: user.Employee_Name, ...(reason ? { reason } : {}) },
+            userData: user
+        });
+        keepFocus(row);
+        return settle(promise, {
+            task, fields, before: { totalEstimatedTime: task.totalEstimatedTime || 0 }, undoing,
+            message: t("Toast.Task_total_estimate_update_succesfull"),
+            undo: () => setEstimate({ ...task, ...fields }, previous, { undoing: true, reason: t("ViewColumns.estimate_undo_reason") }),
+            failure: "Toast.something_went_wrong"
+        });
+    }
+
+    const hasComputedFields = () => projectFieldDefs(getters["settings/finalCustomFields"], project()._id)
+        .some((def) => COMPUTED_TYPES.includes(def.fieldType));
+
+    function writeField(task, def, detail, { row = null, undoing = false } = {}) {
+        const previous = storedEntry(task, def);
+        const fields = { customField: { ...(task.customField || {}), [def._id]: detail } };
+        const promise = taskClass.updateTaskCustomField({
+            companyId: companyId.value || project().CompanyId,
+            taskId: task._id,
+            customFieldId: def._id,
+            updateDetail: detail,
+            taskObj: { ...task }
+        }).then((response) => {
+            if (!response?.status) throw new Error("custom field not saved");
+            if (hasComputedFields()) recomputeCustomFields({ taskIds: [task._id], projectId: project()._id || "" });
+        });
+        keepFocus(row);
+        return settle(promise, {
+            task, fields, before: { customField: { ...(task.customField || {}) } }, undoing,
+            message: t("Toast.Custom_field_updated_successfully"),
+            undo: () => writeField({ ...task, ...fields }, def, previous ? { ...previous } : emptyFieldDetail(def), { undoing: true }),
+            failure: "Toast.something_went_wrong"
+        });
+    }
+
+    /* Converts the input as the task panel's submitHandler does, phone dial code included. */
+    function setCustomField(task, def, input, options = {}) {
+        const payload = customFieldPayload(def, input);
+        if (payload.invalid) {
+            $toast.error(t("ViewColumns.field_invalid", { field: def.fieldTitle || "" }), TOAST);
+            return Promise.resolve(false);
+        }
+        const previous = storedEntry(task, def);
+        if (JSON.stringify(previous?.fieldValue ?? emptyFieldDetail(def).fieldValue) === JSON.stringify(payload.fieldValue)) return Promise.resolve(true);
+        const detail = { ...payload };
+        if (def.fieldType === "phone") {
+            detail.fieldCode = previous?.fieldCode || def.fieldCountryCode || "";
+            detail.fieldPattern = previous?.fieldPattern || def.fieldCountryObject?.maskWithDialCode || "";
+            detail.fieldFlag = previous?.fieldFlag || def.fieldCountryObject?.code || "";
+        }
+        return writeField(task, def, detail, options).then(() => true);
+    }
+
+    return { setStatus, setAssignee, setDue, setPriority, rename, setPoints, setEstimate, setCustomField };
 }
 
 /* Everything a row needs to edit itself, built once per List and handed down by provide. */
@@ -254,7 +356,11 @@ export function useListRowEdit(projectRef, showArchived) {
     const project = computed(() => unref(projectRef) || {});
     const check = (path) => checkPermission(path, project.value?.isGlobalPermission);
 
-    const rights = computed(() => rowEditRights(check, { archived: Boolean(unref(showArchived)) }));
+    const fields = useProjectCustomFields(project, { archived: showArchived });
+    const rights = computed(() => {
+        const archived = Boolean(unref(showArchived));
+        return { ...rowEditRights(check, { archived }), ...fieldEditRights(check, { archived, customFields: fields.canEdit.value }) };
+    });
     const showPriority = computed(() => priorityAppOn(project.value, getters["settings/selectedCompany"]?.planFeature)
         && check("task.task_priority") !== null);
     const statuses = computed(() => project.value?.taskStatusData || []);
@@ -289,6 +395,7 @@ export function useListRowEdit(projectRef, showArchived) {
 
     return {
         ...edits,
+        fields,
         rights,
         showPriority,
         statuses,

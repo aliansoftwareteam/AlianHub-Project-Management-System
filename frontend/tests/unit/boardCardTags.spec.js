@@ -57,9 +57,9 @@ const store = createStore({
 });
 const ButtonOnlyDropDown = { name: 'DropDown', template: '<div><slot name="button" /></div>' };
 
-const mountCard = ({ tagsArray = [], archived = false } = {}) => mount(BoardCard, {
+const mountCard = ({ tagsArray = [], archived = false, points = null, cardFields = [] } = {}) => mount(BoardCard, {
     props: {
-        data: { _id: 't1', TaskName: 'Tag the release notes', AssigneeUserId: [], Task_Priority: 'HIGH', deletedStatusKey: 0, sprintId: 's1', tagsArray },
+        data: { _id: 't1', TaskName: 'Tag the release notes', AssigneeUserId: [], Task_Priority: 'HIGH', deletedStatusKey: 0, sprintId: 's1', tagsArray, points },
         groupValue: 0,
         isSubTask: false
     },
@@ -70,7 +70,8 @@ const mountCard = ({ tagsArray = [], archived = false } = {}) => mount(BoardCard
             toggleTaskDetail: vi.fn(),
             selectedProject: ref({ _id: 'p1', isGlobalPermission: true, viewColumn: [], tagsArray: PROJECT_TAGS }),
             searchedTask: ref(false),
-            taskCollapsed: ref(true)
+            taskCollapsed: ref(true),
+            boardCardFields: ref(cardFields)
         },
         stubs: {
             DropDown: ButtonOnlyDropDown,
@@ -174,5 +175,17 @@ describe('board card tags', () => {
         expect(tagRow(wrapper).exists()).toBe(false);
         expect(wrapper.find('.tagname').exists()).toBe(false);
         expect(addTagButton(wrapper).exists()).toBe(false);
+    });
+});
+
+describe('board card story points (task 042 slice 5)', () => {
+    it('show only once Points is ticked in the card fields', async () => {
+        expect((await mountSettled({ points: 5 })).find('.card-points').exists()).toBe(false);
+        const shown = await mountSettled({ points: 5, cardFields: [{ id: 'points' }] });
+        expect(shown.get('.card-points').text()).toBe('ViewColumns.points_total');
+    });
+
+    it('a task without points shows no chip', async () => {
+        expect((await mountSettled({ cardFields: [{ id: 'points' }] })).find('.card-points').exists()).toBe(false);
     });
 });
