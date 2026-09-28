@@ -30,8 +30,21 @@ Close the AI gaps found by using ClickUp Brain² and Super Agents directly on 20
    - Fill one or many tasks (bulk), optionally re-fill when the task changes.
    - Shown in List and Table columns, with spend recorded and preview on first fill.
 
+7. **Ask AI inside comments and chat.**
+   - `@ai` in a task comment or a chat message posts an answer as a reply in that thread: cited, built from what the asker can open, and streamed.
+   - In a chat channel, "Ask about this channel" answers from its messages and linked work.
+8. **From notes to tasks.**
+   - Call notes and doc pages get "Extract action items". An AI preview lists the tasks (title, owner, due) and creates only the ticked ones through the normal path.
+   - Docs also get "Summarise this page".
+9. **Automate with AI.**
+   - When the plain-sentence rule compiler can't parse a sentence, the model drafts the rule (trigger, conditions, actions from the registry only) into the builder for review, backtest and dry run. Nothing saves without the person.
+10. **AI answer feedback and quality.**
+    - 👍 and 👎 with a reason on Ask answers, AI previews and agent proposals, stored per company.
+    - An AI quality page for owners and admins: answer ratings, the held-out question set's pass rate, the most-disliked answers with their sources, and cost per feature. It feeds task 019 (evals).
+
 ## Out of scope
 - Meeting bots joining Zoom, Meet or Teams.
+- Gmail, Calendar and Slack connectors for agents (a later task, one connector at a time).
 - A desktop hotkey app.
 - Importing a model's memories automatically (import is paste only).
 
