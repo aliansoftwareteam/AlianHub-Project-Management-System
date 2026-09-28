@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { objectIdKeys } = require('./objectIdKeys');
+const { objectIdKeys, objectIdIfHex } = require('./objectIdKeys');
 
 const schema = {
     tasks: {
@@ -3302,8 +3302,9 @@ const schema = {
             required: true,
         },
         projectId:{
-            type: String,
+            type: mongoose.Schema.Types.Mixed,
             required: true,
+            set: objectIdIfHex,
         },
         startDate:{
             type: Number,
