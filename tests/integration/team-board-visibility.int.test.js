@@ -97,7 +97,7 @@ describe('GET /api/v2/agents/team shows task names and logged hours only where t
         const agent = await db.collection('agents').insertOne({ name: `[QA team] agent ${suffix}`, ownerId: owner.uid, autonomy: 0, paused: false, deletedStatusKey: 0, createdAt: new Date() });
         agentId = agent.insertedId;
         ({ insertedId: runId } = await db.collection('agent_runs').insertOne({
-            agentId: String(agentId), agentName: `[QA team] agent ${suffix}`, taskId: String(privateTask._id), projectId: String(hidden._id),
+            agentId: String(agentId), agentName: `[QA team] agent ${suffix}`, taskId: String(privateTask._id), projectId: new ObjectId(String(hidden._id)),
             status: 'waiting_approval', outcome: `[QA team] outcome ${suffix}`, startedAt: new Date(), startedBy: owner.uid,
         }));
     });
@@ -212,7 +212,7 @@ describe('the agent pipeline and release screens leave out tasks in a private sp
         await db.collection('tasks').updateOne({ _id: new ObjectId(hiddenTask._id) }, { $set: { sprintId, sprintArray: { id: sprintId, name: 'private' } } });
         await db.collection('tasks').updateMany({ _id: { $in: taskIds.map((id) => new ObjectId(id)) } }, { $set: { statusType: 'done', updatedAt: new Date() } });
         await db.collection('agent_runs').insertMany(taskIds.map((taskId) => ({
-            agentId: String(new ObjectId()), agentName: '[QA ship] agent', taskId: String(taskId), projectId: String(project._id), status: 'done', startedAt: new Date(), finishedAt: new Date(),
+            agentId: String(new ObjectId()), agentName: '[QA ship] agent', taskId: String(taskId), projectId: new ObjectId(String(project._id)), status: 'done', startedAt: new Date(), finishedAt: new Date(),
         })));
     });
 
