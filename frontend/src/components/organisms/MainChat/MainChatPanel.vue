@@ -11,6 +11,9 @@
             :is-channel="isChannel"
             :icon="icon"
             :active-pane="rightPane"
+            :details-open="rightPane === 'info'"
+            :summarizing="summarizing"
+            @summarize="summarize"
             @search="toggleRightPane('search')"
             @pinned="toggleRightPane('pinned')"
             @info="toggleRightPane('info')"
@@ -64,6 +67,8 @@
             @pin="onPin"
             @mark-unread="onMarkUnread"
             @edit="editingMessage = $event"
+            @make-task="openTaskSheet($event && $event.text)"
+            @save-later="onSaveLater"
         />
 
         <MainChatComposer
@@ -75,6 +80,8 @@
             :conversation-key="conversationKey"
             @typing="setTyping"
             @send="onSend"
+            @send-task="onSendTask"
+            @command="onCommand"
             @files="onFiles"
             @save="onSaveEdit"
             @cancel-reply="replyTo = null"
@@ -95,6 +102,7 @@
         :messages="messages"
         @close="rightPane = ''"
         @preview="openPreview"
+        @open="openSearchHit"
     />
 
     <!-- Same pane in two modes: free-text search, or this conversation's pinned
@@ -110,6 +118,27 @@
         @close="rightPane = ''"
         @open="openSearchHit"
         @unpin="onUnpinFromList"
+    />
+
+    <MainChatSummary
+        v-if="summaryState"
+        :loading="summarizing"
+        :error="summaryState.error"
+        :summary="summaryState.summary"
+        :items="summaryState.items"
+        @close="closeSummary"
+        @create-task="(item) => openTaskSheet(item.title, item)"
+    />
+
+    <MakeTaskSheet
+        v-if="taskDraft"
+        :initial-title="taskDraft.title"
+        :source-text="taskDraft.sourceText"
+        :source-label="sourceLabel"
+        :source-url="sourceUrl"
+        :default-project-id="(linkedProject && linkedProject._id) || ''"
+        @close="taskDraft = null"
+        @created="onTaskCreated"
     />
 
     <!--
@@ -165,6 +194,11 @@ import MainChatMessageList from './MainChatMessageList.vue';
 import MainChatComposer from './MainChatComposer.vue';
 import MainChatInfo from './MainChatInfo.vue';
 import MainChatSearch from './MainChatSearch.vue';
+import MainChatSummary from './MainChatSummary.vue';
+import MakeTaskSheet from './MakeTaskSheet.vue';
+import { aiUsable, loadAiAvailability } from '@/composable/aiAvailability';
+import { useClipRecorder } from '@/composables/useClipRecorder';
+import { shellState } from '@/components/organisms/Shell/shellState';
 import CallIcon from '@/components/organisms/CallOverlay/CallIcon.vue';
 import { useCall } from '@/composable/useCall';
 import { useMainChatConversation } from './useMainChatConversation';
@@ -188,6 +222,7 @@ const props = defineProps({
     // glyph onto the channel document, so this is normally the channel itself.
     icon: { type: Object, default: () => ({}) },
     sendMessageAllowed: { type: Boolean, default: true },
+    linkedProject: { type: Object, default: null },
 });
 
 // Attachment previews, search and the details pane are all owned here rather than
@@ -291,7 +326,7 @@ const composerLockReason = computed(() => {
 const {
     messages, loading, loadingOlder, hasMore,
     load, loadOlder, catchUp, typingUsers, setTyping,
-    attach, detach, sendText, sendFiles, retry, removeMessage, markRead,
+    attach, detach, sendText, sendMedia, sendFiles, retry, removeMessage, markRead,
     toggleReaction, togglePin, markUnreadFrom, editText,
 } = useMainChatConversation({
     socket,
@@ -768,6 +803,99 @@ async function onSend(text) {
 async function onFiles(files) {
     if (!(await ensureConversation())) return;
     await sendFiles(files.map((f) => f), fileExtentions.value);
+}
+
+async function onSendTask(text) {
+    openTaskSheet(text);
+    await onSend(text);
+}
+
+async function onSaveLater(message) {
+    const saved = await togglePin(message);
+    $toast.success(t(saved ? 'Chat.saved_later' : 'Chat.unsaved_later'), { position: 'top-right' });
+}
+
+const summarizing = ref(false);
+const summaryState = ref(null);
+// Bumped on every run and close, so an answer for a conversation left behind is dropped.
+let summaryRun = 0;
+
+function closeSummary() {
+    summaryRun += 1;
+    summaryState.value = null;
+    summarizing.value = false;
+}
+
+async function summarize() {
+    if (!aiUsable.value || summarizing.value) return;
+    summaryRun += 1;
+    const run = summaryRun;
+    summaryState.value = { summary: '', items: [], error: '' };
+    if (!projectId.value || !props.sprintId || !effectiveTaskId.value) return;
+
+    summarizing.value = true;
+    try {
+        const response = await apiRequest('post', env.AI_CHAT_SUMMARY, {
+            projectId: projectId.value,
+            sprintId: props.sprintId,
+            taskId: effectiveTaskId.value,
+        });
+        if (run !== summaryRun) return;
+        const body = (response && response.data) || {};
+        summaryState.value = body.status
+            ? { summary: (body.data && body.data.summary) || '', items: (body.data && body.data.actionItems) || [], error: '' }
+            : { summary: '', items: [], error: t('Chat.summary_failed') };
+    } catch (error) {
+        if (run !== summaryRun) return;
+        const aiOff = !!(error && error.response && error.response.data && error.response.data.code === 'ai_off');
+        summaryState.value = { summary: '', items: [], error: t(aiOff ? 'Chat.summary_ai_off' : 'Chat.summary_failed') };
+        if (aiOff) loadAiAvailability(companyId.value);
+    } finally {
+        if (run === summaryRun) summarizing.value = false;
+    }
+}
+
+watch(conversationKey, closeSummary);
+
+const taskDraft = ref(null);
+const sourceLabel = computed(() => (props.isChannel ? `#${props.title}` : props.title));
+const sourceUrl = computed(() => (typeof window === 'undefined' ? '' : window.location.href));
+
+function plainText(raw) {
+    return String(raw || '').replace(/<[^>]*>/g, '').trim();
+}
+
+function openTaskSheet(text, item = null) {
+    const body = plainText(text);
+    taskDraft.value = { title: body.slice(0, 250), sourceText: body, item };
+}
+
+function onTaskCreated(created) {
+    const item = taskDraft.value && taskDraft.value.item;
+    if (item && created) item.taskUrl = created.url;
+    taskDraft.value = null;
+}
+
+const { openRecorder } = useClipRecorder();
+
+async function postClip(clip) {
+    if (!clip || !clip.url) return;
+    if (!(await ensureConversation())) return;
+    const name = `${clip.title || 'clip'}.webm`;
+    await sendMedia({
+        type: clip.mediaType === 'audio' ? 'audio' : 'video',
+        mediaURL: clip.url,
+        mediaName: name,
+        mediaOriginalName: name,
+        mediaSize: clip.size || 0,
+    });
+}
+
+function onCommand({ name, text } = {}) {
+    if (name === 'summarize') summarize();
+    else if (name === 'task') openTaskSheet(text || (replyTo.value && replyTo.value.message));
+    else if (name === 'clip') openRecorder({ type: 'chat', conversationKey: conversationKey.value }, postClip);
+    else if (name === 'talk' && aiUsable.value) shellState.talkToText = true;
 }
 
 async function onPin(message) {
