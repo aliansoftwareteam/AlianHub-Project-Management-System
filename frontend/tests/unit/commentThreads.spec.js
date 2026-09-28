@@ -10,7 +10,7 @@ const { apiRequest, store, users, route, router } = vi.hoisted(() => ({
     router: { replace: vi.fn(() => Promise.resolve()), push: vi.fn(() => Promise.resolve()), hasRoute: () => false },
 }));
 
-vi.mock('@/services', () => ({ apiRequest }));
+vi.mock('@/services', () => ({ apiRequest, apiRequestWithoutCompnay: vi.fn() }));
 vi.mock('vuex', async (importOriginal) => ({ ...(await importOriginal()), useStore: () => store }));
 vi.mock('vue-router', () => ({ useRoute: () => route, useRouter: () => router }));
 vi.mock('@/composable', () => ({
@@ -198,6 +198,16 @@ describe('Home card', () => {
         await flushPromises();
         expect(calls('post', '/resolve')[0][2]).toEqual({ id: PARENT, resolved: true });
         expect(wrapper.findAll('[data-test="assigned-comment"]')).toHaveLength(0);
+    });
+
+    it('can be hidden like the other Home cards', async () => {
+        const { HOME_CARDS } = await import('@/components/molecules/Home/homeCards');
+        expect(HOME_CARDS.map((card) => card.id)).toContain('assigned_comments');
+        await mountWith(AssignedCommentsCard, {});
+        const hide = wrapper.find('[data-test="assigned-comments-hide"]');
+        expect(hide.attributes('aria-label')).toBe('Home.hide_card');
+        await hide.trigger('click');
+        expect(wrapper.emitted('hide')).toHaveLength(1);
     });
 });
 
