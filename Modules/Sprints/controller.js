@@ -27,9 +27,9 @@ exports.addSprint = (req, res) => {
     })
 }
 
-exports.updateChannelsCounts = (companyId, private, type) => {
+exports.updateChannelsCounts = (companyId, isPrivate, type) => {
     return new Promise((resolve, reject) => {
-        const channelType = private ? 'privateChannels' : 'publicChannels';
+        const channelType = isPrivate ? 'privateChannels' : 'publicChannels';
         const step = type === 'inc' ? 1 : -1;
 
         requestQueue.enqueue(() => {
@@ -60,7 +60,7 @@ exports.updateChannelsCounts = (companyId, private, type) => {
                     const publicChannels = projectCount.publicChannels || 0;
                     const maxPublicChannels = planFeature.maxPublicChannels;
 
-                    if(private) {
+                    if(isPrivate) {
                         if(maxPrivateChannels === null) {
                             resolve(true);
                         } else {
@@ -93,17 +93,24 @@ exports.updateChannelsCounts = (companyId, private, type) => {
     })
 }
 
+const ICON_FIELDS = ['type', 'iconName', 'prefix', 'url'];
+
+/* A channel's icon is a Font Awesome glyph (prefix, iconName) or an uploaded image (url). */
+const iconFields = (icon) => Object.fromEntries(ICON_FIELDS
+    .filter((field) => icon && typeof icon === 'object' && typeof icon[field] === 'string')
+    .map((field) => [field, icon[field]]));
+
 exports.addSprintFun = (req) => {
     try {
         return new Promise(async(resolve, reject) => {
-            const {companyId, projectId, folder, sprintName, userData, isPreCompany = false, mainChat = false, private = false, sendMessage = true, AssigneeUserId = [], icon = {},from = '',taskSprintObj = {}} = req.body;
+            const {companyId, projectId, folder, sprintName, userData, isPreCompany = false, mainChat = false, private: isPrivate = false, sendMessage = true, AssigneeUserId = [], icon,from = '',taskSprintObj = {}} = req.body;
             const sprintObject = {
                 tasks : 0,
-                private: private,
+                private: isPrivate,
                 name: sprintName,
                 deletedStatusKey : 0,
                 projectId : new mongoose.Types.ObjectId(projectId),
-                ...(Object.keys(icon || {}).length ? icon : {})
+                ...iconFields(icon),
             }
             if(mainChat) {
                 sprintObject.sendMessage = sendMessage;
@@ -130,7 +137,7 @@ exports.addSprintFun = (req) => {
             }
 
             if(mainChat) {
-                exports.updateChannelsCounts(companyId, private, 'inc').then((result) => {
+                exports.updateChannelsCounts(companyId, isPrivate, 'inc').then((result) => {
                     if(result) {
                         MongoQ.MongoDbCrudOpration(companyId, obj, "save").then((responsee) => {
                             resolve({ status: true, statusText: "Sprint added successfully",data: responsee});
@@ -140,7 +147,7 @@ exports.addSprintFun = (req) => {
                             reject({ status: false, statusText: error });
                         });
                     } else {
-                        exports.updateChannelsCounts(companyId, private, 'dec');
+                        exports.updateChannelsCounts(companyId, isPrivate, 'dec');
                         resolve({ status: false, statusText: "Channels creation limits have been exceeded" });
                     }
                 })
