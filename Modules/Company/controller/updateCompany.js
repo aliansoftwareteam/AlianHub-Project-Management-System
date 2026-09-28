@@ -8,7 +8,7 @@ const socketEmitter = require("../../../event/socketEventEmitter");
 const { isInstanceOwner } = require("../../Instance/guard");
 const { tenantOf, namedCompanyIds, TenantError } = require("../../../Config/tenant");
 const { OBJECT_ID_PATTERN, ownCompanyIds, allowedCompanyIds, scopeCompanyPipeline, companyUpdateKind, seatFilter } = require("../helpers/companyAccessRules");
-const { evaluatePermission, isPrivileged, isWritable, ROLE_OWNER } = require("../../../Config/permissionGuard");
+const { isPrivileged, ROLE_OWNER } = require("../../../Config/permissionGuard");
 const { checkCompanyDetails } = require("../helpers/companyDetails");
 
 const findSeat = (companyId, uid, kind) => MongoDbCrudOpration(companyId, {
@@ -16,12 +16,8 @@ const findSeat = (companyId, uid, kind) => MongoDbCrudOpration(companyId, {
     data: [seatFilter(uid, kind), { roleType: 1 }]
 }, 'findOne');
 
-const managesMembers = async (companyId, uid) => isWritable(await evaluatePermission(companyId, uid, 'settings.settings_member_list').catch(() => null));
-
 const MAY_SEND = {
     details: ({ roleType }) => isPrivileged(roleType),
-    projectType: () => true,
-    seatRelease: ({ roleType, companyId, req }) => isPrivileged(roleType) || managesMembers(companyId, req.uid),
     ownerClaim: ({ roleType, req }) => roleType === ROLE_OWNER && req.body.updateObject.objId.userId === String(req.uid),
 };
 
@@ -33,11 +29,7 @@ const companyWrite = (companyId, body, kind, uid) => {
     if (kind === 'ownerClaim') {
         return [{ _id: companyId }, { $set: { userId: new mongoose.Types.ObjectId(String(uid)) } }, { returnDocument: 'after' }];
     }
-    const data = body.key
-        ? [{ _id: companyId }, { [body.key]: body.updateObject }]
-        : [{ _id: companyId }, { $set: body.updateObject }, { returnDocument: 'after' }];
-    if (body.arrayFilters?.length) data.push({ arrayFilters: body.arrayFilters });
-    return data;
+    return [{ _id: companyId }, { $set: body.updateObject }, { returnDocument: 'after' }];
 };
 
 const loadOwnCompanyIds = async (uid) => {

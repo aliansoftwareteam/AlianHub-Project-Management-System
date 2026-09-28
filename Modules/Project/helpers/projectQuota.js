@@ -45,4 +45,31 @@ const syncProjectQuota = async (companyId, projectId, nextStatus) => {
     return stepProjectCount(companyId, claimed.isPrivateSpace, trashing ? -1 : 1);
 };
 
-module.exports = { TRASHED, bucketOf, quotaStatus, stepProjectCount, syncProjectQuota };
+const privacyChange = (updateObject, key) => {
+    if (!updateObject || (key && key !== '$set')) return null;
+    return typeof updateObject.isPrivateSpace === 'boolean' ? updateObject.isPrivateSpace : null;
+};
+
+/* Moves a live project's count between the public and private buckets, once per actual switch. */
+const syncProjectType = async (companyId, projectId, isPrivateSpace) => {
+    const switched = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PROJECTS,
+        data: [
+            {
+                _id: new mongoose.Types.ObjectId(String(projectId)),
+                deletedStatusKey: { $ne: TRASHED },
+                isPrivateSpace: isPrivateSpace ? { $ne: true } : true
+            },
+            { $set: { isPrivateSpace } },
+            { projection: { _id: 1 } }
+        ]
+    }, 'findOneAndUpdate');
+
+    if (!switched) return null;
+    return stepCompanyCounters(companyId, {
+        [`projectCount.${bucketOf(isPrivateSpace)}`]: 1,
+        [`projectCount.${bucketOf(!isPrivateSpace)}`]: -1
+    });
+};
+
+module.exports = { TRASHED, bucketOf, quotaStatus, stepProjectCount, syncProjectQuota, privacyChange, syncProjectType };

@@ -91,6 +91,7 @@ async function generateMeetingNotes(input = {}) {
         transcript,
     ].filter((line, index) => line !== '' || index > 2).join('\n');
 
+    let timer = null;
     try {
         const result = await Promise.race([
             provider.chat({
@@ -101,7 +102,7 @@ async function generateMeetingNotes(input = {}) {
                 maxTokens: 4096,
                 spend: { feature: FEATURES.MEETING_NOTES, companyId: input.companyId, userId: input.userId },
             }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Meeting notes request timed out')), REQUEST_TIMEOUT_MS)),
+            new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Meeting notes request timed out')), REQUEST_TIMEOUT_MS); }),
         ]);
         const parsed = result && typeof result.content === 'string' ? parseNotes(result.content) : null;
         if (!parsed) return { status: false, reason: 'The AI returned nothing usable.' };
@@ -109,6 +110,8 @@ async function generateMeetingNotes(input = {}) {
     } catch (error) {
         logger.error(`meetingNotes: ${error && error.message ? error.message : error}`);
         return { status: false, reason: (error && error.message) || 'Meeting notes failed.' };
+    } finally {
+        clearTimeout(timer);
     }
 }
 
