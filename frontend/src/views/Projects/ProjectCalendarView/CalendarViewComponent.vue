@@ -70,7 +70,7 @@
                 </div>
                 <div v-if="proposal" class="cv__proposal">
                     <span class="cv__spark">✦</span>
-                    {{ proposal.what }}
+                    {{ proposalTitle(t, proposal) }}
                     <router-link class="cv__proposal-link" :to="{ name: 'AiInbox', params: { cid: companyId } }">{{ $t('Views.review') }}</router-link>
                 </div>
             </aside>
@@ -96,6 +96,7 @@
     import { useToast } from 'vue-toast-notification';
     import { apiRequest } from '../../../services';
     import { useI18n } from "vue-i18n";
+    import { proposalTitle } from "@/views/Ai/plainLabels";
 
     defineOptions({ name: "CalendarViewComponent" });
 

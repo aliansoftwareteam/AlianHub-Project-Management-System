@@ -132,7 +132,7 @@
                     <span v-if="agentRun.skill" class="agent-strip__meta">{{ skillLabel(t, agentRun.skill) }}</span>
                 </div>
                 <div v-else-if="agentProposal" class="agent-proposal">
-                    <span class="agent-proposal__who">✦ {{ agentProposal.agentName }}:</span> {{ agentProposal.what }}
+                    <span class="agent-proposal__who">✦ {{ agentProposal.agentName }}:</span> {{ proposalTitle(t, agentProposal) }}
                     <button type="button" class="agent-proposal__review" @click.stop="openAiInbox()">{{ $t('Projects.review') }}</button>
                 </div>
                 <div v-if="isTiming || showSplitBadge || cardPoints !== null" class="card-meta">
@@ -261,7 +261,7 @@
     import ConvertToList from '@/components/molecules/ConvertToList/ConvertToList.vue';
     import DueDateCompo from '@/components/molecules/DueDateCompo/DueDateCompo.vue';
     import { useI18n } from "vue-i18n";
-    import { skillLabel } from "@/views/Ai/plainLabels";
+    import { proposalTitle, skillLabel } from "@/views/Ai/plainLabels";
     import { useTimer } from "@/components/molecules/Home/useTimer";
     import { permittedAssignees, selfAssignable } from "@/utils/assigneeOptions";
     const { t } = useI18n();
