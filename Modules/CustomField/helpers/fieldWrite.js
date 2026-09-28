@@ -1,5 +1,6 @@
 const { evaluatePermission, isWritable } = require('../../../Config/permissionGuard');
 const logger = require('../../../Config/loggerConfig');
+const { normaliseAiConfig, AiConfigError } = require('../aiFields/config');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const SETTINGS_PERMISSION = 'settings.settings_custom_field';
@@ -14,6 +15,17 @@ class FieldWriteError extends Error {}
 const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 const isIdList = (value) => (Array.isArray(value) ? value : [value]).every((id) => typeof id === 'string' && OBJECT_ID.test(id));
 
+const checkedAiConfig = ({ fieldAi, fieldType }) => {
+    if (fieldAi && fieldAi.enabled === false) return { enabled: false };
+    if (!fieldType) throw new FieldWriteError('An AI field is saved together with its field type.');
+    try {
+        return normaliseAiConfig(fieldAi, fieldType);
+    } catch (error) {
+        if (error instanceof AiConfigError) throw new FieldWriteError(error.message);
+        throw error;
+    }
+};
+
 const checkProperties = (updateObject, { insert }) => {
     if (!isPlainObject(updateObject) || !Object.keys(updateObject).length) throw new FieldWriteError('Update Object is required');
     const allowed = insert ? [...SHARED_PROPERTIES, ...INSERT_ONLY_PROPERTIES] : SHARED_PROPERTIES;
@@ -23,6 +35,7 @@ const checkProperties = (updateObject, { insert }) => {
         if (name in updateObject && typeof updateObject[name] !== 'boolean') throw new FieldWriteError(`${name} must be true or false.`);
     });
     if ('projectId' in updateObject && !isIdList(updateObject.projectId)) throw new FieldWriteError('projectId must be a list of project ids.');
+    if ('fieldAi' in updateObject) updateObject.fieldAi = checkedAiConfig(updateObject);
     return updateObject;
 };
 

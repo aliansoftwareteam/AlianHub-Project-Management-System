@@ -20,6 +20,7 @@ const FEATURES = Object.freeze({
     GUIDE: 'guide',
     MCP_BRIEF: 'mcp_brief',
     KNOWLEDGE_EMBED: 'knowledge_embed',
+    AI_FIELD: 'ai_field',
 });
 
 const UNKNOWN_FEATURE = 'unknown';

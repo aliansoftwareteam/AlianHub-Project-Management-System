@@ -96,7 +96,7 @@ const modelAnswers = (...values) => {
     });
 };
 
-const storedTask = (id) => db().store(SCHEMA_TYPE.TASKS).find((row) => String(row._id) === String(id));
+const storedTask = (id) => (db().store[SCHEMA_TYPE.TASKS] || []).find((row) => String(row._id) === String(id));
 const promptSent = (index = 0) => mockChat.mock.calls[index][0].messages.map((m) => m.content).join('\n');
 
 beforeEach(() => {
@@ -110,6 +110,7 @@ beforeEach(() => {
         }, 'updateOne');
         return { status: true };
     });
+    require('../Config/config').myCache.flushAll();
     delete process.env.AI_ENABLED;
     delete process.env.AI_FIELD_DAILY_LIMIT;
     delete process.env.AI_FIELD_BULK_MAX;
@@ -469,7 +470,7 @@ describe('auto-refill', () => {
     });
 
     it('refills on a new comment when the field reads comments', async () => {
-        const { task } = await filledTask({ reads: ['comments'] });
+        const { task } = await filledTask({ reads: ['title', 'comments'] });
         const comment = db().seed(SCHEMA_TYPE.COMMENTS, { taskId: String(task._id), message: 'Certificate arrived', type: 'text', userId: ALICE, createdAt: new Date() });
         socketEmitter.emit('insert', { type: 'insert', module: 'comments', companyId: COMPANY, data: comment, updatedFields: {} });
         await autoRefill.flush();

@@ -66,6 +66,7 @@ const {
     apiActivityLogsSchema,
     exportJobsSchema,
     importJobsSchema,
+    aiFieldJobsSchema,
     epicsSchema,
     pagesSchema,
     pageVersionsSchema,
@@ -263,6 +264,8 @@ exports.checkType = (type) => {
             return exportJobsSchema
         case SCHEMA_TYPE.IMPORT_JOBS:
             return importJobsSchema
+        case SCHEMA_TYPE.AI_FIELD_JOBS:
+            return aiFieldJobsSchema
         case SCHEMA_TYPE.EPICS:
             return epicsSchema
         case SCHEMA_TYPE.PAGES:
@@ -531,6 +534,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.EXPORT_JOBS}`
         case SCHEMA_TYPE.IMPORT_JOBS:
                 return `${dbCollections.IMPORT_JOBS}`
+        case SCHEMA_TYPE.AI_FIELD_JOBS:
+                return `${dbCollections.AI_FIELD_JOBS}`
         case SCHEMA_TYPE.EPICS:
                 return `${dbCollections.EPICS}`
         case SCHEMA_TYPE.PAGES:
