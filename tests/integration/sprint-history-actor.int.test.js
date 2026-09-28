@@ -1,4 +1,4 @@
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 const { resolveMongoUrl } = require('../../e2e/support/env');
 const { createApiClient } = require('../../e2e/support/api');
 const { PASSWORD, assertOk, createProject, login, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
@@ -18,7 +18,7 @@ const db = () => client.db(state.companyId);
 
 /* Every test makes its own project, so its history is the only history under that id. */
 const historyRows = async (projectId, key, needle) => {
-    const rows = await db().collection('history').find({ ProjectId: String(projectId) }).toArray();
+    const rows = await db().collection('history').find({ ProjectId: new ObjectId(String(projectId)) }).toArray();
     return rows.filter((row) => row.Key === key && String(row.Message || '').includes(needle));
 };
 

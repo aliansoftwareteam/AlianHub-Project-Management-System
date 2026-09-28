@@ -3,10 +3,7 @@ import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { projectDataOf } from "@/utils/aiTargets";
 
-const RETRY_MS = 1500;
-
 const newItemId = () => Math.random().toString(36).slice(2, 8);
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /* One checklist named `heading` holding the steps, through the same write the Suggest checklists
  * flow uses. Resolves to the undo, which removes exactly those items. */
@@ -41,19 +38,11 @@ export async function addStepsAsChecklist({ taskOf, steps, heading, companyId, u
     };
 }
 
-async function trash(task, context) {
-    const send = () => taskClass.updateArchiveDelete({ ...context, sprintId: task.sprintId, task, deletedStatusKey: 1 });
-    try {
-        await send();
-    } catch (error) {
-        // The server creates the tasks one after another after it answers, so an early undo can outrun the last one.
-        await wait(RETRY_MS);
-        await send();
-    }
-}
+const trash = (task, context) => taskClass.updateArchiveDelete({ ...context, sprintId: task.sprintId, task, deletedStatusKey: 1 });
 
 /* Tasks (type "task") or subtasks (type "subTask") through the create path the AI subtask and
- * task suggestions already use. Resolves to what was created and the undo that sends it to trash. */
+ * task suggestions already use. The server answers once every task is written, naming only those,
+ * so the undo trashes exactly what was created. */
 export async function createTasksFromTitles({ titles, type, parentTask, sprintObj, project, companyId, userId, userData }) {
     const projectData = projectDataOf(project);
     const response = await taskClass.createSubTaskWithAi({
