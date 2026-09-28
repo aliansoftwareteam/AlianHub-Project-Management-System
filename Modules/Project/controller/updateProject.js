@@ -3,7 +3,7 @@ const { MongoDbCrudOpration,validateObjectId } = require("../../../utils/mongo-h
 const {removeCache} = require('../../../utils/commonFunctions');
 const { resolveProjectSkills } = require('../../settings/ProjectSkills/helper');
 const { PROJECT_SOURCES, normaliseSource, sourceOrDefault, cleanProposalId, numericProposalId, validateProposalId } = require('../helpers/projectSourceRules');
-const { TRASHED, quotaStatus, syncProjectQuota } = require('../helpers/projectQuota');
+const { TRASHED, quotaStatus, syncProjectQuota, privacyChange, syncProjectType } = require('../helpers/projectQuota');
 const logger = require('../../../Config/loggerConfig');
 const knowledgeEvents = require('../../Knowledge/ingest/events');
 const { recordProjectChanges } = require('../helpers/projectHistory');
@@ -22,6 +22,12 @@ exports.updateProjectInternal = async (companyId, projectId, updateObject, key, 
             if (nextStatus === TRASHED) knowledgeEvents.publishProjectTrashed(companyId, projectId);
             else knowledgeEvents.publishProjectRestored(companyId, projectId);
         }
+    }
+    const nextPrivacy = privacyChange(updateObject, key);
+    if (nextPrivacy !== null && companyId && validateObjectId(projectId)) {
+        await syncProjectType(companyId, projectId, nextPrivacy).catch((error) => {
+            logger.error(`syncProjectType ${projectId}: ${error && error.message ? error.message : error}`);
+        });
     }
 
     return new Promise((resolve, reject) => {

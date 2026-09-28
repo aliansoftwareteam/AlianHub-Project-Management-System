@@ -11,7 +11,7 @@ jest.mock('../Modules/settings/ProjectSkills/helper', () => ({
     resolveProjectSkills: jest.fn(async (companyId, skills) => skills || []),
     skillNamesOf: jest.fn(async (companyId, slugs) => slugs.map((slug) => ({ vue: 'Vue.js', node: 'Node.js' }[slug] || slug))),
 }));
-jest.mock('../Modules/Project/helpers/projectQuota', () => ({ TRASHED: 1, quotaStatus: () => null, syncProjectQuota: jest.fn(async () => false) }));
+jest.mock('../Modules/Project/helpers/projectQuota', () => ({ TRASHED: 1, quotaStatus: () => null, syncProjectQuota: jest.fn(async () => false), privacyChange: () => null, syncProjectType: jest.fn() }));
 jest.mock('../Modules/Knowledge/ingest/events', () => ({ guideTouched: () => false, publishGuideSaved: jest.fn(), publishProjectTrashed: jest.fn(), publishProjectRestored: jest.fn() }));
 jest.mock('../Modules/Tasks/helpers/handleNotification', () => ({ HandleBothNotification: jest.fn(async () => ({ status: true })) }));
 
