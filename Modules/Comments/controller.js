@@ -16,6 +16,7 @@ const { taskIdMatch } = require("./helpers/taskIdMatch");
 const { withoutAssignment, withoutThreadState, placeReply } = require("./helpers/commentThreads");
 const { notifyReply } = require("./helpers/threadNotices");
 const { parseAgentMentionIds } = require("./helpers/parseMentions");
+const { bumpUnreadCounts } = require("./helpers/unreadBumps");
 
 /* A comment an agent run writes never starts agents, so agents cannot start each other.
  * Required on use: the agent modules are only needed by a comment that names an agent. */
@@ -76,8 +77,12 @@ exports.save = async (req, res) => {
         else {
             socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments_project', companyId });
         }
-        if (mentionIds.length && response && response._id) {
-            const saved = typeof response.toObject === "function" ? response.toObject() : response;
+        const saved = response && response._id && (typeof response.toObject === "function" ? response.toObject() : response);
+        if (saved && !placement.parent) {
+            bumpUnreadCounts(companyId, saved, mentionIds)
+                .catch((err) => logger.error(`[comments] unread counts not raised: ${err.message}`));
+        }
+        if (mentionIds.length && saved) {
             deliverMentions(companyId, { ...saved, folderId: convertData.folderId }, mentionIds)
                 .then((failures) => failures.forEach((err) => logger.error(`[mentions] delivery failed: ${(err && err.message) || JSON.stringify(err)}`)))
                 .catch((err) => logger.error(`[mentions] delivery failed: ${err.message}`));

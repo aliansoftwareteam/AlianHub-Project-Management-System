@@ -34,6 +34,9 @@ for (const [path, name] of [
 import { apiRequest } from '@/services';
 import { undoToast, runUndo, dismissUndoToast } from '@/composable/useUndoToast';
 import en from '@/locales/en.js';
+import { applyAiAvailability } from '@/composable/aiAvailability';
+
+applyAiAvailability({ state: 'on', planAllowsAi: true, loaded: true });
 
 config.global.plugins[0].global.setLocaleMessage('en', en);
 
@@ -57,7 +60,7 @@ async function mountSide(value = task()) {
             provide: {
                 $userId: ref('u1'),
                 $dateFormat: ref('DD/MM/YYYY'),
-                selectedProject: ref({ _id: 'proj-1', CompanyId: 'company-1', ProjectName: 'Launch', ProjectCode: 'AH', lastTaskId: 1, isGlobalPermission: false })
+                selectedProject: ref({ _id: 'proj-1', CompanyId: 'company-1', ProjectName: 'Launch', ProjectCode: 'AH', lastTaskId: 1, isGlobalPermission: false, apps: [{ key: 'AI' }] })
             }
         }
     });

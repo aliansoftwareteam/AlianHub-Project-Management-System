@@ -80,6 +80,9 @@ vi.mock('@/components/organisms/TaskDetailOverlay/TaskTrackerHandoff.vue', () =>
 import { apiRequest } from '@/services';
 import TaskDetailPanel from '@/components/organisms/TaskDetailOverlay/TaskDetailPanel.vue';
 import en from '@/locales/en.js';
+import { applyAiAvailability } from '@/composable/aiAvailability';
+
+applyAiAvailability({ state: 'on', planAllowsAi: true, loaded: true });
 
 const i18n = config.global.plugins[0];
 i18n.global.setLocaleMessage('en', en);

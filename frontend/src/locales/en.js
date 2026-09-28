@@ -7070,7 +7070,8 @@ export default {
         taint_kind_form: "Form submission",
         taint_kind_webhook: "Webhook",
         taint_kind_file: "Uploaded file",
-        taint_kind_passage: "Knowledge passage"
+        taint_kind_passage: "Knowledge passage",
+        taint_kind_instruction: "Instruction-shaped text"
     },
     QuickCreate: {
         title: "New task",

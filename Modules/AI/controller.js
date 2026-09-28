@@ -573,7 +573,7 @@ exports.summarizeTask = async (req, res) => {
         const result = await summarizeTask({ companyId, uid: req.uid, taskId: String(taskId), force: force === true });
         if (result.notFound) return res.status(404).send({ status: false, statusText: result.reason });
         if (!result.status) {
-            return res.send({ status: false, statusText: result.reason || 'Could not summarise this task.' });
+            return res.send({ status: false, statusText: result.reason || 'Could not summarise this task.', ...(result.aiState ? { aiState: result.aiState } : {}) });
         }
         return res.send({ status: true, data: result.data });
     } catch (error) {

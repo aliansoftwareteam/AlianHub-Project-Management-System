@@ -49,7 +49,7 @@
                 </template>
 
                 <button
-                    v-if="checkApps('AI',project) && checkPermission('task.task_list',project?.isGlobalPermission) === true && checkPermission('task.task_create',project?.isGlobalPermission) === true"
+                    v-if="canUseAi({ project, permitted: checkPermission('task.task_list',project?.isGlobalPermission) === true && checkPermission('task.task_create',project?.isGlobalPermission) === true })"
                     type="button"
                     class="spr__ai"
                     :disabled="isSpinner"
@@ -359,6 +359,7 @@ import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
 import { apiRequest } from '../../../services'
 import { useAiApiFunction } from "@/composable/aiHelper";
+import { canUseAi } from "@/composable/aiAvailability";
 import { isTitledItem, parseGeneratedList } from "@/utils/parseGeneratedList";
 import taskClass from "@/utils/TaskOperations"
 import { useI18n } from "vue-i18n";
@@ -368,7 +369,7 @@ const { t } = useI18n();
 const project = inject("selectedProject");
 const searchedTask = inject("searchedTask");
 const clientWidth = inject("$clientWidth");
-const { checkPermission, debouncerWithPromise, checkApps} = useCustomComposable();
+const { checkPermission, debouncerWithPromise } = useCustomComposable();
 const showArchiveVar = inject("showArchived");
 const companyId = inject("$companyId");
 const userId = inject("$userId");

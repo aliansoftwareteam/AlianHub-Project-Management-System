@@ -33,7 +33,7 @@ Fix the broken AI buttons and make Ask the way into AI. This covers recommendati
 
 7. **Plain-language agents** (recommendation 8).
    - Skills are named in words in the UI ("Summarise a pull request", not `pr.summary`).
-   - Autonomy reads "Suggests changes", "Acts, you approve" or "Acts" instead of L0–L2, SUGGEST or GATED.
+   - Autonomy is named after what the code does (owner decision, 2026-09-28): L0 "Answers and suggests", L1 "Suggests changes", L2 "Acts, you approve the rest", L3 "Acts, also on a schedule".
    - Counts are pluralised ("1 change", "7 changes").
    - A proposal waiting more than 3 days is marked as waiting, and the AI Inbox can sort by age.
 8. **Preview, then apply, for every AI write** (recommendation 7).
@@ -54,6 +54,10 @@ Fix the broken AI buttons and make Ask the way into AI. This covers recommendati
     - With AI off, every entry point is hidden, including the rail tile, the estimate, the checklist, docs Ask and AI assist.
     - An unpriced model doesn't block Ask.
     - ✦ marks only features that call a model.
+
+12. **Automatic assignment** (owner request, 2026-09-28, after ClickUp's AI Assignee).
+    - 12a: an "Assign to" automation action (add, replace, remove, clear, round robin), with the compiler, backtest and dry run. No model.
+    - 12b: assignment rules per project: one plain sentence per person, a fallback, on create and on change, suggest (default) or apply. The model picks only among listed members who can open the task, gives a reason, and every decision can be undone.
 
 ## Out of scope
 - A meeting notetaker and a desktop hotkey app (see the findings).

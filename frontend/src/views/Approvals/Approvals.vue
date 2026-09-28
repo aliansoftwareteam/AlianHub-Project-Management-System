@@ -93,6 +93,7 @@ import { formatHm } from '@/composable/useTimer';
 import { isOwnerOrAdmin } from "@/utils/roles";
 import { fetchPendingProposals, sendProposalDecision } from '@/composable/agentProposals';
 import ProposalWhyDialog from './ProposalWhyDialog.vue';
+import { proposalTitle } from '@/views/Ai/plainLabels';
 
 /**
  * @typedef {Object} AgentProposal
@@ -190,7 +191,7 @@ const bodyOf = (res) => (res && res.data) || {};
 const toAgentProposal = (p) => {
     const changes = Array.isArray(p.changes) ? p.changes : [];
     return {
-        id: String(p._id), agentName: p.agentName || '', summary: p.what || '', detail: p.why || '',
+        id: String(p._id), agentName: p.agentName || '', summary: proposalTitle(t, p), detail: p.why || '',
         reversible: changes.length > 0 && changes.every((c) => c && c.reversible), createdAt: p.createdAt,
         changes: changes.filter(Boolean).map((c) => ({ label: c.label || c.action || '', reversible: Boolean(c.reversible) })),
     };
