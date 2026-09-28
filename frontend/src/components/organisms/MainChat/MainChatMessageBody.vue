@@ -29,14 +29,16 @@
             <div v-if="gallery.length > 1" class="mc-gallery-hint">{{ $t('Chat.lightbox_hint') }}</div>
         </template>
 
+        <div v-else-if="isAi" class="mc-ai-body" v-html="aiBody" @click="followCitation"></div>
         <span v-else v-html="renderedBody"></span>
     </template>
 </template>
 
 <script setup>
-import { computed, defineProps, defineEmits } from 'vue';
+import { computed, defineProps, defineEmits, getCurrentInstance, inject, unref } from 'vue';
 import { useGetterFunctions } from '@/composable';
 import { commentHtml, commentPlainText } from '@/utils/commentHtml';
+import { aiAnswerHtml, aiAuthorOf, citationTarget } from '@/utils/aiMention';
 import MainChatMedia from './MainChatMedia.vue';
 
 const props = defineProps({
@@ -53,6 +55,20 @@ const gallery = computed(() => [props.message, ...props.siblings]);
 
 const renderedBody = computed(() => commentHtml(props.message.message, { links: true }));
 
+const companyId = inject('$companyId', '');
+const instance = getCurrentInstance();
+const routerOf = () => (instance && instance.proxy && instance.proxy.$router) || null;
+const isAi = computed(() => !!aiAuthorOf(props.message));
+const aiBody = computed(() => aiAnswerHtml(props.message, { router: routerOf(), companyId: unref(companyId) }));
+
+function followCitation(event) {
+    const to = citationTarget(event, props.message, unref(companyId));
+    const router = routerOf();
+    if (!to || !router) return;
+    event.preventDefault();
+    router.push(to);
+}
+
 const replyAuthor = computed(() => {
     const user = props.message.reply_userId ? getUser(props.message.reply_userId) : null;
     return (user && user.Employee_Name) || props.message.reply_userName || '';
@@ -64,3 +80,19 @@ const replyPreview = computed(() => {
     return plain.length > 70 ? `${plain.slice(0, 70)}…` : plain;
 });
 </script>
+
+<style scoped>
+.mc-ai-body :deep(p),
+.mc-ai-body :deep(ul),
+.mc-ai-body :deep(ol) {
+    margin: 0 0 6px;
+}
+.mc-ai-body :deep(ul),
+.mc-ai-body :deep(ol) {
+    padding-left: 20px;
+}
+.mc-ai-body :deep(.ask-cite) {
+    color: var(--brand);
+    font-weight: 600;
+}
+</style>

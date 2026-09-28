@@ -119,8 +119,7 @@ const agentPatchFields = (body) => {
     if (body.spendCapUsd !== undefined) set.spendCapUsd = Math.max(0, Number(body.spendCapUsd) || 0);
     if (body.account !== undefined && accounts.MODES.includes(body.account)) set.account = body.account;
     if (body.model !== undefined) set.model = String(body.model).slice(0, modelPin.MAX_LENGTH);
-    // `schedule` is stored for a scheduler that does not exist yet: nothing reads
-    // it, so the UI hides the field. `rateLimitPerDay` is enforced in runs.canStart.
+    // Schedules live in agent_schedules (Modules/Agents/schedules); this legacy field is kept only because revisions snapshot it.
     if (body.schedule !== undefined && typeof body.schedule === 'object') set.schedule = body.schedule;
     if (body.rateLimitPerDay !== undefined) set.rateLimitPerDay = Math.max(0, Number(body.rateLimitPerDay) || 0);
     if (body.confidenceFloor !== undefined) set.confidenceFloor = confidence.floorToStore(body.confidenceFloor);
@@ -407,8 +406,13 @@ exports.getRun = async (req, res) => {
         if (!run) return fail(res, 'Run not found.', 404);
         const caller = await callerOf(req, companyId);
         const visible = await visibleProjectIdsFor(companyId, caller);
-        if (visible && !visible.includes(String(run.projectId || ''))) return fail(res, 'Run not found.', 404);
-        if (!(await canSeeTaskOf(companyId, caller, run))) return fail(res, 'Run not found.', 404);
+        // A report holds what its owner could read, so only they and owners/admins open it.
+        if (run.kind === 'report') {
+            if (!caller.privileged && String(run.startedBy || '') !== String(caller.actor.userId || '')) return fail(res, 'Run not found.', 404);
+        } else {
+            if (visible && !visible.includes(String(run.projectId || ''))) return fail(res, 'Run not found.', 404);
+            if (!(await canSeeTaskOf(companyId, caller, run))) return fail(res, 'Run not found.', 404);
+        }
         const auditRows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [{ 'meta.runId': String(run._id) }, {}, { sort: { createdAt: 1 }, limit: 200 }] }, 'find')
             .then((rows) => auditChain.foldRows(companyId, rows)).catch(() => []);
         const plain = typeof run.toObject === 'function' ? run.toObject() : { ...run };

@@ -12,7 +12,7 @@
             </div>
 
             <AiModelNotice />
-            <div class="ai-inbox" :class="{ 'ai-inbox--detail': selected || selectedApproval }">
+            <div class="ai-inbox" :class="{ 'ai-inbox--detail': selected || selectedApproval || selectedReport }">
                 <div class="ai-inbox__list ah-scroll">
                     <div class="ai-inbox__tabs">
                         <div class="ah-tabs">
@@ -20,7 +20,7 @@
                                 {{ $t(tab.label) }}<span v-if="tab.count" class="ai-side__count ah-mono">{{ tab.count }}</span>
                             </button>
                         </div>
-                        <select v-if="view !== 'approvals' && proposals.length > 1" v-model="sortOrder" class="ah-input ai-inbox__sort" :aria-label="$t('Ai.sort_by')" data-test="inbox-sort">
+                        <select v-if="view !== 'approvals' && view !== 'reports' && proposals.length > 1" v-model="sortOrder" class="ah-input ai-inbox__sort" :aria-label="$t('Ai.sort_by')" data-test="inbox-sort">
                             <option value="newest">{{ $t('Ai.sort_newest') }}</option>
                             <option value="oldest">{{ $t('Ai.sort_oldest') }}</option>
                         </select>
@@ -39,6 +39,30 @@
                             :active="selectedApproval && selectedApproval._id === approval._id"
                             @pick="selectedApproval = approval"
                         />
+                    </template>
+
+                    <template v-else-if="view === 'reports'">
+                        <div v-if="!reportsLoaded" class="ah-empty" style="margin:14px">{{ $t('Ai.loading') }}</div>
+                        <EmptyState v-else-if="reportsError" :title="$t('Ai.load_failed')" :message="reportsError" :action-label="$t('Ai.retry')" @action="loadReports" />
+                        <EmptyState v-else-if="!reports.length" data-test="reports-empty" :title="$t('Ai.reports_empty_title')" :message="$t('Ai.reports_empty_body')" />
+                        <button
+                            v-for="r in reports"
+                            v-else
+                            :key="r._id"
+                            type="button"
+                            class="ai-item"
+                            :class="{ 'is-active': selectedReport && selectedReport._id === r._id }"
+                            data-test="report-row"
+                            @click="selectedReport = r"
+                        >
+                            <div class="ai-item__top">
+                                <span class="ai-item__agent">{{ r.agentName }}</span>
+                                <span v-if="r.status !== 'done'" class="ah-chip ah-chip--mono">{{ runStatusLabel(r.status) }}</span>
+                                <span class="ai-item__time ah-mono">{{ shortTime(r.slotAt || r.startedAt) }}</span>
+                            </div>
+                            <div class="ai-item__what">{{ $t(`Ai.report_${(r.report && r.report.key) || 'daily_briefing'}`) }}</div>
+                            <div v-if="r.report && r.report.summary" class="ai-item__why">{{ r.report.summary }}</div>
+                        </button>
                     </template>
 
                     <div v-else-if="loading" class="ah-empty" style="margin:14px">{{ $t('Ai.loading') }}</div>
@@ -80,6 +104,12 @@
                     @decide="onDecideApproval"
                     @reassign="onReassignApproval"
                 />
+
+                <AgentReportDetail v-else-if="view === 'reports' && selectedReport" :report="selectedReport" @back="selectedReport = null" />
+
+                <div v-else-if="view === 'reports'" class="ai-detail ai-detail__empty">
+                    <span class="ah-small">{{ $t('Ai.report_pick_one') }}</span>
+                </div>
 
                 <div v-else-if="view === 'approvals'" class="ai-detail ai-detail__empty">
                     <span class="ah-small">{{ $t('Workflows.approval_pick_one') }}</span>
@@ -157,6 +187,7 @@
 <script setup>
 import AiModelNotice from '@/components/molecules/AiUnavailable/AiModelNotice.vue';
 import { computed, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import moment from "moment";
@@ -165,6 +196,8 @@ import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
 import WorkflowApprovalRow from "./WorkflowApprovalRow.vue";
 import WorkflowApprovalDetail from "./WorkflowApprovalDetail.vue";
+import AgentReportDetail from "./AgentReportDetail.vue";
+import { useAgentReports } from "./useAgentReports";
 import { useWorkflowApprovals } from "./useWorkflowApprovals";
 import { useAgents, reasonOf } from "./useAgents";
 import { DECLINE_REASONS } from "./episodeText";
@@ -177,7 +210,7 @@ defineOptions({ name: "AiInboxPage" });
 
 const GATE_OWNER_ADMIN = "owner_admin";
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const { canManage, userId, mayUndo } = useAgentAccess();
 const $toast = useToast();
 const { proposals, counts, loadProposals, loadSummary, decide } = useAgents();
@@ -192,6 +225,11 @@ const {
     decide: decideApproval,
     reassign: reassignApproval
 } = useWorkflowApprovals();
+
+const route = useRoute();
+const { reports, loaded: reportsLoaded, error: reportsError, load: loadReports } = useAgentReports();
+const selectedReport = ref(null);
+const runStatusLabel = (status) => (te(`Ai.run_status_${status}`) ? t(`Ai.run_status_${status}`) : status);
 
 const view = ref("pending");
 const sortOrder = ref("newest");
@@ -224,6 +262,7 @@ const gateChip = (gate) => t(gate === GATE_OWNER_ADMIN ? "Ai.gate_chip_owner_adm
 const tabs = computed(() => [
     { key: "pending", label: "Ai.waiting", count: counts.value.waiting || 0 },
     { key: "approvals", label: "Workflows.approvals_tab", count: approvalCount.value },
+    { key: "reports", label: "Ai.reports_tab", count: 0 },
     { key: "done", label: "Ai.done_by_ai", count: counts.value.doneByAi || 0 },
     { key: "declined", label: "Ai.declined", count: counts.value.declined || 0 }
 ]);
@@ -277,6 +316,8 @@ const switchView = async (key) => {
     view.value = key;
     selected.value = null;
     selectedApproval.value = null;
+    selectedReport.value = null;
+    if (key === "reports") return loadReports();
     await (key === "approvals" ? loadApprovals() : reload());
 };
 
@@ -365,7 +406,13 @@ const onUndo = async () => {
 /* The approvals are loaded on arrival whatever tab is open, because the tab's
  * count is the only sign a workflow is waiting on somebody. With the engine off
  * the load answers 503 and the count is simply nought. */
-onMounted(() => Promise.all([reload(), loadApprovals()]));
+const openLinkedReport = async (id) => {
+    view.value = "reports";
+    await loadReports();
+    selectedReport.value = reports.value.find((r) => String(r._id) === String(id)) || null;
+};
+
+onMounted(() => Promise.all([reload(), loadApprovals(), route?.query?.report ? openLinkedReport(route.query.report) : null]));
 </script>
 
 <style>

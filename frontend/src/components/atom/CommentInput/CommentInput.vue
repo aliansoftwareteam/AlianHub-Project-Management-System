@@ -47,6 +47,21 @@
                             </li>
                         </ul>
                     </li>
+                    <li
+                        v-if="showAiOption"
+                        :id="optionId(aiIndex)"
+                        class="d-flex align-items-center cursor-pointer p5px-p10px"
+                        :class="{'bg-blue white': selectedUserIndex === aiIndex}"
+                        role="option"
+                        data-test="mention-ai"
+                        :aria-selected="selectedUserIndex === aiIndex"
+                        @mouseover="selectedUserIndex = aiIndex"
+                        @click="addMention(aiOption)"
+                    >
+                        <span class="ah-avatar ah-avatar--sm ah-avatar--agent mr-10px" aria-hidden="true">{{ aiOption.name }}</span>
+                        <span>{{ $t('AiMention.option') }}</span>
+                        <span class="ml-10px font-size-12 comment-input__ai-hint">{{ $t('AiMention.option_hint') }}</span>
+                    </li>
                 </template>
                 <template v-else>
                     <li :id="optionId('none')" role="option" aria-disabled="true" class="d-flex align-items-center cursor-pointer p5px-p10px" @click="focusTextArea()">
@@ -113,6 +128,8 @@ import {defineProps, defineEmits, computed, onMounted, onBeforeUnmount, watch, r
 // COMPONENTS
 import UserProfile from "@/components/atom/UserProfile/UserProfile.vue"
 import { agentMentionKey } from "@/utils/agentMention";
+import { AI_MENTION_KEY, AI_MENTION_NAME } from "@/utils/aiMention";
+import { canUseAi } from "@/composable/aiAvailability";
 
 // UTILS
 const {getUser} = useGetterFunctions();
@@ -158,6 +175,10 @@ const props = defineProps({
     agents: {
         type: Array,
         default: () => []
+    },
+    aiMention: {
+        type: Boolean,
+        default: false
     }
 });
 
@@ -222,7 +243,12 @@ const filteredAgents = computed(() => props.agents
     .map((agent) => ({ name: agent.name, key: agentMentionKey(agent._id) }))
     .filter((agent) => agent.name.replaceAll(" ", "").toLowerCase().includes(mentionSearch.value.toLowerCase())));
 
-const mentionOptions = computed(() => [...filteredUsers.value, ...filteredAgents.value]);
+const aiOption = { name: AI_MENTION_NAME, key: AI_MENTION_KEY };
+const showAiOption = computed(() => props.aiMention && canUseAi()
+    && aiOption.name.toLowerCase().startsWith(mentionSearch.value.replaceAll(" ", "").toLowerCase()));
+const aiIndex = computed(() => filteredUsers.value.length + filteredAgents.value.length);
+
+const mentionOptions = computed(() => [...filteredUsers.value, ...filteredAgents.value, ...(showAiOption.value ? [aiOption] : [])]);
 
 const listboxId = `comment-mentions-${useId()}`;
 const optionId = (key) => `${listboxId}-${key}`;
