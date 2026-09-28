@@ -55,7 +55,7 @@
                         </select>
 
                         <span class="au__kw">{{ $t('Automations.in') }}</span>
-                        <select v-model="scopeChoice" class="au__slot" @change="onRuleEdit">
+                        <select v-model="scopeChoice" class="au__slot" @change="onScopeChange">
                             <option value="all">{{ $t('Automations.all_projects') }}</option>
                             <option v-for="p in projects" :key="p._id" :value="String(p._id)">{{ p.ProjectName || '—' }}</option>
                         </select>
@@ -66,10 +66,14 @@
                                 <option v-for="f in manifest.conditionFields" :key="f.field" :value="f.field">{{ f.label }}</option>
                             </select>
                             <select v-model="c.op" class="au__slot" @change="onRuleEdit">
-                                <option v-for="op in opsFor(c.field)" :key="op" :value="op">{{ opLabel(op) }}</option>
+                                <option v-for="op in opsFor(c.field)" :key="op" :value="op">{{ opLabel(op, c.field) }}</option>
                             </select>
-                            <select v-if="optionsFor(c.field).length && needsValue(c.op)" v-model="c.value" class="au__slot" @change="onRuleEdit">
-                                <option v-for="o in optionsFor(c.field)" :key="o" :value="o">{{ o }}</option>
+                            <select v-if="isStatusField(c.field) && needsValue(c.op)" v-model="c.label" class="au__slot" data-test="status-picker" @change="pickStatus(c)">
+                                <option value="" disabled>{{ $t('Automations.status_pick') }}</option>
+                                <option v-for="choice in choicesFor(c, projects, scopeChoice)" :key="choice.label" :value="choice.label">{{ choice.label }}</option>
+                            </select>
+                            <select v-else-if="optionsFor(c.field).length && needsValue(c.op)" v-model="c.value" class="au__slot" @change="onRuleEdit">
+                                <option v-for="o in optionsFor(c.field)" :key="o" :value="o">{{ optionText(c.field, o) }}</option>
                             </select>
                             <input v-else-if="needsValue(c.op)" v-model="c.value" class="au__slot au__slot--text" :placeholder="$t('Automations.value')" @change="onRuleEdit" />
                             <button type="button" class="au__x" :title="$t('Automations.remove')" @click="conditions.splice(i, 1); onRuleEdit()">×</button>
@@ -186,6 +190,9 @@
                         @click="toggle(r)"
                     ><span class="au__knob"></span></button>
                     <span class="au__rule-text">{{ r.sentence || r.summary }}</span>
+                    <span v-if="r.needsReview && r.needsReview.length" class="ah-chip ah-chip--warn" data-test="needs-review">
+                        {{ $t('Automations.status_needs_review', { status: r.needsReview.map((n) => n.status).join(', ') }) }}
+                    </span>
                     <span class="au__rule-count ah-mono">{{ $t('Parity.fired_n', { n: r.firedCount || 0 }) }}</span>
                     <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="open-runs" @click="runsRule = r">{{ $t('Automations.runs_open') }}</button>
                     <button v-if="canManage" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="edit(r)">{{ $t('Automations.edit') }}</button>
@@ -207,6 +214,7 @@ import * as env from '@/config/env';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import RunHistoryDrawer from './RunHistoryDrawer.vue';
 import { assignPeopleText, assignSkippedText } from './assignText';
+import { choicesFor, refsFor } from './statusChoices';
 
 // Loaded on first use: most rules never assign, and the people picker pulls in the shared DropDown.
 const AssignActionEditor = defineAsyncComponent(() => import('./AssignActionEditor.vue'));
@@ -261,7 +269,10 @@ const OP_LABELS = {
     gt: 'is more than', gte: 'is at least', lt: 'is less than', lte: 'is at most',
     changed: 'changed', changedTo: 'changed to', changedFrom: 'changed from',
 };
-const opLabel = (op) => OP_LABELS[op] || op;
+const isStatusField = (field) => fieldDef(field)?.type === 'status';
+const STATUS_OP_KEYS = { in: 'Automations.status_is', notIn: 'Automations.status_is_not' };
+const opLabel = (op, field) => (isStatusField(field) && STATUS_OP_KEYS[op] ? t(STATUS_OP_KEYS[op]) : (OP_LABELS[op] || op));
+const optionText = (field, option) => (field === 'statusType' ? t(`Automations.status_type_${option}`) : option);
 
 const { getters } = useStore();
 const { t } = useI18n();
@@ -278,16 +289,33 @@ const changeOpWarning = computed(() => {
     return uses ? `"${t.label}" has no before/after, so a "changed" condition will never match.` : '';
 });
 
+const emptyValue = (field) => (isStatusField(field) ? [] : '');
+
 const onFieldChange = (c) => {
     const ops = opsFor(c.field);
     if (!ops.includes(c.op)) c.op = ops[0] || 'eq';
-    c.value = '';
+    c.value = emptyValue(c.field);
+    c.label = '';
     onRuleEdit();
 };
 
 const addCondition = () => {
     const f = manifest.conditionFields[0];
-    if (f) conditions.value.push({ field: f.field, op: f.ops[0], value: '' });
+    if (f) conditions.value.push({ field: f.field, op: f.ops[0], value: emptyValue(f.field), label: '' });
+    onRuleEdit();
+};
+
+const pickStatus = (c) => {
+    c.value = refsFor(c.label, projects.value, scopeChoice.value);
+    onRuleEdit();
+};
+
+/* A status name is a different key in each project, so the keys follow the scope. */
+const onScopeChange = () => {
+    conditions.value.filter((c) => isStatusField(c.field) && c.label).forEach((c) => {
+        const refs = refsFor(c.label, projects.value, scopeChoice.value);
+        if (refs.length) c.value = refs;
+    });
     onRuleEdit();
 };
 
@@ -315,7 +343,11 @@ const addStep = () => {
 const buildConditions = () => {
     const list = conditions.value
         .filter((c) => c.field && c.op)
-        .map((c) => (needsValue(c.op) ? { op: c.op, field: c.field, value: c.value } : { op: c.op, field: c.field }));
+        .filter((c) => !(isStatusField(c.field) && needsValue(c.op) && !(c.value || []).length))
+        .map((c) => {
+            if (!needsValue(c.op)) return { op: c.op, field: c.field };
+            return isStatusField(c.field) ? { op: c.op, field: c.field, value: c.value, label: c.label } : { op: c.op, field: c.field, value: c.value };
+        });
     if (!list.length) return {};
     return list.length === 1 ? list[0] : { op: 'and', args: list };
 };
@@ -324,7 +356,7 @@ const buildConditions = () => {
 const loadConditions = (node) => {
     if (!node || !node.op) return [];
     const list = node.op === 'and' && Array.isArray(node.args) ? node.args : [node];
-    return list.filter((n) => n && n.field).map((n) => ({ field: n.field, op: n.op, value: n.value ?? '' }));
+    return list.filter((n) => n && n.field).map((n) => ({ field: n.field, op: n.op, value: n.value ?? '', label: n.label || '' }));
 };
 
 /* No name: the server composes it from the rule it is saving. A name derived
@@ -354,7 +386,7 @@ const applyRule = (rule) => {
 const compileSentence = async () => {
     if (!sentence.value.trim()) return;
     backtest.value = null;
-    const body = (await apiRequest('post', env.AUTOMATIONS_COMPILE, { sentence: sentence.value }))?.data;
+    const body = (await apiRequest('post', env.AUTOMATIONS_COMPILE, { sentence: sentence.value, scope: currentRule().scope }))?.data;
     if (!body?.status) { errors.value = [body?.statusText || 'Could not read that sentence.']; return; }
     errors.value = body.data.errors || [];
     ambiguities.value = body.data.ambiguities || [];

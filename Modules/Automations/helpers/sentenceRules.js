@@ -1,5 +1,6 @@
 const registry = require('../engine/registry');
 const { PRIORITIES } = require('./automationRules');
+const { statusClause, TYPE_WORD } = require('./statusConditions');
 
 // Natural-language automations (handoff 13d) — a deterministic parser, not a
 // model call.
@@ -33,8 +34,8 @@ const MARKED = /^a task (?:is marked|status changes to|is moved to)\s+(.+)$/i;
 const COND_PATTERNS = [
     { re: /^(?:the )?priority is not\s+(.+)$/i, build: (m) => ({ op: 'neq', field: 'Task_Priority', value: normPriority(m[1]) }) },
     { re: /^(?:the )?priority is\s+(.+)$/i, build: (m) => ({ op: 'eq', field: 'Task_Priority', value: normPriority(m[1]) }) },
-    { re: /^(?:the )?status is not\s+(.+)$/i, build: (m) => ({ op: 'neq', field: 'statusType', value: trim(m[1]) }) },
-    { re: /^(?:the )?status is\s+(.+)$/i, build: (m) => ({ op: 'eq', field: 'statusType', value: trim(m[1]) }) },
+    { re: /^(?:the )?status is not\s+(.+)$/i, build: (m) => ({ op: 'neq', statusWord: unquote(m[1]) }) },
+    { re: /^(?:the )?status is\s+(.+)$/i, build: (m) => ({ op: 'eq', statusWord: unquote(m[1]) }) },
     { re: /^(?:the )?title contains\s+(.+)$/i, build: (m) => ({ op: 'contains', field: 'TaskName', value: unquote(m[1]) }) },
     { re: /^(?:it |the task )?has no assignee$/i, build: () => ({ op: 'empty', field: 'AssigneeUserId' }) },
     { re: /^(?:it |the task )?has an assignee$/i, build: () => ({ op: 'notEmpty', field: 'AssigneeUserId' }) },
@@ -163,9 +164,10 @@ const sections = (sentence) => {
 };
 
 /* sentence → v2 rule. Returns every problem it found rather than the first, so
- * the builder can underline each slot it could not read. `people` ({ id, name }) are
- * the members a name may resolve to; the caller supplies them, so this stays pure. */
-const parseSentence = (sentence, { name, people = [] } = {}) => {
+ * the builder can underline each slot it could not read. `people` ({ id, name }) and
+ * `statuses` (statusConditions.catalogueOf) are what names may resolve to; the
+ * caller supplies them, so this stays pure. */
+const parseSentence = (sentence, { name, people = [], statuses = [], scope } = {}) => {
     const errors = [];
     const ambiguities = [];
     const parts = sections(sentence);
@@ -173,6 +175,11 @@ const parseSentence = (sentence, { name, people = [] } = {}) => {
 
     const triggerPhrase = phrase(parts.triggerText);
     const conditions = [];
+    const addStatus = (op, word) => {
+        const clause = statusClause(op, word, statuses);
+        if (clause.error) errors.push(clause.error);
+        else conditions.push(clause);
+    };
     let trigger = matchTrigger(triggerPhrase);
 
     if (!trigger) {
@@ -180,7 +187,7 @@ const parseSentence = (sentence, { name, people = [] } = {}) => {
         if (marked) {
             const value = unquote(marked[1]);
             trigger = CANON_TRIGGERS.find((t) => t.event === 'task.status_changed');
-            conditions.push({ op: 'changedTo', field: 'statusType', value });
+            addStatus('changedTo', value);
             // "marked High" reads as a priority to a human and as a status to the
             // engine. Guessing either way would put a rule in production that does
             // not do what its own sentence says.
@@ -210,7 +217,9 @@ const parseSentence = (sentence, { name, people = [] } = {}) => {
         const text = phrase(raw);
         const pattern = COND_PATTERNS.find((p) => p.re.test(text));
         if (!pattern) { errors.push(`I do not know the condition "${trim(raw)}".`); return; }
-        conditions.push(pattern.build(pattern.re.exec(text)));
+        const built = pattern.build(pattern.re.exec(text));
+        if (built.statusWord !== undefined) addStatus(built.op, built.statusWord);
+        else conditions.push(built);
     });
 
     const steps = [];
@@ -244,7 +253,9 @@ const parseSentence = (sentence, { name, people = [] } = {}) => {
         name: trim(name) || trim(sentence).slice(0, 120),
         version: 2,
         trigger: { type: 'event', event: trigger.event },
-        scope: { allProjects: true, projectIds: [] },
+        scope: scope && scope.allProjects === false && Array.isArray(scope.projectIds) && scope.projectIds.length
+            ? { allProjects: false, projectIds: scope.projectIds.map(String) }
+            : { allProjects: true, projectIds: [] },
         conditions: foldConditions(conditions),
         steps,
     };
@@ -253,8 +264,11 @@ const parseSentence = (sentence, { name, people = [] } = {}) => {
 
 const CHANGE_FIELD_PHRASE = {
     statusType: 'a task status changes to',
+    statusRef: 'a task status changes to',
     Task_Priority: 'a task priority changes to',
 };
+
+const statusWord = (node) => (node.field === 'statusRef' ? node.label : (TYPE_WORD[node.value] || node.value));
 
 const conditionSentence = (node) => {
     if (!node || !node.op) return '';
@@ -262,8 +276,10 @@ const conditionSentence = (node) => {
     switch (`${node.field}:${node.op}`) {
         case 'Task_Priority:eq': return `the priority is ${value}`;
         case 'Task_Priority:neq': return `the priority is not ${value}`;
-        case 'statusType:eq': return `the status is ${value}`;
-        case 'statusType:neq': return `the status is not ${value}`;
+        case 'statusType:eq':
+        case 'statusRef:in': return `the status is ${statusWord(node)}`;
+        case 'statusType:neq':
+        case 'statusRef:notIn': return `the status is not ${statusWord(node)}`;
         case 'TaskName:contains': return `the title contains "${value}"`;
         case 'AssigneeUserId:empty': return 'it has no assignee';
         case 'AssigneeUserId:notEmpty': return 'it has an assignee';
@@ -316,7 +332,7 @@ const describeRule = (rule = {}, { people = [] } = {}) => {
     const rest = nodes.filter((n) => n !== changeNode);
 
     let when = (CANON_TRIGGERS.find((t) => t.event === rule.trigger?.event) || {}).phrase || rule.trigger?.event || 'something happens';
-    if (changeNode) when = `${CHANGE_FIELD_PHRASE[changeNode.field]} ${changeNode.value}`;
+    if (changeNode) when = `${CHANGE_FIELD_PHRASE[changeNode.field]} ${changeNode.field === 'Task_Priority' ? changeNode.value : statusWord(changeNode)}`;
 
     const conditionText = rest.map(conditionSentence).filter(Boolean).join(' and ');
     const actionText = (rule.steps || []).filter((s) => s.type === 'action').map((step) => actionSentence(step, people)).filter(Boolean).join(' and ');

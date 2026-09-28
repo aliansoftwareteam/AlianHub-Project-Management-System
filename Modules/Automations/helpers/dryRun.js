@@ -3,6 +3,7 @@ const { render, placeholdersIn } = require('../engine/template');
 const { getAction } = require('../engine/registry');
 const { contextFor, inScope } = require('../engine/matcher');
 const { trimTask } = require('../../../event/domainEventBus');
+const { normaliseStatusConditions, statusNameOf, statusNameOfTask, TYPE_WORD } = require('./statusConditions');
 
 // Plans what a rule would do to one stored task. Pure: it only evaluates and
 // renders, and never touches an action's run(), so nothing here can write, emit
@@ -36,17 +37,34 @@ const rootField = (field) => {
  * field had just changed to the value the task holds now. */
 const changedFieldsFor = (conditions) => [...new Set(leavesOf(conditions).filter((n) => CHANGE_OPS.includes(n.op)).map((n) => rootField(n.field)))];
 
-const describeLeaf = (node, ctx) => {
+const statusNames = (node, ctx, statuses) => {
+    if (rootField(node.field) === 'statusRef') {
+        const wanted = node.label || [].concat(node.value || []).map((ref) => statusNameOf(ref, statuses) || ref).join(', ');
+        return { valueName: wanted, actualName: statusNameOfTask(ctx.task, statuses) || String(ctx.task.statusKey ?? 'empty') };
+    }
+    if (rootField(node.field) === 'statusType') {
+        const actual = readField(node.field, ctx);
+        return { valueName: TYPE_WORD[node.value] || String(node.value ?? ''), actualName: statusNameOfTask(ctx.task, statuses) || TYPE_WORD[actual] || String(actual ?? 'empty') };
+    }
+    return null;
+};
+
+const describeLeaf = (node, ctx, statuses = []) => {
     const passed = evaluate(node, ctx);
     const actual = readField(node.field, ctx);
-    const clause = { field: node.field, op: node.op, value: node.value, actual: actual === undefined ? null : actual, passed };
+    const clause = { field: node.field, op: node.op, value: node.value, actual: actual === undefined ? null : actual, passed, ...statusNames(node, ctx, statuses) };
     if (node.op === 'changedFrom') clause.note = 'A stored task has no earlier value, so a "changed from" clause cannot be checked.';
     else if (CHANGE_OPS.includes(node.op)) clause.note = `Read as though ${node.field} had just changed.`;
     return clause;
 };
 
+const STATUS_NEEDS = { eq: 'to be', in: 'to be', neq: 'not to be', notIn: 'not to be', changedTo: 'to change to' };
+
 const failureReason = (clause) => {
-    if (clause.op === 'changedFrom') return `${clause.field} changed from ${shown(clause.value)} cannot be checked on a stored task.`;
+    if (clause.op === 'changedFrom') return `${clause.valueName ? 'the status' : clause.field} changed from ${shown(clause.valueName || clause.value)} cannot be checked on a stored task.`;
+    if (clause.valueName !== undefined && STATUS_NEEDS[clause.op]) {
+        return `The status is "${clause.actualName}", and the rule needs the status ${STATUS_NEEDS[clause.op]} "${clause.valueName}".`;
+    }
     const wanted = ['empty', 'notEmpty', 'changed'].includes(clause.op) ? clause.op : `${clause.op} ${shown(clause.value)}`;
     return `${clause.field} is ${shown(clause.actual)}, and the rule needs ${clause.field} ${wanted}.`;
 };
@@ -64,7 +82,7 @@ const envelopeFor = ({ rule, task, uid }) => {
     };
 };
 
-const planSteps = (steps, ctx, matched) => {
+const planSteps = (steps, ctx, matched, statuses) => {
     let stoppedBy = matched ? null : 'The rule does not match this task.';
     return (Array.isArray(steps) ? steps.slice(0, MAX_STEPS) : []).map((step, i) => {
         const id = step.id || `s${i + 1}`;
@@ -72,7 +90,7 @@ const planSteps = (steps, ctx, matched) => {
             const passed = evaluate(step.condition, ctx);
             const entry = { id, type: 'condition', action: null, label: 'Condition', params: null, passed, wouldRun: !stoppedBy && passed };
             if (!stoppedBy && !passed) {
-                entry.note = `This condition does not hold, so the run would stop here. ${leavesOf(step.condition).map((n) => describeLeaf(n, ctx)).filter((c) => !c.passed).map(failureReason).join(' ')}`.trim();
+                entry.note = `This condition does not hold, so the run would stop here. ${leavesOf(step.condition).map((n) => describeLeaf(n, ctx, statuses)).filter((c) => !c.passed).map(failureReason).join(' ')}`.trim();
                 stoppedBy = `Stopped by condition ${id}.`;
             } else if (stoppedBy) entry.note = stoppedBy;
             return entry;
@@ -93,11 +111,15 @@ const planSteps = (steps, ctx, matched) => {
     });
 };
 
-const plan = ({ rule, task, uid, triggerLabel }) => {
+/* `statuses` (statusConditions.catalogueOf) names the statuses a condition holds
+ * by key, and resolves a condition still stored with a status name. */
+const plan = ({ rule: stored, task, uid, triggerLabel, statuses = [] }) => {
+    const plain = stored && stored.toObject ? stored.toObject() : stored;
+    const rule = { ...plain, conditions: normaliseStatusConditions(plain.conditions, statuses, plain.scope).conditions };
     const envelope = envelopeFor({ rule, task, uid });
     const ctx = contextFor(envelope);
     const scoped = inScope(rule, envelope);
-    const conditions = leavesOf(rule.conditions).map((n) => describeLeaf(n, ctx));
+    const conditions = leavesOf(rule.conditions).map((n) => describeLeaf(n, ctx, statuses));
     const conditionsHold = evaluate(rule.conditions, ctx);
     const matched = scoped && conditionsHold;
     const label = envelope.data.TaskKey || envelope.data.TaskName || 'This task';
@@ -116,7 +138,7 @@ const plan = ({ rule, task, uid, triggerLabel }) => {
         inScope: scoped,
         reasons,
         conditions,
-        actions: planSteps(rule.steps, ctx, matched),
+        actions: planSteps(rule.steps, ctx, matched, statuses),
         basis: `Evaluated against the task as it is stored now, as though "${triggerLabel || envelope.type}" had just happened to it. Nothing was saved and no action ran.`,
     };
 };

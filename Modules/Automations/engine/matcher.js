@@ -2,6 +2,8 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const logger = require('../../../Config/loggerConfig');
 const { evaluate } = require('./expression');
+const statusConditions = require('../helpers/statusConditions');
+const { loadStatuses } = require('../helpers/projectStatuses');
 
 // Which rules care about this event.
 //
@@ -27,6 +29,22 @@ const indexRules = (rules) => {
     return byTrigger;
 };
 
+/* Rules saved before status conditions were keyed still name statuses; resolving
+ * those here makes them match without waiting for the migration. */
+const withResolvedStatuses = async (companyId, rules) => {
+    const needs = (rule) => statusConditions.needsStatusCatalogue(rule?.conditions);
+    if (!(rules || []).some(needs)) return rules;
+    const statuses = await loadStatuses(companyId).catch((error) => {
+        logger.error(`${LOG_PREFIX} could not load statuses for ${companyId}: ${error.message}`);
+        return [];
+    });
+    return rules.map((rule) => {
+        if (!needs(rule)) return rule;
+        const plain = rule.toObject ? rule.toObject() : rule;
+        return { ...plain, conditions: statusConditions.normaliseStatusConditions(plain.conditions, statuses, plain.scope).conditions };
+    });
+};
+
 async function loadRules(companyId) {
     const cached = ruleCache.get(companyId);
     if (cached && (Date.now() - cached.at) < CACHE_TTL_MS) return cached.byTrigger;
@@ -37,7 +55,7 @@ async function loadRules(companyId) {
             type: SCHEMA_TYPE.AUTOMATION_RULES,
             data: [{ enabled: true, deletedStatusKey: 0 }],
         }, 'find');
-        const byTrigger = indexRules(rules);
+        const byTrigger = indexRules(await withResolvedStatuses(companyId, rules));
         ruleCache.set(companyId, { at: Date.now(), byTrigger });
         return byTrigger;
     } catch (error) {
@@ -53,12 +71,12 @@ const invalidateAll = () => { ruleCache.clear(); };
  * nothing more — a condition cannot reach the database, so evaluating one is
  * always cheap and always side-effect free. */
 const contextFor = (envelope, outputs = {}) => ({
-    task: envelope.data || {},
-    previous: envelope.previous || {},
+    task: statusConditions.withStatusRef(envelope.data || {}),
+    previous: statusConditions.withStatusRef(envelope.previous || {}),
     actor: envelope.actor || {},
     scope: envelope.scope || {},
     entity: envelope.entity || {},
-    changedFields: envelope.changedFields || [],
+    changedFields: statusConditions.withStatusChange(envelope.changedFields || []),
     steps: outputs,
 });
 

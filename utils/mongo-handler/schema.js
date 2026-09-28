@@ -883,6 +883,9 @@ const schema = {
         reactToAutomation: { type: Boolean, default: false, required: false },
         // Round-robin turn per assign step id, advanced atomically by Modules/Automations/engine/assignees.
         assignCursors: { type: Object, default: {}, required: false },
+        // [{ reason: 'unknown_status', status }] — a condition naming a status no project in scope has,
+        // flagged by migration 061 instead of being dropped; cleared when the rule is saved again.
+        needsReview: { type: Array, default: undefined, required: false },
         enabled: { type: Boolean, default: true, required: false },
         // The v1 on-demand bulk apply only: when it last ran and how many tasks it
         // changed. A v2 rule is fired by events, never applied, so these stay unset
