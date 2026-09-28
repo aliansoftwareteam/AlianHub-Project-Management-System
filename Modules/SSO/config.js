@@ -10,6 +10,7 @@ const { resolveTxt } = require("./helpers/dnsTxt");
 const logger = require("../../Config/loggerConfig");
 const { pinSessionTenant } = require("../../Config/tenant");
 const { forgetSsoOnInstance } = require("./discover");
+const { isKnownCompany } = require("../../Config/knownCompany");
 
 // SSO config holds IdP secrets — only owner/admin may read/write it.
 const callerIsAdmin = async (companyId, uid) => isPrivileged(await getRoleType(companyId, uid));
@@ -132,9 +133,9 @@ exports.getPublicSsoConfig = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || (req.query && req.query.companyId); // tenant-scoping: the login page asks before any session exists, and the answer is the secret-free public view
         if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
-        const cfg = await MongoDbCrudOpration(companyId, {
+        const cfg = (await isKnownCompany(companyId)) ? await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.SSO_CONFIGS, data: [{ deletedStatusKey: 0, isEnabled: true }],
-        }, 'findOne');
+        }, 'findOne') : null;
         return res.send({ status: true, statusText: 'OK', data: publicSsoView(cfg) });
     } catch (error) {
         return res.send({ status: false, statusText: error.message });
