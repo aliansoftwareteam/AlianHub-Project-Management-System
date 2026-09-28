@@ -67,7 +67,7 @@ const ok = (data) => Promise.resolve({ data: { status: true, data } });
 const mountSchedules = async (props = {}, rows = [ROW]) => {
     apiRequest.mockImplementation((type) => (type === 'get' ? ok(rows) : ok({ ...ROW, _id: 's2' })));
     const wrapper = mount(AgentSchedules, {
-        props: { agentId: 'a1', autonomy: 3, canManage: true, agentOwnerId: 'user-1', projects: [], ...props },
+        props: { agentId: 'a1', autonomy: 3, canManage: true, agentOwnerId: 'user-1', projects: [{ _id: 'p1', ProjectName: 'Launch' }], ...props },
         global: { stubs: { RouterLink: RouterLinkStub, ShellIcon: true } }
     });
     await flushPromises();
@@ -108,6 +108,14 @@ describe('the Schedule section on the agent page', () => {
         const post = apiRequest.mock.calls.find(([type]) => type === 'post');
         expect(post[1]).toBe('/api/v2/agents/a1/schedules');
         expect(post[2]).toMatchObject({ report: 'weekly_status', every: 'weekly', weekday: 5, at: '16:00' });
+    });
+
+    it('says a report posted to a task only includes what its readers can see', async () => {
+        wrapper = await mountSchedules({}, []);
+        await wrapper.find('[data-test="schedule-add"]').trigger('click');
+        expect(wrapper.find('[data-test="schedule-shared-note"]').exists()).toBe(false);
+        await wrapper.find('[data-test="schedule-page"]').setValue('p1');
+        expect(wrapper.find('[data-test="schedule-shared-note"]').text()).toBe('Ai.schedule_shared_scope_note');
     });
 
     it('does not send an editor with a bad time', async () => {

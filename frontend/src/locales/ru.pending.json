@@ -718,6 +718,7 @@
     "Ai.schedule_runs_as_you": "Runs as you",
     "Ai.schedule_save": "Save schedule",
     "Ai.schedule_save_failed": "The schedule could not be saved.",
+    "Ai.schedule_shared_scope_note": "Posted to a task or a page, the report only includes what its readers can see: that project, without private sprints, and without the summary written from your wider view.",
     "Ai.schedule_task_chosen": "A task is chosen",
     "Ai.schedule_task_clear": "Clear",
     "Ai.schedule_task_none": "No task",

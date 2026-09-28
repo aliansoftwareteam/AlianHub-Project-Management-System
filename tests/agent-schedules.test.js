@@ -356,6 +356,57 @@ describe('delivery', () => {
         expect(run.report.delivered.comment).toBe(true);
     });
 
+    describe('to a shared place', () => {
+        const PRIVATE_SPRINT = '6f0000000000000000000e01';
+        const T_PRIVATE = '6f0000000000000000000705';
+        const seedWide = () => {
+            seedTask(T_OPEN, OPEN_PROJECT, { TaskName: 'Visible launch checklist' });
+            seedTask(T_HIDDEN, HIDDEN_PROJECT, { TaskName: 'Secret board merger' });
+            store().seed(SCHEMA_TYPE.SPRINTS, { _id: PRIVATE_SPRINT, projectId: OPEN_PROJECT, private: true, AssigneeUserId: [ADMIN] });
+            seedTask(T_PRIVATE, OPEN_PROJECT, { TaskName: 'Private sprint plan', sprintId: PRIVATE_SPRINT });
+        };
+
+        it('posts to a task comment only what that task\'s readers can open, while the Inbox keeps the owner\'s full view', async () => {
+            seedAgent({ allowedActions: ['task.comment'] });
+            seedSchedule({ ownerId: ADMIN, report: 'deadline_watch', deliver: { taskId: T_OPEN } });
+            seedWide();
+            await scheduler.tickCompany(A, { now: NOW });
+            const body = actions.perform.mock.calls[0][0].params.body;
+            expect(body).toContain('Visible launch checklist');
+            expect(body).not.toContain('Secret board merger');
+            expect(body).not.toContain('Private sprint plan');
+            expect(body).not.toContain('Two things need you today.');
+            const [run] = reportRuns();
+            expect(reportText(run)).toContain('Secret board merger');
+            expect(reportText(run)).toContain('Private sprint plan');
+            expect(run.report.shared.comment).toMatchObject({ projectId: OPEN_PROJECT });
+        });
+
+        it('keeps the destination task\'s own private sprint, whose readers are on it', async () => {
+            seedAgent({ allowedActions: ['task.comment'] });
+            seedSchedule({ ownerId: ADMIN, report: 'deadline_watch', deliver: { taskId: T_PRIVATE } });
+            seedWide();
+            await scheduler.tickCompany(A, { now: NOW });
+            const body = actions.perform.mock.calls[0][0].params.body;
+            expect(body).toContain('Private sprint plan');
+            expect(body).not.toContain('Secret board merger');
+        });
+
+        it('drafts a page with only what the page\'s project readers can open', async () => {
+            seedAgent({ allowedActions: ['page.draft'] });
+            seedSchedule({ ownerId: ADMIN, report: 'deadline_watch', deliver: { pageProjectId: OPEN_PROJECT } });
+            store().seed(SCHEMA_TYPE.PROJECTS, { _id: OPEN_PROJECT, ProjectName: 'Launch', deletedStatusKey: 0 });
+            seedWide();
+            await scheduler.tickCompany(A, { now: NOW });
+            const args = actions.perform.mock.calls[0][0];
+            expect(args).toMatchObject({ action: 'page.draft', params: { projectId: OPEN_PROJECT } });
+            expect(args.params.text).toContain('Visible launch checklist');
+            expect(args.params.text).not.toContain('Secret board merger');
+            expect(args.params.text).not.toContain('Private sprint plan');
+            expect(reportText(reportRuns()[0])).toContain('Secret board merger');
+        });
+    });
+
     it('never posts on a task the owner cannot open', async () => {
         seedAgent({ allowedActions: ['task.comment'] });
         seedSchedule({ deliver: { taskId: T_HIDDEN } });

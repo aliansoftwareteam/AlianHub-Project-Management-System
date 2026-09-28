@@ -1018,7 +1018,7 @@ const schema = {
         kind: { type: String, required: false },
         scheduleId: { type: String, required: false },
         slotAt: { type: Date, required: false },
-        // { key, title, summary, sections, counts, text, delivered: { inbox, email, comment, page }, notes }
+        // { key, title, summary, sections, counts, text, delivered: { inbox, email, comment, page }, shared: { comment, page: { projectId, counts } }, notes }
         report: { type: Object, required: false },
     },
     // Modules/Agents/schedules — when an L3 agent runs a report, and as whom

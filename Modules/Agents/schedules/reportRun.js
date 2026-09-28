@@ -54,13 +54,16 @@ const runReport = async (companyId, { agent, schedule, slot, now = new Date() })
 
     try {
         const scope = await taskScopeFor(companyId, ownerId, agent);
-        const report = await reports.gather(schedule.report, {
-            companyId, ownerId, scope, now, tzOffset: tzOffsetAt(schedule.timezone, now), options: schedule.options || {},
-        });
+        const ctx = { companyId, ownerId, now, tzOffset: tzOffsetAt(schedule.timezone, now), options: schedule.options || {} };
+        const report = await reports.gather(schedule.report, { ...ctx, scope });
         const { summary, note, capReached } = await summarise(companyId, { run, agent, report });
         const text = reports.textOf(report, { agentName: agent.name, summary });
-        const { delivered, notes } = await delivery.deliver(companyId, { run, agent, schedule, report, text, scope });
-        const stored = { ...report, summary, text, delivered, notes: [note, ...notes].filter(Boolean) };
+        const rebuild = async (sharedScope) => {
+            const scoped = await reports.gather(schedule.report, { ...ctx, scope: sharedScope });
+            return { report: scoped, text: reports.textOf(scoped, { agentName: agent.name }) };
+        };
+        const { delivered, notes, shared } = await delivery.deliver(companyId, { run, agent, schedule, report, text, scope, rebuild });
+        const stored = { ...report, summary, text, delivered, shared, notes: [note, ...notes].filter(Boolean) };
         await runs.patch(companyId, run._id, { report: stored });
         const outcome = `${report.title} delivered${capReached ? ' (spend cap reached)' : ''}`;
         await runs.finish(companyId, run._id, { status: runs.STATUS.DONE, outcome, onlyIf: runs.STATUS.RUNNING });

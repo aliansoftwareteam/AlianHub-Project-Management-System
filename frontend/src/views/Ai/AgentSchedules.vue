@@ -94,6 +94,7 @@
                     </div>
                 </div>
                 <p class="ah-field__hint" data-test="schedule-writes-note">{{ $t('Ai.schedule_writes_note') }}</p>
+                <p v-if="form.taskId || form.pageProjectId" class="ah-field__hint" data-test="schedule-shared-note">{{ $t('Ai.schedule_shared_scope_note') }}</p>
 
                 <div v-if="formError" class="ah-field__error" data-test="schedule-error">{{ $t(formError) }}</div>
                 <div v-else-if="saveError" class="ah-field__error" data-test="schedule-error">{{ saveError }}</div>

@@ -2539,6 +2539,7 @@ export default {
         schedule_deliver_page: "Draft a page in a project",
         schedule_page_none: "No page",
         schedule_writes_note: "A comment or a page is a write. It happens only when the agent's allowed actions include it; otherwise the report stays read-only.",
+        schedule_shared_scope_note: "Posted to a task or a page, the report only includes what its readers can see: that project, without private sprints, and without the summary written from your wider view.",
         schedule_save: "Save schedule",
         schedule_add: "Add a schedule",
         schedule_save_failed: "The schedule could not be saved.",

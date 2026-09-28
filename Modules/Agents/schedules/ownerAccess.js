@@ -3,6 +3,7 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { ROLE_GUEST } = require('../../../Config/roleTypes');
+const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const { visibilityStage, toObjectIds } = require('../../Tasks/helpers/taskQueryGuard');
 
 // A scheduled run reads as the schedule's owner, exactly as a run that person
@@ -40,7 +41,7 @@ const taskScopeFor = async (companyId, ownerId, agent) => {
 const ownerSeesTask = async (companyId, scope, taskId) => {
     if (!OBJECT_ID.test(String(taskId || ''))) return null;
     return MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.TASKS, data: [{ $and: [scope, { _id: oid(taskId), deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true } }] }, { ProjectID: 1, TaskName: 1 }],
+        type: SCHEMA_TYPE.TASKS, data: [{ $and: [scope, { _id: oid(taskId), deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true } }] }, { ProjectID: 1, sprintId: 1, TaskName: 1 }],
     }, 'findOne').catch(() => null);
 };
 
@@ -53,4 +54,17 @@ const ownerSeesProject = async (companyId, scope, projectId) => {
     return Boolean(project);
 };
 
-module.exports = { REFUSAL, ownerMayRun, taskScopeFor, ownerSeesTask, ownerSeesProject };
+/* What a shared destination's readers can all open: the owner's view cut to the destination's
+ * project, without the project's private sprints. The destination task's own sprint stays in,
+ * because whoever reads that task's thread is on it. */
+const sharedScopeFor = async (companyId, ownerScope, projectId, { sprintId } = {}) => {
+    const privateSprints = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.SPRINTS, data: [{ projectId: { $in: idForms([String(projectId)]) }, private: true }, { _id: 1 }],
+    }, 'find');
+    const hidden = (privateSprints || []).map((s) => String(s._id)).filter((id) => id !== String(sprintId || ''));
+    const clauses = [ownerScope, { ProjectID: { $in: idForms([String(projectId)]) } }];
+    if (hidden.length) clauses.push({ sprintId: { $nin: idForms(hidden) } });
+    return { $and: clauses.filter((c) => c && Object.keys(c).length) };
+};
+
+module.exports = { REFUSAL, ownerMayRun, taskScopeFor, ownerSeesTask, ownerSeesProject, sharedScopeFor };
