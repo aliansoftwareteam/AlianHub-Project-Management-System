@@ -71,11 +71,13 @@
                 :href="edit.taskHref(data)"
                 :can-rename="rights.rename"
                 :can-subtask="rights.subtask"
+                :can-template="rights.template"
                 @rename="startRename"
                 @add-subtask="$emit('add-subtask', data)"
                 @copy-link="edit.copyLink(data)"
                 @copy-key="edit.copyKey && edit.copyKey(data)"
                 @open="open"
+                @save-template="openTemplateDialog({ mode: 'save', task: data })"
             />
         </div>
 
@@ -131,6 +133,7 @@ import ListAssigneeCell from "./ListAssigneeCell.vue";
 import ListDueCell from "./ListDueCell.vue";
 import ListPriorityCell from "./ListPriorityCell.vue";
 import ListRowActions from "./ListRowActions.vue";
+import { openTemplateDialog } from "@/components/molecules/TaskTemplates/taskTemplates";
 import TaskTagCell from "@/components/molecules/TagList/TaskTagCell.vue";
 import { timerState, isTimerFor, elapsedSeconds } from "@/components/organisms/TaskDetailOverlay/useTaskTimer";
 import { taskRisk } from "@/views/Projects/composables/taskRisk";
@@ -154,7 +157,7 @@ const emit = defineEmits(["open", "select", "toggle-subtasks", "toggle-done", "r
 
 const { t } = useI18n();
 
-const NO_RIGHTS = { status: false, assignee: false, due: false, priority: false, rename: false, subtask: false };
+const NO_RIGHTS = { status: false, assignee: false, due: false, priority: false, rename: false, subtask: false, template: false };
 const edit = inject("listRowEdit", null);
 const rights = computed(() => edit?.rights.value || NO_RIGHTS);
 const statuses = computed(() => edit?.statuses.value || []);

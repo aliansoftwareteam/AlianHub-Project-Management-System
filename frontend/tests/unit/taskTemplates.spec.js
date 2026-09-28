@@ -24,7 +24,7 @@ vi.mock('@/composable', () => ({
 import { closeQuickCreate, openQuickCreate } from '@/components/organisms/QuickCreateTask/quickCreateTask';
 import QuickCreateTask from '@/components/organisms/QuickCreateTask/QuickCreateTask.vue';
 import TaskTemplateDialog from '@/components/molecules/TaskTemplates/TaskTemplateDialog.vue';
-import { dueDayFromOffset, renderTitle } from '@/components/molecules/TaskTemplates/taskTemplates';
+import { dayFromOffset, renderTitle } from '@/components/molecules/TaskTemplates/taskTemplates';
 
 const STATUSES = [{ name: 'To Do', key: 1, value: 'to_do', type: 'default_active' }];
 const TYPES = [{ key: 1, value: 'task', name: 'Task' }, { key: 2, value: 'bug', name: 'Bug' }];
@@ -92,8 +92,8 @@ describe('template helpers', () => {
     });
 
     it('turns a day offset into a local day', () => {
-        expect(dueDayFromOffset(3, new Date(2026, 9, 1, 15, 0))).toBe('2026-10-04');
-        expect(dueDayFromOffset(null, new Date(2026, 9, 1))).toBe('');
+        expect(dayFromOffset(3, new Date(2026, 9, 1, 15, 0))).toBe('2026-10-04');
+        expect(dayFromOffset(null, new Date(2026, 9, 1))).toBe('');
     });
 });
 
@@ -121,7 +121,7 @@ describe('the template picker in the create dialog', () => {
         await mountDialog();
         expect($('[data-field="title"]').element.value).toMatch(/^Release \d{4}-\d{2}-\d{2}$/);
         expect($('[data-field="priority"]').element.value).toBe('HIGH');
-        expect($('[data-field="due"]').element.value).toBe(dueDayFromOffset(3, new Date()));
+        expect($('[data-field="due"]').element.value).toBe(dayFromOffset(3, new Date()));
     });
 
     it('creates the task with the template\'s type, then applies the rest of the template to it', async () => {

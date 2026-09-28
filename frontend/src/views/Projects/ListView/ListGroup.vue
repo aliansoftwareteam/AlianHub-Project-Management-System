@@ -68,6 +68,13 @@
             </div></div>
 
             <div v-if="creating" role="row" class="lv2__aria-row"><div role="cell" class="lv2__create">
+                <label v-if="templates.length" class="lv2__template">
+                    <span class="lv2__template-label">{{ $t('TaskTemplates.template') }}</span>
+                    <select v-model="templateId" class="lv2__template-select" data-field="row-template">
+                        <option value="">{{ $t('TaskTemplates.no_template') }}</option>
+                        <option v-for="tpl in templates" :key="tpl._id" :value="tpl._id">{{ tpl.name }}</option>
+                    </select>
+                </label>
                 <CreateTask
                     :sprint="sprint"
                     :assigneeOptions="project.AssigneeUserId"
@@ -103,6 +110,7 @@ import { groupLabel, groupRows, listSourceTasks, searchExpandIds } from "./listF
 import { apiRequest } from "@/services";
 import { subtaskCreateAssignees } from "@/utils/assigneeOptions";
 import * as env from "@/config/env";
+import { applyContext, applyTemplate, defaultTemplateOf, listTemplates } from "@/components/molecules/TaskTemplates/taskTemplates";
 
 defineOptions({ name: "ListGroup" });
 
@@ -126,6 +134,8 @@ const searchedTask = inject("searchedTask", ref(false));
 const taskCollapsed = inject("taskCollapsed", ref(true));
 
 const creating = ref(false);
+const templates = ref([]);
+const templateId = ref("");
 const expandedIds = ref([]);
 const subtaskFor = ref("");
 
@@ -268,9 +278,29 @@ function onDragChange(event) {
     applyDrag({ event, item: props.item, groupType: props.groupType, rows: rows.value, project: props.project });
 }
 
+watch(creating, (on) => {
+    if (!on) return;
+    const pid = String(props.project._id);
+    listTemplates(pid)
+        .then((found) => {
+            if (String(props.project._id) !== pid) return;
+            templates.value = found;
+            if (!templateId.value) templateId.value = defaultTemplateOf(found)?._id || "";
+        })
+        .catch((error) => console.error("ERROR in list templates: ", error));
+});
+
+/* The add row picks its own type and priority by default, so the template chosen in the same row replaces them. */
+function applyRowTemplate(created) {
+    if (!templateId.value || !created._id) return;
+    applyTemplate(templateId.value, { taskId: String(created._id), overwrite: ["type", "priority"], ...applyContext() })
+        .catch((error) => console.error("ERROR in list template apply: ", error));
+}
+
 function onCreated(payload) {
     const created = payload?.data;
     if (!created) return;
+    applyRowTemplate(created);
     if (props.groupType === 0 && created.statusKey !== props.item.key) {
         updateTaskByGroup({ ...created, _id: created._id }, props.item, 0).catch((error) => console.error("ERROR in list inline add: ", error));
     }
