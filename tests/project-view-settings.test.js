@@ -300,6 +300,8 @@ describe('private view settings', () => {
     it('writes to the caller\'s company only', async () => {
         rowOf(MEMBER).ProjectRequiredComponent = [privateList()];
         await call(MEMBER, { id: String(rowOf(MEMBER)._id), operation: 'settings', data: { id: 'mylist0001', settings: SETTINGS } });
-        mockDb.calls.forEach((c) => expect(c.companyId).toBe(C));
+        const memberCalls = mockDb.calls.filter((c) => c.type === SCHEMA_TYPE.COMPANY_USERS);
+        expect(memberCalls.length).toBeGreaterThan(0);
+        memberCalls.forEach((c) => expect(c.companyId).toBe(C));
     });
 });

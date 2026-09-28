@@ -10,6 +10,7 @@ const { judgeMemberUpdate, judgeInvitationAcceptance, memberRowView } = require(
 const { SEAT_CANCELLED, SEAT_PENDING } = require('../../../Config/seatStatus');
 const knowledgeEvents = require('../../Knowledge/ingest/events');
 const { recordPrivateViewChange } = require('./privateViewHistory');
+const { cleanViewSettings, cleanViewTitle } = require('../../Project/helpers/viewSettings');
 const { revokeMemberTokens } = require('../../ApiTokens/memberTokens');
 const logger = require('../../../Config/loggerConfig');
 
@@ -195,9 +196,13 @@ exports.handlePrivateView = async (req, res) => {
         }
 
         let update = {};
+        let options;
         if (operation === 'push') {
+            const view = { ...data };
+            if (Object.prototype.hasOwnProperty.call(view, 'settings')) view.settings = cleanViewSettings(view.settings);
+            if (Object.prototype.hasOwnProperty.call(view, 'title')) view.title = cleanViewTitle(view.title);
             update = {
-                $push: { ProjectRequiredComponent: data }
+                $push: { ProjectRequiredComponent: view }
             }
         } else if (operation === 'update') {
             if(!data.id && ["name"].includes(key)) {
@@ -206,12 +211,24 @@ exports.handlePrivateView = async (req, res) => {
             update = {
                 $set: { "ProjectRequiredComponent.$[elem].name": data.name }
             }
+            if (["name"].includes(key)) options = { arrayFilters: [{ "elem.id": data.id }] };
+        } else if (operation === 'settings') {
+            if (!data.id) {
+                return refuse(res, 400, `Element 'id' parameter is required.`);
+            }
+            if (!isPlainObject(data.settings)) {
+                return refuse(res, 400, 'Settings must be an object.');
+            }
+            update = {
+                $set: { "ProjectRequiredComponent.$[elem].settings": cleanViewSettings(data.settings) }
+            }
+            options = { arrayFilters: [{ "elem.id": data.id }] };
         } else if (operation === 'delete') {
             update = {
                 $pull: { ProjectRequiredComponent: { id: data.id } }
             }
         } else {
-            return refuse(res, 400, 'Invalid operation type. Supported operations: push, update, delete');
+            return refuse(res, 400, 'Invalid operation type. Supported operations: push, update, settings, delete');
         }
 
         const row = await findMemberRow(companyId, id);
@@ -221,8 +238,9 @@ exports.handlePrivateView = async (req, res) => {
         if (!req.uid || String(row.userId || '') !== String(req.uid)) {
             return refuse(res, 403, 'You can only change your own private views.');
         }
-
-        const options = (operation === 'update' && (["name"].includes(key))) ? { arrayFilters: [{ "elem.id": data.id }] } : undefined;
+        if (operation === 'settings' && !(row.ProjectRequiredComponent || []).some((view) => view && String(view.id) === String(data.id))) {
+            return refuse(res, 404, 'Private view not found.');
+        }
 
         const params = {
             type: SCHEMA_TYPE.COMPANY_USERS,
