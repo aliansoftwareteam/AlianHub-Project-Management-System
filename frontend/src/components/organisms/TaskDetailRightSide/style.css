@@ -128,18 +128,18 @@
     .taskdetail-label, .task-esitmate-hours{font-size: 16px !important;padding-right: 0 !important;}
 }
 
-/* AI-estimate icon button — sits inline with the EstimatedTimeInput on
-   the right of the "Estimated" row. Sized to match the inline time
-   value's visual height (24px) so the row stays balanced. */
 .estimated-with-ai {
     gap: 6px;
+    flex-wrap: wrap;
 }
 .ai-estimate-btn {
-    width: 24px;
+    min-width: 24px;
     height: 24px;
-    padding: 0;
+    padding: 0 6px;
+    gap: 4px;
     border: none;
     background: transparent;
+    color: var(--brand);
     border-radius: 4px;
     cursor: pointer;
     display: inline-flex;
@@ -148,7 +148,33 @@
     transition: background-color 0.15s ease-in-out;
 }
 .ai-estimate-btn:hover:not(:disabled) {
-    background-color: rgba(100, 115, 232, 0.10);
+    background-color: var(--brand-tint);
+}
+.ai-estimate-btn:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 1px;
+}
+.ai-estimate-btn .ai-estimate-label {
+    height: auto;
+    padding: 0;
+    border-radius: 0;
+    font: 500 12.5px/1 var(--font-ui);
+    color: var(--brand);
+}
+.ai-estimate-preview {
+    margin: 4px 0 10px;
+}
+.ai-estimate-preview__lead {
+    margin: 0 0 4px;
+    font: 600 13px/1.45 var(--font-ui);
+    color: var(--ink);
+}
+.ai-estimate-preview__range,
+.ai-estimate-preview__reason {
+    margin: 0 0 4px;
+    font: 400 12.5px/1.5 var(--font-ui);
+    color: var(--ink-2);
+    white-space: pre-wrap;
 }
 .ai-estimate-btn:disabled {
     cursor: progress;
