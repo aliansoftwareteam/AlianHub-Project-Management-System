@@ -132,6 +132,7 @@ const commentOn = async ({ companyId, actor, params, depth }, action, body) => {
         type: SCHEMA_TYPE.COMMENTS,
         data: [{ _id: oid(r.commentId) }, { $set: { userId: String(actor.userId || a.actorId), actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null } }],
     }, 'updateOne').catch(() => {});
+    if (!actor.runId) await require('./triggers').fromComment(companyId, { authorId: actor.userId, taskId: params.taskId, message: body, depth: clampDepth(depth) + 1 });
     return { result: { commentId: r.commentId }, undo: { kind: 'comment', commentId: r.commentId, taskId: String(params.taskId) }, entityId: params.taskId };
 };
 
