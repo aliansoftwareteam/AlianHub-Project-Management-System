@@ -156,7 +156,7 @@ exports.manualLogTime = async (req, res) => {
         });
         return;
     }
-    const { type = SCHEMA_TYPE.TIMESHEET } = req.body;
+    const type = SCHEMA_TYPE.TIMESHEET;
     if (typeof req.body.timeDuration !== 'string' || !/^\d+:\d+$/.test(req.body.timeDuration)) {
         res.send({
             status: false,
