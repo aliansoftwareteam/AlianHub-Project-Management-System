@@ -32,6 +32,8 @@ describe('every AI entry point asks the one availability question', () => {
         'views/Projects/components/ProjectEmptyState.vue',
         'views/Projects/components/ProjectFiltersToolbar.vue',
         'views/Projects/ListView/ListBulkBar.vue',
+        'components/organisms/MainChat/MainChatHeader.vue',
+        'components/organisms/MainChat/MainChatComposer.vue',
         'views/Inbox/Inbox.vue'
     ];
 
