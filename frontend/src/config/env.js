@@ -363,6 +363,11 @@ module.exports.CUSTOM_FIELD_COMPUTE = '/api/v2/custom-fields/compute';
 // CSV import (handoff 22b)
 module.exports.IMPORT_CSV = '/api/v2/imports/csv';
 module.exports.IMPORT_CSV_PREVIEW = '/api/v2/imports/csv/preview';
+module.exports.IMPORT_CLICKUP = '/api/v2/imports/clickup';
+module.exports.IMPORT_CLICKUP_PREVIEW = '/api/v2/imports/clickup/preview';
+module.exports.IMPORT_CLICKUP_PROJECT = '/api/v2/imports/clickup/project';
+module.exports.EXPORTS = '/api/v2/exports';
+module.exports.EXPORTS_WORKSPACE = '/api/v2/exports/workspace';
 
 // Per-status WIP limit on a project's board columns
 module.exports.PROJECT_WIP_LIMIT = '/api/v1/projectSetting/taskStatus/wipLimit';

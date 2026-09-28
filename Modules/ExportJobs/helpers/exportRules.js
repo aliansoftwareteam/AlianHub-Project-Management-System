@@ -4,6 +4,7 @@ const { neutraliseFormula } = require('../../../utils/csvSafe');
 const { csvCell: csvEscape } = require('../../../utils/csv');
 
 const FORMATS = Object.freeze(['csv', 'xlsx']);
+const WORKSPACE = 'workspace';
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
 
 const isObjectIdString = (id) => OBJECT_ID_PATTERN.test(String(id || ''));
@@ -54,6 +55,12 @@ const taskToRow = (task) => {
     return Object.fromEntries(Object.entries(row).map(([key, value]) => [key, neutraliseFormula(value)]));
 };
 
+const workspaceTaskRow = (task, project) => ({
+    Project: neutraliseFormula((project && project.ProjectName) || ''),
+    ProjectKey: neutraliseFormula((project && project.ProjectCode) || ''),
+    ...taskToRow(task),
+});
+
 const rowsToCsv = (rows) => {
     if (!rows.length) return '';
     const headers = Object.keys(rows[0]);
@@ -66,10 +73,12 @@ const rowsToCsv = (rows) => {
 
 module.exports = {
     FORMATS,
+    WORKSPACE,
     isObjectIdString,
     validateExportInput,
     buildFileName,
     taskToRow,
+    workspaceTaskRow,
     csvEscape,
     rowsToCsv,
 };

@@ -103,6 +103,15 @@ export default [
                 component: () => import(/* webpackChunkName: Projects */ '@/views/Settings/Projects/Projects.vue')
             },
             {
+                path: "import-export",
+                name: "ImportExport",
+                meta: {
+                    title: "Import & export",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: ImportExport */ '@/views/Settings/ImportExport/ImportExport.vue')
+            },
+            {
                 path: "template",
                 name: "Template",
                 meta: {
