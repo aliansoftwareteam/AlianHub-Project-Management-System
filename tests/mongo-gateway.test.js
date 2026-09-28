@@ -35,10 +35,10 @@ const resetStore = () => {
     mockDb.calls.length = 0;
     Object.keys(mockDb.store).forEach((type) => { delete mockDb.store[type]; });
     mockDb.seed(dbCollections.USERS, { _id: USER, AssignCompany: COMPANY });
-    mockDb.seed(dbCollections.COMPANY_USERS, { userId: USER, status: 2, isDelete: false });
-    mockDb.seed(dbCollections.TIMESHEET, { TicketID: 'task-1', LogTimeDuration: 30 });
-    mockDb.seed(dbCollections.TIMESHEET, { TicketID: 'task-1', LogTimeDuration: 15 });
-    mockDb.seed(dbCollections.TIMESHEET, { TicketID: 'task-2', LogTimeDuration: 99 });
+    mockDb.seed(dbCollections.COMPANY_USERS, { userId: USER, status: 2, isDelete: false, roleType: 3 });
+    mockDb.seed(dbCollections.TIMESHEET, { TicketID: 'task-1', Loggeduser: USER, LogTimeDuration: 30 });
+    mockDb.seed(dbCollections.TIMESHEET, { TicketID: 'task-1', Loggeduser: USER, LogTimeDuration: 15 });
+    mockDb.seed(dbCollections.TIMESHEET, { TicketID: 'task-2', Loggeduser: USER, LogTimeDuration: 99 });
 };
 
 const SESSION = '6f00000000000000000005e1';
