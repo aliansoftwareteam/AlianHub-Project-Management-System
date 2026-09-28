@@ -126,15 +126,16 @@ const citationsOf = (answer, sources) => sources
     .filter((s) => s.ref && answer.includes(`[${s.ref}]`))
     .map((s) => ({ kind: String(s.kind), id: String(s.id), ref: String(s.ref), projectId: String(s.projectId || '') }));
 
-/* The answer, built from the conversation and what the asker can open. `task` adds the task being discussed. */
-const answerFor = async (companyId, { askerId, question, thread, accessMatch, task = null, tokenProjectIds = [] }) => {
+/* The answer, built from the conversation and what the asker can open. `task` adds the task being discussed. `about`,
+ * the asker's private profile, is only for an answer the asker alone reads: a thread reply never carries it. */
+const answerFor = async (companyId, { askerId, question, thread, accessMatch, task = null, tokenProjectIds = [], about = '' }) => {
     const [lines, gathered] = await Promise.all([
         conversationLines(companyId, thread, accessMatch),
         gather(companyId, askerId, { question, projectId: task ? String(task.ProjectID) : undefined, tokenProjectIds }),
     ]);
     const sources = uniqueSources([...(task ? [taskSource(task, gathered.projects)] : []), ...gathered.sources]);
     const prompt = [
-        promptFor(question, sources, gathered.intent),
+        promptFor(question, sources, gathered.intent, about),
         '',
         'CONVERSATION:',
         ...(lines.length ? lines : ['(no earlier messages)']),

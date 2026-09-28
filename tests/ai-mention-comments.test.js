@@ -159,6 +159,17 @@ describe('@ai in a task comment', () => {
         expect(reply.aiCitations).toEqual([{ kind: 'task', id: mockIds.task, ref: 'WEB-7', projectId: mockIds.project }]);
     });
 
+    it('never puts the asker\'s private AI profile into a reply others read', async () => {
+        mockDb.seed(SCHEMA_TYPE.AI_PROFILES, {
+            ownerId: mockIds.member, enabled: true, nickname: 'Captain Zed', preferences: 'Answer in haiku',
+            facts: [{ id: 'f1', text: 'I am interviewing elsewhere', source: 'manual' }],
+        });
+        await ask(mockIds.member, 'what is left on pricing?');
+
+        expect(promptSent()).not.toMatch(/Captain Zed|haiku|interviewing|ABOUT THE PERSON ASKING/);
+        expect(aiRows()[0].message).not.toMatch(/Captain Zed|interviewing/);
+    });
+
     it('answers a comment only once, and an edit never asks again', async () => {
         const r = await ask(mockIds.member, 'what is left on pricing?');
         const saved = commentById(r.body.data._id);

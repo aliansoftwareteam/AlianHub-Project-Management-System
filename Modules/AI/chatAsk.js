@@ -6,7 +6,7 @@ const aiSwitch = require('../AICore/aiSwitch');
 const { isAnyProviderConfigured } = require('../AICore/llmProvider');
 const { commentThreadAccess, refuseThread } = require('../Comments/helpers/threadAccess');
 const { canPostToThread } = require('../Comments/helpers/threadWriteAccess');
-const { tokenProjectIdsOf } = require('./ask');
+const { tokenProjectIdsOf, aboutOf } = require('./ask');
 const aiMention = require('./aiMention');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -68,6 +68,7 @@ async function chatAskHandler(req, res) {
 
         const { answer, cited } = await aiMention.answerFor(companyId, {
             askerId: req.uid, question, thread, accessMatch: access.match, tokenProjectIds: tokenProjectIdsOf(req),
+            about: await aboutOf(req, companyId, req.uid),
         });
         if (!answer) return res.status(200).json({ status: false, code: 'empty', statusText: 'No answer came back.' });
         const issuedAt = Date.now();

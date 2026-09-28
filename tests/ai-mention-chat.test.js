@@ -158,6 +158,13 @@ describe('@ai in a chat message', () => {
         expect(socketEmitter.emit).toHaveBeenCalledWith('insert', expect.objectContaining({ module: 'comments', companyId: COMPANY, data: expect.objectContaining({ actorType: 'ai' }) }));
     });
 
+    it('never reads the asker\'s private AI profile for an answer the channel reads', async () => {
+        db().seed(SCHEMA_TYPE.AI_PROFILES, { ownerId: ALICE, enabled: true, nickname: 'Captain Zed', facts: [{ id: 'f1', text: 'I am interviewing elsewhere', source: 'manual' }] });
+        await post(ALICE, '@ai when do we launch?', channel);
+
+        expect(promptSent()).not.toMatch(/Captain Zed|interviewing|ABOUT THE PERSON ASKING/);
+    });
+
     it('answers in a direct message from that conversation only', async () => {
         await post(ALICE, '@ai what did Bob say about the launch?', dm);
 
@@ -192,6 +199,12 @@ describe('Ask about this channel', () => {
         expect(promptSent()).toContain('Bob: We agreed to launch pricing on Friday');
         expect(promptSent()).not.toMatch(/private channel plans|another workspace|SEC-1/);
         expect(mockChat.mock.calls[0][0].spend).toEqual(expect.objectContaining({ feature: 'ask', companyId: COMPANY, userId: ALICE }));
+    });
+
+    it('shapes the private answer with the asker\'s own AI profile', async () => {
+        db().seed(SCHEMA_TYPE.AI_PROFILES, { ownerId: ALICE, enabled: true, nickname: 'Captain Zed', facts: [] });
+        await askChannel(ALICE, 'when do we launch?');
+        expect(promptSent()).toContain('Captain Zed');
     });
 
     it('posts the same answer to the channel only when the asker chooses to', async () => {

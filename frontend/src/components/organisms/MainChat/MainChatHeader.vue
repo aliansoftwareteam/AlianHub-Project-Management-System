@@ -26,7 +26,7 @@
             </button>
 
             <button
-                v-if="aiUsable && isChannel"
+                v-if="canUseAi() && isChannel"
                 type="button"
                 class="mc-head-ai"
                 data-test="ask-channel"

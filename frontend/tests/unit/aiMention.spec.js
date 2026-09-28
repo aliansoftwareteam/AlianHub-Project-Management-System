@@ -83,7 +83,7 @@ describe('the mention list', () => {
     };
 
     it('offers the AI when AI is usable, and it is reachable from the keyboard', async () => {
-        applyAiAvailability({ state: AI_STATE.ON });
+        applyAiAvailability({ state: AI_STATE.ON, loaded: true, planAllowsAi: true });
         const box = await openList({ aiMention: true });
         const options = wrapper.findAll('[role="option"]');
         const ai = wrapper.find('[data-test="mention-ai"]');
@@ -99,9 +99,10 @@ describe('the mention list', () => {
     });
 
     it.each([
-        ['AI is off for the workspace', { state: AI_STATE.OFF_WORKSPACE }, { aiMention: true }],
-        ['no model is set up', { state: AI_STATE.UNCONFIGURED }, { aiMention: true }],
-        ['the composer does not take it', { state: AI_STATE.ON }, {}],
+        ['AI is off for the workspace', { state: AI_STATE.OFF_WORKSPACE, loaded: true, planAllowsAi: true }, { aiMention: true }],
+        ['no model is set up', { state: AI_STATE.UNCONFIGURED, loaded: true, planAllowsAi: true }, { aiMention: true }],
+        ['the plan has no AI', { state: AI_STATE.ON, loaded: true, planAllowsAi: false }, { aiMention: true }],
+        ['the composer does not take it', { state: AI_STATE.ON, loaded: true, planAllowsAi: true }, {}],
     ])('leaves the AI out when %s', async (label, availability, props) => {
         applyAiAvailability(availability);
         await openList(props);
