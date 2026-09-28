@@ -29,6 +29,7 @@ const { buildTrace } = require('./runTrace');
 const workflows = require('../Workflows');
 const knowledgeMemory = require('../Knowledge/memory/publish');
 const { DEFAULT_RATE_LIMIT_PER_DAY } = require('./dailyRunLimit');
+const confidence = require('./engine/confidence');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 
 // Every /api/v2/agents route sits behind the company-header JWT check, so the header is the verified tenant.
@@ -124,6 +125,7 @@ const agentPatchFields = (body) => {
     // it, so the UI hides the field. `rateLimitPerDay` is enforced in runs.canStart.
     if (body.schedule !== undefined && typeof body.schedule === 'object') set.schedule = body.schedule;
     if (body.rateLimitPerDay !== undefined) set.rateLimitPerDay = Math.max(0, Number(body.rateLimitPerDay) || 0);
+    if (body.confidenceFloor !== undefined) set.confidenceFloor = confidence.floorToStore(body.confidenceFloor);
     return set;
 };
 
