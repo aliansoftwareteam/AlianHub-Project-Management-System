@@ -25,8 +25,12 @@
                 :class="{ 'is-active': isActive(item) }"
                 :aria-current="isActive(item) ? 'page' : null"
                 :tabindex="focusIndex(item.key)"
+                :aria-label="item.key === 'inbox' && unread ? $t('Shell.inbox_unread', { n: unread }) : null"
             >
-                <span class="ah-rail__tile"><ShellIcon :name="item.icon" :size="17" /></span>
+                <span class="ah-rail__tile">
+                    <ShellIcon :name="item.icon" :size="17" />
+                    <span v-if="item.key === 'inbox' && unread" class="ah-unread-badge" aria-hidden="true">{{ badge }}</span>
+                </span>
                 <span class="ah-rail__label">{{ $t(item.label) }}</span>
             </router-link>
         </div>
@@ -147,6 +151,7 @@ import { useNavItems } from "./navItems";
 import { shellState, openPanel, closePopovers, toggleTheme, syncNavPreferences } from "./shellState";
 import { openQuickCreate } from "@/components/organisms/QuickCreateTask/quickCreateTask";
 import { shortcutPrefs } from "@/composable/shortcuts";
+import { useInboxUnread } from "./inboxUnread";
 
 const emit = defineEmits(["change"]);
 const companyId = inject("$companyId");
@@ -157,6 +162,7 @@ const { version } = useAppVersion();
 const { logOut } = useAuth();
 const router = useRouter();
 const { rail, more, isActive, moreActive } = useNavItems(companyId);
+const { unread, badge } = useInboxUnread();
 
 const railLogo = "/api/v1/getlogo?key=favicon";
 const logoOk = ref(true);

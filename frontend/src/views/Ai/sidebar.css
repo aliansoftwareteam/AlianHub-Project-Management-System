@@ -57,5 +57,19 @@
     }
 }
 @media (max-width: 767px) {
-    .ai-side { display: none; }
+    /* The tab bar has one AI tab, so the everyday entries ride above the page as a scrolling row. */
+    .ah-page.ah-page:has(> .ai-side) { flex-direction: column; }
+    .ai-side {
+        width: auto; flex-direction: row; align-items: center;
+        padding: 6px 8px; border-right: 0; border-bottom: 1px solid var(--hairline);
+        overflow-x: auto; scrollbar-width: none;
+    }
+    .ai-side__head, .ai-side__group, .ai-side__usage { display: none; }
+    .ai-side__nav { flex-direction: row; gap: 4px; }
+    .ai-side__item { width: auto; height: 36px; padding: 0 12px; gap: 8px; white-space: nowrap; }
+    .ai-side__item > span:not(.ai-side__count) { display: inline; }
+    .ai-side__count {
+        position: static; min-width: 0; height: auto; padding: 0; border-radius: 0;
+        background: none; color: var(--ink-2); font-size: inherit; line-height: inherit;
+    }
 }

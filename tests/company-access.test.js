@@ -174,17 +174,11 @@ const TRACKER_SEAT_RELEASE = { key: '$inc', updateObject: { trackerUsers: -1 } }
 const RENAME = { updateObject: { Cst_CompanyName: 'Taken over' } };
 
 describe('companyUpdateKind', () => {
-    it('recognises the project type swap in both directions', () => {
-        expect(companyUpdateKind(SWAP_TO_PRIVATE)).toBe('projectType');
-        expect(companyUpdateKind({ key: '$inc', updateObject: { 'projectCount.publicCount': 1, 'projectCount.privateCount': -1 } })).toBe('projectType');
-    });
-
-    it('recognises the seat releases the members page sends', () => {
-        expect(companyUpdateKind(SEAT_RELEASE)).toBe('seatRelease');
-        expect(companyUpdateKind(TRACKER_SEAT_RELEASE)).toBe('seatRelease');
-    });
-
     it.each([
+        [SWAP_TO_PRIVATE],
+        [{ key: '$inc', updateObject: { 'projectCount.publicCount': 1, 'projectCount.privateCount': -1 } }],
+        [SEAT_RELEASE],
+        [TRACKER_SEAT_RELEASE],
         [{ key: '$set', updateObject: SWAP_TO_PRIVATE.updateObject }],
         [{ key: '$inc', updateObject: { 'projectCount.privateCount': 5, 'projectCount.publicCount': -5 } }],
         [{ key: '$inc', updateObject: { 'projectCount.privateCount': 1, 'projectCount.publicCount': 1 } }],
@@ -222,17 +216,17 @@ describe('PUT company update is for owners and admins', () => {
         expect(callsOf('findOneAndUpdate')[0][1].data[1]).toEqual({ $set: RENAME.updateObject });
     });
 
-    it('lets a member swap a project between private and public', async () => {
+    it('refuses a member moving the project type counts', async () => {
         const res = await put('/api/v1/admin/company', MEMBER, SWAP_TO_PRIVATE);
-        expect(res.status).toBe(200);
-        expect(callsOf('findOneAndUpdate')[0][1].data[1]).toEqual({ $inc: SWAP_TO_PRIVATE.updateObject });
+        expect(res.status).toBe(403);
+        expect(callsOf('findOneAndUpdate')).toHaveLength(0);
     });
 
-    it('lets a member who manages the member list release a seat', async () => {
+    it('refuses a member who manages the member list moving the seat counts', async () => {
         evaluatePermission.mockImplementation(async (companyId, uid, key) => (key === 'settings.settings_member_list' ? true : null));
-        expect((await put('/api/v1/admin/company', MEMBER, SEAT_RELEASE)).status).toBe(200);
-        expect((await put('/api/v1/admin/company', MEMBER, TRACKER_SEAT_RELEASE)).status).toBe(200);
-        expect(evaluatePermission).toHaveBeenCalledWith(COMPANY, MEMBER, 'settings.settings_member_list');
+        expect((await put('/api/v1/admin/company', MEMBER, SEAT_RELEASE)).status).toBe(403);
+        expect((await put('/api/v1/admin/company', MEMBER, TRACKER_SEAT_RELEASE)).status).toBe(403);
+        expect(callsOf('findOneAndUpdate')).toHaveLength(0);
     });
 
     it('refuses a seat release from a member without member-list write access', async () => {
@@ -315,10 +309,11 @@ describe('PUT company update never takes server-controlled fields', () => {
             expect(callsOf('findOneAndUpdate')[0][1].data[1]).toEqual({ $set: COMPANY_DETAILS_FORM.updateObject });
         });
 
-        it('releases a seat and switches a project between private and public', async () => {
-            expect((await put('/api/v1/company', uid, SEAT_RELEASE)).status).toBe(200);
-            expect((await put('/api/v1/company', uid, TRACKER_SEAT_RELEASE)).status).toBe(200);
-            expect((await put('/api/v1/company', uid, SWAP_TO_PRIVATE)).status).toBe(200);
+        it('leaves the seat and project type counts to the server', async () => {
+            expect((await put('/api/v1/company', uid, SEAT_RELEASE)).status).toBe(403);
+            expect((await put('/api/v1/company', uid, TRACKER_SEAT_RELEASE)).status).toBe(403);
+            expect((await put('/api/v1/company', uid, SWAP_TO_PRIVATE)).status).toBe(403);
+            expect(callsOf('findOneAndUpdate')).toHaveLength(0);
         });
     });
 

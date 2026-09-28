@@ -79,4 +79,38 @@ test.describe('List view filters', () => {
         await expect(page.getByRole('button', { name: 'Group by' })).toContainText('Assignee');
         await expect(unassigned.locator('.lv2__name')).toHaveText([`Nobody ${suffix}`]);
     });
+
+    test('at 390 px the List page has no sideways scroll and the filters fold into one row', async ({ page, state, loginAs }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        const owner = await loginAs('owner');
+        const suffix = uniqueSuffix();
+        const project = await createProject(owner.api, { name: `LIST390 ${suffix}`, assigneeIds: [owner.uid], createdBy: owner.uid });
+        const task = await createTask(owner.api, { project, name: `Phone row ${suffix}`, user: state.users.owner, companyOwnerId: owner.uid, assigneeIds: [owner.uid] });
+
+        await page.goto(`/#/${state.companyId}/project/${project._id}/s/${task.sprintId}`);
+        await expect(page.locator('.lv2__row .lv2__name')).toHaveCount(1);
+
+        const noSideways = () => page.evaluate(() => {
+            const view = document.querySelector('.ah-app__view');
+            const bar = document.querySelector('.pft .task-filtersearchassignee-wrapper');
+            return document.documentElement.scrollWidth <= window.innerWidth
+                && view.scrollWidth <= view.clientWidth
+                && bar.getBoundingClientRect().right <= window.innerWidth;
+        });
+        expect(await noSideways()).toBe(true);
+
+        const filters = page.getByRole('button', { name: 'Filters', exact: true });
+        await expect(filters).toBeVisible();
+        const bar = await page.locator('.pft .task-filtersearchassignee-wrapper').boundingBox();
+        expect(bar.height).toBeLessThan(64);
+
+        await expect(page.locator('.ah-tabbar').getByRole('link', { name: /^Inbox/ })).toBeVisible();
+
+        await filters.click();
+        const sheet = page.getByRole('dialog', { name: 'Filters' });
+        await expect(sheet.locator('.manage__filter-users button[aria-pressed]').first()).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(sheet).toBeHidden();
+        await expect(filters).toBeFocused();
+    });
 });
