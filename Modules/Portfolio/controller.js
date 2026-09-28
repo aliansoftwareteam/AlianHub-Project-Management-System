@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { keepVisibleProjectIds } = require('../../Config/projectAccess');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const { removeCache } = require('../../utils/commonFunctions');
 const { myCache } = require('../../Config/config');
 const logger = require('../../Config/loggerConfig');
@@ -109,7 +110,7 @@ const buildRollup = async (companyId, portfolioId, uid) => {
         let milestones = [];
         try {
             milestones = await MongoDbCrudOpration(companyId, {
-                type: SCHEMA_TYPE.MILESTONE, data: [{ projectId: String(pid) }],
+                type: SCHEMA_TYPE.MILESTONE, data: [{ projectId: { $in: idForms(pid) } }],
             }, 'find') || [];
         } catch (e) { milestones = []; }
         const summary = R.summarizeProject(tasks || [], nowMs);

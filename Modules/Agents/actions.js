@@ -10,6 +10,7 @@ const audit = require('./agentAudit');
 const { attribution, isAgent } = require('./actor');
 const stepCredential = require('../Workflows/stepCredential');
 const completionStore = require('../Tasks/helpers/completionStore');
+const { sprintPlacementOf, followSprintMove } = require('../Tasks/helpers/sprintPlacement');
 const { emitPageChange } = require('../Pages/helpers/pageEvents');
 const { escapeCommentText } = require('../Comments/helpers/plainText');
 const { isPeriodLocked } = require('../TimesheetApproval/helpers/lockGuard');
@@ -238,8 +239,10 @@ const executors = {
         if (!target) throw new tools.DeterministicError('a valid sprintId is required');
         const sprint = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: target, projectId: task.ProjectID }] }, 'findOne');
         if (!sprint) throw new tools.DeterministicError('sprint not found in this project');
-        const previous = { sprintId: task.sprintId, sprintArray: task.sprintArray };
-        const r = await tools.updateTask(companyId, task._id, { sprintId: target, sprintArray: { _id: target, name: sprint.name } }, context(actor, 'task.sprint.move', depth));
+        const previous = { sprintId: task.sprintId, sprintArray: task.sprintArray, folderObjId: task.folderObjId || null };
+        const placement = await sprintPlacementOf(companyId, sprint);
+        const r = await tools.updateTask(companyId, task._id, placement.set, context(actor, 'task.sprint.move', depth), placement.unset);
+        await followSprintMove(companyId, { taskId: task._id, projectId: task.ProjectID, fromSprintId: task.sprintId, toSprintId: target });
         return { result: { sprintId: String(target), name: sprint.name }, undo: { kind: 'sprint', taskId: String(task._id), previous }, entityId: task._id, entityName: task.TaskName, task: r.task };
     },
 
