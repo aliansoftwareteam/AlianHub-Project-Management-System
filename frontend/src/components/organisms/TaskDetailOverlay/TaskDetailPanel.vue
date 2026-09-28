@@ -124,7 +124,7 @@
                     <button type="button" class="ah-chip ah-detail__chips-more" @click="sheetOpen = true">{{ $t('TaskPanel.properties') }}</button>
                 </div>
 
-                <TaskSummaryBlock v-if="task._id && canComment" ref="summaryRef" :taskId="task._id" :enabled="aiUsable" @count="(n) => commentTotal = n" />
+                <TaskSummaryBlock v-if="task._id && canComment" ref="summaryRef" :taskId="task._id" :enabled="canUseAi()" @count="(n) => commentTotal = n" />
                 <TaskActionItems v-if="task._id && canComment" :task="task" @open="openActionItem" />
 
                 <div class="ah-detail__tabs" role="tablist">
@@ -377,7 +377,7 @@ import taskClass from "@/utils/TaskOperations";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { publicConfig } from "@/config/publicConfig";
-import { aiUsable } from "@/composable/aiAvailability";
+import { canUseAi } from "@/composable/aiAvailability";
 import { statusChipStyle } from "@/utils/statusChipColors";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { useUpdateTasks } from "@/views/Projects/helper";
@@ -973,7 +973,7 @@ function applyAiDraft(mode) {
 function onKeydownCapture(event) {
     const target = event.target;
     if (!target || target.id !== "message-box" || event.key !== "Enter" || event.shiftKey) return;
-    if (!aiUsable.value || !aiCommandIn(target.value || "", target.selectionStart ?? 0)) return;
+    if (!canUseAi() || !aiCommandIn(target.value || "", target.selectionStart ?? 0)) return;
     event.preventDefault();
     event.stopPropagation();
     draftWithAi(target);
