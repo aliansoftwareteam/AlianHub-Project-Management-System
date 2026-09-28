@@ -8,6 +8,7 @@ jest.mock('../Modules/Agents/actions', () => ({ perform: jest.fn() }));
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const socketEmitter = require('../event/socketEventEmitter');
 const runs = require('../Modules/Agents/runs');
+const triggers = require('../Modules/Agents/triggers');
 const planRules = require('../Modules/AIProjectGenerator/planRules');
 const X = require('../Modules/AIProjectGenerator/executeAgents');
 
@@ -44,6 +45,7 @@ beforeEach(() => {
     mockDb.calls.length = 0;
     jest.clearAllMocks();
     jest.spyOn(runs, 'executeSkill').mockResolvedValue({ status: 'done' });
+    jest.spyOn(triggers, 'mayRunOn').mockResolvedValue(true);
 });
 
 afterEach(flushImmediates);
@@ -179,5 +181,18 @@ describe('the Guide agent and the runs', () => {
         agents[0].projectIds = ['6f0000000000000000000p99'];
         const result = await X.start({ companyId: C, uid: UID, projectId: PROJECT_ID, projectName: 'Bike shop', pairs: docsFor(out).flat(), agents, withGuide: false });
         expect(result.runsRefused[0].reason).toMatch(/not scoped/);
+    });
+
+    it('starts no run on a task the person cannot open', async () => {
+        mockDb.seed(SCHEMA_TYPE.AGENTS, reviewer());
+        triggers.mayRunOn.mockResolvedValue(false);
+        const { plan: out, agents } = await X.prepare({ plan: plan(), companyId: C });
+        const pairs = docsFor(out).flat();
+        const result = await X.start({ companyId: C, uid: UID, projectId: PROJECT_ID, projectName: 'Bike shop', pairs, agents, withGuide: false });
+        expect(triggers.mayRunOn).toHaveBeenCalledWith(C, UID, pairs[0].doc);
+        expect(result).toMatchObject({ runsQueued: 0, runsRefused: [{ taskId: pairs[0].doc._id, reason: 'Task not found.' }] });
+        expect(mockDb.store[SCHEMA_TYPE.AGENT_RUNS] || []).toHaveLength(0);
+        await flushImmediates();
+        expect(runs.executeSkill).not.toHaveBeenCalled();
     });
 });

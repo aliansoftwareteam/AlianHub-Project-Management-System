@@ -35,7 +35,6 @@ const triggers = require('./triggers');
 const companyOf = (req) => String(req.headers['companyid'] || '');
 // Recorded because "who asked for this" is the first question about any run.
 const TRIGGERS = ['manual', triggers.TRIGGER.MENTION, 'schedule', 'rule', triggers.TRIGGER.ASSIGN];
-const FROM_TASK = [triggers.TRIGGER.MENTION, triggers.TRIGGER.ASSIGN];
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 const fail = (res, statusText, code, extra) => res.status(code || 400).send({ status: false, statusText, message: statusText, ...(extra || {}) });
@@ -474,7 +473,7 @@ exports.startRun = async (req, res) => {
         if (taskId) {
             task = await tools.getTask(companyId, taskId).catch(() => null);
             if (!task) return fail(res, 'Task not found.', 404);
-            if (human && FROM_TASK.includes(trigger) && !(await triggers.mayRunOn(companyId, actor.userId, task))) return fail(res, 'Task not found.', 404);
+            if (human && !(await triggers.mayRunOn(companyId, actor.userId, task))) return fail(res, 'Task not found.', 404);
             if (agent.projectIds && agent.projectIds.length && !agent.projectIds.includes(String(task.ProjectID))) return fail(res, 'This agent is not scoped to that project.', 403);
         }
         if (!task) {
