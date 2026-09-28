@@ -18,6 +18,9 @@ exports.getCounts = async (req, res) => {
                 message: `'id' parameters is required.`
             });
         }
+        if (String(id) !== String(req.uid)) {
+            return res.status(403).json({ status: false, message: 'You can only read your own counts.' });
+        }
 
         let params = {
             type: SCHEMA_TYPE.USERID,
@@ -48,12 +51,16 @@ exports.getCounts = async (req, res) => {
  */
 exports.updateCounts = async (req, res) => {
     try {
-        const { userId, key } = req.body;
+        const { key } = req.body;
+        const userId = String(req.uid || '');
 
-        if(!userId && !key) {
+        if (req.body.userId !== undefined && req.body.userId !== userId) {
+            return res.status(403).json({ status: false, message: 'You can only clear your own counts.' });
+        }
+        if(!userId || !key) {
             return res.status(400).json({
                 status: false,
-                message: `'userId' and 'key' parameters are required.`
+                message: `'key' parameter is required.`
             });
         }
 

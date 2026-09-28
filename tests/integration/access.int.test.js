@@ -319,14 +319,14 @@ describe('access — only owners and admins change the company', () => {
         expect(res.body.Cst_CompanyName).toBe(before.Cst_CompanyName);
     });
 
-    it('lets a member switch a project between private and public', async () => {
+    it('leaves the project type counts to the server', async () => {
         const member = await loginAs('member');
         const swap = (toPrivate) => member.api.put('/api/v1/company', {
             key: '$inc',
             updateObject: { 'projectCount.privateCount': toPrivate ? 1 : -1, 'projectCount.publicCount': toPrivate ? -1 : 1 },
         });
-        expect((await swap(true)).status).toBe(200);
-        expect((await swap(false)).status).toBe(200);
+        expect((await swap(true)).status).toBe(403);
+        expect((await swap(false)).status).toBe(403);
     });
 
     it('refuses a guest releasing a seat', async () => {
