@@ -5,8 +5,10 @@ const scrum = require('./scrum');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { READ, WRITE, requireProjectAccess, projectIdsFrom } = require('../../Config/projectAccess');
 const { requireSprintAccess } = require('./helpers/sprintVisibility');
+const { sprintUpdateFrom, sprintWriteKinds, folderUpdateFrom, writtenStatus } = require('./helpers/listWrites');
 const { withActingUser } = require('./helpers/actingUser');
 const { newSprintNamesOnlyMembers, sprintPatchNamesOnlyMembers } = require('./helpers/sprintPeople');
+const { CHAT_CHANNEL, CHAT_CATEGORY, isChatSpace, requireChatAccess } = require('./helpers/chatAccess');
 
 // Whitelist of functions allowed to be called via PATCH /sprint/:id
 const ALLOWED_SPRINT_TYPES = ['editSprintName', 'updateSprint', 'deleteChannel'];
@@ -19,7 +21,8 @@ const ALLOWED_FOLDER_TYPES = ['editFolderName', 'updateFolder'];
 // exists for new companies only and would deny every existing one.
 const SPRINT_CREATE = 'project.project_sprint_create';
 const SPRINT_EDIT = ['project.project_sprint_name_edit', 'project.sprint_type_change', SPRINT_CREATE];
-const SPRINT_STATUS = { 0: 'project.sprint_restore', 1: 'project.sprint_delete', 2: 'project.sprint_archive' };
+const SPRINT_SHARE = 'project.sprint_type_change';
+const SPRINT_STATUS = { 0: 'project.sprint_restore', 1: 'project.sprint_delete', 2: 'project.sprint_archive', 5: 'project.sprint_archive' };
 const FOLDER_RENAME = 'project.project_folder_name_edit';
 const FOLDER_STATUS = { 0: 'project.folder_restore', 1: 'project.folder_delete', 2: 'project.folder_archive' };
 
@@ -31,42 +34,62 @@ const onSprint = (pick) => requireSprintAccess(pick);
 
 const sprintProject = (pick, direct) => projectIdsFrom({ records: [[SCHEMA_TYPE.SPRINTS, pick]], direct });
 
-// Chat channels share the sprint and folder collections, and their container is not a project.
-const guard = (mode, projectIds, permissions = () => []) => requireProjectAccess({ mode, projectIds, permissions, passMissing: () => true });
+// Chat channels and categories share the sprint and folder collections; their container is a chat space, not a project.
+const guard = (mode, projectIds, permissions = () => [], chatPermission = () => CHAT_CHANNEL) => (mode === READ
+    ? [requireProjectAccess({ mode, projectIds, permissions })]
+    : [requireProjectAccess({ mode, projectIds, permissions, passMissing: isChatSpace }), requireChatAccess({ containers: projectIds, permission: chatPermission })]);
+
+// An update the handler will refuse still has to pass a permission first.
+const orRefused = (build, fallback) => {
+    try {
+        return build();
+    } catch (error) {
+        return [fallback];
+    }
+};
+
+const sprintUpdatePermissions = (req) => orRefused(() => {
+    const { status, moves, shares } = sprintWriteKinds(sprintUpdateFrom(bodyOf(req).updateObject), req.uid);
+    return [
+        ...(status === undefined ? [] : [SPRINT_STATUS[status]]),
+        ...(moves ? [SPRINT_EDIT] : []),
+        ...(shares ? [SPRINT_SHARE] : []),
+    ];
+}, SPRINT_EDIT);
 
 const sprintPatchPermissions = (req) => {
-    const { type, updatedValueDeleteStatusKey } = bodyOf(req);
+    const { type } = bodyOf(req);
     if (type === 'editSprintName') return ['project.project_sprint_name_edit'];
     if (type === 'deleteChannel') return [SPRINT_STATUS[1]];
-    return [SPRINT_STATUS[updatedValueDeleteStatusKey] || SPRINT_EDIT];
+    return sprintUpdatePermissions(req);
 };
 
 const folderPatchPermissions = (req) => {
-    const { type, updatedValueDeleteStatusKey } = bodyOf(req);
+    const { type, updateObject } = bodyOf(req);
     if (type === 'editFolderName') return [FOLDER_RENAME];
-    return [FOLDER_STATUS[updatedValueDeleteStatusKey] || FOLDER_RENAME];
+    return orRefused(() => [FOLDER_STATUS[writtenStatus(folderUpdateFrom(updateObject))]], FOLDER_RENAME);
 };
 
 exports.init = (app) => {
     const burndownSprint = (req) => bodyOf(req).sprintId || (req.query && req.query.sprintId);
-    app.post('/api/v2/sprints/burndown', guard(READ, sprintProject(burndownSprint)), onSprint(burndownSprint), burndown.getSprintBurndown);
-    app.post('/api/v2/sprints/hours', guard(READ, sprintProject((req) => bodyOf(req).sprintId)), onSprint((req) => bodyOf(req).sprintId), hours.getSprintHours);
+    app.post('/api/v2/sprints/burndown', ...guard(READ, sprintProject(burndownSprint)), onSprint(burndownSprint), burndown.getSprintBurndown);
+    app.post('/api/v2/sprints/hours', ...guard(READ, sprintProject((req) => bodyOf(req).sprintId)), onSprint((req) => bodyOf(req).sprintId), hours.getSprintHours);
 
     // Scrum lifecycle. Deliberately under /api/v2/sprints: setMiddleware.js
     // registers that as a PREFIX, so these are behind a token by default.
     // /api/v1/sprints (plural) is NOT registered anywhere and would be open.
     const managesSprint = guard(WRITE, sprintProject((req) => [bodyOf(req).sprintId, bodyOf(req).incompleteDestination]), () => [SPRINT_CREATE]);
     const writesSprint = onSprint((req) => [bodyOf(req).sprintId, bodyOf(req).incompleteDestination]);
-    app.post('/api/v2/sprints/scrum', managesSprint, writesSprint, scrum.setScrum);
-    app.post('/api/v2/sprints/start', managesSprint, writesSprint, scrum.startSprint);
-    app.post('/api/v2/sprints/complete', managesSprint, writesSprint, scrum.completeSprint);
-    app.get('/api/v2/sprints/complete-preview', guard(READ, sprintProject((req) => req.query && req.query.sprintId)), onSprint((req) => req.query && req.query.sprintId), scrum.completePreview);
-    app.post('/api/v2/sprints/backlog', guard(READ, (req) => bodyOf(req).projectId), scrum.getBacklog);
-    app.get('/api/v2/sprints/report', guard(READ, sprintProject((req) => req.query && req.query.sprintId)), onSprint((req) => req.query && req.query.sprintId), scrum.sprintReport);
+    app.post('/api/v2/sprints/scrum', ...managesSprint, writesSprint, scrum.setScrum);
+    app.post('/api/v2/sprints/start', ...managesSprint, writesSprint, scrum.startSprint);
+    app.post('/api/v2/sprints/complete', ...managesSprint, writesSprint, scrum.completeSprint);
+    app.get('/api/v2/sprints/complete-preview', ...guard(READ, sprintProject((req) => req.query && req.query.sprintId)), onSprint((req) => req.query && req.query.sprintId), scrum.completePreview);
+    app.post('/api/v2/sprints/backlog', ...guard(READ, (req) => bodyOf(req).projectId), scrum.getBacklog);
+    app.get('/api/v2/sprints/report', ...guard(READ, sprintProject((req) => req.query && req.query.sprintId)), onSprint((req) => req.query && req.query.sprintId), scrum.sprintReport);
 
     const addsSprint = projectIdsFrom({ records: [[SCHEMA_TYPE.FOLDERS, (req) => bodyOf(req).folder && bodyOf(req).folder.folderId]], direct: (req) => bodyOf(req).projectId });
-    app.post('/api/v1/sprint', guard(WRITE, addsSprint, () => [SPRINT_CREATE]), withActingUser, newSprintNamesOnlyMembers, ctrl.addSprint);
-    app.patch('/api/v1/sprint/:id', guard(WRITE, sprintProject((req) => req.params.id, (req) => bodyOf(req).projectId), sprintPatchPermissions), withActingUser, sprintPatchNamesOnlyMembers, (req, res) => {
+    app.post('/api/v1/sprint', ...guard(WRITE, addsSprint, () => [SPRINT_CREATE]), withActingUser, newSprintNamesOnlyMembers, ctrl.addSprint);
+    app.patch('/api/v1/sprint/:id', ...guard(WRITE, sprintProject((req) => req.params.id, (req) => bodyOf(req).projectId), sprintPatchPermissions), onSprint((req) => req.params.id), withActingUser, sprintPatchNamesOnlyMembers, (req, res) => {
         if(!req?.body?.type) {
             res.send({status: false, statusText: "type not found"});
             return;
@@ -82,9 +105,9 @@ exports.init = (app) => {
         ctrl[req.body.type](req,res);
     });
 
-    app.post('/api/v1/folder', guard(WRITE, (req) => bodyOf(req).projectId, () => ['project.project_folder_create']), withActingUser, ctrl.addFolder);
+    app.post('/api/v1/folder', ...guard(WRITE, (req) => bodyOf(req).projectId, () => ['project.project_folder_create'], () => CHAT_CATEGORY), withActingUser, ctrl.addFolder);
     const folderProject = projectIdsFrom({ records: [[SCHEMA_TYPE.FOLDERS, (req) => req.params.id]], direct: (req) => [bodyOf(req).projectId, bodyOf(req).projectData] });
-    app.patch('/api/v1/folder/:id', guard(WRITE, folderProject, folderPatchPermissions), withActingUser, (req, res) => {
+    app.patch('/api/v1/folder/:id', ...guard(WRITE, folderProject, folderPatchPermissions, () => CHAT_CATEGORY), withActingUser, (req, res) => {
         if(!req?.body?.type) {
             res.send({status: false, statusText: "type not found"});
             return;

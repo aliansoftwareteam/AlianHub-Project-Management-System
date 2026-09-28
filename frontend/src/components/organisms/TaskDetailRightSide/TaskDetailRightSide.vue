@@ -181,31 +181,40 @@
                         :editable="canEditEstimatedHours"
                         @update:totalEstimatedTime="(val) => updateTotalEstimatedTime(val)"
                     />
-                    <!--
-                      Icon-only AI estimator trigger. Tooltip via the native
-                      title attribute matches the project's existing tooltip
-                      convention (see BulkActionBar.vue / CheckList.vue).
-                      Disabled + spinner state while a request is in flight.
-                      Hidden unless the user can actually write the estimate:
-                      the old gate was `=== true`, which wrongly excluded the
-                      Own/Everyone values too and so was dropped; this uses the
-                      correct writable test instead of no test at all.
-                    -->
                     <button
                         v-if="canEditEstimatedHours"
+                        ref="aiEstimateTrigger"
                         type="button"
                         class="ai-estimate-btn"
                         :class="{ 'is-loading': isAiEstimateLoading }"
                         :disabled="isAiEstimateLoading"
-                        :title="isAiEstimateLoading ? $t('TaskPanel.ai_estimate_generating') : $t('TaskPanel.ai_estimate_generate')"
-                        :aria-label="isAiEstimateLoading ? $t('TaskPanel.ai_estimate_generating_label') : $t('TaskPanel.ai_estimate_generate')"
+                        :title="isAiEstimateLoading ? $t('TaskPanel.ai_estimate_generating') : $t('TaskPanel.ai_estimate_suggest_hint')"
+                        :aria-label="isAiEstimateLoading ? $t('TaskPanel.ai_estimate_generating_label') : $t('TaskPanel.ai_estimate_suggest_hint')"
                         @click.stop="generateAiEstimate"
                     >
                         <span v-if="isAiEstimateLoading" class="ai-estimate-spinner" aria-hidden="true"></span>
                         <img v-else :src="aiEstimateIcon" alt="" class="ai-estimate-icon" />
+                        <span class="ai-estimate-label">{{ $t('TaskPanel.ai_estimate_suggest') }}</span>
                     </button>
                 </div>
             </div>
+            <AiResultPreview
+                v-if="aiEstimate"
+                class="ai-estimate-preview"
+                :title="$t('TaskPanel.ai_estimate_preview_title')"
+                :busy="isAiEstimateLoading"
+                :replace-label="$t('TaskPanel.ai_estimate_apply')"
+                :return-focus="() => aiEstimateTrigger"
+                @replace="applyAiEstimate"
+                @retry="generateAiEstimate"
+                @cancel="aiEstimate = null"
+            >
+                <p class="ai-estimate-preview__lead">{{ $t('TaskPanel.ai_estimate_suggests', { time: formatMinutes(aiEstimate.minutes) }) }}</p>
+                <p v-if="aiEstimate.optimistic && aiEstimate.pessimistic && aiEstimate.optimistic !== aiEstimate.pessimistic" class="ai-estimate-preview__range">
+                    {{ $t('TaskPanel.ai_estimate_range', { low: formatMinutes(aiEstimate.optimistic), high: formatMinutes(aiEstimate.pessimistic) }) }}
+                </p>
+                <p v-if="aiEstimate.reasoning" class="ai-estimate-preview__reason">{{ aiEstimate.reasoning }}</p>
+            </AiResultPreview>
             <!-- AHE — reason required when RE-updating an already-set estimate; the
                  reason is written to the task Activity Log by the backend. -->
             <Modal
@@ -277,10 +286,9 @@ import { permittedAssignees, scopedAssignees, selfAssignable } from '@/utils/ass
 import Modal from '@/components/atom/Modal/Modal.vue';
 import { showUndoToast } from '@/composable/useUndoToast';
 import { assignAgent, fetchRunnableAgents } from '@/views/Ai/useRunnableAgents';
+import AiResultPreview from '@/components/molecules/AiPreview/AiResultPreview.vue';
+import { useEscapeLayer } from '@/composable/useEscapeLayer';
 
-// Icon for the "Generate estimate using AI" sidebar button. Same asset
-// the SubTasks / Checklist / Sprints components use for their AI actions
-// so the visual language stays consistent.
 const aiEstimateIcon = require("@/assets/images/svg/ai_image.svg");
 const { t } = useI18n();
 
@@ -355,9 +363,10 @@ async function startAgent(option) {
 const taskLeaderData = ref(getUser(props.task?.Task_Leader));
 const assigneeInProgress = ref({});
 const isSpinner = ref(false);
-// In-flight flag for the manual AI-estimate request — drives both the
-// button's spinner state and the click-debounce.
 const isAiEstimateLoading = ref(false);
+const aiEstimate = ref(null);
+const aiEstimateTrigger = ref(null);
+useEscapeLayer(() => Boolean(aiEstimate.value), () => { aiEstimate.value = null; });
 
 // task_estimated_hours is a "selection field" permission, so its stored value
 // is null (None) | false (Read) | 1 (Own) | 2 (Everyone) | true (Read & Write).
@@ -817,7 +826,7 @@ const updateTotalEstimatedTime = (value) => {
     persistEstimate(value);
 }
 
-const persistEstimate = (value, reason = '') => {
+const persistEstimate = (value, reason = '', { silent = false } = {}) => {
     const userData = getUserData();
 
     const firebaseObj = {
@@ -836,12 +845,14 @@ const persistEstimate = (value, reason = '') => {
         ProjectCode: project.value.ProjectCode
     }
 
-    taskClass.updateTotalEstimatedTime({firebaseObj, projectData, taskData: props.task, obj, userData})
+    return taskClass.updateTotalEstimatedTime({firebaseObj, projectData, taskData: props.task, obj, userData})
     .then(() => {
-        $toast.success(t('Toast.Task_total_estimate_update_succesfull'), {position: "top-right"})
+        if (!silent) $toast.success(t('Toast.Task_total_estimate_update_succesfull'), {position: "top-right"})
+        return true;
     })
     .catch((err) => {
         console.error(err);
+        return false;
     })
 }
 
@@ -872,17 +883,18 @@ const displayTime = (time) => {
   return `${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m`
 }
 
-// Manual AI-estimate trigger. Posts to the EstimatedTime route which
-// loads the canonical task doc server-side, runs the LLM estimator with
-// force=true (so it overwrites any existing value), persists to
-// `totalEstimatedTime`, and emits a Socket.io `task` update — so other
-// connected clients see the new value without a refresh. We don't need
-// to patch local state here because the socket update flows back through
-// the same channel that drives `props.task`.
+const formatMinutes = (total) => {
+    const minutes = Math.max(0, Math.round(Number(total) || 0));
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    if (!hours) return `${rest}m`;
+    return rest ? `${hours}h ${rest}m` : `${hours}h`;
+}
+
+const AI_REASON_LIMIT = 300;
+
 const generateAiEstimate = async () => {
     if (isAiEstimateLoading.value) return;
-    // The trigger is hidden without write access; this also blocks the request
-    // itself, since it writes the estimate straight through the API.
     if (!canEditEstimatedHours.value) return;
     const taskId = props.task && props.task._id;
     if (!taskId) {
@@ -891,29 +903,38 @@ const generateAiEstimate = async () => {
     }
     isAiEstimateLoading.value = true;
     try {
-        // Send the logged-in user so the estimator can attribute the
-        // "updated estimated time" activity-log entry to whoever clicked
-        // (and so the required HISTORY.UserId is never blank).
-        const userData = getUserData();
-        const response = await apiRequest('post', `${env.ESTIMATED_TIME}/ai/${taskId}`, {
-            userName: userData.Employee_Name,
-            userId: userData.id,
-        });
-        if (response && response.data && response.data.status) {
-            $toast.success(t('TaskPanel.ai_estimate_done'), { position: 'top-right' });
+        const response = await apiRequest('post', `${env.ESTIMATED_TIME}/ai/${taskId}/propose`, {});
+        const payload = response && response.data;
+        if (payload && payload.status && payload.data && Number(payload.data.minutes) > 0) {
+            aiEstimate.value = payload.data;
         } else {
-            const msg = (response && response.data && response.data.statusText)
-                || t('TaskPanel.ai_estimate_failed');
-            $toast.error(msg, { position: 'top-right' });
+            $toast.error((payload && payload.statusText) || t('TaskPanel.ai_estimate_failed'), { position: 'top-right' });
         }
     } catch (err) {
         const msg = (err && err.response && err.response.data && err.response.data.statusText)
-            || (err && err.message)
             || t('TaskPanel.ai_estimate_failed');
         $toast.error(msg, { position: 'top-right' });
     } finally {
         isAiEstimateLoading.value = false;
     }
+}
+
+const applyAiEstimate = async () => {
+    const proposal = aiEstimate.value;
+    if (!proposal || !canEditEstimatedHours.value) return;
+    const previous = Number(props.task.totalEstimatedTime) || 0;
+    const reasoning = String(proposal.reasoning || '').slice(0, AI_REASON_LIMIT);
+    aiEstimate.value = null;
+    const reason = reasoning ? t('TaskPanel.ai_estimate_reason', { reasoning }) : t('TaskPanel.ai_estimate_preview_title');
+    const saved = await persistEstimate(proposal.minutes, reason, { silent: true });
+    if (!saved) {
+        $toast.error(t('TaskPanel.ai_estimate_not_applied'), { position: 'top-right' });
+        return;
+    }
+    showUndoToast({
+        message: t('TaskPanel.ai_estimate_applied', { time: formatMinutes(proposal.minutes) }),
+        undo: () => persistEstimate(previous, t('TaskPanel.ai_estimate_undo_reason'), { silent: true }).then((undone) => undone && undoneToast())
+    });
 }
 </script>
 <style scoped src='./style.css'>

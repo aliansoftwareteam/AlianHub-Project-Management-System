@@ -127,6 +127,7 @@
                 :title="draftTitle"
                 :current-text="rawDraft"
                 @apply="onComposeApply"
+                @undo="onComposeUndo"
             />
 
             <div v-if="showShare" class="pd__share-back" @click.self="showShare = false">
@@ -543,8 +544,18 @@ function onBlockChange({ blocks, html }) {
     contentHtml.value = html;
 }
 
-function onComposeApply(payload) {
-    if (blockEditor.value && blockEditor.value.applyBlocks) blockEditor.value.applyBlocks(payload);
+let beforeCompose = null;
+
+async function onComposeApply(payload) {
+    if (!blockEditor.value || !blockEditor.value.applyBlocks) return;
+    beforeCompose = await blockEditor.value.applyBlocks(payload);
+}
+
+async function onComposeUndo() {
+    if (!beforeCompose || !blockEditor.value || !blockEditor.value.restore) return;
+    const snapshot = beforeCompose;
+    beforeCompose = null;
+    await blockEditor.value.restore(snapshot);
 }
 
 function present() {

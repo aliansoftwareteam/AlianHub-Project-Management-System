@@ -124,7 +124,7 @@
     /* Left-aligned rows of equal-height pills; the search group takes its own row. */
     /* !important on purpose: legacy utility classes (w-545, justify-content-between, btn-white)
        sit on the same elements with the same specificity. */
-    .pft .task-filtersearchassignee-wrapper { flex-wrap: wrap !important; justify-content: flex-start !important; width: 100% !important; }
+    .pft .task-filtersearchassignee-wrapper { flex-wrap: wrap !important; justify-content: flex-start !important; width: 100% !important; box-sizing: border-box; }
     .pft .task-filtersearch { flex: 0 0 100% !important; width: 100% !important; justify-content: flex-start !important; }
     .pft .task-filter-assignee { flex: 0 0 100% !important; width: 100% !important; justify-content: flex-start !important; gap: 6px; }
     .pft .border-groupBy, .pft .ai_button, .pft .pft__mode-chip, .pft .calendar-button, .pft__search-toggle,
@@ -135,3 +135,39 @@
     .pft .top-filter-section { box-sizing: border-box; width: auto; max-width: none; min-width: 40px; }
     .pft .assignee-filter .assignee-user, .pft .assignee-filter .assignee-status { height: 38px !important; }
 }
+
+/* Phone, List/Board/Table: one row of search + Filters; the rest lives in a bottom sheet. */
+.pft__filters-btn {
+    display: none; align-items: center; gap: 6px; flex: none;
+    height: 40px; padding: 0 12px; border: 1px solid var(--hairline); border-radius: 8px;
+    background: var(--surface); color: var(--ink); font: 500 12.5px/1 var(--font-ui); cursor: pointer;
+}
+.pft__filters-btn:focus-visible { outline: none; box-shadow: var(--focus); }
+.pft__filters-count {
+    min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; box-sizing: border-box;
+    background: var(--brand); color: var(--on-brand); font: 600 11px/18px var(--font-ui); text-align: center;
+}
+.pft--phone .pft__filters-btn { display: inline-flex; }
+.pft--phone .task-filtersearchassignee-wrapper { flex-direction: row; flex-wrap: nowrap !important; padding: 0 !important; }
+.pft--phone .task-filtersearch { flex: 1 1 auto !important; width: auto !important; min-width: 0; flex-wrap: nowrap; }
+.pft--phone .pft__search-toggle { display: none; }
+.pft--phone .pft__search { display: flex; flex: 1 1 auto; width: auto; min-width: 0; max-width: none; order: 0; }
+
+.pft-sheet { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; background: rgba(0, 0, 0, .45); }
+.pft-sheet__panel {
+    width: 100%; max-height: 82dvh; overflow: auto; box-sizing: border-box;
+    padding: 8px 14px calc(14px + env(safe-area-inset-bottom));
+    border-radius: 16px 16px 0 0; background: var(--surface); color: var(--ink);
+}
+.pft-sheet__panel:focus { outline: none; }
+.pft-sheet__grab { width: 36px; height: 4px; margin: 2px auto 8px; border-radius: 4px; background: var(--border); }
+.pft-sheet__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pft-sheet__title { margin: 0; font: 600 15px/1.3 var(--font-ui); color: var(--ink); }
+.pft-sheet__close {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 44px; height: 44px; margin-right: -10px; border: 0; border-radius: 8px;
+    background: transparent; color: var(--ink-2); cursor: pointer;
+}
+.pft-sheet__close:focus-visible { outline: none; box-shadow: var(--focus); }
+.pft.pft-sheet__body { padding: 8px 0 0; border: 0; background: transparent; }
+.pft-sheet__body .task-filter-assignee { flex-wrap: wrap !important; justify-content: flex-start !important; gap: 8px !important; }
