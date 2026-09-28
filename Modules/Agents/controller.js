@@ -684,6 +684,17 @@ exports.teamBoard = async (req, res) => {
     } catch (e) { logger.error(`teamBoard: ${e.message}`); return fail(res, e.message, 500); }
 };
 
+/* GET /api/v2/agents/team/standup?tz= — the caller's own standup, from activity rather than a model */
+exports.myStandup = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
+        const window = team.standupWindow({ now: Date.now(), tzOffset: req.query && req.query.tz });
+        const activity = await team.personalActivity(companyId, { userId: req.uid, window });
+        return res.send({ status: true, statusText: 'Standup fetched.', data: team.personalStandup(activity) });
+    } catch (e) { logger.error(`myStandup: ${e.message}`); return fail(res, e.message, 500); }
+};
+
 /* GET /api/v2/agents/routable?projectId=&limit= — open tasks the caller can
  * already see, for the bulk router (30b). Scoped through Agents/scope so routing
  * can never surface a task the person could not open on their own. */

@@ -1,5 +1,5 @@
 <template>
-<div ref="viewRoot" class="w-100 list-view-wrapper ah-page lv2">
+<div ref="viewRoot" class="w-100 list-view-wrapper ah-page lv2" :style="listGridStyle">
     <div v-if="!currentCompany?.planFeature?.listView">
         <UpgradePlan
             :buttonText="$t('Upgrades.upgrade_your_plan')"
@@ -43,14 +43,23 @@
                 <div class="lv2__scroll ah-scroll" id="list_scroll" role="table">
                     <div class="lv2__cols" role="row">
                         <span class="lv2__c-select" role="columnheader"><span class="ah-sr-only">{{ $t('List.col_select') }}</span></span>
-                        <span class="lv2__c-title" role="columnheader">{{ $t('List.col_task') }}</span>
-                        <span class="lv2__c-tags" role="columnheader"><template v-if="tagsOn">{{ $t('List.col_tags') }}</template></span>
-                        <span class="lv2__c-assignee" role="columnheader">{{ $t('List.col_assignee') }}</span>
-                        <span class="lv2__c-due" role="columnheader">{{ $t('List.col_due') }}</span>
-                        <span class="lv2__c-prio" role="columnheader"><template v-if="rowEdit.showPriority.value">{{ $t('List.col_priority') }}</template></span>
-                        <span class="lv2__c-est" role="columnheader">{{ $t('List.col_est') }}</span>
-                        <span class="lv2__c-risk" role="columnheader">{{ $t('List.col_risk') }}</span>
-                        <span class="lv2__c-done" role="columnheader">{{ $t('Provenance.col_done_by') }}</span>
+                        <span class="lv2__c-title lv2__head-title" role="columnheader">
+                            {{ $t('List.col_task') }}
+                            <ViewColumnChooser
+                                class="lv2__chooser"
+                                :columns="columnState.columns.value"
+                                @toggle="columnState.setVisible"
+                                @move="columnState.move"
+                                @reset="columnState.reset"
+                            />
+                        </span>
+                        <span
+                            v-for="column in columnState.visibleColumns.value"
+                            :key="column.id"
+                            :class="listColumnClass(column)"
+                            role="columnheader"
+                            :title="column.field ? column.label : null"
+                        >{{ column.field ? column.label : $t(column.labelKey) }}</span>
                     </div>
 
                     <section v-for="sprint in groupedTasks" :key="sprint?.id" class="lv2__sprint" role="presentation" :id="`sprint_${sprint?.id}`">
@@ -146,6 +155,8 @@ import { groupCountsFor, groupLabel, listSourceTasks } from './listFilter.js';
 import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyState.js';
 import { openTask, useTaskSequenceSource } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { useListRowEdit } from './useListInlineEdit.js';
+import ViewColumnChooser from '@/views/Projects/components/columns/ViewColumnChooser.vue';
+import { columnCatalogue, gridTracks, listColumnClass, listColumnsAt, useViewColumns } from '@/views/Projects/composables/viewColumns';
 
 // UTILS
 const {getters} = useStore();
@@ -169,6 +180,20 @@ const agents = useProjectAgentActivity();
 const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
 const rowEdit = useListRowEdit(project, showArchived);
 provide('listRowEdit', rowEdit);
+
+const listCatalogue = computed(() => columnCatalogue('list', {
+    tagsOn: tagsOn.value,
+    priorityOn: rowEdit.showPriority.value,
+    estimateOn: checkPermission('task.task_estimated_hours', project.value?.isGlobalPermission) !== null,
+    startOn: checkPermission('task.task_start_date', project.value?.isGlobalPermission) !== null,
+    fields: rowEdit.fields.defs.value
+}));
+const columnState = useViewColumns(computed(() => project.value?._id), 'list', listCatalogue);
+provide('listColumns', columnState.visibleColumns);
+/* Phone width keeps the stylesheet's two-line row; wider, the tracks follow the chosen columns. */
+const listGridStyle = computed(() => ((clientWidth?.value || 1280) <= 767
+    ? {}
+    : { '--lv2-cols': gridTracks('list', listColumnsAt(columnState.visibleColumns.value, clientWidth?.value || 1280)) }));
 
 // EMITS
 defineEmits(['change'])

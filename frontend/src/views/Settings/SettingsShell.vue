@@ -167,6 +167,7 @@ const rawGroups = computed(() => [
             { key: "timeoff", text: label("settingslider.Time Off"), icon: "planner", to: to("TimeOff"), names: ["TimeOff"], show: true },
             { key: "timetracking", text: label("settingslider.Time Tracking"), icon: "time", to: to("Time Tracking"), names: ["Time Tracking"], show: true },
             { key: "audit", text: label("settingslider.Audit Log"), icon: "audit", to: to("AuditLog"), names: ["AuditLog"], show: isOwnerOrAdmin.value },
+            { key: "import-export", text: t("ImportExport.nav"), icon: "download", to: to("ImportExport"), names: ["ImportExport"], show: isOwnerOrAdmin.value },
             { key: "billing", text: t("Settings.nav_billing"), icon: "billing", to: to("Upgrade"), names: ["Upgrade"], show: hasBilling.value }
         ]
     },

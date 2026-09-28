@@ -11,6 +11,8 @@ const COMPONENTS = {
     ProjectPulseCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/ProjectPulseCard/ProjectPulseCard.vue')),
     TeamLoggedVsEtaCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/TeamLoggedVsEtaCard/TeamLoggedVsEtaCard.vue')),
     FreeResourcesCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/FreeResourcesCard/FreeResourcesCard.vue')),
+    AtRiskTodayCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/AtRiskTodayCard/AtRiskTodayCard.vue')),
+    AgentSpendCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/AgentSpendCard/AgentSpendCard.vue')),
     TasksByStatusCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/TasksByStatusCard/TasksByStatusCard.vue')),
 };
 

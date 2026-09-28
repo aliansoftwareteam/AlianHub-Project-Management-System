@@ -1,6 +1,6 @@
 <template>
     <div class="story-points" ref="rootEl" :class="{ 'sp-disabled': !permission }">
-        <button type="button" class="sp-trigger" :disabled="!permission" :aria-expanded="open ? 'true' : 'false'" @click="toggle">
+        <button type="button" class="sp-trigger" :disabled="!permission" :aria-label="buttonLabel || null" :aria-expanded="open ? 'true' : 'false'" @click="toggle">
             <span v-if="display !== null" class="sp-chip">{{ display }}</span>
             <span v-else class="sp-empty">{{ emptyLabel || $t('Scrum.story_points_empty') }}</span>
         </button>
@@ -31,6 +31,7 @@ const props = defineProps({
     estimationScale: { type: String, default: 'fibonacci' },
     permission: { type: Boolean, default: true },
     emptyLabel: { type: String, default: '' },
+    buttonLabel: { type: String, default: '' },
 });
 const emit = defineEmits(['select']);
 

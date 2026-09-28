@@ -7,6 +7,8 @@ const runs = require('./runs');
 const { agentProjectsFor } = require('./access');
 const { visibilityStage } = require('../Tasks/helpers/taskQueryGuard');
 const { resolveSheetScope, scopedTimeMatch, SHEET_PERMISSION } = require('../TimeSheet/helpers/timeScope');
+const { CLOSED_STATUS_TYPES, isClosedTask, isBlockedTask, taskRef } = require('../Tasks/helpers/taskSignals');
+const { localDayStart, localWeekday } = require('../../utils/localDay');
 
 // The Team board (handoff 13h): who is on what right now, people and agents in
 // one list.
@@ -273,4 +275,108 @@ const standup = (data) => {
     };
 };
 
-module.exports = { board, standup, weekStart };
+const STANDUP_LINES = 6;
+const STANDUP_TASK_FIELDS = { TaskName: 1, TaskKey: 1, ProjectID: 1, sprintId: 1, sprintArray: 1, folderObjId: 1, statusType: 1, status: 1, DueDate: 1, relations: 1 };
+const YESTERDAY_ORDER = ['completed', 'moved', 'commented'];
+
+/* Monday's standup reports Friday onwards, so a weekend never leaves "yesterday" empty. */
+const standupWindow = ({ now = Date.now(), tzOffset } = {}) => {
+    const todayStart = localDayStart(now, tzOffset);
+    const monday = localWeekday(now, tzOffset) === 1;
+    return {
+        since: monday ? 'friday' : 'yesterday',
+        yesterdayStart: new Date(todayStart.getTime() - (monday ? 3 : 1) * DAY_MS),
+        todayStart,
+        todayEnd: new Date(todayStart.getTime() + DAY_MS),
+    };
+};
+
+const visibleTasksById = async (companyId, ids, taskFilter) => {
+    const wanted = [...new Set(ids.map((id) => String(id || '')).filter(Boolean))].map(oid).filter(Boolean);
+    if (!wanted.length) return {};
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS,
+        data: [{ ...taskFilter, _id: { $in: wanted }, deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true } }, STANDUP_TASK_FIELDS],
+    }, 'find').catch(() => []);
+    const byId = {};
+    (rows || []).forEach((t) => { byId[String(t._id)] = t; });
+    return byId;
+};
+
+/* Only the caller's own history, comments, assignments and timer, each read through the
+ * caller's task visibility, so a line never names a task they could not open. */
+const personalActivity = async (companyId, { userId, window }) => {
+    const uid = String(userId);
+    const taskFilter = await taskFilterFor(companyId, uid);
+    const inWindow = { $gte: window.yesterdayStart, $lt: window.todayStart };
+    const [moves, comments, open, timer] = await Promise.all([
+        MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.HISTORY,
+            data: [{ UserId: uid, Key: 'Task_Status', createdAt: inWindow }, { TaskId: 1, createdAt: 1 }, { sort: { createdAt: -1 }, limit: 200 }],
+        }, 'find').catch(() => []),
+        MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.COMMENTS,
+            data: [{ userId: uid, isDeleted: { $ne: true }, createdAt: inWindow }, { taskId: 1, createdAt: 1 }, { sort: { createdAt: -1 }, limit: 200 }],
+        }, 'find').catch(() => []),
+        MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [{ ...taskFilter, AssigneeUserId: uid, deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true }, statusType: { $nin: CLOSED_STATUS_TYPES } },
+                   STANDUP_TASK_FIELDS, { sort: { DueDate: 1 }, limit: 200 }],
+        }, 'find').catch(() => []),
+        MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TIMESHEET,
+            data: [{ Loggeduser: uid, startTimeTracker: { $exists: true, $ne: null }, LogEndTime: { $in: [null, 0, undefined] } }, { TicketID: 1 }, { sort: { LogStartTime: -1 }, limit: 1 }],
+        }, 'find').then((rows) => (rows && rows[0]) || null).catch(() => null),
+    ]);
+    const tasks = await visibleTasksById(companyId, [
+        ...(moves || []).map((m) => m.TaskId),
+        ...(comments || []).map((c) => c.taskId),
+        timer && timer.TicketID,
+    ], taskFilter);
+    return { window, moves: moves || [], comments: comments || [], tasks, open: open || [], timer };
+};
+
+const personalStandup = ({ window, moves = [], comments = [], tasks = {}, open = [], timer = null }) => {
+    const seen = new Set();
+    const yesterday = [];
+    const note = (id, kindOf) => {
+        const task = tasks[id];
+        if (!task || seen.has(id)) return;
+        seen.add(id);
+        yesterday.push({ kind: kindOf(task), task: taskRef(task) });
+    };
+    moves.forEach((m) => note(String(m.TaskId), (task) => (isClosedTask(task) ? 'completed' : 'moved')));
+    comments.forEach((c) => note(String(c.taskId), () => 'commented'));
+    yesterday.sort((a, b) => YESTERDAY_ORDER.indexOf(a.kind) - YESTERDAY_ORDER.indexOf(b.kind));
+
+    const todayStart = window.todayStart.getTime();
+    const todayEnd = window.todayEnd.getTime();
+    const dueOf = (task) => (task.DueDate ? new Date(task.DueDate).getTime() : NaN);
+
+    const today = [];
+    const tracked = timer ? (tasks[String(timer.TicketID)] || open.find((t) => String(t._id) === String(timer.TicketID))) : null;
+    if (tracked) today.push({ kind: 'tracking', task: taskRef(tracked) });
+    open.forEach((task) => {
+        if (tracked && String(task._id) === String(tracked._id)) return;
+        const due = dueOf(task);
+        if (due >= todayStart && due < todayEnd) today.push({ kind: 'due_today', task: taskRef(task) });
+    });
+
+    const blocked = open.map((task) => {
+        const due = dueOf(task);
+        const overdue = due < todayStart;
+        const stuck = isBlockedTask(task);
+        if (isClosedTask(task) || (!overdue && !stuck)) return null;
+        return { kind: stuck ? 'blocked' : 'overdue', task: taskRef(task), days: overdue ? Math.ceil((todayStart - due) / DAY_MS) : 0 };
+    }).filter(Boolean).sort((a, b) => b.days - a.days);
+
+    return {
+        since: window.since,
+        yesterday: yesterday.slice(0, STANDUP_LINES),
+        today: today.slice(0, STANDUP_LINES),
+        blocked: blocked.slice(0, STANDUP_LINES),
+        totals: { yesterday: yesterday.length, today: today.length, blocked: blocked.length },
+    };
+};
+
+module.exports = { board, standup, weekStart, standupWindow, personalActivity, personalStandup };

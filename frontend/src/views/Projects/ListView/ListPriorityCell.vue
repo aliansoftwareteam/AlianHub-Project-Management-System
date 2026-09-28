@@ -38,7 +38,7 @@ const props = defineProps({
 const emit = defineEmits(["change"]);
 
 const { t } = useI18n();
-const { getters } = useStore();
+const getters = useStore()?.getters || {};
 
 /* The chip tone keys off the built-in priority key, but the word only ever comes from
  * the company's own vocabulary: a workspace that renames or adds a priority must not

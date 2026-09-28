@@ -77,7 +77,7 @@
                 <ul class="pm__episodes">
                     <li v-for="e in episodes" :key="e.runId" class="pm__episode">
                         <span class="ah-mono pm__at">{{ when(e.at) }}</span>
-                        <span class="pm__skill">{{ e.skill }}</span>
+                        <span class="pm__skill">{{ skillLabel(t, e.skill) }}</span>
                         <span v-if="e.taskTitle" class="pm__task">· {{ e.taskTitle }}</span>
                         <span class="ah-small" data-test="episode-summary">{{ episodeSummary(e, t) }}</span>
                     </li>
@@ -97,6 +97,7 @@ import { useConvertDate } from "@/composable";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { useProjectMemory } from "@/views/Ai/useProjectMemory";
 import { episodeSummary } from "@/views/Ai/episodeText";
+import { skillLabel } from "@/views/Ai/plainLabels";
 import { isOwnerOrAdmin } from "@/utils/roles";
 
 defineOptions({ name: "ProjectMemoryCard" });

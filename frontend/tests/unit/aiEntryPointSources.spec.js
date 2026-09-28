@@ -82,9 +82,8 @@ describe('✦ marks only features that call a model', () => {
 
     it('the table keeps ✦ on the model columns and drops it from the risk formula', () => {
         const head = template('views/Projects/TableView/TableView.vue');
-        expect(head).toContain("✦ {{ $t('List.col_summary') }}");
-        expect(head).toContain("✦ {{ $t('List.col_area') }}");
-        expect(head).not.toContain("✦ {{ $t('List.col_risk') }}");
+        expect(head).toContain("{{ column.id === 'risk' ? '' : '✦ ' }}");
+        expect(head).toContain("{ 'tv2__head-ai': column.id !== 'risk' }");
     });
 
     it('the gantt replan is computed, while agent proposals keep ✦', () => {
