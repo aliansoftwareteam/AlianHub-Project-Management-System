@@ -13,6 +13,7 @@
 const mongoose = require("mongoose");
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
+const { idForms } = require("../../../utils/mongo-handler/objectIdKeys");
 
 /**
  * Resolve the reporting window from a card payload.
@@ -237,15 +238,15 @@ async function getSprintTypeMap(companyId, sprintIds = []) {
  *   mode 'all'      → null (no restriction — all accessible projects)
  *   mode 'include'  → { $in:  ids }
  *   mode 'exclude'  → { $nin: ids }
- * Empty ids → null (no restriction). Pass { string: true } for the timesheet
- * `ProjectId` field (stored as a String) vs task/project `_id` (ObjectId).
+ * Empty ids → null (no restriction). Pass { bothForms: true } for the timesheet
+ * `ProjectId` field, which holds text in older rows and an ObjectId in newer ones.
  *
  * @returns {object|null} clause for ProjectID/_id/ProjectId, or null
  */
-function projectScopeClause(mode, ids, { string = false } = {}) {
+function projectScopeClause(mode, ids, { bothForms = false } = {}) {
     const valid = (ids || []).filter((id) => mongoose.Types.ObjectId.isValid(String(id)));
     if (!valid.length) return null; // no ids → all accessible (new 'all' cards send [])
-    const vals = string ? valid.map(String) : valid.map((id) => new mongoose.Types.ObjectId(String(id)));
+    const vals = bothForms ? idForms(valid) : valid.map((id) => new mongoose.Types.ObjectId(String(id)));
     if (mode === 'exclude') return { $nin: vals };
     // include, OR a legacy card whose mode is 'all' but still carries saved ids —
     // treat those ids as an include list so old cards keep their existing scope.

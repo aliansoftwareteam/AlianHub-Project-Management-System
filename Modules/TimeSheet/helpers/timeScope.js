@@ -1,6 +1,7 @@
 const { IANAZone } = require('luxon');
 const { getRoleType, isPrivileged, evaluatePermission } = require('../../../Config/permissionGuard');
 const { visibleProjectIds } = require('../../Agents/scope');
+const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 
 const SCOPE_COMPANY = 'company';
 const SCOPE_SELF = 'self';
@@ -56,16 +57,17 @@ const resolveSheetScope = async (companyId, uid, permissionKeys) => {
     return { ...scope, everyone, visible: await visibleProjectsFor(companyId, scope) };
 };
 
-/* userIds and projectIds are the filters the client asked for; null means none. */
+/* userIds and projectIds are the filters the client asked for; null means none. A project id
+ * is matched in both stored forms until every time row holds it as an ObjectId (task 040). */
 const scopedTimeMatch = (scope, { userIds = null, projectIds = null } = {}) => {
     const match = {};
     if (!scope.everyone) match.Loggeduser = scope.uid;
     else if (userIds) match.Loggeduser = { $in: userIds.map(String) };
     if (projectIds) {
         const wanted = projectIds.map(String);
-        match.ProjectId = { $in: scope.visible ? wanted.filter((id) => scope.visible.includes(id)) : wanted };
+        match.ProjectId = { $in: idForms(scope.visible ? wanted.filter((id) => scope.visible.includes(id)) : wanted) };
     } else if (scope.visible && (scope.everyone || scope.roleType === null)) {
-        match.ProjectId = { $in: scope.visible };
+        match.ProjectId = { $in: idForms(scope.visible) };
     }
     return match;
 };
@@ -75,7 +77,7 @@ const scopedTimeMatch = (scope, { userIds = null, projectIds = null } = {}) => {
 const scopedEstimateMatch = (scope) => {
     const match = {};
     if (!scope.everyone) match.$or = [{ UserId: scope.uid }, { UserId: { $exists: false }, userId: scope.uid }];
-    if (scope.visible && (scope.everyone || scope.roleType === null)) match.ProjectId = { $in: scope.visible };
+    if (scope.visible && (scope.everyone || scope.roleType === null)) match.ProjectId = { $in: idForms(scope.visible) };
     return match;
 };
 

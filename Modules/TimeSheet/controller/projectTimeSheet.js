@@ -45,7 +45,7 @@ exports.getProjectTimeSheet = async(req,res) => {
                 $group: {
                     _id: {
                         date: "$convertedToDate",
-                        projectId: "$ProjectId",
+                        projectId: { $toString: "$ProjectId" },
                         logType: "$logAddType"
                     },
                     data: {

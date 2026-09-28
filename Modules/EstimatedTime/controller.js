@@ -9,6 +9,7 @@ const { resolveSheetScope, SHEET_PERMISSION, scopedEstimateMatch } = require("..
 const { scopeEstimatePipeline, TimesheetQueryRefused } = require("../TimeSheet/helpers/timesheetQueryScope");
 const { buildEstimateWrite, EstimateWriteRefused } = require("./helpers/estimateWriteScope");
 const { previousPlanOf, recordPlanChange } = require("./helpers/planHistory");
+const { idForms } = require("../../utils/mongo-handler/objectIdKeys");
 
 /* The same grant that decides who may plan another person's time decides who may read it. */
 const ESTIMATE_SCOPE_PERMISSIONS = [SHEET_PERMISSION.workload, SHEET_PERMISSION.project];
@@ -29,7 +30,7 @@ exports.getEstimatedTime = async(req,res) => {
             data: [
                 {
                     ...scopedEstimateMatch(scope),
-                    "ProjectId": projectId,
+                    "ProjectId": { $in: idForms(projectId) },
                     "TaskId": TaskId
                 }
             ]

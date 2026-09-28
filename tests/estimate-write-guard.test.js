@@ -111,7 +111,8 @@ describe('PUT /api/v1/estimatedTime', () => {
         const { filter, options } = sent();
         expect(String(filter._id)).toBe(ROW);
         expect(filter.$or).toEqual([{ UserId: ME }, { UserId: { $exists: false }, userId: ME }]);
-        expect(filter.ProjectId).toEqual({ $in: [P1] });
+        expect(filter.ProjectId.$in.map(String)).toEqual([P1, P1]);
+        expect(filter.ProjectId.$in.map((id) => typeof id)).toEqual(['string', 'object']);
         expect(options.upsert).toBe(false);
     });
 
