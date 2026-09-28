@@ -1,0 +1,63 @@
+{
+  "about": "Held-out structured questions for Ask. Each case names the task keys the scoped task query must return for the asker; dueInDays is counted from now in UTC.",
+  "now": "2026-09-28T10:00:00Z",
+  "asker": "6f0000000000000000000001",
+  "members": [
+    { "id": "6f0000000000000000000001", "first": "Mevil", "last": "Bhojani" },
+    { "id": "6f0000000000000000000002", "first": "Priya", "last": "Shah" },
+    { "id": "6f0000000000000000000003", "first": "Arjun", "last": "Rao" }
+  ],
+  "statuses": [
+    { "type": "default_active", "name": "To Do", "key": 1 },
+    { "type": "active", "name": "In Progress", "key": 3 },
+    { "type": "active", "name": "Blocked", "key": 5 },
+    { "type": "close", "name": "Complete", "key": 2 }
+  ],
+  "projects": [
+    { "id": "6f0000000000000000000a01", "name": "Local Smoke", "code": "SMOKE", "visible": true },
+    { "id": "6f0000000000000000000a02", "name": "AlianHub Platform", "code": "AP", "visible": true },
+    { "id": "6f0000000000000000000a03", "name": "Board Minutes", "code": "BRD", "visible": false }
+  ],
+  "sprints": [
+    { "id": "6f0000000000000000000d01", "name": "Sprint 11", "project": "SMOKE", "isScrum": true, "state": "closed" },
+    { "id": "6f0000000000000000000d02", "name": "Sprint 12", "project": "SMOKE", "isScrum": true, "state": "active", "endInDays": 4 },
+    { "id": "6f0000000000000000000d03", "name": "Platform Cycle 7", "project": "AP", "isScrum": true, "state": "active", "endInDays": 2 }
+  ],
+  "tasks": [
+    { "key": "SMOKE-1", "project": "SMOKE", "status": 1, "assignee": "Mevil", "dueInDays": -3, "sprint": "Sprint 11" },
+    { "key": "SMOKE-2", "project": "SMOKE", "status": 3, "assignee": "Mevil", "dueInDays": -1, "sprint": "Sprint 12" },
+    { "key": "SMOKE-3", "project": "SMOKE", "status": 1, "assignee": "Priya", "dueInDays": -2, "sprint": "Sprint 12" },
+    { "key": "SMOKE-4", "project": "SMOKE", "status": 2, "assignee": "Priya", "dueInDays": -5, "sprint": "Sprint 12" },
+    { "key": "SMOKE-5", "project": "SMOKE", "status": 5, "assignee": "Arjun", "dueInDays": 0, "sprint": "Sprint 12" },
+    { "key": "SMOKE-6", "project": "SMOKE", "status": 1, "assignee": null, "dueInDays": 1, "sprint": "Sprint 12" },
+    { "key": "SMOKE-7", "project": "SMOKE", "status": 1, "assignee": "Mevil", "dueInDays": null, "sprint": "Sprint 12" },
+    { "key": "AP-1", "project": "AP", "status": 1, "assignee": "Mevil", "dueInDays": -8, "sprint": "Platform Cycle 7" },
+    { "key": "AP-2", "project": "AP", "status": 3, "assignee": "Arjun", "dueInDays": 2, "sprint": "Platform Cycle 7" },
+    { "key": "AP-3", "project": "AP", "status": 2, "assignee": "Mevil", "dueInDays": -1, "sprint": "Platform Cycle 7" },
+    { "key": "AP-4", "project": "AP", "status": 1, "assignee": "Priya", "dueInDays": 9, "sprint": "Platform Cycle 7" },
+    { "key": "BRD-1", "project": "BRD", "status": 1, "assignee": "Mevil", "dueInDays": -2, "sprint": null }
+  ],
+  "cases": [
+    { "question": "Which tasks in Local Smoke are overdue?", "expect": ["SMOKE-1", "SMOKE-2", "SMOKE-3"] },
+    { "question": "What is overdue in SMOKE?", "expect": ["SMOKE-1", "SMOKE-2", "SMOKE-3"] },
+    { "question": "What's overdue?", "expect": ["AP-1", "SMOKE-1", "SMOKE-2", "SMOKE-3"] },
+    { "question": "Which of my tasks are overdue?", "expect": ["AP-1", "SMOKE-1", "SMOKE-2"] },
+    { "question": "What is Priya working on in Local Smoke?", "expect": ["SMOKE-3"] },
+    { "question": "Which of Priya's tasks are still open?", "expect": ["AP-4", "SMOKE-3"] },
+    { "question": "What is due today?", "expect": ["SMOKE-5"] },
+    { "question": "What is due tomorrow in Local Smoke?", "expect": ["SMOKE-6"] },
+    { "question": "Which tasks are due this week?", "expect": ["AP-2", "SMOKE-5", "SMOKE-6"] },
+    { "question": "What is due next week?", "expect": ["AP-4"] },
+    { "question": "Which tasks are blocked?", "expect": ["SMOKE-5"] },
+    { "question": "What is in progress in AP?", "expect": ["AP-2"] },
+    { "question": "Which tasks in Local Smoke are completed?", "expect": ["SMOKE-4"] },
+    { "question": "Unassigned tasks in Local Smoke", "expect": ["SMOKE-6"] },
+    { "question": "Which Local Smoke tasks have no due date?", "expect": ["SMOKE-7"] },
+    { "question": "What is left in the current sprint for Local Smoke?", "expect": ["SMOKE-2", "SMOKE-3", "SMOKE-5", "SMOKE-6", "SMOKE-7"] },
+    { "question": "Which tasks in Sprint 11 are open?", "expect": ["SMOKE-1"] },
+    { "question": "What is Arjun doing in the current sprint?", "expect": ["AP-2", "SMOKE-5"] },
+    { "question": "Which tasks in Board Minutes are overdue?", "expect": ["AP-1", "SMOKE-1", "SMOKE-2", "SMOKE-3"] },
+    { "question": "Is SMOKE-2 done yet?", "expect": [] },
+    { "question": "What did we decide about the release notes?", "expect": [] }
+  ]
+}
