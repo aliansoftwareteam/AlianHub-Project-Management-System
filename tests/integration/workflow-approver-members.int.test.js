@@ -30,7 +30,7 @@ const OUTSIDER_NAME = `Otto Outsider ${id().slice(0, 6)}`;
 let client;
 
 const req = ({ uid = OWNER, params = {}, body = {} } = {}) => ({
-    headers: { companyid: COMPANY }, uid, params, query: {}, body, ip: '127.0.0.1',
+    headers: { companyid: COMPANY }, aud: COMPANY, uid, params, query: {}, body, ip: '127.0.0.1',
 });
 
 const res = () => {

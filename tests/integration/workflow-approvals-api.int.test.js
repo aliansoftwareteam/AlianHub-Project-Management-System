@@ -36,7 +36,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let client;
 
 const req = ({ companyId = COMPANY, uid = OWNER, params = {}, body = {}, query = {} } = {}) => ({
-    headers: { companyid: companyId }, uid, params, query, body, ip: '127.0.0.1',
+    headers: { companyid: companyId }, aud: companyId, uid, params, query, body, ip: '127.0.0.1',
 });
 
 const res = () => {
