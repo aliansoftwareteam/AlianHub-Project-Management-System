@@ -66,7 +66,8 @@ describe('saving a comment', () => {
         expect(bumpUnreadCounts).toHaveBeenCalledTimes(1);
         const [companyId, comment, mentionIds] = bumpUnreadCounts.mock.calls[0];
         expect(companyId).toBe(C);
-        expect(comment).toMatchObject({ _id: 'c1', userId: ME, projectId: PROJECT, sprintId: SPRINT, taskId: TASK });
+        expect({ ...comment, projectId: String(comment.projectId), sprintId: String(comment.sprintId), taskId: String(comment.taskId) })
+            .toMatchObject({ _id: 'c1', userId: ME, projectId: PROJECT, sprintId: SPRINT, taskId: TASK });
         expect(mentionIds).toEqual([MENTIONED]);
     });
 
