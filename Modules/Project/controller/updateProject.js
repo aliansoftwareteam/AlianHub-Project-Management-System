@@ -54,8 +54,8 @@ exports.updateProjectInternal = async (companyId, projectId, updateObject, key, 
                             [fieldName]: {
                                 $cond: {
                                     if: { $isArray: `$${fieldName}` },
-                                    then: { $concatArrays: [`$${fieldName}`, [fieldValue]] },
-                                    else: [fieldValue]
+                                    then: { $concatArrays: [`$${fieldName}`, [{ $literal: fieldValue }]] },
+                                    else: [{ $literal: fieldValue }]
                                 }
                             }
                         }
