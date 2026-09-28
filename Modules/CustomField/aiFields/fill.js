@@ -149,7 +149,7 @@ async function proposeFills({ companyId, uid, fieldId, taskIds }) {
         const proposalId = answer.empty ? null : remember({
             companyId: String(companyId), uid: String(uid), fieldId: definition._id, taskId: String(taskId), fieldValue: answer.fieldValue, hash: answer.hash,
         });
-        proposals.push({ taskId: String(taskId), proposalId, text: answer.text, fieldValue: answer.fieldValue, empty: answer.empty, ...(answer.reason ? { reason: answer.reason } : {}) });
+        proposals.push({ taskId: String(taskId), taskName: String(task.TaskName || ''), proposalId, text: answer.text, fieldValue: answer.fieldValue, empty: answer.empty, ...(answer.reason ? { reason: answer.reason } : {}) });
     }
     return { proposals };
 }

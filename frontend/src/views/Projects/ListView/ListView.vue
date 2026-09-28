@@ -69,7 +69,10 @@
                             :class="listColumnClass(column)"
                             role="columnheader"
                             :title="column.field ? column.label : null"
-                        >{{ column.id === 'risk' ? '✦ ' : '' }}{{ column.field ? column.label : $t(column.labelKey) }}</span>
+                        >
+                            <AiFieldColumnHead v-if="column.field && isAiField(column.field)" :field="column.field" :tasks="aiColumnTasks" :editable="rowEdit.rights.value.customField === true" />
+                            <template v-else>{{ column.id === 'risk' ? '✦ ' : '' }}{{ column.field ? column.label : $t(column.labelKey) }}</template>
+                        </span>
                     </div>
 
                     <section v-for="sprint in groupedTasks" :key="sprint?.id" class="lv2__sprint" role="presentation" :id="`sprint_${sprint?.id}`">
@@ -166,6 +169,8 @@ import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyStat
 import { openTask, useTaskSequenceSource } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { useListRowEdit } from './useListInlineEdit.js';
 import ViewColumnChooser from '@/views/Projects/components/columns/ViewColumnChooser.vue';
+import AiFieldColumnHead from '@/views/Projects/components/columns/AiFieldColumnHead.vue';
+import { isAiField, loadedViewTasks } from '@/views/Projects/composables/aiFields';
 import ListSortControl from './ListSortControl.vue';
 import ConvertToSubTaskSidebar from '@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue';
 import { useListRowMenu } from './useListRowMenu.js';
@@ -194,6 +199,7 @@ const agents = useProjectAgentActivity();
 const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
 const rowEdit = useListRowEdit(project, showArchived);
 provide('listRowEdit', rowEdit);
+const aiColumnTasks = computed(() => loadedViewTasks(getters, project.value?._id, { searched: Boolean(searchedTask?.value) }));
 const rowMenu = useListRowMenu(project, showArchived);
 provide('listRowMenu', rowMenu);
 const sortState = useListSort();

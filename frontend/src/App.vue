@@ -17,6 +17,7 @@
                         <QuickCreateTask />
                         <KeyboardShortcuts />
                         <TaskTemplateDialogHost />
+                        <AiFieldFillDialog />
                         <div class="ah-app__view billing__history-wrapper style-scroll">
                             <AiOffPage v-if="aiGated"/>
                             <router-view v-else/>
@@ -74,6 +75,7 @@ import QuickCreateTask from '@/components/organisms/QuickCreateTask/QuickCreateT
 import KeyboardShortcuts from '@/components/organisms/KeyboardShortcuts/KeyboardShortcuts.vue'
 import SkipLink from '@/components/atom/SkipLink/SkipLink.vue'
 import TaskTemplateDialogHost from '@/components/molecules/TaskTemplates/TaskTemplateDialogHost.vue'
+import AiFieldFillDialog from '@/components/molecules/AiFieldFill/AiFieldFillDialog.vue'
 import { PALETTE_OPEN_EVENT, isPaletteShortcut } from '@/components/molecules/AdvanceSearch/paletteKeys'
 import { useStore } from 'vuex';
 import axios from 'axios'

@@ -69,6 +69,9 @@
                             </button>
                         </span>
                         <span v-else-if="column.ai" role="columnheader" class="tv2__head-ai" :title="$t(column.id === 'risk' ? 'List.risk_formula' : 'List.ai_source_hint')">✦ {{ $t(column.labelKey) }}</span>
+                        <span v-else-if="column.field && isAiField(column.field)" role="columnheader" class="tv2__head-col" :title="column.label">
+                            <AiFieldColumnHead :field="column.field" :tasks="aiColumnTasks" :editable="rowEdit.rights.value.customField === true" />
+                        </span>
                         <span v-else role="columnheader" class="tv2__head-col" :title="column.field ? column.label : null">{{ column.field ? column.label : $t(column.labelKey) }}</span>
                     </template>
                 </div>
@@ -127,6 +130,8 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import ListBulkBar from '@/views/Projects/ListView/ListBulkBar.vue';
 import ViewColumnChooser from '@/views/Projects/components/columns/ViewColumnChooser.vue';
+import AiFieldColumnHead from '@/views/Projects/components/columns/AiFieldColumnHead.vue';
+import { isAiField, loadedViewTasks } from '@/views/Projects/composables/aiFields';
 
 // UTILS
 import { useCustomComposable } from "@/composable";
@@ -178,6 +183,7 @@ const showArchiveVar = inject("showArchived");
 const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
 
 const rowEdit = useListRowEdit(project, showArchiveVar);
+const aiColumnTasks = computed(() => loadedViewTasks(getters, project.value?._id, { table: true, searched: Boolean(searchedTask?.value) }));
 provide('listRowEdit', rowEdit);
 
 const catalogue = computed(() => columnCatalogue('table', {

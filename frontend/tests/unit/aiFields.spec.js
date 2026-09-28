@@ -104,7 +104,7 @@ describe('AI field config in the field builder', () => {
 });
 
 describe('fill preview', () => {
-    const mountDialog = () => mount(AiFieldFillDialog, { attachTo: document.body });
+    const mountDialog = () => mount(AiFieldFillDialog, { props: { teleport: false }, attachTo: document.body });
 
     it('previews one task and writes only after Apply', async () => {
         apiRequest.mockImplementation((method, url) => {

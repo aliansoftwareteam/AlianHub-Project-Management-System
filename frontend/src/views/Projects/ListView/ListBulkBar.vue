@@ -33,6 +33,14 @@
             <button type="button" class="lv2-bulk__btn lv2-bulk__btn--ai" :disabled="working" @click.stop="toggle('ai')">✦ {{ $t('List.ask_ai') }}</button>
             <div v-if="open === 'ai'" class="lv2-bulk__menu" @click.stop>
                 <button type="button" class="lv2-bulk__item" @click="summarise">{{ $t('List.ai_summarise') }}</button>
+                <button
+                    v-for="field in aiFields"
+                    :key="field._id"
+                    type="button"
+                    class="lv2-bulk__item"
+                    :data-ai-field-fill="field._id"
+                    @click="fillAiField(field)"
+                >{{ $t('AiFields.bulk_fill', { field: field.fieldTitle, n: selection.count.value }) }}</button>
                 <p class="lv2-bulk__note">{{ $t('List.ai_scope_note') }}</p>
             </div>
         </span>
@@ -70,6 +78,9 @@ import * as env from "@/config/env";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
 import { useTaskSummaries } from "@/views/Projects/TableView/useTaskSummaries.js";
+import { useProjectCustomFields } from "@/views/Projects/composables/projectCustomFields";
+import { isAiField } from "@/views/Projects/composables/aiFields";
+import { openAiFill } from "@/composable/aiFieldFill";
 import { snapshotTasks, statusPayload, undoRequests } from "./bulkUndo.js";
 import { priorityAppOn } from "./listRowEdit.js";
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue";
@@ -264,6 +275,14 @@ function pickSprint(option) {
 function pickTag(option) {
     if (!option.id) return;
     run("bulkUpdateTags", { tagId: option.id, operation: "add" });
+}
+
+const customFields = useProjectCustomFields(computed(() => props.project));
+const aiFields = computed(() => (customFields.canEdit.value ? customFields.defs.value.filter(isAiField) : []));
+
+function fillAiField(field) {
+    open.value = "";
+    openAiFill(field, [...selection.selectedTaskIds.value]);
 }
 
 async function summarise() {
