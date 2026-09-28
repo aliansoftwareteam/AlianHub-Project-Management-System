@@ -10,9 +10,9 @@
 - [x] 8 Preview, then apply, for every AI write (#1120, build 585)
 - [x] 9 Agents where people work (#1124, build 597)
 - [x] 10 AI on Home (#1125, build 593)
-- [ ] 11 One AI availability state
-- [ ] 12 Automatic assignment: an assign action and AI assignment rules
-- [ ] Follow-ups: plain proposal titles everywhere; dark-mode description, comments and Ask lists
+- [x] 11 One AI availability state (#1122, build 609)
+- [x] 12 Automatic assignment: an assign action and AI assignment rules (#1157 build 625, #1159 build 629)
+- [x] Follow-ups: plain proposal titles everywhere; dark-mode description, comments and Ask lists (#1154, build 615)
 
 ## Log
 - 2026-09-28: AI comparison with ClickUp written (task 034 findings); three slices started in parallel.
@@ -21,3 +21,4 @@
 - 2026-09-28: slices 1–10 merged (builds 568–597). Owner decision: keep the code-based autonomy names from #1116. L0 "Answers and suggests", L1 "Suggests changes", L2 "Acts, you approve the rest", L3 "Acts, also on a schedule".
 - 2026-09-28: security follow-ups merged. #1140 (build 601): project template writes need owner or admin. #1141 (build 604): every run a person starts needs access to its task.
 - 2026-09-28: slice 12 started (after the owner's ClickUp AI Assignee screenshot): 12a, an "Assign to" automation action; 12b, AI assignment rules per project. A dark-mode and plain-label follow-up also started.
+- 2026-09-28: all slices merged. Slice 12a uses one assignee write path (`updateAssignee` with `eventActor` and `eventDepth`). Related fixes merged: #1148 (localePreferences schema, build 612) and #1143 (startup migration version, build 608).

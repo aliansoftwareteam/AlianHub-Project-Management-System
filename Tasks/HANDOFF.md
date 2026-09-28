@@ -1,8 +1,38 @@
 # Handoff — where to start next session
 
-Updated 2026-09-27. Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
+Updated 2026-09-28. Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
 
-## State of `beta` (5ed17827, `14.36.0-beta.600`)
+## State of `beta` (9f1f63db, `14.36.0-beta.635`)
+
+- **2026-09-28 evening: builds 601–635 (tasks 041, 042 and 043).** The owner's local server was rebuilt at 603, 608 and 635.
+  - **Task 041 (AI UX fixes) is done:**
+    - #1122: one AI availability state (build 609).
+    - #1157: automation "Assign to" action; assignees now have one write path, `updateAssignee` with `eventActor` and `eventDepth` (build 625).
+    - #1159: AI assignment rules per project (build 629).
+    - #1154: plain proposal titles and dark-mode fixes (build 615).
+  - **Task 042 (non-AI UX fixes) is done:** all 13 slices, builds 581–607.
+  - **Task 043 (advanced AI, from a hands-on look at ClickUp Brain²) is done:** all 10 slices, builds 620–635.
+    - personal AI memory (#1160)
+    - Ask composer (#1164)
+    - task and editor AI (#1163)
+    - agent catalogue and builder (#1158)
+    - scheduled agents (#1165)
+    - AI fields (#1166)
+    - `@ai` in comments and chat (#1168)
+    - notes to tasks (#1167)
+    - Automate with AI (#1161)
+    - feedback and Quality page (#1162)
+  - **Fixes:**
+    - #1136: build-info git buffer raised to 64 MB. version:show had failed with ENOBUFS since build 581.
+    - #1143: startup migrations record the resolved build.
+    - #1140: project template writes need owner or admin.
+    - #1141: every run a person starts needs access to its task.
+    - #1148: localePreferences declared in the users schema.
+    - #1169: automation status conditions match by key; migration `061`.
+  - **Offered as task chips, not started:**
+    - workflow condition steps and `statusRef`
+    - email templates for `comment_reply` and `comment_assigned`
+    - the flaky `external-agent-step` integration test
 
 - **2026-09-28 afternoon and evening: builds 560–600.** #1094 (build log). Two sessions merged into beta in parallel.
   - **This session — a second security audit** (details in the owner's private notes), all in-company: channel lists check the channel's members (#1106); project updates take only the app's operators and fields, so a renamed field cannot flip a project's visibility (#1105); the project sprint update only adds or removes the caller's own favourite (#1107); sprint and folder updates write only the app's fields, with permissions from what is written, no silent creation, private lists 404 to others and moves inside the project (#1112); a new list takes only its icon's fields from the icon (#1114); managing teams needs the teams permission and adds only active members (#1099); a project rule update sets only its roles (#1098); company-wide custom fields need the settings permission (#1104); restoring from the trash needs the same rights as deleting (#1108) and the trash lists only what you can open (#1118); the milestone week needs admin rights (#1100); manual time writes only time records (#1101, after #1090/#1091); comment updates take no client options (#1102); company counters are kept by the server (#1109); notification counters act on your own user (#1110). Every new gate is a hard check, independent of `PERMISSION_ENFORCEMENT_MODE`.
@@ -52,6 +82,8 @@ Updated 2026-09-27. Read this first, then `Tasks/index.md`. Overwrite this file 
 
 ## Owner decisions recorded
 
+- **2026-09-28:** agent autonomy names follow the code (#1116): L0 "Answers and suggests", L1 "Suggests changes", L2 "Acts, you approve the rest", L3 "Acts, also on a schedule". The owner also asked that tasks 041–043 start all at once rather than queued.
+
 - **2026-09-27 evening:** task 039 go; task 040 PRD confirmed (ObjectId, sprintArray first); deploy workflow from `beta` (not yet changed: the edit was blocked by the permission system); remove the legacy header fallback (done, #1064); tags show on List and Table rows (done, #1063); the rail mark stays lavender in dark mode.
 - **2026-09-27:** public forms stay public. The share API refuses a password on a form link, since the form page never asks for one (#1038).
 - **2026-09-26:** new passwords are pre-hashed (`bcrypt(base64(sha256(input)))`) with a stored format version and no new secret; older hashes keep working and upgrade at the next sign-in; 8–256 characters (follow-up 130, #1027). The owner skipped CodeRabbit for the batches (one review an hour on the current plan). Task 040 is written as a PRD before any migration code.
@@ -76,6 +108,9 @@ Updated 2026-09-27. Read this first, then `Tasks/index.md`. Overwrite this file 
 - Only owners and admins delete agents (#620). `REFRESH_TOKEN_REUSE_GRACE_SECONDS` defaults to 10 (#609). The `e2e` job runs on pushes to `beta` (#634). Webhooks reach private hosts only through an instance-owner allowlist (#647). Timesheet reads respect an admin's "Everyone" grant per screen (#635). `project.project_create` is enforced for API tokens but not for web sessions (#637). A private sprint is visible to its assignees plus owners and admins (#656).
 
 ## Things learned that affect the next session
+
+- **An AI output posted where others read it may only use what every reader can open** (2026-09-28). Public `@ai` replies (#1168) and scheduled reports delivered to tasks or pages (#1165) were held until they followed this. Private answers keep the asker's full access. Check every new "AI writes into a shared place" feature against this rule.
+- **Batches that add to shared registries conflict after every merge** (2026-09-28). The shared files are the five schema/collection files, `Modules/AICore/features.js`/`taskClass.js`, `Modules/AI/routes.js`, `frontend/src/config/env.js` and the locales. Resolve by keeping both sides and re-checking the braces in `utils/mongo-handler/schema.js`. Merge the first green PR at once and have the others merge beta again.
 
 - **Two sessions can merge into `beta` at once.** Before writing `docs/BETA-LOG.md` or this file, run `git log -3 -- Tasks/HANDOFF.md docs/BETA-LOG.md` and `gh pr list --base beta` to see the other session's work; log every merged build, and leave another session's task progress files to that session.
 - **A local rebuild never reinstalls with `--ignore-scripts`.** It leaves bcrypt's native module unbuilt and breaks sign-in. Reinstall only when a lockfile changed, with scripts on.
