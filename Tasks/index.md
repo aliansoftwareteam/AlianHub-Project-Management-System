@@ -47,3 +47,5 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 039 | Make the shared DropDown keyboard and screen-reader accessible | active | medium | — | active/039-accessible-dropdown |
 | 040 | Store each reference id in one form, with a migration | active | medium | — | active/040-one-stored-form-per-id |
 | 041 | AI UX fixes from the ClickUp AI comparison | active | high | 034 | active/041-ai-ux-fixes |
+| 042 | Non-AI UX fixes from the ClickUp comparison | active | high | 034 | active/042-non-ai-ux-fixes |
+| 043 | Advanced AI from a hands-on look at ClickUp Brain² | active | high | 041 | active/043-advanced-ai |

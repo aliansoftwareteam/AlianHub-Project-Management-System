@@ -131,6 +131,7 @@ const {
     askThreadsSchema,
     assignmentRulesSchema,
     assignmentDecisionsSchema,
+    aiProfilesSchema,
     secretsSchema,
     oauthClientsSchema,
     oauthGrantsSchema,
@@ -395,6 +396,8 @@ exports.checkType = (type) => {
             return assignmentRulesSchema
         case SCHEMA_TYPE.ASSIGNMENT_DECISIONS:
             return assignmentDecisionsSchema
+        case SCHEMA_TYPE.AI_PROFILES:
+            return aiProfilesSchema
         case SCHEMA_TYPE.SECRETS:
             return secretsSchema
         case SCHEMA_TYPE.OAUTH_CLIENTS:
@@ -667,6 +670,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.ASSIGNMENT_RULES}`
         case SCHEMA_TYPE.ASSIGNMENT_DECISIONS:
                 return `${dbCollections.ASSIGNMENT_DECISIONS}`
+        case SCHEMA_TYPE.AI_PROFILES:
+                return `${dbCollections.AI_PROFILES}`
         case SCHEMA_TYPE.SECRETS:
                 return `${dbCollections.SECRETS}`
         case SCHEMA_TYPE.OAUTH_CLIENTS:

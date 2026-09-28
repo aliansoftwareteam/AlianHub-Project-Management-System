@@ -21,6 +21,7 @@ const FEATURES = Object.freeze({
     MCP_BRIEF: 'mcp_brief',
     KNOWLEDGE_EMBED: 'knowledge_embed',
     ASSIGNMENT_RULES: 'assignment_rules',
+    AGENT_BUILDER: 'agent_builder',
 });
 
 const UNKNOWN_FEATURE = 'unknown';

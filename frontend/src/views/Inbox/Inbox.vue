@@ -116,7 +116,7 @@
                                     <span class="ibx__dim">· {{ $t('Inbox.needs_your_approval') }}</span>
                                 </template>
                                 <template v-else-if="it.kind === 'proposal'">
-                                    <strong>{{ it.agentName }}</strong> {{ $t('Inbox.wants_to') }} {{ it.what }}
+                                    <strong>{{ it.agentName }}</strong> {{ $t('Inbox.wants_to') }} {{ proposalTitle(t, it) }}
                                     <span class="ibx__dim">· {{ $t('Inbox.needs_your_approval') }}</span>
                                 </template>
                                 <template v-else-if="it.kind === 'reminder'">
@@ -292,6 +292,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { sendProposalDecision } from '@/composable/agentProposals';
+import { proposalTitle } from '@/views/Ai/plainLabels';
 import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useHelper } from '@/components/organisms/Header/helper';

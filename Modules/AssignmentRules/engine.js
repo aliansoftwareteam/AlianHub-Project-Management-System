@@ -18,6 +18,8 @@ const DAILY_DECISION_LIMIT = 500;
 const PER_COMPANY = 2;
 const MAX_WAITING = 200;
 const ACTOR_NAME = 'Assignment rules';
+/* The bus knows no kind of its own for rules; 'automation' is the one its loop guard and the automation matcher honour. */
+const RULE_ACTOR = Object.freeze({ kind: 'automation', userId: null });
 /* No assignee or watcher field: those are all the rules ever write, so their own writes cannot wake them again. */
 const WATCHED_FIELDS = Object.freeze(['TaskName', 'rawDescription', 'descriptionBlock', 'TaskType', 'TaskTypeKey', 'tagsArray']);
 const TASK_FIELDS = {
@@ -154,7 +156,7 @@ const taskDataOf = (task) => ({
 });
 
 /* The normal assignee path, so history, watchers, notifications and sockets behave as for a person. */
-const changeAssignee = ({ companyId, project, task, userId, name, type, userData, actor, depth }) => require('../Tasks/helpers/task_class_Mongo').taskMongo.updateAssignee({
+const changeAssignee = ({ companyId, project, task, userId, name, type, userData, eventActor, eventDepth }) => require('../Tasks/helpers/task_class_Mongo').taskMongo.updateAssignee({
     firebaseObj: { AssigneeUserId: userId },
     projectData: projectDataOf(companyId, project, task),
     taskData: taskDataOf(task),
@@ -162,8 +164,8 @@ const changeAssignee = ({ companyId, project, task, userId, name, type, userData
     type,
     userData: { companyOwnerId: '', ...userData },
     isUpdateTask: true,
-    actor,
-    depth,
+    eventActor,
+    eventDepth,
 });
 
 async function eligibleCandidates(companyId, task, entries) {
@@ -249,8 +251,8 @@ async function decide({ companyId, taskId, trigger = 'create', depth = 0 }) {
             await changeAssignee({
                 companyId, project, task: fresh, userId: fields.userId, name, type: 'assigneeAdd',
                 userData: { id: rules.updatedBy || fields.userId, Employee_Name: ACTOR_NAME },
-                actor: { kind: 'automation', userId: rules.updatedBy || null },
-                depth: (Number(depth) || 0) + 1,
+                eventActor: RULE_ACTOR,
+                eventDepth: (Number(depth) || 0) + 1,
             });
             state = 'applied';
         }
@@ -265,6 +267,7 @@ async function decide({ companyId, taskId, trigger = 'create', depth = 0 }) {
 const triggerOf = (envelope) => {
     if (!envelope || !envelope.entity || envelope.entity.kind !== 'task' || !envelope.companyId) return null;
     if (envelope.type === 'task.created') return 'create';
+    if (envelope.actor && envelope.actor.kind === 'automation') return null;
     const changed = Array.isArray(envelope.changedFields) ? envelope.changedFields : [];
     return changed.some((field) => WATCHED_FIELDS.includes(field)) ? 'change' : null;
 };

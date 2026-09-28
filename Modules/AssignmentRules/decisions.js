@@ -85,7 +85,7 @@ async function accept(companyId, actor, taskId, decisionId) {
     try {
         const project = await engine.readProject(companyId, task.ProjectID);
         const name = (await namesOf(companyId, [decision.userId])).get(String(decision.userId)) || '';
-        await engine.changeAssignee({ companyId, project, task, userId: String(decision.userId), name, type: 'assigneeAdd', userData: actor, actor: { kind: 'user', userId: actor.id } });
+        await engine.changeAssignee({ companyId, project, task, userId: String(decision.userId), name, type: 'assigneeAdd', userData: actor, eventActor: { kind: 'user', userId: actor.id } });
     } catch (error) {
         await restore(companyId, decision, 'suggested');
         throw error;
@@ -121,7 +121,7 @@ async function undo(companyId, actor, taskId, decisionId) {
     try {
         const project = await engine.readProject(companyId, task.ProjectID);
         const name = (await namesOf(companyId, [decision.userId])).get(String(decision.userId)) || '';
-        await engine.changeAssignee({ companyId, project, task, userId: String(decision.userId), name, type: 'assigneRemove', userData: actor, actor: { kind: 'user', userId: actor.id } });
+        await engine.changeAssignee({ companyId, project, task, userId: String(decision.userId), name, type: 'assigneRemove', userData: actor, eventActor: { kind: 'user', userId: actor.id } });
     } catch (error) {
         await restore(companyId, decision, 'applied');
         throw error;

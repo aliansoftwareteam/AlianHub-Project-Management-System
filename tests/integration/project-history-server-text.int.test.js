@@ -16,8 +16,8 @@ let member;
 
 const db = () => client.db(state.companyId);
 const storedProject = (projectId) => db().collection('projects').findOne({ _id: new ObjectId(String(projectId)) });
-const historyOf = (projectId, key) => db().collection('history').find({ ProjectId: String(projectId), Key: key }).toArray();
-const noticesOf = (projectId, key) => db().collection('notifications').find({ projectId: String(projectId), key }).toArray();
+const historyOf = (projectId, key) => db().collection('history').find({ ProjectId: new ObjectId(String(projectId)), Key: key }).toArray();
+const noticesOf = (projectId, key) => db().collection('notifications').find({ projectId: new ObjectId(String(projectId)), key }).toArray();
 const nameOf = async (uid) => (await client.db('global').collection('users').findOne({ _id: new ObjectId(String(uid)) })).Employee_Name;
 
 const waitFor = async (read, what) => {

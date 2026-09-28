@@ -134,6 +134,7 @@ const SCHEMA_TYPE = {
     ASK_THREADS: "ask_threads",
     ASSIGNMENT_RULES: "assignment_rules",
     ASSIGNMENT_DECISIONS: "assignment_decisions",
+    AI_PROFILES: "ai_profiles",
 }
 
 module.exports = {
