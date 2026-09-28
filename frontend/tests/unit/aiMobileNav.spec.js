@@ -17,7 +17,7 @@ const blank = { render: () => null };
 const routerFor = () => createRouter({
     history: createMemoryHistory(),
     routes: [
-        ...aiRoutes,
+        ...aiRoutes.map((r) => ({ path: r.path, name: r.name, component: blank })),
         { path: '/:cid/workflows', name: 'WorkflowBuilder', component: blank },
         { path: '/:cid/connections', name: 'Connections', component: blank },
         { path: '/:cid/audit', name: 'AuditLog', component: blank },
