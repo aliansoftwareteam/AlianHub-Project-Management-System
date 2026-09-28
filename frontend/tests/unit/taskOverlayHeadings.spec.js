@@ -81,6 +81,7 @@ vi.mock('@/components/organisms/TaskDetailOverlay/TaskSubtaskList.vue', () => sl
 vi.mock('@/components/organisms/TaskDetailOverlay/TaskTrackerHandoff.vue', () => slotStub('TaskTrackerHandoff', 'none'));
 
 import en from '@/locales/en.js';
+import { applyAiAvailability } from '@/composable/aiAvailability';
 
 const i18n = config.global.plugins[0];
 i18n.global.setLocaleMessage('en', en);
@@ -151,8 +152,9 @@ describe('section headings inside the task overlay (A11Y-O2)', () => {
     const provide = { selectedProject: ref(project), $userId: ref('u1') };
 
     it('Checklist is an h3 and its "suggest" action is not a heading', async () => {
+        applyAiAvailability({ state: 'on', planAllowsAi: true, loaded: true });
         const { default: CheckList } = await import('@/components/molecules/CheckList/CheckList.vue');
-        const wrapper = shallowMount(CheckList, { props: { taskId: 'task-1', permission: true }, global: { plugins: [store()], mocks: { $t: t }, provide } });
+        const wrapper = shallowMount(CheckList, { props: { taskId: 'task-1', permission: true }, global: { plugins: [store()], mocks: { $t: t }, provide: { ...provide, selectedProject: ref({ ...project, apps: [{ key: 'AI' }] }) } } });
         mounted.push(wrapper);
         const headings = wrapper.findAll(HEADING);
         expect(headings.map((h) => levelOf(h.element))).toEqual([3]);

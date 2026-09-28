@@ -68,7 +68,7 @@
                                 {{ $t('Projects.status') }}<span class="tv2__sort-caret" :class="{ 'is-on': sortOf('statusKey') }" aria-hidden="true">{{ sortGlyph('statusKey') }}</span>
                             </button>
                         </span>
-                        <span v-else-if="column.ai" role="columnheader" class="tv2__head-ai" :title="$t(column.id === 'risk' ? 'List.risk_formula' : 'List.ai_source_hint')">✦ {{ $t(column.labelKey) }}</span>
+                        <span v-else-if="column.ai" role="columnheader" :class="{ 'tv2__head-ai': column.id !== 'risk' }" :title="$t(column.id === 'risk' ? 'List.risk_formula' : 'List.ai_source_hint')">{{ column.id === 'risk' ? '' : '✦ ' }}{{ $t(column.labelKey) }}</span>
                         <span v-else role="columnheader" class="tv2__head-col" :title="column.field ? column.label : null">{{ column.field ? column.label : $t(column.labelKey) }}</span>
                     </template>
                 </div>

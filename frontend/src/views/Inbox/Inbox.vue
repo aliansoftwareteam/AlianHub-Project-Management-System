@@ -283,7 +283,7 @@
 
 <script setup>
 import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { aiOff } from "@/composable/aiAvailability";
+import { aiReachable } from "@/composable/aiAvailability";
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
@@ -355,7 +355,7 @@ const customError = ref('');
 let undoTimer = null;
 let replyEl = null;
 
-const hasAiHub = computed(() => !aiOff.value && router.hasRoute('AiHub'));
+const hasAiHub = computed(() => aiReachable.value && router.hasRoute('AiHub'));
 const timeZone = computed(() => resolveTimeZone((getUser(userId?.value) || {}).Time_Zone));
 
 const rowKey = (it) => `${it.sourceType}:${it.sourceId}`;

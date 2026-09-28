@@ -1,4 +1,4 @@
-jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn() }));
+jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn(async () => undefined) }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Modules/Agents/skillRecord', () => ({ getSkill: async (companyId, slug) => require('../Modules/Agents/skills').getSkill(slug) }));
 

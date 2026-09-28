@@ -69,7 +69,7 @@
                             :class="listColumnClass(column)"
                             role="columnheader"
                             :title="column.field ? column.label : null"
-                        >{{ column.id === 'risk' ? '✦ ' : '' }}{{ column.field ? column.label : $t(column.labelKey) }}</span>
+                        >{{ column.field ? column.label : $t(column.labelKey) }}</span>
                     </div>
 
                     <section v-for="sprint in groupedTasks" :key="sprint?.id" class="lv2__sprint" role="presentation" :id="`sprint_${sprint?.id}`">
