@@ -51,7 +51,16 @@
                             {{ busy === card.key ? $t('Time.approving') : $t('Time.approve') }}
                         </button>
                         <button v-if="card.kind === 'timesheet'" type="button" class="ah-btn ah-btn--secondary" @click="openDetail(card.row)">{{ $t('Time.detail') }}</button>
-                        <button v-if="card.kind === 'agent'" type="button" class="ah-btn ah-btn--secondary" :title="card.row.detail">{{ $t('Time.why') }}</button>
+                        <button
+                            v-if="card.kind === 'agent'"
+                            :ref="(el) => setWhyButton(card.key, el)"
+                            type="button"
+                            class="ah-btn ah-btn--secondary"
+                            aria-haspopup="dialog"
+                            :aria-expanded="String(whyKey === card.key)"
+                            data-test="proposal-why"
+                            @click="openWhy(card)"
+                        >{{ $t('Time.why') }}</button>
                         <button type="button" class="ah-btn ah-btn--secondary tv-btn-danger-outline" :disabled="!!busy" @click="startReject(card)">{{ $t('Time.reject') }}</button>
                     </div>
                 </article>
@@ -67,11 +76,12 @@
                 <div v-else-if="loading && !visibleCards.length" class="ah-small">{{ $t('Time.loading') }}</div>
             </div>
         </template>
+        <ProposalWhyDialog v-if="whyCard" :proposal="whyCard.row" @close="closeWhy" />
     </div>
 </template>
 
 <script setup>
-import { ref, computed, inject, onMounted } from 'vue';
+import { ref, computed, inject, nextTick, onMounted } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -82,6 +92,7 @@ import { useGetterFunctions } from '@/composable';
 import { formatHm } from '@/composable/useTimer';
 import { isOwnerOrAdmin } from "@/utils/roles";
 import { fetchPendingProposals, sendProposalDecision } from '@/composable/agentProposals';
+import ProposalWhyDialog from './ProposalWhyDialog.vue';
 
 /**
  * @typedef {Object} AgentProposal
@@ -90,6 +101,7 @@ import { fetchPendingProposals, sendProposalDecision } from '@/composable/agentP
  * @property {string} summary       one line, e.g. "Daily PM · 2 sprint moves"
  * @property {string} detail        why the agent proposes it
  * @property {boolean} reversible
+ * @property {{label: string, reversible: boolean}[]} changes
  * @property {string} createdAt
  */
 
@@ -180,6 +192,7 @@ const toAgentProposal = (p) => {
     return {
         id: String(p._id), agentName: p.agentName || '', summary: p.what || '', detail: p.why || '',
         reversible: changes.length > 0 && changes.every((c) => c && c.reversible), createdAt: p.createdAt,
+        changes: changes.filter(Boolean).map((c) => ({ label: c.label || c.action || '', reversible: Boolean(c.reversible) })),
     };
 };
 const loadProposals = async () => {
@@ -261,6 +274,18 @@ const confirmReject = async (card) => {
     } finally {
         busy.value = '';
     }
+};
+const whyKey = ref('');
+const whyButtons = new Map();
+const whyCard = computed(() => cards.value.find((c) => c.key === whyKey.value) || null);
+const setWhyButton = (key, el) => { if (el) whyButtons.set(key, el); else whyButtons.delete(key); };
+const openWhy = (card) => { whyKey.value = card.key; };
+const closeWhy = async () => {
+    const key = whyKey.value;
+    whyKey.value = '';
+    await nextTick();
+    const button = whyButtons.get(key);
+    if (button && button.isConnected) button.focus();
 };
 const openDetail = (row) => {
     router.push({ name: 'User Timesheet', params: { cid: cid.value }, query: { userId: row.userId, week: moment(row.periodStart).format('YYYY-MM-DD') } });

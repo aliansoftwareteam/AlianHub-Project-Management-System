@@ -7,9 +7,11 @@ export const RECORD_CHIPS = ['tasks', 'projects', 'docs'];
 
 const KIND_OF_CHIP = { tasks: 'task', projects: 'project', docs: 'page', people: 'person' };
 
-/* Which rows a chip keeps. "ask" stays under every chip so the query can always go to AI. */
+const ASK_KINDS = new Set(['ask', 'source', 'continue']);
+
+/* Which rows a chip keeps. Ask AI and its answer stay under every chip so the query can always go to AI. */
 export function chipAllows(chip, kind) {
-    if (chip === 'all' || kind === 'ask') return true;
+    if (chip === 'all' || ASK_KINDS.has(kind)) return true;
     return KIND_OF_CHIP[chip] === kind;
 }
 

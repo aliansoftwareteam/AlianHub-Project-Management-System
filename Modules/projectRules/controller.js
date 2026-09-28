@@ -33,16 +33,33 @@ exports.getProjectRules = async(req,res) => {
     }
 }
 
+const MAX_ROLES = 100;
+const isRoleEntry = (entry) => Boolean(entry) && typeof entry === 'object' && !Array.isArray(entry)
+    && Object.keys(entry).every((field) => field === 'key' || field === 'permission')
+    && ['number', 'string'].includes(typeof entry.key)
+    && (entry.permission === null || ['boolean', 'number', 'string'].includes(typeof entry.permission));
+
+/* The settings screen only ever sets a rule's roles; the operator and the fields are not the caller's to choose. */
+const rolesUpdateOf = (body) => {
+    const update = body && body.updateObject;
+    if (body.key !== undefined && body.key !== '$set') return null;
+    if (!update || typeof update !== 'object' || Object.keys(update).join() !== 'roles') return null;
+    const { roles } = update;
+    if (!Array.isArray(roles) || roles.length > MAX_ROLES || !roles.every(isRoleEntry)) return null;
+    return { $set: { roles: roles.map(({ key, permission }) => ({ key, permission })) } };
+};
+
 exports.updateProjectRules = async(req,res) => {
     try {
         const ruleId = req.body.id;
-        let key = req.body.key;
         const projectId = req.body.projectId;
+        const update = rolesUpdateOf(req.body);
+        if (!update) {
+            return res.status(400).json({ message: "Only a rule's roles can be changed." });
+        }
         let data =  [
             { _id: ruleId, projectId: { $in: idForms(String(projectId)) } },
-            {
-                [key]: req.body.updateObject
-            },
+            update,
             { returnDocument: "after" }
         ]
 
