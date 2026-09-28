@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
@@ -64,7 +65,7 @@ const res = () => {
     r.json = r.send;
     return r;
 };
-const req = (uid, over = {}) => ({ headers: { companyid: C }, query: {}, body: {}, params: {}, uid, ...over });
+const req = (uid, over = {}) => verified({ headers: { companyid: C }, query: {}, body: {}, params: {}, uid, ...over });
 const handler = async (fn, uid, over) => { const r = res(); await fn(req(uid, over), r); return r.body; };
 const withoutScope = (data) => Object.fromEntries(Object.entries(data).filter(([key]) => key !== 'scope'));
 

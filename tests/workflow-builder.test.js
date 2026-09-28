@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 jest.mock('../Modules/Workflows/store');
 jest.mock('../Modules/Workflows/queue');
 jest.mock('../Modules/Workflows/definitions');
@@ -24,7 +25,7 @@ const VALID_STEPS = [
     { id: 'sTwo', type: 'human_approval', dependsOn: ['sOne'], config: { prompt: 'Ship $sOne.findings?' } },
 ];
 
-const reqFor = (over = {}) => ({ headers: { companyid: COMPANY }, params: {}, query: {}, body: {}, ip: '', ...over });
+const reqFor = (over = {}) => verified({ headers: { companyid: COMPANY }, params: {}, query: {}, body: {}, ip: '', ...over });
 
 const resSpy = () => {
     const res = { statusCode: 200, body: null };

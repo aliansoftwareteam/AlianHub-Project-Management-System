@@ -10,8 +10,11 @@ class TenantError extends Error {
 
 // `aud` is the comma-joined company list of a JWT, or the single company of an
 // API token (see Config/jwt.js); an exact entry match is the only accepted form.
-const inAudience = (aud, companyId) => {
-    if (aud === undefined || aud === null || aud === '') return true;
+// The instance admin key carries no token, so it is the one caller with no audience to hold it to.
+const inAudience = (req, companyId) => {
+    if (req.instanceAdmin === 'key') return true;
+    const { aud } = req;
+    if (!aud) return false;
     const list = Array.isArray(aud) ? aud : String(aud).split(',');
     return list.some((entry) => String(entry).trim() === companyId);
 };
@@ -27,7 +30,7 @@ function tenantOf(req) {
         req.body && (req.body.companyId || req.body.CompanyId)
     );
     if (!OBJECT_ID.test(candidate)) throw new TenantError('A valid companyid header is required.');
-    if (!inAudience(req.aud, candidate)) throw new TenantError('You do not have access to this company');
+    if (!inAudience(req, candidate)) throw new TenantError('You do not have access to this company');
     return candidate;
 }
 

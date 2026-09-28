@@ -26,10 +26,10 @@
                         <img :src="homeSetting" alt="home" class="default_home_settingsImg"/>
                         {{$t('Projects.default_view')}}
                     </span>
-                    <DropDown v-if="!viewList.setAsDefault">
+                    <DropDown mode="menu" v-if="!viewList.setAsDefault">
                         <template #button>
-                            <img :src="horizontalDots" alt="horizontalDots" class="makeAsDefaultDot mr-15px vertical-middle"/>
-                            <img v-if="!viewList.setAsDefault" :src="horizontalDotsBlue" alt="horizontalDots" class="makeAsDefaultDotBlue mr-15px vertical-middle"/>
+                            <img :src="horizontalDots" :alt="$t('ProjectDetails.view_actions')" class="makeAsDefaultDot mr-15px vertical-middle"/>
+                            <img v-if="!viewList.setAsDefault" :src="horizontalDotsBlue" :alt="$t('ProjectDetails.view_actions')" class="makeAsDefaultDotBlue mr-15px vertical-middle"/>
                         </template>
                         <template #options>
                             <DropDownOption @click="updateRequiredViews(viewList, true),getView(viewList)">

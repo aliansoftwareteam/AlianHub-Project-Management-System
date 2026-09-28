@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const fakeMongo = require('./fixtures/fakeMongo');
 
 let mockDb;
@@ -81,7 +82,7 @@ const run = async (handlers, req) => {
     return res;
 };
 
-const request = ({ uid = MEMBER, params = {}, body = {}, query = {} } = {}) => ({ uid, params, body, query, headers: { companyid: C } });
+const request = ({ uid = MEMBER, params = {}, body = {}, query = {} } = {}) => verified({ uid, params, body, query, headers: { companyid: C } });
 
 const seedRules = (grants = {}) => {
     const parents = {};

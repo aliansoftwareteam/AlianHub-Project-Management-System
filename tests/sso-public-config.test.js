@@ -1,3 +1,4 @@
+const verifiedRequest = require('./fixtures/verifiedRequest');
 const mockDbs = {};
 const mockDbFor = (companyId) => { mockDbs[companyId] = mockDbs[companyId] || require('./fixtures/fakeMongo').create(); return mockDbs[companyId]; };
 
@@ -39,7 +40,7 @@ const asOwner = async (handler, body) => {
     res.status = (c) => { res.code = c; return res; };
     res.json = (b) => { res.body = b; return res; };
     res.send = res.json;
-    await handler({ uid: OWNER, headers: { companyid: A }, body, query: {} }, res);
+    await handler(verifiedRequest({ uid: OWNER, headers: { companyid: A }, body, query: {} }), res);
     return res.body;
 };
 const saveConfig = (over = {}) => asOwner(ssoConfig.setSsoConfig, { provider: 'oidc', oidc, isEnabled: true, domains: ['acme.test'], ...over });

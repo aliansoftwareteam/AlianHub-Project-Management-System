@@ -27,6 +27,7 @@
         </template>
         <DropDown
             v-else-if="editable"
+            mode="listbox"
             :maxHeight="'200px'"
             :bodyClassHeader="{'w-100': true}"
             :title="$t('Projects.select_source')">
@@ -38,6 +39,9 @@
             </template>
             <template #options>
                 <div v-for="option in options" :key="option.value"
+                    role="option"
+                    tabindex="-1"
+                    :aria-selected="String(option.value === modelValue)"
                     class="source-select__option d-flex align-items-center cursor-pointer"
                     :class="{'source-select__option--active': option.value === modelValue}"
                     @click.stop="pick(option.value)">

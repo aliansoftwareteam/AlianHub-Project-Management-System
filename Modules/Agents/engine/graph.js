@@ -215,7 +215,7 @@ async function propose(state, config) {
         : `${run.skill}: ${toPropose.length} change(s) on ${titleOf(task)}`;
     // What the grounding check removed is part of the record a person reviews.
     const dropped = Array.isArray(result.dropped) && result.dropped.length
-        ? `Dropped as unsupported by the data: ${result.dropped.map((d) => `"${String(d.text).slice(0, 80)}" (${d.reason})`).join('; ')}` : '';
+        ? `Dropped as unsupported by the data: ${result.dropped.map((d) => `"${String(d.text || d.title).slice(0, 80)}" (${d.reason})`).join('; ')}` : '';
     const proposal = await deps.proposals.create(companyId, {
         agent, runId: String(run._id), taskId: String(task._id), projectId: String(task.ProjectID),
         what,

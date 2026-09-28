@@ -160,35 +160,35 @@
                     </div>
                 </div>
             </div>
-            <DropDown v-if="showOptions && !message?.isDeleted" class="align-self-start"  :bodyClass="{'comments__message--dropdown' : true}">
+            <DropDown mode="menu" v-if="showOptions && !message?.isDeleted" class="align-self-start"  :bodyClass="{'comments__message--dropdown' : true}">
                 <template #button>
-                    <img :ref="`message_option_${message._id}`" :src="verticalDots" alt="verticalDots" class="cursor-pointer ml-10px" :class="[showMessageTime ? 'mt-30px' : 'mt-10px']">
+                    <img :src="verticalDots" :alt="$t('Comments.message_actions')" class="cursor-pointer ml-10px" :class="[showMessageTime ? 'mt-30px' : 'mt-10px']">
                 </template>
                 <template #options>
                     <template v-if="!message.isDeleted">
-                        <DropDownOption v-if="message.sent && (message.type === 'text' || message.type === 'link') && new Date(message.createdAt).setSeconds(0, 0) > (new Date().setSeconds(0, 0) - 360000)" @click="$emit('edit', JSON.parse(JSON.stringify(message))), $refs[`message_option_${message._id}`].click()">
+                        <DropDownOption v-if="message.sent && (message.type === 'text' || message.type === 'link') && new Date(message.createdAt).setSeconds(0, 0) > (new Date().setSeconds(0, 0) - 360000)" @click="$emit('edit', JSON.parse(JSON.stringify(message)))">
                             {{$t('Comments.edit')}}
                         </DropDownOption>
-                        <DropDownOption v-if="!mainChat && (message.type === 'text' || message.type === 'link')" @click="$emit('createTask', message), $refs[`message_option_${message._id}`].click()">
+                        <DropDownOption v-if="!mainChat && (message.type === 'text' || message.type === 'link')" @click="$emit('createTask', message)">
                             {{$t('Comments.create_task')}}
                         </DropDownOption>
-                        <DropDownOption v-if="!mainChat && (message.type === 'text' || message.type === 'link')" @click="$emit('addCheckList', message), $refs[`message_option_${message._id}`].click()">
+                        <DropDownOption v-if="!mainChat && (message.type === 'text' || message.type === 'link')" @click="$emit('addCheckList', message)">
                             {{ $t('Comments.add_to_checklist') }}
                         </DropDownOption>
-                        <DropDownOption v-if="message.type === 'text' || message.type === 'link'" @click="$emit('copy', message), $refs[`message_option_${message._id}`].click()">
+                        <DropDownOption v-if="message.type === 'text' || message.type === 'link'" @click="$emit('copy', message)">
                             {{$t('Comments.copy_message')  }}
                         </DropDownOption>
-                        <DropDownOption v-if="message.sent || message.userId === userId" @click="$emit('delete', message), $refs[`message_option_${message._id}`].click()">
+                        <DropDownOption v-if="message.sent || message.userId === userId" @click="$emit('delete', message)">
                             {{$t('Projects.delete')}}
                         </DropDownOption>
-                        <DropDownOption @click="$emit('reply', message), $refs[`message_option_${message._id}`].click()">
+                        <DropDownOption @click="$emit('reply', message)">
                             {{$t('Comments.reply')}}
                         </DropDownOption>
-                        <DropDownOption v-if="mainChat" @click="$emit('pin', message), $refs[`message_option_${message._id}`].click()">
+                        <DropDownOption v-if="mainChat" @click="$emit('pin', message)">
                             {{!message?.pinnedMessage ? $t('Projects.pin') : $t('Projects.unpin')}} {{$t('Comments.message')}}
                         </DropDownOption>
                     </template>
-                    <DropDownOption id="mark_as_unread" @click="showUnread ? '' : $emit('markUnread', message), $refs[`message_option_${message._id}`].click()">
+                    <DropDownOption id="mark_as_unread" @click="showUnread ? '' : $emit('markUnread', message)">
                         {{$t('Comments.mark_unread')}}
                     </DropDownOption>
                 </template>

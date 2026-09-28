@@ -1,4 +1,4 @@
-const { Types } = require('mongoose');
+const { HEX_ID, idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 // REP-02 — pure custom-report config validation + Mongo pipeline builder.
 // SAFETY: only allow-listed dimensions / metrics / filter-fields ever reach the
 // database. The user's config supplies KEYS (validated against these maps) and
@@ -34,8 +34,13 @@ const LOG_MONTH = {
     $dateToString: { format: '%Y-%m', date: { $toDate: { $multiply: ['$LogStartTime', 1000] } } },
 };
 
+/* A time log's project id is stored as text until its migration turns it into an ObjectId; grouping
+   on the text form keeps one project in one row while rows hold both. A value that cannot convert
+   groups as it is. */
+const LOG_PROJECT = { $convert: { input: '$ProjectId', to: 'string', onError: '$ProjectId', onNull: null } };
+
 const LOG_DIMENSIONS = {
-    project: '$ProjectId',
+    project: LOG_PROJECT,
     person: '$Loggeduser',
     month: LOG_MONTH,
 };
@@ -96,11 +101,8 @@ const validateConfig = (cfg = {}) => {
     };
 };
 
-// Tasks hold ProjectID as an ObjectId while the report sends ids as strings; match either form.
 const ID_FILTERS = new Set(['project', 'sprint']);
-const eitherIdForm = (value) => (typeof value === 'string' && /^[0-9a-fA-F]{24}$/.test(value)
-    ? { $in: [value, new Types.ObjectId(value)] }
-    : value);
+const eitherIdForm = (value) => (typeof value === 'string' && HEX_ID.test(value) ? { $in: idForms(value) } : value);
 
 const monthsAgoSeconds = (months, nowMs) => {
     const d = new Date(nowMs);
@@ -126,7 +128,7 @@ const buildTaskPipeline = (cfg) => {
 const buildLogPipeline = (cfg, nowMs) => {
     const match = {};
     const filters = (cfg && cfg.filters) || {};
-    if (filters.project) match.ProjectId = filters.project;
+    if (filters.project) match.ProjectId = eitherIdForm(filters.project);
     if (filters.billable === 'yes') match.billable = { $ne: false };
     if (filters.billable === 'no') match.billable = false;
     const months = RANGES[filters.range];

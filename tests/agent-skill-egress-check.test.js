@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const mockDbs = {};
 const mockDbFor = (companyId) => {
     const id = String(companyId);
@@ -30,7 +31,7 @@ const LISTED = ['api.github.com', 'status.example.org:8443', '*.acme.io'];
 
 const seedList = (hosts, companyId = C) => mockDbFor(companyId).seed(allowlist.COLLECTION, { _id: allowlist.DOC_ID, hosts });
 
-const req = (host, over = {}) => ({ headers: { companyid: C }, params: {}, query: { host }, body: {}, uid: OWNER, ...over });
+const req = (host, over = {}) => verified({ headers: { companyid: C }, params: {}, query: { host }, body: {}, uid: OWNER, ...over });
 const res = () => { const r = { code: 200, body: null }; r.status = (c) => { r.code = c; return r; }; r.send = (b) => { r.body = b; return r; }; return r; };
 const check = async (host, over) => { const r = res(); await skillsCtrl.egressCheck(req(host, over), r); return r; };
 

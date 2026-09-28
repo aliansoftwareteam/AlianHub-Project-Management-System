@@ -399,103 +399,56 @@ exports.migrateProject = (project,companyId) => {
     })
 };
 
-/* tasks.sprintArray is an untyped object: Mongoose casts neither .id nor .folderId, and moving a sprint writes folderId as an ObjectId. */
+/* A filter on tasks.sprintArray is not cast, and a task not yet rewritten by migration 044 holds .id and .folderId as text. */
 const idForms = (id) => [String(id), new mongoose.Types.ObjectId(String(id))];
 
-exports.updateTaksSprints = (projectId,companyId) => {
-    return new Promise((resolve, reject) => {
-        try {
-            let findObj = {
-                type: dbCollections.SPRINTS,
-                data: [{ projectId: new mongoose.Types.ObjectId(projectId)}],
+exports.updateTaksSprints = async (projectId, companyId) => {
+    try {
+        const sprints = await MongoDbCrudOpration(companyId, {
+            type: dbCollections.SPRINTS,
+            data: [{ projectId: new mongoose.Types.ObjectId(projectId) }],
+        }, "find");
+        await Promise.allSettled((sprints || []).map((sprint) => {
+            const legacyId = sprint.legacyId || '';
+            const sprintId = String(sprint._id);
+            const updateObj = {
+                type: SCHEMA_TYPE.TASKS,
+                data: [
+                    { "sprintArray.id": { $in: legacyId ? [legacyId, ...idForms(sprintId)] : idForms(sprintId) }, ProjectID: new mongoose.Types.ObjectId(projectId) },
+                    { sprintId: new mongoose.Types.ObjectId(sprintId) }
+                ]
             };
-            let updatePromises = [];
-            MongoDbCrudOpration(companyId, findObj, "find").then(async(resp) => {
-                resp.forEach((sprint) => {
-                    let legacyId = sprint.legacyId ? sprint.legacyId : '';
-                    let sprintId = JSON.parse(JSON.stringify(sprint._id));
-                    if(legacyId){
-                        const updateObj = {
-                            type: SCHEMA_TYPE.TASKS,
-                            data: [
-                                { "sprintArray.id": {$in : [legacyId, ...idForms(sprintId)]} , ProjectID: new mongoose.Types.ObjectId(projectId)},
-                                { sprintId:  new mongoose.Types.ObjectId(sprintId)}
-                            ]
-                        }
-                        const promise =  MongoDbCrudOpration(companyId,updateObj,"updateMany").then(() => {
-                            logger.info("IF DONE updateTaksSprints");
-                        }).catch((err) => {
-                            logger.error(`ERROR IN IF UPDATE MANY: ${err}`);
-                        })
-                        updatePromises.push(promise);
-                    }else{
-                        const uObj = {
-                            type: SCHEMA_TYPE.TASKS,
-                            data: [
-                                { "sprintArray.id": {$in : idForms(sprintId)} , ProjectID: new mongoose.Types.ObjectId(projectId)},
-                                { "sprintId":  new mongoose.Types.ObjectId(sprintId)}
-                            ]
-                        }
-                        const promise =  MongoDbCrudOpration(companyId,uObj,"updateMany").then(() => {
-                            logger.info("ELSE DONE updateTaksSprints");
-                        }).catch((err) => {
-                            logger.error(`ERROR IN ELSE UPDATE MANY: ${err}`);
-                        })
-                        updatePromises.push(promise);
-                    }
-                })
-            })
-            Promise.allSettled(updatePromises).then(() => {
-                resolve();
-            }).catch((error) => {
-                logger.error(`ERROR IN ALL SETTLED: ${error}`);
-                reject();
+            return MongoDbCrudOpration(companyId, updateObj, "updateMany").catch((err) => {
+                logger.error(`ERROR IN UPDATE MANY updateTaksSprints: ${err}`);
             });
-        } catch (error) {
-            logger.error(`ERROR IN UPDATE SPRINTS: ${error}`);
-            reject();
-        }
-    })
+        }));
+    } catch (error) {
+        logger.error(`ERROR IN UPDATE SPRINTS: ${error}`);
+        throw error;
+    }
 }
 
-exports.updateTaksFolders = (projectId,companyId) => {
-    return new Promise((resolve, reject) => {
-        try {
-            let findObj = {
-                type: dbCollections.FOLDERS,
-                data: [{ projectId: new mongoose.Types.ObjectId(projectId)}],
+exports.updateTaksFolders = async (projectId, companyId) => {
+    try {
+        const folders = await MongoDbCrudOpration(companyId, {
+            type: dbCollections.FOLDERS,
+            data: [{ projectId: new mongoose.Types.ObjectId(projectId) }],
+        }, "find");
+        await Promise.allSettled((folders || []).filter((folder) => folder.legacyId).map((folder) => {
+            const folderId = String(folder._id);
+            const updateObj = {
+                type: SCHEMA_TYPE.TASKS,
+                data: [
+                    { "sprintArray.folderId": { $in: [folder.legacyId, ...idForms(folderId)] }, ProjectID: new mongoose.Types.ObjectId(projectId) },
+                    { folderObjId: new mongoose.Types.ObjectId(folderId) }
+                ]
             };
-            let updatePromises = [];
-            MongoDbCrudOpration(companyId, findObj, "find").then(async(resp) => {
-                resp.forEach((folder) => {
-                    let legacyId = folder.legacyId ? folder.legacyId : '';
-                    let folderId = JSON.parse(JSON.stringify(folder._id));
-                    if(legacyId){
-                        const updateObj = {
-                            type: SCHEMA_TYPE.TASKS,
-                            data: [
-                                {"sprintArray.folderId": {$in : [legacyId, ...idForms(folderId)]} , ProjectID: new mongoose.Types.ObjectId(projectId)},
-                                { folderObjId : new mongoose.Types.ObjectId(folderId)}
-                            ]
-                        }
-                        const promise =  MongoDbCrudOpration(companyId,updateObj,"updateMany").then(() => {
-                            logger.info("IF DONE updateTaksFolders");
-                        }).catch((err) => {
-                            logger.error(`ERROR IN IF UPDATE MANY: ${err}`);
-                        })
-                        updatePromises.push(promise);
-                    }
-                })
-            })
-            Promise.allSettled(updatePromises).then(() => {
-                resolve();
-            }).catch((error) => {
-                logger.error(`ERROR IN ALL SETTLED: ${error}`);
-                reject();
+            return MongoDbCrudOpration(companyId, updateObj, "updateMany").catch((err) => {
+                logger.error(`ERROR IN UPDATE MANY updateTaksFolders: ${err}`);
             });
-        } catch (error) {
-            reject();
-            logger.error(`ERROR IN UPDATE FOLDERS: ${error}`);
-        }
-    })
+        }));
+    } catch (error) {
+        logger.error(`ERROR IN UPDATE FOLDERS: ${error}`);
+        throw error;
+    }
 }

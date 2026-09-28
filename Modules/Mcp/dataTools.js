@@ -9,6 +9,7 @@ const v2 = require('./v2Flag');
 const cursor = require('./cursor');
 const names = require('./names');
 const { PAGE_TEXT_MAX, pageText } = require('./pageText');
+const { taskIdMatch } = require('../Comments/helpers/taskIdMatch');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -209,7 +210,7 @@ const TOOLS = [
                 ? await findOne(ctx, SCHEMA_TYPE.TASKS, { _id: oid(String(args.taskId)), deletedStatusKey: { $ne: 1 } }, { ProjectID: 1, sprintId: 1 })
                 : null;
             if (!vis.allowsTask(task)) return { ...NO_TASK };
-            const filter = { taskId: oid(String(task._id)), isDeleted: { $ne: true } };
+            const filter = { taskId: taskIdMatch(task._id), isDeleted: { $ne: true } };
             return listOf(ctx, 'comments.list', args, 'comments', { type: SCHEMA_TYPE.COMMENTS, filter, sort: { createdAt: -1, _id: -1 } }, commentRow, async (rows) => {
                 const projectId = idOf(task.ProjectID);
                 const named = await names.resolver(ctx, { projectIds: [projectId], userIds: rows.map((c) => c.userId).filter(isId) });

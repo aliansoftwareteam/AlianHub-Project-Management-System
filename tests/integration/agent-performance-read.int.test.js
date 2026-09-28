@@ -164,7 +164,7 @@ describe('performance.read over MCP keeps a private sprint to the people it is s
             commitment: { points: 3, tasks: 1, at: new Date(Date.now() - 5 * DAY_MS) }, closeReport: { at: closedAt },
         });
         sprintId = inserted.insertedId;
-        await db.collection('tasks').updateOne({ _id: new ObjectId(hidden._id) }, { $set: { sprintId, sprintArray: { id: String(sprintId), name: 'private' } } });
+        await db.collection('tasks').updateOne({ _id: new ObjectId(hidden._id) }, { $set: { sprintId, sprintArray: { id: sprintId, name: 'private' } } });
 
         const row = (userId, taskId, minutes) => ({
             LogDescription: '[QA perf] log', Loggeduser: userId, TicketID: taskId, ProjectId: String(project._id),

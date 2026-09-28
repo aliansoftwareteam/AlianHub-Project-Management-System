@@ -24,7 +24,7 @@
                         width="25px" class="cursor-pointer converted__subtask-image"
                         :thumbnail="'25x25'"
                     />
-                    <DropDown :id="'timeloguser_'" v-if="getAssignes.length > 1">
+                    <DropDown mode="menu" :id="`timeloguser_${data._id}`" v-if="getAssignes.length > 1">
                         <template #button>
                             <div class="d-flex align-items-center justify-content-center profile-image GunPowder black text-nowrap font-size-12 border-2px-blue ml--5px bg-colorlightgray">
                                 +{{getAssignes.length - 1}}
@@ -33,7 +33,7 @@
                         <template #options>
                             <DropDownOption
                                 v-for="(user, index) in getAssignes.filter((x, index) => index >= 1).map((x) => ({...x,label: x.Employee_Name, image: x.profileImage}))"
-                                :key="'user'+index" @click="usersFilter(user)"
+                                :key="'user'+index"
                             >
                                 <div class="d-flex align-items-center" :title="user.label">
                                     <!-- <img :src="user.image" class="profile-image" alt="user image"> -->

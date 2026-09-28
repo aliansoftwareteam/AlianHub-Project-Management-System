@@ -96,7 +96,7 @@ describe('recordAuditFromReq writes the row to the verified company', () => {
     });
 
     it('still records an instance admin key script that names the company in the body', async () => {
-        recordAuditFromReq({ headers: {}, body: { companyId: C } }, ENTRY);
+        recordAuditFromReq({ instanceAdmin: 'key', headers: {}, body: { companyId: C } }, ENTRY);
         await settle();
 
         expect(auditRows().map((c) => String(c.companyId))).toEqual([C]);
