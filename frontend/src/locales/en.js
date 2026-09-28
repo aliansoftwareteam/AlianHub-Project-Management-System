@@ -5472,6 +5472,7 @@ export default {
         minimum_value_should_not_be_greater_than_maximum_value:
             "Minimum value should not be greater than Maximum value",
         no_country_found: "No country found",
+        country_code: "Country code",
         enter_maximum_limit_type: "Enter Maximum Limit Type",
         enter_minimum_limit_type: "Enter Minimum Limit Type",
         limit_minimum_or_maximum_text_allowed:

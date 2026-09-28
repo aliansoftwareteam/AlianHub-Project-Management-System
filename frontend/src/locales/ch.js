@@ -5355,6 +5355,7 @@ export default {
         "minimum_limit_type_not_allowed_value": "输入的最小限制值无效。",
         "minimum_value_should_not_be_greater_than_maximum_value": "最小值不得大于最大值。",
         "no_country_found": "未找到国家",
+        "country_code": "Country code",
         "enter_maximum_limit_type": "输入最大限制类型",
         "enter_minimum_limit_type": "输入最小限制类型",
         "limit_minimum_or_maximum_text_allowed": "限制此字段允许的最小或最大文本量",

@@ -5355,6 +5355,7 @@ export default {
         "minimum_limit_type_not_allowed_value": "Der eingegebene Wert für den Typ der minimalen Grenze ist kein erlaubter Wert.",
         "minimum_value_should_not_be_greater_than_maximum_value": "Der minimale Wert sollte nicht größer als der maximale Wert sein",
         "no_country_found": "Kein Land gefunden",
+        "country_code": "Country code",
         "enter_maximum_limit_type": "Geben Sie den Typ der maximalen Grenze ein",
         "enter_minimum_limit_type": "Geben Sie den Typ der minimalen Grenze ein",
         "limit_minimum_or_maximum_text_allowed": "Beschränken Sie die minimale oder maximale Menge an Text, die in diesem Feld erlaubt ist",

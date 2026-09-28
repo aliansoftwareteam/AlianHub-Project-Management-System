@@ -5355,6 +5355,7 @@ export default {
         "minimum_limit_type_not_allowed_value": "न्यूनतम सीमा प्रकार के लिए दर्ज किया गया मान अनुमत नहीं है।",
         "minimum_value_should_not_be_greater_than_maximum_value": "न्यूनतम मान अधिकतम मान से अधिक नहीं होना चाहिए",
         "no_country_found": "कोई देश नहीं मिला",
+        "country_code": "Country code",
         "enter_maximum_limit_type": "अधिकतम सीमा प्रकार दर्ज करें",
         "enter_minimum_limit_type": "न्यूनतम सीमा प्रकार दर्ज करें",
         "limit_minimum_or_maximum_text_allowed": "इस फ़ील्ड में अनुमत न्यूनतम या अधिकतम टेक्स्ट की मात्रा को सीमित करें",
