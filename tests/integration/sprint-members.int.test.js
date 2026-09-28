@@ -86,7 +86,7 @@ describe('private sprint members', () => {
         expect((await patchSprint({ $addToSet: { AssigneeUserId: `tId_${OWN_TEAM}` } })).body.status).toBe(true);
         expect((await patchSprint({ $set: { AssigneeUserId: [owner.uid, NOBODY, member.uid, `tId_${OWN_TEAM}`] } })).body.status).toBe(true);
         expect((await patchSprint({ $pull: { AssigneeUserId: NOBODY } })).body.status).toBe(true);
-        expect((await putSprint({ favouriteTasks: [] })).status).toBe(200);
+        expect((await putSprint({ favouriteTasks: { userId: owner.uid } }, '$addToSet')).status).toBe(200);
 
         expect((await storedSprint()).AssigneeUserId).toEqual([owner.uid, member.uid, `tId_${OWN_TEAM}`]);
     });
