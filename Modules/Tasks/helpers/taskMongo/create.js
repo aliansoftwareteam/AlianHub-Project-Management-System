@@ -20,6 +20,11 @@ const { emitListener } = require("../../../Company/eventController.js");
 const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
+const importedDetails = (task) => ({
+    ...(Array.isArray(task.tagsArray) && task.tagsArray.length ? { tagsArray: task.tagsArray } : {}),
+    ...(Number.isFinite(task.totalEstimatedTime) && task.totalEstimatedTime > 0 ? { totalEstimatedTime: task.totalEstimatedTime } : {}),
+});
+
 module.exports = {
     create({data, user, projectData ,indexObj, setNotif}) {
         return new Promise((resolve,reject) => {
@@ -265,6 +270,7 @@ module.exports = {
                         'rawDescription': task.rawDescription || '',
                         'checklistArray': task.checklistArray || [],
                         'attachments': task.attachments || [],
+                        ...importedDetails(task),
                     };
                     if(sprint.folderId) {
                         parentTaskObj.folderObjId = sprint.folderId;
@@ -315,6 +321,8 @@ module.exports = {
                             'sprintArray': sprint,
                             'customField': task.customField || {},
                             'descriptionBlock': task.descriptionBlock || {},
+                            'rawDescription': task.rawDescription || '',
+                            ...importedDetails(task),
                         };
                         if(sprint.folderId) {
                             subTaskObj.folderObjId = sprint.folderId;

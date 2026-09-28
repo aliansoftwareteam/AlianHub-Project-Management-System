@@ -11,7 +11,7 @@
                 <span class="ah-toolbar__date">{{ todayLabel }}</span>
                 <div class="ah-toolbar__actions">
                     <StatusChip />
-                    <router-link v-if="router.hasRoute('Dashboards')" class="ah-tbtn ah-tbtn--strong home__manage" :to="{ name: 'Dashboards', params: { cid: companyId } }">{{ $t('Home.manage_cards') }}</router-link>
+                    <HomeCardsMenu />
                     <div class="ah-pop-anchor" @click.stop>
                         <button type="button" class="ah-tbtn ah-tbtn--primary" :aria-expanded="newOpen" aria-haspopup="menu" @click="newOpen = !newOpen">{{ $t('Home.new') }}</button>
                         <transition name="ah-fade">
@@ -67,12 +67,14 @@
                             @open-project="goProject"
                         />
                         <div class="home__side">
+                            <WaitingOnYouCard v-if="isHomeCardShown('waiting')" @hide="hideCard('waiting')" />
                             <AgendaCard :day="agendaDay" :items="agendaItems" :connected="agenda.connected.value" :first-run="firstRun" @shift="shiftAgenda" />
                             <section v-if="firstRun && !timer.active" class="hc-card">
                                 <div class="hc-personal__title">{{ $t('Home.personal_list') }}</div>
                                 <p class="hc-hint" style="margin: 0">{{ $t('Home.personal_hint') }}</p>
                                 <router-link class="hc-personal__open" :to="{ name: 'PersonalList', params: { cid: companyId } }">{{ $t('Home.open') }}</router-link>
                             </section>
+                            <StandupCard v-if="isHomeCardShown('standup')" @hide="hideCard('standup')" />
                             <TimerChip />
                         </div>
                     </div>
@@ -92,16 +94,6 @@
 
         <input ref="dateInput" type="date" class="home__date-input" tabindex="-1" aria-hidden="true" @change="onDatePicked" />
 
-        <TaskDetail
-            v-if="detail.open"
-            :companyId="companyId"
-            :projectId="detail.projectId"
-            :sprintId="detail.sprintId"
-            :taskId="detail.taskId"
-            :isTaskDetailSideBar="detail.open"
-            :zIndex="7"
-            @toggleTaskDetail="closeTask"
-        />
         <CreateProjectSidebar
             v-if="createProjectOpen"
             :isActiveCreateSidebar="createProjectOpen"
@@ -121,7 +113,7 @@ import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { openPanel } from "@/components/organisms/Shell/shellState";
-import TaskDetail from "@/views/TaskDetail/TaskDetail.vue";
+import { onTaskClosed, openTask as openTaskPanel, useTaskSequenceSource } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 import CreateProjectSidebar from "@/components/organisms/CreateProject/CreateProjectSidebar.vue";
 import HomeSidebar from "@/components/molecules/Home/HomeSidebar.vue";
 import MyWorkCard from "@/components/molecules/Home/MyWorkCard.vue";
@@ -129,6 +121,10 @@ import AgendaCard from "@/components/molecules/Home/AgendaCard.vue";
 import PlannerPanel from "@/components/molecules/Home/PlannerPanel.vue";
 import TimerChip from "@/components/molecules/Home/TimerChip.vue";
 import SetupChecklist from "@/components/molecules/Home/SetupChecklist.vue";
+import HomeCardsMenu from "@/components/molecules/Home/HomeCardsMenu.vue";
+import WaitingOnYouCard from "@/components/molecules/Home/WaitingOnYouCard.vue";
+import StandupCard from "@/components/molecules/Home/StandupCard.vue";
+import { isHomeCardShown, setHomeCardShown, syncHomeCards } from "@/components/molecules/Home/homeCards";
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue";
 import { useOnboardingChecklist } from "@/composable/useOnboardingChecklist";
 import { useBlockingSurface } from "@/composable/blockingSurface";
@@ -168,7 +164,6 @@ const newOpen = ref(false);
 const createProjectOpen = ref(false);
 const adding = ref(false);
 const agendaDay = ref(moment());
-const detail = ref({ open: false, taskId: "", projectId: "", sprintId: "" });
 const pendingDateTask = ref(null);
 
 const todayLabel = computed(() => moment().format("ddd MMM D"));
@@ -187,6 +182,18 @@ const firstRun = computed(() => projects.value.length <= 1 || !checklistComplete
 const confirmRemoveSample = ref(false);
 
 const agendaItems = computed(() => agenda.itemsFor(agendaDay.value, work.mine.value));
+
+const myRecord = computed(() => (getters["users/users"] || []).find((u) => u._id === userId.value));
+watch(myRecord, (record) => { if (record) syncHomeCards(userId.value, record.homeCards); }, { immediate: true });
+
+async function hideCard(id) {
+    try {
+        await setHomeCardShown(id, false);
+        $toast.info(t("Home.card_hidden"), { position: "top-right" });
+    } catch (error) {
+        $toast.error(t("Home.cards_save_failed"), { position: "top-right" });
+    }
+}
 
 function shiftAgenda(delta) {
     agendaDay.value = delta === 0 ? moment() : moment(agendaDay.value).add(delta, "day");
@@ -212,12 +219,17 @@ watch(() => timer.active, (now, before) => {
     if (before && !now) onboarding.mark("log_time");
 });
 
+useTaskSequenceSource(computed(() => myWorkCard.value?.$el));
+const stopOnTaskClosed = onTaskClosed(() => work.fetchOpen().catch(() => {}));
+
 function openTask(task) {
-    detail.value = { open: true, taskId: task._id, projectId: task.ProjectID, sprintId: task.sprintId };
-}
-function closeTask() {
-    detail.value = { open: false, taskId: "", projectId: "", sprintId: "" };
-    work.fetchOpen().catch(() => {});
+    openTaskPanel({
+        companyId: companyId.value,
+        projectId: task.ProjectID,
+        sprintId: task.sprintId,
+        folderId: task.folderObjId || "",
+        taskId: task._id
+    });
 }
 function goProject(project) {
     onboarding.mark("open_project");
@@ -325,6 +337,7 @@ onMounted(() => {
     document.addEventListener("visibilitychange", onVisible);
 });
 onUnmounted(() => {
+    stopOnTaskClosed();
     document.removeEventListener("click", closePops);
     document.removeEventListener("visibilitychange", onVisible);
 });

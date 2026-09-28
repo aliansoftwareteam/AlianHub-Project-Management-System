@@ -83,6 +83,18 @@
                                 <span class="dropdown-label">{{$t('ProjectDetails.convert_subtask')}}</span>
                             </div>
                         </DropDownOption>
+                        <DropDownOption v-if="checkPermission('task.task_create',projectData.isGlobalPermission) === true" @click="openTemplateDialog({ mode: 'save', task: props.task, project: projectData })">
+                            <div>
+                                <img :src="copyIcon" class="copyIcon" alt="" />
+                                <span class="dropdown-label">{{$t('TaskTemplates.save_as')}}</span>
+                            </div>
+                        </DropDownOption>
+                        <DropDownOption v-if="checkPermission('task.task_create',projectData.isGlobalPermission) === true" @click="openTemplateDialog({ mode: 'apply', task: props.task, project: projectData })">
+                            <div>
+                                <img :src="combinedIcon" alt="" />
+                                <span class="dropdown-label">{{$t('TaskTemplates.apply_menu')}}</span>
+                            </div>
+                        </DropDownOption>
                         <DropDownOption @click="duplicateTask()" v-if="checkPermission('task.task_duplicate',projectData.isGlobalPermission) == true">
                             <div>
                                 <img :src="copyIcon" class="copyIcon"/>
@@ -223,6 +235,7 @@
     import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
     import WasabiIamgeCompp from '@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue';
     import SubtaskProgressBadge from '@/components/atom/SubtaskProgressBadge/SubtaskProgressBadge.vue';
+    import { openTemplateDialog } from '@/components/molecules/TaskTemplates/taskTemplates';
 
     import { computed, defineProps,defineEmits, ref, inject, watch } from 'vue';
     import taskClass from "@/utils/TaskOperations"

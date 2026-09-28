@@ -6,6 +6,8 @@
         <span class="ah-agent-strip__text">{{ statusText }}</span>
         <span v-if="elapsed" class="ah-agent-strip__elapsed ah-mono">{{ elapsed }}</span>
         <span v-if="run.status === 'running'" class="ah-dot ah-dot--ok ah-agent-strip__pulse" aria-hidden="true"></span>
+        <router-link v-if="runLink" class="ah-btn ah-btn--ghost ah-btn--sm" :to="runLink">{{ $t('TaskPanel.agent_open_run') }}</router-link>
+        <router-link v-if="proposalLink" class="ah-btn ah-btn--ghost ah-btn--sm" :to="proposalLink">{{ $t('TaskPanel.agent_open_proposal') }}</router-link>
         <button v-if="run.status === 'running' && run.onStop" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="run.onStop">{{ $t('TaskPanel.agent_stop') }}</button>
         <ol v-if="recent.length" class="ah-agent-strip__activities" :aria-label="$t('TaskPanel.agent_activities')">
             <li v-for="(item, index) in recent" :key="`${item.at}-${index}`" class="ah-agent-strip__activity" :class="`is-${item.type}`">
@@ -17,7 +19,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, inject, onBeforeUnmount, onMounted, ref, unref } from "vue";
 import { useI18n } from "vue-i18n";
 import { formatClock } from "./useTaskTimer";
 
@@ -30,11 +32,18 @@ defineOptions({ name: "TaskAgentStrip" });
  * @property {number|string} [startedAt]   epoch ms or ISO string
  * @property {string} [summary]            one line shown while working / after finishing
  * @property {Function} [onStop]
+ * @property {string} [runId]              a workspace agent's run, linked to its page
+ * @property {string} [proposalId]         the run's latest proposal, linked in the AI Inbox
  * @property {Object} [session]            an outside agent's session: state, reason and typed activities
  */
 const props = defineProps({
     run: { type: Object, required: true }
 });
+
+const companyId = inject("$companyId", null);
+const cid = computed(() => String(unref(companyId) || ""));
+const runLink = computed(() => (props.run.runId && !props.run.session ? { name: "AiRun", params: { cid: cid.value, runId: String(props.run.runId) } } : null));
+const proposalLink = computed(() => (runLink.value && props.run.proposalId ? { name: "AiInbox", params: { cid: cid.value }, query: { proposal: String(props.run.proposalId) } } : null));
 
 const SHOWN_ACTIVITIES = 3;
 const SESSION_TEXT = {

@@ -1,5 +1,6 @@
 // The comment editor inserts a mention as "[Display Name](userId)", and "[All](everyone)" for
 // everyone. Only 24-hex ids count, so an ordinary link like "[docs](https://…)" is never one.
+// An agent is "[Name](agent_<agentId>)": the prefix keeps it out of the person ids.
 
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const EVERYONE = /\[[^\]]*\]\(\s*everyone\s*\)/;
@@ -16,6 +17,16 @@ const parseMentionIds = (message) => {
     return Array.from(ids);
 };
 
+const AGENT_MENTION = /\[([^\]]*)\]\(\s*agent_([0-9a-fA-F]{24})\s*\)/g;
+
+const parseAgentMentionIds = (message) => {
+    if (!message || typeof message !== 'string') return [];
+    return Array.from(new Set(Array.from(message.matchAll(AGENT_MENTION), (match) => match[2])));
+};
+
+/* The comment as a brief: mentions read as "@Name", not as their markup. */
+const mentionsAsNames = (message) => String(message || '').replace(/@?\[([^\]]*)\]\(\s*(?:agent_)?[0-9a-fA-F]{24}\s*\)/g, '@$1');
+
 const mentionsEveryone = (message) => typeof message === 'string' && EVERYONE.test(message);
 
-module.exports = { parseMentionIds, mentionsEveryone };
+module.exports = { parseMentionIds, parseAgentMentionIds, mentionsAsNames, mentionsEveryone };

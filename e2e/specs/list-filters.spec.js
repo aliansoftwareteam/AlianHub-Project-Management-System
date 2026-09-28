@@ -7,11 +7,18 @@ const skipFirstRun = (page) => page.addInitScript(() => {
     sessionStorage.setItem('ah.gs.dismissed', '1');
 });
 
+const saveView = async (page) => {
+    const bar = page.locator('.svb');
+    await expect(bar).toContainText('Unsaved changes');
+    await bar.locator('[data-action="save"]').click();
+    await expect(bar).toBeHidden();
+};
+
 test.describe('List view filters', () => {
     test.use(asRole('owner'));
     test.beforeEach(async ({ page }) => skipFirstRun(page));
 
-    test('"Me" and search narrow the List rows and survive a reload', async ({ page, state, loginAs }) => {
+    test('"Me" and search narrow the List rows and, once the view is saved, survive a reload', async ({ page, state, loginAs }) => {
         const owner = await loginAs('owner');
         const suffix = uniqueSuffix();
         const project = await createProject(owner.api, { name: `LISTF ${suffix}`, assigneeIds: [owner.uid], createdBy: owner.uid });
@@ -35,6 +42,7 @@ test.describe('List view filters', () => {
         await me.click();
         await expect(rows).toHaveCount(3);
         await expect(me).toHaveAttribute('aria-pressed', 'true');
+        await saveView(page);
 
         await page.reload();
         await expect(rows).toHaveCount(3);
@@ -47,6 +55,7 @@ test.describe('List view filters', () => {
         await search.fill('Kilo target');
         await expect(rows).toHaveCount(1);
         await expect(rows.first()).toContainText('Kilo target');
+        await saveView(page);
 
         await page.reload();
         await expect(page.locator('.pft__input')).toHaveValue('Kilo target');
@@ -60,7 +69,7 @@ test.describe('List view filters', () => {
         await expect(rows).toHaveCount(11);
     });
 
-    test('group by Assignee lists each assignee and Unassigned, and is remembered', async ({ page, state, loginAs }) => {
+    test('group by Assignee lists each assignee and Unassigned, and is kept by the saved view', async ({ page, state, loginAs }) => {
         const owner = await loginAs('owner');
         const suffix = uniqueSuffix();
         const project = await createProject(owner.api, { name: `LISTG ${suffix}`, assigneeIds: [owner.uid], createdBy: owner.uid });
@@ -74,6 +83,7 @@ test.describe('List view filters', () => {
         await page.locator('.drop-down-menu').getByText('Assignee', { exact: true }).click();
         const unassigned = page.locator('.lv2__group').filter({ has: page.locator('.lv2__group-name', { hasText: 'Unassigned' }) });
         await expect(unassigned.locator('.lv2__name')).toHaveText([`Nobody ${suffix}`]);
+        await saveView(page);
 
         await page.reload();
         await expect(page.getByRole('button', { name: 'Group by' })).toContainText('Assignee');

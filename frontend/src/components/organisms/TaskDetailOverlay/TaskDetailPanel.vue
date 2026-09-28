@@ -256,6 +256,7 @@
                     :zIndexEstimate="10"
                     :isMainSpinner="isSpinner"
                     :clientWidth="clientWidth"
+                    @agent-run="loadAgentRun"
                 >
                     <template #status>
                         <button
@@ -346,6 +347,7 @@ import TaskDetailTab from "@/components/molecules/TaskDetailTab/TaskDetailTab.vu
 import TaskDetailRightSide from "@/components/organisms/TaskDetailRightSide/TaskDetailRightSide.vue";
 import LinkedTasks from "@/components/organisms/LinkedTasks/LinkedTasks.vue";
 import Comments from "@/views/Projects/Comments/Comments.vue";
+import { mentionsAnAgent } from "@/utils/agentMention";
 import ActivityLog from "@/components/templates/ActivityLog/ActivityLog.vue";
 import PagesPanel from "@/components/molecules/Pages/PagesPanel.vue";
 import TagChip from "@/components/atom/TagChip/TagChip.vue";
@@ -980,7 +982,9 @@ function visibilityHandler() {
 }
 
 function onCommentInsert(data) {
-    if (String(data?.fullDocument?.taskId || "") === String(props.taskId)) summaryRef.value?.refresh?.();
+    if (String(data?.fullDocument?.taskId || "") !== String(props.taskId)) return;
+    summaryRef.value?.refresh?.();
+    if (mentionsAnAgent(data.fullDocument.message)) loadAgentRun();
 }
 
 /* The strip reads the open run on this task; a parent may still hand one in
@@ -1018,7 +1022,7 @@ async function loadAgentRun() {
         const res = await apiRequest("get", `${env.AGENT_RUNS}?status=open&taskId=${encodeURIComponent(props.taskId)}&limit=5`);
         const run = (res?.data?.status ? res.data.data || [] : [])[0];
         liveRun.value = run
-            ? { agentName: run.agentName, status: STRIP_STATUS[run.status] || "running", startedAt: run.startedAt, onStop: run.status === "running" && mayStopRun(run) ? () => stopAgentRun(run._id) : null }
+            ? { agentName: run.agentName, status: STRIP_STATUS[run.status] || "running", startedAt: run.startedAt, runId: run._id, proposalId: (run.proposals || []).slice(-1)[0] || null, onStop: run.status === "running" && mayStopRun(run) ? () => stopAgentRun(run._id) : null }
             : null;
     } catch (error) {
         liveRun.value = null;

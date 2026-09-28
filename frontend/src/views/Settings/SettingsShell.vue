@@ -164,9 +164,11 @@ const rawGroups = computed(() => [
             { key: "agent-clients", text: t("Settings.nav_agent_clients"), icon: "key", to: to("AgentClients"), names: ["AgentClients"], show: isOwnerOrAdmin.value && oauthOn.value === true },
             { key: "integrations", text: label("settingslider.Integrations"), icon: "integrations", to: to("Integrations"), names: ["Integrations"], show: true },
             { key: "templates", text: label("settingslider.Templates"), icon: "template", to: to("Template"), names: ["Template"], show: true },
+            { key: "task-templates", text: t("TaskTemplates.settings_nav"), icon: "template", to: to("TaskTemplates"), names: ["TaskTemplates"], show: true },
             { key: "timeoff", text: label("settingslider.Time Off"), icon: "planner", to: to("TimeOff"), names: ["TimeOff"], show: true },
             { key: "timetracking", text: label("settingslider.Time Tracking"), icon: "time", to: to("Time Tracking"), names: ["Time Tracking"], show: true },
             { key: "audit", text: label("settingslider.Audit Log"), icon: "audit", to: to("AuditLog"), names: ["AuditLog"], show: isOwnerOrAdmin.value },
+            { key: "import-export", text: t("ImportExport.nav"), icon: "download", to: to("ImportExport"), names: ["ImportExport"], show: isOwnerOrAdmin.value },
             { key: "billing", text: t("Settings.nav_billing"), icon: "billing", to: to("Upgrade"), names: ["Upgrade"], show: hasBilling.value }
         ]
     },

@@ -172,9 +172,9 @@ const transformCsvRows = ({ rows, mapping = {}, statusNames, leaderId, users = [
             rawDescription: valueFor(row, mapping, 'description', ['description', 'desc', 'notes']).slice(0, 10000),
             ParentTaskId: '',
         };
-        if (start) task.StartDate = start.toISOString();
-        if (estimate !== null) task.totalEstimatedTime = estimate;
-        if (tags.length) task.tagsArray = tags.slice(0, 20);
+        if (start) task.startDate = start.toISOString();
+        if (estimate !== null) task.totalEstimatedTime = Math.round(estimate * 60);
+        if (tags.length) task.tagNames = tags.slice(0, 20);
         tasks.push(task);
     });
     return { tasks, skipped };

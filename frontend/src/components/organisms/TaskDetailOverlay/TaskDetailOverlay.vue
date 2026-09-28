@@ -48,8 +48,9 @@ import { initTimer } from "./useTaskTimer";
 import { useFocusTrap } from "@/composable/useFocusTrap";
 import {
     overlayState, isExpanded, bindRouter, openTask, closeTask, expandTask, minimizeTask,
-    restoreTask, dismissMinimized, stepTask, restoreFromSequence, closeOnPageChange, TASK_QUERY_KEY
+    restoreTask, dismissMinimized, stepTask, restoreFromSequence, closeOnPageChange, loadMinimizedTray, TASK_QUERY_KEY
 } from "./useTaskOverlay";
+import { trayStorageKey } from "./minimizedTray";
 import { navKeyDirection } from "./taskNavigation";
 import { handlePanelEscape } from "./panelEscape";
 import { escapeLayerMark } from "@/composable/useEscapeLayer";
@@ -96,6 +97,12 @@ function openFromRoute() {
         taskId,
         tab: route.query?.detailTab === "comment" ? "activity" : ""
     });
+}
+
+const fetchTask = (taskId) => apiRequest("get", `${env.TASK}/${taskId}`).then((response) => response?.data);
+const loadTray = () => loadMinimizedTray({ userId: userId.value, companyId: companyId.value, fetchTask });
+function onStorage(event) {
+    if (event.key && event.key === trayStorageKey(userId.value, companyId.value)) loadTray();
 }
 
 function restoreFromQuery() {
@@ -168,16 +175,20 @@ watch(isExpanded, (expanded) => {
 watch(() => route.params?.taskId, openFromRoute);
 watch(() => route.query?.[TASK_QUERY_KEY], (value) => { if (value) restoreFromQuery(); });
 watch(() => route.path, closeOnPageChange);
+watch(() => [userId.value, companyId.value], loadTray);
 
 onMounted(() => {
     overlayState.hostMounted += 1;
     initTimer(userId.value);
     document.addEventListener("keydown", onKeydown);
+    window.addEventListener("storage", onStorage);
+    loadTray();
     openFromRoute();
     restoreFromQuery();
 });
 onBeforeUnmount(() => {
     overlayState.hostMounted -= 1;
     document.removeEventListener("keydown", onKeydown);
+    window.removeEventListener("storage", onStorage);
 });
 </script>

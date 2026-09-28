@@ -7,13 +7,14 @@ import { FIRST_RUN_STEPS, isFirstRunStepDone } from "@/composable/firstRunProgre
 import { onboardingRecord, saveOnboarding } from "@/composable/onboardingState";
 import { isOwnerOrAdmin as isOwnerOrAdminRole } from "@/utils/roles";
 import { askForBrowserNotifications } from "@/composable/browserNotifications";
+import { openWorkspaceImport } from "@/components/organisms/WorkspaceImport/workspaceImportState";
 
 const SAMPLE_CODE = "WELCOME";
 
 /* Facts about the workspace rather than the person: a member neither sees nor gets credit for them. */
-export const WORKSPACE_STEPS = ["company", "sample", "invite", "project", "permissions", "apps", "remove_sample"];
+export const WORKSPACE_STEPS = ["company", "sample", "invite", "project", "import", "permissions", "apps", "remove_sample"];
 export const MEMBER_STEPS = ["open_project", "complete_task", "log_time", "notifications", "tour"];
-export const ADMIN_STEPS = ["company", "sample", "invite", "project", "permissions", "board", "notifications", "apps", "remove_sample", "tour"];
+export const ADMIN_STEPS = ["company", "sample", "invite", "project", "import", "permissions", "board", "notifications", "apps", "remove_sample", "tour"];
 
 const FLAG = {
     permissions: "reviewedPermissions",
@@ -22,7 +23,8 @@ const FLAG = {
     log_time: "loggedTime",
     apps: "chosenApps",
     board: "viewedBoard",
-    notifications: "viewedNotifications"
+    notifications: "viewedNotifications",
+    import: "importedWork"
 };
 
 export function useOnboardingChecklist({ openCreateProject = () => {}, startTour = () => {}, routeVersion = () => "" } = {}) {
@@ -59,6 +61,7 @@ export function useOnboardingChecklist({ openCreateProject = () => {}, startTour
         sample: () => projects.value.length > 0,
         invite: () => companyUsers.value.length > 1,
         project: () => projects.value.some((p) => p.ProjectCode !== SAMPLE_CODE),
+        import: () => flagged("import"),
         permissions: () => flagged("permissions"),
         board: () => flagged("board") || firstRunDone(FIRST_RUN_STEPS.BOARD_VIEW),
         notifications: () => flagged("notifications") || firstRunDone(FIRST_RUN_STEPS.NOTIFICATIONS),
@@ -75,6 +78,7 @@ export function useOnboardingChecklist({ openCreateProject = () => {}, startTour
         sample: "Home.create_project",
         invite: "Home.invite_team",
         project: "Home.create_project",
+        import: "Home.bring_work_in",
         permissions: "Home.review_permissions",
         board: "Home.step_board",
         notifications: "Home.step_notifications",
@@ -117,6 +121,7 @@ export function useOnboardingChecklist({ openCreateProject = () => {}, startTour
     const onAction = (key) => {
         if (key === "invite") go("Members");
         else if (key === "sample" || key === "project") openCreateProject();
+        else if (key === "import") openWorkspaceImport();
         else if (key === "permissions") {
             mark(key);
             go(router.hasRoute("Security & Permissions") ? "Security & Permissions" : "Setting");

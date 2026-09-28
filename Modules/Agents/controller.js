@@ -7,7 +7,6 @@ const runs = require('./runs');
 const { TYPE_LIST: PROVIDER_ERROR_TYPES } = require('../AICore/providerError');
 const proposals = require('./proposals');
 const accounts = require('./accounts');
-const actions = require('./actions');
 const { isAgent } = require('./actor');
 const access = require('./access');
 const tools = require('../Automations/engine/tools');
@@ -26,17 +25,17 @@ const taskClass = require('../AICore/taskClass');
 const revisions = require('./revisions');
 const skillRecord = require('./skillRecord');
 const { buildTrace } = require('./runTrace');
-const workflows = require('../Workflows');
 const knowledgeMemory = require('../Knowledge/memory/publish');
 const { DEFAULT_RATE_LIMIT_PER_DAY } = require('./dailyRunLimit');
 const confidence = require('./engine/confidence');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
+const triggers = require('./triggers');
 
 // Every /api/v2/agents route sits behind the company-header JWT check, so the header is the verified tenant.
 const companyOf = (req) => String(req.headers['companyid'] || '');
-// 'mention' is a run started by @naming the agent in a comment (13b); it is
-// recorded because "who asked for this" is the first question about any run.
-const TRIGGERS = ['manual', 'mention', 'schedule', 'rule', 'assignment'];
+// Recorded because "who asked for this" is the first question about any run.
+const TRIGGERS = ['manual', triggers.TRIGGER.MENTION, 'schedule', 'rule', triggers.TRIGGER.ASSIGN];
+const FROM_TASK = [triggers.TRIGGER.MENTION, triggers.TRIGGER.ASSIGN];
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 const fail = (res, statusText, code, extra) => res.status(code || 400).send({ status: false, statusText, message: statusText, ...(extra || {}) });
@@ -144,6 +143,19 @@ exports.listAgents = async (req, res) => {
         const agents = await skillRecord.enrichAgentSkills(companyId, rows || []);
         return res.send({ status: true, statusText: 'Agents fetched.', data: agents.map((agent) => ({ ...agent, ...agentProjectsFor(agent, visible) })) });
     } catch (e) { logger.error(`listAgents: ${e.message}`); return fail(res, e.message, 500); }
+};
+
+/* GET /api/v2/agents/runnable?taskId= — the agents the caller may start on that task, for the
+ * assignee picker and the comment mention list. Empty for anyone who may not start one there. */
+exports.runnableAgents = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId) return fail(res, 'companyId is required.');
+        const { actor, human } = await humanActor(req);
+        const task = human ? await triggers.workTask(companyId, (req.query || {}).taskId) : null;
+        const agents = task ? await triggers.runnableAgents(companyId, actor.userId, task) : [];
+        return res.send({ status: true, statusText: 'Agents fetched.', data: agents.map(triggers.listed) });
+    } catch (e) { logger.error(`runnableAgents: ${e.message}`); return fail(res, e.message, 500); }
 };
 
 /* POST /api/v2/agents */
@@ -462,26 +474,18 @@ exports.startRun = async (req, res) => {
         if (taskId) {
             task = await tools.getTask(companyId, taskId).catch(() => null);
             if (!task) return fail(res, 'Task not found.', 404);
+            if (human && FROM_TASK.includes(trigger) && !(await triggers.mayRunOn(companyId, actor.userId, task))) return fail(res, 'Task not found.', 404);
             if (agent.projectIds && agent.projectIds.length && !agent.projectIds.includes(String(task.ProjectID))) return fail(res, 'This agent is not scoped to that project.', 403);
         }
         if (!task) {
             // Every executable skill works on a task. Without one the run used to be created,
             // never executed and never finished — "running" forever in every counter.
-            return fail(res, 'This agent needs a task to run on. Start the run from a task, or mention the agent in a comment.');
+            return fail(res, 'This agent needs a task to run on. Assign the agent to a task, @mention it in a task comment, or run it on a task from the agent\'s page.');
         }
         const { run, deduplicated } = await runs.start(companyId, { agent, taskId, projectId: task && task.ProjectID, skill: runs.skillSlugOf(agent, skill), trigger: TRIGGERS.includes(trigger) ? trigger : 'manual', startedBy: actor.userId, viaAccount: isAgent(actor) ? actor.viaAccount : agent.account, note, spendCapUsd, notifyMe: Boolean(notifyMe), idempotencyKey });
         const plain = typeof run.toObject === 'function' ? run.toObject() : { ...run };
         if (deduplicated) return res.send({ status: true, statusText: 'Run already started.', data: { ...plain, deduplicated: true } });
-        if (task && registry.has('subtask.create')) {
-            const runActor = { kind: 'agent', userId: actor.userId, agentId: String(agent._id), agentName: agent.name, runId: String(run._id), viaAccount: run.viaAccount, tokenId: null };
-            // With the engine on the run rides the queue, like a rule-started one: the
-            // same runner executes it, under a lease, and a worker that dies does not
-            // take the run with it. Off, it executes here exactly as it always has.
-            const execute = () => (workflows.enabled()
-                ? workflows.enqueueForAgentRun(companyId, plain, { note })
-                : runs.executeSkill(companyId, run, agent, task, { proposals, actions, actor: runActor }));
-            setImmediate(() => Promise.resolve(execute()).catch((e) => logger.error(`startRun: ${run._id} was not dispatched: ${e.message}`)));
-        }
+        triggers.dispatch(companyId, run, agent, task, { userId: actor.userId, note });
         return res.send({ status: true, statusText: 'Run started.', data: { ...plain, deduplicated: false } });
     } catch (e) { logger.error(`startRun: ${e.message}`); return fail(res, e.message, e.status || 500); }
 };
@@ -682,6 +686,17 @@ exports.teamBoard = async (req, res) => {
         const data = await team.board(companyId, { hoursPerWeek, viewerId: req.uid });
         return res.send({ status: true, statusText: 'Team board fetched.', data: { ...data, standup: team.standup(data) } });
     } catch (e) { logger.error(`teamBoard: ${e.message}`); return fail(res, e.message, 500); }
+};
+
+/* GET /api/v2/agents/team/standup?tz= — the caller's own standup, from activity rather than a model */
+exports.myStandup = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
+        const window = team.standupWindow({ now: Date.now(), tzOffset: req.query && req.query.tz });
+        const activity = await team.personalActivity(companyId, { userId: req.uid, window });
+        return res.send({ status: true, statusText: 'Standup fetched.', data: team.personalStandup(activity) });
+    } catch (e) { logger.error(`myStandup: ${e.message}`); return fail(res, e.message, 500); }
 };
 
 /* GET /api/v2/agents/routable?projectId=&limit= — open tasks the caller can

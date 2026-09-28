@@ -103,6 +103,15 @@ export default [
                 component: () => import(/* webpackChunkName: Projects */ '@/views/Settings/Projects/Projects.vue')
             },
             {
+                path: "import-export",
+                name: "ImportExport",
+                meta: {
+                    title: "Import & export",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: ImportExport */ '@/views/Settings/ImportExport/ImportExport.vue')
+            },
+            {
                 path: "template",
                 name: "Template",
                 meta: {
@@ -110,6 +119,15 @@ export default [
                     requiresAuth: true
                 },
                 component: () => import(/* webpackChunkName: Template */ '@/views/Settings/Template/Template.vue')
+            },
+            {
+                path: "task-templates",
+                name: "TaskTemplates",
+                meta: {
+                    title: "Task templates",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: TaskTemplates */ '@/views/Settings/TaskTemplates/TaskTemplates.vue')
             },
             {
                 path: "security-permissions",

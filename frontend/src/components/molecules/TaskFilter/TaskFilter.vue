@@ -108,7 +108,7 @@ import { apiRequest } from '../../../services';
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
 import { buildFilterQuery } from "@/composable/commonFunction";
-import { clearFilterSignal } from "@/views/Projects/composables/taskFilterSignal";
+import { clearFilterSignal, VIEW_FILTER_ROWS } from "@/views/Projects/composables/taskFilterSignal";
 
 // Utils
 const { getUser } = useGetterFunctions();
@@ -154,6 +154,14 @@ const isInvalid = ref(false);
 const selectedRow = ref({});
 const filters = ref([]);
 const closeFilterRef = ref();
+const viewFilterRows = inject(VIEW_FILTER_ROWS, null);
+let syncedRows = null;
+const rowsOf = (list) => list.map(({ name, comparison, values, condition, date }) => ({ name, comparison, values, condition, date }));
+const shareRows = (rows) => {
+    if (!viewFilterRows) return;
+    syncedRows = rows;
+    viewFilterRows.value = rows;
+};
 const mainOptions = ref([
     { value: 'statusKey', name: "status",type:'array',filterOn:'statusKey' },
     { value: 'DueDate', name: "due_date",type:'date',filterOn:'DueDate' } ,
@@ -218,9 +226,13 @@ const prioritiesArray = computed(() => {
     })?.sort((a, b) => a?.name.localeCompare(b?.name));
 });
 
-// Mounted
 onMounted(() => {
-    addRow();
+    if (viewFilterRows?.value?.length) {
+        syncedRows = viewFilterRows.value;
+        loadRows(viewFilterRows.value);
+    } else {
+        addRow();
+    }
     getFiltersData();
 });
 
@@ -409,6 +421,7 @@ const applyFilter = (data) => {
     }
     filterBy = buildFilterQuery(queries)
     emits('apply', filterBy);
+    shareRows(rowsOf(queries));
     isApplyed.value = true;
     closeFilterRef.value.click();
 }
@@ -422,6 +435,33 @@ const resetPanel = () => {
     isValidate.value = true;
     isEdit.value = false;
     isApplyed.value = false;
+    if (viewFilterRows?.value?.length) shareRows([]);
+}
+
+const loadRows = (rows) => {
+    if (!rows.length) {
+        inputs.value = [];
+        addRow();
+        isApplyed.value = false;
+    } else {
+        inputs.value = rows.map((row) => ({
+            ...JSON.parse(JSON.stringify(row)),
+            isAllChecked: false,
+            isValidate: true,
+            comparisonsData: manageComparisonArray(row.name.value),
+            displayData: (manageArray(row.name.value).value || []).filter((option) => row.values.includes(option.finalValue)),
+        }));
+        isApplyed.value = true;
+    }
+    isValidate.value = true;
+    isEdit.value = false;
+}
+if (viewFilterRows) {
+    watch(viewFilterRows, (rows) => {
+        if (rows === syncedRows) return;
+        syncedRows = rows;
+        loadRows(rows || []);
+    });
 }
 const clearFilter = () => {
     resetPanel();
