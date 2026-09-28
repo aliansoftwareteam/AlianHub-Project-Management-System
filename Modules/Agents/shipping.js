@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const { getCatalog } = require('../Integrations/helpers/integrationsRules');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const registry = require('./registry');
@@ -136,7 +137,7 @@ const releaseCandidate = async (companyId, uid, { since } = {}) => {
             : Promise.resolve([]),
         MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AGENT_PROPOSALS,
-            data: [{ ...(privileged ? {} : { projectId: { $in: visible } }), $or: [{ gate: { $ne: null } }, { 'changes.action': { $in: keys } }] }, {}, { sort: { createdAt: -1 }, limit: 50 }],
+            data: [{ ...(privileged ? {} : { projectId: { $in: idForms(visible) } }), $or: [{ gate: { $ne: null } }, { 'changes.action': { $in: keys } }] }, {}, { sort: { createdAt: -1 }, limit: 50 }],
         }, 'find').catch(() => []),
         MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS, data: [{ deletedStatusKey: { $ne: 1 }, status: 'connected' }, 'type name status'],

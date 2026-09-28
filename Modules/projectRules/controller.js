@@ -2,6 +2,7 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const { myCache } = require('../../Config/config');
 const { removeCache } = require("../../utils/commonFunctions");
+const { idForms } = require("../../utils/mongo-handler/objectIdKeys");
 
 exports.getProjectRules = async(req,res) => {
     try {
@@ -9,11 +10,7 @@ exports.getProjectRules = async(req,res) => {
 
         const projectRulesObj = {
             type: SCHEMA_TYPE.PROJECT_RULES,
-            data: [
-                {
-                    "projectId": projectId
-                }
-            ]
+            data: [{ projectId: { $in: idForms(projectId) } }]
         };
 
         const projectRuleCache = `projectRules:${projectId}`;
@@ -42,7 +39,7 @@ exports.updateProjectRules = async(req,res) => {
         let key = req.body.key;
         const projectId = req.body.projectId;
         let data =  [
-            { _id: ruleId, projectId: String(projectId) },
+            { _id: ruleId, projectId: { $in: idForms(String(projectId)) } },
             {
                 [key]: req.body.updateObject
             },
@@ -71,11 +68,7 @@ exports.deleteProjectRules = async(req,res) => {
 
         const deleteObj = {
             type: SCHEMA_TYPE.PROJECT_RULES,
-            data: [
-                {
-                    projectId: projectId
-                }
-            ]
+            data: [{ projectId: { $in: idForms(projectId) } }]
         }
         const response = await MongoDbCrudOpration(req.headers['companyid'], deleteObj, "deleteMany");
 

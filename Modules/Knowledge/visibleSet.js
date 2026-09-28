@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const permissionGuard = require('../../Config/permissionGuard');
 const { isPrivileged } = require('../../Config/roleTypes');
 const { visibleProjectIds } = require('../Agents/scope');
@@ -129,7 +130,7 @@ const clausesFor = (set) => {
         transcript: {
             participants: set.caller.userId,
             deletedStatusKey: { $ne: 1 },
-            ...callProjects(set, set.projectIds),
+            ...callProjects(set, idForms(set.projectIds)),
         },
     };
 };

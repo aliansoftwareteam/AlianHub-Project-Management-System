@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const persistence = require('../AICore/persistence');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const logger = require('../../Config/loggerConfig');
 const { COVERAGE_POINT_LABELS } = require('../AIProjectGenerator/promptBuilder');
 const { hasInstruction, fresh: freshGuard } = require('../AICore/instructionGuard');
@@ -290,7 +291,7 @@ async function episodesFor(companyId, projectId, limit) {
     try {
         const rows = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AGENT_RUNS,
-            data: [{ projectId: String(projectId), episode: { $exists: true } }, {}, { sort: { finishedAt: -1 }, limit }],
+            data: [{ projectId: { $in: idForms(String(projectId)) }, episode: { $exists: true } }, {}, { sort: { finishedAt: -1 }, limit }],
         }, 'find');
         return (Array.isArray(rows) ? rows : []).map(plain).map(episodeRow);
     } catch (error) {

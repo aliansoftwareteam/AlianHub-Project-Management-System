@@ -3087,7 +3087,7 @@ exports.listDashboards = async (req, res) => {
                     { userId: uid },
                     { visibility: "workspace" },
                     { sharedWith: uid },
-                    ...(projectIds.length ? [{ visibility: "project", projectId: { $in: projectIds } }] : []),
+                    ...(projectIds.length ? [{ visibility: "project", projectId: { $in: idForms(projectIds) } }] : []),
                 ],
             }],
         }, "find").catch(() => []);
