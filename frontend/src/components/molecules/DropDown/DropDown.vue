@@ -9,7 +9,7 @@
         </DropDownTrigger>
         <teleport to="#my-dropdown" v-if="dropdownVisible">
             <div class="position-fi dropdown-back-drop cursor-default" :style="[{'z-index':zIndex}]" v-if="dropdownVisible && !hover" @click.stop="buttonClick()"/>
-            <div :id="panelId" v-bind="panelAttrs" @click.stop="onPanelClick" @keydown="onPanelKeydown" @keyup="onPanelKeyup" class="bg-white gray border border-radius-8-px box-shadow-serach drop-down-menu" :style="[{'z-index':zIndex}]" :class="{'drop-down-hide' : !bind, 'desktop-view position-fi' : clientWidth > 767, 'mobile-view position-fi' : clientWidth <= 767, ...bodyClass}" v-if="dropdownVisible">
+            <div :id="panelId" v-bind="panelAttrs" @click.stop="onPanelClick" @keydown="onPanelKeydown" @keyup="onPanelKeyup" @focusin="rememberFocus" class="bg-white gray border border-radius-8-px box-shadow-serach drop-down-menu" :style="[{'z-index':zIndex}]" :class="{'drop-down-hide' : !bind, 'desktop-view position-fi' : clientWidth > 767, 'mobile-view position-fi' : clientWidth <= 767, ...bodyClass}" v-if="dropdownVisible">
                 <slot name="head" v-if="clientWidth > 767">
                 </slot>
                 <div class="border-bottom-mobiledrop cursor-default mobile-title-header p-20px box-sizing-box" v-else :style="{height : clientWidth <=767 ? '64px' : ''}">
@@ -40,7 +40,7 @@
 </template>
 
 <script setup>
-import {Comment, Fragment, computed, defineProps, h, isVNode, nextTick, provide, ref, watch} from "vue";
+import {Comment, Fragment, computed, defineProps, h, isVNode, nextTick, onBeforeUnmount, provide, ref, watch} from "vue";
 import { useCustomComposable } from "@/composable";
 
 const {debounce, makeUniqueId} = useCustomComposable();
@@ -320,6 +320,43 @@ function onOptionActionKeydown(event, action) {
     return false;
 }
 
+let lastFocus = null;
+function rememberFocus(event) {
+    const item = event.target.closest?.(ITEM_SELECTOR);
+    lastFocus = item ? { el: event.target, item, index: menuItems().indexOf(item) } : null;
+}
+
+// Removing the focused element drops focus to the page body; an action that takes itself or its option away must not strand the keyboard there.
+function restoreLostFocus() {
+    if (!lastFocus || lastFocus.el.isConnected) return;
+    if (document.activeElement && document.activeElement !== document.body) return;
+    const { item, index } = lastFocus;
+    lastFocus = null;
+    const items = menuItems();
+    const next = item.isConnected ? item : items[index] || items[index - 1];
+    if (next) {
+        focusItem(next);
+        return;
+    }
+    returningFocus = true;
+    triggerEl()?.focus();
+    returningFocus = false;
+}
+
+let focusKeeper = null;
+function watchForLostFocus() {
+    const panel = panelEl();
+    if (!panel || !props.mode) return;
+    focusKeeper = new MutationObserver(restoreLostFocus);
+    focusKeeper.observe(panel, { childList: true, subtree: true });
+}
+function stopWatchingForLostFocus() {
+    focusKeeper?.disconnect();
+    focusKeeper = null;
+    lastFocus = null;
+}
+onBeforeUnmount(stopWatchingForLostFocus);
+
 function onPanelKeyup(event) {
     if (props.mode && event.key === " " && optionActionOf(event.target)) event.preventDefault();
 }
@@ -420,11 +457,13 @@ function stopMouseListener() {
 
 watch(dropdownVisible, (val) => {
     if(val) {
+        nextTick(watchForLostFocus);
         startClickListener();
         if(props.hover) {
             startMouseListener();
         }
     } else {
+        stopWatchingForLostFocus();
         stopClickListener();
         if(props.hover) {
             stopMouseListener();
