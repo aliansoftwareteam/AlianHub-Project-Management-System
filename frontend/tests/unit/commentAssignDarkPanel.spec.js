@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import path from 'path';
 
 const source = readFileSync(path.resolve(__dirname, '../../src/components/molecules/CommentThread/CommentAssignment.vue'), 'utf8');
-const style = source.slice(source.indexOf('<style'));
+const style = source.slice(source.indexOf('<style')).replace(/\/\*[\s\S]*?\*\//g, '');
 const rulesFor = (selector) => [...style.matchAll(/([^{}]+)\{([^}]*)\}/g)]
     .filter(([, selectors]) => selectors.split(',').some((s) => s.trim().startsWith(selector)))
     .map(([, , body]) => body)
@@ -16,6 +16,7 @@ describe('comment assign picker on the white DropDown panel', () => {
         const option = rulesFor('.cm-assign__option');
         expect(option).toMatch(/color:\s*inherit/);
         expect(option).not.toMatch(/var\(--/);
+        expect(rulesFor('.cm-assign__empty')).not.toMatch(/var\(--/);
     });
 
     it('draws the search field with the legacy light input look, not the themed ah-input', () => {
