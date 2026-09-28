@@ -2,6 +2,18 @@
     <div class="ph2">
         <div class="ph2__bar">
             <h1 class="ah-sr-only">{{ project?.ProjectName }}</h1>
+            <button
+                type="button"
+                class="ph2__tree"
+                :class="{ 'is-on': treeShown }"
+                aria-controls="project-tree-panel"
+                :aria-expanded="treeShown ? 'true' : 'false'"
+                :aria-label="treeShown ? t('ProjectTree.hide') : t('ProjectTree.show')"
+                :title="treeShown ? t('ProjectTree.hide') : t('ProjectTree.show')"
+                @click="toggleProjectTree(clientWidth)"
+            >
+                <ShellIcon name="sidebar" :size="15" />
+            </button>
             <select
                 v-if="projects.length > 1"
                 class="ph2__switch"
@@ -19,22 +31,15 @@
             </div>
             <template v-else>
                 <span class="ph2__swatch" :style="{ background: swatch }"></span>
-                <button
-                    type="button"
-                    class="ph2__star"
-                    :class="{ 'is-on': favourite }"
-                    :aria-label="$t('Projects.favourite')"
-                    :title="$t('Projects.favourite')"
-                    @click="$emit('toggle-favourite')"
-                >
-                    <ShellIcon name="star" :size="14" />
-                </button>
+                <FavouriteStar class="ph2__star" type="project" :id="project?._id || ''" :name="project?.ProjectName || ''" />
                 <span v-if="project?.ProjectCode" class="ph2__code">{{ project.ProjectCode }}</span>
             </template>
 
             <span v-if="sprint?.name" class="ph2__crumb">
-                <span class="ph2__sep">›</span>
-                <span class="ph2__sprint">{{ sprint.name }}</span>
+                <span class="ph2__sep" aria-hidden="true">›</span>
+                <router-link v-if="sprintTo" class="ph2__sprint" :to="sprintTo">{{ sprint.name }}</router-link>
+                <span v-else class="ph2__sprint">{{ sprint.name }}</span>
+                <FavouriteStar v-if="sprintId" type="sprint" :id="sprintId" :name="sprint.name" :projectId="project?._id" :folderId="sprint.folderId ? String(sprint.folderId) : undefined" />
             </span>
 
             <span v-if="rangeLabel" class="ph2__range">{{ rangeLabel }}</span>
@@ -67,16 +72,15 @@
  * Props
  *   project       Object   the project document (ProjectName, ProjectCode, projectIcon)
  *   projects      Array    the user's projects; two or more render the switcher (emits select-project(id))
- *   sprint        Object   { name, startDate, endDate } — the sprint in view, or null
- *   favourite     Boolean  star state
+ *   sprint        Object   { id, name, folderId, startDate, endDate } — the sprint in view, or null; its crumb links to it
  *   agentSummary  Object   { agents, running, elapsedMs, spendUsd } from GET /api/v2/agents/runs — chip hidden when nothing runs
  *   showAiAssist / showAddTask   Boolean
  *
  * Emits
- *   ai-assist · add-task · toggle-favourite · select-project
+ *   ai-assist · add-task · select-project
  *
  * Slots
- *   title    replaces the swatch + star + code (Projects.vue passes its icon, inline rename and key)
+ *   title    replaces the swatch + project star + code (Projects.vue passes its icon, inline rename and key)
  *   views    the view-tab row; its [role="tablist"] gets arrow/Home/End navigation from here
  *   actions  extra buttons, placed before AI Assist
  *
@@ -84,9 +88,12 @@
  * counter it provides as `addTaskRequest`, which the board watches to open its
  * first column's create row.
  */
-import { computed, defineProps, defineEmits } from 'vue';
+import { computed, defineProps, defineEmits, inject } from 'vue';
 import { useI18n } from 'vue-i18n';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import FavouriteStar from '@/components/atom/FavouriteStar/FavouriteStar.vue';
+import { treeRoute } from '@/components/molecules/ProjectTree/projectTreeModel';
+import { projectTreeShown, toggleProjectTree } from './projectTreePanelState';
 
 const { t } = useI18n();
 
@@ -94,13 +101,22 @@ const props = defineProps({
     project: { type: Object, default: () => ({}) },
     projects: { type: Array, default: () => [] },
     sprint: { type: Object, default: null },
-    favourite: { type: Boolean, default: false },
     agentSummary: { type: Object, default: null },
     showAiAssist: { type: Boolean, default: false },
     showAddTask: { type: Boolean, default: true }
 });
 
-defineEmits(['ai-assist', 'add-task', 'toggle-favourite', 'select-project']);
+defineEmits(['ai-assist', 'add-task', 'select-project']);
+
+const companyId = inject('$companyId', null);
+const clientWidthRef = inject('$clientWidth', null);
+const clientWidth = computed(() => clientWidthRef?.value || 0);
+const treeShown = computed(() => projectTreeShown(clientWidth.value));
+
+const sprintId = computed(() => String(props.sprint?.id || props.sprint?._id || ''));
+const sprintTo = computed(() => (sprintId.value && props.project?._id && companyId?.value
+    ? treeRoute('sprint', { cid: companyId.value, projectId: props.project._id, folderId: props.sprint.folderId ? String(props.sprint.folderId) : '', id: sprintId.value })
+    : null));
 
 const PALETTE = ['#2F3990', '#2f9e7e', '#d98324', '#6b5ce7', '#0EA5E9', '#EC4899'];
 

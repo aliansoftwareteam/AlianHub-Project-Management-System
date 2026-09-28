@@ -8,12 +8,13 @@ vi.mock('@/composable', () => composable);
 vi.mock('@/composable/index', () => composable);
 vi.mock('@/composable/index.js', () => composable);
 vi.mock('@/services', () => ({
-    apiRequest: vi.fn(() => Promise.resolve({ data: { status: false } })),
+    apiRequest: vi.fn((method, url) => Promise.resolve({ data: method === 'put' && String(url).includes('favourites') ? { status: true } : { status: false } })),
     apiRequestWithoutCompnay: vi.fn(() => Promise.resolve({ data: { status: false } })),
 }));
 
 import HomeSidebar from '@/components/molecules/Home/HomeSidebar.vue';
 import { shellState } from '@/components/organisms/Shell/shellState';
+import { favouritesState, resetFavourites } from '@/composable/favourites';
 
 const INTERACTIVE = 'a[href], button, input, select, textarea, [role="link"], [role="button"], [tabindex]:not([tabindex="-1"])';
 const blank = { render: () => null };
@@ -26,6 +27,7 @@ const open = async () => {
             { path: '/:cid/inbox', name: 'inbox', component: blank },
             { path: '/:cid/personal', name: 'PersonalList', component: blank },
             { path: '/:cid/project/:id', name: 'Project', component: blank },
+            { path: '/:cid/project/:id/f/:folderId', name: 'ProjectFolder', component: blank },
             { path: '/:cid/project/:id/sprint/:sprintId', name: 'ProjectSprint', component: blank },
             { path: '/:cid/project/:id/folder/:folderId/sprint/:sprintId', name: 'ProjectFolderSprint', component: blank },
         ],
@@ -50,7 +52,7 @@ const open = async () => {
 };
 
 const group = (wrapper, label) => wrapper.find(`nav[aria-label="${label}"]`).element;
-const rowOf = (nav, name) => [...nav.querySelectorAll('.hs-item')].find((el) => el.textContent.includes(name));
+const rowOf = (nav, name) => [...nav.querySelectorAll('.pt-row, .fav-row')].find((el) => el.textContent.includes(name));
 const nameOf = (el) => el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent.trim();
 const nestedControls = (root) => [root, ...root.querySelectorAll('*')]
     .filter((el) => el.matches(INTERACTIVE))
@@ -59,6 +61,7 @@ const nestedControls = (root) => [root, ...root.querySelectorAll('*')]
 describe('Home sidebar project rows', () => {
     beforeEach(() => {
         shellState.nav = { pinned: [], hidden: [] };
+        resetFavourites();
     });
 
     it('put no control inside another', async () => {
@@ -72,7 +75,7 @@ describe('Home sidebar project rows', () => {
     it('name the project with a link that opens it', async () => {
         const { wrapper, router } = await open();
         const row = rowOf(group(wrapper, 'Home.projects'), 'Alpha');
-        const link = [...row.querySelectorAll('a[href]')].find((a) => a.textContent.trim() === 'Alpha');
+        const link = [...row.querySelectorAll('a[href]')].find((a) => a.textContent.includes('Alpha'));
         expect(link).toBeTruthy();
         expect(link.getAttribute('href')).toBe(router.resolve({ name: 'Project', params: { cid: 'company-1', id: 'p1' } }).href);
 
@@ -83,7 +86,7 @@ describe('Home sidebar project rows', () => {
         wrapper.unmount();
     });
 
-    it('keep pin and lists as named buttons that do not open the project', async () => {
+    it('keep the star and the lists toggle as named buttons that do not open the project', async () => {
         const { wrapper, router } = await open();
         const row = rowOf(group(wrapper, 'Home.projects'), 'Alpha');
         const buttons = [...row.querySelectorAll('button')];
@@ -92,15 +95,16 @@ describe('Home sidebar project rows', () => {
             expect(button.getAttribute('type')).toBe('button');
             expect(nameOf(button)).not.toBe('');
         });
-        const [pin, chevron] = buttons;
-        expect(nameOf(pin)).toBe('Home.pin');
+        const [star, chevron] = buttons;
+        expect(nameOf(star)).toBe('Favourites.toggle');
         expect(nameOf(chevron)).toBe('Home.show_lists');
 
-        pin.click();
+        star.click();
         chevron.click();
         await flushPromises();
         expect(router.currentRoute.value.name).toBe('Home');
-        expect(shellState.nav.pinned.map((f) => f.id)).toEqual(['p1']);
+        expect(favouritesState.items.map((f) => f.id)).toEqual(['p1']);
+        expect(shellState.nav.pinned).toEqual([]);
         expect(chevron.getAttribute('aria-expanded')).toBe('true');
         wrapper.unmount();
     });
@@ -108,20 +112,37 @@ describe('Home sidebar project rows', () => {
 
 describe('Home sidebar favorite rows', () => {
     beforeEach(() => {
-        shellState.nav = { pinned: [{ id: 'p1', type: 'project', label: 'Alpha', to: { name: 'Project', params: { cid: 'company-1', id: 'p1' } } }], hidden: [] };
+        resetFavourites();
+        favouritesState.items = [
+            { type: 'project', id: 'p1', name: 'Alpha' },
+            { type: 'sprint', id: 's1', name: 'Sprint 1', projectId: 'p1' },
+        ];
+        favouritesState.companyId = 'company-1';
+        favouritesState.loaded = true;
     });
 
-    it('keep the unpin button beside the link, not inside it', async () => {
+    it('keep the unstar button beside the link, not inside it', async () => {
         const { wrapper, router } = await open();
         const row = rowOf(group(wrapper, 'Home.favorites'), 'Alpha');
         expect(nestedControls(row)).toEqual([]);
 
-        const unpin = row.querySelector('button');
-        expect(nameOf(unpin)).toBe('Home.unpin');
-        unpin.click();
+        const unstar = [...row.querySelectorAll('button')].find((b) => nameOf(b) === 'Favourites.remove_named');
+        expect(unstar).toBeTruthy();
+        unstar.click();
         await flushPromises();
         expect(router.currentRoute.value.name).toBe('Home');
-        expect(shellState.nav.pinned).toEqual([]);
+        expect(favouritesState.items.map((f) => f.id)).toEqual(['s1']);
+        wrapper.unmount();
+    });
+
+    it('move an item with the keyboard from its handle', async () => {
+        const { wrapper } = await open();
+        const row = rowOf(group(wrapper, 'Home.favorites'), 'Sprint 1');
+        const handle = [...row.querySelectorAll('button')].find((b) => nameOf(b) === 'Favourites.reorder_named');
+        expect(handle).toBeTruthy();
+        handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+        await flushPromises();
+        expect(favouritesState.items.map((f) => f.id)).toEqual(['s1', 'p1']);
         wrapper.unmount();
     });
 });

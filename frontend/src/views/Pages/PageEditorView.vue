@@ -8,6 +8,7 @@
                 <template v-if="projectName">{{ projectName }} / </template>{{ $t('Docs.breadcrumb_docs') }} /
             </span>
             <span class="pev__crumb-title">{{ title || $t('Docs.untitled') }}</span>
+            <FavouriteStar v-if="pageId" type="doc" :id="pageId" :name="title || $t('Docs.untitled')" />
             <span v-if="page && page.isWiki" class="ah-chip" :class="reviewChipClass(page.reviewState)">{{ $t(reviewLabelKey(page.reviewState)) }}</span>
             <span class="ah-toolbar__spacer"></span>
             <span v-if="editorName" class="pev__editing">
@@ -62,6 +63,7 @@ import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useStore } from 'vuex';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import FavouriteStar from '@/components/atom/FavouriteStar/FavouriteStar.vue';
 import PageDocument from '@/components/molecules/Pages/PageDocument.vue';
 import { useGetterFunctions } from '@/composable';
 import { relativeTime, initials, reviewChipClass, reviewLabelKey } from '@/components/molecules/Pages/docsFormat';

@@ -2117,6 +2117,17 @@ const schema = {
         navPreferences: {
             pinned: { type: [String], required: false, default: undefined }
         },
+        // Stars across companies live on the global user record, so each entry names its company.
+        favourites: {
+            type: [new mongoose.Schema({
+                companyId: { type: String, required: true },
+                type: { type: String, required: true },
+                id: { type: String, required: true },
+                addedAt: { type: Date, required: false }
+            }, { _id: false })],
+            required: false,
+            default: undefined
+        },
         // Written only by PUT /api/v2/users/home-cards (Modules/Users/homeCards.js).
         homeCards: {
             hidden: { type: [String], required: false, default: undefined }
