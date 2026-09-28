@@ -75,10 +75,25 @@ const resolveStatusName = (word, statuses = [], { generic = true } = {}) => {
     return { error: all.length ? `I do not know a status called "${raw}". The statuses are ${joinWords(all)}.` : `I do not know a status called "${raw}".` };
 };
 
+const TYPE_OP = Object.freeze({ in: 'eq', notIn: 'neq' });
+
+/* "Blocked or In Review" names several statuses; tried only when the whole
+ * phrase is not itself a status name. */
+const resolveEither = (word, statuses) => {
+    const parts = String(word ?? '').split(/\s+or\s+/i).map((p) => p.trim()).filter(Boolean);
+    if (parts.length < 2) return null;
+    const found = parts.map((part) => resolveStatusName(part, statuses));
+    const failed = found.find((f) => f.error);
+    if (failed) return failed;
+    if (found.some((f) => f.type)) return { error: `"${String(word).trim()}" mixes statuses with open, in progress or done; a condition can name either, not both.` };
+    return { refs: [...new Set(found.flatMap((f) => f.refs))], label: found.map((f) => f.label).join(' or ') };
+};
+
 const statusClause = (op, word, statuses) => {
-    const found = resolveStatusName(word, statuses);
+    let found = resolveStatusName(word, statuses);
+    if (found.error) found = resolveEither(word, statuses) || found;
     if (found.error) return found;
-    if (found.type) return { op, field: 'statusType', value: found.type };
+    if (found.type) return { op: TYPE_OP[op] || op, field: 'statusType', value: found.type };
     return { op: KEY_OP[op], field: 'statusRef', value: found.refs, label: found.label };
 };
 
@@ -98,7 +113,7 @@ const resolveStoredLeaf = (node, statuses, generic) => {
         return { node, unresolved: values.map(String), errors: [`A status condition cannot mix "${values.join('", "')}" as names and types.`] };
     }
     const refs = [...new Set(resolved.flatMap((r) => r.refs))];
-    return { node: { op: KEY_OP[node.op], field: 'statusRef', value: refs, label: resolved.map((r) => r.label).join(', ') }, changed: true };
+    return { node: { op: KEY_OP[node.op], field: 'statusRef', value: refs, label: resolved.map((r) => r.label).join(' or ') }, changed: true };
 };
 
 /* An all-projects rule written before a project existed still means that
