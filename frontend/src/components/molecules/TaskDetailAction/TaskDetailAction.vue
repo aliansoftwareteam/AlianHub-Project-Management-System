@@ -21,98 +21,99 @@
             </li>
             <li class="horizontalDocs">
                 <DropDown
+                    mode="menu"
                     :maxHeight="clientWidth > 765 ? 'fit-content' : '40dvh'"
                     id="horizontalDocs"
                     :zIndex="10"
                     class="h-100 w-100"
                     :bodyClassHeader="{'h-100 w-100 red': true}"
                 >
-                    <template #button>
+                    <template #button="{ triggerAttrs }">
                         <Skelaton v-if="isSpinner" style="height: 30px;" class="w-30px border-radius-6-px"/>
-                        <button v-else type="button" class="h-100 w-100 d-flex align-items-center task-action__btn" :aria-label="$t('TaskPanel.more_actions')">
-                            <img :src="horizontalDots" ref="horizontalDocs" alt="">
+                        <button v-else type="button" class="h-100 w-100 d-flex align-items-center task-action__btn" :aria-label="$t('TaskPanel.more_actions')" v-bind="triggerAttrs">
+                            <img :src="horizontalDots" alt="">
                         </button>
                     </template> 
                     <template #options>
-                        <DropDownOption @click="$refs['horizontalDocs'].click(),copyTaskLink()">
+                        <DropDownOption @click="copyTaskLink()">
                             <div>
                                 <img :src="linkIcon" />
                                 <span class="dropdown-label">{{$t('ProjectDetails.copy_task_link')}}</span>
                             </div>
                         </DropDownOption>
-                        <DropDownOption @click="$refs['horizontalDocs'].click(),copyTaskKey()">
+                        <DropDownOption @click="copyTaskKey()">
                             <div>
                                 <img :src="splitScreen" />
                                 <span class="dropdown-label">{{$t('ProjectDetails.copy_task_key')}}</span>
                             </div>
                         </DropDownOption>
-                        <DropDownOption @click="$refs['horizontalDocs'].click(),openReminderModal()">
+                        <DropDownOption @click="openReminderModal()">
                             <div>
                                 <img :src="linkIcon" />
                                 <span class="dropdown-label">{{$t('ProjectDetails.remind_me')}}</span>
                             </div>
                         </DropDownOption>
-                        <DropDownOption v-if="canOpenTracker" @click="$refs['horizontalDocs'].click(),$emit('open', 'tracker')">
+                        <DropDownOption v-if="canOpenTracker" @click="$emit('open', 'tracker')">
                             <div>
                                 <img :src="trackerIcon" alt="" />
                                 <span class="dropdown-label">{{$t('TaskPanel.open_in_desktop_tracker')}}</span>
                             </div>
                         </DropDownOption>
-                        <DropDownOption v-if="(task.queueListArray == undefined || (task.queueListArray && task.queueListArray.indexOf(userId) == -1)) && (task.AssigneeUserId && task.AssigneeUserId.indexOf(userId) !== -1) && checkPermission('task.queue_list',projectData.isGlobalPermission) == true" @click="$refs['horizontalDocs'].click(),addToQueue('add')">
+                        <DropDownOption v-if="(task.queueListArray == undefined || (task.queueListArray && task.queueListArray.indexOf(userId) == -1)) && (task.AssigneeUserId && task.AssigneeUserId.indexOf(userId) !== -1) && checkPermission('task.queue_list',projectData.isGlobalPermission) == true" @click="addToQueue('add')">
                             <div>
                                 <img :src="cancelIcon" />
                                 <span class="dropdown-label">{{$t('ProjectDetails.add_que_list')}}</span>
                             </div>
                         </DropDownOption>
-                        <DropDownOption v-if="(task.queueListArray && task.queueListArray.indexOf(userId) !== -1) && (task.AssigneeUserId && task.AssigneeUserId.indexOf(userId) !== -1) && checkPermission('task.queue_list',projectData.isGlobalPermission) == true" @click="$refs['horizontalDocs'].click(),addToQueue('remove')">
+                        <DropDownOption v-if="(task.queueListArray && task.queueListArray.indexOf(userId) !== -1) && (task.AssigneeUserId && task.AssigneeUserId.indexOf(userId) !== -1) && checkPermission('task.queue_list',projectData.isGlobalPermission) == true" @click="addToQueue('remove')">
                             <div>
                                 <img :src="cancelIcon" />
                                 <span class="dropdown-label">{{$t('ProjectDetails.remove_que_list')}}</span>
                             </div>
                         </DropDownOption>
-                        <DropDownOption @click="$refs['horizontalDocs'].click(),convertToList()" v-if="checkPermission('project.project_sprint_create',projectData.isGlobalPermission) === true && checkPermission('task.task_convert_to_list',projectData.isGlobalPermission) === true">
+                        <DropDownOption @click="convertToList()" v-if="checkPermission('project.project_sprint_create',projectData.isGlobalPermission) === true && checkPermission('task.task_convert_to_list',projectData.isGlobalPermission) === true">
                             <div>
                                 <img :src="combinedIcon" />
                                 <span class="dropdown-label">{{$t('ProjectDetails.convert_list')}}</span>
                             </div>
                         </DropDownOption>
-                        <DropDownOption @click="$refs['horizontalDocs'].click(),convertToSubTask()" v-if="checkPermission('task.sub_task_create',projectData.isGlobalPermission) === true && task.isParentTask && checkPermission('task.task_convert_to_subtask',projectData.isGlobalPermission) === true">
+                        <DropDownOption @click="convertToSubTask()" v-if="checkPermission('task.sub_task_create',projectData.isGlobalPermission) === true && task.isParentTask && checkPermission('task.task_convert_to_subtask',projectData.isGlobalPermission) === true">
                             <div>
                                 <img :src="subTaskIcon" />
                                 <span class="dropdown-label">{{$t('ProjectDetails.convert_subtask')}}</span>
                             </div>
                         </DropDownOption>
-                        <DropDownOption @click="$refs['horizontalDocs'].click(),duplicateTask()" v-if="checkPermission('task.task_duplicate',projectData.isGlobalPermission) == true">
+                        <DropDownOption @click="duplicateTask()" v-if="checkPermission('task.task_duplicate',projectData.isGlobalPermission) == true">
                             <div>
                                 <img :src="copyIcon" class="copyIcon"/>
                                 <span class="dropdown-label">{{$t('Projects.duplicate')}}</span>
                             </div>
                         </DropDownOption>
-                        <DropDownOption @click="$refs['horizontalDocs'].click(),mergeTask()" v-if="checkPermission('task.task_merge',projectData.isGlobalPermission) == true">
+                        <DropDownOption @click="mergeTask()" v-if="checkPermission('task.task_merge',projectData.isGlobalPermission) == true">
                             <div>
                                 <img :src="mergeIcon" />
                                 <span class="dropdown-label">{{$t('ProjectDetails.merge')}}</span>
                             </div>
                         </DropDownOption>
-                        <DropDownOption @click="$refs['horizontalDocs'].click(),moveTask()" v-if="checkPermission('task.task_move',projectData.isGlobalPermission) == true">
+                        <DropDownOption @click="moveTask()" v-if="checkPermission('task.task_move',projectData.isGlobalPermission) == true">
                             <div>
                                 <img :src="moveIcon" />
                                 <span class="dropdown-label">{{$t('ProjectDetails.move')}}</span>
                             </div>
                         </DropDownOption>
-                        <DropDownOption @click="$refs['horizontalDocs'].click(),convertToTask()" v-if="task.isParentTask === false && checkPermission('task.task_create',projectData.isGlobalPermission) && checkPermission('task.convert_to_task',projectData.isGlobalPermission) === true">
+                        <DropDownOption @click="convertToTask()" v-if="task.isParentTask === false && checkPermission('task.task_create',projectData.isGlobalPermission) && checkPermission('task.convert_to_task',projectData.isGlobalPermission) === true">
                             <div>
                                 <img :src="mergeIcon" />
                                 <span class="dropdown-label">{{$t('ProjectDetails.convert_task')}}</span>
                             </div>
                         </DropDownOption>
-                        <DropDownOption @click="$refs['horizontalDocs'].click(), showSidebar = true, archive = true" v-if="checkPermission('task.task_archive',projectData.isGlobalPermission) == true">
+                        <DropDownOption @click="showSidebar = true, archive = true" v-if="checkPermission('task.task_archive',projectData.isGlobalPermission) == true">
                             <div>
                                 <img :src="inventoryIcon" />
                                 <span class="dropdown-label">{{$t('Projects.archive')}}</span>
                             </div>
                         </DropDownOption>
-                        <DropDownOption @click="$refs['horizontalDocs'].click(), showSidebar = true, archive = false" v-if="checkPermission('task.task_delete',projectData.isGlobalPermission) == true">
+                        <DropDownOption @click="showSidebar = true, archive = false" v-if="checkPermission('task.task_delete',projectData.isGlobalPermission) == true">
                             <div>
                                 <img :src="deleteIcon" />
                                 <span class="dropdown-label red">{{$t('Projects.delete')}}</span>
@@ -123,13 +124,14 @@
             </li>
             <li class="watcher-action">
                 <DropDown
+                    mode="listbox"
                     id="watcher"
                     :bodyClass="{'watcher__action-dropdown border-radius-12-px border-0' : true}"
                     :zIndex="10"
                 >
-                    <template #button>
+                    <template #button="{ triggerAttrs }">
                         <Skelaton v-if="isSpinner" style="height: 30px;" class="w-30px border-radius-6-px"/>
-                        <button type="button" v-if="!isSpinner" class="task-action__btn" :aria-label="$t('TaskPanel.watchers', { n: watchers && watchers.length ? watchers.length : 0 })">
+                        <button type="button" v-if="!isSpinner" class="task-action__btn" :aria-label="$t('TaskPanel.watchers', { n: watchers && watchers.length ? watchers.length : 0 })" v-bind="triggerAttrs">
                             <img src="@/assets/images/svg/PriorityIcon/watchProjectEye.svg" alt="">
                         </button>
                         <span v-if="!isSpinner" class="watcher-count">{{ watchers && watchers.length ? watchers.length : 0 }}</span>
@@ -152,26 +154,24 @@
                             :key="user.id"
                             :item="user"
                             :class="{ 'selected-watcher': user.isWatcher == true }"
+                            :selected="user.isWatcher == true"
+                            @click="updateWatchers(user.id, 'add')"
                         >
                             <template #default>
                                 <img class="cursor-pointer employee__profile-img"
                                     v-if="!user.Employee_profileImageURL"
                                     :src="user.Employee_profileImage"
                                     alt="userImg"
-                                    @click="updateWatchers(user.id, 'add')"
                                 >
                                 <WasabiIamgeCompp v-else :userImage="true" :data="{title: user.Employee_Name, url: user.Employee_profileImageURL}" :thumbnail="'30x30'" class="cursor-pointer wasabi__emp-image"/>
-                                <span 
-                                    class="cursor-pointer ml-10px" 
-                                    @click="updateWatchers(user.id, 'add')"
-                                >
+                                <span class="cursor-pointer ml-10px">
                                     {{ user.Employee_Name }}
                                 </span>
                                 <img
                                     class="cursor-pointer deleted__icon ml-auto"
                                     src="@/assets/images/svg/deletered.svg"
                                     v-if="user.isWatcher && user.isLoggedUser"
-                                    @click="updateWatchers(user.id, 'remove')"
+                                    @click.stop="updateWatchers(user.id, 'remove')"
                                 />
                             </template>
                         </DropDownOption>

@@ -124,7 +124,8 @@ describe('the task detail header', () => {
     });
 
     it('opens a listbox of watchers that marks who is watching', async () => {
-        await mountOn(TaskDetailAction, props, provide);
+        await mountOn(TaskDetailAction, { ...props, watchers: [] }, provide);
+        await wrapper.setProps({ watchers: ['user-1'] });
         const trigger = document.querySelector('.watcher-action [aria-haspopup]');
         expect(trigger.classList.contains('task-action__btn')).toBe(true);
         expect(trigger.getAttribute('aria-haspopup')).toBe('listbox');

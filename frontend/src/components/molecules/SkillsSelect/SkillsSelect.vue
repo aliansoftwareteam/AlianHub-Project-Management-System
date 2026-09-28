@@ -11,6 +11,7 @@
     <div class="skills-select">
         <DropDown
             v-if="editable"
+            mode="listbox"
             :maxHeight="'240px'"
             :bodyClass="{'skills-select__menu': true}"
             :bodyClassHeader="{'w-100': true}"
@@ -31,10 +32,13 @@
                 <input v-if="options.length" v-model="search" type="text" class="skills-select__search font-size-13"
                     :placeholder="$t('Projects.search')" @click.stop/>
                 <div v-for="skill in filtered" :key="skill.slug"
+                    role="option"
+                    :aria-selected="String(isSelected(skill.slug))"
+                    :aria-disabled="!isSelected(skill.slug) && atLimit ? 'true' : undefined"
                     class="skills-select__option d-flex align-items-center cursor-pointer"
                     :class="{'skills-select__option--disabled': !isSelected(skill.slug) && atLimit}"
                     @click.stop="toggle(skill.slug)">
-                    <input type="checkbox" class="cursor-pointer" :checked="isSelected(skill.slug)"
+                    <input type="checkbox" class="cursor-pointer" tabindex="-1" aria-hidden="true" :checked="isSelected(skill.slug)"
                         :disabled="!isSelected(skill.slug) && atLimit"/>
                     <span class="skills-select__option-name text-ellipsis" :title="skill.slug">{{ skill.name }}</span>
                 </div>
