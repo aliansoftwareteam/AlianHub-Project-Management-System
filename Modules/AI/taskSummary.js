@@ -7,6 +7,7 @@ const { myCache } = require('../../Config/config');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { memberProfiles } = require('../../utils/companyMembers');
+const { taskIdMatch } = require('../Comments/helpers/taskIdMatch');
 
 const { FEATURES } = require('../AICore/features');
 
@@ -46,7 +47,7 @@ function stripMentions(message) {
 
 async function loadComments(companyId, taskId) {
     const match = {
-        taskId: new mongoose.Types.ObjectId(taskId),
+        taskId: taskIdMatch(taskId),
         isDeleted: { $ne: true },
         $or: [{ type: 'text' }, { type: 'link' }, { type: { $exists: false } }],
     };

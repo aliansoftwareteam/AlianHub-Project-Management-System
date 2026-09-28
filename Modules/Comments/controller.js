@@ -12,12 +12,8 @@ const { sprintIdentities, visibleSprintExpr } = require("../Sprints/helpers/spri
 const { commentThreadAccess, refuseThread } = require("./helpers/threadAccess");
 const { threadOf, canPostToThread, canChangeComment, changesThreadOrAuthor } = require("./helpers/threadWriteAccess");
 const { resolveMentionIds, deliverMentions } = require("./helpers/commentNotifications");
+const { taskIdMatch } = require("./helpers/taskIdMatch");
 
-const OBJECT_ID = /^[a-f0-9]{24}$/i;
-/* comments.taskId is Mixed: rows hold a task id as an ObjectId or as text, Mongoose casts neither, and 'default' names the main chat. */
-const taskIdMatch = (taskId) => (OBJECT_ID.test(String(taskId))
-    ? { $in: [String(taskId), new mongoose.Types.ObjectId(String(taskId))] }
-    : taskId);
 
 /**
  * This endpoint is used to save data in comments collection
@@ -572,7 +568,7 @@ exports.updateCommentCollection = (companyId, task, sprintObj, newProjectData,ta
 exports.addCommentCollection = (companyId, projectData, task, newTask, sprintObj) => {
     return new Promise(async (resolve, reject) => {
         try {
-            const comment = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: [{ taskId: task._id }] }, "find").then((querySnapshot) => {
+            const comment = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: [{ taskId: taskIdMatch(task._id) }] }, "find").then((querySnapshot) => {
                 if (querySnapshot.length === 0) {
                     return []
                 } else {
