@@ -86,18 +86,7 @@
                                 </div>
 
                                 <template v-if="view !== 'agents'">
-                                    <div v-for="person in people" :key="person.id" class="member-row">
-                                        <span class="member-row__person">
-                                            <span class="ah-avatar">{{ person.name.slice(0, 1).toUpperCase() }}</span>
-                                            <span>
-                                                <strong>{{ person.name }}</strong>
-                                                <span class="member-row__mail">{{ person.email }}</span>
-                                            </span>
-                                        </span>
-                                        <span class="member-row__role">{{ $t(teammateRoleKeys(person.roleType).role) }}</span>
-                                        <span class="member-row__access">{{ $t(teammateRoleKeys(person.roleType).access) }}</span>
-                                        <span class="member-row__active ah-mono">{{ person.status }}</span>
-                                    </div>
+                                    <PersonMemberRow v-for="person in people" :key="person.id" :person="person" />
                                 </template>
 
                                 <template v-if="view !== 'people'">
@@ -154,13 +143,13 @@ import { useGetterFunctions } from "@/composable";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
 import AgentMemberRow from "./AgentMemberRow.vue";
+import PersonMemberRow from "./PersonMemberRow.vue";
 import AgentMentionBox from "./AgentMentionBox.vue";
 import AgentPicker from "./AgentPicker.vue";
 import AgentOutcomes from "./AgentOutcomes.vue";
 import { useParity } from "./useParity";
 import { reasonOf } from "./useAgents";
 import { useAgentAccess } from "./agentAccess";
-import { teammateRoleKeys } from "./teammateRoles";
 
 // Agents as teammates (13b): they appear in Members with an AGENT tag, they can
 // be @mentioned into a run, and assigning one states its scope and limits first.

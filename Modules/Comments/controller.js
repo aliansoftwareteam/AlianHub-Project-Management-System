@@ -24,6 +24,13 @@ const startMentionedAgents = async (req, companyId, comment) => {
     await require("../Agents/triggers").fromComment(companyId, { authorId: comment.userId, taskId: comment.taskId, message: comment.message });
 };
 
+const writeOptionsFrom = (options) => {
+    if (options === undefined) return {};
+    const valid = Boolean(options) && typeof options === 'object' && !Array.isArray(options)
+        && Object.keys(options).every((key) => key === 'timestamps' && typeof options[key] === 'boolean');
+    return valid ? options : null;
+};
+
 
 /**
  * This endpoint is used to save data in comments collection
@@ -93,7 +100,7 @@ exports.save = async (req, res) => {
  */
 exports.update = async (req, res) => {
     try {
-        const { id, isProjectComment, options = {} } = req.body;
+        const { id, isProjectComment } = req.body;
         const data = escapeCommentFields(req.body.data);
 
         if (!id) {
@@ -101,6 +108,10 @@ exports.update = async (req, res) => {
                 status: false,
                 message: `'id' parameter is required.`
             });
+        }
+        const options = writeOptionsFrom(req.body.options);
+        if (!options) {
+            return res.status(400).json({ status: false, message: "'options' may only carry timestamps (true or false)." });
         }
 
         // SEC (AHE-3834) — a comment may only be edited/soft-deleted by its author
@@ -148,10 +159,7 @@ exports.update = async (req, res) => {
                         ...((data.taskId && data.taskId !== 'default') ? { taskId: new mongoose.Types.ObjectId(data.taskId) } : {})
                     }
                 },
-                {
-                    returnDocument: 'after',
-                    ...options
-                }
+                { returnDocument: 'after', ...options }
             ]
         }
 

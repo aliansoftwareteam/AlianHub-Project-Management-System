@@ -1,21 +1,13 @@
 export default [
-    {
-        path: '/:cid/ai',
-        name: 'AiHome',
-        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiSoon.vue'),
-        meta: { title: 'AI', requiresAuth: true, soonTitle: 'Ai.nav_home', soonLead: 'Ai.soon_home' }
-    },
+    { path: '/:cid/ai', redirect: { name: 'AiAsk' } },
+    // Home and Analytics were placeholder screens; links saved before they left still land on Ask.
+    { path: '/:cid/ai/home', redirect: { name: 'AiAsk' } },
+    { path: '/:cid/ai/analytics', redirect: { name: 'AiAsk' } },
     {
         path: '/:cid/ai/agents',
         name: 'AiHub',
         component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiHub.vue'),
         meta: { title: 'AI Agents', requiresAuth: true }
-    },
-    {
-        path: '/:cid/ai/analytics',
-        name: 'AiAnalytics',
-        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiSoon.vue'),
-        meta: { title: 'AI analytics', requiresAuth: true, soonTitle: 'Ai.nav_analytics', soonLead: 'Ai.soon_analytics' }
     },
     {
         path: '/:cid/ai/inbox',
