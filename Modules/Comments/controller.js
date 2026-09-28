@@ -476,51 +476,31 @@ exports.searchComments = async (req, res) => {
  * @param {*} companyId 
  * @returns 
  */
-exports.updateCommentSprint = (projectId, companyId) => {
-    return new Promise((resolve, reject) => {
-        try {
-            let findObj = {
-                type: SCHEMA_TYPE.SPRINTS,
-                data: [{ projectId: new mongoose.Types.ObjectId(projectId) }],
+exports.updateCommentSprint = async (projectId, companyId) => {
+    try {
+        const sprints = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.SPRINTS,
+            data: [{ projectId: new mongoose.Types.ObjectId(projectId) }],
+        }, "find");
+        await Promise.allSettled((sprints || []).filter((sprint) => sprint.legacyId).map((sprint) => {
+            const updateObj = {
+                type: SCHEMA_TYPE.COMMENTS,
+                data: [
+                    {
+                        $expr: { $eq: [{ $toString: "$sprintId" }, sprint.legacyId] },
+                        projectId: new mongoose.Types.ObjectId(projectId)
+                    },
+                    { sprintId: new mongoose.Types.ObjectId(String(sprint._id)) }
+                ]
             };
-            let updatePromises = [];
-            MongoDbCrudOpration(companyId, findObj, "find").then(async (resp) => {
-                resp.forEach((sprint) => {
-                    let legacyId = sprint.legacyId ? sprint.legacyId : '';
-                    let sprintId = JSON.parse(JSON.stringify(sprint._id));
-                    if (legacyId) {
-                        const updateObj = {
-                            type: SCHEMA_TYPE.COMMENTS,
-                            data: [
-                                {
-                                    $expr: {
-                                        $eq: [{ $toString: "$sprintId" }, legacyId]
-                                    },
-                                    projectId: new mongoose.Types.ObjectId(projectId)
-                                },
-                                { sprintId: new mongoose.Types.ObjectId(sprintId) }
-                            ]
-                        }
-                        const promise = MongoDbCrudOpration(companyId, updateObj, "updateMany").catch((err) => {
-                            console.error(err, "ERROR IN IF UPDATE MANY");
-                        })
-                        updatePromises.push(promise);
-                    } else {
-                        console.info("ELSE IN COMMENT");
-                    }
-                })
-            })
-            Promise.allSettled(updatePromises).then(() => {
-                resolve();
-            }).catch((error) => {
-                console.error(error, "ERROR IN ALL SETTLED");
-                reject();
+            return MongoDbCrudOpration(companyId, updateObj, "updateMany").catch((err) => {
+                logger.error(`ERROR IN UPDATE MANY updateCommentSprint: ${err}`);
             });
-        } catch (error) {
-            reject();
-            console.error(error, "ERROR IN UPDATE COMMENTS:");
-        }
-    })
+        }));
+    } catch (error) {
+        logger.error(`ERROR IN UPDATE COMMENTS: ${error}`);
+        throw error;
+    }
 }
 
 /**
