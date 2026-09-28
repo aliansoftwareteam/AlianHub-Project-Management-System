@@ -119,6 +119,7 @@ import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyState.js';
 import { openTask, useTaskSequenceSource } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
+import { useViewSettings } from '@/views/Projects/composables/viewSettingsContext';
 
 // PACKAGES
 import { useStore } from 'vuex';
@@ -159,7 +160,8 @@ const showArchiveVar = inject("showArchived");
 const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
 
 const createTask = ref(false);
-const globalSortKey = ref('');
+const viewSettings = useViewSettings();
+const globalSortKey = computed(() => (viewSettings.sort.value ? `${viewSettings.sort.value.field}: ${viewSettings.sort.value.dir}` : ''));
 const groupedTasks = ref([]);
 const expandedSprints = ref([]);
 
@@ -226,10 +228,7 @@ function openRow(task) {
     });
 }
 
-const sortOf = (field) => {
-    const [key, direction] = globalSortKey.value.split(':');
-    return key === field ? Number(direction) : 0;
-};
+const sortOf = (field) => (viewSettings.sort.value?.field === field ? viewSettings.sort.value.dir : 0);
 const sortGlyph = (field) => (sortOf(field) === -1 ? '▼' : '▲');
 const ariaSort = (field) => {
     const direction = sortOf(field);
@@ -237,7 +236,7 @@ const ariaSort = (field) => {
     return direction === -1 ? 'descending' : 'ascending';
 };
 const toggleSort = (field) => {
-    globalSortKey.value = `${field}: ${sortOf(field) === 1 ? -1 : 1}`;
+    viewSettings.setSort({ field, dir: sortOf(field) === 1 ? -1 : 1 });
 };
 </script>
 <style>

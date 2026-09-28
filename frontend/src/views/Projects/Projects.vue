@@ -78,7 +78,7 @@
                                                     <DropDownOption
                                                         v-for="view in projectData.ProjectRequiredComponent"
                                                         :key="view.id"
-                                                        :selected="activeTab === 'EmbedView' ? !view?.keyName && view.name === embedViewName : activeTab === view.keyName"
+                                                        :selected="activeTab === 'EmbedView' ? !view?.keyName && view.name === embedViewName : isActiveView(view)"
                                                         @click="$refs[projectView].click(),handleView(view),!view?.keyName ? openEmbedView(view) : ''"
                                                     >
                                                         <div class="d-flex align-items-center justify-content-between w-100">
@@ -86,12 +86,12 @@
                                                                 <span class="d-flex align-items-center justify-content-center border-radius-6-px mr-20px bg-white border-gray view__activeproject-name">
                                                                     <img :src="view?.keyName ? activeTab === view.keyName ? projectComponentsIcons(view?.keyName)?.activeIcon || '' : projectComponentsIcons(view?.keyName)?.icon || '' : icons?.[view?.type] || ''" alt="" class="mr-0">
                                                                 </span>
-                                                                <span class="font-size-16 font-weight-500 text-ellipsis d-inline-block gray81 mw-66" @click="handleViewName(view.name)">{{ $t(`ViewList.${view.name}`) }}</span>
+                                                                <span class="font-size-16 font-weight-500 text-ellipsis d-inline-block gray81 mw-66" @click="handleViewName(view.name)">{{ view.title || $t(`ViewList.${view.name}`) }}</span>
                                                             </div>
                                                             <span v-if="view.setAsDefault" class="mobile-defaultview-text font-size-12 font-weight-400 darkblue"><img class="list_make_as_defaultimg" :src="viewDefaultIcon"/>
                                                                 {{ $t('Projects.default_view') }}
                                                             </span>
-                                                            <img class="ml-20px activeTab-tick" v-if="activeTab === view.keyName" :src="viewDefaultActive"/>
+                                                            <img class="ml-20px activeTab-tick" v-if="isActiveView(view)" :src="viewDefaultActive"/>
                                                         </div>
                                                     </DropDownOption>
                                                     <DropDownOption class="position-sti border d-flex justify-content-center addview__dropdown" @click="$refs[projectView].click(), $refs.bottomModals.openAllViews()">
@@ -117,14 +117,14 @@
                                             <div class="ph2__tablist" role="group" :aria-label="$t('Projects.views_tablist')">
                                                 <ViewsList
                                                     v-for="(view, index) in (viewsListArray)"
-                                                    :key="view._id"
+                                                    :key="viewKeyOf(view)"
                                                     :id="view.keyName"
                                                     :item="view"
-                                                    :active="activeTab === view.keyName"
+                                                    :active="isActiveView(view)"
                                                     :firstChild="index === 0"
                                                     :isDeleteDisabled="viewsListArray.length == 1"
                                                     :commentCount="view.keyName === 'Comments' ? myCounts?.[`project_${projectData._id}_comments`] || 0 : 0"
-                                                    @click="activeTab = view.keyName,$router.replace({query: {tab: view.keyName}})"
+                                                    @click="selectView(view)"
                                                 />
                                             </div>
                                             <div class="project__requirementcomponent-wrapper" v-if="projectData?.ProjectRequiredComponent && (embedViews).length">
@@ -303,6 +303,16 @@
                                 @nextMonth="nextMonth"
                                 @defaultMonth="defaultMonth"
                             />
+                            <SavedViewBar
+                                v-if="viewDirty"
+                                :canSaveShared="canSaveSharedView"
+                                :isPrivate="Boolean(activeView?.isPrivate)"
+                                :saving="viewSaving"
+                                @save="settleView(saveView, 'SavedViews.saved')"
+                                @saveForMe="settleView(saveViewForMe, 'SavedViews.saved')"
+                                @saveAsNew="(choice) => settleView(() => saveViewAsNew(choice), 'SavedViews.created')"
+                                @reset="resetView"
+                            />
                             <!-- AI Assist (AHE-3777): project-level AI task generation, opened from the toolbar. -->
                             <AiTaskCreator v-if="projectData && projectData._id" v-model="showAiTaskCreator" :projectId="String(projectData._id)" :sprints="aiSprints" :activeSprintId="aiActiveSprintId" @done="onAiTasksCreated" />
                             <component
@@ -433,7 +443,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { useValidation } from '@/composable/Validation';
-import { projectComponentsIcons } from '@/composable/commonFunction';
+import { projectComponentsIcons, buildFilterQuery } from '@/composable/commonFunction';
+import { useToast } from 'vue-toast-notification';
 
 // COMPONENTS
 import ConfirmationSidebar from '@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue';
@@ -476,6 +487,7 @@ import ProjectActionsBar from './components/ProjectActionsBar.vue';
 import ProjectHeader from './components/ProjectHeader.vue';
 import NewInProjectMenu from './components/NewInProjectMenu.vue';
 import ProjectFiltersToolbar from './components/ProjectFiltersToolbar.vue';
+import SavedViewBar from './components/SavedViewBar.vue';
 import { useProjectAgents } from './Kanban/useProjectAgents';
 import AiTaskCreator from '@/components/organisms/AiTaskCreator/AiTaskCreator.vue';
 import ProjectSidebars from './components/ProjectSidebars.vue';
@@ -492,6 +504,10 @@ import { useProjectAvatar } from './composables/useProjectAvatar';
 import { useProjectSearch } from './composables/useProjectSearch';
 import { useProjectTree } from './composables/useProjectTree';
 import { splitProjectViews } from './composables/projectViewBar';
+import { useSavedViews } from './composables/useSavedViews';
+import { viewKeyOf } from './composables/savedViewSettings';
+import { provideViewSettings } from './composables/viewSettingsContext';
+import { VIEW_FILTER_ROWS } from './composables/taskFilterSignal';
 
 import { useProjectsHelper } from './helper';
 import { isOwnerOrAdmin } from "@/utils/roles";
@@ -685,7 +701,8 @@ const { editProject, projectName, updateProjectName } = useProjectNameEdit(proje
 const { changeAssignee } = useProjectAssignee(projectData);
 const { archive, showSidebar, showSpinner, updateProject, markProjectFavourite } = useProjectLifecycle(projectData);
 const { showColorAvatar, savingAvatar, formData, resetFormData, assignAvatarData, updateImageValue, saveProjectAvatar } = useProjectAvatar(projectData);
-const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, searchTask, collapsed, groupBy, userSidebar, resetFilters, clearAllFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter, doneBy, setDoneBy } = useProjectSearch(projectData, showArchived);
+const projectSearch = useProjectSearch(projectData, showArchived, { buildFilterQuery });
+const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, filterRows, searchTask, collapsed, groupBy, userSidebar, clearAllFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter, doneBy, setDoneBy } = projectSearch;
 const { sprintLoading, loadSprintFolderData, selectProject } = useProjectTree(projectData);
 
 const Uid = ref('embed' + makeUniqueId(6));
@@ -718,6 +735,37 @@ provide('refreshTaskSearch', searchMongoDB);
 provide('showArchived', showArchived);
 provide('selectedProject', projectData);
 provide('isSupport', ref(false));
+provide(VIEW_FILTER_ROWS, filterRows);
+
+const toast = useToast();
+const canSaveSharedView = computed(() => ['project.view_list', 'project.project_details'].some((key) => checkPermission(key, projectData.value?.isGlobalPermission) === true));
+
+const selectView = (view) => {
+    activeTab.value = view.keyName;
+    router.replace({ query: { tab: view.keyName, view: viewKeyOf(view) } });
+};
+
+const savedViews = useSavedViews({
+    project: projectData,
+    activeTab,
+    views: viewsListArray,
+    requestedViewKey: computed(() => route.query.view),
+    companyUser,
+    search: projectSearch,
+    canSaveShared: canSaveSharedView,
+    onSelect: selectView,
+});
+provideViewSettings(savedViews);
+const { activeView, dirty: viewDirty, saving: viewSaving, save: saveView, saveForMe: saveViewForMe, saveAsNew: saveViewAsNew, reset: resetView } = savedViews;
+
+const isActiveView = (view) => (activeView.value ? viewKeyOf(view) === viewKeyOf(activeView.value) : activeTab.value === view.keyName);
+
+const settleView = (task, message) => task()
+    .then(() => toast.success(t(message), { position: 'top-right' }))
+    .catch((error) => {
+        console.error('ERROR in saving the view: ', error);
+        toast.error(t('SavedViews.failed'), { position: 'top-right' });
+    });
 
 const icons = ref({
     Anything_url: require('@/assets/images/svg/anything.svg'),
@@ -744,7 +792,6 @@ watch(projectData, (newVal, oldVal) => {
         if (!showArchivedProjects.value) {
             showArchived.value = false;
         }
-        resetFilters();
     }
     getChange();
 });
@@ -1281,12 +1328,14 @@ function openPermissionSidebar() {
     permissionSidebar.value = true;
 }
 const handleView = (view) => {
+    if (!view?.keyName) return;
     activeTab.value = view.keyName;
-    if (route.query.tab !== view.keyName) {
+    if (route.query.tab !== view.keyName || route.query.view !== viewKeyOf(view)) {
         router.push({
             query: {
                 ...route.query,
                 tab: view.keyName,
+                view: viewKeyOf(view),
             },
         });
     }
