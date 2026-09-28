@@ -87,7 +87,7 @@ const thread = () => ({ projectId: props.projectId, sprintId: props.sprintId, ta
 const asRow = (data) => ({ message: data.answer, aiCitations: data.cited || [] });
 const answerBody = computed(() => (result.value ? aiAnswerHtml(asRow(result.value), { router: routerOf(), companyId: unref(companyId) }) : ''));
 
-const ERROR_KEYS = { ai_off: 'AiMention.off', unconfigured: 'AiMention.unconfigured', rate_limited: 'AiMention.rate_limited', share_refused: 'AiMention.ask_again' };
+const ERROR_KEYS = { ai_off: 'AiMention.off', unconfigured: 'AiMention.unconfigured', rate_limited: 'AiMention.rate_limited', share_refused: 'AiMention.ask_again', not_shared: 'AiMention.not_shared' };
 const errorFrom = (body) => t(ERROR_KEYS[body && body.code] || 'AiMention.failed');
 
 async function ask() {

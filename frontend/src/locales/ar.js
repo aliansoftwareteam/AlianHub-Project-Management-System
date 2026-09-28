@@ -10011,6 +10011,7 @@ export default {
         "post_to_channel": "Post to channel",
         "posted": "Posted to the channel.",
         "ask_again": "Ask again to post this answer.",
+        "not_shared": "This answer uses items some members can't see, so it was not posted.",
         "close": "Close"
     },
     "AiAvailability": {

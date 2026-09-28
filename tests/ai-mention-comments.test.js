@@ -170,6 +170,23 @@ describe('@ai in a task comment', () => {
         expect(aiRows()[0].message).not.toMatch(/Captain Zed|interviewing/);
     });
 
+    it('leaves private-sprint work out of a reply, even in the task\'s own project', async () => {
+        mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: '6f0000000000000000000809', projectId: oid(mockIds.project), private: true, AssigneeUserId: [mockIds.member] });
+        mockDb.seed(SCHEMA_TYPE.TASKS, {
+            ProjectID: mockIds.project, sprintId: oid('6f0000000000000000000809'), TaskName: 'Pricing bonus pool', TaskKey: 'WEB-9',
+            deletedStatusKey: 0, updatedAt: new Date(),
+        });
+        mockDb.seed(SCHEMA_TYPE.PAGES, { ProjectID: mockIds.project, title: 'Pricing salary notes', visibility: 'private', createdBy: mockIds.member, deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.PAGES, { ProjectID: mockIds.project, title: 'Pricing FAQ', visibility: 'project', deletedStatusKey: 0 });
+        mockChat.mockImplementation(async (args) => ({ content: args.messages[0].content, model: 'echo' }));
+
+        await ask(mockIds.member, 'pricing bonus?');
+
+        expect(promptSent()).toContain('Pricing FAQ');
+        expect(promptSent()).not.toMatch(/WEB-9|bonus pool|salary notes/);
+        expect(aiRows()[0].message).not.toMatch(/WEB-9|bonus pool|salary notes/);
+    });
+
     it('answers a comment only once, and an edit never asks again', async () => {
         const r = await ask(mockIds.member, 'what is left on pricing?');
         const saved = commentById(r.body.data._id);

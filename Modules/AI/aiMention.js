@@ -12,6 +12,7 @@ const { threadOf, canPostToThread } = require('../Comments/helpers/threadWriteAc
 const { AI_ACTOR, isAiAuthored } = require('../Comments/helpers/aiActor');
 const { gather, promptFor, tokenProjectIdsOf, SYSTEM, ASK_TOKENS } = require('./ask');
 const { loadMessages, namesOf, _internal: { plainMessage } } = require('./chatSummary');
+const { threadReaders, sharedProjects, publicSources } = require('./publicSources');
 
 const AI_MENTION_KEY = 'ai_ask';
 const AI_MENTION_LIMIT = 10;
@@ -76,12 +77,26 @@ const findTask = (companyId, taskId) => (isId(taskId)
     ? MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: oid(taskId) }] }, 'findOne')
     : Promise.resolve(null));
 
-/* A chat conversation is a channel ('default') or a task row marked mainChat; anything else is a work task. */
+/* A chat conversation is a channel ('default') or a task row marked mainChat (a direct message); anything else is a work task. */
 const placeOf = async (companyId, comment) => {
-    if (String(comment.taskId) === 'default') return { chat: true, task: null };
+    if (String(comment.taskId) === 'default') return { chat: true, task: null, conversation: null };
     const task = await findTask(companyId, comment.taskId);
     if (!task || task.deletedStatusKey === 1) return null;
-    return task.mainChat === true ? { chat: true, task: null } : { chat: false, task };
+    return task.mainChat === true ? { chat: true, task: null, conversation: task } : { chat: false, task, conversation: null };
+};
+
+const narrowed = (projects, tokenProjectIds) => (tokenProjectIds.length
+    ? projects.filter((p) => tokenProjectIds.includes(String(p._id)))
+    : projects);
+
+/* Sources for a reply the whole thread reads. A task's reply draws on its own project only; a chat reply on the
+ * projects every member of the conversation can open. Private sprints and private pages are never used. */
+const sourcesForAll = async (companyId, { question, thread, task, conversation, tokenProjectIds }) => {
+    const projects = task
+        ? [{ _id: String(task.ProjectID), ProjectName: '' }]
+        : await sharedProjects(companyId, await threadReaders(companyId, thread, conversation));
+    const sources = await publicSources(companyId, { question, projects: narrowed(projects, tokenProjectIds) });
+    return { sources, projects, intent: null };
 };
 
 const conversationLines = async (companyId, thread, accessMatch) => {
@@ -126,16 +141,21 @@ const citationsOf = (answer, sources) => sources
     .filter((s) => s.ref && answer.includes(`[${s.ref}]`))
     .map((s) => ({ kind: String(s.kind), id: String(s.id), ref: String(s.ref), projectId: String(s.projectId || '') }));
 
-/* The answer, built from the conversation and what the asker can open. `task` adds the task being discussed. `about`,
- * the asker's private profile, is only for an answer the asker alone reads: a thread reply never carries it. */
-const answerFor = async (companyId, { askerId, question, thread, accessMatch, task = null, tokenProjectIds = [], about = '' }) => {
+/* The answer, built from the conversation and, for a reply others read (`forAll`), only what all of them can open;
+ * otherwise from what the asker can open. `task` adds the task being discussed. `about`, the asker's private profile,
+ * is only for an answer the asker alone reads. */
+const answerFor = async (companyId, {
+    askerId, question, thread, accessMatch, task = null, conversation = null, tokenProjectIds = [], about = '', forAll = true,
+}) => {
     const [lines, gathered] = await Promise.all([
         conversationLines(companyId, thread, accessMatch),
-        gather(companyId, askerId, { question, projectId: task ? String(task.ProjectID) : undefined, tokenProjectIds }),
+        forAll
+            ? sourcesForAll(companyId, { question, thread, task, conversation, tokenProjectIds })
+            : gather(companyId, askerId, { question, projectId: task ? String(task.ProjectID) : undefined, tokenProjectIds }),
     ]);
     const sources = uniqueSources([...(task ? [taskSource(task, gathered.projects)] : []), ...gathered.sources]);
     const prompt = [
-        promptFor(question, sources, gathered.intent, about),
+        promptFor(question, sources, gathered.intent, forAll ? '' : about),
         '',
         'CONVERSATION:',
         ...(lines.length ? lines : ['(no earlier messages)']),
@@ -148,7 +168,7 @@ const answerFor = async (companyId, { askerId, question, thread, accessMatch, ta
         spend: { feature: FEATURES.ASK, companyId, userId: askerId },
     });
     const answer = String(result.content || '').trim();
-    return { answer, cited: citationsOf(answer, sources), model: result.model || '' };
+    return { answer, cited: citationsOf(answer, sources), used: sources.map((s) => [String(s.kind), String(s.id)]), model: result.model || '' };
 };
 
 const emit = (companyId, type, data) => socketEmitter.emit(type, {
@@ -211,7 +231,7 @@ const answerComment = async (companyId, { questionId, askerId, question, tokenPr
             return null;
         }
         const { answer, cited } = await answerFor(companyId, {
-            askerId, question, thread, accessMatch: access.match, task: place.task, tokenProjectIds,
+            askerId, question, thread, accessMatch: access.match, task: place.task, conversation: place.conversation, tokenProjectIds,
         });
         if (!answer) {
             await setState(companyId, questionId, { state: STATE.FAILED, code: 'empty' });

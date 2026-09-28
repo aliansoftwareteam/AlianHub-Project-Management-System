@@ -1169,6 +1169,7 @@
     "AiMention.author": "AI",
     "AiMention.close": "Close",
     "AiMention.failed": "AI could not answer this.",
+    "AiMention.not_shared": "This answer uses items some members can't see, so it was not posted.",
     "AiMention.off": "AI is turned off, so nobody will answer @ai.",
     "AiMention.option": "Ask AI",
     "AiMention.option_hint": "Answers in the thread",

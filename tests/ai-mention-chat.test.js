@@ -16,6 +16,7 @@ const CHANNEL = '6a9954186dd786246031e483';
 const PRIVATE_CHANNEL = '6a9954186dd786246031e482';
 const WORK_PROJECT = '6a9954186dd786246031e490';
 const HIDDEN_PROJECT = '6a9954186dd786246031e491';
+const ALICE_PROJECT = '6a9954186dd786246031e492';
 const ALICE = '6f0000000000000000000d01';
 const BOB = '6f0000000000000000000d02';
 const CAROL = '6f0000000000000000000d03';
@@ -54,7 +55,10 @@ jest.mock('../utils/companyMembers', () => ({
     memberProfiles: jest.fn(async (companyId, ids) => [...new Set(ids.map(String))].map((id) => ({ _id: id, Employee_Name: { '6f0000000000000000000d01': 'Alice', '6f0000000000000000000d02': 'Bob', '6f0000000000000000000d03': 'Carol' }[id] }))),
 }));
 jest.mock('../Modules/Agents/scope', () => ({
-    visibleProjects: jest.fn(async () => [{ _id: '6a9954186dd786246031e490', ProjectName: 'Web' }]),
+    visibleProjects: jest.fn(async (companyId, uid) => [
+        { _id: '6a9954186dd786246031e490', ProjectName: 'Web' },
+        ...(String(uid) === '6f0000000000000000000d01' ? [{ _id: '6a9954186dd786246031e492', ProjectName: 'Alice only' }] : []),
+    ]),
 }));
 jest.mock('../Modules/Agents/actor', () => ({ resolveActor: jest.fn(async (req) => ({ userId: req.uid, runId: null })) }));
 jest.mock('../Modules/AICore/llmProvider', () => ({
@@ -127,6 +131,8 @@ beforeEach(() => {
     d.seed(SCHEMA_TYPE.TASKS, { _id: OTHER_DM_TASK, ProjectID: CHAT_SPACE, sprintId: DM_SPRINT, mainChat: true, AssigneeUserId: [ALICE, CAROL] });
     d.seed(SCHEMA_TYPE.TASKS, { ProjectID: WORK_PROJECT, TaskName: 'Launch pricing page', TaskKey: 'WEB-7', deletedStatusKey: 0, updatedAt: new Date() });
     d.seed(SCHEMA_TYPE.TASKS, { ProjectID: HIDDEN_PROJECT, TaskName: 'Launch merger secretly', TaskKey: 'SEC-1', deletedStatusKey: 0, updatedAt: new Date() });
+    d.seed(SCHEMA_TYPE.TASKS, { ProjectID: ALICE_PROJECT, TaskName: 'Alpha acquisition plan', TaskKey: 'ALP-1', deletedStatusKey: 0, updatedAt: new Date() });
+    [ALICE, BOB, CAROL].forEach((userId) => d.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, status: 2, roleType: 3 }));
 
     seedMessage(d, { ...channel, userId: BOB, text: 'We agreed to launch pricing on Friday' });
     seedMessage(d, { ...dm, userId: BOB, text: 'The DM launch note' });
@@ -163,6 +169,25 @@ describe('@ai in a chat message', () => {
         await post(ALICE, '@ai when do we launch?', channel);
 
         expect(promptSent()).not.toMatch(/Captain Zed|interviewing|ABOUT THE PERSON ASKING/);
+    });
+
+    it('never uses a project some channel members cannot open, even when the asker can', async () => {
+        mockChat.mockImplementation(async (args) => ({ content: args.messages[0].content, model: 'echo' }));
+        await post(ALICE, '@ai what about the alpha acquisition?', channel);
+
+        const [answer] = aiRows();
+        expect(answer).toBeTruthy();
+        expect(answer.message).not.toMatch(/ALP-1|Alpha acquisition plan/);
+        expect(promptSent()).not.toMatch(/ALP-1|Alpha acquisition/);
+    });
+
+    it('uses only what both people in a direct message can open', async () => {
+        mockChat.mockImplementation(async (args) => ({ content: args.messages[0].content, model: 'echo' }));
+        await post(ALICE, '@ai alpha acquisition or pricing launch?', dm);
+
+        expect(promptSent()).toContain('WEB-7');
+        expect(promptSent()).not.toMatch(/ALP-1|Alpha acquisition plan/);
+        expect(aiRows()[0].message).not.toMatch(/ALP-1/);
     });
 
     it('answers in a direct message from that conversation only', async () => {
@@ -216,6 +241,19 @@ describe('Ask about this channel', () => {
         const [answer] = aiRows();
         expect(answer).toMatchObject({ userId: 'ai', actorType: 'ai', aiAskerId: ALICE, taskId: 'default', message: data.answer });
         expect(mockChat).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses to post a private answer built from items some members cannot see', async () => {
+        mockChat.mockResolvedValue({ content: 'The alpha acquisition is on track [ALP-1].', model: 'test-model' });
+        const { body: { data } } = await askChannel(ALICE, 'how is the alpha acquisition?');
+        expect(promptSent()).toContain('ALP-1');
+        expect(data.cited).toEqual([expect.objectContaining({ ref: 'ALP-1' })]);
+
+        const r = await call(chatAskPostHandler, ALICE, { ...channel, question: data.question, answer: data.answer, cited: data.cited, shareToken: data.shareToken });
+        expect(r.code).toBe(403);
+        expect(r.body.code).toBe('not_shared');
+        expect(r.body.statusText).toBe("This answer uses items some members can't see.");
+        expect(aiRows()).toHaveLength(0);
     });
 
     it('refuses to post an answer that was changed, or someone else\'s', async () => {
