@@ -134,6 +134,7 @@ const SCHEMA_TYPE = {
     ASK_THREADS: "ask_threads",
     AI_FEEDBACK: "ai_feedback",
     AI_EVAL_RUNS: "ai_eval_runs",
+    AI_PROFILES: "ai_profiles",
 }
 
 module.exports = {

@@ -352,6 +352,8 @@ aiFeedbackSchema.index({ userId: 1, feature: 1, itemId: 1 }, { unique: true, nam
 aiFeedbackSchema.index({ createdAt: -1 });
 const aiEvalRunsSchema = new Schema(schema.aiEvalRuns, {strict: true, timestamps: false});
 aiEvalRunsSchema.index({ suite: 1, ranAt: -1 });
+const aiProfilesSchema = new Schema(schema.aiProfiles, {strict: true, timestamps: true});
+aiProfilesSchema.index({ ownerId: 1 }, { unique: true, name: 'owner_id' });
 
 const oauthClientsSchema = new Schema(schema.oauthClients, {strict: true, timestamps: false});
 oauthClientsSchema.index({ clientId: 1 }, { unique: true, name: 'client_id' });
@@ -524,6 +526,7 @@ module.exports = {
     askThreadsSchema,
     aiFeedbackSchema,
     aiEvalRunsSchema,
+    aiProfilesSchema,
     secretsSchema,
     oauthClientsSchema,
     oauthGrantsSchema,

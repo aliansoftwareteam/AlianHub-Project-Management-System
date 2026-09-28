@@ -68,7 +68,7 @@ exports.getMilestones = async (req, res) => {
             }, 'find').catch(() => []),
             MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.HISTORY,
-                data: [{ Key: 'Project_Milestone_Changed', ProjectId: { $in: projectIds } }, 'ProjectId UserId Message createdAt'],
+                data: [{ Key: 'Project_Milestone_Changed', ProjectId: { $in: idForms(projectIds) } }, 'ProjectId UserId Message createdAt'],
             }, 'find').catch(() => []),
             MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TASKS,

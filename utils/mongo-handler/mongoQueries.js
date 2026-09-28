@@ -131,6 +131,7 @@ const {
     askThreadsSchema,
     aiFeedbackSchema,
     aiEvalRunsSchema,
+    aiProfilesSchema,
     secretsSchema,
     oauthClientsSchema,
     oauthGrantsSchema,
@@ -395,6 +396,8 @@ exports.checkType = (type) => {
             return aiFeedbackSchema
         case SCHEMA_TYPE.AI_EVAL_RUNS:
             return aiEvalRunsSchema
+        case SCHEMA_TYPE.AI_PROFILES:
+            return aiProfilesSchema
         case SCHEMA_TYPE.SECRETS:
             return secretsSchema
         case SCHEMA_TYPE.OAUTH_CLIENTS:
@@ -667,6 +670,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.AI_FEEDBACK}`
         case SCHEMA_TYPE.AI_EVAL_RUNS:
                 return `${dbCollections.AI_EVAL_RUNS}`
+        case SCHEMA_TYPE.AI_PROFILES:
+                return `${dbCollections.AI_PROFILES}`
         case SCHEMA_TYPE.SECRETS:
                 return `${dbCollections.SECRETS}`
         case SCHEMA_TYPE.OAUTH_CLIENTS:

@@ -135,6 +135,7 @@ const dbCollections = {
     ASK_THREADS: "ask_threads",
     AI_FEEDBACK: "ai_feedback",
     AI_EVAL_RUNS: "ai_eval_runs",
+    AI_PROFILES: "ai_profiles",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/

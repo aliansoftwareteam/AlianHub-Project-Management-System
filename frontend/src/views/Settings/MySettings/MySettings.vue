@@ -154,6 +154,14 @@
             </div>
         </section>
 
+        <section class="ah-card" data-test="ai-memory">
+            <div class="ah-card__head">
+                <h2 class="ah-h3">{{ $t('AskMemory.settings_title') }}</h2>
+                <span class="ah-small">{{ $t('AskMemory.settings_hint') }}</span>
+            </div>
+            <div class="ah-card__body"><AskMemoryButton /></div>
+        </section>
+
         <section class="ah-card" data-test="agent-prefs">
             <div class="ah-card__head">
                 <h2 class="ah-h3">{{ $t('Settings.agents_title') }}</h2>
@@ -253,6 +261,7 @@ import SpinnerComp from "@/components/atom/SpinnerComp/SpinnerComp.vue";
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
 import CroppingTool from "@/components/atom/CroppingTool/CroppingTool.vue";
 import AhSwitch from "@/components/molecules/Setting/AhSwitch.vue";
+import AskMemoryButton from "@/views/Ai/AskMemoryButton.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { useAgentPreferences } from "@/views/Ai/useAgentPreferences";
 import { DECLINE_REASONS } from "@/views/Ai/episodeText";

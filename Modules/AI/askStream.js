@@ -5,7 +5,7 @@ const { getProvider, isAnyProviderConfigured } = require('../AICore/llmProvider'
 const { FEATURES } = require('../AICore/features');
 const { keepStreamOpen } = require('../Agents/engine/timeouts');
 const {
-    gather, promptFor, tokenProjectIdsOf, SYSTEM, RESEARCH_SYSTEM, MAX_PER_TYPE, ASK_TOKENS, RESEARCH_TOKENS,
+    gather, promptFor, tokenProjectIdsOf, aboutOf, SYSTEM, RESEARCH_SYSTEM, MAX_PER_TYPE, ASK_TOKENS, RESEARCH_TOKENS,
 } = require('./ask');
 const threads = require('./askThreads');
 
@@ -82,12 +82,13 @@ const askStream = async (req, res) => {
             return res.send({ status: true, data: { configured: true, answer: '', sources: [], mode: modeName, empty: EMPTY, emptyCode: 'no_match', scope, threadId: threadIdOut, ...found } });
         }
 
+        const about = await aboutOf(req, companyId, uid);
         const stream = openStream(req, res);
         let streamed = false;
         try {
             const result = await getProvider().chat({
                 systemPrompt: `${research ? RESEARCH_SYSTEM : SYSTEM}${thread ? FOLLOW_UP : ''}`,
-                messages: [...threads.historyOf(thread), { role: 'user', content: promptFor(asked, gathered.sources, gathered.intent) }],
+                messages: [...threads.historyOf(thread), { role: 'user', content: promptFor(asked, gathered.sources, gathered.intent, about) }],
                 maxTokens: research ? RESEARCH_TOKENS : ASK_TOKENS,
                 temperature: 0.2,
                 spend: { feature: FEATURES.ASK, companyId, userId: uid },

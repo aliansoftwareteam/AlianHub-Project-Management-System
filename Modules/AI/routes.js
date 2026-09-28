@@ -8,6 +8,8 @@ const askStream = require('./askStream');
 const askThreads = require('./askThreads');
 const feedback = require('./feedback');
 const quality = require('./quality');
+const aiProfile = require('./aiProfile');
+const aiProfileImport = require('./aiProfileImport');
 const { chatSummaryHandler } = require('./chatSummary');
 
 exports.init = (app) => {
@@ -44,6 +46,11 @@ exports.init = (app) => {
     app.delete('/api/v1/ai/feedback/:id', feedback.removeFeedback);
     app.get('/api/v1/ai/quality', quality.getQuality);
     app.post('/api/v1/ai/quality/held-out', quality.runHeldOut);
+    app.get('/api/v1/ai/memory', aiProfile.getProfile);
+    app.put('/api/v1/ai/memory', aiProfile.saveProfile);
+    app.delete('/api/v1/ai/memory', aiProfile.clearProfile);
+    app.post('/api/v1/ai/memory/import/preview', aiProfileImport.previewImport);
+    app.post('/api/v1/ai/memory/import/confirm', aiProfileImport.confirmImport);
     // Talk to Text — audio → text via OpenAI Whisper (multipart, field "file").
     app.post('/api/v1/ai/transcribe', ...transcribe.transcribe);
     app.post('/api/v1/ai/meeting-notes', meetingNotes.meetingNotesHandler);
