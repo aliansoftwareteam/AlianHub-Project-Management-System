@@ -338,6 +338,7 @@ For development:
 - 🌿 [BRANCHING.md](BRANCHING.md) — branching strategy and PR workflow
 - 🛡️ [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — community standards
 - 🔒 [SECURITY.md](SECURITY.md) — responsible disclosure for security issues
+- ♿ [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) — accessibility statement, known gaps and how to report a problem
 - 🆘 [SUPPORT.md](SUPPORT.md) — where to ask questions, report bugs, request features
 
 ---
