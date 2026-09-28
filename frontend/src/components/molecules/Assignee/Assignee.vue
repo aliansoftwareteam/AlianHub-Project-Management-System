@@ -124,7 +124,7 @@ defineComponent({
     }
 })
 
-const emit = defineEmits(["selected", "removed"])
+const emit = defineEmits(["selected", "removed", "agent"])
 
 // PROPS
 const props = defineProps({
@@ -185,6 +185,11 @@ const props = defineProps({
     buttonLabel: {
         type: String,
         default: ''
+    },
+    /** Agents the person may start on this task: choosing one starts a run and assigns nobody. */
+    agents: {
+        type: Array,
+        default: () => []
     }
 })
 
@@ -239,6 +244,11 @@ const unselectedUser = computed(() => {
 })
 
 function selectFun(event) {
+    if (event?.type === 'agent') {
+        visible.value = false;
+        emit('agent', event);
+        return;
+    }
     selectedUser.value.includes(event.id) ? emit('removed', event) : emit('selected', event)
 }
 // Temporary team assign hide
@@ -270,6 +280,21 @@ const detailedOptions = computed(() => {
         // Temporary team assign hide
         // res[isDisplayTeam.value ? 1: 0].options.push(x);
     })
+    if (props.agents.length) {
+        res.push({
+            label: t('TaskPanel.agents_group'),
+            options: props.agents.map((agent) => ({
+                id: `agent_${agent._id}`,
+                value: `agent_${agent._id}`,
+                label: agent.name,
+                image: '',
+                type: 'agent',
+                agentId: agent._id,
+                tag: t('TaskPanel.agent_tag'),
+                teamColor: { color: '#fff', bgColor: 'var(--agent)' }
+            }))
+        });
+    }
     // Temporary team assign hide
     // if (isDisplayTeam.value) {
     //     res[0].options = teams.value.filter((tf) => unselectedUser.value.indexOf('tId_'+tf._id) !== -1 || selectedUser.value.indexOf('tId_'+tf._id) !== -1).map((tRow) => ({

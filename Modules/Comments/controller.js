@@ -15,6 +15,16 @@ const { resolveMentionIds, deliverMentions } = require("./helpers/commentNotific
 const { taskIdMatch } = require("./helpers/taskIdMatch");
 const { withoutAssignment, withoutThreadState, placeReply } = require("./helpers/commentThreads");
 const { notifyReply } = require("./helpers/threadNotices");
+const { parseAgentMentionIds } = require("./helpers/parseMentions");
+
+/* A comment an agent run writes never starts agents, so agents cannot start each other.
+ * Required on use: the agent modules are only needed by a comment that names an agent. */
+const startMentionedAgents = async (req, companyId, comment) => {
+    if (!parseAgentMentionIds(comment.message).length) return;
+    const actor = await require("../Agents/actor").resolveActor(req);
+    if (actor.runId) return;
+    await require("../Agents/triggers").fromComment(companyId, { authorId: comment.userId, taskId: comment.taskId, message: comment.message });
+};
 
 const writeOptionsFrom = (options) => {
     if (options === undefined) return {};
@@ -54,6 +64,10 @@ exports.save = async (req, res) => {
         }
 
         const response = await MongoDbCrudOpration(companyId, query, "save");
+        if (response && response._id) {
+            await startMentionedAgents(req, companyId, { ...thread, userId: convertData.userId, message: convertData.message })
+                .catch((err) => logger.error(`[mentions] agents not started: ${err.message}`));
+        }
         if (placement.parent || (data?.objId?.projectId && data?.objId?.taskId && data?.objId?.sprintId)) {
             socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments', companyId });
         } else if(data?.taskId === "default"){

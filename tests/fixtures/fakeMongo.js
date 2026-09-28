@@ -71,17 +71,40 @@ const matches = (doc, filter = {}, textFields) => Object.entries(filter).every((
     return value === want;
 });
 
-const write = (doc, key, fn) => {
+const FILTERED = /^\$\[(\w+)\]$/;
+
+/* An arrayFilters segment ($[name]) walks every element its filter matches, as MongoDB does. */
+const conditionFor = (name, arrayFilters) => Object.fromEntries((arrayFilters || [])
+    .flatMap((filter) => Object.entries(filter))
+    .filter(([path]) => path.startsWith(`${name}.`))
+    .map(([path, value]) => [path.slice(name.length + 1), value]));
+
+const write = (doc, key, fn, arrayFilters) => {
     const path = key.split('.');
-    const last = path.pop();
-    const target = path.reduce((v, k) => { if (v[k] == null || typeof v[k] !== 'object') v[k] = {}; return v[k]; }, doc);
-    fn(target, last);
+    const walk = (target, at) => {
+        const segment = path[at];
+        const last = at === path.length - 1;
+        const filtered = FILTERED.exec(segment);
+        if (filtered) {
+            const condition = conditionFor(filtered[1], arrayFilters);
+            (Array.isArray(target) ? target : []).forEach((item, index) => {
+                if (!matches(item, condition)) return;
+                if (last) fn(target, index);
+                else walk(item, at + 1);
+            });
+            return;
+        }
+        if (last) { fn(target, segment); return; }
+        if (target[segment] == null || typeof target[segment] !== 'object') target[segment] = {};
+        walk(target[segment], at + 1);
+    };
+    walk(doc, 0);
 };
 
-const apply = (doc, update = {}) => {
-    Object.entries(update.$set || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = v; }));
-    Object.entries(update.$inc || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = Number(t[l] || 0) + v; }));
-    Object.entries(update.$push || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = [...(t[l] || []), ...(v && Array.isArray(v.$each) ? v.$each : [v])]; }));
+const apply = (doc, update = {}, arrayFilters) => {
+    Object.entries(update.$set || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = v; }, arrayFilters));
+    Object.entries(update.$inc || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = Number(t[l] || 0) + v; }, arrayFilters));
+    Object.entries(update.$push || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = [...(t[l] || []), ...(v && Array.isArray(v.$each) ? v.$each : [v])]; }, arrayFilters));
     Object.entries(update.$unset || {}).forEach(([k]) => write(doc, k, (t, l) => { delete t[l]; }));
     Object.entries(update.$addToSet || {}).forEach(([k, v]) => write(doc, k, (t, l) => {
         const list = Array.isArray(t[l]) ? t[l] : [];
@@ -235,7 +258,7 @@ const create = ({ mongooseCasting = false } = {}) => {
             const doc = (options.sort ? ordered(list, { sort: options.sort }) : list).find((d) => matches(d, data[0], textFields));
             if (doc) {
                 const before = clone(doc);
-                apply(doc, data[1]);
+                apply(doc, data[1], options.arrayFilters);
                 return wantsNew ? clone(doc) : before;
             }
             if (!options.upsert) return null;
@@ -244,7 +267,7 @@ const create = ({ mongooseCasting = false } = {}) => {
         }
         if (method === 'updateOne') {
             const doc = list.find((d) => matches(d, data[0], textFields));
-            if (doc) { apply(doc, data[1]); return { matchedCount: 1, modifiedCount: 1 }; }
+            if (doc) { apply(doc, data[1], data[2] && data[2].arrayFilters); return { matchedCount: 1, modifiedCount: 1 }; }
             if (!(data[2] && data[2].upsert)) return { matchedCount: 0, modifiedCount: 0 };
             const inserted = insertUpserted(type, data[0], data[1]);
             return { matchedCount: 0, modifiedCount: 0, upsertedCount: 1, upsertedId: inserted._id };

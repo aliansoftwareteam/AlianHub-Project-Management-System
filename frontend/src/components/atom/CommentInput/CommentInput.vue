@@ -2,7 +2,7 @@
     <!-- <div> -->
         <div v-if="showUsersList" class="position-fi overflow-y-auto bg-white style-scroll border-radius-5-px z-index-6 show__userlist">
             <ul :id="listboxId" role="listbox" :aria-label="$t('Comments.mention_suggestions')" class="d-flex flex-column m-0 p-0">
-                <template v-if="filteredUsers.length">
+                <template v-if="mentionOptions.length">
                     <li
                         class="d-flex align-items-center cursor-pointer p5px-p10px"
                         :class="{'bg-blue white': selectedUserIndex === index}"
@@ -26,6 +26,26 @@
                             :thumbnail="'30x30'"
                         />
                         <span>{{data.name}}</span>
+                    </li>
+                    <li v-if="filteredAgents.length" role="group" :aria-label="$t('Comments.mention_agents')" class="d-flex flex-column">
+                        <span class="p5px-p10px font-size-12 gray" aria-hidden="true">{{ $t('Comments.mention_agents') }}</span>
+                        <ul class="d-flex flex-column m-0 p-0">
+                            <li
+                                class="d-flex align-items-center cursor-pointer p5px-p10px"
+                                :class="{'bg-blue white': selectedUserIndex === filteredUsers.length + index}"
+                                v-for="(agent, index) in filteredAgents"
+                                :id="optionId(filteredUsers.length + index)"
+                                :key="agent.key"
+                                role="option"
+                                :aria-selected="selectedUserIndex === filteredUsers.length + index"
+                                @mouseover="selectedUserIndex = filteredUsers.length + index"
+                                @click="addMention(agent)"
+                            >
+                                <span class="ah-avatar ah-avatar--sm ah-avatar--agent mr-10px" aria-hidden="true">{{ agent.name.slice(0, 1).toUpperCase() }}</span>
+                                <span>{{ agent.name }}</span>
+                                <span class="ah-chip ah-chip--agent ah-chip--mono ml-10px">{{ $t('TaskPanel.agent_tag') }}</span>
+                            </li>
+                        </ul>
                     </li>
                 </template>
                 <template v-else>
@@ -92,6 +112,7 @@ import {defineProps, defineEmits, computed, onMounted, onBeforeUnmount, watch, r
 
 // COMPONENTS
 import UserProfile from "@/components/atom/UserProfile/UserProfile.vue"
+import { agentMentionKey } from "@/utils/agentMention";
 
 // UTILS
 const {getUser} = useGetterFunctions();
@@ -133,6 +154,10 @@ const props = defineProps({
     loadingChat: {
         type: Boolean,
         default: true
+    },
+    agents: {
+        type: Array,
+        default: () => []
     }
 });
 
@@ -193,12 +218,18 @@ const filteredUsers = computed(() => {
     return users.value.filter((x) => !x.ghost && x.name.replaceAll(" ", "").toLowerCase().includes(mentionSearch.value.toLowerCase()))
 });
 
+const filteredAgents = computed(() => props.agents
+    .map((agent) => ({ name: agent.name, key: agentMentionKey(agent._id) }))
+    .filter((agent) => agent.name.replaceAll(" ", "").toLowerCase().includes(mentionSearch.value.toLowerCase())));
+
+const mentionOptions = computed(() => [...filteredUsers.value, ...filteredAgents.value]);
+
 const listboxId = `comment-mentions-${useId()}`;
 const optionId = (key) => `${listboxId}-${key}`;
 const activeOptionId = computed(() => {
     if(!showUsersList.value) return undefined;
-    if(!filteredUsers.value.length) return optionId("none");
-    return selectedUserIndex.value < filteredUsers.value.length ? optionId(selectedUserIndex.value) : undefined;
+    if(!mentionOptions.value.length) return optionId("none");
+    return selectedUserIndex.value < mentionOptions.value.length ? optionId(selectedUserIndex.value) : undefined;
 });
 
 function handleEnter(e) {
@@ -207,7 +238,7 @@ function handleEnter(e) {
         e.preventDefault();
 
         if(showUsersList.value) {
-            addMention(filteredUsers.value[selectedUserIndex.value]);
+            addMention(mentionOptions.value[selectedUserIndex.value]);
         } else {
             if(props.modelValue.trim().length) {
                 emit("enter");
@@ -222,7 +253,7 @@ function keyDown(e) {
         if(e.keyCode === 38 || e.keyCode === 40) {
             e.preventDefault();
             if (e.keyCode === 40) {
-                selectedUserIndex.value += selectedUserIndex.value < (filteredUsers.value.length -1) ? 1 : 0;
+                selectedUserIndex.value += selectedUserIndex.value < (mentionOptions.value.length -1) ? 1 : 0;
             } else if (e.keyCode === 38) {
                 selectedUserIndex.value -= selectedUserIndex.value > 0 ? 1 : 0;
             }

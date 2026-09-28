@@ -10,7 +10,8 @@ export function rowEditRights(check, { archived = false } = {}) {
         due: open && yes("task_due_date"),
         priority: open && yes("task_priority"),
         rename: open && yes("task_name_edit"),
-        subtask: open && yes("sub_task_create")
+        subtask: open && yes("sub_task_create"),
+        template: open && yes("task_create")
     };
 }
 
