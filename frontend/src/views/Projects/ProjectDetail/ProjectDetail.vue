@@ -23,6 +23,10 @@
                 v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id"
                 :projectId="String(projectData._id)"
             />
+            <ProjectDefaultTemplateCard
+                v-if="checkPermission('project.project_details',projectData.isGlobalPermission) === true && projectData?._id && !projectData.isPersonal"
+                :projectId="String(projectData._id)"
+            />
             <CheckListComponent
                 v-if="checkPermission('project.project_checklist',projectData.isGlobalPermission) !== null"
                 :data="checkList"
@@ -87,6 +91,7 @@
     import { useToast } from 'vue-toast-notification';
     import Description  from '@/components/atom/Description/Description.vue';
     import ProjectMemoryCard from './ProjectMemoryCard.vue';
+    import ProjectDefaultTemplateCard from './ProjectDefaultTemplateCard.vue';
     import Attachments from '@/components/atom/Attachments/Attachments.vue';
     import FixMilestone from '@/components/organisms/FixMilestone/FixMilestone.vue';
     import HourlyMilestone from '@/components/organisms/HourlyMilestone/HourlyMilestone.vue';
