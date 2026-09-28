@@ -4189,6 +4189,7 @@ export default {
         "copy_link": "Αντιγραφή Συνδέσμου",
         "watchers": "Παρατηρητές",
         "watchers_count": "{n} watcher | {n} watchers",
+        "stop_watching": "Stop watching",
         "list_actions": "List actions",
         "active_members": "People active in this project",
         "files_links": "Αρχεία & Σύνδεσμοι",
@@ -4805,7 +4806,7 @@ export default {
         "This_tag_has_already_been_added": "Αυτή η ετικέτα έχει ήδη προστεθεί",
         "Tag_name_required": "Απαιτείται το όνομα της ετικέτας",
         "add_tag": "Add tag",
-        "more_tags": "{count} more: {names}",
+        "more_tags": "{count} more: {names}"
     },
     "Embeded": {
         "Anything": "Οτιδήποτε",

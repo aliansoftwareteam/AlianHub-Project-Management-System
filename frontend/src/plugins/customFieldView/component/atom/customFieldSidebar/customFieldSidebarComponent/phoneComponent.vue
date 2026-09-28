@@ -92,8 +92,10 @@
                         </div>
                     </div>
                 </template>
-                <template #options>
+                <template #search>
                     <input type="text" class="customfield__form-control" :placeHolder="$t('PlaceHolder.search')" v-model="search" @input="handleInput">
+                </template>
+                <template #options>
                     <div v-if="allCountriesArray && allCountriesArray.length">
                         <DropDownOption v-for="(Country,index) in allCountriesArray" :key="index" :selected="Country.code === flag" @click="$refs[customFieldUniqueId].click(),handleUpdate(Country)">
                             <div class="d-flex align-items-center">

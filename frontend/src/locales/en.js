@@ -4249,6 +4249,7 @@ export default {
         copy_link: "Copy Link",
         watchers: "Watchers",
         watchers_count: "{n} watcher | {n} watchers",
+        stop_watching: "Stop watching",
         list_actions: "List actions",
         active_members: "People active in this project",
         files_links: "Files & Links",

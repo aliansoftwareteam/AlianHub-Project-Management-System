@@ -4189,6 +4189,7 @@ export default {
         "copy_link": "Копировать ссылку",
         "watchers": "Наблюдатели",
         "watchers_count": "{n} watcher | {n} watchers",
+        "stop_watching": "Stop watching",
         "list_actions": "List actions",
         "active_members": "People active in this project",
         "files_links": "Файлы и ссылки",
@@ -4805,7 +4806,7 @@ export default {
         "This_tag_has_already_been_added": "Этот тег уже добавлен",
         "Tag_name_required": "Требуется имя тега",
         "add_tag": "Add tag",
-        "more_tags": "{count} more: {names}",
+        "more_tags": "{count} more: {names}"
     },
     "Embeded": {
         "Anything": "Что угодно",

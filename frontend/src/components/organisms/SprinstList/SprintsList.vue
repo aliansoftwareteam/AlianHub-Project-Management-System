@@ -90,7 +90,7 @@
 
                 <template v-if="!showArchiveVar">
                     <div class="spr__watchers" @click.stop>
-                        <DropDown mode="listbox">
+                        <DropDown mode="listbox" multiselectable>
                             <template #button>
                                 <span class="spr__eye">
                                     <img :src="eyeIcon" :alt="$t('Projects.watchers')">
@@ -116,6 +116,7 @@
                                     :class="{ 'selected-watcher': user.isWatcher == true }"
                                     :selected="user.isWatcher == true"
                                     @click="updateWatchers(user._id, 'add')"
+                                    @keydown.delete="user.isWatcher && user.isLoggedUser && updateWatchers(user._id, 'remove')"
                                 >
                                     <div class="d-flex align-items-center justify-content-between w-100">
                                         <div class="d-flex align-items-center">
@@ -127,12 +128,15 @@
                                             <WasabiIamgeCompp v-else :userImage="true" :thumbnail="'26x26'" :data="{title:getUser(user._id).Employee_Name, url: getUser(user._id).Employee_profileImageURL}" class="cursor-pointer emp__profile-imgurl"/>
                                             <span class="cursor-pointer ml-5px">{{ user.Employee_Name }}</span>
                                         </div>
-                                        <img
-                                            class="cursor-pointer"
-                                            src="@/assets/images/svg/deletered.svg"
+                                        <button
                                             v-if="user.isWatcher && user.isLoggedUser"
+                                            type="button"
+                                            class="d-flex bg-transparent border-0 p-0 cursor-pointer"
+                                            :aria-label="$t('Projects.stop_watching')"
                                             @click.stop="updateWatchers(user._id, 'remove')"
-                                        />
+                                        >
+                                            <img src="@/assets/images/svg/deletered.svg" alt="">
+                                        </button>
                                     </div>
                                 </DropDownOption>
                             </template>

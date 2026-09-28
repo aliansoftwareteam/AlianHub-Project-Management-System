@@ -12,6 +12,7 @@
         <DropDown
             v-if="editable"
             mode="listbox"
+            multiselectable
             :maxHeight="'240px'"
             :bodyClass="{'skills-select__menu': true}"
             :bodyClassHeader="{'w-100': true}"
@@ -28,9 +29,11 @@
                     <span v-if="!selected.length" class="skills-select__placeholder">{{ $t('PlaceHolder.Select_Skills') }}</span>
                 </div>
             </template>
-            <template #options>
+            <template #search>
                 <input v-if="options.length" v-model="search" type="text" class="skills-select__search font-size-13"
                     :placeholder="$t('Projects.search')" @click.stop/>
+            </template>
+            <template #options>
                 <div v-for="skill in filtered" :key="skill.slug"
                     role="option"
                     :aria-selected="String(isSelected(skill.slug))"
@@ -218,11 +221,7 @@ const toggle = (slug) => {
     color: #818181;
     font-size: 13px;
 }
-/* Sticky so it survives scrolling the list inside the dropdown's max-height. */
 .skills-select__search {
-    position: sticky;
-    top: 0;
-    z-index: 1;
     width: 100%;
     box-sizing: border-box;
     border: 1px solid #DFE1E6;

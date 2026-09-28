@@ -1,7 +1,8 @@
 <template>
     <DropDown 
         mode="listbox"
-        :id="props.id" 
+        :multiselectable="isMultiSelect"
+        :id="props.id"
         @isVisible="handleClose()" 
         maxHeight="20dvh" 
         :keepSameWidth="true" 
@@ -14,7 +15,6 @@
                     {{ $t(`dashboardCard.${props?.field?.label}`) }}
                 </label>
                 
-                <!-- Multi-select display -->
                 <div v-if="isMultiSelect && selectedItems.length" class="custom-field-input d-flex align-items-center" :class="{'w-65': clientWidth > 480}">
                     <template v-if="displayType === 'text' || displayType === 'project'">
                         <span v-for="(item, ind) in selectedItems.slice(0, 2)" :key="ind" class="ml-1 black font-size-14 text-ellipsis mw-90px">
@@ -72,7 +72,6 @@
                     </template>
                 </div>
                 
-                <!-- Single select display -->
                 <div v-else-if="!isMultiSelect && (selectedItem || selectedItem === 0)" class="custom-field-input d-flex align-items-center" :class="{'w-65': clientWidth > 480}">
                     <template v-if="displayType === 'text'">
                         <span class="ml-1 black font-size-14">
@@ -114,7 +113,6 @@
                     </template>
                 </div>
                 
-                <!-- Default placeholder -->
                 <div v-else :class="{'w-65': clientWidth > 480}">
                     <div 
                         class="custom-field-input" 
@@ -129,40 +127,41 @@
             </div>
         </template>
         
+        <template #search>
+            <div class="d-flex align-items-center justify-content-between pb-15px">
+                <div :class="{isMultiSelect:'input-wrapper'}" class="w-100">
+                    <InputText
+                        v-model="search"
+                        :place-holder="$t('PlaceHolder.search')"
+                        type="text"
+                        :isOutline="false"
+                        @keyup="handleSearch"
+                    />
+                </div>
+                <div v-if="isMultiSelect && filteredItems.length && props?.field?.label === 'location'" class="assigned-to-me">
+                    <span
+                        class="d-block cursor-pointer"
+                        @click="assignedToMe"
+                    >
+                        {{$t('Projects.Assigned_to')}} {{$t('Projects.me')}}
+                    </span>
+                </div>
+                <div v-if="isMultiSelect && filteredItems.length" class="no-result">
+                    <span
+                        class="d-block cursor-pointer"
+                        @click="toggleSelectAll"
+                    >
+                        {{ items.length === selectedItems.length
+                            ? $t('Filters.unselect_all')
+                            : $t('Filters.select_all')
+                        }}
+                    </span>
+                </div>
+            </div>
+        </template>
+
         <template #options>
             <div>
-                <div class="d-flex align-items-center justify-content-between pb-15px">
-                    <div :class="{isMultiSelect:'input-wrapper'}" class="w-100">
-                        <InputText
-                            v-model="search"
-                            :place-holder="$t('PlaceHolder.search')"
-                            type="text"
-                            :isOutline="false"
-                            @keyup="handleSearch"
-                        />
-                    </div>
-                    <div v-if="isMultiSelect && filteredItems.length && props?.field?.label === 'location'" class="assigned-to-me">
-                        <span 
-                            class="d-block cursor-pointer" 
-                            @click="assignedToMe"
-                        >
-                            {{$t('Projects.Assigned_to')}} {{$t('Projects.me')}}
-                        </span>
-                    </div>
-                    <div v-if="isMultiSelect && filteredItems.length" class="no-result">
-                        <span 
-                            class="d-block cursor-pointer" 
-                            @click="toggleSelectAll"
-                        >
-                            {{ items.length === selectedItems.length 
-                                ? $t('Filters.unselect_all') 
-                                : $t('Filters.select_all') 
-                            }}
-                        </span>
-                    </div>
-                </div>
-                
-                <!-- Items List -->
                 <template v-if="filteredItems.length">
                     <DropDownOption 
                         v-for="(item, i) in filteredItems" 
@@ -174,7 +173,6 @@
                             class="user-content d-flex align-items-center"
                             :class="{'activeClass': isSelected(item)}"
                         >
-                            <!-- Profile Display -->
                             <template v-if="displayType === 'profile'">
                                 <div v-if="item._id.startsWith('tId_')">
                                     <span 
@@ -201,7 +199,6 @@
                                 </span>
                             </template>
                             
-                            <!-- Color Display -->
                             <template v-else-if="displayType === 'color'">
                                 <div class="project-custom-checkbox d-flex align-items-center justify-content-between w-100" :class="{'h-20': clientWidth > 767}">
                                     <div class="d-flex align-items-center">
@@ -222,7 +219,6 @@
                                 </div>
                             </template>
 
-                            <!-- project display -->
                             <template v-else-if="displayType === 'project'">
                                 <div class="d-flex align-items-center justify-content-between w-100 project-custom-checkbox" :class="{'h-20': clientWidth > 767}">
                                     <span class="d-flex align-items-center">
@@ -236,7 +232,6 @@
                                     <span class="project-checkbox-mark"></span>
                                 </div>
                             </template>
-                            <!-- Text Display -->
                             <template v-else>
                                 <div v-if="props.isCheckBox" class="d-flex align-items-center justify-content-between w-100 project-custom-checkbox" :class="{'h-20': clientWidth > 767}">
                                     <span class="ml-1">
@@ -255,7 +250,6 @@
                     </DropDownOption>
                 </template>
                 
-                <!-- No Records Found -->
                 <template v-else>
                     <DropDownOption>
                         <div class="font-size-13 p0x-15px gray81">

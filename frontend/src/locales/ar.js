@@ -4189,6 +4189,7 @@ export default {
         "copy_link": "Copy Link",
         "watchers": "Watchers",
         "watchers_count": "{n} watcher | {n} watchers",
+        "stop_watching": "Stop watching",
         "list_actions": "List actions",
         "active_members": "People active in this project",
         "files_links": "Files & Links",
@@ -4805,7 +4806,7 @@ export default {
         "This_tag_has_already_been_added": "This tag has already been added",
         "Tag_name_required": "Tag name required",
         "add_tag": "Add tag",
-        "more_tags": "{count} more: {names}",
+        "more_tags": "{count} more: {names}"
     },
     "Embeded": {
         "Anything": "Anything",
