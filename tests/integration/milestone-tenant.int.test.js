@@ -1,5 +1,5 @@
 const crypto = require('node:crypto');
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 const { resolveMongoUrl } = require('../../e2e/support/env');
 const { loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
 
@@ -84,7 +84,7 @@ describe('the milestone write routes take the company from the companyid header'
 
         expect(res.status).toBe(200);
         expect(res.body).toMatchObject({ status: true });
-        expect(await client.db(state.companyId).collection('milestone').countDocuments({ projectId: PROJECT._id })).toBeGreaterThan(0);
+        expect(await client.db(state.companyId).collection('milestone').countDocuments({ projectId: new ObjectId(String(PROJECT._id)) })).toBeGreaterThan(0);
         expect(await foreignDatabaseExists()).toBe(false);
     });
 });

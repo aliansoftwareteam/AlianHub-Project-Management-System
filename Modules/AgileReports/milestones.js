@@ -4,6 +4,7 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const { keepVisibleProjectIds } = require('../../Config/projectAccess');
 const logger = require('../../Config/loggerConfig');
@@ -63,7 +64,7 @@ exports.getMilestones = async (req, res) => {
 
         const [milestones, historyRows, tasks] = await Promise.all([
             MongoDbCrudOpration(companyId, {
-                type: SCHEMA_TYPE.MILESTONE, data: [{ projectId: { $in: projectIds } }],
+                type: SCHEMA_TYPE.MILESTONE, data: [{ projectId: { $in: idForms(projectIds) } }],
             }, 'find').catch(() => []),
             MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.HISTORY,

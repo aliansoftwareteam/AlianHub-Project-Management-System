@@ -8,6 +8,7 @@ const hlp = require("../../Tasks/helpers/helper");
 const {updateProjectInternal} = require("../../Project/controller/updateProject.js");
 const mongoose = require("mongoose")
 const { settingsCollectionDocs } = require("../../../Config/collections");
+const { idForms } = require("../../../utils/mongo-handler/objectIdKeys");
 
 exports.getMilestone = async (req, res) => {
     try {
@@ -25,7 +26,7 @@ exports.getMilestone = async (req, res) => {
 
         const query = {
             type: SCHEMA_TYPE.MILESTONE,
-            data: id === "Weekly" ? [{ billingPeriod: id }] : [{ projectId: id }]
+            data: id === "Weekly" ? [{ billingPeriod: id }] : [{ projectId: { $in: idForms(id) } }]
         };
 
         const response = await MongoDbCrudOpration(companyId, query, "findOne");
@@ -65,7 +66,7 @@ exports.getMilestoneByProject = async (req, res) => {
 
         const query = {
             type: SCHEMA_TYPE.MILESTONE,
-            data: [{ projectId: pid }]
+            data: [{ projectId: { $in: idForms(pid) } }]
         };
 
         const response = await MongoDbCrudOpration(companyId, query, "find");
@@ -162,7 +163,7 @@ exports.getMilestoneReport = async (req, res) => {
                 $and: [
                     { statusDate: { $gt: startDate } },
                     { statusDate: { $lt: endDate } },
-                    { projectId: { $in: element } },
+                    { projectId: { $in: idForms(element) } },
                     statusCondition
                 ]
             },
@@ -170,7 +171,7 @@ exports.getMilestoneReport = async (req, res) => {
                 $and: [
                     { minRefundDate: { $lt: endDate } },
                     { maxRefundDate: { $gt: startDate } },
-                    { projectId: { $in: element } },
+                    { projectId: { $in: idForms(element) } },
                     statusCondition
                 ]
             }
