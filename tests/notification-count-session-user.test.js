@@ -117,3 +117,39 @@ describe('updateunreadcommentscount takes the company and user from the verified
         expect(writtenUsers()).toEqual([OUTSIDER]);
     });
 });
+
+describe('a bump sent through the route', () => {
+    const bumpOf = () => countWrites().map(([, { data }]) => data[1].$inc);
+
+    it.each([
+        ['a large count', 500],
+        ['a negative count', -100],
+        ['a zero count', 0],
+    ])('raises a project count by one message whatever the body says, given %s', async (_label, messageCount) => {
+        const r = await call({ companyId: C, key: 1, projectId: PROJECT, userIds: [TEAMMATE], messageCount });
+
+        expect(r.body.status).toBe(true);
+        expect(bumpOf()).toEqual([{ [`project_${PROJECT}_comments`]: 1 }]);
+    });
+
+    it('raises a task count by one message whatever the body says', async () => {
+        const r = await call({ companyId: C, key: 2, projectId: PROJECT, sprintId: SPRINT, taskId: TASK, parentTaskId: TASK, userIds: [TEAMMATE], messageCount: 50, prevCount: 0 });
+
+        expect(r.body.status).toBe(true);
+        expect(bumpOf()).toEqual([{
+            [`task_${PROJECT}_${SPRINT}_${TASK}_comments`]: 1,
+            [`parentTask_${PROJECT}_${SPRINT}_${TASK}_comments`]: 1,
+        }]);
+    });
+
+    it.each([
+        ['a chat message count', { key: 3, messageId: TASK }],
+        ['a notification count', { key: 5, readAll: false }],
+    ])('refuses raising %s, which the app never sends, and writes nothing', async (_label, body) => {
+        const r = await call({ companyId: C, userIds: [TEAMMATE], ...body });
+
+        expect(r.code).toBe(403);
+        expect(r.body.status).toBe(false);
+        expect(countWrites()).toHaveLength(0);
+    });
+});
