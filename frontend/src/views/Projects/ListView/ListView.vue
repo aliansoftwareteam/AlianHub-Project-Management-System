@@ -1,5 +1,5 @@
 <template>
-<div ref="viewRoot" class="w-100 list-view-wrapper ah-page lv2" :style="listGridStyle">
+<div ref="viewRoot" class="w-100 list-view-wrapper ah-page lv2" :class="{ 'lv2--sorted': !sortState.isManual.value }" :style="listGridStyle">
     <div v-if="!currentCompany?.planFeature?.listView">
         <UpgradePlan
             :buttonText="$t('Upgrades.upgrade_your_plan')"
@@ -40,6 +40,15 @@
             </div>
             <template v-else-if="groupedTasks.length && (totalTasks || !countsSettled)">
                 <ListBulkBar v-if="project" :project="project" />
+                <ConvertToSubTaskSidebar
+                    v-if="rowMenu.moving.value"
+                    :closeSideBar="true"
+                    :isMoveTask="true"
+                    :isBulkMove="true"
+                    :task="{}"
+                    @isConvertSubtaskOPen="rowMenu.cancelMove"
+                    @bulkMoveConfirm="rowMenu.confirmMove"
+                />
                 <div class="lv2__scroll ah-scroll" id="list_scroll" role="table">
                     <div class="lv2__cols" role="row">
                         <span class="lv2__c-select" role="columnheader"><span class="ah-sr-only">{{ $t('List.col_select') }}</span></span>
@@ -52,6 +61,7 @@
                                 @move="columnState.move"
                                 @reset="columnState.reset"
                             />
+                            <ListSortControl :sort="sortState.sort.value" @key="sortState.setKey" @dir="sortState.setDir" />
                         </span>
                         <span
                             v-for="column in columnState.visibleColumns.value"
@@ -156,6 +166,10 @@ import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyStat
 import { openTask, useTaskSequenceSource } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { useListRowEdit } from './useListInlineEdit.js';
 import ViewColumnChooser from '@/views/Projects/components/columns/ViewColumnChooser.vue';
+import ListSortControl from './ListSortControl.vue';
+import ConvertToSubTaskSidebar from '@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue';
+import { useListRowMenu } from './useListRowMenu.js';
+import { useViewSort } from '@/views/Projects/composables/viewSort';
 import { columnCatalogue, gridTracks, listColumnClass, listColumnsAt, useViewColumns } from '@/views/Projects/composables/viewColumns';
 
 // UTILS
@@ -180,6 +194,10 @@ const agents = useProjectAgentActivity();
 const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
 const rowEdit = useListRowEdit(project, showArchived);
 provide('listRowEdit', rowEdit);
+const rowMenu = useListRowMenu(project, showArchived);
+provide('listRowMenu', rowMenu);
+const sortState = useViewSort(computed(() => project.value?._id), 'list');
+provide('listSort', sortState.sort);
 
 const listCatalogue = computed(() => columnCatalogue('list', {
     tagsOn: tagsOn.value,

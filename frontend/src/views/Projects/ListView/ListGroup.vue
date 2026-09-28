@@ -105,6 +105,7 @@ import { apiRequest } from "@/services";
 import { subtaskCreateAssignees } from "@/utils/assigneeOptions";
 import * as env from "@/config/env";
 import { pointsTotal } from "@/views/Projects/composables/taskPoints";
+import { MANUAL, sortTasks } from "@/views/Projects/composables/viewSort";
 
 defineOptions({ name: "ListGroup" });
 
@@ -126,6 +127,7 @@ const { applyDrag } = useListDragDrop();
 const showArchived = inject("showArchived", ref(false));
 const searchedTask = inject("searchedTask", ref(false));
 const taskCollapsed = inject("taskCollapsed", ref(true));
+const listSort = inject("listSort", ref(MANUAL));
 
 const creating = ref(false);
 const expandedIds = ref([]);
@@ -138,7 +140,7 @@ const canCreate = computed(() => !showArchived.value
     && checkPermission("task.task_list", props.project?.isGlobalPermission) === true);
 const canSelect = computed(() => !showArchived.value && checkPermission("task.task_status", props.project?.isGlobalPermission) === true);
 const canSetStatus = canSelect;
-const canDrag = computed(() => canSelect.value && !searchedTask.value && props.item.value !== "NO_DUE_DATE" && props.item.value !== "NEXT");
+const canDrag = computed(() => canSelect.value && !searchedTask.value && listSort.value.key === "manual" && props.item.value !== "NO_DUE_DATE" && props.item.value !== "NEXT");
 
 const storeTasks = computed(() => getters["projectData/tasks"]?.[props.project._id]?.[sprintId.value]?.tasks || []);
 const sourceTasks = computed(() => listSourceTasks({
@@ -151,7 +153,10 @@ const found = computed(() => (searchedTask.value
     ? null
     : getters["projectData/tasks"]?.[props.project._id]?.[sprintId.value]?.found?.[`${props.item.searchKey}_${props.item.searchValue}`] ?? null));
 
-const groupTasks = computed(() => groupRows(sourceTasks.value, props.item, showArchived.value));
+const groupTasks = computed(() => sortTasks(groupRows(sourceTasks.value, props.item, showArchived.value), listSort.value, {
+    priorities: getters["settings/companyPriority"] || [],
+    statuses: props.project?.taskStatusData || []
+}));
 
 const rows = ref([]);
 watch(groupTasks, (value) => { rows.value = [...value]; }, { immediate: true, deep: true });
