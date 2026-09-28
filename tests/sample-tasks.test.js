@@ -5,8 +5,8 @@
 
    Schema: the task document was once built by copying shapes from a create-project payload instead
    of reading the schema. Task_Leader is a required String holding a user id (an array, then an
-   empty string, both failed), status is an object, sprintArray holds the whole sprint document, and
-   TaskType stores the type's value ("task") rather than its display name. The insert failed inside
+   empty string, both failed), status is an object, sprintArray holds the sprint element the app's
+   own create stores ({ id, name } and the folder), and TaskType stores the type's value ("task") rather than its display name. The insert failed inside
    a catch that only logged, so a project appeared with no tasks and no error at all.
 
    Variety: eleven tasks still read as a blank project — every row To Do, nobody assigned, no dates,
@@ -43,7 +43,11 @@ const project = {
         { name: 'Complete', key: 2, type: 'close' },
     ],
 };
-const sprint = { _id: '67beeeea2930c35b90cd874c', name: 'List', projectId: project._id, tasks: 0 };
+const placed = (_id, name) => {
+    const id = new mongoose.Types.ObjectId(_id);
+    return { sprintId: id, sprintArray: { id, name } };
+};
+const sprint = placed('67beeeea2930c35b90cd874c', 'List');
 
 const build = (rows, from = 0) => buildTaskDocs(project, sprint, rows, from, OWNER);
 const demo = (focus = '') => build(demoTasksForFocus(focus));
@@ -85,10 +89,10 @@ describe('the task document matches the real schema', () => {
         }
     });
 
-    test('sprintArray holds the sprint document, not an array', () => {
+    test('sprintArray holds the sprint element the app reads, not the sprint document', () => {
         for (const doc of demo().docs) {
-            expect(Array.isArray(doc.sprintArray)).toBe(false);
-            expect(String(doc.sprintArray._id)).toBe(String(sprint._id));
+            expect(doc.sprintArray).toEqual(sprint.sprintArray);
+            expect(doc.sprintId).toBe(sprint.sprintId);
         }
     });
 
@@ -160,7 +164,7 @@ describe('the demo project looks worked-in — whatever the setup answer', () =>
         expect(parent.subTasks).toBe(kids.length);
         for (const kid of kids) {
             expect(kid.ParentTaskId).toBe(String(parent._id));
-            expect(kid.sprintId).toBe(String(sprint._id));
+            expect(kid.sprintId).toBe(sprint.sprintId);
             expect(kid.subTasks).toBe(0);
             expect(new TaskModel(kid).validateSync()).toBeUndefined();
         }
@@ -232,10 +236,8 @@ describe('the demo project is split across sprints', () => {
     });
 
     test('a subtask always sits in the same sprint as its parent', () => {
-        // Three distinct sprint documents, so a mismatch would show up as a different id.
-        const sprints = DEMO_SPRINTS.map((name, i) => ({
-            _id: `67beeeea2930c35b90cd87${40 + i}`, name, projectId: project._id, tasks: 0,
-        }));
+        // Three distinct sprints, so a mismatch would show up as a different id.
+        const sprints = DEMO_SPRINTS.map((name, i) => placed(`67beeeea2930c35b90cd87${40 + i}`, name));
         const { docs } = buildTaskDocs(project, sprints, demoTasksForFocus(''), 0, OWNER);
         const parent = docs.find((d) => d.subTasks > 0);
         const kids = docs.filter((d) => d.isParentTask === false);
@@ -244,9 +246,7 @@ describe('the demo project is split across sprints', () => {
     });
 
     test('the tasks that teach subtasks and comments are the ones that have them', () => {
-        const sprints = DEMO_SPRINTS.map((name, i) => ({
-            _id: `67beeeea2930c35b90cd87${40 + i}`, name, projectId: project._id, tasks: 0,
-        }));
+        const sprints = DEMO_SPRINTS.map((name, i) => placed(`67beeeea2930c35b90cd87${40 + i}`, name));
         const { docs, comments } = buildTaskDocs(project, sprints, demoTasksForFocus(''), 0, OWNER);
         expect(docs.find((d) => d.subTasks > 0).TaskName).toBe('Break a big task into subtasks');
         expect(docs.find((d) => String(d._id) === String(comments[0].taskId)).TaskName)

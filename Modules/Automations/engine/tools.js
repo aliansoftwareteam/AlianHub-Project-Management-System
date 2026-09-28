@@ -6,6 +6,7 @@ const { ACTOR_SERVICE, serviceStamp } = require('../../Agents/serviceIdentity');
 const socketEmitter = require('../../../event/socketEventEmitter');
 const knowledgeEvents = require('../../Knowledge/ingest/events');
 const { canPostToThread } = require('../../Comments/helpers/threadWriteAccess');
+const { sprintPlacementOf } = require('../../Tasks/helpers/sprintPlacement');
 
 // The only way an action is allowed to touch data.
 //
@@ -309,23 +310,21 @@ const createTask = async (companyId, projectId, { title, description = '', sprin
     const leader = String(leaderId || project.userId || project.createdBy || project.ProjectLeader || '').trim();
     if (!leader) throw new DeterministicError('no one to record as task leader');
 
-    let sprint = {};
+    let sprintDoc = null;
     if (sprintId) {
         const _sid = oid(sprintId);
-        const s = _sid ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: _sid }] }, 'findOne').catch(() => null) : null;
-        const owner = s && (s.projectId || s.ProjectID || s.ProjectId);
-        if (!s || (owner && String(owner) !== String(project._id))) throw new DeterministicError(`sprint ${sprintId} is not in this project`);
-        sprint = { sprintId: String(s._id), sprintArray: { id: String(s._id), name: s.sprintName || s.name || '' } };
+        sprintDoc = _sid ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: _sid }] }, 'findOne').catch(() => null) : null;
+        const owner = sprintDoc && (sprintDoc.projectId || sprintDoc.ProjectID || sprintDoc.ProjectId);
+        if (!sprintDoc || (owner && String(owner) !== String(project._id))) throw new DeterministicError(`sprint ${sprintId} is not in this project`);
     } else {
         // The schema requires a list; without a choice the task goes into the project's oldest live one.
         const lists = await Promise.resolve(MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.SPRINTS,
             data: [{ $or: [{ projectId: project._id }, { projectId: String(project._id) }, { ProjectID: project._id }], deletedStatusKey: { $in: [0, null] } }, {}, { sort: { createdAt: 1 }, limit: 1 }],
         }, 'find')).catch(() => null);
-        const s = Array.isArray(lists) ? lists[0] : null;
-        if (s) sprint = { sprintId: String(s._id), sprintArray: { id: String(s._id), name: s.sprintName || s.name || '' } };
+        sprintDoc = Array.isArray(lists) ? lists[0] : null;
     }
-
+    const sprint = sprintDoc ? (await sprintPlacementOf(companyId, sprintDoc)).set : {};
 
     const wanted = String(priority || '').toUpperCase();
     const _id = new mongoose.Types.ObjectId();
