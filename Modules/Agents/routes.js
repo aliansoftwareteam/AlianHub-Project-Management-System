@@ -2,6 +2,7 @@ const ctrl = require('./controller');
 const memoryCtrl = require('./memoryController');
 const skillsCtrl = require('./skillsController');
 const metricsCtrl = require('./metricsController');
+const builderCtrl = require('./builderController');
 const { agentPerimeter } = require('./guard');
 
 exports.init = (app) => {
@@ -21,6 +22,7 @@ exports.init = (app) => {
     app.get('/api/v2/agents/pipeline', ctrl.pipelineTasks);
     app.get('/api/v2/agents/release', ctrl.releaseCandidate);
     app.post('/api/v2/agents/pause-all', ctrl.pauseAll);
+    app.post('/api/v2/agents/draft', builderCtrl.draftAgent);
     app.get('/api/v2/agents/settings', ctrl.getSettings);
     app.put('/api/v2/agents/settings', ctrl.putSettings);
     app.get('/api/v2/agents/budget', ctrl.getBudget);

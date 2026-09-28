@@ -28,12 +28,13 @@ const describe = ({ task, subtasks, docs, comments }) => [
 
 /* Suggestions only: nothing is written here. The person applies them as a checklist or as
  * subtasks through the task's own write paths. */
-async function suggestNextSteps({ companyId, uid, taskId }) {
-    const ctx = await taskContext({ companyId, uid, taskId });
+async function suggestNextSteps({ companyId, uid, taskId, tokenProjectIds = [], about = '' }) {
+    const ctx = await taskContext({ companyId, uid, taskId, tokenProjectIds });
     if (!ctx) return { status: false, notFound: true, code: 'task_not_found', reason: 'Task not found.' };
     const outcome = await askJson({
         system: SYSTEM,
         data: describe(ctx),
+        about,
         maxTokens: 600,
         spend: { feature: FEATURES.TASK_ASSIST, companyId, userId: uid },
     });

@@ -31,9 +31,9 @@ const isWebUrl = (url) => {
 
 /* Only the task's own name and description leave the workspace as the search query: never its
  * comments, subtasks or docs. */
-async function researchTask({ companyId, uid, taskId, search }) {
+async function researchTask({ companyId, uid, taskId, tokenProjectIds = [], search }) {
     if (typeof search !== 'function') return { status: false, notAvailable: true, code: 'research_not_available', reason: 'Research is not available on this instance.' };
-    const ctx = await taskContext({ companyId, uid, taskId });
+    const ctx = await taskContext({ companyId, uid, taskId, tokenProjectIds });
     if (!ctx) return { status: false, notFound: true, code: 'task_not_found', reason: 'Task not found.' };
     const query = clip(`${ctx.task.TaskName} ${clip(ctx.task.rawDescription, 200)}`, 300);
     const found = ((await search(query)) || []).filter((r) => r && isWebUrl(r.url)).slice(0, MAX_RESULTS);

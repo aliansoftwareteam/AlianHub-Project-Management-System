@@ -178,6 +178,34 @@ describe('Suggest next steps', () => {
     });
 });
 
+describe("the asker's own notes", () => {
+    beforeEach(() => seed(SCHEMA_TYPE.AI_PROFILES, { ownerId: ME, nickname: 'Mev', preferences: 'Short bullet points', facts: [] }));
+
+    it('shape Ask about this task and Suggest next steps for the person asking', async () => {
+        mockChat.mockResolvedValue(reply('Ready [AH-1].'));
+        await ask(request({ question: 'Ready?', taskId: String(parent._id) }), fakeRes());
+        expect(promptOf(mockChat.mock.calls[0])).toContain('Short bullet points');
+
+        mockChat.mockResolvedValue(reply({ steps: ['One', 'Two', 'Three'] }));
+        await assist.nextSteps(request({ taskId: String(parent._id) }), fakeRes());
+        const content = mockChat.mock.calls[1][0].messages[0].content;
+        expect(content).toContain('about_the_asker');
+        expect(content).toContain('Short bullet points');
+        expect(content.indexOf('about_the_asker')).toBeLessThan(content.indexOf('workspace_data'));
+    });
+
+    it('are left out for a narrowed API token', async () => {
+        mockChat.mockResolvedValue(reply({ steps: ['One', 'Two', 'Three'] }));
+        await assist.nextSteps(request({ taskId: String(parent._id) }, { apiToken: { projectIds: [OPEN] } }), fakeRes());
+        expect(promptOf(mockChat.mock.calls[0])).not.toContain('Short bullet points');
+
+        const outside = fakeRes();
+        await assist.nextSteps(request({ taskId: String(parent._id) }, { apiToken: { projectIds: [HIDDEN_PROJECT] } }), outside);
+        expect(outside.statusCode).toBe(404);
+        expect(mockChat).toHaveBeenCalledTimes(1);
+    });
+});
+
 describe('Research this', () => {
     it('is hidden while the instance allows no outbound web access for AI', async () => {
         expect(research.capability()).toMatchObject({ available: false, reason: 'egress_off' });

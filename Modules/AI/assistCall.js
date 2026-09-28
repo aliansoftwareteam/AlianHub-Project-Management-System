@@ -8,13 +8,13 @@ const logger = require('../../Config/loggerConfig');
 
 /* One JSON answer for the task and editor assists. The workspace text goes in as data, never as
  * instructions, and the spend meter behind chat() books the call, holds the budget and refuses
- * while AI is off. */
-async function askJson({ system, data, maxTokens, spend, temperature = 0.3 }) {
+ * while AI is off. `about` is the asker's own block from aiProfile, already tagged and escaped. */
+async function askJson({ system, data, maxTokens, spend, temperature = 0.3, about = '' }) {
     if (!providerFactory.isAnyProviderConfigured()) return { ok: false, code: 'unconfigured', reason: 'No model is configured.' };
     try {
         const result = await providerFactory.getProvider().chat({
             systemPrompt: untrusted.withNotice(system),
-            messages: [{ role: 'user', content: untrusted.wrap(data) }],
+            messages: [{ role: 'user', content: [about, untrusted.wrap(data)].filter(Boolean).join('\n\n') }],
             jsonMode: true,
             temperature,
             maxTokens,

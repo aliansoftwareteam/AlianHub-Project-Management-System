@@ -22,6 +22,7 @@ const FEATURES = Object.freeze({
     KNOWLEDGE_EMBED: 'knowledge_embed',
     TASK_ASSIST: 'task_assist',
     WRITING_ASSIST: 'writing_assist',
+    AGENT_BUILDER: 'agent_builder',
 });
 
 const UNKNOWN_FEATURE = 'unknown';

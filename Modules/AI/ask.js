@@ -13,6 +13,8 @@ const knowledgeFlag = require('../Knowledge/flag');
 const { askSources } = require('../Knowledge/askSources');
 const { structuredTasks } = require('./askStructured');
 const { gatherForTask } = require('./taskContext');
+const { isNarrowed } = require('../../Config/tokenNarrowing');
+const { aboutAsker } = require('./aiProfile');
 
 // Ask (handoff 13i) — a question box over the workspace.
 //
@@ -48,6 +50,9 @@ const orRegex = (terms, fields) => {
 /* An API token narrowed to some projects asks inside them only, as it does over MCP. An empty list
  * is a token that is not narrowed. */
 const tokenProjectIdsOf = (req) => (req.apiToken && Array.isArray(req.apiToken.projectIds) ? req.apiToken.projectIds.map(String) : []);
+
+/* A narrowed token may belong to an integration, so it never carries the person's private notes. */
+const aboutOf = (req, companyId, uid) => (isNarrowed(req.apiToken) ? Promise.resolve('') : aboutAsker(companyId, uid));
 
 const openProjects = async (companyId, uid, tokenProjectIds = []) => {
     const projects = await visibleProjects(companyId, uid);
@@ -186,8 +191,9 @@ const filterBlock = (intent) => {
     return [`TASK FILTER: tasks ${describeFilter(intent)}. Today is ${intent.today} (${intent.timeZone}).`, rows, ''];
 };
 
-/* `intent` is optional: without it the prompt is the one Ask has always sent. */
-const promptFor = (question, sources, intent) => [
+/* `intent` and `about` are optional: without them the prompt is the one Ask has always sent. */
+const promptFor = (question, sources, intent, about) => [
+    ...(about ? [about, ''] : []),
     'QUESTION:',
     question,
     '',
@@ -245,10 +251,11 @@ const ask = async (req, res) => {
             });
         }
 
+        const about = await aboutOf(req, companyId, uid);
         const provider = getProvider();
         const result = await provider.chat({
             systemPrompt: research ? RESEARCH_SYSTEM : SYSTEM,
-            messages: [{ role: 'user', content: promptFor(gathered.focus ? `${gathered.focus}\n${question}` : question, gathered.sources, gathered.intent) }],
+            messages: [{ role: 'user', content: promptFor(gathered.focus ? `${gathered.focus}\n${question}` : question, gathered.sources, gathered.intent, about) }],
             maxTokens: research ? RESEARCH_TOKENS : ASK_TOKENS,
             temperature: 0.2,
             spend: { feature: FEATURES.ASK, companyId, userId: uid },
@@ -308,4 +315,4 @@ const sources = async (req, res) => {
 };
 
 module.exports = { ask, sources, gather, searchTerms, promptFor };
-Object.assign(module.exports, { SYSTEM, RESEARCH_SYSTEM, openProjects, tokenProjectIdsOf, MAX_PER_TYPE, ASK_TOKENS, RESEARCH_TOKENS });
+Object.assign(module.exports, { SYSTEM, RESEARCH_SYSTEM, openProjects, tokenProjectIdsOf, aboutOf, MAX_PER_TYPE, ASK_TOKENS, RESEARCH_TOKENS });

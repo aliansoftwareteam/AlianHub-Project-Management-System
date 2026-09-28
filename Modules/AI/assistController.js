@@ -5,6 +5,7 @@ const { tenantOf } = require('../../Config/tenant');
 const { suggestNextSteps } = require('./taskAssist');
 const taskResearch = require('./taskResearch');
 const { improveSelection, splitSelection } = require('./selectionAssist');
+const { aboutOf, tokenProjectIdsOf } = require('./ask');
 
 const send = (res, result) => {
     if (result.status) return res.send({ status: true, data: result.data });
@@ -21,7 +22,7 @@ const handler = (name, run) => async (req, res) => {
     }
     if (!req.uid) return res.status(401).send({ status: false, statusText: 'An authenticated user is required.', code: 'unauthenticated' });
     try {
-        return send(res, await run({ companyId, uid: String(req.uid), body: req.body || {} }));
+        return send(res, await run({ req, companyId, uid: String(req.uid), body: req.body || {} }));
     } catch (error) {
         logger.error(`ai ${name}: ${error.message}`);
         return res.send({ status: false, statusText: 'Something went wrong. Try again.', code: 'failed' });
@@ -32,12 +33,14 @@ const handler = (name, run) => async (req, res) => {
 exports.capabilities = handler('task assist capabilities', async () => ({ status: true, data: { research: taskResearch.capability().available } }));
 
 /* POST /api/v1/ai/task-next-steps  body: { taskId } */
-exports.nextSteps = handler('next steps', ({ companyId, uid, body }) => suggestNextSteps({ companyId, uid, taskId: String(body.taskId || '') }));
+exports.nextSteps = handler('next steps', async ({ req, companyId, uid, body }) => suggestNextSteps({
+    companyId, uid, taskId: String(body.taskId || ''), tokenProjectIds: tokenProjectIdsOf(req), about: await aboutOf(req, companyId, uid),
+}));
 
 /* POST /api/v1/ai/task-research  body: { taskId } — refused before any read while research is unavailable. */
-exports.research = handler('task research', ({ companyId, uid, body }) => {
+exports.research = handler('task research', ({ req, companyId, uid, body }) => {
     const { search } = taskResearch.capability();
-    return taskResearch.researchTask({ companyId, uid, taskId: String(body.taskId || ''), search });
+    return taskResearch.researchTask({ companyId, uid, taskId: String(body.taskId || ''), tokenProjectIds: tokenProjectIdsOf(req), search });
 });
 
 /* POST /api/v1/ai/selection/improve  body: { mode, text, language? } */

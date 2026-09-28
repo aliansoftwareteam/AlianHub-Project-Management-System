@@ -14,15 +14,21 @@
                 </slot>
                 <div class="border-bottom-mobiledrop cursor-default mobile-title-header p-20px box-sizing-box" v-else :style="{height : clientWidth <=767 ? '64px' : ''}">
                     <div>
-                        <slot name="head">
+                        <slot v-if="!mode || ($slots.head && headDismisses)" name="head">
                             <div class="d-flex justify-content-between align-items-center">
                                 <span class="font-weight-bold text-ellipsis project-list-mobiletitle mw-85">{{title}}</span>
-                                <button v-if="mode" type="button" class="dropdown-close-btn" :aria-label="$t('Common.close')" @click.stop="close()">
-                                    <img :src="closeIcon" alt="" class="cursor-pointer mobileCloseIcon">
-                                </button>
-                                <img v-else :src="closeIcon" alt="close" class="cursor-pointer mobileCloseIcon" @click.stop="buttonClick()">
+                                <img :src="closeIcon" alt="close" class="cursor-pointer mobileCloseIcon" @click.stop="buttonClick()">
                             </div>
                         </slot>
+                        <div v-else class="d-flex justify-content-between align-items-center">
+                            <div v-if="$slots.head" class="dropdown-sheet-head">
+                                <slot name="head"></slot>
+                            </div>
+                            <span v-else class="font-weight-bold text-ellipsis project-list-mobiletitle mw-85">{{title}}</span>
+                            <button type="button" class="dropdown-close-btn" :aria-label="$t('Common.close')" @click.stop="close()">
+                                <img :src="closeIcon" alt="" class="cursor-pointer mobileCloseIcon">
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div v-if="options" :style="`padding: ${clientWidth > 767 ? '10px 10px 10px' : '20px;'}`"  class="search-project-filter dropdown_option font-size-12">
@@ -102,6 +108,10 @@ const props = defineProps({
     keepSameWidth:{
         type: Boolean,
         default:false
+    },
+    headDismisses: {
+        type: Boolean,
+        default: false
     }
 });
 
