@@ -209,6 +209,7 @@ module.exports.AGENTS = '/api/v2/agents';
 module.exports.AGENT_METRICS = '/api/v2/agents/metrics';
 module.exports.AGENT_ALERTS = '/api/v2/agents/alerts';
 module.exports.AGENT_RUNS = '/api/v2/agents/runs';
+module.exports.AGENTS_RUNNABLE = '/api/v2/agents/runnable';
 module.exports.AGENT_SESSIONS = '/api/v2/agent-sessions';
 module.exports.TIMESHEET_HOURS_BY_SOURCE = '/api/v1/timesheet/hours-by-source';
 module.exports.AGENT_PROPOSALS = '/api/v2/agents/proposals';

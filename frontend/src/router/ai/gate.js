@@ -5,7 +5,7 @@ import { AI_STATE } from "@/composable/aiAvailability";
  * coding accounts and MCP tokens, connections, workflows) is configuration or history and makes
  * no model call of its own, so it stays reachable whatever the switch says; the server refuses
  * any model call it would trigger. */
-export const MODEL_DRIVEN_ROUTES = Object.freeze(["AiAsk", "AiInbox", "AiHub", "AiPipeline", "AiRelease"]);
+export const MODEL_DRIVEN_ROUTES = Object.freeze(["AiAsk", "AiInbox", "AiHub", "AiPipeline", "AiRelease", "AiRun"]);
 
 export const AI_GATE = Object.freeze({ PAGE: "page", NOTICE: "notice" });
 

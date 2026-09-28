@@ -88,5 +88,11 @@ export default [
         name: 'AiAccounts',
         component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiAccounts.vue'),
         meta: { title: 'Coding accounts', requiresAuth: true }
+    },
+    {
+        path: '/:cid/ai/runs/:runId',
+        name: 'AiRun',
+        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AgentRunPage.vue'),
+        meta: { title: 'Agent run', requiresAuth: true }
     }
 ];

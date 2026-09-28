@@ -28,8 +28,10 @@
                         :users="task.AssigneeUserId"
                         :addUser="checkPermission('task.task_assignee',project?.isGlobalPermission) === true"
                         :options="permittedOptions"
+                        :agents="runnableAgents"
                         @selected="updateAssignee($event, checkApps('MultipleAssignees',project) ? 'add' : 'replace')"
                         @removed="updateAssignee($event, 'remove')"
+                        @agent="startAgent"
                         imageWidth="30px"
                         :showAddUser="true"
                         :zIndexAssigne="props.zIndexAssigne"
@@ -274,6 +276,7 @@ import * as env from '@/config/env';
 import { permittedAssignees, scopedAssignees, selfAssignable } from '@/utils/assigneeOptions';
 import Modal from '@/components/atom/Modal/Modal.vue';
 import { showUndoToast } from '@/composable/useUndoToast';
+import { assignAgent, fetchRunnableAgents } from '@/views/Ai/useRunnableAgents';
 
 // Icon for the "Generate estimate using AI" sidebar button. Same asset
 // the SubTasks / Checklist / Sprints components use for their AI actions
@@ -329,6 +332,24 @@ const props = defineProps({
     },
     clientWidth: Number,
 })
+
+const emit = defineEmits(["agent-run"]);
+
+const runnableAgents = ref([]);
+watch(() => props.task?._id, async (taskId) => {
+    const agents = await fetchRunnableAgents(taskId);
+    if (taskId === props.task?._id) runnableAgents.value = agents;
+}, { immediate: true });
+
+async function startAgent(option) {
+    try {
+        await assignAgent(option.agentId, props.task._id);
+        $toast.success(t('TaskPanel.agent_assigned', { name: option.label }), { position: 'top-right' });
+        emit('agent-run');
+    } catch (error) {
+        $toast.error(error?.response?.data?.statusText || error.message || t('TaskPanel.agent_assign_failed'), { position: 'top-right' });
+    }
+}
 
 //ref
 const taskLeaderData = ref(getUser(props.task?.Task_Leader));
