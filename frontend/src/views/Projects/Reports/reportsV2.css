@@ -56,7 +56,7 @@ button.rp-row:hover .rp-row__name { color: var(--brand); text-decoration: underl
 
 .rp-note { padding: 11px 13px; background: var(--surface); border: 1px solid var(--hairline); border-radius: 10px; font: var(--text-small); line-height: 1.5; color: var(--ink-2); }
 .rp-note--brand { border-color: var(--brand-border); color: var(--ink); }
-.rp-spark { color: var(--brand); font-weight: 600; }
+.rp-spark { color: var(--ink-2); vertical-align: -2px; }
 
 .rp-table { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-card); overflow: hidden; }
 .rp-thead, .rp-tr { display: grid; grid-template-columns: minmax(0, 1fr) 110px 100px 90px 96px; gap: 10px; padding: 10px 14px; align-items: center; }

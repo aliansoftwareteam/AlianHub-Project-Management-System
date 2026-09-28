@@ -29,6 +29,9 @@ vi.mock('@/components/atom/SpinnerComp/SpinnerComp.vue', () => stub('SpinnerComp
 vi.mock('@/components/atom/Skelaton/AiSkelaton.vue', () => stub('Skelaton'));
 
 import SubTasks from '@/components/organisms/SubTasks/SubTasks.vue';
+import { applyAiAvailability } from '@/composable/aiAvailability';
+
+applyAiAvailability({ state: 'on', planAllowsAi: true, loaded: true });
 
 function mountSubTasks() {
     const store = createStore({
@@ -40,7 +43,7 @@ function mountSubTasks() {
     });
     return mount(SubTasks, {
         props: { task: { _id: 'task-1', TaskName: 'Launch', rawDescription: '', sprintArray: {} } },
-        global: { plugins: [store], provide: { selectedProject: ref({ _id: 'proj-1', isGlobalPermission: false }) } }
+        global: { plugins: [store], provide: { selectedProject: ref({ _id: 'proj-1', isGlobalPermission: false, apps: [{ key: 'AI' }] }) } }
     });
 }
 

@@ -19,8 +19,8 @@
                 appKey="tags" class="mb-1"
             />
             <Description
-                v-if="show.description && checkPermission('task.task_description',projectData?.isGlobalPermission) !== null && checkApps('AI',projectData) !== undefined && checkPermission('task.task_description',projectData?.isGlobalPermission) !== undefined && Object.keys(projectData).length > 0"
-                :isShowAi="checkApps('AI',projectData) && checkPermission('task.task_description',projectData?.isGlobalPermission) == true"
+                v-if="show.description && checkPermission('task.task_description',projectData?.isGlobalPermission) !== null && checkPermission('task.task_description',projectData?.isGlobalPermission) !== undefined && Object.keys(projectData).length > 0"
+                :isShowAi="canUseAi({ project: projectData, permitted: checkPermission('task.task_description',projectData?.isGlobalPermission) == true })"
                 :description="task?.descriptionBlock ? task.descriptionBlock : task.description"
                 :editPermission="checkPermission('task.task_description',projectData?.isGlobalPermission)"
                 :minlength="10"
@@ -149,6 +149,7 @@ import * as env from '@/config/env';
 
 // UTILS
 import { useCustomComposable, useGetterFunctions } from '@/composable';
+import { canUseAi } from '@/composable/aiAvailability';
 import taskClass from '@/utils/TaskOperations';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock.vue';

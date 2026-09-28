@@ -16,7 +16,7 @@
 
             <template v-if="building && canManage">
                 <div class="au__sentence">
-                    <ShellIcon name="ai" :size="14" class="au__spark" />
+                    <ShellIcon name="automations" :size="14" class="au__lead" />
                     <input
                         ref="sentenceInput"
                         v-model="sentence"
