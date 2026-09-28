@@ -12,6 +12,7 @@ const { updateUserFun } = require('../Users/controller');
 const { storeRefferalCode } = require('../Affiliate/controller');
 const { planObj } = require('./defaultSubscriptionData');
 const { createDemoProject } = require('./demoProject');
+const { ensureViewCatalogue } = require('../projectTabs/catalogue');
 const vectorStore = require('../Knowledge/vectorStore');
 const { handleCreateCompanyDataStorageFun } = require(`../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
 
@@ -73,6 +74,8 @@ async function createFirstCompany({ userId, email, companyName, teamFocus = '', 
         ensureNotificationDefaults(companyId, userId),
     ]);
     side.filter((r) => r.status === 'rejected').forEach((r) => logger.error(`setup: company side step failed: ${r.reason?.message || r.reason}`));
+    // The settings import stops at its first failed batch, which can leave the view catalogue unseeded.
+    await ensureViewCatalogue(companyId).catch((error) => logger.error(`setup: project view catalogue failed: ${error.message}`));
     vectorStore.prepareCompany(companyId);
 
     await updateUserFun(SCHEMA_TYPE.GOLBAL, {
