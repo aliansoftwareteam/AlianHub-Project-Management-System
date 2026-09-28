@@ -78,27 +78,27 @@
                 </div>
             </span>
 
-            <DropDown :id="`mc_menu_${message._id}`" :zIndex="1300">
-                <template #button>
-                    <button :ref="`mcMenu${message._id}`" type="button" :title="$t('MainChat.more')"><MainChatIcon name="more" :size="15" /></button>
+            <DropDown mode="menu" :id="`mc_menu_${message._id}`" :zIndex="1300">
+                <template #button="{ triggerAttrs }">
+                    <button type="button" :title="$t('MainChat.more')" v-bind="triggerAttrs"><MainChatIcon name="more" :size="15" /></button>
                 </template>
                 <template #options>
-                    <DropDownOption @click="closeMenu(), $emit('copy', message)">
+                    <DropDownOption @click="$emit('copy', message)">
                         <span class="mc-menu-item">{{ $t('MainChat.copy') }}</span>
                     </DropDownOption>
-                    <DropDownOption @click="closeMenu(), $emit('reply', message)">
+                    <DropDownOption @click="$emit('reply', message)">
                         <span class="mc-menu-item">{{ $t('MainChat.reply') }}</span>
                     </DropDownOption>
-                    <DropDownOption v-if="canEdit" @click="closeMenu(), $emit('edit', message)">
+                    <DropDownOption v-if="canEdit" @click="$emit('edit', message)">
                         <span class="mc-menu-item">{{ $t('MainChat.edit') }}</span>
                     </DropDownOption>
-                    <DropDownOption @click="closeMenu(), $emit('pin', message)">
+                    <DropDownOption @click="$emit('pin', message)">
                         <span class="mc-menu-item">{{ message.pinnedMessage ? $t('MainChat.unpin') : $t('MainChat.pin') }}</span>
                     </DropDownOption>
-                    <DropDownOption @click="closeMenu(), $emit('mark-unread', message)">
+                    <DropDownOption @click="$emit('mark-unread', message)">
                         <span class="mc-menu-item">{{ $t('MainChat.mark_unread') }}</span>
                     </DropDownOption>
-                    <DropDownOption v-if="message.sent" @click="closeMenu(), $emit('remove', message)">
+                    <DropDownOption v-if="message.sent" @click="$emit('remove', message)">
                         <span class="mc-menu-item mc-menu-item--danger">{{ $t('MainChat.delete') }}</span>
                     </DropDownOption>
                 </template>
@@ -113,7 +113,7 @@
  * messages from the same author inside the grouping window drops the repeated
  * header. Agent posts carry the rounded-square avatar and the AGENT tag.
  */
-import { computed, defineProps, defineEmits, getCurrentInstance, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, defineProps, defineEmits, onBeforeUnmount, ref, watch } from 'vue';
 import moment from 'moment';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
@@ -135,8 +135,6 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['reply', 'copy', 'remove', 'retry', 'preview', 'react', 'pin', 'mark-unread', 'edit', 'make-task', 'save-later', 'transcribed']);
-
-const instance = getCurrentInstance();
 
 // Must match the backend allowlist in Modules/Reactions/helpers/reactionRules.js
 const REACTION_EMOJIS = ['👍', '❤️', '😄', '🎉', '😮', '😢', '🚀', '👀'];
@@ -196,11 +194,4 @@ const shortTime = computed(() => {
     if (!date.isValid()) return '';
     return date.format(props.hour12 ? 'h:mm A' : 'HH:mm');
 });
-
-// DropDown exposes no close method, so its trigger is re-clicked to dismiss it.
-function closeMenu() {
-    const refs = instance && instance.refs;
-    const trigger = refs && refs[`mcMenu${props.message._id}`];
-    if (trigger && trigger.click) trigger.click();
-}
 </script>

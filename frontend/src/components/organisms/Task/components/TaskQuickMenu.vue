@@ -1,56 +1,57 @@
 <template>
     <DropDown
+        mode="menu"
         :title="task.TaskName"
         :bodyClass="{ 'tqm': true }"
         v-if="showArchiveVar ? task.deletedStatusKey === 2 : task.deletedStatusKey === 0"
     >
         <template #button>
-            <img :ref="task._id+'options'" :src="horizontalDots" alt="horizontalDots" id="taskquickmenudriver">
+            <img :src="horizontalDots" :alt="$t('Projects.task_actions')" id="taskquickmenudriver">
         </template>
         <template #options>
             <div id="taskquickmenu_driver" class="tqm__list">
                 <div class="ah-label tqm__label">{{ $t('Members.quick_menu') }}</div>
-                <DropDownOption @click="closeAnd($emit('copyLink'))" v-if="!showArchiveVar">
+                <DropDownOption @click="$emit('copyLink')" v-if="!showArchiveVar">
                     <span class="tqm__item">{{ $t('ProjectDetails.copy_task_link') }}</span>
                 </DropDownOption>
-                <DropDownOption @click="closeAnd($emit('copyKey'))" v-if="!showArchiveVar">
+                <DropDownOption @click="$emit('copyKey')" v-if="!showArchiveVar">
                     <span class="tqm__item">{{ $t('ProjectDetails.copy_task_key') }}</span>
                 </DropDownOption>
-                <DropDownOption v-if="(task.queueListArray == undefined || (task.queueListArray && task.queueListArray.indexOf(userId) == -1)) && (task.AssigneeUserId && task.AssigneeUserId.indexOf(userId) !== -1) && !showArchiveVar && checkPermission('task.queue_list',projectData.isGlobalPermission) == true" @click="closeAnd($emit('queue', 'add'))">
+                <DropDownOption v-if="(task.queueListArray == undefined || (task.queueListArray && task.queueListArray.indexOf(userId) == -1)) && (task.AssigneeUserId && task.AssigneeUserId.indexOf(userId) !== -1) && !showArchiveVar && checkPermission('task.queue_list',projectData.isGlobalPermission) == true" @click="$emit('queue', 'add')">
                     <span class="tqm__item">{{ $t('ProjectDetails.add_que_list') }}</span>
                 </DropDownOption>
-                <DropDownOption v-if="(task.queueListArray && task.queueListArray.indexOf(userId) !== -1) && (task.AssigneeUserId && task.AssigneeUserId.indexOf(userId) !== -1) && !showArchiveVar && checkPermission('task.queue_list',projectData.isGlobalPermission) == true" @click="closeAnd($emit('queue', 'remove'))">
+                <DropDownOption v-if="(task.queueListArray && task.queueListArray.indexOf(userId) !== -1) && (task.AssigneeUserId && task.AssigneeUserId.indexOf(userId) !== -1) && !showArchiveVar && checkPermission('task.queue_list',projectData.isGlobalPermission) == true" @click="$emit('queue', 'remove')">
                     <span class="tqm__item">{{ $t('ProjectDetails.remove_from_queue_list') }}</span>
                 </DropDownOption>
-                <DropDownOption @click="closeAnd($emit('convertToSubTask'))" v-if="checkPermission('task.sub_task_create',projectData.isGlobalPermission) === true && !showArchiveVar && task.isParentTask && checkPermission('task.task_convert_to_subtask',projectData.isGlobalPermission) === true">
+                <DropDownOption @click="$emit('convertToSubTask')" v-if="checkPermission('task.sub_task_create',projectData.isGlobalPermission) === true && !showArchiveVar && task.isParentTask && checkPermission('task.task_convert_to_subtask',projectData.isGlobalPermission) === true">
                     <span class="tqm__item">{{ $t('ProjectDetails.convert_subtask') }}</span>
                 </DropDownOption>
-                <DropDownOption @click="closeAnd($emit('convertToList'))" v-if="checkPermission('project.project_sprint_create',projectData.isGlobalPermission) === true && !showArchiveVar && checkPermission('task.task_convert_to_list',projectData.isGlobalPermission) === true">
+                <DropDownOption @click="$emit('convertToList')" v-if="checkPermission('project.project_sprint_create',projectData.isGlobalPermission) === true && !showArchiveVar && checkPermission('task.task_convert_to_list',projectData.isGlobalPermission) === true">
                     <span class="tqm__item">{{ $t('ProjectDetails.convert_list') }}</span>
                 </DropDownOption>
-                <DropDownOption @click="closeAnd($emit('convertToTask'))" v-if="task.isParentTask === false && checkPermission('task.task_create',projectData.isGlobalPermission) === true && checkPermission('task.convert_to_task',projectData.isGlobalPermission) === true && !showArchiveVar">
+                <DropDownOption @click="$emit('convertToTask')" v-if="task.isParentTask === false && checkPermission('task.task_create',projectData.isGlobalPermission) === true && checkPermission('task.convert_to_task',projectData.isGlobalPermission) === true && !showArchiveVar">
                     <span class="tqm__item">{{ $t('ProjectDetails.convert_task') }}</span>
                 </DropDownOption>
-                <DropDownOption @click="closeAnd($emit('duplicate'))" v-if="!showArchiveVar && checkPermission('task.task_duplicate',projectData.isGlobalPermission) === true">
+                <DropDownOption @click="$emit('duplicate')" v-if="!showArchiveVar && checkPermission('task.task_duplicate',projectData.isGlobalPermission) === true">
                     <span class="tqm__item">{{ $t('Projects.duplicate') }}</span>
                 </DropDownOption>
-                <DropDownOption @click="closeAnd($emit('move'))" v-if="!showArchiveVar && checkPermission('task.task_move',projectData.isGlobalPermission) == true">
+                <DropDownOption @click="$emit('move')" v-if="!showArchiveVar && checkPermission('task.task_move',projectData.isGlobalPermission) == true">
                     <span class="tqm__item">{{ $t('ProjectDetails.move') }}</span>
                 </DropDownOption>
-                <DropDownOption @click="closeAnd($emit('merge'))" v-if="!showArchiveVar && checkPermission('task.task_merge',projectData.isGlobalPermission) == true">
+                <DropDownOption @click="$emit('merge')" v-if="!showArchiveVar && checkPermission('task.task_merge',projectData.isGlobalPermission) == true">
                     <span class="tqm__item">{{ $t('ProjectDetails.merge') }}</span>
                 </DropDownOption>
-                <DropDownOption @click="closeAnd($emit('askAi'))" v-if="hasAiListener">
+                <DropDownOption @click="$emit('askAi')" v-if="hasAiListener">
                     <span class="tqm__item tqm__item--ai">✦ {{ $t('Members.ask_ai') }}</span>
                 </DropDownOption>
-                <DropDownOption v-if="(task.deletedStatusKey === undefined || task.deletedStatusKey === 0) && !showArchiveVar && checkPermission('task.task_archive',projectData.isGlobalPermission) == true" @click="closeAnd($emit('confirmArchive'))">
+                <DropDownOption v-if="(task.deletedStatusKey === undefined || task.deletedStatusKey === 0) && !showArchiveVar && checkPermission('task.task_archive',projectData.isGlobalPermission) == true" @click="$emit('confirmArchive')">
                     <span class="tqm__item">{{ $t('Projects.archive') }}</span>
                 </DropDownOption>
-                <DropDownOption v-if="task.deletedStatusKey === 2" @click="closeAnd($emit('restore'))">
+                <DropDownOption v-if="task.deletedStatusKey === 2" @click="$emit('restore')">
                     <span class="tqm__item">{{ $t('Projects.restore') }}</span>
                 </DropDownOption>
                 <div class="tqm__sep" v-if="checkPermission('task.task_delete',projectData.isGlobalPermission) == true"></div>
-                <DropDownOption @click="closeAnd($emit('confirmDelete'))" v-if="checkPermission('task.task_delete',projectData.isGlobalPermission) == true">
+                <DropDownOption @click="$emit('confirmDelete')" v-if="checkPermission('task.task_delete',projectData.isGlobalPermission) == true">
                     <span class="tqm__item tqm__item--danger">
                         {{ $t('Projects.delete') }}
                         <span class="tqm__hint">{{ $t('Members.admin_only') }}</span>
@@ -69,7 +70,7 @@ import { useCustomComposable } from '@/composable';
 
 const { checkPermission } = useCustomComposable();
 
-const props = defineProps({
+defineProps({
     task: { type: Object, required: true },
     projectData: { type: Object, required: true },
     showArchiveVar: { type: Boolean, default: false },
@@ -97,13 +98,6 @@ const instance = getCurrentInstance();
 // The AI entry only appears where a parent actually wired it up; an item that
 // does nothing is worse than no item.
 const hasAiListener = computed(() => !!instance?.vnode?.props?.onAskAi);
-
-function closeAnd() {
-    const ref = instance?.proxy?.$refs?.[props.task._id + 'options'];
-    if (ref && typeof ref.click === 'function') {
-        ref.click();
-    }
-}
 
 const horizontalDots = require('@/assets/images/svg/horizontalDots.svg');
 </script>

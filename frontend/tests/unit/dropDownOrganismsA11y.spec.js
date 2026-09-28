@@ -23,13 +23,15 @@ const popup = () => document.getElementById(trigger().getAttribute('aria-control
 const items = () => [...document.querySelectorAll('#my-dropdown .drop-down-item')];
 const itemNamed = (text) => items().find((el) => el.textContent.includes(text));
 const isOpen = () => document.querySelector('#my-dropdown .drop-down-menu') !== null;
-const open = async () => {
-    trigger().click();
-    await flushPromises();
-};
 const settle = async () => {
     vi.advanceTimersByTime(150);
     await flushPromises();
+};
+// Vue ignores an event no newer than the listener it reaches, so the clock moves on once the panel has rendered.
+const open = async () => {
+    trigger().click();
+    await flushPromises();
+    await settle();
 };
 
 beforeEach(() => {
@@ -53,7 +55,7 @@ describe('the task quick menu', () => {
         expect(button.tagName).toBe('BUTTON');
         expect(button.getAttribute('aria-haspopup')).toBe('menu');
         expect(button.getAttribute('aria-expanded')).toBe('false');
-        expect(button.querySelector('img').getAttribute('alt')).toBe('ProjectDetails.task_actions');
+        expect(button.querySelector('img').getAttribute('alt')).toBe('Projects.task_actions');
         await open();
         expect(button.getAttribute('aria-expanded')).toBe('true');
         expect(popup().getAttribute('role')).toBe('menu');
