@@ -63,7 +63,7 @@
                                 <span v-for="key in tpl.skills" :key="key" class="ah-chip" :title="skillAbout(t, key)">{{ skillLabel(t, key) }}</span>
                             </div>
                             <p v-if="tpl.cadence" class="ah-small ac-card__line" data-test="catalogue-schedule">
-                                <ShellIcon name="clock" :size="12" />{{ $t(`AgentCatalogue.cadence_${tpl.cadence}`) }} · {{ $t('AgentCatalogue.schedule_later') }}
+                                <ShellIcon name="clock" :size="12" />{{ $t(`AgentCatalogue.cadence_${tpl.cadence}`) }} · {{ tpl.schedule ? $t('AgentCatalogue.schedule_report', { report: $t(`Ai.report_${tpl.schedule.report}`) }) : $t('AgentCatalogue.schedule_in_settings') }}
                             </p>
                             <p v-if="needsOf(tpl).length" class="ah-small ac-card__line" data-test="catalogue-needs">{{ $t('Ai.needs_line', { what: needsOf(tpl).join(' · ') }) }}</p>
                             <p v-if="blockOf(tpl, skillManifest)" class="ah-small ac-card__blocked">{{ $t(`AgentCatalogue.blocked_${blockOf(tpl, skillManifest)}`) }}</p>
