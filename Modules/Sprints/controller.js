@@ -92,17 +92,24 @@ exports.updateChannelsCounts = (companyId, isPrivate, type) => {
     })
 }
 
+const ICON_FIELDS = ['type', 'iconName', 'prefix', 'url'];
+
+/* A channel's icon is a Font Awesome glyph (prefix, iconName) or an uploaded image (url). */
+const iconFields = (icon) => Object.fromEntries(ICON_FIELDS
+    .filter((field) => icon && typeof icon === 'object' && typeof icon[field] === 'string')
+    .map((field) => [field, icon[field]]));
+
 exports.addSprintFun = (req) => {
     try {
         return new Promise(async(resolve, reject) => {
-            const {companyId, projectId, folder, sprintName, userData, isPreCompany = false, mainChat = false, private: isPrivate = false, sendMessage = true, AssigneeUserId = [], icon = {},from = '',taskSprintObj = {}} = req.body;
+            const {companyId, projectId, folder, sprintName, userData, isPreCompany = false, mainChat = false, private: isPrivate = false, sendMessage = true, AssigneeUserId = [], icon,from = '',taskSprintObj = {}} = req.body;
             const sprintObject = {
                 tasks : 0,
                 private: isPrivate,
                 name: sprintName,
                 deletedStatusKey : 0,
                 projectId : new mongoose.Types.ObjectId(projectId),
-                ...(Object.keys(icon || {}).length ? icon : {})
+                ...iconFields(icon),
             }
             if(mainChat) {
                 sprintObject.sendMessage = sendMessage;
