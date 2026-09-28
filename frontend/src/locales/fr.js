@@ -1129,7 +1129,16 @@ export default {
         "age_hours": "{n}h ago",
         "age_days": "{n}d ago",
         "age_months": "{n}mo ago",
-        "age_years": "{n}y ago"
+        "age_years": "{n}y ago",
+        "answer": "AI answer",
+        "answer_model": "Model that wrote the answer",
+        "ask_loading": "Finding an answer…",
+        "ask_failed": "AI could not answer that just now. Try again, or continue in Ask.",
+        "ask_no_model": "No AI model is connected, so there is no written answer. These are the sources it would have used.",
+        "ask_nothing": "Nothing you can open matches that question.",
+        "ask_continue": "Continue in Ask",
+        "group_sources": "Cited sources",
+        "hint_cancel": "cancel"
     },
     "Shell": {
         "home": "Home",
