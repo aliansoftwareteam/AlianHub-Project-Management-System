@@ -1,9 +1,9 @@
 /* 042 slice 13: the List sorts within each group by due, priority, created, updated, name or
    status; Manual keeps the drag order and is the default; a sorted list cannot be dragged. */
 import { describe, expect, test, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
-import { defineComponent, h, ref } from 'vue';
+import { computed, defineComponent, h, nextTick, ref } from 'vue';
 
 vi.mock('@/composable', () => ({
     useCustomComposable: () => ({ checkPermission: () => true, debounce: (fn) => fn })
@@ -17,8 +17,17 @@ vi.mock('@/views/Projects/ListView/useProjectAgentActivity.js', () => ({
     useProjectAgentActivity: () => ({ runFor: () => null, proposalFor: () => null, load: () => {} })
 }));
 vi.mock('@/views/Projects/ListView/useListDragDrop.js', () => ({ useListDragDrop: () => ({ applyDrag: vi.fn() }) }));
+vi.mock('@/views/Projects/composables/savedViewApi', () => ({
+    saveSharedViewSettings: vi.fn(async () => ({ status: true })),
+    createSharedView: vi.fn(async () => ({ status: true, data: {} })),
+    savePrivateViewSettings: vi.fn(async () => ({ status: true })),
+    createPrivateView: vi.fn(async () => ({ status: true }))
+}));
 
-import { MANUAL, SORT_KEYS, cleanSort, loadSort, saveSort, sortTasks, useViewSort } from '@/views/Projects/composables/viewSort';
+import { MANUAL, SORT_KEYS, cleanSort, settingsFromSort, sortFromSettings, sortTasks, useListSort } from '@/views/Projects/composables/viewSort';
+import { useProjectSearch } from '@/views/Projects/composables/useProjectSearch';
+import { useSavedViews } from '@/views/Projects/composables/useSavedViews';
+import { provideViewSettings } from '@/views/Projects/composables/viewSettingsContext';
 import ListGroup from '@/views/Projects/ListView/ListGroup.vue';
 import ListSortControl from '@/views/Projects/ListView/ListSortControl.vue';
 import en from '@/locales/en';
@@ -83,12 +92,32 @@ describe('sortTasks', () => {
     });
 });
 
-describe('the sort choice persists with the view', () => {
-    const memory = () => {
-        const data = {};
-        return { data, getItem: (k) => (k in data ? data[k] : null), setItem: (k, v) => { data[k] = v; }, removeItem: (k) => { delete data[k]; } };
+describe('the sort choice is the saved view sort', () => {
+    const LIST = 'a'.repeat(24);
+    const mountView = (settings) => {
+        const project = ref({ _id: 'p1', isGlobalPermission: true, ProjectRequiredComponent: [{ _id: LIST, id: LIST, name: 'List', keyName: 'ProjectListView', viewStatus: true, settings }] });
+        const companyUser = ref({ _id: 'row-1', userId: 'user-1', ProjectRequiredComponent: [] });
+        const store = createStore({
+            getters: { 'projectData/searchedTasks': () => [] },
+            mutations: { 'projectData/mutateSearchTask': () => {}, 'projectData/projectLocalUpdate': () => {}, 'settings/mutateCompanyUsers': () => {} },
+            actions: { 'projectData/searchTask': () => Promise.resolve() }
+        });
+        const out = {};
+        const Sorter = defineComponent({ setup() { out.list = useListSort(); return () => null; } });
+        const Host = defineComponent({
+            setup() {
+                const search = useProjectSearch(project, ref(false), { buildFilterQuery: (rows) => ({ rows: rows.length }) });
+                out.saved = useSavedViews({
+                    project, activeTab: ref('ProjectListView'), views: computed(() => project.value.ProjectRequiredComponent),
+                    requestedViewKey: ref(undefined), companyUser, search, canSaveShared: ref(true)
+                });
+                provideViewSettings(out.saved);
+                return () => h(Sorter);
+            }
+        });
+        mount(Host, { global: { plugins: [store] } });
+        return out;
     };
-    const who = { companyId: 'c1', userId: 'u1', projectId: 'p1' };
 
     test('an unknown key or direction falls back to Manual', () => {
         expect(cleanSort({ key: 'colour', dir: 'up' })).toEqual(MANUAL);
@@ -96,36 +125,44 @@ describe('the sort choice persists with the view', () => {
         expect(cleanSort(null)).toEqual(MANUAL);
     });
 
-    test('saves per user, project and view, and Manual clears the entry', () => {
-        const storage = memory();
-        saveSort(who, 'list', { key: 'name', dir: 'desc' }, storage);
-        expect(loadSort(who, 'list', storage)).toEqual({ key: 'name', dir: 'desc' });
-        expect(loadSort({ ...who, projectId: 'p2' }, 'list', storage)).toEqual(MANUAL);
-        saveSort(who, 'list', MANUAL, storage);
-        expect(Object.keys(storage.data)).toEqual([]);
+    test('Manual is stored as no sort, and every other key as the task field the Table sorts by', () => {
+        expect(settingsFromSort(MANUAL)).toBe(null);
+        expect(settingsFromSort({ key: 'name', dir: 'desc' })).toEqual({ field: 'TaskName', dir: -1 });
+        expect(settingsFromSort({ key: 'status', dir: 'asc' })).toEqual({ field: 'statusKey', dir: 1 });
+        expect(settingsFromSort({ key: 'due', dir: 'asc' })).toEqual({ field: 'DueDate', dir: 1 });
+        for (const key of SORT_KEYS.slice(1)) {
+            for (const dir of ['asc', 'desc']) expect(sortFromSettings(settingsFromSort({ key, dir }))).toEqual({ key, dir });
+        }
+        expect(sortFromSettings(null)).toEqual(MANUAL);
+        expect(sortFromSettings({ field: 'Task_Leader', dir: 1 })).toEqual(MANUAL);
     });
 
-    test('useViewSort reloads the choice and picks a natural direction for a new key', () => {
-        const storage = memory();
-        let state;
-        const Harness = defineComponent({
-            setup() {
-                state = useViewSort(ref('p1'), 'list', { storage });
-                return () => h('div');
-            }
-        });
-        mount(Harness, { global: { provide: { $companyId: ref('c1'), $userId: ref('u1') } } });
-        expect(state.sort.value).toEqual(MANUAL);
-        state.setKey('updated');
-        expect(state.sort.value).toEqual({ key: 'updated', dir: 'desc' });
-        state.setDir('asc');
+    test('a view saved with a sort opens sorted', async () => {
+        const { list, saved } = mountView({ sort: { field: 'createdAt', dir: -1 } });
+        await flushPromises();
+        expect(list.sort.value).toEqual({ key: 'created', dir: 'desc' });
+        expect(list.isManual.value).toBe(false);
+        expect(saved.dirty.value).toBe(false);
+    });
 
-        let again;
-        mount(defineComponent({ setup() { again = useViewSort(ref('p1'), 'list', { storage }); return () => h('div'); } }), {
-            global: { provide: { $companyId: ref('c1'), $userId: ref('u1') } }
-        });
-        expect(again.sort.value).toEqual({ key: 'updated', dir: 'asc' });
-        expect(again.isManual.value).toBe(false);
+    test('changing the sort is an unsaved change of the view, and Manual puts it back', async () => {
+        const { list, saved } = mountView(undefined);
+        await flushPromises();
+        expect(list.sort.value).toEqual(MANUAL);
+
+        list.setKey('updated');
+        await nextTick();
+        expect(saved.sort.value).toEqual({ field: 'updatedAt', dir: -1 });
+        expect(saved.dirty.value).toBe(true);
+
+        list.setDir('asc');
+        await nextTick();
+        expect(list.sort.value).toEqual({ key: 'updated', dir: 'asc' });
+
+        list.setKey('manual');
+        await nextTick();
+        expect(saved.sort.value).toBe(null);
+        expect(saved.dirty.value).toBe(false);
     });
 });
 

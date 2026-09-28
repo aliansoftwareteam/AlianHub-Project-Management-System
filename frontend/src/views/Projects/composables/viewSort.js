@@ -1,5 +1,5 @@
-import { computed, inject, ref, unref, watch } from 'vue';
-import { viewPrefsKey } from './projectViewPrefs';
+import { computed } from 'vue';
+import { useViewSettings } from './viewSettingsContext';
 import { PRIORITY_RANK, priorityKey } from '@/components/molecules/Home/homeFormat';
 
 export const SORT_KEYS = ['manual', 'due', 'priority', 'created', 'updated', 'name', 'status'];
@@ -8,9 +8,24 @@ export const MANUAL = Object.freeze({ key: 'manual', dir: 'asc' });
 /* The direction a key opens with: soonest, most urgent and newest first. */
 const NATURAL_DIR = { due: 'asc', priority: 'asc', created: 'desc', updated: 'desc', name: 'asc', status: 'asc' };
 
+/* The task fields the Table's sort headers also store, so a view's sort names one field either way. */
+const FIELD_OF = { due: 'DueDate', priority: 'Task_Priority', created: 'createdAt', updated: 'updatedAt', name: 'TaskName', status: 'statusKey' };
+
 export function cleanSort(raw) {
     if (!raw || !SORT_KEYS.includes(raw.key) || raw.key === 'manual') return { ...MANUAL };
     return { key: raw.key, dir: raw.dir === 'desc' ? 'desc' : 'asc' };
+}
+
+/* A saved view keeps { field, dir: 1 | -1 }, or null for Manual. A field the List cannot sort by reads as Manual. */
+export function sortFromSettings(saved) {
+    const key = Object.keys(FIELD_OF).find((id) => FIELD_OF[id] === saved?.field);
+    if (!key || (saved.dir !== 1 && saved.dir !== -1)) return { ...MANUAL };
+    return { key, dir: saved.dir === -1 ? 'desc' : 'asc' };
+}
+
+export function settingsFromSort(sort) {
+    const clean = cleanSort(sort);
+    return clean.key === 'manual' ? null : { field: FIELD_OF[clean.key], dir: clean.dir === 'desc' ? -1 : 1 };
 }
 
 const timeOf = (value) => {
@@ -56,58 +71,17 @@ export function sortTasks(rows, sort, context = {}) {
         .map((entry) => entry.task);
 }
 
-export const sortStorageKey = (ids, viewId) => `${viewPrefsKey(ids)}.sort.${viewId}`;
-
-const hasIds = (ids) => Boolean(ids?.companyId && ids?.userId && ids?.projectId);
-
-const defaultStorage = () => {
-    try {
-        return window.localStorage;
-    } catch {
-        return null;
-    }
-};
-
-export function loadSort(ids, viewId, storage = defaultStorage()) {
-    if (!hasIds(ids) || !storage) return { ...MANUAL };
-    try {
-        return cleanSort(JSON.parse(storage.getItem(sortStorageKey(ids, viewId)) || 'null'));
-    } catch {
-        return { ...MANUAL };
-    }
-}
-
-export function saveSort(ids, viewId, sort, storage = defaultStorage()) {
-    if (!hasIds(ids) || !storage) return;
-    const clean = cleanSort(sort);
-    try {
-        if (clean.key === 'manual') storage.removeItem(sortStorageKey(ids, viewId));
-        else storage.setItem(sortStorageKey(ids, viewId), JSON.stringify(clean));
-    } catch {
-        // Private windows and blocked site data refuse writes; the sort still applies unsaved.
-    }
-}
-
-/* Browser storage beside the column choice until 042 slice 4 moves view state onto the saved view. */
-export function useViewSort(projectId, viewId, { storage } = {}) {
-    const companyId = inject('$companyId', ref(''));
-    const userId = inject('$userId', ref(''));
-    const ids = computed(() => ({ companyId: unref(companyId), userId: unref(userId), projectId: unref(projectId) }));
-    const store = () => storage ?? defaultStorage();
-    const state = ref(loadSort(ids.value, viewId, store()));
-
-    watch(ids, (next) => { state.value = loadSort(next, viewId, store()); });
-
-    function set(next) {
-        state.value = cleanSort(next);
-        saveSort(ids.value, viewId, state.value, store());
-    }
+/* The open saved view's sort, so a change shows as an unsaved change of that view. */
+export function useListSort() {
+    const view = useViewSettings();
+    const sort = computed(() => sortFromSettings(view.sort.value));
+    const set = (next) => view.setSort(settingsFromSort(next));
 
     return {
-        sort: computed(() => state.value),
-        isManual: computed(() => state.value.key === 'manual'),
+        sort,
+        isManual: computed(() => sort.value.key === 'manual'),
         set,
         setKey: (key) => set({ key, dir: NATURAL_DIR[key] || 'asc' }),
-        setDir: (dir) => set({ ...state.value, dir })
+        setDir: (dir) => set({ ...sort.value, dir })
     };
 }

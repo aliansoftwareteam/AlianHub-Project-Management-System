@@ -169,7 +169,7 @@ import ViewColumnChooser from '@/views/Projects/components/columns/ViewColumnCho
 import ListSortControl from './ListSortControl.vue';
 import ConvertToSubTaskSidebar from '@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue';
 import { useListRowMenu } from './useListRowMenu.js';
-import { useViewSort } from '@/views/Projects/composables/viewSort';
+import { useListSort } from '@/views/Projects/composables/viewSort';
 import { columnCatalogue, gridTracks, listColumnClass, listColumnsAt, useViewColumns } from '@/views/Projects/composables/viewColumns';
 
 // UTILS
@@ -196,7 +196,7 @@ const rowEdit = useListRowEdit(project, showArchived);
 provide('listRowEdit', rowEdit);
 const rowMenu = useListRowMenu(project, showArchived);
 provide('listRowMenu', rowMenu);
-const sortState = useViewSort(computed(() => project.value?._id), 'list');
+const sortState = useListSort();
 provide('listSort', sortState.sort);
 
 const listCatalogue = computed(() => columnCatalogue('list', {
