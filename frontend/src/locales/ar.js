@@ -5742,6 +5742,7 @@ export default {
         "back": "Back",
         "tracked_time": "Tracked Time",
         "manual_time": "Manual Time",
+        "time_split": "Tracked and manual time",
         "users": "Users",
         "logged": "Logged",
         "hours": "Hours",

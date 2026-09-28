@@ -5742,6 +5742,7 @@ export default {
         "back": "返回",
         "tracked_time": "跟踪时间",
         "manual_time": "手动时间",
+        "time_split": "Tracked and manual time",
         "users": "用户",
         "logged": "已记录",
         "hours": "小时",

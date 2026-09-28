@@ -5742,6 +5742,7 @@ export default {
         "back": "Zurück",
         "tracked_time": "Verfolgte Zeit",
         "manual_time": "Manuelle Zeit",
+        "time_split": "Tracked and manual time",
         "users": "Benutzer",
         "logged": "Protokolliert",
         "hours": "Stunden",

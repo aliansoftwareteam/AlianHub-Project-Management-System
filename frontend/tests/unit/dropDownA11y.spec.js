@@ -422,6 +422,38 @@ describe('the mobile sheet', () => {
         expect(isOpen()).toBe(false);
     });
 
+    it('keeps the labelled close button beside a #head slot', async () => {
+        await mountUsage(`
+            <DropDown mode="listbox" id="types" title="Type">
+                <template #button>Type</template>
+                <template #head><input class="head-search" aria-label="Search types"></template>
+                <template #options><DropDownOption>Bug</DropDownOption></template>
+            </DropDown>`);
+        trigger().click();
+        await flushPromises();
+        const header = document.querySelector('#my-dropdown .mobile-title-header');
+        expect(header.querySelector('.head-search')).not.toBeNull();
+        const close = header.querySelector('button[aria-label="Common.close"]');
+        expect(close).not.toBeNull();
+        close.click();
+        await settle();
+        expect(isOpen()).toBe(false);
+    });
+
+    it('leaves the close button out when the #head brings its own dismiss control', async () => {
+        await mountUsage(`
+            <DropDown mode="dialog" id="save" aria-label="Save filter" head-dismisses>
+                <template #button>Save</template>
+                <template #head><button type="button" class="cancel">Cancel</button></template>
+                <template #options><input aria-label="Name"></template>
+            </DropDown>`);
+        trigger().click();
+        await flushPromises();
+        const header = document.querySelector('#my-dropdown .mobile-title-header');
+        expect(header.querySelector('.cancel')).not.toBeNull();
+        expect(header.querySelector('button[aria-label="Common.close"]')).toBeNull();
+    });
+
     it('moves focus into the sheet when it opens and keeps it there on Tab and Shift+Tab', async () => {
         await mountUsage(ROW_MENU);
         trigger().click();
