@@ -1,14 +1,17 @@
+process.env.STORAGE_TYPE = process.env.STORAGE_TYPE || 'server';
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../Modules/Audit/recorder', () => ({ recordAudit: jest.fn() }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
 jest.mock('../Config/projectAccess', () => ({ canReadProject: jest.fn() }));
-jest.mock('../Modules/Tasks/helpers/taskMongo/updateAssignment', () => ({ updateAssignee: jest.fn(async () => ({ status: true })) }));
+jest.mock('../Modules/Tasks/helpers/mongo_helper', () => ({ HandleHistory: jest.fn(async () => ({ status: true })) }));
+jest.mock('../Modules/Tasks/helpers/handleNotification', () => ({ HandleBothNotification: jest.fn(async () => ({ status: true })) }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { canReadProject } = require('../Config/projectAccess');
-const { updateAssignee } = require('../Modules/Tasks/helpers/taskMongo/updateAssignment');
+const assignment = require('../Modules/Tasks/helpers/taskMongo/updateAssignment');
+const { HandleHistory } = require('../Modules/Tasks/helpers/mongo_helper');
 const socketEmitter = require('../event/socketEventEmitter');
 const registry = require('../Modules/Automations/engine/registry');
 const matcher = require('../Modules/Automations/engine/matcher');
@@ -33,6 +36,7 @@ const NAMES = { [PRIYA]: 'Priya Shah', [SAM]: 'Sam Lee', [LEE]: 'Lee Wong', [GON
 const assign = () => registry.getAction('assign');
 
 let emitSpy;
+let updateAssignee;
 let task;
 
 const seedWorld = (taskOver = {}) => {
@@ -50,7 +54,13 @@ const seedWorld = (taskOver = {}) => {
 };
 
 const context = (over = {}) => ({ runId: 'run1', ruleId: RULE, ruleName: 'Triage', stepId: 's1', depth: 0, eventType: 'task.created', task: { _id: task._id, ProjectID: PROJECT }, ...over });
-const run = (config, over = {}) => assign().run({ companyId: C, entity: { kind: 'task', id: task._id }, config, context: context(over) });
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+const run = async (config, over = {}) => {
+    const out = await assign().run({ companyId: C, entity: { kind: 'task', id: task._id }, config, context: context(over) });
+    await settle();
+    return out;
+};
+const assigneeEmits = () => emitSpy.mock.calls.filter(([, payload]) => payload && payload.updatedFields && Object.keys(payload.updatedFields).length);
 const stored = () => mockDb.store[SCHEMA_TYPE.TASKS].find((t) => String(t._id) === String(task._id));
 const tenantCalls = () => mockDb.calls.filter((c) => c.type !== SCHEMA_TYPE.USERS);
 
@@ -60,6 +70,7 @@ beforeEach(() => {
     jest.clearAllMocks();
     canReadProject.mockImplementation(async (companyId, uid) => (uid === HIDDEN ? { allowed: false, statusCode: 404 } : { allowed: true }));
     emitSpy = jest.spyOn(socketEmitter, 'emit').mockImplementation(() => true);
+    updateAssignee = jest.spyOn(assignment, 'updateAssignee');
 });
 
 afterEach(() => { jest.restoreAllMocks(); });
@@ -84,6 +95,13 @@ describe('modes', () => {
         expect(out).toMatchObject({ changed: true, mode: 'add', skipped: [] });
         expect(out.assigned).toEqual([{ userId: PRIYA, name: 'Priya Shah' }, { userId: SAM, name: 'Sam Lee' }]);
         expect(out.assignees).toEqual([LEE, PRIYA, SAM]);
+    });
+
+    it('every write is announced as the automation, one person at a time', async () => {
+        seedWorld({ AssigneeUserId: [LEE] });
+        await run({ mode: 'replace', userIds: [PRIYA, SAM] });
+        expect(assigneeEmits().map(([, p]) => Object.keys(p.updatedFields)[0])).toEqual(['$pull', '$addToSet', '$addToSet']);
+        expect(assigneeEmits().every(([, p]) => p.actor.kind === 'automation' && p.depth === 1)).toBe(true);
     });
 
     it('replace leaves exactly the named people', async () => {
@@ -121,13 +139,17 @@ describe('modes', () => {
         expect(updateAssignee).not.toHaveBeenCalled();
     });
 
-    it('records history and notifications through the task panel\'s assignee helper, as the rule, without a second write', async () => {
+    it('writes through the task panel\'s assignee helper, as the rule, so history and notifications are the panel\'s', async () => {
         seedWorld();
         await run({ mode: 'add', userIds: [PRIYA] });
 
         expect(updateAssignee).toHaveBeenCalledTimes(1);
         const [args] = updateAssignee.mock.calls[0];
-        expect(args).toMatchObject({ type: 'assigneeAdd', isUpdateTask: false, firebaseObj: { AssigneeUserId: PRIYA } });
+        expect(args).toMatchObject({ type: 'assigneeAdd', isUpdateTask: true, firebaseObj: { AssigneeUserId: PRIYA } });
+        expect(args.eventActor).toEqual({ kind: 'automation', userId: null });
+        expect(args.eventDepth).toBe(1);
+        expect(HandleHistory).toHaveBeenCalled();
+        expect(HandleHistory.mock.calls[0][5].Employee_Name).toMatch(/Triage/);
         expect(args.employeeName).toBe('Priya Shah');
         expect(args.userData.id).toBe(OWNER);
         expect(args.userData.Employee_Name).toMatch(/Triage/);
@@ -257,25 +279,25 @@ describe('loop guard', () => {
         seedWorld();
         await run({ mode: 'add', userIds: [PRIYA] }, { depth: 1 });
 
-        expect(emitSpy).toHaveBeenCalledTimes(1);
-        const [name, payload] = emitSpy.mock.calls[0];
+        expect(assigneeEmits()).toHaveLength(1);
+        const [name, payload] = assigneeEmits()[0];
         expect(name).toBe('update');
         expect(payload.actor).toEqual({ kind: 'automation', userId: null });
         expect(payload.depth).toBe(2);
-        expect(Object.keys(payload.updatedFields)).toContain('AssigneeUserId');
+        expect(payload.updatedFields).toEqual({ $addToSet: { AssigneeUserId: PRIYA } });
     });
 
     it('so an assign rule on "assignee changes" does not wake itself', async () => {
         seedWorld();
         await run({ mode: 'add', userIds: [PRIYA] });
-        const [, payload] = emitSpy.mock.calls[0];
+        const [, payload] = assigneeEmits()[0];
         expect(matcher.acceptsActor(selfRule, { actor: payload.actor })).toBe(false);
     });
 
     it('and a rule that opts in to automation events is still stopped by the depth cap', async () => {
         seedWorld();
         await run({ mode: 'add', userIds: [PRIYA] }, { depth: MAX_DEPTH });
-        const [, payload] = emitSpy.mock.calls[0];
+        const [, payload] = assigneeEmits()[0];
         expect(payload.depth).toBeGreaterThan(MAX_DEPTH);
     });
 });
