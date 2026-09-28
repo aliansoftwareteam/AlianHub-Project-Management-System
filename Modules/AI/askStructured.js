@@ -19,6 +19,8 @@ const { readIntent, dueWindow, zoneFor, localDate, mentionsSprint, DONE_TYPES } 
 const STRUCTURED_LIMIT = 40;
 const ACTIVE_SPRINT_STATES = ['active', 'overdue'];
 const MAX_NAME_WORDS = 24;
+const NEVER_DONE_WINDOWS = ['overdue', 'urgent'];
+const URGENT_PRIORITY = /^(urgent|high)$/i;
 
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 const oids = (ids) => ids.map(oid).filter(Boolean);
@@ -80,19 +82,21 @@ const askerZone = async (uid) => {
     return zoneFor(user && user.Time_Zone);
 };
 
-/* Due windows other than overdue default to work that is not done, unless the question names a status;
- * overdue is never done, whatever it names. */
+/* Due windows other than overdue and urgent default to work that is not done, unless the question names a
+ * status; overdue and urgent work is never done, whatever it names. Urgent is overdue, due within the week,
+ * or marked high or urgent priority. */
 const taskClauses = (intent, { now = new Date(), timeZone = 'UTC' } = {}) => {
     const clauses = [];
     const notDone = { statusType: { $nin: DONE_TYPES } };
     const window = intent.due ? dueWindow(intent.due, { now, timeZone }) : null;
-    const status = intent.due === 'overdue' && intent.status && intent.status.type === 'done' ? null : intent.status;
+    const status = NEVER_DONE_WINDOWS.includes(intent.due) && intent.status && intent.status.type === 'done' ? null : intent.status;
     if (status && status.keys) clauses.push({ $or: status.keys.map((k) => ({ ProjectID: k.projectId, statusKey: k.key })) });
     else if (status && status.type === 'open') clauses.push(notDone);
     else if (status && status.type === 'done') clauses.push({ statusType: { $in: DONE_TYPES } });
     else if (status && status.type === 'active') clauses.push({ statusType: 'active' });
-    if (window && (intent.due === 'overdue' || !status) && !(status && status.type === 'open')) clauses.push(notDone);
+    if (window && (NEVER_DONE_WINDOWS.includes(intent.due) || !status) && !(status && status.type === 'open')) clauses.push(notDone);
     if (window && window.none) clauses.push({ DueDate: null });
+    else if (window && window.urgent) clauses.push({ $or: [{ DueDate: { $lt: window.before, $ne: null } }, { Task_Priority: URGENT_PRIORITY }] });
     else if (window && window.from) clauses.push({ DueDate: { $gte: window.from, $lt: window.before } });
     else if (window) clauses.push({ DueDate: { $lt: window.before, $ne: null } });
     if (intent.assignee && intent.assignee.none) clauses.push({ $or: [{ AssigneeUserId: { $size: 0 } }, { AssigneeUserId: null }] });

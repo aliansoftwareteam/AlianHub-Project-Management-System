@@ -28,6 +28,20 @@
                         <ShellIcon name="plus" :size="13" />{{ $t('Ask.make_task') }}
                     </button>
                     <button
+                        v-if="workItems.length > 1"
+                        type="button"
+                        class="ah-btn ah-btn--secondary ah-btn--sm"
+                        aria-haspopup="dialog"
+                        ref="tasksOpener"
+                        data-test="ask-build-tasks"
+                        @click="building = 'tasks'"
+                    >
+                        <ShellIcon name="check" :size="13" />{{ $t('Ask.build_tasks_open', { n: workItems.length }) }}
+                    </button>
+                    <button ref="docOpener" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" aria-haspopup="dialog" data-test="ask-build-doc" @click="building = 'doc'">
+                        <ShellIcon name="docs" :size="13" />{{ $t('Ask.build_doc_open') }}
+                    </button>
+                    <button
                         ref="opener"
                         type="button"
                         class="ah-btn ah-btn--secondary ah-btn--sm"
@@ -39,9 +53,23 @@
                         <ShellIcon name="shield" :size="13" />{{ $t('Ask.why_open') }}
                     </button>
                 </div>
+                <p v-if="builtDoc" class="ah-small ask__built" data-test="ask-doc-link">
+                    {{ $t('Ask.build_doc_saved') }}
+                    <router-link :to="{ name: 'PageEditor', params: { cid: unref(companyId), pageId: builtDoc.id } }">{{ builtDoc.title }}</router-link>
+                </p>
             </template>
         </div>
         <AskWhyPanel v-if="open" :sources="sources" :cited="cited.map((source) => source.ref)" :privileged="privileged" @close="close" />
+        <AskBuildTasks v-if="building === 'tasks'" :items="workItems" :projects="projects" :project-id="buildProjectId" @close="closeBuild" />
+        <AskBuildDoc
+            v-if="building === 'doc'"
+            :answer="String(answer.answer || '')"
+            :question="String(answer.question || '')"
+            :projects="projects"
+            :project-id="buildProjectId"
+            @created="docCreated"
+            @close="closeBuild"
+        />
     </section>
 </template>
 
@@ -51,7 +79,13 @@ import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { openQuickCreate, saveDraft } from "@/components/organisms/QuickCreateTask/quickCreateTask";
+import { apiRequest } from "@/services";
+import * as env from "@/config/env";
+import { showUndoToast } from "@/composable/useUndoToast";
 import AskWhyPanel from "./AskWhyPanel.vue";
+import AskBuildTasks from "./AskBuildTasks.vue";
+import AskBuildDoc from "./AskBuildDoc.vue";
+import { workItemsOf } from "./askComposer";
 import { sourceLink } from "./askWhy";
 import { answerHtml, taskTitleOf } from "./askMarkdown";
 
@@ -59,7 +93,9 @@ defineOptions({ name: "AskAnswer" });
 
 const props = defineProps({
     answer: { type: Object, required: true },
-    streaming: { type: Boolean, default: false }
+    streaming: { type: Boolean, default: false },
+    projects: { type: Array, default: () => [] },
+    projectId: { type: String, default: "" }
 });
 
 const { t } = useI18n();
@@ -70,6 +106,10 @@ const linkOf = (source) => sourceLink(source, unref(companyId));
 
 const open = ref(false);
 const opener = ref(null);
+const building = ref("");
+const tasksOpener = ref(null);
+const docOpener = ref(null);
+const builtDoc = ref(null);
 
 const sources = computed(() => (Array.isArray(props.answer.sources) ? props.answer.sources.filter(Boolean) : []));
 const privileged = computed(() => Boolean(props.answer.scope && props.answer.scope.privileged));
@@ -118,6 +158,40 @@ const makeTask = () => {
     openQuickCreate({ projectId: inProject ? inProject.projectId : "" });
 };
 
+const workItems = computed(() => (props.streaming ? [] : workItemsOf(props.answer.answer)));
+
+/* The scoped project, else the one the answer cites most. */
+const buildProjectId = computed(() => {
+    if (props.projectId) return props.projectId;
+    const counts = {};
+    cited.value.forEach((source) => { if (source.projectId) counts[source.projectId] = (counts[source.projectId] || 0) + 1; });
+    return Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || "";
+});
+
+const closeBuild = async () => {
+    const opener = building.value === "tasks" ? tasksOpener.value : docOpener.value;
+    building.value = "";
+    await nextTick();
+    if (opener) opener.focus();
+};
+
+const docCreated = (page) => {
+    builtDoc.value = page;
+    showUndoToast({
+        message: t("Ask.build_doc_created"),
+        undo: async () => {
+            try {
+                const res = await apiRequest("delete", `${env.PAGES}/${encodeURIComponent(page.id)}`);
+                if (res?.data?.status === false) throw new Error(res.data.statusText);
+                if (builtDoc.value && builtDoc.value.id === page.id) builtDoc.value = null;
+                $toast.success(t("Ask.build_doc_undone"), { position: "top-right" });
+            } catch {
+                $toast.error(t("Ask.build_undo_failed"), { position: "top-right" });
+            }
+        }
+    });
+};
+
 const close = async () => {
     open.value = false;
     await nextTick();
@@ -142,4 +216,6 @@ const close = async () => {
 .ask__answer .ask-cite { font-family: var(--font-mono, monospace); font-size: 12px; }
 .ask__streaming { margin-top: 8px; color: var(--ink-2); }
 .ask__cite--gone .ask__cite-ref { color: var(--ink-2); }
+.ask__built { margin: 8px 0 0; }
+.ask__built a { color: var(--brand); }
 </style>
