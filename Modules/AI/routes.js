@@ -6,6 +6,8 @@ const meetingNotes = require('./meetingNotes');
 const askController = require('./ask');
 const askStream = require('./askStream');
 const askThreads = require('./askThreads');
+const feedback = require('./feedback');
+const quality = require('./quality');
 const { chatSummaryHandler } = require('./chatSummary');
 
 exports.init = (app) => {
@@ -37,6 +39,11 @@ exports.init = (app) => {
     app.get('/api/v1/ai/ask/threads/:id', askThreads.getThread);
     app.put('/api/v1/ai/ask/threads/:id', askThreads.renameThread);
     app.delete('/api/v1/ai/ask/threads/:id', askThreads.deleteThread);
+    app.put('/api/v1/ai/feedback', feedback.saveFeedback);
+    app.get('/api/v1/ai/feedback/mine', feedback.listMine);
+    app.delete('/api/v1/ai/feedback/:id', feedback.removeFeedback);
+    app.get('/api/v1/ai/quality', quality.getQuality);
+    app.post('/api/v1/ai/quality/held-out', quality.runHeldOut);
     // Talk to Text — audio → text via OpenAI Whisper (multipart, field "file").
     app.post('/api/v1/ai/transcribe', ...transcribe.transcribe);
     app.post('/api/v1/ai/meeting-notes', meetingNotes.meetingNotesHandler);

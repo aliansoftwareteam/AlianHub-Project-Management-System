@@ -25,12 +25,14 @@
             <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm aip__retry" :disabled="busy" @click="$emit('retry')">{{ $t('AiPreview.retry') }}</button>
             <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm aip__cancel" @click="$emit('cancel')">{{ $t('AiPreview.cancel') }}</button>
         </div>
+        <AiFeedback v-if="feedback && feedback.feature && !busy" :key="resultKey" :feature="feedback.feature" kind="preview" :model="feedback.model || ''" :answer="text" />
     </section>
 </template>
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import AiFeedback from '@/components/molecules/AiFeedback/AiFeedback.vue';
 
 defineOptions({ name: 'AiResultPreview' });
 
@@ -44,6 +46,7 @@ const props = defineProps({
     replaceLabel: { type: String, default: '' },
     insertLabel: { type: String, default: '' },
     returnFocus: { type: [Object, Function], default: null },
+    feedback: { type: Object, default: null },
 });
 
 const emit = defineEmits(['replace', 'insert', 'retry', 'cancel', 'copy']);
@@ -51,6 +54,7 @@ const emit = defineEmits(['replace', 'insert', 'retry', 'cancel', 'copy']);
 const { t } = useI18n();
 const root = ref(null);
 const copied = ref(false);
+const resultKey = ref(0);
 const heading = computed(() => props.title || t('AiPreview.title'));
 let opener = null;
 
@@ -71,6 +75,7 @@ async function copy() {
 
 // The action a person pressed is disabled while the next result loads, which drops focus to the page.
 watch(() => props.busy, (busy) => {
+    if (!busy) resultKey.value += 1;
     const active = document.activeElement;
     if (!busy && root.value && (!active || active === document.body)) root.value.focus();
 }, { flush: 'post' });

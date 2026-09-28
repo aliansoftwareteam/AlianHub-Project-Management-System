@@ -208,6 +208,7 @@
                             :text="aiDraft.text"
                             :busy="aiDrafting"
                             :show-insert="true"
+                            :feedback="{ feature: 'description' }"
                             @replace="applyAiDraft('replace')"
                             @insert="applyAiDraft('insert')"
                             @retry="draftWithAi(aiDraft.box, aiDraft.command)"

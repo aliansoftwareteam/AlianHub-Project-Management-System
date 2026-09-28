@@ -39,6 +39,7 @@
                         <ShellIcon name="shield" :size="13" />{{ $t('Ask.why_open') }}
                     </button>
                 </div>
+                <AiFeedback v-if="answer.turnId" class="ask__feedback" feature="ask" kind="ask_turn" :item-id="answer.turnId" :answer="answer.answer || ''" />
             </template>
         </div>
         <AskWhyPanel v-if="open" :sources="sources" :cited="cited.map((source) => source.ref)" :privileged="privileged" @close="close" />
@@ -51,6 +52,7 @@ import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { openQuickCreate, saveDraft } from "@/components/organisms/QuickCreateTask/quickCreateTask";
+import AiFeedback from "@/components/molecules/AiFeedback/AiFeedback.vue";
 import AskWhyPanel from "./AskWhyPanel.vue";
 import { sourceLink } from "./askWhy";
 import { answerHtml, taskTitleOf } from "./askMarkdown";
@@ -127,6 +129,7 @@ const close = async () => {
 
 <style>
 .ask__why { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.ask__feedback { margin-top: 10px; }
 .ask__answer { line-height: 1.55; overflow-wrap: anywhere; }
 .ask__answer > :first-child { margin-top: 0; }
 .ask__answer > :last-child { margin-bottom: 0; }

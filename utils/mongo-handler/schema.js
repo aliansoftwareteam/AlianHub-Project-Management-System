@@ -1767,6 +1767,53 @@ const schema = {
         turnCount: { type: Number, required: false, default: 0 },
         lastTurnAt: { type: Date, required: false },
     },
+    // One person's thumbs up or down on an AI answer (Modules/AI/feedback). Never the question; the answer and its
+    // cited ids only when the person ticked "include the answer" (shared).
+    aiFeedback: {
+        userId: { type: String, required: true },
+        feature: { type: String, required: true },
+        kind: { type: String, required: true },
+        itemId: { type: String, required: true },
+        threadId: { type: String, required: false, default: '' },
+        runId: { type: String, required: false, default: '' },
+        model: { type: String, required: false, default: '' },
+        rating: { type: String, required: true },
+        reasons: { type: [String], required: false, default: [] },
+        note: { type: String, required: false, default: '' },
+        via: { type: String, required: false, default: 'thumbs' },
+        shared: { type: Boolean, required: false, default: false },
+        answer: { type: String, required: false, default: '' },
+        sources: {
+            type: [{
+                _id: false,
+                kind: { type: String, required: true },
+                sourceId: { type: String, required: true },
+                ref: { type: String, required: false, default: '' },
+            }],
+            required: false,
+            default: [],
+        },
+        createdAt: { type: Date, required: true },
+        updatedAt: { type: Date, required: false },
+    },
+    // A held-out eval run from the AI quality page (Modules/AI/quality): counts and the failing cases only.
+    aiEvalRuns: {
+        suite: { type: String, required: true },
+        passed: { type: Number, required: true },
+        total: { type: Number, required: true },
+        failures: {
+            type: [{
+                _id: false,
+                question: { type: String, required: true },
+                expected: { type: [String], required: false, default: [] },
+                got: { type: [String], required: false, default: [] },
+            }],
+            required: false,
+            default: [],
+        },
+        ranBy: { type: String, required: true },
+        ranAt: { type: Date, required: true },
+    },
     // Client invoices raised against a project (handoff 19c). Distinct from the
     // global `invoices` collection, which is AlianHub's own subscription billing.
     // Every line keeps the ids it was drafted from so a client question about a

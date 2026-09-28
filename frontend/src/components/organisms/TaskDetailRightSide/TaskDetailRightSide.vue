@@ -206,6 +206,7 @@
                 :busy="isAiEstimateLoading"
                 :replace-label="$t('TaskPanel.ai_estimate_apply')"
                 :return-focus="() => aiEstimateTrigger"
+                :feedback="{ feature: 'task_estimate' }"
                 @replace="applyAiEstimate"
                 @retry="generateAiEstimate"
                 @cancel="aiEstimate = null"

@@ -23,6 +23,7 @@
             :show-copy="result.action === 'ask'"
             :insert-label="$t('Projects.pages_ai_insert_below')"
             :return-focus="() => inputRef"
+            :feedback="{ feature: 'page_compose' }"
             @replace="apply('replace')"
             @insert="apply('append')"
             @retry="compose(result.request)"

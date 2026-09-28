@@ -133,6 +133,8 @@ const dbCollections = {
     AGENT_SESSIONS: "agent_sessions",
     AGENT_SESSION_ENDPOINTS: "agent_session_endpoints",
     ASK_THREADS: "ask_threads",
+    AI_FEEDBACK: "ai_feedback",
+    AI_EVAL_RUNS: "ai_eval_runs",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/

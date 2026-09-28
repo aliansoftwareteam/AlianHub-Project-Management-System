@@ -129,7 +129,7 @@ describe('rating an Ask answer', () => {
     it('keeps the answer and its cited sources only when the person opts in, read from their own thread', async () => {
         seedThread();
         await rateTurn({ reasons: ['missing_sources'], includeAnswer: true, answer: 'a forged answer' });
-        expect(stored()[0]).toMatchObject({ shared: true, answer: ANSWER, sources: [{ kind: 'task', id: '6f0000000000000000000071', ref: 'OPS-1' }] });
+        expect(stored()[0]).toMatchObject({ shared: true, answer: ANSWER, sources: [{ kind: 'task', sourceId: '6f0000000000000000000071', ref: 'OPS-1' }] });
 
         await rateTurn({ reasons: ['missing_sources'], includeAnswer: false });
         expect(stored()).toHaveLength(1);
@@ -265,7 +265,7 @@ describe('erasure by person', () => {
 describe('the AI quality page', () => {
     const seedRatings = () => {
         const row = (over) => db().seed(FEEDBACK, { feature: 'ask', kind: 'ask_turn', model: 'model-a', reasons: [], note: '', shared: false, answer: '', sources: [], via: 'thumbs', createdAt: new Date(), ...over });
-        row({ userId: ALICE, itemId: 'turn-aaaaaa', rating: 'down', reasons: ['wrong'], shared: true, answer: 'shared answer text', sources: [{ kind: 'task', id: 't1', ref: 'OPS-1' }] });
+        row({ userId: ALICE, itemId: 'turn-aaaaaa', rating: 'down', reasons: ['wrong'], shared: true, answer: 'shared answer text', sources: [{ kind: 'task', sourceId: 't1', ref: 'OPS-1' }] });
         row({ userId: BOB, itemId: 'turn-bbbbbb', rating: 'down', reasons: ['too_long'], answer: '' });
         row({ userId: BOB, itemId: 'turn-cccccc', rating: 'up', model: 'model-b' });
         row({ userId: ALICE, itemId: 'pv-dddddd', feature: 'task_estimate', kind: 'preview', rating: 'up', model: 'model-b' });

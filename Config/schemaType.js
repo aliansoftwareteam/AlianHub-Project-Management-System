@@ -132,6 +132,8 @@ const SCHEMA_TYPE = {
     AGENT_SESSIONS: "agent_sessions",
     AGENT_SESSION_ENDPOINTS: "agent_session_endpoints",
     ASK_THREADS: "ask_threads",
+    AI_FEEDBACK: "ai_feedback",
+    AI_EVAL_RUNS: "ai_eval_runs",
 }
 
 module.exports = {

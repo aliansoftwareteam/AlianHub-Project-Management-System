@@ -148,6 +148,7 @@
                     <p v-else-if="selected.status !== 'pending'" class="ah-small" style="margin-top:14px">{{ decidedLine }}</p>
 
                     <p class="ai-cost">{{ costLine }}</p>
+                    <AiFeedback :key="selected._id" class="ai-detail__feedback" feature="agent_run" kind="proposal" :item-id="String(selected._id)" />
                 </div>
             </div>
         </div>
@@ -162,6 +163,7 @@ import { useToast } from "vue-toast-notification";
 import moment from "moment";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
+import AiFeedback from "@/components/molecules/AiFeedback/AiFeedback.vue";
 import AiSidebar from "./AiSidebar.vue";
 import WorkflowApprovalRow from "./WorkflowApprovalRow.vue";
 import WorkflowApprovalDetail from "./WorkflowApprovalDetail.vue";
@@ -382,4 +384,5 @@ onMounted(() => Promise.all([reload(), loadApprovals()]));
 .ah-input.ai-decline__note { max-width: 420px; height: 32px; }
 .ai-decline__actions { margin-top: 4px; align-items: center; }
 .ai-decline__skip { border: 0; background: transparent; color: var(--ink-2); font: var(--text-small); cursor: pointer; text-decoration: underline; padding: 0 4px; }
+.ai-detail__feedback { margin-top: 12px; }
 </style>

@@ -1,11 +1,11 @@
 import { AI_STATE } from "@/composable/aiAvailability";
 
 /* Screens whose purpose is a model answering: asking a question, agent runs and what they
- * propose. Every other AI-section screen (skills, agent settings, teammates, routing, health,
+ * propose, and how well those answers are rated. Every other AI-section screen (skills, agent settings, teammates, routing, health,
  * coding accounts and MCP tokens, connections, workflows) is configuration or history and makes
  * no model call of its own, so it stays reachable whatever the switch says; the server refuses
  * any model call it would trigger. */
-export const MODEL_DRIVEN_ROUTES = Object.freeze(["AiAsk", "AiInbox", "AiHub", "AiPipeline", "AiRelease", "AiRun"]);
+export const MODEL_DRIVEN_ROUTES = Object.freeze(["AiAsk", "AiInbox", "AiHub", "AiPipeline", "AiRelease", "AiRun", "AiQuality"]);
 
 export const AI_GATE = Object.freeze({ PAGE: "page", NOTICE: "notice" });
 

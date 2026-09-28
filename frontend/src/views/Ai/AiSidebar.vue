@@ -92,6 +92,7 @@ const setup = computed(() => [
     { name: "AiPipeline", label: "Pipeline.nav_pipeline", icon: "layout" },
     { name: "AiRelease", label: "Pipeline.nav_release", icon: "share" },
     { name: "AiHealth", label: "AiHealth.nav", icon: "reports" },
+    ...(canManage.value ? [{ name: "AiQuality", label: "AiQuality.nav", icon: "reports" }] : []),
     { name: "AuditLog", label: "Ai.audit", icon: "audit" }
 ]);
 
