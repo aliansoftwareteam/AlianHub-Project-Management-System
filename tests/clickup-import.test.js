@@ -198,7 +198,7 @@ describe('a ClickUp list imported as a new project', () => {
         const { plan, companyId, uid } = executePlan.mock.calls[0][0];
         expect({ companyId, uid, name: plan.project.ProjectName, leads: plan.project.LeadUserId, sprints: plan.sprints }).toEqual({ companyId: COMPANY, uid: OWNER, name: 'Sprint Backlog', leads: [OWNER], sprints: [] });
         expect(addSprintFun.mock.calls[0][0].body).toMatchObject({ companyId: COMPANY, projectId: NEW_PROJECT, sprintName: 'Sprint Backlog' });
-        expect(created().sprint).toEqual({ id: NEW_SPRINT, name: 'Sprint Backlog' });
+        expect(created().sprint).toEqual({ id: new ObjectId(NEW_SPRINT), name: 'Sprint Backlog' });
         expect(project(NEW_PROJECT).taskStatusData.map((status) => status.name)).toEqual(['To Do', 'In Progress', 'Done', 'In Review']);
     });
 
