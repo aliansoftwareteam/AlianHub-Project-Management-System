@@ -67,7 +67,6 @@ exports.timeTrackerStart = async (req, res) => {
     if (await startsInLockedPeriod(companyId, actor.id, timeStamp)) {
         return res.send({ status: false, statusText: START_LOCKED, code: PERIOD_LOCKED });
     }
-    let type = req.body.type || SCHEMA_TYPE.TIMESHEET
     let data = {
         CreatedAt: utcDateTime.ts,
         UpdatedAt: utcDateTime.ts,
@@ -83,7 +82,7 @@ exports.timeTrackerStart = async (req, res) => {
         startTimeTracker: timeStamp,
     }
     let obj = {
-        type: type,
+        type: SCHEMA_TYPE.TIMESHEET,
         data: data
     }
     MongoDbCrudOpration(companyId, obj, "save")
@@ -137,7 +136,6 @@ exports.timeTrackerStart2 = async (req, res) => {
     }
     const utcDateTime = DateTime.utc();
     const timeStamp = Math.floor(utcDateTime.toSeconds());
-    let type = req.body.type || SCHEMA_TYPE.TIMESHEET
     let data = {
         CreatedAt: utcDateTime.ts,
         UpdatedAt: utcDateTime.ts,
@@ -170,7 +168,7 @@ exports.timeTrackerStart2 = async (req, res) => {
                 return res.send({ status: false, statusText: START_LOCKED, code: PERIOD_LOCKED });
             }
             let obj = {
-                type: type,
+                type: SCHEMA_TYPE.TIMESHEET,
                 data: data
             }
             MongoDbCrudOpration(companyId, obj, "save")
@@ -287,14 +285,13 @@ exports.endTimeTracker = async (req, res) => {
     }
     const utcDateTime = DateTime.utc();
     const timeStamp = Math.floor(utcDateTime.toSeconds());
-    let type =  req.body.type||SCHEMA_TYPE.TIMESHEET
     const calculateDuration = (startTimestamp, endTimestamp) => {
         const timeDifference = endTimestamp - startTimestamp;
         const durationMinutes = timeDifference / 60;
         return Math.round(durationMinutes);
     }
     let objGet = {
-        type: type,
+        type: SCHEMA_TYPE.TIMESHEET,
         data: [{
             _id: {
                 $in:[req.body.timeSheetId]
@@ -303,8 +300,9 @@ exports.endTimeTracker = async (req, res) => {
     }
     MongoDbCrudOpration(companyId, objGet, "findOne")
         .then(async (response) => {
-            if (response && String(response.Loggeduser) !== actor.id) return refuse(res, 403, 'You can only track your own time.');
-            if (response && await startsInLockedPeriod(companyId, actor.id, response.LogStartTime)) {
+            if (!response) return refuse(res, 404, 'No time entry was found for this timer.');
+            if (String(response.Loggeduser) !== actor.id) return refuse(res, 403, 'You can only track your own time.');
+            if (await startsInLockedPeriod(companyId, actor.id, response.LogStartTime)) {
                 return res.send({ status: false, statusText: STOP_LOCKED, code: PERIOD_LOCKED });
             }
             let trackShots = [];
@@ -321,7 +319,7 @@ exports.endTimeTracker = async (req, res) => {
                 trackShots: response.trackShots ? trttt : [],
             }
             let obj = {
-                type: type,
+                type: SCHEMA_TYPE.TIMESHEET,
                 data: [{ _id: req.body.timeSheetId },{
                     $set: { ...data },
                     $unset: {
