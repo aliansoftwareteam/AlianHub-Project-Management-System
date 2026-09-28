@@ -90,10 +90,10 @@
 
                 <template v-if="!showArchiveVar">
                     <div class="spr__watchers" @click.stop>
-                        <DropDown>
+                        <DropDown mode="listbox">
                             <template #button>
                                 <span class="spr__eye">
-                                    <img :src="eyeIcon" alt="">
+                                    <img :src="eyeIcon" :alt="$t('Projects.watchers')">
                                     <span class="ah-mono">{{ sprint?.watchers?.length || 0 }}</span>
                                 </span>
                             </template>
@@ -114,9 +114,11 @@
                                     :key="user._id"
                                     :item="user"
                                     :class="{ 'selected-watcher': user.isWatcher == true }"
+                                    :selected="user.isWatcher == true"
+                                    @click="updateWatchers(user._id, 'add')"
                                 >
                                     <div class="d-flex align-items-center justify-content-between w-100">
-                                        <div class="d-flex align-items-center" @click="updateWatchers(user._id, 'add')">
+                                        <div class="d-flex align-items-center">
                                             <img class="cursor-pointer emp__profile-imgurl"
                                                 v-if="!getUser(user._id).Employee_profileImageURL"
                                                 :src="user.Employee_profileImage"
@@ -129,7 +131,7 @@
                                             class="cursor-pointer"
                                             src="@/assets/images/svg/deletered.svg"
                                             v-if="user.isWatcher && user.isLoggedUser"
-                                            @click="updateWatchers(user._id, 'remove')"
+                                            @click.stop="updateWatchers(user._id, 'remove')"
                                         />
                                     </div>
                                 </DropDownOption>
@@ -156,12 +158,12 @@
                     </div>
 
                     <div class="spr__menu" @click.stop>
-                        <DropDown>
+                        <DropDown mode="menu">
                             <template #button>
-                                <img :ref=sprint.id :src="horizontalDots" alt="horizontalDots" class="vertical-middle">
+                                <img :src="horizontalDots" :alt="$t('Projects.list_actions')" class="vertical-middle">
                             </template>
                             <template #options>
-                                <DropDownOption @click="$refs[sprint.id].click(), updateItem(0)" v-if="showArchiveVar && sprint?.deletedStatusKey === 2">
+                                <DropDownOption @click="updateItem(0)" v-if="showArchiveVar && sprint?.deletedStatusKey === 2">
                                     <div class="d-flex align-items-center project-mobile-desc">
                                         <img :src="restore_icon" alt="restore_icon" class="mr-10px">
                                         {{$t('Projects.restore')}}
@@ -169,7 +171,7 @@
                                 </DropDownOption>
                                 <DropDownOption
                                     v-if="canRunScrum && scrumState === 'planned'"
-                                    @click="$refs[sprint.id]?.click(), startSprint()"
+                                    @click="startSprint()"
                                 >
                                     <div class="d-flex align-items-center project-mobile-desc">
                                         <img :src="sprintStartIcon" alt="start sprint" class="mr-10px">
@@ -178,7 +180,7 @@
                                 </DropDownOption>
                                 <DropDownOption
                                     v-if="canRunScrum && (scrumState === 'active' || scrumState === 'overdue')"
-                                    @click="$refs[sprint.id]?.click(), showCompleteSprint = true"
+                                    @click="showCompleteSprint = true"
                                 >
                                     <div class="d-flex align-items-center project-mobile-desc">
                                         <img :src="sprintCompleteIcon" alt="complete sprint" class="mr-10px">
@@ -187,26 +189,26 @@
                                 </DropDownOption>
                                 <DropDownOption
                                     v-if="canRunScrum"
-                                    @click="$refs[sprint.id]?.click(), showSprintSetup = true"
+                                    @click="showSprintSetup = true"
                                 >
                                     <div class="d-flex align-items-center project-mobile-desc">
                                         <img :src="sprintSetupIcon" alt="sprint settings" class="mr-10px">
                                         {{ scrumState === 'none' ? $t('Scrum.make_it_a_sprint') : $t('Scrum.sprint_settings') }}
                                     </div>
                                 </DropDownOption>
-                                <DropDownOption @click="$refs[sprint.id]?.click(), showSidebar = true, archive = true" v-if="!showArchiveVar">
+                                <DropDownOption @click="showSidebar = true, archive = true" v-if="!showArchiveVar">
                                     <div class="d-flex align-items-center project-mobile-desc">
                                         <img :src="inventoryIcon" alt="inventoryIcon" class="mr-10px">
                                         {{$t('Projects.archive')}}
                                     </div>
                                 </DropDownOption>
-                                <DropDownOption @click="$refs[sprint.id]?.click(), showMoveToFolder = true" v-if="!showArchiveVar && !sprint.isFolder && folderList.length">
+                                <DropDownOption @click="showMoveToFolder = true" v-if="!showArchiveVar && !sprint.isFolder && folderList.length">
                                     <div class="d-flex align-items-center project-mobile-desc">
                                         <img :src="folder" alt="folder" class="mr-10px" style="width: 16px;">
                                         {{$t('Projects.move_to_folder')}}
                                     </div>
                                 </DropDownOption>
-                                <DropDownOption @click="$refs[sprint.id]?.click(), showSidebar = true, archive = false">
+                                <DropDownOption @click="showSidebar = true, archive = false">
                                     <div class="d-flex align-items-center project-mobile-desc mobile-deleteIcon red">
                                         <img :src="deleteIcon" alt="deleteIcon" class="mr-10px">
                                         {{$t('Projects.delete')}}

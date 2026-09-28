@@ -30,7 +30,7 @@
                             <span v-if="lastActivity && !isOpened && !isShowArchived" class="font-size-11 project-last-activity">
                                 {{getTimeAgo(lastActivity * 1000)}}
                             </span>
-                            <DropDown :id="item.id" @isVisible="(val) => isOpened = val" :title="item.ProjectName" v-if="
+                            <DropDown mode="menu" :id="item.id" @isVisible="(val) => isOpened = val" :title="item.ProjectName" v-if="
                                 (
                                     item.status !== 'close' && (
                                         checkPermission('project.project_sprint_create',item.isGlobalPermission) === true
@@ -44,29 +44,29 @@
                                 && (showArchivedProjects ? item.deletedStatusKey === 2 : !item.deletedStatusKey)
                             ">
                                 <template #button>
-                                    <img ref="butt" src="@/assets/images/svg/horizontalDots.svg" class="project__three-dot ml-6px vertical-middle" :class="{'project-option': clientWidth > 767 && !isOpened, 'project-option-mobile': clientWidth <= 767 }" alt="dots">
+                                    <img src="@/assets/images/svg/horizontalDots.svg" class="project__three-dot ml-6px vertical-middle" :class="{'project-option': clientWidth > 767 && !isOpened, 'project-option-mobile': clientWidth <= 767 }" :alt="$t('Projects.project_actions', { name: item.ProjectName })">
                                 </template>
                                 <template #options>
                                     <template v-if="!showArchivedProjects">
-                                        <DropDownOption @click="item?.status !== 'close' && $refs.butt.click(), createSprint = true, createFolder = false" v-if="checkPermission('project.project_sprint_create',item.isGlobalPermission) === true">
+                                        <DropDownOption @click="createSprint = true, createFolder = false" v-if="checkPermission('project.project_sprint_create',item.isGlobalPermission) === true">
                                             <div class="d-flex align-items-center project-mobile-desc">
                                                 <img :src="listIcon" alt="listIcon" class="mr-10px">
                                                 {{$t('Projects.create_new_list')}}
                                             </div>
                                         </DropDownOption>
-                                        <DropDownOption @click="item?.status !== 'close' && $refs.butt.click(), createSprint = false, createFolder = true" v-if="checkPermission('project.project_folder_create',item.isGlobalPermission) === true">
+                                        <DropDownOption @click="createSprint = false, createFolder = true" v-if="checkPermission('project.project_folder_create',item.isGlobalPermission) === true">
                                             <div class="d-flex align-items-center project-mobile-desc">
                                                 <img :src="folderIcon" alt="folderIcon" class="mr-10px">
                                                 {{$t('Projects.create_new_folder')}}
                                             </div>
                                         </DropDownOption>
-                                        <DropDownOption @click="item?.status !== 'close' && $refs.butt.click(),toggleRenameProject()" v-if="checkPermission('project.project_name_edit',item.isGlobalPermission) === true">
+                                        <DropDownOption @click="toggleRenameProject()" v-if="checkPermission('project.project_name_edit',item.isGlobalPermission) === true">
                                             <div class="d-flex align-items-center project-mobile-desc">
                                                 <img :src="editIcon" alt="editIcon" class="mr-10px">
                                                 {{$t('Projects.rename')}}
                                             </div>
                                         </DropDownOption>
-                                        <DropDownOption v-if="checkPermission('project.project_create',item.isGlobalPermission) === true" @click="$refs.butt.click(), $emit('changeAvatar', {id: item.id, name: item.ProjectName, icon: item.projectIcon})">
+                                        <DropDownOption v-if="checkPermission('project.project_create',item.isGlobalPermission) === true" @click="$emit('changeAvatar', {id: item.id, name: item.ProjectName, icon: item.projectIcon})">
                                             <div class="d-flex align-items-center project-mobile-desc">
                                                 <img :src="colorPalletIcon" alt="colorPalletIcon" class="mr-10px">
                                                 {{$t('Projects.color_avatar')}}
@@ -78,20 +78,20 @@
                                                 {{$t('Projects.duplicate')}}
                                             </div>
                                         </DropDownOption>
-                                        <DropDownOption @click="item?.status !== 'close' && $refs.butt.click(), showSidebar = true, archive = 0" v-if="checkPermission('project.project_close',item.isGlobalPermission) === true">
+                                        <DropDownOption @click="showSidebar = true, archive = 0" v-if="checkPermission('project.project_close',item.isGlobalPermission) === true">
                                             <div class="d-flex align-items-center project-mobile-desc">
                                                 <img :src="cancelIcon" alt="cancelIcon" class="mr-10px">
                                                 {{$t('Projects.close_project')}}
                                             </div>
                                         </DropDownOption>
                                     </template>
-                                    <DropDownOption v-if="checkPermission('project.project_list',item.isGlobalPermission) === true && item.deletedStatusKey === 2" @click="item?.status !== 'close' && $refs.butt.click(), updateProject(0)">
+                                    <DropDownOption v-if="checkPermission('project.project_list',item.isGlobalPermission) === true && item.deletedStatusKey === 2" @click="updateProject(0)">
                                         <div class="d-flex align-items-center project-mobile-desc">
                                             <img :src="inventoryIcon" alt="restoreInventoryIcon" class="mr-10px">
                                             {{$t('Projects.restore')}}
                                         </div>
                                     </DropDownOption>
-                                    <DropDownOption v-if="checkPermission('project.project_list',item.isGlobalPermission) === true && checkPermission('project.project_delete',item.isGlobalPermission) === true" @click="item?.status !== 'close' && $refs.butt.click(), showSidebar = true, archive = 2">
+                                    <DropDownOption v-if="checkPermission('project.project_list',item.isGlobalPermission) === true && checkPermission('project.project_delete',item.isGlobalPermission) === true" @click="showSidebar = true, archive = 2">
                                         <div class="d-flex align-items-center project-mobile-desc mobile-deleteIcon red">
                                             <img :src="deleteIcon" alt="deleteIcon" class="mr-10px">
                                             {{$t('Projects.delete')}}
@@ -110,9 +110,9 @@
                             </div>
                             <!-- <div class="count-block parent-count-block">5</div> -->
                             <template v-if="Object.keys(userActivityObj || {}).length">
-                                <DropDown>
+                                <DropDown mode="menu" @isVisible="(visible) => visible && userActivityClick()">
                                     <template #button>
-                                        <img :src="Object.keys(userActivityObj || {}).length ? clockBlue : clockGray" alt="clockBlue" class="ml-5px" @click="userActivityClick">
+                                        <img :src="Object.keys(userActivityObj || {}).length ? clockBlue : clockGray" :alt="$t('Projects.active_members')" class="ml-5px">
                                     </template>
 
                                     <template #options>
