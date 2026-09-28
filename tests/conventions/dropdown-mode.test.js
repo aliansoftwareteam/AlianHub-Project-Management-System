@@ -5,7 +5,7 @@ const baseline = require('./dropdown-mode.baseline.json');
 const SRC = path.join(__dirname, '..', '..', 'frontend', 'src');
 const total = (counts) => Object.values(counts).reduce((sum, n) => sum + n, 0);
 
-describe('every <DropDown> declares mode="menu" or mode="listbox" (task 039)', () => {
+describe('every <DropDown> declares mode="menu", "listbox" or "dialog" (task 039)', () => {
     const current = countUsesWithoutMode(SRC);
 
     it('never appears without a mode in a file that had none', () => {
@@ -34,12 +34,13 @@ describe('the scanner', () => {
     it('reads the mode from a static or bound attribute', () => {
         const uses = findDropDownUses([
             '<DropDown mode="menu"></DropDown>',
+            '<DropDown mode="dialog"></DropDown>',
             '<DropDown :mode="kind" :z-index="a > b ? 1 : 2"></DropDown>',
             '<DropDown v-bind:mode="kind"></DropDown>',
             '<DropDown :hover="true"\n    title="x"></DropDown>',
             '<DropDownOption mode="menu"></DropDownOption>',
         ].join('\n'));
-        expect(uses.map((use) => [use.line, use.hasMode])).toEqual([[1, true], [2, true], [3, true], [4, false]]);
+        expect(uses.map((use) => [use.line, use.hasMode])).toEqual([[1, true], [2, true], [3, true], [4, true], [5, false]]);
     });
 
     it('does not mistake a longer attribute name for mode', () => {
