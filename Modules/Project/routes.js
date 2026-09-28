@@ -12,7 +12,7 @@ const getQueryCtrl = require('./controller/getQueryFun');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { projectUpdateNamesOnlyMembers } = require('./helpers/projectPeople');
 const { sprintUpdateNamesOnlyMembers } = require('../Sprints/helpers/sprintPeople');
-const { READ, requireProjectAccess, keepVisibleProjects, projectIdsFrom, fieldsOf, permissionsForProjectUpdate, DELETE_OR_CLOSE } = require('../../Config/projectAccess');
+const { READ, requireProjectAccess, keepVisibleProjects, projectIdsFrom, fieldsOf, permissionsForProjectUpdate, requireSupportedProjectUpdate, DELETE_OR_CLOSE } = require('../../Config/projectAccess');
 
 const CHECKLIST_ASSIGN_KEYS = ['assigneeAdd', 'assigneeRemove'];
 const SPRINT_EDIT = ['project.project_sprint_name_edit', 'project.sprint_type_change'];
@@ -30,7 +30,7 @@ exports.init = (app) => {
     app.post('/api/v1/project/search',projectFilterCtrl.projectFilter);
     app.get('/api/v1/project/:id', readsProject((req) => req.params.id), Projectctrl.getProjectById);
     app.get('/api/v1/project', projectListCtrl.getProjectList);
-    app.put('/api/v1/project/:id', requireProjectAccess({ projectIds: (req) => req.params.id, permissions: (req) => permissionsForProjectUpdate(req.body && req.body.updateObject) }), projectUpdateNamesOnlyMembers, updateProjectCtrl.updateProject);
+    app.put('/api/v1/project/:id', requireSupportedProjectUpdate, requireProjectAccess({ projectIds: (req) => req.params.id, permissions: (req) => permissionsForProjectUpdate(req.body && req.body.updateObject, req.uid) }), projectUpdateNamesOnlyMembers, updateProjectCtrl.updateProject);
     app.put('/api/v1/project/allTask/:id', requireProjectAccess({ projectIds: (req) => req.params.id, permissions: () => [DELETE_OR_CLOSE] }), projectAlltaskUpdateCtrl.projectAlltaskUpdate);
     app.get('/api/v1/project/sprintFolder/:id', readsProject((req) => req.params.id), projectSprintFolderCtrl.getSprintFolder);
     app.put('/api/v1/project/sprint/:id', requireProjectAccess({

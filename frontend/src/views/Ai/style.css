@@ -57,12 +57,6 @@
 .ai-detail__empty { display: flex; align-items: center; justify-content: center; height: 100%; padding: 40px; }
 .ai-done { text-align: center; padding: 48px 24px; }
 
-.ai-soon { max-width: 560px; padding: 22px 24px 24px; }
-.ai-soon__flag { margin-bottom: 12px; }
-.ai-soon__lead { margin: 8px 0 0; }
-.ai-soon__label { margin-top: 20px; }
-.ai-soon__links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
-
 @media (max-width: 1280px) {
     .ai-inbox { grid-template-columns: 300px 1fr; }
 }

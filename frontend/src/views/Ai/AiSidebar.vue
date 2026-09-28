@@ -59,6 +59,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AiMobileNav from "./AiMobileNav.vue";
 import { useAgents } from "./useAgents";
 import { useAgentAccess } from "./agentAccess";
+import { useLiveAgents } from "./useLiveAgents";
 
 defineOptions({ name: "AiSidebar" });
 
@@ -68,21 +69,20 @@ const { t } = useI18n();
 const $toast = useToast();
 const route = useRoute();
 const companyId = inject("$companyId");
-const { waiting, running, spend, pauseAll } = useAgents();
+const { waiting, spend, pauseAll } = useAgents();
+const { running, refresh: refreshLive } = useLiveAgents();
 const { canManage } = useAgentAccess();
 const busy = ref(false);
 
 const everyday = computed(() => [
-    { name: "AiHome", label: "Ai.nav_home", icon: "ai" },
+    { name: "AiAsk", label: "Parity.nav_ask", icon: "ai" },
     { name: "AiInbox", label: "Ai.inbox", icon: "inbox", count: waiting.value },
     { name: "AiHub", label: "Ai.agents", icon: "agent" },
     { name: "AiSkills", label: "Ai.skills", icon: "docs" },
-    { name: "AiAnalytics", label: "Ai.nav_analytics", icon: "reports" },
     { name: "Connections", label: "Parity.nav_connections", icon: "integrations" }
 ]);
 
 const setup = computed(() => [
-    { name: "AiAsk", label: "Parity.nav_ask", icon: "ai" },
     { name: "AgentTeammates", label: "Parity.nav_teammates", icon: "members" },
     { name: "AgentRouting", label: "Parity.nav_routing", icon: "automations" },
     // The workflow API refuses everybody but an Owner and an Admin, so the way in
@@ -128,6 +128,7 @@ const onPauseAll = async () => {
     busy.value = true;
     try {
         await pauseAll();
+        await refreshLive();
         $toast.success(t("Ai.all_paused"), { position: "top-right" });
     } catch (error) {
         $toast.error(error.message, { position: "top-right" });

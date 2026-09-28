@@ -1,6 +1,7 @@
 const ctrl = require('./controller');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { READ, requireProjectAccess, keepVisibleProjects, projectIdsFrom } = require('../../Config/projectAccess');
+const { requireCompanyAdmin } = require('../../Config/permissionGuard');
 
 const MILESTONE = ['project.project_milestone'];
 const MILESTONE_STATUS = [['project.project_milestone_status_change', 'project.project_milestone']];
@@ -427,7 +428,7 @@ exports.init = (app) => {
 
     app.get('/api/v1/milestone/project/:pid', readsProject((req) => req.params.pid), ctrl.getMilestoneByProject);
     app.get('/api/v1/milestone/:id', readsProject(projectIdsFrom({ records: [[SCHEMA_TYPE.MILESTONE, (req) => req.params.id]] })), ctrl.getMilestone);
-    app.post('/api/v1/milestone', ctrl.updateWeeklyRangeMilestone);
+    app.post('/api/v1/milestone', requireCompanyAdmin({ permission: 'settings.milestone_weekly_range' }), ctrl.updateWeeklyRangeMilestone);
     app.post('/api/v1/milestoneReport', keepVisibleProjects({ get: (req) => req.body && req.body.element, set: (req, ids) => { req.body.element = ids; } }), ctrl.getMilestoneReport);
 
     // Billing (handoff 19a / 19b / 19d). `billing.*` is deliberately absent from

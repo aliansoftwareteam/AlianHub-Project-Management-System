@@ -44,23 +44,19 @@
 </template>
 
 <script setup>
-import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, inject, onBeforeUnmount, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
-import { shellState } from "@/components/organisms/Shell/shellState";
 import { useAgentFinishToast } from "./useAgentFinishToast";
 import { reasonOf } from "./useAgents";
 import { useAgentAccess } from "./agentAccess";
+import { useLiveAgents } from "./useLiveAgents";
 
-// 28b surface 4 — one 40px line mixing people and agents. It is the only place
-// both are read from the same request, so the strip and the rail footer can
-// never disagree about how many agents are working.
 defineOptions({ name: "AgentLiveStrip" });
 
-const POLL_MS = 30000;
 const MAX_ITEMS = 4;
 
 const { t } = useI18n();
@@ -69,17 +65,19 @@ const companyId = inject("$companyId", localStorage.getItem("selectedCompany") |
 const { toast, observe, dismiss, reset } = useAgentFinishToast();
 const { canManage } = useAgentAccess();
 
-const people = ref([]);
-const agents = ref([]);
 const pausing = ref(false);
-let poller = null;
 
 const ok = (res) => res?.data?.status === true;
-const running = computed(() => agents.value.filter((a) => a.status === "running").length);
+
+const observeRuns = async () => {
+    const res = await apiRequest("get", `${env.AGENT_RUNS}?limit=25`);
+    if (ok(res)) observe(res.data.data || []);
+};
+
+const { people, live, running, refresh } = useLiveAgents({ onPoll: observeRuns });
 
 const items = computed(() => {
-    const live = agents.value
-        .filter((a) => a.run)
+    const agentsLive = live.value
         .map((a) => ({
             key: `a-${a.id}`,
             agent: true,
@@ -91,29 +89,15 @@ const items = computed(() => {
     const busy = people.value
         .filter((p) => p.timer && p.timer.taskName)
         .map((p) => ({ key: `p-${p.id}`, agent: false, who: p.name, what: t("Pipeline.live_on", { what: p.timer.taskName }) }));
-    return [...live, ...busy].slice(0, MAX_ITEMS);
+    return [...agentsLive, ...busy].slice(0, MAX_ITEMS);
 });
-
-const load = async () => {
-    const [teamRes, runsRes] = await Promise.allSettled([
-        apiRequest("get", env.AGENT_TEAM),
-        apiRequest("get", `${env.AGENT_RUNS}?limit=25`)
-    ]);
-    if (teamRes.status === "fulfilled" && ok(teamRes.value)) {
-        const data = teamRes.value.data.data || {};
-        people.value = data.people || [];
-        agents.value = data.agents || [];
-        shellState.agentsRunning = Number(data.totals?.running || 0);
-    }
-    if (runsRes.status === "fulfilled" && ok(runsRes.value)) observe(runsRes.value.data.data || []);
-};
 
 const onPauseAll = async () => {
     pausing.value = true;
     try {
         const res = await apiRequest("post", env.AGENT_PAUSE_ALL, {});
         if (!ok(res)) throw new Error(res?.data?.statusText || t("Ai.pause_failed"));
-        await load();
+        await refresh();
     } catch (error) {
         $toast.error(reasonOf(error, "Ai.pause_failed"), { position: "top-right" });
     } finally {
@@ -121,16 +105,7 @@ const onPauseAll = async () => {
     }
 };
 
-onMounted(() => {
-    load().catch(() => {});
-    poller = setInterval(() => load().catch(() => {}), POLL_MS);
-});
-
-onBeforeUnmount(() => {
-    if (poller) clearInterval(poller);
-    poller = null;
-    reset();
-});
+onBeforeUnmount(reset);
 </script>
 
 <style>
