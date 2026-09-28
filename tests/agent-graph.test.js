@@ -78,13 +78,24 @@ describe('a run is a LangGraph thread', () => {
         expect(proposalRows()[0]).toMatchObject({ _id: out.proposalId, runId: String(run._id), what: 'plan: 2 change(s) on AR-1', why: 'planned', cost: { usd: 0.01, tokens: 100, model: 'm' } });
 
         expect(memory.contextFor).toHaveBeenCalledWith({ companyId: C, projectId: 'p1', userId: 'u1' });
-        expect(orchestrator.analyse).toHaveBeenCalledWith({ skillSlug: 'plan', task: TASK, context: { projectName: 'Launch', memory: expect.stringContaining('Budget is fixed') }, budget: { maxTokens: 4000, guard: expect.objectContaining({ reserve: expect.any(Function), reconcile: expect.any(Function), release: expect.any(Function) }) }, spend: { feature: 'agent_run', companyId: C, runId: String(run._id), userId: 'u1', account: 'workspace', agentId: AGENT_ID, agentRevision: run.agentRevision, skillRevision: run.skillRevision }, companyId: C, agent: expect.objectContaining({ _id: AGENT_ID }), onExternal: expect.any(Function) });
+        expect(orchestrator.analyse).toHaveBeenCalledWith({ skillSlug: 'plan', task: TASK, context: { projectName: 'Launch', memory: expect.stringContaining('Budget is fixed') }, budget: { maxTokens: 4000, guard: expect.objectContaining({ reserve: expect.any(Function), reconcile: expect.any(Function), release: expect.any(Function) }) }, spend: { feature: 'agent_run', companyId: C, runId: String(run._id), userId: 'u1', account: 'workspace', agentId: AGENT_ID, agentRevision: run.agentRevision, skillRevision: run.skillRevision }, companyId: C, agent: expect.objectContaining({ _id: AGENT_ID }), onExternal: expect.any(Function), about: '' });
 
         const thread = await threadOf(C, run);
         expect(thread.next).toEqual(['hold']);
         expect(thread.tasks[0].interrupts[0].value).toEqual({ proposalId: out.proposalId, changes: [expect.objectContaining({ action: 'subtask.create' }), expect.objectContaining({ action: 'task.create' })] });
         expect(await persistence.saverFor(C).getTuple({ configurable: { thread_id: String(run._id) } })).toBeTruthy();
         expect(memory.recordEpisode).not.toHaveBeenCalled();
+    });
+
+    it('hands the skill the starter\'s own AI profile block, read for that run', async () => {
+        const profile = require('../Modules/AI/aiProfile');
+        const spy = jest.spyOn(profile, 'aboutRunStarter').mockResolvedValue('<about_the_asker>\nAlly\n</about_the_asker>');
+        planned([subtask('One')]);
+        const run = await start(agent());
+        await execute(run);
+        expect(spy).toHaveBeenCalledWith(C, expect.objectContaining({ startedBy: 'u1' }));
+        expect(orchestrator.analyse).toHaveBeenCalledWith(expect.objectContaining({ about: '<about_the_asker>\nAlly\n</about_the_asker>' }));
+        spy.mockRestore();
     });
 
     it('hands gather the run id, so a declared read can land in the run replay', async () => {

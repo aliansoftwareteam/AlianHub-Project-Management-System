@@ -5,6 +5,7 @@
             <div class="ah-toolbar">
                 <div class="ah-toolbar__title">{{ $t('AiLanding.title') }}</div>
                 <div class="ah-toolbar__spacer"></div>
+                <AskMemoryButton />
             </div>
 
             <AiModelNotice />
@@ -324,6 +325,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import MainChatRecorder from "@/components/organisms/MainChat/MainChatRecorder.vue";
 import AiSidebar from "./AiSidebar.vue";
 import AskAnswer from "./AskAnswer.vue";
+import AskMemoryButton from "./AskMemoryButton.vue";
 import { useParity } from "./useParity";
 import { useAgents, reasonOf, autonomyOf } from "./useAgents";
 import { useAgentAccess } from "./agentAccess";
