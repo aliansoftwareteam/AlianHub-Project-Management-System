@@ -90,6 +90,12 @@
     font: 500 10px/1 var(--font-ui);
 }
 .ah-tabbar__item.is-active { color: #fff; }
+.ah-tabbar__icon, .ah-rail__tile { position: relative; }
+.ah-unread-badge {
+    position: absolute; top: -5px; left: calc(50% + 4px);
+    min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; box-sizing: border-box;
+    background: var(--danger); color: var(--surface); font: 600 10px/16px var(--font-ui); text-align: center;
+}
 .ah-sheet__backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 60; display: flex; align-items: flex-end; }
 .ah-sheet {
     width: 100%; max-height: 82dvh; overflow: auto; background: var(--surface); color: var(--ink);

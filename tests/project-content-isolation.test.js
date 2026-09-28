@@ -280,9 +280,10 @@ describe('where the project comes from', () => {
     });
 
     it('leaves a chat channel, whose container is not a project, to its handler', async () => {
-        seedRules({});
-        const id = sprintIn(oid(), { mainChat: true });
-        const res = await run(routesOf(SPRINTS)['PATCH /api/v1/sprint/:id'], request({ params: { id }, body: { type: 'deleteChannel', mainChat: true, projectId: oid() } }));
+        seedRules({ 'chat.chat_channel': true });
+        const space = String(mockDb.seed(SCHEMA_TYPE.MAIN_CHATS, { _id: oid(), default: false })._id);
+        const id = sprintIn(space, { mainChat: true });
+        const res = await run(routesOf(SPRINTS)['PATCH /api/v1/sprint/:id'], request({ params: { id }, body: { type: 'deleteChannel', mainChat: true, projectId: space } }));
         expect(res.body).toMatchObject({ status: true, reached: 'deleteChannel' });
     });
 

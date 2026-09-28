@@ -195,6 +195,18 @@
                         </div>
                         <span v-if="aiDrafting" class="ah-detail__drafting ah-small">✦ {{ $t('TaskPanel.ai_drafting') }}</span>
                     </div>
+                    <Teleport v-if="aiDraft" :to="aiDraft.footer || 'body'" :disabled="!aiDraft.footer">
+                        <AiResultPreview
+                            class="ah-detail__ai-draft"
+                            :text="aiDraft.text"
+                            :busy="aiDrafting"
+                            :show-insert="true"
+                            @replace="applyAiDraft('replace')"
+                            @insert="applyAiDraft('insert')"
+                            @retry="draftWithAi(aiDraft.box, aiDraft.command)"
+                            @cancel="aiDraft = null"
+                        />
+                    </Teleport>
                     <div v-if="activityView === 'comments' && canComment && task._id && projectData._id" class="ah-detail__comments">
                         <Comments
                             :key="`comments-${task._id}`"
@@ -351,6 +363,7 @@ import { useEscapeLayer } from "@/composable/useEscapeLayer";
 import TaskSubtaskList from "./TaskSubtaskList.vue";
 import TaskTimerChip from "./TaskTimerChip.vue";
 import TaskAgentStrip from "./TaskAgentStrip.vue";
+import AiResultPreview from "@/components/molecules/AiPreview/AiResultPreview.vue";
 import { canControlRun } from "@/views/Ai/agentAccess";
 
 import taskClass from "@/utils/TaskOperations";
@@ -915,8 +928,33 @@ function jumpToComposer() {
     nextTick(() => document.getElementById("message-box")?.focus());
 }
 
-async function draftWithAi(textarea) {
-    const intent = textarea.value.replace(/^\/ai\s*/i, "").trim();
+const AI_COMMAND = /^\/ai(\s|$)/i;
+const aiDraft = ref(null);
+useEscapeLayer(() => Boolean(aiDraft.value), () => { aiDraft.value = null; });
+watch([() => props.taskId, activityView], () => { aiDraft.value = null; });
+
+/* The /ai line the caret sits on, else the first one in the draft. */
+function aiCommandIn(value, caret) {
+    const lineStart = value.lastIndexOf("\n", Math.max(0, caret - 1)) + 1;
+    const lineEnd = value.indexOf("\n", lineStart);
+    const caretLine = value.slice(lineStart, lineEnd === -1 ? value.length : lineEnd);
+    if (AI_COMMAND.test(caretLine)) return caretLine;
+    return value.split("\n").find((line) => AI_COMMAND.test(line)) || null;
+}
+
+function setComposerText(textarea, value, caret) {
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
+    setter.call(textarea, value);
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    textarea.focus();
+    textarea.setSelectionRange(caret, caret);
+}
+
+async function draftWithAi(textarea, previousCommand = null) {
+    if (aiDrafting.value || !textarea) return;
+    const command = previousCommand || aiCommandIn(textarea.value, textarea.selectionStart ?? textarea.value.length);
+    if (!command) return;
+    const intent = command.replace(/^\/ai\s*/i, "").trim();
     aiDrafting.value = true;
     try {
         const response = await apiRequest("post", env.AI_WRITE_DESCRIPTION, {
@@ -933,10 +971,7 @@ async function draftWithAi(textarea) {
             $toast.error(payload.statusText || t("AI.ai_failed"), { position: "top-right" });
             return;
         }
-        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
-        setter.call(textarea, draft);
-        textarea.dispatchEvent(new Event("input", { bubbles: true }));
-        textarea.focus();
+        aiDraft.value = { text: draft, command, box: textarea, footer: textarea.closest("#comment_footer") };
     } catch (error) {
         $toast.error(error?.response?.data?.statusText || t("AI.ai_failed"), { position: "top-right" });
     } finally {
@@ -944,13 +979,34 @@ async function draftWithAi(textarea) {
     }
 }
 
+/* Insert swaps the /ai line for the text and keeps the rest of the draft; if that line was edited away
+ * meanwhile, the text goes in at the caret instead. Replace swaps the whole draft. */
+function applyAiDraft(mode) {
+    const draft = aiDraft.value;
+    if (!draft || !draft.box || !draft.box.isConnected) {
+        aiDraft.value = null;
+        return;
+    }
+    const { box, text, command } = draft;
+    const current = box.value;
+    aiDraft.value = null;
+    if (mode === "replace") {
+        setComposerText(box, text, text.length);
+        return;
+    }
+    const at = current.indexOf(command);
+    const start = at === -1 ? (box.selectionStart ?? current.length) : at;
+    const end = at === -1 ? (box.selectionEnd ?? start) : at + command.length;
+    setComposerText(box, current.slice(0, start) + text + current.slice(end), start + text.length);
+}
+
 function onKeydownCapture(event) {
     const target = event.target;
     if (!target || target.id !== "message-box" || event.key !== "Enter" || event.shiftKey) return;
-    if (!aiUsable.value || !/^\/ai(\s|$)/i.test(target.value || "")) return;
+    if (!aiUsable.value || !aiCommandIn(target.value || "", target.selectionStart ?? 0)) return;
     event.preventDefault();
     event.stopPropagation();
-    if (!aiDrafting.value) draftWithAi(target);
+    draftWithAi(target);
 }
 
 function visibilityHandler() {

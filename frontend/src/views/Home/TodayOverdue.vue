@@ -11,7 +11,7 @@
                 <span class="ah-toolbar__date">{{ todayLabel }}</span>
                 <div class="ah-toolbar__actions">
                     <StatusChip />
-                    <router-link v-if="router.hasRoute('Dashboards')" class="ah-tbtn ah-tbtn--strong home__manage" :to="{ name: 'Dashboards', params: { cid: companyId } }">{{ $t('Home.manage_cards') }}</router-link>
+                    <HomeCardsMenu />
                     <div class="ah-pop-anchor" @click.stop>
                         <button type="button" class="ah-tbtn ah-tbtn--primary" :aria-expanded="newOpen" aria-haspopup="menu" @click="newOpen = !newOpen">{{ $t('Home.new') }}</button>
                         <transition name="ah-fade">
@@ -67,6 +67,7 @@
                             @open-project="goProject"
                         />
                         <div class="home__side">
+                            <WaitingOnYouCard v-if="isHomeCardShown('waiting')" @hide="hideCard('waiting')" />
                             <AgendaCard :day="agendaDay" :items="agendaItems" :connected="agenda.connected.value" :first-run="firstRun" @shift="shiftAgenda" />
                             <AssignedCommentsCard @open="openTask" />
                             <section v-if="firstRun && !timer.active" class="hc-card">
@@ -74,6 +75,7 @@
                                 <p class="hc-hint" style="margin: 0">{{ $t('Home.personal_hint') }}</p>
                                 <router-link class="hc-personal__open" :to="{ name: 'PersonalList', params: { cid: companyId } }">{{ $t('Home.open') }}</router-link>
                             </section>
+                            <StandupCard v-if="isHomeCardShown('standup')" @hide="hideCard('standup')" />
                             <TimerChip />
                         </div>
                     </div>
@@ -131,6 +133,10 @@ import AssignedCommentsCard from "@/components/molecules/Home/AssignedCommentsCa
 import PlannerPanel from "@/components/molecules/Home/PlannerPanel.vue";
 import TimerChip from "@/components/molecules/Home/TimerChip.vue";
 import SetupChecklist from "@/components/molecules/Home/SetupChecklist.vue";
+import HomeCardsMenu from "@/components/molecules/Home/HomeCardsMenu.vue";
+import WaitingOnYouCard from "@/components/molecules/Home/WaitingOnYouCard.vue";
+import StandupCard from "@/components/molecules/Home/StandupCard.vue";
+import { isHomeCardShown, setHomeCardShown, syncHomeCards } from "@/components/molecules/Home/homeCards";
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue";
 import { useOnboardingChecklist } from "@/composable/useOnboardingChecklist";
 import { useBlockingSurface } from "@/composable/blockingSurface";
@@ -189,6 +195,18 @@ const firstRun = computed(() => projects.value.length <= 1 || !checklistComplete
 const confirmRemoveSample = ref(false);
 
 const agendaItems = computed(() => agenda.itemsFor(agendaDay.value, work.mine.value));
+
+const myRecord = computed(() => (getters["users/users"] || []).find((u) => u._id === userId.value));
+watch(myRecord, (record) => { if (record) syncHomeCards(userId.value, record.homeCards); }, { immediate: true });
+
+async function hideCard(id) {
+    try {
+        await setHomeCardShown(id, false);
+        $toast.info(t("Home.card_hidden"), { position: "top-right" });
+    } catch (error) {
+        $toast.error(t("Home.cards_save_failed"), { position: "top-right" });
+    }
+}
 
 function shiftAgenda(delta) {
     agendaDay.value = delta === 0 ? moment() : moment(agendaDay.value).add(delta, "day");

@@ -21,6 +21,7 @@ const { updateMainChat } = require('../Modules/MainChats/controller');
 const { toSlug } = require('../Modules/settings/ProjectSkills/skillRules');
 const { MEMBER_DEFAULT_PERMISSIONS } = require('../Modules/settings/securityPermissions/memberDefaults');
 const { ROLE_GUEST, ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER } = require('../Config/roleTypes');
+const { addMissingViews } = require('../Modules/projectTabs/catalogue');
 
 //IMPORT CURRENCY
 exports.importCurrency = (companyName) => {
@@ -1778,198 +1779,13 @@ exports.importUserNotifications = async (companyName, uid) => {
     });
 }
 
-// PROJECT DEFAULT TAB COMPONENT 88888888
-exports.importProjectTabComponents = (companyName) => {
-    let data = [
-        {
-            name: "List",
-            sortIndex: 1,
-            keyName: "ProjectListView",
-            value: "list",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Board",
-            sortIndex: 2,
-            keyName: "ProjectKanban",
-            value: "ProjectKanban",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Project Details",
-            sortIndex: 3,
-            keyName: "ProjectDetail",
-            value: "projectDetails",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Comments",
-            sortIndex: 4,
-            keyName: "Comments",
-            value: "comments",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Calendar",
-            sortIndex: 5,
-            keyName: "Calendar",
-            value: "calendar",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Activity",
-            sortIndex: 6,
-            keyName: "ActivityLog",
-            value: "activitylog",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Workload",
-            sortIndex: 7,
-            keyName: "Workload",
-            value: "workload",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Dashboard",
-            sortIndex: 8,
-            keyName: "ProjectDashboard",
-            value: "dashboard",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Table",
-            sortIndex: 9,
-            keyName: "TableView",
-            value: "TableView",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Embed",
-            sortIndex: 11,
-            keyName: "Embed",
-            value: "embed",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Reports",
-            sortIndex: 12,
-            keyName: "Reports",
-            value: "reports",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Gantt View",
-            sortIndex: 12,
-            keyName: "GanttView",
-            value: "ganttview",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Recurring Tasks",
-            sortIndex: 12,
-            keyName: "RecurringTasks",
-            value: "recurringtasks",
-            setAsDefault: false,
-            viewStatus: false
-        },       
-        {
-            name: "Timeline View",
-            sortIndex: 12,
-            keyName: "TimelineView",
-            value: "timelineview",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Mind Map View",
-            sortIndex: 13,
-            keyName: "MindMapView",
-            value: "mindmapview",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Whiteboard View",
-            sortIndex: 14,
-            keyName: "WhiteboardView",
-            value: "whiteboardview",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Canvas View",
-            sortIndex: 15,
-            keyName: "CanvasView",
-            value: "canvasview",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Map View",
-            sortIndex: 16,
-            keyName: "MapView",
-            value: "mapview",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Docs",
-            sortIndex: 17,
-            keyName: "DocsView",
-            value: "docsview",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Forms",
-            sortIndex: 20,
-            keyName: "FormsView",
-            value: "formsview",
-            setAsDefault: false,
-            viewStatus: false
-        }
-    ];
-    return new Promise(async (resolve, reject) => {
-        try {
-            // Upsert by keyName, never wipe and refill: a crash or a second import between
-            // the delete and the last save used to leave catalogues partial, and one
-            // failed save was only a console line. Existing rows keep their stored
-            // values; only missing views are inserted.
-            const savePromises = data.map(async (item) => {
-                await MongoDbCrudOpration(companyName, {
-                    type: SCHEMA_TYPE.PROJECT_TAB_COMPONENTS,
-                    data: [
-                        { keyName: item.keyName },
-                        { $setOnInsert: { ...item, default: true } },
-                        { upsert: true },
-                    ],
-                }, 'findOneAndUpdate');
-            });
-
-            const settled = await Promise.allSettled(savePromises);
-            const failed = settled.filter((result) => result.status === 'rejected');
-            if (failed.length) {
-                throw new Error(`${failed.length} of ${data.length} project tab components were not stored: ${failed.map((result) => result.reason && result.reason.message || result.reason).join('; ')}`);
-            }
-            resolve();
-        } catch (error) {
-            logger.error(`ERROR in importProjectTabComponents: ${error.message || error}`);
-            reject(error);
-        }
-    });
+exports.importProjectTabComponents = async (companyName) => {
+    try {
+        await addMissingViews(companyName);
+    } catch (error) {
+        logger.error(`ERROR in importProjectTabComponents: ${error.message || error}`);
+        throw error;
+    }
 }
 
 // PROJECT DEFAULT TAB COMPONENT 88888888

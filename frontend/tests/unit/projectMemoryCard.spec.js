@@ -78,7 +78,7 @@ describe('ProjectMemoryCard', () => {
 
         const episodes = wrapper.findAll('[data-test="episodes"] .pm__episode');
         expect(episodes).toHaveLength(2);
-        expect(episodes[0].text()).toContain('project.guide');
+        expect(episodes[0].find('.pm__skill').text()).toBe('Ai.skill_label_project_guide');
         expect(episodes[0].text()).toContain('Set up CI');
         expect(episodes[0].find('.pm__at').text()).toBe('2026-09-09||false');
         expect(episodes[0].find('[data-test="episode-summary"]').text()).toBe('Ai.episode_proposed {"n":3}, Ai.episode_approved {"n":2}, Ai.episode_declined_reason {"n":1,"reason":"Ai.decline_reason_wrong_tone"}');

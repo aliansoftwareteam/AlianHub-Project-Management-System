@@ -200,17 +200,7 @@
                                             </div>
                                         </div>
                                         <div class="d-flex align-items-center text-nowrap border-top-radius-10-px cursor-pointer view-list-wrapper h-100">
-                                            <DropDown v-if="checkPermission('project.view_list',projectData.isGlobalPermission) === true" mode="dialog" :aria-label="$t('Projects.add_view')" maxHeight="80vh" :bodyClass="{'embed__dropdown':true}" id="embeddropdown">
-                                                <template #button="{ triggerAttrs }">
-                                                    <button type="button" v-bind="triggerAttrs" ref="embeddropdown" class="ph2__tab ph2__tab--add d-flex align-items-center justify-content-center">
-                                                        <img :src="addIcon" alt="" aria-hidden="true" class="mr-10px">
-                                                        <span>{{ $t('Projects.add_view') }}</span>
-                                                    </button>
-                                                </template>
-                                                <template #options>
-                                                    <ViewsDropdown :projectData="projectData" @closeDropdown="$refs['embeddropdown'].click()" :tourId="'projectviewlist_driver'"/>
-                                                </template>
-                                            </DropDown>
+                                            <AddViewMenu v-if="checkPermission('project.view_list',projectData.isGlobalPermission) === true" :projectData="projectData" :activeView="activeTab" tourId="projectviewlist_driver"/>
                                         </div>
                                     </template>
                                 </div>
@@ -439,7 +429,7 @@ import { projectComponentsIcons } from '@/composable/commonFunction';
 import ConfirmationSidebar from '@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue';
 import BulkActionBar from '@/components/molecules/BulkActionBar/BulkActionBar.vue';
 import WasabiImage from '@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue';
-import ViewsDropdown from '@/components/molecules/ProjectViews/ViewsDropdown.vue';
+import AddViewMenu from '@/components/molecules/ProjectViews/AddViewMenu.vue';
 import UpgradYourPlanComponent from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import ProjectDetailRightSide from '@/components/organisms/ProjectDetailRightSide/ProjectDetailRightSide.vue';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
@@ -631,10 +621,6 @@ const companyUserDetail = computed(() => getters['settings/companyUserDetail']);
 const myCounts = computed(() => getters['users/myCounts']?.data || {});
 
 const userId = inject('$userId');
-// template ref: bound via ref="embeddropdown" in the View list DropDown,
-// accessed via $refs in @closeDropdown handler.
-// eslint-disable-next-line no-unused-vars
-const embeddropdown = ref(null);
 const isVisible = ref(true);
 const isVisibleProjectDetial = ref(true);
 // `visible` was a separate ref in the original (initialized false) and
@@ -664,7 +650,6 @@ const { getUser } = useGetterFunctions();
 // IMAGES
 const listDropIcon = require('@/assets/images/svg/list_view_dropicon.svg');
 const publicIcon = require('@/assets/images/svg/public_folder.svg');
-const addIcon = require('@/assets/images/Shape 614.png');
 const publicFolder = require('@/assets/images/public_folder.png');
 const whiteDownArrow = require('@/assets/images/svg/embed_drop_arrow.svg');
 const deleteImage = require('@/assets/images/svg/delete-red.svg');
