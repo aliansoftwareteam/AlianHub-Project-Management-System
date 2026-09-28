@@ -4168,6 +4168,8 @@ export default {
         "no_activity_log_found": "Nessun registro attività trovato"
     },
     "Projects": {
+        "actions_for_item": "Actions for {name}",
+        "status_actions": "Status actions",
         "select_source": "Select Source",
         "source_upwork": "Upwork",
         "source_fiverr": "Fiverr",
@@ -4801,7 +4803,7 @@ export default {
         "This_tag_has_already_been_added": "Questo tag è già stato aggiunto",
         "Tag_name_required": "Nome del tag richiesto",
         "add_tag": "Add tag",
-        "more_tags": "{count} more: {names}"
+        "more_tags": "{count} more: {names}",
     },
     "Embeded": {
         "Anything": "Qualsiasi cosa",

@@ -4228,6 +4228,8 @@ export default {
         no_activity_log_found: "No activity log found",
     },
     Projects: {
+        actions_for_item: "Actions for {name}",
+        status_actions: "Status actions",
         select_source: "Select Source",
         source_upwork: "Upwork",
         source_fiverr: "Fiverr",
