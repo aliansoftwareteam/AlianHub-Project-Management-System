@@ -154,3 +154,6 @@ Correction: the 180-day TTL index on `agent_runs` does exist
 
 ### 2026-09-28 — confidence floor in the verifier (#1080)
 QA Review findings now carry a model-reported `confidence`. `verify()` drops the ones below the floor with the reason, after the evidence gate and before dedup. The floor is the agent's `confidenceFloor`, then the skill's (0.6), bounded to 0.3–0.9, and the API refuses values outside that range. A finding without a confidence is kept. Module: `Modules/Agents/engine/confidence.js`.
+
+### 2026-09-28 — instruction guard on the run path (#1144)
+Found by #1079: runs never called the instruction guard. The orchestrator now checks the model input of every run (task, brief, attached page, comments, memory, fetched facts) with the built-in and owner-added patterns before the call. A hit is logged and, under `AGENT_TAINT_ROUTING`, taints the run with source `instruction task:<id>`, so risky writes go to approval; the text is not stripped and clean runs are unchanged.

@@ -45,6 +45,8 @@ import CommentInput from '@/components/atom/CommentInput/CommentInput.vue';
 import { shellState } from '@/components/organisms/Shell/shellState';
 import { aiAvailability, AI_STATE } from '@/composable/aiAvailability';
 
+aiAvailability.planAllowsAi = true;
+
 const CHAT_DIR = path.resolve(__dirname, '../../src/components/organisms/MainChat');
 const read = (file) => fs.readFileSync(path.join(CHAT_DIR, file), 'utf8');
 

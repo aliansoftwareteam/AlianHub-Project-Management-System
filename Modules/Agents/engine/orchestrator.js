@@ -1,5 +1,7 @@
+const logger = require('../../../Config/loggerConfig');
 const { emptyUsage } = require('../../AICore/usage');
 const { askModel, parseModelJson } = require('../../AICore/modelCall');
+const instructionGuard = require('../../AICore/instructionGuard');
 const { FEATURES } = require('../../AICore/features');
 const { extractUrl } = require('./pageAudit');
 const { audit } = require('./agentFetch');
@@ -93,6 +95,15 @@ function findingsWithoutModel(auditResult, skill) {
     }));
 }
 
+/* The guard flags, it never strips (docs/AI-PLATFORM-ARCHITECTURE.md §G): the model still reads the text inside
+ * the data block, and the run is marked before the call so the replay row carries it too. */
+async function flagInstructions(prompt, { task, spend, onExternal }) {
+    await instructionGuard.fresh();
+    if (!instructionGuard.hasInstruction(prompt)) return;
+    logger.info(`[agent-run] ${(spend && spend.runId) || '-'}: the instruction guard flagged the model input for task ${task && task._id}`);
+    if (typeof onExternal === 'function') await onExternal(taint.instruction(task && task._id));
+}
+
 const skipped = (skill, reason, started) => ({ status: 'skipped', reason, skill: skill.slug, findings: [], usage: emptyUsage(), durationMs: Date.now() - started });
 
 /* The spend guard refused the call before the vendor saw it: no fallback, no
@@ -120,9 +131,11 @@ async function gather({ skillSlug = 'qa-review', task, companyId, memory, starte
 
 /* Skills other than the page audit: ask the model once about the gathered
  * context and hand back a summary plus the changes the run should propose or apply. */
-async function analyseGeneric(skill, { task, context, budget, spend, agent, about }) {
+async function analyseGeneric(skill, { task, context, budget, spend, agent, onExternal, about }) {
     const started = Date.now();
-    const asked = await askModel(skill, { prompt: skill.buildUserPrompt({ task, context }), budget, spend, agent, about });
+    const prompt = skill.buildUserPrompt({ task, context });
+    await flagInstructions(prompt, { task, spend, onExternal });
+    const asked = await askModel(skill, { prompt, budget, spend, agent, about });
     if (asked.refused) return refused(skill, asked, started);
     const { raw: answer, model, degraded, usage } = asked;
     if (!answer && !context.fallback) {
@@ -153,7 +166,9 @@ async function analyseAudit(skill, { task, context, budget, spend, companyId, ag
     }
     if (typeof onExternal === 'function') await onExternal(taint.fetched(url));
 
-    const asked = await askModel(skill, { prompt: skill.buildUserPrompt({ task, audit: auditResult }), budget, spend, agent, about });
+    const prompt = skill.buildUserPrompt({ task, audit: auditResult });
+    await flagInstructions(prompt, { task, spend, onExternal });
+    const asked = await askModel(skill, { prompt, budget, spend, agent, about });
     if (asked.refused) return refused(skill, asked, started);
     const { raw, model, degraded, usage } = asked;
 
@@ -185,7 +200,7 @@ async function analyseAudit(skill, { task, context, budget, spend, companyId, ag
 async function analyse({ skillSlug = 'qa-review', task, context, budget = {}, spend, companyId, agent, onExternal, about = '' }) {
     const tenant = companyId || (spend && spend.companyId);
     const skill = await requireSkill(tenant, skillSlug);
-    return skill.kind === 'generic' ? analyseGeneric(skill, { task, context, budget, spend, agent, about }) : analyseAudit(skill, { task, context, budget, spend, companyId: tenant, agent, onExternal, about });
+    return skill.kind === 'generic' ? analyseGeneric(skill, { task, context, budget, spend, agent, onExternal, about }) : analyseAudit(skill, { task, context, budget, spend, companyId: tenant, agent, onExternal, about });
 }
 
 async function run({ skillSlug = 'qa-review', task, companyId, budget = {}, spend, agent }) {

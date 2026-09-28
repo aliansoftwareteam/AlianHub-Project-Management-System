@@ -183,7 +183,7 @@
                         @update:totalEstimatedTime="(val) => updateTotalEstimatedTime(val)"
                     />
                     <button
-                        v-if="canEditEstimatedHours"
+                        v-if="canUseAi({ project, permitted: canEditEstimatedHours })"
                         ref="aiEstimateTrigger"
                         type="button"
                         class="ai-estimate-btn"
@@ -290,6 +290,7 @@ import { assignAgent, fetchRunnableAgents } from '@/views/Ai/useRunnableAgents';
 import AiResultPreview from '@/components/molecules/AiPreview/AiResultPreview.vue';
 import { useEscapeLayer } from '@/composable/useEscapeLayer';
 import TaskRepeatControl from '@/components/organisms/TaskDetailOverlay/TaskRepeatControl.vue';
+import { canUseAi } from "@/composable/aiAvailability";
 
 const aiEstimateIcon = require("@/assets/images/svg/ai_image.svg");
 const { t } = useI18n();

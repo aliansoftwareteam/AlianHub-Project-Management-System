@@ -8,7 +8,7 @@ const { apiRequest, stub } = vi.hoisted(() => ({ apiRequest: vi.fn(), stub: (nam
 vi.mock('@/services', () => ({ apiRequest, apiRequestWithoutCompnay: vi.fn() }));
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useRoute: () => ({ params: {}, query: {} }) }));
 vi.mock('@/composable', () => ({ useGetterFunctions: () => ({ getUser: () => ({}) }) }));
-vi.mock('@/composable/aiAvailability', () => ({ aiUsable: ref(false) }));
+vi.mock('@/composable/aiAvailability', () => ({ aiUsable: ref(false), canUseAi: () => false }));
 vi.mock('@/components/templates/CreateProject/helper.js', () => ({ HandleProject: vi.fn() }));
 vi.mock('@vuepic/vue-datepicker', () => stub('VueDatePicker'));
 vi.mock('@vuepic/vue-datepicker/dist/main.css', () => ({}));

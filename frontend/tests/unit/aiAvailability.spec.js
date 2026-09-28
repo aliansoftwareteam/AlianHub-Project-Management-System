@@ -36,9 +36,9 @@ describe('AI availability', () => {
         resetAiAvailability();
     });
 
-    it('treats AI as usable until the server has answered, so nothing flickers away on load', () => {
+    it('keeps AI hidden until the server has answered, so nothing flashes on and then off', () => {
         expect(aiAvailability.state).toBe(AI_STATE.UNKNOWN);
-        expect(aiUsable.value).toBe(true);
+        expect(aiUsable.value).toBe(false);
     });
 
     it('loads the state for the workspace and hides AI for every state but on', async () => {

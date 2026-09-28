@@ -66,13 +66,13 @@
                         <button type="button" class="mc-tool" :title="$t('Chat.cmd_clip')" :aria-label="$t('Chat.cmd_clip')" @click="$emit('command', { name: 'clip', text: '' })">
                             <ShellIcon name="film" :size="13" /><span>{{ $t('Chat.clip') }}</span>
                         </button>
-                        <button v-if="aiUsable" type="button" class="mc-tool" :title="$t('Chat.talk_to_text')" :aria-label="$t('Chat.talk_to_text')" @click="$emit('command', { name: 'talk', text: '' })">
+                        <button v-if="canUseAi()" type="button" class="mc-tool" :title="$t('Chat.talk_to_text')" :aria-label="$t('Chat.talk_to_text')" @click="$emit('command', { name: 'talk', text: '' })">
                             <ShellIcon name="mic" :size="13" /><span>{{ $t('Chat.talk_to_text') }}</span>
                         </button>
                         <button type="button" class="mc-tool" :title="$t('Chat.voice_note')" :aria-label="$t('Chat.voice_note')" @click="startRecording">
                             <ShellIcon name="wave" :size="13" /><span>{{ $t('Chat.voice_note') }}</span>
                         </button>
-                        <button v-if="aiUsable" type="button" class="mc-tool mc-tool--ai" :class="{ 'is-on': commandsOpen }" :title="$t('Chat.ask_ai')" :aria-label="$t('Chat.ask_ai')" :aria-expanded="commandsOpen" @click.stop="commandsOpen = !commandsOpen">
+                        <button v-if="canUseAi()" type="button" class="mc-tool mc-tool--ai" :class="{ 'is-on': commandsOpen }" :title="$t('Chat.ask_ai')" :aria-label="$t('Chat.ask_ai')" :aria-expanded="commandsOpen" @click.stop="commandsOpen = !commandsOpen">
                             <ShellIcon name="ai" :size="13" /><span>{{ $t('Chat.ask_ai') }}</span>
                         </button>
 
@@ -126,7 +126,7 @@
 import { computed, defineProps, defineEmits, defineExpose, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useGetterFunctions } from '@/composable';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
-import { aiUsable } from "@/composable/aiAvailability";
+import { canUseAi } from "@/composable/aiAvailability";
 import CommentInput from '@/components/atom/CommentInput/CommentInput.vue';
 import MainChatIcon from './MainChatIcon.vue';
 import MainChatRecorder from './MainChatRecorder.vue';
@@ -173,7 +173,7 @@ const slash = computed(() => {
 const filteredCommands = computed(() => {
     const term = (slash.value || '').split(/\s+/)[0].toLowerCase();
     return COMMANDS
-        .filter((c) => !c.ai || aiUsable.value)
+        .filter((c) => !c.ai || canUseAi())
         .filter((c) => !term || c.key.startsWith(term));
 });
 
