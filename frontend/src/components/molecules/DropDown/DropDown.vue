@@ -9,7 +9,7 @@
         </DropDownTrigger>
         <teleport to="#my-dropdown" v-if="dropdownVisible">
             <div class="position-fi dropdown-back-drop cursor-default" :style="[{'z-index':zIndex}]" v-if="dropdownVisible && !hover" @click.stop="buttonClick()"/>
-            <div :id="panelId" v-bind="sheetAttrs" @click.stop="onPanelClick" @keydown="onPanelKeydown" class="bg-white gray border border-radius-8-px box-shadow-serach drop-down-menu" :style="[{'z-index':zIndex}]" :class="{'drop-down-hide' : !bind, 'desktop-view position-fi' : clientWidth > 767, 'mobile-view position-fi' : clientWidth <= 767, ...bodyClass}" v-if="dropdownVisible">
+            <div :id="panelId" v-bind="panelAttrs" @click.stop="onPanelClick" @keydown="onPanelKeydown" class="bg-white gray border border-radius-8-px box-shadow-serach drop-down-menu" :style="[{'z-index':zIndex}]" :class="{'drop-down-hide' : !bind, 'desktop-view position-fi' : clientWidth > 767, 'mobile-view position-fi' : clientWidth <= 767, ...bodyClass}" v-if="dropdownVisible">
                 <slot name="head" v-if="clientWidth > 767">
                 </slot>
                 <div class="border-bottom-mobiledrop cursor-default mobile-title-header p-20px box-sizing-box" v-else :style="{height : clientWidth <=767 ? '64px' : ''}">
@@ -26,7 +26,10 @@
                     </div>
                 </div>
                 <div v-if="options" :style="`padding: ${clientWidth > 767 ? '10px 10px 10px' : '20px;'}`"  class="search-project-filter dropdown_option font-size-12">
-                    <div :id="mode ? listId : undefined" :role="mode || undefined" :aria-labelledby="mode ? triggerId : undefined" class="overflow-y-auto overflow-x-hidden drop-down-options black" :class="[{'dropDownScroll':props.dropDownClass}]" :style="{'max-height' : maxHeight}">
+                    <div v-if="$slots.search" class="drop-down-search black">
+                        <slot name="search"></slot>
+                    </div>
+                    <div :id="listRole ? listId : undefined" :role="listRole" :aria-labelledby="listRole ? triggerId : undefined" :aria-multiselectable="listRole === 'listbox' && multiselectable ? 'true' : undefined" class="overflow-y-auto overflow-x-hidden drop-down-options black" :class="[{'dropDownScroll':props.dropDownClass}]" :style="{'max-height' : maxHeight}">
                         <slot name="options">
                         </slot>
                     </div>
@@ -58,7 +61,15 @@ const props = defineProps({
     mode: {
         type: String,
         default: "",
-        validator: (value) => ["", "menu", "listbox"].includes(value)
+        validator: (value) => ["", "menu", "listbox", "dialog"].includes(value)
+    },
+    ariaLabel: {
+        type: String,
+        default: ""
+    },
+    multiselectable: {
+        type: Boolean,
+        default: false
     },
     hover: {
         type: Boolean,
@@ -97,6 +108,10 @@ const props = defineProps({
 const TRIGGER_MARKER = "data-dropdown-trigger";
 const ITEM_SELECTOR = '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"]';
 const TABBABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const AUTOFOCUS_SELECTOR = "[data-dropdown-autofocus]";
+const TEXT_FIELD_SELECTOR = 'input:not([type]):not([disabled]), input[type="text"]:not([disabled]), input[type="search"]:not([disabled]), textarea:not([disabled])';
+const FORM_FIELD_SELECTOR = 'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled])';
+const HAS_POPUP = { listbox: "listbox", dialog: "dialog" };
 const TOUR_CLASSES = ["driver-active", "driver-popover-title", "driver-popover-description"];
 
 const dropdownVisible = ref(false);
@@ -108,21 +123,31 @@ const triggerId = computed(() => `${dyid.value}_trigger`);
 const panelId = computed(() => `dd_${dyid.value}`);
 const listId = computed(() => `${dyid.value}_list`);
 const isSheet = computed(() => Boolean(props.mode) && clientWidth.value <= 767);
+const isDialog = computed(() => props.mode === "dialog");
+const listRole = computed(() => (props.mode === "menu" || props.mode === "listbox" ? props.mode : undefined));
 
 provide("dropDownMode", computed(() => props.mode));
 
 const triggerAttrs = computed(() => ({
     id: triggerId.value,
     [TRIGGER_MARKER]: "",
-    "aria-haspopup": props.mode === "listbox" ? "listbox" : "menu",
+    "aria-haspopup": HAS_POPUP[props.mode] || "menu",
     "aria-expanded": dropdownVisible.value ? "true" : "false",
-    "aria-controls": props.options ? listId.value : panelId.value,
+    "aria-controls": props.options && listRole.value ? listId.value : panelId.value,
     onKeydown: onTriggerKeydown,
     onKeyup: preventSpaceClick,
     ...(props.hover ? { onFocus: onTriggerFocus, onBlur: onTriggerBlur } : {})
 }));
 
-const sheetAttrs = computed(() => isSheet.value ? { role: "dialog", "aria-modal": "true", "aria-labelledby": triggerId.value } : {});
+const panelAttrs = computed(() => {
+    if (!isDialog.value && !isSheet.value) return {};
+    return {
+        role: "dialog",
+        "aria-modal": "true",
+        tabindex: isDialog.value ? "-1" : undefined,
+        ...(props.ariaLabel ? { "aria-label": props.ariaLabel } : { "aria-labelledby": triggerId.value })
+    };
+});
 
 function bindsTriggerAttrs(nodes) {
     return nodes.some((node) => {
@@ -154,8 +179,24 @@ function focusItem(el) {
     el.focus();
 }
 
-function focusOnOpen(target) {
+// A search field above the options keeps focus so people can type at once; a dialog starts on its first field.
+function openingField() {
+    const panel = panelEl();
+    if (!panel) return null;
+    const marked = panel.querySelector(AUTOFOCUS_SELECTOR);
+    if (marked) return marked;
+    if (isDialog.value) return panel.querySelector(FORM_FIELD_SELECTOR) || panel.querySelector(TABBABLE_SELECTOR) || panel;
+    return [...panel.querySelectorAll(TEXT_FIELD_SELECTOR)].find((el) => !el.closest(ITEM_SELECTOR)) || null;
+}
+
+function focusOnOpen(target, fieldOnly = false) {
     nextTick(() => {
+        const field = openingField();
+        if (field) {
+            field.focus();
+            return;
+        }
+        if (fieldOnly) return;
         const items = menuItems();
         if (target === "last") {
             focusItem(items[items.length - 1]);
@@ -191,8 +232,9 @@ function close() {
 function onTriggerClick(event) {
     const wasOpen = dropdownVisible.value;
     buttonClick();
-    // detail 0 is a click from the keyboard or a screen reader, not from the mouse.
-    if (props.mode && !wasOpen && (event.detail === 0 || isSheet.value)) focusOnOpen("first");
+    if (!props.mode || wasOpen) return;
+    // detail 0 is a click from the keyboard or a screen reader; a mouse click on a desktop menu or listbox leaves the options unfocused.
+    focusOnOpen("first", event.detail !== 0 && !isSheet.value && !isDialog.value);
 }
 
 function onTriggerKeydown(event) {
@@ -237,26 +279,46 @@ function onTriggerBlur(event) {
 function trapFocus(event) {
     event.preventDefault();
     const tabbables = [...panelEl().querySelectorAll(TABBABLE_SELECTOR)];
-    if (!tabbables.length) return;
-    const index = tabbables.indexOf(event.target);
-    const last = tabbables.length - 1;
-    const next = event.shiftKey ? (index <= 0 ? last : index - 1) : (index === -1 || index === last ? 0 : index + 1);
-    tabbables[next].focus();
+    const step = event.shiftKey ? -1 : 1;
+    const found = tabbables.indexOf(event.target);
+    let index = found === -1 && event.shiftKey ? 0 : found;
+    // A hidden element (display: none) refuses focus, so keep stepping until one takes it.
+    for (let tries = 0; tries < tabbables.length; tries++) {
+        index = (index + step + tabbables.length) % tabbables.length;
+        tabbables[index].focus();
+        if (document.activeElement === tabbables[index]) return;
+    }
 }
 
 function onPanelKeydown(event) {
     if (!props.mode) return;
+    if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+        return;
+    }
+    if (event.key === "Tab") {
+        // Closing puts focus on the trigger before the browser acts, so Tab carries on from the trigger.
+        if (isDialog.value || isSheet.value) trapFocus(event);
+        else close();
+        return;
+    }
+    if (isDialog.value) return;
     const items = menuItems();
     const index = items.indexOf(event.target);
     const onItem = index !== -1;
+    const field = onItem ? openingField() : null;
     switch (event.key) {
         case "ArrowDown":
             event.preventDefault();
-            focusItem(items[onItem ? (index + 1) % items.length : 0]);
+            if (field && index === items.length - 1) field.focus();
+            else focusItem(items[onItem ? (index + 1) % items.length : 0]);
             break;
         case "ArrowUp":
             event.preventDefault();
-            focusItem(items[onItem ? (index - 1 + items.length) % items.length : items.length - 1]);
+            if (field && index === 0) field.focus();
+            else focusItem(items[onItem ? (index - 1 + items.length) % items.length : items.length - 1]);
             break;
         case "Home":
         case "End":
@@ -271,16 +333,6 @@ function onPanelKeydown(event) {
                 event.preventDefault();
                 items[index].click();
             }
-            break;
-        case "Escape":
-            event.preventDefault();
-            event.stopPropagation();
-            close();
-            break;
-        case "Tab":
-            // Focus is on the trigger before the browser acts, so Tab carries on from the trigger.
-            if (isSheet.value) trapFocus(event);
-            else close();
             break;
     }
 }
