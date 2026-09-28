@@ -5021,6 +5021,27 @@ export default {
         "Embed": "Embed",
         "ProjectDetail": "Details"
     },
+    "SavedViews": {
+        "region": "View settings",
+        "unsaved": "Unsaved changes",
+        "save": "Save",
+        "save_hint": "Save these settings on the view for everyone",
+        "save_private_hint": "Save these settings on your private view",
+        "save_for_me": "Save for me",
+        "save_for_me_hint": "Keep these settings in a private view only you see",
+        "save_as_new": "Save as new view",
+        "reset": "Reset",
+        "reset_hint": "Go back to the view's saved settings",
+        "new_name": "View name",
+        "new_name_placeholder": "Name the new view",
+        "only_me": "Only me",
+        "create": "Create view",
+        "cancel": "Cancel",
+        "saving": "Saving…",
+        "saved": "View saved",
+        "created": "View added",
+        "failed": "The view could not be saved"
+    },
     "Apps": {
         "tags": "ટૅગ્સ",
         "Priority": "પ્રાથમિકતા",

@@ -45,6 +45,7 @@ module.exports = defineConfig({
         '@egressRules': path.resolve(__dirname, '../Modules/Agents/engine/egressRules.js'),
         '@agentDailyRunLimit': path.resolve(__dirname, '../Modules/Agents/dailyRunLimit.js'),
         '@passwordRule': path.resolve(__dirname, '../Modules/Auth/helpers/passwordRule.js'),
+        '@viewSettings': path.resolve(__dirname, '../Modules/Project/helpers/viewSettings.js'),
       },
     },
     plugins: [
