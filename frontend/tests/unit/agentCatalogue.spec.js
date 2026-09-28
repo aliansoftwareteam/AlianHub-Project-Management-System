@@ -125,7 +125,9 @@ describe('the template catalogue as data', () => {
         expect(prefill.source).toBe('builder');
         expect(prefill.autonomy).toBe(1);
         expect(prefill.spendCapUsd).toBeLessThanOrEqual(30);
-        expect(prefill.why.autonomy).toBe('Start by suggesting.');
+        expect(prefill.adjusted).toEqual(expect.arrayContaining(['autonomy', 'spendCap']));
+        expect(prefill.why.autonomy).toBeUndefined();
+        expect(prefill.why.name).toBe('It watches deadlines.');
     });
 });
 
@@ -146,9 +148,8 @@ describe('the catalogue dialog', () => {
 
     it('narrows the cards by category chip and marks the chip pressed', async () => {
         const wrapper = await mountWith(AgentCatalogue);
-        const chip = wrapper.findAll('[data-test="catalogue-chip"]').find((c) => c.attributes('data-category') === 'product');
-        await chip.trigger('click');
-        expect(chip.attributes('aria-pressed')).toBe('true');
+        await wrapper.find('[data-test="catalogue-chip"][data-category="product"]').trigger('click');
+        expect(wrapper.find('[data-test="catalogue-chip"][data-category="product"]').attributes('aria-pressed')).toBe('true');
         wrapper.findAll('[data-test="catalogue-card"]').forEach((card) => {
             const tpl = CATALOGUE_TEMPLATES.find((x) => x.slug === card.attributes('data-slug'));
             expect(tpl.categories).toContain('product');

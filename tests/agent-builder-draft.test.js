@@ -155,7 +155,8 @@ describe('what a draft may contain', () => {
     it('never drafts more autonomy than "Suggests changes"', async () => {
         const r = await call(ctrl.draftAgent, req('owner1', { description: DESCRIPTION }));
         expect(r.body.data.autonomy).toBe(1);
-        expect(r.body.data.why.autonomy).toBeTruthy();
+        expect(r.body.data.adjusted).toContain('autonomy');
+        expect(r.body.data.why.autonomy).toBe('');
     });
 
     it('may draft less autonomy than that when the model asks for it', async () => {
