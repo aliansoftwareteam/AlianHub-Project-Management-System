@@ -235,7 +235,7 @@ describe('permissionsForProjectUpdate', () => {
         expect(permissionsForProjectUpdate({ 'customField.abc': 1 })).toEqual([['project.project_custom_field']]);
         expect(permissionsForProjectUpdate({ deletedStatusKey: 2 })).toEqual([['project.project_delete', 'project.project_close']]);
         expect(permissionsForProjectUpdate({ status: 'x', statusType: 'close' })).toEqual([['project.project_status_change', 'project.project_close']]);
-        expect(permissionsForProjectUpdate({ 'watchers.u1': 'all_activity' })).toEqual([]);
+        expect(permissionsForProjectUpdate({ 'watchers.u1': 'all_activity' }, 'u1')).toEqual([]);
     });
 
     it('fails closed to project_details for a field it does not know, including one nested under an operator', () => {
@@ -324,7 +324,7 @@ describe('every other project-mutating route runs the same guard', () => {
 
     it('leaves company-level custom fields and non-project trash kinds to their existing checks', async () => {
         seedRules({});
-        const global = await run(routesOf('../Modules/CustomField/routes')['POST /api/v1/customField'], request({ body: { type: 'save', updateObject: { global: true } } }));
+        const global = await run(routesOf('../Modules/CustomField/routes')['POST /api/v1/customField'], request({ uid: OWNER, body: { type: 'save', updateObject: { global: true } } }));
         expect(global.body).toMatchObject({ reached: 'insertCustomField' });
         const task = await run(routesOf('../Modules/Trash/routes')['PUT /api/v2/trash/:kind/:id/restore'], request({ params: { kind: 'tasks', id: oid() } }));
         expect(task.body).toMatchObject({ reached: 'restore' });

@@ -10,6 +10,8 @@ const mongoose = require("mongoose")
 const { settingsCollectionDocs } = require("../../../Config/collections");
 const { idForms } = require("../../../utils/mongo-handler/objectIdKeys");
 
+const MILESTONE_WEEKLY_RANGES = ['Mon - Sun', 'Sun - Mon'];
+
 exports.getMilestone = async (req, res) => {
     try {
         const { id } = req.params;
@@ -91,17 +93,21 @@ exports.updateWeeklyRangeMilestone = async (req, res) => {
                 error: "Company ID is required in headers"
             });
         }
-        // Validate body keys
-
         const allowedKeys = ["action","refreshToken"];
         const invalidKeys = Object.keys(req.body).filter((key) => !allowedKeys.includes(key));
         if (invalidKeys.length > 0) {
             return res.status(400).json({
-                message: "An error occurred while updating the currency.",
+                message: "An error occurred while updating the milestone week.",
                 error: `Invalid keys provided: ${invalidKeys.join(", ")}. Only the following keys are allowed: ${allowedKeys.join(", ")}.`
             });
         }
-        
+        if (!MILESTONE_WEEKLY_RANGES.includes(action)) {
+            return res.status(400).json({
+                message: "An error occurred while updating the milestone week.",
+                error: `action must be one of: ${MILESTONE_WEEKLY_RANGES.join(", ")}.`
+            });
+        }
+
         const query = {
             type: SCHEMA_TYPE.SETTINGS,
             data: [

@@ -10,7 +10,7 @@
 /* Members-style rows (13b) — the same grid whether the row is a person or an agent. */
 .member-row {
     display: grid;
-    grid-template-columns: 1fr 90px 160px 90px;
+    grid-template-columns: minmax(0, 1fr) 90px 160px 90px;
     gap: 10px;
     align-items: center;
     padding: 10px 14px;
@@ -21,8 +21,9 @@
 .member-row--agent { background: var(--brand-tint); }
 .member-row__head { font: var(--text-label); color: var(--ink-label); text-transform: uppercase; letter-spacing: .06em; }
 .member-row__person { display: flex; align-items: center; gap: 9px; min-width: 0; }
-.member-row__person strong { font: 600 13px/1.2 var(--font-ui); display: block; }
-.member-row__mail { font: var(--text-small); color: var(--ink-2); }
+.member-row__who { display: flex; flex-direction: column; min-width: 0; }
+.member-row__name { font: 600 13px/1.2 var(--font-ui); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.member-row__mail { font: var(--text-small); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .member-row__role, .member-row__access { color: var(--ink-label); }
 .member-row__active { color: var(--ink-2); }
 
@@ -32,7 +33,18 @@
 .parity-lead { font: var(--text-small); color: var(--ink-2); margin: 0; max-width: 680px; }
 .parity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
 .parity-count { font: var(--text-data); color: var(--ink-label); text-transform: uppercase; }
-.parity-table { border: 1px solid var(--hairline); border-radius: var(--r-card); overflow: hidden; background: var(--surface); }
+.parity-table { container: members / inline-size; border: 1px solid var(--hairline); border-radius: var(--r-card); overflow: hidden; background: var(--surface); }
+
+/* The table sits in a half-width card at desktop sizes, so it follows its own width rather than the viewport's. */
+@container members (max-width: 620px) {
+    .member-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who role" "access active"; row-gap: 4px; }
+    .member-row__head { display: none; }
+    .member-row > :first-child { grid-area: who; }
+    .member-row__role { grid-area: role; justify-self: end; }
+    .member-row__access { grid-area: access; font: var(--text-small); padding-left: 35px; }
+    .member-row--agent .member-row__access { padding-left: 41px; }
+    .member-row__active { grid-area: active; justify-self: end; font-size: 11px; }
+}
 
 /* 30a — the picker */
 .picker { display: grid; grid-template-columns: 1fr 340px; gap: 0; border: 1px solid var(--hairline); border-radius: var(--r-card); background: var(--surface); overflow: hidden; }
@@ -161,8 +173,6 @@ a.ask__cite-ref:focus-visible { outline: none; box-shadow: var(--focus); border-
 }
 @media (max-width: 900px) {
     .ask__cards { grid-template-columns: 1fr; }
-    .member-row { grid-template-columns: 1fr; gap: 4px; }
-    .member-row__head { display: none; }
     .route__to { width: auto; }
     .picker__row { min-height: 44px; }
 }

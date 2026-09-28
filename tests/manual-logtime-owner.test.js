@@ -166,6 +166,30 @@ describe('manual log time records the signed-in user', () => {
     });
 });
 
+describe('the collection a manual entry is written to', () => {
+    const touchedTypes = () => mockCrud.mock.calls
+        .filter(([, , method]) => ['save', 'findOne', 'findOneAndUpdate'].includes(method))
+        .map(([, arg, method]) => `${method}:${arg.type}`);
+
+    it('saves a new entry only as a time record, whatever collection the body names', async () => {
+        const r = await call(manualLogTime, logBody({ type: 'projects' }));
+
+        expect(r.body.status).toBe(true);
+        expect(touchedTypes()).not.toContain('save:projects');
+        expect(touchedTypes()).toContain('save:timesheets');
+    });
+
+    it('reads and edits only time records, whatever collection the body names', async () => {
+        stored.Loggeduser = ME;
+        const r = await call(manualLogTime, editBody({ type: 'projects' }));
+
+        expect(r.body.status).toBe(true);
+        expect(touchedTypes()).not.toContain('findOne:projects');
+        expect(touchedTypes()).not.toContain('findOneAndUpdate:projects');
+        expect(touchedTypes()).toContain('findOneAndUpdate:timesheets');
+    });
+});
+
 describe('editing a manual entry', () => {
     it('edits the session\'s own entry', async () => {
         stored.Loggeduser = ME;
