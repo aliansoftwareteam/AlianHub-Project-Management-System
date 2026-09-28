@@ -12,15 +12,14 @@ Tick each box with the commit that closed it.
 - [x] `.claude/MIGRATION-task-type-icons-and-keys.md` still documents the deleted script — ad582067
 - [x] Migrations runner has no dry-run/verify mode — 9043b599 (`npm run migrate -- up --dry-run`, `npm run migrate -- verify`, `verify` on 004)
 - [x] ADR 002 amendment for Agenda-on-global (`docs/adr/002-automation-and-agent-engines.md:75`) — f5087ecb
-- [ ] Delete `--kiln-*` aliases (`tokens.css:384-389`) and the legacy Header kiln classes once `ah.legacyNav` goes
+- [x] Delete `--kiln-*` aliases (`tokens.css:384-389`) and the legacy Header kiln classes once `ah.legacyNav` goes — #1064 (523), owner decision 2026-09-27
 - [x] Stale `.wizard-step-fill` comment in `TemplateSelectForm.vue:189` and inert `.tsf-fill-list` classes — 273cc0da
 - [x] Run-history drawer for `GET /api/v2/automations/:id/runs` — 988d520d (tests 61dbfbca)
 - [x] "Test on a real task" dry-run endpoint for automation rules — 07d6d95b, editor button f2bed2fe (tests 1dc5954e, 07200e8d)
-- [ ] Trash the sample/fixture rows in the "AlianHub Redesign" dogfood project
+- [x] Trash the sample/fixture rows in the "AlianHub Redesign" dogfood project — owner decision 9, 2026-09-23 (AR-1..8, AR-54..57 moved to Trash)
 
 ## Last step
-Migrations runner dry-run and verify landed (9043b599); the MIGRATION doc half of that item is still open.
-Five items closed on `chore/maintainability-leftovers-021`; the rest are untouched.
+Closed 2026-09-28: every box ticked.
 
 ## Blockers
 None.

@@ -1,7 +1,7 @@
 ---
 id: 040
 title: Store each reference id in one form, with a migration
-status: backlog
+status: active
 priority: medium
 depends_on: []
 created: 2026-09-26

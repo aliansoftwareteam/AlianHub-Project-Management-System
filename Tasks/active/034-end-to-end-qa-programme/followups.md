@@ -168,6 +168,12 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 142 | The provenance rollup's `tasks_closed` text reads "1 tasks closed" for one task; the key needs a plural form. | #1046 | Existing key; its own change. **Closed** by #1051 (build 516). |
 | 143 | Direct `req.headers['companyid']` reads remain outside task 013 B.4's modules, e.g. eight in `Modules/Sprints` (`scrum.js`, `burndown.js`, `hours.js`, `helpers/sprintVisibility.js`). | #1052 | All sit behind the global `verifyJWTTokenWithCV2` (`Config/setMiddleware.js`), which refuses a header outside the token audience, so this is consistency (adopt `tenantOf`), not a hole. Low priority. |
 | 144 | The upgrade card on plan-locked screens renders a 451 px illustration with no width limit, so a 390 px page scrolled sideways. | #1053 | **Closed** by #1054 (build 519). |
+| 145 | In the bulk bar's tag menu, tag chip text on a selected row (tinted #eef0ff, #e3e6ff on hover) was worked out against the page background: 4.31:1, 3.99:1 on hover. | #1044 | **Closed** by #1056 (build 521): `statusChipColors` takes the surface the chip sits on. |
+| 146 | Projects: the mobile view switcher's "+ Add view" called `$refs.all_views_dd.click()`, a ref that lives in the child `ProjectBottomModals`, so it threw on phones. | #1071 | **Closed** by #1071 (build 552): `openAllViews()` exposed by the child. |
+| 147 | An agent's `task.sprint.move` stored `sprintArray: { _id, name }` without `id` or folder fields, so readers lost the task's sprint. | #1077 | **Closed** by #1081 (build 540): `sprintPlacementOf` and the web move's follow-ups. |
+| 148 | Sample tasks stored the whole sprint document as `sprintArray` (no `id`), and the agent `task.create` left out the folder fields. | #1081 | **Closed** by #1086 (build 556), with migration `046-task-sprint-placement` for tasks already stored. |
+| 149 | The task importer (`Modules/Importers/controller.js`, ~:262) stores the client-supplied sprint object as `sprintArray` without checking it against `sprintPlacementOf`. | #1086 | Open. |
+| 150 | Parallel PRs that each add the same i18n key with different text merge textually into a duplicate key, which fails lint and the build (`Projects.project_actions`, `Tags.tag_actions`). | #1074, #1076, #1073 | Process: batch briefs should reserve key names. Both cases fixed before merge. |
 
 ## Owner decisions recorded
 
