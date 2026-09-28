@@ -234,6 +234,19 @@ describe('editing a manual entry', () => {
 });
 
 describe('deleting a manual entry', () => {
+    it('reads and deletes only time records, whatever collection the body names', async () => {
+        stored.Loggeduser = ME;
+        const r = await call(deleteManualLogtime, deleteBody({ type: 'projects' }));
+
+        expect(r.body.status).toBe(true);
+        const touched = mockCrud.mock.calls
+            .filter(([, , method]) => method === 'deleteOne' || method === 'findOne')
+            .map(([, arg, method]) => `${method}:${arg.type}`);
+        expect(touched).not.toContain('findOne:projects');
+        expect(touched).not.toContain('deleteOne:projects');
+        expect(touched).toContain('deleteOne:timesheets');
+    });
+
     it('deletes the session\'s own entry and names the session', async () => {
         stored.Loggeduser = ME;
         const r = await call(deleteManualLogtime, deleteBody());
