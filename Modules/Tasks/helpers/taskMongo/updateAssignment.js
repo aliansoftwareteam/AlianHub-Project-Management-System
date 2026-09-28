@@ -23,11 +23,16 @@ const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
 const { taskNotFound, escapeText } = require('../taskWriteFields');
 
 const shownName = (employeeName) => (Array.isArray(employeeName) ? employeeName.map(escapeText).join(',') : escapeText(employeeName));
+/* An automation passes who made the change and how deep in a chain of events it is, so the event bus can refuse to
+ * let a rule wake itself; a person's write carries neither and emits exactly as it always has. */
+const assigneeEvent = (result, updatedFields, eventActor, eventDepth) => (eventActor
+    ? { type: "update", data: result, updatedFields, module: 'task', actor: eventActor, depth: Number(eventDepth) || 0 }
+    : { type: "update", data: result, updatedFields, module: 'task' });
 module.exports = {
 
     /* -------------- UPDATE ASSIGNEE ADD OR ASSIGNEE REMOVE FUNCTION FOR TASK -----------------*/
 
-    updateAssignee({firebaseObj,projectData ,taskData,employeeName: sentName,type,userData,isUpdateTask}) {
+    updateAssignee({firebaseObj,projectData ,taskData,employeeName: sentName,type,userData,isUpdateTask,eventActor,eventDepth}) {
         return new Promise((resolve,reject) => {
             try {
                 const employeeName = shownName(sentName);
@@ -147,7 +152,7 @@ module.exports = {
                                 ]
                             }
                             MongoDbCrudOpration(projectData.CompanyId,object, "findOneAndUpdate").then((result) => {
-                                socketEmitter.emit('update', { type: "update", data: result , updatedFields: mongoUpdateObj, module: 'task' });
+                                socketEmitter.emit('update', assigneeEvent(result, mongoUpdateObj, eventActor, eventDepth));
                                 resolve({status: true, statusText: "Assignee updated successfully"});
                                 try {
                                     this.updateWatcher({companyId : projectData.CompanyId, projectId: projectData._id, sprintId: taskData.sprintId, taskId: taskData._id, userId: uid, add: type === "assigneeAdd", type: type,userData:userData,employeeName:sentName})

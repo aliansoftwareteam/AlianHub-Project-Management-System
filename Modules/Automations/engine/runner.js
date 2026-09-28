@@ -102,7 +102,7 @@ async function executeStep(step, { companyId, envelope, outputs, context }) {
     }
 
     const config = render(step.config || {}, ctx);
-    const output = await action.run({ companyId, entity: envelope.entity, config, context: { ...context, task: envelope.data } });
+    const output = await action.run({ companyId, entity: envelope.entity, config, context: { ...context, task: envelope.data, actor: envelope.actor, stepId: step.id } });
     return { output };
 }
 

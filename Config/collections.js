@@ -63,6 +63,7 @@ const dbCollections = {
     API_ACTIVITY_LOGS: "apiActivityLogs",
     EXPORT_JOBS: "exportJobs",
     IMPORT_JOBS: "importJobs",
+    AI_FIELD_JOBS: "aiFieldJobs",
     EPICS: "epics",
     PAGES: "pages",
     PAGE_VERSIONS: "pageVersions",
