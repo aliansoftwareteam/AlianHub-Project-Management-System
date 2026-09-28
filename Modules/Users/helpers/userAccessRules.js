@@ -9,7 +9,7 @@ const MEMBER_FIELDS = [
 const SELF_FIELDS = [
     ...MEMBER_FIELDS,
     'isEmailVerified', 'isProductOwner', 'tour', 'lastSelectedCompany', 'customerId', 'customerIds',
-    'homeChecklist', 'navPreferences', 'homeCards', 'localePreferences', 'agentAccount', 'demo',
+    'homeChecklist', 'navPreferences', 'homeCards', 'localePreferences', 'accessibilityPreferences', 'agentAccount', 'demo',
 ];
 // What a pre-authentication answer may carry: the sign-in, OAuth and sign-up screens read
 // these, and the caller is only as trusted as the password or invite they arrived with, so
@@ -21,7 +21,7 @@ const AUTH_FIELDS = [
 ];
 const SELF_WRITABLE = [
     'isOnline', 'lastActive', 'lastSelectedCompany', 'tour', 'presence', 'languageCode',
-    'localePreferences', 'updatedAt', 'Employee_FName', 'Employee_LName', 'Employee_Name',
+    'localePreferences', 'accessibilityPreferences', 'updatedAt', 'Employee_FName', 'Employee_LName', 'Employee_Name',
     'Employee_profileImage', 'Employee_profileImageURL', 'Time_Format', 'Time_Zone', 'workingHours',
 ];
 const FILTER_FIELDS = ['_id', 'isActive', 'AssignCompany', 'Employee_Email', 'Employee_Name', 'Employee_FName', 'Employee_LName', 'isOnline'];

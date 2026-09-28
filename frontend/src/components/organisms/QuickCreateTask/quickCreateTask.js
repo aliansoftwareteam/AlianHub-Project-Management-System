@@ -17,30 +17,6 @@ export function closeQuickCreate() {
     quickCreate.sprintId = "";
 }
 
-const NON_TEXT_INPUTS = new Set(["checkbox", "radio", "button", "submit", "reset", "range", "color", "file", "image"]);
-
-export function isEditableTarget(target) {
-    if (!target || typeof target.closest !== "function") return false;
-    if (target.isContentEditable || target.closest("[contenteditable=\"\"], [contenteditable=\"true\"]")) return true;
-    const tag = String(target.tagName || "").toLowerCase();
-    if (tag === "textarea" || tag === "select") return true;
-    if (tag === "input") return !NON_TEXT_INPUTS.has(String(target.getAttribute("type") || "").toLowerCase());
-    return false;
-}
-
-const OPEN_LAYERS = "[aria-modal=\"true\"], dialog[open], .ah-sheet__backdrop, .swal2-container";
-
-export function hasOpenDialog(doc = typeof document === "undefined" ? null : document) {
-    return Boolean(doc && doc.querySelector(OPEN_LAYERS));
-}
-
-export function isCreateTaskShortcut(event, { dialogOpen = false } = {}) {
-    if (!event || event.defaultPrevented || event.isComposing || event.repeat) return false;
-    if (event.key !== "c" || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return false;
-    if (dialogOpen || isEditableTarget(event.target)) return false;
-    return true;
-}
-
 /* Enter creates; Shift+Enter, or Enter with "Create another" on, creates and stays;
  * Cmd/Ctrl+Enter creates and opens the task. */
 export function submitIntent(event, { keepOpen = false } = {}) {

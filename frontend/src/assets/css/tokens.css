@@ -119,6 +119,68 @@
     --shadow-card: 0 2px 6px rgba(0, 0, 0, .3);
 }
 
+/* High contrast (Settings → Contrast, or prefers-contrast: more): body text at 7:1 or more, borders at 3:1 or more. */
+:root.ah-high-contrast {
+    --brand: #1e2666;
+    --brand-deep: #0f1440;
+    --brand-tint: rgba(30, 38, 102, .12);
+    --brand-ring: rgba(30, 38, 102, .2);
+    --brand-border: #1e2666;
+    --on-brand: #ffffff;
+    --ink: #000000;
+    --ink-2: #2b2b2b;
+    --ink-3: #4d4d4d;
+    --ink-label: #1f1f1f;
+    --hairline: #767676;
+    --border: #4d4d4d;
+    --canvas: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #f2f2f2;
+    --surface-hover: rgba(0, 0, 0, .08);
+    --fill: rgba(0, 0, 0, .1);
+    --track: #767676;
+    --rail-ink: #ffffff;
+    --rail-ink-2: #d9d9d9;
+    --ok: #14694f;
+    --ok-ink: #0d4a37;
+    --warn-ink: #6b2f00;
+    --danger: #a00d18;
+    --danger-ink: #7a0f1b;
+    --agent: #4a3cc2;
+    --focus: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink);
+}
+
+:root.ah-high-contrast[data-theme="dark"] {
+    --brand: #c9bdff;
+    --brand-deep: #b3a4ff;
+    --brand-tint: rgba(201, 189, 255, .2);
+    --brand-ring: rgba(201, 189, 255, .3);
+    --brand-border: #c9bdff;
+    --on-brand: #000000;
+    --ink: #ffffff;
+    --ink-2: #e6e6e6;
+    --ink-3: #c7c7c7;
+    --ink-label: #f0f0f0;
+    --hairline: #8f8f8f;
+    --border: #b3b3b3;
+    --canvas: #000000;
+    --surface: #0a0a0a;
+    --surface-2: #161616;
+    --surface-hover: rgba(255, 255, 255, .12);
+    --fill: rgba(255, 255, 255, .16);
+    --track: #8f8f8f;
+    --knob: #ffffff;
+    --ok: #5fe3b5;
+    --ok-ink: #9ff0d4;
+    --warn-ink: #ffc78a;
+    --danger: #ff9ea5;
+    --danger-ink: #ffb8bd;
+    --agent-bg: rgba(201, 189, 255, .2);
+}
+
+/* Many controls draw focus as a box-shadow and switch the outline off; here the outline wins. */
+:root.ah-high-contrast :focus-visible { outline: 3px solid var(--ink) !important; outline-offset: 2px !important; }
+
 html, body, #app {
     font-family: var(--font-ui);
     color: var(--ink);

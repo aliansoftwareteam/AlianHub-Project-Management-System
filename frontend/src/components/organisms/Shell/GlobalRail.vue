@@ -10,7 +10,7 @@
                 type="button"
                 class="ah-rail__item ah-rail__item--new"
                 :title="$t('QuickCreate.rail_title')"
-                aria-keyshortcuts="c"
+                :aria-keyshortcuts="shortcutPrefs.singleKeys ? 'c' : null"
                 :tabindex="focusIndex('new')"
                 @click="openQuickCreate()"
             >
@@ -150,6 +150,7 @@ import { useAuth } from "@/services";
 import { useNavItems } from "./navItems";
 import { shellState, openPanel, closePopovers, toggleTheme, syncNavPreferences } from "./shellState";
 import { openQuickCreate } from "@/components/organisms/QuickCreateTask/quickCreateTask";
+import { shortcutPrefs } from "@/composable/shortcuts";
 import { useInboxUnread } from "./inboxUnread";
 
 const emit = defineEmits(["change"]);

@@ -383,3 +383,62 @@ test.describe('accessibility: create task dialog', () => {
         await expect(opener).toBeFocused();
     });
 });
+
+test.describe('accessibility: skip link, shortcut sheet and high contrast', () => {
+    test.use(asRole('owner'));
+    test.beforeEach(async ({ page }) => skipFirstRun(page));
+
+    const home = async (page, state) => {
+        await page.goto(`/#/${state.companyId}`);
+        await expect(page.getByRole('heading', { level: 1, name: 'Today & Overdue' })).toBeVisible();
+    };
+    const blur = (page) => page.evaluate(() => document.activeElement && document.activeElement.blur());
+
+    test('the skip link is the first Tab stop and moves focus to the main region', async ({ page, state }) => {
+        await home(page, state);
+        await blur(page);
+        await page.keyboard.press('Tab');
+        const skip = page.getByRole('link', { name: 'Skip to content' });
+        await expect(skip).toBeFocused();
+        await expect(skip).toBeInViewport();
+        expect(await blockingViolations(page)).toEqual([]);
+        await page.keyboard.press('Enter');
+        await expect.poll(() => page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('ah-main');
+    });
+
+    test('? opens the shortcut sheet, it is axe clean, and Escape hands focus back', async ({ page, state }) => {
+        await home(page, state);
+        const opener = page.getByRole('button', { name: 'Search or ask AI' });
+        await opener.focus();
+        await page.keyboard.press('Shift+Slash');
+        const sheet = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+        await expect(sheet).toBeVisible();
+        await expect(sheet).toContainText('New task');
+        await expect(sheet).toContainText('Inbox');
+        expect(await blockingViolations(page)).toEqual([]);
+
+        await page.keyboard.press('Tab');
+        expect(await inDialog(page)).toBe(true);
+        await page.keyboard.press('Escape');
+        await expect(sheet).toBeHidden();
+        await expect(opener).toBeFocused();
+    });
+
+    test('g i goes to the Inbox', async ({ page, state }) => {
+        await home(page, state);
+        await blur(page);
+        await page.keyboard.press('g');
+        await page.keyboard.press('i');
+        await expect(page.getByRole('heading', { level: 1, name: 'Inbox' })).toBeVisible();
+    });
+
+    test('high contrast follows prefers-contrast and is axe clean in light and dark', async ({ page, state }) => {
+        await page.emulateMedia({ contrast: 'more' });
+        await home(page, state);
+        await expect(page.locator('html')).toHaveClass(/ah-high-contrast/);
+        expect(await blockingViolations(page)).toEqual([]);
+
+        await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+        expect(await blockingViolations(page)).toEqual([]);
+    });
+});

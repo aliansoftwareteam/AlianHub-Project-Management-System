@@ -2120,6 +2120,9 @@ const schema = {
         navPreferences: {
             pinned: { type: [String], required: false, default: undefined }
         },
+        accessibilityPreferences: {
+            singleKeyShortcuts: { type: Boolean, required: false }
+        },
         // Stars across companies live on the global user record, so each entry names its company.
         favourites: {
             type: [new mongoose.Schema({

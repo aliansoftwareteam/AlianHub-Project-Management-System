@@ -1,3 +1,5 @@
+import { shortcutPrefs } from "@/composable/shortcuts";
+
 export const NAV_ATTR = "data-task-nav";
 
 /* Rows carry where their task lives, so the overlay walks exactly what the view shows:
@@ -48,8 +50,10 @@ export function navKeyDirection(event) {
     if (!event || event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return 0;
     const target = event.target && event.target.nodeType === 1 ? event.target : null;
     if (target && (target.isContentEditable || target.closest(EDITABLE) || target.closest(LAYERS_ON_TOP))) return 0;
-    if (event.key === "j") return 1;
-    if (event.key === "k") return -1;
+    if (event.key === "j" || event.key === "k") {
+        if (!shortcutPrefs.singleKeys) return 0;
+        return event.key === "j" ? 1 : -1;
+    }
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return 0;
     if (!target || !target.closest(".ah-detail__head")) return 0;
     return event.key === "ArrowDown" ? 1 : -1;
