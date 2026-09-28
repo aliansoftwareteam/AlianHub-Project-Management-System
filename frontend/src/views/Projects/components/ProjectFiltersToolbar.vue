@@ -66,7 +66,7 @@
                         :title="$t('AI.write_with_ai')"
                         :aria-label="$t('AI.write_with_ai')"
                         @click="$emit('openAi')"
-                        v-if="aiUsable && checkApps('AI',projectData) && checkPermission('artificial_intelligence',projectData?.isGlobalPermission) === true"
+                        v-if="canUseAi({ project: projectData, permitted: checkPermission('artificial_intelligence',projectData?.isGlobalPermission) === true })"
                     >
                         <ShellIcon name="ai" :size="15" />
                     </button>
@@ -204,7 +204,7 @@
 
 <script setup>
 import { ref, computed, defineProps, defineEmits, watch } from 'vue';
-import { aiUsable } from "@/composable/aiAvailability";
+import { canUseAi } from "@/composable/aiAvailability";
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useRoute } from 'vue-router';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
@@ -239,7 +239,7 @@ const showExport = ref(false);
 const opener = (flag) => () => { flag.value = true; };
 import { useCustomComposable } from '@/composable';
 
-const { checkPermission, checkApps } = useCustomComposable();
+const { checkPermission } = useCustomComposable();
 
 const props = defineProps({
     activeTab: { type: String, required: true },

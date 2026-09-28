@@ -42,7 +42,6 @@
     color: var(--ink-label);
     justify-items: end;
 }
-.lv2__cols .lv2__c-risk { color: var(--brand); }
 
 .lv2__sprint { display: flex; flex-direction: column; gap: 12px; }
 .lv2__sprint-head {

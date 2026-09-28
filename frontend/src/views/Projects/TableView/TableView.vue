@@ -55,7 +55,7 @@
                     <span role="columnheader">{{ $t('List.col_owner') }}</span>
                     <span role="columnheader"><template v-if="tagsOn">{{ $t('List.col_tags') }}</template></span>
                     <span role="columnheader" class="tv2__head-ai" :title="$t('List.ai_source_hint')">✦ {{ $t('List.col_summary') }}</span>
-                    <span role="columnheader" class="tv2__head-ai" :title="$t('List.risk_formula')">✦ {{ $t('List.col_risk') }}</span>
+                    <span role="columnheader" :title="$t('List.risk_formula')">{{ $t('List.col_risk') }}</span>
                     <span role="columnheader" class="tv2__head-ai" :title="$t('List.ai_source_hint')">✦ {{ $t('List.col_area') }}</span>
                     <span role="columnheader">{{ $t('Provenance.col_done_by') }}</span>
                 </div>

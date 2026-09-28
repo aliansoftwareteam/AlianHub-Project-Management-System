@@ -434,6 +434,7 @@ import { useI18n } from 'vue-i18n';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { useValidation } from '@/composable/Validation';
 import { projectComponentsIcons } from '@/composable/commonFunction';
+import { canUseAi } from '@/composable/aiAvailability';
 
 // COMPONENTS
 import ConfirmationSidebar from '@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue';
@@ -658,7 +659,7 @@ const viewDefaultIcon = require('@/assets/images/svg/list_home_icon.svg');
 const viewDefaultActive = require('@/assets/images/svg/blue_tick.svg');
 
 const companyId = inject('$companyId');
-const { checkPermission, checkApps, makeUniqueId } = useCustomComposable();
+const { checkPermission, makeUniqueId } = useCustomComposable();
 const { getUser } = useGetterFunctions();
 
 // IMAGES
@@ -1006,7 +1007,7 @@ const sprints = ref([]);
 // request the views listen for.
 const headerSprint = computed(() => (sprints.value.length === 1 && !sprints.value[0]?.isFolder ? sprints.value[0] : null));
 const isProjectFavourite = computed(() => Boolean((projectData.value?.favouriteTasks || []).find((x) => x.userId === userId.value)));
-const canAiAssist = computed(() => checkApps('AI', projectData.value) && checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true);
+const canAiAssist = computed(() => canUseAi({ project: projectData.value, permitted: checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true }));
 // Only shown where a view actually answers the request (the board injects
 // `addTaskRequest`); other views opt in by injecting it too.
 const OWN_BULK_BAR_VIEWS = ['ProjectListView', 'TableView', 'ProjectKanban'];

@@ -49,7 +49,7 @@
                         <span class="lv2__c-due" role="columnheader">{{ $t('List.col_due') }}</span>
                         <span class="lv2__c-prio" role="columnheader"><template v-if="rowEdit.showPriority.value">{{ $t('List.col_priority') }}</template></span>
                         <span class="lv2__c-est" role="columnheader">{{ $t('List.col_est') }}</span>
-                        <span class="lv2__c-risk" role="columnheader">✦ {{ $t('List.col_risk') }}</span>
+                        <span class="lv2__c-risk" role="columnheader">{{ $t('List.col_risk') }}</span>
                         <span class="lv2__c-done" role="columnheader">{{ $t('Provenance.col_done_by') }}</span>
                     </div>
 

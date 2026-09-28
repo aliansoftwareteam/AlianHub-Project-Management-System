@@ -117,7 +117,7 @@
                     <button type="button" class="ah-chip ah-detail__chips-more" @click="sheetOpen = true">{{ $t('TaskPanel.properties') }}</button>
                 </div>
 
-                <TaskSummaryBlock v-if="task._id && canComment" ref="summaryRef" :taskId="task._id" :enabled="aiUsable" @count="(n) => commentTotal = n" />
+                <TaskSummaryBlock v-if="task._id && canComment" ref="summaryRef" :taskId="task._id" :enabled="canUseAi()" @count="(n) => commentTotal = n" />
 
                 <div class="ah-detail__tabs" role="tablist">
                     <button
@@ -355,7 +355,7 @@ import taskClass from "@/utils/TaskOperations";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { publicConfig } from "@/config/publicConfig";
-import { aiUsable } from "@/composable/aiAvailability";
+import { canUseAi } from "@/composable/aiAvailability";
 import { dbCollections } from "@/utils/Collections";
 import { statusChipStyle } from "@/utils/statusChipColors";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
@@ -936,7 +936,7 @@ async function draftWithAi(textarea) {
 function onKeydownCapture(event) {
     const target = event.target;
     if (!target || target.id !== "message-box" || event.key !== "Enter" || event.shiftKey) return;
-    if (!aiUsable.value || !/^\/ai(\s|$)/i.test(target.value || "")) return;
+    if (!canUseAi() || !/^\/ai(\s|$)/i.test(target.value || "")) return;
     event.preventDefault();
     event.stopPropagation();
     if (!aiDrafting.value) draftWithAi(target);
