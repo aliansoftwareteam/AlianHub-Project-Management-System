@@ -166,7 +166,7 @@ async function dryRunMigrations({ store, migrations, makeContext, guard }) {
                 error = errorText(e);
             }
             const journal = guard.take();
-            const outcome = { id: migration.id, scope: migration.scope, writes: groupWrites(journal.writes) };
+            const outcome = { id: migration.id, scope: migration.scope, writes: groupWrites(journal.writes), companies: ctx.companies || {} };
             const reason = cannotDryRunReason(migration.id, journal);
             if (reason) Object.assign(outcome, { status: 'cannot-dry-run', reason });
             else if (error) Object.assign(outcome, { status: 'failed', error });
