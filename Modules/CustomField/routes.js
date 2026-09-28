@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const ctrl = require('./controller');
+const aiFields = require('./aiFields/controller');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { requireProjectAccess } = require('../../Config/projectAccess');
@@ -41,4 +42,8 @@ exports.init = (app) => {
     app.get('/api/v2/custom-fields/formula/scope', ctrl.formulaScope)
     app.post('/api/v2/custom-fields/formula/validate', ctrl.validateFormula)
     app.post('/api/v2/custom-fields/compute', ctrl.computeFields)
+    app.post('/api/v2/custom-fields/:fieldId/ai/preview', aiFields.preview)
+    app.post('/api/v2/custom-fields/:fieldId/ai/apply', aiFields.apply)
+    app.post('/api/v2/custom-fields/:fieldId/ai/jobs', aiFields.startJob)
+    app.get('/api/v2/custom-fields/ai/jobs/:jobId', aiFields.readJob)
 }

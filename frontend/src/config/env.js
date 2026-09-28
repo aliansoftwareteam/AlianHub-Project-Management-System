@@ -373,6 +373,7 @@ module.exports.PUBLIC_SHARES = '/api/v2/public-shares';
 module.exports.CUSTOM_FIELD_FORMULA_SCOPE = '/api/v2/custom-fields/formula/scope';
 module.exports.CUSTOM_FIELD_FORMULA_VALIDATE = '/api/v2/custom-fields/formula/validate';
 module.exports.CUSTOM_FIELD_COMPUTE = '/api/v2/custom-fields/compute';
+module.exports.CUSTOM_FIELDS_V2 = '/api/v2/custom-fields';
 
 // CSV import (handoff 22b)
 module.exports.IMPORT_CSV = '/api/v2/imports/csv';
