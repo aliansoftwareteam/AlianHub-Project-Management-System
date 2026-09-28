@@ -387,6 +387,7 @@ const verifyJWTToken = [
     "/api/v2/users/sessions",
     "/api/v2/users/onboarding",
     "/api/v2/users/nav-preferences",
+    "/api/v2/users/home-cards",
     "/api/v2/session/update",
     "/api/v2/auth/tracker-code",
     "/api/v1/userAndCompanyCheck",

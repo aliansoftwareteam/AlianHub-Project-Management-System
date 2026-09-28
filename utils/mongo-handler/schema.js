@@ -2084,10 +2084,15 @@ const schema = {
             chosenApps: { type: Boolean, required: false },
             viewedBoard: { type: Boolean, required: false },
             viewedNotifications: { type: Boolean, required: false },
+            importedWork: { type: Boolean, required: false },
             toursOffered: { type: [String], required: false, default: undefined }
         },
         navPreferences: {
             pinned: { type: [String], required: false, default: undefined }
+        },
+        // Written only by PUT /api/v2/users/home-cards (Modules/Users/homeCards.js).
+        homeCards: {
+            hidden: { type: [String], required: false, default: undefined }
         },
         languageCode: {
             type: String,
