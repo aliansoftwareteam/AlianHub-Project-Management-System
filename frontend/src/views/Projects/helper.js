@@ -9,6 +9,7 @@ const t = i18n.global.t;
 import * as env from '@/config/env';
 import { apiRequest } from '../../services';
 import { isOwnerOrAdmin } from "@/utils/roles";
+import { isFavourite } from "@/composable/favourites";
 import { assigneeCondition, assigneeGroups, dueDateBuckets, dueDateCondition, restoreGroupState, sprintToLoad } from "./taskGroups";
 
 const projectsList = ref([]);
@@ -49,8 +50,8 @@ export function useProjectsHelper() {
                 };
     
                 const filterFavoritesAndSort = (projects) => {
-                    const favourites = projects.filter((x) => x.favouriteTasks?.some((y) => y.userId === userId.value));
-                    const others = projects.filter((x) => !x.favouriteTasks?.some((y) => y.userId === userId.value));
+                    const favourites = projects.filter((x) => isFavourite('project', x._id));
+                    const others = projects.filter((x) => !isFavourite('project', x._id));
                     return [...sortProjects(favourites), ...sortProjects(others)];
                 };
     
@@ -123,8 +124,8 @@ export function useProjectsHelper() {
 
             let tmp = {};
             if(filterFavorites) {
-                const favourites = Object.values(sprints).filter(x => x.favouriteTasks?.length && x.favouriteTasks.filter((y) => y.userId === userId.value).length).sort((a,b) => new Date(a?.createdAt) > new Date(b?.createdAt) ? -1 : 1)
-                const others = Object.values(sprints).filter(x => !x.favouriteTasks?.length || !x.favouriteTasks.filter((y) => y.userId === userId.value).length).sort((a,b) => new Date(a?.createdAt) > new Date(b?.createdAt) ? -1 : 1)
+                const favourites = Object.values(sprints).filter(x => isFavourite('sprint', x._id || x.id)).sort((a,b) => new Date(a?.createdAt) > new Date(b?.createdAt) ? -1 : 1)
+                const others = Object.values(sprints).filter(x => !isFavourite('sprint', x._id || x.id)).sort((a,b) => new Date(a?.createdAt) > new Date(b?.createdAt) ? -1 : 1)
                 let arr = [...favourites, ...others]
                 arr.forEach((sprint) => {
                     tmp[sprint.id] = sprint;
@@ -145,8 +146,8 @@ export function useProjectsHelper() {
 
                 let tmp = {};
                 if(filterFavorites && folder?.sprintsObj) {
-                    const favourites = Object.values(folder.sprintsObj).filter(x => x.favouriteTasks?.length && x.favouriteTasks.filter((y) => y.userId === userId.value).length).sort((a,b) => a?.createdAt?.seconds > b?.createdAt?.seconds ? -1 : 1)
-                    const others = Object.values(folder.sprintsObj).filter(x => !x.favouriteTasks?.length || !x.favouriteTasks.filter((y) => y.userId === userId.value).length).sort((a,b) => a?.createdAt?.seconds > b?.createdAt?.seconds ? -1 : 1)
+                    const favourites = Object.values(folder.sprintsObj).filter(x => isFavourite('sprint', x._id || x.id)).sort((a,b) => a?.createdAt?.seconds > b?.createdAt?.seconds ? -1 : 1)
+                    const others = Object.values(folder.sprintsObj).filter(x => !isFavourite('sprint', x._id || x.id)).sort((a,b) => a?.createdAt?.seconds > b?.createdAt?.seconds ? -1 : 1)
                     let arr = [...favourites, ...others]
                     arr.forEach((sprint) => {
                         tmp[sprint.id] = sprint;
@@ -303,8 +304,8 @@ export function useProjectsHelper() {
                     })
     
                     if(filterFavorites) {
-                        const favourites = tmp.value.filter(x => x.favouriteTasks?.length && x.favouriteTasks.filter((y) => y.userId === userId.value).length)?.sort((a,b) => new Date(a.createdAt).getTime() > new Date(b.createdAt).getTime() ? -1 : 1)
-                        const others = tmp.value.filter(x => !x.favouriteTasks?.length || !x.favouriteTasks.filter((y) => y.userId === userId.value).length)?.sort((a,b) => new Date(a.createdAt).getTime() > new Date(b.createdAt).getTime() ? -1 : 1)
+                        const favourites = tmp.value.filter(x => isFavourite('project', x._id))?.sort((a,b) => new Date(a.createdAt).getTime() > new Date(b.createdAt).getTime() ? -1 : 1)
+                        const others = tmp.value.filter(x => !isFavourite('project', x._id))?.sort((a,b) => new Date(a.createdAt).getTime() > new Date(b.createdAt).getTime() ? -1 : 1)
                         tmp.value = [...favourites, ...others];
                     } else {
                         tmp.value = tmp.value.sort((a, b) => new Date(a?.createdAt).getTime() > new Date(b?.createdAt).getTime() ? -1 : 1);

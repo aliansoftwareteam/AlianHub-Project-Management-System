@@ -15,9 +15,12 @@ const CONVENTIONAL = /^(\w+)(?:\([^)]*\))?(!)?:\s/;
 const GIT_TIMEOUT_MS = Number(process.env.BUILD_INFO_GIT_TIMEOUT_MS || 10000);
 const execFileAsync = promisify(execFile);
 
-const git = (cwd, args) => execFileSync('git', args, { cwd, timeout: GIT_TIMEOUT_MS, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+// Commit bodies since the release tag passed Node's 1 MB default by build 581.
+const GIT_MAX_BUFFER = 64 * 1024 * 1024;
 
-const gitAsync = async (cwd, args) => (await execFileAsync('git', args, { cwd, timeout: GIT_TIMEOUT_MS, encoding: 'utf8' })).stdout.trim();
+const git = (cwd, args) => execFileSync('git', args, { cwd, timeout: GIT_TIMEOUT_MS, maxBuffer: GIT_MAX_BUFFER, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+
+const gitAsync = async (cwd, args) => (await execFileAsync('git', args, { cwd, timeout: GIT_TIMEOUT_MS, maxBuffer: GIT_MAX_BUFFER, encoding: 'utf8' })).stdout.trim();
 
 function readPackage(cwd) {
     for (const dir of [cwd, ROOT]) {

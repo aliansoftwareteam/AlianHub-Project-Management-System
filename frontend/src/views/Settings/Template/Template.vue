@@ -6,7 +6,7 @@
             <div class="tp__head">
                 <h1 class="ah-h2 tp__title">{{ $t('Templates.templates') }}</h1>
                 <span class="ah-label">{{ totalCount }} · {{ $t('Settings.built_in_count', { n: defaultMainTemplate.length }) }}</span>
-                <div class="tp__head-actions">
+                <div v-if="canManageTemplates" class="tp__head-actions">
                     <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="openSidebar('createTemplateWithAI')"><ShellIcon name="ai" :size="14" />{{ $t('Settings.from_description') }}</button>
                     <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openSidebar('createTemplate')"><ShellIcon name="plus" :size="14" />{{ $t('Settings.new_template') }}</button>
                 </div>
@@ -49,7 +49,7 @@
             </div>
             <div v-else-if="!isSpinner" class="ah-empty tp__empty">
                 <span>{{ categoryType === 'basicData' ? $t('Settings.templates_empty_yours') : $t('Settings.templates_empty') }}</span>
-                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openSidebar('createTemplate')">{{ $t('Settings.new_template') }}</button>
+                <button v-if="canManageTemplates" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openSidebar('createTemplate')">{{ $t('Settings.new_template') }}</button>
             </div>
 
             <div class="ah-card tp__carry">
@@ -73,8 +73,8 @@
             @closeTemplateDetail="isDisplayTemplateDetail = false"
         />
 
-        <CreateTemplate v-if="createTemplateSidebar" :createTemplateSidebar="createTemplateSidebar" :defaultMainTemplate="defaultMainTemplate" @click:closeSidebar="closeEvent()" @closeSidebar="closeSidebar" />
-        <CreateTemplateWithAI v-if="isCreateWithAI" :isSidebar="isCreateWithAI" @click:closeSidebar="closeEvent()" @closeSidebar="isCreateWithAI = false" :existingTemplates="defaultMainTemplate" />
+        <CreateTemplate v-if="canManageTemplates && createTemplateSidebar" :createTemplateSidebar="createTemplateSidebar" :defaultMainTemplate="defaultMainTemplate" @click:closeSidebar="closeEvent()" @closeSidebar="closeSidebar" />
+        <CreateTemplateWithAI v-if="canManageTemplates && isCreateWithAI" :isSidebar="isCreateWithAI" @click:closeSidebar="closeEvent()" @closeSidebar="isCreateWithAI = false" :existingTemplates="defaultMainTemplate" />
     </div>
 </template>
 
@@ -84,6 +84,7 @@ import { useStore } from "vuex";
 import * as env from "@/config/env";
 import { apiRequest } from "@/services";
 import { removeDuplicatesWithKey } from "./helper.js";
+import { isOwnerOrAdmin } from "@/utils/roles";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import SpinnerComp from "@/components/atom/SpinnerComp/SpinnerComp.vue";
 import CreateTemplate from "@/views/Settings/Template/CreateTemplate.vue";
@@ -119,6 +120,7 @@ const isSpinner = ref(false);
 const categoryType = ref("");
 const templateView = ref({});
 
+const canManageTemplates = computed(() => isOwnerOrAdmin(Number(getters["settings/companyUserDetail"]?.roleType)));
 const companies = computed(() => getters["settings/companies"] || []);
 const companyName = computed(() => companies.value.find((c) => c._id === companyId.value)?.Cst_CompanyName || "");
 const projectTemplateGetter = computed(() => getters["projectData/projectTemplate"]);

@@ -125,6 +125,9 @@
                                 <template v-else-if="it.kind === 'mention'">
                                     <strong>{{ actorName(it) || $t('Inbox.someone') }}</strong> {{ it.mainChat ? $t('Inbox.mentioned_you_chat') : $t('Inbox.mentioned_you') }}
                                 </template>
+                                <template v-else-if="it.kind === 'assigned' || it.key === 'comment_reply'">
+                                    <strong>{{ actorName(it) || $t('Inbox.someone') }}</strong> {{ it.kind === 'assigned' ? $t('Inbox.assigned_you_comment') : $t('Inbox.replied_in_thread') }}
+                                </template>
                                 <template v-else>
                                     <strong v-if="actorName(it)">{{ actorName(it) }}</strong>
                                     <span v-else-if="it.taskName" class="ibx__strong">{{ it.taskName }}</span>
@@ -143,7 +146,7 @@
                                 <span class="ah-chip ah-chip--agent ibx__chip">{{ $t('Inbox.changes_n', { n: it.changes }) }}</span>
                                 <span v-if="it.why" class="ibx__quote">"{{ it.why }}"</span>
                             </template>
-                            <template v-else-if="it.kind === 'mention'">
+                            <template v-else-if="it.kind === 'mention' || it.kind === 'assigned' || it.key === 'comment_reply'">
                                 <span class="ibx__quote">"<span v-html="render(it)"></span>"</span>
                                 <span v-if="it.taskName" class="ibx__target" @click.stop="open(it)">· {{ it.taskName }}</span>
                             </template>
@@ -305,7 +308,7 @@ import { wakeTimer } from './snoozeWake';
 defineOptions({ name: 'InboxPage' });
 
 const TABS = ['primary', 'other', 'later', 'done', 'cleared'];
-const KINDS = ['all', 'mention', 'approval', 'reminder', 'update'];
+const KINDS = ['all', 'mention', 'assigned', 'approval', 'reminder', 'update'];
 const SNOOZE_MENU = [...SNOOZE_PRESETS, 'custom'];
 const ZERO_SUB = {
     primary: 'Inbox.zero_sub_primary',

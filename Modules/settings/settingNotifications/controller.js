@@ -4,6 +4,7 @@ const { dbCollections } = require("../../../Config/collections");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
 const { ensureNotificationDefaults } = require("../../notification/defaults");
+const { ensureCommentNoticeItems } = require("../../Comments/helpers/noticeItems");
 
 const OBJECT_ID_RE = /^[0-9a-f]{24}$/i;
 
@@ -79,6 +80,7 @@ exports.getNotifications = async (req, res) => {
             return res.status(403).json({ status: false, message: "You can only read your own notification settings." });
         }
 
+        await ensureCommentNoticeItems(companyId, [id]);
         const cacheKey = `notification:${id}:${companyId}`;
         const value = myCache.get(cacheKey);
 

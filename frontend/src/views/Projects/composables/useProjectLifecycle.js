@@ -1,8 +1,8 @@
-import { ref, inject } from 'vue';
+import { ref } from 'vue';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
-import { useProjects } from '@/composable/projects';
+import { useFavourites } from '@/composable/favourites';
 import * as env from '@/config/env';
 import { apiRequest } from '@/services';
 import { keyFor, ACTIVE, ARCHIVED, TRASHED } from '@/utils/lifecycle';
@@ -16,10 +16,8 @@ export function useProjectLifecycle(projectData) {
     const { commit } = useStore();
     const $toast = useToast();
     const { t } = useI18n();
-    const { markFavourite } = useProjects();
+    const { toggleFavourite } = useFavourites();
 
-    const userId = inject('$userId');
-    const companyId = inject('$companyId');
 
     const archive = ref(0);
     const showSidebar = ref(false);
@@ -90,30 +88,8 @@ export function useProjectLifecycle(projectData) {
     }
 
     function markProjectFavourite() {
-        if (!projectData.value.favouriteTasks || !projectData.value.favouriteTasks.find((x) => x.userId === userId.value)) {
-            markFavourite({
-                cid: companyId.value,
-                projectId: projectData.value._id,
-                userId: userId.value,
-            }).then((msg) => {
-                commit('projectData/projectLocalUpdate', { itemData: { ...projectData.value }, projectId: projectData.value._id, key: 'MarkAsFavourite', subKey: 'add', userId: userId.value });
-                $toast.success(msg, { position: 'top-right' });
-            }).catch((error) => {
-                console.error('ERROR in mark project fav: ', error);
-            });
-        } else {
-            markFavourite({
-                cid: companyId.value,
-                projectId: projectData.value._id,
-                userId: userId.value,
-                data: projectData.value.favouriteTasks.find((x) => x.userId === userId.value),
-            }).then((msg) => {
-                commit('projectData/projectLocalUpdate', { itemData: { ...projectData.value }, projectId: projectData.value._id, key: 'MarkAsFavourite', subKey: 'remove', userId: userId.value });
-                $toast.success(msg, { position: 'top-right' });
-            }).catch((error) => {
-                console.error('ERROR in mark project fav: ', error);
-            });
-        }
+        const project = projectData.value || {};
+        toggleFavourite({ type: 'project', id: String(project._id || ''), name: project.ProjectName || '' });
     }
 
     return {
