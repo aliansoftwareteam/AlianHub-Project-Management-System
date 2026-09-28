@@ -18,7 +18,6 @@
 }
 @media (max-width: 991px) {
     .home__grid { grid-template-columns: 1fr; }
-    .home__manage { display: none; }
 }
 @media (max-width: 767px) {
     .ah-page__content { padding: 14px 12px; }

@@ -1,0 +1,7 @@
+Task ID,Task Custom ID,Task Name,Task Content,Status,Date Created,Date Created Text,Due Date,Due Date Text,Start Date,Start Date Text,Parent ID,Assignees,Tags,Priority,List Name,Folder Name,Space Name,Time Estimated,Time Estimated Text,Story Points (number),Launch Date (date),Client (short_text),Latest Comment
+86a1aaa01,,Set up the billing page,Build the plan picker and the invoice list,in progress,1767225600000,"Thursday, January 1st 2026",1768435200000,"Thursday, January 15th 2026",1767830400000,"Thursday, January 8th 2026",,"[max@member.test, Pat Example]","[billing, frontend]",high,Sprint Backlog,Web,Product,9000000,2h 30m,5,1769904000000,Acme,Looks good
+86a1aaa02,,Write the billing tests,,to do,1767225600000,,,,,,86a1aaa01,[ghost@nowhere.test],[billing],normal,Sprint Backlog,Web,Product,3600000,1h,,,,
+86a1aaa03,,Ship the release notes,Summarise the changes,complete,1767225600000,,,"Friday, June 5th 2026",,,,[],,urgent,Launch,,Product,,45m,,,Globex,
+86a1aaa04,,,Row with no name,to do,1767225600000,,,,,,,[],,low,Launch,,Product,,,,,,
+86a1aaa05,,Check the rounding,,in review,1767225600000,,,,,,86a1aaa02,[MAX@member.test],[Billing],low,Sprint Backlog,Web,Product,,,,,,
+86a1aaa06,,Follow up with legal,,to do,1767225600000,,,,,,86zzzzz99,[],,,Launch,,Product,,,,,,

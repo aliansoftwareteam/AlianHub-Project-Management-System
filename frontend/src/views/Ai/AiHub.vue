@@ -20,7 +20,7 @@
 
                 <div v-else-if="!agents.length" class="ah-card ai-agent">
                     <h3 class="ah-h3">{{ $t('Ai.empty_title') }}</h3>
-                    <p class="ai-lead" style="margin:6px 0 12px">{{ $t('Ai.empty_body') }}</p>
+                    <p class="ai-lead" style="margin:6px 0 12px">{{ $t('Ai.empty_lead') }}</p>
                     <div v-if="canManage" class="ai-templates" data-test="templates">
                         <button v-for="tpl in templates" :key="tpl.slug" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="startFromTemplate(tpl)">
                             {{ tpl.name }}
@@ -35,7 +35,7 @@
                             <div class="ai-agent__id">
                                 <div class="ai-agent__name">
                                     <strong>{{ agent.name }}</strong>
-                                    <span class="ah-chip ah-chip--agent ah-chip--mono">{{ autonomyChip(agent) }}</span>
+                                    <span class="ah-chip ah-chip--agent" data-test="agent-autonomy" :title="autonomyTip(t, agent.autonomy)">{{ autonomyName(t, agent.autonomy) }}</span>
                                     <span v-if="agent.paused" class="ah-chip ah-chip--warn">{{ $t('Ai.paused') }}</span>
                                 </div>
                                 <div class="ai-agent__scope">{{ scopeOf(agent) }}</div>
@@ -43,7 +43,7 @@
                         </div>
 
                         <div class="ai-agent__skills">
-                            <span v-for="skill in agent.skills || []" :key="skill.key || skill" class="ah-chip">{{ skill.name || skill.key || skill }}</span>
+                            <span v-for="skill in agent.skills || []" :key="skill.key || skill" class="ah-chip" :title="skillAbout(t, skill)">{{ skillLabel(t, skill) }}</span>
                         </div>
 
                         <p class="ai-agent__today">{{ monthLine(agent) }}</p>
@@ -56,7 +56,7 @@
                             <button v-if="canManage" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="pause" :disabled="busyId === agent._id" @click="onPause(agent)">
                                 {{ agent.paused ? $t('Ai.resume') : $t('Ai.pause') }}
                             </button>
-                            <span class="ai-agent__trigger">{{ $t('Ai.manual_only') }}</span>
+                            <span class="ai-agent__trigger">{{ $t('Ai.runs_when_started') }}</span>
                         </div>
                     </article>
                 </div>
@@ -65,12 +65,12 @@
                     <div class="ah-label">{{ $t('Ai.ladder') }}</div>
                     <div class="ai-ladder__steps" style="margin-top:8px">
                         <template v-for="(step, i) in AUTONOMY" :key="step.level">
-                            <span class="ah-chip ah-chip--mono">{{ step.key }} · {{ ladderLabel(step) }}</span>
+                            <span class="ah-chip" :title="autonomyTip(t, step.level)">{{ autonomyName(t, step.level) }}</span>
                             <ShellIcon v-if="i < AUTONOMY.length - 1" name="chevron" :size="12" class="ai-ladder__arrow" />
                         </template>
                     </div>
                     <p class="ai-ladder__rule">{{ $t('Ai.ladder_rule') }}</p>
-                    <p class="ai-ladder__rule"><strong>{{ $t('Ai.never_label') }}</strong> <span class="ah-mono">{{ neverList }}</span></p>
+                    <p class="ai-ladder__rule"><strong>{{ $t('Ai.never_label') }}</strong> <span>{{ neverList }}</span></p>
                 </section>
             </div>
         </div>
@@ -89,7 +89,8 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AiSidebar from "./AiSidebar.vue";
 import AgentWizard from "./AgentWizard.vue";
 import RunTaskPicker from "./RunTaskPicker.vue";
-import { useAgents, autonomyOf } from "./useAgents";
+import { useAgents } from "./useAgents";
+import { actionLabel, autonomyName, autonomyTip, skillAbout, skillLabel } from "./plainLabels";
 import { AGENT_TEMPLATES } from "./agentTemplates";
 import { requirementsOf } from "./skillInputs";
 import { projectScopeOf } from "./agentFit";
@@ -129,17 +130,11 @@ const onPause = (agent) => withAgent(agent, async () => {
 
 const templates = AGENT_TEMPLATES;
 
-const neverList = computed(() => (registryManifest.value.never || []).join(" · "));
-
-const autonomyChip = (agent) => {
-    const a = autonomyOf(agent.autonomy);
-    return `${a.key} · ${t(`Ai.autonomy_${a.level}`).toUpperCase()}`;
-};
-const ladderLabel = (step) => t(`Ai.autonomy_${step.level}`);
+const neverList = computed(() => (registryManifest.value.never || []).map((key) => actionLabel(t, key)).join(" · "));
 
 const scopeOf = (agent) => {
     const projects = projectScopeOf(agent);
-    return projects.scoped ? t("Ai.scope_projects", { n: projects.ids.length }) : t("Ai.scope_none");
+    return projects.scoped ? t("Ai.scope_projects_n", { n: projects.ids.length }, projects.ids.length) : t("Ai.scope_none");
 };
 
 const monthLine = (agent) => {

@@ -9,7 +9,7 @@ const MEMBER_FIELDS = [
 const SELF_FIELDS = [
     ...MEMBER_FIELDS,
     'isEmailVerified', 'isProductOwner', 'tour', 'lastSelectedCompany', 'customerId', 'customerIds',
-    'homeChecklist', 'navPreferences', 'localePreferences', 'accessibilityPreferences', 'agentAccount', 'demo',
+    'homeChecklist', 'navPreferences', 'homeCards', 'localePreferences', 'accessibilityPreferences', 'agentAccount', 'demo',
 ];
 // What a pre-authentication answer may carry: the sign-in, OAuth and sign-up screens read
 // these, and the caller is only as trusted as the password or invite they arrived with, so

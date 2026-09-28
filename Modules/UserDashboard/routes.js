@@ -1,4 +1,5 @@
 const ctrl = require('./controller');
+const atRisk = require('./atRisk');
 
 exports.init = (app) => {
     app.get('/api/v1/dashboard/:id', ctrl.getDashboard);
@@ -31,6 +32,7 @@ exports.init = (app) => {
     app.post('/api/v1/dashboard/my-leave', ctrl.getMyLeave);
     app.post('/api/v1/dashboard/my-due-soon', ctrl.getMyDueSoon);
     app.post('/api/v1/dashboard/my-time', ctrl.getMyTime);
+    app.post('/api/v1/dashboard/at-risk', atRisk.getAtRisk);
     // TaskStatusSummaryCard — task counts per status for the window, plus the task rows
     // behind one status. Owner/Admin see the company; everyone else sees their own work
     // (resolved server-side from company_users, not from the body).

@@ -54,7 +54,7 @@ test.describe('a new member', () => {
         await expect(page.getByRole('region', { name: /Getting started|Workspace setup/ })).toHaveCount(0);
         await expect(page.locator('.ah-gs')).toHaveCount(0);
 
-        for (const workspaceStep of ['Invite your team', 'Create a project', 'Review member permissions', 'Choose project apps', 'Remove the sample data']) {
+        for (const workspaceStep of ['Invite your team', 'Create a project', 'Bring your work in', 'Review member permissions', 'Choose project apps', 'Remove the sample data']) {
             await expect(checklist).not.toContainText(workspaceStep);
         }
         await expect(checklist).toContainText('Open a project');

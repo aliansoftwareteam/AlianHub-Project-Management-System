@@ -1,6 +1,6 @@
 <template>
     <teleport to="body">
-        <div v-if="modelValue" class="imd__overlay" @click.self="close()">
+        <div v-if="modelValue" class="imd__overlay" @click.self="close()" @keydown.esc="close()">
             <div class="imd__card" role="dialog" aria-modal="true" :aria-label="$t('Projects.import_title')">
                 <div class="imd__head">
                     <div>
@@ -12,7 +12,7 @@
                     </button>
                 </div>
                 <div class="imd__grid">
-                    <button v-for="source in SOURCES" :key="source.key" type="button" class="ah-card imd__source" @click="pick(source.key)">
+                    <button v-for="source in IMPORT_SOURCES" :key="source.key" type="button" class="ah-card imd__source" @click="pick(source.key)">
                         <span class="imd__mark" :style="{ background: source.tint }">{{ source.mark }}</span>
                         <span class="imd__text">
                             <strong>{{ $t(`Projects.import_${source.key}_title`) }}</strong>
@@ -25,28 +25,17 @@
         </div>
     </teleport>
 
-    <ImportWizard
-        :showImportModal="open.csv"
-        :projectId="String(projectData?._id || '')"
-        :taskStatus="projectData?.taskStatusData || []"
-        :users="projectData?.isPrivateSpace ? (projectData?.AssigneeUserId || []) : users"
-        :sprint="sprint"
-        @toggle-import-modal="open.csv = $event"
-    />
-    <ImportJiraModal v-model="open.jira" :projectData="projectData" />
-    <ImportTrelloModal v-model="open.trello" :projectData="projectData" />
-    <ImportAsanaModal v-model="open.asana" :projectData="projectData" />
-    <ImportMondayModal v-model="open.monday" :projectData="projectData" />
+    <ImportSourceModals v-model:source="openSource" :projectData="projectData" :users="users" :sprint="sprint" />
+    <WorkspaceImportDialog v-if="clickUpOpen" initial-source="clickup" :project="projectData" @close="clickUpOpen = false" />
 </template>
 
 <script setup>
-import { reactive, defineProps, defineEmits } from 'vue';
+import { defineAsyncComponent, ref, defineProps, defineEmits } from 'vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
-import ImportWizard from '@/plugins/importTasks/components/organisms/ImportWizard/ImportWizard.vue';
-import ImportJiraModal from '@/components/molecules/ImportJira/ImportJiraModal.vue';
-import ImportTrelloModal from '@/components/molecules/ImportTrello/ImportTrelloModal.vue';
-import ImportAsanaModal from '@/components/molecules/ImportAsana/ImportAsanaModal.vue';
-import ImportMondayModal from '@/components/molecules/ImportMonday/ImportMondayModal.vue';
+import ImportSourceModals from './ImportSourceModals.vue';
+import { IMPORT_SOURCES } from '@/components/organisms/WorkspaceImport/workspaceImportState';
+
+const WorkspaceImportDialog = defineAsyncComponent(() => import('@/components/organisms/WorkspaceImport/WorkspaceImportDialog.vue'));
 
 defineProps({
     modelValue: { type: Boolean, default: false },
@@ -56,26 +45,20 @@ defineProps({
 });
 const emit = defineEmits(['update:modelValue']);
 
-const SOURCES = [
-    { key: 'csv', mark: 'CSV', tint: '#2f9e7e' },
-    { key: 'jira', mark: 'J', tint: '#0052cc' },
-    { key: 'trello', mark: 'T', tint: '#0079bf' },
-    { key: 'asana', mark: 'A', tint: '#f06a6a' },
-    { key: 'monday', mark: 'M', tint: '#6161ff' }
-];
-
-const open = reactive({ csv: false, jira: false, trello: false, asana: false, monday: false });
+const openSource = ref('');
+const clickUpOpen = ref(false);
 
 const close = () => emit('update:modelValue', false);
 const pick = (key) => {
     close();
-    open[key] = true;
+    if (key === 'clickup') clickUpOpen.value = true;
+    else openSource.value = key;
 };
 </script>
 
 <style scoped>
 .imd__overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, .35); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; }
-.imd__card { background: var(--surface); color: var(--ink); border-radius: 12px; width: min(520px, 100%); padding: 20px; box-shadow: var(--shadow-pop); font-family: var(--font-ui); }
+.imd__card { background: var(--surface); color: var(--ink); border-radius: 12px; width: min(520px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; padding: 20px; box-shadow: var(--shadow-pop); font-family: var(--font-ui); }
 .imd__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .imd__title { margin: 0 0 4px; }
 .imd__lead { margin: 0; }

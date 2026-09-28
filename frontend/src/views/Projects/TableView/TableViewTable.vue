@@ -1,7 +1,7 @@
 <template>
     <div role="rowgroup">
         <div class="tv2__group" role="row">
-            <span role="cell" :aria-colspan="9" class="tv2__group-cell">
+            <span role="cell" :aria-colspan="columnCount" class="tv2__group-cell">
                 <label v-if="canGroupSelect && groupTaskIds.length" @click.stop>
                     <input
                         type="checkbox"
@@ -15,6 +15,7 @@
                 </label>
                 <span class="ah-chip ah-status-ink" :style="chipStyle">{{ groupLabel }}</span>
                 <span v-if="hasFetched || tasks.length" class="tv2__group-count">{{ tasks.length }}</span>
+                <span v-if="showPoints && groupPoints" class="tv2__points-total">{{ $t('ViewColumns.points_total', { n: groupPoints }) }}</span>
             </span>
         </div>
 
@@ -48,6 +49,7 @@ import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { taskInGroup } from "@/views/Projects/ListView/listFilter";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
 import { statusChipStyle } from "@/utils/statusChipColors";
+import { pointsTotal } from "@/views/Projects/composables/taskPoints";
 
 defineOptions({ name: "TableViewTable" });
 
@@ -56,7 +58,8 @@ const props = defineProps({
     group: { type: Number, default: 0 },
     sprintId: { type: String, default: "" },
     globalSortKey: { type: String, default: "" },
-    keys: { type: String, default: "" }
+    keys: { type: String, default: "" },
+    showPoints: { type: Boolean, default: false }
 });
 defineEmits(["open"]);
 
@@ -96,6 +99,10 @@ const storeTasks = computed(() => {
 const tasks = computed(() => storeTasks.value
     .filter((task) => !task?.deletedStatusKey && taskInGroup(task, props.data))
     .sort((a, b) => (props.globalSortKey ? 0 : a[props.data.indexName] - b[props.data.indexName])));
+
+const groupPoints = computed(() => pointsTotal(tasks.value));
+const tableColumns = inject("tableColumns", null);
+const columnCount = computed(() => (tableColumns?.value?.length || 0) + 2);
 
 const groupTaskIds = computed(() => tasks.value.map((task) => String(task._id)).filter(Boolean));
 const groupCheckboxState = computed(() => selection.groupState(groupTaskIds.value));

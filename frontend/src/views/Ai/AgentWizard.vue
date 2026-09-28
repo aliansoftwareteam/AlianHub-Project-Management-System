@@ -20,7 +20,7 @@
                             <label class="ah-field__label" for="aw-template">{{ $t('Ai.start_from') }}</label>
                             <select id="aw-template" v-model="chosenSlug" class="ah-input">
                                 <option value="">{{ $t('Ai.no_template') }}</option>
-                                <option v-for="tpl in AGENT_TEMPLATES" :key="tpl.slug" :value="tpl.slug">{{ tpl.name }} — {{ tpl.skills.join(', ') }}</option>
+                                <option v-for="tpl in AGENT_TEMPLATES" :key="tpl.slug" :value="tpl.slug">{{ tpl.name }} — {{ tpl.skills.map((key) => skillLabel(t, key)).join(', ') }}</option>
                             </select>
                         </div>
                         <ul v-if="requirements.length" class="aw__reqs">
@@ -36,18 +36,15 @@
                         <p class="ai-lead">{{ $t('Ai.actions_lead') }}</p>
                         <p v-if="requirements.length" class="ah-small aw__reqs-line">{{ $t('Ai.needs_line', { what: requirements.map((code) => $t(`Ai.req_${code}`)).join(' · ') }) }}</p>
                         <div class="aw__actions">
-                            <label v-for="action in writeActions" :key="action.key" class="aw__action">
+                            <label v-for="action in writeActions" :key="action.key" class="aw__action" :title="action.key">
                                 <input v-model="form.allowedActions" type="checkbox" :value="action.key" class="ah-check" />
-                                <span class="aw__action-label">
-                                    <span class="ah-mono">{{ action.key }}</span>
-                                    <span class="ah-small">{{ action.label }}</span>
-                                </span>
-                                <span v-if="action.risk !== 'low'" class="ah-chip ah-chip--warn">{{ action.risk }}</span>
+                                <span class="aw__action-label">{{ actionLabel(t, action) }}</span>
+                                <span v-if="action.risk !== 'low'" class="ah-chip ah-chip--warn">{{ riskLabel(action.risk) }}</span>
                             </label>
                         </div>
                         <p class="ai-never">
                             <strong>{{ $t('Ai.never_label') }}</strong>
-                            <span class="ah-mono">{{ never }}</span>
+                            <span>{{ never }}</span>
                         </p>
                     </template>
 
@@ -55,12 +52,12 @@
                         <div class="ah-field">
                             <span class="ah-field__label">{{ $t('Ai.autonomy') }}</span>
                             <div class="ai-radios">
-                                <label v-for="level in [0, 1, 2]" :key="level" class="ai-radio" :class="{ 'is-on': form.autonomy === level }">
+                                <label v-for="level in [0, 1, 2]" :key="level" class="ai-radio" :class="{ 'is-on': form.autonomy === level }" :title="autonomyTip(t, level)">
                                     <input v-model.number="form.autonomy" type="radio" :value="level" class="ah-check" />
-                                    <span><strong>L{{ level }}</strong> · {{ $t(`Ai.autonomy_${level}`) }}</span>
+                                    <span class="aw__level"><strong>{{ autonomyName(t, level) }}</strong><span class="ah-small">{{ autonomyAbout(t, level) }}</span></span>
                                 </label>
                             </div>
-                            <span class="ah-field__hint">{{ $t('Ai.start_low') }}</span>
+                            <span class="ah-field__hint">{{ $t('Ai.start_suggesting') }}</span>
                         </div>
                         <div class="ah-field">
                             <span class="ah-field__label">{{ $t('Ai.scope') }}</span>
@@ -102,6 +99,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useAgents, NEW_AGENT_DEFAULTS } from "./useAgents";
 import { AGENT_TEMPLATES } from "./agentTemplates";
 import { requirementsOf, indexSkills } from "./skillInputs";
+import { actionLabel, autonomyAbout, autonomyName, autonomyTip, skillLabel } from "./plainLabels";
 
 defineOptions({ name: "AgentWizard" });
 
@@ -131,7 +129,8 @@ const form = reactive({
 });
 
 const writeActions = computed(() => (registryManifest.value.actions || []).filter((a) => !a.proposeOnly));
-const never = computed(() => (registryManifest.value.never || []).join(" · "));
+const never = computed(() => (registryManifest.value.never || []).map((key) => actionLabel(t, key)).join(" · "));
+const riskLabel = (risk) => t(`Ai.risk_level_${risk === "high" ? "high" : "medium"}`);
 
 const next = () => {
     errors.name = "";
@@ -177,5 +176,6 @@ onMounted(async () => {
 .aw__reqs li { display: flex; align-items: center; gap: 6px; color: var(--ink-2); }
 .aw__reqs-line { margin: -8px 0 0; color: var(--ink-2); }
 .aw__action { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid var(--hairline); border-radius: 9px; cursor: pointer; }
-.aw__action-label { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.aw__action-label { flex: 1; min-width: 0; }
+.aw__level { display: flex; flex-direction: column; gap: 2px; }
 </style>
