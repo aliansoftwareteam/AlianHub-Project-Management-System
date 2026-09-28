@@ -87,26 +87,30 @@ describe('updateunreadcommentscount takes the company and user from the verified
         expect(writtenUsers()).toEqual([ME]);
     });
 
-    it('bumps the unread count of other active members, as sending a comment does', async () => {
-        const r = await call({ companyId: C, key: 2, projectId: PROJECT, sprintId: SPRINT, taskId: TASK, userIds: [TEAMMATE], prevCount: 0 });
+    it.each([
+        ['a project count', { key: 1, projectId: PROJECT }],
+        ['a task count', { key: 2, projectId: PROJECT, sprintId: SPRINT, taskId: TASK, prevCount: 0 }],
+        ['a mention count', { key: 4, readAll: false }],
+    ])('refuses raising %s for someone else, which the server now does when the comment is saved', async (_label, body) => {
+        const r = await call({ companyId: C, userIds: [TEAMMATE], ...body });
 
-        expect(r.body.status).toBe(true);
-        expect(writtenUsers()).toEqual([TEAMMATE]);
-        expect(writtenCompanies()).toEqual([C]);
+        expect(r.code).toBe(403);
+        expect(r.body.status).toBe(false);
+        expect(countWrites()).toHaveLength(0);
     });
 
-    it('ignores recipients who are not active members of the session company', async () => {
-        const r = await call({ companyId: C, key: 1, projectId: PROJECT, userIds: [TEAMMATE, OUTSIDER] });
+    it('refuses a bump that names the caller alongside someone else', async () => {
+        const r = await call({ companyId: C, key: 1, projectId: PROJECT, userIds: [ME, TEAMMATE, OUTSIDER] });
 
-        expect(r.body.status).toBe(true);
-        expect(writtenUsers()).toEqual([TEAMMATE]);
+        expect(r.code).toBe(403);
+        expect(countWrites()).toHaveLength(0);
     });
 
     it('works when the body carries no companyId at all', async () => {
-        const r = await call({ key: 4, userIds: [TEAMMATE], readAll: false });
+        const r = await call({ key: 4, userIds: [ME], readAll: true });
 
         expect(r.body.status).toBe(true);
-        expect(writtenUsers()).toEqual([TEAMMATE]);
+        expect(writtenUsers()).toEqual([ME]);
         expect(writtenCompanies()).toEqual([C]);
     });
 
@@ -118,7 +122,7 @@ describe('updateunreadcommentscount takes the company and user from the verified
     });
 });
 
-describe('a bump sent through the route', () => {
+describe('a bump of the caller\'s own count sent through the route', () => {
     const bumpOf = () => countWrites().map(([, { data }]) => data[1].$inc);
 
     it.each([
@@ -126,14 +130,14 @@ describe('a bump sent through the route', () => {
         ['a negative count', -100],
         ['a zero count', 0],
     ])('raises a project count by one message whatever the body says, given %s', async (_label, messageCount) => {
-        const r = await call({ companyId: C, key: 1, projectId: PROJECT, userIds: [TEAMMATE], messageCount });
+        const r = await call({ companyId: C, key: 1, projectId: PROJECT, userIds: [ME], messageCount });
 
         expect(r.body.status).toBe(true);
         expect(bumpOf()).toEqual([{ [`project_${PROJECT}_comments`]: 1 }]);
     });
 
     it('raises a task count by one message whatever the body says', async () => {
-        const r = await call({ companyId: C, key: 2, projectId: PROJECT, sprintId: SPRINT, taskId: TASK, parentTaskId: TASK, userIds: [TEAMMATE], messageCount: 50, prevCount: 0 });
+        const r = await call({ companyId: C, key: 2, projectId: PROJECT, sprintId: SPRINT, taskId: TASK, parentTaskId: TASK, userIds: [ME], messageCount: 50, prevCount: 0 });
 
         expect(r.body.status).toBe(true);
         expect(bumpOf()).toEqual([{
@@ -146,7 +150,7 @@ describe('a bump sent through the route', () => {
         ['a chat message count', { key: 3, messageId: TASK }],
         ['a notification count', { key: 5, readAll: false }],
     ])('refuses raising %s, which the app never sends, and writes nothing', async (_label, body) => {
-        const r = await call({ companyId: C, userIds: [TEAMMATE], ...body });
+        const r = await call({ companyId: C, userIds: [ME], ...body });
 
         expect(r.code).toBe(403);
         expect(r.body.status).toBe(false);
