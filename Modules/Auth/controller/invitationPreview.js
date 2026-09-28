@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const logger = require('../../../Config/loggerConfig');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
+const { isKnownCompany } = require('../../../Config/knownCompany');
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 const PENDING = 1;
@@ -28,6 +29,7 @@ exports.invitationPreview = async (req, res) => {
         if (!OBJECT_ID_PATTERN.test(String(companyId || '')) || !OBJECT_ID_PATTERN.test(String(memberId || ''))) {
             return res.send({ ...INVALID });
         }
+        if (!(await isKnownCompany(companyId))) return res.send({ ...INVALID });
         const member = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMPANY_USERS, data: [{ _id: memberId }, { status: 1, userEmail: 1, linkId: 1, isDelete: 1 }] }, 'findOne');
         if (!member || member.isDelete === true || member.status !== PENDING || !linkTokenAccepted(member.linkId, linkId)) {
             return res.send({ ...INVALID });

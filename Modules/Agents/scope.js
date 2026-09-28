@@ -3,6 +3,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { fetchRules } = require('../settings/securityPermissions/controller');
 const { isPrivileged } = require('../../Config/roleTypes');
 const { allowsProject } = require('../../Config/tokenNarrowing');
+const { ACTIVE_SEAT } = require('../../Config/seatStatus');
 
 // Which projects a given person may open.
 //
@@ -15,10 +16,11 @@ const { allowsProject } = require('../../Config/tokenNarrowing');
 const visibleProjects = async (companyId, uid) => {
     const [teams, membership, rules] = await Promise.all([
         MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TEAMS_MANAGEMENT, data: [{ assigneeUsersArray: { $in: [String(uid)] } }, { _id: 1 }] }, 'find').catch(() => []),
-        MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMPANY_USERS, data: [{ userId: String(uid) }, { roleType: 1, _id: 0 }] }, 'findOne').catch(() => null),
+        MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMPANY_USERS, data: [{ userId: String(uid), ...ACTIVE_SEAT }, { roleType: 1, _id: 0 }] }, 'findOne').catch(() => null),
         fetchRules(companyId).catch(() => []),
     ]);
-    const roleType = membership && membership.roleType;
+    if (!membership) return [];
+    const { roleType } = membership;
     const nonAdmin = !isPrivileged(roleType);
     const privateRule = (rules || []).find((r) => r && r.key === 'private_projects') || {};
     const privatePermission = ((privateRule.roles || []).find((r) => r.key === roleType) || {}).permission;

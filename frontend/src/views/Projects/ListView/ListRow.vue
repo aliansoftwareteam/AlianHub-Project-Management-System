@@ -79,6 +79,10 @@
             />
         </div>
 
+        <span class="lv2__c-tags" role="cell">
+            <TaskTagCell :task="data" :limit="tagLimit" :can-add="!isSub" />
+        </span>
+
         <span class="lv2__c-assignee" role="cell">
             <ListAssigneeCell
                 :task="data"
@@ -127,6 +131,7 @@ import ListAssigneeCell from "./ListAssigneeCell.vue";
 import ListDueCell from "./ListDueCell.vue";
 import ListPriorityCell from "./ListPriorityCell.vue";
 import ListRowActions from "./ListRowActions.vue";
+import TaskTagCell from "@/components/molecules/TagList/TaskTagCell.vue";
 import { timerState, isTimerFor, elapsedSeconds } from "@/components/organisms/TaskDetailOverlay/useTaskTimer";
 import { taskRisk } from "@/views/Projects/composables/taskRisk";
 import { isClosedTask, subtaskProgress, subtaskTotal } from "./subtaskProgress";
@@ -155,6 +160,8 @@ const rights = computed(() => edit?.rights.value || NO_RIGHTS);
 const statuses = computed(() => edit?.statuses.value || []);
 const showPriority = computed(() => (edit ? edit.showPriority.value : true));
 const rowEl = ref(null);
+const clientWidth = inject("$clientWidth", ref(1280));
+const tagLimit = computed(() => (clientWidth.value < 768 ? 2 : 3));
 
 const done = computed(() => isClosedTask(props.data));
 const subtaskCount = computed(() => subtaskTotal(props.data, props.progress));

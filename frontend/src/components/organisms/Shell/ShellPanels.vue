@@ -17,7 +17,7 @@
             <div class="overflow-y-auto style-scroll mh-100 pt-5px">
                 <template v-if="tourList.length">
                     <div v-for="item in tourList" :key="item.id" class="notification p5px-p15px">
-                        <div class="p-9px d-flex tour-box-card justify-content-between">
+                        <div class="d-flex tour-box-card justify-content-between">
                             <div class="d-flex position-re align-items-center">
                                 <img class="tour_image" :src="tourImages[item.image] || defaultUserIcon" :alt="item.image" />
                                 <div class="d-flex ml-1 flex-column comment__notification-message">

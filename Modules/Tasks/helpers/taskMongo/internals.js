@@ -152,11 +152,17 @@ module.exports = {
     updateTaskIndex (companyId,projectId,taskId,indexObj,taskKey,sprintId)  {
         return new Promise((resolve, reject) => {
             try {
+                    // Aggregates skip Mongoose casting, and tasks store ProjectID as an ObjectId.
+                    const projectObjectId = mongoose.isObjectIdOrHexString(projectId) ? new mongoose.Types.ObjectId(String(projectId)) : null;
+                    if (!projectObjectId) {
+                        resolve(0);
+                        return;
+                    }
                     if (indexObj.searchKey === "AssigneeUserId" && indexObj.searchValue == "[]") {
                         let taskObj = [
                             {
                               $match: {
-                                ProjectID: projectId,
+                                ProjectID: projectObjectId,
                                 TaskKey: {$ne: taskKey},
                                 [indexObj.indexName]: { $exists: true },
                                 // sprintId: sprintId,
@@ -178,7 +184,7 @@ module.exports = {
                             data: [taskObj]
                         }
                         MongoDbCrudOpration(companyId, objSh, 'aggregate').then((resp)=>{
-                            if (resp && resp[0].results && resp[0].results.length) {
+                            if (resp?.[0]?.results?.length) {
                                 resolve(resp[0].results[0][indexObj.indexName] - 65536)
                             } else {
                                 resolve(0)
@@ -200,7 +206,7 @@ module.exports = {
                               $match: {
                                 $and: [
                                   {[indexObj.indexName]: {$exists: true}},
-                                  { ProjectID: new mongoose.Types.ObjectId(projectId) },
+                                  { ProjectID: projectObjectId },
                                 //   { sprintId: sprintId },
                                   { [indexObj.searchKey]: searchValue },
                                   {[indexObj.indexName]: {$ne: -999999999999999 }}

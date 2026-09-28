@@ -356,3 +356,20 @@ input[type="color"]::-moz-color-swatch {
     .count-block.child-count-block{border-radius: 20px !important; } */
     .profile-image{border-radius: 50% !important;}
 }
+
+.notification-tick {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background-color: red;
+    border-radius: 6px;
+    left: 14px;
+    top: -6px;
+}
+.blinking {
+    animation: 1s blink ease infinite;
+}
+@keyframes blink {
+    from, to { opacity: 0; }
+    50% { opacity: 1; }
+}

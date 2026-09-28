@@ -105,6 +105,21 @@
 }
 .ah-sheet .ah-pop__item { min-height: 44px; }
 
+.tour_sidebar .black.sidebar-body.bg-white { background-color: #fff !important; }
+.tour_sidebar .tour-box-card { border: 1px solid rgba(223, 225, 230, 1); border-radius: 10px; padding: 9px; }
+.tour_sidebar .tour_image { width: 40px; height: 40px; object-fit: fill; min-width: 40px; }
+.tour_sidebar .comment__notification-message { width: calc(100% - 45px); }
+.tour_sidebar .tour__title { line-height: 24px; }
+.tour_sidebar .tour__description {
+    line-height: 21px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    text-overflow: ellipsis;
+}
+.tour_sidebar .notification span { color: #b5b5b5; font-size: 14px; }
+.tour_sidebar .image_wrapper_tour img { width: 20px; min-width: 20px; }
+
 @media (max-width: 767px) {
     .ah-rail { display: none; }
     .ah-tabbar { display: flex; }

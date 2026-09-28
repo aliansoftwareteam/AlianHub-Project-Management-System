@@ -25,7 +25,6 @@ vi.mock('@/utils/tabSyncs.js', () => ({ tabSyncHelper: () => ({ tabSync: vi.fn()
 vi.mock('@/offline', () => ({ initOffline: vi.fn() }));
 vi.mock('@/components/offline/OfflineBanner.vue', () => stub('OfflineBanner'));
 vi.mock('@/components/organisms/Tour/TourComponet.vue', () => stub('TourCom'));
-vi.mock('@/components/organisms/Header/Header.vue', () => stub('HeaderComponent'));
 vi.mock('@/components/organisms/Shell/GlobalRail.vue', () => stub('GlobalRail'));
 vi.mock('@/components/organisms/Shell/MobileTabBar.vue', () => stub('MobileTabBar'));
 vi.mock('@/components/organisms/Shell/ShellPanels.vue', () => stub('ShellPanels'));

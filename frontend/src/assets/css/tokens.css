@@ -474,16 +474,6 @@ html, body, #app {
     outline-offset: 2px;
 }
 
-/* Compatibility aliases for the Pages components until they are restyled. */
-:root {
-    --kiln-ink: var(--ink); --kiln-ink-soft: var(--ink-2); --kiln-text: var(--ink); --kiln-muted: var(--ink-2);
-    --kiln-paper: var(--surface); --kiln-paper-2: var(--surface-2); --kiln-canvas: var(--canvas);
-    --kiln-ember: var(--brand); --kiln-ember-deep: var(--brand-deep); --kiln-brass: var(--warn); --kiln-moss: var(--ok);
-    --kiln-line: var(--hairline); --kiln-danger: var(--danger);
-    --kiln-font-display: var(--font-ui); --kiln-font-body: var(--font-ui);
-    --kiln-radius: var(--r-card); --kiln-radius-sm: var(--r-input); --kiln-shadow: var(--shadow-pop); --kiln-header-h: 0px;
-}
-
 /* ---------- RTL (handoff 22d) ----------
    Layout mirrors from logical properties; only the few places that hard-code a
    physical direction need a rule. What must NOT mirror — the timer, ids, code,
