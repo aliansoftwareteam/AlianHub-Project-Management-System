@@ -1361,6 +1361,7 @@
     "Audit.taint_kind_fetch": "Web page",
     "Audit.taint_kind_file": "Uploaded file",
     "Audit.taint_kind_form": "Form submission",
+    "Audit.taint_kind_instruction": "Instruction-shaped text",
     "Audit.taint_kind_passage": "Knowledge passage",
     "Audit.taint_kind_webhook": "Webhook",
     "Audit.tainted": "Read external content",

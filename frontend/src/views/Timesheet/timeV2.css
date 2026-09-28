@@ -20,7 +20,7 @@
 .tv-section-label { font: var(--text-label); letter-spacing: .06em; color: var(--ink-2); text-transform: uppercase; }
 .tv-legend { display: flex; gap: 14px; font-size: 11.5px; color: var(--ink-2); flex-wrap: wrap; align-items: center; }
 .tv-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
-.tv-spark { color: var(--brand); font-weight: 600; }
+.tv-spark { color: var(--ink-2); flex: none; vertical-align: -2px; }
 .tv-link { color: var(--brand); font: 600 12.5px/1.2 var(--font-ui); background: transparent; border: 0; cursor: pointer; padding: 0; white-space: nowrap; }
 .tv-link:hover { text-decoration: underline; }
 .tv-error { color: var(--danger-ink); font: var(--text-small); display: flex; align-items: center; gap: 6px; margin: 0; }
@@ -32,7 +32,7 @@
 .tv-hatch { background: repeating-linear-gradient(45deg, rgba(0, 0, 0, .04) 0 4px, transparent 4px 8px); }
 :root[data-theme="dark"] .tv-hatch { background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .06) 0 4px, transparent 4px 8px); }
 .tv-dark { background: var(--rail); color: #fff; border-radius: 10px; padding: 11px 13px; line-height: 1.55; }
-.tv-dark .tv-spark, .tv-dark .tv-link { color: #a892ff; }
+.tv-dark .tv-link { color: #a892ff; }
 .tv-pill { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: var(--r-chip); font: 500 11px/1 var(--font-mono); color: var(--ink-2); background: rgba(0, 0, 0, .05); }
 :root[data-theme="dark"] .tv-pill { background: rgba(255, 255, 255, .08); }
 .ah-input.tv-input-mono { font: 600 16px/1 var(--font-mono); }

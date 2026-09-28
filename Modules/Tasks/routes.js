@@ -8,6 +8,7 @@ const logger = require('../../Config/loggerConfig');
 const { requireTaskActionPermission, requireTaskWritePermission } = require('../../Config/permissionGuard');
 const { TASK_ACTIONS, PRE_V2_TASK_ACTIONS, RELATION_ACTIONS, TASK_WRITE_ROUTES, actionEntry } = require('../../Config/taskWritePermissions');
 const { TASK_ACTION_FIELDS, PRE_V2_ACTION_FIELDS, specFor, prepareOrRefuse, sendFailure } = require('./helpers/taskWriteFields');
+const { importTargetAccess, refuseImport } = require('../Importers/helpers/importAccess');
 
 exports.init = (app) => {
     app.patch('/api/tasks/', requireTaskActionPermission(PRE_V2_TASK_ACTIONS), async (req, res) => {
@@ -119,9 +120,14 @@ exports.init = (app) => {
     app.patch('/api/v1/importTasks', requireTaskWritePermission(TASK_WRITE_ROUTES['PATCH /api/v1/importTasks'].entry), async (req, res) => {
         const payload = await prepareOrRefuse(req, res, TASK_ACTION_FIELDS.createMultipleTasks, 'createMultipleTasks');
         if (!payload) return;
-        taskMongo.createMultipleTasks(payload)
-        .then((response) => {
-            res.send({status: true, statusText: 'Task updated successfully.',data:response});
+        const projectData = payload.projectData || {};
+        importTargetAccess(projectData.CompanyId, String(req.uid || ''), { projectId: String(projectData._id || ''), sprintId: payload.sprint && payload.sprint.id })
+        .then((target) => {
+            if (!target.allowed) return refuseImport(res, target);
+            return taskMongo.createMultipleTasks({ ...payload, sprint: target.sprint })
+            .then((response) => {
+                res.send({status: true, statusText: 'Task updated successfully.',data:response});
+            });
         })
         .catch((error) => {
             console.error("ERRORsssss: ", error.message);

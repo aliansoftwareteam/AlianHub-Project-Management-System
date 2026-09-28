@@ -5,7 +5,7 @@ const { rekey, withIcon, hasIcon } = require('../migrations/lib/taskTypeIcons');
 
 const quiet = { info() {}, error() {} };
 const mig = (id, up, scope = 'global') => ({ id, scope, up });
-const deps = (migrations, store = createMemoryStore()) => ({ store, migrations, makeContext: () => ({ companies: {} }), logger: quiet, owner: 'test' });
+const deps = (migrations, store = createMemoryStore()) => ({ store, migrations, makeContext: () => ({ companies: {} }), logger: quiet, owner: 'test', appVersion: async () => '14.36.0-beta.7' });
 
 describe('the shipped migrations', () => {
     it('are named after their file, ordered, and each declares a scope and an up()', () => {
@@ -43,7 +43,7 @@ describe('running', () => {
         expect(result).toMatchObject({ skipped: false, applied: ['001-a', '002-b'], failed: null, pending: [] });
         const status = await migrationStatus({ store, migrations });
         expect(status.applied.map((m) => m.id)).toEqual(['001-a', '002-b']);
-        expect(status.applied[0].appVersion).toBe(require('../Config/buildInfo').get().version);
+        expect(status.applied[0].appVersion).toBe('14.36.0-beta.7');
         expect(store.docs.has(LOCK_ID)).toBe(false);
     });
 
