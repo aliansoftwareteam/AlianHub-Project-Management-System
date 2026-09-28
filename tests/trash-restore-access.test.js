@@ -120,11 +120,20 @@ describe('restoring a task from the trash', () => {
 });
 
 describe('restoring a list from the trash', () => {
-    it('refuses a member who may not delete lists', async () => {
-        seedRules({ ...CAN_DELETE, 'project.sprint_delete': false });
+    it('refuses a member who may neither restore nor delete lists', async () => {
+        seedRules({ ...CAN_DELETE, 'project.sprint_delete': false, 'project.sprint_restore': false });
         const res = await restore(MEMBER, 'lists', seedSprint(seedProject())._id);
         expect(res.statusCode).toBe(403);
         expect(mockReached).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['restore', { 'project.sprint_restore': true, 'project.sprint_delete': false }],
+        ['delete', { 'project.sprint_restore': false, 'project.sprint_delete': true }],
+    ])('lets a member who may only %s lists restore one', async (label, grants) => {
+        seedRules({ ...CAN_DELETE, ...grants });
+        const res = await restore(MEMBER, 'lists', seedSprint(seedProject())._id);
+        expect(res.body).toMatchObject({ reached: 'restore' });
     });
 
     it('answers 404 for a private list the member is not on', async () => {
