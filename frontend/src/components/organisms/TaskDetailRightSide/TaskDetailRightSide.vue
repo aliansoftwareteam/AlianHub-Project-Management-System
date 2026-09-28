@@ -170,6 +170,7 @@
                     </template>
                 </template>
             </div>
+            <TaskRepeatControl v-if="task?._id && !isSupport" :task="task" :project="project" />
              <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
                 <div class="task-detail-field-name">{{$t('UserTimesheet.estimated')}}</div>
                 <Skelaton v-if="isMainSpinner" style="height: 24px;" class="w-100px border-radius-7-px"/>
@@ -274,6 +275,7 @@ import * as env from '@/config/env';
 import { permittedAssignees, scopedAssignees, selfAssignable } from '@/utils/assigneeOptions';
 import Modal from '@/components/atom/Modal/Modal.vue';
 import { showUndoToast } from '@/composable/useUndoToast';
+import TaskRepeatControl from '@/components/organisms/TaskDetailOverlay/TaskRepeatControl.vue';
 
 // Icon for the "Generate estimate using AI" sidebar button. Same asset
 // the SubTasks / Checklist / Sprints components use for their AI actions
