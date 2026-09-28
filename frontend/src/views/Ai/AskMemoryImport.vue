@@ -12,13 +12,13 @@
             </details>
         </div>
 
-        <p v-if="!aiUsable" class="ah-small ami__off" data-test="memory-import-off">{{ $t('AskMemory.import_off') }}</p>
+        <p v-if="blockedKey" class="ah-small ami__off" data-test="memory-import-off">{{ $t(blockedKey) }}</p>
         <div class="ah-field">
             <label class="ah-field__label" :for="pasteId">{{ $t('AskMemory.paste_label') }}</label>
             <textarea :id="pasteId" v-model="pasted" class="ah-input ah-textarea" :maxlength="limit" :placeholder="$t('AskMemory.paste_hint')" data-test="memory-paste"></textarea>
         </div>
         <div class="ami__actions">
-            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="!aiUsable || !pasted.trim() || reading" data-test="memory-read-paste" @click="read">
+            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="Boolean(blockedKey) || !pasted.trim() || reading" data-test="memory-read-paste" @click="read">
                 {{ reading ? $t('AskMemory.reading') : $t('AskMemory.read_paste') }}
             </button>
             <span class="ah-small">{{ $t('AskMemory.read_note') }}</span>
@@ -48,12 +48,12 @@
 </template>
 
 <script setup>
-import { ref, useId } from "vue";
+import { computed, ref, useId } from "vue";
 import { useI18n } from "vue-i18n";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
-import { aiUsable } from "@/composable/aiAvailability";
+import { AI_ACCESS, aiAccessFor } from "@/composable/aiAvailability";
 import { memoryErrorKey } from "./askMemory";
 
 defineOptions({ name: "AskMemoryImport" });
@@ -70,6 +70,14 @@ const reading = ref(false);
 const saving = ref(false);
 const copied = ref(false);
 const error = ref("");
+
+/* Unknown stays open: the server refuses the read itself while AI is off or not allowed. */
+const BLOCKED = {
+    [AI_ACCESS.OFF]: "AskMemory.import_off",
+    [AI_ACCESS.UNCONFIGURED]: "AskMemory.import_unconfigured",
+    [AI_ACCESS.NOT_PERMITTED]: "AskMemory.import_not_permitted"
+};
+const blockedKey = computed(() => BLOCKED[aiAccessFor()] || "");
 
 const errorOf = (failure) => t(memoryErrorKey(failure?.response?.data?.code || failure?.data?.code));
 

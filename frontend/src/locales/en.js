@@ -3946,6 +3946,8 @@ export default {
         import_prompt: "I am moving to a new assistant. Please list what you know or remember about me that would help it work with me: what I like to be called, my role and work, the projects I care about, and how I like answers (tone, length, format, language). Write each item as one short bullet. Leave out passwords, keys, account or card numbers and anything else private.",
         copy_failed: "Could not copy. Open \"Show the prompt\" and copy it from there.",
         import_off: "AI is off in this workspace, so a paste cannot be read. You can still edit your memory by hand.",
+        import_unconfigured: "No model is connected, so a paste cannot be read. You can still edit your memory by hand.",
+        import_not_permitted: "Your plan or role does not include AI, so a paste cannot be read. You can still edit your memory by hand.",
         paste_label: "Paste the answer",
         paste_hint: "Paste what the other assistant said about you",
         read_paste: "Read it",
