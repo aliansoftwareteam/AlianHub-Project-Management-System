@@ -2415,6 +2415,7 @@ export default {
         col_owner: "Owner",
         col_summary: "Summary",
         col_area: "Area",
+        col_tags: "Tags",
         sort_by: "Sort by {column}",
         toggle_subtasks: "Show subtasks",
         tracking_now: "Tracking now",
@@ -4856,6 +4857,7 @@ export default {
         This_tag_has_already_been_added: "This tag has already been added",
         Tag_name_required: "Tag name required",
         add_tag: "Add tag",
+        more_tags: "{count} more: {names}",
     },
     Embeded: {
         Anything: "Anything",

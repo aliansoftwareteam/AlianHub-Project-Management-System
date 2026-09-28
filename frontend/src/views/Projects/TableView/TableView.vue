@@ -53,6 +53,7 @@
                         </button>
                     </span>
                     <span role="columnheader">{{ $t('List.col_owner') }}</span>
+                    <span role="columnheader"><template v-if="tagsOn">{{ $t('List.col_tags') }}</template></span>
                     <span role="columnheader" class="tv2__head-ai" :title="$t('List.ai_source_hint')">✦ {{ $t('List.col_summary') }}</span>
                     <span role="columnheader" class="tv2__head-ai" :title="$t('List.risk_formula')">✦ {{ $t('List.col_risk') }}</span>
                     <span role="columnheader" class="tv2__head-ai" :title="$t('List.ai_source_hint')">✦ {{ $t('List.col_area') }}</span>
@@ -61,7 +62,7 @@
 
                 <template v-for="sprint in groupedTasks" :key="sprintKey(sprint)">
                     <div class="tv2__sprint-row" role="row">
-                        <span role="cell" class="tv2__sprint-cell" :aria-colspan="8">
+                        <span role="cell" class="tv2__sprint-cell" :aria-colspan="9">
                             <button
                                 type="button"
                                 class="tv2__sprint-head"
@@ -127,7 +128,7 @@ defineOptions({ name: "ProjectTableView" });
 
 const { groupBy } = taskListHelper();
 const { getters } = useStore();
-const { checkPermission } = useCustomComposable();
+const { checkApps, checkPermission } = useCustomComposable();
 
 const props = defineProps({
     grouped: { type: Number, default: 0 },
@@ -151,6 +152,7 @@ const viewRoot = ref(null);
 useTaskSequenceSource(viewRoot);
 
 const project = inject('selectedProject');
+const tagsOn = computed(() => checkApps('tags') && checkPermission('task.task_tag', project.value?.isGlobalPermission) !== null);
 const companyId = inject('$companyId');
 const searchedTask = inject('searchedTask');
 const showArchiveVar = inject("showArchived");

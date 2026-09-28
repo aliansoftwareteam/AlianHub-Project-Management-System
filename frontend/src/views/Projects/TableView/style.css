@@ -1,7 +1,7 @@
 /* Table view with AI fields (handoff 13c) */
 
 .tv2 {
-    --tv2-cols: 28px minmax(0, 1fr) 100px 90px 1.3fr 110px 140px 96px;
+    --tv2-cols: 28px minmax(0, 1fr) 100px 90px 170px 1.3fr 110px 140px 96px;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -40,7 +40,7 @@
     background: var(--surface);
     border: 1px solid var(--hairline);
     border-radius: var(--r-card);
-    min-width: 1000px;
+    min-width: 1160px;
 }
 
 .tv2__head {
@@ -128,6 +128,7 @@
 .tv2__row:last-child { border-bottom: 0; border-radius: 0 0 var(--r-card) var(--r-card); }
 
 .tv2__name-cell { min-width: 0; display: block; }
+.tv2__tags { min-width: 0; }
 .tv2__name {
     background: none; border: 0; padding: 0;
     max-width: 100%;
