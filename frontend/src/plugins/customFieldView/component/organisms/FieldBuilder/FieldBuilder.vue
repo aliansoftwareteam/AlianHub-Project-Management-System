@@ -38,7 +38,7 @@
                 >
                     <span class="fb__grip" :aria-hidden="true"><ShellIcon name="grip" :size="14" /></span>
                     <span class="fb__name" :title="field.fieldTitle">{{ field.fieldTitle }}</span>
-                    <span class="ah-chip" :class="{ 'ah-chip--brand': isComputed(field) }">{{ typeLabel(field.fieldType) }}</span>
+                    <span class="ah-chip" :class="{ 'ah-chip--brand': isComputed(field) || isAiField(field) }">{{ isAiField(field) ? $t('Fields.type_ai') : typeLabel(field.fieldType) }}</span>
                     <span class="fb__shown" :class="{ 'fb__shown--mono': isComputed(field) }">{{ shownIn(field) }}</span>
                     <span v-if="isComputed(field)" class="fb__req--off">{{ $t('Fields.read_only') }}</span>
                     <span v-else-if="isRequired(field)" class="fb__req"><ShellIcon name="check" :size="14" /></span>
@@ -56,7 +56,7 @@
                             :key="option.key"
                             type="button"
                             class="fb__type"
-                            :class="{ 'fb__type--computed': option.computed }"
+                            :class="{ 'fb__type--computed': option.computed || option.ai }"
                             :disabled="!canEdit"
                             @click="startNew(option.key)"
                         >
@@ -69,7 +69,22 @@
         </div>
 
         <aside class="fb__panel">
-            <template v-if="draft">
+            <template v-if="aiDraft">
+                <div class="fb__panel-head">
+                    <span class="fb__panel-mark" aria-hidden="true">✦</span>
+                    <span class="fb__panel-title">{{ aiDraft.fieldTitle || $t('Fields.untitled') }}</span>
+                    <span class="fb__panel-kind">{{ $t('Fields.type_ai') }}</span>
+                </div>
+                <AiFieldPanel v-model="aiDraft" :errors="errors" />
+                <div class="fb__warn">{{ $t('AiFields.builder_note') }}</div>
+                <div class="fb__panel-foot">
+                    <button type="button" class="ah-btn ah-btn--primary fb__save" data-ai-field-save :disabled="saving" @click="saveAi">
+                        {{ saving ? $t('Fields.saving') : $t('Fields.save_field') }}
+                    </button>
+                    <button type="button" class="ah-btn ah-btn--ghost" @click="closeDraft">{{ $t('Fields.cancel') }}</button>
+                </div>
+            </template>
+            <template v-else-if="draft">
                 <div class="fb__panel-head">
                     <span class="fb__panel-mark">{{ draft.fieldType === 'rollup' ? 'Σ' : 'ƒ' }}</span>
                     <span class="fb__panel-title">{{ draft.fieldTitle || $t('Fields.untitled') }}</span>
@@ -187,6 +202,8 @@ import { useCustomComposable } from "@/composable";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import UpgradePlan from "@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue";
 import CustomFieldsSidebarComponent from "../../molecules/customFieldSidebar/customFieldsSidebarComponent/customFieldsSidebarComponent.vue";
+import AiFieldPanel from "./AiFieldPanel.vue";
+import { aiDraftFrom, aiFieldPayload, isAiField, newAiDraft, validateAiDraft } from "@/views/Projects/composables/aiFields";
 
 defineOptions({ name: "FieldBuilder" });
 
@@ -215,11 +232,13 @@ const typeOptions = [
     { key: "email", label: t("Fields.type_email"), hint: t("Fields.hint_email") },
     { key: "phone", label: t("Fields.type_phone"), hint: t("Fields.hint_phone") },
     { key: "formula", label: t("Fields.type_formula"), hint: t("Fields.hint_formula"), computed: true },
-    { key: "rollup", label: t("Fields.type_rollup"), hint: t("Fields.hint_rollup"), computed: true }
+    { key: "rollup", label: t("Fields.type_rollup"), hint: t("Fields.hint_rollup"), computed: true },
+    { key: "ai", label: t("Fields.type_ai"), hint: t("Fields.hint_ai"), ai: true }
 ];
 
 const selectedId = ref("");
 const draft = ref(null);
+const aiDraft = ref(null);
 const errors = ref({});
 const saving = ref(false);
 const testing = ref(false);
@@ -250,6 +269,7 @@ const isRequired = (field) => Array.isArray(field?.fieldRequired) && field.field
 const typeLabel = (key) => (typeOptions.find((option) => option.key === key) || {}).label || key;
 
 const shownIn = (field) => {
+    if (isAiField(field)) return t(`AiFields.template_${field.fieldAi.template}`);
     if (field.fieldType === "formula") return field.formulaExpression || t("Fields.no_expression");
     if (field.fieldType === "rollup") {
         const source = fields.value.find((entry) => entry._id === field.rollupSourceFieldId);
@@ -271,6 +291,13 @@ function detailFor(fieldType) {
 function startNew(fieldType) {
     if (!canEdit.value) return;
     selectedId.value = "";
+    aiDraft.value = null;
+    if (fieldType === "ai") {
+        draft.value = null;
+        aiDraft.value = newAiDraft();
+        errors.value = {};
+        return;
+    }
     if (!COMPUTED_TYPES.includes(fieldType)) {
         legacyDetail.value = detailFor(fieldType);
         legacyObject.value = {};
@@ -293,6 +320,13 @@ function startNew(fieldType) {
 
 function selectField(field) {
     selectedId.value = field._id;
+    aiDraft.value = null;
+    if (isAiField(field)) {
+        draft.value = null;
+        aiDraft.value = aiDraftFrom(field);
+        errors.value = {};
+        return;
+    }
     if (!isComputed(field)) {
         legacyDetail.value = detailFor(field.fieldType);
         legacyObject.value = field;
@@ -316,6 +350,7 @@ function selectField(field) {
 
 function closeDraft() {
     draft.value = null;
+    aiDraft.value = null;
     selectedId.value = "";
     errors.value = {};
 }
@@ -433,6 +468,42 @@ async function save() {
         const message = error?.response?.data?.message || error?.message || t("Toast.something_went_wrong");
         errors.value = { ...errors.value, formulaExpression: draft.value?.fieldType === "formula" ? message : errors.value.formulaExpression };
         if (draft.value?.fieldType !== "formula") $toast.error(message, { position: "top-right" });
+    } finally {
+        saving.value = false;
+    }
+}
+
+async function saveAi() {
+    const next = validateAiDraft(aiDraft.value, t);
+    if (!next.fieldTitle && fields.value.some((field) => field._id !== aiDraft.value._id && slugOf(field.fieldTitle) === slugOf(aiDraft.value.fieldTitle))) {
+        next.fieldTitle = t("Fields.error_title_taken");
+    }
+    errors.value = next;
+    if (Object.keys(next).length) return;
+    saving.value = true;
+    try {
+        const detail = detailFor(aiDraft.value.output);
+        const payload = {
+            ...aiFieldPayload(aiDraft.value),
+            fieldImage: detail.cfIcon || "",
+            fieldImageGrey: detail.cfIconGrey || "",
+            fieldPrimaryColor: detail.cfPrimaryColor || "",
+            fieldBackgroundColor: detail.cfBackgroundColor || ""
+        };
+        if (aiDraft.value._id) {
+            const response = await apiRequest("put", env.CUSTOM_FIELD, { type: "updateOne", key: "$set", id: aiDraft.value._id, updateObject: payload });
+            if (response?.status !== 200) throw new Error(response?.data?.message || t("Toast.something_went_wrong"));
+            commit("settings/mutateFinalCustomFields", { data: { ...fields.value.find((field) => field._id === aiDraft.value._id), ...payload, _id: aiDraft.value._id }, op: "modified" });
+        } else {
+            const created = { ...payload, global: true, isDelete: true, projectId: [], userId: userId?.value || "", createdAt: new Date() };
+            const response = await apiRequest("post", env.CUSTOM_FIELD, { type: "save", updateObject: created });
+            if (response?.status !== 200) throw new Error(response?.data?.message || t("Toast.something_went_wrong"));
+            commit("settings/mutateFinalCustomFields", { data: { ...created, _id: response?.data?._id || "" }, op: "added" });
+        }
+        $toast.success(t("Toast.Field_Updated_Successfully"), { position: "top-right" });
+        closeDraft();
+    } catch (error) {
+        $toast.error(error?.response?.data?.message || error?.message || t("Toast.something_went_wrong"), { position: "top-right" });
     } finally {
         saving.value = false;
     }

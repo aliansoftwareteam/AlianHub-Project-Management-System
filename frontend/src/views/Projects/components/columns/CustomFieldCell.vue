@@ -1,5 +1,6 @@
 <template>
     <span class="cfc" :class="`cfc--${type}`" :data-field-type="type" @click.stop>
+        <AiFieldMark v-if="isAi" :def="def" :task="task" :canFill="editable" />
         <ComputedComponentViewColumn
             v-if="computedType"
             class="cfc__computed"
@@ -75,6 +76,8 @@
 import { computed, inject, nextTick, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import AiFieldMark from "@/components/atom/AiFieldMark/AiFieldMark.vue";
+import { isAiField } from "@/views/Projects/composables/aiFields";
 import ComputedComponentViewColumn from "@/plugins/customFieldView/component/atom/customFieldViewColumn/computedComponentViewColumn.vue";
 import {
     COMPUTED_TYPES, customFieldText, dropdownChoices, fieldEditValue, fieldIsChecked, storedEntry
@@ -98,6 +101,7 @@ const INPUT_TYPES = { number: "text", money: "text", date: "date", email: "email
 
 const type = computed(() => props.def.fieldType);
 const computedType = computed(() => COMPUTED_TYPES.includes(type.value));
+const isAi = computed(() => isAiField(props.def));
 const inputType = computed(() => INPUT_TYPES[type.value] || "text");
 const text = computed(() => customFieldText(props.def, props.task, { allTasks: props.allTasks, dateFormat: dateFormat.value }));
 const checked = computed(() => fieldIsChecked(props.def, props.task));
