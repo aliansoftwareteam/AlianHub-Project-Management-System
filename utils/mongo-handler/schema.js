@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const { objectIdKeys } = require('./objectIdKeys');
+
 const schema = {
     tasks: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.
@@ -69,6 +71,7 @@ const schema = {
         'sprintArray': {
             type: Object,
             required: true,
+            set: objectIdKeys('id', 'folderId'),
         },
         'Task_Priority': {
             type: String,

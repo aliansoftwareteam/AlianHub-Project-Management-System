@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const http = require('http');
 const dns = require('dns');
 
@@ -224,7 +225,7 @@ const res = () => {
 };
 const call = async (handler, { body = {}, params = {} } = {}) => {
     const r = res();
-    await handler({ headers: { companyid: COMPANY }, uid: OWNER, body, params, query: {} }, r);
+    await handler(verified({ headers: { companyid: COMPANY }, uid: OWNER, body, params, query: {} }), r);
     return r;
 };
 

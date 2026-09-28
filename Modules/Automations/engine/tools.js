@@ -125,15 +125,9 @@ const addComment = async (companyId, taskId, body, context = {}) => {
     const access = await canPostToThread(companyId, context.actingUserId, commentThreadOf(task));
     if (!access.allowed) throw new DeterministicError(THREAD_REFUSED);
 
-    // Field names follow the comments schema exactly: `message` (not Comment),
-    // `taskId` / `projectId` lowercase, and `project:false` marking this as a task
-    // comment rather than a project-level one.
-    //
-    // taskId MUST be an ObjectId, not a string. The schema types it as Mixed so a
-    // string writes without complaint, but every read path casts
-    // (`{ taskId: new mongoose.Types.ObjectId(taskId) }` in Comments/controller.js),
-    // and in Mongo a string never equals an ObjectId — so a string-keyed comment is
-    // stored successfully and is then invisible in the task's Comments tab forever.
+    // comments.taskId is Mixed, so Mongoose stores whatever form it is given. Reads match
+    // both forms (Comments/helpers/taskIdMatch), but ObjectId is the canonical form task 040
+    // migrates to, so new rows are written that way.
     const saved = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.COMMENTS,
         data: {

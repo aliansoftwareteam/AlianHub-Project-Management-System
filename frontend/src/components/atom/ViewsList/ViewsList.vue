@@ -20,29 +20,29 @@
            <span class="notification-tick blinking position-sti ml-7px" v-if="item?.isPrivate" :title="$t('Projects.private_view')"></span>
         </button>
         <div class="view-list__menu" v-if="hasViewMenu">
-           <DropDown :id="item._id" @isVisible="(visible) => isDropDownVisible = visible" :zIndex="6">
-                <template #button>
-                    <button type="button" class="dots ml-5px" :ref="item._id" :aria-expanded="isDropDownVisible ? 'true' : 'false'" :aria-label="$t('Projects.view_options', {view: $t(`ViewList.${item.name}`)})">
+           <DropDown :id="item._id" mode="menu" :zIndex="6">
+                <template #button="{ triggerAttrs }">
+                    <button type="button" class="dots ml-5px" v-bind="triggerAttrs" :aria-label="$t('Projects.view_options', {view: $t(`ViewList.${item.name}`)})">
                         <img :src="dots" alt="" aria-hidden="true">
                     </button>
                 </template>
                 <template #options>
                     <div>
-                        <ul class="p-0 m-0 justify-content-start" role="menu">
+                        <ul class="p-0 m-0 justify-content-start" role="none">
                             <li role="none">
-                                <button type="button" role="menuitem" class="embed-edit-options mb-7px view-list__menuitem cursor-pointer" @click.stop="editOptions('Pin'),$refs[item._id].click()">
+                                <button type="button" role="menuitem" class="embed-edit-options mb-7px view-list__menuitem cursor-pointer" @click="editOptions('Pin')">
                                     <img :src="pin" class="mr-14-px list__edit" alt="" aria-hidden="true" />
                                     <span class="font-ui font-weight-400 font-size-14 line-height-19 text-left gray81">{{item?.isPin ? $t('Projects.unpin') :$t('Projects.pinview') }}</span>
                                 </button>
                             </li>
                             <li role="none" v-if="project?.ProjectRequiredComponent && (project?.ProjectRequiredComponent?.filter((e)=>e.setAsDefault === true).length == 0 || project?.ProjectRequiredComponent?.find((e)=>e.setAsDefault === true).keyName === item?.keyName)">
-                                <button type="button" role="menuitem" class="embed-edit-options mb-7px view-list__menuitem cursor-pointer" @click.stop="editOptions('AddDefault'),$refs[item._id].click()">
+                                <button type="button" role="menuitem" class="embed-edit-options mb-7px view-list__menuitem cursor-pointer" @click="editOptions('AddDefault')">
                                     <img :src="defaultView" class="mr-14-px list__edit" alt="" aria-hidden="true" />
                                     <span class="font-ui font-weight-400 font-size-14 line-height-19 text-left gray81">{{!item?.setAsDefault ? $t('ViewList.set_as_default') :$t('ViewList.remove_as_default') }}</span>
                                 </button>
                             </li>
                             <li role="none" v-if="isDeleteDisabled == false">
-                                <button type="button" role="menuitem" class="embed-edit-options view-list__menuitem cursor-pointer" @click.stop="isDelete = true, $refs[item._id].click()">
+                                <button type="button" role="menuitem" class="embed-edit-options view-list__menuitem cursor-pointer" @click="isDelete = true">
                                     <img :src="deleteImage" class="mr-14-px list__edit" alt="" aria-hidden="true"/>
                                     <span class="font-ui font-weight-400 font-size-14 line-height-19 text-left red pt-2px">{{$t('Projects.deleteview')}}</span>
                                 </button>
@@ -89,7 +89,6 @@ const pin = require("@/assets/images/svg/pin.svg")
 const activePin = require("@/assets/images/svg/active-pin.svg")
 const defaultView = require("@/assets/images/svg/HomeVector.svg")
 const dots  = require("@/assets/images/svg/PriorityIcon/dotsIcon.svg") 
-const isDropDownVisible = ref(false)
 const deleteImage = require('@/assets/images/svg/delete-red.svg')
 const isDelete = ref(false)
 const route = useRoute();

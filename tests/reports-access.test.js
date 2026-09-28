@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const mockDb = require('./fixtures/fakeMongo').create();
 
 const mockRoles = {};
@@ -35,7 +36,7 @@ const res = () => {
 };
 const call = async (handler, uid, { body = {}, params = {} } = {}) => {
     const r = res();
-    await handler({ headers: { companyid: COMPANY }, uid, body, params, query: {} }, r);
+    await handler(verified({ headers: { companyid: COMPANY }, uid, body, params, query: {} }), r);
     return r;
 };
 const refused = (r) => r.code >= 400 && r.body.status === false;

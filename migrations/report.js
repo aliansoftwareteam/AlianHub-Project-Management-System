@@ -12,6 +12,14 @@ function describeWrite(w) {
     return `    ${w.op.padEnd(18)} ${w.collection}  ${parts.join(', ')}${detail.length ? `; ${detail.join('; ')}` : ''}`;
 }
 
+/* Only the plain values a migration returns for a company: an error text or a returned list can
+ * quote stored data. */
+function describeCompany({ ok, error, ...counts }) {
+    if (!ok) return 'failed';
+    const parts = Object.entries(counts).filter(([, value]) => value === null || typeof value !== 'object').map(([key, value]) => `${key} ${value}`);
+    return parts.length ? parts.join(', ') : 'ok';
+}
+
 function formatDryRun({ results }) {
     const lines = ['Dry run: every write was refused and recorded; nothing is written and nothing is marked applied.'];
     if (!results.length) return [...lines, 'Nothing pending.'].join('\n');
@@ -23,6 +31,9 @@ function formatDryRun({ results }) {
         if (r.status === 'cannot-dry-run' && r.writes.length) lines.push('  writes recorded before it stopped being reliable:');
         if (r.status === 'plan' && !r.writes.length) lines.push('    nothing');
         r.writes.forEach((w) => lines.push(describeWrite(w)));
+        const companies = Object.entries(r.companies || {});
+        if (companies.length) lines.push('  per company:');
+        companies.forEach(([companyId, outcome]) => lines.push(`    ${companyId}  ${describeCompany(outcome)}`));
     }
     const count = (status) => results.filter((r) => r.status === status).length;
     lines.push('', `${plural(results.length, 'pending migration')}: ${count('plan')} planned, ${count('cannot-dry-run')} cannot dry-run, ${count('failed')} failed.`);

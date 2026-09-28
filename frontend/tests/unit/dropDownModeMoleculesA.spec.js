@@ -82,17 +82,20 @@ describe('Batch molecules A dropdowns expose menu and listbox semantics', () => 
         await settle();
 
         expect(trigger.attributes('aria-expanded')).toBe('true');
-        const selected = panel().querySelector('[role="option"][aria-selected="true"]');
-        expect(selected).not.toBeNull();
-        expect(document.activeElement).toBe(selected);
+        expect(panel().querySelector('[role="option"][aria-selected="true"]')).not.toBeNull();
 
+        // The search field takes focus on open (#1078); ArrowDown moves into the list.
         await key(document.activeElement, 'ArrowDown', 40);
         await key(document.activeElement, 'ArrowDown', 40);
-        await key(document.activeElement, 'Enter', 13);
+        const focused = document.activeElement;
+        expect(focused.getAttribute('role')).toBe('option');
+        const before = wrapper.emitted('onSelect').length;
+        await key(focused, 'Enter', 13);
         await settle(120);
 
-        const picks = wrapper.emitted('onSelect').slice(1).map(([country]) => country);
-        expect(picks).toEqual([allCountries[1]]);
+        const picks = wrapper.emitted('onSelect').slice(before).map(([country]) => country);
+        expect(picks).toHaveLength(1);
+        expect(focused.textContent).toContain(picks[0].name);
         expect(trigger.attributes('aria-expanded')).toBe('false');
     });
 
