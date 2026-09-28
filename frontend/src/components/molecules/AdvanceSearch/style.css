@@ -66,6 +66,13 @@
 .pal__action:hover { background: var(--surface-2); color: var(--ink); }
 .pal__action--ai { color: var(--brand); }
 
+.pal__answer { margin: 4px 16px 8px; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 10px; background: var(--surface-2); }
+.pal__answer-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 600; color: var(--ink); }
+.pal__answer-model { margin-left: auto; font: 500 10.5px/1 var(--font-mono); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.pal__answer-body { line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 30vh; overflow: auto; color: var(--ink); }
+.pal__answer-body.is-wait { display: flex; align-items: center; gap: 8px; color: var(--ink-label); }
+.pal__answer-body.is-error { color: var(--danger); }
+
 .pal__empty { padding: 22px 16px 16px; display: flex; flex-direction: column; gap: 6px; }
 .pal__empty--idle { padding: 18px 16px; }
 .pal__empty-title { font-size: 13px; font-weight: 600; }

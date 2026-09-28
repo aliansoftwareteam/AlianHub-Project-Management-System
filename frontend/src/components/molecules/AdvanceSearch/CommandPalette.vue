@@ -49,6 +49,20 @@
                 </div>
 
                 <div ref="bodyEl" class="pal__body ah-scroll">
+                    <div class="pal__live" aria-live="polite" :aria-busy="asked && asked.loading ? 'true' : 'false'">
+                        <div v-if="asked" :id="answerId" class="pal__answer" role="region" :aria-label="$t('Palette.answer')">
+                            <div class="pal__answer-head">
+                                <span class="pal__icon pal__icon--brand"><ShellIcon name="ai" :size="12" /></span>
+                                <span>{{ $t('Palette.answer') }}</span>
+                                <span v-if="answerModel" class="pal__answer-model" :title="$t('Palette.answer_model')">{{ answerModel }}</span>
+                            </div>
+                            <div v-if="asked.loading" class="pal__answer-body is-wait">
+                                <span class="pal__spin" aria-hidden="true"></span>{{ $t('Palette.ask_loading') }}
+                            </div>
+                            <div v-else class="pal__answer-body" :class="{ 'is-error': asked.error }">{{ answerText }}</div>
+                        </div>
+                    </div>
+
                     <div v-if="flat.length" :id="listId" role="listbox" class="pal__list" :aria-label="$t('Palette.results_label')">
                         <div v-for="g in groups" :key="g.key" role="group" :aria-labelledby="groupId(g)">
                             <div :id="groupId(g)" class="pal__group" aria-hidden="true">{{ g.label }}</div>
@@ -60,6 +74,7 @@
                                 class="pal__row"
                                 :class="{ 'is-active': row.index === active, 'is-ask': row.kind === 'ask', 'has-actions': hasActions(row) }"
                                 :aria-selected="row.index === active ? 'true' : 'false'"
+                                :aria-describedby="row.kind === 'continue' && asked ? answerId : undefined"
                                 :data-kind="row.kind"
                                 :data-index="row.index"
                                 @mouseenter="active = row.index"
@@ -102,7 +117,7 @@
                         <button type="button" class="pal__action" :aria-label="$t('Palette.action_copy')" :title="$t('Palette.action_copy')" @click="copyLink(actionRow)">
                             <ShellIcon name="link" :size="13" />
                         </button>
-                        <button v-if="hasAi" type="button" class="pal__action pal__action--ai" :aria-label="$t('Palette.action_ask')" :title="$t('Palette.action_ask')" @click="askAi(actionRow)">
+                        <button v-if="hasAi && actionRow.kind !== 'source'" type="button" class="pal__action pal__action--ai" :aria-label="$t('Palette.action_ask')" :title="$t('Palette.action_ask')" @click="askAi(actionRow)">
                             <ShellIcon name="ai" :size="13" />
                         </button>
                     </div>
@@ -126,7 +141,7 @@
                     <span><kbd>↵</kbd> {{ $t('Inbox.hint_open') }}</span>
                     <span><kbd>{{ modEnter }}</kbd> {{ $t('Palette.hint_new_tab') }}</span>
                     <span><kbd>{{ $t('Palette.key_tab') }}</kbd> {{ $t('Palette.hint_actions') }}</span>
-                    <span><kbd>{{ $t('Palette.key_esc') }}</kbd> {{ $t('Palette.hint_close') }}</span>
+                    <span><kbd>{{ $t('Palette.key_esc') }}</kbd> {{ asked && asked.loading ? $t('Palette.hint_cancel') : $t('Palette.hint_close') }}</span>
                 </div>
             </div>
         </div>
@@ -134,7 +149,7 @@
 </template>
 
 <script setup>
-import { computed, inject, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useStore } from 'vuex';
@@ -150,6 +165,8 @@ import { isMacPlatform } from './paletteKeys';
 import { CHIPS, RECORD_CHIPS, chipAllows, commandArgument, commandLeads, projectPath, relativeAge, taskLocation, taskPath } from './paletteRows';
 import { openQuickCreate } from '@/components/organisms/QuickCreateTask/quickCreateTask';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
+import { messageKey } from '@/views/Ai/askWhy';
+import { leaveAskHandoff } from './askHandoff';
 import '@/components/molecules/AdvanceSearch/style.css';
 
 defineOptions({ name: 'CommandPalette' });
@@ -175,6 +192,7 @@ const titleId = `${instance}-title`;
 const listId = `${instance}-list`;
 const optionId = (row) => `${instance}-opt-${row.index}`;
 const groupId = (g) => `${instance}-grp-${g.key}`;
+const answerId = `${instance}-answer`;
 
 const dialogEl = ref(null);
 const inputEl = ref(null);
@@ -189,6 +207,8 @@ const connections = ref([]);
 const recentSearches = ref([]);
 const recentTasks = ref([]);
 const toolbarStyle = ref({});
+const asked = ref(null);
+let askController = null;
 
 useFocusTrap(dialogEl, computed(() => props.open));
 
@@ -264,14 +284,47 @@ const commandRow = (c) => {
     return { id: `cmd:${c.key}`, kind: 'command', icon: c.icon, title: c.label, sub: name, command: c.key, name };
 };
 
+const sourceRow = (s) => {
+    const isTask = s.kind === 'task';
+    return {
+        id: `source:${s.ref}`, kind: 'source', icon: isTask ? 'check' : 'docs', code: isTask ? s.ref : '', title: s.title || s.ref, sub: s.project || '',
+        to: isTask ? `/${cid.value}/project/${s.projectId}/p?task=${encodeURIComponent(s.id)}` : { name: 'PageEditor', params: { cid: cid.value, pageId: String(s.id) } },
+        overlay: isTask ? { query: { task: String(s.id) } } : null,
+    };
+};
+const answerData = computed(() => (asked.value && !asked.value.loading && !asked.value.error ? asked.value.data || {} : null));
+const answerModel = computed(() => answerData.value?.usage?.model || '');
+const answerText = computed(() => {
+    if (!asked.value || asked.value.loading) return '';
+    if (asked.value.error) return asked.value.error;
+    const data = answerData.value;
+    if (data.answer) return data.answer;
+    if (data.configured === false) return t('Palette.ask_no_model');
+    return messageKey(data.emptyCode) ? t(messageKey(data.emptyCode)) : t('Palette.ask_nothing');
+});
+/* Only what the answer cites, and only sources that open somewhere: comments and call transcripts have no page. */
+const answerSources = computed(() => {
+    const data = answerData.value;
+    if (!data) return [];
+    const sources = (Array.isArray(data.sources) ? data.sources : []).filter(Boolean);
+    const retrieved = new Set(sources.map((s) => s.ref));
+    const shown = data.configured === false ? sources : (data.cited || []).filter((s) => s && retrieved.has(s.ref));
+    return shown.filter((s) => s.id && ((s.kind === 'task' && s.projectId) || s.kind === 'page'));
+});
+
 const groups = computed(() => {
     let index = 0;
     const out = [];
     const limit = chip.value === 'all' ? MAX_PER_GROUP : MAX_PER_CHIP;
-    const add = (key, label, rows) => {
-        const kept = rows.filter((r) => chipAllows(chip.value, r.kind)).slice(0, limit);
+    const add = (key, label, rows, cap = limit) => {
+        const kept = rows.filter((r) => chipAllows(chip.value, r.kind)).slice(0, cap);
         if (kept.length) out.push({ key, label, rows: kept.map((r) => ({ ...r, index: index++ })) });
     };
+    if (asked.value) {
+        add('sources', t('Palette.group_sources'), answerSources.value.map(sourceRow), MAX_PER_CHIP);
+        add('ask', t('Inbox.group_ask'), [{ id: 'ask:continue', kind: 'continue', icon: 'ai', iconClass: 'pal__icon--brand', bold: true, title: t('Palette.ask_continue'), hint: '↵' }]);
+        return out;
+    }
     const people = () => users.value.filter((u) => matches(u.Employee_Name, u.Employee_Email)).map(personRow);
 
     if (!q.value) {
@@ -376,6 +429,40 @@ const askAi = (row) => {
     go({ name: 'AiAsk', params: { cid: cid.value }, query: text ? { q: text } : {} });
 };
 
+const cancelAsk = () => {
+    if (askController) askController.abort();
+    askController = null;
+    asked.value = null;
+};
+const askHere = async () => {
+    const question = query.value.trim();
+    if (!question) return;
+    cancelAsk();
+    const controller = new AbortController();
+    askController = controller;
+    asked.value = { question, loading: true, data: null, error: '' };
+    active.value = 0;
+    focusInput();
+    const settle = (patch) => {
+        if (askController !== controller) return;
+        askController = null;
+        asked.value = { question, loading: false, data: null, error: '', ...patch };
+        active.value = 0;
+    };
+    try {
+        const res = await apiRequest('post', env.AI_ASK, { question, mode: 'ask' }, undefined, { signal: controller.signal });
+        if (res?.data?.status) settle({ data: res.data.data || {} });
+        else settle({ error: messageKey(res?.data?.code) ? t(messageKey(res.data.code)) : t('Palette.ask_failed') });
+    } catch (e) {
+        settle({ error: t('Palette.ask_failed') });
+    }
+};
+const continueInAsk = () => {
+    if (answerData.value) leaveAskHandoff(asked.value.question, answerData.value);
+    cancelAsk();
+    askAi();
+};
+
 const command = (key, name = '') => {
     if (key === 'toggle-theme') { toggleTheme(); close(); return; }
     if (key === 'logout') { close(); logOut({ islogOut: true }); return; }
@@ -391,8 +478,10 @@ const run = (row) => {
     if (row.kind === 'recent') { query.value = row.value; onInput(); focusInput(); return; }
     if (row.kind === 'command') return command(row.command, row.name);
     remember(query.value);
-    if (row.kind === 'ask') return askAi();
+    if (row.kind === 'ask') return askHere();
+    if (row.kind === 'continue') return continueInAsk();
     if (row.task) { close(); openTask(row.task); return; }
+    if (row.overlay) return go(row.overlay);
     if (row.to) return go(row.to);
     return close();
 };
@@ -436,12 +525,18 @@ const onToolbarKey = (e) => {
 };
 
 const onDialogKey = (e) => {
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (asked.value && asked.value.loading) { cancelAsk(); focusInput(); return; }
+    close();
 };
 
 watch(flat, (rows) => { if (active.value > rows.length - 1) active.value = 0; });
 watch([active, flat], placeToolbar);
+watch(query, (value) => { if (asked.value && value.trim() !== asked.value.question) cancelAsk(); });
 watch(() => props.open, (on) => {
+    cancelAsk();
     if (!on) return;
     query.value = '';
     chip.value = 'all';
@@ -453,4 +548,5 @@ watch(() => props.open, (on) => {
 }, { immediate: true });
 watch(() => props.open, (on) => { if (on) inputEl.value?.focus(); }, { flush: 'post' });
 onMounted(() => { if (props.open) inputEl.value?.focus(); });
+onBeforeUnmount(cancelAsk);
 </script>
