@@ -1,6 +1,9 @@
 const mongoose = require('mongoose');
 const { objectIdKeys, objectIdIfHex } = require('./objectIdKeys');
 
+/* A Mixed path's required check lets '' through, where the String path it replaced refused it. */
+const notEmpty = { validator: (value) => value !== '', message: 'Path `{PATH}` is required.' };
+
 const schema = {
     tasks: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.
@@ -323,8 +326,10 @@ const schema = {
             required: true,
         },
         ProjectId: {
-            type: String,
+            type: mongoose.Schema.Types.Mixed,
             required: true,
+            validate: notEmpty,
+            set: objectIdIfHex,
         },
         TaskId: {
             type: String,
@@ -3525,8 +3530,10 @@ const schema = {
             required: true,
         },
         projectId: {
-            type: String,
+            type: mongoose.Schema.Types.Mixed,
             required: true,
+            validate: notEmpty,
+            set: objectIdIfHex,
         },
         taskId: {
             type: String,
@@ -3545,8 +3552,9 @@ const schema = {
             required: true,
         },
         folderId: {
-            type: String,
+            type: mongoose.Schema.Types.Mixed,
             required: false,
+            set: objectIdIfHex,
         },
         isSelected: {
             type: Boolean,
@@ -3558,8 +3566,9 @@ const schema = {
             default: []
         },
         sprintId: {
-            type: String,
+            type: mongoose.Schema.Types.Mixed,
             required: false,
+            set: objectIdIfHex,
         },
         companyId: {
             type: String,
@@ -3763,8 +3772,9 @@ const schema = {
             required: true
         },
         folderId: {
-            type: String,
-            required: false
+            type: mongoose.Schema.Types.Mixed,
+            required: false,
+            set: objectIdIfHex,
         },
         mentionIds: {
             type: Array,
@@ -3775,12 +3785,15 @@ const schema = {
             required: false
         },
         projectId: {
-            type: String,
-            required: true
+            type: mongoose.Schema.Types.Mixed,
+            required: true,
+            validate: notEmpty,
+            set: objectIdIfHex,
         },
         sprintId: {
-            type: String,
-            required: false
+            type: mongoose.Schema.Types.Mixed,
+            required: false,
+            set: objectIdIfHex,
         },
         taskId: {
             type: String,

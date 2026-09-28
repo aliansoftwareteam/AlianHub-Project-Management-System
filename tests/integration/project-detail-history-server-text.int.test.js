@@ -15,7 +15,7 @@ let owner;
 let project;
 
 const db = () => client.db(state.companyId);
-const historyOf = (key) => db().collection('history').find({ ProjectId: String(project._id), Key: key }).toArray();
+const historyOf = (key) => db().collection('history').find({ ProjectId: new ObjectId(String(project._id)), Key: key }).toArray();
 const nameOf = async (uid) => (await client.db('global').collection('users').findOne({ _id: new ObjectId(String(uid)) })).Employee_Name;
 
 const waitFor = async (read, what) => {
