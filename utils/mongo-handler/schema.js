@@ -3917,7 +3917,12 @@ const schema = {
         assignedAt: { type: Date, required: false },
         resolved: { type: Boolean, required: false },
         resolvedBy: { type: String, required: false },
-        resolvedAt: { type: Date, required: false }
+        resolvedAt: { type: Date, required: false },
+        // @ai: the question's { state, askerId, at, answerId, code }, and on the AI's answer who asked, which comment and what it cites.
+        aiAsk: { type: Object, required: false },
+        aiAskerId: { type: String, required: false },
+        aiQuestionId: { type: String, required: false },
+        aiCitations: { type: Array, required: false }
     },
     mainChat: {
         ProjectCode: {

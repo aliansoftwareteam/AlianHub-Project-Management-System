@@ -16,6 +16,7 @@ const { taskIdMatch } = require("./helpers/taskIdMatch");
 const { withoutAssignment, withoutThreadState, placeReply } = require("./helpers/commentThreads");
 const { notifyReply } = require("./helpers/threadNotices");
 const { parseAgentMentionIds } = require("./helpers/parseMentions");
+const { withoutAiFields } = require("./helpers/aiActor");
 
 /* A comment an agent run writes never starts agents, so agents cannot start each other.
  * Required on use: the agent modules are only needed by a comment that names an agent. */
@@ -44,7 +45,7 @@ exports.save = async (req, res) => {
     try {
         const { data } = req.body
         const companyId = req.headers['companyid'];
-        const placement = await placeReply(companyId, withoutAssignment(escapeCommentFields(replaceObjectKey(data, ["objId"]))));
+        const placement = await placeReply(companyId, withoutAiFields(withoutAssignment(escapeCommentFields(replaceObjectKey(data, ["objId"])))));
         if (!placement.allowed) return refuseThread(res, placement);
         const convertData = placement.data;
         // SEC (AHE-3834) — the author is the authenticated caller, never a client-supplied
@@ -86,8 +87,12 @@ exports.save = async (req, res) => {
             notifyReply(companyId, response, placement.parent, mentionIds)
                 .catch((err) => logger.error(`[comments] reply notice failed: ${err.message}`));
         }
+        const ai = response && response._id
+            ? await require("../AI/aiMention").acceptFromComment(req, companyId, response)
+                .catch((err) => { logger.error(`[ai-mention] not accepted: ${err.message}`); return null; })
+            : null;
         if (response) {
-            return res.status(200).json({ status: true, data: response || {}  });
+            return res.status(200).json({ status: true, data: response || {}, ...(ai ? { ai } : {}) });
         } else {
             return res.status(404).json({ status: false });
         }
@@ -109,7 +114,7 @@ exports.save = async (req, res) => {
 exports.update = async (req, res) => {
     try {
         const { id, isProjectComment } = req.body;
-        const data = withoutThreadState(escapeCommentFields(req.body.data));
+        const data = withoutAiFields(withoutThreadState(escapeCommentFields(req.body.data)));
 
         if (!id) {
             return res.status(400).json({

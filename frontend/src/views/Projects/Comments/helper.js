@@ -7,7 +7,13 @@ const $toast = useToast();
 const { makeUniqueId } = useCustomComposable();
 import { i18n } from "@/locales/main";
 import { isAgentComment } from "@/utils/commentSide";
+import { AI_MENTION_NOTICES } from "@/utils/aiMention";
 const t = i18n.global.t;
+
+const noticeAiMention = (ai) => {
+    const key = ai && AI_MENTION_NOTICES[ai.code];
+    if (key) $toast.info(t(key), { position: 'top-right' });
+};
 
 
 
@@ -244,6 +250,7 @@ export const sendMessage = async ({messageData, edited}) => {
                     apiRequest('post', `${env.API_COMMENTS}`, params).then((response) => {
                         if(response.data.status) {
                             const data = response.data.data
+                            noticeAiMention(response.data.ai);
                             resolve({...messageData, _id: data._id, id: data._id});
                         } else {
                             reject(new Error(response.data.message || response.data.statusText || "Comment not saved"));

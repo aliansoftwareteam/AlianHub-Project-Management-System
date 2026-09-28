@@ -115,7 +115,7 @@ describe('an AI reply in a comment thread', () => {
         wrapper = mount(CommentThread, {
             props: { message, people: [] },
             attachTo: document.getElementById('app'),
-            global: { stubs: { UserProfile: true }, mocks: { $router: router }, provide: { $userId: ref(BO), $companyId: ref('company-1') } },
+            global: { stubs: { UserProfile: true, CommentAssignment: true }, mocks: { $router: router }, provide: { $userId: ref(BO), $companyId: ref('company-1') } },
         });
         await flushPromises();
         return wrapper;

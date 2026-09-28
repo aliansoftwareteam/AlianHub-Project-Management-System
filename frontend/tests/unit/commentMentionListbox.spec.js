@@ -10,6 +10,7 @@ vi.mock('@/composable', () => composable);
 vi.mock('@/composable/index', () => composable);
 vi.mock('@/composable/index.js', () => composable);
 vi.mock('@/components/atom/UserProfile/UserProfile.vue', () => ({ default: { name: 'UserProfile', render: () => null } }));
+vi.mock('@/services', () => ({ apiRequest: vi.fn(), apiRequestWithoutCompnay: vi.fn() }));
 
 import CommentInput from '@/components/atom/CommentInput/CommentInput.vue';
 

@@ -118,6 +118,7 @@
                                 :showAll="mainChat && !projectData?.default"
                                 :userIds="users.map((x) => x.id)"
                                 :agents="mentionAgents"
+                                :aiMention="threadsOn"
                                 @enter="sendFromComposer()"
                                 :sendMessageAllowed="messageAllowed"
                                 @pasteFile="checkMedia"

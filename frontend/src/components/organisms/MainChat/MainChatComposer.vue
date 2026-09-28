@@ -53,6 +53,7 @@
                             :userIds="userIds"
                             :sendMessageAllowed="!disabled"
                             :loadingChat="false"
+                            aiMention
                             @enter="submit"
                             @pasteFile="onPasted"
                         />

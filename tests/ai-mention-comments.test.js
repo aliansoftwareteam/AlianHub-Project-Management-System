@@ -92,7 +92,7 @@ const commentBody = (message, extra = {}) => ({ body: {
     },
 } });
 const ask = async (uid, question, extra) => {
-    const r = await call(save, uid, commentBody(`@[AI](ai_ask) ${question}`), extra);
+    const r = await call(save, uid, { ...commentBody(`@[AI](ai_ask) ${question}`), ...(extra || {}) });
     await aiMention.settled();
     return r;
 };

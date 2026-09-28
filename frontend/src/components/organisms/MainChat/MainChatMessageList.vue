@@ -36,6 +36,7 @@
                     :continued="row.continued"
                     :sender-name="senderName(row.message)"
                     :sender-src="senderSrc(row.message)"
+                    :asker-name="askerName(row.message)"
                     :hour12="use12Hour"
                     @reply="$emit('reply', $event)"
                     @copy="$emit('copy', $event)"
@@ -242,6 +243,12 @@ function senderName(message) {
     const user = getUser(message.userId) || {};
     if (isFormerMember(user)) return t('MainChat.former_member');
     return user.Employee_Name || '';
+}
+
+function askerName(message) {
+    if (!message.aiAskerId) return '';
+    if (message.aiAskerId === userId.value) return t('MainChat.you');
+    return (getUser(message.aiAskerId) || {}).Employee_Name || '';
 }
 
 function typerName(id) {
