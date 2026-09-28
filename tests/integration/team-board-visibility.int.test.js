@@ -81,7 +81,7 @@ describe('GET /api/v2/agents/team shows task names and logged hours only where t
         await db.collection('tasks').updateOne({ _id: new ObjectId(sprintTask._id) }, { $set: { sprintId, sprintArray: { id: sprintId, name: 'private' }, updatedAt: new Date() } });
 
         const logged = (userId, task, project, minutes) => ({
-            LogDescription: '[QA team] log', Loggeduser: userId, TicketID: task._id, ProjectId: String(project._id),
+            LogDescription: '[QA team] log', Loggeduser: userId, TicketID: task._id, ProjectId: new ObjectId(String(project._id)),
             LogStartTime: nowSec() - 2 * MINUTE, LogEndTime: nowSec() - 2 * MINUTE + minutes * MINUTE, LogTimeDuration: minutes, logAddType: 1, trackShots: [],
         });
         await db.collection('timesheets').insertMany([
@@ -89,7 +89,7 @@ describe('GET /api/v2/agents/team shows task names and logged hours only where t
             logged(owner.uid, privateTask, hidden, 60),
             logged(member.uid, sharedTask, shared, 30),
             {
-                LogDescription: '[QA team] timer', Loggeduser: owner.uid, TicketID: privateTask._id, ProjectId: String(hidden._id),
+                LogDescription: '[QA team] timer', Loggeduser: owner.uid, TicketID: privateTask._id, ProjectId: new ObjectId(String(hidden._id)),
                 LogStartTime: nowSec(), LogEndTime: null, startTimeTracker: nowSec(), logAddType: 1, trackShots: [],
             },
         ]);
