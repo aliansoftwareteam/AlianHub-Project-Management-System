@@ -1087,7 +1087,14 @@ export default {
         "assign_skip_no_submitter": "the submitter was not signed in",
         "assign_backtest_people": "Assigns {people}",
         "assign_backtest_turns": "Takes turns between {people}",
-        "assign_assigned": "assigned {people}"
+        "assign_assigned": "assigned {people}",
+        "status_is": "is",
+        "status_is_not": "is not",
+        "status_pick": "Choose a status",
+        "status_type_default_active": "Open",
+        "status_type_active": "In progress",
+        "status_type_close": "Done",
+        "status_needs_review": "This condition names a status that doesn't exist: {status}"
     },
     "WorkflowBuilder": {
         "nav": "Workflows",

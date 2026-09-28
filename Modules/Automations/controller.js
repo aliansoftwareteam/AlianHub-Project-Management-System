@@ -14,6 +14,8 @@ const access = require('./helpers/ruleAccess');
 const { canEditProject } = require('../AIProjectGenerator/projectAccess');
 const dryRunPlan = require('./helpers/dryRun');
 const assignees = require('./engine/assignees');
+const statusConditions = require('./helpers/statusConditions');
+const { loadStatuses } = require('./helpers/projectStatuses');
 
 const NOT_FOUND = 'Not found.';
 const APPLY_REFUSED = 'You cannot edit every task this automation targets.';
@@ -47,6 +49,29 @@ const ruleForWrite = async (req, res, companyId, extraRule) => {
     }
     return { id, rule };
 };
+
+/* The statuses of the projects `uid` can open, narrowed to the rule's scope, so a
+ * status name never resolves to (or is offered from) a project the author cannot see. */
+const visibleStatuses = async (companyId, uid, scope) => {
+    const visible = (await access.visibleProjectIds(companyId, uid)).map(String);
+    const wanted = scope && scope.allProjects === false && Array.isArray(scope.projectIds) && scope.projectIds.length
+        ? visible.filter((id) => scope.projectIds.map(String).includes(id))
+        : visible;
+    return loadStatuses(companyId, wanted);
+};
+
+/* A status written by name is stored by key, resolved the way the compiler resolves
+ * it; a name that places nowhere is refused with the choices rather than saved. */
+const keyedConditions = async (companyId, uid, rule) => {
+    if (!statusConditions.hasStatusNames(rule.conditions)) return { conditions: rule.conditions, errors: [] };
+    const statuses = await visibleStatuses(companyId, uid, rule.scope);
+    const out = statusConditions.normaliseStatusConditions(rule.conditions, statuses, rule.scope, { extend: false, generic: true });
+    return { conditions: out.conditions, errors: out.errors };
+};
+
+const v1Statuses = (companyId, conditions, projectIds) => (conditions && conditions.statusType && !statusConditions.STATUS_TYPES.includes(conditions.statusType)
+    ? loadStatuses(companyId, projectIds).catch(() => [])
+    : Promise.resolve([]));
 
 const visibleOnly = async (companyId, uid, match) => ({
     $and: [match, { ProjectID: { $in: await access.visibleProjectIds(companyId, uid) } }],
@@ -128,7 +153,8 @@ exports.preview = async (req, res) => {
         const companyId = companyOf(req);
         if (!companyId) return refuse(res, 400, 'companyId is required.');
         const conditions = (req.body && req.body.conditions) || {};
-        const match = await visibleOnly(companyId, req.uid, R.buildMatch(conditions, oid));
+        const statuses = await v1Statuses(companyId, conditions, await access.visibleProjectIds(companyId, req.uid));
+        const match = await visibleOnly(companyId, req.uid, R.buildMatch(conditions, oid, statuses));
         const tasks = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [match, 'TaskName TaskKey Task_Priority', { limit: 10 }] }, 'find');
         const count = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [match] }, 'countDocuments').catch(() => null);
         return res.send({
@@ -156,8 +182,9 @@ exports.applyRule = async (req, res) => {
         // over the counter.
         if (Number(rule.version) === 2) return refuse(res, 400, V2_NOT_APPLIABLE);
         const pr = (rule.actions || []).find((a) => a.type === 'set_priority');
+        const statuses = pr ? await v1Statuses(companyId, rule.conditions) : [];
         const tasks = pr
-            ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [R.buildMatch(rule.conditions || {}, oid), 'ProjectID Task_Priority'] }, 'find')
+            ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [R.buildMatch(rule.conditions || {}, oid, statuses), 'ProjectID Task_Priority'] }, 'find')
             : [];
         const projectIds = [...new Set((tasks || []).map((t) => String(t.ProjectID)))];
         for (const projectId of projectIds) {
@@ -245,6 +272,9 @@ exports.createRuleV2 = async (req, res) => {
         if (!check.valid) return res.send({ status: false, statusText: check.errors[0], errors: check.errors });
         const denied = await access.refuseRuleWrite({ companyId, uid: req.uid, rule: check.value });
         if (denied) return refuse(res, denied.code, denied.statusText);
+        const keyed = await keyedConditions(companyId, req.uid, check.value);
+        if (keyed.errors.length) return res.send({ status: false, statusText: keyed.errors[0], errors: keyed.errors });
+        check.value.conditions = keyed.conditions;
 
         // A rule that mutates tasks the instant it is saved gives the author no chance to look at it first.
         // No lastRunCount: that counter belongs to the v1 bulk apply, and seeding it
@@ -270,9 +300,12 @@ exports.updateRuleV2 = async (req, res) => {
         if (!check.valid) return res.send({ status: false, statusText: check.errors[0], errors: check.errors });
         const target = await ruleForWrite(req, res, companyId, check.value);
         if (!target) return undefined;
+        const keyed = await keyedConditions(companyId, req.uid, check.value);
+        if (keyed.errors.length) return res.send({ status: false, statusText: keyed.errors[0], errors: keyed.errors });
+        check.value.conditions = keyed.conditions;
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AUTOMATION_RULES,
-            data: [{ _id: target.id, deletedStatusKey: { $ne: 1 } }, { $set: check.value }, { returnDocument: 'after' }],
+            data: [{ _id: target.id, deletedStatusKey: { $ne: 1 } }, { $set: check.value, $unset: { needsReview: 1 } }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
         if (!updated) return refuse(res, 404, NOT_FOUND);
         rulesChanged(companyId);
@@ -401,7 +434,8 @@ exports.dryRun = async (req, res) => {
         }, 'findOne');
         const visible = (await access.visibleProjectIds(companyId, req.uid)).map(String);
         if (!task || !visible.includes(String(task.ProjectID))) return refuse(res, 404, NOT_FOUND);
-        const plan = dryRunPlan.plan({ rule, task: task.toObject ? task.toObject() : task, uid: req.uid, triggerLabel: trigger.label });
+        const statuses = await loadStatuses(companyId, [String(task.ProjectID)]).catch(() => []);
+        const plan = dryRunPlan.plan({ rule, task: task.toObject ? task.toObject() : task, uid: req.uid, triggerLabel: trigger.label, statuses });
         await previewAssignments(companyId, rule, task, plan);
         return res.send({ status: true, statusText: plan.matched ? 'The rule would run.' : 'The rule would not run.', data: plan });
     } catch (e) { logger.error(`dryRun: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
@@ -409,11 +443,14 @@ exports.dryRun = async (req, res) => {
 
 const NAMES_PEOPLE = /\b(?:assign|reassign|unassign|rotate|take turns)\b/i;
 
-/* POST /api/v2/automations/compile  body: { sentence?, rule?, name? }
- * Deterministic, no model call: what the user reads is what the engine will run. */
+const NAMES_STATUS = /\b(?:status|marked|moved to)\b/i;
+
+/* POST /api/v2/automations/compile  body: { sentence?, rule?, name?, scope? }
+ * Deterministic, no model call: what the user reads is what the engine will run.
+ * `scope` is the builder's project choice, which status names resolve within. */
 exports.compileSentence = async (req, res) => {
     try {
-        const { sentence, rule, name } = req.body || {};
+        const { sentence, rule, name, scope } = req.body || {};
         const companyId = companyOf(req);
         if (rule && !sentence) {
             const check = V2.validateRuleV2({ name: name || 'Automation', ...rule });
@@ -425,7 +462,8 @@ exports.compileSentence = async (req, res) => {
         }
         if (!String(sentence || '').trim()) return res.send({ status: false, statusText: 'A sentence is required.' });
         const people = companyId && NAMES_PEOPLE.test(String(sentence)) ? await assignees.activePeople(companyId) : [];
-        const parsed = sentences.parseSentence(sentence, { name, people });
+        const statuses = companyId && NAMES_STATUS.test(String(sentence)) ? await visibleStatuses(companyId, req.uid, scope) : [];
+        const parsed = sentences.parseSentence(sentence, { name, people, statuses, scope });
         const check = parsed.rule ? V2.validateRuleV2(parsed.rule, { people }) : { valid: false, errors: [] };
         return res.send({
             status: true,
@@ -451,6 +489,7 @@ const backtestMatch = (node) => {
     if (node.op === 'or') return { $or: (node.args || []).map(backtestMatch).filter((m) => Object.keys(m).length) };
     const field = String(node.field || '').split('.').pop();
     if (!field) return {};
+    if (field === 'statusRef') return statusConditions.statusRefMatch(node);
     switch (node.op) {
         case 'eq': case 'changedTo': return { [field]: node.value };
         case 'neq': return { [field]: { $ne: node.value } };
@@ -473,18 +512,20 @@ exports.backtest = async (req, res) => {
         if (!companyId) return refuse(res, 400, 'companyId is required.');
         const rule = (req.body && req.body.rule) || {};
         const since = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000);
-        const conditionMatch = backtestMatch(rule.conditions);
-        const match = { deletedStatusKey: { $ne: 1 }, updatedAt: { $gte: since } };
-        if (Object.keys(conditionMatch).length) Object.assign(match, conditionMatch);
         let projectIds = await access.visibleProjectIds(companyId, req.uid);
         if (rule.scope && rule.scope.allProjects === false && (rule.scope.projectIds || []).length) {
             const wanted = new Set(rule.scope.projectIds.map(String));
             projectIds = projectIds.filter((id) => wanted.has(String(id)));
         }
+        const statuses = await loadStatuses(companyId, projectIds.map(String)).catch(() => []);
+        const conditions = statusConditions.normaliseStatusConditions(rule.conditions, statuses, rule.scope).conditions;
+        const conditionMatch = backtestMatch(conditions);
+        const match = { deletedStatusKey: { $ne: 1 }, updatedAt: { $gte: since } };
+        if (Object.keys(conditionMatch).length) Object.assign(match, conditionMatch);
         const scoped = { $and: [match, { ProjectID: { $in: projectIds } }] };
         const [count, sample] = await Promise.all([
             MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [scoped] }, 'countDocuments').catch(() => 0),
-            MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [scoped, 'TaskName TaskKey', { limit: 5, sort: { updatedAt: -1 } }] }, 'find').catch(() => []),
+            MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [scoped, 'TaskName TaskKey ProjectID statusKey', { limit: 5, sort: { updatedAt: -1 } }] }, 'find').catch(() => []),
         ]);
         const assignments = [];
         for (const step of assignees.assignStepsOf(rule)) {
@@ -498,7 +539,7 @@ exports.backtest = async (req, res) => {
                 windowDays: WINDOW_DAYS,
                 matched: Number(count) || 0,
                 assignments,
-                sample: (sample || []).map((t) => ({ id: String(t._id), key: t.TaskKey || '', name: t.TaskName || '' })),
+                sample: (sample || []).map((t) => ({ id: String(t._id), key: t.TaskKey || '', name: t.TaskName || '', status: statusConditions.statusNameOfTask(t, statuses) })),
                 basis: `tasks touched in the last ${WINDOW_DAYS} days whose current state matches these conditions`,
             },
         });

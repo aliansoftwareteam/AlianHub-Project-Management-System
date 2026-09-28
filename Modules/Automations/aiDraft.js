@@ -10,6 +10,7 @@ const { FEATURES } = require('../AICore/features');
 const { parseModelJson } = require('../AICore/modelCall');
 const { describeRule } = require('./helpers/sentenceRules');
 const { draftSchema, checkDraft } = require('./helpers/aiDraftCheck');
+const { catalogueOf } = require('./helpers/statusConditions');
 const access = require('./helpers/ruleAccess');
 
 const MAX_SENTENCE = 1000;
@@ -78,7 +79,7 @@ async function loadRefs(companyId, uid) {
     const taskTypes = (settings || []).flatMap((doc) => (Array.isArray(doc.taskTypes) ? doc.taskTypes : []))
         .filter((t) => t && !t.isDeleted && t.name).map((t) => t.name);
 
-    return { projects, people, taskTypes };
+    return { projects, people, taskTypes, statusCatalogue: catalogueOf(rows || []) };
 }
 
 /* POST /api/v2/automations/draft  body: { sentence }
