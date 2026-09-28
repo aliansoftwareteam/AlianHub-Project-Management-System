@@ -73,6 +73,7 @@ const {
     intakeItemsSchema,
     publicShareIndexSchema,
     recurringTasksSchema,
+    taskTemplatesSchema,
     remindersSchema,
     generalRemindersSchema,
     generalReminderQueueSchema,
@@ -275,6 +276,8 @@ exports.checkType = (type) => {
             return publicShareIndexSchema
         case SCHEMA_TYPE.RECURRING_TASKS:
             return recurringTasksSchema
+        case SCHEMA_TYPE.TASK_TEMPLATES:
+            return taskTemplatesSchema
         case SCHEMA_TYPE.REMINDERS:
             return remindersSchema
         case SCHEMA_TYPE.GENERAL_REMINDERS:
@@ -539,6 +542,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.PUBLIC_SHARE_INDEX}`
         case SCHEMA_TYPE.RECURRING_TASKS:
                 return `${dbCollections.RECURRING_TASKS}`
+        case SCHEMA_TYPE.TASK_TEMPLATES:
+                return `${dbCollections.TASK_TEMPLATES}`
         case SCHEMA_TYPE.REMINDERS:
                 return `${dbCollections.REMINDERS}`
         case SCHEMA_TYPE.GENERAL_REMINDERS:
