@@ -15,7 +15,7 @@
 - [ ] Two-week trial on a real sprint — folds into 019 (evals)
 - [ ] Prompt-injection regression test on the agent run path
 - [x] Evaluate `run.spendCapUsd` before the model call — done in 024 (#571)
-- [ ] Confidence floor in `verify()`
+- [x] Confidence floor in `verify()` — #1080
 
 ## Last step
 Verified remaining on 2026-09-10 against beta: no prompt-injection regression test on the run
@@ -148,3 +148,6 @@ Checked against origin/beta (64f4f507). Still open:
 
 Correction: the 180-day TTL index on `agent_runs` does exist
 (`utils/mongo-handler/createSchema.js:193`), so it is not an open item.
+
+### 2026-09-28 — confidence floor in the verifier (#1080)
+QA Review findings now carry a model-reported `confidence`. `verify()` drops the ones below the floor with the reason, after the evidence gate and before dedup. The floor is the agent's `confidenceFloor`, then the skill's (0.6), bounded to 0.3–0.9, and the API refuses values outside that range. A finding without a confidence is kept. Module: `Modules/Agents/engine/confidence.js`.
