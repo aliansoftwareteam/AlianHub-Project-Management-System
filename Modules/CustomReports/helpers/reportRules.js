@@ -1,5 +1,4 @@
-const { Types } = require('mongoose');
-const { HEX_ID } = require('../../../utils/mongo-handler/objectIdKeys');
+const { HEX_ID, idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 // REP-02 — pure custom-report config validation + Mongo pipeline builder.
 // SAFETY: only allow-listed dimensions / metrics / filter-fields ever reach the
 // database. The user's config supplies KEYS (validated against these maps) and
@@ -35,8 +34,13 @@ const LOG_MONTH = {
     $dateToString: { format: '%Y-%m', date: { $toDate: { $multiply: ['$LogStartTime', 1000] } } },
 };
 
+/* A time log's project id is stored as text until its migration turns it into an ObjectId; grouping
+   on the text form keeps one project in one row while rows hold both. A value that cannot convert
+   groups as it is. */
+const LOG_PROJECT = { $convert: { input: '$ProjectId', to: 'string', onError: '$ProjectId', onNull: null } };
+
 const LOG_DIMENSIONS = {
-    project: '$ProjectId',
+    project: LOG_PROJECT,
     person: '$Loggeduser',
     month: LOG_MONTH,
 };
@@ -97,11 +101,6 @@ const validateConfig = (cfg = {}) => {
     };
 };
 
-/* Tasks hold ids as ObjectIds and time logs hold their project id as text, the report sends ids as
-   text, and an aggregate casts neither side, so every id is matched in each stored form. */
-const idForms = (ids) => [].concat(ids === undefined || ids === null ? [] : ids)
-    .flatMap((id) => (HEX_ID.test(String(id)) ? [String(id), new Types.ObjectId(String(id))] : [id]));
-
 const ID_FILTERS = new Set(['project', 'sprint']);
 const eitherIdForm = (value) => (typeof value === 'string' && HEX_ID.test(value) ? { $in: idForms(value) } : value);
 
@@ -157,5 +156,5 @@ const buildPipeline = (cfg, { nowMs = Date.now() } = {}) => (
 module.exports = {
     SOURCES, DIMENSIONS, METRICS, FILTERS, CHART_TYPES,
     LOG_DIMENSIONS, LOG_METRICS, LOG_FILTERS, RANGES, SOURCE_SPEC,
-    validateConfig, buildPipeline, idForms,
+    validateConfig, buildPipeline,
 };
