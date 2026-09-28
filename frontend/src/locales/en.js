@@ -1086,6 +1086,7 @@ export default {
         ai_rejected: "The AI draft was not used, because it went outside what automations can do:",
         ai_draft_off: "AI is turned off, so this rule cannot be drafted with AI. Rephrase it using the shape above.",
         ai_draft_unconfigured: "No AI model is set up, so this rule cannot be drafted with AI. Rephrase it using the shape above.",
+        ai_draft_not_permitted: "AI is not included in this workspace's plan, so this rule cannot be drafted with AI. Rephrase it using the shape above.",
         ai_draft_failed: "Could not draft a rule right now.",
     },
     WorkflowBuilder: {

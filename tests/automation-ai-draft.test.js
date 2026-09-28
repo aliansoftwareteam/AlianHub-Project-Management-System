@@ -286,7 +286,7 @@ describe('who may draft, and when AI is off', () => {
         modelSays(draftOf());
         const res = await call({ body: { sentence: 'When a task becomes urgent, tell the team' } });
         expect(res.statusCode).toBe(403);
-        expect(res.body).toMatchObject({ status: false, code: aiSwitch.AI_OFF });
+        expect(res.body).toMatchObject({ status: false, code: aiSwitch.AI_OFF, aiState: 'off_workspace' });
         expect(res.body.statusText).toMatch(/turned off/i);
         expect(adapter.chat).not.toHaveBeenCalled();
         expect(ledger()).toHaveLength(0);
@@ -297,7 +297,7 @@ describe('who may draft, and when AI is off', () => {
         modelSays(draftOf());
         const res = await call({ body: { sentence: 'When a task becomes urgent, tell the team' } });
         expect(res.statusCode).toBe(403);
-        expect(res.body.code).toBe(aiSwitch.AI_OFF);
+        expect(res.body).toMatchObject({ code: aiSwitch.AI_OFF, aiState: 'off_instance' });
         expect(adapter.chat).not.toHaveBeenCalled();
     });
 });

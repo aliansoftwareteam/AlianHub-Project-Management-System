@@ -81,7 +81,7 @@ describe('Draft with AI — the fallback when the sentence compiler cannot parse
 
     beforeEach(() => {
         resetAiAvailability();
-        applyAiAvailability({ state: AI_STATE.ON });
+        applyAiAvailability({ state: AI_STATE.ON, loaded: true, planAllowsAi: true });
         apiRequest.mockReset();
         draftAnswer = () => ({ data: { status: true, data: { drafted: true, rule: DRAFTED_RULE, sentence: 'When a task priority changes to HIGH, post a comment saying "Escalated".', unmapped: [], rejected: [] } } });
         apiRequest.mockImplementation(answer);
@@ -185,7 +185,7 @@ describe('Draft with AI — the fallback when the sentence compiler cannot parse
     });
 
     it('shows a clear message when the server answers that AI is off', async () => {
-        draftAnswer = () => Promise.reject(Object.assign(new Error('403'), { response: { status: 403, data: { status: false, code: 'ai_off', statusText: 'AI is turned off for this workspace.' } } }));
+        draftAnswer = () => Promise.reject(Object.assign(new Error('403'), { response: { status: 403, data: { status: false, code: 'ai_off', aiState: 'off_workspace', statusText: 'AI is turned off for this workspace.' } } }));
         wrapper = await open();
         await typeSentence(wrapper, UNPARSED);
         await wrapper.find('[data-test="ai-draft"]').trigger('click');

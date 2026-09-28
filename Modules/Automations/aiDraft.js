@@ -94,7 +94,7 @@ async function draftHandler(req, res) {
         if (sentence.length > MAX_SENTENCE) return res.status(400).send({ status: false, statusText: `A sentence may be at most ${MAX_SENTENCE} characters.` });
 
         await aiSwitch.assertAllowed(companyId);
-        if (!llmProvider.isAnyProviderConfigured()) return res.send({ status: false, code: 'ai_unconfigured', statusText: UNCONFIGURED });
+        if (!llmProvider.isAnyProviderConfigured()) return res.send({ status: false, aiState: aiSwitch.STATE.UNCONFIGURED, statusText: UNCONFIGURED });
 
         const answer = await askModel({ companyId, uid: req.uid, sentence });
         const parsed = parseModelJson(answer && answer.content);
@@ -112,7 +112,10 @@ async function draftHandler(req, res) {
             },
         });
     } catch (error) {
-        if (aiSwitch.isAiOff(error)) return res.status(403).send({ status: false, code: aiSwitch.AI_OFF, statusText: error.message });
+        if (aiSwitch.isAiOff(error)) {
+            const aiState = error.scope === 'instance' ? aiSwitch.STATE.OFF_INSTANCE : aiSwitch.STATE.OFF_WORKSPACE;
+            return res.status(403).send({ status: false, code: aiSwitch.AI_OFF, aiState, statusText: error.message });
+        }
         logger.error(`automation ai draft: ${error && error.message ? error.message : error}`);
         return res.send({ status: false, code: (error && error.code) || undefined, statusText: error && error.code ? error.message : FAILED });
     }

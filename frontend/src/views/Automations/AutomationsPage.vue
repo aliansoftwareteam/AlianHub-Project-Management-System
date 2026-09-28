@@ -45,31 +45,7 @@
                     <li v-for="(e, i) in errors" :key="i">{{ e }}</li>
                 </ul>
 
-                <div v-if="aiDraftOffered" class="au__ai" aria-live="polite">
-                    <p v-if="aiBlockedKey" class="ah-small au__ai-off" data-test="ai-draft-off">{{ $t(aiBlockedKey) }}</p>
-                    <template v-else>
-                        <p class="ah-small au__ai-offer">{{ $t('Automations.ai_draft_offer') }}</p>
-                        <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="ai-draft" :disabled="aiDrafting" :aria-busy="aiDrafting" @click="draftWithAi">
-                            <ShellIcon name="ai" :size="14" class="au__spark" />{{ aiDrafting ? $t('Automations.ai_drafting') : $t('Automations.ai_draft_button') }}
-                        </button>
-                    </template>
-                </div>
-                <p v-if="aiError" class="ah-field__error" role="alert">{{ aiError }}</p>
-                <ul v-if="aiUnmapped.length" class="au__ai-unmapped">
-                    <li v-for="(u, i) in aiUnmapped" :key="i" data-test="ai-unmapped">
-                        {{ u.reason ? $t('Automations.ai_unmapped', { text: u.text, reason: u.reason }) : $t('Automations.ai_unmapped_no_reason', { text: u.text }) }}
-                    </li>
-                </ul>
-                <div v-if="aiRejected.length" class="au__errors" data-test="ai-rejected">
-                    <p class="au__ai-rejected-title">{{ $t('Automations.ai_rejected') }}</p>
-                    <ul>
-                        <li v-for="(r, i) in aiRejected" :key="i">{{ r }}</li>
-                    </ul>
-                </div>
-                <div v-if="aiDrafted" ref="aiBanner" class="au__ai-banner" role="status" tabindex="-1" data-test="ai-draft-banner">
-                    <strong>{{ $t('Automations.ai_draft_banner') }}</strong>
-                    <span class="ah-small">{{ $t('Automations.ai_draft_banner_sub') }}</span>
-                </div>
+                <AutomationAiDraft :key="aiKey" :sentence="sentence" :failed="sentenceFailed" @drafted="applyAiDraft" />
 
                 <div class="au__compiled">
                     <div class="ah-label">{{ $t('Parity.compiled_rule') }}</div>
@@ -217,8 +193,8 @@ import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
-import { AI_STATE, aiAvailability, aiOff } from '@/composable/aiAvailability';
 import RunHistoryDrawer from './RunHistoryDrawer.vue';
+import AutomationAiDraft from './AutomationAiDraft.vue';
 
 // Automations (handoff 13d). You describe the rule in a sentence; the compiled
 // rule sits beside it and either can be edited. The compiler is a deterministic
@@ -249,13 +225,7 @@ const dryRunning = ref(false);
 const dryRunResult = ref(null);
 const dryRunError = ref('');
 const sentenceFailed = ref(false);
-const aiDrafting = ref(false);
-const aiDrafted = ref(false);
-const aiBanner = ref(null);
-const aiUnmapped = ref([]);
-const aiRejected = ref([]);
-const aiError = ref('');
-const aiServerCode = ref('');
+const aiKey = ref(0);
 
 /* The sentence the server last wrote or read. Recompiling it on blur would
  * re-parse a canonical sentence that cannot express every drafted condition
@@ -290,12 +260,6 @@ const { t } = useI18n();
 const canManage = computed(() => [1, 2].includes(Number(getters['settings/companyUserDetail']?.roleType)));
 const activeCount = computed(() => rules.value.filter((r) => r.enabled).length);
 const triggerDef = computed(() => manifest.triggers.find((t) => t.key === draft.trigger.event) || null);
-const aiDraftOffered = computed(() => sentenceFailed.value);
-const aiBlockedKey = computed(() => {
-    if (aiOff.value || aiServerCode.value === 'ai_off') return 'Automations.ai_draft_off';
-    if (aiAvailability.state === AI_STATE.UNCONFIGURED || aiServerCode.value === 'ai_unconfigured') return 'Automations.ai_draft_unconfigured';
-    return '';
-});
 
 // The same check the server runs, surfaced while the user is still typing: a
 // "changed to" condition on a trigger with no before/after can never match.
@@ -377,11 +341,7 @@ const applyRule = (rule) => {
 
 const clearAiDraft = () => {
     sentenceFailed.value = false;
-    aiDrafted.value = false;
-    aiUnmapped.value = [];
-    aiRejected.value = [];
-    aiError.value = '';
-    aiServerCode.value = '';
+    aiKey.value += 1;
 };
 
 /* sentence → rule */
@@ -394,14 +354,8 @@ const compileSentence = async () => {
     errors.value = body.data.errors || [];
     ambiguities.value = body.data.ambiguities || [];
     grammar.value = body.data.grammar || {};
-    if (errors.value.length) {
-        aiUnmapped.value = [];
-        aiRejected.value = [];
-        aiError.value = '';
-        sentenceFailed.value = true;
-    } else {
-        clearAiDraft();
-    }
+    if (errors.value.length) sentenceFailed.value = true;
+    else clearAiDraft();
     if (body.data.rule) {
         applyRule(body.data.rule);
         sentence.value = body.data.sentence;
@@ -409,42 +363,15 @@ const compileSentence = async () => {
     settledSentence = body.data.rule ? body.data.sentence : asked;
 };
 
-/* Only a sentence the compiler could not read is sent to the model, and the
- * draft only fills the builder: saving stays the person's own step. */
-const draftWithAi = async () => {
-    if (aiDrafting.value || aiBlockedKey.value) return;
-    aiDrafting.value = true;
-    aiError.value = '';
-    aiUnmapped.value = [];
-    aiRejected.value = [];
-    try {
-        const body = (await apiRequest('post', env.AUTOMATIONS_AI_DRAFT, { sentence: sentence.value }))?.data;
-        if (!body?.status) {
-            if (body?.code === 'ai_unconfigured' || body?.code === 'ai_off') aiServerCode.value = body.code;
-            else aiError.value = body?.statusText || t('Automations.ai_draft_failed');
-            return;
-        }
-        const data = body.data || {};
-        aiUnmapped.value = data.unmapped || [];
-        aiRejected.value = data.rejected || [];
-        if (!data.rule) return;
-        applyRule(data.rule);
-        sentence.value = data.sentence;
-        settledSentence = data.sentence;
-        errors.value = [];
-        ambiguities.value = [];
-        backtest.value = null;
-        sentenceFailed.value = false;
-        aiDrafted.value = true;
-        await nextTick();
-        if (aiBanner.value) aiBanner.value.focus();
-    } catch (e) {
-        const data = e?.response?.data;
-        if (data?.code === 'ai_off') aiServerCode.value = 'ai_off';
-        else aiError.value = data?.statusText || t('Automations.ai_draft_failed');
-    } finally {
-        aiDrafting.value = false;
-    }
+/* The draft only fills the builder: saving stays the person's own step. */
+const applyAiDraft = ({ rule, sentence: drafted }) => {
+    applyRule(rule);
+    sentence.value = drafted;
+    settledSentence = drafted;
+    errors.value = [];
+    ambiguities.value = [];
+    backtest.value = null;
+    sentenceFailed.value = false;
 };
 
 /* rule → sentence, so editing a slot rewrites the sentence above it. */
