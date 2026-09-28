@@ -269,6 +269,7 @@ import { routeTasks, routingTotals } from "./agentFit";
 import { refusalText } from "./fitText";
 import { backlogRead, readLineKey, skillReach } from "./backlogRead";
 import { messageKey } from "./askWhy";
+import { takeAskHandoff } from "@/components/molecules/AdvanceSearch/askHandoff";
 
 defineOptions({ name: "AskPage" });
 
@@ -291,7 +292,7 @@ const mode = ref("ask");
 const projectId = ref("");
 const busy = ref(false);
 const error = ref("");
-const answer = ref({});
+const answer = ref(takeAskHandoff(question.value) || {});
 const sources = ref({});
 const models = ref([]);
 const loading = ref(true);

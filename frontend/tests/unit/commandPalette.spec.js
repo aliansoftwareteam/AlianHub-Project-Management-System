@@ -28,6 +28,7 @@ import { commandLeads, relativeAge, taskLocation } from '@/components/molecules/
 import { closeQuickCreate, quickCreate } from '@/components/organisms/QuickCreateTask/quickCreateTask';
 import { bindRouter, closeTask, isExpanded, overlayState, registerTaskSequence } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { taskNavAttrs } from '@/components/organisms/TaskDetailOverlay/taskNavigation';
+import { applyAiAvailability, resetAiAvailability } from '@/composable/aiAvailability';
 
 const DAY = 24 * 60 * 60 * 1000;
 const twoDaysAgo = new Date(Date.now() - 2 * DAY - 60 * 1000).toISOString();
@@ -101,6 +102,8 @@ beforeEach(() => {
 
 afterEach(() => {
     mounted.splice(0).forEach((w) => w.unmount());
+    resetAiAvailability();
+    sessionStorage.clear();
 });
 
 describe('the palette shortcut', () => {
@@ -427,5 +430,133 @@ describe('the "New project" command', () => {
     it('does not use the command\'s own words as the name', async () => {
         await runNewProject('new proj');
         expect(router.push).toHaveBeenCalledWith({ name: 'Projects', params: { cid: 'company-1' }, query: { create: 'project', name: undefined } });
+    });
+});
+
+describe('asking AI inside the palette', () => {
+    const CITED = [
+        { kind: 'task', id: 't1', ref: 'AH-1', title: 'Budget plan', project: 'Budget ops', projectId: 'p1' },
+        { kind: 'page', id: 'd1', ref: 'page:0000d1', title: 'Budget wiki', project: 'Budget ops', projectId: 'p1' }
+    ];
+    const ANSWER = { configured: true, mode: 'ask', answer: 'The budget is on track [AH-1], see [page:0000d1].', cited: CITED, sources: CITED, usage: { model: 'gpt-test', tokens: 42 } };
+    const serveAsk = (reply) => {
+        const signals = [];
+        apiRequest.mockImplementation((type, url, body, dataType, options) => {
+            if (type === 'post' && url === '/api/v1/ai/ask') { signals.push(options && options.signal); return reply(); }
+            if (type === 'post' && url === '/api/v2/search') return ok({ tasks: [TASK], projects: [], pages: [], comments: [] });
+            return ok([]);
+        });
+        return signals;
+    };
+    const askRow = (wrapper) => options(wrapper).find((o) => o.attributes('data-kind') === 'ask');
+    const pressAsk = async (wrapper) => {
+        await askRow(wrapper).trigger('mouseenter');
+        await key(wrapper, { key: 'Enter' });
+        await flushPromises();
+    };
+    const answerRegion = (wrapper) => wrapper.find('[aria-live="polite"]');
+    const escape = (wrapper) => wrapper.find('[role="dialog"]').trigger('keydown', { key: 'Escape' });
+
+    it('answers in the palette on Enter, with the model and the cited task and doc as rows', async () => {
+        serveAsk(() => ok(ANSWER));
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper, 'budget');
+        await pressAsk(wrapper);
+
+        expect(apiRequest).toHaveBeenCalledWith('post', '/api/v1/ai/ask', { question: 'budget', mode: 'ask' }, undefined, expect.objectContaining({ signal: expect.anything() }));
+        expect(router.push).not.toHaveBeenCalled();
+        expect(wrapper.emitted('close')).toBeFalsy();
+        expect(answerRegion(wrapper).text()).toContain('The budget is on track');
+        expect(answerRegion(wrapper).text()).toContain('gpt-test');
+
+        const sources = options(wrapper).filter((o) => o.attributes('data-kind') === 'source');
+        expect(sources.map((o) => o.text())).toEqual([expect.stringContaining('Budget plan'), expect.stringContaining('Budget wiki')]);
+        expect(kinds(wrapper)).toContain('continue');
+        expect(activeOption(wrapper).attributes('data-kind')).toBe('source');
+        const cont = options(wrapper).find((o) => o.attributes('data-kind') === 'continue');
+        expect(wrapper.find(`#${cont.attributes('aria-describedby')}`).text()).toContain('The budget is on track');
+    });
+
+    it('opens, copies and opens in a new tab a cited source with the usual row keys', async () => {
+        serveAsk(() => ok(ANSWER));
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper, 'budget');
+        await pressAsk(wrapper);
+
+        expect(activeOption(wrapper).attributes('data-kind')).toBe('source');
+        await key(wrapper, { key: 'Tab' });
+        const toolbar = wrapper.find('[role="toolbar"]');
+        expect(toolbar.exists()).toBe(true);
+        await toolbar.find('button[aria-label="Palette.action_copy"]').trigger('click');
+        await flushPromises();
+        expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('task=t1'));
+
+        await key(wrapper, { key: 'ArrowDown' });
+        await key(wrapper, { key: 'Enter', metaKey: true });
+        expect(window.open).toHaveBeenCalledWith(expect.stringContaining('/named/PageEditor'), '_blank', expect.stringContaining('noopener'));
+
+        await key(wrapper, { key: 'ArrowUp' });
+        await key(wrapper, { key: 'Enter' });
+        expect(router.push).toHaveBeenCalledWith({ query: { task: 't1' } });
+        expect(wrapper.emitted('close')).toBeTruthy();
+    });
+
+    it('shows a loading state, and Esc cancels the request before a second Esc closes', async () => {
+        const signals = serveAsk(() => new Promise(() => {}));
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper, 'budget');
+        await pressAsk(wrapper);
+
+        expect(answerRegion(wrapper).attributes('aria-busy')).toBe('true');
+        expect(answerRegion(wrapper).text()).toContain('Palette.ask_loading');
+
+        await escape(wrapper);
+        expect(signals[0].aborted).toBe(true);
+        expect(wrapper.emitted('close')).toBeFalsy();
+        expect(wrapper.find('.pal__answer').exists()).toBe(false);
+        expect(kinds(wrapper)).toContain('ask');
+
+        await escape(wrapper);
+        expect(wrapper.emitted('close')).toBeTruthy();
+    });
+
+    it('drops the answer when the query changes', async () => {
+        const signals = serveAsk(() => new Promise(() => {}));
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper, 'budget');
+        await pressAsk(wrapper);
+        await typeQuery(wrapper, 'budget plan');
+        expect(signals[0].aborted).toBe(true);
+        expect(wrapper.find('.pal__answer').exists()).toBe(false);
+        expect(kinds(wrapper)).toContain('task');
+    });
+
+    it('continues in Ask with the question, handing the answer over so the page does not ask again', async () => {
+        serveAsk(() => ok(ANSWER));
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper, 'budget');
+        await pressAsk(wrapper);
+
+        await options(wrapper).find((o) => o.attributes('data-kind') === 'continue').trigger('click');
+        expect(router.push).toHaveBeenCalledWith({ name: 'AiAsk', params: { cid: 'company-1' }, query: { q: 'budget' } });
+        const handoff = JSON.parse(sessionStorage.getItem('alianhub.ask.handoff'));
+        expect(handoff).toMatchObject({ question: 'budget', answer: { answer: ANSWER.answer } });
+    });
+
+    it('explains a failed answer in words, not the server\'s raw message', async () => {
+        serveAsk(() => Promise.resolve({ data: { status: false, statusText: 'TypeError: cannot read properties of undefined' } }));
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper, 'budget');
+        await pressAsk(wrapper);
+        expect(answerRegion(wrapper).text()).toContain('Palette.ask_failed');
+        expect(answerRegion(wrapper).text()).not.toContain('TypeError');
+        expect(kinds(wrapper)).toContain('continue');
+    });
+
+    it('offers no Ask row while AI is off', async () => {
+        applyAiAvailability({ state: 'off_workspace' });
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper, 'budget');
+        expect(kinds(wrapper)).not.toContain('ask');
     });
 });
