@@ -1,98 +1,54 @@
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration,validateObjectId } = require("../../../utils/mongo-handler/mongoQueries");
-const scrumRules = require("../../Sprints/scrumRules");
 const { recordSprintFavourite } = require("../../Sprints/helpers/sprintHistory");
 const logger = require("../../../Config/loggerConfig");
+
+const FAVOURITE_OPERATORS = ['$addToSet', '$pull'];
+
+const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+const hasOnly = (object, key) => isPlainObject(object) && Object.keys(object).length === 1 && key in object;
+
+/* The sprint list's star is the one client of this route: it adds or removes the caller's own entry. */
+const ownFavourite = ({ key, updateObject } = {}, uid) => {
+    if (!FAVOURITE_OPERATORS.includes(key) || !hasOnly(updateObject, 'favouriteTasks')) return null;
+    const entry = updateObject.favouriteTasks;
+    if (!hasOnly(entry, 'userId') || String(entry.userId) !== String(uid)) return null;
+    return { key, entry: { userId: String(uid) } };
+};
+
+/* A pipeline rather than $addToSet: older sprints store favouriteTasks as something other than an array. */
+const addFavourite = (entry) => [
+    { $set: { favouriteTasks: { $cond: { if: { $isArray: '$favouriteTasks' }, then: { $concatArrays: ['$favouriteTasks', [entry]] }, else: [entry] } } } },
+    { $set: { favouriteTasks: { $setUnion: ['$favouriteTasks'] } } },
+];
 
 exports.updateSprint = async(req,res) => {
     try {
         const sprintId = req.params.id;
 
-        if (!(req.body && req.body.updateObject)) {
-            return res.status(400).json({message: 'Update Object is Required'});
-        }
-
         if (!validateObjectId(sprintId)) {
             return res.status(400).json({ message: "Invalid sprint ID" });
         }
 
-        // Same hole as PATCH /api/v1/sprint/:id: the update document arrives
-        // from the client and is applied as given, under a caller-chosen
-        // operator. The only thing that reaches here today is favouriting a
-        // sprint, so refusing the lifecycle fields costs nothing and stops the
-        // state machine being sidestepped through the back door.
-        const lifecycleField = scrumRules.findLifecycleWrite(req.body.updateObject);
-        if (lifecycleField) {
-            return res.status(400).json({
-                message: `"${lifecycleField}" is managed by the sprint lifecycle. Use the start or complete action instead.`,
-            });
+        const favourite = ownFavourite(req.body, req.uid);
+        if (!favourite) {
+            return res.status(400).json({ status: false, message: 'Only your own favourite can be added or removed here.' });
         }
 
-        let key;
-        let data;
-        if (req.body.key) {
-            key = req.body.key;
-            if (key == '$addToSet') {
-                let fieldName = Object.keys(req.body.updateObject)[0];
-                let fieldValue = req.body.updateObject[fieldName];
-
-                data = [
-                    { _id: sprintId },
-                    [
-                        {
-                            $set: {
-                                [fieldName]: {
-                                $cond: {
-                                    if: { $isArray: `$${fieldName}` },
-                                    then: { $concatArrays: [`$${fieldName}`, [fieldValue]] },
-                                    else: [fieldValue]
-                                }
-                                }
-                            }
-                        },
-                        {
-                            $set: {
-                                [fieldName]: { $setUnion: [`$${fieldName}`] }
-                            }
-                        }
-                    ],
-                    {returnDocument: 'after'},
-                ];
-            } else {
-               data =  [
-                    { _id: sprintId },
-                    {   
-                        [key]: req.body.updateObject
-                    },
-                    {returnDocument: 'after'},
-                ]
-            }
-        } else {
-            key = '$set'
-            data =  [
-                { _id: sprintId }, 
-                {   
-                    [key]: req.body.updateObject
-                },
-                {returnDocument: 'after'},
-            ]
-        }
-        
+        const { key, entry } = favourite;
+        const updateObject = { favouriteTasks: entry };
         const companyId = req.headers['companyid'];
-        const previous = req.body.updateObject.favouriteTasks
-            ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: sprintId }] }, 'findOne').catch(() => null)
-            : null;
-        let mongoObj = {
+        const previous = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: sprintId }] }, 'findOne').catch(() => null);
+        const sprint = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.SPRINTS,
-            data: data
-        }
-        const sprint = await MongoDbCrudOpration(companyId, mongoObj, 'findOneAndUpdate');
+            data: [{ _id: sprintId }, key === '$addToSet' ? addFavourite(entry) : { $pull: updateObject }, { returnDocument: 'after' }],
+        }, 'findOneAndUpdate');
 
         if (!sprint) {
             return res.status(400).json({ message: "sprint not updated" });
         }
 
-        recordSprintFavourite({ companyId, previous, updateObject: req.body.updateObject, key, actorId: req.uid })
+        recordSprintFavourite({ companyId, previous, updateObject, key, actorId: req.uid })
             .catch((error) => logger.error(`sprint favourite history failed: ${(error && error.message) || error}`));
         return res.status(200).json(sprint);
     } catch (error) {
