@@ -129,7 +129,7 @@
                 <div v-if="agentRun" class="agent-strip">
                     <span class="agent-strip__dot"></span>
                     <span class="agent-strip__name">{{ agentRun.agentName }} · {{ runClock }}</span>
-                    <span v-if="agentRun.skill" class="agent-strip__meta">{{ agentRun.skill }}</span>
+                    <span v-if="agentRun.skill" class="agent-strip__meta">{{ skillLabel(t, agentRun.skill) }}</span>
                 </div>
                 <div v-else-if="agentProposal" class="agent-proposal">
                     <span class="agent-proposal__who">✦ {{ agentProposal.agentName }}:</span> {{ agentProposal.what }}
@@ -259,6 +259,7 @@
     import ConvertToList from '@/components/molecules/ConvertToList/ConvertToList.vue';
     import DueDateCompo from '@/components/molecules/DueDateCompo/DueDateCompo.vue';
     import { useI18n } from "vue-i18n";
+    import { skillLabel } from "@/views/Ai/plainLabels";
     import { useTimer } from "@/components/molecules/Home/useTimer";
     import { permittedAssignees, selfAssignable } from "@/utils/assigneeOptions";
     const { t } = useI18n();

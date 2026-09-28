@@ -23,7 +23,7 @@
                         <div class="ai-agent__top">
                             <div class="ai-agent__id">
                                 <div class="ai-agent__name">
-                                    <strong>{{ skill.name }}</strong>
+                                    <strong>{{ skillLabel(t, skill) }}</strong>
                                     <span class="ah-chip ah-chip--mono ah-chip--sm">{{ skill.key }}</span>
                                     <span class="ah-chip ah-chip--sm" :class="skill.source === 'data' ? 'ah-chip--brand' : ''">
                                         {{ skill.source === 'data' ? $t('Ai.skill_source_yours') : $t('Ai.skill_source_builtin') }}
@@ -33,7 +33,7 @@
                                     <span v-else-if="skill.enabled === false" class="ah-chip ah-chip--sm">{{ $t('Ai.off') }}</span>
                                     <span v-if="skill.unavailable" class="ah-chip ah-chip--sm ah-chip--warn">{{ $t('Ai.skill_unavailable') }}</span>
                                 </div>
-                                <p class="ai-agent__scope">{{ skill.description || $t('Ai.skill_no_description') }}</p>
+                                <p class="ai-agent__scope">{{ skillAbout(t, skill) || $t('Ai.skill_no_description') }}</p>
                             </div>
                         </div>
 
@@ -41,7 +41,7 @@
                         <p class="ah-small sk-lib__needs">{{ $t('Ai.skill_needs', { what: $t(`Ai.req_${skill.requires ? skill.requires.code : 'task'}`) }) }}</p>
 
                         <div class="ai-agent__skills">
-                            <span v-for="action in skill.emits" :key="action" class="ah-chip ah-chip--mono ah-chip--sm">{{ action }}</span>
+                            <span v-for="action in skill.emits" :key="action" class="ah-chip ah-chip--sm" :title="action">{{ actionLabel(t, action, actions) }}</span>
                         </div>
 
                         <div class="ai-agent__foot">
@@ -90,7 +90,7 @@
                     <div class="ah-label">{{ $t('Ai.never_available') }}</div>
                     <p class="ai-lead sk-lib__note">{{ $t('Ai.never_note') }}</p>
                     <div class="ai-agent__skills">
-                        <span v-for="key in never" :key="key" class="ah-chip ah-chip--danger ah-chip--mono">{{ key }}</span>
+                        <span v-for="key in never" :key="key" class="ah-chip ah-chip--danger" :title="key">{{ actionLabel(t, key) }}</span>
                     </div>
                 </div>
 
@@ -120,6 +120,7 @@
 
 <script setup>
 import { computed, inject, onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
 import SkillEditor from "./SkillEditor.vue";
@@ -128,11 +129,13 @@ import RunTaskPicker from "./RunTaskPicker.vue";
 import { useAgents, reasonOf } from "./useAgents";
 import { useAgentAccess } from "./agentAccess";
 import { mcpAddCommand } from "./mcpUrl";
+import { actionLabel, skillAbout, skillLabel } from "./plainLabels";
 import { apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
 
 defineOptions({ name: "SkillLibraryPage" });
 
+const { t } = useI18n();
 const companyId = inject("$companyId");
 const { registryManifest, skillManifest, loadRegistry, loadSkills, loadCatalogues, loadSkill, retireSkill, dryRunSkill } = useAgents();
 const { canManage } = useAgentAccess();

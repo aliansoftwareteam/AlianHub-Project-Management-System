@@ -20,6 +20,10 @@
                                 {{ $t(tab.label) }}<span v-if="tab.count" class="ai-side__count ah-mono">{{ tab.count }}</span>
                             </button>
                         </div>
+                        <select v-if="view !== 'approvals' && proposals.length > 1" v-model="sortOrder" class="ah-input ai-inbox__sort" :aria-label="$t('Ai.sort_by')" data-test="inbox-sort">
+                            <option value="newest">{{ $t('Ai.sort_newest') }}</option>
+                            <option value="oldest">{{ $t('Ai.sort_oldest') }}</option>
+                        </select>
                     </div>
 
                     <template v-if="view === 'approvals'">
@@ -46,7 +50,7 @@
                     <EmptyState v-else-if="!proposals.length" :title="$t(view === 'done' ? 'Ai.empty_done_title' : 'Ai.empty_declined_title')" :message="$t(view === 'done' ? 'Ai.empty_done_body' : 'Ai.empty_declined_body')" />
 
                     <button
-                        v-for="p in proposals"
+                        v-for="p in sortedProposals"
                         v-else
                         :key="p._id"
                         type="button"
@@ -56,12 +60,13 @@
                     >
                         <div class="ai-item__top">
                             <span class="ai-item__agent">{{ p.agentName }}</span>
-                            <span v-if="p.gate" class="ah-chip ah-chip--warn ah-chip--mono">{{ $t('Ai.gated') }}</span>
+                            <span v-if="p.gate" class="ah-chip ah-chip--warn" data-test="proposal-gate">{{ gateChip(p.gate) }}</span>
                             <span v-if="p.taint" class="ah-chip ah-chip--warn ah-chip--mono" data-test="proposal-tainted">{{ $t('Audit.tainted') }}</span>
                             <span v-if="p.status !== 'pending'" class="ah-chip ah-chip--mono">{{ $t(`Ai.status_${p.status}`) }}</span>
+                            <span v-if="waitingDaysOf(p)" class="ah-chip ah-chip--warn" data-test="proposal-waiting">{{ t('Ai.waiting_days', { n: waitingDaysOf(p) }, waitingDaysOf(p)) }}</span>
                             <span class="ai-item__time ah-mono">{{ shortTime(p.createdAt) }}</span>
                         </div>
-                        <div class="ai-item__what">{{ p.what }}</div>
+                        <div class="ai-item__what">{{ proposalTitle(t, p) }}</div>
                         <div class="ai-item__why">{{ p.why }}</div>
                     </button>
                 </div>
@@ -95,7 +100,7 @@
                         <span v-if="selectedSkillSource">· <span data-test="proposal-skill-source">{{ selectedSkillSource }}</span></span>
                         <span>· {{ shortTime(selected.createdAt) }}</span>
                     </div>
-                    <h2 class="ai-detail__what">{{ selected.what }}</h2>
+                    <h2 class="ai-detail__what">{{ proposalTitle(t, selected) }}</h2>
 
                     <div class="ah-label">{{ $t('Ai.why') }}</div>
                     <p class="ai-detail__why">{{ selected.why }}</p>
@@ -165,6 +170,7 @@ import { useAgents, reasonOf } from "./useAgents";
 import { DECLINE_REASONS } from "./episodeText";
 import { taintSourcesLine, taintSourcesOf } from "./taintText";
 import { skillSourceLabel } from "./skillSourceText";
+import { proposalTitle, sortProposals, waitingDaysOf } from "./plainLabels";
 import { useAgentAccess } from "./agentAccess";
 
 defineOptions({ name: "AiInboxPage" });
@@ -188,6 +194,7 @@ const {
 } = useWorkflowApprovals();
 
 const view = ref("pending");
+const sortOrder = ref("newest");
 const loading = ref(true);
 const loadError = ref("");
 const selected = ref(null);
@@ -211,6 +218,8 @@ const declineReasonValue = computed(() => declineReason.value || declineNote.val
 const canDecide = computed(() => !selected.value || selected.value.gate !== GATE_OWNER_ADMIN || canManage.value);
 const taintLine = (marker) => taintSourcesLine(t, taintSourcesOf(marker));
 const selectedSkillSource = computed(() => skillSourceLabel(t, selected.value?.skillSource));
+const sortedProposals = computed(() => sortProposals(proposals.value, sortOrder.value));
+const gateChip = (gate) => t(gate === GATE_OWNER_ADMIN ? "Ai.gate_chip_owner_admin" : "Ai.gate_chip");
 
 const tabs = computed(() => [
     { key: "pending", label: "Ai.waiting", count: counts.value.waiting || 0 },
@@ -363,6 +372,7 @@ onMounted(() => Promise.all([reload(), loadApprovals()]));
 @import "./style.css";
 @import "./workflow.css";
 .ai-back { display: none; }
+.ai-inbox__sort { width: auto; height: 28px; margin-top: 8px; }
 @media (max-width: 900px) { .ai-back { display: inline-flex; margin-bottom: 10px; } }
 .ai-decline { margin-top: 18px; padding: 12px 14px; border: 1px solid var(--hairline); border-radius: 9px; background: var(--surface); display: flex; flex-direction: column; gap: 8px; }
 .ai-decline__lead { margin: 0; }
