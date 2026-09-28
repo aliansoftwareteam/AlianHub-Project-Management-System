@@ -1794,6 +1794,47 @@ const schema = {
         turnCount: { type: Number, required: false, default: 0 },
         lastTurnAt: { type: Date, required: false },
     },
+    // Who a project's AI assignment rules name, and when (Modules/AssignmentRules). One row per project.
+    assignmentRules: {
+        projectId: { type: String, required: true },
+        entries: {
+            type: [{
+                _id: false,
+                userId: { type: String, required: true },
+                when: { type: String, required: true },
+            }],
+            default: [],
+            required: false,
+        },
+        fallbackUserId: { type: String, required: false, default: null },
+        onCreate: { type: Boolean, required: false, default: true },
+        onChange: { type: Boolean, required: false, default: false },
+        mode: { type: String, required: false, default: 'suggest' },
+        revision: { type: Number, required: false, default: 1 },
+        updatedBy: { type: String, required: false },
+        updatedAt: { type: Date, required: false },
+    },
+    // One decision per task revision: what the rules chose, why, and what became of it. `inputHash` covers the task text
+    // and the rule revision, so the same task is never decided twice for the same input.
+    assignmentDecisions: {
+        taskId: { type: String, required: true },
+        projectId: { type: String, required: true },
+        inputHash: { type: String, required: true },
+        trigger: { type: String, required: false, default: 'create' },
+        state: { type: String, required: true },
+        mode: { type: String, required: false, default: 'suggest' },
+        userId: { type: String, required: false, default: null },
+        source: { type: String, required: false, default: null },
+        rejectedUserId: { type: String, required: false, default: null },
+        reason: { type: String, required: false, default: '' },
+        model: { type: String, required: false, default: '' },
+        rulesRevision: { type: Number, required: false, default: 0 },
+        rulesBy: { type: String, required: false, default: '' },
+        resolvedBy: { type: String, required: false, default: '' },
+        resolvedAt: { type: Date, required: false },
+        createdAt: { type: Date, required: false },
+        updatedAt: { type: Date, required: false },
+    },
     // One person's AI memory (Modules/AI/aiProfile): private to ownerId, admins included, and read only into
     // prompts that person starts.
     aiProfiles: {

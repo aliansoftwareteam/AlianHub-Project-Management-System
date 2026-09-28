@@ -27,6 +27,12 @@
                 v-if="checkPermission('project.project_details',projectData.isGlobalPermission) === true && projectData?._id && !projectData.isPersonal"
                 :projectId="String(projectData._id)"
             />
+            <AssignmentRulesCard
+                v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
+                :projectId="String(projectData._id)"
+                :candidates="assignmentCandidates"
+                :canEdit="checkPermission('project.project_details',projectData.isGlobalPermission) === true"
+            />
             <CheckListComponent
                 v-if="checkPermission('project.project_checklist',projectData.isGlobalPermission) !== null"
                 :data="checkList"
@@ -92,6 +98,7 @@
     import Description  from '@/components/atom/Description/Description.vue';
     import ProjectMemoryCard from './ProjectMemoryCard.vue';
     import ProjectDefaultTemplateCard from './ProjectDefaultTemplateCard.vue';
+    import AssignmentRulesCard from './AssignmentRulesCard.vue';
     import Attachments from '@/components/atom/Attachments/Attachments.vue';
     import FixMilestone from '@/components/organisms/FixMilestone/FixMilestone.vue';
     import HourlyMilestone from '@/components/organisms/HourlyMilestone/HourlyMilestone.vue';
@@ -101,7 +108,7 @@
     import * as env from '@/config/env';
     import { apiRequest, apiRequestWithoutCompnay } from '../../../services'
     import Swal from 'sweetalert2';
-    import { useCustomComposable } from '@/composable';
+    import { useCustomComposable, useGetterFunctions } from '@/composable';
     import {storageQueryBuilder,generateFileName} from '@/utils/storageQueryBuild.js';
     import { buildCloudAttachment, isCloudAttachment, cloudTypeOf, CLOUD_PROVIDERS } from '@/utils/cloudAttachment';
     import { importCloudFile } from '@/composable/cloudPicker';
@@ -124,6 +131,17 @@
     const { checkPermission, makeUniqueId, checkApps, getAppState, checkBucketStorage } = useCustomComposable();
     const { getters,commit } = useStore();
     const checkList = computed(() => projectData.value.checklistArray)
+    const { getUser } = useGetterFunctions();
+    const assignmentCandidates = computed(() => {
+        const members = (getters["settings/companyUsers"] || []).filter((member) => member.isDelete !== true).map((member) => String(member.userId));
+        const ids = projectData.value?.isPrivateSpace
+            ? (projectData.value.AssigneeUserId || []).map(String).filter((id) => members.includes(id))
+            : members;
+        return [...new Set(ids)]
+            .map((id) => ({ id, name: getUser(id)?.Employee_Name || '' }))
+            .filter((person) => person.name)
+            .sort((a, b) => a.name.localeCompare(b.name));
+    });
     const currentCompany = computed(() => getters["settings/selectedCompany"])
     const clientWidth = inject("$clientWidth");
     const emit = defineEmits(["openSeeAllProject","rightSideBarEmit","description"])

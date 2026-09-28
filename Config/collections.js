@@ -134,6 +134,8 @@ const dbCollections = {
     AGENT_SESSIONS: "agent_sessions",
     AGENT_SESSION_ENDPOINTS: "agent_session_endpoints",
     ASK_THREADS: "ask_threads",
+    ASSIGNMENT_RULES: "assignment_rules",
+    ASSIGNMENT_DECISIONS: "assignment_decisions",
     AI_PROFILES: "ai_profiles",
 }
 

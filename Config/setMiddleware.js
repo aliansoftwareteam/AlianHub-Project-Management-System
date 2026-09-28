@@ -80,6 +80,7 @@ const verifyJWTTokenWithCRoute = [
     // endpoint is deliberately not under this prefix.
     "/api/v2/forms",
     "/api/v2/task-templates",
+    "/api/v2/assignment-rules",
     "/api/v1/removeCache",
     // Found by walking the Express stack for routes no guard list reached (task 034).
     // /api/v1/generatePrompt is exact on purpose: its /events/:id stream is an

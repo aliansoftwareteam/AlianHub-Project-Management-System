@@ -102,6 +102,7 @@ function initializeControllers() {
     require('./Modules/AgileReports/init').init(app);
     require('./Modules/Export/init').init(app);
     require('./Modules/RecurringTasks/init').init(app);
+    require('./Modules/AssignmentRules/init').init(app);
     require('./Modules/Reminders/init').init(app);
     require('./Modules/GeneralReminders/init').init(app);
     require('./Modules/Notes/init').init(app);
