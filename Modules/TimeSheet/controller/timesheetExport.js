@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueri
 const { buildTimesheetCsv } = require("../helpers/timesheetCsv");
 const logger = require("../../../Config/loggerConfig");
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
+const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 
 const toObjId = (id) => {
     try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; }
@@ -18,7 +19,7 @@ exports.exportTimesheetCsv = async (req, res) => {
         const { userArray = [], projectArray = [], start, end } = req.body || {};
         const match = {};
         if (Array.isArray(userArray) && userArray.length) match.Loggeduser = { $in: userArray };
-        if (Array.isArray(projectArray) && projectArray.length) match.ProjectId = { $in: projectArray };
+        if (Array.isArray(projectArray) && projectArray.length) match.ProjectId = { $in: idForms(projectArray) };
         if (start && end) match.LogStartTime = { $gte: Number(start), $lte: Number(end) };
 
         const entries = await MongoDbCrudOpration(companyId, {

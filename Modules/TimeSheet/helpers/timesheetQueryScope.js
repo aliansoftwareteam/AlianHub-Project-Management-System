@@ -1,5 +1,6 @@
 const { scopedTimeMatch, scopedEstimateMatch } = require('./timeScope');
 const { toObjectIds } = require('../../Tasks/helpers/taskQueryGuard');
+const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 
 const REFUSED_OPERATORS = Object.freeze(['$out', '$merge', '$unionWith', '$graphLookup', '$function', '$accumulator', '$where']);
 
@@ -36,12 +37,36 @@ const scopeLookup = (spec, scope, joinable) => {
     };
 };
 
+const LOGICAL_OPERATORS = Object.freeze(['$and', '$or', '$nor']);
+
+const projectIdInBothForms = (condition) => {
+    if (typeof condition === 'string') return { $in: idForms(condition) };
+    if (!isPlainObject(condition)) return condition;
+    return Object.fromEntries(Object.entries(condition).map(([op, value]) => {
+        if (['$in', '$nin'].includes(op) && Array.isArray(value)) return [op, idForms(value)];
+        if (op === '$eq' && typeof value === 'string') return ['$in', idForms(value)];
+        if (op === '$ne' && typeof value === 'string') return ['$nin', idForms(value)];
+        return [op, value];
+    }));
+};
+
+/* The screens send project ids as text, and a time row holds its project id as text or, from
+ * task 040 on, as an ObjectId; an aggregate casts neither, so the $match names both forms. */
+const matchBothProjectIdForms = (match) => {
+    if (!isPlainObject(match)) return match;
+    return Object.fromEntries(Object.entries(match).map(([key, value]) => {
+        if (LOGICAL_OPERATORS.includes(key) && Array.isArray(value)) return [key, value.map(matchBothProjectIdForms)];
+        return [key, key === 'ProjectId' ? projectIdInBothForms(value) : value];
+    }));
+};
+
 const walk = (value, scope, joinable = PROJECT_FIELD_OF_JOINABLE) => {
     if (Array.isArray(value)) return value.map((item) => walk(item, scope, joinable));
     if (!isPlainObject(value)) return value;
     return Object.fromEntries(Object.entries(value).map(([key, inner]) => {
         if (REFUSED_OPERATORS.includes(key)) throw new TimesheetQueryRefused(`${key} is not allowed in a timesheet query.`);
-        return [key, key === '$lookup' ? scopeLookup(inner, scope, joinable) : walk(inner, scope, joinable)];
+        if (key === '$lookup') return [key, scopeLookup(inner, scope, joinable)];
+        return [key, walk(key === '$match' ? matchBothProjectIdForms(inner) : inner, scope, joinable)];
     }));
 };
 

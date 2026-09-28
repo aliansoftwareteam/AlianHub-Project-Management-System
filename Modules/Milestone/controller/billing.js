@@ -125,7 +125,7 @@ const loadProjectTasks = (companyId, projectId) => MongoDbCrudOpration(companyId
 const loadProjectTimelogs = (companyId, projectId) => MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.TIMESHEET,
     data: [
-        { ProjectId: String(projectId) },
+        { ProjectId: { $in: idForms(projectId) } },
         '_id TicketID Loggeduser LogTimeDuration LogStartTime billable LogDescription',
     ],
 }, 'find');
@@ -565,7 +565,7 @@ exports.getHourlyBilling = async (req, res) => {
             MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TIMESHEET,
                 data: [
-                    { ProjectId: projectId, LogStartTime: { $gte: startSec, $lte: endSec } },
+                    { ProjectId: { $in: idForms(projectId) }, LogStartTime: { $gte: startSec, $lte: endSec } },
                     'Loggeduser LogTimeDuration LogStartTime billable',
                 ],
             }, 'find'),

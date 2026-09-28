@@ -10,6 +10,7 @@ const cursor = require('./cursor');
 const names = require('./names');
 const { PAGE_TEXT_MAX, pageText } = require('./pageText');
 const { taskIdMatch } = require('../Comments/helpers/taskIdMatch');
+const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -289,7 +290,7 @@ const TOOLS = [
             if (error) return { error };
             const filter = { Loggeduser: target };
             const projects = entryProjects(ctx, vis, args, sheetVisible);
-            if (projects !== null) filter.ProjectId = { $in: projects };
+            if (projects !== null) filter.ProjectId = { $in: idForms(projects) };
             if (range) filter.LogStartTime = range;
             const out = await listOf(ctx, 'timesheet.read', args, 'entries', { type: SCHEMA_TYPE.TIMESHEET, filter, sort: { LogStartTime: -1, _id: -1 } }, entryRow, async (rows) => {
                 const named = await names.resolver(ctx, { projectIds: rows.map((e) => idOf(e.ProjectId)), userIds: [target] });
