@@ -1,6 +1,4 @@
 .description-main {
-    /* max-height: calc(100dvh - 360px);
-    overflow: auto; */
     padding-top: 3px;
     padding-bottom: 10px;
 }
@@ -13,11 +11,11 @@
     overflow: auto;
 }
 .description-wrapper {
-    border-bottom: 1px solid #d4d6d7;
+    border-bottom: 1px solid var(--border);
 }
 .ql-snow .ql-editor pre.ql-syntax {
     background-color: transparent !important;
-    color: black;
+    color: var(--ink);
 }
 .description-wrapper pre {
     white-space: pre-wrap;
@@ -33,15 +31,14 @@
 }
 .description-main::-webkit-scrollbar{display: none;}
 .description-action button {
-    
     height: 30px;
     font-size: 16px;
     line-height: 24px;
     padding: 0px 15px;
 }
 .description-editor {
-    background: #ffffff;
-    border: 1px solid #DFE1E6;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: 6px;
     margin-top: 11px;
 }
@@ -63,12 +60,11 @@
 }
 #editorjs {
     list-style-type: disc;
-    color: black;
-    background-color: white;
+    color: var(--ink);
+    background-color: var(--surface);
     border-radius: 8px 8px 0px 0px;
-    border: 1px solid #f5f1f1;
+    border: 1px solid var(--hairline);
     border-bottom: 0;
-    /* min-height: 350px; */
 }
 
 #editorjs .codex-editor__redactor {
@@ -78,17 +74,17 @@
 }
 
 #editorjs .codex-editor__redactor::-webkit-scrollbar-track {
-    background-color: #f5f5f5;
+    background-color: var(--surface-2);
 }
 #editorjs .codex-editor__redactor::-webkit-scrollbar {
     width: 2px;
     height: 2px;
-    background-color: red;
+    background-color: transparent;
     border-radius: 8px;
 }
 #editorjs .codex-editor__redactor::-webkit-scrollbar-thumb {
-    background-color: #959595;
-    border-radius: 8px; 
+    background-color: var(--border);
+    border-radius: 8px;
 }
 
 
@@ -99,23 +95,85 @@
 #editorjs .ce-toolbar__actions {
     right: 100%;
 }
-#editorjs .ce-toolbar__settings-btn{
+#editorjs .ce-toolbar__plus,
+#editorjs .ce-toolbar__settings-btn {
+    color: var(--ink-2);
+}
+#editorjs .ce-toolbar__settings-btn {
     margin-left: -5px;
 }
+#editorjs .ce-toolbar__plus:hover,
+#editorjs .ce-toolbar__plus--active,
+#editorjs .ce-toolbar__settings-btn:hover,
+#editorjs .ce-toolbar__settings-btn--active {
+    background-color: var(--surface-hover);
+    color: var(--ink);
+}
+#editorjs .ce-popover,
+#editorjs .ce-inline-toolbar {
+    --color-background: var(--surface);
+    --color-border: var(--border);
+    --color-text-primary: var(--ink);
+    --color-text-secondary: var(--ink-2);
+    --color-border-icon: var(--hairline);
+    --color-border-icon-disabled: var(--hairline);
+    --color-background-item-hover: var(--surface-hover);
+    --color-background-item-focus: var(--brand-tint);
+    --color-background-icon-active: var(--brand-tint);
+    --color-text-icon-active: var(--brand);
+}
+#editorjs .ce-inline-tool:hover,
+#editorjs .ce-inline-toolbar__dropdown:hover {
+    background-color: var(--surface-hover);
+}
+#editorjs .ce-inline-tool-input {
+    background: var(--surface-2);
+    border-color: var(--hairline);
+    color: var(--ink);
+}
+#editorjs .ce-inline-tool-input::placeholder {
+    color: var(--ink-2);
+}
+#editorjs .ce-block--selected .ce-block__content {
+    background: var(--brand-tint);
+}
+#editorjs .ce-code__textarea {
+    background: var(--surface-2);
+    border-color: var(--hairline);
+    color: var(--ink);
+}
+#editorjs .inline-code {
+    background: var(--danger-bg);
+    color: var(--danger-ink);
+}
+#editorjs .cdx-checklist__item-checkbox-check {
+    background: var(--surface);
+    border-color: var(--border);
+}
+#editorjs .tc-wrap {
+    --color-background: var(--surface-2);
+    --color-text-secondary: var(--ink-2);
+    --color-border: var(--hairline);
+}
+#editorjs .tc-popover {
+    --color-background: var(--surface);
+    --color-border: var(--border);
+    --color-background-hover: var(--surface-hover);
+}
+
 .editor-container .show_hide_class{
     max-height: 350px;
-    /* height: 350px; */
     overflow: hidden;
 }
 .editor-container .hide_show_wrapper {
     border-radius: 0 0 8px 8px;
-    background: #FFF;
-    border: 1px solid #f5f1f1;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-top: 0;
 }
 .editor-container .hide_show{
-    background-color: white;
-    color: #000;
+    background-color: var(--surface);
+    color: var(--ink);
     cursor: pointer;
     font-size: 16px;
     font-weight: 500;
@@ -127,7 +185,7 @@
     margin: 5px
 }
 .editor-container .hide_show:hover {
-    background-color: #d1cfcf5c;
+    background-color: var(--surface-hover);
 }
 .editor-container .codex-editor__redactor {
     padding-bottom: 50px;
@@ -155,12 +213,16 @@ max-width: 100% !important;
     border-radius: 5px;
 }
 
+.description__add-box {
+    background: var(--surface);
+}
+
 .add_description_button {
     width: 100%;
     padding: 4px 14px;
     border: 0;
     border-radius: 4px;
-    background-color: white;
+    background-color: var(--surface);
     text-wrap: nowrap;
     font-weight: 400;
     font-size: 16px;
@@ -169,18 +231,17 @@ max-width: 100% !important;
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    color: #959595;
-
+    color: var(--ink-2);
     cursor: pointer;
 }
 
 .add_description_button:hover {
-    color: #333;
-    background-color: #d1cfcf5c;
+    color: var(--ink);
+    background-color: var(--surface-hover);
 }
 .description_componenet{
     padding-bottom: 18px;
-    border-bottom: 1px solid #DFE1E6;
+    border-bottom: 1px solid var(--hairline);
     border-radius: 0;
 }
 
@@ -191,11 +252,8 @@ max-width: 100% !important;
     .description-action{margin-bottom: 20px;}
     .description-main .ql-toolbar.ql-snow+.ql-container.ql-snow{padding: 15px !important;}
     .description-main .ql-editor p{padding: 0 !important;}
-    /* .editor-container .hide_show_wrapper {
-        bottom: 28px;
-        width: calc(100% - 15px);
-        left: 50.5%;
-    } */
+    #editorjs .ce-toolbar__plus,
+    #editorjs .ce-toolbar__settings-btn {background-color: var(--surface); border-color: var(--hairline);}
     .editor-container .btn-primary {
         margin-left: 10px;
     }
@@ -215,14 +273,10 @@ max-width: 100% !important;
     }
 }
 
-/* "Write with AI" header bar — right-aligned compact button above #editorjs.
-   Separate, lightweight entry point from the Editor.js WriteWithAi block. */
 .ai-write-desc-bar {
     display: flex;
     justify-content: flex-end;
     padding: 0 4px 6px;
 }
-/* The trigger reuses the shared AI link style (.ai-color gradient text +
-   .ai-border-bottom), matching "Suggest Tasks"/"Suggest Subtasks". */
 
 

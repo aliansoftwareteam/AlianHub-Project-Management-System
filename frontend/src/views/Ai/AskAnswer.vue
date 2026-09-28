@@ -206,6 +206,8 @@ const close = async () => {
 .ask__answer > :last-child { margin-bottom: 0; }
 .ask__answer p, .ask__answer ul, .ask__answer ol, .ask__answer pre, .ask__answer blockquote { margin: 0 0 8px; }
 .ask__answer ul, .ask__answer ol { padding-left: 20px; }
+.ask__answer li > p { margin: 0; }
+.ask__answer li > ul, .ask__answer li > ol { margin: 0; }
 .ask__answer h1, .ask__answer h2, .ask__answer h3, .ask__answer h4 { font-size: 14px; font-weight: 600; margin: 12px 0 6px; }
 .ask__answer pre { overflow-x: auto; padding: 8px; border-radius: 6px; background: var(--fill); }
 .ask__answer code { font-family: var(--font-mono, monospace); font-size: 12px; }

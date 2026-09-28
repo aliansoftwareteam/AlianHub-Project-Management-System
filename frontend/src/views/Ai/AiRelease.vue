@@ -82,7 +82,7 @@
                             <p class="ah-small">{{ stagingRule }}</p>
                             <div v-for="p in staging.proposals.slice(0, 4)" :key="p._id" class="rel-proposal">
                                 <span class="ah-avatar ah-avatar--agent ah-avatar--sm"><ShellIcon name="agent" :size="10" /></span>
-                                <span class="rel-proposal__what">{{ p.what }}</span>
+                                <span class="rel-proposal__what">{{ proposalTitle(t, p) }}</span>
                                 <span class="ah-chip" :class="p.status === 'pending' ? 'ah-chip--warn' : 'ah-chip--ok'">{{ p.status }}</span>
                                 <router-link
                                     v-if="p.status === 'pending'"
@@ -169,6 +169,7 @@ import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
 import { useShipping } from "./useShipping";
 import { reasonOf } from "./useAgents";
+import { proposalTitle } from "./plainLabels";
 
 // 28c — the release candidate. Staging is a proposal an Owner or Admin approves;
 // production is not offered to any agent, and there is no deploy integration in

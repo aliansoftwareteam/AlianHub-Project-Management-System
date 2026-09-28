@@ -145,7 +145,7 @@
 
 <script setup>
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { aiUsable } from "@/composable/aiAvailability";
+import { canUseAi } from "@/composable/aiAvailability";
 import { escapeHtml } from '@/utils/notificationHtml';
 import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';
@@ -189,8 +189,7 @@ const confirmOpen = ref(false);
 const { archive, showSpinner, updateProject, markProjectFavourite } = useProjectLifecycle(pending);
 
 const allProjects = computed(() => getters['projectData/allProjects']?.data || []);
-const currentCompany = computed(() => getters['settings/selectedCompany'] || {});
-const aiEnabled = computed(() => aiUsable.value && Boolean(currentCompany.value?.planFeature?.aiPermission));
+const aiEnabled = computed(() => canUseAi());
 const hasPortfolio = computed(() => router.hasRoute('Portfolio'));
 const canCreate = computed(() => checkPermission('project.project_create') === true);
 
