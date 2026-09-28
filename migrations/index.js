@@ -67,24 +67,28 @@ function buildContext({ MongoDbCrudOpration, SCHEMA_TYPE, dbCollections, setting
     return ctx;
 }
 
-async function runMigrations({ store, migrations, makeContext, logger = console, owner = `${os.hostname()}:${process.pid}` }) {
+const resolvedVersion = async () => (await buildInfo.ready()).version;
+
+async function runMigrations({ store, migrations, makeContext, logger = console, owner = `${os.hostname()}:${process.pid}`, appVersion = resolvedVersion }) {
     const locked = await store.tryLock(owner, LOCK_TTL_MS);
     if (!locked) return { skipped: 'locked', applied: [], failed: null, pending: [] };
     const applied = [];
     let failed = null;
     try {
         const { pending } = planRuns(migrations, await store.all());
+        /* At boot the git read started moments ago; get() alone would record the package.json base. */
+        const version = pending.length ? await appVersion() : null;
         for (const migration of pending) {
             const ctx = makeContext();
             const startedAt = Date.now();
             logger.info(`[migrations] running ${migration.id} (${migration.scope})`);
             try {
                 await migration.up(ctx);
-                await store.put({ _id: migration.id, appliedAt: new Date(), durationMs: Date.now() - startedAt, appVersion: buildInfo.get().version, ok: true, error: null, companies: ctx.companies });
+                await store.put({ _id: migration.id, appliedAt: new Date(), durationMs: Date.now() - startedAt, appVersion: version, ok: true, error: null, companies: ctx.companies });
                 applied.push(migration.id);
             } catch (error) {
                 const message = String(error?.message || error);
-                await store.put({ _id: migration.id, appliedAt: new Date(), durationMs: Date.now() - startedAt, appVersion: buildInfo.get().version, ok: false, error: message, companies: ctx.companies });
+                await store.put({ _id: migration.id, appliedAt: new Date(), durationMs: Date.now() - startedAt, appVersion: version, ok: false, error: message, companies: ctx.companies });
                 logger.error(`[migrations] ${migration.id} failed: ${message}`);
                 failed = { id: migration.id, error: message };
                 break;
@@ -257,7 +261,7 @@ async function refreshMigrationState(deps = liveDeps()) {
 /* Boot hook: never throws, never blocks on a dead database; the outcome lands in
  * instanceState for /health and the Upgrade page. With MIGRATIONS_AUTO=false only
  * the status is read, so pending work is still visible. */
-async function runMigrationsAtBoot({ auto = process.env.MIGRATIONS_AUTO !== 'false' } = {}) {
+async function runMigrationsAtBoot({ auto = process.env.MIGRATIONS_AUTO !== 'false', deps } = {}) {
     const { state } = require('../Config/instanceState');
     const { checkDb } = require('../Modules/Instance/health');
     const logger = require('../Config/loggerConfig');
@@ -268,9 +272,9 @@ async function runMigrationsAtBoot({ auto = process.env.MIGRATIONS_AUTO !== 'fal
         return null;
     }
     try {
-        const deps = liveDeps();
-        const result = auto ? await runMigrations(deps) : { skipped: 'MIGRATIONS_AUTO=false', applied: [], failed: null };
-        const status = await refreshMigrationState(deps);
+        const live = deps || liveDeps();
+        const result = auto ? await runMigrations(live) : { skipped: 'MIGRATIONS_AUTO=false', applied: [], failed: null };
+        const status = await refreshMigrationState(live);
         state.migrationError = result.failed ? `${result.failed.id}: ${result.failed.error}` : null;
         if (result.skipped) logger.info(`[migrations] skipped: ${result.skipped}; ${status.pending.length} pending`);
         else logger.info(`[migrations] applied ${result.applied.length}, pending ${status.pending.length}`);

@@ -69,6 +69,29 @@ describe('running build resolver under a slow git', () => {
         expect(resolver.get()).toMatchObject({ version: '14.36.0-beta.1', channel: 'beta', source: 'git' });
     });
 
+    it('ready() waits for the read in flight, then gives the resolved build', async () => {
+        let answer;
+        const run = jest.fn((cwd, args) => (args[1] === '-1' ? new Promise((resolve) => { answer = () => resolve(betaGit(cwd, args)); }) : betaGit(cwd, args)));
+        resolver = createResolver({ root: checkout(), run });
+        resolver.start();
+        const ready = resolver.ready();
+        await settle();
+        answer();
+
+        await expect(ready).resolves.toMatchObject({ version: '14.36.0-beta.1', source: 'git' });
+        expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('ready() gives up after waitMs on a git that never answers and reports the unresolved package version', async () => {
+        resolver = createResolver({ root: checkout(), run: () => new Promise(() => {}), waitMs: 5000 });
+        const ready = resolver.ready();
+
+        await jest.advanceTimersByTimeAsync(5000);
+
+        await expect(ready).resolves.toMatchObject({ version: '14.35.0', channel: 'unknown', source: 'git-pending' });
+        expect(jest.getTimerCount()).toBe(0);
+    });
+
     it('a git timeout gives source git-unavailable with the contract fields and one warning', async () => {
         const onWarning = jest.fn();
         resolver = createResolver({ root: checkout(), run: failingThenWorking(Infinity), onWarning, onInfo: jest.fn() });
