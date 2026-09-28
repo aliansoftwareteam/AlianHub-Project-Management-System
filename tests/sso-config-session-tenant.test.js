@@ -29,6 +29,7 @@ const configOf = (companyId) => (mockDbFor(companyId).store[SCHEMA_TYPE.SSO_CONF
 beforeEach(() => {
     Object.keys(mockDbs).forEach((k) => { delete mockDbs[k]; });
     for (const companyId of [COMPANY, OTHER_COMPANY]) {
+        mockDbFor(SCHEMA_TYPE.GOLBAL).seed(SCHEMA_TYPE.COMPANIES, { _id: companyId });
         mockDbFor(companyId).seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
         mockDbFor(companyId).seed(SCHEMA_TYPE.SSO_CONFIGS, { ...OIDC, deletedStatusKey: 0, domainVerificationToken: `token-${companyId}` });
     }

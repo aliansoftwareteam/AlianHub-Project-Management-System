@@ -12,6 +12,7 @@ const {
 const { strictSince } = require('./helpers/strictSince');
 const { maxLifetimeSince } = require('./helpers/maxLifetimeSince');
 const { stepCredentialsEnabled } = require('../Agents/serviceIdentity');
+const { isKnownCompany } = require('../../Config/knownCompany');
 
 // Resolve the acting user. These routes now sit behind the JWT middleware
 // (Config/setMiddleware.js) which populates req.uid; the body userData
@@ -369,7 +370,7 @@ exports.listTokenLogs = async (req, res) => {
 /* Resolve a raw token for the token middlewares: { token, refusal }. `refusal` is
  * set only when the caller should be told why, never for an unknown token. */
 exports.resolveToken = async (companyId, rawToken) => {
-    if (!companyId || !looksLikeToken(rawToken)) return { token: null, refusal: null };
+    if (!companyId || !looksLikeToken(rawToken) || !(await isKnownCompany(companyId))) return { token: null, refusal: null };
     try {
         const doc = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.API_TOKENS,

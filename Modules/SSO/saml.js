@@ -4,6 +4,7 @@ const logger = require("../../Config/loggerConfig");
 const { extractIdentity } = require("./helpers/ssoRules");
 const { ssoSignInUser, SSO_NOT_ALLOWED } = require("./provisioning");
 const { finalizeSsoSession } = require("./ssoSession");
+const { isKnownCompany } = require("../../Config/knownCompany");
 
 // `samlify` (+ its schema validator) are lazy-required so app load never breaks
 // before `npm install`. SAML responses MUST be signature-validated — samlify
@@ -23,9 +24,9 @@ const ensureValidator = () => {
     validatorReady = true;
 };
 
-const loadConfig = async (companyId) => MongoDbCrudOpration(companyId, {
+const loadConfig = async (companyId) => ((await isKnownCompany(companyId)) ? MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.SSO_CONFIGS, data: [{ deletedStatusKey: 0, isEnabled: true }],
-}, 'findOne');
+}, 'findOne') : null);
 
 const buildSp = (companyId) => {
     const samlify = require('samlify');

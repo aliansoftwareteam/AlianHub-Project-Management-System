@@ -2390,6 +2390,7 @@ export default {
         "col_owner": "Owner",
         "col_summary": "Summary",
         "col_area": "Area",
+        "col_tags": "Tags",
         "sort_by": "Sort by {column}",
         "toggle_subtasks": "Show subtasks",
         "tracking_now": "Tracking now",
@@ -4792,7 +4793,8 @@ export default {
         "note_msg": "नया टैग बनाने के लिए एंटर दबाएं",
         "This_tag_has_already_been_added": "यह टैग पहले ही जोड़ा जा चुका है",
         "Tag_name_required": "टैग का नाम आवश्यक है",
-        "add_tag": "Add tag"
+        "add_tag": "Add tag",
+        "more_tags": "{count} more: {names}"
     },
     "Embeded": {
         "Anything": "कुछ भी",

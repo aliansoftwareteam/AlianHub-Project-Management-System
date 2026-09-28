@@ -24,11 +24,11 @@
         <img :src="cancelimage" class=" cursor-pointer color-edit_img ml-0" @click="(e)=> HandleChange(e,'isColorCancel')"/>
         </div>
 
-        <div class="tagList tagListContent d-flex align-items-center " :class="[{'remove_hover' : checkPermission('task.task_tag',prjectGlobalPermission) == false, 'ah-status-ink': !lightSurface}]" v-if="editStatus != 'isRename'" :style="[chipStyle, {border:isBorder?'1px solid':'0px',borderColor: isBorder?data.tagColor:'none'}]">
+        <div class="tagList tagListContent d-flex align-items-center " :class="[{'remove_hover' : !canEdit, 'ah-status-ink': !lightSurface}]" v-if="editStatus != 'isRename'" :style="[chipStyle, {border:isBorder?'1px solid':'0px',borderColor: isBorder?data.tagColor:'none'}]">
             <div class="tagname__contianer d-flex">
                 <span class="tagname" :title="data.tagName" :class="[{'threedots' : clientWidth < 767 || showClass}]">{{data.tagName}}</span>
             </div>
-            <DropDown mode="menu" @isVisible="(val)=> visible = val" v-if="checkPermission('task.task_tag',prjectGlobalPermission) === true">
+            <DropDown mode="menu" @isVisible="(val)=> visible = val" v-if="canEdit">
                 <template #button>       
                     <img  :src="threedots" class="cursor-pointer tagHover__icon ml-2px"  :alt="$t('Tags.tag_actions', { name: data.tagName })" :class="{threedots:showClass}"  @click="showClass = true"/>  
                     </template>
@@ -51,8 +51,9 @@
                     </div>
                     </template>   
             </DropDown> 
-            <img  :src="cross" v-if="checkPermission('task.task_tag',prjectGlobalPermission) === true" class="cursor-pointer tagHover__icon-close ml-5px" alt="" :class="{threedots:showClass}"  @click="removeTag(ids,data)">
+            <img  :src="cross" v-if="canEdit" class="cursor-pointer tagHover__icon-close ml-5px" alt="" :class="{threedots:showClass}"  @click="removeTag(ids,data)">
                 <ConfirmationSidebar
+                v-if="canEdit"
                 v-model="showSidebar"
                 :acceptButtonClass="`btn-danger`"
                 :acceptButton="$t('Projects.delete')"
@@ -144,8 +145,14 @@ const props = defineProps({
     lightSurface: {
         type: Boolean,
         default: false,
+    },
+    readonly: {
+        type: Boolean,
+        default: false,
     }
 });
+
+const canEdit = computed(() => !props.readonly && checkPermission('task.task_tag', props.prjectGlobalPermission) === true);
 
 const chipStyle = computed(() => tagChipStyle(props.data));
 

@@ -5,14 +5,15 @@ const logger = require("../../Config/loggerConfig");
 const { extractIdentity } = require("./helpers/ssoRules");
 const { ssoSignInUser, SSO_NOT_ALLOWED } = require("./provisioning");
 const { finalizeSsoSession } = require("./ssoSession");
+const { isKnownCompany } = require("../../Config/knownCompany");
 
 // `openid-client` is lazy-required so app load never breaks before `npm install`.
 const apiBase = () => String(process.env.APIURL || '').replace(/\/$/, '');
 const REDIRECT_URI = () => `${apiBase()}/api/v2/sso/oidc/callback`;
 
-const loadConfig = async (companyId) => MongoDbCrudOpration(companyId, {
+const loadConfig = async (companyId) => ((await isKnownCompany(companyId)) ? MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.SSO_CONFIGS, data: [{ deletedStatusKey: 0, isEnabled: true }],
-}, 'findOne');
+}, 'findOne') : null);
 
 const buildClient = async (cfg) => {
     const { Issuer } = require('openid-client');

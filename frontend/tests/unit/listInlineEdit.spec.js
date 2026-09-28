@@ -370,8 +370,8 @@ describe('the row wires the cells to the shared edit context', () => {
         expect(wrapper.find('.lv2__c-select .lv2__status').exists()).toBe(false);
     });
 
-    it('still announces eight cells', () => {
-        expect(renderRow(edit()).findAll('[role="row"] > [role="cell"]')).toHaveLength(8);
+    it('still announces nine cells', () => {
+        expect(renderRow(edit()).findAll('[role="row"] > [role="cell"]')).toHaveLength(9);
     });
 
     it('a status pick goes through the shared update with the row task', async () => {

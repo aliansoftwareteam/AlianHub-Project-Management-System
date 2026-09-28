@@ -91,6 +91,7 @@ beforeEach(() => {
     Object.keys(mockDbs).forEach((k) => { delete mockDbs[k]; });
     myCache.flushAll();
     jest.clearAllMocks();
+    [A, B].forEach((companyId) => globalDb().seed(SCHEMA_TYPE.COMPANIES, { _id: companyId }));
     seedAccount(OUTSIDER, 'pat@outside.test', [B]);
     seedSeat(B, OUTSIDER, 'pat@outside.test');
     seedAccount(MEMBER, 'max@member.test', [A, B], 'Max Member');
