@@ -12,24 +12,37 @@
                     @click="action = item.key"
                 >{{ $t(item.label) }}</button>
             </div>
+            <div class="pcr__quick">
+                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm pcr__summarise" :disabled="busy" @click="summarise">{{ $t('Projects.pages_ai_summarise_page') }}</button>
+                <button v-if="pageId" type="button" class="ah-btn ah-btn--ghost ah-btn--sm pcr__extract" :disabled="busy" @click="extract">{{ $t('Projects.pages_ai_extract_items') }}</button>
+            </div>
         </div>
+        <AiTaskChecklist
+            v-if="extracting"
+            kind="page"
+            :source-id="pageId"
+            :return-focus="() => inputRef"
+            @created="$emit('tasks-linked', $event)"
+            @undone="$emit('tasks-unlinked', $event)"
+            @close="extracting = false"
+        />
         <AiResultPreview
-            v-if="result"
+            v-else-if="result"
             :text="result.text"
             :busy="busy"
-            :title="result.action === 'ask' ? $t('Projects.pages_ai_answer') : ''"
-            :show-replace="result.action !== 'ask'"
-            :show-insert="result.action !== 'ask'"
-            :show-copy="result.action === 'ask'"
-            :insert-label="$t('Projects.pages_ai_insert_below')"
+            :title="previewTitle"
+            :show-replace="result.kind === 'compose'"
+            :show-insert="result.kind !== 'ask'"
+            :show-copy="result.kind !== 'compose'"
+            :insert-label="result.kind === 'summary' ? $t('Projects.pages_ai_insert_top') : $t('Projects.pages_ai_insert_below')"
             :return-focus="() => inputRef"
             @replace="apply('replace')"
-            @insert="apply('append')"
-            @retry="compose(result.request)"
+            @insert="apply(result.kind === 'summary' ? 'prepend' : 'append')"
+            @retry="compose(result.request, result.kind)"
             @cancel="result = null"
         />
         <div v-else-if="applied" class="pcr__applied" role="status">
-            <span>{{ applied === 'replace' ? $t('Projects.pages_ai_replaced') : $t('Projects.pages_ai_added') }}</span>
+            <span>{{ $t(appliedLabel) }}</span>
             <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm pcr__undo" @click="undo">{{ $t('UndoToast.undo') }}</button>
         </div>
         <form class="pcr__form" @submit.prevent="compose()">
@@ -50,13 +63,14 @@
 </template>
 
 <script setup>
-import { nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import AiResultPreview from '@/components/molecules/AiPreview/AiResultPreview.vue';
+import AiTaskChecklist from '@/components/molecules/AiPreview/AiTaskChecklist.vue';
 
 defineOptions({ name: 'PageComposeRail' });
 
@@ -69,7 +83,7 @@ const props = defineProps({
     currentText: { type: String, default: '' },
 });
 
-const emit = defineEmits(['apply', 'undo']);
+const emit = defineEmits(['apply', 'undo', 'tasks-linked', 'tasks-unlinked']);
 
 const actions = [
     { key: 'draft', label: 'Projects.pages_compose_draft' },
@@ -87,6 +101,17 @@ const notice = ref('');
 const inputRef = ref(null);
 const result = ref(null);
 const applied = ref('');
+const extracting = ref(false);
+
+const APPLIED_LABELS = { replace: 'Projects.pages_ai_replaced', prepend: 'Projects.pages_ai_added_top', append: 'Projects.pages_ai_added' };
+const appliedLabel = computed(() => APPLIED_LABELS[applied.value] || APPLIED_LABELS.append);
+
+const previewTitle = computed(() => {
+    if (!result.value) return '';
+    if (result.value.kind === 'ask') return t('Projects.pages_ai_answer');
+    if (result.value.kind === 'summary') return t('Projects.pages_ai_summary');
+    return '';
+});
 
 onMounted(() => {
     apiRequest('get', `${env.PAGES}/ai-status`)
@@ -103,8 +128,23 @@ function focusAsk() {
 
 defineExpose({ focusAsk });
 
-function compose(previous = null) {
+function kindOf(requestAction) {
+    return requestAction === 'ask' ? 'ask' : 'compose';
+}
+
+function summarise() {
+    compose({ action: 'summarize', title: props.title, instruction: '', currentText: props.currentText, pageId: props.pageId || undefined }, 'summary');
+}
+
+function extract() {
+    result.value = null;
+    applied.value = '';
+    extracting.value = true;
+}
+
+function compose(previous = null, kind = '') {
     if (busy.value) return;
+    extracting.value = false;
     const request = previous || {
         action: action.value,
         title: props.title,
@@ -130,7 +170,7 @@ function compose(previous = null) {
         }
         const payload = response.data.data || {};
         result.value = {
-            action: request.action,
+            kind: kind || kindOf(request.action),
             request,
             text: payload.markdown || payload.previewText || '',
             blocks: payload.blocks,
@@ -168,6 +208,7 @@ function undo() {
     gap: 8px;
 }
 .pcr__row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pcr__quick { display: flex; gap: 4px; flex-wrap: wrap; margin-left: auto; }
 .pcr__mark {
     width: 22px; height: 22px; border-radius: 6px;
     background: var(--brand-tint); color: var(--brand);

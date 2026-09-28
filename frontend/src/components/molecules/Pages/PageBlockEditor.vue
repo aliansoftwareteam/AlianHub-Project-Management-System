@@ -175,6 +175,8 @@ async function applyBlocks(payload) {
     const incoming = { ...contentToEditorData({ blocks: payload.blocks || payload }) };
     if (payload.mode === 'append') {
         incoming.blocks = [...(previous.blocks || []), ...(incoming.blocks || [])];
+    } else if (payload.mode === 'prepend') {
+        incoming.blocks = [...(incoming.blocks || []), ...(previous.blocks || [])];
     }
     await editor.value.render(incoming.blocks && incoming.blocks.length ? incoming : emptyEditorData());
     await emitChange();

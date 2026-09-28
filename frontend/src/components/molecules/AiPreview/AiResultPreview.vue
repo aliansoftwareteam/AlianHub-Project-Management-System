@@ -19,7 +19,7 @@
             </slot>
         </div>
         <div class="aip__actions">
-            <button v-if="showReplace" type="button" class="ah-btn ah-btn--primary ah-btn--sm aip__replace" :disabled="busy" @click="$emit('replace')">{{ replaceLabel || $t('AiPreview.replace') }}</button>
+            <button v-if="showReplace" type="button" class="ah-btn ah-btn--primary ah-btn--sm aip__replace" :disabled="busy || replaceDisabled" @click="$emit('replace')">{{ replaceLabel || $t('AiPreview.replace') }}</button>
             <button v-if="showInsert" type="button" class="ah-btn ah-btn--secondary ah-btn--sm aip__insert" :disabled="busy" @click="$emit('insert')">{{ insertLabel || $t('AiPreview.insert') }}</button>
             <button v-if="showCopy" type="button" class="ah-btn ah-btn--secondary ah-btn--sm aip__copy" :disabled="busy" @click="copy">{{ copied ? $t('AiPreview.copied') : $t('AiPreview.copy') }}</button>
             <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm aip__retry" :disabled="busy" @click="$emit('retry')">{{ $t('AiPreview.retry') }}</button>
@@ -39,6 +39,7 @@ const props = defineProps({
     title: { type: String, default: '' },
     busy: { type: Boolean, default: false },
     showReplace: { type: Boolean, default: true },
+    replaceDisabled: { type: Boolean, default: false },
     showInsert: { type: Boolean, default: false },
     showCopy: { type: Boolean, default: false },
     replaceLabel: { type: String, default: '' },

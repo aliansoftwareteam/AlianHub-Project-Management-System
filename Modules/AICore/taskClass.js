@@ -58,7 +58,7 @@ const DEFINITIONS = Object.freeze({
         qualityFloor: QUALITY.STANDARD,
         latencyTargetMs: 60000,
         inputBudgetTokens: 200000,
-        features: Object.freeze([FEATURES.MEETING_NOTES, FEATURES.WORKLOAD_SUMMARY, FEATURES.PORTFOLIO_SUMMARY]),
+        features: Object.freeze([FEATURES.MEETING_NOTES, FEATURES.ACTION_ITEMS, FEATURES.WORKLOAD_SUMMARY, FEATURES.PORTFOLIO_SUMMARY]),
     }),
 });
 

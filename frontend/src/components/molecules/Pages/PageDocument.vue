@@ -128,6 +128,8 @@
                 :current-text="rawDraft"
                 @apply="onComposeApply"
                 @undo="onComposeUndo"
+                @tasks-linked="onTasksLinked"
+                @tasks-unlinked="onTasksUnlinked"
             />
 
             <div v-if="showShare" class="pd__share-back" @click.self="showShare = false">
@@ -428,6 +430,17 @@ function linkTask(taskItem) {
     if (linkedTasks.value.some((x) => x.id === id)) return;
     linkedTasks.value = [...linkedTasks.value, { id, key: taskItem.TaskKey || '' }];
     persistMeta({ linkedTasks: linkedTasks.value.map((x) => x.id) });
+}
+
+/* The server already linked or unlinked these; only the list on screen follows, so a later link does not drop them. */
+function onTasksLinked(tasks) {
+    const known = new Set(linkedTasks.value.map((x) => x.id));
+    linkedTasks.value = [...linkedTasks.value, ...tasks.filter((task) => !known.has(String(task.taskId))).map((task) => ({ id: String(task.taskId), key: '' }))];
+}
+
+function onTasksUnlinked(ids) {
+    const gone = new Set(ids.map(String));
+    linkedTasks.value = linkedTasks.value.filter((x) => !gone.has(x.id));
 }
 
 function unlinkTask(id) {

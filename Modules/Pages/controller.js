@@ -23,6 +23,7 @@ const {
     blocksToRawText,
 } = require('./helpers/pageContent');
 const { composePage, isAiConfigured } = require('./helpers/pageAi');
+const { canUsePage } = require('./helpers/pageAccess');
 const { projectAccess, isCompanyAdmin, isCompanyMember, visibleProjectIds } = require('../../Config/contentAccess');
 
 // There is no version history. It was removed rather than fixed: it recorded a snapshot
@@ -84,16 +85,6 @@ const inVisibleProjects = (visibleIds) => ({
         { ProjectID: { $in: [null, undefined] } },
     ],
 });
-
-/* A doc is readable when the private-doc rule allows it and its project is visible;
- * changing it also needs edit rights on that project. A doc with no project is the
- * company's. */
-const canUsePage = async (companyId, page, uid, { edit = false } = {}) => {
-    if (!page || !pageVisibleTo(page, uid)) return false;
-    if (!page.ProjectID) return isCompanyMember(companyId, uid);
-    const access = await projectAccess(companyId, uid, page.ProjectID);
-    return edit ? access.canEdit : access.visible;
-};
 
 /* A non-deleted (or trashed) page the caller may act on, or null. */
 const findPage = async (companyId, id, uid, { deletedStatusKey = 0, edit = false } = {}) => {
@@ -515,20 +506,13 @@ exports.composeWithAi = async (req, res) => {
         let bodyText = String(currentText || '');
         let pageTitle = String(title || '');
 
-        if (pageId && isObjectIdString(pageId) && (!bodyText || !pageTitle)) {
-            const page = await MongoDbCrudOpration(companyId, {
-                type: SCHEMA_TYPE.PAGES,
-                data: [{ _id: new mongoose.Types.ObjectId(pageId), deletedStatusKey: 0 }],
-            }, 'findOne');
-            if (page) {
-                if (!(await canUsePage(companyId, page, callerId(req)))) {
-                    return res.send({ status: false, statusText: 'Page not found.' });
-                }
-                if (!pageTitle) pageTitle = page.title || '';
-                if (!bodyText) {
-                    bodyText = page.rawText || htmlToRawText((page.content && page.content.html) || '')
-                        || blocksToRawText(contentToEditorData(page.content));
-                }
+        if (pageId) {
+            const page = isObjectIdString(pageId) ? await findPage(companyId, pageId, callerId(req)) : null;
+            if (!page) return res.send({ status: false, statusText: 'Page not found.' });
+            if (!pageTitle) pageTitle = page.title || '';
+            if (!bodyText) {
+                bodyText = page.rawText || htmlToRawText((page.content && page.content.html) || '')
+                    || blocksToRawText(contentToEditorData(page.content));
             }
         }
 
