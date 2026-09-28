@@ -8,6 +8,7 @@ const { taskMongo } = require('../Tasks/helpers/task_class_Mongo');
 const pages = require('../Pages/controller');
 const rules = require('./rules');
 const { tenantOf, TenantError } = require('../../Config/tenant');
+const { visibleTrash } = require('./listAccess');
 const { sessionActor } = require('../Tasks/helpers/taskWriteFields');
 
 const ObjectId = mongoose.Types.ObjectId;
@@ -32,7 +33,8 @@ exports.list = async (req, res) => {
     try {
         const q = rules.listQuery(kind);
         const docs = await MongoDbCrudOpration(companyId, { type: q.type, data: [q.filter, q.fields, q.options] }, 'find');
-        return res.send({ status: true, statusText: 'Trash fetched.', data: (docs || []).map((doc) => rules.toRow(kind, doc)) });
+        const visible = await visibleTrash(companyId, req.uid, kind, docs || []);
+        return res.send({ status: true, statusText: 'Trash fetched.', data: visible.map((doc) => rules.toRow(kind, doc)) });
     } catch (error) {
         logger.error(`ERROR in list trash (${kind}): ${error.message}`);
         return fail(res, error.message, 500);
