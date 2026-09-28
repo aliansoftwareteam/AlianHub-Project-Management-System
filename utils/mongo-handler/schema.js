@@ -1012,7 +1012,7 @@ const schema = {
         steps: { type: Array, default: [], required: false },
         // Set once the run took in content from outside the workspace (Modules/Agents/taint.js); absent on a clean run
         tainted: { type: Boolean, required: false },
-        // [{ kind: fetch | email | form | webhook | file | passage, ref, at }] — where it came from, never the content
+        // [{ kind: fetch | email | form | webhook | file | passage | client | instruction, ref, at }] — where it came from, never the content
         taintSources: { type: Array, default: undefined, required: false },
     },
     agentRevisions: {
