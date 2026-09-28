@@ -399,7 +399,7 @@ exports.migrateProject = (project,companyId) => {
     })
 };
 
-/* tasks.sprintArray is an untyped object: Mongoose casts neither .id nor .folderId, and moving a sprint writes folderId as an ObjectId. */
+/* A filter on tasks.sprintArray is not cast, and a task not yet rewritten by migration 044 holds .id and .folderId as text. */
 const idForms = (id) => [String(id), new mongoose.Types.ObjectId(String(id))];
 
 exports.updateTaksSprints = async (projectId, companyId) => {
