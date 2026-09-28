@@ -6,6 +6,8 @@ const meetingNotes = require('./meetingNotes');
 const askController = require('./ask');
 const askStream = require('./askStream');
 const askThreads = require('./askThreads');
+const aiProfile = require('./aiProfile');
+const aiProfileImport = require('./aiProfileImport');
 const askBuild = require('./askBuild');
 const { requireTaskWritePermission } = require('../../Config/permissionGuard');
 const { TASK_WRITE_ROUTES } = require('../../Config/taskWritePermissions');
@@ -40,6 +42,11 @@ exports.init = (app) => {
     app.get('/api/v1/ai/ask/threads/:id', askThreads.getThread);
     app.put('/api/v1/ai/ask/threads/:id', askThreads.renameThread);
     app.delete('/api/v1/ai/ask/threads/:id', askThreads.deleteThread);
+    app.get('/api/v1/ai/memory', aiProfile.getProfile);
+    app.put('/api/v1/ai/memory', aiProfile.saveProfile);
+    app.delete('/api/v1/ai/memory', aiProfile.clearProfile);
+    app.post('/api/v1/ai/memory/import/preview', aiProfileImport.previewImport);
+    app.post('/api/v1/ai/memory/import/confirm', aiProfileImport.confirmImport);
     app.get('/api/v1/ai/ask/build/:projectId', askBuild.buildTarget);
     app.post('/api/v1/ai/ask/create-tasks', requireTaskWritePermission(TASK_WRITE_ROUTES['POST /api/v1/ai/ask/create-tasks'].entry), askBuild.createTasks);
     // Talk to Text — audio → text via OpenAI Whisper (multipart, field "file").

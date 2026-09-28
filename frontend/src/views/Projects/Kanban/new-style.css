@@ -275,8 +275,11 @@
     border-radius: 6px;
 }
 
+/* The open menu is teleported out of the card, so neither :hover nor :focus-within
+   holds; a hidden trigger would refuse the focus Escape returns to it. */
 .kanban-card:hover .option-list,
-.kanban-card:focus-within .option-list {
+.kanban-card:focus-within .option-list,
+.kanban-card .option-list:has([aria-expanded="true"]) {
     opacity: 1;
     visibility: visible;
 }
