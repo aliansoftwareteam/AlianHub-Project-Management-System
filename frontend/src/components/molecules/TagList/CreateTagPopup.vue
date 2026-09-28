@@ -70,7 +70,7 @@
                                 <span class="tag_name"  :title="item.tagName" :style="{color: tagChipColors(item).color}" >{{item.tagName}}</span>
                                 <DropDown mode="menu" :id="`${tagActionsId}_${item.uid}`" v-if="checkPermission('task.task_tag',project?.isGlobalPermission) === true" @isVisible="(open) => open && (dataItem = item)">
                                     <template #button="{ triggerAttrs }">
-                                        <button type="button" class="taglist__add-btn d-block" :aria-label="$t('Tags.tag_actions', { name: item.tagName })" v-bind="triggerAttrs">
+                                        <button type="button" class="taglist__add-btn d-block" :aria-label="$t('Tags.tag_actions', { name: item.tagName })" data-option-action v-bind="triggerAttrs">
                                             <img :src="threedots" class="cursor-pointer p0x-5px ml-auto mt-7px tagname__threedots" :class="[{'threedots': clientWidth > 767}]" alt=""/>
                                         </button>
                                     </template>

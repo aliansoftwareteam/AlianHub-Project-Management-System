@@ -272,12 +272,13 @@ describe('the list view column picker', () => {
 
 describe('the sprint watchers picker', () => {
     const mountWatchers = async () => {
+        const watchers = [
+            { _id: 'user-1', Employee_Name: 'Me', isWatcher: true, isLoggedUser: true },
+            { _id: 'user-2', Employee_Name: 'Sam', isWatcher: true, isLoggedUser: false },
+        ];
         const scope = {
             sprint: { watchers: ['user-1'] }, eyeIcon: '', searchWatcher: ref(''), clientWidth: 1280,
-            filteredWatchers: [
-                { _id: 'user-1', Employee_Name: 'Me', isWatcher: true, isLoggedUser: true },
-                { _id: 'user-2', Employee_Name: 'Sam', isWatcher: true, isLoggedUser: false },
-            ],
+            filteredWatchers: ref(watchers),
             getUser: () => ({ Employee_profileImageURL: '' }), updateWatchers: vi.fn(),
         };
         await mountMarkup(dropDownMarkup('components/organisms/SprinstList/SprintsList.vue', 'eyeIcon'), scope, { WasabiIamgeCompp: Blank });
@@ -299,6 +300,32 @@ describe('the sprint watchers picker', () => {
         await flushPromises();
         expect(scope.updateWatchers.mock.calls).toEqual([['user-1', 'remove']]);
         expect(optionNamed(list, 'Sam').querySelector('button')).toBeNull();
+    });
+
+    it('reaches "stop watching" with ArrowRight from your own option and runs it on Enter', async () => {
+        const { scope, list } = await mountWatchers();
+        const mine = optionNamed(list, 'Me');
+        mine.focus();
+        await press(mine, 'ArrowRight');
+        expect(document.activeElement).toBe(mine.querySelector('button'));
+        await press(document.activeElement, 'Enter');
+        expect(scope.updateWatchers.mock.calls).toEqual([['user-1', 'remove']]);
+        await press(document.activeElement, 'ArrowLeft');
+        expect(document.activeElement).toBe(mine);
+    });
+
+    it('keeps focus in the list when stopping watching takes your own option away', async () => {
+        const { scope, list } = await mountWatchers();
+        scope.updateWatchers.mockImplementation((id) => {
+            scope.filteredWatchers.value = scope.filteredWatchers.value.filter((user) => user._id !== id);
+        });
+        const mine = optionNamed(list, 'Me');
+        mine.focus();
+        await press(mine, 'ArrowRight');
+        await press(document.activeElement, 'Enter');
+        await flushPromises();
+        expect(optionNamed(list, 'Me')).toBeUndefined();
+        expect(document.activeElement).toBe(optionNamed(list, 'Sam'));
     });
 
     it('stops watching when Delete is pressed on your own option', async () => {
@@ -332,5 +359,17 @@ describe('the per-tag actions in the tag picker', () => {
         const menu = await openList(actions[1]);
         expect(menu.getAttribute('role')).toBe('menu');
         expect(actions[1].getAttribute('aria-expanded')).toBe('true');
+    });
+
+    it('reach the dots button with ArrowRight from its tag and open the menu on Enter', async () => {
+        await mountSite(CreateTagPopup, props, { stubs });
+        await openList(document.querySelector('[aria-haspopup="listbox"]'));
+        const beta = [...document.querySelectorAll('#my-dropdown [role="option"]')].find((el) => el.textContent.includes('Beta'));
+        const dots = beta.querySelector('[aria-haspopup="menu"]');
+        beta.focus();
+        await press(beta, 'ArrowRight');
+        expect(document.activeElement).toBe(dots);
+        await press(dots, 'Enter');
+        expect(dots.getAttribute('aria-expanded')).toBe('true');
     });
 });

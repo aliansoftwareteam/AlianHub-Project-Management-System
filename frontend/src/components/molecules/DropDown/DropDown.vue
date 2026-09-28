@@ -9,7 +9,7 @@
         </DropDownTrigger>
         <teleport to="#my-dropdown" v-if="dropdownVisible">
             <div class="position-fi dropdown-back-drop cursor-default" :style="[{'z-index':zIndex}]" v-if="dropdownVisible && !hover" @click.stop="buttonClick()"/>
-            <div :id="panelId" v-bind="panelAttrs" @click.stop="onPanelClick" @keydown="onPanelKeydown" class="bg-white gray border border-radius-8-px box-shadow-serach drop-down-menu" :style="[{'z-index':zIndex}]" :class="{'drop-down-hide' : !bind, 'desktop-view position-fi' : clientWidth > 767, 'mobile-view position-fi' : clientWidth <= 767, ...bodyClass}" v-if="dropdownVisible">
+            <div :id="panelId" v-bind="panelAttrs" @click.stop="onPanelClick" @keydown="onPanelKeydown" @keyup="onPanelKeyup" @focusin="rememberFocus" class="bg-white gray border border-radius-8-px box-shadow-serach drop-down-menu" :style="[{'z-index':zIndex}]" :class="{'drop-down-hide' : !bind, 'desktop-view position-fi' : clientWidth > 767, 'mobile-view position-fi' : clientWidth <= 767, ...bodyClass}" v-if="dropdownVisible">
                 <slot name="head" v-if="clientWidth > 767">
                 </slot>
                 <div class="border-bottom-mobiledrop cursor-default mobile-title-header p-20px box-sizing-box" v-else :style="{height : clientWidth <=767 ? '64px' : ''}">
@@ -40,7 +40,7 @@
 </template>
 
 <script setup>
-import {Comment, Fragment, computed, defineProps, h, isVNode, nextTick, provide, ref, watch} from "vue";
+import {Comment, Fragment, computed, defineProps, h, isVNode, nextTick, onBeforeUnmount, provide, ref, watch} from "vue";
 import { useCustomComposable } from "@/composable";
 
 const {debounce, makeUniqueId} = useCustomComposable();
@@ -107,6 +107,7 @@ const props = defineProps({
 
 const TRIGGER_MARKER = "data-dropdown-trigger";
 const ITEM_SELECTOR = '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"]';
+const OPTION_ACTION_SELECTOR = "[data-option-action]";
 const TABBABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 const AUTOFOCUS_SELECTOR = "[data-dropdown-autofocus]";
 const TEXT_FIELD_SELECTOR = 'input:not([type]):not([disabled]), input[type="text"]:not([disabled]), input[type="search"]:not([disabled]), textarea:not([disabled])';
@@ -276,6 +277,90 @@ function onTriggerBlur(event) {
     if (event.relatedTarget && !panelEl()?.contains(event.relatedTarget)) close();
 }
 
+// An action hidden until hover or focus-within (display: none) refuses focus, so the next one is tried.
+function focusFirstOf(elements) {
+    return elements.some((el) => {
+        el.focus();
+        return document.activeElement === el;
+    });
+}
+
+const optionActions = (item) => [...item.querySelectorAll(OPTION_ACTION_SELECTOR)];
+
+function optionActionOf(target) {
+    const action = target.closest?.(OPTION_ACTION_SELECTOR);
+    return action && action.closest(ITEM_SELECTOR) ? action : null;
+}
+
+// Escape steps back to the option rather than closing, as leaving a cell does in a grid, so the place in the list is kept.
+function onOptionActionKeydown(event, action) {
+    const item = action.closest(ITEM_SELECTOR);
+    const actions = optionActions(item);
+    const at = actions.indexOf(action);
+    switch (event.key) {
+        case "ArrowRight":
+            event.preventDefault();
+            focusFirstOf(actions.slice(at + 1));
+            return true;
+        case "ArrowLeft":
+            event.preventDefault();
+            if (!focusFirstOf(actions.slice(0, at).reverse())) focusItem(item);
+            return true;
+        case "Escape":
+            event.preventDefault();
+            event.stopPropagation();
+            focusItem(item);
+            return true;
+        case "Enter":
+        case " ":
+            event.preventDefault();
+            action.click();
+            return true;
+    }
+    return false;
+}
+
+let lastFocus = null;
+function rememberFocus(event) {
+    const item = event.target.closest?.(ITEM_SELECTOR);
+    lastFocus = item ? { el: event.target, item, index: menuItems().indexOf(item) } : null;
+}
+
+// Removing the focused element drops focus to the page body; an action that takes itself or its option away must not strand the keyboard there.
+function restoreLostFocus() {
+    if (!lastFocus || lastFocus.el.isConnected) return;
+    if (document.activeElement && document.activeElement !== document.body) return;
+    const { item, index } = lastFocus;
+    lastFocus = null;
+    const items = menuItems();
+    const next = item.isConnected ? item : items[index] || items[index - 1];
+    if (next) {
+        focusItem(next);
+        return;
+    }
+    returningFocus = true;
+    triggerEl()?.focus();
+    returningFocus = false;
+}
+
+let focusKeeper = null;
+function watchForLostFocus() {
+    const panel = panelEl();
+    if (!panel || !props.mode) return;
+    focusKeeper = new MutationObserver(restoreLostFocus);
+    focusKeeper.observe(panel, { childList: true, subtree: true });
+}
+function stopWatchingForLostFocus() {
+    focusKeeper?.disconnect();
+    focusKeeper = null;
+    lastFocus = null;
+}
+onBeforeUnmount(stopWatchingForLostFocus);
+
+function onPanelKeyup(event) {
+    if (props.mode && event.key === " " && optionActionOf(event.target)) event.preventDefault();
+}
+
 function trapFocus(event) {
     event.preventDefault();
     const tabbables = [...panelEl().querySelectorAll(TABBABLE_SELECTOR)];
@@ -292,21 +377,24 @@ function trapFocus(event) {
 
 function onPanelKeydown(event) {
     if (!props.mode) return;
-    if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        close();
-        return;
-    }
     if (event.key === "Tab") {
         // Closing puts focus on the trigger before the browser acts, so Tab carries on from the trigger.
         if (isDialog.value || isSheet.value) trapFocus(event);
         else close();
         return;
     }
+    // An action that handles the key itself, such as a nested dropdown's trigger, has already prevented it.
+    const action = isDialog.value ? null : optionActionOf(event.target);
+    if (action && (event.defaultPrevented || onOptionActionKeydown(event, action))) return;
+    if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+        return;
+    }
     if (isDialog.value) return;
     const items = menuItems();
-    const index = items.indexOf(event.target);
+    const index = items.indexOf(action ? action.closest(ITEM_SELECTOR) : event.target);
     const onItem = index !== -1;
     const field = onItem ? openingField() : null;
     switch (event.key) {
@@ -319,6 +407,9 @@ function onPanelKeydown(event) {
             event.preventDefault();
             if (field && index === 0) field.focus();
             else focusItem(items[onItem ? (index - 1 + items.length) % items.length : items.length - 1]);
+            break;
+        case "ArrowRight":
+            if (onItem && focusFirstOf(optionActions(items[index]))) event.preventDefault();
             break;
         case "Home":
         case "End":
@@ -366,11 +457,13 @@ function stopMouseListener() {
 
 watch(dropdownVisible, (val) => {
     if(val) {
+        nextTick(watchForLostFocus);
         startClickListener();
         if(props.hover) {
             startMouseListener();
         }
     } else {
+        stopWatchingForLostFocus();
         stopClickListener();
         if(props.hover) {
             stopMouseListener();

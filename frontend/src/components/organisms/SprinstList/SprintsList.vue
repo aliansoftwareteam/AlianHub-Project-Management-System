@@ -133,6 +133,7 @@
                                             type="button"
                                             class="d-flex bg-transparent border-0 p-0 cursor-pointer"
                                             :aria-label="$t('Projects.stop_watching')"
+                                            data-option-action
                                             @click.stop="updateWatchers(user._id, 'remove')"
                                         >
                                             <img src="@/assets/images/svg/deletered.svg" alt="">

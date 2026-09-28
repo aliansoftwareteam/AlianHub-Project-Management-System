@@ -94,6 +94,33 @@ const FORM_DIALOG = `
         </template>
     </DropDown>`;
 
+const ACTION_LISTBOX = `
+    <DropDown mode="listbox" id="watchers" title="Watchers" multiselectable>
+        <template #button>Watchers</template>
+        <template #options>
+            <DropDownOption v-for="name in statuses" :key="name" :selected="chosen.includes(name)" @click="toggle(name)">
+                {{ name }}
+                <template v-if="name === 'Doing'">
+                    <button type="button" class="rename" data-option-action aria-label="Rename Doing" @click.stop="picked.push('rename')"></button>
+                    <button type="button" class="remove" data-option-action aria-label="Remove Doing" @click.stop="picked.push('remove')"></button>
+                </template>
+                <button v-if="name === 'Done'" type="button" class="unmarked" aria-label="Unmarked" @click.stop="picked.push('unmarked')"></button>
+            </DropDownOption>
+        </template>
+    </DropDown>`;
+
+const REMOVABLE_LISTBOX = `
+    <DropDown mode="listbox" id="people" title="People" multiselectable>
+        <template #button>People</template>
+        <template #options>
+            <DropDownOption v-for="name in people" :key="name" @click="picked.push(name)">
+                {{ name }}
+                <button type="button" class="remove" data-option-action :aria-label="'Remove ' + name" @click.stop="removePerson(name)"></button>
+                <button v-if="!dropped.includes(name)" type="button" class="drop" data-option-action :aria-label="'Drop ' + name" @click.stop="dropped.push(name)"></button>
+            </DropDownOption>
+        </template>
+    </DropDown>`;
+
 let width = 1280;
 const setWidth = (value) => { width = value; };
 Object.defineProperty(document.documentElement, 'clientWidth', { configurable: true, get: () => width });
@@ -108,7 +135,10 @@ const mountUsage = async (template) => {
             const toggle = (name) => {
                 chosen.value = chosen.value.includes(name) ? chosen.value.filter((n) => n !== name) : [...chosen.value, name];
             };
-            return { picked: ref([]), status: ref('Doing'), statuses: ['To do', 'Doing', 'Done'], query: ref(''), chosen, toggle };
+            const people = ref(['Ann', 'Bob', 'Cy']);
+            const dropped = ref([]);
+            const removePerson = (name) => { people.value = people.value.filter((n) => n !== name); };
+            return { picked: ref([]), status: ref('Doing'), statuses: ['To do', 'Doing', 'Done'], query: ref(''), chosen, toggle, people, dropped, removePerson };
         },
         template: `<div>${template}</div>`,
     }), { attachTo: '#app' });
@@ -647,5 +677,137 @@ describe('a dialog dropdown holding a form', () => {
         const event = await press(field('save'), 'Tab');
         expect(event.defaultPrevented).toBe(true);
         expect(panel().contains(active())).toBe(true);
+    });
+});
+
+describe('an option holding its own action, marked data-option-action', () => {
+    const control = (name) => document.querySelector(`#my-dropdown .${name}`);
+    const openOnDoing = async () => {
+        await mountUsage(ACTION_LISTBOX);
+        await press(trigger(), 'Enter');
+        await settle();
+        await press(active(), 'ArrowDown');
+        expect(active()).toBe(items()[1]);
+    };
+
+    it('ArrowRight moves from the option to its actions in order, ArrowLeft walks back to the option', async () => {
+        await openOnDoing();
+        let event = await press(active(), 'ArrowRight');
+        expect(event.defaultPrevented).toBe(true);
+        expect(active()).toBe(control('rename'));
+        await press(active(), 'ArrowRight');
+        expect(active()).toBe(control('remove'));
+        await press(active(), 'ArrowRight');
+        expect(active()).toBe(control('remove'));
+        await press(active(), 'ArrowLeft');
+        expect(active()).toBe(control('rename'));
+        event = await press(active(), 'ArrowLeft');
+        expect(event.defaultPrevented).toBe(true);
+        expect(active()).toBe(items()[1]);
+    });
+
+    it.each(['Enter', ' '])('%j runs the focused action without picking its option, and the panel stays open', async (key) => {
+        await openOnDoing();
+        await press(active(), 'ArrowRight');
+        await press(active(), 'ArrowRight');
+        const event = await press(active(), key);
+        expect(event.defaultPrevented).toBe(true);
+        expect(wrapper.vm.picked).toEqual(['remove']);
+        expect(wrapper.vm.chosen).toEqual([]);
+        await settle();
+        expect(isOpen()).toBe(true);
+    });
+
+    it('Space released on an action does not click it a second time', async () => {
+        await openOnDoing();
+        await press(active(), 'ArrowRight');
+        const keyup = new KeyboardEvent('keyup', { key: ' ', bubbles: true, cancelable: true });
+        active().dispatchEvent(keyup);
+        expect(keyup.defaultPrevented).toBe(true);
+    });
+
+    it('ArrowDown and ArrowUp from an action move to the options around its own option', async () => {
+        await openOnDoing();
+        await press(active(), 'ArrowRight');
+        await press(active(), 'ArrowDown');
+        expect(active()).toBe(items()[2]);
+        await press(active(), 'ArrowUp');
+        await press(active(), 'ArrowRight');
+        await press(active(), 'ArrowUp');
+        expect(active()).toBe(items()[0]);
+    });
+
+    it('Escape on an action returns focus to its option; Escape again closes', async () => {
+        await openOnDoing();
+        await press(active(), 'ArrowRight');
+        const event = await press(active(), 'Escape');
+        expect(event.defaultPrevented).toBe(true);
+        expect(active()).toBe(items()[1]);
+        await settle();
+        expect(isOpen()).toBe(true);
+        await press(active(), 'Escape');
+        expect(active()).toBe(trigger());
+        await settle();
+        expect(isOpen()).toBe(false);
+    });
+
+    it('Tab on an action still closes and hands focus back to the trigger', async () => {
+        await openOnDoing();
+        await press(active(), 'ArrowRight');
+        const event = await press(active(), 'Tab');
+        expect(event.defaultPrevented).toBe(false);
+        expect(active()).toBe(trigger());
+        await settle();
+        expect(isOpen()).toBe(false);
+    });
+
+    describe('when an action takes itself or its option out of the list', () => {
+        const option = (name) => items().find((el) => el.textContent.includes(name));
+        const removeFocusedOption = async () => {
+            await press(active(), 'ArrowRight');
+            expect(active().className).toBe('remove');
+            await press(active(), 'Enter');
+            await flushPromises();
+        };
+
+        it('moves focus to the next option, else the previous, else the trigger, and the list stays open', async () => {
+            await mountUsage(REMOVABLE_LISTBOX);
+            await press(trigger(), 'Enter');
+            await settle();
+            await press(active(), 'ArrowDown');
+            expect(active()).toBe(option('Bob'));
+            await removeFocusedOption();
+            expect(active()).toBe(option('Cy'));
+            await removeFocusedOption();
+            expect(active()).toBe(option('Ann'));
+            await removeFocusedOption();
+            expect(items()).toHaveLength(0);
+            expect(active()).toBe(trigger());
+            await settle();
+            expect(isOpen()).toBe(true);
+        });
+
+        it('hands focus back to its option when only the action itself goes away', async () => {
+            await mountUsage(REMOVABLE_LISTBOX);
+            await press(trigger(), 'Enter');
+            await settle();
+            await press(active(), 'ArrowDown');
+            await press(active(), 'ArrowRight');
+            await press(active(), 'ArrowRight');
+            expect(active().className).toBe('drop');
+            await press(active(), 'Enter');
+            await flushPromises();
+            expect(option('Bob').querySelector('.drop')).toBeNull();
+            expect(active()).toBe(option('Bob'));
+        });
+    });
+
+    it('leaves an option with no marked action alone on ArrowRight', async () => {
+        await openOnDoing();
+        await press(active(), 'ArrowDown');
+        expect(active()).toBe(items()[2]);
+        const event = await press(active(), 'ArrowRight');
+        expect(event.defaultPrevented).toBe(false);
+        expect(active()).toBe(items()[2]);
     });
 });
