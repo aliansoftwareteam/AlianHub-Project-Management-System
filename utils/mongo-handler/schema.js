@@ -270,8 +270,9 @@ const schema = {
             required: true,
         },
         ProjectId: {
-            type: String,
+            type: mongoose.Schema.Types.Mixed,
             required: true,
+            set: objectIdIfHex,
         },
         TicketID: {
             type: String,
@@ -2799,8 +2800,9 @@ const schema = {
             required: true
         },
         ProjectId: {
-            type: String,
-            required: true
+            type: mongoose.Schema.Types.Mixed,
+            required: true,
+            set: objectIdIfHex,
         },
         TaskId: {
             type: String,
