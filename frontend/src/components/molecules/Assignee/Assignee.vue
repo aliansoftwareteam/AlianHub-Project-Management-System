@@ -25,10 +25,11 @@
                 :thumbnail="'30x30'"
             />
 
-            <DropDown :id="'Assignee_'+makeUniqueId(6)" v-if="detailedUsers.length > numOfUsers">
+            <DropDown :id="'Assignee_'+makeUniqueId(6)" mode="listbox" v-if="detailedUsers.length > numOfUsers">
                 <template #button>
                     <div class="d-flex align-items-center justify-content-center profile-image black text-nowrap font-weight-400 ml--5px border-2px-blue font-size-12 bg-colorlightgray position-re" :style="{width: imageWidth, height: imageWidth}">
-                        +{{detailedUsers.length - numOfUsers}}
+                        <span aria-hidden="true">+{{detailedUsers.length - numOfUsers}}</span>
+                        <span class="ah-sr-only">{{ $t('Common.more_assignees', { count: detailedUsers.length - numOfUsers }) }}</span>
                     </div>
                 </template>
                 <template #options>

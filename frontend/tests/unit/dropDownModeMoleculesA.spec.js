@@ -115,7 +115,7 @@ describe('Batch molecules A dropdowns expose menu and listbox semantics', () => 
         await settle(120);
 
         expect(trigger.attributes('aria-expanded')).toBe('false');
-        expect(wrapper.find('.milestone__value-input input').element.value).toBe('Beta');
+        expect(wrapper.find('input.milestone__value-input').element.value).toBe('Beta');
     });
 
     it('the weekly range picker is a listbox that picks from the keyboard', async () => {

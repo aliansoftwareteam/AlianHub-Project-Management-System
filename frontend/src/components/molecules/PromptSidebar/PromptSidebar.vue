@@ -37,14 +37,15 @@
                                     </textarea>
                                     <div class="red" >{{item?.error }}</div>
                                 </div>
-                                <DropDown v-if="item.type === 'dropdown'">
+                                <DropDown v-if="item.type === 'dropdown'" mode="listbox">
                                     <template #button>
-                                        <div :ref="uniqueId+item.title" class="dropdown-button">{{item.value}}</div>
+                                        <div :ref="uniqueId+item.title" class="dropdown-button"><span class="ah-sr-only">{{ item.title }}</span>{{item.value}}</div>
                                     </template>
                                     <template #options>
                                         <DropDownOption
                                             v-for="(option, index) in item.options"
                                             :key="index"
+                                            :selected="option.value === item.value"
                                             @click="item.value = option.value,$refs[uniqueId+item.title][0].click()"
                                         >
                                             <span class="ml-10px">{{ option.value }}</span>

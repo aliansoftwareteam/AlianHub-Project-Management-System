@@ -1,12 +1,13 @@
 <template>
-    <DropDown :id="uniqueId" :bodyClass="{'countrycode__dropdown' : true}" @isVisible="checkDropdown">
+    <DropDown :id="uniqueId" mode="listbox" :bodyClass="{'countrycode__dropdown' : true}" @isVisible="checkDropdown">
         <template #button>
             <div class="dropdown" ref="dropdownButton">
                 <span class="imageCountry text-ellipsis">
+                <span class="ah-sr-only">{{ $t('Common.country_code_of', { country: activeCountry?.name || '' }) }}</span>
                 <div class="vti__flag" :class="activeCountry?.isoCode.toLowerCase()"></div>
                 <span v-if="enabledCountryCode" class="black activeCountrydialCode">+{{ activeCountry?.dialCode }}</span>
                 </span>
-                <img v-if="enabledArrowIcon" :src="arrow" alt="dropdown-arrow" class="dropdown-arrow">
+                <img v-if="enabledArrowIcon" :src="arrow" alt="" class="dropdown-arrow">
             </div>
         </template>
         <template #head>
@@ -28,6 +29,7 @@
                 :key="'phone'+index"
                 @click="chooseCountry(country)"
                 :highlight="index === highlightIndex"
+                :selected="country.isoCode === activeCountry?.isoCode"
                 :id="'item'+index"
             >
                 <div class="d-flex align-items-center w-100">
@@ -149,7 +151,11 @@
 
     onBeforeUnmount(stopListener)
 
+    // The listbox moves focus and picks with the keyboard itself; this listener serves the search box and a trigger opened without focus.
     function keyListener(event) {
+        const target = event.target;
+        if (target.closest?.('[role="option"], [data-dropdown-trigger]')) return;
+        if (event.keyCode !== 13 && target.closest?.('.countrycode__dropdown')) return;
         if(event.keyCode === 13) { // Enter
             chooseCountry(sortedCountries.value[highlightIndex.value]);
         } else if(event.keyCode === 38){ // UP

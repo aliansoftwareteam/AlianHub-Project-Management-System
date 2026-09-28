@@ -53,21 +53,24 @@
                                     />
                                 </li>
                                 <li v-if="index == 3 && Number(userList.length-4) !== 0" class="position-re li__equal-three">
-                                    <DropDown :id="'Assignee_'+'fileandlinks'" :bodyClass="{'filelinks__user-sidebar' : true}">
+                                    <DropDown :id="'Assignee_'+'fileandlinks'" mode="listbox" :bodyClass="{'filelinks__user-sidebar' : true}">
                                         <template #button>
                                             <div @click="toggleUsers = true" class="cursor-pointer d-flex align-items-center justify-content-center profile-image GunPowder blue text-nowrap">
-                                                + {{ Number(userList.length-4) }}
+                                                <span aria-hidden="true">+ {{ Number(userList.length-4) }}</span>
+                                                <span class="ah-sr-only">{{ $t('Filters.more_users', { count: Number(userList.length-4) }) }}</span>
                                             </div>
                                         </template>
                                         <template #options>
                                             <DropDownOption
                                                 v-for="(user1,index1) in userList.filter((x, index) => index >= 4)"
                                                 :key="'user'+index1"
+                                                :selected="Boolean(user1.isSelected)"
+                                                @click="user1.isSelected = !user1.isSelected,getDataWithUserFilter()"
                                             >
                                                 <div class="font-size-13 getdata__userfilter">
                                                     <div class="overflow-y-auto overflow-x-hidden drop-down-options black">
                                                         <div class="align-items-center border-radius-5-px justify-content-between hover-purple cursor-pointer text-nowrap drop-down-item">
-                                                            <div class="d-flex align-items-center selected__employee-users" :title="user1.Employee_Name" @click.stop.prevent="user1.isSelected = !user1.isSelected,getDataWithUserFilter()">
+                                                            <div class="d-flex align-items-center selected__employee-users" :title="user1.Employee_Name">
                                                                 <input type="checkbox" :class="[{'checkboxBlueFileLink' : user1.isSelected}]" :id="'checkboxlinkfile'+user1._id" v-model="user1.isSelected" />
                                                                 <UserProfile
                                                                     :showDot="false"
@@ -93,7 +96,7 @@
                         </ul>
                     </div>
                     <div class="border-radius-6-px  file__ascedesc-wrapper">
-                        <DropDown id="filter" :bodyClass="{'file__ascedesc-dropdown z-index-10' : true}">
+                        <DropDown id="filter" mode="listbox" :bodyClass="{'file__ascedesc-dropdown z-index-10' : true}">
                             <template #button>
                                 <div ><span class="font-size-16 font-weight-700 gray81 mr-15px">{{$t('Projects.sort_by')}}:</span> <span class="font-size-16 font-weight-400 gray81 ml-6px sort__by-category">{{selectedOrder == '0' ? $t('Filters.a_to_z') : $t('Filters.z_to_a')}}</span></div>
                             </template>
@@ -103,6 +106,7 @@
                                     v-for="order in orders"
                                     :key="order.value"
                                     :item="order"
+                                    :selected="order.value === selectedOrder"
                                     @click="oldOrder = selectedOrder,selectedOrder = order.value,changesOrderOfSorting()"
                                 />
                             </template>
