@@ -13,6 +13,8 @@ const { commentThreadAccess, refuseThread } = require("./helpers/threadAccess");
 const { threadOf, canPostToThread, canChangeComment, changesThreadOrAuthor } = require("./helpers/threadWriteAccess");
 const { resolveMentionIds, deliverMentions } = require("./helpers/commentNotifications");
 const { taskIdMatch } = require("./helpers/taskIdMatch");
+const { withoutAssignment, withoutThreadState, placeReply } = require("./helpers/commentThreads");
+const { notifyReply } = require("./helpers/threadNotices");
 
 const writeOptionsFrom = (options) => {
     if (options === undefined) return {};
@@ -31,11 +33,13 @@ const writeOptionsFrom = (options) => {
 exports.save = async (req, res) => {
     try {
         const { data } = req.body
-        const convertData = escapeCommentFields(replaceObjectKey(data, ["objId"]));
+        const companyId = req.headers['companyid'];
+        const placement = await placeReply(companyId, withoutAssignment(escapeCommentFields(replaceObjectKey(data, ["objId"]))));
+        if (!placement.allowed) return refuseThread(res, placement);
+        const convertData = placement.data;
         // SEC (AHE-3834) — the author is the authenticated caller, never a client-supplied
         // userId. Legit callers already send their own id, so this is transparent.
         if (req.uid) convertData.userId = req.uid;
-        const companyId = req.headers['companyid'];
         const thread = threadOf(convertData);
         const access = await canPostToThread(companyId, req.uid, thread);
         if (!access.allowed) return refuseThread(res, access);
@@ -50,7 +54,7 @@ exports.save = async (req, res) => {
         }
 
         const response = await MongoDbCrudOpration(companyId, query, "save");
-        if (data?.objId?.projectId && data?.objId?.taskId && data?.objId?.sprintId) {
+        if (placement.parent || (data?.objId?.projectId && data?.objId?.taskId && data?.objId?.sprintId)) {
             socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments', companyId });
         } else if(data?.taskId === "default"){
             socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments', companyId });
@@ -63,6 +67,10 @@ exports.save = async (req, res) => {
             deliverMentions(companyId, { ...saved, folderId: convertData.folderId }, mentionIds)
                 .then((failures) => failures.forEach((err) => logger.error(`[mentions] delivery failed: ${(err && err.message) || JSON.stringify(err)}`)))
                 .catch((err) => logger.error(`[mentions] delivery failed: ${err.message}`));
+        }
+        if (placement.parent && response && response._id) {
+            notifyReply(companyId, response, placement.parent, mentionIds)
+                .catch((err) => logger.error(`[comments] reply notice failed: ${err.message}`));
         }
         if (response) {
             return res.status(200).json({ status: true, data: response || {}  });
@@ -87,7 +95,7 @@ exports.save = async (req, res) => {
 exports.update = async (req, res) => {
     try {
         const { id, isProjectComment } = req.body;
-        const data = escapeCommentFields(req.body.data);
+        const data = withoutThreadState(escapeCommentFields(req.body.data));
 
         if (!id) {
             return res.status(400).json({
@@ -170,6 +178,20 @@ exports.update = async (req, res) => {
     }
 }
 
+const replyCountStages = (taskId) => (/^[a-f0-9]{24}$/i.test(String(taskId || '')) ? [
+    {
+        $lookup: {
+            from: SCHEMA_TYPE.COMMENTS,
+            localField: '_id',
+            foreignField: 'parentId',
+            as: 'replyRows',
+            pipeline: [{ $match: { isDeleted: { $ne: true } } }, { $project: { _id: 1 } }],
+        },
+    },
+    { $addFields: { replyCount: { $size: '$replyRows' } } },
+    { $project: { replyRows: 0 } },
+] : []);
+
 /**
  * This endpoint is used to get message form comments collection
  * @param {*} req 
@@ -203,6 +225,7 @@ exports.getPaginatedMessages = async (req, res) => {
                     // (isDeleted === true) reappeared in main-chat pagination.
                     // `$ne: true` keeps documents whose flag is missing/false.
                     { isDeleted: { $ne: true } },
+                    { parentId: null },
                     ...(sprintId ? [{ sprintId: new mongoose.Types.ObjectId(sprintId) }] : []),
                     ...(tabLeaveTime ? [{ updatedAt: { $gte: new Date(Number(tabLeaveTime)) } }] : []),
                     ...(!isDefault && mainChat
@@ -225,7 +248,7 @@ exports.getPaginatedMessages = async (req, res) => {
 
         const limitStage = tabLeaveTime ? null : { $limit: parseInt(batchLimit) };
         
-        const aggregationPipeline = [searchResultMatch, sortOption, skipStage, ...(limitStage ? [limitStage] : [])];
+        const aggregationPipeline = [searchResultMatch, sortOption, skipStage, ...(limitStage ? [limitStage] : []), ...replyCountStages(taskId)];
 
         const params = {
             type: SCHEMA_TYPE.COMMENTS,

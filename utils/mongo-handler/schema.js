@@ -3831,7 +3831,15 @@ const schema = {
         agentId: { type: String, default: "" },
         viaAccount: { type: String, default: "" },
         runId: { type: String, default: "" },
-        automationName: { type: String, required: false }
+        automationName: { type: String, required: false },
+        // A threaded reply's first comment; the reply always carries that comment's thread ids.
+        parentId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        assigneeId: { type: String, required: false },
+        assignedBy: { type: String, required: false },
+        assignedAt: { type: Date, required: false },
+        resolved: { type: Boolean, required: false },
+        resolvedBy: { type: String, required: false },
+        resolvedAt: { type: Date, required: false }
     },
     mainChat: {
         ProjectCode: {

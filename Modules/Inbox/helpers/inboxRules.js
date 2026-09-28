@@ -44,12 +44,14 @@ const parseSnooze = (body = {}, now = new Date()) => {
 
 // Row kinds the client can filter on. A reminder is a notification the reminder
 // scheduler wrote on its due date; everything else from that source is an update.
-const KINDS = Object.freeze(['all', 'mention', 'reminder', 'update', 'approval']);
+const KINDS = Object.freeze(['all', 'mention', 'assigned', 'reminder', 'update', 'approval']);
 const REMINDER_KEY = 'general_reminder';
+const ASSIGNED_KEY = Notification_key.COMMENT_ASSIGNED;
 const normalizeKind = (kind) => (KINDS.includes(String(kind)) ? String(kind) : 'all');
 const kindOf = (item = {}) => {
     if (item.sourceType === 'approval') return 'approval';
     if (item.sourceType === 'mention') return 'mention';
+    if (item.key === ASSIGNED_KEY) return 'assigned';
     return item.key === REMINDER_KEY ? 'reminder' : 'update';
 };
 
@@ -223,7 +225,8 @@ const planFor = (tab, source = 'all', kind = 'all') => {
     const byKind = (plan) => {
         if (kind === 'mention') return { ...plan, notifications: false, mentions: true };
         if (kind === 'reminder') return { ...plan, notifications: true, mentions: false, keyOnly: REMINDER_KEY };
-        if (kind === 'update') return { ...plan, notifications: true, mentions: false, keyNot: REMINDER_KEY };
+        if (kind === 'assigned') return { ...plan, notifications: true, mentions: false, keyOnly: ASSIGNED_KEY };
+        if (kind === 'update') return { ...plan, notifications: true, mentions: false, keyNot: [REMINDER_KEY, ASSIGNED_KEY] };
         return plan;
     };
     if (tab === 'notifications') return { notifications: true, mentions: false, read: false };
@@ -265,7 +268,7 @@ const notificationMatch = (userId, { tab, source = 'all', kind = 'all', now = ne
     if (plan.read === true) and.push({ notSeen: { $nin: [userId] } });
     if (plan.read === false) and.push({ notSeen: { $in: [userId] } });
     if (plan.keyOnly) and.push({ key: plan.keyOnly });
-    if (plan.keyNot) and.push({ key: { $ne: plan.keyNot } });
+    if (plan.keyNot) and.push({ key: { $nin: plan.keyNot } });
     return { $and: and };
 };
 
@@ -294,6 +297,7 @@ module.exports = {
     mentionMatch,
     KINDS,
     REMINDER_KEY,
+    ASSIGNED_KEY,
     normalizeKind,
     kindOf,
     SORTS,

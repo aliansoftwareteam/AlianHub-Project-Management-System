@@ -13,6 +13,7 @@ const { settingsCollectionDocs } = require('../Config/collections');
 const logger = require("../Config/loggerConfig");
 const { MongoDbCrudOpration } = require("./mongo-handler/mongoQueries");
 const { SCHEMA_TYPE } = require("../Config/schemaType");
+const { COMMENT_NOTICE_ITEMS } = require("../Config/notificationKey");
 const {defaultCustomFields} = require("../utils/Tempates/customFields");
 const {defaultProjectTours} = require("../utils/Tempates/projectTours");
 const { addSprintFun } = require('../Modules/Sprints/controller');
@@ -1721,7 +1722,8 @@ exports.importUserNotifications = async (companyName, uid) => {
                 browser: true,
                 mobile: true,
                 key: "task_estimated_hours"
-            }
+            },
+            ...COMMENT_NOTICE_ITEMS.map((item) => ({ ...item }))
         ]
     }
 
