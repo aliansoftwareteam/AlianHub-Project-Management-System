@@ -134,7 +134,7 @@ it('marks the hourly members listbox panel with its class', async () => {
 });
 
 describe('FixMilestoneTr.css', () => {
-    const css = readFileSync(resolve(__dirname, '../../src/components/atom/FixMilestoneTr/FixMilestoneTr.css'), 'utf8');
+    const css = readFileSync(resolve(__dirname, '../../src/components/atom/FixMilestoneTr/FixMilestoneTr.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
     const rules = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].map(([, selector, body]) => ({
         selector: selector.trim().replace(/\s+/g, ' '),
         declarations: body.split(';').map((d) => d.replace(/\s+/g, '')).filter(Boolean).sort(),

@@ -7,7 +7,7 @@
     <td>
         <div class="position-re">
             {{ $t('Milestone.date_range', { start: convertDateFormat(props.milestoneArray.startDate,'',{showDayName: false}), end: convertDateFormat(props.milestoneArray.endDate,'',{showDayName: false}) }) }}
-            <DropDown id="user_detail" mode="listbox" class="position-ab user_detail" v-if="props.userArray[props.milestoneArray._id] && props.userArray[props.milestoneArray._id].assigneeArray && props.userArray[props.milestoneArray._id].assigneeArray.length">
+            <DropDown :id="dropdownId('hourly_milestone_members')" mode="listbox" class="position-ab user_detail" :bodyClass="{ milestone_members_panel: true }" v-if="props.userArray[props.milestoneArray._id] && props.userArray[props.milestoneArray._id].assigneeArray && props.userArray[props.milestoneArray._id].assigneeArray.length">
                 <template #button>
                     <img :src="userinfo" :alt="$t('Milestone.time_logged_by_member')" />
                 </template>
@@ -54,7 +54,7 @@
         <div>
             <div class="d-flex align-items-center">
                 <span @click="permissionData ? $emit('editMilestonetd','edit',props.hourlyMilestoneIndex,true) : '',permissionData ? focusInputForFix('amount',props.hourlyMilestoneIndex) : ''" :class="[{'paymentcancelled':props.milestoneArray.statusArray && props.milestoneArray.statusArray.length > 0 ? props.milestoneArray.statusArray[props.milestoneArray.statusArray.length - 1].milestoneStatusColor.includes('CANCELLED'):''}]">{{currencyMilestone.symbol}} {{getCommaSeperatedNumber(props.milestoneArray.amount)}}</span>
-                <DropDown v-if="props.milestoneArray.refundedAmount && props.milestoneArray.refundedAmount.length" id="amonut_history" mode="menu" class="status_change_dropdown">
+                <DropDown v-if="props.milestoneArray.refundedAmount && props.milestoneArray.refundedAmount.length" :id="dropdownId('hourly_milestone_refunds')" mode="menu" class="status_change_dropdown" :bodyClass="{ milestone_refund_panel: true }">
                     <template #button="{ triggerAttrs }">
                         <button type="button" class="cursor-pointer dot-btn border-0" :aria-label="$t('Milestone.refund_details')" v-bind="triggerAttrs">
                             <img v-if="props.planCondition" :src="detaildropdown" alt="" class="left_space_wrapper" />
@@ -129,7 +129,7 @@
                 </div>
             </template>
             <div class="statushistory">
-                <DropDown id="fix_milestone_status_dropdown" mode="menu" class="status_change_dropdown">
+                <DropDown :id="dropdownId('hourly_milestone_status')" mode="menu" class="status_change_dropdown" :bodyClass="{ milestone_status_panel: true }">
                     <template #button="{ triggerAttrs }">
                         <button type="button" class="cursor-pointer dot-btn border-0" :aria-label="$t('Milestone.status_history')" v-bind="triggerAttrs">
                             <img v-if="props.planCondition" :src="statushistory" alt="" @click="props.planCondition ? $emit('valueBody',true) : $emit('valueBody',false)">
@@ -194,6 +194,7 @@
     const { t } = useI18n();
     const  { checkErrors,checkAllFields } = useValidation();
     const { convertDateFormat } = useConvertDate();
+    const dropdownId = (name) => `${name}_${props.milestoneArray._id ?? `row${props.hourlyMilestoneIndex}`}`;
     const statushistory = require('@/assets/images/svg/statushistory.svg');
     // props
     const props = defineProps({
