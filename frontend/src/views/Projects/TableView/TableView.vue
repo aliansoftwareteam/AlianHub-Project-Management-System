@@ -29,10 +29,18 @@
         </div>
 
         <div class="tv2__scroll ah-scroll" id="tableview_scroll">
-            <div v-if="hasRows" class="tv2__grid" role="table" :aria-label="$t('Projects.tasks')">
+            <div
+                v-if="hasRows"
+                ref="gridRef"
+                class="tv2__grid"
+                role="table"
+                :aria-label="$t('Projects.tasks')"
+                :style="gridStyle"
+                @keydown="onGridKey"
+            >
                 <div class="tv2__head" role="row">
                     <span role="columnheader"></span>
-                    <span role="columnheader" :aria-sort="ariaSort('TaskName')">
+                    <span role="columnheader" class="tv2__head-name" :aria-sort="ariaSort('TaskName')">
                         <button
                             type="button"
                             class="tv2__sort"
@@ -41,28 +49,33 @@
                         >
                             {{ $t('Projects.tasks') }}<span class="tv2__sort-caret" :class="{ 'is-on': sortOf('TaskName') }" aria-hidden="true">{{ sortGlyph('TaskName') }}</span>
                         </button>
+                        <ViewColumnChooser
+                            class="tv2__chooser"
+                            :columns="columnState.columns.value"
+                            @toggle="columnState.setVisible"
+                            @move="columnState.move"
+                            @reset="columnState.reset"
+                        />
                     </span>
-                    <span role="columnheader" :aria-sort="ariaSort('statusKey')">
-                        <button
-                            type="button"
-                            class="tv2__sort"
-                            :title="$t('List.sort_by', { column: $t('Projects.status') })"
-                            @click="toggleSort('statusKey')"
-                        >
-                            {{ $t('Projects.status') }}<span class="tv2__sort-caret" :class="{ 'is-on': sortOf('statusKey') }" aria-hidden="true">{{ sortGlyph('statusKey') }}</span>
-                        </button>
-                    </span>
-                    <span role="columnheader">{{ $t('List.col_owner') }}</span>
-                    <span role="columnheader"><template v-if="tagsOn">{{ $t('List.col_tags') }}</template></span>
-                    <span role="columnheader" class="tv2__head-ai" :title="$t('List.ai_source_hint')">✦ {{ $t('List.col_summary') }}</span>
-                    <span role="columnheader" class="tv2__head-ai" :title="$t('List.risk_formula')">✦ {{ $t('List.col_risk') }}</span>
-                    <span role="columnheader" class="tv2__head-ai" :title="$t('List.ai_source_hint')">✦ {{ $t('List.col_area') }}</span>
-                    <span role="columnheader">{{ $t('Provenance.col_done_by') }}</span>
+                    <template v-for="column in columnState.visibleColumns.value" :key="column.id">
+                        <span v-if="column.id === 'status'" role="columnheader" :aria-sort="ariaSort('statusKey')">
+                            <button
+                                type="button"
+                                class="tv2__sort"
+                                :title="$t('List.sort_by', { column: $t('Projects.status') })"
+                                @click="toggleSort('statusKey')"
+                            >
+                                {{ $t('Projects.status') }}<span class="tv2__sort-caret" :class="{ 'is-on': sortOf('statusKey') }" aria-hidden="true">{{ sortGlyph('statusKey') }}</span>
+                            </button>
+                        </span>
+                        <span v-else-if="column.ai" role="columnheader" class="tv2__head-ai" :title="$t(column.id === 'risk' ? 'List.risk_formula' : 'List.ai_source_hint')">✦ {{ $t(column.labelKey) }}</span>
+                        <span v-else role="columnheader" class="tv2__head-col" :title="column.field ? column.label : null">{{ column.field ? column.label : $t(column.labelKey) }}</span>
+                    </template>
                 </div>
 
                 <template v-for="sprint in groupedTasks" :key="sprintKey(sprint)">
                     <div class="tv2__sprint-row" role="row">
-                        <span role="cell" class="tv2__sprint-cell" :aria-colspan="9">
+                        <span role="cell" class="tv2__sprint-cell" :aria-colspan="columnCount">
                             <button
                                 type="button"
                                 class="tv2__sprint-head"
@@ -85,6 +98,7 @@
                             :group="grouped"
                             :globalSortKey="globalSortKey"
                             :keys="`${item.key}`"
+                            :showPoints="columnState.isVisible('points')"
                             @open="openRow"
                         />
                     </template>
@@ -112,6 +126,7 @@ import TableViewTable from './TableViewTable.vue';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import ListBulkBar from '@/views/Projects/ListView/ListBulkBar.vue';
+import ViewColumnChooser from '@/views/Projects/components/columns/ViewColumnChooser.vue';
 
 // UTILS
 import { useCustomComposable } from "@/composable";
@@ -119,10 +134,13 @@ import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyState.js';
 import { openTask, useTaskSequenceSource } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
+import { useListRowEdit } from '@/views/Projects/ListView/useListInlineEdit.js';
+import { columnCatalogue, gridMinWidth, gridTracks, useViewColumns } from '@/views/Projects/composables/viewColumns';
+import { handleGridKey } from './gridKeyboard';
 
 // PACKAGES
 import { useStore } from 'vuex';
-import { computed, inject, onMounted, ref, watch } from "vue";
+import { computed, inject, onMounted, provide, ref, watch } from "vue";
 
 defineOptions({ name: "ProjectTableView" });
 
@@ -157,6 +175,29 @@ const companyId = inject('$companyId');
 const searchedTask = inject('searchedTask');
 const showArchiveVar = inject("showArchived");
 const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
+
+const rowEdit = useListRowEdit(project, showArchiveVar);
+provide('listRowEdit', rowEdit);
+
+const catalogue = computed(() => columnCatalogue('table', {
+    tagsOn: tagsOn.value,
+    priorityOn: rowEdit.showPriority.value,
+    estimateOn: checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours', project.value?.isGlobalPermission) !== null,
+    startOn: checkPermission('task.task_start_date', project.value?.isGlobalPermission) !== null,
+    fields: rowEdit.fields.defs.value
+}));
+const columnState = useViewColumns(computed(() => project.value?._id), 'table', catalogue);
+provide('tableColumns', columnState.visibleColumns);
+const columnCount = computed(() => columnState.visibleColumns.value.length + 2);
+const gridStyle = computed(() => {
+    const tracks = gridTracks('table', columnState.visibleColumns.value);
+    return { '--tv2-cols': tracks, minWidth: `${gridMinWidth(tracks)}px` };
+});
+
+const gridRef = ref(null);
+function onGridKey(event) {
+    handleGridKey(event, gridRef.value);
+}
 
 const createTask = ref(false);
 const globalSortKey = ref('');

@@ -1,7 +1,8 @@
 /* Table view with AI fields (handoff 13c) */
+@import "../ListView/style.css";
 
 .tv2 {
-    --tv2-cols: 28px minmax(0, 1fr) 100px 90px 170px 1.3fr 110px 140px 96px;
+    --tv2-cols: 28px minmax(220px, 1fr) 110px 72px 96px 96px 84px 64px 170px minmax(200px, 1.3fr) 110px 140px 96px;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -40,7 +41,6 @@
     background: var(--surface);
     border: 1px solid var(--hairline);
     border-radius: var(--r-card);
-    min-width: 1160px;
 }
 
 .tv2__head {
@@ -60,6 +60,18 @@
     z-index: 2;
 }
 .tv2__head-ai { color: var(--brand); }
+.tv2__head-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.tv2__chooser { margin-left: auto; }
+.tv2__head-col { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tv2__row > [role="cell"] { min-width: 0; }
+.tv2__row > [role="cell"]:focus { outline: none; }
+.tv2__row > [role="cell"]:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
+.tv2__cell { display: flex; align-items: center; }
+.tv2__status-cell { display: flex; align-items: center; min-width: 0; }
+.tv2 .lv2__status-chip { border: 0; cursor: pointer; font: inherit; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tv2 .lv2__status-chip:focus-visible { outline: none; box-shadow: var(--focus); }
+.tv2__points-total { font: var(--text-data); color: var(--ink-label); }
+.tv2__row:hover .lv2__cell-empty, .tv2__row:focus-within .lv2__cell-empty { opacity: 1; }
 .tv2__sort {
     display: inline-flex;
     align-items: center;
@@ -202,4 +214,5 @@
 @media (max-width: 767px) {
     .tv2__scroll { padding: 12px 16px 20px; }
     .tv2__row { min-height: 44px; }
+    .tv2__row .lv2__cell-empty { opacity: 1; }
 }

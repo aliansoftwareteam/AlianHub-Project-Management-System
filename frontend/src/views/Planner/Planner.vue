@@ -56,7 +56,7 @@
                 </button>
             </nav>
 
-            <div class="planner__grid-wrap ah-scroll">
+            <div ref="gridWrap" class="planner__grid-wrap ah-scroll" tabindex="0" role="region" :aria-label="$t('Home.planner_grid')">
                 <div class="planner__grid" :style="{ gridTemplateColumns: `44px repeat(${days.length}, minmax(0, 1fr))` }">
                     <div class="planner__corner"></div>
                     <div v-for="d in days" :key="`h-${d.key}`" class="planner__day-head" :class="{ 'is-today': d.isToday }">{{ d.label }}</div>
@@ -76,6 +76,8 @@
                         @dblclick="onDoubleClick($event, d)"
                         @click="onColumnClick($event, d)"
                     >
+                        <div class="planner__off" :style="{ top: '0px', height: `${top(startHour)}px` }"></div>
+                        <div class="planner__off" :style="{ top: `${top(endHour)}px`, height: `${gridHeight - top(endHour)}px` }"></div>
                         <div
                             v-for="item in blocksFor(d)"
                             :key="item.id"
@@ -92,7 +94,7 @@
                             {{ dragging.TaskName }}
                             <span class="planner__block-sub">{{ $t('Home.dropping', { range: ghostRange }) }}</span>
                         </div>
-                        <div v-if="d.isToday && nowTop !== null" class="planner__now" :style="{ top: `${nowTop}px` }"></div>
+                        <div v-if="d.isToday" class="planner__now" :style="{ top: `${nowTop}px` }"></div>
                     </div>
                 </div>
             </div>
@@ -133,7 +135,7 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted, onUnmounted, ref } from "vue";
+import { computed, inject, nextTick, onMounted, onUnmounted, ref } from "vue";
 import moment from "moment";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -153,6 +155,7 @@ import "./style.css";
 defineOptions({ name: "PlannerPage" });
 
 const HOUR_PX = 60;
+const DAY_HOURS = 24;
 const router = useRouter();
 const { t } = useI18n();
 const $toast = useToast();
@@ -176,10 +179,11 @@ const now = ref(moment());
 const detail = ref({ open: false, taskId: "", projectId: "", sprintId: "" });
 const isMobile = ref(false);
 const pending = ref(null);
+const gridWrap = ref(null);
 
-const hours = computed(() => Array.from({ length: endHour.value - startHour.value }, (_, i) => startHour.value + i));
-const gridHeight = computed(() => (endHour.value - startHour.value) * HOUR_PX);
-const top = (hour) => (hour - startHour.value) * HOUR_PX;
+const hours = Array.from({ length: DAY_HOURS }, (_, i) => i);
+const gridHeight = DAY_HOURS * HOUR_PX;
+const top = (hour) => hour * HOUR_PX;
 
 const days = computed(() => {
     if (mode.value === "day") {
@@ -235,7 +239,7 @@ function estimateMinutes(task) {
 
 function blocksFor(day) {
     return agenda.itemsFor(day.date, work.openTasks.value).map((item) => {
-        const startMin = (item.start.hours() - startHour.value) * 60 + item.start.minutes();
+        const startMin = item.start.hours() * 60 + item.start.minutes();
         const durMin = Math.max(30, item.end.diff(item.start, "minutes"));
         const tracking = item.task && timer.active?.taskId === item.task._id;
         return {
@@ -256,14 +260,10 @@ const ghostRange = computed(() => {
 });
 function ghostStart(day = days.value.find((d) => d.key === overKey.value)) {
     const slot = Math.round((ghostTop.value / HOUR_PX) * 2) / 2;
-    return moment(day ? day.date : anchor.value).startOf("day").add(startHour.value, "hours").add(slot * 60, "minutes");
+    return moment(day ? day.date : anchor.value).startOf("day").add(slot * 60, "minutes");
 }
 
-const nowTop = computed(() => {
-    const minutes = (now.value.hours() - startHour.value) * 60 + now.value.minutes();
-    if (minutes < 0 || minutes > (endHour.value - startHour.value) * 60) return null;
-    return (minutes / 60) * HOUR_PX;
-});
+const nowTop = computed(() => ((now.value.hours() * 60 + now.value.minutes()) / 60) * HOUR_PX);
 
 function onDragStart(event, task) {
     dragging.value = task;
@@ -275,7 +275,7 @@ function onDragOver(event, day) {
     overKey.value = day.key;
     const rect = event.currentTarget.getBoundingClientRect();
     const y = Math.max(0, event.clientY - rect.top);
-    ghostTop.value = Math.min(Math.floor(y / (HOUR_PX / 2)) * (HOUR_PX / 2), gridHeight.value - ghostHeight.value);
+    ghostTop.value = Math.min(Math.floor(y / (HOUR_PX / 2)) * (HOUR_PX / 2), gridHeight - ghostHeight.value);
     event.dataTransfer.dropEffect = "move";
 }
 function onDragLeave(day) {
@@ -311,15 +311,15 @@ function onColumnClick(event, day) {
     if (!task) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const y = Math.max(0, event.clientY - rect.top);
-    const slot = Math.round((Math.min(y, gridHeight.value) / HOUR_PX) * 2) / 2;
+    const slot = Math.round((Math.min(y, gridHeight) / HOUR_PX) * 2) / 2;
     pending.value = null;
-    place(task, moment(day.date).startOf("day").add(startHour.value, "hours").add(slot * 60, "minutes"));
+    place(task, moment(day.date).startOf("day").add(slot * 60, "minutes"));
 }
 
 function onDoubleClick(event, day) {
     const rect = event.currentTarget.getBoundingClientRect();
     const slot = Math.floor((event.clientY - rect.top) / (HOUR_PX / 2)) / 2;
-    agenda.addFocus(moment(day.date).startOf("day").add(startHour.value + slot, "hours"), 1);
+    agenda.addFocus(moment(day.date).startOf("day").add(slot, "hours"), 1);
 }
 function addFocusNow() {
     const begin = moment().add(1, "hour").startOf("hour");
@@ -342,6 +342,13 @@ function toggleHours() {
     endHour.value = b;
     localStorage.setItem("ah.planner.start", String(a));
     localStorage.setItem("ah.planner.end", String(b));
+    scrollToWorkingHours();
+}
+
+function scrollToWorkingHours() {
+    nextTick(() => {
+        if (gridWrap.value) gridWrap.value.scrollTop = top(startHour.value);
+    });
 }
 
 function openTask(task) {
@@ -361,6 +368,7 @@ function syncViewport() {
 let clock = null;
 onMounted(() => {
     syncViewport();
+    scrollToWorkingHours();
     window.addEventListener("resize", syncViewport);
     work.fetchOpen().catch((error) => console.error("planner tasks failed", error));
     agenda.load().catch(() => {});

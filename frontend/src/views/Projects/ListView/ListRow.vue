@@ -79,44 +79,58 @@
             />
         </div>
 
-        <span class="lv2__c-tags" role="cell">
-            <TaskTagCell :task="data" :limit="tagLimit" :can-add="!isSub" />
-        </span>
-
-        <span class="lv2__c-assignee" role="cell">
-            <ListAssigneeCell
-                :task="data"
-                :editable="!isSub && rights.assignee"
-                :options="!isSub && rights.assignee ? edit.assigneeOptions(data) : []"
-                :multiple="Boolean(edit && edit.multipleAssignees.value)"
-                @change="(change) => edit.setAssignee(data, change, { row: rowEl })"
-            />
-        </span>
-
-        <span class="lv2__c-due" role="cell">
-            <ListDueCell :task="data" :done="done" :editable="!isSub && rights.due" @change="(date) => edit.setDue(data, date, { row: rowEl })" />
-        </span>
-
-        <span class="lv2__c-prio" role="cell">
-            <ListPriorityCell
-                v-if="!isSub && showPriority"
-                :task="data"
-                :editable="rights.priority"
-                @change="(option) => edit.setPriority(data, option, { row: rowEl })"
-            />
-        </span>
-
-        <span class="lv2__est lv2__c-est" role="cell">{{ estimate }}</span>
-
-        <span class="lv2__c-risk" role="cell">
-            <span v-if="!isSub && risk.score" class="lv2__risk" :class="`lv2__risk--${risk.level}`" :title="riskTitle">
-                <span class="lv2__risk-dot"></span>{{ $t(`List.risk_${risk.level}`) }} · {{ risk.score }}
+        <template v-for="column in columns" :key="column.id">
+            <span v-if="column.id === 'tags'" class="lv2__c-tags" role="cell">
+                <TaskTagCell :task="data" :limit="tagLimit" :can-add="!isSub" />
             </span>
-        </span>
 
-        <span class="lv2__c-done" role="cell">
-            <ProvenanceBadge :task="data" />
-        </span>
+            <span v-else-if="column.id === 'assignee'" class="lv2__c-assignee" role="cell">
+                <ListAssigneeCell
+                    :task="data"
+                    :editable="!isSub && rights.assignee"
+                    :options="!isSub && rights.assignee ? edit.assigneeOptions(data) : []"
+                    :multiple="Boolean(edit && edit.multipleAssignees.value)"
+                    @change="(change) => edit.setAssignee(data, change, { row: rowEl })"
+                />
+            </span>
+
+            <span v-else-if="column.id === 'due'" class="lv2__c-due" role="cell">
+                <ListDueCell :task="data" :done="done" :editable="!isSub && rights.due" @change="(date) => edit.setDue(data, date, { row: rowEl })" />
+            </span>
+
+            <span v-else-if="column.id === 'priority'" class="lv2__c-prio" role="cell">
+                <ListPriorityCell
+                    v-if="!isSub && showPriority"
+                    :task="data"
+                    :editable="rights.priority"
+                    @change="(option) => edit.setPriority(data, option, { row: rowEl })"
+                />
+            </span>
+
+            <span v-else-if="column.id === 'estimate'" class="lv2__est lv2__c-est" role="cell">
+                <EstimateCell
+                    v-if="edit && !isSub && rights.estimate"
+                    :task="data"
+                    editable
+                    @change="(minutes, reason) => edit.setEstimate(data, minutes, { row: rowEl, reason })"
+                />
+                <template v-else>{{ estimate }}</template>
+            </span>
+
+            <span v-else-if="column.id === 'risk'" class="lv2__c-risk" role="cell">
+                <span v-if="!isSub && risk.score" class="lv2__risk" :class="`lv2__risk--${risk.level}`" :title="riskTitle">
+                    <span class="lv2__risk-dot"></span>{{ $t(`List.risk_${risk.level}`) }} · {{ risk.score }}
+                </span>
+            </span>
+
+            <span v-else-if="column.id === 'doneBy'" class="lv2__c-done" role="cell">
+                <ProvenanceBadge :task="data" />
+            </span>
+
+            <span v-else :class="listColumnClass(column)" role="cell">
+                <TaskColumnCell :column="column" :task="data" :is-sub="isSub" :rowEl="rowEl" />
+            </span>
+        </template>
     </div>
 </template>
 
@@ -136,6 +150,9 @@ import { timerState, isTimerFor, elapsedSeconds } from "@/components/organisms/T
 import { taskRisk } from "@/views/Projects/composables/taskRisk";
 import { isClosedTask, subtaskProgress, subtaskTotal } from "./subtaskProgress";
 import { taskNavAttrs } from "@/components/organisms/TaskDetailOverlay/taskNavigation";
+import EstimateCell from "@/views/Projects/components/columns/EstimateCell.vue";
+import TaskColumnCell from "@/views/Projects/components/columns/TaskColumnCell.vue";
+import { defaultColumns, listColumnClass } from "@/views/Projects/composables/viewColumns";
 
 defineOptions({ name: "ListRow" });
 
@@ -154,12 +171,14 @@ const emit = defineEmits(["open", "select", "toggle-subtasks", "toggle-done", "r
 
 const { t } = useI18n();
 
-const NO_RIGHTS = { status: false, assignee: false, due: false, priority: false, rename: false, subtask: false };
+const NO_RIGHTS = { status: false, assignee: false, due: false, priority: false, rename: false, subtask: false, estimate: false, points: false, customField: false };
 const edit = inject("listRowEdit", null);
 const rights = computed(() => edit?.rights.value || NO_RIGHTS);
 const statuses = computed(() => edit?.statuses.value || []);
 const showPriority = computed(() => (edit ? edit.showPriority.value : true));
 const rowEl = ref(null);
+const injectedColumns = inject("listColumns", null);
+const columns = computed(() => injectedColumns?.value || defaultColumns("list"));
 const clientWidth = inject("$clientWidth", ref(1280));
 const tagLimit = computed(() => (clientWidth.value < 768 ? 2 : 3));
 

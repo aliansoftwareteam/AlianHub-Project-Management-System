@@ -12,7 +12,7 @@ const KINDS = {
     },
     lists: {
         type: SCHEMA_TYPE.SPRINTS,
-        fields: 'name projectId updatedAt',
+        fields: 'name projectId private AssigneeUserId updatedAt',
         row: (doc) => ({ title: doc.name, code: '', projectId: doc.projectId ? String(doc.projectId) : '' })
     },
     tasks: {
@@ -22,7 +22,7 @@ const KINDS = {
     },
     docs: {
         type: SCHEMA_TYPE.PAGES,
-        fields: 'title ProjectID updatedAt',
+        fields: 'title ProjectID visibility createdBy updatedAt',
         row: (doc) => ({ title: doc.title, code: '', projectId: doc.ProjectID ? String(doc.ProjectID) : '' })
     }
 };

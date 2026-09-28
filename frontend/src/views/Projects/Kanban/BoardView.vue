@@ -42,6 +42,15 @@
         <template v-else>
             <template v-if="processedBoardData.length && sprints?.length">
                 <ListBulkBar v-if="projectData?._id" :project="projectData" />
+                <div class="board-card-fields">
+                    <ViewColumnChooser
+                        titleKey="ViewColumns.card_fields"
+                        :columns="cardFields.columns.value"
+                        @toggle="cardFields.setVisible"
+                        @move="cardFields.move"
+                        @reset="cardFields.reset"
+                    />
+                </div>
                 <KanbanBoard :data="processedBoardData" :group="grouped" :sprintId="sprintId" />
             </template>
             <template v-else>
@@ -59,7 +68,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, inject, defineProps, defineEmits } from 'vue';
+import { ref, computed, onMounted, watch, inject, provide, defineProps, defineEmits } from 'vue';
 import { useStore } from 'vuex';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { markFirstRunStep, FIRST_RUN_STEPS } from '@/composable/firstRunProgress';
@@ -71,6 +80,8 @@ import ListBulkBar from '@/views/Projects/ListView/ListBulkBar.vue';
 import { taskInGroup } from '@/views/Projects/ListView/listFilter';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
+import ViewColumnChooser from '@/views/Projects/components/columns/ViewColumnChooser.vue';
+import { columnCatalogue, useViewColumns } from '@/views/Projects/composables/viewColumns';
 
 // Helpers
 import { taskListHelper } from '@/views/Projects/helper.js';
@@ -95,6 +106,9 @@ const showArchiveVar = inject("showArchived");
 const searchedTask = inject('searchedTask');
 const project = inject('selectedProject');
 const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
+
+const cardFields = useViewColumns(computed(() => project.value?._id), 'board', computed(() => columnCatalogue('board')));
+provide('boardCardFields', cardFields.visibleColumns);
 
 // --- Reactive State ---
 const isLoading = ref(true);
@@ -229,3 +243,7 @@ onMounted(async () => {
 
 </script>
 <style src="./new-style.css" />
+
+<style>
+.board-card-fields { display: flex; justify-content: flex-end; padding: 6px 20px 0; }
+</style>

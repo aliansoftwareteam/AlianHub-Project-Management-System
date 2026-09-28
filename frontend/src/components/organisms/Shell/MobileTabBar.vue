@@ -7,15 +7,20 @@
             class="ah-tabbar__item"
             :class="{ 'is-active': isActive(item) }"
             :aria-current="isActive(item) ? 'page' : null"
+            :aria-label="item.key === 'inbox' && unread ? $t('Shell.inbox_unread', { n: unread }) : null"
+            :data-test="`tab-${item.key}`"
         >
-            <ShellIcon :name="item.icon" :size="20" />
+            <span class="ah-tabbar__icon">
+                <ShellIcon :name="item.icon" :size="20" />
+                <span v-if="item.key === 'inbox' && unread" class="ah-unread-badge" aria-hidden="true">{{ badge }}</span>
+            </span>
             <span>{{ $t(item.label) }}</span>
         </router-link>
         <button type="button" class="ah-tabbar__item ah-tabbar__item--new" aria-keyshortcuts="c" @click="openQuickCreate()">
             <ShellIcon name="plus" :size="20" />
             <span>{{ $t('QuickCreate.rail_label') }}</span>
         </button>
-        <button type="button" class="ah-tabbar__item" :class="{ 'is-active': sheet }" @click="sheet = true">
+        <button type="button" class="ah-tabbar__item" :class="{ 'is-active': sheet }" data-test="tab-more" @click="sheet = true">
             <ShellIcon name="more" :size="20" />
             <span>{{ $t('Shell.more') }}</span>
         </button>
@@ -76,6 +81,7 @@ import { useAuth } from "@/services";
 import { useNavItems } from "./navItems";
 import { shellState, openPanel, toggleTheme } from "./shellState";
 import { openQuickCreate } from "@/components/organisms/QuickCreateTask/quickCreateTask";
+import { useInboxUnread } from "./inboxUnread";
 
 const companyId = inject("$companyId");
 const userId = inject("$userId");
@@ -87,7 +93,11 @@ const { rail, more, isActive } = useNavItems(companyId);
 const sheet = ref(false);
 watch(() => route.fullPath, () => { sheet.value = false; });
 
-const PRIMARY = ["home", "planner", "chat", "ai"];
+const { unread, badge } = useInboxUnread();
+
+// Inbox is the phone's triage surface, so it takes Planner's slot; Planner's week grid
+// needs a wide screen and stays one tap further away in More.
+const PRIMARY = ["home", "inbox", "chat", "ai"];
 const tabs = computed(() => rail.value.filter((i) => PRIMARY.includes(i.key)).slice(0, 4));
 const overflowRail = computed(() => rail.value.filter((i) => !tabs.value.includes(i)));
 const me = computed(() => getUser(userId.value) || {});

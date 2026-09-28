@@ -1711,6 +1711,35 @@ const schema = {
         updatedBy: { type: String, required: false },
         updatedAt: { type: Date, required: false },
     },
+    // One person's Ask conversation (Modules/AI/askThreads). Private to ownerId, admins included; a turn keeps only the
+    // ids of what it cited, so reopening a thread re-reads each source under the reader's access of the day.
+    askThreads: {
+        ownerId: { type: String, required: true },
+        title: { type: String, required: false, default: '' },
+        turns: {
+            type: [{
+                _id: false,
+                turnId: { type: String, required: true },
+                question: { type: String, required: true },
+                answer: { type: String, required: false, default: '' },
+                mode: { type: String, required: false, default: 'ask' },
+                model: { type: String, required: false, default: '' },
+                cited: {
+                    type: [{
+                        _id: false,
+                        kind: { type: String, required: true },
+                        sourceId: { type: String, required: true },
+                        ref: { type: String, required: false, default: '' },
+                    }],
+                    required: false,
+                },
+                createdAt: { type: Date, required: true },
+            }],
+            required: false,
+        },
+        turnCount: { type: Number, required: false, default: 0 },
+        lastTurnAt: { type: Date, required: false },
+    },
     // Client invoices raised against a project (handoff 19c). Distinct from the
     // global `invoices` collection, which is AlianHub's own subscription billing.
     // Every line keeps the ids it was drafted from so a client question about a
