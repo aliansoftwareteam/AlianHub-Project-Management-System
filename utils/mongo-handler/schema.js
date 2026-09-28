@@ -2060,6 +2060,10 @@ const schema = {
         navPreferences: {
             pinned: { type: [String], required: false, default: undefined }
         },
+        // Written only by PUT /api/v2/users/home-cards (Modules/Users/homeCards.js).
+        homeCards: {
+            hidden: { type: [String], required: false, default: undefined }
+        },
         languageCode: {
             type: String,
             required: false,

@@ -24,6 +24,11 @@ const SOMEONE = '6f0000000000000000000a02';
 const P = '6f0000000000000000000701';
 const HIDDEN_P = '6f0000000000000000000702';
 
+const T1 = '6f0000000000000000000b01';
+const T2 = '6f0000000000000000000b02';
+const T3 = '6f0000000000000000000b03';
+const T4 = '6f0000000000000000000b04';
+
 const WEDNESDAY = new Date('2026-09-30T10:00:00.000Z').getTime();
 const MONDAY = new Date('2026-09-28T10:00:00.000Z').getTime();
 const at = (iso) => new Date(iso);
@@ -131,14 +136,14 @@ describe('GET /api/v2/agents/team/standup', () => {
         mockDb.calls.length = 0;
         jest.clearAllMocks();
         jest.spyOn(Date, 'now').mockReturnValue(WEDNESDAY);
-        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: 't1', TaskName: 'Ship the invoice export', ProjectID: P, sprintId: 's1', statusType: 'close', status: { text: 'Done', type: 'close' }, AssigneeUserId: [ME], deletedStatusKey: 0 });
-        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: 't2', TaskName: 'Secret roadmap', ProjectID: HIDDEN_P, sprintId: 's2', statusType: 'active', status: { text: 'In Progress', type: 'active' }, AssigneeUserId: [SOMEONE], deletedStatusKey: 0 });
-        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: 't3', TaskName: 'Due today', ProjectID: P, sprintId: 's1', statusType: 'active', status: { text: 'In Progress', type: 'active' }, AssigneeUserId: [ME], DueDate: at('2026-09-30T16:00:00.000Z'), deletedStatusKey: 0 });
-        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: 't4', TaskName: 'Someone else\'s late task', ProjectID: P, sprintId: 's1', statusType: 'active', status: { text: 'In Progress', type: 'active' }, AssigneeUserId: [SOMEONE], DueDate: at('2026-09-20T16:00:00.000Z'), deletedStatusKey: 0 });
-        mockDb.seed(SCHEMA_TYPE.HISTORY, { Key: 'Task_Status', TaskId: 't1', UserId: ME, ProjectId: P, createdAt: at('2026-09-29T11:00:00.000Z') });
-        mockDb.seed(SCHEMA_TYPE.HISTORY, { Key: 'Task_Status', TaskId: 't2', UserId: ME, ProjectId: HIDDEN_P, createdAt: at('2026-09-29T12:00:00.000Z') });
-        mockDb.seed(SCHEMA_TYPE.HISTORY, { Key: 'Task_Status', TaskId: 't3', UserId: SOMEONE, ProjectId: P, createdAt: at('2026-09-29T12:00:00.000Z') });
-        mockDb.seed(SCHEMA_TYPE.HISTORY, { Key: 'Task_Status', TaskId: 't3', UserId: ME, ProjectId: P, createdAt: at('2026-09-27T12:00:00.000Z') });
+        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: T1, TaskName: 'Ship the invoice export', ProjectID: P, sprintId: 's1', statusType: 'close', status: { text: 'Done', type: 'close' }, AssigneeUserId: [ME], deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: T2, TaskName: 'Secret roadmap', ProjectID: HIDDEN_P, sprintId: 's2', statusType: 'active', status: { text: 'In Progress', type: 'active' }, AssigneeUserId: [SOMEONE], deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: T3, TaskName: 'Due today', ProjectID: P, sprintId: 's1', statusType: 'active', status: { text: 'In Progress', type: 'active' }, AssigneeUserId: [ME], DueDate: at('2026-09-30T16:00:00.000Z'), deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: T4, TaskName: 'Someone else\'s late task', ProjectID: P, sprintId: 's1', statusType: 'active', status: { text: 'In Progress', type: 'active' }, AssigneeUserId: [SOMEONE], DueDate: at('2026-09-20T16:00:00.000Z'), deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.HISTORY, { Key: 'Task_Status', TaskId: T1, UserId: ME, ProjectId: P, createdAt: at('2026-09-29T11:00:00.000Z') });
+        mockDb.seed(SCHEMA_TYPE.HISTORY, { Key: 'Task_Status', TaskId: T2, UserId: ME, ProjectId: HIDDEN_P, createdAt: at('2026-09-29T12:00:00.000Z') });
+        mockDb.seed(SCHEMA_TYPE.HISTORY, { Key: 'Task_Status', TaskId: T3, UserId: SOMEONE, ProjectId: P, createdAt: at('2026-09-29T12:00:00.000Z') });
+        mockDb.seed(SCHEMA_TYPE.HISTORY, { Key: 'Task_Status', TaskId: T3, UserId: ME, ProjectId: P, createdAt: at('2026-09-27T12:00:00.000Z') });
     });
     afterEach(() => jest.restoreAllMocks());
 
@@ -156,8 +161,8 @@ describe('GET /api/v2/agents/team/standup', () => {
         const r = await call();
         expect(r.body.status).toBe(true);
         const { yesterday, today, blocked } = r.body.data;
-        expect(yesterday.map((i) => [i.kind, i.task.taskId])).toEqual([['completed', 't1'], ['moved', 't2']]);
-        expect(today.map((i) => i.task.taskId)).toEqual(['t3']);
+        expect(yesterday.map((i) => [i.kind, i.task.taskId])).toEqual([['completed', T1], ['moved', T2]]);
+        expect(today.map((i) => i.task.taskId)).toEqual([T3]);
         expect(blocked).toEqual([]);
     });
 
@@ -174,7 +179,7 @@ describe('GET /api/v2/agents/team/standup', () => {
         const r = await call();
         const named = JSON.stringify(r.body.data);
         expect(named).not.toContain('Secret roadmap');
-        expect(r.body.data.yesterday.map((i) => i.task.taskId)).toEqual(['t1']);
+        expect(r.body.data.yesterday.map((i) => i.task.taskId)).toEqual([T1]);
         expect(visibilityStage).toHaveBeenCalledWith(C, ME);
     });
 });
