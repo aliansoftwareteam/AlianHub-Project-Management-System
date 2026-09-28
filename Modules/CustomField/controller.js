@@ -118,12 +118,12 @@ exports.updateCustomField = async (req, res) => {
             type: dbCollections.CUSTOM_FIELDS,
             data:[
                 filter,
-                { [key]: updateObjectDate },
+                { $set: updateObjectDate },
             ]
         };
         const response = await MongoDbCrudOpration(companyId, query, type);
         removeCache(`customField:${companyId}`);
-        if (previous && key === '$set') {
+        if (previous) {
             recordFieldRenamed({ companyId, previous, next: updateObject, actorId: req.uid })
                 .catch((error) => logger.error(`custom field renamed history: ${error && error.message}`));
         }
