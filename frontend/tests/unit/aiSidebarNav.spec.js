@@ -4,6 +4,7 @@ import { createStore } from 'vuex';
 import { createMemoryHistory, createRouter } from 'vue-router';
 
 vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 'ShellIcon', render: () => null } }));
+vi.mock('@/views/Ai/useLiveAgents', () => ({ useLiveAgents: () => ({ running: { value: 0 }, refresh: vi.fn() }) }));
 vi.mock('@/views/Ai/useAgents', () => ({
     useAgents: () => ({ waiting: { value: 2 }, running: { value: 0 }, spend: { value: { totalUsd: 0, agents: [] } }, pauseAll: vi.fn() }),
 }));
@@ -17,7 +18,7 @@ const blank = { render: () => null };
 const routerFor = () => createRouter({
     history: createMemoryHistory(),
     routes: [
-        ...aiRoutes,
+        ...aiRoutes.map((route) => (route.component ? { ...route, component: blank } : route)),
         { path: '/:cid/workflows', name: 'WorkflowBuilder', component: blank },
         { path: '/:cid/connections', name: 'Connections', component: blank },
         { path: '/:cid/audit', name: 'AuditLog', component: blank },
