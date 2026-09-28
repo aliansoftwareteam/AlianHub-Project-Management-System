@@ -10,7 +10,7 @@ async function blockingViolations(page) {
     const { violations } = await new AxeBuilder({ page }).withTags(WCAG_TAGS).disableRules(['color-contrast']).analyze();
     return violations
         .filter((v) => v.impact === 'serious' || v.impact === 'critical')
-        .map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`);
+        .map((v) => `${v.id} (${v.impact}): ${v.help}: ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`);
 }
 
 // The first-run tour and checklist cover the screen and are audited on their own.
@@ -265,6 +265,66 @@ test.describe('accessibility: keyboard in the task overlay', () => {
         await page.keyboard.press('Enter');
         await expect(dialog.locator('.story-points .sp-menu')).toBeVisible();
         expect(await blockingViolations(page)).toEqual([]);
+    });
+});
+
+test.describe('accessibility: shared dropdowns from the keyboard', () => {
+    test.use(asRole('owner'));
+    test.beforeEach(async ({ page }) => skipFirstRun(page));
+
+    const controlledBy = async (page, trigger) => page.locator(`[id="${await trigger.getAttribute('aria-controls')}"]`);
+
+    test('a view options menu on the project List opens as a menu, is axe clean, and Escape hands focus back', async ({ page, state }) => {
+        const { shared } = state.projects;
+        await page.goto(`/#/${state.companyId}/project/${shared._id}/s/${state.tasks[0].sprintId}`);
+        await expect(page.getByRole('button', { name: 'E2E Task One', exact: true })).toBeVisible();
+
+        // The options button stays hidden until its view tab holds focus, so reach it the way a keyboard user does.
+        const views = page.getByRole('group', { name: 'Project views' });
+        const trigger = views.getByRole('button', { name: /^Options for the .+ view$/, includeHidden: true }).first();
+        await expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+        await views.getByRole('button').first().focus();
+        await page.keyboard.press('Tab');
+        await expect(trigger).toBeFocused();
+
+        await page.keyboard.press('Enter');
+        await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+        const menu = await controlledBy(page, trigger);
+        await expect(menu).toHaveAttribute('role', 'menu');
+        await expect(menu.getByRole('menuitem').first()).toBeFocused();
+        expect(await blockingViolations(page)).toEqual([]);
+
+        await page.keyboard.press('Escape');
+        await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+        await expect(menu).toHaveCount(0);
+        await expect(trigger).toBeFocused();
+    });
+
+    test('the task type picker in the task panel opens as a listbox, is axe clean, and Escape hands focus back', async ({ page, state, loginAs }) => {
+        const owner = await loginAs('owner');
+        const project = await createProject(owner.api, { name: `A11Y ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid });
+        const name = `Listbox ${uniqueSuffix()}`;
+        const task = await createTask(owner.api, { project, name, user: state.users.owner, companyOwnerId: owner.uid });
+        await page.goto(`/#/${state.companyId}/project/${project._id}/s/${task.sprintId}?task=${task._id}`);
+        const dialog = page.getByRole('dialog', { name: 'Task detail' });
+        await expect(dialog).toBeVisible();
+
+        const title = dialog.getByRole('listitem').filter({ has: page.getByRole('heading', { level: 2, name }) });
+        const trigger = title.locator('[aria-haspopup="listbox"]');
+        await expect(trigger).toHaveAttribute('aria-haspopup', 'listbox');
+        await trigger.focus();
+        await page.keyboard.press('Enter');
+        await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+        const listbox = await controlledBy(page, trigger);
+        await expect(listbox).toHaveAttribute('role', 'listbox');
+        await expect(listbox.getByRole('option', { selected: true })).toHaveCount(1);
+        expect(await blockingViolations(page)).toEqual([]);
+
+        await page.keyboard.press('Escape');
+        await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+        await expect(listbox).toHaveCount(0);
+        await expect(trigger).toBeFocused();
+        await expect(dialog).toBeVisible();
     });
 });
 
