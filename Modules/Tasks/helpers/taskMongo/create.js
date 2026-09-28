@@ -181,31 +181,21 @@ module.exports = {
                     }
                     tasksArray.push(obj);
                 });
-                resolve(tasksArray);
-                let count = 0;
-                const countFun = (obj) => {
-                    if(count >= tasksArray.length) {
-                        return;
-                    } else {
-                        let indexObj;
-                        indexObj = {
-                            indexName : "groupByStatusIndex",
-                            searchKey : "statusKey",
-                            searchValue : "1"
+                const indexObj = { indexName: "groupByStatusIndex", searchKey: "statusKey", searchValue: "1" };
+                // Answer once every task is written and name only those, so a caller can undo by the ids it gets back.
+                const createAll = async () => {
+                    const created = [];
+                    for (const obj of tasksArray) {
+                        try {
+                            await this.create({data: obj, user: userData, projectData, indexObj});
+                            created.push(obj);
+                        } catch (error) {
+                            logger.error(`ERROR in create task: ${error && error.message}`);
                         }
-                        this.create({data: obj, user: userData, projectData, indexObj})
-                        .then(() => {
-                            count++;
-                            countFun(tasksArray[count]);
-                        })
-                        .catch((error) => {
-                            console.error("ERROR in create task: ", error);
-                            count++;
-                            countFun(tasksArray[count]);
-                        })
                     }
-                }
-                countFun(tasksArray[count]);
+                    return created;
+                };
+                createAll().then(resolve).catch(reject);
             } catch (error) {
                 logger.error(`ERROR in create sub task : ${error.message}`);
                 reject(error);
