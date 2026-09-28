@@ -93,6 +93,7 @@ beforeEach(() => {
     mockDb.seed(SCHEMA_TYPE.USERS, { _id: OWNER, Employee_Name: 'Olivia Owner' });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
     submission = mockDb.seed(SCHEMA_TYPE.FORM_SUBMISSIONS, { formId: FORM, taskId: TASK });
+    mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: SPRINT, name: 'Sprint 1', projectId: PROJECT });
     mockDb.seed('tasks', taskDoc(TASK));
     mockDb.seed('tasks', taskDoc(OTHER_TASK));
 });
