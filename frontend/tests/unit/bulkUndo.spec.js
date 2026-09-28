@@ -11,7 +11,7 @@ const { apiRequest, toast } = vi.hoisted(() => ({
 
 vi.mock('@/services', () => ({ apiRequest }));
 vi.mock('vue-toast-notification', () => ({ useToast: () => toast }));
-vi.mock('@/composable/aiAvailability', () => ({ aiUsable: ref(false) }));
+vi.mock('@/composable/aiAvailability', () => ({ aiUsable: ref(false), canUseAi: () => false }));
 vi.mock('@/views/Projects/TableView/useTaskSummaries.js', () => ({ useTaskSummaries: () => ({ generateMany: vi.fn() }) }));
 vi.mock('@/composable', () => ({
     useCustomComposable: () => ({ checkPermission: () => true }),

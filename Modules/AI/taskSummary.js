@@ -10,6 +10,7 @@ const { memberProfiles } = require('../../utils/companyMembers');
 const { taskIdMatch } = require('../Comments/helpers/taskIdMatch');
 
 const { FEATURES } = require('../AICore/features');
+const { STATE, isAiOff } = require('../AICore/aiSwitch');
 
 let providerFactory = null;
 try {
@@ -148,7 +149,7 @@ async function summarizeTask({ companyId, uid, taskId, force = false }) {
         const task = await visibleTask({ companyId, uid, taskId, projection: { TaskName: 1, status: 1 } });
         if (!task) return { status: false, notFound: true, reason: TASK_NOT_FOUND };
         if (!providerFactory || typeof providerFactory.isAnyProviderConfigured !== 'function' || !providerFactory.isAnyProviderConfigured()) {
-            return { status: false, reason: 'no LLM provider configured' };
+            return { status: false, aiState: STATE.UNCONFIGURED, reason: 'no LLM provider configured' };
         }
 
         const { total, comments } = await loadComments(companyId, taskId);
@@ -169,6 +170,7 @@ async function summarizeTask({ companyId, uid, taskId, force = false }) {
         return { status: true, data: { ...data, cached: false } };
     } catch (error) {
         logger.error(`AI task summary failed: ${error && error.message ? error.message : error}`);
+        if (isAiOff(error)) return { status: false, aiState: error.scope === 'instance' ? STATE.OFF_INSTANCE : STATE.OFF_WORKSPACE, reason: error.message };
         return { status: false, reason: (error && error.message) || 'summary error' };
     }
 }

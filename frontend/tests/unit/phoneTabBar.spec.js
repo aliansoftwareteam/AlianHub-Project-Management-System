@@ -7,7 +7,7 @@ vi.mock('@/composable', () => ({
     useCustomComposable: () => ({ checkPermission: () => true }),
     useGetterFunctions: () => ({ getUser: () => ({ Employee_Name: 'Pat', Employee_Email: 'pat@example.test' }) })
 }));
-vi.mock('@/composable/aiAvailability', () => ({ aiUsable: ref(true) }));
+vi.mock('@/composable/aiAvailability', () => ({ aiUsable: ref(true), aiReachable: ref(true), canUseAi: () => true }));
 vi.mock('@/services', () => ({ useAuth: () => ({ logOut: vi.fn() }) }));
 vi.mock('vue-router', () => ({
     useRoute: () => ({ name: 'Home', fullPath: '/', path: '/' }),

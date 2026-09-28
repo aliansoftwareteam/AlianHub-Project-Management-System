@@ -1012,7 +1012,7 @@ const schema = {
         steps: { type: Array, default: [], required: false },
         // Set once the run took in content from outside the workspace (Modules/Agents/taint.js); absent on a clean run
         tainted: { type: Boolean, required: false },
-        // [{ kind: fetch | email | form | webhook | file | passage, ref, at }] — where it came from, never the content
+        // [{ kind: fetch | email | form | webhook | file | passage | client | instruction, ref, at }] — where it came from, never the content
         taintSources: { type: Array, default: undefined, required: false },
     },
     agentRevisions: {
@@ -2169,6 +2169,15 @@ const schema = {
         },
         accessibilityPreferences: {
             singleKeyShortcuts: { type: Boolean, required: false }
+        },
+        // Written by Settings > Language (frontend/src/views/Settings/Language/localePrefs.js).
+        localePreferences: {
+            language: { type: String, required: false },
+            numerals: { type: String, required: false },
+            dateFormat: { type: String, required: false },
+            numberFormat: { type: String, required: false },
+            weekStart: { type: String, required: false },
+            currency: { type: String, required: false }
         },
         // Stars across companies live on the global user record, so each entry names its company.
         favourites: {
