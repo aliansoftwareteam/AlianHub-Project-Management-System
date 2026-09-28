@@ -253,4 +253,5 @@ onMounted(async () => {
 .aw__level { display: flex; flex-direction: column; gap: 2px; }
 .aw__skills { display: flex; flex-wrap: wrap; gap: 4px; }
 .aw__why { margin: 2px 0 0; color: var(--ink-2); }
+.aw__schedule { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; font: var(--text-body); cursor: pointer; }
 </style>
