@@ -7,7 +7,7 @@
         <div class="checklist-main mobile__bg--withPadding">
             <div class="d-flex align-items-center">
                 <h3 :class="{'font-size-16 font-weight-600' : clientWidth <=767 , 'font-size-14 font-weight-700' : clientWidth > 767 }" class="black checklist-main__title">{{$t('Checklist.checklist')}}</h3>
-                <div class="d-flex align-items-center ml-auto" @click="generateChecklistWithAi()" v-if="checkApps('AI',project) && checkPermission('task.task_checklist',project?.isGlobalPermission) === true">
+                <div class="d-flex align-items-center ml-auto" @click="generateChecklistWithAi()" v-if="canUseAi({ project, permitted: checkPermission('task.task_checklist',project?.isGlobalPermission) === true })">
                     <img :src="aiIcon" class="mr-3px" />
                     <span class="cursor-pointer ai-color ai-border-bottom font-size-14 font-weight-500 checklist-main__suggest" :class="[{'pointer-event-none' : isSpinnerAi}]">{{$t('Checklist.suggest_checklists')}}</span>
                 </div>
@@ -143,6 +143,7 @@ import { apiRequest } from '../../../services';
 import { useToast } from 'vue-toast-notification';
 import AiCheckList from './AiCheckList.vue';
 import { useAiApiFunction } from "@/composable/aiHelper";
+import { canUseAi } from "@/composable/aiAvailability";
 import { isChecklistItem, parseGeneratedList } from "@/utils/parseGeneratedList";
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue";
 import Skelatons from '@/components/atom/Skelaton/Skelaton.vue';
@@ -151,7 +152,7 @@ const { t } = useI18n();
 import taskClass from "@/utils/TaskOperations";
 
 // UTILS
-const {makeUniqueId, checkPermission,checkApps,debouncerWithPromise} = useCustomComposable();
+const {makeUniqueId, checkPermission,debouncerWithPromise} = useCustomComposable();
 const { getUser } = useGetterFunctions();
 const { getters } = useStore();
 const $toast = useToast();

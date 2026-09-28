@@ -71,7 +71,7 @@
                             :title="column.field ? column.label : null"
                         >
                             <AiFieldColumnHead v-if="column.field && isAiField(column.field)" :field="column.field" :tasks="aiColumnTasks" :editable="rowEdit.rights.value.customField === true" />
-                            <template v-else>{{ column.id === 'risk' ? '✦ ' : '' }}{{ column.field ? column.label : $t(column.labelKey) }}</template>
+                            <template v-else>{{ column.field ? column.label : $t(column.labelKey) }}</template>
                         </span>
                     </div>
 

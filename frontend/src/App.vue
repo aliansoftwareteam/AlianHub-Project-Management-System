@@ -100,7 +100,7 @@ import { initOffline } from '@/offline';
 import * as env from '@/config/env';
 import {tabSyncHelper} from '@/utils/tabSyncs.js';
 const AiOffPage = defineAsyncComponent(() => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiOffPage.vue'));
-import { aiAvailability, loadAiAvailability } from '@/composable/aiAvailability';
+import { aiAvailability, loadAiAvailability, trackAiPlan } from '@/composable/aiAvailability';
 import { AI_GATE, aiGateFor } from '@/router/ai/gate';
 const {tabSync} = tabSyncHelper();
 const mainTour = ref();
@@ -140,6 +140,8 @@ const aiGated = computed(() => aiGateFor(route.name, aiAvailability.state) === A
 watch(() => [logged.value, currentCompany.value?._id], ([isLogged, cid]) => {
     if (isLogged && cid) loadAiAvailability(cid);
 }, { immediate: true });
+
+watch(() => currentCompany.value?.planFeature, trackAiPlan, { immediate: true, deep: true });
 
 watch(() => currentUser.value, (val) => {
     if(val?.isVesionUpdate){
