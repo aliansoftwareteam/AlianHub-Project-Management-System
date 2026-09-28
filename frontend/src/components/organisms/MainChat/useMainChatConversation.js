@@ -441,9 +441,8 @@ export function useMainChatConversation(options) {
     /* ------------------------------------------------------------------ *
      * unread counts + notifications
      *
-     * Ported from the shared comment component so the new surface keeps the
-     * recipient side working: without these the message still saves, but the
-     * other person gets no unread badge and no push notification.
+     * The server raises the other people's unread counts when the comment is
+     * saved; the push notification is still sent from here.
      * ------------------------------------------------------------------ */
 
     /** Drop anyone who muted this project; add anyone watching all activity. */
@@ -459,20 +458,6 @@ export function useMainChatConversation(options) {
         });
 
         return [...new Set(out)].filter((uid) => uid && uid !== userId.value);
-    }
-
-    /** Bump the unread counter for everyone else in the conversation. */
-    function bumpUnread() {
-        const { projectId, sprintId, taskId } = ctx.value;
-        const userIds = resolveRecipients();
-        if (!userIds.length) return;
-
-        const payload = taskId
-            ? { companyId: companyId.value, key: 2, projectId, userIds, taskId, sprintId, prevCount: 0 }
-            : { companyId: companyId.value, key: 1, projectId, userIds };
-
-        apiRequest('post', env.UPDATE_UNREADREAD_COMMENTS_COUNT, payload)
-            .catch((error) => console.error('MainChat: unread bump failed', error));
     }
 
     /** Web-push for a chat message, mirroring the existing chat notification. */
@@ -524,7 +509,6 @@ export function useMainChatConversation(options) {
 
     function announce(doc) {
         if (!doc) return;
-        bumpUnread();
         pushNotification(doc);
         touchConversationPreview(doc);
     }

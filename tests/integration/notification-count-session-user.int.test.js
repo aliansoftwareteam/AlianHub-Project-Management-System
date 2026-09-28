@@ -33,15 +33,15 @@ afterAll(async () => {
 });
 
 describe('updateunreadcommentscount takes the company and user from the verified request', () => {
-    it('bumps a teammate\'s unread count, as sending a comment does', async () => {
+    it('refuses to raise a teammate\'s unread count, which the server raises when a comment is saved', async () => {
         const res = await member.api.post('/api/v1/updateunreadcommentscount', { companyId: member.companyId, key: 1, projectId: PROJECT._id, userIds: [owner.userId] });
 
-        expect(res.body).toMatchObject({ status: true });
-        expect(await countOf(owner.userId)).toBe(1);
+        expect(res.status).toBe(403);
+        expect(await countOf(owner.userId)).toBe(0);
     });
 
     it('marks the signed-in user read', async () => {
-        await member.api.post('/api/v1/updateunreadcommentscount', { companyId: member.companyId, key: 1, projectId: PROJECT._id, userIds: [owner.userId] });
+        await counters().updateOne({ userId: String(owner.userId) }, { $set: { [FIELD]: 1 } }, { upsert: true });
         const res = await owner.api.post('/api/v1/updateunreadcommentscount', { companyId: owner.companyId, key: 1, projectId: PROJECT._id, userIds: [owner.userId], read: true });
 
         expect(res.body).toMatchObject({ status: true });
@@ -49,7 +49,7 @@ describe('updateunreadcommentscount takes the company and user from the verified
     });
 
     it('refuses to mark someone else read and leaves their count alone', async () => {
-        await member.api.post('/api/v1/updateunreadcommentscount', { companyId: member.companyId, key: 1, projectId: PROJECT._id, userIds: [owner.userId] });
+        await counters().updateOne({ userId: String(owner.userId) }, { $set: { [FIELD]: 1 } }, { upsert: true });
         const res = await member.api.post('/api/v1/updateunreadcommentscount', { companyId: member.companyId, key: 1, projectId: PROJECT._id, userIds: [owner.userId], read: true });
 
         expect(res.status).toBe(403);
@@ -67,7 +67,7 @@ describe('updateunreadcommentscount takes the company and user from the verified
         const stranger = new ObjectId().toHexString();
         const res = await member.api.post('/api/v1/updateunreadcommentscount', { companyId: member.companyId, key: 1, projectId: PROJECT._id, userIds: [stranger] });
 
-        expect(res.body).toMatchObject({ status: true });
+        expect(res.status).toBe(403);
         expect(await counters().countDocuments({ userId: stranger })).toBe(0);
     });
 });
