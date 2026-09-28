@@ -307,11 +307,7 @@
                 </div>
 
                 <div class="ah-detail__prop-group" v-if="checkApps('TimeTracking', projectData)">
-                    <div class="ah-detail__prop">
-                        <span class="ah-detail__prop-label">{{ $t('TaskPanel.logged') }}</span>
-                        <span class="ah-mono">{{ loggedText }}</span>
-                    </div>
-                    <TaskTimerChip v-if="!isMobile" :task="task" :project="projectData" :canStart="canTrack" @logged="refreshLogged" />
+                    <TaskTimeSection ref="timeSectionRef" :task="task" :project="projectData" :canTrack="canTrack" :showTimer="!isMobile" />
                 </div>
 
                 <div class="ah-detail__prop-group">
@@ -372,6 +368,7 @@ import { showUndoToast } from "@/composable/useUndoToast";
 import { useEscapeLayer } from "@/composable/useEscapeLayer";
 import TaskSubtaskList from "./TaskSubtaskList.vue";
 import TaskTimerChip from "./TaskTimerChip.vue";
+import TaskTimeSection from "./TaskTimeSection.vue";
 import TaskAgentStrip from "./TaskAgentStrip.vue";
 import AiResultPreview from "@/components/molecules/AiPreview/AiResultPreview.vue";
 import { canControlRun } from "@/views/Ai/agentAccess";
@@ -381,7 +378,6 @@ import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { publicConfig } from "@/config/publicConfig";
 import { aiUsable } from "@/composable/aiAvailability";
-import { dbCollections } from "@/utils/Collections";
 import { statusChipStyle } from "@/utils/statusChipColors";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { useUpdateTasks } from "@/views/Projects/helper";
@@ -431,7 +427,7 @@ const subTaskLimit = 35;
 const fetchedSubtaskCount = ref(null);
 const isSpinner = ref(true);
 const relations = ref([]);
-const loggedMinutes = ref(null);
+const timeSectionRef = ref(null);
 const commentTotal = ref(0);
 const tagChipArray = ref([]);
 const tagIds = ref({});
@@ -462,7 +458,7 @@ const users = computed(() => getters["settings/companyUsers"]?.map((x) => x.user
 const canComment = computed(() => checkPermission("task.task_comment", projectData.value?.isGlobalPermission) === true);
 const canSeeHistory = computed(() => checkPermission("task.task_activity_log", projectData.value?.isGlobalPermission) === true);
 const canSetStatus = computed(() => checkPermission("task.task_status", projectData.value?.isGlobalPermission) === true);
-const canTrack = computed(() => (task.value?.AssigneeUserId || []).includes(currentUserId.value) && !isDone.value);
+const canTrack = computed(() => !isDone.value);
 const isSupportProject = computed(() => process.env.VUE_APP_SUPPORT_PROJECTID === projectData.value._id);
 const productData = computed(() => ({
     customerId: task.value?.customField?.[process.env.VUE_APP_CUSTOMFIELDID]?.fieldValue,
@@ -544,14 +540,6 @@ const commentUsers = computed(() => {
     if (sprintData.value?.private) return Array.from(new Set([...(sprintData.value?.AssigneeUserId || []), ...(task.value.watchers || [])]));
     if (projectData.value?.isPrivateSpace) return [...(projectData.value?.AssigneeUserId || [])];
     return [...(users.value || [])];
-});
-
-const loggedText = computed(() => {
-    const minutes = loggedMinutes.value;
-    if (minutes === null) return "…";
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    return h ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
 });
 
 function formatDay(value) {
@@ -786,19 +774,7 @@ function fetchRelations() {
 }
 
 function refreshLogged() {
-    if (!task.value?._id) return;
-    apiRequest("post", env.MONGO_OPRATION, {
-        dbName: props.companyId,
-        collection: dbCollections.TIMESHEETS,
-        methodName: "aggregate",
-        dataObj: [[{ $match: { TicketID: task.value._id } }, { $group: { _id: null, total: { $sum: "$LogTimeDuration" } } }]]
-    }).then((response) => {
-        const rows = response?.data?.data;
-        loggedMinutes.value = Array.isArray(rows) && rows[0] ? Number(rows[0].total) || 0 : 0;
-    }).catch((error) => {
-        console.error("ERROR in logged time: ", error);
-        loggedMinutes.value = 0;
-    });
+    timeSectionRef.value?.refresh();
 }
 
 function fetchSubtaskCount() {

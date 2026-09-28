@@ -172,6 +172,7 @@
                     </template>
                 </template>
             </div>
+            <TaskRepeatControl v-if="task?._id && !isSupport" :task="task" :project="project" />
              <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
                 <div class="task-detail-field-name">{{$t('UserTimesheet.estimated')}}</div>
                 <Skelaton v-if="isMainSpinner" style="height: 24px;" class="w-100px border-radius-7-px"/>
@@ -288,6 +289,7 @@ import { showUndoToast } from '@/composable/useUndoToast';
 import { assignAgent, fetchRunnableAgents } from '@/views/Ai/useRunnableAgents';
 import AiResultPreview from '@/components/molecules/AiPreview/AiResultPreview.vue';
 import { useEscapeLayer } from '@/composable/useEscapeLayer';
+import TaskRepeatControl from '@/components/organisms/TaskDetailOverlay/TaskRepeatControl.vue';
 
 const aiEstimateIcon = require("@/assets/images/svg/ai_image.svg");
 const { t } = useI18n();
