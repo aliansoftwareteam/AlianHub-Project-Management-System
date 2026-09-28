@@ -249,6 +249,10 @@ const verifyJWTTokenWithCRoute = [
     // Ask (handoff 13i) — retrieval is scoped to req.uid's own visible projects,
     // so the handler is only correct when this populates req.uid.
     '/api/v1/ai/ask',
+    '/api/v1/ai/memory',
+    '/api/v1/ai/feedback',
+    '/api/v1/ai/quality',
+    '/api/v1/ai/notes-to-tasks',
     // Personal API tokens (Modules/ApiTokens). app.use prefix-matching
     // covers /:id, /:id/logs and /me too. Routes were previously
     // unauthenticated (trusted body userData) — now JWT-protected; the
