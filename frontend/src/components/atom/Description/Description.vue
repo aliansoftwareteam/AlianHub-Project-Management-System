@@ -1,7 +1,7 @@
 <template>
     <div class="description-wrapper">
         <div v-if="noDescription" class="description_componenet">
-            <div class="bg-white border-radius-8-px mt-1 p-10px" :class="{'ml-10px mr-5-px': clientWidth < 767}">
+            <div class="description__add-box border-radius-8-px mt-1 p-10px" :class="{'ml-10px mr-5-px': clientWidth < 767}">
                 <button @click="noDescription = false" class="add_description_button">
                     {{$t('PlaceHolder.Add_description')}}
                 </button>

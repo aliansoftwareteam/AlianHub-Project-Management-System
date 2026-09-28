@@ -123,7 +123,7 @@ import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
 import { useShipping, runElapsed } from "./useShipping";
 import { reasonOf } from "./useAgents";
-import { skillLabel } from "./plainLabels";
+import { proposalTitle, skillLabel } from "./plainLabels";
 
 // 28a — one task through five stages. Stages 4 and 5 are not written here: the
 // gate and the hard stop are read from the registry manifest, so removing
@@ -240,7 +240,7 @@ const stages = computed(() => {
         evidence: gatedProposals.value.slice(0, 4).map((p) => ({
             agent: true,
             who: p.agentName,
-            what: `${p.what} — ${proposalOutcome(p)}`,
+            what: `${proposalTitle(t, p)} — ${proposalOutcome(p)}`,
             at: at(p.createdAt)
         })),
         audit: auditDecisions.value

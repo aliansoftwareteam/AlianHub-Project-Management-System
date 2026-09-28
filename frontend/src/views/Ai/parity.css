@@ -157,7 +157,7 @@
 .ask__card span { font: var(--text-small); color: var(--ink-2); }
 .ask__card--research { border-color: var(--brand); background: var(--brand-tint); }
 .ask__card--research strong { color: var(--brand); }
-.ask__answer { white-space: pre-wrap; font: var(--text-body); line-height: 1.6; color: var(--ink); }
+.ask__answer { font: var(--text-body); line-height: 1.6; color: var(--ink); }
 .ask__cites { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
 .ask__cite { display: flex; gap: 8px; align-items: baseline; font: var(--text-small); color: var(--ink-label); }
 .ask__cite-ref { font: var(--text-data); color: var(--brand); flex: none; }

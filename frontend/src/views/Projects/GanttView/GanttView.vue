@@ -75,7 +75,7 @@
                         <span v-if="i === 0" class="gv__replan-tag">✦ {{ $t('Views.replan') }}:</span> {{ line }}
                     </p>
                     <p v-for="p in proposals" :key="p._id" class="gv__replan-line">
-                        <span class="gv__replan-tag">✦ {{ p.agentName }}:</span> {{ p.what }}
+                        <span class="gv__replan-tag">✦ {{ p.agentName }}:</span> {{ proposalTitle(t, p) }}
                         <router-link class="gv__replan-link" :to="{ name: 'AiInbox', params: { cid: companyId } }">{{ $t('Views.review') }}</router-link>
                     </p>
                 </div>
@@ -88,6 +88,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, inject, nextTick } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
+import { proposalTitle } from '@/views/Ai/plainLabels';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
