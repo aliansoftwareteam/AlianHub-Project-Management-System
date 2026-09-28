@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 process.env.STORAGE_TYPE = 'server';
 
 const mockDb = require('./fixtures/fakeMongo').create();
@@ -46,7 +47,7 @@ const call = async (handler, { params = {}, body = {} } = {}) => {
     res.status = (code) => { res.statusCode = code; return res; };
     res.send = (b) => { res.body = b; return res; };
     res.json = res.send;
-    await handler({ uid: ME, params, body, query: {}, headers: { companyid: C } }, res);
+    await handler(verified({ uid: ME, params, body, query: {}, headers: { companyid: C } }), res);
     return res;
 };
 

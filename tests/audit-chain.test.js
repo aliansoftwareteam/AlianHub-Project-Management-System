@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const crypto = require('crypto');
 
 const mockDb = require('./fixtures/fakeMongo').create();
@@ -845,7 +846,7 @@ describe('the filtered audit log', () => {
     const OWNER = '6f0000000000000000000001';
     const list = async (query) => {
         const res = { status: () => res, json: (b) => { res.body = b; return res; }, send: (b) => { res.body = b; return res; } };
-        await require('../Modules/Audit/controller').listAuditLogs({ uid: OWNER, headers: { companyid: CID }, query, body: {} }, res);
+        await require('../Modules/Audit/controller').listAuditLogs(verified({ uid: OWNER, headers: { companyid: CID }, query, body: {} }), res);
         return res.body;
     };
     const inLists = (value, found = []) => {
@@ -898,7 +899,7 @@ describe('the audit log export', () => {
         const res = { setHeader: () => {}, write: (b) => { chunks.push(String(b)); return true; }, end: () => {} };
         res.status = () => res;
         res.json = (b) => { chunks.push(JSON.stringify(b)); return res; };
-        await require('../Modules/Audit/controller').exportAuditCsv({ uid: OWNER, headers: { companyid: CID }, query, body: {} }, res);
+        await require('../Modules/Audit/controller').exportAuditCsv(verified({ uid: OWNER, headers: { companyid: CID }, query, body: {} }), res);
         return chunks.join('').split('\n');
     };
 

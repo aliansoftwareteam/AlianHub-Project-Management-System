@@ -23,7 +23,7 @@ const HIDDEN = '6f00000000000000000ca022';
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const feeds = () => mockDbFor(SCHEMA_TYPE.GOLBAL).store[SCHEMA_TYPE.CALENDAR_FEEDS] || [];
 
-const run = async (handler, { uid, params = {}, body = {}, aud } = {}) => {
+const run = async (handler, { uid, params = {}, body = {}, aud = COMPANY } = {}) => {
     const res = { statusCode: 200, headers: {} };
     res.status = (code) => { res.statusCode = code; return res; };
     res.json = (payload) => { res.body = payload; return res; };

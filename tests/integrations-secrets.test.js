@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
@@ -13,7 +14,7 @@ const PLAIN = 'PlaintextVerificationToken1';
 const SECOND = 'SecondVerificationToken22';
 const res = () => { const r = { body: null }; r.send = (b) => { r.body = b; return r; }; r.json = r.send; r.status = () => r; return r; };
 const COMPANY = '6f0000000000000000000c01';
-const req = (body, extra = {}) => ({ headers: { companyid: COMPANY }, body, uid: 'u1', params: {}, ...extra });
+const req = (body, extra = {}) => verified({ headers: { companyid: COMPANY }, body, uid: 'u1', params: {}, ...extra });
 
 beforeAll(() => { process.env.JWT_SECRET = 'test-secret'; });
 

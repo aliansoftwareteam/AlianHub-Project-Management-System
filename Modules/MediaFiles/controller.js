@@ -3,6 +3,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { escapeRegex } = require("../../utils/escapeRegex");
+const { taskIdMatch } = require("../Comments/helpers/taskIdMatch");
 
 exports.getPaginateMediaFiles = async (req, res) => {
     try {
@@ -69,7 +70,7 @@ exports.getPaginateMediaFiles = async (req, res) => {
                 { projectId: new mongoose.Types.ObjectId(parsedSelectedData.ProjectID) },
                 { project: false },
                 { sprintId: new mongoose.Types.ObjectId(parsedSelectedData.sprintId) },
-                { taskId: new mongoose.Types.ObjectId(parsedSelectedData._id) }
+                { taskId: taskIdMatch(parsedSelectedData._id) }
             );
         } else if (handleType === 'project') {
             matchConditions.unshift(
@@ -81,11 +82,7 @@ exports.getPaginateMediaFiles = async (req, res) => {
                 { projectId: new mongoose.Types.ObjectId(parsedSelectedData.ProjectID) },
                 { project: false },
                 { sprintId: new mongoose.Types.ObjectId(parsedSelectedData.sprintId) },
-                {
-                    taskId: parsedSelectedData._id === 'default'
-                        ? 'default'
-                        : new mongoose.Types.ObjectId(parsedSelectedData._id)
-                }
+                { taskId: taskIdMatch(parsedSelectedData._id) }
             );
         }
 
@@ -146,7 +143,7 @@ exports.getMediaFileUsers = async (req, res) => {
                 { projectId: new mongoose.Types.ObjectId(parsedSelectedData.ProjectID) },
                 { project: false },
                 { sprintId: new mongoose.Types.ObjectId(parsedSelectedData.sprintId) },
-                { taskId: new mongoose.Types.ObjectId(parsedSelectedData._id) },
+                { taskId: taskIdMatch(parsedSelectedData._id) },
                 { type: { $in: ['audio'] } },
                 { isDeleted: false },
             ];
@@ -162,9 +159,7 @@ exports.getMediaFileUsers = async (req, res) => {
                 { projectId: new mongoose.Types.ObjectId(parsedSelectedData.ProjectID) },
                 { project: false },
                 { sprintId: new mongoose.Types.ObjectId(parsedSelectedData.sprintId) },
-                { taskId: parsedSelectedData._id === 'default'
-                    ? 'default'
-                    : new mongoose.Types.ObjectId(parsedSelectedData._id) },
+                { taskId: taskIdMatch(parsedSelectedData._id) },
                 { type: { $in: ['audio'] } },
                 { isDeleted: false },
             ];
