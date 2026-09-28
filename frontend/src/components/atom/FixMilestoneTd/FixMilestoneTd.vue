@@ -24,10 +24,10 @@
         <div>
             <div class="d-flex align-items-center">
                 <span @click="permissionData ? $emit('editMilestonetd','edit',fixMilestoneIndex,true) : '',permissionData ? focusInputForFix('amount',fixMilestoneIndex,'amount') : ''" :class="[{'paymentcancelled':fixMilestoneProps.statusArray && fixMilestoneProps.statusArray.length > 0 ? fixMilestoneProps.statusArray[fixMilestoneProps.statusArray.length - 1].milestoneStatusColor.includes('CANCELLED'):''}]">{{currencyMilestone.symbol}} {{getCommaSeperatedNumber(fixMilestoneProps.amount)}}</span>
-                <DropDown v-if="fixMilestoneProps.refundedAmount && fixMilestoneProps.refundedAmount.length" id="amonut_history" class="status_change_dropdown">
-                    <template #button>
-                        <button class="cursor-pointer dot-btn border-0">
-                            <img v-if="props.planCondition" :src="detaildropdown" alt="detaildropdown" class="left_space_wrapper" />
+                <DropDown v-if="fixMilestoneProps.refundedAmount && fixMilestoneProps.refundedAmount.length" id="amonut_history" mode="menu" class="status_change_dropdown">
+                    <template #button="{ triggerAttrs }">
+                        <button type="button" class="cursor-pointer dot-btn border-0" :aria-label="$t('Milestone.refund_details')" v-bind="triggerAttrs">
+                            <img v-if="props.planCondition" :src="detaildropdown" alt="" class="left_space_wrapper" />
                         </button>
                     </template>
                     <template #options>
@@ -99,10 +99,10 @@
                 </div>
             </template>
             <div class="statushistory">
-                <DropDown id="fix_milestone_status_dropdown" class="status_change_dropdown">
-                    <template #button>
-                        <button class="cursor-pointer dot-btn border-0">
-                            <img v-if="props.planCondition" :src="statushistory" alt="statushistory" @click="props.planCondition ? $emit('valueBody',true) : $emit('valueBody',false)">
+                <DropDown id="fix_milestone_status_dropdown" mode="menu" class="status_change_dropdown">
+                    <template #button="{ triggerAttrs }">
+                        <button type="button" class="cursor-pointer dot-btn border-0" :aria-label="$t('Milestone.status_history')" v-bind="triggerAttrs">
+                            <img v-if="props.planCondition" :src="statushistory" alt="" @click="props.planCondition ? $emit('valueBody',true) : $emit('valueBody',false)">
                         </button>
                     </template>
                     <template #options>

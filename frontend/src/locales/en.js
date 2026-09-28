@@ -4849,6 +4849,7 @@ export default {
         no_tags_found: "No Tags Found",
         search_or_create_new: "Search or Create New",
         change_color: "Change Color",
+        tag_actions: "Actions for the {name} tag",
         delete_tag: "Delete Tag",
         delete_tag_desc:
             "Are you sure you want to delete the tag everywhere in this Space?",
@@ -5338,6 +5339,9 @@ export default {
             "The milestone status field must be at least 3 characters",
         actual_amount: "Actual Amount",
         partially_refunded: "Partially refunded",
+        refund_details: "Refund details",
+        status_history: "Status history",
+        time_logged_by_member: "Time logged by each member",
         refunded_amount_should_not_exceed_amount:
             "The refunded amount field should not be more than the amount",
         total_partially_refunded: "Total partially refunded",
@@ -5542,6 +5546,7 @@ export default {
         create_template: "Create Template",
         new_template: "New Template",
         remove: "Remove",
+        item_actions: "Actions for {name}",
         enable_apps: "Enable Apps",
         Turn: "Turn",
         all_apps: "all Apps",

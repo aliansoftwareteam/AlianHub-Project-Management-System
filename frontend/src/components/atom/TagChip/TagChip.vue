@@ -28,23 +28,23 @@
             <div class="tagname__contianer d-flex">
                 <span class="tagname" :title="data.tagName" :class="[{'threedots' : clientWidth < 767 || showClass}]">{{data.tagName}}</span>
             </div>
-            <DropDown @isVisible="(val)=> visible = val" v-if="checkPermission('task.task_tag',prjectGlobalPermission) === true">
+            <DropDown mode="menu" @isVisible="(val)=> visible = val" v-if="checkPermission('task.task_tag',prjectGlobalPermission) === true">
                 <template #button>       
-                    <img  :src="threedots" class="cursor-pointer tagHover__icon ml-2px"  alt="" :class="{threedots:showClass}"  @click="showClass = true" :ref="Did"/>  
+                    <img  :src="threedots" class="cursor-pointer tagHover__icon ml-2px"  :alt="$t('Tags.tag_actions', { name: data.tagName })" :class="{threedots:showClass}"  @click="showClass = true"/>  
                     </template>
                 <template #options> 
                     <div class="">
-                        <ul class="tag-edit-option justify-content-start">
-                            <li class="mainDiv justify-content-start" @click="$refs[Did].click(),EditChips('isRename')">
-                                <img :src="renameimage" class="inner-tagedit-list-item"/>
+                        <ul class="tag-edit-option justify-content-start" role="none">
+                            <li class="mainDiv justify-content-start" role="menuitem" @click="EditChips('isRename')">
+                                <img :src="renameimage" class="inner-tagedit-list-item" alt=""/>
                                 <span>{{$t("Projects.rename")}}</span>
                             </li>
-                            <li class="mainDiv justify-content-start" @click=" $refs[Did].click(),EditChips('isColor')">
-                                <img :src="colorimage" class="inner-tagedit-list-item"/>
+                            <li class="mainDiv justify-content-start" role="menuitem" @click="EditChips('isColor')">
+                                <img :src="colorimage" class="inner-tagedit-list-item" alt=""/>
                                 <span>{{$t("Tags.change_color")}}</span>
                             </li>
-                            <li class="mainDiv justify-content-start" @click=" $refs[Did].click(),EditChips('isDelete'),showSidebar = true">
-                                <img :src="deleteimage" class="inner-tagedit-list-item"/>
+                            <li class="mainDiv justify-content-start" role="menuitem" @click="EditChips('isDelete'),showSidebar = true">
+                                <img :src="deleteimage" class="inner-tagedit-list-item" alt=""/>
                                 <span class="red">{{$t("Projects.delete")}}</span>
                             </li>
                         </ul>
@@ -83,7 +83,7 @@ import { useToast } from 'vue-toast-notification';
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
 
-const {makeUniqueId,checkPermission} = useCustomComposable();
+const {checkPermission} = useCustomComposable();
 const clientWidth = inject('$clientWidth');
 const threedots = require("@/assets/images/svg/tagdots.svg")
 const cross = require("@/assets/images/svg/tagcross.svg")
@@ -98,7 +98,6 @@ const editStatus = ref()
 const tagColor = ref('#000000')
 const tagBgColor = ref('#C8C8C8')
 const renameVal = ref('')
-const Did = ref("custom"+makeUniqueId(5));
 const Data = ref()
 const renameErrorMessage = ref("")
 const toast = useToast()

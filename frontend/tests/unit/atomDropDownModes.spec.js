@@ -62,7 +62,7 @@ describe('atom pickers are listboxes that mark the current value', () => {
         expect(button.tagName).toBe('BUTTON');
         expect(button.getAttribute('aria-haspopup')).toBe('listbox');
         expect(button.getAttribute('aria-expanded')).toBe('false');
-        expect(button.textContent).toContain('Doing');
+        expect(button.querySelector('[role="img"]').getAttribute('aria-label')).toBe('Doing');
         const list = await openPanel();
         expect(button.getAttribute('aria-expanded')).toBe('true');
         expect(list.getAttribute('role')).toBe('listbox');
