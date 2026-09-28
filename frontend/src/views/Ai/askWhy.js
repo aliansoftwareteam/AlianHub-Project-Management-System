@@ -1,6 +1,7 @@
 export const KIND_KEYS = Object.freeze({
     task: "Ask.kind_task",
     page: "Ask.kind_page",
+    project: "Ask.kind_project",
     comment: "Ask.kind_comment",
     transcript: "Ask.kind_transcript"
 });

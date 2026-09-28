@@ -10,6 +10,9 @@ const feedback = require('./feedback');
 const quality = require('./quality');
 const aiProfile = require('./aiProfile');
 const aiProfileImport = require('./aiProfileImport');
+const askBuild = require('./askBuild');
+const { requireTaskWritePermission } = require('../../Config/permissionGuard');
+const { TASK_WRITE_ROUTES } = require('../../Config/taskWritePermissions');
 const { chatSummaryHandler } = require('./chatSummary');
 
 exports.init = (app) => {
@@ -51,6 +54,8 @@ exports.init = (app) => {
     app.delete('/api/v1/ai/memory', aiProfile.clearProfile);
     app.post('/api/v1/ai/memory/import/preview', aiProfileImport.previewImport);
     app.post('/api/v1/ai/memory/import/confirm', aiProfileImport.confirmImport);
+    app.get('/api/v1/ai/ask/build/:projectId', askBuild.buildTarget);
+    app.post('/api/v1/ai/ask/create-tasks', requireTaskWritePermission(TASK_WRITE_ROUTES['POST /api/v1/ai/ask/create-tasks'].entry), askBuild.createTasks);
     // Talk to Text — audio → text via OpenAI Whisper (multipart, field "file").
     app.post('/api/v1/ai/transcribe', ...transcribe.transcribe);
     app.post('/api/v1/ai/meeting-notes', meetingNotes.meetingNotesHandler);

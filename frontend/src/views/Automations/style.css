@@ -22,6 +22,26 @@
 .au__ambiguous-opts { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .au__errors { margin: 0; padding: 10px 14px 10px 28px; background: var(--danger-bg); border-radius: var(--r-card); color: var(--danger-ink); font: var(--text-small); }
+div.au__errors { padding-left: 14px; }
+div.au__errors ul { margin: 4px 0 0; padding-left: 14px; }
+.au__ai-rejected-title { margin: 0; }
+
+.au__ai { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.au__ai-note { margin: 0; color: var(--ink-2); }
+.au__ai-mark { color: var(--brand); }
+.au__ai .ah-btn { gap: 6px; }
+.au__ai-unmapped { margin: 0; padding: 10px 14px 10px 28px; background: var(--warn-bg); border-radius: var(--r-card); color: var(--warn-ink); font: var(--text-small); overflow-wrap: anywhere; }
+.au__ai-banner {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 10px 14px;
+    background: var(--brand-tint);
+    border: 1px solid var(--brand-border);
+    border-radius: var(--r-card);
+    color: var(--ink);
+    font: var(--text-body);
+}
+.au__ai-banner:focus-visible { outline: none; box-shadow: var(--focus); }
+.au__ai-banner .ah-small { color: var(--ink-2); }
 
 .au__compiled {
     padding: 12px 14px;

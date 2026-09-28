@@ -135,6 +135,7 @@ const notATaskWrite = (by) => Object.freeze({ judged: NOT_A_TASK_WRITE, by });
 const TASK_WRITE_ROUTES = Object.freeze({
 'PATCH /api/tasks/': { judged: ACTIONS, actions: PRE_V2_TASK_ACTIONS },
     'POST /api/v2/tasks': { judged: ROUTE, entry: tokenEnforcedEntry('task.task_create') },
+    'POST /api/v1/ai/ask/create-tasks': { judged: ROUTE, entry: tokenEnforcedEntry('task.task_create') },
     'PATCH /api/v2/tasks': { judged: ACTIONS, actions: TASK_ACTIONS },
     'POST /api/v2/tasks/bulk': { judged: ACTIONS, actions: TASK_ACTIONS },
     'POST /api/v2/tasks/relations': { judged: ACTIONS, actions: RELATION_ACTIONS },

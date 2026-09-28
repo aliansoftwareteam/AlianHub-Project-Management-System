@@ -22,6 +22,7 @@ const RULES = {
             next_week: ['due next week'],
             soon: ['due soon', 'coming due', 'due in the next few days', 'due in the next 7 days', 'upcoming deadlines'],
             none: ['no due date', 'no due dates', 'without a due date', 'without due dates', 'undated'],
+            urgent: ['urgent', 'urgent work', 'urgent tasks', 'overdue or due soon', 'overdue, due soon or high priority', 'overdue, due soon, or high priority'],
         },
         sprint: {
             word: ['sprint', 'sprints'],
@@ -212,6 +213,7 @@ const dueWindow = (window, { now = new Date(), timeZone = 'UTC' } = {}) => {
         case 'next_week': return { from: at(week.plus({ weeks: 1 })), before: at(week.plus({ weeks: 2 })) };
         case 'soon': return { from: at(today), before: at(today.plus({ days: 8 })) };
         case 'none': return { none: true };
+        case 'urgent': return { before: at(today.plus({ days: 8 })), urgent: true };
         default: return null;
     }
 };

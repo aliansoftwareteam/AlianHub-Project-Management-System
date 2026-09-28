@@ -77,7 +77,7 @@
                         <ol v-if="turns.length" class="ask-thread" :aria-label="$t('Ask.conversation_label')">
                             <li v-for="turn in turns" :key="turn.key" class="ask-thread__turn" data-test="ask-turn">
                                 <p class="ask-thread__q"><span class="ah-sr-only">{{ $t('Ask.you_asked') }}</span>{{ turn.question }}</p>
-                                <AskAnswer v-if="showsAnswer(turn)" :answer="turn" :streaming="turn.status === 'streaming'" />
+                                <AskAnswer v-if="showsAnswer(turn)" :answer="turn" :streaming="turn.status === 'streaming'" :projects="sources.projects || []" :project-id="projectId" />
                                 <p v-if="turn.status === 'stopped'" class="ah-small" data-test="ask-stopped">{{ $t('Ask.stopped') }}</p>
                                 <p v-else-if="turn.status === 'error'" class="ah-field__error" data-test="ask-turn-error">{{ turn.error }}</p>
                                 <p v-else-if="turn.status === 'empty' || turn.status === 'unconfigured'" class="ah-empty">{{ turn.error }}</p>
@@ -85,15 +85,41 @@
                         </ol>
 
                         <div class="land__composer" :class="{ 'land__composer--off': !providerReady }">
+                            <div v-if="composer.skill.value || composer.chips.value.length" class="ask-chips">
+                                <span v-if="composer.skill.value" class="ah-chip ah-chip--brand ask-chip" data-test="ask-skill-chip">
+                                    <ShellIcon name="docs" :size="12" />{{ composer.skill.value.name }}
+                                    <button type="button" class="ask-chip__x" :aria-label="$t('Ask.chip_remove', { name: composer.skill.value.name })" @click="composer.clearSkill()"><ShellIcon name="x" :size="11" /></button>
+                                </span>
+                                <span v-for="chip in composer.chips.value" :key="`${chip.kind}-${chip.id}`" class="ah-chip ask-chip" data-test="ask-context-chip">
+                                    <ShellIcon name="at" :size="12" />{{ chip.title }}
+                                    <button type="button" class="ask-chip__x" :aria-label="$t('Ask.chip_remove', { name: chip.title })" data-test="ask-context-remove" @click="composer.removeChip(chip)"><ShellIcon name="x" :size="11" /></button>
+                                </span>
+                            </div>
                             <label class="ah-sr-only" for="land-q">{{ $t('AiLanding.question_label') }}</label>
                             <textarea
                                 id="land-q"
                                 ref="questionBox"
                                 v-model="question"
                                 class="land__input"
-                                :placeholder="turns.length ? $t('Ask.follow_up_placeholder') : $t('AiLanding.placeholder')"
-                                @keydown.enter.exact="onEnter"
+                                :placeholder="turns.length ? $t('Ask.follow_up_placeholder') : $t('Ask.composer_placeholder')"
+                                aria-autocomplete="list"
+                                :aria-controls="composer.menu.kind ? MENU_ID : undefined"
+                                :aria-activedescendant="composer.activeId.value || undefined"
+                                @input="composer.onInput"
+                                @keydown="onKeydown"
+                                @blur="composer.close"
                             ></textarea>
+                            <AskComposerMenu
+                                v-if="composer.menu.kind"
+                                :id="MENU_ID"
+                                :kind="composer.menu.kind"
+                                :items="composer.menu.items"
+                                :active="composer.menu.active"
+                                :searching="composer.menu.searching"
+                                :short="composer.menu.short"
+                                @pick="composer.pick"
+                                @hover="composer.hover"
+                            />
 
                             <div class="land__controls" @click.stop>
                                 <span class="land__ctl land__ctl--select">
@@ -161,6 +187,8 @@
 
                             <MainChatRecorder ref="recorder" @recorded="onRecorded" @active="listening = $event" />
                         </div>
+
+                        <AskStarters v-if="!turns.length" :project-name="scopedProjectName" @pick="useStarter" />
 
                         <p class="land__note">
                             <span>{{ coded(sources.noteCode, sources.note) || $t('Ask.note_scope') }}</span>
@@ -335,6 +363,9 @@ import { backlogRead, readLineKey, skillReach } from "./backlogRead";
 import { messageKey } from "./askWhy";
 import { takeAskHandoff } from "@/components/molecules/AdvanceSearch/askHandoff";
 import { useAskConversation } from "./useAskConversation";
+import { MENU_ID, useAskComposer } from "./useAskComposer";
+import AskComposerMenu from "./AskComposerMenu.vue";
+import AskStarters from "./AskStarters.vue";
 
 defineOptions({ name: "AskPage" });
 
@@ -382,6 +413,8 @@ const recorder = ref(null);
 
 const read = computed(() => backlogRead(routable.value));
 const reach = computed(() => skillReach(skillManifest.value, routable.value));
+const composer = useAskComposer({ question, box: questionBox, skills: reach });
+const scopedProjectName = computed(() => ((sources.value.projects || []).find((p) => p.id === projectId.value) || {}).name || "");
 
 const providerReady = computed(() => sources.value.configured !== false);
 /* A model the pricing table does not cover is refused by name when an agent run starts
@@ -482,13 +515,31 @@ const submit = async () => {
     if (!asked || streaming.value) return;
     error.value = "";
     question.value = "";
-    await send({ question: asked, mode: mode.value, projectId: projectId.value });
+    const explicit = composer.body();
+    composer.reset();
+    await send({ question: asked, mode: mode.value, projectId: projectId.value, ...explicit });
 };
 
 const onEnter = (event) => {
     if (event.isComposing) return;
     event.preventDefault();
     submit();
+};
+
+const onKeydown = (event) => {
+    if (composer.onKeydown(event)) return;
+    if (event.key === "Enter" && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey) onEnter(event);
+};
+
+const useStarter = (prompt) => {
+    question.value = prompt;
+    composer.close();
+    nextTick(() => {
+        const box = questionBox.value;
+        if (!box) return;
+        box.focus();
+        box.setSelectionRange(prompt.length, prompt.length);
+    });
 };
 
 const stopAnswer = () => {
@@ -498,6 +549,7 @@ const stopAnswer = () => {
 
 const startOver = () => {
     newQuestion();
+    composer.reset();
     threadError.value = "";
     question.value = "";
     focusQuestion();
@@ -590,6 +642,11 @@ onMounted(async () => {
 .ask-thread { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-7); }
 .ask-thread__turn { display: flex; flex-direction: column; gap: var(--sp-3); }
 .ask-thread__q { align-self: flex-end; max-width: 85%; margin: 0; padding: var(--sp-3) var(--sp-5); border-radius: var(--r-card); background: var(--brand-tint); color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ask-chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.ask-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ask-chip__x { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 2px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
+.ask-chip__x:hover { background: var(--surface-hover); }
+.ask-chip__x:focus-visible { outline: none; box-shadow: var(--focus); }
 @media (max-width: 480px) {
     .ask-thread__q { max-width: 100%; }
 }

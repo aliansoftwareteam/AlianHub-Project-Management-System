@@ -84,12 +84,13 @@ const objectIds = (ids) => ids.map((id) => new mongoose.Types.ObjectId(id));
 
 const idsOfKind = (cites, kind) => [...new Set(cites.filter((c) => c.kind === kind).map((c) => String(c.sourceId)).filter((id) => OBJECT_ID.test(id)))];
 
-/* Tasks and pages the reader can open today, by `kind:id`. Other kinds have no page of their own to open. */
+/* Tasks, pages and projects the reader can open today, by `kind:id`. Other kinds have no page of their own to open. */
 const openSources = async (companyId, uid, cites) => {
     const taskIds = idsOfKind(cites, 'task');
     const pageIds = idsOfKind(cites, 'page');
+    const citedProjects = idsOfKind(cites, 'project');
     const found = new Map();
-    if (!taskIds.length && !pageIds.length) return found;
+    if (!taskIds.length && !pageIds.length && !citedProjects.length) return found;
     const projects = await openProjects(companyId, uid);
     const projectIds = projects.map((p) => String(p._id));
     if (!projectIds.length) return found;
@@ -107,6 +108,7 @@ const openSources = async (companyId, uid, cites) => {
     const add = (kind, row, title) => found.set(`${kind}:${String(row._id)}`, { title: String(title || ''), projectId: String(row.ProjectID || ''), project: nameById[String(row.ProjectID)] || '' });
     (tasks || []).forEach((t) => add('task', t, t.TaskName));
     (pages || []).forEach((p) => add('page', p, p.title));
+    projects.filter((p) => citedProjects.includes(String(p._id))).forEach((p) => add('project', { _id: p._id, ProjectID: p._id }, p.ProjectName));
     return found;
 };
 
