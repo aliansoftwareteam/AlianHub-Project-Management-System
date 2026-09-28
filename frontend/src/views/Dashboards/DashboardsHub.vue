@@ -22,7 +22,7 @@
             <div v-else class="dash__hub-grid">
                 <article v-for="d in visible" :key="d._id" class="dash__tile" @click="open(d)">
                     <div class="dash__tile-head">
-                        <span class="dash__tile-title" :title="d.title">{{ d.title }}</span>
+                        <button type="button" class="dash__tile-title dash__tile-open" :title="d.title" @click.stop="open(d)">{{ d.title }}</button>
                         <span class="dash__tile-count">{{ $t('Dash.n_cards', { n: d.cardCount }) }}</span>
                         <div class="dash__pop-anchor" @click.stop>
                             <button type="button" class="dash__tile-menu" :aria-expanded="menuFor === d._id" :title="$t('Dash.more')" @click="menuFor = menuFor === d._id ? '' : d._id">
@@ -41,14 +41,17 @@
                         </div>
                     </div>
 
-                    <div class="dash__preview" aria-hidden="true">
-                        <span
-                            v-for="(block, i) in previewBlocks(d)"
-                            :key="i"
-                            class="dash__preview-block"
-                            :style="block"
-                        ></span>
-                        <span v-if="!d.cardCount" class="dash__preview-empty">{{ $t('Dash.no_cards_yet') }}</span>
+                    <div class="dash__preview">
+                        <ul v-if="d.cardCount" class="dash__preview-list" :aria-label="$t('Dash.preview_label')">
+                            <li v-for="card in d.summary.cards" :key="card.key" class="dash__preview-item">
+                                <ShellIcon :name="card.icon" :size="12" />
+                                <span class="dash__preview-name">{{ $t(card.titleKey) }}</span>
+                            </li>
+                            <li v-if="d.summary.more" class="dash__preview-more">
+                                {{ d.summary.cards.length ? $t('Dash.preview_more', { n: d.summary.more }) : $t('Dash.preview_other', { n: d.summary.more }) }}
+                            </li>
+                        </ul>
+                        <span v-else class="dash__preview-empty">{{ $t('Dash.no_cards_yet') }}</span>
                     </div>
 
                     <div class="dash__tile-foot">
@@ -104,7 +107,7 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount, inject } from 'vue
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
-import { CARD_CATALOG } from '@/plugins/dashboard/cardCatalog';
+import { CARD_CATALOG, catalogEntry } from '@/plugins/dashboard/cardCatalog';
 import { fetchDashboards, createDashboard, duplicateDashboard, removeDashboard, makeCardUid } from '@/plugins/dashboard/dashboardsApi';
 
 defineOptions({ name: 'DashboardsHub' });
@@ -133,11 +136,27 @@ const creating = ref(false);
 const formError = ref('');
 const form = reactive({ title: '', visibility: 'private', template: 'blank' });
 
-const visible = computed(() => dashboards.value.filter((d) => {
-    if (activeTab.value === 'mine') return d.isMine;
-    if (activeTab.value === 'shared') return !d.isMine;
-    return true;
-}));
+const PREVIEW_LIMIT = 4;
+const FAMILY_ICONS = { mine: 'user', team: 'members', charts: 'reports', ai: 'ai' };
+
+const summaryOf = (d) => {
+    const inReadingOrder = [...(d.preview || [])].sort((a, b) => ((Number(a.y) || 0) - (Number(b.y) || 0)) || ((Number(a.x) || 0) - (Number(b.x) || 0)));
+    const named = [];
+    inReadingOrder.forEach((block) => {
+        const entry = catalogEntry(block.componentId);
+        if (entry && !named.some((card) => card.key === entry.key)) named.push({ key: entry.key, titleKey: entry.titleKey, icon: FAMILY_ICONS[entry.family] || 'dash' });
+    });
+    const cards = named.slice(0, PREVIEW_LIMIT);
+    return { cards, more: Math.max(0, (Number(d.cardCount) || 0) - cards.length) };
+};
+
+const visible = computed(() => dashboards.value
+    .filter((d) => {
+        if (activeTab.value === 'mine') return d.isMine;
+        if (activeTab.value === 'shared') return !d.isMine;
+        return true;
+    })
+    .map((d) => ({ ...d, summary: summaryOf(d) })));
 
 const initials = (d) => (d.ownerName || '?').trim().charAt(0).toUpperCase();
 
@@ -155,17 +174,6 @@ const relative = (iso) => {
     if (days <= 0) return t('Dash.updated_today');
     if (days === 1) return t('Dash.updated_yesterday');
     return t('Dash.updated_days', { n: days });
-};
-
-const previewBlocks = (d) => {
-    const blocks = (d.preview || []).filter((b) => Number.isFinite(Number(b.w)));
-    const maxY = blocks.reduce((m, b) => Math.max(m, (Number(b.y) || 0) + (Number(b.h) || 1)), 0) || 1;
-    return blocks.map((b) => ({
-        left: `${((Number(b.x) || 0) / 12) * 100}%`,
-        width: `${((Number(b.w) || 1) / 12) * 100}%`,
-        top: `${((Number(b.y) || 0) / maxY) * 100}%`,
-        height: `${((Number(b.h) || 1) / maxY) * 100}%`,
-    }));
 };
 
 const open = (d) => {

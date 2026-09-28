@@ -230,6 +230,8 @@ function close() {
     }, 100);
 }
 
+defineExpose({ open, close });
+
 function onTriggerClick(event) {
     const wasOpen = dropdownVisible.value;
     buttonClick();

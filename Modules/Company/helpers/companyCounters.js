@@ -31,4 +31,17 @@ const stepCompanyCounters = (companyId, steps) => {
     return updateCompanyFun(SCHEMA_TYPE.GOLBAL, query, 'findOneAndUpdate', String(companyId), true);
 };
 
-module.exports = { stepCompanyCounters };
+/* The seat count is taken when an invitation goes out; removing the member or cancelling the invitation gives it back. */
+const releaseMemberSeat = async (companyId, { tracker = false } = {}) => {
+    await updateCompanyFun(SCHEMA_TYPE.GOLBAL, {
+        type: SCHEMA_TYPE.COMPANIES,
+        data: [
+            { _id: new mongoose.Types.ObjectId(String(companyId)) },
+            { $inc: { 'companyData.$[elementIndex].users': -1 } },
+            { arrayFilters: [{ 'elementIndex.users': { $gt: 0 } }], returnDocument: 'after' }
+        ]
+    }, 'findOneAndUpdate', String(companyId), true);
+    if (tracker) await stepCompanyCounters(companyId, { trackerUsers: -1 });
+};
+
+module.exports = { stepCompanyCounters, releaseMemberSeat };

@@ -458,14 +458,6 @@ async function removeMember(item) {
             newObj: { returnDocument: "after" }
         });
         commit("settings/mutateUsers", { data: resp.data.data, op: "modified" });
-        await apiRequest("put", `${env.COMPANYACTIONS}`, {
-            updateObject: { "companyData.$[elementIndex].users": -1 },
-            key: "$inc",
-            arrayFilters: [{ "elementIndex.users": { $exists: true } }]
-        });
-        if (item.isTrackerUser === true) {
-            apiRequest("put", `${env.COMPANYACTIONS}`, { updateObject: { trackerUsers: -1 }, key: "$inc" }).catch((e) => console.error(e));
-        }
         apiRequest("post", env.REMOVE_USER_NOTIFICATION, { companyId: companyId.value, userId: item.userId })
             .catch((error) => console.error("ERROR in remove-user notification: ", error));
         listing.value = getCompanyUsers();
@@ -486,11 +478,6 @@ async function cancelInvitation(item) {
                 op: "modified"
             });
         }
-        apiRequest("put", `${env.COMPANYACTIONS}`, {
-            updateObject: { "companyData.$[elementIndex].users": -1 },
-            key: "$inc",
-            arrayFilters: [{ "elementIndex.users": { $exists: true } }]
-        }).catch((error) => console.error("ERROR in seat count: ", error));
         listing.value = getCompanyUsers();
         $toast.success(t("Toast.Invitation_cancelled_successfully"), { position: "top-right" });
     } catch (error) {
