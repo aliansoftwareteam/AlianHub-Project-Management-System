@@ -137,6 +137,6 @@ function toggleResolved() {
 .cm-assign__action:disabled { opacity: .6; cursor: default; }
 .cm-assign__search { width: 100%; box-sizing: border-box; margin-bottom: 6px; }
 .cm-assign__option { color: var(--ink); }
-.cm-assign__empty { margin: 4px 0; color: var(--ink-3); }
+.cm-assign__empty { margin: 4px 0; color: var(--ink-2); }
 .cm-assign__error { color: var(--danger-ink, var(--danger)); }
 </style>

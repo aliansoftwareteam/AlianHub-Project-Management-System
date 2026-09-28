@@ -150,9 +150,9 @@ async function send() {
 .cm-thread__reply { background: var(--surface-2); border-radius: 8px; padding: 6px 8px; min-width: 0; }
 .cm-thread__head { display: flex; align-items: center; gap: 6px; font-size: 12px; min-width: 0; }
 .cm-thread__name { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cm-thread__time { color: var(--ink-3); white-space: nowrap; }
+.cm-thread__time { color: var(--ink-2); white-space: nowrap; }
 .cm-thread__text { margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; color: var(--ink); }
-.cm-thread__hint { margin: 0; font-size: 12px; color: var(--ink-3); }
+.cm-thread__hint { margin: 0; font-size: 12px; color: var(--ink-2); }
 .cm-thread__composer { display: flex; flex-direction: column; gap: 6px; }
 .cm-thread__input { width: 100%; box-sizing: border-box; resize: vertical; }
 .cm-thread__actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }

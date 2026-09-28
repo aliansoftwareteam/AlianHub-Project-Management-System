@@ -85,6 +85,6 @@ defineExpose({ load });
 .hc-assigned__open:focus-visible { outline: 2px solid var(--focus, var(--brand)); outline-offset: 2px; border-radius: 4px; }
 .hc-assigned__text { font-size: 13px; overflow-wrap: anywhere; }
 .hc-assigned__task { font-size: 11.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hc-assigned__from { grid-column: 1; font-size: 11.5px; color: var(--ink-3); }
+.hc-assigned__from { grid-column: 1; font-size: 11.5px; color: var(--ink-2); }
 .hc-assigned__resolve { grid-column: 2; grid-row: 1 / span 2; }
 </style>
