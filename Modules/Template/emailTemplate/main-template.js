@@ -7,7 +7,7 @@ const { Notification_key, TemplateType } = require("../../../Config/notification
 const { APIURL, USERPROFILEBUCKET } = require('../../../Config/config');
 const awsRef = require('../../../Config/aws.js');
 const imageUrl = APIURL + "api/v1/getlogo?key=logo&type=emailTemplateLogo" || 'https://firebasestorage.googleapis.com/v0/b/alianerphubdev.appspot.com/o/beta_logo.png?alt=media&token=7f601008-28eb-4fd9-a62a-3ef577fa4bd0';
-exports.renderHTML = ({ templateHeader = { title: "", description: [] }, templateBody = [] ,action_url}) => {
+exports.renderHTML = ({ templateHeader = { title: "", description: [] }, templateBody = [] ,action_url, action_label = "Open Task"}) => {
   return (`<html>
   <head>
     <meta charset="utf-8">
@@ -126,7 +126,7 @@ exports.renderHTML = ({ templateHeader = { title: "", description: [] }, templat
                                 <tr>
                                   <td class="column col-sm-12" max-width="640px" style="background-color:#fff;mso-table-lspace:0pt;mso-table-rspace:0pt;padding:40px 15px;width: 100%; text-align: center;" align="left" valign="top">
                                         <a href="${action_url}" style="text-decoration:none;background-color:#F241CD;color:#fff;border:1px solid #F241CD;padding: 17px 32px;font-size: 18px;line-height: 11px;border-radius: 12px;box-shadow: 0px 8px 30px 0px #F241CD66;
-                                        cursor: pointer;" target="_blank">Open Task</a>
+                                        cursor: pointer;" target="_blank">${action_label}</a>
                                   </td>
                                 </tr>
                               </tbody>
@@ -173,7 +173,7 @@ function checkHeaderType(data) {
     case TemplateType.CREATE:
       return header.subHeader({ title: "Create", data })
     case TemplateType.COMMENTS:
-      return header.subHeader({ title: "Comments", data })
+      return header.subHeader({ title: data.title || "Comments", data })
     case TemplateType.UPDATES:
       return header.subHeader({ title: "Updates", data })
     default:

@@ -7,6 +7,7 @@ const { handleNotificationtFun } = require('../../notification/prepare-notificat
 const { commentThreadAccess } = require('./threadAccess');
 const { threadOf } = require('./threadWriteAccess');
 const { ensureCommentNoticeItems } = require('./noticeItems');
+const { AI_ACTOR, isAiAuthored } = require('./aiActor');
 
 const text = (value) => (value === undefined || value === null ? '' : String(value));
 
@@ -46,13 +47,15 @@ const threadReplies = (companyId, parentId) => MongoDbCrudOpration(companyId, {
  * the reply never does, and neither does anyone it mentions, who is told by the mention notice instead. */
 const replyRecipients = async (companyId, reply, parent, mentionIds = []) => {
     const earlier = await threadReplies(companyId, parent._id);
-    const skip = new Set([text(reply.userId), ...mentionIds.map(String)]);
+    const skip = new Set([text(reply.userId), AI_ACTOR, ...mentionIds.map(String)]);
     const named = [parent.userId, parent.assigneeId, ...(earlier || []).map((row) => row.userId)]
         .map(text).filter((id) => id && !skip.has(id));
     return readersAmong(companyId, threadOf(parent), [...new Set(named)]);
 };
 
+/* The AI's answer is written straight to the thread and never comes here; the guard keeps it that way. */
 const notifyReply = async (companyId, reply, parent, mentionIds) => {
+    if (isAiAuthored(reply)) return [];
     const recipients = await replyRecipients(companyId, reply, parent, mentionIds);
     if (!recipients.length) return [];
     await ensureCommentNoticeItems(companyId, recipients);
