@@ -1,6 +1,7 @@
 const roundImage = require("./roundImage")
 const { APIURL, USERPROFILEBUCKET } = require('../../../Config/config');
 const awsRef = require('../../../Config/aws.js');
+const { textHtml, commentHtml, messageHtml, cssColor, imageSrc } = require('../emailText');
 const imageUrl = APIURL + "api/v1/getlogo?key=logo&type=emailTemplateLogo" || 'https://firebasestorage.googleapis.com/v0/b/alianerphubdev.appspot.com/o/beta_logo.png?alt=media&token=7f601008-28eb-4fd9-a62a-3ef577fa4bd0';
 exports.titleAndValueWithText = (key = "", value = "") => {
     return (
@@ -12,7 +13,7 @@ exports.titleAndValueWithText = (key = "", value = "") => {
                         font-weight: 400;
                         line-height: 26px;
                         margin-right: 10px;">
-                 ${key}
+                 ${textHtml(key)}
             </span>
             <span style="color: #000;
                     font-family: Sofia Pro;
@@ -20,7 +21,7 @@ exports.titleAndValueWithText = (key = "", value = "") => {
                     font-style: normal;
                     font-weight: 400;
                     line-height: 26px;">
-                ${value}
+                ${textHtml(value)}
             </span>
     </div>
         `
@@ -45,7 +46,7 @@ function nameAndDateGet(name = "", time = "") {
                         font-style: normal;
                         font-weight: 400;
                         line-height: 30px;">
-                ${name}
+                ${textHtml(name)}
             </span>
             <span style="color: #535358;
                         font-family: Sofia Pro;
@@ -54,7 +55,7 @@ function nameAndDateGet(name = "", time = "") {
                         font-weight: 300;
                         line-height: 30px;
                         margin-left: 5px;">
-                             ${time}
+                             ${textHtml(time)}
             </span>
     </div>
         `
@@ -65,7 +66,7 @@ function nameAndDateGet(name = "", time = "") {
 
 exports.titleTextToChange = ({ title = "", oldValue = "", newValue = "" }) => {
     return (`<div> 
-         ${title} <div><span>${oldValue}</span></div>  ->  <div><span >${newValue}</span></div>
+         ${textHtml(title)} <div><span>${textHtml(oldValue)}</span></div>  ->  <div><span >${textHtml(newValue)}</span></div>
         </div> 
         `)
 
@@ -73,7 +74,7 @@ exports.titleTextToChange = ({ title = "", oldValue = "", newValue = "" }) => {
 
 exports.titleTextImageToChange = ({ title = "", oldValue = "", newValue = "", oldImage = "", newImage = "" }) => {
     return (`<div> 
-         ${title} <div><img src="${oldImage}" /><span>${oldValue}</span></div>  ->  <div><img src="${newImage}" /><span >${newValue}</span></div>
+         ${textHtml(title)} <div><img src="${imageSrc(oldImage)}" /><span>${textHtml(oldValue)}</span></div>  ->  <div><img src="${imageSrc(newImage)}" /><span >${textHtml(newValue)}</span></div>
         </div> 
         `)
 
@@ -81,10 +82,9 @@ exports.titleTextImageToChange = ({ title = "", oldValue = "", newValue = "", ol
 
 
 
-exports.imageViewTD = (image = "",name = "") => {    
-    if (image == "") {
-        image = APIURL + 'api/v1/getlogo?key=defaultuser'
-    }
+exports.imageViewTD = (image = "", name = "") => {
+    image = imageSrc(image) || imageSrc(APIURL + 'api/v1/getlogo?key=defaultuser')
+    name = textHtml(name)
     return (`
     <p class="sub-p" style="text-size-adjust:100%;-ms-text-size-adjust:100%;-moz-text-size-adjust:100%;-webkit-text-size-adjust:9%;font-size:16px;line-height:1.4em;color: #4d4d4d; margin: 0 !important;">
     <img src="${image}" alt="${name}" width="40" border="0" style="border:0;height:auto;line-height:100%;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;display: block; mso-hide: all; width: 35px;height: 35px; border-radius: 50%;">
@@ -95,7 +95,7 @@ exports.imageViewTD = (image = "",name = "") => {
 exports.userNameViewTD = (name = "") => {
     return (`
     <p class="sub-p" style="text-size-adjust:100%;-ms-text-size-adjust:100%;-moz-text-size-adjust:100%;-webkit-text-size-adjust:31%;font-size:16px;font-weight: 400;color: #4d4d4d; margin: 0 !important;">
-    <font color="#535358">${name}</font>
+    <font color="#535358">${textHtml(name)}</font>
   </p>
     `)
 }
@@ -103,7 +103,7 @@ exports.userNameViewTD = (name = "") => {
 exports.dateViewTD = (date = "") => {
     return (
         `<p class="sub-p" style="text-size-adjust:100%;-ms-text-size-adjust:100%;-moz-text-size-adjust:100%;-webkit-text-size-adjust:60%;font-size:14px;color: #4d4d4d;font-weight: 300; margin: 0 !important;">
-         <font color="#535358">${date}</font>
+         <font color="#535358">${textHtml(date)}</font>
         </p>
         `
     )
@@ -117,11 +117,11 @@ exports.LabelAndValueTextOnly = (label = "", value = "") => {
         <tbody>
             <tr style="display:flex;align-items: center;">
                 <td style="mso-table-lspace:0pt;mso-table-rspace:0pt; padding-left: 0; padding-right: 20px; width: 20%; min-width:0px;" align="left" valign="top">
-                <font color="#818181">${label}</font>
+                <font color="#818181">${textHtml(label)}</font>
                 </td>
                 <td style="mso-table-lspace:0pt;mso-table-rspace:0pt;padding-left: 0; padding-right: 0px; vertical-align: middle;width:80%;" align="left" valign="middle">
                     <div style="display:flex;align-items:center;">
-                    <p style="display:inline-block;margin: 0;padding: 0px 7px;color: #000;font-size: 16px;line-height: 26px;border-radius: 4px;">${value}</p> 
+                    <p style="display:inline-block;margin: 0;padding: 0px 7px;color: #000;font-size: 16px;line-height: 26px;border-radius: 4px;">${textHtml(value)}</p> 
                     </div>
                 </td>
             </tr>
@@ -140,7 +140,7 @@ exports.messageTextOnly = (value = "") => {
         <tbody>
           <tr style="display:flex;align-items: center;">
             <td style="mso-table-lspace:0pt;mso-table-rspace:0pt; padding-left: 0; padding-right: 20px; width: 100%; min-width:0px;" align="left" valign="top">
-              <p>${value}</p>
+              <p>${commentHtml(value)}</p>
               </td>
           </tr>
       </tbody>
@@ -157,7 +157,7 @@ exports.updateView = ({ value = "Status", oldValue = { backColor: "", color: "",
         <tbody>
           <tr style="display:flex;align-items: center;">
             <td style="mso-table-lspace:0pt;mso-table-rspace:0pt; padding-left: 0; padding-right: 20px; width: 12%; min-width:60px;" align="left" valign="top">
-              <font color="#818181">${value}</font>
+              <font color="#818181">${textHtml(value)}</font>
             </td>
             <td style="mso-table-lspace:0pt;mso-table-rspace:0pt;padding-left: 0; padding-right: 0px; vertical-align: middle;width:88%;" align="left" valign="middle">
                 <div style="display:flex;align-items: center;">
@@ -174,7 +174,7 @@ exports.updateView = ({ value = "Status", oldValue = { backColor: "", color: "",
     )
 }
 
-exports.notificationCommonTemplate = (data) => {
+exports.notificationCommonTemplate = (message) => {
     return (`<html>
       <head>
         <meta charset="utf-8">
@@ -255,7 +255,7 @@ exports.notificationCommonTemplate = (data) => {
                           <!-- table for top LOGO End -->
                             <!-- Table for Top Title  -->
                             <div style="padding-right: 30px;padding-left: 30px;padding-bottom: 30px;padding-top: 30px; background-color: #F6F7FB;background-image: url('https://s3.${awsRef.region}.wasabisys.com/${USERPROFILEBUCKET}/public_assets/email_banner_icon.png');background-size: 100%;">
-                            ${data}
+                            ${messageHtml(message)}
                             </div>
                             <!-- Table for Top Title End  -->
                             <div style="padding-bottom:0px; background-color: #F0F3FD;margin:0 auto;max-width:640px;">
@@ -297,26 +297,26 @@ exports.notificationCommonTemplate = (data) => {
 
 function Button(data) {
     return (
-        `<p style="display:inline-block;margin: 0;padding: 5px 7px;background-color:${data.backColor};color: ${data.color};font-size: 13px;line-height: 19px;border-radius: 4px;">${data.name}</p> 
+        `<p style="display:inline-block;margin: 0;padding: 5px 7px;background-color:${cssColor(data.backColor)};color: ${cssColor(data.color)};font-size: 13px;line-height: 19px;border-radius: 4px;">${textHtml(data.name)}</p> 
         `
     )
 }
 
 function ImageWithText(data) {
     return (
-        ` <p style="display:inline-block;margin: 0;padding: 5px 7px;color: #000;font-size: 16px;line-height: 23px;"><img style="width:11px;height:auto;object-fit:contain;margin:0 10px" src="${data.image}"/>${data.name}</p>`
+        ` <p style="display:inline-block;margin: 0;padding: 5px 7px;color: #000;font-size: 16px;line-height: 23px;"><img style="width:11px;height:auto;object-fit:contain;margin:0 10px" src="${imageSrc(data.image)}"/>${textHtml(data.name)}</p>`
     )
 }
 
 function TextOnly(data) {
     return (
-        `<p style="display:inline-block;margin: 0;padding: 5px 7px;color: #000;font-size: 16px;line-height: 23px;">${data.name == "" ? "" : data.name}</p>`
+        `<p style="display:inline-block;margin: 0;padding: 5px 7px;color: #000;font-size: 16px;line-height: 23px;">${textHtml(data.name)}</p>`
     )
 }
 
 function RoundImageWithText(data) {
     return (
-        ` <p style="display:inline-block;margin: 0;padding: 5px 7px;color: #000;font-size: 16px;line-height: 23px;">${exports.imageViewTD(data.image)}<span style="margin-left:10px;"/>${data.name}</p>`
+        ` <p style="display:inline-block;margin: 0;padding: 5px 7px;color: #000;font-size: 16px;line-height: 23px;">${exports.imageViewTD(data.image)}<span style="margin-left:10px;"/>${textHtml(data.name)}</p>`
     )
 }
 function manageRender(type, value, isRight) {

@@ -23,6 +23,7 @@ const { ensureViewCatalogue } = require("../projectTabs/catalogue.js");
 const { normaliseFocus, FOCUS_LABELS } = require("../createProject/sampleTasks.js");
 const { pinSessionTenant } = require("../../Config/tenant.js");
 const { getRoleType, ROLE_OWNER } = require("../../Config/permissionGuard.js");
+const { escapeHtml } = require('../../utils/escapeHtml');
 
 const TEAM_SIZES = ["1", "2-15", "16-50", "50+"];
 
@@ -462,9 +463,9 @@ exports.sendMailAfterCompanyCreation = (allSettledRes, companyId, req) => {
         html += "<ul>";
         html += `<li><strong>Date/Time:</strong> ${new Date()}</li>`;
         html += `<li><strong>Company Id:</strong> ${companyId}</li>`;
-        html += `<li><strong>Error Message/Code:</strong> ${JSON.stringify(rejectedPromise, null, 4)}</li>`;
+        html += `<li><strong>Error Message/Code:</strong> ${escapeHtml(JSON.stringify(rejectedPromise, null, 4))}</li>`;
         html += `<li><strong>Environment:</strong> ${config.NODE_ENV}</li>`;
-        html += `<li><strong>Browser/Device Information:</strong> ${req?.headers["user-agent"] || "Unknown"}</li>`;
+        html += `<li><strong>Browser/Device Information:</strong> ${escapeHtml(req?.headers["user-agent"] || "Unknown")}</li>`;
         html += `</ul>`
         serviceCtr.sendAttachMail(subject, html, toMail, null, () => {
             logger.info(`Company Creation Error Email Send Successfully (${companyId}).`);

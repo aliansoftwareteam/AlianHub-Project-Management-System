@@ -2,6 +2,8 @@
 // the heart of the feature: approved PTO reduces a user's available capacity.
 // Unit-tested in tests/pto-rules.test.js.
 
+const { textHtml } = require('../../Template/emailText');
+
 const PTO_TYPES = ['casual', 'privilege', 'sick'];
 const PTO_STATUS = ['pending', 'approved', 'rejected'];
 const DEFAULT_HOURS_PER_DAY = 9; // office mandates a 9-hour working day
@@ -118,6 +120,8 @@ const computeAvailableCapacity = ({
     return { workingDays, totalCapacityHours, ptoHours, availableHours };
 };
 
+const decisionEmailHtml = ({ name, message }) => `<p>Hi ${textHtml(name) || 'there'},</p><p>${textHtml(message)}</p><p>You can review it under Settings &rarr; Time Off.</p>`;
+
 module.exports = {
     PTO_TYPES,
     PTO_STATUS,
@@ -131,4 +135,5 @@ module.exports = {
     ptoHoursInRange,
     leaveDays,
     computeAvailableCapacity,
+    decisionEmailHtml,
 };
