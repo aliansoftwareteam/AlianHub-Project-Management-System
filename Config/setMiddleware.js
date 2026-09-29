@@ -174,6 +174,7 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/milestoneReport',
     '/api/v1/customField',
     '/api/v1/project/template/custom',
+    '/api/v1/getGlobalTemplate',
     '/api/v1/templates/taskType',
     '/api/v1/templates/taskStatus',
     '/api/v1/tours',
