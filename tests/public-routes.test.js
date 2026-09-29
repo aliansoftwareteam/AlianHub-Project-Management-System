@@ -66,6 +66,7 @@ const NEEDS_SESSION_AND_COMPANY = [
     ['post', '/api/v1/ai/notes-to-tasks/undo'],
     ['post', '/api/v1/ai/chat-ask'],
     ['post', '/api/v1/ai/chat-ask/post'],
+    ['post', '/api/v1/getGlobalTemplate'],
 ];
 
 const NEEDS_SESSION = [
