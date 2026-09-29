@@ -7,6 +7,7 @@ const { formatNotificationDate } = require('../../../utils/dateHelpers');
 const { Notification_key, TemplateType } = require("../../../Config/notificationKey");
 const { removeDocument, UpdateDocument } = require("../notification-middleware/push-controllerV2")
 const { isCommentNotice, commentNoticeEmail } = require("./commentNoticeEmail")
+const { urlSegment } = require("../../Template/emailText")
 
 const sendCommentNotice = (EmailDetails) => new Promise((resolve, reject) => {
   const notice = commentNoticeEmail(EmailDetails)
@@ -368,20 +369,20 @@ function actionForOpenTask(body) {
   if (body.type.toLowerCase() === "project") {
     if (folderId !== undefined && folderId !== null && folderId !== '') {
       if (sprintId !== undefined && sprintId !== null && sprintId !== '') {
-        actionUrl = `${body.companyId}/project/${projectId}/fs/${folderId}/${sprintId}`
+        actionUrl = `${urlSegment(body.companyId)}/project/${urlSegment(projectId)}/fs/${urlSegment(folderId)}/${urlSegment(sprintId)}`
       } else {
-        actionUrl = `${body.companyId}/project/${projectId}/f/${folderId}`
+        actionUrl = `${urlSegment(body.companyId)}/project/${urlSegment(projectId)}/f/${urlSegment(folderId)}`
       }
     } else if (sprintId !== undefined && sprintId !== null && sprintId !== '') {
-      actionUrl = `${body.companyId}/project/${projectId}/s/${sprintId}`
+      actionUrl = `${urlSegment(body.companyId)}/project/${urlSegment(projectId)}/s/${urlSegment(sprintId)}`
     } else {
-      actionUrl = `${body.companyId}/project/${projectId}/p?tab=ProjectDetail`
+      actionUrl = `${urlSegment(body.companyId)}/project/${urlSegment(projectId)}/p?tab=ProjectDetail`
     }
   } else {
     if (folderId !== undefined && folderId !== null && folderId !== '') {
-      actionUrl = `${body.companyId}/project/${projectId}/fs/${folderId}/${sprintId}/${taskId}${body.key === "logged_hours_notification" ? '?tab=ProjectListView&taskTab=TimeLog' : body.key === "comments_I'm_@mentioned_in" ? '?tab=ProjectListView&taskTab=comment' : ''}`
+      actionUrl = `${urlSegment(body.companyId)}/project/${urlSegment(projectId)}/fs/${urlSegment(folderId)}/${urlSegment(sprintId)}/${urlSegment(taskId)}${body.key === "logged_hours_notification" ? '?tab=ProjectListView&taskTab=TimeLog' : body.key === "comments_I'm_@mentioned_in" ? '?tab=ProjectListView&taskTab=comment' : ''}`
     } else {
-      actionUrl = `${body.companyId}/project/${projectId}/s/${sprintId}/${taskId}${body.key === "logged_hours_notification" ? '?tab=ProjectListView&taskTab=TimeLog' : body.key === "comments_I'm_@mentioned_in" ? '?tab=ProjectListView&taskTab=comment' : ''}`
+      actionUrl = `${urlSegment(body.companyId)}/project/${urlSegment(projectId)}/s/${urlSegment(sprintId)}/${urlSegment(taskId)}${body.key === "logged_hours_notification" ? '?tab=ProjectListView&taskTab=TimeLog' : body.key === "comments_I'm_@mentioned_in" ? '?tab=ProjectListView&taskTab=comment' : ''}`
     }
   }
 

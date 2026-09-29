@@ -6,6 +6,7 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const socketEmitter = require('../../../event/socketEventEmitter');
 const logger = require('../../../Config/loggerConfig');
 const { escapeCommentText } = require('../../Comments/helpers/plainText');
+const { subjectText } = require('../../Template/emailText');
 const registry = require('../registry');
 const { ownerSeesTask, ownerSeesProject, sharedScopeFor } = require('./ownerAccess');
 
@@ -63,7 +64,7 @@ const toEmail = async ({ report, text, agent, ownerId }) => {
     if (!to) return false;
     const { SendEmail } = require('../../service');
     return new Promise((resolve) => {
-        try { SendEmail(`${report.title} from ${agent.name || 'your agent'}`, text, to, false, (r) => resolve(Boolean(r && r.status))); } catch (e) { resolve(false); }
+        try { SendEmail(subjectText(`${report.title} from ${agent.name || 'your agent'}`), text, to, false, (r) => resolve(Boolean(r && r.status))); } catch (e) { resolve(false); }
     });
 };
 

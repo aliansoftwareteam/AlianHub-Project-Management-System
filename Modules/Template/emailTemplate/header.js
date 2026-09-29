@@ -1,5 +1,6 @@
 const { USERPROFILEBUCKET } = require('../../../Config/config');
 const awsRef = require('../../../Config/aws.js');
+const { textHtml } = require('../emailText');
 exports.headerHTML = ({ title = "", description = [] }) => {
     return(
         `
@@ -10,7 +11,7 @@ exports.headerHTML = ({ title = "", description = [] }) => {
             <a href="#" target="_blank" style="text-size-adjust:100%;-ms-text-size-adjust:100%;-moz-text-size-adjust:100%;-webkit-text-size-adjust:100%;text-decoration:none;text-decoration: none; margin: 0; color: #253D98;">
               <span style="font-size:30px;font-weight: 600; line-height: 39px;  text-size-adjust:100%;-ms-text-size-adjust:100%;-moz-text-size-adjust:100%;-webkit-text-size-adjust:100%;margin: 0; text-decoration: none; color: #253D98;">
                 <!-- ===== LOGO ===== -->
-                ${title}
+                ${textHtml(title)}
                 <!-- ===== LOGO ===== -->
               </span>
             </a>
@@ -40,7 +41,7 @@ function headerDescriptions(description) {
             ${index!=0?`<span style="padding:0px 5px;"> /</span>`:`<span/>`}
             ${item.showFolder? `<img src="https://s3.${awsRef.region}.wasabisys.com/${USERPROFILEBUCKET}/public_assets/email_folder_icon.png" alt="folder-icon" style="padding:0px 5px;">`:`<span/>`}
             <a href="#" target="_blank" style="font-size:16px;line-height:30px;color:#818181;text-size-adjust:100%;-ms-text-size-adjust:100%;-moz-text-size-adjust:100%;-webkit-text-size-adjust:100%;text-decoration:none;text-decoration: none; margin: 0;">
-            ${item.title}
+            ${textHtml(item.title)}
             </a>
          `
         )
@@ -52,7 +53,7 @@ exports.subHeader = ({ title = "" }) => {
     return(
       `
       <p class="sub-p" style="text-size-adjust:100%;-ms-text-size-adjust:100%;-moz-text-size-adjust:100%;-webkit-text-size-adjust:100%;font-size:20px;line-height:26px;color: #253D98; margin: 0 !important;">
-      <font color="#253D98">${title} </font>
+      <font color="#253D98">${textHtml(title)} </font>
     </p>
     `
     )

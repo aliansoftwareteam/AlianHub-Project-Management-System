@@ -55,7 +55,7 @@ const notifyPtoDecision = async (req, companyId, entry, status) => {
     try {
         const email = requester && requester.Employee_Email;
         if (email) {
-            const html = `<p>Hi ${nameOf(requester) || 'there'},</p><p>${message}</p><p>You can review it under Settings &rarr; Time Off.</p>`;
+            const html = R.decisionEmailHtml({ name: nameOf(requester), message });
             await new Promise((resolve) => sendMail.SendNotificationEmail(`Time off ${verb}`, html, [email], true, () => resolve()));
         }
     } catch (e) { logger.error(`notifyPtoDecision email: ${e.message}`); }
