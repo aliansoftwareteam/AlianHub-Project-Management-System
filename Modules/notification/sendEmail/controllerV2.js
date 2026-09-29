@@ -6,7 +6,29 @@ const sendEmailNotification = require("../../Template/sendEmailNotification.js")
 const { formatNotificationDate } = require('../../../utils/dateHelpers');
 const { Notification_key, TemplateType } = require("../../../Config/notificationKey");
 const { removeDocument, UpdateDocument } = require("../notification-middleware/push-controllerV2")
+const { isCommentNotice, commentNoticeEmail } = require("./commentNoticeEmail")
+
+const sendCommentNotice = (EmailDetails) => new Promise((resolve, reject) => {
+  const notice = commentNoticeEmail(EmailDetails)
+  if (!notice) {
+    removeDocument(EmailDetails.notification).catch(() => null)
+    resolve(false)
+    return
+  }
+  Promise.resolve(sendMail.SendNotificationEmail(notice.subject, notice.html, [EmailDetails.notification.Employee_Email], true, (result) => {
+    if (!result.status) {
+      logger.error(`send comment notice email not sent`)
+      reject({ message: result.error, status: false })
+      return
+    }
+    removeDocument(EmailDetails.notification).catch(() => null)
+    UpdateDocument(EmailDetails.notification).catch(() => null)
+    resolve(true)
+  })).catch((error) => reject({ message: error.message, status: false }))
+})
+
 exports.sendEmailHandlerSingle = (EmailDetails) => {
+  if (isCommentNotice(EmailDetails?.notification?.key)) return sendCommentNotice(EmailDetails)
   return new Promise(async (resolve, reject) => {
     try {
       let email = [EmailDetails.notification.Employee_Email]
