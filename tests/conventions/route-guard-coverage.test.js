@@ -131,12 +131,6 @@ const PUBLIC_ROUTES = [
     'GET /version',
 ];
 
-/* Open today and not clearly meant to be: called only from signed-in screens, but the handler reads no
- * session, so moving it behind the guard needs a decision. Listed so the set cannot grow unnoticed. */
-const OPEN_PENDING_DECISION = [
-    'POST /api/v1/getGlobalTemplate',
-];
-
 /* Guards a module installs with its own app.use, which the stack walk cannot see through; each is probed live below. */
 const MODULE_GUARDS = [
     { prefix: '/api/v2/instance', probe: 'GET /api/v2/instance/settings' },
@@ -217,7 +211,7 @@ const app = buildApp();
 const { routes, guardLayers, moduleGuardAt } = listRoutes(app);
 const keys = new Set(routes.map((r) => r.key));
 const open = routes.filter((r) => !r.guarded).map((r) => r.key);
-const listed = [...PUBLIC_ROUTES, ...OPEN_PENDING_DECISION];
+const listed = PUBLIC_ROUTES;
 
 afterAll(async () => {
     intervals.forEach(clearInterval);
