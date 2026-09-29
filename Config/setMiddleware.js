@@ -253,6 +253,8 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/ai/feedback',
     '/api/v1/ai/quality',
     '/api/v1/ai/notes-to-tasks',
+    // @ai in comments and chat: the handlers check thread access for req.uid.
+    '/api/v1/ai/chat-ask',
     // Personal API tokens (Modules/ApiTokens). app.use prefix-matching
     // covers /:id, /:id/logs and /me too. Routes were previously
     // unauthenticated (trusted body userData) — now JWT-protected; the
