@@ -86,6 +86,20 @@ const startHeartbeat = (claim, lost, beat) => {
     };
 };
 
+/* What a step waits on can finish while the step is still running, when a wake-up finds no pending step to wake.
+ * Asked again once the step is pending, a finish is seen here or its wake-up finds the step, so none is missed. */
+const waitAlreadyOver = async (companyId, run, claimed, error) => {
+    if (typeof error.recheck !== 'function') return false;
+    try {
+        if (!(await error.recheck())) return false;
+        await store.wakeStep(companyId, run._id, claimed.stepId);
+        return true;
+    } catch (recheckError) {
+        logger.error(`${LOG_PREFIX} ${run._id}/${claimed.stepId}: checking the wait again failed: ${recheckError.message}`);
+        return false;
+    }
+};
+
 /* A failed step either comes back later or fails for good, whatever stage failed. */
 const settleFailure = async (companyId, run, claimed, claim, error) => {
     const decision = retry.decide(error, { attempt: Number(claimed.attempts) || 1, maxAttempts: Number(claimed.maxAttempts) || 3 });
@@ -98,6 +112,9 @@ const settleFailure = async (companyId, run, claimed, claim, error) => {
     }
     const runAt = new Date(Date.now() + decision.delayMs);
     await store.deferStep(companyId, claim, { error: message, failure, runAt });
+    if (decision.reason === 'waiting' && (await waitAlreadyOver(companyId, run, claimed, error))) {
+        return { outcome: 'retrying', retryInMs: 0, reason: message };
+    }
     logger.info(`${LOG_PREFIX} ${run._id}/${claimed.stepId} retrying in ${decision.delayMs}ms (attempt ${claimed.attempts}): ${message}`);
     return { outcome: 'retrying', retryInMs: decision.delayMs, reason: message };
 };

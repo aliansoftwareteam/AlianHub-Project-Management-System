@@ -13,13 +13,14 @@ const { WAITING } = require('../retry');
 // error and gives the attempt back, because waiting is not failing.
 
 class WorkflowWaiting extends Error {
-    constructor(reason, { until = null, pollMs = 0, set = null } = {}) {
+    constructor(reason, { until = null, pollMs = 0, set = null, recheck = null } = {}) {
         super(String(reason || 'waiting'));
         this.name = WAITING;
         this.deterministic = false;
         this.until = until;
         this.retryAfterMs = Math.max(0, Number(pollMs) || 0);
         this.wait = { reason: String(reason || 'waiting'), until, ...(set ? { set } : {}) };
+        this.recheck = recheck;
     }
 }
 
@@ -28,11 +29,11 @@ const isWaiting = (error) => Boolean(error && error.name === WAITING);
 /* Wait until a moment, looking again no later than `pollMs` — whichever comes
  * first, because a deadline that falls before the next poll still has to be
  * noticed on time. */
-const waitUntil = (reason, until, { pollMs = 0, set = null } = {}) => {
+const waitUntil = (reason, until, { pollMs = 0, set = null, recheck = null } = {}) => {
     const at = until instanceof Date ? until : new Date(until);
     const remaining = at.getTime() - Date.now();
     const poll = Number(pollMs) > 0 ? Math.min(Number(pollMs), Math.max(remaining, 0)) : Math.max(remaining, 0);
-    throw new WorkflowWaiting(reason, { until: at, pollMs: poll, set });
+    throw new WorkflowWaiting(reason, { until: at, pollMs: poll, set, recheck });
 };
 
 const waitFor = (reason, ms, { set = null } = {}) => {

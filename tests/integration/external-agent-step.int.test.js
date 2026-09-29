@@ -32,6 +32,7 @@ async function waitFor(check, { timeoutMs = 25000, intervalMs = 200 } = {}) {
 }
 
 const announcements = [];
+let onAnnounce = null;
 let sink;
 let server;
 let mongo;
@@ -98,7 +99,12 @@ beforeAll(async () => {
         const listener = http.createServer((req, res) => {
             let body = '';
             req.on('data', (chunk) => { body += chunk; });
-            req.on('end', () => { announcements.push({ headers: req.headers, body }); res.statusCode = 202; res.end('ok'); });
+            req.on('end', () => {
+                announcements.push({ headers: req.headers, body });
+                res.statusCode = 202;
+                res.end('ok');
+                if (onAnnounce) onAnnounce(JSON.parse(body));
+            });
         });
         listener.listen(0, '127.0.0.1', () => { sink = { listener, port: listener.address().port }; resolve(); });
     });
@@ -174,6 +180,26 @@ describe('the external_agent step with EXTERNAL_AGENT_STEPS on', () => {
         expect(commented).toMatchObject({ actorId: clientId, meta: { viaAccount: 'external', delegatedBy: owner.uid, tainted: true } });
         const delegated = await waitFor(() => audits().findOne({ action: 'agent_session.delegated', 'meta.sessionId': sessionId }));
         expect(delegated).toMatchObject({ actorId: owner.uid, meta: { workflowRunId: runId, workflowStepId: STEP } });
+    }, 60000);
+
+    it('finishes without waiting for its next poll when the outside agent completes the moment it is told', async () => {
+        const tokens = await connectClient('tasks:read tasks:write');
+        const task = await newTask('instant');
+        let completed;
+        onAnnounce = (body) => {
+            if (body.task.id !== String(task._id)) return;
+            completed = mcp(tokens.access_token, 'session.complete', { sessionId: body.sessionId, handle: body.handle, summary: 'Done already' });
+        };
+        try {
+            const runId = await startStep(task);
+            // Well inside the step's 30-second poll: the finish has to be noticed, not polled for.
+            const done = await waitFor(async () => { const data = await runOf(runId); return data.run.status === 'success' ? data : null; }, { timeoutMs: 15000 });
+            expect(done).toBeTruthy();
+            expect((await completed).payload).toMatchObject({ state: 'completed' });
+            expect(done.steps.find((s) => s.stepId === STEP).output).toMatchObject({ state: 'completed', response: 'Done already' });
+        } finally {
+            onAnnounce = null;
+        }
     }, 60000);
 
     it('is stopped mid-step by a revoked grant: 401, the session revoked, the step failed by name, the refusal attributed', async () => {

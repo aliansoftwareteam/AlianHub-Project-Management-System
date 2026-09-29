@@ -5,7 +5,15 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (
 jest.mock('../Config/config', () => ({ WEBURL: 'https://hub.test/', myCache: { get: () => undefined, set: () => {}, del: () => {}, getTtl: () => 0 } }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
 jest.mock('../Modules/Audit/recorder', () => ({ recordAudit: jest.fn() }));
-jest.mock('../Modules/Agents/agentAudit', () => ({ recordRefusal: jest.fn(async () => 'refusal-1'), recordAction: jest.fn(async () => 'action-1') }));
+jest.mock('../Modules/Agents/agentAudit', () => ({
+    STATE: { APPLIED: 'applied' },
+    recordRefusal: jest.fn(async () => 'refusal-1'),
+    recordAction: jest.fn(async () => 'action-1'),
+    findByIdempotencyKey: jest.fn(async () => null),
+    openAction: jest.fn(async () => 'action-open'),
+    applyAction: jest.fn(async () => undefined),
+    failAction: jest.fn(async () => undefined),
+}));
 jest.mock('../Modules/notification/prepare-notification-data/controllerV2', () => ({ handleNotificationtFun: jest.fn(async () => undefined) }));
 jest.mock('../Modules/Automations/engine/tools', () => ({
     ...jest.requireActual('../Modules/Automations/engine/tools'),
@@ -260,6 +268,39 @@ describe('the step and its session', () => {
         await new Promise((resolve) => setImmediate(resolve));
         expect(queue.dispatch).toHaveBeenCalledWith(CID, String(run._id));
         expect((await stepRow()).nextAttemptAt).toBeNull();
+    });
+
+    it('comes straight back, not at the next poll, when the session closed before the step started waiting', async () => {
+        const engine = require('../Modules/Workflows/engine');
+        await setStep({ status: 'pending', attempts: 0 });
+        const defer = workflowStore.deferStep;
+        jest.spyOn(workflowStore, 'deferStep').mockImplementationOnce(async (...args) => {
+            const session = await sessions.forStep(CID, run._id, STEP);
+            await activity.complete(ctxFor(), { sessionId: String(session._id), handle: handleOf(), summary: 'Opened PR #12' });
+            await new Promise((resolve) => setImmediate(resolve));
+            return defer(...args);
+        });
+        const enqueue = jest.fn(async () => undefined);
+        try {
+            const started = Date.now();
+            await engine.tick(CID, String(run._id), { enqueue });
+            expect(enqueue).toHaveBeenCalledTimes(1);
+            expect(enqueue.mock.calls[0][1].runAt.getTime() - started).toBeLessThan(1000);
+            await engine.tick(CID, String(run._id), { enqueue });
+        } finally {
+            workflowStore.deferStep.mockRestore();
+        }
+        expect(await stepRow()).toMatchObject({ status: 'success', output: expect.objectContaining({ state: 'completed', response: 'Opened PR #12' }) });
+    });
+
+    it('keeps its poll while the session is still open', async () => {
+        const engine = require('../Modules/Workflows/engine');
+        await setStep({ status: 'pending', attempts: 0 });
+        const enqueue = jest.fn(async () => undefined);
+        const started = Date.now();
+        await engine.tick(CID, String(run._id), { enqueue });
+        expect(enqueue.mock.calls[0][1].runAt.getTime() - started).toBeGreaterThanOrEqual(29000);
+        expect(await stepRow()).toMatchObject({ status: 'pending', nextAttemptAt: expect.any(Date) });
     });
 });
 

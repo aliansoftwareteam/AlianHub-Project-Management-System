@@ -68,7 +68,7 @@ const execute = async ({ companyId, run, step, claim, context = {} }) => {
     const config = step.config || {};
     const where = `external agent step ${step.stepId}`;
     if (!config.clientId) throw deterministic(`${where}: needs a "clientId"`);
-    const { lifecycle, rules } = sessionsApi();
+    const { sessions, lifecycle, rules } = sessionsApi();
     const session = await openSession({ companyId, run, step, claim, where });
     const id = String(session._id);
 
@@ -94,6 +94,10 @@ const execute = async ({ companyId, run, step, claim, context = {} }) => {
     return waitUntil(`waiting for ${session.clientName || session.clientId} to finish`, deadlineAt, {
         pollMs: POLL_MS,
         set: { agentSessionId: id, ...(step.waitingSince ? {} : { waitingSince: now }) },
+        recheck: async () => {
+            const latest = await sessions.find(companyId, id);
+            return Boolean(latest) && !rules.isOpen(latest);
+        },
     });
 };
 
