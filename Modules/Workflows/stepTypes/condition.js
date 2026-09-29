@@ -1,6 +1,7 @@
 const executors = require('../executors');
 const store = require('../store');
 const { evaluate, validate } = require('../../Automations/engine/expression');
+const { resolveStepStatuses } = require('../../Automations/helpers/projectStatuses');
 const { ids, deterministic, contextFor } = require('./graph');
 
 // A branch, expressed as skipping the path not taken.
@@ -18,9 +19,10 @@ const { ids, deterministic, contextFor } = require('./graph');
 const TYPE = 'condition';
 
 const execute = async ({ companyId, run, step }) => {
-    const config = step.config || {};
-    const errors = validate(config.when, `${step.stepId}.when`);
+    const errors = validate((step.config || {}).when, `${step.stepId}.when`);
     if (errors.length) throw deterministic(`condition ${step.stepId}: ${errors.join('; ')}`);
+    const [resolved] = await resolveStepStatuses(companyId, [step]);
+    const config = resolved.config || {};
 
     const outputs = await store.outputsOf(companyId, run._id);
     const matched = Boolean(evaluate(config.when, contextFor(run, outputs)));

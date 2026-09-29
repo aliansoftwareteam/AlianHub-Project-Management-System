@@ -6,6 +6,7 @@ const { getAction } = require('./registry');
 const { evaluate } = require('./expression');
 const { render } = require('./template');
 const { contextFor } = require('./matcher');
+const { resolveStepStatuses } = require('../helpers/projectStatuses');
 
 // Executes one rule against one event, and records what it did.
 //
@@ -153,11 +154,13 @@ async function execute({ companyId, runId, ruleId, enqueue, keepAlive }) {
     if (!run || !run._id) { logger.error(`${LOG_PREFIX} run ${runId} vanished`); return { status: 'missing' }; }
     if (run.status === 'success' || run.status === 'failed' || run.status === 'stopped') return { status: run.status };
 
-    const rule = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUTOMATION_RULES, data: [{ _id: ruleId || run.ruleId }] }, 'findOne');
-    if (!rule || !rule._id) {
+    const stored = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUTOMATION_RULES, data: [{ _id: ruleId || run.ruleId }] }, 'findOne');
+    if (!stored || !stored._id) {
         await patchRun(companyId, runId, { status: 'failed', error: 'rule no longer exists', finishedAt: new Date() });
         return { status: 'failed' };
     }
+    const plain = stored.toObject ? stored.toObject() : stored;
+    const rule = { ...plain, steps: await resolveStepStatuses(companyId, plain.steps, plain.scope) };
 
     const attempts = (Number(run.attempts) || 0) + 1;
     await patchRun(companyId, runId, { attempts, status: 'running' });

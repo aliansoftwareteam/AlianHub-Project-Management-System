@@ -4,6 +4,7 @@ const flag = require('../flag');
 const runLimit = require('../runLimit');
 const { evaluate } = require('../../Automations/engine/expression');
 const { waitFor } = require('./waiting');
+const { resolveStepStatuses } = require('../../Automations/helpers/projectStatuses');
 const { num, ids, deterministic, contextFor } = require('./graph');
 const agentRun = require('./agentRun');
 
@@ -75,11 +76,12 @@ const execute = async ({ companyId, run, step }) => {
 
     const broken = rows.filter((row) => BROKEN.includes(row.status));
     const outputs = await store.outputsOf(companyId, run._id);
+    const whileCondition = config.while ? (await resolveStepStatuses(companyId, [step]))[0].config.while : null;
     const stoppedBy = (() => {
         if (broken.length) return 'body_failed';
         if (iteration >= cap) return 'iteration_cap';
         if (budget !== null && spent >= budget) return 'budget';
-        if (config.while && !evaluate(config.while, contextFor(run, outputs))) return 'condition';
+        if (whileCondition && !evaluate(whileCondition, contextFor(run, outputs))) return 'condition';
         return null;
     })();
 
