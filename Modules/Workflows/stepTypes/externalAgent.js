@@ -54,12 +54,13 @@ const openSession = async ({ companyId, run, step, claim, where }) => {
             taskId: String(taskId),
             clientId: String(config.clientId),
             binding: { workflowRunId: String(run._id), workflowStepId: String(step.stepId) },
+            // Before the announcement, so the run already names the session once the outside agent can act on it.
+            onCreated: claim ? (session) => store.noteStep(companyId, claim, { agentSessionId: String(session._id) }) : null,
         });
     } catch (error) {
         if (error instanceof delegation.DelegationError) throw deterministic(`${where}: ${error.message}`);
         throw error;
     }
-    if (claim) await store.noteStep(companyId, claim, { agentSessionId: String(opened.session._id) });
     return opened.session;
 };
 
