@@ -292,6 +292,16 @@ describe('the step and its session', () => {
         }
         expect(await stepRow()).toMatchObject({ status: 'success', output: expect.objectContaining({ state: 'completed', response: 'Opened PR #12' }) });
     });
+
+    it('keeps its poll while the session is still open', async () => {
+        const engine = require('../Modules/Workflows/engine');
+        await setStep({ status: 'pending', attempts: 0 });
+        const enqueue = jest.fn(async () => undefined);
+        const started = Date.now();
+        await engine.tick(CID, String(run._id), { enqueue });
+        expect(enqueue.mock.calls[0][1].runAt.getTime() - started).toBeGreaterThanOrEqual(29000);
+        expect(await stepRow()).toMatchObject({ status: 'pending', nextAttemptAt: expect.any(Date) });
+    });
 });
 
 describe('the live check on a session bound to a waiting step', () => {
