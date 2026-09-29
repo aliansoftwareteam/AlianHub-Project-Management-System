@@ -47,7 +47,7 @@ const notifyDelegator = async (companyId, task, uid, session) => {
 
 /* The owner's rules (2026-09-21): the assignee stays; an unassigned task gets the delegating person, who is notified;
  * a private sprint only with a delegator who is a member of it and a client an admin opted in to private sprints. */
-const delegate = async ({ companyId, uid, taskId, clientId, ip = '', binding = null, now = new Date() }) => {
+const delegate = async ({ companyId, uid, taskId, clientId, ip = '', binding = null, onCreated = null, now = new Date() }) => {
     const task = await access.taskOf(companyId, taskId);
     if (!task) refuse(404, 'Task not found.');
     if (!(await access.canEditTask(companyId, uid, task))) refuse(403, 'You cannot edit this task, so you cannot delegate it.');
@@ -81,6 +81,7 @@ const delegate = async ({ companyId, uid, taskId, clientId, ip = '', binding = n
         state: STATE.OFFERED, handleHash: hashOf(handle), handleExpiresAt: new Date(now.getTime() + LIMITS.handleMs),
         tainted: true, createdAt: now, activityCount: 0, activities: [], ...bound,
     });
+    if (onCreated) await onCreated(session);
 
     if (assignDelegator) {
         await automationTools.updateTask(companyId, task._id, { AssigneeUserId: [String(uid)] }, { auditedByCaller: true });

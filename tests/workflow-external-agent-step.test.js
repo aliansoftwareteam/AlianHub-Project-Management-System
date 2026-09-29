@@ -170,6 +170,18 @@ describe('the step and its session', () => {
         expect(sent).toHaveLength(1);
     });
 
+    it('names the session on its step before the outside agent is told of it', async () => {
+        const seen = [];
+        agentFetch.postJson.mockImplementation(async (url, options) => {
+            sent.push({ url, options });
+            seen.push((await stepRow()).agentSessionId);
+            return { status: 202, hops: [] };
+        });
+        const first = await settle(execute());
+        expect(isWaiting(first.error)).toBe(true);
+        expect(seen).toEqual([JSON.parse(sent[0].options.body).sessionId]);
+    });
+
     it('keeps the task assignee: the session is delegated by the person who started the run', async () => {
         await opened();
         const { recordAudit } = require('../Modules/Audit/recorder');
