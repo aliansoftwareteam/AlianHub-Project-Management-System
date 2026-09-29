@@ -903,8 +903,8 @@ const schema = {
         reactToAutomation: { type: Boolean, default: false, required: false },
         // Round-robin turn per assign step id, advanced atomically by Modules/Automations/engine/assignees.
         assignCursors: { type: Object, default: {}, required: false },
-        // [{ reason: 'unknown_status', status }] — a condition naming a status no project in scope has,
-        // flagged by migration 061 instead of being dropped; cleared when the rule is saved again.
+        // [{ reason: 'unknown_status', status, step? }] — a condition naming a status no project in scope has,
+        // flagged by migrations 061 (conditions) and 062 (condition steps) instead of being dropped; cleared when the rule is saved again.
         needsReview: { type: Array, default: undefined, required: false },
         enabled: { type: Boolean, default: true, required: false },
         // The v1 on-demand bulk apply only: when it last ran and how many tasks it
@@ -1445,6 +1445,9 @@ const schema = {
         updatedBy: { type: String, required: false },
         enabledBy: { type: String, required: false },
         enabledAt: { type: Date, required: false },
+        // [{ reason: 'unknown_status', status, step }] — a condition or loop step naming a status no
+        // project has, flagged by migration 062 instead of being dropped.
+        needsReview: { type: Array, default: undefined, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     // Integration connections — managed by Modules/Integrations (AUTO-04). Generic

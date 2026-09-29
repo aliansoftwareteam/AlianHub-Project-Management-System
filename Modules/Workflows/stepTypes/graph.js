@@ -1,4 +1,5 @@
 const store = require('../store');
+const { contextFor: eventContext } = require('../../Automations/engine/matcher');
 
 // Reading and pruning the step graph from inside a step.
 //
@@ -43,16 +44,21 @@ const skipAll = async (companyId, runId, stepIds, reason) => {
     return skipped;
 };
 
-/* The evaluation context a condition and a loop are given: the run's entity
- * under the roots the expression language already knows, and every finished
- * step's output under `$<stepId>`. */
-const contextFor = (run, outputs) => ({
-    task: (run.entity && run.entity.data) || run.entity || {},
-    entity: run.entity || {},
-    previous: run.envelope || {},
-    actor: { userId: run.startedBy || null },
-    scope: { workflowId: run.workflowId || null, runId: String(run._id) },
-    steps: outputs || {},
-});
+/* The automation matcher's context, so a condition reads a workflow run the way
+ * a rule reads its event (a task's `statusRef` included). A run an event
+ * started carries that envelope; any other run is read against its entity,
+ * with no previous state and nothing changed. Finished steps' outputs sit
+ * under `$<stepId>`. */
+const contextFor = (run, outputs) => {
+    const envelope = run.envelope && run.envelope.data ? run.envelope : {};
+    const entity = run.entity || envelope.entity || {};
+    const ctx = eventContext({
+        ...envelope,
+        data: envelope.data || entity.data || entity,
+        entity,
+        actor: envelope.actor || { userId: run.startedBy || null },
+    }, outputs || {});
+    return { ...ctx, scope: { ...ctx.scope, workflowId: run.workflowId || null, runId: String(run._id) } };
+};
 
 module.exports = { num, ids, deterministic, descendantsOf, skipAll, contextFor };

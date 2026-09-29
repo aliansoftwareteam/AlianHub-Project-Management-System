@@ -168,6 +168,47 @@ const namesStatus = (node) => isStatusTypeField(node.field) && KEY_OP[node.op] &
 const hasStatusNames = (conditions) => someLeaf(conditions, namesStatus);
 const needsStatusCatalogue = (conditions) => someLeaf(conditions, (node) => node.field === 'statusRef' || namesStatus(node));
 
+/* A rule's condition step holds its tree in `condition`; a workflow's condition
+ * step holds it in `config.when` and a loop in `config.while`. */
+const WORKFLOW_SLOT = Object.freeze({ condition: 'when', loop: 'while' });
+
+const conditionSlotOf = (step) => {
+    if (!isPlainObject(step)) return null;
+    if (step.type === 'condition' && isPlainObject(step.condition)) {
+        return { conditions: step.condition, put: (c) => ({ ...step, condition: c }) };
+    }
+    const key = WORKFLOW_SLOT[step.type];
+    if (key && isPlainObject(step.config) && isPlainObject(step.config[key])) {
+        return { conditions: step.config[key], put: (c) => ({ ...step, config: { ...step.config, [key]: c } }) };
+    }
+    return null;
+};
+
+const stepsNeedStatusCatalogue = (steps) => (Array.isArray(steps) ? steps : []).some((step) => {
+    const slot = conditionSlotOf(step);
+    return Boolean(slot) && needsStatusCatalogue(slot.conditions);
+});
+
+/* normaliseStatusConditions over every condition a step list holds, under the
+ * same options; `unresolved` names the step each unknown status sits in. */
+const normaliseStepConditions = (steps, statuses = [], scope = {}, options = {}) => {
+    const unresolved = [];
+    const errors = [];
+    let changed = false;
+    const out = (Array.isArray(steps) ? steps : []).map((step) => {
+        const slot = conditionSlotOf(step);
+        if (!slot || !needsStatusCatalogue(slot.conditions)) return step;
+        const result = normaliseStatusConditions(slot.conditions, statuses, scope, options);
+        const stepId = String(step.id ?? step.stepId ?? '');
+        unresolved.push(...result.unresolved.map((status) => ({ step: stepId, status })));
+        errors.push(...result.errors);
+        if (!result.changed && options.extend === false) return step;
+        changed = changed || result.changed;
+        return slot.put(result.conditions);
+    });
+    return { steps: out, changed, unresolved, errors: [...new Set(errors)] };
+};
+
 const withStatusRef = (snapshot) => {
     if (!isPlainObject(snapshot) || !snapshot.ProjectID || snapshot.statusKey === undefined || snapshot.statusKey === null) return snapshot;
     return { ...snapshot, statusRef: statusRef(snapshot.ProjectID, snapshot.statusKey) };
@@ -209,6 +250,8 @@ module.exports = {
     normaliseStatusConditions,
     hasStatusNames,
     needsStatusCatalogue,
+    stepsNeedStatusCatalogue,
+    normaliseStepConditions,
     withStatusRef,
     withStatusChange,
     statusNameOf,

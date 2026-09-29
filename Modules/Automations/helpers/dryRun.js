@@ -3,7 +3,7 @@ const { render, placeholdersIn } = require('../engine/template');
 const { getAction } = require('../engine/registry');
 const { contextFor, inScope } = require('../engine/matcher');
 const { trimTask } = require('../../../event/domainEventBus');
-const { normaliseStatusConditions, statusNameOf, statusNameOfTask, TYPE_WORD } = require('./statusConditions');
+const { normaliseStatusConditions, normaliseStepConditions, statusNameOf, statusNameOfTask, TYPE_WORD } = require('./statusConditions');
 
 // Plans what a rule would do to one stored task. Pure: it only evaluates and
 // renders, and never touches an action's run(), so nothing here can write, emit
@@ -115,7 +115,11 @@ const planSteps = (steps, ctx, matched, statuses) => {
  * by key, and resolves a condition still stored with a status name. */
 const plan = ({ rule: stored, task, uid, triggerLabel, statuses = [] }) => {
     const plain = stored && stored.toObject ? stored.toObject() : stored;
-    const rule = { ...plain, conditions: normaliseStatusConditions(plain.conditions, statuses, plain.scope).conditions };
+    const rule = {
+        ...plain,
+        conditions: normaliseStatusConditions(plain.conditions, statuses, plain.scope).conditions,
+        steps: normaliseStepConditions(plain.steps, statuses, plain.scope).steps,
+    };
     const envelope = envelopeFor({ rule, task, uid });
     const ctx = contextFor(envelope);
     const scoped = inScope(rule, envelope);
