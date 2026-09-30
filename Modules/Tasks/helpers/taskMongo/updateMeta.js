@@ -23,6 +23,17 @@ const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
 const { taskNotFound, escapeText, TaskWriteRefusal } = require('../taskWriteFields');
 const { recordCustomFieldValue, recordTaskTag } = require('../taskItemHistory');
+const { customFieldDefinitionOf } = require('../../../CustomField/helpers/customFieldText');
+const { fieldAppliesToTask } = require('../../../CustomField/helpers/fieldTaskTypes');
+
+const FIELD_NOT_FOR_TASK_TYPE = 'This custom field is not used for this task type.';
+
+const refuseFieldOffType = async ({ companyId, taskId, customFieldId, storedTask }) => {
+    const definition = await customFieldDefinitionOf(companyId, customFieldId);
+    if (!definition) return;
+    const task = storedTask || await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: new mongoose.Types.ObjectId(taskId) }] }, 'findOne');
+    if (!fieldAppliesToTask(definition, task)) throw new TaskWriteRefusal(400, FIELD_NOT_FOR_TASK_TYPE);
+};
 
 const storedFileName = (storedTask, data) => {
     const stored = ((storedTask && storedTask.attachments) || []).find((file) => file && file.id !== undefined && file.id === data.id);
@@ -273,7 +284,8 @@ module.exports = {
         })
     },
 
-    updateTaskCustomField({companyId,taskId,updateDetail,customFieldId,userData,storedTask,filledByAi = false}) {
+    async updateTaskCustomField({companyId,taskId,updateDetail,customFieldId,userData,storedTask,filledByAi = false}) {
+        await refuseFieldOffType({ companyId, taskId, customFieldId, storedTask });
         return new Promise((resolve,reject) => {
             try {
                 const query = {

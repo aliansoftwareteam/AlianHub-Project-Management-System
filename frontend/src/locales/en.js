@@ -3107,7 +3107,8 @@ export default {
         field_invalid: "That is not a valid value for {field}.",
         estimate_label: "Estimate",
         estimate_placeholder: "1h 30m",
-        estimate_undo_reason: "Undid an estimate change from the task list."
+        estimate_undo_reason: "Undid an estimate change from the task list.",
+        field_not_for_type: "{field} is not used for this task type"
     },
     Views: {
         desktop_only_title: "Open this on a desktop",
@@ -3714,6 +3715,11 @@ export default {
         hint_rollup: "sums up subtasks or a sprint",
         type_ai: "AI field",
         hint_ai: "filled by AI from the task",
+        task_types_label: "Show for task types",
+        task_types_hint: "Leave every type unticked to show this field on all tasks.",
+        task_types_empty: "This workspace has no task types yet.",
+        task_type_missing: "Removed type {key}",
+        task_types_shown: "Only {types}",
     },
     Import: {
         title: "Import tasks",

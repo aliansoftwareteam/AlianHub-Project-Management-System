@@ -46,6 +46,7 @@ module.exports = defineConfig({
         '@agentDailyRunLimit': path.resolve(__dirname, '../Modules/Agents/dailyRunLimit.js'),
         '@passwordRule': path.resolve(__dirname, '../Modules/Auth/helpers/passwordRule.js'),
         '@viewSettings': path.resolve(__dirname, '../Modules/Project/helpers/viewSettings.js'),
+        '@fieldTaskTypes': path.resolve(__dirname, '../Modules/CustomField/helpers/fieldTaskTypes.js'),
       },
     },
     plugins: [

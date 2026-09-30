@@ -4,6 +4,8 @@ import moment from 'moment';
 import { useCustomComposable } from '@/composable';
 import { computeCustomFieldValue } from '@/plugins/customFieldView/formulaEngine.js';
 
+export { fieldAppliesToTask, fieldTaskTypes } from '@fieldTaskTypes';
+
 export const COMPUTED_TYPES = ['formula', 'rollup'];
 export const FIELD_TYPES = ['text', 'textarea', 'number', 'money', 'date', 'dropdown', 'checkbox', 'email', 'phone', ...COMPUTED_TYPES];
 

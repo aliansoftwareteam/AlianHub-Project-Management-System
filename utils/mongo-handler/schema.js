@@ -4433,6 +4433,11 @@ const schema = {
         fieldAi:{
             type:Object,
             required: false
+        },
+        fieldTaskTypes:{
+            type:Array,
+            required: false,
+            default:[]
         }
     },
     sprints: {

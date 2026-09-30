@@ -1,10 +1,13 @@
 /* Task 045 slice 9 — a custom field can be limited to task types. */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { config, mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import { createStore } from 'vuex';
 import { ref } from 'vue';
 import en from '@/locales/en';
+
+vi.mock('@/services', () => ({ apiRequest: vi.fn(() => Promise.resolve({ data: {} })) }));
+vi.mock('@/store/index', () => ({ default: { commit: () => {}, dispatch: () => Promise.resolve(), getters: {}, state: {} } }));
 
 import { fieldAppliesToTask } from '@/views/Projects/composables/projectCustomFields';
 import { taskTypeOptions } from '@/plugins/customFieldView/taskTypeOptions';
@@ -13,6 +16,7 @@ import FieldTaskTypesPicker from '@/plugins/customFieldView/component/atom/Field
 
 const i18n = createI18n({ legacy: false, locale: 'en', messages: { en }, missingWarn: false, fallbackWarn: false });
 config.global.plugins = [i18n];
+config.global.mocks = {};
 
 const BUG = 2;
 const SEVERITY = { _id: 'f-sev', fieldType: 'text', fieldTitle: 'Severity', isDelete: true, type: 'task', global: true, fieldTaskTypes: [BUG] };
