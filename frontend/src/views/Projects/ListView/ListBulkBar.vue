@@ -1,6 +1,9 @@
 <template>
     <div v-if="selection.hasSelection.value" class="lv2-bulk" role="region" :aria-label="$t('List.bulk_region')">
         <span class="lv2-bulk__count">{{ $t('List.selected', { n: selection.count.value }) }}</span>
+        <button type="button" class="lv2-bulk__clear" :aria-label="$t('BulkActions.clear_selection')" :title="$t('BulkActions.clear_selection')" @click.stop="selection.clear()">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+        </button>
 
         <span v-for="menu in menus" :key="menu.key" class="lv2-bulk__menu-wrap">
             <button
@@ -21,7 +24,18 @@
                         <button type="button" class="lv2-bulk__item">{{ $t('List.bulk_due_pick') }}</button>
                     </template>
                 </CalenderCompo>
-                <button v-for="option in menu.options" :key="option.id" type="button" class="lv2-bulk__item" @click="menu.pick(option)">
+                <button
+                    v-for="option in menu.options"
+                    :key="option.id"
+                    type="button"
+                    class="lv2-bulk__item"
+                    :class="{ 'lv2-bulk__item--split': option.split }"
+                    :disabled="option.disabled"
+                    :title="option.title"
+                    :aria-pressed="option.pressed"
+                    @click="option.action ? option.action() : menu.pick(option)"
+                >
+                    <span v-if="option.pressed" class="lv2-bulk__check" aria-hidden="true">{{ PRESSED_MARK[option.pressed] }}</span>
                     <span v-if="option.color" class="lv2-bulk__dot" :style="{ background: option.color }"></span>
                     {{ option.label }}
                 </button>
@@ -61,6 +75,20 @@
         :showSpinner="working"
         @confirm="runConfirmed"
     />
+    <ConvertToSubTaskSidebar
+        v-if="placing"
+        :key="placing"
+        :closeSideBar="true"
+        :isMoveTask="placing !== 'subtask'"
+        :isBulkMove="placing !== 'subtask'"
+        :isOpenSubTask="placing === 'subtask'"
+        :isBulkConvert="placing === 'subtask'"
+        :task="{}"
+        :projectOptions="pickerProjects"
+        @isConvertSubtaskOPen="placing = ''"
+        @bulkMoveConfirm="onDestinationPicked"
+        @bulkConvertConfirm="onParentPicked"
+    />
     <div v-if="undo && !selection.hasSelection.value" class="lv2-undo" role="status">
         <span>{{ undo.text }}</span>
         <button v-if="undo.requests.length" type="button" class="lv2-undo__btn" :disabled="working" @click="runUndo">{{ $t('List.bulk_undo') }}</button>
@@ -68,7 +96,7 @@
 </template>
 
 <script setup>
-import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, defineAsyncComponent, inject, onBeforeUnmount, onMounted, ref } from "vue";
 import { canUseAi } from "@/composable/aiAvailability";
 import { useStore } from "vuex";
 import { useToast } from "vue-toast-notification";
@@ -81,10 +109,14 @@ import { useTaskSummaries } from "@/views/Projects/TableView/useTaskSummaries.js
 import { useProjectCustomFields } from "@/views/Projects/composables/projectCustomFields";
 import { isAiField } from "@/views/Projects/composables/aiFields";
 import { openAiFill } from "@/composable/aiFieldFill";
+import { useOtherProjectRules } from "@/composable/otherProjectRules";
 import { snapshotTasks, statusPayload, undoRequests } from "./bulkUndo.js";
-import { priorityAppOn } from "./listRowEdit.js";
+import { bulkReport, convertTargets, moveTargets, parentTargets, placementActions, selectionShape } from "./bulkPlacement.js";
+import { priorityAppOn, projectHasApp } from "./listRowEdit.js";
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue";
 import CalenderCompo from "@/components/atom/CalenderCompo/CalenderCompo.vue";
+
+const ConvertToSubTaskSidebar = defineAsyncComponent(() => import("@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue"));
 
 defineOptions({ name: "ListBulkBar" });
 
@@ -105,14 +137,31 @@ const userId = inject("$userId");
 const open = ref("");
 const working = ref(false);
 
-const canStatus = computed(() => checkPermission("task.task_status", props.project?.isGlobalPermission) === true);
-const canPriority = computed(() => checkPermission("task.task_priority", props.project?.isGlobalPermission) === true);
-const canAssign = computed(() => checkPermission("task.task_assignee", props.project?.isGlobalPermission) === true);
-const canDue = computed(() => checkPermission("task.task_due_date", props.project?.isGlobalPermission) === true);
-const canMove = computed(() => checkPermission("task.task_move", props.project?.isGlobalPermission) === true || canStatus.value);
-const canTag = computed(() => checkPermission("task.task_tag", props.project?.isGlobalPermission) === true || canStatus.value);
-const canArchive = computed(() => checkPermission("task.task_archive", props.project?.isGlobalPermission) === true);
-const canDelete = computed(() => checkPermission("task.task_delete", props.project?.isGlobalPermission) === true);
+const can = (key) => checkPermission(key, props.project?.isGlobalPermission) === true;
+const canStatus = computed(() => can("task.task_status"));
+const canPriority = computed(() => can("task.task_priority"));
+const canAssign = computed(() => can("task.task_assignee"));
+const canDue = computed(() => can("task.task_due_date"));
+const canMove = computed(() => can("task.task_move") || canStatus.value);
+const canTag = computed(() => can("task.task_tag") || canStatus.value);
+const canArchive = computed(() => can("task.task_archive"));
+const canDelete = computed(() => can("task.task_delete"));
+const canMakeSubtasks = computed(() => can("task.task_convert_to_subtask") && can("task.sub_task_create"));
+const canMakeTasks = computed(() => can("task.convert_to_task") && can("task.task_create"));
+
+const PRESSED_MARK = { true: "✓", mixed: "–", false: "" };
+const selectedTasks = computed(() => Object.values(snapshotTasks(store.state.projectData, selection.selectedTaskIds.value)));
+function pressed(field, value) {
+    const hits = selectedTasks.value.filter((task) => (task[field] || []).includes(String(value))).length;
+    if (!hits) return "false";
+    return hits === selectedTasks.value.length ? "true" : "mixed";
+}
+
+const placement = computed(() => placementActions(
+    selectionShape(store.state.projectData, selection.selectedTaskIds.value),
+    { move: canMove.value, toSubtask: canMakeSubtasks.value, toTask: canMakeTasks.value }
+));
+const offered = (state) => ({ disabled: !state.enabled, title: state.enabled ? null : t(state.reason) });
 
 const confirmOpen = ref(false);
 const pending = ref("");
@@ -141,7 +190,7 @@ const people = computed(() => {
         seen.add(key);
         const user = getUser(key);
         if (!user || user.ghostUser) return list;
-        list.push({ id: key, label: user.Employee_Name || key });
+        list.push({ id: key, label: user.Employee_Name || key, pressed: pressed("AssigneeUserId", key) });
         return list;
     }, []);
 });
@@ -150,14 +199,22 @@ const sprints = computed(() => {
     const direct = Object.values(props.project?.sprintsObj || {});
     const inFolders = Object.values(props.project?.sprintsfolders || {})
         .flatMap((folder) => Object.values(folder?.sprintsObj || {}));
-    return [...direct, ...inFolders]
+    const move = offered(placement.value.moveProject);
+    const here = [...direct, ...inFolders]
         .filter((sprint) => sprint && !sprint.deletedStatusKey)
-        .map((sprint) => ({ id: sprint.id, label: sprint.name, raw: sprint }));
+        .map((sprint) => ({ id: sprint.id, label: sprint.name, raw: sprint, ...(placement.value.moveProject.enabled ? {} : move) }));
+    return [...here, { id: "another-project", label: t("List.bulk_move_project"), split: here.length > 0, ...move, action: () => place("project") }];
 });
 
-const tags = computed(() => (props.project?.tagsArray || []).map((tag) => ({
-    id: tag.uid || tag._id || tag.id, label: tag.tagName || tag.name, raw: tag
-})));
+const tags = computed(() => (props.project?.tagsArray || []).map((tag) => {
+    const id = tag.uid || tag._id || tag.id;
+    return { id, label: tag.tagName || tag.name, raw: tag, pressed: pressed("tagsArray", id) };
+}));
+
+const conversions = computed(() => [
+    { id: "to-subtask", label: t("BulkActions.convert_subtask_title"), ...offered(placement.value.toSubtask), action: () => place("subtask") },
+    { id: "to-task", label: t("BulkActions.convert_task_title"), ...offered(placement.value.toTask), action: () => place("task") }
+]);
 
 const priorities = computed(() => getters["settings/companyPriority"] || []);
 const showPriority = computed(() => priorityAppOn(props.project, getters["settings/selectedCompany"]?.planFeature));
@@ -174,7 +231,8 @@ const menus = computed(() => [
         options: [{ id: "clear", label: t("List.bulk_due_clear") }], pick: () => run("bulkUpdateDueDate", { DueDate: null })
     },
     { key: "sprint", label: t("List.sprint"), enabled: canMove.value, options: sprints.value, pick: pickSprint },
-    { key: "tags", label: t("List.tags"), enabled: canTag.value, options: tags.value, pick: pickTag }
+    { key: "tags", label: t("List.tags"), enabled: canTag.value, options: tags.value, pick: pickTag },
+    { key: "convert", label: t("List.bulk_convert"), enabled: canMakeSubtasks.value || canMakeTasks.value, options: conversions.value }
 ].filter(Boolean));
 
 function toggle(key) {
@@ -200,6 +258,24 @@ function showUndo(text, requests) {
     undoTimer = setTimeout(() => { undo.value = null; }, UNDO_MS);
 }
 
+/* Sprint badges are not socket-driven, and these actions change which sprint a task counts in. */
+const RELOCATING = new Set(["bulkMove", "bulkConvertToTask", "bulkConvertToSubTask"]);
+
+async function refreshSprintCounts() {
+    const pid = props.project?._id;
+    if (!pid) return;
+    try {
+        const res = await apiRequest("get", `/api/v1/${env.GET_SPRINT_OR_PROJECT}/${pid}?collection=sprints`);
+        (Array.isArray(res?.data) ? res.data : []).forEach((row) => {
+            store.commit("projectData/mutateSprints", { op: "modified", data: { ...row, id: row._id } });
+        });
+    } catch (error) {
+        console.error("ERROR refreshing sprint counts: ", error);
+    }
+}
+
+const nameOf = (id) => getUser(id)?.Employee_Name || "";
+
 async function run(action, payload) {
     if (working.value) return;
     working.value = true;
@@ -219,9 +295,14 @@ async function run(action, payload) {
         }
         const result = response?.data?.data || {};
         const updatedIds = Array.isArray(result.updated) ? result.updated : taskIds;
-        const requests = undoRequests({ action, payload, before, updatedIds, project: props.project, priorities: priorities.value });
-        showUndo(t("List.bulk_done", { n: result.totals?.updated ?? taskIds.length }), requests);
+        const report = bulkReport(result, t);
+        if (report) $toast.warning(report);
+        if (updatedIds.length) {
+            const requests = undoRequests({ action, payload, before, updatedIds, project: props.project, priorities: priorities.value, nameOf });
+            showUndo(t("List.bulk_done", { n: result.totals?.updated ?? updatedIds.length }), requests);
+        }
         selection.clear();
+        if (RELOCATING.has(action)) refreshSprintCounts();
     } catch (error) {
         $toast.error(error?.message || t("List.bulk_failed"));
     } finally {
@@ -241,6 +322,7 @@ async function runUndo() {
             if (response?.data?.status === false) throw new Error(response.data.statusText);
         }
         $toast.success(t("List.bulk_undone"));
+        if (requests.some((request) => RELOCATING.has(request.action))) refreshSprintCounts();
     } catch (error) {
         $toast.error(t("List.bulk_undo_failed"));
     } finally {
@@ -262,7 +344,9 @@ function pickDue(date) {
 }
 
 function pickAssignee(option) {
-    run("bulkUpdateAssignee", { type: "assigneeAdd", employeeId: [String(option.id)], employeeName: option.label });
+    const type = option.pressed === "true" ? "assigneRemove"
+        : projectHasApp(props.project, "MultipleAssignees") ? "assigneeAdd" : "replace";
+    run("bulkUpdateAssignee", { type, employeeId: [String(option.id)], employeeName: option.label });
 }
 
 function pickSprint(option) {
@@ -274,7 +358,33 @@ function pickSprint(option) {
 
 function pickTag(option) {
     if (!option.id) return;
-    run("bulkUpdateTags", { tagId: option.id, operation: "add" });
+    run("bulkUpdateTags", { tagId: option.id, operation: option.pressed === "true" ? "remove" : "add" });
+}
+
+const placing = ref("");
+const otherRules = useOtherProjectRules();
+const activeProjects = computed(() => getters["projectData/onlyActiveProjects"]?.data || []);
+const TARGETS = { project: moveTargets, subtask: parentTargets, task: convertTargets };
+const pickerProjects = computed(() => (placing.value ? TARGETS[placing.value](activeProjects.value, otherRules.check) : []));
+
+function place(kind) {
+    open.value = "";
+    placing.value = kind;
+    otherRules.loadAll(activeProjects.value);
+}
+
+const destinationOf = (project) => ({ id: project._id, ProjectCode: project.ProjectCode, ProjectName: project.ProjectName });
+
+function onDestinationPicked({ project: destination, sprint } = {}) {
+    const kind = placing.value;
+    placing.value = "";
+    if (!destination?._id || !sprint?.id) return;
+    run(kind === "task" ? "bulkConvertToTask" : "bulkMove", { sprintObj: sprint, projectData: destinationOf(destination) });
+}
+
+function onParentPicked({ task } = {}) {
+    placing.value = "";
+    if (task?._id) run("bulkConvertToSubTask", { parentTaskId: String(task._id) });
 }
 
 const customFields = useProjectCustomFields(computed(() => props.project));
@@ -406,7 +516,19 @@ onBeforeUnmount(() => {
     color: var(--ink);
     cursor: pointer;
 }
-.lv2-bulk__item:hover { background: var(--surface-hover); }
+.lv2-bulk__item:hover:not(:disabled) { background: var(--surface-hover); }
+.lv2-bulk__item:disabled { opacity: .45; cursor: not-allowed; }
+.lv2-bulk__item--split { margin-top: 4px; padding-top: 9px; border-top: 1px solid var(--hairline); border-radius: 0 0 6px 6px; }
+.lv2-bulk__check { width: 12px; flex: none; text-align: center; color: var(--ink); font-weight: 600; }
+.lv2-bulk__clear {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; margin-left: -8px;
+    background: none; border: 0; border-radius: 6px; padding: 0;
+    color: var(--rail-ink);
+    cursor: pointer;
+}
+.lv2-bulk__clear:hover { background: var(--rail-hover); color: var(--rail-ink-strong); }
+.lv2-bulk__clear:focus-visible { outline: none; box-shadow: var(--focus); }
 .lv2-bulk__note { padding: 7px 8px; color: var(--ink-2); font: var(--text-small); }
 
 .lv2-bulk__dot { width: 8px; height: 8px; border-radius: 2px; flex: none; background: var(--ink-3); }
@@ -417,6 +539,8 @@ onBeforeUnmount(() => {
 @media (max-width: 767px) {
     .lv2-bulk { padding: 0 16px; gap: 10px; overflow-x: auto; white-space: nowrap; }
     .lv2-bulk > * { flex: none; }
+    .lv2-bulk__esc { display: none; }
+    .lv2-bulk__clear { width: 36px; height: 36px; }
     .lv2 > .lv2-bulk { position: fixed; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px)); }
     .lv2 > .lv2-bulk ~ .lv2__scroll { padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px)); }
     /* The bar scrolls sideways here, which would clip a menu positioned inside it. */

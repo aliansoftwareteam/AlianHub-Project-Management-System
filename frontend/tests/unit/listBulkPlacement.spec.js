@@ -21,6 +21,7 @@ vi.mock('@/composable', () => ({
     useGetterFunctions: () => ({ getUser: (id) => ({ id, Employee_Name: `User ${id}` }) })
 }));
 vi.mock('@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue', () => ({
+    __esModule: true,
     default: {
         name: 'ConvertToSubTaskSidebar',
         props: ['closeSideBar', 'isMoveTask', 'isBulkMove', 'isOpenSubTask', 'isBulkConvert', 'task', 'projectOptions'],
@@ -158,7 +159,7 @@ describe('ListBulkBar placement', () => {
                 },
                 settings: {
                     namespaced: true,
-                    getters: { companyUsers: () => [], companyOwnerDetail: () => ({ userId: 'owner' }), projectRawRules: () => [] }
+                    getters: { companyUsers: () => [{ userId: 'u1', isDelete: false }, { userId: 'u2', isDelete: false }], companyOwnerDetail: () => ({ userId: 'owner' }), projectRawRules: () => [] }
                 }
             }
         });
@@ -267,7 +268,7 @@ describe('ListBulkBar placement', () => {
         await menu(wrapper, 'List.status').trigger('click');
         await item(wrapper, 'To do').trigger('click');
         await flushPromises();
-        expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('BulkActions.reason_permission'));
+        expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('BulkActions.result_skipped'));
         expect(wrapper.find('.lv2-undo').exists()).toBe(false);
     });
 
