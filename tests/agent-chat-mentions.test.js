@@ -98,6 +98,10 @@ const { save } = require('../Modules/Comments/controller');
 const chatAgents = require('../Modules/Agents/chatAgents');
 const chatCtrl = require('../Modules/Agents/chatController');
 
+// chatAgents loads these on first use; loading them here keeps that cost out of the first test's timeout.
+['../Modules/Agents/runs', '../Modules/Agents/actions', '../Modules/Agents/proposals', '../Modules/AI/ask', '../Modules/AI/aiMention', '../Modules/AICore/modelCall', '../Modules/Agents/skillRecord']
+    .forEach((path) => require(path));
+
 const oid = (id) => new mongoose.Types.ObjectId(id);
 let seq = 0;
 const at = () => new Date(Date.UTC(2026, 8, 30, 10, seq++));

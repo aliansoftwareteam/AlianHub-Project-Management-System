@@ -232,6 +232,9 @@ const schema = {
             type: Boolean,
             required: false
         },
+        // A mainChat conversation with an agent (Modules/Agents/chatAgents); its one assignee is the person.
+        agentId: { type: String, required: false },
+        agentName: { type: String, required: false },
         totalEstimatedTime:{
             type: Number,
             required: false
@@ -4113,7 +4116,11 @@ const schema = {
         aiAsk: { type: Object, required: false },
         aiAskerId: { type: String, required: false },
         aiQuestionId: { type: String, required: false },
-        aiCitations: { type: Array, required: false }
+        aiCitations: { type: Array, required: false },
+        // @agent in chat: the question's { state, askerId, agentIds, at, answerIds, code }; on the agent's reply what it cites and the changes it made or proposed.
+        agentAsk: { type: Object, required: false },
+        agentCitations: { type: Array, required: false },
+        agentChanges: { type: Array, required: false }
     },
     mainChat: {
         ProjectCode: {
