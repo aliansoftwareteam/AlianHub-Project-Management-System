@@ -398,8 +398,11 @@ const directSprintOf = async (companyId, spaceId) => (await MongoDbCrudOpration(
 
 /* The conversation a person has with an agent: a mainChat row in the direct-message space whose only assignee is
  * that person. Found or made; null when the person may not use the agent. */
+const DIRECT_PERMISSION = 'chat.one_to_one_chat';
+
 const openDirect = async (companyId, uid, agentId) => {
     if (!isId(agentId)) return null;
+    if (!lazy.roles.isWritable(await lazy.roles.evaluatePermission(companyId, uid, DIRECT_PERMISSION))) return null;
     const agent = (await usableAgents(companyId, uid)).find((a) => String(a._id) === String(agentId));
     if (!agent) return null;
     const space = plain(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.MAIN_CHATS, data: [{ default: true }] }, 'findOne'));

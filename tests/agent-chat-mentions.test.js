@@ -49,6 +49,8 @@ jest.mock('../Modules/Comments/helpers/commentNotifications', () => ({
 jest.mock('../Config/permissionGuard', () => ({
     getRoleType: jest.fn(async (companyId, uid) => (String(uid) === '6f0000000000000000000d04' ? 0 : 3)),
     isPrivileged: (role) => role === 1 || role === 2,
+    evaluatePermission: jest.fn(async (companyId, uid) => String(uid) !== '6f0000000000000000000d03'),
+    isWritable: (permission) => permission === true,
 }));
 jest.mock('../Config/projectAccess', () => ({
     canReadProject: jest.fn(async (companyId, uid, projectId) => (String(projectId) === '6a9954186dd786246031e481'
@@ -305,10 +307,11 @@ describe('a direct message with an agent', () => {
         expect(String(conversation.sprintId)).toBe(DM_SPRINT);
     });
 
-    it('refuses an agent the person may not use', async () => {
+    it('refuses an agent the person may not use, and anyone who may not send direct messages', async () => {
         expect((await openDirect(ALICE, ELSEWHERE)).code).toBe(404);
         expect((await openDirect(ALICE, PAUSED)).code).toBe(404);
         expect((await openDirect(GUEST, HELPER)).code).toBe(404);
+        expect((await openDirect(CAROL, HELPER)).code).toBe(404);
     });
 
     it('runs the agent on every message, with what that person can open, and replies in the conversation', async () => {
