@@ -160,9 +160,14 @@
                             <input class="ah-input pd__share-url" type="text" readonly :value="shareUrl" @focus="$event.target.select()" />
                             <button type="button" class="ah-btn ah-btn--primary ah-btn--block" @click="copyShareLink">{{ $t('Projects.doc_copy_public_link') }}</button>
                         </template>
+                        <button type="button" class="ah-btn ah-btn--secondary ah-btn--block pd__who" @click="showWhoCanSee = true">
+                            <ShellIcon name="eye" :size="13" />{{ $t('WhoCanSee.menu_doc') }}
+                        </button>
                     </div>
                 </div>
             </div>
+
+            <WhoCanSeeModal v-model="showWhoCanSee" kind="page" :itemId="page?._id || ''" :title="draftTitle" />
 
             <PagePresenter
                 v-if="presenting"
@@ -185,6 +190,7 @@ import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
 import { useStore } from 'vuex';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import WhoCanSeeModal from '@/components/molecules/WhoCanSee/WhoCanSeeModal.vue';
 import TaskChipPicker from '@/components/molecules/Pages/TaskChipPicker.vue';
 import PageBlockEditor from '@/components/molecules/Pages/PageBlockEditor.vue';
 import PageComposeRail from '@/components/molecules/Pages/PageComposeRail.vue';
@@ -233,6 +239,7 @@ const showLinker = ref(false);
 const linkedTasks = ref([]);
 const isPrivate = ref(false);
 const showShare = ref(false);
+const showWhoCanSee = ref(false);
 const share = ref(null);
 const isSharing = ref(false);
 const presenting = ref(false);
@@ -713,6 +720,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 .pd__switch.is-on { background: var(--brand); }
 .pd__switch.is-on i { transform: translateX(17px); }
 .pd__switch:disabled { opacity: .45; cursor: not-allowed; }
+.pd__who { margin-top: 12px; }
 .pd__share-url { margin: 12px 0 8px; font: var(--text-data); color: var(--ink-2); background: var(--surface-2); }
 
 .pd__missing { padding: 24px; }

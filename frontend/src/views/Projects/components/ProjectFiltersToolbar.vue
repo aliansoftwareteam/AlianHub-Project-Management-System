@@ -213,6 +213,7 @@
             <PagesPanel v-model="showPages" :projectData="projectData" />
             <ExportTasksDropdown v-model="showExport" :projectData="projectData" />
             <PublicShareModal v-model="showPublicShare" :projectData="projectData" />
+            <WhoCanSeeModal v-model="showWhoCanSee" kind="project" :itemId="projectData?._id || ''" :title="projectData?.ProjectName || ''" />
             <ImportDialog v-model="showImport" :projectData="projectData" :users="users" :sprint="importSprint" />
             <AutoArchiveModal v-model="showAutoArchive" :projectData="projectData" />
             <EstimationScaleModal v-model="showEstimationScale" :projectData="projectData" />
@@ -239,6 +240,7 @@ import EpicsPanel from '@/components/molecules/Epics/EpicsPanel.vue';
 import ExportTasksDropdown from '@/components/molecules/ExportTasks/ExportTasksDropdown.vue';
 import PagesPanel from '@/components/molecules/Pages/PagesPanel.vue';
 import PublicShareModal from '@/components/molecules/PublicShare/PublicShareModal.vue';
+import WhoCanSeeModal from '@/components/molecules/WhoCanSee/WhoCanSeeModal.vue';
 import ImportDialog from '@/components/organisms/ImportDialog/ImportDialog.vue';
 import AutoArchiveModal from '@/components/molecules/AutoArchive/AutoArchiveModal.vue';
 import EstimationScaleModal from '@/components/molecules/EstimationScale/EstimationScaleModal.vue';
@@ -260,6 +262,7 @@ const showGlobalSearch = ref(false);
 const showEpics = ref(false);
 const showPages = ref(false);
 const showPublicShare = ref(false);
+const showWhoCanSee = ref(false);
 const showImport = ref(false);
 const showAutoArchive = ref(false);
 const showEstimationScale = ref(false);
@@ -386,7 +389,8 @@ const moreGroups = computed(() => {
         ] },
         { key: 'share', items: [
             { key: 'export', label: 'Projects.export_tasks', open: opener(showExport) },
-            { key: 'public', label: 'Projects.public_link', open: opener(showPublicShare) }
+            { key: 'public', label: 'Projects.public_link', open: opener(showPublicShare) },
+            { key: 'whoCanSee', label: 'WhoCanSee.menu_project', open: opener(showWhoCanSee) }
         ] },
         { key: 'import', items: [
             { key: 'import', label: 'Projects.import_any', open: opener(showImport) }
