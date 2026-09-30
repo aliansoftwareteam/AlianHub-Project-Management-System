@@ -2,7 +2,24 @@
 
 Updated 2026-09-28. Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
 
-## State of `beta` (9f1f63db, `14.36.0-beta.635`)
+## State of `beta` (`14.36.0-beta.644`)
+
+- **2026-09-29: builds 636–644, follow-ups from tasks 041–043.** The owner's local server is on 644 (backend pulled; the frontend was last built at 635, and nothing since changed it).
+  - **Login guard:**
+    - #1171 (636): memory, feedback, quality and notes-to-tasks routes.
+    - #1174 (640): `tests/conventions/route-guard-coverage.test.js` walks every route: 856 in total, 767 guarded, 88 public with reasons. It also guarded `/api/v1/ai/chat-ask`.
+    - #1176 (642): `getGlobalTemplate` is now guarded.
+    - A new route must be in the guard list or in the test's `PUBLIC_ROUTES`, or CI fails.
+  - **Emails:**
+    - #1172 (639): comment_reply and comment_assigned emails.
+    - #1177 (643): every notification and account email escapes the text it includes (`Modules/Template/emailText.js`).
+  - **Workflows:**
+    - #1173 (638): condition steps match status by key (migration `062`) and fixed the workflow's `previous` context.
+    - #1175 (641): the external agent step saves its session id before announcing it. This was the flaky integration test.
+    - #1178 (644): a session that closes before the step waits is picked up at once.
+  - **Docs:** #1170 (637) ticked tasks 041 and 043 and refreshed the beta log and handoff.
+
+### Earlier: `beta` at 9f1f63db, `14.36.0-beta.635`
 
 - **2026-09-28 evening: builds 601–635 (tasks 041, 042 and 043).** The owner's local server was rebuilt at 603, 608 and 635.
   - **Task 041 (AI UX fixes) is done:**
