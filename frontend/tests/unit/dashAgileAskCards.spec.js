@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils';
 import { h, reactive, ref } from 'vue';
 
 const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }));
@@ -11,11 +11,14 @@ import BurndownCard from '@/components/organisms/BurndownCard/BurndownCard.vue';
 import VelocityCard from '@/components/organisms/VelocityCard/VelocityCard.vue';
 import AskAQuestionCard from '@/components/organisms/AskAQuestionCard/AskAQuestionCard.vue';
 import { forgetAskAnswers } from '@/components/organisms/AskAQuestionCard/askCardCache';
+import CardSettings from '@/views/Dashboards/CardSettings.vue';
 import { CARD_META_KEY } from '@/components/organisms/DashboardCard/useCardMeta';
 import { catalogEntry, isBuiltCard } from '@/plugins/dashboard/cardCatalog';
 import { cardComponent } from '@/plugins/dashboard/cardRegistry';
 import { AI_STATE, applyAiAvailability, resetAiAvailability } from '@/composable/aiAvailability';
 import { burndownSeries, velocityScale, sprintChoices } from '@/views/Projects/Reports/composables/agileReports';
+
+enableAutoUnmount(afterEach);
 
 const ApexChart = { name: 'ApexChart', props: ['series', 'options', 'type', 'height'], render: () => h('div', { 'data-test': 'apex' }) };
 const RouterLink = { name: 'RouterLink', props: ['to'], render() { return h('a', { 'data-test': 'cite-link' }, this.$slots.default && this.$slots.default()); } };
@@ -87,7 +90,7 @@ describe('the shared agile chart helpers', () => {
 });
 
 describe('Burndown card', () => {
-    beforeEach(() => apiRequest.mockReset());
+    beforeEach(() => { apiRequest.mockReset(); });
 
     it('asks for a sprint rather than loading anything when none is chosen', async () => {
         const { meta } = await mountCard(BurndownCard, { cardData: {} });
@@ -128,7 +131,7 @@ describe('Burndown card', () => {
 });
 
 describe('Velocity card', () => {
-    beforeEach(() => apiRequest.mockReset());
+    beforeEach(() => { apiRequest.mockReset(); });
 
     const sprints = (n) => Array.from({ length: n }, (_, i) => ({ sprintId: `s${i}`, name: `Sprint ${i}`, committed: 10, completed: 8 + i }));
 
@@ -261,5 +264,53 @@ describe('Ask card', () => {
         apiRequest.mockRejectedValue(new Error('down'));
         const { meta } = await mountCard(AskAQuestionCard, { cardData: { question: 'What is late?' } });
         expect(meta.state).toBe('error');
+    });
+});
+
+describe('card settings form', () => {
+    const burndownFields = () => catalogEntry('BurndownCard').settings;
+    const projects = [{ _id: 'p1', ProjectName: 'Website' }, { _id: 'p2', ProjectName: 'App' }];
+    const mountForm = async (fields, cardData = {}) => {
+        const wrapper = mount(CardSettings, { props: { fields, cardData, projects } });
+        await flushPromises();
+        return wrapper;
+    };
+
+    beforeEach(() => { apiRequest.mockReset(); });
+
+    it('offers the chosen project\'s sprints and forgets the sprint when the project changes', async () => {
+        apiRequest.mockResolvedValue({ data: { data: [{ _id: 's1', name: 'Sprint 1' }, { _id: 'b1', name: 'Backlog', isBacklog: true }] } });
+        const wrapper = await mountForm(burndownFields(), { projectId: 'p1', sprintId: 's1' });
+        expect(apiRequest).toHaveBeenCalledWith('get', '/api/v1/project/sprintFolder/p1?collection=sprints');
+        expect(wrapper.findAll('[data-test="csf-sprintId"] option').map((o) => o.element.value)).toEqual(['', 's1']);
+        expect(wrapper.find('[data-test="csf-sprintId"]').element.value).toBe('s1');
+
+        await wrapper.find('[data-test="csf-projectId"]').setValue('p2');
+        await flushPromises();
+        await wrapper.find('form').trigger('submit');
+        expect(wrapper.emitted('save')).toBeUndefined();
+        expect(wrapper.find('[data-test="csf-error"]').text()).toBe('Dash.settings_required');
+    });
+
+    it('saves the sprint, the measure and a sprint count kept inside its range', async () => {
+        apiRequest.mockResolvedValue({ data: { data: [{ _id: 's1', name: 'Sprint 1' }] } });
+        const burndown = await mountForm(burndownFields(), { projectId: 'p1' });
+        await burndown.find('[data-test="csf-sprintId"]').setValue('s1');
+        await burndown.find('[data-test="csf-metric"]').setValue('count');
+        await burndown.find('form').trigger('submit');
+        expect(burndown.emitted('save')[0][0]).toEqual({ projectId: 'p1', sprintId: 's1', metric: 'count' });
+
+        const velocity = await mountForm(catalogEntry('VelocityCard').settings, { projectId: 'p2' });
+        await velocity.find('[data-test="csf-sprintCount"]').setValue(40);
+        await velocity.find('form').trigger('submit');
+        expect(velocity.emitted('save')[0][0]).toEqual({ projectId: 'p2', sprintCount: 12 });
+    });
+
+    it('saves a trimmed question with or without a project', async () => {
+        const wrapper = await mountForm(catalogEntry('AskAQuestionCard').settings);
+        await wrapper.find('[data-test="csf-question"]').setValue('  What is late?  ');
+        await wrapper.find('form').trigger('submit');
+        expect(wrapper.emitted('save')[0][0]).toEqual({ question: 'What is late?', projectId: '' });
+        expect(apiRequest).not.toHaveBeenCalled();
     });
 });
