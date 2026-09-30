@@ -4,6 +4,9 @@
             <div class="ah-toolbar__title">{{ $t('Automations.title') }}</div>
             <span class="parity-count">{{ $t('Parity.n_active', { n: activeCount }) }}</span>
             <div class="ah-toolbar__spacer"></div>
+            <button v-if="!building && canManage" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="open-templates" :aria-pressed="showGallery" @click="showGallery = !showGallery">
+                {{ $t('AutomationTemplates.open') }}
+            </button>
             <button v-if="!building && canManage" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="startNew">
                 <ShellIcon name="plus" :size="14" />{{ $t('Automations.new') }}
             </button>
@@ -175,11 +178,19 @@
             </template>
 
             <template v-else>
+                <AutomationTemplateGallery
+                    v-if="showGallery && canManage && !loading"
+                    v-model:projectId="galleryProjectId"
+                    :projects="projects"
+                    @use="startFromTemplate"
+                    @close="showGallery = false"
+                />
                 <p v-if="loading" class="ah-empty">{{ $t('Parity.loading') }}</p>
-                <div v-else-if="!rules.length" class="ah-empty au__empty">
+                <div v-else-if="!rules.length && !showGallery" class="ah-empty au__empty">
                     <h2 class="ah-h2">{{ $t('Automations.empty_title') }}</h2>
                     <p>{{ $t('Automations.empty_sub') }}</p>
                     <button v-if="canManage" type="button" class="ah-btn ah-btn--primary" @click="startNew">{{ $t('Automations.new') }}</button>
+                    <button v-if="canManage" type="button" class="ah-btn ah-btn--secondary" @click="showGallery = true">{{ $t('AutomationTemplates.open') }}</button>
                 </div>
 
                 <div v-for="r in rules" :key="r._id" class="au__rule" :class="{ 'au__rule--off': !r.enabled }">
@@ -216,8 +227,10 @@ import * as env from '@/config/env';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import RunHistoryDrawer from './RunHistoryDrawer.vue';
 import AutomationAiDraft from './AutomationAiDraft.vue';
+import AutomationTemplateGallery from './AutomationTemplateGallery.vue';
 import { assignPeopleText, assignSkippedText } from './assignText';
 import { choicesFor, refsFor } from './statusChoices';
+import { fillTemplate } from '@automationTemplates';
 
 // Loaded on first use: most rules never assign, and the people picker pulls in the shared DropDown.
 const AssignActionEditor = defineAsyncComponent(() => import('./AssignActionEditor.vue'));
@@ -227,6 +240,14 @@ const AssignActionEditor = defineAsyncComponent(() => import('./AssignActionEdit
 // parser on the server (Modules/Automations/helpers/sentenceRules), never a
 // model call — the whole point of the screen is that nothing is a black box.
 defineOptions({ name: 'AutomationsPage' });
+
+const props = defineProps({
+    openTemplates: { type: Boolean, default: false },
+    templateProjectId: { type: String, default: '' },
+});
+
+const showGallery = ref(props.openTemplates);
+const galleryProjectId = ref(props.templateProjectId);
 
 const manifest = reactive({ triggers: [], conditionFields: [], actions: [], operators: {} });
 const rules = ref([]);
@@ -496,13 +517,17 @@ const peopleText = assignPeopleText;
 const skippedText = assignSkippedText;
 const shownParam = (value) => (value !== null && typeof value === 'object' ? JSON.stringify(value) : String(value ?? ''));
 
-const startNew = async () => {
+const resetBuilder = () => {
     resetDryRun();
     clearAiDraft();
     errors.value = [];
     ambiguities.value = [];
     backtest.value = null;
     editingId.value = null;
+};
+
+const startNew = async () => {
+    resetBuilder();
     draft.trigger = { type: 'event', event: manifest.triggers[0]?.key || '' };
     draft.steps = [];
     conditions.value = [];
@@ -517,12 +542,19 @@ const startNew = async () => {
     onRuleEdit();
 };
 
+/* A template only fills the builder: the person reviews it, and saving stays their step. */
+const startFromTemplate = (template) => {
+    resetBuilder();
+    applyRule(fillTemplate(template, { projects: projects.value, projectId: galleryProjectId.value, translate: t }));
+    sentence.value = '';
+    settledSentence = '';
+    showGallery.value = false;
+    building.value = true;
+    onRuleEdit();
+};
+
 const edit = (rule) => {
-    resetDryRun();
-    clearAiDraft();
-    errors.value = [];
-    ambiguities.value = [];
-    backtest.value = null;
+    resetBuilder();
     editingId.value = rule._id;
     applyRule(rule);
     sentence.value = rule.sentence || '';
@@ -596,6 +628,7 @@ onMounted(async () => {
     try {
         await loadRegistry();
         await Promise.all([loadRules(), loadProjects()]);
+        if (!projects.value.some((p) => String(p._id) === galleryProjectId.value)) galleryProjectId.value = '';
     } catch (e) {
         loadError.value = e?.message || 'Could not load automations.';
     } finally {

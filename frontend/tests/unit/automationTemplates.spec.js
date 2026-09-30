@@ -101,7 +101,8 @@ describe('the automation template gallery', () => {
         expect(rule.trigger.event).toBe('task.status_changed');
         expect(rule.scope).toEqual({ allProjects: false, projectIds: ['p1'] });
         expect(rule.conditions).toEqual({ op: 'changedTo', field: 'statusRef', value: ['p1:3'], label: 'Shipped' });
-        expect(apiRequest.mock.calls.filter(([method, url]) => ['post', 'put'].includes(method) && /\/automations(\/[^/]+)?$/.test(url))).toEqual([]);
+        const saves = apiRequest.mock.calls.filter(([method, url]) => ['post', 'put'].includes(method) && !url.endsWith('/compile'));
+        expect(saves).toEqual([]);
     });
 
     it('keeps the backtest in reach for a filled-in template', async () => {
