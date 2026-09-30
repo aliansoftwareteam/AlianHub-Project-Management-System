@@ -8,6 +8,10 @@ vi.mock('@/composable/aiAvailability', async () => {
     const { ref: vueRef } = await import('vue');
     return { aiUsable: vueRef(true), canUseAi: () => true };
 });
+vi.mock('@/composable', () => ({
+    useCustomComposable: () => ({ checkPermission: () => true, checkApps: () => true }),
+    useGetterFunctions: () => ({ getUser: (id) => ({ id }) })
+}));
 
 import {
     AI_OUTPUTS, aiDraftFrom, aiFieldPayload, aiOutputOf, isAiField, newAiDraft, templatesFor, validateAiDraft

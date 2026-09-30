@@ -11,6 +11,8 @@ const STALE_MS = 10 * 60 * 1000;
 const STATUS = Object.freeze({ QUEUED: 'queued', RUNNING: 'running', DONE: 'done', STOPPED: 'stopped', FAILED: 'failed' });
 const GATE_STOPS = Object.freeze([limits.STOP.AI_OFF, limits.STOP.NO_PROVIDER, limits.STOP.DAILY_LIMIT, limits.STOP.BUDGET]);
 
+const JOB_COUNT = Object.freeze({ filled: 'filled', failed: 'failed' });
+
 const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
 
 const PUBLIC_FIELDS = ['_id', 'fieldId', 'status', 'total', 'processed', 'filled', 'skipped', 'failed', 'stopReason', 'startedAt', 'finishedAt', 'createdAt', 'updatedAt'];
@@ -42,7 +44,7 @@ async function runJob(companyId, job, { definition, config }) {
                     counts[outcome.reason ? 'skipped' : 'filled'] += 1;
                 } else {
                     const outcome = await fill.fillTask({ companyId, uid: job.userId, definition, config, taskId, trigger: fill.TRIGGER.BULK });
-                    counts[outcome.outcome === 'filled' ? 'filled' : 'skipped'] += 1;
+                    counts[JOB_COUNT[outcome.outcome] || 'skipped'] += 1;
                 }
             } catch (error) {
                 if (GATE_STOPS.includes(error && error.code)) { stopReason = error.code; break; }

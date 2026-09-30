@@ -204,7 +204,8 @@ const schema = {
             type: Object,
             required: false
         },
-        // Per AI custom field: when and by whom it was last filled by AI, and the hash of the task parts it read.
+        // Per AI custom field: when and by whom it was last filled by AI, and the hash of the task parts it read;
+        // `failed: { at, reason, trigger }` when a later answer did not fit and was not stored.
         aiFieldFills: {
             type: Object,
             required: false
@@ -4430,9 +4431,23 @@ const schema = {
             required: false,
             default:''
         },
-        fieldAi:{
-            type:Object,
-            required: false
+        // Modules/CustomField/aiFields/config.js writes this shape; min to dateRule apply to one output each
+        fieldAi: {
+            enabled: { type: Boolean, required: false },
+            template: { type: String, required: false },
+            // text | option | labels | number | rating | date
+            output: { type: String, required: false },
+            language: { type: String, required: false },
+            prompt: { type: String, required: false },
+            reads: { type: [String], default: undefined, required: false },
+            autoRefill: { type: Boolean, required: false },
+            min: { type: Number, required: false },
+            max: { type: Number, required: false },
+            decimals: { type: Number, required: false },
+            // clamp | reject
+            outOfRange: { type: String, required: false },
+            // '' | after_start | not_past
+            dateRule: { type: String, required: false },
         }
     },
     sprints: {

@@ -42,7 +42,7 @@ jest.mock('../Modules/Tasks/helpers/task_class_Mongo', () => ({
 
 const mongoose = require('mongoose');
 const socketEmitter = require('../event/socketEventEmitter');
-const dbCollections = require('../Config/collections');
+const { dbCollections } = require('../Config/collections');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { schema } = require('../utils/mongo-handler/schema');
 const config = require('../Modules/CustomField/aiFields/config');
