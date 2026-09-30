@@ -64,6 +64,7 @@ export function useListDragDrop() {
         if (event.added) {
             updateTaskByGroup(element, item, groupType).catch((error) => console.error("ERROR in list drop: ", error));
         }
+        if (item.customFieldId) return;
 
         const tempIndex = nextIndex(rows, index, item.indexName);
         const relevantIndex = rows.length > 1 ? rows[index === 0 ? 1 : index - 1][item.indexName] : 0;

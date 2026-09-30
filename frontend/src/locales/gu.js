@@ -3062,7 +3062,18 @@ export default {
         "sort_created": "Created",
         "sort_updated": "Updated",
         "sort_name": "Name",
-        "sort_status": "Status"
+        "sort_status": "Status",
+        "sort_assignee": "Assignee",
+        "sort_points": "Points",
+        "sort_estimate": "Estimate",
+        "sort_fields": "Custom fields"
+    },
+    "ViewGroups": {
+        "no_value": "No value",
+        "checked": "Checked",
+        "unchecked": "Not checked",
+        "date_past": "Past",
+        "custom_fields": "Custom fields"
     },
     "ViewColumns": {
         "title": "Columns",
@@ -5909,7 +5920,15 @@ export default {
         "select_project_types": "પ્રોજેક્ટ પ્રકારો પસંદ કરો",
         "unselect_all": "બધા પસંદગી દૂર કરો",
         "are_you_suredelete": "શું તમે ખાતરીથી કાઢી નાખવા માંગો છો?",
-        "Not_Equals_To": "નથી"
+        "Not_Equals_To": "નથી",
+        "cf_contains": "Contains",
+        "cf_on": "Is on",
+        "cf_before": "Is before",
+        "cf_after": "Is after",
+        "cf_is_set": "Is set",
+        "cf_is_empty": "Is empty",
+        "cf_value": "Value",
+        "cf_choose": "Choose one or more options"
     },
     "conformationmsg": {
         "archive": "યાદી આર્કાઇવ કરી શકાય છે જેથી તે દૃશ્યમાંથી છુપાય પરંતુ કોઈપણ સમયે પુનઃસ્થાપિત કરી શકાય. જ્યારે તમે યાદી આર્કાઇવ કરો છો ત્યારે બધા કાર્યો રાખવામાં આવે છે અને શોધી શકાય છે.",

@@ -61,7 +61,7 @@
                                 @move="columnState.move"
                                 @reset="columnState.reset"
                             />
-                            <ListSortControl :sort="sortState.sort.value" @key="sortState.setKey" @dir="sortState.setDir" />
+                            <ListSortControl :sort="sortState.sort.value" :options="sortOptions" @key="sortState.setKey" @dir="sortState.setDir" />
                         </span>
                         <span
                             v-for="column in columnState.visibleColumns.value"
@@ -174,7 +174,7 @@ import { isAiField, loadedViewTasks } from '@/views/Projects/composables/aiField
 import ListSortControl from './ListSortControl.vue';
 import ConvertToSubTaskSidebar from '@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue';
 import { useListRowMenu } from './useListRowMenu.js';
-import { useListSort } from '@/views/Projects/composables/viewSort';
+import { sortChoices, useListSort } from '@/views/Projects/composables/viewSort';
 import { columnCatalogue, gridTracks, listColumnClass, listColumnsAt, useViewColumns } from '@/views/Projects/composables/viewColumns';
 
 // UTILS
@@ -204,6 +204,9 @@ const rowMenu = useListRowMenu(project, showArchived);
 provide('listRowMenu', rowMenu);
 const sortState = useListSort();
 provide('listSort', sortState.sort);
+const sortOptions = computed(() => sortChoices(rowEdit.fields.defs.value));
+const userNames = computed(() => new Map((getters['users/users'] || []).map((user) => [user._id, user.Employee_Name])));
+provide('listSortContext', computed(() => ({ fields: rowEdit.fields.defs.value, userName: (id) => userNames.value.get(id) })));
 
 const listCatalogue = computed(() => columnCatalogue('list', {
     tagsOn: tagsOn.value,
@@ -225,7 +228,7 @@ defineEmits(['change'])
 // PROPS
 const props = defineProps({
     grouped: {
-        type: Number,
+        type: [Number, String],
         default: 0
     },
     commonDateFormatForDate: {

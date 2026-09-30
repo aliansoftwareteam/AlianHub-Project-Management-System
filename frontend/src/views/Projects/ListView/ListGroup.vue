@@ -121,7 +121,7 @@ const props = defineProps({
     item: { type: Object, required: true },
     sprint: { type: Object, required: true },
     project: { type: Object, required: true },
-    groupType: { type: Number, default: 0 }
+    groupType: { type: [Number, String], default: 0 }
 });
 defineEmits(["toggle", "open", "review-agent"]);
 
@@ -136,6 +136,7 @@ const showArchived = inject("showArchived", ref(false));
 const searchedTask = inject("searchedTask", ref(false));
 const taskCollapsed = inject("taskCollapsed", ref(true));
 const listSort = inject("listSort", ref(MANUAL));
+const listSortContext = inject("listSortContext", ref({}));
 
 const creating = ref(false);
 const templates = ref([]);
@@ -150,7 +151,7 @@ const canCreate = computed(() => !showArchived.value
     && checkPermission("task.task_list", props.project?.isGlobalPermission) === true);
 const canSelect = computed(() => !showArchived.value && checkPermission("task.task_status", props.project?.isGlobalPermission) === true);
 const canSetStatus = canSelect;
-const canDrag = computed(() => canSelect.value && !searchedTask.value && listSort.value.key === "manual" && props.item.value !== "NO_DUE_DATE" && props.item.value !== "NEXT");
+const canDrag = computed(() => canSelect.value && !searchedTask.value && listSort.value.key === "manual" && !props.item.dropDisabled && props.item.value !== "NO_DUE_DATE" && props.item.value !== "NEXT");
 
 const storeTasks = computed(() => getters["projectData/tasks"]?.[props.project._id]?.[sprintId.value]?.tasks || []);
 const sourceTasks = computed(() => listSourceTasks({
@@ -165,7 +166,8 @@ const found = computed(() => (searchedTask.value
 
 const groupTasks = computed(() => sortTasks(groupRows(sourceTasks.value, props.item, showArchived.value), listSort.value, {
     priorities: getters["settings/companyPriority"] || [],
-    statuses: props.project?.taskStatusData || []
+    statuses: props.project?.taskStatusData || [],
+    ...listSortContext.value
 }));
 
 const rows = ref([]);
@@ -312,6 +314,9 @@ function onCreated(payload) {
     applyRowTemplate(created);
     if (props.groupType === 0 && created.statusKey !== props.item.key) {
         updateTaskByGroup({ ...created, _id: created._id }, props.item, 0).catch((error) => console.error("ERROR in list inline add: ", error));
+    }
+    if (props.item.customFieldId && !props.item.dropDisabled && props.item.searchValue !== "" && props.item.searchValue !== false) {
+        updateTaskByGroup({ ...created }, props.item, props.groupType).catch((error) => console.error("ERROR in list inline add: ", error));
     }
 }
 </script>

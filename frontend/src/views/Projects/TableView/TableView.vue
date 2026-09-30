@@ -72,6 +72,16 @@
                         <span v-else-if="column.field && isAiField(column.field)" role="columnheader" class="tv2__head-col" :title="column.label">
                             <AiFieldColumnHead :field="column.field" :tasks="aiColumnTasks" :editable="rowEdit.rights.value.customField === true" />
                         </span>
+                        <span v-else-if="sortFieldOf(column)" role="columnheader" class="tv2__head-col" :aria-sort="ariaSort(sortFieldOf(column))">
+                            <button
+                                type="button"
+                                class="tv2__sort tv2__sort--col"
+                                :title="$t('List.sort_by', { column: column.field ? column.label : $t(column.labelKey) })"
+                                @click="toggleSort(sortFieldOf(column))"
+                            >
+                                <span class="tv2__sort-text">{{ column.field ? column.label : $t(column.labelKey) }}</span><span class="tv2__sort-caret" :class="{ 'is-on': sortOf(sortFieldOf(column)) }" aria-hidden="true">{{ sortGlyph(sortFieldOf(column)) }}</span>
+                            </button>
+                        </span>
                         <span v-else role="columnheader" class="tv2__head-col" :title="column.field ? column.label : null">{{ column.field ? column.label : $t(column.labelKey) }}</span>
                     </template>
                 </div>
@@ -143,6 +153,7 @@ import { useViewSettings } from '@/views/Projects/composables/viewSettingsContex
 import { useListRowEdit } from '@/views/Projects/ListView/useListInlineEdit.js';
 import { columnCatalogue, gridMinWidth, gridTracks, useViewColumns } from '@/views/Projects/composables/viewColumns';
 import { handleGridKey } from './gridKeyboard';
+import { valuePath } from '@/views/Projects/composables/customFieldQuery';
 
 // PACKAGES
 import { useStore } from 'vuex';
@@ -155,7 +166,7 @@ const { getters } = useStore();
 const { checkApps, checkPermission } = useCustomComposable();
 
 const props = defineProps({
-    grouped: { type: Number, default: 0 },
+    grouped: { type: [Number, String], default: 0 },
     projectData: { type: Object, default: () => ({}) },
     commonDateFormatForDate: { type: String, default: "DD/MM/YYYY" },
     sprints: { type: Array, default: () => [] },
@@ -282,6 +293,8 @@ const ariaSort = (field) => {
     if (!direction) return 'none';
     return direction === -1 ? 'descending' : 'ascending';
 };
+const COLUMN_SORT_FIELDS = { estimate: 'totalEstimatedTime', points: 'points' };
+const sortFieldOf = (column) => (column.field ? valuePath(column.field._id) : COLUMN_SORT_FIELDS[column.id] || null);
 const toggleSort = (field) => {
     viewSettings.setSort({ field, dir: sortOf(field) === 1 ? -1 : 1 });
 };

@@ -89,14 +89,14 @@
                         <template #button="{ triggerAttrs }">
                             <button type="button" class="text-nowrap btn-white border-groupBy pft__pill cursor-pointer" ref="group_by_status" :title="$t('Projects.group_by')" :aria-label="$t('Projects.group_by')" v-bind="triggerAttrs">
                                 <ShellIcon name="layout" :size="14" />
-                                <span>{{ $t(`Projects.${groupByOptions.find(x => x.id === groupBy).label}`) }}</span>
+                                <span class="pft__group-label">{{ groupLabel(groupByOptions.find(x => x.id === groupBy)) }}</span>
                             </button>
                         </template>
                         <template #options>
                             <DropDownOption v-for="item in groupByOptions" :key="item.id" :selected="item.id === groupBy" @click="$emit('update:groupBy', item.id); $refs.group_by_status.click()" :class="{'bg-light-gray' : item.id === groupBy}">
                                 <div>
                                     <img :src="item.image" alt="" class="pr-10px">
-                                    <span :class="{'purple' : item.id === groupBy}">{{ $t(`Projects.${item.label}`) }}</span>
+                                    <span :class="{'purple' : item.id === groupBy}">{{ groupLabel(item) }}</span>
                                 </div>
                             </DropDownOption>
                         </template>
@@ -222,6 +222,7 @@
 
 <script setup>
 import { ref, computed, defineProps, defineEmits, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { canUseAi } from "@/composable/aiAvailability";
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useRoute } from 'vue-router';
@@ -247,6 +248,8 @@ import { clearFilterSignal } from '@/views/Projects/composables/taskFilterSignal
 import ProjectFiltersSheet from './ProjectFiltersSheet.vue';
 
 const PHONE_MAX = 767;
+const { t } = useI18n();
+const groupLabel = (option) => (option?.title !== undefined ? option.title : t(`Projects.${option?.label || 'status'}`));
 const LIST_LIKE_TABS = ['ProjectListView', 'ProjectKanban', 'TableView'];
 // Menus opened from the sheet have to stack above its backdrop.
 const SHEET_MENU_Z = 70;
@@ -285,7 +288,7 @@ const props = defineProps({
     doneBy: { type: String, default: 'all' },
     userSidebar: { type: Boolean, default: false },
     collapsed: { type: Boolean, default: true },
-    groupBy: { type: Number, default: 0 },
+    groupBy: { type: [Number, String], default: 0 },
     groupByOptions: { type: Array, default: () => [] },
     users: { type: Array, default: () => [] },
     teams: { type: Array, default: () => [] },

@@ -1,32 +1,52 @@
 import { computed } from 'vue';
 import { useViewSettings } from './viewSettingsContext';
 import { PRIORITY_RANK, priorityKey } from '@/components/molecules/Home/homeFormat';
+import { taskPoints } from './taskPoints';
+import { customFieldIdOf, customGroupId, customSortValue, fieldIdOfPath, valuePath } from './customFieldQuery';
 
-export const SORT_KEYS = ['manual', 'due', 'priority', 'created', 'updated', 'name', 'status'];
+export const SORT_KEYS = ['manual', 'due', 'priority', 'created', 'updated', 'name', 'status', 'assignee', 'points', 'estimate'];
 export const MANUAL = Object.freeze({ key: 'manual', dir: 'asc' });
 
 /* The direction a key opens with: soonest, most urgent and newest first. */
-const NATURAL_DIR = { due: 'asc', priority: 'asc', created: 'desc', updated: 'desc', name: 'asc', status: 'asc' };
+const NATURAL_DIR = { due: 'asc', priority: 'asc', created: 'desc', updated: 'desc', name: 'asc', status: 'asc', assignee: 'asc', points: 'desc', estimate: 'desc' };
 
 /* The task fields the Table's sort headers also store, so a view's sort names one field either way. */
-const FIELD_OF = { due: 'DueDate', priority: 'Task_Priority', created: 'createdAt', updated: 'updatedAt', name: 'TaskName', status: 'statusKey' };
+const FIELD_OF = {
+    due: 'DueDate', priority: 'Task_Priority', created: 'createdAt', updated: 'updatedAt', name: 'TaskName', status: 'statusKey',
+    assignee: 'AssigneeUserId', points: 'points', estimate: 'totalEstimatedTime'
+};
+
+const isSortKey = (key) => (SORT_KEYS.includes(key) && key !== 'manual') || Boolean(customFieldIdOf(key));
 
 export function cleanSort(raw) {
-    if (!raw || !SORT_KEYS.includes(raw.key) || raw.key === 'manual') return { ...MANUAL };
+    if (!raw || !isSortKey(raw.key)) return { ...MANUAL };
     return { key: raw.key, dir: raw.dir === 'desc' ? 'desc' : 'asc' };
 }
 
+const keyOfField = (field) => {
+    const fieldId = fieldIdOfPath(field);
+    if (fieldId) return customGroupId(fieldId);
+    return Object.keys(FIELD_OF).find((id) => FIELD_OF[id] === field);
+};
+
 /* A saved view keeps { field, dir: 1 | -1 }, or null for Manual. A field the List cannot sort by reads as Manual. */
 export function sortFromSettings(saved) {
-    const key = Object.keys(FIELD_OF).find((id) => FIELD_OF[id] === saved?.field);
+    const key = keyOfField(saved?.field);
     if (!key || (saved.dir !== 1 && saved.dir !== -1)) return { ...MANUAL };
     return { key, dir: saved.dir === -1 ? 'desc' : 'asc' };
 }
 
 export function settingsFromSort(sort) {
     const clean = cleanSort(sort);
-    return clean.key === 'manual' ? null : { field: FIELD_OF[clean.key], dir: clean.dir === 'desc' ? -1 : 1 };
+    if (clean.key === 'manual') return null;
+    const fieldId = customFieldIdOf(clean.key);
+    return { field: fieldId ? valuePath(fieldId) : FIELD_OF[clean.key], dir: clean.dir === 'desc' ? -1 : 1 };
 }
+
+export const sortChoices = (fields = []) => [
+    ...SORT_KEYS.map((key) => ({ key, labelKey: `List.sort_${key}` })),
+    ...(fields || []).filter((field) => field?._id).map((field) => ({ key: customGroupId(field._id), label: field.fieldTitle || '' }))
+];
 
 const timeOf = (value) => {
     if (!value) return null;
@@ -39,8 +59,18 @@ function rankIn(list, matches) {
     return index === -1 ? null : index;
 }
 
-function valueReader(key, { priorities = [], statuses = [] }) {
+const firstAssignee = (task) => [].concat(task.AssigneeUserId || []).find((id) => id && !String(id).startsWith('tId_'));
+
+function valueReader(key, { priorities = [], statuses = [], fields = [], userName = () => null }) {
+    const fieldId = customFieldIdOf(key);
+    if (fieldId) {
+        const def = fields.find((field) => String(field?._id) === fieldId);
+        return (task) => (def ? customSortValue(def, task) : null);
+    }
     if (key === 'due') return (task) => timeOf(task.DueDate);
+    if (key === 'assignee') return (task) => (firstAssignee(task) ? userName(firstAssignee(task)) || null : null);
+    if (key === 'points') return (task) => taskPoints(task);
+    if (key === 'estimate') return (task) => (Number(task.totalEstimatedTime) > 0 ? Number(task.totalEstimatedTime) : null);
     if (key === 'created') return (task) => timeOf(task.createdAt);
     if (key === 'updated') return (task) => timeOf(task.updatedAt || task.Updated_At);
     if (key === 'name') return (task) => (task.TaskName ? String(task.TaskName) : null);
@@ -52,7 +82,10 @@ function valueReader(key, { priorities = [], statuses = [] }) {
 }
 
 const collator = typeof Intl !== 'undefined' ? new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }) : null;
-const compareValues = (a, b) => (typeof a === 'string' ? (collator ? collator.compare(a, b) : a.localeCompare(b)) : a - b);
+const compareValues = (a, b) => {
+    if (typeof a !== typeof b) return typeof a === 'number' ? -1 : 1;
+    return typeof a === 'string' ? (collator ? collator.compare(a, b) : a.localeCompare(b)) : a - b;
+};
 
 /* Tasks without a value stay at the end in both directions, and ties keep the drag order. */
 export function sortTasks(rows, sort, context = {}) {

@@ -35,12 +35,12 @@
                             </div>
                         </template>
                         <template #button>
-                            <div ref="keyRefs" :class="{'font-size-13' : clientWidth > 767 , 'font-size-14' : clientWidth <= 767}" :style="{color : clientWidth > 767 ? '#818181' : '#B3B3B3' }" :title="Object.keys(item.name).length > 0 ? `${$t(`Projects.${item.name.name}`)}` : `${$t('PlaceHolder.Select')}`">{{ Object.keys(item.name).length > 0 ? `${$t(`Projects.${item.name.name}`)}` : `${$t('PlaceHolder.Select')}`}}</div>
+                            <div ref="keyRefs" class="text-ellipsis" :class="{'font-size-13' : clientWidth > 767 , 'font-size-14' : clientWidth <= 767}" :style="{color : clientWidth > 767 ? '#818181' : '#B3B3B3' }" :title="Object.keys(item.name).length > 0 ? keyLabel(item.name) : $t('PlaceHolder.Select')">{{ Object.keys(item.name).length > 0 ? keyLabel(item.name) : $t('PlaceHolder.Select') }}</div>
                         </template>
                         <template #options>
                             <div v-if="mainOptions.length > 0">
                                 <div v-for="(option, i) in mainOptions" :key="i" class="cursor-pointer filter-status-field" @click="$refs.keyRefs[index].click(), resetFields(item), handleSelected('keys', item, option, index)">
-                                    <span class="font-size-14 font-weight-400">{{ `${$t(`Projects.${option.name}`)}` }}</span>
+                                    <span class="font-size-14 font-weight-400">{{ keyLabel(option) }}</span>
                                 </div>
                             </div>
                             <div v-else class="font-size-13 gray81">{{$t('Filters.no_data_found')}}</div>
@@ -57,7 +57,7 @@
                             </div>
                         </template>
                         <template #button>
-                            <span ref="compRef" class="text-ellipsis d-block select-compRef" :class="{'font-size-13' : clientWidth > 767 , 'font-size-14' : clientWidth <= 767}" :style="{color : clientWidth > 767 ? '#818181' : '#B3B3B3' }" :title="Object.keys(item.name).length > 0 ? `${$t(`Filters.${item.name.name}`)}` : `${$t('PlaceHolder.Select')}`">{{ Object.keys(item.comparison).length > 0 ? `${$t(`Filters.${item.comparison.name}`)}` : `${$t('PlaceHolder.Select')}`}}</span>
+                            <span ref="compRef" class="text-ellipsis d-block select-compRef" :class="{'font-size-13' : clientWidth > 767 , 'font-size-14' : clientWidth <= 767}" :style="{color : clientWidth > 767 ? '#818181' : '#B3B3B3' }" :title="Object.keys(item.comparison).length > 0 ? $t(`Filters.${item.comparison.name}`) : $t('PlaceHolder.Select')">{{ Object.keys(item.comparison).length > 0 ? `${$t(`Filters.${item.comparison.name}`)}` : `${$t('PlaceHolder.Select')}`}}</span>
                         </template>
                         <template #options>
                             <div v-for="(option, i) in item.comparisonsData" :key="i" class="cursor-pointer filter-status-field" @click="$refs.compRef[index].click(), handleSelected('comparison', item, option)">
@@ -67,6 +67,7 @@
                     </CustomDropDown>
                 </div>
                 <div class="mr-010 custom-filters-col d-flex align-items-center" :class= "{'date_range_calendar': clientWidth < 767 && item?.name.value === 'DueDate'  && dateOption === 'Date range' }">
+                    <CustomFieldFilterValue v-if="item.name.type === 'custom'" v-model="item.values" :field="customFieldOf(item.name)" :comparison="item.comparison.value || ''" />
                     <CustomDropDown v-if="arrayKeys.includes(item?.name.value)" @isVisible="(isOpen) => resetSearchValue(isOpen)" :zindexCustomDrop="99" :style="{marginBottom : clientWidth <= 767 ? item?.name.value === 'DueDate'  && dateOption === 'Date range' ? '0px' : '20px !important' : '0' }"  :maxWidth="clientWidth > 767 ? '211px' : '100%'"  :bodyClass="{'filter-selectall-options' : true}">
                         <template #head v-if="clientWidth <= 767">
                             <div class="d-flex align-items-center justify-content-between cancel-title-donewrapper">
@@ -357,6 +358,9 @@ import WasabiIamgeCompp from "@/components/atom/WasabiIamgeCompp/WasabiIamgeComp
 import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
 import InputText from "@/components/atom/InputText/InputText.vue";
+import CustomFieldFilterValue from "@/components/molecules/TaskFilter/CustomFieldFilterValue.vue";
+import { comparisonsFor, needsValue } from "@/views/Projects/composables/customFieldQuery";
+import { useI18n } from "vue-i18n";
 import { useGetterFunctions } from "@/composable";
 import { tagChipColors } from "@/utils/statusChipColors";
 
@@ -405,6 +409,10 @@ const props = defineProps({
         type: Array,
         default: () => []
     },
+    customFields: {
+        type: Array,
+        default: () => []
+    },
 });
 
 // Variables
@@ -412,7 +420,10 @@ const clientWidth = inject("$clientWidth");
 const dateOption = ref('')
 const comparison = ref({})
 const search = ref('');
-// const { t } = useI18n();
+const { t } = useI18n();
+
+const customFieldOf = (name) => props.customFields.find((field) => `customField.${field._id}` === name?.value) || null;
+const keyLabel = (name) => (name?.type === 'custom' ? (customFieldOf(name)?.fieldTitle || name.name) : t(`Projects.${name?.name}`));
 
 onMounted(() => {
     let checkDueDateOption = props.inputs.find((x) => x.name.value === "DueDate");
@@ -507,7 +518,11 @@ const resetFields = (item) => {
     const statusKeys = ["statusKey"];
 
     setTimeout(() => {
-        if (arraykeys.includes(item.name.value)) {
+        if (item.name.type === 'custom') {
+            item.comparisonsData = comparisonsFor(item.name.fieldType);
+            item.comparison = item.comparisonsData[0] || {};
+            comparison.value = item.comparison;
+        } else if (arraykeys.includes(item.name.value)) {
             item.comparisonsData = [
                 { value: ':', name: "Is" },
                 { value: ':!=', name: "Not_Equals_To" }
@@ -535,9 +550,10 @@ const resetFields = (item) => {
 // This function is used to handel seleted options for the key and comparison field
 const handleSelected = (field, item, option) => {
     if (field === 'comparison') {
+        const keepsValue = item.name.type === 'custom' && needsValue(option.value) && needsValue(item.comparison?.value);
         item.comparison = option;
         comparison.value = option;
-        item.values = [];
+        if (!keepsValue) item.values = item.name.type === 'custom' && !needsValue(option.value) ? [true] : [];
         item.displayData = [];
     }
     if (field === 'keys') {

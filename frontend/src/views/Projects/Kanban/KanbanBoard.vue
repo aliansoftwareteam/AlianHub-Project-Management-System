@@ -47,7 +47,7 @@
                     <Draggable
                         class="kanban-cards"
                         :list="column.tasksArray"
-                        group="tasks"
+                        :group="{ name: 'tasks', put: !column.dropDisabled }"
                         item-key="id"
                         @change="updateEvent($event, column)"
                         @scroll="checkScroll($event, column)"
@@ -109,7 +109,7 @@ const props = defineProps({
         default: () => []
     },
     group: {
-        type: Number
+        type: [Number, String]
     },
     sprintId: {
         type: String
@@ -192,6 +192,7 @@ function init() {
     let taskArray = [];
 
     columns.value.forEach((data) => {
+        if (data.customFieldId) return;
         let withoutIndexTask = data.tasksArray?.filter((x) => {
             return (x[data.indexName] === undefined || x[data.indexName] === null) && x.TaskKey !== '--'
         })
@@ -284,8 +285,9 @@ const updateEvent = (event, task) => {
     }
     if (element) {
         if (event.added) {
-            updateTaskByGroup(element, task, groupValue.value, null, true);
+            updateTaskByGroup(element, task, groupValue.value, null, true).catch((error) => console.error("ERROR in board drop: ", error));
         }
+        if (task.customFieldId) return;
         let relevantIndex
         let tempIndex;
         let taskDt = columns.value.find((x) => x.searchValue === task.searchValue);
