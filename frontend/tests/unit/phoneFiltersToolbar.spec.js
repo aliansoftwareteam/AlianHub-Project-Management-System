@@ -35,7 +35,7 @@ const mountToolbar = async (props = {}) => {
             mocks: { $t },
             stubs: {
                 ShellIcon: true, Assignee: true, TaskFilter: true, ProvenanceFilter: true, MonthlyCalendarMilestone: true,
-                BurndownModal: true, RecentVisitsDropdown: true, GlobalSearchModal: true, EpicsPanel: true,
+                BurndownModal: true, RecentVisitsDropdown: true, EpicsPanel: true,
                 ExportTasksDropdown: true, PagesPanel: true, PublicShareModal: true, ImportDialog: true,
                 AutoArchiveModal: true, EstimationScaleModal: true, Toggle: true,
             },

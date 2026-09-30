@@ -77,6 +77,7 @@ import SkipLink from '@/components/atom/SkipLink/SkipLink.vue'
 import TaskTemplateDialogHost from '@/components/molecules/TaskTemplates/TaskTemplateDialogHost.vue'
 import AiFieldFillDialog from '@/components/molecules/AiFieldFill/AiFieldFillDialog.vue'
 import { PALETTE_OPEN_EVENT, isPaletteShortcut } from '@/components/molecules/AdvanceSearch/paletteKeys'
+import { recordRouteVisit } from '@/components/molecules/RecentVisits/routeVisits'
 import { useStore } from 'vuex';
 import axios from 'axios'
 import { refreshWebPush } from '@/composable/browserNotifications';
@@ -232,6 +233,10 @@ watch(() => getters['settings/companyUserDetail'], async(val) => {
 const shellReady = computed(() => Boolean(logged.value && rules.value && Object.keys(rules.value).length && companyUserDetail.value && Object.keys(companyUserDetail.value).length && socketSettled.value));
 // A page that loaded before maintenance began keeps its content under the banner; one whose boot calls were refused would otherwise stay blank or spin forever.
 const maintenanceBlocksPage = computed(() => maintenanceOn.value && (route.meta.requiresAuth ? !shellReady.value : !route.matched.length));
+
+watch(() => [route.fullPath, shellReady.value, companyId.value], () => {
+	if (shellReady.value && route.params.cid && route.params.cid === companyId.value) recordRouteVisit(route);
+}, { immediate: true });
 
 watch(() => getters['settings/selectedCompany'], async(val) => {
     if(val.isDisable === true){
