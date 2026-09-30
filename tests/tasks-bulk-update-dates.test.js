@@ -68,8 +68,9 @@ describe('bulkUpdateDates', () => {
             type: 'update',
             module: 'task',
             updatedFields: { startDate: new Date(dates[0].startDate), DueDate: new Date(dates[0].DueDate) },
-            data: { _id: A, sprintId: 's1', DueDate: new Date(dates[0].DueDate) },
+            data: { sprintId: 's1', DueDate: new Date(dates[0].DueDate) },
         });
+        expect(String(updates[0][1].data._id)).toBe(String(A));
         expect(socketEmitter.emit).toHaveBeenCalledWith('bulkUpdate', expect.objectContaining({ action: 'bulkUpdateDates', taskIds: [String(A), String(B)] }));
         expect(HandleHistory).toHaveBeenCalledTimes(2);
         expect(HandleHistory).toHaveBeenCalledWith('task', COMPANY, PROJECT, A, expect.objectContaining({ key: 'Project_DueDate', sprintId: 's1' }), USER);
