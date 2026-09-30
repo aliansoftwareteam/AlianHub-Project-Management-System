@@ -43,6 +43,9 @@ const pageVisibleTo = (page, uid) => Boolean(page)
 
 const pageVisibilityFilter = (uid) => ({ $or: [{ visibility: { $ne: 'private' } }, { createdBy: String(uid || '') }] });
 
+/* Whoever can read a doc may comment on it; a doc in the trash is read-only. */
+const pageTakesComments = (page) => Boolean(page) && Number(page.deletedStatusKey || 0) === 0;
+
 const REVIEW_INTERVAL_MONTHS = 3;
 const STALE_AFTER_MONTHS = 6;
 const REVIEW_STATES = ['none', 'verified', 'due', 'stale'];
@@ -84,6 +87,7 @@ module.exports = {
     htmlToRawText,
     pageVisibleTo,
     pageVisibilityFilter,
+    pageTakesComments,
     parseDate,
     nextReviewDate,
     reviewState,

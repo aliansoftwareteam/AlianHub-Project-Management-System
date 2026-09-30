@@ -328,7 +328,7 @@ describe('reply notices', () => {
         const older = mockDb.seed(SCHEMA_TYPE.NOTIFICATIONS_SETTINGS, { userId: mockIds.author, tasks: { key: 'tasks', items: [{ key: 'task_status', browser: true }] } });
         await ensureCommentNoticeItems(C, [mockIds.author]);
         await ensureCommentNoticeItems(C, [mockIds.author]);
-        expect(older.tasks.items.map((i) => i.key)).toEqual(['task_status', 'comment_reply', 'comment_assigned']);
+        expect(older.tasks.items.map((i) => i.key)).toEqual(['task_status', 'comment_reply', 'comment_assigned', 'doc_comment_mention', 'doc_comment_reply']);
         expect(older.tasks.items[1]).toMatchObject({ browser: true, mobile: true, email: false });
         expect(removeCache).toHaveBeenCalledWith(`notification:${mockIds.author}:${C}`);
     });

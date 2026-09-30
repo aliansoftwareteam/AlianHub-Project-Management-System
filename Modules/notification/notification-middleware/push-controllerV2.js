@@ -80,7 +80,10 @@ exports.sendNotificationBody = (body) => {
 
             if (body?.type === "project" && body.key === "comments_I'm_@mentioned_in") {
                 actionUrl = `${body.companyId}/project/${projectId}/p?tab=Comments`;
-            } 
+            }
+            if (body?.changeType === "doc_comment" && body.changeData?.pageId) {
+                actionUrl = `${body.companyId}/pages/${encodeURIComponent(body.changeData.pageId)}?comment=${encodeURIComponent(body.changeData.commentId || "")}`;
+            }
             var payload = {}
             if (body?.type == "chat") {
                 let Image;

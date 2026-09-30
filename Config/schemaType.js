@@ -66,6 +66,7 @@ const SCHEMA_TYPE = {
     EPICS: "epics",
     PAGES: "pages",
     PAGE_VERSIONS: "pageVersions",
+    PAGE_COMMENTS: "pageComments",
     PUBLIC_SHARES: "publicShares",
     INTAKE_ITEMS: "intakeItems",
     PUBLIC_SHARE_INDEX: "publicShareIndex",

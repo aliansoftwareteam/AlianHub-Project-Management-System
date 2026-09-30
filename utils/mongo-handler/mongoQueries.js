@@ -70,6 +70,7 @@ const {
     epicsSchema,
     pagesSchema,
     pageVersionsSchema,
+    pageCommentsSchema,
     publicSharesSchema,
     intakeItemsSchema,
     publicShareIndexSchema,
@@ -278,6 +279,8 @@ exports.checkType = (type) => {
             return pagesSchema
         case SCHEMA_TYPE.PAGE_VERSIONS:
             return pageVersionsSchema
+        case SCHEMA_TYPE.PAGE_COMMENTS:
+            return pageCommentsSchema
         case SCHEMA_TYPE.PUBLIC_SHARES:
             return publicSharesSchema
         case SCHEMA_TYPE.INTAKE_ITEMS:
@@ -560,6 +563,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.PAGES}`
         case SCHEMA_TYPE.PAGE_VERSIONS:
                 return `${dbCollections.PAGE_VERSIONS}`
+        case SCHEMA_TYPE.PAGE_COMMENTS:
+                return `${dbCollections.PAGE_COMMENTS}`
         case SCHEMA_TYPE.PUBLIC_SHARES:
                 return `${dbCollections.PUBLIC_SHARES}`
         case SCHEMA_TYPE.INTAKE_ITEMS:

@@ -1535,6 +1535,23 @@ const schema = {
         rawText: { type: String, required: false },
         savedBy: { type: String, required: false },
     },
+    // Comments on a doc (Modules/Pages/comments.js). A reply carries its thread's first comment as parentId and that
+    // comment's blockId; a blockId the doc no longer has is read as a doc-level comment.
+    pageComments: {
+        pageId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        blockId: { type: String, required: false },
+        parentId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        userId: { type: String, required: true },
+        message: { type: String, required: true },
+        mentionIds: { type: [String], required: false, default: [] },
+        resolved: { type: Boolean, required: false },
+        resolvedBy: { type: String, required: false },
+        resolvedAt: { type: Date, required: false },
+        editedAt: { type: Date, required: false },
+        isDeleted: { type: Boolean, required: false },
+        deletedBy: { type: String, required: false },
+        deletedAt: { type: Date, required: false },
+    },
     // Public share links for sprints/projects (+ optional intake form)
     publicShares: {
         entityType: { type: String, required: true },

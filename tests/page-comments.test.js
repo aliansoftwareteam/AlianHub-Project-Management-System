@@ -65,7 +65,7 @@ const res = () => {
 };
 const call = async (handler, uid, { params = {}, body = {}, companyId = C } = {}) => {
     const r = res();
-    await handler({ headers: { companyid: companyId }, uid, params: { id: mockIds.page, ...params }, body, query: {} }, r);
+    await handler({ headers: { companyid: companyId }, aud: C, uid, params: { id: mockIds.page, ...params }, body, query: {} }, r);
     await settle();
     return r;
 };

@@ -4,6 +4,8 @@ const Notification_key = {
   COMMENTS_IM_MENTIONS_IN:"comments_I'm_@mentioned_in",
   COMMENT_REPLY:"comment_reply",
   COMMENT_ASSIGNED:"comment_assigned",
+  DOC_COMMENT_MENTION:"doc_comment_mention",
+  DOC_COMMENT_REPLY:"doc_comment_reply",
   CREATE_TASK:"task_create",
   TASK_NAME:"task_edit",
   TASK_NOTIFICATION:"task_notification",
@@ -83,6 +85,8 @@ const ChangeTypes={
 const COMMENT_NOTICE_ITEMS = Object.freeze([
   { name: "Replies to my comments", email: false, browser: true, mobile: true, key: Notification_key.COMMENT_REPLY },
   { name: "Comments assigned to me", email: false, browser: true, mobile: true, key: Notification_key.COMMENT_ASSIGNED },
+  { name: "Doc comments I'm @mentioned in", email: false, browser: true, mobile: true, key: Notification_key.DOC_COMMENT_MENTION },
+  { name: "Replies to my doc comments", email: false, browser: true, mobile: true, key: Notification_key.DOC_COMMENT_REPLY },
 ]);
 
 module.exports = {

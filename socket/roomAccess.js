@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { canReadProject } = require('../Config/projectAccess');
 const { getRoleType, isPrivileged } = require('../Config/permissionGuard');
 const { canSeeSprintById } = require('../Modules/Sprints/helpers/sprintVisibility');
+const { canUsePage } = require('../Modules/Pages/helpers/pageAccess');
 const logger = require('../Config/loggerConfig');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -68,8 +69,22 @@ const canOpenSprintBoard = async (identity, projectId, sprintId) => {
 
 const COMMENT_TASK_ROOM = /^comments_([^_]+)_([^_]+)_([^_]+)$/;
 const COMMENT_PROJECT_ROOM = /^comments_project_([^_]+)$/;
+const PAGE_COMMENT_ROOM = /^pagecomments_([a-f0-9]{24})$/i;
+
+const pageCommentRoomOf = (pageId) => `pagecomments_${pageId}`;
+
+/* The live doc behind a comment room, when this person can still read it. */
+const readablePage = async ({ companyId, uid }, pageId) => {
+    const page = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PAGES,
+        data: [{ _id: new mongoose.Types.ObjectId(String(pageId)), deletedStatusKey: 0 }],
+    }, 'findOne');
+    return page && await canUsePage(companyId, page, uid) ? page : null;
+};
 
 const canOpenComments = async (identity, prefix) => {
+    const doc = PAGE_COMMENT_ROOM.exec(prefix);
+    if (doc) return Boolean(await readablePage(identity, doc[1]));
     const project = COMMENT_PROJECT_ROOM.exec(prefix);
     if (project) return OBJECT_ID.test(project[1]) && projectReadable(identity, project[1]);
     const task = COMMENT_TASK_ROOM.exec(prefix);
@@ -110,6 +125,8 @@ module.exports = {
     canOpenTask,
     canOpenSprintBoard,
     canOpenComments,
+    pageCommentRoomOf,
+    readablePage,
     isCompanyMember,
     onJoin,
 };
