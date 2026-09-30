@@ -44,8 +44,9 @@ describe('recording visits to projects, sprints and docs', () => {
     it.each(['project', 'sprint', 'doc', 'task'])('records a %s visit', async (entityType) => {
         const res = await call(recordVisit, { body: { entityType, entityId: PROJECT } });
         expect(res.body.status).toBe(true);
-        expect(mockDb.calls[0]).toMatchObject({ companyId: C, type: SCHEMA_TYPE.RECENTVISITS });
-        expect(mockDb.calls[0].data[0]).toMatchObject({ userId: ME, entityType });
+        const written = mockDb.calls[mockDb.calls.length - 1];
+        expect(written).toMatchObject({ companyId: C, type: SCHEMA_TYPE.RECENTVISITS, method: 'updateOne' });
+        expect(written.data[0]).toMatchObject({ userId: ME, entityType });
     });
 
     it('refuses an unknown type or a malformed id', async () => {
