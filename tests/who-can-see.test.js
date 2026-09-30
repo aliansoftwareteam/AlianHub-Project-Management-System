@@ -164,8 +164,8 @@ describe('who can see a sprint', () => {
         const sprint = seedSprint({ projectId: PUBLIC_PROJECT, private: true, AssigneeUserId: [BYSTANDER, `tId_${TEAM}`] });
         const listed = await expectAgreesWithEnforcement('sprint', sprint._id, PUBLIC_PROJECT);
         expect(listed.get(ADMIN).reason).toBe('admin');
-        expect(listed.get(BYSTANDER).reason).toBe('member');
-        expect(listed.get(IN_TEAM).reason).toBe('team');
+        expect(listed.get(BYSTANDER).reason).toBe('sprint_member');
+        expect(listed.get(IN_TEAM)).toMatchObject({ reason: 'sprint_team', teamNames: ['Design'] });
         expect(listed.has(ASSIGNED)).toBe(false);
     });
 

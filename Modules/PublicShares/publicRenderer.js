@@ -3,7 +3,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { isShareToken, validateIntakeSubmission, escapeHtml, sanitizeDocHtml } = require('./helpers/shareRules');
-const { shareStillAuthorised } = require('./helpers/shareAccess');
+const { shareIsLive } = require('./helpers/shareAccess');
 const reportRules = require('../CustomReports/helpers/reportRules'); // REP-09 — share saved reports
 const customReports = require('../CustomReports/controller');
 const { hashPassword, isCurrentPasswordHash, verifyPassword } = require('../Auth/helpers/passwordHash');
@@ -292,9 +292,7 @@ async function resolveShare(token) {
         type: SCHEMA_TYPE.PUBLIC_SHARES,
         data: [{ _id: index.shareId }],
     }, 'findOne');
-    if (!share || share.enabled === false) return null;
-    if (share.expiresAt && new Date(share.expiresAt).getTime() < Date.now()) return null;
-    if (!(await shareStillAuthorised(index.companyId, share))) return null;
+    if (!(await shareIsLive(index.companyId, share))) return null;
     return { companyId: index.companyId, share };
 }
 
