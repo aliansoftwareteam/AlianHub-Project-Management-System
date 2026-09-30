@@ -277,7 +277,8 @@ async function getFirebaseData() {
                     userData = userResult.data;
                 }
 
-                const { language, upload } = adoptAccountPrefs(userData);
+                // Without the profile, an upload could overwrite an account copy we never read.
+                const { language, upload } = userData._id ? adoptAccountPrefs(userData) : {};
                 if(language){
                     localStorage.setItem('language', language);
                     const updateLanguage = await changeLanguage(language);
