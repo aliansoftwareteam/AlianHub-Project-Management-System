@@ -10,7 +10,10 @@ const ACTIVE = (row) => Number((row && row.deletedStatusKey) || 0) === 0;
  * category, people not messaged yet — derived straight from the mainChat store so one
  * sidebar can show all of it at once.
  */
-export function useChatDirectory({ projects, userId, canStartDirect }) {
+/* The key a not-yet-opened agent conversation is listed and routed under. */
+export const agentPersonId = (agentId) => `agent_${agentId}`;
+
+export function useChatDirectory({ projects, userId, canStartDirect, agents }) {
     const { getters, dispatch } = useStore();
     const { getUser } = useGetterFunctions();
     const { changeText } = useCustomComposable();
@@ -115,9 +118,24 @@ export function useChatDirectory({ projects, userId, canStartDirect }) {
         const project = directProject.value;
         if (!project) return [];
         const rows = (getters['mainChat/chats'] && getters['mainChat/chats'].data) || [];
+        const agentName = (chat) => ((agents && agents.value) || []).find((a) => String(a._id) === String(chat.agentId))?.name
+            || chat.agentName || chat.TaskName || '';
         return rows
             .filter((chat) => String(chat.ProjectID) === String(project._id) && ACTIVE(chat))
             .map((chat) => {
+                if (chat.agentId) {
+                    return {
+                        ...chat,
+                        id: chat._id,
+                        receiverId: '',
+                        isAgent: true,
+                        name: agentName(chat),
+                        image: '',
+                        isDnd: false,
+                        preview: chat.message && chat.message !== 'general.message_deleted' ? changeText(String(chat.message), '', '') : '',
+                        unread: Number(myCounts.value[`task_${project._id}_${chat.sprintId}_${chat._id}_comments`] || 0),
+                    };
+                }
                 const peerId = peerIdOf(chat);
                 const peer = getUser(peerId) || {};
                 return {
@@ -131,7 +149,7 @@ export function useChatDirectory({ projects, userId, canStartDirect }) {
                     unread: Number(myCounts.value[`task_${project._id}_${chat.sprintId}_${chat._id}_comments`] || 0),
                 };
             })
-            .filter((chat) => isActiveUser(chat.receiverId))
+            .filter((chat) => chat.isAgent || isActiveUser(chat.receiverId))
             .sort((a, b) => {
                 if (a.lastMessage && b.lastMessage) return new Date(b.lastMessage) - new Date(a.lastMessage);
                 if (a.lastMessage) return -1;
@@ -144,7 +162,11 @@ export function useChatDirectory({ projects, userId, canStartDirect }) {
     const people = computed(() => {
         if (!canStartDirect.value || !directProject.value) return [];
         const known = new Set(directMessages.value.map((c) => c.receiverId));
-        return (getters['users/users'] || [])
+        const messaged = new Set(directMessages.value.filter((c) => c.isAgent).map((c) => String(c.agentId)));
+        const agentRows = ((agents && agents.value) || [])
+            .filter((a) => !messaged.has(String(a._id)))
+            .map((a) => ({ id: agentPersonId(a._id), agentId: String(a._id), isAgent: true, name: a.name || '', image: '', isDnd: false, newChat: true }));
+        return [...agentRows, ...(getters['users/users'] || [])
             .filter((u) => String(u._id) !== String(userId.value) && !known.has(String(u._id)) && isActiveUser(u._id))
             .map((u) => ({
                 id: u._id,
@@ -155,7 +177,7 @@ export function useChatDirectory({ projects, userId, canStartDirect }) {
                 newChat: true,
                 AssigneeUserId: [u._id],
             }))
-            .sort((a, b) => a.name.localeCompare(b.name));
+            .sort((a, b) => a.name.localeCompare(b.name))];
     });
 
     const totalUnread = computed(() => allChannels.value.reduce((n, c) => n + c.unread, 0)
