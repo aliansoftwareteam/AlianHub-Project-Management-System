@@ -57,9 +57,9 @@ const store = createStore({
 });
 const ButtonOnlyDropDown = { name: 'DropDown', template: '<div><slot name="button" /></div>' };
 
-const mountCard = ({ tagsArray = [], archived = false, points = null, cardFields = [] } = {}) => mount(BoardCard, {
+const mountCard = ({ tagsArray = [], archived = false, points = null, cardFields = [], customField = {} } = {}) => mount(BoardCard, {
     props: {
-        data: { _id: 't1', TaskName: 'Tag the release notes', AssigneeUserId: [], Task_Priority: 'HIGH', deletedStatusKey: 0, sprintId: 's1', tagsArray, points },
+        data: { _id: 't1', TaskName: 'Tag the release notes', AssigneeUserId: [], Task_Priority: 'HIGH', deletedStatusKey: 0, sprintId: 's1', tagsArray, points, customField },
         groupValue: 0,
         isSubTask: false
     },
@@ -71,7 +71,8 @@ const mountCard = ({ tagsArray = [], archived = false, points = null, cardFields
             selectedProject: ref({ _id: 'p1', isGlobalPermission: true, viewColumn: [], tagsArray: PROJECT_TAGS }),
             searchedTask: ref(false),
             taskCollapsed: ref(true),
-            boardCardFields: ref(cardFields)
+            boardCardFields: ref(cardFields),
+            $dateFormat: ref('DD/MM/YYYY')
         },
         stubs: {
             DropDown: ButtonOnlyDropDown,
@@ -187,5 +188,69 @@ describe('board card story points (task 042 slice 5)', () => {
 
     it('a task without points shows no chip', async () => {
         expect((await mountSettled({ cardFields: [{ id: 'points' }] })).find('.card-points').exists()).toBe(false);
+    });
+});
+
+describe('board card custom fields (task 044 slice 1)', () => {
+    const FIELD = {
+        customer: { _id: 'f-text', fieldType: 'text', fieldTitle: 'Customer' },
+        seats: { _id: 'f-num', fieldType: 'number', fieldTitle: 'Seats' },
+        golive: { _id: 'f-date', fieldType: 'date', fieldTitle: 'Go live' },
+        signed: { _id: 'f-check', fieldType: 'checkbox', fieldTitle: 'Signed' },
+        tier: {
+            _id: 'f-drop', fieldType: 'dropdown', fieldTitle: 'Tier',
+            fieldOptions: [{ id: 1, label: 'Gold', color: '#ffff00' }, { id: 2, label: 'Navy', color: '#2f3990' }]
+        }
+    };
+    const column = (field) => ({ id: `cf:${field._id}`, label: field.fieldTitle, field, visible: true });
+    const entry = (fieldValue) => ({ fieldValue });
+    const shown = (wrapper) => wrapper.findAll('.card-field').map((row) => [row.get('.card-field__name').text(), row.get('.card-field__value').text()]);
+
+    it('shows the chosen fields that have a value, in the chosen order, next to points', async () => {
+        const wrapper = await mountSettled({
+            points: 3,
+            cardFields: [column(FIELD.seats), { id: 'points' }, column(FIELD.customer), column(FIELD.golive)],
+            customField: { 'f-text': entry('Acme'), 'f-num': entry('12'), 'f-date': entry('2026-10-05T12:00:00.000Z') }
+        });
+        expect(shown(wrapper)).toEqual([['Seats', '12'], ['Customer', 'Acme'], ['Go live', '05/10/2026']]);
+        expect(wrapper.find('.card-points').exists()).toBe(true);
+    });
+
+    it('leaves out a field the view does not show', async () => {
+        const wrapper = await mountSettled({ cardFields: [column(FIELD.customer)], customField: { 'f-text': entry('Acme'), 'f-num': entry('12') } });
+        expect(shown(wrapper)).toEqual([['Customer', 'Acme']]);
+    });
+
+    it('gives an empty value no space, and renders nothing when every value is empty', async () => {
+        const some = await mountSettled({
+            cardFields: [column(FIELD.customer), column(FIELD.seats), column(FIELD.signed), column(FIELD.tier)],
+            customField: { 'f-text': entry('Acme'), 'f-num': entry(''), 'f-check': entry(false), 'f-drop': entry([]) }
+        });
+        expect(shown(some)).toEqual([['Customer', 'Acme']]);
+
+        const none = await mountSettled({ cardFields: [column(FIELD.customer), column(FIELD.seats)], customField: {} });
+        expect(none.find('.card-fields').exists()).toBe(false);
+    });
+
+    it('is read-only: no inputs, buttons or edit targets among the values', async () => {
+        const wrapper = await mountSettled({
+            cardFields: [column(FIELD.customer), column(FIELD.signed), column(FIELD.tier)],
+            customField: { 'f-text': entry('Acme'), 'f-check': entry(true), 'f-drop': entry([1]) }
+        });
+        const block = wrapper.get('.card-fields');
+        expect(block.findAll('input, button, select, [contenteditable], [data-cell-edit]')).toHaveLength(0);
+        expect(shown(wrapper)).toEqual([['Customer', 'Acme'], ['Signed', '✓'], ['Tier', 'Gold']]);
+    });
+
+    it('keeps a dropdown choice readable on its tint in both themes', async () => {
+        const wrapper = await mountSettled({ cardFields: [column(FIELD.tier)], customField: { 'f-drop': entry([1, 2]) } });
+        const chips = wrapper.findAll('.card-field__chip');
+        expect(chips.map((chip) => chip.text())).toEqual(['Gold', 'Navy']);
+        for (const chip of chips) {
+            const style = chip.element.style;
+            expect(chip.classes()).toContain('ah-status-ink');
+            expect(worstContrast(inkOf(style), style.background, 'light'), chip.text()).toBeGreaterThanOrEqual(4.5);
+            expect(worstContrast(style.getPropertyValue('--status-ink-dark'), style.background, 'dark'), chip.text()).toBeGreaterThanOrEqual(4.5);
+        }
     });
 });
