@@ -366,6 +366,7 @@ module.exports.TIMESHEET_WEEK = '/api/v1/timesheet/week';
 module.exports.TIMESHEET_BILLABLE_ENTRIES = '/api/v1/timesheet/entries/billable';
 module.exports.WORKLOAD_GRID = '/api/v1/timesheet/workload-grid';
 module.exports.WORKLOAD_MOVE = '/api/v1/timesheet/workload-move';
+module.exports.WORKLOAD_CAPACITY = '/api/v1/timesheet/workload-capacity';
 module.exports.TIMER_RUNNING = '/api/v2/timetracker/running';
 module.exports.TIMER_TRIM = '/api/v2/timetracker/trim';
 module.exports.TIMESHEET_APPROVAL_QUEUE = '/api/v2/timesheet-approval/queue';

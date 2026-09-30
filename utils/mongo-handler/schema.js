@@ -2995,6 +2995,11 @@ const schema = {
         ProjectRequiredComponent: {
             type: Array,
             required: false
+        },
+        // { points: { value, per: 'day' | 'week' }, count: { value, per } }; hours capacity stays on users.workingHours.
+        workloadCapacity: {
+            type: Object,
+            required: false
         }
     },
     rules: {
