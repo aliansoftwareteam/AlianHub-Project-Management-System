@@ -247,6 +247,15 @@ describe('ListBulkBar placement', () => {
         expect(bodies()[1]).toMatchObject({ action: 'bulkConvertToSubTask', taskIds: ['s-a'], parentTaskId: 't1' });
     });
 
+    it('keeps the selection when Esc is pressed while a picker is open', async () => {
+        const wrapper = mountBar(['t2']);
+        await menu(wrapper, 'List.bulk_convert').trigger('click');
+        await item(wrapper, 'BulkActions.convert_subtask_title').trigger('click');
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+        expect(store.state.taskSelection.selectedTaskIds).toEqual(['t2']);
+        wrapper.unmount();
+    });
+
     it('greys out Convert to task when no subtask is selected, and says why', async () => {
         const wrapper = mountBar(['t1', 't2']);
         await menu(wrapper, 'List.bulk_convert').trigger('click');

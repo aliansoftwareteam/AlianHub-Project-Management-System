@@ -409,6 +409,7 @@ const OWN_LAYERS = ".dp__menu, [role=\"dialog\"], [role=\"menu\"], [role=\"listb
 function onKey(event) {
     if (event.key !== "Escape" || event.defaultPrevented) return;
     if (event.target?.closest?.(OWN_LAYERS)) return;
+    if (placing.value) return;
     if (open.value) { open.value = ""; return; }
     if (selection.hasSelection.value) selection.clear();
 }
