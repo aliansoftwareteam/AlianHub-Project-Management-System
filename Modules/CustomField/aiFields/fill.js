@@ -19,7 +19,7 @@ const PREVIEW_MAX = 5;
 const PROPOSAL_TTL_SECONDS = 30 * 60;
 const REQUEST_TIMEOUT_MS = 60_000;
 
-const TRIGGER = Object.freeze({ MANUAL: 'manual', BULK: 'bulk', AUTO: 'auto' });
+const TRIGGER = Object.freeze({ MANUAL: 'manual', BULK: 'bulk', AUTO: 'auto', AGENT: 'agent' });
 
 const REFUSAL = Object.freeze({ NOT_FOUND: 'not_found', FORBIDDEN: 'forbidden', NOT_IN_PROJECT: 'not_in_project' });
 
@@ -198,6 +198,7 @@ module.exports = {
     PREVIEW_MAX,
     AiFieldError,
     loadDefinition,
+    appliesToProject,
     editableTask,
     proposeFills,
     applyProposals,

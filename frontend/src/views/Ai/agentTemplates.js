@@ -11,6 +11,8 @@ const CATALOGUE_CATEGORIES = Object.freeze(["projects", "personal", "tasks", "sc
 const READ = ["task.get", "tasks.search"];
 const REPORT = [...READ, "task.comment"];
 const BREAK_DOWN = [...READ, "subtask.create", "task.comment"];
+// Registered while MCP_TOOLS_DATA is on; the wizard drops an action the registry does not offer.
+const PAGE_READS = ["pages.search", "page.get"];
 
 const SUGGESTS = 1;
 const SCHEDULED = 3;
@@ -45,10 +47,10 @@ const CATALOGUE_TEMPLATES = Object.freeze([
     template("qa_reviewer", ["product"], ["qa-review"], BREAK_DOWN),
     template("action_extractor", ["meetings"], ["brief.parse"], BREAK_DOWN),
     template("task_insights", ["research", "knowledge"], ["project.guide"], BREAK_DOWN, { needs: ["guide", "mention"] }),
-    template("field_filler", ["tasks"], [], [...READ, "task.update"], { blockedBy: "ai_fields" }),
+    template("field_filler", ["tasks"], ["fields.fill"], [...READ, "aifield.fill"], { needs: ["ai_field"] }),
     template("mentions_digest", ["personal", "digests"], [], READ, scheduled("daily", { report: "mentions_digest", every: "weekdays", at: "16:00" })),
-    template("wiki_upkeep", ["knowledge"], [], READ, { blockedBy: "pages" }),
-    template("prd_writer", ["product"], [], [...READ, "page.draft"], { blockedBy: "doc_drafting" })
+    template("wiki_upkeep", ["knowledge"], ["wiki.upkeep"], [...REPORT, ...PAGE_READS]),
+    template("prd_writer", ["product"], ["prd.draft"], [...REPORT, "page.draft", ...PAGE_READS, "project.get"])
 ]);
 
 module.exports = { CATALOGUE_CATEGORIES, CATALOGUE_TEMPLATES, SUGGESTS, SCHEDULED, DRAFT_MAX_AUTONOMY };

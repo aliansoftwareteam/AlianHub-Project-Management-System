@@ -29,9 +29,17 @@ describe('the agent templates keep only promises the engine can keep', () => {
         expect(tpl.skills.filter((key) => !codeSkills.getSkill(key))).toEqual([]);
     });
 
-    it.each(CATALOGUE_TEMPLATES.filter((tpl) => tpl.blockedBy).map((tpl) => [tpl.slug, tpl.blockedBy]))('%s is blocked on %s, which is still missing', (slug, blocker) => {
-        expect(Object.keys(BLOCKERS)).toContain(blocker);
-        expect(capabilityExists(BLOCKERS[blocker])).toBe(false);
+    it('blocks a template only on something that is still missing', () => {
+        const stale = CATALOGUE_TEMPLATES.filter((tpl) => tpl.blockedBy)
+            .filter((tpl) => !BLOCKERS[tpl.blockedBy] || capabilityExists(BLOCKERS[tpl.blockedBy]))
+            .map((tpl) => `${tpl.slug}: ${tpl.blockedBy}`);
+        expect(stale).toEqual([]);
+    });
+
+    it('treats a blocker as stale once its actions and skills exist', () => {
+        expect(capabilityExists({ actions: ['page.draft'], skills: ['prd.draft'] })).toBe(true);
+        expect(capabilityExists({ actions: ['page.draft'], skills: ['no.such.skill'] })).toBe(false);
+        expect(capabilityExists({ actions: ['no.such.action'], skills: [] })).toBe(false);
     });
 
     it.each(CATALOGUE_TEMPLATES.map((tpl) => [tpl.slug, tpl]))('%s grants every action its skills propose', (slug, tpl) => {
