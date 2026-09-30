@@ -28,6 +28,10 @@
                             <ShellIcon name="link" :size="13" />{{ $t('Docs.link_tasks') }}
                             <span v-if="linkedTasks.length" class="pd__count">{{ linkedTasks.length }}</span>
                         </button>
+                        <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" :aria-pressed="showComments" @click="showComments = !showComments">
+                            <ShellIcon name="chat" :size="13" />{{ $t('Docs.comments') }}
+                            <span v-if="openComments" class="pd__count">{{ openComments }}</span>
+                        </button>
                         <template v-if="layout === 'panel'">
                             <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="present">
                                 <ShellIcon name="play" :size="11" />{{ $t('Docs.present') }}
@@ -118,6 +122,17 @@
                     @ready="onEditorReady"
                 />
                 <div v-else class="pd__preview ah-scroll" v-html="previewHtml"></div>
+                <PageComments
+                    v-show="showComments"
+                    :page-id="String(page._id)"
+                    :blocks="contentBlocks && contentBlocks.blocks"
+                    :focus-id="focusCommentId"
+                    :pick-block="mode === 'edit' ? currentBlock : null"
+                    @count="openComments = $event"
+                    @threads="markCommented"
+                    @jump="jumpToBlock"
+                    @close="showComments = false"
+                />
             </div>
 
             <PageComposeRail
@@ -184,11 +199,13 @@ import { canUseAi } from "@/composable/aiAvailability";
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
 import { useStore } from 'vuex';
+import { useRoute } from 'vue-router';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import TaskChipPicker from '@/components/molecules/Pages/TaskChipPicker.vue';
 import PageBlockEditor from '@/components/molecules/Pages/PageBlockEditor.vue';
 import PageComposeRail from '@/components/molecules/Pages/PageComposeRail.vue';
 import PagePresenter from '@/components/molecules/Pages/PagePresenter.vue';
+import PageComments from '@/components/molecules/Pages/PageComments.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useGetterFunctions } from '@/composable';
@@ -236,6 +253,11 @@ const showShare = ref(false);
 const share = ref(null);
 const isSharing = ref(false);
 const presenting = ref(false);
+const route = useRoute();
+const showComments = ref(false);
+const openComments = ref(0);
+const commentedBlocks = ref([]);
+const focusCommentId = computed(() => String((route && route.query && route.query.comment) || ''));
 
 const projectId = computed(() => String((props.projectData && props.projectData._id) || (page.value && page.value.ProjectID) || ''));
 const projectName = computed(() => {
@@ -546,6 +568,7 @@ function openEditor() {
 }
 
 function onEditorReady() {
+    markCommented(commentedBlocks.value);
     if (baselinePending.value) {
         baselinePending.value = false;
         savedSnapshot.value = { ...savedSnapshot.value, html: contentHtml.value };
@@ -562,6 +585,7 @@ let beforeCompose = null;
 async function onComposeApply(payload) {
     if (!blockEditor.value || !blockEditor.value.applyBlocks) return;
     beforeCompose = await blockEditor.value.applyBlocks(payload);
+    markCommented(commentedBlocks.value);
 }
 
 async function onComposeUndo() {
@@ -569,6 +593,7 @@ async function onComposeUndo() {
     const snapshot = beforeCompose;
     beforeCompose = null;
     await blockEditor.value.restore(snapshot);
+    markCommented(commentedBlocks.value);
 }
 
 function present() {
@@ -585,6 +610,22 @@ function scrollToHeading(blockId) {
     if (blockEditor.value && blockEditor.value.scrollToBlock) blockEditor.value.scrollToBlock(blockId);
 }
 
+function currentBlock() {
+    return blockEditor.value && blockEditor.value.currentBlock ? blockEditor.value.currentBlock() : null;
+}
+
+function markCommented(blockIds) {
+    commentedBlocks.value = blockIds || [];
+    if (blockEditor.value && blockEditor.value.markCommented) blockEditor.value.markCommented(commentedBlocks.value);
+}
+
+function jumpToBlock(blockId) {
+    if (mode.value !== 'edit') openEditor();
+    setTimeout(() => scrollToHeading(blockId), 0);
+}
+
+watch(focusCommentId, (id) => { if (id) showComments.value = true; }, { immediate: true });
+
 defineExpose({ openShare, present, askAi, scrollToHeading, confirmDiscard, isDirty });
 
 function onKeydown(e) {
@@ -596,6 +637,7 @@ function onKeydown(e) {
         if (presenting.value) { presenting.value = false; return; }
         if (showShare.value) { showShare.value = false; return; }
         if (showLinker.value) { showLinker.value = false; return; }
+        if (showComments.value) { showComments.value = false; return; }
         if (props.closable) requestClose();
     }
 }

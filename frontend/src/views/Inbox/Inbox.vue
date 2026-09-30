@@ -771,6 +771,10 @@ const open = (it) => {
         router.push({ name: 'AiInbox', params: { cid: companyId?.value }, query: { report: String(it.changeData.runId) } }).catch(() => {});
         return;
     }
+    if (it.changeType === 'doc_comment' && it.changeData?.pageId) {
+        router.push({ name: 'PageEditor', params: { cid: companyId?.value, pageId: String(it.changeData.pageId) }, query: { comment: String(it.changeData.commentId || '') } }).catch(() => {});
+        return;
+    }
     if (alertNotice(it) && router.hasRoute('AiHealth')) {
         router.push({ name: 'AiHealth', params: { cid: companyId?.value } }).catch(() => {});
         return;
