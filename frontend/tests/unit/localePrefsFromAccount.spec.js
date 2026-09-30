@@ -29,7 +29,7 @@ describe('language settings follow the person, not the browser', () => {
         expect({ ...prefs.localePrefs }).toEqual(SERVER);
         expect(stored()).toMatchObject(SERVER);
         expect(document.documentElement.getAttribute('dir')).toBe('rtl');
-        expect(prefs.formatNumber(1250)).toBe('١٬٢٥٠٫٠٠');
+        expect(prefs.formatNumber(1250)).toBe('١.٢٥٠,٠٠');
     });
 
     it('the account copy wins over what this browser had', async () => {
