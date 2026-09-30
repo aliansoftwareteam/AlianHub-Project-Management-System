@@ -60,6 +60,7 @@ const WEB_APP_BODIES = [
     { route: BULK, action: 'bulkUpdatePriority', source: 'BulkActionBar.vue', keys: ['task.task_priority'], body: bulk('bulkUpdatePriority', { firebaseObj: { Task_Priority: 'HIGH' }, priorityObj: { priorityName: 'High', newPriorityName: 'High' } }) },
     { route: BULK, action: 'bulkUpdateAssignee', source: 'BulkActionBar.vue and ListBulkBar.vue', keys: ['task.task_assignee'], body: bulk('bulkUpdateAssignee', { type: 'assigneeAdd', employeeId: [USER.id], employeeName: 'Max' }) },
     { route: BULK, action: 'bulkUpdateDueDate', source: 'BulkActionBar.vue', keys: ['task.task_due_date'], body: bulk('bulkUpdateDueDate', { DueDate: '2026-10-01' }) },
+    { route: BULK, action: 'bulkUpdateDates', source: 'GanttView.vue shift dependants and its undo', keys: ['task.task_due_date'], body: ({ taskId, otherTaskId }) => ({ action: 'bulkUpdateDates', dates: [{ taskId, startDate: '2026-10-01', DueDate: '2026-10-02' }, { taskId: otherTaskId, startDate: '2026-10-02', DueDate: '2026-10-03' }], userData: USER }) },
     { route: BULK, action: 'bulkUpdateTags', source: 'BulkActionBar.vue and ListBulkBar.vue', keys: ['task.task_tag|task.task_status'], body: bulk('bulkUpdateTags', { tagId: 'tag-1', operation: 'add' }) },
     { route: BULK, action: 'bulkArchive', source: 'BulkActionBar.vue and ListBulkBar.vue', keys: ['task.task_archive'], body: bulk('bulkArchive', {}) },
     { route: BULK, action: 'bulkDelete', source: 'BulkActionBar.vue', keys: ['task.task_delete'], body: bulk('bulkDelete', {}) },
