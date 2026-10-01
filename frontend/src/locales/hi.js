@@ -5648,6 +5648,11 @@ export default {
         "new": "New",
         "new_list": "New list",
         "new_folder": "New folder",
+        "new_subfolder": "New subfolder",
+        "new_subfolder_in": "New subfolder in {folder}",
+        "move_folder": "Move folder",
+        "move_folder_hint": "Choose where {folder} goes",
+        "top_level": "Top level of the project",
         "new_menu_task": "Task",
         "menu_view": "View",
         "menu_find": "Find",
@@ -8724,6 +8729,7 @@ export default {
         "Upgrade_your_plan_you_have_reached_the_limit_for_creating_sprints": "अपनी योजना को अपग्रेड करें। आपने स्प्रिंट बनाने की सीमा तक पहुँच चुके हैं।",
         "Folder created successfully": "फ़ोल्डर सफलतापूर्वक बनाया गया",
         "Folder updated successfully": "फ़ोल्डर सफलतापूर्वक अपडेट किया गया",
+        "Folder_moved_successfully": "Folder moved successfully",
         "Folde restored successfully": "फ़ोल्डर सफलतापूर्वक पुनर्स्थापित किया गया",
         "Folder closed successfully": "फ़ोल्डर सफलतापूर्वक बंद किया गया",
         "Folder archived successfully": "फ़ोल्डर सफलतापूर्वक संग्रहित किया गया",
@@ -11171,7 +11177,8 @@ export default {
         "show": "Show the project tree",
         "hide": "Hide the project tree",
         "close": "Close the project tree",
-        "tasks": "{n} tasks"
+        "tasks": "{n} tasks",
+        "folder_actions": "Actions for {folder}"
     },
     "TaskTemplates": {
         "save_as": "Save as template",

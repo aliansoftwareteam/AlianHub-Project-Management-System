@@ -58,7 +58,7 @@ describe('the project header location', () => {
         expect(crumbs.map((crumb) => crumb.text())).toEqual(['Design', 'Icons']);
         expect(crumbs.map((crumb) => crumb.attributes('href'))).toEqual([folderLink('f1'), folderLink('f2')]);
         expect(wrapper.find('.ph2__crumb a[href]').text()).toBe('Sprint 2');
-        expect(wrapper.find('.ph2__bar').text().replace(/\s+/g, ' ')).toMatch(/Design › Icons › Sprint 2/);
+        expect(wrapper.find('.ph2__bar').text()).toMatch(/›\s*Design\s*›\s*Icons\s*›\s*Sprint 2/);
     });
 
     it('names the folders on a folder page that shows no single sprint', async () => {

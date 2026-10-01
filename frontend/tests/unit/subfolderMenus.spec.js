@@ -204,6 +204,14 @@ describe('a folder\'s own menu', () => {
         expect(commits).toEqual([{ op: 'modified', data: { ...FOLDERS.ops, parentFolderId: 'design' } }]);
         expect(toast.success).toHaveBeenCalledWith('Toast.Folder_moved_successfully', { position: 'top-right' });
         expect(document.body.querySelector('.mtf__item')).toBeNull();
+        expect(wrapper.emitted('reveal')).toEqual([['design']]);
+    });
+
+    it('asks the tree to open the folder a subfolder was created in', async () => {
+        const wrapper = menu('ops');
+        await choose(wrapper, 'Projects.new_subfolder');
+        wrapper.findComponent(SprintFolderInput).vm.$emit('updateData', { _id: 'new' }, 'Folder');
+        expect(wrapper.emitted('reveal')).toEqual([['ops']]);
     });
 
     it('moves a subfolder out to the top level', async () => {

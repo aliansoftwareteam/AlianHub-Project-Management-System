@@ -9,7 +9,7 @@
                 <span class="font-size-13 font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
                 <select v-model="selectedSprintId" class="pshare__select font-size-13">
                     <option v-for="sprint in sprintOptions" :key="'ps-'+sprint.id" :value="sprint.id">
-                        {{ sprint.folderName ? sprint.folderName + ' / ' : '' }}{{ sprint.name }}
+                        {{ listLabel(sprint) }}
                     </option>
                 </select>
                 <button v-if="selectedSprintId" type="button" class="pshare__who font-size-13 blue ml-10px" @click="showWhoCanSee = true">{{ $t('WhoCanSee.menu_sprint') }}</button>
@@ -66,6 +66,7 @@
 <script setup>
 // PACKAGES
 import { computed, defineProps, inject, ref, watch } from "vue";
+import { folderPathLabel, listLabel } from "@/utils/folderTree";
 import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
 
@@ -107,7 +108,7 @@ const sprintOptions = computed(() => {
     });
     Object.values(props.projectData?.sprintsfolders || {}).forEach((folder) => {
         Object.values(folder?.sprintsObj || {}).forEach((sprint) => {
-            if (sprint?.id) options.push({ id: sprint.id, name: sprint.name || 'Sprint', folderName: folder.folderName || '' });
+            if (sprint?.id) options.push({ id: sprint.id, name: sprint.name || 'Sprint', folderName: folder.folderName || '', folderPath: folderPathLabel(props.projectData?.sprintsfolders, folder) });
         });
     });
     return options;
