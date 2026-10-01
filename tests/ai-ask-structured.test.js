@@ -71,6 +71,8 @@ beforeEach(() => {
     task(PLATFORM, { TaskName: 'Platform overdue tasks report', DueDate: days(-6), rawDescription: 'Which tasks are overdue across the platform' });
 });
 
+afterEach(() => jest.useRealTimers());
+
 describe('Ask answers a structured question from a scoped task query', () => {
     it('returns the three overdue Local Smoke tasks, ahead of text passages', async () => {
         const out = await gather(C, ME, { question: QUESTION, now: NOW });
@@ -125,6 +127,7 @@ describe('Ask answers a structured question from a scoped task query', () => {
     });
 
     it('returns the response additively, with the intent beside the sources', async () => {
+        jest.useFakeTimers({ now: NOW, doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
         isAnyProviderConfigured.mockReturnValue(true);
         const chat = jest.fn(async () => ({ content: 'Three are overdue [SMOKE-1] [SMOKE-2] [SMOKE-3].', totalTokens: 10, model: 'm' }));
         getProvider.mockReturnValue({ chat });
