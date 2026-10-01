@@ -41,7 +41,7 @@ test.describe('logging time and writing docs', () => {
         await page.waitForURL(/\/pages\/[0-9a-f]{24}/);
         const pageId = /\/pages\/([0-9a-f]{24})/.exec(page.url())[1];
 
-        await expect(page.getByText('Type / for blocks')).toBeVisible();
+        await expect(page.locator('[contenteditable="true"]').first()).toBeVisible();
         await page.getByPlaceholder('Untitled').fill(title);
         await expect.poll(async () => JSON.stringify((await owner.api.get(`/api/v2/pages/${pageId}`)).body)).toContain(title);
 
