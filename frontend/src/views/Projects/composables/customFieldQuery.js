@@ -2,18 +2,19 @@ import moment from 'moment';
 import { dueDateBuckets } from '../taskGroups';
 import { fieldAppliesToTask, fieldTaskTypes } from '@fieldTaskTypes';
 import { typeModuleOf } from '@fieldTypes';
+import { maxOf as ratingMaxOf, text as ratingText } from '@fieldTypes/rating';
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const VALUE_PATH = /^customField\.([a-f0-9]{24})\.fieldValue$/i;
 const GROUP_PREFIX = 'cf:';
 const TEXT_TYPES = ['text', 'textarea', 'email', 'phone', 'url'];
 const NUMBER_TYPES = ['number', 'money'];
-const NUMERIC_TYPES = [...NUMBER_TYPES];
+const NUMERIC_TYPES = [...NUMBER_TYPES, 'rating'];
 const LIST_TYPES = ['dropdown', 'people'];
 const EMPTY_VALUES = [null, '', []];
 const CHECKED = [true, 'true'];
 
-export const GROUPABLE_TYPES = Object.freeze(['dropdown', 'checkbox', 'date', 'people']);
+export const GROUPABLE_TYPES = Object.freeze(['dropdown', 'checkbox', 'date', 'people', 'rating']);
 export const FILTERABLE_TYPES = Object.freeze(['dropdown', 'checkbox', 'date', 'people', ...NUMERIC_TYPES, ...TEXT_TYPES]);
 
 export const valuePath = (fieldId) => `customField.${fieldId}.fieldValue`;
@@ -118,6 +119,19 @@ export function customFieldGroups(def, { t = (key) => key, now = new Date(), peo
             { ...none, conditions: [blankOrOtherType({ [path]: { $in: EMPTY_VALUES } }, { [path]: { $nin: EMPTY_VALUES } }, types)] }
         ];
     }
+    if (def.fieldType === 'rating') {
+        const ratings = Array.from({ length: ratingMaxOf(def) }, (_, at) => ratingMaxOf(def) - at);
+        return [
+            ...ratings.map((rating) => ({
+                ...base,
+                name: ratingText(rating, def),
+                value: rating,
+                searchValue: rating,
+                conditions: [valueInTypes({ [path]: { $in: [rating, String(rating)] } }, types)]
+            })),
+            { ...none, conditions: [blankOrOtherType({ [path]: { $in: EMPTY_VALUES } }, { [path]: { $nin: EMPTY_VALUES } }, types)] }
+        ];
+    }
     if (def.fieldType === 'checkbox') {
         return [
             { ...base, name: t('ViewGroups.checked'), value: true, searchValue: true, conditions: [valueInTypes({ [path]: { $in: CHECKED } }, types)] },
@@ -161,6 +175,7 @@ export function customGroupMatches(task, item) {
         const chosen = [].concat(isBlank(value) ? [] : value).filter((id) => !isBlank(id)).map(String);
         return item.searchValue === '' ? chosen.length === 0 : chosen.includes(String(item.searchValue));
     }
+    if (item.customFieldType === 'rating') return item.searchValue === '' ? isBlank(value) : !isBlank(value) && Number(value) === Number(item.searchValue);
     if (item.customFieldType === 'checkbox') return CHECKED.includes(value) === (item.searchValue === true);
     if (item.customFieldType === 'date') return dateMatches(timeOf(value), item);
     return false;
@@ -177,6 +192,7 @@ export const putFrom = (groupName, item) => (to, from, dragged) => (groupTakesTa
 export function customGroupUpdate(item) {
     if (!item?.customFieldId || item.dropDisabled) return null;
     if (LIST_TYPES.includes(item.customFieldType)) return { fieldValue: item.searchValue ? [item.searchValue] : [], _id: item.customFieldId };
+    if (item.customFieldType === 'rating') return { fieldValue: item.searchValue, _id: item.customFieldId };
     if (item.customFieldType === 'checkbox') return { fieldValue: item.searchValue === true, _id: item.customFieldId };
     return null;
 }
