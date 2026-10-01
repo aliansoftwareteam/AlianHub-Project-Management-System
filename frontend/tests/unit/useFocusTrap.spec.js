@@ -38,6 +38,24 @@ const Host = defineComponent({
         </div>`,
 });
 
+const MenuHost = defineComponent({
+    setup() {
+        const menu = ref(true);
+        const open = ref(false);
+        const panel = ref(null);
+        useFocusTrap(panel, open);
+        return { menu, open, panel };
+    },
+    template: `
+        <div>
+            <button id="trigger" aria-controls="menu">more</button>
+            <div v-if="menu" id="menu" role="menu">
+                <div id="item" role="menuitem" tabindex="-1" @click="open = true">open</div>
+            </div>
+            <div v-if="open" ref="panel" tabindex="-1" id="panel"></div>
+        </div>`,
+});
+
 describe('focusableIn', () => {
     it('lists tabbable controls in order and skips disabled or tabindex -1 ones', () => {
         document.body.innerHTML = '<div id="r"><button id="a">a</button><button disabled>x</button><span tabindex="-1">y</span><a href="#" id="b">b</a><div aria-hidden="true"><button>z</button></div></div>';
@@ -109,6 +127,22 @@ describe('useFocusTrap', () => {
         expect(document.activeElement.id).toBe('opener');
 
         expect(tab(document.getElementById('behind')).defaultPrevented).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('returns focus to the menu trigger when the menu item that opened the panel is gone', async () => {
+        const wrapper = mount(MenuHost, { attachTo: document.body });
+        document.getElementById('item').focus();
+        await wrapper.find('#item').trigger('click');
+        await nextTick();
+        await nextTick();
+        expect(document.activeElement.id).toBe('panel');
+
+        wrapper.vm.menu = false;
+        await nextTick();
+        wrapper.vm.open = false;
+        await nextTick();
+        expect(document.activeElement.id).toBe('trigger');
         wrapper.unmount();
     });
 

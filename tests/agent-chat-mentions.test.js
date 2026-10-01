@@ -237,6 +237,27 @@ describe('@agent in a chat channel', () => {
         expect(answer.message).not.toMatch(/ALP-1|Alpha acquisition plan/);
     });
 
+    it('answers a message in a thread inside that thread, under the same limit on what it may use', async () => {
+        mockChat.mockImplementation(async (args) => reply({ reply: args.messages[0].content.slice(0, 4000), changes: [] }));
+        const root = seedMessage({ ...channel, userId: BOB, text: 'Thread on the alpha acquisition' });
+
+        const r = await call(save, ALICE, { body: { data: {
+            parentId: String(root._id), message: `${mention(HELPER)} how is the alpha acquisition going?`, type: 'text', project: false, taskId: 'default',
+            objId: { projectId: CHANNEL_PROJECT, sprintId: CHANNEL },
+        } } });
+        await chatAgents.settled();
+
+        expect(r.code).toBe(200);
+        const [answer] = agentReplies();
+        expect(String(answer.parentId)).toBe(String(root._id));
+        expect(answer).toMatchObject({ actorType: 'agent', agentId: HELPER, taskId: 'default' });
+        expect(answer.hasReply).toBeUndefined();
+        expect(String(answer.sprintId)).toBe(CHANNEL);
+        expect(promptSent()).toContain('Bob: Thread on the alpha acquisition');
+        expect(promptSent()).not.toMatch(/ALP-1|Alpha acquisition plan|SEC-1|merger|We agreed to launch pricing on Friday/);
+        expect(answer.message).not.toMatch(/ALP-1|Alpha acquisition plan/);
+    });
+
     it('does not start an agent the person may not use, a paused one, or one past its spend cap', async () => {
         const r = await post(ALICE, `${mention(ELSEWHERE, 'Hidden helper')} ${mention(PAUSED, 'Sleeper')} ${mention(CAPPED, 'Spent')} status?`, channel);
 

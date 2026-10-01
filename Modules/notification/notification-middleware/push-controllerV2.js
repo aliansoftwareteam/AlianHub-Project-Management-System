@@ -6,6 +6,7 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType")
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose")
 const { sendFCMNotification } = require("./sendNotification")
+const { CHAT_THREAD_REPLY, chatThreadPath } = require("../../Comments/helpers/chatThreads")
 const fs = require('fs');
 const path = require('path');
 var brandSettings = null; 
@@ -56,7 +57,9 @@ exports.sendNotificationBody = (body) => {
             const topicName = "fcmNotification"
             let actionUrl = "";
             var { folderId = "", sprintId = "", projectId = "", companyId = '', taskId = "" } = body
-            if (body?.type === "docs") {
+            if (body?.changeType === CHAT_THREAD_REPLY) {
+                actionUrl = chatThreadPath(body)
+            } else if (body?.type === "docs") {
                 actionUrl = `${encodeURIComponent(companyId)}/pages/${encodeURIComponent(String(body.changeData?.pageId || ''))}`
                 if (body.changeData?.commentId) actionUrl += `?comment=${encodeURIComponent(String(body.changeData.commentId))}`
             } else if (body?.type?.toLowerCase() === "project") {

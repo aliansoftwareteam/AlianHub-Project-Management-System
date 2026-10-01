@@ -1,15 +1,15 @@
 <template>
-    <div v-if="modelValue" class="pshare__overlay" @click.self="$emit('update:modelValue', false)">
-        <div class="pshare__card">
+    <div v-if="modelValue" class="pshare__overlay" @click.self="close">
+        <div ref="dialogEl" class="pshare__card" role="dialog" aria-modal="true" :aria-labelledby="titleId" tabindex="-1">
             <div class="d-flex align-items-center justify-content-between pshare__head">
-                <span class="font-size-16 font-weight-700">{{ $t('Projects.public_link') }}</span>
-                <span class="cursor-pointer font-size-16 pshare__close" @click="$emit('update:modelValue', false)">&#10005;</span>
+                <span :id="titleId" class="font-size-16 font-weight-700">{{ $t('Projects.public_link') }}</span>
+                <button type="button" class="font-size-16 pshare__close" :title="$t('Projects.close')" :aria-label="$t('Projects.close')" @click="close">&#10005;</button>
             </div>
             <div class="d-flex align-items-center pshare__controls">
                 <span class="font-size-13 font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
                 <select v-model="selectedSprintId" class="pshare__select font-size-13">
                     <option v-for="sprint in sprintOptions" :key="'ps-'+sprint.id" :value="sprint.id">
-                        {{ sprint.folderName ? sprint.folderName + ' / ' : '' }}{{ sprint.name }}
+                        {{ listLabel(sprint) }}
                     </option>
                 </select>
                 <button v-if="selectedSprintId" type="button" class="pshare__who font-size-13 blue ml-10px" @click="showWhoCanSee = true">{{ $t('WhoCanSee.menu_sprint') }}</button>
@@ -64,14 +64,15 @@
 </template>
 
 <script setup>
-// PACKAGES
 import { computed, defineProps, inject, ref, watch } from "vue";
+import { folderPathLabel, listLabel } from "@/utils/folderTree";
 import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
 
-// UTILS
 import { apiRequest } from '@/services';
 import { useGetterFunctions } from "@/composable";
+import { useFocusTrap } from '@/composable/useFocusTrap';
+import { useDialogEscape } from '@/composable/useDialogEscape';
 import WhoCanSeeModal from '@/components/molecules/WhoCanSee/WhoCanSeeModal.vue';
 
 const { t } = useI18n();
@@ -90,7 +91,14 @@ const props = defineProps({
     }
 });
 
-defineEmits(['update:modelValue']);
+const emit = defineEmits(['update:modelValue']);
+
+const titleId = `pshare-${Math.random().toString(36).slice(2, 8)}-title`;
+const dialogEl = ref(null);
+const isOpen = computed(() => props.modelValue);
+const close = () => emit('update:modelValue', false);
+useFocusTrap(dialogEl, isOpen);
+useDialogEscape(isOpen, close);
 
 const selectedSprintId = ref('');
 const share = ref(null);
@@ -107,7 +115,7 @@ const sprintOptions = computed(() => {
     });
     Object.values(props.projectData?.sprintsfolders || {}).forEach((folder) => {
         Object.values(folder?.sprintsObj || {}).forEach((sprint) => {
-            if (sprint?.id) options.push({ id: sprint.id, name: sprint.name || 'Sprint', folderName: folder.folderName || '' });
+            if (sprint?.id) options.push({ id: sprint.id, name: sprint.name || 'Sprint', folderName: folder.folderName || '', folderPath: folderPathLabel(props.projectData?.sprintsfolders, folder) });
         });
     });
     return options;
@@ -232,6 +240,8 @@ function formatDate(d) {
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
 }
 .pshare__head { margin-bottom: 12px; }
+.pshare__card:focus { outline: none; }
+.pshare__close { border: 0; background: none; padding: 0 4px; line-height: 1; border-radius: var(--r-chip); cursor: pointer; }
 .pshare__close { color: #9a9a9a; }
 .pshare__close:hover { color: #e84a4a; }
 .pshare__controls { margin-bottom: 12px; flex-wrap: wrap; row-gap: 6px; }

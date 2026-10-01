@@ -1,6 +1,6 @@
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn(async () => null) }));
-jest.mock('../event/socketEventEmitter', () => ({}));
+jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Config/permissionGuard', () => ({
     ...jest.requireActual('../Config/permissionGuard'),
     getRoleType: jest.fn(async () => null),
