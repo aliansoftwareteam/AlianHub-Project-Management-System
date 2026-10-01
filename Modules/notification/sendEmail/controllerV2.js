@@ -7,10 +7,17 @@ const { formatNotificationDate } = require('../../../utils/dateHelpers');
 const { Notification_key, TemplateType } = require("../../../Config/notificationKey");
 const { removeDocument, UpdateDocument } = require("../notification-middleware/push-controllerV2")
 const { isCommentNotice, commentNoticeEmail } = require("./commentNoticeEmail")
+const { isDocMention, docMentionEmail } = require("./docMentionEmail")
 const { urlSegment } = require("../../Template/emailText")
 
-const sendCommentNotice = (EmailDetails) => new Promise((resolve, reject) => {
-  const notice = commentNoticeEmail(EmailDetails)
+const noticeBuilderFor = (key) => {
+  if (isCommentNotice(key)) return commentNoticeEmail
+  if (isDocMention(key)) return docMentionEmail
+  return null
+}
+
+const sendNoticeEmail = (EmailDetails, build) => new Promise((resolve, reject) => {
+  const notice = build(EmailDetails)
   if (!notice) {
     removeDocument(EmailDetails.notification).catch(() => null)
     resolve(false)
@@ -18,7 +25,7 @@ const sendCommentNotice = (EmailDetails) => new Promise((resolve, reject) => {
   }
   Promise.resolve(sendMail.SendNotificationEmail(notice.subject, notice.html, [EmailDetails.notification.Employee_Email], true, (result) => {
     if (!result.status) {
-      logger.error(`send comment notice email not sent`)
+      logger.error(`send notice email not sent`)
       reject({ message: result.error, status: false })
       return
     }
@@ -29,7 +36,8 @@ const sendCommentNotice = (EmailDetails) => new Promise((resolve, reject) => {
 })
 
 exports.sendEmailHandlerSingle = (EmailDetails) => {
-  if (isCommentNotice(EmailDetails?.notification?.key)) return sendCommentNotice(EmailDetails)
+  const build = noticeBuilderFor(EmailDetails?.notification?.key)
+  if (build) return sendNoticeEmail(EmailDetails, build)
   return new Promise(async (resolve, reject) => {
     try {
       let email = [EmailDetails.notification.Employee_Email]

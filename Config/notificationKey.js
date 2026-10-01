@@ -47,6 +47,7 @@ const Notification_key = {
   PROJECT_MILESTONE_STATUS_CHANGE:"project_milestone_status_change",
   PROJECT_SPRINT_CREATE:"project_sprint_create",
   PROJECT_FOLDER_CREATE:"project_folder_create",
+  DOC_MENTION:"doc_mention",
 }
 const TemplateType = {
  CREATE:'create',
@@ -85,9 +86,22 @@ const COMMENT_NOTICE_ITEMS = Object.freeze([
   { name: "Comments assigned to me", email: false, browser: true, mobile: true, key: Notification_key.COMMENT_ASSIGNED },
 ]);
 
+// A settings section added after users had settings documents; Modules/notification/docNotices.js adds it to older ones.
+const DOC_NOTICE_SECTION = Object.freeze({
+  key: "docs",
+  sectionName: "Docs",
+  items: Object.freeze([
+    Object.freeze({ name: "Docs I'm @mentioned in", email: false, browser: true, mobile: true, key: Notification_key.DOC_MENTION }),
+  ]),
+});
+
+const docNoticeSection = () => ({ ...DOC_NOTICE_SECTION, items: DOC_NOTICE_SECTION.items.map((item) => ({ ...item })) });
+
 module.exports = {
     Notification_key,
     COMMENT_NOTICE_ITEMS,
+    DOC_NOTICE_SECTION,
+    docNoticeSection,
     TemplateType,
     ChangeTypes
 };

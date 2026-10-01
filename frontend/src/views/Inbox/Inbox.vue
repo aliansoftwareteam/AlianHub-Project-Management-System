@@ -379,7 +379,7 @@ const canSnooze = (it) => clearable(it) && (tab.value === 'primary' || tab.value
 const whenLabel = (iso) => formatWhen(iso, timeZone.value, locale?.value);
 
 const glyphIcon = (it) => {
-    if (it.kind === 'mention') return 'at';
+    if (it.kind === 'mention' || it.changeType === 'doc_mention') return 'at';
     if (it.changeType === 'agent_alert') return 'alert';
     if (it.changeType === 'agent_report') return 'agent';
     if (/milestone/i.test(it.key || '')) return 'alert';
@@ -769,6 +769,10 @@ const open = (it) => {
     if (it.unread && it.kind !== 'approval') setRead(it, true).then((ok) => { if (ok && tab.value !== 'done') removeRow(it); });
     if (it.changeType === 'agent_report' && it.changeData?.runId && router.hasRoute('AiInbox')) {
         router.push({ name: 'AiInbox', params: { cid: companyId?.value }, query: { report: String(it.changeData.runId) } }).catch(() => {});
+        return;
+    }
+    if (it.changeType === 'doc_mention' && it.changeData?.pageId) {
+        router.push({ name: 'PageEditor', params: { cid: companyId?.value, pageId: String(it.changeData.pageId) } }).catch(() => {});
         return;
     }
     if (alertNotice(it) && router.hasRoute('AiHealth')) {
