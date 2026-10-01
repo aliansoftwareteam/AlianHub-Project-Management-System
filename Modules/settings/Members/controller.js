@@ -425,6 +425,7 @@ exports.updateMemberFunction = (companyId, queryObject, method) => {
             const response = await MongoDbCrudOpration(companyId, query, method);
 
             removeCache(`company_users:${companyId}`);
+            if (response && response.userId) removeCache(`UserProjectData:${companyId}:${response.userId}`);
             removeCache(`UserData:${queryObject.userId}`, false);
             removeCache(`UserAllData:${companyId}`);
 
