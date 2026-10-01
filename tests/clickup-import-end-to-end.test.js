@@ -310,7 +310,7 @@ describe('the sample export imported by an owner into one list of an existing pr
 
     it('is quiet: tasks arrive as new tasks do, and nothing announces a comment or notifies anyone', () => {
         const events = countBy(socketEmitter.emit.mock.calls, ([event, payload]) => `${event}:${payload && payload.module}`);
-        expect(Object.keys(events).sort()).toEqual(['insert:task', 'update:project', 'update:task']);
+        expect(Object.keys(events).sort()).toEqual(['insert:customFields', 'insert:task', 'update:project', 'update:task']);
         expect(events['insert:task']).toBe(39);
         expect(events['update:task']).toBeLessThanOrEqual(39 * 3);
         expect(events['update:project']).toBe(3);
