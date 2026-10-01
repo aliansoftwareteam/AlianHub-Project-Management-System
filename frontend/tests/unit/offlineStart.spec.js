@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { mount } from '@vue/test-utils';
@@ -78,7 +78,16 @@ describe('marking the app away', () => {
 });
 
 describe('the screen a signed-in person gets when the app opens with no connection', () => {
-    const mountScreen = () => mount(OfflineStart, { global: { stubs: { ShellIcon: true } } });
+    let mounted = [];
+    const mountScreen = () => {
+        const wrapper = mount(OfflineStart, { global: { stubs: { ShellIcon: true } } });
+        mounted.push(wrapper);
+        return wrapper;
+    };
+    afterEach(() => {
+        mounted.forEach((wrapper) => wrapper.unmount());
+        mounted = [];
+    });
 
     it('says the app is offline and what happens next, in place of a spinner', () => {
         const wrapper = mountScreen();

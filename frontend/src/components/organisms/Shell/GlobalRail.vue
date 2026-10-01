@@ -118,6 +118,7 @@
                             <ShellIcon :name="shellState.theme === 'dark' ? 'sun' : 'moon'" :size="15" />
                             <span>{{ shellState.theme === 'dark' ? $t('Shell.theme_light') : $t('Shell.theme_dark') }}</span>
                         </button>
+                        <InstallAppItem @done="closePopovers()" />
                         <template v-if="otherCompanies.length">
                             <div class="ah-pop__sep"></div>
                             <div class="ah-label ah-pop__label">{{ $t('Shell.switch_workspace') }}</div>
@@ -143,6 +144,7 @@ import { computed, defineEmits, inject, onMounted, onUnmounted, ref, watch } fro
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import ShellIcon from "./ShellIcon.vue";
+import InstallAppItem from "./InstallAppItem.vue";
 import UserProfile from "@/components/atom/UserProfile/UserProfile.vue";
 import { useGetterFunctions } from "@/composable/index.js";
 import { useAppVersion } from "@/composable/useAppVersion";

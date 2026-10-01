@@ -2,6 +2,7 @@
 	<div>
 		<SkipLink/>
 		<OfflineBanner/>
+		<UpdateReadyNotice/>
 		<DemoBanner/>
 		<MaintenanceBanner/>
 		<MaintenanceCard v-if="maintenanceBlocksPage"/>
@@ -36,6 +37,7 @@
 			<div v-else-if="!companyId?.length && $route.name === 'Create_Company'" class="d-flex align-items-center justify-content-center lds-roller h-100dvh">
 				<router-view/>
 			</div>
+			<OfflineStart v-else-if="away"/>
 			<div v-else class="d-flex align-items-center justify-content-center lds-roller h-100dvh">
 				<img :src="logo" alt="logo" class="position-ab z-index-1 company__logo">
 				<div class="spinner"></div>
@@ -97,7 +99,9 @@ import { languageTranslateHelper } from './composable/index';
 import {socketHelper} from './composable/socketHelper';
 import { apiRequest,apiRequestWithoutCompnay } from './services';
 import OfflineBanner from '@/components/offline/OfflineBanner.vue';
-import { initOffline } from '@/offline';
+import OfflineStart from '@/components/offline/OfflineStart.vue';
+import UpdateReadyNotice from '@/components/molecules/UpdateReadyNotice/UpdateReadyNotice.vue';
+import { away, initOffline } from '@/offline';
 import { dropWorkerRuntimeCaches } from '@/serviceWorker/registration';
 import * as env from '@/config/env';
 import {tabSyncHelper} from '@/utils/tabSyncs.js';

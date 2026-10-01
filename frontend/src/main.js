@@ -5,6 +5,7 @@ import { initTheme } from '@/components/organisms/Shell/shellState'
 import { readRememberedEmail } from '@/utils/rememberedLogin'
 initTheme()
 readRememberedEmail()
+watchInstallPrompt()
 import store from './store'
 import { firebaseConfigured } from '@/config/firebaseInit';
 import ToastPlugin from 'vue-toast-notification';
@@ -20,6 +21,7 @@ import VueApexCharts from "vue3-apexcharts";
 import DemoBanner from "@/components/atom/DemoBanner/DemoBanner.vue";
 import { installChunkRecovery } from '@/config/chunkRecovery';
 import { registerShellWorker } from '@/serviceWorker/registration';
+import { watchInstallPrompt } from '@/serviceWorker/installPrompt';
 // Plugins Path
 import registerPlugin from './plugins/register/registerPlugin';
 import createcompanyinsidePlugin from './plugins/createcompanyinside/createcompanyinsidePlugin';

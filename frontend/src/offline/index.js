@@ -49,12 +49,16 @@ export const maybeCacheResponse = (type, endPoint, resData) => {
     } catch (e) { /* offline cache is best-effort */ }
 };
 
+export const markAway = () => {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) isOnline.value = false;
+    else unreachable.value = true;
+    startTicker();
+};
+
 export const handleOfflineFailure = async (type, endPoint, data, dataType, err) => {
     try {
         if (!rules.isOfflineError(err)) return null;
-        if (typeof navigator !== 'undefined' && navigator.onLine === false) isOnline.value = false;
-        else unreachable.value = true;
-        startTicker();
+        markAway();
         if (rules.isCacheableGet(type, endPoint)) {
             const cached = await db.cacheGet(rules.cacheKeyFor(endPoint));
             return cached !== undefined ? rules.makeCachedResponse(cached) : null;
