@@ -2,6 +2,7 @@ const { defineConfig } = require('@vue/cli-service');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const path = require('path');
 const brandSettings = require('../brandSettings.json');
+const { ShellWorkerPlugin } = require('./shellWorkerPlugin');
 const imageURL = `/api/v1/getlogo?key=logo&type=web`;
 
 module.exports = defineConfig({
@@ -108,7 +109,9 @@ module.exports = defineConfig({
             content: '315'
           },
         }
-      })
+      }),
+      // The dev server gets no sw.js, and the app does not register one there.
+      ...(process.env.NODE_ENV === 'production' ? [new ShellWorkerPlugin()] : [])
     ]
   },
   chainWebpack: config => {

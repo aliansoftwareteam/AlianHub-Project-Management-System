@@ -19,6 +19,7 @@ import {i18n } from '@/locales/main';
 import VueApexCharts from "vue3-apexcharts";
 import DemoBanner from "@/components/atom/DemoBanner/DemoBanner.vue";
 import { installChunkRecovery } from '@/config/chunkRecovery';
+import { registerShellWorker } from '@/serviceWorker/registration';
 // Plugins Path
 import registerPlugin from './plugins/register/registerPlugin';
 import createcompanyinsidePlugin from './plugins/createcompanyinside/createcompanyinsidePlugin';
@@ -95,13 +96,16 @@ element = document.createElement('div');
 element.id="my-image-slider"
 document.getElementById("app")?.appendChild(element)
 
-// firebase-messaging-sw.js only exists once frontend/config.sh has copied it into public/.
+/* A scope holds one worker, and "/" belongs to the app shell's (sw.js). The push worker goes under the
+ * scope the Firebase SDK registers it with when it asks for a token, so both calls name the same one.
+ * firebase-messaging-sw.js only exists once frontend/config.sh has copied it into public/. */
+const PUSH_WORKER_SCOPE = '/firebase-cloud-messaging-push-scope';
 if (firebaseConfigured && 'serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/firebase-messaging-sw.js')
-    .then(() => {
-      console.info('Service worker registered:');
-    })
+  navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: PUSH_WORKER_SCOPE })
     .catch((error) => {
       console.info('Service worker registration failed:', error);
     });
 }
+
+if (document.readyState === 'complete') registerShellWorker();
+else window.addEventListener('load', () => registerShellWorker(), { once: true });

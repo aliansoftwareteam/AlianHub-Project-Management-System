@@ -98,6 +98,7 @@ import {socketHelper} from './composable/socketHelper';
 import { apiRequest,apiRequestWithoutCompnay } from './services';
 import OfflineBanner from '@/components/offline/OfflineBanner.vue';
 import { initOffline } from '@/offline';
+import { dropWorkerRuntimeCaches } from '@/serviceWorker/registration';
 import * as env from '@/config/env';
 import {tabSyncHelper} from '@/utils/tabSyncs.js';
 import { adoptAccountPrefs } from '@/views/Settings/Language/localePrefs';
@@ -515,6 +516,7 @@ async function getFirebaseData() {
 }
 async function changeCompany(cid) {
     try {
+        dropWorkerRuntimeCaches();
         const uid = userId.value || localStorage.getItem("userId");
         const companyDetail = getters['settings/companies'].find((x) => x._id === cid)
         if(!companyDetail && !getters['settings/companies'].length && uid){

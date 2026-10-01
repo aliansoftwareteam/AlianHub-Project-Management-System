@@ -34,6 +34,7 @@ app.use(bodyParser.json({ limit: BODY_LIMIT }));
 app.use(bodyParser.raw({ limit: BODY_LIMIT }));
 app.use(require('./Config/requestLog').requestLog());
 
+require('./Config/appShellWorker').install(app, path.join(__dirname, './frontend/dist'));
 app.use(express.static(path.join(__dirname, './frontend/dist')));
 app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, './frontend/dist/index.html'));
