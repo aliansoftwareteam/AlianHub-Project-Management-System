@@ -39,6 +39,7 @@ function parseArgs(argv) {
         themes,
         sizes: list(raw.sizes || DEFAULT_SIZES).map(parseSize),
         variant,
+        core: Boolean(raw.core),
         tokenFile: text(raw['token-file']),
         company: text(raw.company),
         project: text(raw.project),

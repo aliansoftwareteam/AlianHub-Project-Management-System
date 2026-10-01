@@ -182,7 +182,7 @@ import { SUBTASK_EXPANSION, createSubtaskExpansion } from './subtaskExpansion.js
 import { eachRow } from '@/store/ProjectData/taskTree';
 import TaskMenuSidebars from '@/views/Projects/components/taskMenu/TaskMenuSidebars.vue';
 import { sortChoices, useListSort } from '@/views/Projects/composables/viewSort';
-import { columnCatalogue, gridTracks, listColumnClass, listColumnsAt, useViewColumns } from '@/views/Projects/composables/viewColumns';
+import { columnCatalogue, listColumnClass, listColumnsAt, listGridVars, useViewColumns } from '@/views/Projects/composables/viewColumns';
 
 // UTILS
 const {getters} = useStore();
@@ -241,9 +241,7 @@ const anyTagged = computed(() => {
 const gridColumns = computed(() => listColumnsAt(columnState.visibleColumns.value, clientWidth?.value || 1280)
     .map((column) => (column.id === 'tags' && !anyTagged.value ? { ...column, track: EMPTY_TAGS_TRACK } : column)));
 /* Phone width keeps the stylesheet's two-line row; wider, the tracks follow the chosen columns. */
-const listGridStyle = computed(() => ((clientWidth?.value || 1280) <= 767
-    ? {}
-    : { '--lv2-cols': gridTracks('list', gridColumns.value) }));
+const listGridStyle = computed(() => ((clientWidth?.value || 1280) <= 767 ? {} : listGridVars(gridColumns.value)));
 
 // EMITS
 defineEmits(['change'])
