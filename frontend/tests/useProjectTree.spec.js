@@ -146,4 +146,26 @@ describe('useProjectTree', () => {
         expect(project.sprintsObj).toEqual({});
         expect(project.sprintsfolders.f9.sprintsObj.s10).toMatchObject({ _id: 's10', id: 's10', folderName: 'Folder' });
     });
+
+    it('keeps the map flat and gives every folder its parent, null at the top level', async () => {
+        const project = { _id: 'p5', ProjectName: 'Epsilon', isGlobalPermission: true, ProjectRequiredComponent: [{ keyName: 'ProjectListView' }] };
+        setSprints.mockResolvedValueOnce([{ _id: 's11', name: 'Nested', projectId: 'p5', folderId: 'f11', deletedStatusKey: 0 }]);
+        setFolders.mockResolvedValueOnce([
+            { _id: 'f10', name: 'Parent', projectId: 'p5', deletedStatusKey: 0, parentFolderId: null },
+            { _id: 'f11', name: 'Sub', projectId: 'p5', deletedStatusKey: 0, parentFolderId: 'f10' },
+            { _id: 'f12', name: 'Before subfolders', projectId: 'p5', deletedStatusKey: 0 }
+        ]);
+
+        projects.value = [project];
+        routeParams.id = 'p5';
+        mountTree();
+        await flushPromises();
+
+        expect(Object.keys(project.sprintsfolders).sort()).toEqual(['f10', 'f11', 'f12']);
+        expect(project.sprintsfolders.f10.parentFolderId).toBeNull();
+        expect(project.sprintsfolders.f11.parentFolderId).toBe('f10');
+        expect(project.sprintsfolders.f12.parentFolderId).toBeNull();
+        expect(project.sprintsfolders.f10.sprintsObj).toEqual({});
+        expect(project.sprintsfolders.f11.sprintsObj.s11).toMatchObject({ id: 's11', folderName: 'Sub' });
+    });
 });

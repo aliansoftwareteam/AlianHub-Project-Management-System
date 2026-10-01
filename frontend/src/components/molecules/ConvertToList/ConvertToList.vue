@@ -78,6 +78,7 @@
     import { useI18n } from "vue-i18n";
     import { apiRequest } from "../../../services";
     import * as env from '@/config/env';
+    import { nestedFolders } from '@/utils/folderTree';
 
     const { t } = useI18n();
 
@@ -114,7 +115,7 @@
     })
 
     onMounted(() => {
-        if(selectedProjectData.value.sprintsfolders && Object.values(selectedProjectData.value.sprintsfolders).length) {
+        if(sprintFolders.value.length) {
             isFolder.value = true;
         }else{
             isFolder.value = false;
@@ -130,7 +131,7 @@
         }
     })
 
-    const sprintFolders = ref(JSON.parse(JSON.stringify(selectedProjectData.value.sprintsfolders || {})));
+    const sprintFolders = ref(JSON.parse(JSON.stringify(nestedFolders(selectedProjectData.value.sprintsfolders))));
 
     // Check subtask exist or not
     const checkSubTask = () => {

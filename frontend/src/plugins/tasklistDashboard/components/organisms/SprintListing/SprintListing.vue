@@ -79,6 +79,7 @@ import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
 import { apiRequest } from '../../../../../services/index'
 import { useI18n } from "vue-i18n";
+import { applyFolderStatusResult } from '@/views/Projects/folderActions';
 const { t } = useI18n();
 
 // UTILS
@@ -254,7 +255,7 @@ function updateItem(value = null) {
             return;
         }
         if (props.sprint.isFolder) {
-            commit("projectData/mutateFolders",{op:'modified',data:{...res?.data?.data}});
+            applyFolderStatusResult({ commit, getters }, res.data);
         }
         else{
             commit("projectData/mutateSprints",{op:'modified',data:{...res?.data?.data}});
