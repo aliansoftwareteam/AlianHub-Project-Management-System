@@ -34,6 +34,7 @@ const open = async ({ roleType = 1 } = {}) => {
         routes: [
             { path: '/:cid', name: 'Home', component: blank },
             { path: '/:cid/ai/inbox', name: 'AiInbox', component: blank },
+            { path: '/:cid/inbox', name: 'inbox', component: blank },
         ],
     });
     await router.push({ name: 'Home', params: { cid: 'company-1' } });
@@ -84,8 +85,17 @@ describe('Waiting on you (Home card)', () => {
         expect(apiRequest).toHaveBeenCalledWith('post', expect.stringContaining('/run-a1/steps/step-a1/decide'), { decision: 'approved', comment: '' });
     });
 
-    it('opens the AI Inbox from a row', async () => {
+    it('opens the Inbox\'s approval tab from a proposal', async () => {
         serverProposals = [proposal('p1')];
+        const { wrapper, router } = await open();
+        await rows(wrapper)[0].find('[data-test="waiting-open"]').trigger('click');
+        await flushPromises();
+        expect(router.currentRoute.value.name).toBe('inbox');
+        expect(router.currentRoute.value.query.tab).toBe('approval');
+    });
+
+    it('opens the AI Inbox from a workflow step, which the approval tab does not hold yet', async () => {
+        serverApprovals = [approval('a1')];
         const { wrapper, router } = await open();
         await rows(wrapper)[0].find('[data-test="waiting-open"]').trigger('click');
         await flushPromises();
