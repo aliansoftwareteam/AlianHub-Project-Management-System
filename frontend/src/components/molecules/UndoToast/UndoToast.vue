@@ -52,11 +52,12 @@ onBeforeUnmount(() => document.removeEventListener("keydown", onKeydown));
 .ah-undo-toast {
     display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 14px; pointer-events: auto;
     background: var(--rail); color: #fff; border-radius: 9px; box-shadow: var(--shadow-pop); font: 500 12.5px/1.3 var(--font-ui);
+    animation: ah-rise-in var(--motion-base) var(--ease-out);
 }
 .ah-undo-toast__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ah-undo-toast__undo {
     flex: none; min-height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent;
-    color: #c4b5ff; font: 600 12.5px/1 var(--font-ui); cursor: pointer;
+    color: var(--rail-brand); font: 600 12.5px/1 var(--font-ui); cursor: pointer;
 }
 .ah-undo-toast__undo:hover { background: rgba(255, 255, 255, .12); }
 .ah-undo-toast__close {
@@ -64,7 +65,7 @@ onBeforeUnmount(() => document.removeEventListener("keydown", onKeydown));
     color: rgba(255, 255, 255, .7); font-size: 18px; line-height: 1; cursor: pointer;
 }
 .ah-undo-toast__close:hover { background: rgba(255, 255, 255, .12); color: #fff; }
-.ah-undo-toast__undo:focus-visible, .ah-undo-toast__close:focus-visible { outline: 2px solid #c4b5ff; outline-offset: 1px; }
+.ah-undo-toast__undo:focus-visible, .ah-undo-toast__close:focus-visible { outline: 2px solid var(--rail-brand); outline-offset: 1px; }
 @media (max-width: 767px) {
     .ah-undo-toast-region { bottom: calc(var(--tabbar-h, 56px) + 72px + env(safe-area-inset-bottom, 0px)); width: calc(100vw - 32px); }
     .ah-undo-toast { justify-content: space-between; }
