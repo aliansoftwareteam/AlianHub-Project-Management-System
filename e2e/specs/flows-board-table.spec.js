@@ -38,7 +38,7 @@ test.describe('the Board and the Table', () => {
     test('a status changed in a Table cell is saved', async ({ page, state, loginAs }) => {
         const { owner, task, name, next } = await openProjectWithTask({ page, state, loginAs, label: 'Cell' });
 
-        await page.getByRole('button', { name: '+ View', exact: true }).click();
+        await page.getByRole('button', { name: 'Add View', exact: true }).click();
         await page.getByRole('button', { name: /^Table/ }).click();
         await page.getByRole('button', { name: 'Table', exact: true }).click();
         const row = page.getByRole('row').filter({ has: page.getByRole('button', { name, exact: true }) });
