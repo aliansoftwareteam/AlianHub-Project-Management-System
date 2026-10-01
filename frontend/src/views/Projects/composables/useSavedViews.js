@@ -1,6 +1,6 @@
 import { computed, inject, ref, shallowRef, watch } from 'vue';
 import { useStore } from 'vuex';
-import { cleanViewSettings, DEFAULT_VIEW_SETTINGS, FILTERABLE_VIEWS, resolveActiveView, sameSettings, settingsFromPrefs, viewKeyOf } from './savedViewSettings';
+import { cleanViewSettings, DEFAULT_VIEW_SETTINGS, FILTERABLE_VIEWS, SAVED_SETTINGS_VIEWS, resolveActiveView, sameSettings, settingsFromPrefs, viewKeyOf } from './savedViewSettings';
 import { clearViewPrefs, loadViewPrefs } from './projectViewPrefs';
 import { VIEW_COLUMN_SETS, clearColumnState, loadColumnState, settingsFromColumnState } from './viewColumns';
 import * as api from './savedViewApi';
@@ -14,7 +14,7 @@ const privateViewId = () => Array.from({ length: PRIVATE_ID_LENGTH }, () => ID_C
 const copyOf = (view) => Object.fromEntries(COPIED_FIELDS.filter((field) => view?.[field] !== undefined).map((field) => [field, view[field]]));
 
 /* The views' saved settings and the screen's current ones. `search` is useProjectSearch;
-   sort and columns live here because only the views that render them read them. */
+   sort, columns and the workload unit live here because only the views that render them read them. */
 export function useSavedViews({ project, activeTab, views, requestedViewKey, companyUser, search, canSaveShared, onSelect = () => {} }) {
     const { commit } = useStore();
     const userId = inject('$userId', ref(''));
@@ -22,6 +22,7 @@ export function useSavedViews({ project, activeTab, views, requestedViewKey, com
 
     const sort = ref(null);
     const columns = ref(cleanViewSettings(DEFAULT_VIEW_SETTINGS).columns);
+    const workloadUnit = ref(DEFAULT_VIEW_SETTINGS.workloadUnit);
     const saving = ref(false);
     const drafts = new Map();
     const closed = () => ({ key: '', saved: cleanViewSettings(DEFAULT_VIEW_SETTINGS) });
@@ -30,10 +31,10 @@ export function useSavedViews({ project, activeTab, views, requestedViewKey, com
     const projectId = computed(() => String(project.value?._id || ''));
     const activeView = computed(() => resolveActiveView(views.value, activeTab.value, requestedViewKey?.value));
     const activeKey = computed(() => (activeView.value ? `${projectId.value}:${viewKeyOf(activeView.value)}` : ''));
-    const isFilterable = computed(() => Boolean(activeView.value) && FILTERABLE_VIEWS.includes(activeTab.value));
+    const hasSettings = computed(() => Boolean(activeView.value) && SAVED_SETTINGS_VIEWS.includes(activeTab.value));
     const savedSettings = computed(() => cleanViewSettings(activeView.value?.settings));
-    const currentSettings = computed(() => cleanViewSettings({ ...search.viewState(), sort: sort.value, columns: columns.value }));
-    const dirty = computed(() => isFilterable.value && opened.value.key === activeKey.value && !sameSettings(currentSettings.value, opened.value.saved));
+    const currentSettings = computed(() => cleanViewSettings({ ...search.viewState(), sort: sort.value, columns: columns.value, workloadUnit: workloadUnit.value }));
+    const dirty = computed(() => hasSettings.value &&opened.value.key === activeKey.value && !sameSettings(currentSettings.value, opened.value.saved));
 
     const prefsIds = () => ({ companyId: companyId.value, userId: userId.value, projectId: projectId.value });
     const columnSet = () => VIEW_COLUMN_SETS[activeTab.value];
@@ -55,12 +56,14 @@ export function useSavedViews({ project, activeTab, views, requestedViewKey, com
         const clean = cleanViewSettings(settings);
         sort.value = clean.sort;
         columns.value = clean.columns;
+        workloadUnit.value = clean.workloadUnit;
         search.applyViewState(clean);
     }
 
     function openingSettings(view) {
         if (drafts.has(activeKey.value)) return drafts.get(activeKey.value);
         if (view?.settings) return view.settings;
+        if (!FILTERABLE_VIEWS.includes(activeTab.value)) return DEFAULT_VIEW_SETTINGS;
         const legacy = legacySettings();
         return sameSettings(legacy, DEFAULT_VIEW_SETTINGS) ? DEFAULT_VIEW_SETTINGS : legacy;
     }
@@ -69,7 +72,7 @@ export function useSavedViews({ project, activeTab, views, requestedViewKey, com
         const { key: previousKey, saved: previousSaved } = opened.value;
         if (previousKey && !sameSettings(currentSettings.value, previousSaved)) drafts.set(previousKey, currentSettings.value);
         else drafts.delete(previousKey);
-        if (!key || !isFilterable.value) {
+        if (!key || !hasSettings.value) {
             opened.value = closed();
             apply(DEFAULT_VIEW_SETTINGS);
             return;
@@ -87,6 +90,7 @@ export function useSavedViews({ project, activeTab, views, requestedViewKey, com
 
     const setSort = (value) => { sort.value = cleanViewSettings({ sort: value }).sort; };
     const setColumns = (value) => { columns.value = cleanViewSettings({ columns: value }).columns; };
+    const setWorkloadUnit = (value) => { workloadUnit.value = cleanViewSettings({ workloadUnit: value }).workloadUnit; };
 
     const myPrivateViews = () => (companyUser.value?.ProjectRequiredComponent || []);
 
@@ -186,5 +190,5 @@ export function useSavedViews({ project, activeTab, views, requestedViewKey, com
         apply(opened.value.saved);
     }
 
-    return { activeView, isFilterable, savedSettings, currentSettings, dirty, saving, sort, columns, setSort, setColumns, save, saveForMe, saveAsNew, reset };
+    return { activeView, hasSettings, savedSettings, currentSettings, dirty, saving, sort, columns, workloadUnit, setSort, setColumns, setWorkloadUnit, save, saveForMe, saveAsNew, reset };
 }

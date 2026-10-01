@@ -4,6 +4,7 @@ const skillsCtrl = require('./skillsController');
 const metricsCtrl = require('./metricsController');
 const schedulesCtrl = require('./schedulesController');
 const builderCtrl = require('./builderController');
+const chatCtrl = require('./chatController');
 const { agentPerimeter } = require('./guard');
 
 exports.init = (app) => {
@@ -20,6 +21,8 @@ exports.init = (app) => {
     app.get('/api/v2/agents/team/standup', ctrl.myStandup);
     app.get('/api/v2/agents/routable', ctrl.routableTasks);
     app.get('/api/v2/agents/runnable', ctrl.runnableAgents);
+    app.get('/api/v2/agents/chat/usable', chatCtrl.usableAgents);
+    app.post('/api/v2/agents/chat/direct', chatCtrl.openDirect);
     app.get('/api/v2/agents/pipeline', ctrl.pipelineTasks);
     app.get('/api/v2/agents/release', ctrl.releaseCandidate);
     app.post('/api/v2/agents/pause-all', ctrl.pauseAll);

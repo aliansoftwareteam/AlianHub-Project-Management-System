@@ -77,6 +77,7 @@ import SkipLink from '@/components/atom/SkipLink/SkipLink.vue'
 import TaskTemplateDialogHost from '@/components/molecules/TaskTemplates/TaskTemplateDialogHost.vue'
 import AiFieldFillDialog from '@/components/molecules/AiFieldFill/AiFieldFillDialog.vue'
 import { PALETTE_OPEN_EVENT, isPaletteShortcut } from '@/components/molecules/AdvanceSearch/paletteKeys'
+import { recordRouteVisit } from '@/components/molecules/RecentVisits/routeVisits'
 import { useStore } from 'vuex';
 import axios from 'axios'
 import { refreshWebPush } from '@/composable/browserNotifications';
@@ -99,6 +100,7 @@ import OfflineBanner from '@/components/offline/OfflineBanner.vue';
 import { initOffline } from '@/offline';
 import * as env from '@/config/env';
 import {tabSyncHelper} from '@/utils/tabSyncs.js';
+import { adoptAccountPrefs } from '@/views/Settings/Language/localePrefs';
 const AiOffPage = defineAsyncComponent(() => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiOffPage.vue'));
 import { aiAvailability, loadAiAvailability, trackAiPlan } from '@/composable/aiAvailability';
 import { AI_GATE, aiGateFor } from '@/router/ai/gate';
@@ -233,6 +235,10 @@ const shellReady = computed(() => Boolean(logged.value && rules.value && Object.
 // A page that loaded before maintenance began keeps its content under the banner; one whose boot calls were refused would otherwise stay blank or spin forever.
 const maintenanceBlocksPage = computed(() => maintenanceOn.value && (route.meta.requiresAuth ? !shellReady.value : !route.matched.length));
 
+watch(() => [route.fullPath, shellReady.value, companyId.value], () => {
+	if (shellReady.value && route.params.cid && route.params.cid === companyId.value) recordRouteVisit(route);
+}, { immediate: true });
+
 watch(() => getters['settings/selectedCompany'], async(val) => {
     if(val.isDisable === true){
         await checkUserCompany(userId.value,true).then((response) => {
@@ -276,11 +282,21 @@ async function getFirebaseData() {
                     userData = userResult.data;
                 }
 
-                if(userData.languageCode){
-                    localStorage.setItem('language', userData.languageCode);
-                    const updateLanguage = await changeLanguage(userData.languageCode);
-                    locale.value = userData.languageCode;
-                    setLocaleMessage(userData.languageCode, updateLanguage || "en");
+                // Without the profile, an upload could overwrite an account copy we never read.
+                const { language, upload } = userData._id ? adoptAccountPrefs(userData) : {};
+                if(language){
+                    localStorage.setItem('language', language);
+                    const updateLanguage = await changeLanguage(language);
+                    locale.value = language;
+                    setLocaleMessage(language, updateLanguage || "en");
+                }
+                if(upload){
+                    apiRequestWithoutCompnay("put", env.USER_UPATE, {
+                        userId: userId.value,
+                        updateObject: { $set: { localePreferences: upload } }
+                    }).catch((error) => {
+                        console.error("ERROR in saving locale preferences: ", error);
+                    });
                 }
 
                 await dispatch('settings/setCompanies', userData?.AssignCompany)

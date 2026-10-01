@@ -372,3 +372,32 @@ describe('the unsaved-changes bar', () => {
         wrapper.unmount();
     });
 });
+
+describe('the workload view keeps its unit', () => {
+    const WORKLOAD = 'd'.repeat(24);
+    const workloadView = (extra = {}) => ({ _id: WORKLOAD, id: WORKLOAD, name: 'Workload', keyName: 'Workload', viewStatus: true, ...extra });
+
+    test('opens in the saved unit, marks a change and saves it for everyone', async () => {
+        const { saved } = mountViews({ views: [workloadView({ settings: { workloadUnit: 'points' } })], tab: 'Workload' });
+        await flushPromises();
+        expect(saved.workloadUnit.value).toBe('points');
+        expect(saved.dirty.value).toBe(false);
+
+        saved.setWorkloadUnit('count');
+        await nextTick();
+        expect(saved.dirty.value).toBe(true);
+        await saved.save();
+        expect(api.saveSharedViewSettings).toHaveBeenCalledWith('p1', WORKLOAD, expect.objectContaining({ workloadUnit: 'count' }));
+        expect(saved.dirty.value).toBe(false);
+    });
+
+    test('a view with no saved unit opens in hours, whatever the list left in this browser', async () => {
+        window.localStorage.setItem(PREFS, JSON.stringify({ groupBy: 3 }));
+        const { saved } = mountViews({ views: [workloadView()], tab: 'Workload' });
+        await flushPromises();
+        expect(saved.workloadUnit.value).toBe('hours');
+        expect(saved.dirty.value).toBe(false);
+        saved.setWorkloadUnit('bananas');
+        expect(saved.workloadUnit.value).toBe('hours');
+    });
+});

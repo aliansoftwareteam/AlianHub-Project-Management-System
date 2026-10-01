@@ -482,9 +482,10 @@ async function saveAi() {
     if (Object.keys(next).length) return;
     saving.value = true;
     try {
-        const detail = detailFor(aiDraft.value.output);
+        const aiField = aiFieldPayload(aiDraft.value);
+        const detail = detailFor(aiField.fieldType);
         const payload = {
-            ...aiFieldPayload(aiDraft.value),
+            ...aiField,
             fieldImage: detail.cfIcon || "",
             fieldImageGrey: detail.cfIconGrey || "",
             fieldPrimaryColor: detail.cfPrimaryColor || "",

@@ -14,6 +14,9 @@ const COMPONENTS = {
     AtRiskTodayCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/AtRiskTodayCard/AtRiskTodayCard.vue')),
     AgentSpendCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/AgentSpendCard/AgentSpendCard.vue')),
     TasksByStatusCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/TasksByStatusCard/TasksByStatusCard.vue')),
+    BurndownCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/BurndownCard/BurndownCard.vue')),
+    VelocityCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/VelocityCard/VelocityCard.vue')),
+    AskAQuestionCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/AskAQuestionCard/AskAQuestionCard.vue')),
 };
 
 export const cardComponent = (key) => COMPONENTS[key] || null;

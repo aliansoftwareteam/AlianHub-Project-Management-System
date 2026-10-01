@@ -25,8 +25,18 @@
                     <ul class="aff__list">
                         <li v-for="proposal in state.proposals" :key="proposal.taskId" class="aff__item" data-ai-proposal>
                             <span v-if="proposal.taskName" class="aff__task">{{ proposal.taskName }}</span>
-                            <span v-if="!proposal.empty" class="aff__value">{{ proposal.text }}</span>
-                            <span v-else class="aff__empty">{{ $t(emptyKey(proposal)) }}</span>
+                            <AiProposalValue v-if="!proposal.empty" class="aff__value" :field="state.field" :proposal="proposal" />
+                            <template v-else>
+                                <span class="aff__empty" :class="{ 'aff__empty--failed': proposal.invalid }">{{ $t(emptyKey(proposal)) }}</span>
+                                <button
+                                    v-if="proposal.invalid"
+                                    type="button"
+                                    class="ah-btn ah-btn--ghost ah-btn--sm aff__retry"
+                                    data-ai-retry
+                                    :disabled="proposal.retrying"
+                                    @click="retryAiProposal(proposal.taskId)"
+                                >{{ $t('AiFields.retry') }}</button>
+                            </template>
                         </li>
                     </ul>
                     <p v-if="bulk" class="aff__hint">{{ $t('AiFields.preview_note', { shown: state.proposals.length, n: state.taskIds.length }) }}</p>
@@ -70,7 +80,8 @@
 <script setup>
 import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { PHASE, aiFieldFill as state, closeAiFill, confirmAiFill, isBulkFill } from "@/composable/aiFieldFill";
+import { PHASE, aiFieldFill as state, closeAiFill, confirmAiFill, isBulkFill, retryAiProposal } from "@/composable/aiFieldFill";
+import AiProposalValue from "./AiProposalValue.vue";
 
 defineOptions({ name: "AiFieldFillDialog" });
 
@@ -95,11 +106,12 @@ const STOP_REASONS = ["ai_off", "daily_limit", "budget", "no_provider", "interru
 
 const finishedText = computed(() => {
     const current = job.value || {};
-    if (current.status === "done") return t("AiFields.job_done", { filled: current.filled || 0, skipped: current.skipped || 0 });
+    const counts = { filled: current.filled || 0, skipped: current.skipped || 0, failed: current.failed || 0 };
+    if (current.status === "done") return t(counts.failed ? "AiFields.job_done_failed" : "AiFields.job_done", counts);
     return t(`AiFields.stop_${STOP_REASONS.includes(current.stopReason) ? current.stopReason : "error"}`);
 });
 
-const EMPTY_REASONS = ["no_fit", "no_source", "no_answer", "not_found", "forbidden", "not_in_project"];
+const EMPTY_REASONS = ["no_fit", "no_source", "no_answer", "not_found", "forbidden", "not_in_project", "invalid", "out_of_range", "date_rule"];
 
 const errorText = computed(() => {
     if (STOP_REASONS.includes(state.errorCode)) return t(`AiFields.stop_${state.errorCode}`);
@@ -162,6 +174,8 @@ watch(() => state.phase, async (phase) => {
 .aff__task { font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
 .aff__value { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
 .aff__empty { color: var(--ink-2); font-style: italic; }
+.aff__empty--failed { color: var(--danger); font-style: normal; }
+.aff__retry { align-self: flex-start; }
 .aff__job { display: flex; flex-direction: column; gap: 6px; }
 .aff__bar { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
 .aff__bar-fill { display: block; height: 100%; background: var(--brand); transition: width var(--t-state, .2s) var(--ease, ease); }

@@ -52,4 +52,29 @@ describe('command palette results follow project visibility (TSK-05)', () => {
         expect(ids).toContain(String(open._id));
         expect(ids).not.toContain(String(secret._id));
     });
+
+    it('lists recently opened projects and sprints a member can open, and never a private project\'s', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const { hidden, shared, secret, open } = await privateAndSharedTasks(owner, member, `Zrty${uniqueSuffix()}`);
+
+        const visits = [['project', hidden._id], ['sprint', secret.sprintId], ['project', shared._id], ['sprint', open.sprintId]];
+        for (const [entityType, entityId] of visits) {
+            const visit = await member.api.post('/api/v2/recent-visits', { entityType, entityId });
+            expect(visit.body.status).toBe(true);
+        }
+
+        const res = await member.api.get('/api/v2/recent-visits', { query: { types: 'all' } });
+        expect(res.body.status).toBe(true);
+        const keys = res.body.data.map((item) => `${item.type}:${item.id}`);
+        expect(keys).toEqual(expect.arrayContaining([`sprint:${open.sprintId}`, `project:${shared._id}`]));
+        expect(keys).not.toContain(`project:${hidden._id}`);
+        expect(keys).not.toContain(`sprint:${secret.sprintId}`);
+        const sprint = res.body.data.find((item) => item.type === 'sprint' && sameId(item.id, open.sprintId));
+        expect(sprint.projectName).toMatch(/^PAL Shared /);
+        expect(sprint.route).toMatchObject({ projectId: String(shared._id), sprintId: String(open.sprintId) });
+
+        const tasksOnly = await member.api.get('/api/v2/recent-visits');
+        expect(tasksOnly.body.data.every((item) => item.task && item.type === 'task')).toBe(true);
+    });
 });

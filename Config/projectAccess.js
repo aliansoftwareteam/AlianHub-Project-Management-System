@@ -5,10 +5,10 @@ const { getRoleType, isPrivileged, evaluatePermission, isWritable, fineGrainedEn
 const logger = require('./loggerConfig');
 const { visibleProjectIds } = require('../Modules/Agents/scope');
 const { allowsProject } = require('./tokenNarrowing');
+const { PRIVATE_PROJECTS, seesEveryPrivateProject } = require('./rulePermissions');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const TEAM_PREFIX = 'tId_';
-const PRIVATE_VISIBLE_TO_EVERYONE = 2;
 
 const DETAILS = 'project.project_details';
 const DELETE_OR_CLOSE = ['project.project_delete', 'project.project_close'];
@@ -174,8 +174,7 @@ const decideProjectAccess = async (companyId, uid, projectId, { mode = WRITE, pe
     if (isPrivileged(roleType)) return { allowed: true };
 
     if (project.isPrivateSpace === true && !(await isAssigned(company, project, user))) {
-        const privateProjects = await evaluatePermission(company, user, 'project.private_projects');
-        if (privateProjects !== PRIVATE_VISIBLE_TO_EVERYONE) return NOT_FOUND;
+        if (!seesEveryPrivateProject(await evaluatePermission(company, user, PRIVATE_PROJECTS))) return NOT_FOUND;
         if (mode !== READ) return forbidden(null);
     }
 

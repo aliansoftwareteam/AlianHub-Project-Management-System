@@ -90,3 +90,41 @@ describe('PUT /api/v1/user with localePreferences', () => {
         expect(updates()).toHaveLength(0);
     });
 });
+
+describe('GET /api/v1/user/:id hands the saved preferences back to their owner', () => {
+    let app;
+    const get = (uid, id) => app.call('GET', `/api/v1/user/${id}`, { token: signSession(uid, [COMPANY]) });
+
+    beforeAll(async () => {
+        app = await startApp((server) => {
+            setMiddlewareV2(server);
+            server.get('/api/v1/user/:id', ctrl.getUserById);
+        });
+    });
+    afterAll(() => app.close());
+
+    beforeEach(() => {
+        myCache.flushAll();
+        MongoDbCrudOpration.mockReset();
+        MongoDbCrudOpration.mockImplementation(async (db, obj, method) => {
+            if (method !== 'findOne') return null;
+            const id = String(((obj.data && obj.data[0]) || {})._id);
+            if (id === MEMBER) return { _id: MEMBER, AssignCompany: [COMPANY], languageCode: 'ar', localePreferences: SAVED };
+            if (id === ADMIN) return { _id: ADMIN, AssignCompany: [COMPANY] };
+            return null;
+        });
+    });
+
+    it('returns them when a user loads their own profile, as a new device does at sign-in', async () => {
+        const res = await get(MEMBER, MEMBER);
+        expect(res.status).toBe(200);
+        expect(res.body.localePreferences).toEqual(SAVED);
+        expect(res.body.languageCode).toBe('ar');
+    });
+
+    it('keeps them out of a teammate\'s view of that profile', async () => {
+        const res = await get(ADMIN, MEMBER);
+        expect(res.status).toBe(200);
+        expect(res.body.localePreferences).toBeUndefined();
+    });
+});

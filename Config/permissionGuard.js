@@ -35,6 +35,7 @@ const { ACTIVE_SEAT, INVITED_SEAT } = require("./seatStatus");
 const { resolveMode, OFF, ENFORCE } = require("./permissionEnforcement");
 const { recordDecision, REASONS, GLOBAL_SCOPE } = require("./permissionDecisions");
 const { TASK_ACTIONS, BODY_COMPANY_PATHS, requirementsOf, actionEntry } = require("./taskWritePermissions");
+const { arrangeRules, rolePermission } = require("./rulePermissions");
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 const ROLE_CACHE_TTL_SECONDS = 60;
@@ -98,33 +99,6 @@ const getRoleType = async (companyId, uid, { seat = 'active', throwOnError = fal
     }
 };
 
-/** Arrange the flat RULES array into the nested object the frontend uses. */
-const arrangeRules = (rawRules) => {
-    const arranged = {};
-    const rules = [...(rawRules || [])].sort((a, b) => (a.isParent > b.isParent ? -1 : 1));
-    rules.forEach((rule) => {
-        const ownKey = rule.key ? rule.key : String(rule.name || "").replaceAll(" ", "_").toLowerCase();
-        if (rule.isParent) {
-            arranged[ownKey] = { ...rule };
-        } else {
-            const parent = rules.find((x) => String(x._id) === String(rule.parentId));
-            if (parent && parent.key && arranged[parent.key]) {
-                arranged[parent.key][ownKey] = rule;
-            }
-        }
-    });
-    return arranged;
-};
-
-const lookupRule = (arranged, path) => {
-    let rule = null;
-    for (const segment of String(path).split('.')) {
-        rule = rule ? rule[segment] : arranged[segment];
-        if (rule === undefined || rule === null) return null;
-    }
-    return rule && Array.isArray(rule.roles) ? rule : null;
-};
-
 /* Same cache key as Modules/projectRules, so an edit there invalidates this too. */
 const loadProjectRules = async (companyId, projectId) => {
     const key = `projectRules:${projectId}`;
@@ -156,9 +130,7 @@ const rulesFor = async (companyId, projectId) => {
 
 const permissionIn = ({ arranged, projectScoped }, roleType, path) => {
     if (projectScoped && PROJECT_CONTEXT_GRANTED.includes(path)) return true;
-    const rule = lookupRule(arranged, path);
-    const match = rule && rule.roles.find((r) => r.key === roleType);
-    return match ? match.permission : null;
+    return rolePermission(arranged, roleType, path);
 };
 
 /**

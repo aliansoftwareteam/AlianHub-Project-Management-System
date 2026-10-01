@@ -150,7 +150,7 @@
 
 <script setup>
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
@@ -162,7 +162,7 @@ import { aiOff } from '@/composable/aiAvailability';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { toggleTheme, shellState } from '@/components/organisms/Shell/shellState';
 import { isMacPlatform } from './paletteKeys';
-import { CHIPS, RECORD_CHIPS, chipAllows, commandArgument, commandLeads, projectPath, relativeAge, taskLocation, taskPath } from './paletteRows';
+import { CHIPS, RECORD_CHIPS, chipAllows, commandArgument, commandLeads, foldRecentProjects, projectPath, recentType, relativeAge, taskLocation, taskPath } from './paletteRows';
 import { openQuickCreate } from '@/components/organisms/QuickCreateTask/quickCreateTask';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { messageKey } from '@/views/Ai/askWhy';
@@ -174,6 +174,7 @@ defineOptions({ name: 'CommandPalette' });
 const props = defineProps({ open: { type: Boolean, default: false } });
 const emit = defineEmits(['close']);
 const router = useRouter();
+const route = useRoute();
 const { t } = useI18n();
 const $toast = useToast();
 const { getters } = useStore();
@@ -183,6 +184,8 @@ const companyId = inject('$companyId');
 
 const RECENT_KEY = 'alianhub.search.recent';
 const MAX_RECENT = 6;
+const MAX_RECENT_OPENED = 8;
+const RECENT_TYPES = 'task,project,sprint,doc';
 const MAX_PER_GROUP = 5;
 const MAX_PER_CHIP = 10;
 const EMPTY_RECORDS = () => ({ tasks: [], projects: [], pages: [], comments: [] });
@@ -205,7 +208,7 @@ const searching = ref(false);
 const records = ref(EMPTY_RECORDS());
 const connections = ref([]);
 const recentSearches = ref([]);
-const recentTasks = ref([]);
+const recentVisits = ref([]);
 const toolbarStyle = ref({});
 const asked = ref(null);
 let askController = null;
@@ -267,11 +270,32 @@ const taskRow = (task, when) => ({
     task: { companyId: cid.value, projectId: task.ProjectID, sprintId: task.sprintId, folderId: task.folderObjId || '', taskId: task._id },
 });
 const projectRow = (p) => ({ id: `project:${p._id}`, kind: 'project', icon: 'projects', title: p.ProjectName, sub: t('Header.Projects'), age: relativeAge(p.updatedAt, t), to: projectPath(cid.value, p) });
-const pageRow = (p) => ({
+const pageRow = (p, place = '') => ({
     id: `page:${p._id}`, kind: 'page', icon: 'docs', title: p.title || t('Docs.untitled'),
-    sub: projectName(p.ProjectID) || t('Palette.docs_company'), age: relativeAge(p.updatedAt, t),
+    sub: place || projectName(p.ProjectID) || t('Palette.docs_company'), age: relativeAge(p.updatedAt, t),
     to: { name: 'Pages', params: { cid: cid.value }, query: { page: String(p._id) } },
 });
+const commentRow = (c) => ({
+    id: `comment:${c._id}`, kind: 'comment', icon: 'chat', title: c.message,
+    sub: t('Palette.comment_on', { task: [c.taskKey, c.taskName].filter(Boolean).join(' ') || projectName(c.projectId) }),
+    to: taskPath(cid.value, { _id: c.taskId, ProjectID: c.projectId, sprintId: c.sprintId, folderObjId: c.folderObjId || '' }),
+    task: { companyId: cid.value, projectId: c.projectId, sprintId: c.sprintId, folderId: c.folderObjId || '', taskId: c.taskId },
+});
+const recentRow = (v) => {
+    const type = recentType(v);
+    const at = v.route || {};
+    if (type === 'task') return v.task ? taskRow(v.task, v.visitedAt) : null;
+    if (type === 'project') return projectRow({ _id: v.id, ProjectName: v.title, sprintId: at.sprintId || null, folderId: at.folderId || null, updatedAt: v.visitedAt });
+    if (type === 'doc') return pageRow({ _id: v.id, title: v.title, ProjectID: v.projectId, updatedAt: v.visitedAt }, v.projectName);
+    if (type === 'sprint') {
+        return {
+            id: `sprint:${v.id}`, kind: 'sprint', icon: 'layout', title: v.title,
+            sub: t('Palette.sprint_in', { project: v.projectName || projectName(v.projectId) }), age: relativeAge(v.visitedAt, t),
+            to: projectPath(cid.value, { _id: at.projectId || v.projectId, sprintId: v.id, folderId: at.folderId || null }),
+        };
+    }
+    return null;
+};
 const personRow = (u) => ({
     id: `user:${u._id}`, kind: 'person', avatar: { image: u.Employee_profileImageURL || '', initial: initialOf(u.Employee_Name) },
     title: u.Employee_Name, sub: u.Employee_Email,
@@ -328,7 +352,7 @@ const groups = computed(() => {
     const people = () => users.value.filter((u) => matches(u.Employee_Name, u.Employee_Email)).map(personRow);
 
     if (!q.value) {
-        add('recent_opened', t('Palette.group_recent_opened'), recentTasks.value.map((v) => taskRow(v.task, v.visitedAt)));
+        add('recent_opened', t('Palette.group_recent_opened'), foldRecentProjects(recentVisits.value).map(recentRow).filter(Boolean), chip.value === 'all' ? MAX_RECENT_OPENED : MAX_PER_CHIP);
         add('recent', t('Inbox.group_recent'), recentSearches.value.map((r) => ({ id: `recent:${r}`, kind: 'recent', icon: 'search', title: r, value: r })));
         if (chip.value === 'people') add('people', t('Inbox.group_people'), people());
         if (chip.value === 'all') add('navigation', t('Inbox.group_navigation'), NAV.value.slice(0, 8).map(navRow));
@@ -344,7 +368,8 @@ const groups = computed(() => {
     if (q.value.length >= 2) {
         add('tasks', t('Palette.chip_tasks'), records.value.tasks.map((task) => taskRow(task)));
         add('projects', t('Palette.chip_projects'), records.value.projects.map(projectRow));
-        add('docs', t('Palette.chip_docs'), records.value.pages.map(pageRow));
+        add('docs', t('Palette.chip_docs'), records.value.pages.map((p) => pageRow(p)));
+        add('comments', t('Palette.group_comments'), records.value.comments.filter((c) => c.taskId && c.projectId && c.sprintId).map(commentRow));
         add('people', t('Inbox.group_people'), people());
     }
     add('navigation', t('Inbox.group_navigation'), NAV.value.filter((n) => matches(n.label, n.key, n.sub)).map(navRow));
@@ -375,9 +400,9 @@ const remember = (value) => {
     recentSearches.value = [v, ...recentSearches.value.filter((x) => x !== v)].slice(0, MAX_RECENT);
     try { localStorage.setItem(RECENT_KEY, JSON.stringify(recentSearches.value)); } catch (e) { /* storage may be unavailable */ }
 };
-const loadRecentTasks = () => {
-    apiRequest('get', env.RECENT_VISITS).then((res) => {
-        if (res?.data?.status) recentTasks.value = (res.data.data || []).filter((v) => v && v.task);
+const loadRecentVisits = () => {
+    apiRequest('get', `${env.RECENT_VISITS}?types=${RECENT_TYPES}`).then((res) => {
+        if (res?.data?.status) recentVisits.value = (res.data.data || []).filter((v) => v && recentType(v));
     }).catch(() => {});
 };
 const loadConnections = () => {
@@ -543,10 +568,12 @@ watch(() => props.open, (on) => {
     active.value = 0;
     records.value = EMPTY_RECORDS();
     loadRecentSearches();
-    loadRecentTasks();
+    loadRecentVisits();
     loadConnections();
 }, { immediate: true });
 watch(() => props.open, (on) => { if (on) inputEl.value?.focus(); }, { flush: 'post' });
+/* The path, not the query: pages rewrite their own query while loading and the task panel opens by query. */
+watch(() => route.path, () => { if (props.open) close(); });
 onMounted(() => { if (props.open) inputEl.value?.focus(); });
 onBeforeUnmount(cancelAsk);
 </script>
