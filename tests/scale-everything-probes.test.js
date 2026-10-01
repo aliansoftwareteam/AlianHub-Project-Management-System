@@ -5,6 +5,7 @@ const { summarisePlan, planText } = require('../scripts/scale/lib/explain');
 const { budgetOf, verdict, budgetText } = require('../scripts/scale/lib/report');
 const { parseRequest, EverythingRefused } = require('../Modules/Tasks/helpers/everythingQuery');
 const page = require('../frontend/src/views/Everything/everythingRequest');
+const { EVERYTHING_PAGES, keptPage, metricKey } = require('../scripts/scale/lib/browserProbes');
 
 const VIEWER = { now: new Date('2026-10-01T06:30:00.000Z'), timeZone: 'Asia/Kolkata' };
 const ASSIGNEE = '6f0000000000000000000002';
@@ -75,6 +76,30 @@ describe('budgets', () => {
         expect(verdict({ key: 'api.everythingFirstPage', median: 20 }, 10000)).toBe('met');
         expect(budgetText({ key: 'everything.firstRows', median: 900 }, 10000)).toBe('< 1500 ms');
         expect(verdict({ key: 'api.everythingFirstPage', median: 20 }, 50000)).toBe('measured, no budget yet');
+    });
+});
+
+describe('the pages opened in the browser', () => {
+    const session = { companyId: 'c1', userId: 'u1' };
+
+    it('are a first visit and the two grouped views the page keeps from the visit before', () => {
+        expect(EVERYTHING_PAGES.map((opened) => [opened.key, opened.group])).toEqual([['everything', null], ['everything.grouped', 'status'], ['everything.byProject', 'project']]);
+        expect(keptPage(session, null)).toEqual({});
+    });
+
+    it('keep a grouped view where the page looks for it, as settings the page accepts unchanged', () => {
+        const kept = keptPage(session, 'project');
+        expect(Object.keys(kept)).toEqual(['ah.everything.c1.u1']);
+        const stored = JSON.parse(kept['ah.everything.c1.u1']);
+        expect(page.cleanSettings(stored)).toEqual({ ...page.DEFAULT_SETTINGS, group: 'project' });
+        expect(stored.viewId).toBe('');
+    });
+
+    it('name their numbers so each first paint is held to the page budget', () => {
+        const keys = EVERYTHING_PAGES.map((opened) => metricKey(opened.key, 'firstRows'));
+        expect(keys).toEqual(['everything.firstRows', 'everything.groupedFirstRows', 'everything.byProjectFirstRows']);
+        keys.forEach((key) => expect(budgetOf(key)).toEqual({ limit: 1500, unit: 'ms' }));
+        expect(budgetOf(metricKey('everything.grouped', 'domNodes'))).toBeNull();
     });
 });
 
