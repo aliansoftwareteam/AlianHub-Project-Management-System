@@ -152,7 +152,7 @@ describe('the body a task view sends when it opens is accepted and writes the mi
     });
 
     test('the views name the groups the route knows', () => {
-        const { GROUP_INDEXES } = require('../frontend/src/views/Projects/composables/taskIndexOnLoad');
+        const { GROUP_INDEXES } = require('../frontend/src/views/Projects/composables/taskGroupIndex');
         expect(Object.keys(GROUP_INDEXES).sort()).toEqual([...SEARCH_KEYS].sort());
         expect(Object.values(GROUP_INDEXES).sort()).toEqual([...INDEX_NAMES].sort());
     });

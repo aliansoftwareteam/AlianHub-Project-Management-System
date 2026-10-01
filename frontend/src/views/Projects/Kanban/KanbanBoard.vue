@@ -95,6 +95,7 @@ import BoardViewDisplayCardComponent from '@/views/Projects/Kanban/BoardViewDisp
 import { useUpdateTasks } from "../helper";
 import { groupTakesTask } from "@/views/Projects/composables/customFieldQuery";
 import * as env from '@/config/env';
+import { indexRepairBody, indexRepairRows } from "@/views/Projects/composables/taskGroupIndex";
 import { apiRequest } from "../../../services";
 import { useCustomComposable } from "@/composable";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
@@ -187,50 +188,21 @@ onMounted(() => {
 })
 
 function init() {
-    let taskWithoutFilter = []
-    let taskArray = [];
+    const taskListPermission = checkPermission('task.task_list', projectData.value?.isGlobalPermission);
+    const rows = columns.value.flatMap((column) => indexRepairRows(column.tasksArray, column, taskListPermission));
+    if (!rows.length) return;
 
-    columns.value.forEach((data) => {
-        if (data.customFieldId) return;
-        let withoutIndexTask = data.tasksArray?.filter((x) => {
-            return (x[data.indexName] === undefined || x[data.indexName] === null) && x.TaskKey !== '--'
-        })
-        if (withoutIndexTask?.length > 0) {
-            withoutIndexTask.map((x) => taskWithoutFilter.push({ data: x._id, item: data, taskKey: x.TaskKey }))
-            withoutIndexTask.map((x) => taskArray.push(x));
-        }
-    })
-
-    if (!(taskWithoutFilter.length === 0 && taskArray.length === 0)) {
-        var newObj = { pid: projectData.value._id, sprintId: columns.value[0].sprintId || props.sprintId, tasksArray: taskArray, indexName: columns.value[0].indexName };
-        commit("projectData/mutateTaskIndex", newObj)
-        let count = 0;
-
-        let countFunction = async (row) => {
-            if (count >= taskWithoutFilter.length) {
-                return;
-            } else {
-                if (row.taskKey != '--') {
-                    await apiRequest("post", env.ONLOAD_UPDATE_TASK_INDEX, {
-                        taskUpdate: row,
-                        companyId: companyId.value,
-                    }).then(() => {
-                        count++;
-                        countFunction(taskWithoutFilter[count])
-                    })
-                    .catch((error) => {
-                        console.error("ERROR in update project history: ", error);
-                        count++;
-                        countFunction(taskWithoutFilter[count])
-                    })
-                } else {
-                    count++;
-                    countFunction(taskWithoutFilter[count]);
-                }
-            }
-        }
-        countFunction(taskWithoutFilter[count])
-    }
+    commit("projectData/mutateTaskIndex", { pid: projectData.value._id, sprintId: columns.value[0].sprintId || props.sprintId, tasksArray: rows.map((row) => ({ _id: row.data })), indexName: columns.value[0].indexName });
+    const next = (index) => {
+        if (index >= rows.length) return;
+        apiRequest("post", env.ONLOAD_UPDATE_TASK_INDEX, indexRepairBody(rows[index], companyId.value))
+            .then(() => next(index + 1))
+            .catch((error) => {
+                console.error("ERROR in update task index: ", error);
+                next(index + 1);
+            });
+    };
+    next(0);
 }
 
 function debouncer(timeout = 1000) {

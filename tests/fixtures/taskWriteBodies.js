@@ -4,6 +4,8 @@
  * project a move, copy or conversion writes into. `destination` lists the keys judged in that project.
  */
 
+const { indexRepairBody, indexRepairRows } = require('../../frontend/src/views/Projects/composables/taskGroupIndex');
+
 const USER = { Employee_Name: 'Max Member', id: '6f0000000000000000000003', companyOwnerId: '6f0000000000000000000001' };
 const CID = '6f00000000000000000000c1';
 const STATUS = { status: { key: 2, value: '', text: 'Doing', type: 'active' }, statusKey: 2, statusType: 'active' };
@@ -18,7 +20,8 @@ const ONLOAD = 'POST /api/v1/updateTaskIndexOnload';
 
 /*
  * The groups views/Projects/helper.js groupBy hands every task view. Beside the three values the on-load index route
- * reads, each carries the query its rows are fetched with and the rows already loaded.
+ * reads, each carries the query its rows are fetched with and the rows already loaded, so the bodies are built by
+ * the function the views send them with.
  */
 const DUE_TODAY = Date.parse('2026-10-01T00:00:00.000Z') / 1000;
 const loadedRow = { _id: '6f0000000000000000000b02', TaskKey: 'PAR-2', TaskName: 'Task 02', statusKey: 2, groupByStatusIndex: 5 };
@@ -30,7 +33,7 @@ const VIEW_GROUPS = {
     dueDate: { key: '0_1_TODAY', matchName: 'Today', name: 'Today', value: 'TODAY', operation: 'range', searchCondition: ':=', seconds: DUE_TODAY, endSeconds: DUE_TODAY + 86400, isExpanded: true, tasksArray: [], searchKey: 'DueDate', indexName: 'groupByDueDateIndex', searchValue: DUE_TODAY, mongoConditions: [{ DueDate: { dbDate: { $gte: new Date(DUE_TODAY * 1000), $lt: new Date((DUE_TODAY + 86400) * 1000) } } }] },
     customField: { customFieldId: '6f00000000000000000000f1', customFieldType: 'dropdown', name: 'Blue', value: 'opt-1', isExpanded: true, tasksArray: [], conditions: [{ 'customField.6f00000000000000000000f1.fieldValue': 'opt-1' }], searchKey: 'customField.6f00000000000000000000f1.fieldValue', indexName: 'groupByStatusIndex', searchValue: 'opt-1' },
 };
-const onLoadIndex = (group) => ({ taskId }) => ({ taskUpdate: { data: taskId, item: group, taskKey: 'PAR-1' }, companyId: CID });
+const onLoadIndex = (group) => ({ taskId }) => indexRepairBody(indexRepairRows([{ _id: taskId, TaskKey: 'PAR-1' }], group, true)[0], CID);
 
 const bulk = (action, payload) => ({ taskId, otherTaskId }) => ({ action, taskIds: [taskId, otherTaskId], userData: USER, ...payload });
 
