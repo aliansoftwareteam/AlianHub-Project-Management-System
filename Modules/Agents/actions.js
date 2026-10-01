@@ -75,6 +75,15 @@ const FLAGGED_RATINGS = Object.freeze({
     'timesheet.read': read(SCOPE.WORKSPACE),
     'comment.create': write(SCOPE.TASK),
     'timelog.create': write(SCOPE.TASK),
+    'fields.list': read(SCOPE.PROJECT),
+    'subtasks.list': read(SCOPE.TASK),
+    'members.list': read(SCOPE.WORKSPACE),
+    'task.edit': write(SCOPE.TASK),
+    'task.assignees.set': write(SCOPE.TASK),
+    'task.field.set': write(SCOPE.TASK),
+    'task.move': write(SCOPE.PROJECT, false),
+    'task.archive': write(SCOPE.PROJECT),
+    'task.restore': write(SCOPE.PROJECT),
 });
 
 const ratingTable = () => ({ ...RATINGS, ...Object.fromEntries(Object.entries(FLAGGED_RATINGS).filter(([k]) => registry.has(k))) });
@@ -353,6 +362,8 @@ const executors = {
         const r = await tools.addComment(companyId, params.taskId, params.body, context(actor, 'chat.post', depth));
         return { result: { commentId: r.commentId }, undo: { kind: 'comment', commentId: r.commentId, taskId: String(params.taskId) }, entityId: params.taskId };
     },
+
+    ...require('./taskRequests').executors,
 };
 
 const COMMENT_ACTIONS = new Set(['task.comment', 'comment.create', 'chat.post']);
