@@ -99,12 +99,7 @@ const pausing = ref(false);
 
 const ok = (res) => res?.data?.status === true;
 
-const observeRuns = async () => {
-    const res = await apiRequest("get", `${env.AGENT_RUNS}?limit=25`);
-    if (ok(res)) observe(res.data.data || []);
-};
-
-const { people, live, running, refresh } = useLiveAgents({ onPoll: observeRuns });
+const { people, live, running, refresh } = useLiveAgents({ onRuns: observe });
 
 const all = computed(() => {
     const agentsLive = live.value

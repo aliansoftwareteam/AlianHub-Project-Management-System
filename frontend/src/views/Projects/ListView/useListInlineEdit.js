@@ -368,8 +368,14 @@ export function useListRowEdit(projectRef, showArchived) {
     const multipleAssignees = computed(() => projectHasApp(project.value, "MultipleAssignees"));
     const companyUsers = computed(() => (getters["settings/companyUsers"] || []).map((x) => x.userId));
 
-    const assigneeOptions = (task) => permittedAssignees({
-        task, sprint: sprintOf(project.value, task), project: project.value, companyUsers: companyUsers.value
+    /* A subtask row passes the task it sits under: its people narrow the subtask's, as they do
+     * in the task panel and on the Board. */
+    const assigneeOptions = (task, parent = null) => permittedAssignees({
+        task,
+        sprint: sprintOf(project.value, task),
+        project: project.value,
+        parentAssignees: parent ? (parent.AssigneeUserId || []) : undefined,
+        companyUsers: companyUsers.value
     });
 
     const taskHref = (task) => taskUrl(router, { companyId: companyId.value, project: project.value, task });
