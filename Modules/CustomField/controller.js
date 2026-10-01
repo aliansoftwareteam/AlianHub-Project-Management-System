@@ -6,6 +6,7 @@ const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { recordFieldCreated, recordFieldRenamed } = require("./helpers/customFieldHistory");
 const { withFieldDefaults } = require("./helpers/fieldDefaults");
+const { PROJECTS_CHANGED, PROJECTS_CHANGED_TEXT, linkPlan, applyLinks, announceFields } = require("./helpers/fieldProjects");
 
 exports.insertCustomField = async (req, res) => {
     try {
@@ -64,7 +65,7 @@ exports.insertCustomFieldPromise = (updateObject, type, companyId) => {
 
             MongoDbCrudOpration(companyId, query, type)
                 .then((response) => {
-                    removeCache(`customField:${companyId}`);
+                    announceFields(companyId, 'insert');
                     removeCache(`aiFieldAutoRefill:${companyId}`);
                     resolve(response);
                 })
@@ -84,7 +85,9 @@ exports.insertCustomFieldPromise = (updateObject, type, companyId) => {
 exports.updateCustomField = async (req, res) => {
     try {
         const companyId = req.headers["companyid"];
-        const { key,updateObject,type,id } = req.body;
+        const { key,type,id } = req.body;
+        const updateObject = req.body.updateObject || {};
+        const namesProjects = Boolean((req.body.addProjects || []).length || (req.body.removeProjects || []).length);
 
         if (!companyId) {
             return res.status(400).json({
@@ -96,8 +99,8 @@ exports.updateCustomField = async (req, res) => {
             return res.status(400).json({message: 'Type is Required'});
         }
         if(type === 'updateOne'){
-            if (!(updateObject && Object.keys(updateObject).length) || !(key) || !(id)) {
-                return res.status(400).json({message: `${!updateObject ? 'Update Object' : !key ? 'Key' : !id ? 'Id' : '' } is Required`});
+            if (!(Object.keys(updateObject).length || namesProjects) || !(key) || !(id)) {
+                return res.status(400).json({message: `${!Object.keys(updateObject).length ? 'Update Object' : !key ? 'Key' : !id ? 'Id' : '' } is Required`});
             }
         }else{
             return res.status(400).json({message: 'Invalid type'});
@@ -107,15 +110,16 @@ exports.updateCustomField = async (req, res) => {
             return res.status(400).json({ message: guard.reason });
         }
 
-        const currentDate = new Date();
-
-        const updateObjectDate = {
-            ...updateObject,
-            updatedAt: currentDate
-        };
-
         const filter = { _id: new mongoose.Types.ObjectId(id) };
         const previous = await MongoDbCrudOpration(companyId, { type: dbCollections.CUSTOM_FIELDS, data: [filter] }, 'findOne');
+        const links = linkPlan(previous, req.body);
+        if (links.dropped.length) {
+            return res.status(409).json({ status: false, code: PROJECTS_CHANGED, statusText: PROJECTS_CHANGED_TEXT, message: PROJECTS_CHANGED_TEXT });
+        }
+
+        const updateObjectDate = { ...updateObject, updatedAt: new Date() };
+        if (links.clears) updateObjectDate.projectId = [];
+        else delete updateObjectDate.projectId;
         const query = {
             type: dbCollections.CUSTOM_FIELDS,
             data:[
@@ -124,7 +128,8 @@ exports.updateCustomField = async (req, res) => {
             ]
         };
         const response = await MongoDbCrudOpration(companyId, query, type);
-        removeCache(`customField:${companyId}`);
+        if (previous) await applyLinks(companyId, previous, links);
+        announceFields(companyId, 'update');
         removeCache(`aiFieldAutoRefill:${companyId}`);
         if (previous) {
             recordFieldRenamed({ companyId, previous, next: updateObject, actorId: req.uid })

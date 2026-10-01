@@ -799,7 +799,7 @@ describe('telling the other clients', () => {
         socketEmitter.emit.mockClear();
         await run(EDIT, { id: template._id, body: {} });
         await use(template._id);
-        expect(socketEmitter.emit).not.toHaveBeenCalled();
+        expect(socketEmitter.emit.mock.calls.filter(([, payload]) => payload && payload.module === 'projectSnapshots')).toEqual([]);
     });
 
     it('relays only that the list changed, to the sockets of that company, for every kind of write', () => {

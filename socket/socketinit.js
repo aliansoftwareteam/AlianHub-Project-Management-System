@@ -12,6 +12,7 @@ require('./controller/goalSocket');
 require('./controller/projectTemplateSocket');
 require('./controller/agentSocket');
 require('./controller/folderSocket');
+require('./controller/customFieldSocket');
 const { instrument } = require('@socket.io/admin-ui');
 const jwt = require('jsonwebtoken');
 const { handshakeToken } = require('../Config/cookies');
