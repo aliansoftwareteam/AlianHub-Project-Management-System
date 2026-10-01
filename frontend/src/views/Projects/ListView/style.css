@@ -75,16 +75,24 @@
     border-radius: var(--r-card);
     overflow: hidden;
 }
+/* The group's select-all sits beside the header button, in line with the row checkboxes. */
+.lv2__group-bar {
+    display: flex;
+    align-items: center;
+    background: var(--surface);
+    border-bottom: 1px solid var(--hairline);
+}
+.lv2__group-check { flex: none; margin: 0 0 0 var(--sp-5); }
 .lv2__group-head {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex: 1;
+    min-width: 0;
     min-height: var(--hit-min);
     padding: var(--cell-pad-y) 12px;
     background: var(--surface);
-    border-bottom: 1px solid var(--hairline);
-    width: 100%;
-    border-top: 0; border-left: 0; border-right: 0;
+    border: 0;
     text-align: left;
     color: var(--ink);
     cursor: pointer;
@@ -199,6 +207,21 @@
     cursor: pointer;
 }
 .lv2__add:hover { color: var(--ink-2); background: var(--surface-hover); }
+.lv2__more {
+    display: flex; align-items: center; gap: var(--sp-5);
+    min-height: var(--hit-min);
+    padding: calc(var(--cell-pad-y) - 1px) 12px calc(var(--cell-pad-y) - 1px) 50px;
+    font-size: var(--row-font);
+}
+.lv2__more-btn {
+    background: none; border: 0; padding: 0;
+    color: var(--brand);
+    font: 600 var(--row-font)/1.3 var(--font-ui);
+    cursor: pointer;
+}
+.lv2__more-btn:hover:not(:disabled) { text-decoration: underline; }
+.lv2__more-btn:disabled { color: var(--ink-2); cursor: default; }
+.lv2__more-hint { color: var(--ink-2); }
 .lv2__add-plus { color: var(--brand); }
 .lv2__create { padding: 8px 12px; }
 .lv2__template { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px; max-width: 100%; color: var(--ink-label); font: 500 11px/1.2 var(--font-ui); }
@@ -341,7 +364,7 @@ button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status
     .lv2__scroll { padding: 0 16px 20px; }
     .lv2__row, .lv2__cols { gap: 8px; }
     .lv2__row { min-height: 44px; row-gap: 2px; }
-    .lv2__add { padding-left: 24px; min-height: 44px; }
+    .lv2__add, .lv2__more { padding-left: 24px; min-height: 44px; }
     /* 16px of a 375px viewport is worth more to the task name than to the indent. */
     .lv2__cols { padding: 12px 13px 8px; }
     .lv2__sprint > .lv2__group,

@@ -774,7 +774,7 @@ export function taskListHelper() {
     const priorities = computed(() => getters["settings/companyPriority"])
     const project = inject('selectedProject');
     const permit = checkPermission("task.show_tasks",project?.value?.isGlobalPermission);
-    function getSprintTasks({projectId, sprintId, item, fetchNew = false, projectData ,indexName,parentId = '',groupType,resetTable}) {
+    function getSprintTasks({projectId, sprintId, item, fetchNew = false, projectData ,indexName,parentId = '',groupType,resetTable,skip,firstPageOnly = false}) {
         return new Promise((resolve, reject) => {
             try {
                 if(permit === null && projectData.isGlobalPermission === false) {
@@ -810,7 +810,9 @@ export function taskListHelper() {
                         userId: userId.value,
                         showAllTasks: projectData.isGlobalPermission === false ? permit : true,
                         indexName: indexName,
-                        parentId : parentId
+                        parentId : parentId,
+                        skip,
+                        firstPageOnly
                     })
                     .then(() => {
                         resolve();
@@ -824,6 +826,16 @@ export function taskListHelper() {
                 console.error("ERROR: ", error);
             }
         })
+    }
+    function getGroupCounts({projectId, sprintId, items, projectData}) {
+        if(permit === null && projectData.isGlobalPermission === false) return Promise.resolve();
+        return dispatch("projectData/refreshGroupCounts", {
+            pid: projectId,
+            sprintId,
+            items,
+            userId: userId.value,
+            showAllTasks: projectData.isGlobalPermission === false ? permit : true
+        });
     }
     // FIREBASE
     function getMongoDBUpdate({projectId, sprintId,projectData, groupBy: groupByValue, currentView})
@@ -845,7 +857,7 @@ export function taskListHelper() {
         })
     }
 
-    async function groupBy(type, refetch = false,project,sprintData,groupedTasks,isBoard,lView='list',resetTable=false,fetchTask = true,cb) {
+    async function groupBy(type, refetch = false,project,sprintData,groupedTasks,isBoard,lView='list',resetTable=false,fetchTask = true,cb,{firstPageOnly = false} = {}) {
         try {
             if(!project || !Object.keys(project).length) {
                 cb([])
@@ -984,7 +996,7 @@ export function taskListHelper() {
                     let promises = [];
                     openSprint.items.forEach((item) => {
                         promises.push(
-                            getSprintTasks({projectId: project._id, sprintId:openSprint?.id ? openSprint?.id : openSprint?._id, item, fetchNew: lView == 'table' ? refetch : true,projectData: project, indexName: item.indexName, groupType: lView,resetTable:resetTable})
+                            getSprintTasks({projectId: project._id, sprintId:openSprint?.id ? openSprint?.id : openSprint?._id, item, fetchNew: lView == 'table' ? refetch : true,projectData: project, indexName: item.indexName, groupType: lView,resetTable:resetTable, firstPageOnly})
                         )
                     })
                     Promise.allSettled(promises)
@@ -1075,6 +1087,7 @@ export function taskListHelper() {
         groupBy,
         checkCase,
         getSprintTasks,
+        getGroupCounts,
         getMongoDBUpdate,
         searchMongoDBTasks
     }

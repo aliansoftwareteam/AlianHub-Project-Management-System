@@ -1,6 +1,10 @@
 import * as env from '@/config/env';
 import { apiRequest } from '../../services/index'
 import { tableSortStages } from '@/views/Projects/composables/customFieldQuery';
+import { groupCondition, groupCountsQuery, readGroupCounts, sprintTaskMatch } from './taskQueries';
+
+/* A second caller for a page that is already on its way gets the first one's answer. */
+const pagesInFlight = new Map();
 /**
  * This function is used to get all the projects from MongoDB and add into the Vuex project store.
  * @param {*} state 
@@ -136,30 +140,24 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
             if(sprintFound) {
                 cursor = state.tasks[pid][sprintId].index[indexKey] || null;
             }
+            // Opening the List asks for a group's first page only: a group that already has one is left as it is.
+            if(payload.firstPageOnly && sprintFound && state.tasks[pid][sprintId].index[indexKey] !== undefined) {
+                resolve();
+                return;
+            }
+            // The List counts the rows it holds up to the last page, so a row that left the group or joined it between pages moves the start.
+            if(Number.isInteger(payload.skip) && payload.skip >= 0) {
+                cursor = payload.skip;
+            }
 
             const queryParams = [
                 {
                     $match: {
-                        objId: {
-                            sprintId: sprintId,
-                            ProjectID: pid
-                        },
-                        deletedStatusKey: 0,
-                        ...((showAllTasks === undefined || showAllTasks === true || showAllTasks === 2) ? {} : {AssigneeUserId: {$in: [payload.userId]}}),
-                        ...( parentId && parentId.length ? 
+                        ...sprintTaskMatch({ pid, sprintId, showAllTasks, userId: payload.userId }),
+                        ...( parentId && parentId.length ?
                             { ParentTaskId: parentId }
                         :
-                            {
-                                isParentTask: true,
-                                ...( item.mongoConditions?.length ? 
-                                    { ...item.mongoConditions[0] }
-                                :
-                                    item?.conditions?.length ?
-                                        { ...item.conditions[0] }
-                                    :
-                                        {}
-                                )
-                            }
+                            { isParentTask: true, ...groupCondition(item) }
                         ),
                     }
                 },
@@ -181,12 +179,18 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
                 }
             ]
 
-            apiRequest('post',`${env.TASK}/find`,{findQuery: findQuery})
+            const flight = `${pid}|${sprintId}|${indexKey}|${cursor || 0}`;
+            if(pagesInFlight.has(flight)) {
+                pagesInFlight.get(flight).then(resolve, reject);
+                return;
+            }
+
+            const page = apiRequest('post',`${env.TASK}/find`,{findQuery: findQuery})
             .then((resp) => {
                 if(resp.status === 200){
                     const response = resp.data[0];
                     const responseData = response.result;
-    
+
                     let resCount = {};
     
                     if (parentId && parentId.length) {
@@ -221,24 +225,37 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
 
                             commit('mutateTypesenseTasks', {found: resCount, nextPage: {[indexKey]: (cursor || 0) + responseData?.length || 0}, pid: pid, sprintId: sprintId, data: {...doc}})
                         })
+                        const last = responseData[responseData.length - 1];
+                        commit('mutatePageFrontier', {pid, sprintId, key: indexKey, row: {index: last[indName] ?? null, createdAt: last.createdAt ?? null, _id: last._id}});
                     } else {
                         commit('mutateTypesenseTasks', {found: resCount, nextPage: {[indexKey]: (cursor || 0) + responseData?.length || 0}, pid: pid, sprintId: sprintId, data: null})
                     }
-    
-                    resolve({responseData});
+
+                    return {responseData};
                 }
-                else{
-                    reject();
-                }
-            })
-            .catch((error) => {
-                reject(error);
-            })
+                return Promise.reject();
+            });
+
+            pagesInFlight.set(flight, page);
+            page.then(resolve, reject).finally(() => pagesInFlight.delete(flight));
 
         } catch (error) {
             reject(error);
         }
     })
+}
+
+/* The server's count for every group of a sprint, in one request. Socket events can only adjust
+   a count for a task the store holds; for any other change the List asks again. */
+export const refreshGroupCounts = ({state, commit}, payload) => {
+    const {pid, sprintId, items = [], showAllTasks, userId} = payload;
+    if(!state.tasks?.[pid]?.sprints?.includes(sprintId) || !items.length) return Promise.resolve();
+
+    return apiRequest('post',`${env.TASK}/find`,{findQuery: groupCountsQuery({ pid, sprintId, items, showAllTasks, userId })})
+    .then((resp) => {
+        if(resp.status !== 200) return;
+        commit('mutateGroupCounts', { pid, sprintId, found: readGroupCounts(items, resp.data?.[0]) });
+    });
 }
 
 
