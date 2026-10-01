@@ -57,7 +57,7 @@ defineExpose({ load });
 
 <style scoped>
 .ah-actions { border: 1px solid var(--warn, var(--hairline)); background: var(--warn-bg); border-radius: 10px; padding: 10px 12px; margin: 8px 0 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.ah-actions__title { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--warn-ink); }
+.ah-actions__title { margin: 0; font-size: var(--fs-sm, 12px); font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--warn-ink); }
 .ah-actions__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .ah-actions__item { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .ah-actions__open { text-align: left; background: none; border: 0; padding: 0; color: var(--ink); font: inherit; cursor: pointer; overflow-wrap: anywhere; }

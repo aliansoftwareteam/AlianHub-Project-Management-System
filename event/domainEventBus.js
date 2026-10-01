@@ -78,6 +78,7 @@ const trimTask = (doc) => ({
     startDate: doc.startDate || null,
     taskType: doc.taskType || null,
     isParentTask: doc.isParentTask !== false,
+    ParentTaskId: doc.ParentTaskId ? String(doc.ParentTaskId) : null,
     ProjectID: doc.ProjectID ? String(doc.ProjectID) : null,
     sprintId: doc.sprintId ? String(doc.sprintId) : null,
 });
@@ -302,6 +303,14 @@ function publishEntityEvent(input) {
     return envelope;
 }
 
+/* A task event no write emitted: one derived from stored state, such as a due date
+ * passing or the last open subtask closing. `doc` is the stored task. */
+function publishTaskEvent({ companyId, type, doc, actor, depth }) {
+    const envelope = buildEnvelope({ companyId, type, doc, changedFields: [], previous: null, actor: resolveActor({ actor }), depth });
+    publish(envelope);
+    return envelope;
+}
+
 /* Page, comment and call rows carry no company id, so their emits carry it beside the row
  * (Modules/Pages/helpers/pageEvents.js, Modules/Comments/controller.js, Modules/Calls/notes.js);
  * one without it is dropped, never guessed. */
@@ -354,6 +363,7 @@ module.exports = {
     listenForComments,
     listenForCalls,
     publishEntityEvent,
+    publishTaskEvent,
     bus,
     isRecording,
     setRecording,
