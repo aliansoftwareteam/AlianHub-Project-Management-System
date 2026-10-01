@@ -70,8 +70,15 @@
                             </button>
                         </span>
                         <span v-else-if="column.ai" role="columnheader" :class="{ 'tv2__head-ai': column.id !== 'risk' }" :title="$t(column.id === 'risk' ? 'List.risk_formula' : 'List.ai_source_hint')">{{ column.id === 'risk' ? '' : '✦ ' }}{{ $t(column.labelKey) }}</span>
-                        <span v-else-if="column.field && isAiField(column.field)" role="columnheader" class="tv2__head-col" :title="column.label">
-                            <AiFieldColumnHead :field="column.field" :tasks="aiColumnTasks" :editable="rowEdit.rights.value.customField === true" />
+                        <span v-else-if="column.field && isAiField(column.field)" role="columnheader" class="tv2__head-col" :aria-sort="ariaSort(sortFieldOf(column))">
+                            <AiFieldColumnHead
+                                :field="column.field"
+                                :tasks="aiColumnTasks"
+                                :editable="rowEdit.rights.value.customField === true"
+                                sortable
+                                :sortDir="sortOf(sortFieldOf(column))"
+                                @sort="toggleSort(sortFieldOf(column))"
+                            />
                         </span>
                         <span v-else-if="sortFieldOf(column)" role="columnheader" class="tv2__head-col" :aria-sort="ariaSort(sortFieldOf(column))">
                             <button

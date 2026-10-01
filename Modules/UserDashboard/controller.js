@@ -21,7 +21,8 @@ const {
 const { ROLE_GUEST, isPrivileged } = require('../../Config/roleTypes');
 const { ACTIVE_SEAT } = require('../../Config/seatStatus');
 const { arrangeRules, rolePermission, PRIVATE_PROJECTS, seesEveryPrivateProject } = require('../../Config/rulePermissions');
-const { ownOrNotPersonal } = require('../PersonalList/ownership');
+const { ownOrNotPersonal, othersPersonalListIds } = require('../PersonalList/ownership');
+const { companyWideMatch } = require('../Tasks/helpers/taskQueryGuard');
 
 // Parse a client-built advanced-filter match from the request body.
 function bodyTaskMatch(body) {
@@ -74,6 +75,12 @@ async function resolveCallerRoleType(companyId, uid) {
     }
 }
 exports.resolveCallerRoleType = resolveCallerRoleType;
+
+/* The tasks a card counts: company-wide for an owner or admin, short of someone else's personal
+ * list and of a chat they are not in; for everyone else, the tasks assigned to them. */
+const cardTaskScope = async (companyId, uid, isManagement) => (isManagement
+    ? companyWideMatch(uid, await othersPersonalListIds(companyId, uid))
+    : { AssigneeUserId: uid });
 
 const noProject = () => ({ filter: { _id: { $in: [] } }, companyWide: false });
 
@@ -2544,6 +2551,7 @@ exports.getTasksByStatus = async (req, res) => {
         }));
 
         const scope = isManagement ? "company" : "self";
+        const callerTasks = await cardTaskScope(companyId, uid, isManagement);
         if (!windowTaskIds.length) {
             return res.status(200).json({
                 status: true,
@@ -2561,7 +2569,7 @@ exports.getTasksByStatus = async (req, res) => {
             ...(projClause ? { ProjectID: projClause } : {}),
             // A member sees their own work only: assigned to them, not merely led or
             // created by them - the same line getMyAchievements draws.
-            ...(isManagement ? {} : { AssigneeUserId: uid }),
+            ...callerTasks,
         }, bodyTaskMatch(body));
 
         const baseFilter = taskScope(true);

@@ -7,6 +7,7 @@ vi.mock('@/services', () => ({ apiRequest }));
 vi.mock('@/locales/main', () => ({ i18n: { global: { t: (key) => key } } }));
 
 import AgentSchedules from '@/views/Ai/AgentSchedules.vue';
+import en from '@/locales/en';
 import { blankSchedule, nextRunText, scheduleError, schedulePayload, scheduleForm, describeSchedule, REPORT_KEYS } from '@/views/Ai/agentSchedule';
 
 const t = (key, params) => (params ? `${key} ${JSON.stringify(params)}` : key);
@@ -59,6 +60,12 @@ describe('the schedule helpers', () => {
     it('describes the rhythm in words', () => {
         expect(describeSchedule(t, ROW)).toContain('Ai.schedule_every_weekdays');
         expect(describeSchedule(t, { ...ROW, every: 'weekly', weekday: 1 })).toContain('Ai.schedule_every_weekly');
+    });
+
+    /* A "weekdays" schedule runs Monday to Friday whatever the company's working days are, so the label names the days. */
+    it('labels the weekdays rhythm as Monday to Friday', () => {
+        expect(en.Ai.schedule_every_option_weekdays).toBe('Monday to Friday');
+        expect(en.Ai.schedule_every_weekdays).toBe('Monday to Friday at {at} ({zone})');
     });
 });
 

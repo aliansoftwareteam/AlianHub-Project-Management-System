@@ -2,7 +2,7 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const R = require('./helpers/varianceRules');
-const { resolveTimeScope, visibleProjectsFor } = require('../TimeSheet/helpers/timeScope');
+const { resolveTimeScope, visibleProjectsFor, withoutHidden, opensProject } = require('../TimeSheet/helpers/timeScope');
 const { canSeeSprintById, hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 
 const { sessionTenantOf, TenantError } = require('../../Config/tenant');
@@ -28,10 +28,11 @@ exports.getVarianceReport = async (req, res) => {
         if (q.sprintId) match.sprintId = String(q.sprintId);
         const scope = await resolveTimeScope(companyId, req.uid);
         const visible = await visibleProjectsFor(companyId, scope);
-        if (visible && q.projectId && !visible.includes(String(q.projectId))) {
+        if (q.projectId && !opensProject({ ...scope, visible }, q.projectId)) {
             return res.status(403).json({ status: false, statusText: 'You do not have access to this project.' });
         }
         if (visible && !q.projectId) match.ProjectID = { $in: visible };
+        else if (!q.projectId) Object.assign(match, withoutHidden(scope, 'ProjectID'));
         if (q.sprintId && !(await canSeeSprintById(companyId, req.uid, q.sprintId))) {
             return res.status(404).json({ status: false, statusText: 'Sprint not found.' });
         }
@@ -95,6 +96,7 @@ exports.getVarianceSummary = async (req, res) => {
         const scope = await resolveTimeScope(companyId, req.uid);
         const logMatch = { LogStartTime: { $gte: Math.floor(from.getTime() / 1000), $lte: Math.floor(to.getTime() / 1000) } };
         if (!scope.companyWide) logMatch.Loggeduser = scope.uid;
+        Object.assign(logMatch, withoutHidden(scope));
         const logs = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
             data: [logMatch, { TicketID: 1, Loggeduser: 1, ProjectId: 1, LogTimeDuration: 1 }],

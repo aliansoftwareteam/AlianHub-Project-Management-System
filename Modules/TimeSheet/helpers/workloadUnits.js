@@ -2,11 +2,12 @@
 // Unit-tested in tests/workload-units.test.js.
 
 const { DEFAULT_WEEKEND, isoDay } = require('./weekRules');
+const { DEFAULT_WORKING_DAYS } = require('../../Company/helpers/workingDays');
 
 const UNITS = Object.freeze(['hours', 'points', 'count']);
 const PERIODS = Object.freeze(['day', 'week']);
 const MAX_CAPACITY = 1000;
-const DEFAULT_WORK_DAYS = 5;
+const DEFAULT_WORK_DAYS = DEFAULT_WORKING_DAYS.length;
 const DEFAULT_CAPACITY = Object.freeze({
     points: Object.freeze({ value: 10, per: 'week' }),
     count: Object.freeze({ value: 10, per: 'week' }),

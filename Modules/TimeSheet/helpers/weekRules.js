@@ -1,7 +1,9 @@
 // Pure week-grid / workload rules — no I/O. Minutes everywhere, days as 'YYYY-MM-DD'.
 // Unit-tested in tests/timesheet-week-rules.test.js.
 
-const DEFAULT_WEEKEND = [0, 6];
+const { weekendDaysFor } = require('../../Company/helpers/workingDays');
+
+const DEFAULT_WEEKEND = weekendDaysFor();
 const MAX_DAYS = 62;
 
 const pad = (n) => String(n).padStart(2, '0');

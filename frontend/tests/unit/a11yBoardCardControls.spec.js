@@ -103,7 +103,9 @@ const quickEdits = {
     'due date': {
         trigger: (wrapper) => wrapper.find('.date-picker').find('button, [role="button"]'),
         opened: () => openMenu.mock.calls.length > 0,
-        value: '30 Sep 2026'
+        value: 'Sep 30',
+        // Its trigger is a native button in the picker's slot: the browser turns Enter and Space into the click that opens it.
+        native: true
     },
     priority: {
         trigger: (wrapper) => wrapper.find('.priority__compo').find('button, [role="button"]'),
@@ -150,7 +152,7 @@ describe('board card controls', () => {
             openMenu.mockClear();
             const wrapper = mountCard();
             expect(control.opened(wrapper)).toBe(false);
-            await activations[how](control.trigger(wrapper));
+            await (control.native ? nativeActivations : activations)[how](control.trigger(wrapper));
             expect(control.opened(wrapper)).toBe(true);
         });
     });
