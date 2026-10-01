@@ -39,8 +39,12 @@ export const mentionQueryAt = (text, caret) => {
     return { start: caret - match[2].length - 1, query: match[2] };
 };
 
-/* Written as the task comments write it, so the server's mention parser and every comment renderer read it. */
-export const insertMention = (text, start, caret, user) => {
-    const token = `@[${String(user.name).replace(/[[\]()]/g, '')}](${user.id}) `;
+const REFERENCE_PREFIX = { doc: 'doc_', task: 'task_' };
+
+/* A person is written as the task comments write one, so the server's mention parser and every comment renderer read
+ * it; a doc or a task carries its kind before the id, which keeps it out of the people a comment notifies. */
+export const insertMention = (text, start, caret, item) => {
+    const label = String(item.label ?? item.name ?? '').replace(/[[\]()]/g, '').replace(/\s+/g, ' ').trim();
+    const token = `@[${label}](${REFERENCE_PREFIX[item.type] || ''}${item.id}) `;
     return { text: `${text.slice(0, start)}${token}${text.slice(caret)}`, caret: start + token.length };
 };

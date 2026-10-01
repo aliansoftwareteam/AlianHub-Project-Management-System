@@ -1,6 +1,6 @@
 <template>
     <div class="d-flex align-items-center">
-        <UserProfile class="log-use-profile" :data="data.userData" :show-dot="false" :width="'30px'" :thumbnail="'30x30'" />
+        <UserProfile decorative class="log-use-profile" :data="data.userData" :show-dot="false" :width="'30px'" :thumbnail="'30x30'" />
         <div class="ml-015 wrapperNameImage">
             <span v-html="activityHtml(data.Message)"></span>
             <span>&nbsp;{{getDateAndTime(data.createdAt == undefined ? new Date().getTime(): new Date(data?.createdAt).getTime())}}</span>

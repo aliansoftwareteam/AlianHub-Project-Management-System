@@ -9,6 +9,7 @@ const logger = require("../../../Config/loggerConfig");
 const { QueryRefused, validatePipeline, visibilityStage } = require("./taskQueryGuard");
 const { WriteRefused, parseCascade, assertCanCascade, cascadeFilter } = require("./taskWriteGuard");
 const { canReadTask } = require("./taskReadAccess");
+const { withLinkConditions } = require("../../CustomField/helpers/fieldLinks");
 
 const refuse = (res, statusCode, statusText, message, extra = {}) => res.status(statusCode).json({ status: false, statusText, message, ...extra });
 
@@ -21,7 +22,7 @@ exports.getTaskByQyery = async (req, res) => {
         }
 
         const stages = validatePipeline(findQuery);
-        const converted = replaceObjectKey(replaceUndefined ? relapceUndefinedvals(stages) : stages, ["objId", "dbDate"]);
+        const converted = await withLinkConditions(companyId, req.uid, replaceObjectKey(replaceUndefined ? relapceUndefinedvals(stages) : stages, ["objId", "dbDate"]));
         const scope = await visibilityStage(companyId, req.uid);
         const pipeline = scope ? [scope, ...converted] : converted;
 

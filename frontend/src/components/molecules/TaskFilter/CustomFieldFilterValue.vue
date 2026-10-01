@@ -8,6 +8,7 @@
             </label>
             <p v-if="!options.length" class="cffv__empty">{{ $t('Filters.no_data_found') }}</p>
         </div>
+        <RelationshipFilterValue v-else-if="field.fieldType === 'relationship'" :field="field" :modelValue="modelValue" @update:modelValue="$emit('update:modelValue', $event)" />
         <select
             v-else-if="field.fieldType === 'checkbox'"
             class="cffv__input"
@@ -33,6 +34,7 @@
 <script setup>
 import { computed, watch } from "vue";
 import { needsValue } from "@/views/Projects/composables/customFieldQuery";
+import RelationshipFilterValue from "@/plugins/customFieldView/fieldTypes/RelationshipFilterValue.vue";
 
 defineOptions({ name: "CustomFieldFilterValue" });
 
@@ -45,7 +47,7 @@ const props = defineProps({
 const emit = defineEmits(["update:modelValue"]);
 
 const LIST_TYPES = ["dropdown", "people"];
-const NUMBER_TYPES = ["number", "money", "rating", "progress"];
+const NUMBER_TYPES = ["number", "money", "rating", "progress", "voting"];
 const USER_ID = /^[a-f0-9]{24}$/i;
 
 /* The assignee filter's list also carries "me" and teams; a people field holds people only. */

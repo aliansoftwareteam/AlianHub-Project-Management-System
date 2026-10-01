@@ -67,12 +67,15 @@ const { input, name, saving, cancel, onKeydown } = useRowRename({
 </script>
 
 <style>
+/* The field starts where the name did: the row's indent less its own padding. */
 .pt-row__rename {
-    flex: 1; min-width: 0; height: 26px; margin: 2px 0 2px 16px; padding: 0 var(--sp-3);
-    border: 1px solid var(--brand-border); border-radius: 6px;
-    background: var(--surface); color: var(--ink); font: 400 12.5px/1.3 var(--font-ui);
+    flex: 1; min-width: 0; box-sizing: border-box; padding: 0 var(--sp-3);
+    height: max(var(--hit-min), calc(var(--row-h) - var(--sp-2) - 2px));
+    margin-left: calc(var(--sp-9) - var(--sp-3));
+    border: 1px solid var(--brand-border); border-radius: var(--r-chip);
+    background: var(--surface); color: var(--ink); font: 400 var(--row-font)/var(--lh-snug, 1.3) var(--font-ui);
 }
 .pt-row__rename:focus { outline: none; box-shadow: var(--focus); }
-.pt-row--l3 .pt-row__rename { margin-left: 30px; }
-.pt-row--l4 .pt-row__rename { margin-left: 44px; }
+.pt-row--l3 .pt-row__rename { margin-left: calc(var(--sp-9) + var(--sp-6) - var(--sp-3)); }
+.pt-row--l4 .pt-row__rename { margin-left: calc(var(--sp-9) + 2 * var(--sp-6) - var(--sp-3)); }
 </style>

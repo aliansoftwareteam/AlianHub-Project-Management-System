@@ -210,6 +210,7 @@ beforeEach(() => {
     mockDb.seed(SCHEMA_TYPE.USERS, { _id: OWNER, Employee_Name: 'Olivia Owner' });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
     mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: OTHER_SPRINT, name: 'Sprint 2', projectId: OPEN_PROJECT, folderId: FOLDER });
+    mockDb.seed(SCHEMA_TYPE.FOLDERS, { _id: FOLDER, name: 'Design' });
     require('../Modules/Sprints/controller').addSprintFun.mockResolvedValue({ status: true, data: { _id: OTHER_SPRINT, name: 'Sprint 2', folderId: FOLDER, folderName: 'Design' } });
     mockDb.seed('tasks', storedTaskDoc(OPEN_TASK));
     mockDb.seed('tasks', { ...storedTaskDoc(OPEN_TASK_2), sprintId: OTHER_SPRINT, sprintArray: wholeList() });
