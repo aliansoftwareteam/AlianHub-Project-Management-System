@@ -366,6 +366,16 @@ describe('opening a notice about a chat thread', () => {
     it('goes to the thread for a mention made in a reply', () => {
         open({ mainChat: true, projectId: 'proj-1', sprintId: 'chan-1', taskId: 'default', comment_id: 'r-1', threadId: 'm-1' }, 'mentions');
 
-        expect(router.push).toHaveBeenCalledWith(expect.objectContaining({ name: 'chat_project_channel', query: { thread: 'm-1' } }));
+        expect(router.push).toHaveBeenCalledWith(expect.objectContaining({
+            name: 'chat_project_channel', params: { cid: 'company-1', pid: 'proj-1', sid: 'chan-1' }, query: { thread: 'm-1' },
+        }));
+    });
+
+    it('opens a direct message by its own id, which its sprint does not tell apart', () => {
+        open({ mainChat: true, projectId: 'space-1', sprintId: 'dm-sprint', taskId: 'dm-1', comment_id: 'r-1', comment_parentId: 'm-1' }, 'mentions');
+
+        expect(router.push).toHaveBeenCalledWith(expect.objectContaining({
+            params: { cid: 'company-1', pid: 'space-1', sid: 'dm-1' }, query: { thread: 'm-1' },
+        }));
     });
 });

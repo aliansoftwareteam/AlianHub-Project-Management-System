@@ -116,10 +116,11 @@ export function useHelper() {
                 }
                 if(data.mainChat) {
                     route.name="chat_project_channel";
+                    // A channel is opened by its sprint; a direct message, whose sprint every one of them shares, by its task.
                     route.params = {
                         cid: companyId.value,
                         pid: data.projectId,
-                        sid: data.sprintId
+                        sid: data.taskId && data.taskId !== "default" ? data.taskId : data.sprintId
                     }
                     const threadId = data.threadId || data.comment_parentId;
                     route.query = threadId ? { thread: threadId } : {};
