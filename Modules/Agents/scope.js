@@ -4,14 +4,17 @@ const { fetchRules } = require('../settings/securityPermissions/controller');
 const { isPrivileged } = require('../../Config/roleTypes');
 const { allowsProject } = require('../../Config/tokenNarrowing');
 const { ACTIVE_SEAT } = require('../../Config/seatStatus');
+const { arrangeRules, rolePermission, PRIVATE_PROJECTS, seesEveryPrivateProject } = require('../../Config/rulePermissions');
 
 // Which projects a given person may open.
 //
 // Anything that reads on a user's behalf — Ask, the bulk router — has to start
 // here, because the one rule those features must never break is that they widen
-// nobody's permissions. This mirrors Modules/Project getProjectList: public
-// spaces are visible to every member, private spaces only where the role's
-// private_projects permission allows, and a personal list only to its owner.
+// nobody's permissions. The rule is decideProjectAccess's in Config/projectAccess.js:
+// public spaces are visible to every member, a private space to its assignees and to
+// a role that lists every private space, and a personal list only to its owner.
+
+const NOT_DELETED = { deletedStatusKey: { $nin: [1] } };
 
 const visibleProjects = async (companyId, uid) => {
     const [teams, membership, rules] = await Promise.all([
@@ -21,19 +24,14 @@ const visibleProjects = async (companyId, uid) => {
     ]);
     if (!membership) return [];
     const { roleType } = membership;
-    const nonAdmin = !isPrivileged(roleType);
-    const privateRule = (rules || []).find((r) => r && r.key === 'private_projects') || {};
-    const privatePermission = ((privateRule.roles || []).find((r) => r.key === roleType) || {}).permission;
-    const teamIds = (teams || []).map((t) => `tId_${t._id}`);
+    const everyPrivateProject = isPrivileged(roleType)
+        || seesEveryPrivateProject(rolePermission(arrangeRules(rules), roleType, PRIVATE_PROJECTS));
+    const assignedTo = { AssigneeUserId: { $in: [String(uid), ...(teams || []).map((t) => `tId_${t._id}`)] } };
 
-    const or = [{ isPrivateSpace: false, deletedStatusKey: { $nin: [1] } }];
-    if (!nonAdmin || privatePermission !== null) {
-        or.push({
-            isPrivateSpace: true,
-            deletedStatusKey: { $nin: [1] },
-            ...(nonAdmin && privatePermission === 1 ? { AssigneeUserId: { $in: [String(uid), ...teamIds] } } : {}),
-        });
-    }
+    const or = [
+        { isPrivateSpace: false, ...NOT_DELETED },
+        { isPrivateSpace: true, ...NOT_DELETED, ...(everyPrivateProject ? {} : assignedTo) },
+    ];
     const projects = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.PROJECTS,
         data: [{ $or: or, $and: [{ $or: [{ isPersonal: { $ne: true } }, { personalOwner: String(uid) }] }] }, { ProjectName: 1 }],

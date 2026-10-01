@@ -58,11 +58,13 @@ const renderedBody = computed(() => commentHtml(props.message.message, { links: 
 const companyId = inject('$companyId', '');
 const instance = getCurrentInstance();
 const routerOf = () => (instance && instance.proxy && instance.proxy.$router) || null;
-const isAi = computed(() => !!aiAuthorOf(props.message));
-const aiBody = computed(() => aiAnswerHtml(props.message, { router: routerOf(), companyId: unref(companyId) }));
+const isAgentAnswer = computed(() => Array.isArray(props.message.agentCitations));
+const isAi = computed(() => !!aiAuthorOf(props.message) || isAgentAnswer.value);
+const cited = computed(() => (isAgentAnswer.value ? { ...props.message, aiCitations: props.message.agentCitations } : props.message));
+const aiBody = computed(() => aiAnswerHtml(cited.value, { router: routerOf(), companyId: unref(companyId) }));
 
 function followCitation(event) {
-    const to = citationTarget(event, props.message, unref(companyId));
+    const to = citationTarget(event, cited.value, unref(companyId));
     const router = routerOf();
     if (!to || !router) return;
     event.preventDefault();

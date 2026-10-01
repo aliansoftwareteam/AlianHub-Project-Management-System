@@ -68,6 +68,7 @@
                             :period-options="periodOptions(item)"
                             :period-value="periodValue(item)"
                             :show-refresh="true"
+                            :show-settings="dashboard.canEdit && hasSettings(item)"
                             :show-remove="dashboard.canEdit"
                             :link-label="linkLabel(item)"
                             :link-to="linkTo(item)"
@@ -76,8 +77,9 @@
                             @period-change="(v) => setPeriod(item, v)"
                             @refresh="refresh(item)"
                             @retry="refresh(item)"
+                            @settings="openCardSettings(item)"
                             @remove="removeCard(item)"
-                            @empty-action="goToLink(item)"
+                            @empty-action="onEmptyAction(item)"
                         >
                             <component
                                 :is="componentFor(item)"
@@ -102,6 +104,7 @@
                             :period-options="periodOptions(item)"
                             :period-value="periodValue(item)"
                             :show-refresh="true"
+                            :show-settings="dashboard.canEdit && hasSettings(item)"
                             :show-remove="dashboard.canEdit"
                             :link-label="linkLabel(item)"
                             :link-to="linkTo(item)"
@@ -110,8 +113,9 @@
                             @period-change="(v) => setPeriod(item, v)"
                             @refresh="refresh(item)"
                             @retry="refresh(item)"
+                            @settings="openCardSettings(item)"
                             @remove="removeCard(item)"
-                            @empty-action="goToLink(item)"
+                            @empty-action="onEmptyAction(item)"
                         >
                             <component
                                 :is="componentFor(item)"
@@ -145,6 +149,19 @@
             @add="addCard"
             @close="pickerOpen = false"
         />
+
+        <div v-if="settingsCard" class="dash__modal" @click.self="settingsCard = null">
+            <div class="dash__modal-panel" role="dialog" aria-modal="true" :aria-label="$t('Dash.card_settings')">
+                <h2 class="ah-h2">{{ $t('Dash.card_settings_for', { name: cardTitle(settingsCard) }) }}</h2>
+                <CardSettings
+                    :fields="entryFor(settingsCard).settings"
+                    :card-data="settingsCard.cardData"
+                    :projects="projects"
+                    @save="saveCardSettings"
+                    @cancel="settingsCard = null"
+                />
+            </div>
+        </div>
 
         <div v-if="settingsOpen" class="dash__modal" @click.self="settingsOpen = false">
             <div class="dash__modal-panel">
@@ -190,6 +207,7 @@ import { GridLayout, GridItem } from 'grid-layout-plus';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import DashboardCard from '@/components/organisms/DashboardCard/DashboardCard.vue';
 import CardPicker from './CardPicker.vue';
+import CardSettings from './CardSettings.vue';
 import { catalogEntry, PERIOD_OPTIONS } from '@/plugins/dashboard/cardCatalog';
 import { cardComponent } from '@/plugins/dashboard/cardRegistry';
 import {
@@ -225,6 +243,7 @@ const moving = ref(false);
 const menuOpen = ref(false);
 const pickerOpen = ref(false);
 const settingsOpen = ref(false);
+const settingsCard = ref(null);
 const formError = ref('');
 const form = reactive({ title: '', visibility: 'private', projectId: '' });
 const refreshKeys = reactive({});
@@ -272,7 +291,19 @@ const componentFor = (item) => cardComponent(item.componentId);
 const entryFor = (item) => catalogEntry(item.componentId);
 const cardTitle = (item) => (item.cardData && item.cardData.fieldName)
     || (entryFor(item) ? t(entryFor(item).titleKey) : item.componentId);
-const cardScope = (item) => (entryFor(item) ? t(entryFor(item).scopeKey) : '');
+const projectNameOf = (id) => {
+    const found = id ? projects.value.find((p) => String(p._id) === String(id)) : null;
+    return (found && found.ProjectName) || '';
+};
+const cardScope = (item) => {
+    const entry = entryFor(item);
+    if (!entry) return '';
+    const onProject = entry.scopeKey === 'Dash.scope_project' ? projectNameOf(item.cardData && item.cardData.projectId) : '';
+    return onProject || t(entry.scopeKey);
+};
+const hasSettings = (item) => Boolean(entryFor(item) && Array.isArray(entryFor(item).settings));
+const needsSettings = (item) => hasSettings(item)
+    && entryFor(item).settings.some((f) => f.required && !String((item.cardData && item.cardData[f.name]) ?? '').trim());
 const periodOptions = (item) => {
     const entry = entryFor(item);
     if (!entry || entry.period === null) return [];
@@ -298,12 +329,25 @@ const emptyText = (item) => {
     return entry && entry.emptyKey ? t(entry.emptyKey) : '';
 };
 const emptyAction = (item) => {
+    if (needsSettings(item)) return dashboard.value.canEdit ? t('Dash.action_card_settings') : '';
     const entry = entryFor(item);
     return entry && entry.emptyActionKey && linkTo(item) ? t(entry.emptyActionKey) : '';
 };
 const goToLink = (item) => {
     const to = linkTo(item);
     if (to) router.push(to);
+};
+
+const openCardSettings = (item) => {
+    if (dashboard.value.canEdit && hasSettings(item)) settingsCard.value = item;
+};
+const onEmptyAction = (item) => (needsSettings(item) ? openCardSettings(item) : goToLink(item));
+const saveCardSettings = (values) => {
+    const item = settingsCard.value;
+    settingsCard.value = null;
+    if (!item) return;
+    item.cardData = { ...(item.cardData || {}), ...values };
+    persist();
 };
 
 const refresh = (item) => { refreshKeys[item.i] = (refreshKeys[item.i] || 0) + 1; };
@@ -345,6 +389,8 @@ const addCard = (entry) => {
     });
     pickerOpen.value = false;
     persist();
+    const added = cards.value[cards.value.length - 1];
+    if (needsSettings(added)) openCardSettings(added);
 };
 
 const removeCard = (item) => {

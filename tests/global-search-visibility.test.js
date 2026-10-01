@@ -136,6 +136,15 @@ describe('TSK-05 global search is limited to the projects the caller can see', (
         expect(new Date(res.body.data.projects[0].updatedAt).toISOString()).toBe(updatedAt.toISOString());
     });
 
+    it('names each comment\'s task and folder, so the palette can open it', async () => {
+        const FOLDER = '6f0000000000000000000f01';
+        mockDb.store[SCHEMA_TYPE.TASKS].find((task) => task._id === TASK_MINE).TaskKey = 'AH-1';
+        mockDb.store[SCHEMA_TYPE.TASKS].find((task) => task._id === TASK_MINE).folderObjId = FOLDER;
+        const res = await search('note');
+        expect(res.body.data.comments).toHaveLength(1);
+        expect(res.body.data.comments[0]).toMatchObject({ taskId: TASK_MINE, taskKey: 'AH-1', taskName: 'Budget plan', folderObjId: FOLDER });
+    });
+
     it('refuses a caller who is not a member of the company', async () => {
         getRoleType.mockResolvedValue(null);
         const res = await search();

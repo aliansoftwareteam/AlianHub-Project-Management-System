@@ -82,6 +82,7 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 import ViewColumnChooser from '@/views/Projects/components/columns/ViewColumnChooser.vue';
 import { columnCatalogue, useViewColumns } from '@/views/Projects/composables/viewColumns';
+import { useProjectCustomFields } from '@/views/Projects/composables/projectCustomFields';
 
 // Helpers
 import { taskListHelper } from '@/views/Projects/helper.js';
@@ -107,8 +108,11 @@ const searchedTask = inject('searchedTask');
 const project = inject('selectedProject');
 const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
 
-const cardFields = useViewColumns(computed(() => project.value?._id), 'board', computed(() => columnCatalogue('board')));
+const customFields = useProjectCustomFields(project, { archived: showArchiveVar });
+const cardCatalogue = computed(() => columnCatalogue('board', { fields: customFields.defs.value }));
+const cardFields = useViewColumns(computed(() => project.value?._id), 'board', cardCatalogue);
 provide('boardCardFields', cardFields.visibleColumns);
+provide('boardFieldTasks', customFields.allTasks);
 
 // --- Reactive State ---
 const isLoading = ref(true);
