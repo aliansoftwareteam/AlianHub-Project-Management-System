@@ -275,7 +275,7 @@ const NAV = computed(() => [
 const { canCreateIn, createIn } = useNewDoc();
 const docProjectId = computed(() => routeProjectId(route));
 const canNewDoc = computed(() => {
-    if (!docProjectId.value) return true;
+    if (!docProjectId.value) return canCreateIn(null);
     const project = (getters['projectData/allProjects']?.data || []).find((p) => String(p._id) === docProjectId.value);
     return Boolean(project) && canCreateIn(project);
 });

@@ -26,9 +26,14 @@ describe('who may create a doc', () => {
         expect(canCreateDocIn(null, { userId: ME, roleType: 3 })).toBe(true);
     });
 
-    it('is anyone who sees a project that is not private', () => {
+    it('is any member who sees a project that is not private', () => {
         expect(canCreateDocIn(OPEN_PROJECT, { userId: ME, roleType: 3 })).toBe(true);
-        expect(canCreateDocIn(OPEN_PROJECT, { userId: ME, roleType: 0 })).toBe(true);
+    });
+
+    it('is never a guest, in a project or outside one', () => {
+        expect(canCreateDocIn(OPEN_PROJECT, { userId: ME, roleType: 0 })).toBe(false);
+        expect(canCreateDocIn(PRIVATE_PROJECT, { userId: 'user-9', roleType: 0 })).toBe(false);
+        expect(canCreateDocIn(null, { userId: ME, roleType: 0 })).toBe(false);
     });
 
     it('is only the people and teams on a private project, and owners and admins', () => {

@@ -48,7 +48,7 @@
                     <ShellIcon name="agent" :size="13" class="hub__item-icon" />{{ $t('Docs.agent_drafted') }}
                     <span v-if="agentDrafts.length" class="hub__item-badge">{{ agentDrafts.length }}</span>
                 </button>
-                <button type="button" class="hub__item" :class="{ 'is-active': view === 'templates' }" @click="view = 'templates'">
+                <button v-if="writesDocs" type="button" class="hub__item" :class="{ 'is-active': view === 'templates' }" @click="view = 'templates'">
                     <ShellIcon name="layout" :size="13" class="hub__item-icon" />{{ $t('Docs.templates') }}
                 </button>
                 <button type="button" class="hub__item" :class="{ 'is-active': view === 'trash' }" @click="view = 'trash'">
@@ -56,7 +56,7 @@
                 </button>
             </nav>
 
-            <button type="button" class="ah-btn ah-btn--primary ah-btn--block hub__new" @click="createDoc({})">
+            <button v-if="writesDocs" type="button" class="ah-btn ah-btn--primary ah-btn--block hub__new" @click="createDoc({})">
                 <ShellIcon name="plus" :size="14" />{{ $t('Docs.new_doc') }}
             </button>
         </aside>
@@ -75,14 +75,14 @@
                     <option value="project:">{{ $t('Docs.workspace') }}</option>
                     <option v-for="project in projects" :key="'vs-' + project._id" :value="'project:' + project._id">{{ project.ProjectName }}</option>
                     <option value="agents">{{ $t('Docs.agent_drafted') }}</option>
-                    <option value="templates">{{ $t('Docs.templates') }}</option>
+                    <option v-if="writesDocs" value="templates">{{ $t('Docs.templates') }}</option>
                     <option value="trash">{{ $t('Docs.trash') }}</option>
                 </select>
                 <span class="ah-toolbar__spacer"></span>
-                <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary hub__wiki-btn" :aria-label="$t('Docs.new_wiki_page')" @click="createDoc({ isWiki: true })">
+                <button v-if="writesDocs" type="button" class="ah-btn ah-btn--sm ah-btn--secondary hub__wiki-btn" :aria-label="$t('Docs.new_wiki_page')" @click="createDoc({ isWiki: true })">
                     <ShellIcon name="book" :size="13" /><span class="hub__btn-label">{{ $t('Docs.new_wiki_page') }}</span>
                 </button>
-                <button type="button" class="ah-btn ah-btn--sm ah-btn--primary" @click="createDoc({})">
+                <button v-if="writesDocs" type="button" class="ah-btn ah-btn--sm ah-btn--primary" @click="createDoc({})">
                     <ShellIcon name="plus" :size="13" />{{ $t('Docs.new_doc') }}
                 </button>
             </div>
@@ -108,7 +108,8 @@
                             :title="$t('Docs.no_recent_title')"
                             :message="$t('Docs.no_recent_hint')"
                             :action-label="$t('Docs.new_doc')"
-                            :secondary-label="$t('Docs.templates')"
+                            :action-allowed="writesDocs"
+                            :secondary-label="writesDocs ? $t('Docs.templates') : ''"
                             @action="createDoc({})"
                             @secondary="view = 'templates'"
                         />
@@ -135,7 +136,7 @@
                 </template>
 
                 <template v-else-if="view === 'mine'">
-                    <EmptyState v-if="!mine.length" class="hub__empty" illustration="docs" data-test="docs-empty-mine" :heading-level="2" :title="$t('Docs.no_mine')" :action-label="$t('Docs.new_doc')" @action="createDoc({})" />
+                    <EmptyState v-if="!mine.length" class="hub__empty" illustration="docs" data-test="docs-empty-mine" :heading-level="2" :title="$t('Docs.no_mine')" :action-label="$t('Docs.new_doc')" :action-allowed="writesDocs" @action="createDoc({})" />
                     <div v-else class="hub__grid">
                         <DocCard v-for="page in mine" :key="'mc-' + page._id" :page="page" @open="open" />
                     </div>
@@ -161,7 +162,7 @@
                         :heading-level="2"
                         :title="onlyDue ? $t('Docs.no_review_due') : $t('Docs.no_project_docs')"
                         :action-label="$t('Docs.new_wiki_page')"
-                        :action-allowed="!onlyDue"
+                        :action-allowed="!onlyDue && writesDocs"
                         @action="createDoc({ isWiki: true })"
                     />
                     <WikiTable v-else :rows="wikiRows" @open="open" @review="markReviewed" />
@@ -193,7 +194,7 @@
                             <span class="hub__row-title">{{ page.title || $t('Docs.untitled') }}</span>
                             <span class="hub__row-project">{{ projectNameOf(page.ProjectID) }}</span>
                             <span class="hub__row-time">{{ shortDate(page.updatedAt) }}</span>
-                            <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="restore(page)">
+                            <button v-if="writesDocs" type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="restore(page)">
                                 <ShellIcon name="restore" :size="13" />{{ $t('Docs.restore') }}
                             </button>
                         </div>
@@ -203,7 +204,7 @@
                 <template v-else>
                     <div class="hub__section-head">
                         <span class="ah-label">{{ projectNameOf(viewProjectId) }}</span>
-                        <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="createDoc({})">
+                        <button v-if="writesDocs" type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="createDoc({})">
                             <ShellIcon name="plus" :size="13" />{{ $t('Docs.new_doc') }}
                         </button>
                     </div>
@@ -227,6 +228,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useGetterFunctions } from '@/composable';
 import templates from '@/components/molecules/Pages/pageTemplates';
+import { useDocRights } from '@/components/molecules/Pages/useDocRights';
 import { relativeTime, shortDate, initials, reviewChipClass, reviewLabelKey } from '@/components/molecules/Pages/docsFormat';
 
 defineOptions({ name: 'PagesSpace' });
@@ -237,6 +239,7 @@ const router = useRouter();
 const store = useStore();
 const $toast = useToast();
 const { getUser } = useGetterFunctions();
+const { writesDocs } = useDocRights();
 
 const SWATCHES = ['var(--brand)', 'var(--ok)', 'var(--warn)', 'var(--agent)', 'var(--danger)'];
 
@@ -490,7 +493,7 @@ const AgentList = defineComponent({
                 relativeTime(page.updatedAt, t),
             ]),
             h('button', { type: 'button', class: 'ah-btn ah-btn--sm ah-btn--secondary', onClick: () => emit('open', page) }, t('Docs.review')),
-            h('button', { type: 'button', class: 'ah-btn ah-btn--sm ah-btn--primary', onClick: () => emit('approve', page) }, t('Docs.approve')),
+            writesDocs.value ? h('button', { type: 'button', class: 'ah-btn ah-btn--sm ah-btn--primary', onClick: () => emit('approve', page) }, t('Docs.approve')) : null,
         ])));
     },
 });
@@ -523,7 +526,7 @@ const WikiTable = defineComponent({
                         : [h('span', { class: 'ah-avatar ah-avatar--sm hub__avatar-none' }, '?'), t('Docs.no_owner')]),
                     h('span', { class: ['hub__when', { 'hub__when--danger': page.reviewState === 'stale' }] }, page.reviewedAt ? shortDate(page.reviewedAt) : '—'),
                     h('span', { class: ['hub__wiki-state', `hub__wiki-state--${page.reviewState}`] }, [dot(page.reviewState), t(reviewLabelKey(page.reviewState))]),
-                    h('button', { type: 'button', class: 'ah-btn ah-btn--sm ah-btn--ghost', onClick: () => emit('review', page) }, t('Docs.mark_reviewed')),
+                    writesDocs.value ? h('button', { type: 'button', class: 'ah-btn ah-btn--sm ah-btn--ghost', onClick: () => emit('review', page) }, t('Docs.mark_reviewed')) : h('span'),
                 ]);
             }),
         ]);

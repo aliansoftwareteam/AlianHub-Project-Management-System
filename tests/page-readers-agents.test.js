@@ -42,7 +42,7 @@ describe('the page readers agree on who reaches a page: undoing an agent\'s page
         admin: ['shared', 'company', 'closed', 'namedEdit'],
         inside: ['insidePrivate', 'shared', 'company', 'closed', 'namedView', 'namedEdit'],
         outside: ['outsidePrivate', 'shared', 'company'],
-        guest: ['shared', 'company'],
+        guest: [],
         viewer: ['shared', 'company'],
         editor: ['shared', 'company'],
     };

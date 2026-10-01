@@ -107,7 +107,7 @@ describe('the page readers agree on who reaches a page: deleting a doc with its 
         ['admin', ['shared', 'company', 'closed', 'namedEdit']],
         ['inside', ['insidePrivate', 'shared', 'company', 'closed', 'namedView', 'namedEdit']],
         ['outside', ['outsidePrivate', 'shared', 'company']],
-        ['guest', ['shared', 'company']],
+        ['guest', []],
         ['viewer', ['shared', 'company']],
         ['editor', ['shared', 'company']],
     ])('takes the sub-pages the %s can reach without being named on them', async (who, expected) => {
