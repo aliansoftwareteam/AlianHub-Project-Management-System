@@ -13,7 +13,7 @@ const WALK_ENV = Object.freeze({
     MCP_OAUTH_ISSUER: 'https://hub.example.test',
     EXTERNAL_AGENT_SESSIONS: 'on',
     CSP_MODE: 'report',
-    CONNECTORS: 'slack',
+    CONNECTORS: 'slack,google_calendar',
 });
 
 /* Guards a module installs with its own app.use, which the stack walk cannot see through. */

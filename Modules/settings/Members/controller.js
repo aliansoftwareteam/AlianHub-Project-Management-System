@@ -13,6 +13,7 @@ const knowledgeEvents = require('../../Knowledge/ingest/events');
 const { recordPrivateViewChange } = require('./privateViewHistory');
 const { cleanViewSettings, cleanViewTitle } = require('../../Project/helpers/viewSettings');
 const { revokeMemberTokens } = require('../../ApiTokens/memberTokens');
+const { endMemberConnections } = require('../../Agents/connectors/memberDeparted');
 const logger = require('../../../Config/loggerConfig');
 const { releaseMemberSeat } = require('../../Company/helpers/companyCounters');
 
@@ -365,6 +366,7 @@ exports.updateMember = async (req, res) => {
         // A guest is still in the workspace and can still read their own private pages.
         if (data.isDelete === true || Number(data.status) === SEAT_CANCELLED) {
             await revokeMemberTokens(companyId, subject.userId);
+            await endMemberConnections(companyId, subject.userId);
             knowledgeEvents.publishMemberDeparted(companyId, subject.userId);
         } else if (holdsSeat(response) && !holdsSeat(subject)) {
             knowledgeEvents.publishMemberActivated(companyId, subject.userId);

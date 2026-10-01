@@ -312,8 +312,17 @@
   },
   "CONNECTORS": {
     "group": "integrations",
-    "description": "Agent connectors to switch on, as a list separated by commas: slack is the only one so far. Default off: no connector route, no connector action in the agent registry and no section on the Integrations screen. With slack named, an owner or admin connects the workspace's Slack app under Integrations > Slack (the bot token and the signing secret go straight into the secrets store under the kind connector and are never shown again) and chooses the channels agents may post to; an agent can then propose a Slack message (slack.message.post), and nothing is sent until an owner or admin approves the exact channel and text in the AI Inbox. Needs SECRETS_STORE with a usable SECRETS_KEY and AGENT_TAINT_ROUTING on: without them the connector stays off, the server says why in one startup log line and the Integrations screen shows the same reason. While AGENT_EGRESS_ALLOWLIST is on and the workspace has a host list, slack.com must be on it.",
+    "description": "Agent connectors to switch on, as a list separated by commas: slack and google_calendar. Default off: no connector route, no connector action in the agent registry and no section on the Integrations screen. With slack named, an owner or admin connects the workspace's Slack app under Integrations > Slack (the bot token and the signing secret go straight into the secrets store under the kind connector and are never shown again) and chooses the channels agents may post to; an agent can then propose a Slack message (slack.message.post), and nothing is sent until an owner or admin approves the exact channel and text in the AI Inbox. Needs SECRETS_STORE with a usable SECRETS_KEY and AGENT_TAINT_ROUTING on: without them the connector stays off, the server says why in one startup log line and the Integrations screen shows the same reason. While AGENT_EGRESS_ALLOWLIST is on and the workspace has a host list, slack.com must be on it. With google_calendar named, each member connects their own Google account on the Connections page: this slice ships the connection only (no calendar is read or written yet). Its access and refresh tokens go to the secrets store, the connection ends when the member disconnects, an owner or admin ends it, or the member is removed, and nobody else can use it. It needs the same two settings plus CONNECTOR_GOOGLE_CLIENT_ID and CONNECTOR_GOOGLE_CLIENT_SECRET, and APIURL, from which the redirect address <APIURL>/api/v1/connector-oauth/google/callback is built; that host list must then also hold oauth2.googleapis.com.",
     "default": "off"
+  },
+  "CONNECTOR_GOOGLE_CLIENT_ID": {
+    "group": "integrations",
+    "description": "Client id of the Google OAuth client the connectors use (CONNECTORS=google_calendar). A separate client from the sign-in one: never reuse GOOGLE_CLIENT_ID, because the sign-in exchange answers to the browser and connector tokens must never leave the server. Create it in the Google Cloud console as a Web application with the redirect address <APIURL>/api/v1/connector-oauth/google/callback. Not a secret."
+  },
+  "CONNECTOR_GOOGLE_CLIENT_SECRET": {
+    "group": "integrations",
+    "description": "Client secret of that Google OAuth client. Type it into .env yourself; it is sent only to Google's token endpoint and is never logged, stored in the database or shown. Without both this and CONNECTOR_GOOGLE_CLIENT_ID the google_calendar connector stays off and the server says so in one startup log line.",
+    "secret": true
   },
   "CORS_ORIGINS": {
     "group": "security",
