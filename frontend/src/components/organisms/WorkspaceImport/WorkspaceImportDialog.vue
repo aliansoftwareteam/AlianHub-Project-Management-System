@@ -107,6 +107,7 @@
                             <li v-if="preview.unmatchedAssignees.length" class="wim__warn">{{ $t('WorkspaceImport.fact_unmatched', { names: preview.unmatchedAssignees.join(', ') }) }}</li>
                             <li v-if="preview.skippedRows.length" class="wim__warn">{{ $t('WorkspaceImport.fact_skipped', { count: preview.skippedRows.length }) }}</li>
                         </ul>
+                        <ImportCounts v-if="preview.plan" :summary="preview.plan" planned data-test="wim-plan" />
                     </template>
                 </div>
 
@@ -125,6 +126,7 @@
                             {{ result.ok ? $t('WorkspaceImport.summary_list', { name: result.list, count: result.created || 0 }) : $t('WorkspaceImport.summary_list_failed', { name: result.list, reason: result.message }) }}
                         </li>
                     </ul>
+                    <ImportCounts v-if="clickUp.summary.value" :summary="clickUp.summary.value" data-test="wim-counts" />
                     <template v-if="clickUp.skippedRows.value.length">
                         <p class="wim__label">{{ $t('WorkspaceImport.summary_skipped', { count: clickUp.skippedRows.value.length }) }}</p>
                         <ul class="ah-small wim__facts">
@@ -159,6 +161,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import ImportSourceModals from "@/components/organisms/ImportDialog/ImportSourceModals.vue";
+import ImportCounts from "./ImportCounts.vue";
 import { useCustomComposable } from "@/composable";
 import { IMPORT_SOURCES, sprintOptionsOf } from "./workspaceImportState";
 import { useClickUpImport } from "./useClickUpImport";
@@ -174,7 +177,7 @@ const props = defineProps({
 });
 const emit = defineEmits(["close", "imported"]);
 
-const { getters } = useStore();
+const { getters, dispatch } = useStore();
 const { t } = useI18n();
 const { checkPermission } = useCustomComposable();
 const clickUp = useClickUpImport();
@@ -265,7 +268,13 @@ async function confirmTarget() {
         return;
     }
     step.value = "preview";
-    await clickUp.loadPreview(mode.value === "existing" ? String(chosenProject.value._id) : "");
+    await clickUp.loadPreview(mode.value === "existing" ? String(chosenProject.value._id) : "", addMissing.value);
+}
+
+// The import may have added fields to the project; the task panel reads them from the store.
+function reloadFields() {
+    const fields = clickUp.summary.value?.fields;
+    if (fields?.created.length || fields?.reused.length) dispatch("settings/setfinalCustomFields");
 }
 
 async function startRun() {
@@ -277,6 +286,7 @@ async function startRun() {
         addMissing: addMissing.value
     });
     step.value = "done";
+    reloadFields();
     if (results.some((result) => result.ok)) emit("imported", { source: "clickup", results });
 }
 
