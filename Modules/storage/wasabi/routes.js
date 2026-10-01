@@ -3,11 +3,14 @@ const ctrl = require('./controller');
 const multer = require("multer");
 const { DEFAULT_LIMITS } = require('../../../utils/uploadConfig');
 const { requireStoredFileRead } = require('../downloadScope');
+const { REMOVE, requireStoredFileChange, uploadScopeRefusal } = require('../changeScope');
 const { USER_PROFILES_BUCKET, isProfileUpload, refuseBeforeWrite, refuseUpload, requireOwnBucket, requireProfileImageRead, requireSafeObjectPath, uploadRefusal, bodyField, paramField } = require('../bucketAccess');
 
-const wasabiUploadRefusal = (req) => {
+const wasabiUploadRefusal = async (req) => {
     const body = req.body || {};
-    return uploadRefusal(req, isProfileUpload(body) ? USER_PROFILES_BUCKET : body.companyId, body.path);
+    const profile = isProfileUpload(body);
+    return (await uploadRefusal(req, profile ? USER_PROFILES_BUCKET : body.companyId, body.path))
+        || (profile ? null : uploadScopeRefusal(req, 'wasabi'));
 };
 
 const signedRead = [requireOwnBucket(bodyField('companyId')), requireStoredFileRead(bodyField('companyId'), bodyField('path'), { storage: 'wasabi' })];
@@ -222,7 +225,7 @@ exports.init = (app) => {
     /**
      * delete file from wasabi api.
      */
-	app.post("/api/v1/wasabi/deleteFile", requireOwnBucket(bodyField('companyId')), ctrl.deleteFileWasabi);
+	app.post("/api/v1/wasabi/deleteFile", requireOwnBucket(bodyField('companyId')), requireStoredFileChange(REMOVE, bodyField('path'), { storage: 'wasabi' }), ctrl.deleteFileWasabi);
     app.post("/api/v1/getUserProfile", requireSafeObjectPath(bodyField('path')), requireProfileImageRead(bodyField('path')), handleProfileGetForUser);
     app.post("/api/v1/getTaskTypeImage", ...signedRead, handleTaskTypeImageGet);
 }

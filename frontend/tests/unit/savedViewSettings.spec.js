@@ -45,7 +45,7 @@ const mountViews = ({ views, tab = 'ProjectListView', requested, canSaveShared =
         mutations: {
             'projectData/mutateSearchTask': () => {},
             'projectData/projectLocalUpdate': (_s, payload) => localUpdates.push(payload),
-            'settings/mutateCompanyUsers': (_s, payload) => memberUpdates.push(payload)
+            'settings/mutateCompanyUsers': (_s, payload) => { memberUpdates.push(payload); companyUser.value = payload.data; }
         },
         actions: { 'projectData/searchTask': (_ctx, payload) => dispatch(payload) }
     });
@@ -220,6 +220,22 @@ describe('saving', () => {
         await saved.saveForMe();
         expect(api.createPrivateView).not.toHaveBeenCalled();
         expect(api.savePrivateViewSettings).toHaveBeenCalledWith('row-1', 'mine000001', expect.objectContaining({ groupBy: 3 }));
+    });
+
+    test('save for me a second time updates the one private copy and adds no third tab', async () => {
+        const { search, saved, companyUser } = mountViews({ views: [listView({ title: 'Sprint' })] });
+        await flushPromises();
+        search.groupBy.value = 2;
+        await nextTick();
+        await saved.saveForMe();
+        search.groupBy.value = 3;
+        await nextTick();
+        await saved.saveForMe();
+        expect(api.createPrivateView).toHaveBeenCalledTimes(1);
+        const copies = companyUser.value.ProjectRequiredComponent;
+        expect(copies).toHaveLength(1);
+        expect(copies[0]).toMatchObject({ sourceViewId: LIST, title: 'Sprint', settings: expect.objectContaining({ groupBy: 3 }) });
+        expect(api.savePrivateViewSettings).toHaveBeenCalledWith('row-1', copies[0].id, expect.objectContaining({ groupBy: 3 }));
     });
 
     test('save on a private view stays private', async () => {

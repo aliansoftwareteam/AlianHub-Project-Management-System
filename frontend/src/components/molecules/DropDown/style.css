@@ -23,6 +23,28 @@
     box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.15);
     border-radius: 12px!important;
 }
+/* Opt-in through the `themed` prop: the panel, and what DropDown and DropDownOption render inside
+   it, take the tokens and so follow the theme. Every other panel keeps its legacy light colours,
+   because its contents still paint dark ink. */
+.dd-tokens {
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--hairline);
+    box-shadow: var(--shadow-pop);
+}
+.dd-tokens .drop-down-options,
+.dd-tokens .drop-down-search,
+.dd-tokens .mobile-title-header { color: var(--ink); }
+.dd-tokens .mobile-title-header,
+.dd-tokens > .border-bottom { border-bottom-color: var(--hairline) !important; }
+.dd-tokens .drop-down-item { color: var(--ink-2); }
+.dd-tokens .drop-down-item.bg-gray91 { background-color: var(--fill); }
+.dd-tokens .drop-down-item:hover { background-color: var(--surface-hover) !important; color: var(--ink) !important; }
+.dd-tokens .drop-down-item[aria-selected="true"] { background-color: var(--brand-tint); color: var(--brand); }
+.dd-tokens .form-control { background: var(--surface); color: var(--ink) !important; border-color: var(--border); }
+.dd-tokens .form-control::placeholder { color: var(--ink-2) !important; }
+.dd-tokens .form-control:focus-visible { outline-color: var(--brand); }
+.dd-tokens .btn-primary:not(.bg-transparent) { background: var(--brand); color: var(--on-brand); }
 .drop-down-hide {
     transform: translateY(5%);
     opacity: 0 !important;
