@@ -73,6 +73,7 @@ const SCHEMA_TYPE = {
     RECURRING_TASKS: "recurring_tasks",
     TASK_TEMPLATES: "task_templates",
     VIEW_TEMPLATES: "view_templates",
+    EVERYTHING_VIEWS: "everything_views",
     REMINDERS: "reminders",
     NOTES: "notes",
     GENERAL_REMINDERS: "general_reminders",

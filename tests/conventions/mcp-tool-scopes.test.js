@@ -11,23 +11,26 @@ describe('every registered MCP tool maps to one scope', () => {
     const saved = process.env.AGENT_PERFORMANCE_READ;
     const savedSessions = process.env.EXTERNAL_AGENT_SESSIONS;
     const savedData = process.env.MCP_TOOLS_DATA;
+    const savedManage = process.env.MCP_TOOLS_MANAGE;
     const restore = (key, value) => { if (value === undefined) delete process.env[key]; else process.env[key] = value; };
 
     beforeAll(() => {
         process.env.AGENT_PERFORMANCE_READ = 'on';
         process.env.EXTERNAL_AGENT_SESSIONS = 'on';
         process.env.MCP_TOOLS_DATA = 'on';
+        process.env.MCP_TOOLS_MANAGE = 'on';
         tools = require('../../Modules/Mcp/tools');
         registry = require('../../Modules/Agents/registry');
         sessionTools = require('../../Modules/Mcp/sessionTools');
         ({ TOOL_SCOPES, scopeForTool } = require('../../Modules/Mcp/scopes'));
     });
-    afterAll(() => { restore('AGENT_PERFORMANCE_READ', saved); restore('EXTERNAL_AGENT_SESSIONS', savedSessions); restore('MCP_TOOLS_DATA', savedData); });
+    afterAll(() => { restore('AGENT_PERFORMANCE_READ', saved); restore('EXTERNAL_AGENT_SESSIONS', savedSessions); restore('MCP_TOOLS_DATA', savedData); restore('MCP_TOOLS_MANAGE', savedManage); });
 
     it('sees the flagged tools too (the scan works)', () => {
         expect(tools.names()).toContain('performance.read');
         expect(tools.names()).toContain('session.activity');
         expect(tools.names()).toContain('timesheet.read');
+        expect(tools.names()).toContain('task.move');
         expect(tools.names().length).toBeGreaterThan(10);
     });
 

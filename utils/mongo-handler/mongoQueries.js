@@ -77,6 +77,7 @@ const {
     recurringTasksSchema,
     taskTemplatesSchema,
     viewTemplatesSchema,
+    everythingViewsSchema,
     remindersSchema,
     generalRemindersSchema,
     generalReminderQueueSchema,
@@ -295,6 +296,8 @@ exports.checkType = (type) => {
             return taskTemplatesSchema
         case SCHEMA_TYPE.VIEW_TEMPLATES:
             return viewTemplatesSchema
+        case SCHEMA_TYPE.EVERYTHING_VIEWS:
+            return everythingViewsSchema
         case SCHEMA_TYPE.REMINDERS:
             return remindersSchema
         case SCHEMA_TYPE.GENERAL_REMINDERS:
@@ -583,6 +586,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.TASK_TEMPLATES}`
         case SCHEMA_TYPE.VIEW_TEMPLATES:
                 return `${dbCollections.VIEW_TEMPLATES}`
+        case SCHEMA_TYPE.EVERYTHING_VIEWS:
+                return `${dbCollections.EVERYTHING_VIEWS}`
         case SCHEMA_TYPE.REMINDERS:
                 return `${dbCollections.REMINDERS}`
         case SCHEMA_TYPE.GENERAL_REMINDERS:
