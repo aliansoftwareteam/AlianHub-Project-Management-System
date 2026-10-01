@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { createI18n } from 'vue-i18n';
-import { createLocaleLoader, LAZY_LOCALES, START_TIMEOUT_MS, RETRY_DELAYS_MS } from '@/locales/loader';
+import { createLocaleLoader, LAZY_LOCALES, START_TIMEOUT_MS, RETRY_DELAYS_MS } from '@/utils/localeLoader';
 
 const SRC = path.resolve(__dirname, '../../src');
 const LOCALES_DIR = path.join(SRC, 'locales');
@@ -226,9 +226,8 @@ describe('switching language', () => {
 });
 
 describe('the locale files in the bundle', () => {
-    const NOT_LOCALES = ['main.js', 'loader.js'];
     const localeCodes = fs.readdirSync(LOCALES_DIR)
-        .filter((file) => /^[a-zA-Z]+\.js$/.test(file) && !NOT_LOCALES.includes(file))
+        .filter((file) => /^[a-zA-Z]+\.js$/.test(file) && file !== 'main.js')
         .map((file) => file.replace(/\.js$/, ''));
     const lazyCodes = localeCodes.filter((code) => code !== 'en');
 
@@ -241,8 +240,8 @@ describe('the locale files in the bundle', () => {
         return found;
     };
     const relative = (file) => path.relative(SRC, file);
-    const loaderFile = path.join(LOCALES_DIR, 'loader.js');
-    const isLocaleFile = (file) => path.dirname(file) === LOCALES_DIR && !NOT_LOCALES.includes(path.basename(file));
+    const loaderFile = path.join(SRC, 'utils/localeLoader.js');
+    const isLocaleFile = (file) => path.dirname(file) === LOCALES_DIR && path.basename(file) !== 'main.js';
     const modules = sourceFiles(SRC).filter((file) => file !== loaderFile && !isLocaleFile(file));
 
     it('gives every language but English a chunk of its own, named after its code', () => {
@@ -250,23 +249,31 @@ describe('the locale files in the bundle', () => {
 
         expect([...LAZY_LOCALES].sort()).toEqual([...lazyCodes].sort());
         lazyCodes.forEach((code) => {
-            expect(loader).toContain(`import(/* webpackChunkName: "locale-${code}" */ "./${code}")`);
+            expect(loader).toContain(`import(/* webpackChunkName: "locale-${code}" */ "@/locales/${code}")`);
         });
-        expect(loader).not.toMatch(/^import .*from\s+["']\.\/(?!en["'])/m);
+        expect(loader).not.toMatch(/^import\s/m);
     });
 
     it('lets no module but the loader import a language other than English', () => {
         const codes = lazyCodes.join('|');
-        const byAlias = new RegExp(`locales/(?:${codes})(?:\\.js)?["'\`]`);
+        const byPath = new RegExp(`locales/(?:${codes})(?:\\.js)?["'\`]`);
         const computed = /locales\/\$\{/;
         const sibling = new RegExp(`["'\`]\\./(?:${codes})(?:\\.js)?["'\`]`);
 
         const offenders = modules.filter((file) => {
             const text = fs.readFileSync(file, 'utf8');
-            if (byAlias.test(text) || computed.test(text)) return true;
+            if (byPath.test(text) || computed.test(text)) return true;
             return path.dirname(file) === LOCALES_DIR && sibling.test(text);
         });
         expect(offenders.map(relative)).toEqual([]);
+    });
+
+    it('keeps the language files themselves free of each other, English aside', () => {
+        const offenders = lazyCodes.filter((code) => {
+            const imports = fs.readFileSync(path.join(LOCALES_DIR, `${code}.js`), 'utf8').match(/^import .*$/gm) || [];
+            return imports.some((line) => !/from\s+["']\.\/en["'];?\s*$/.test(line));
+        });
+        expect(offenders).toEqual([]);
     });
 
     it('keeps the review lists (*.pending.json) out of the app', () => {

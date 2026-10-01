@@ -76,10 +76,13 @@ describe('messages read outside a component, around a lazily loaded language', (
         expect(await requiredError()).toBe(`${fr.errorPage.The} ${fr.errorPage.email.toLowerCase()} ${fr.generalErrorMessage.fieldIsRequired}`);
     });
 
-    it('a key the loaded language lacks reads as English, and says so when asked', async () => {
-        await switchLocale('ja');
+    it('a label that first asks whether its key exists gets the same answer after the load', async () => {
+        expect(i18n.global.te('generalErrorMessage.fieldIsRequired')).toBe(true);
 
-        expect(i18n.global.te('generalErrorMessage.fieldIsRequired')).toBe(false);
+        // ja.js is seeded over English, so it reaches into the entry's en.js from its own chunk.
+        await switchLocale('ja');
+        expect(i18n.global.te('generalErrorMessage.fieldIsRequired')).toBe(true);
+        expect(i18n.global.te('generalErrorMessage.no_such_key')).toBe(false);
         expect(i18n.global.t('generalErrorMessage.fieldIsRequired')).toBe(en.generalErrorMessage.fieldIsRequired);
     });
 });
