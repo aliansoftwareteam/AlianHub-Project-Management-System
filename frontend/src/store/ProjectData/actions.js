@@ -288,7 +288,7 @@ export const tabSyncTaskCommit = ({state,commit},payload) => {
     }
 }
 
-export const setTableTasksFromTypesense = ({ state, commit }, payload) => {
+export const setTableTasksFromTypesense = ({ state, commit, rootGetters }, payload) => {
     return new Promise((resolve, reject) => {
         try {
             const {pid, sprintId, item, fetchNew, parentId = "",sortKey = '',isFirst=false,resetTable=false} = payload;
@@ -364,7 +364,7 @@ export const setTableTasksFromTypesense = ({ state, commit }, payload) => {
                         ],
                     },
                 },
-                ...(sortKey ? tableSortStages(sortKey) : [{ $sort: item?.indexName ? { [item.indexName]: 1 } : { createdAt: 1 } }]),
+                ...(sortKey ? tableSortStages(sortKey, rootGetters?.['settings/finalCustomFields']) : [{ $sort: item?.indexName ? { [item.indexName]: 1 } : { createdAt: 1 } }]),
                 {
                     $skip: skip,
                 },
