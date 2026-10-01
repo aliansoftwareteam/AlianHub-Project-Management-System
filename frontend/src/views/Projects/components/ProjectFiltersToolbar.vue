@@ -213,7 +213,7 @@
             <PagesPanel v-model="showPages" :projectData="projectData" />
             <ExportTasksDropdown v-model="showExport" :projectData="projectData" />
             <PublicShareModal v-model="showPublicShare" :projectData="projectData" />
-            <WhoCanSeeModal v-model="showWhoCanSee" kind="project" :itemId="projectData?._id || ''" :title="projectData?.ProjectName || ''" />
+            <WhoCanSeeModal v-if="showWhoCanSee" v-model="showWhoCanSee" kind="project" :itemId="projectData?._id || ''" :title="projectData?.ProjectName || ''" />
             <ImportDialog v-model="showImport" :projectData="projectData" :users="users" :sprint="importSprint" />
             <AutoArchiveModal v-model="showAutoArchive" :projectData="projectData" />
             <EstimationScaleModal v-model="showEstimationScale" :projectData="projectData" />

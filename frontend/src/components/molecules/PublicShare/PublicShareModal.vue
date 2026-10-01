@@ -14,7 +14,7 @@
                 </select>
                 <button v-if="selectedSprintId" type="button" class="pshare__who font-size-13 blue ml-10px" @click="showWhoCanSee = true">{{ $t('WhoCanSee.menu_sprint') }}</button>
             </div>
-            <WhoCanSeeModal v-model="showWhoCanSee" kind="sprint" :itemId="selectedSprintId" :title="selectedSprintName" />
+            <WhoCanSeeModal v-if="showWhoCanSee" v-model="showWhoCanSee" kind="sprint" :itemId="selectedSprintId" :title="selectedSprintName" />
 
             <template v-if="share">
                 <div class="pshare__linkrow d-flex align-items-center">

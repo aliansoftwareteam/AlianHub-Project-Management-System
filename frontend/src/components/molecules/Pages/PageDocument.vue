@@ -167,7 +167,7 @@
                 </div>
             </div>
 
-            <WhoCanSeeModal v-model="showWhoCanSee" kind="page" :itemId="page?._id || ''" :title="draftTitle" />
+            <WhoCanSeeModal v-if="showWhoCanSee" v-model="showWhoCanSee" kind="page" :itemId="page?._id || ''" :title="draftTitle" />
 
             <PagePresenter
                 v-if="presenting"
