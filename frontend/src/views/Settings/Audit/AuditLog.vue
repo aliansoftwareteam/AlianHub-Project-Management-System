@@ -273,9 +273,9 @@ onMounted(load);
 .al__event { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .al__action { color: var(--ink); }
 .al__entity { color: var(--ink-2); }
-.al__id { color: var(--ink-2); margin-top: 3px; font-size: var(--fs-sm, 12.5px); }
+.al__id { color: var(--ink-2); margin-top: 3px; }
 .al__blocked { color: var(--danger-ink); font-weight: 600; }
-.al__cost { color: var(--ink-2); margin-top: 3px; font-size: var(--fs-sm, 12.5px); }
+.al__cost { color: var(--ink-2); margin-top: 3px; }
 .al__reason { color: var(--ink-2); }
 .al__meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; font-size: var(--fs-sm, 12.5px); }
 .al__run { color: var(--ink-2); }

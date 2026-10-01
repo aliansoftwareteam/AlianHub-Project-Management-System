@@ -144,10 +144,12 @@ describe('real tables keep their header over their cells', () => {
 });
 
 describe('what stays small inside a table', () => {
-    it('the audit log\'s id, cost and meta lines', () => {
-        ['.al__id', '.al__cost', '.al__meta'].forEach((selector) => {
-            expect(declared('views/Settings/Audit/AuditLog.vue', selector, 'font-size'), selector).toBe('var(--fs-sm, 12.5px)');
-        });
+    it('the audit log\'s meta line, and its id and cost lines, which carry the small and mono classes', () => {
+        const AUDIT = 'views/Settings/Audit/AuditLog.vue';
+        expect(declared(AUDIT, '.al__meta', 'font-size')).toBe('var(--fs-sm, 12.5px)');
+        expect(read(AUDIT)).toMatch(/class="ah-mono ah-small al__id"/);
+        expect(read(AUDIT)).toMatch(/class="al__cost ah-mono"/);
+        ['.al__id', '.al__cost'].forEach((selector) => expect(declared(AUDIT, selector, 'font-size'), selector).toBe(''));
     });
 
     it('a table\'s own base type, which its header and caption inherit', () => {
