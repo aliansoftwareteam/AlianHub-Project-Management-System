@@ -109,4 +109,4 @@ async function measureApi({ base, session, runs, room, log = () => {} }) {
     return { metrics, size: { tasks: countOf(true), subtasks: countOf(false), list: { id: list._id, name: list.name, tasks: list.tasks } } };
 }
 
-module.exports = { measureApi, groupPage, wholeProject, subtaskProgress };
+module.exports = { client, measureApi, groupPage, wholeProject, subtaskProgress };

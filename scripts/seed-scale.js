@@ -25,7 +25,21 @@ run(async () => {
         return;
     }
 
-    if (args.tasks === undefined) throw new Error('Pass --tasks <count> (10000 or 50000 for the benchmark sizes), --token or --drop.');
+    if (args['small-projects'] !== undefined) {
+        const report = await require('./scale/lib/smallProjects').seedSmallProjects({ count: args['small-projects'], log: (line) => process.stdout.write(`${line}\n`) });
+        process.stdout.write([
+            '',
+            `Scale seed company ${report.companyId}`,
+            'Created this run:',
+            table([...Object.entries(report.created), ...Object.entries(report.inserted)]),
+            'Stored now:',
+            table([['small projects', report.stored.smallProjects]]),
+            '',
+        ].join('\n'));
+        return;
+    }
+
+    if (args.tasks === undefined) throw new Error('Pass --tasks <count> (10000 or 50000 for the benchmark sizes), --small-projects <count>, --token or --drop.');
     const report = await require('./scale/lib/seed').seedScale({ tasks: args.tasks, log: (line) => process.stdout.write(`${line}\n`) });
     process.stdout.write([
         '',
