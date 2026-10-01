@@ -98,6 +98,11 @@ describe('the project calendar card in dark mode', () => {
         const css = read('assets/css/tokens.css');
         expect(ruleBody(css, ':root[data-theme="dark"] .ah-page .sprint:has(.cv)')).toMatch(/background-color:\s*var\(--surface\)/);
     });
+
+    test('a collapsed list on the calendar tab takes it too', () => {
+        const css = read('assets/css/tokens.css');
+        expect(ruleBody(css, ':root[data-theme="dark"] .ah-page .sprint:has(.spr__head)')).toMatch(/background-color:\s*var\(--surface\)/);
+    });
 });
 
 describe('keyframe animations under prefers-reduced-motion', () => {
