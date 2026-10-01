@@ -146,3 +146,34 @@ div.au__errors ul { margin: 4px 0 0; padding-left: 14px; }
 .au__plan-params dt { color: var(--ink-2); }
 .au__plan-params dd { margin: 0; overflow-wrap: anywhere; }
 .au__plan-note { flex-basis: 100%; color: var(--ink-2); }
+
+.au-tpl { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; background: var(--surface-2); border: 1px solid var(--hairline); border-radius: var(--r-card); }
+.au-tpl__head { display: flex; align-items: flex-start; gap: 10px; }
+.au-tpl__heading { flex: 1; min-width: 0; }
+.au-tpl__sub { margin: 4px 0 0; }
+.au-tpl__controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.ah-input.au-tpl__search { flex: 1 1 240px; min-width: 0; }
+.au-tpl__project { display: inline-flex; align-items: center; gap: 6px; font: var(--text-body); min-width: 0; }
+.au-tpl__cats { display: flex; flex-wrap: wrap; gap: 6px; }
+.au-tpl__cat {
+    padding: 4px 10px; border-radius: var(--r-chip);
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--ink-2); font: var(--text-small); cursor: pointer;
+}
+.au-tpl__cat:hover { color: var(--ink); }
+.au-tpl__cat.is-on { background: var(--brand-tint); border-color: var(--brand-border); color: var(--ink); }
+.au-tpl__cat:focus-visible { outline: none; box-shadow: var(--focus); }
+.au-tpl__none { margin: 0; }
+.au-tpl__group { display: flex; flex-direction: column; gap: 6px; }
+.au-tpl__grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+.au-tpl__card { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 11px 12px; background: var(--surface); border: 1px solid var(--hairline); border-radius: 9px; }
+.au-tpl__name { font: var(--text-body); font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.au-tpl__desc { margin: 0; flex: 1; overflow-wrap: anywhere; }
+
+@media (max-width: 767px) {
+    .au > .ah-toolbar { flex-wrap: wrap; height: auto; min-height: var(--toolbar-h); padding: 8px 16px; row-gap: 8px; }
+    .au-tpl { padding: 12px; }
+    .au-tpl__grid { grid-template-columns: 1fr; }
+    .au-tpl__project { flex: 1 1 100%; }
+    .au-tpl__project .au__slot { flex: 1; min-width: 0; }
+}
