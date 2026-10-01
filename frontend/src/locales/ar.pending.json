@@ -3174,6 +3174,8 @@
     "CustomField.add_new_custom_field": "Add New Custom Field",
     "CustomField.all_projects": "All Projects",
     "CustomField.allow_time_with_date": "Allow users to specify a time with date.",
+    "CustomField.back": "Back",
+    "CustomField.back_to_types": "Back to the field types",
     "CustomField.choose_ready_made_list": "Choose a ready-made list of option (e.g., days, months, etc.)",
     "CustomField.countryCode": "Turn it on to modify the country code.",
     "CustomField.country_code": "Country code",

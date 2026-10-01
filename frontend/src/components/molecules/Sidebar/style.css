@@ -83,6 +83,7 @@
 .sb-tokens .form-control:focus-visible { outline: none; border-color: var(--brand); box-shadow: var(--focus); }
 .sb-tokens .group-title { color: var(--ink); }
 .sb-tokens .red { color: var(--danger); }
+.sb-tokens .btn-primary:not(.bg-transparent) { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
 .sb-tokens .sidebar-close { padding: 4px; border-radius: var(--r-chip); color: var(--ink-2); }
 .sb-tokens .sidebar-close:hover { background: var(--surface-hover); color: var(--ink); }
 .sb-tokens .sidebar-close:focus-visible { outline: none; box-shadow: var(--focus); }

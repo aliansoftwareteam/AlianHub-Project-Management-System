@@ -2942,6 +2942,8 @@
     "ContentSecurity.title": "Content security policy",
     "ContentSecurity.total": "{n} reports in the last {days} days",
     "CustomField.all_projects": "All Projects",
+    "CustomField.back": "Back",
+    "CustomField.back_to_types": "Back to the field types",
     "CustomField.country_code": "Country code",
     "CustomField.edit_custom_field": "Edit Custom Field",
     "CustomField.field_is_required": "{field} is required",
