@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { MAX_DEPTH, ancestorsFor, canNest } = require('../Tasks/helpers/taskTree');
+const { storableFieldValues } = require('../CustomField/helpers/fieldValueWrite');
 const rules = require('./rules');
 
 const asId = (id) => new mongoose.Types.ObjectId(String(id));
@@ -69,6 +70,7 @@ const copyTasks = async ({ companyId, caller, sourceId, copy, plan, include, onP
     const projectRef = copy.project._id;
     const code = copy.project.ProjectCode;
     const made = new Map();
+    const fieldDefinitions = new Map();
     let created = 0;
     for (const [depth, level] of plan.levels.entries()) {
         for (const batch of chunks(level, rules.BATCH)) {
@@ -86,6 +88,9 @@ const copyTasks = async ({ companyId, caller, sourceId, copy, plan, include, onP
                 key: `${code}-${first + at + 1}`,
                 subTasks: depth < MAX_DEPTH ? (plan.childrenOf.get(String(row._id)) || []).length : 0,
             }));
+            for (const doc of docs) {
+                if (doc.customField) doc.customField = (await storableFieldValues({ companyId, task: doc, definitions: fieldDefinitions })).customField;
+            }
             await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [docs] }, 'insertMany');
             await countOnLists(companyId, docs);
             placed.forEach(({ row }, at) => made.set(String(row._id), { _id: String(docs[at]._id), ancestors: docs[at].ancestors }));

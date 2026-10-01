@@ -460,6 +460,16 @@ describe('tasks', () => {
         expect(rowsOf(SCHEMA_TYPE.HISTORY).filter((row) => copy.tasks.some((task) => String(task._id) === String(row.TaskId || row.taskId)))).toHaveLength(0);
     });
 
+    it('carry a field value only where it still fits its field', async () => {
+        const rating = String(seed(SCHEMA_TYPE.CUSTOM_FIELDS, { fieldTitle: 'Score', fieldType: 'rating', fieldRatingMax: 5, global: false, projectId: [launch.id] })._id);
+        const people = String(seed(SCHEMA_TYPE.CUSTOM_FIELDS, { fieldTitle: 'Reviewers', fieldType: 'people', global: false, projectId: [launch.id] })._id);
+        seedTask(launch, launch.backlog, { TaskName: 'Scored', customField: { [rating]: { fieldValue: 4, _id: rating }, [people]: { fieldValue: [MEMBER, oid()], _id: people } } });
+        seedTask(launch, launch.backlog, { TaskName: 'Overscored', customField: { [rating]: { fieldValue: 9, _id: rating } } });
+        const copy = copyOf(await duplicate(launch.id, { include: { tasks: true, assignees: false, dates: false } }));
+        expect(byName(copy.tasks, 'Scored', 'TaskName').customField).toEqual({ [rating]: { fieldValue: 4, _id: rating }, [people]: { fieldValue: [MEMBER], _id: people } });
+        expect(byName(copy.tasks, 'Overscored', 'TaskName').customField).toEqual({});
+    });
+
     it('lose their people and dates unless asked for', async () => {
         seedTree(launch);
         const bare = byName(copyOf(await duplicate(launch.id, { include: { tasks: true, assignees: false, dates: false } })).tasks, 'Draw the set', 'TaskName');
