@@ -83,6 +83,7 @@ module.exports.UNSET_COMMENTS_COUNT = '/api/v1/unsetCommentCounts';
 module.exports.V2_TASKS = '/api/v2/tasks';
 module.exports.V2_TASKS_BULK = '/api/v2/tasks/bulk';
 module.exports.V2_TASKS_EVERYTHING = '/api/v2/tasks/everything';
+module.exports.V2_TASKS_EVERYTHING_VIEWS = '/api/v2/tasks/everything/views';
 module.exports.V1_TASKS_IMPORT = '/api/v1/importTasks';
 module.exports.API_URI = window.location.origin;
 module.exports.DOMAIN_URI = window.location.origin;

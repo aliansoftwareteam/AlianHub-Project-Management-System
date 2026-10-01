@@ -32,15 +32,13 @@
 
 <script setup>
 import { computed } from "vue";
-import { useStore } from "vuex";
 import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
 import ListStatusCircle from "@/views/Projects/ListView/ListStatusCircle.vue";
 import ListAssigneeCell from "@/views/Projects/ListView/ListAssigneeCell.vue";
 import ListDueCell from "@/views/Projects/ListView/ListDueCell.vue";
 import ListPriorityCell from "@/views/Projects/ListView/ListPriorityCell.vue";
-import { isDoneStatus, priorityAppOn } from "@/views/Projects/ListView/listRowEdit";
-import { projectColor } from "@/components/molecules/Home/homeFormat";
 import { taskNavAttrs } from "@/components/organisms/TaskDetailOverlay/taskNavigation";
+import { useRowState } from "./useRowState";
 
 defineOptions({ name: "EverythingRow" });
 
@@ -50,18 +48,6 @@ const props = defineProps({
 });
 defineEmits(["open", "status", "priority"]);
 
-const getters = useStore()?.getters || {};
-
-const statuses = computed(() => props.project?.taskStatusData || []);
-const done = computed(() => isDoneStatus({ type: props.task.statusType }));
-const canStatus = computed(() => props.project?.edit?.status === true);
-const canPriority = computed(() => props.project?.edit?.priority === true);
-/* The project is handed in, never injected: the rows on this page belong to many projects, and
- * the Priority app is switched on per project. */
-const showPriority = computed(() => priorityAppOn(props.project, getters["settings/selectedCompany"]?.planFeature));
-const taskType = computed(() => (props.project?.taskTypeCounts || []).find((type) => type.key === props.task.TaskTypeKey) || null);
-const hasTypeIcon = computed(() => Boolean(taskType.value && (taskType.value.taskImage || taskType.value.iconValue)));
-const color = computed(() => projectColor(props.project));
-const depth = computed(() => (Array.isArray(props.task.ancestors) ? props.task.ancestors.length : 0));
+const { statuses, done, canStatus, canPriority, showPriority, taskType, hasTypeIcon, color, depth } = useRowState(() => props.task, () => props.project);
 const indent = computed(() => (depth.value ? { paddingInlineStart: `${depth.value * 18}px` } : null));
 </script>

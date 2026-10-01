@@ -3,6 +3,7 @@
 const OPEN_STATUS_TYPES = ['default_active', 'active'];
 const PAGE_SIZE = 50;
 const GROUPS = ['none', 'status', 'assignee', 'project', 'priority', 'dueDate'];
+const MODES = ['list', 'board', 'table'];
 const SORT_DIRECTION = { updatedAt: 'desc', DueDate: 'asc' };
 const DUE_BUCKETS = ['overdue', 'today', 'week', 'later', 'none'];
 const UNASSIGNED = 'unassigned';
@@ -13,7 +14,7 @@ const MAX_TEXT = 100;
 const MAX_SEARCH = 200;
 
 const DEFAULT_SETTINGS = Object.freeze({
-    search: '', status: [], assignee: [], priority: [], taskType: [], projectIds: [], due: '',
+    mode: 'list', search: '', status: [], assignee: [], priority: [], taskType: [], projectIds: [], due: '',
     group: 'none', sortBy: 'updatedAt', sortDir: 'desc', showSubtasks: false, hideDone: true, includeClosed: false
 });
 
@@ -28,6 +29,7 @@ function cleanSettings(raw) {
     const sortBy = Object.prototype.hasOwnProperty.call(SORT_DIRECTION, saved.sortBy) ? saved.sortBy : DEFAULT_SETTINGS.sortBy;
     const flag = (key) => (typeof saved[key] === 'boolean' ? saved[key] : DEFAULT_SETTINGS[key]);
     return {
+        mode: MODES.includes(saved.mode) ? saved.mode : DEFAULT_SETTINGS.mode,
         search: typeof saved.search === 'string' ? saved.search.slice(0, MAX_SEARCH) : '',
         ...Object.fromEntries(LIST_KEYS.map((key) => [key, textList(saved[key])])),
         due: DUE_BUCKETS.includes(saved.due) ? saved.due : '',
@@ -122,10 +124,14 @@ function baseRequest(settings, { now, timeZone }) {
     };
 }
 
+/* A board's columns are statuses, whatever the list is grouped by. */
+const queryGroup = (settings) => (settings.mode === 'board' ? 'status' : settings.group);
+
 /* The first request of a query: the counts, and for an ungrouped list the first page with them. */
 function firstRequest(settings, context, pageSize = PAGE_SIZE) {
     const base = baseRequest(settings, context);
-    return settings.group === 'none' ? { ...base, limit: pageSize } : { ...base, group: settings.group, limit: 1 };
+    const kind = queryGroup(settings);
+    return kind === 'none' ? { ...base, limit: pageSize } : { ...base, group: kind, limit: 1 };
 }
 
 const within = (range, bounds) => {
@@ -146,7 +152,7 @@ const byPriority = (a, b) => {
    a page inside a group is the same query narrowed to that group. */
 function groupsFrom(counts, settings, context) {
     const list = Array.isArray(counts) ? counts.filter((entry) => entry.count > 0) : [];
-    const kind = settings.group;
+    const kind = queryGroup(settings);
     if (kind === 'none') return [group('all', null, list.reduce((sum, entry) => sum + entry.count, 0), {})];
     if (kind === 'status') return list.filter((e) => e.key !== null).map((e) => group(`status:${e.key}`, e.key, e.count, { status: [e.key] }));
     if (kind === 'project') return list.filter((e) => e.key !== null).map((e) => group(`project:${e.key}`, e.key, e.count, { projectIds: [e.key] }));
@@ -169,11 +175,50 @@ function groupsFrom(counts, settings, context) {
         .map((bucket) => group(`dueDate:${bucket.id}`, bucket.id, bucket.count, { dueDate: within(windows.filters[bucket.id], chosen) }));
 }
 
+const STATUS_KINDS = [['default_active', 'default'], ['active'], ['done', 'close', 'default_close']];
+const statusRank = (type) => {
+    const rank = STATUS_KINDS.findIndex((types) => types.includes(type));
+    return rank === -1 ? 1 : rank;
+};
+
+/* The board's columns: one per status name, merged across projects. A status no task holds yet
+   still gets a column, so a card has somewhere to be dropped; with done work hidden the closed
+   statuses get none. `statuses` is every status of the projects the person can see. */
+function boardColumns(groups, statuses, settings) {
+    const typeOf = new Map();
+    (statuses || []).forEach((status) => { if (status && status.name && !typeOf.has(status.name)) typeOf.set(status.name, status.type); });
+    const counted = new Set(groups.map((entry) => entry.key));
+    const wanted = (name) => !settings.status.length || settings.status.includes(name);
+    const open = (type) => !settings.hideDone || OPEN_STATUS_TYPES.includes(type);
+    const empty = [...typeOf.keys()]
+        .filter((name) => !counted.has(name) && wanted(name) && open(typeOf.get(name)))
+        .map((name) => group(`status:${name}`, name, 0, { status: [name] }));
+    return [...groups, ...empty].sort((a, b) => statusRank(typeOf.get(a.key)) - statusRank(typeOf.get(b.key)) || String(a.key).localeCompare(String(b.key)));
+}
+
+/* A card may land in a column only when its own project has a status of that name. */
+function dropDecision(task, project, columnName) {
+    if (task.status && task.status.text === columnName) return { allowed: false, reason: 'same' };
+    if (!project || !project.edit || project.edit.status !== true) return { allowed: false, reason: 'no_permission' };
+    const status = (project.taskStatusData || []).find((entry) => entry.name === columnName);
+    return status ? { allowed: true, status } : { allowed: false, reason: 'no_status' };
+}
+
+/* Which group a row belongs to under the current grouping, for the groups an inline edit can move it between. */
+function groupIdOf(kind, row) {
+    if (kind === 'status') return `status:${row.status ? row.status.text : ''}`;
+    if (kind === 'priority') return `priority:${row.Task_Priority}`;
+    return null;
+}
+
+const sameSettings = (a, b) => JSON.stringify(cleanSettings(a)) === JSON.stringify(cleanSettings(b));
+
 function groupRequest(base, groupFilter, { cursor = null, limit = PAGE_SIZE } = {}) {
     return { ...base, filter: { ...base.filter, ...groupFilter }, limit, ...(cursor ? { cursor } : {}) };
 }
 
 module.exports = {
-    OPEN_STATUS_TYPES, PAGE_SIZE, GROUPS, SORT_DIRECTION, DUE_BUCKETS, UNASSIGNED, DEFAULT_SETTINGS,
-    cleanSettings, dayKey, dueWindows, foldDueDays, baseRequest, firstRequest, groupsFrom, groupRequest
+    OPEN_STATUS_TYPES, PAGE_SIZE, GROUPS, MODES, SORT_DIRECTION, DUE_BUCKETS, UNASSIGNED, DEFAULT_SETTINGS,
+    cleanSettings, sameSettings, dayKey, dueWindows, foldDueDays, baseRequest, firstRequest, queryGroup, groupsFrom, groupRequest,
+    boardColumns, dropDecision, groupIdOf
 };
