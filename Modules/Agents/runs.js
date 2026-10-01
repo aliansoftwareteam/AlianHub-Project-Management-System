@@ -261,11 +261,13 @@ const list = async (companyId, { status, projectId, agentId, taskId, errorType, 
     }, 'find');
 };
 
+const usd = (amount) => Math.round(Number(amount || 0) * 100) / 100;
+
 /* What the rail footer and the project header chip show. */
 const summary = async (companyId, { projectId, projectIds, hiddenTaskIds } = {}) => {
     const match = { status: { $in: OPEN }, ...inProjects(projectIds, hiddenTaskIds) };
     if (projectId) match.projectId = { $in: idForms(String(projectId)) };
-    const open = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [match, 'agentId agentName status startedAt spend taskId'] }, 'find');
+    const open = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [match, 'agentId agentName status startedAt spend taskId projectId skill'] }, 'find');
     const now = Date.now();
     const running = (open || []).filter((r) => r.status === STATUS.RUNNING);
     return {
@@ -273,8 +275,12 @@ const summary = async (companyId, { projectId, projectIds, hiddenTaskIds } = {})
         waitingApproval: (open || []).filter((r) => r.status === STATUS.WAITING).length,
         agents: [...new Set((open || []).map((r) => String(r.agentId)))].length,
         elapsedMs: running.reduce((s, r) => s + Math.max(0, now - new Date(r.startedAt || now).getTime()), 0),
-        spendUsd: Math.round((open || []).reduce((s, r) => s + Number((r.spend && r.spend.usd) || 0), 0) * 100) / 100,
-        runs: (open || []).map((r) => ({ _id: String(r._id), agentId: r.agentId, agentName: r.agentName, status: r.status, taskId: r.taskId, startedAt: r.startedAt })),
+        spendUsd: usd((open || []).reduce((s, r) => s + Number((r.spend && r.spend.usd) || 0), 0)),
+        // A project page filters these rows itself, so one read of the open runs serves every page.
+        runs: (open || []).map((r) => ({
+            _id: String(r._id), agentId: r.agentId, agentName: r.agentName, status: r.status, taskId: r.taskId, startedAt: r.startedAt,
+            projectId: r.projectId ? String(r.projectId) : null, skill: r.skill || null, spendUsd: usd(r.spend && r.spend.usd),
+        })),
     };
 };
 
