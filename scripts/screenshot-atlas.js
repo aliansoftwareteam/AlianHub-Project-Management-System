@@ -9,7 +9,7 @@ const { resolveParams } = require('./atlas/params');
 const { decide } = require('./atlas/readOnly');
 const { galleryHtml } = require('./atlas/gallery');
 const { newBudget, noteBudget, roomToLoad } = require('./atlas/pace');
-const { coreScreens, inCore } = require('./atlas/core');
+const { coreScreens, inCore, stepsFor } = require('./atlas/core');
 const { SHELL, SHELL_TIMEOUT_MS, routeOf, settle, runStep } = require('./atlas/browser');
 const { measureLayout, summaryOf } = require('./atlas/layout');
 
@@ -105,7 +105,7 @@ async function shellOrSignIn(page) {
     }
 }
 
-async function capture(context, { baseUrl, screen, route, file, budget }) {
+async function capture(context, { baseUrl, screen, size, route, file, budget, css }) {
     const page = await context.newPage();
     let limited = false;
     page.on('response', (response) => {
@@ -117,8 +117,11 @@ async function capture(context, { baseUrl, screen, route, file, budget }) {
         await page.goto(`${baseUrl}/#${route}`, { waitUntil: 'load', timeout: NAVIGATION_TIMEOUT_MS });
         if (screen.auth !== false) await shellOrSignIn(page);
         let { note } = await settle(page);
-        for (const step of screen.steps || []) await runStep(page, step);
-        if ((screen.steps || []).length) ({ note } = await settle(page));
+        // After the page has settled, so the patch follows every stylesheet the screen loads lazily.
+        if (css) await page.addStyleTag({ content: css });
+        const steps = stepsFor(screen, size);
+        for (const step of steps) await runStep(page, step);
+        if (steps.length || css) ({ note } = await settle(page));
         await page.evaluate(() => document.fonts.ready.then(() => true));
 
         const landed = routeOf(page.url());
@@ -212,6 +215,7 @@ async function main() {
         session = { token, uid, cid: params.cid };
     }
 
+    const css = args.css ? fs.readFileSync(path.resolve(args.css), 'utf8') : null;
     fs.mkdirSync(outDir, { recursive: true });
     const versionAtStart = await appVersion(args.baseUrl);
     const shots = [];
@@ -234,7 +238,7 @@ async function main() {
                     }
                     const file = fileName(entry);
                     try {
-                        const result = await captureWithRetry(screen.auth === false ? signedOut : signedIn, { baseUrl: args.baseUrl, screen, route, file: path.join(outDir, file), budget });
+                        const result = await captureWithRetry(screen.auth === false ? signedOut : signedIn, { baseUrl: args.baseUrl, screen, size, route, file: path.join(outDir, file), budget, css });
                         shots.push({ ...entry, file, ...result });
                         const findings = summaryOf(result.layout);
                         process.stdout.write(`ok    ${file}${result.note ? `  (${result.note})` : ''}${findings ? `  [${findings}]` : ''}\n`);
@@ -258,6 +262,7 @@ async function main() {
         version: versionsSeen(earlierVersion, versionAtStart, await appVersion(args.baseUrl)),
         createdAt: new Date().toISOString(),
         variant: args.variant,
+        css: args.css ? path.basename(args.css) : null,
         blocked: [...new Set([...earlierBlocked, ...blocked])].sort(),
     };
     const count = writeIndex(outDir, { meta, ...merged });
