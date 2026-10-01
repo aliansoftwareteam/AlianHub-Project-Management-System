@@ -93,12 +93,12 @@
                         v-for="d in u.cells"
                         :key="d.date"
                         class="wv__cell"
-                        :class="{ 'is-pto': d.pto, 'is-today': d.date === today, 'is-drop': dropKey === `${u.userId}|${d.date}` }"
+                        :class="{ 'is-pto': d.off, 'is-today': d.date === today, 'is-drop': dropKey === `${u.userId}|${d.date}` }"
                         @dragover.prevent="onDragOver(u, d)"
                         @dragleave="onDragLeave(u, d)"
                         @drop.prevent="onDrop(u, d)"
                     >
-                        <span v-if="d.pto" class="wv__pto">{{ $t('Views.pto') }}</span>
+                        <span v-if="d.off" class="wv__pto">{{ d.pto ? $t('Views.pto') : $t('Views.unavailable') }}</span>
                         <template v-else>
                             <div
                                 v-if="value(d)"
@@ -257,11 +257,14 @@
     const planned = (d) => plannedLoad(gridUnit.value, d);
     const size = (chip) => chipSize(gridUnit.value, chip);
 
+    /* The server names time off as PTO to the person and to owners and admins, and as unavailable to anyone else. */
+    const isOff = (d) => Boolean(d.pto || d.unavailable);
+
     const rows = computed(() => users.value.map((u) => {
         const perDay = dailyCapacity({ unit: gridUnit.value, hoursPerDay: hoursFor(u.userId), rule: u.capacityRule, workDays: workDaysOf(u.userId).length });
         const cells = (u.days || [])
             .filter((d) => visibleDays.value.includes(d.date))
-            .map((d) => ({ ...d, chips: d.chips || [], capacity: d.pto || !worksOn(u.userId, d.date) ? 0 : perDay }));
+            .map((d) => ({ ...d, off: isOff(d), chips: d.chips || [], capacity: isOff(d) || !worksOn(u.userId, d.date) ? 0 : perDay }));
         const capacity = cells.reduce((sum, d) => sum + d.capacity, 0);
         const total = cells.reduce((sum, d) => sum + value(d), 0);
         const plannedTotal = cells.reduce((sum, d) => sum + planned(d), 0);
@@ -286,12 +289,12 @@
     };
     const subLabel = (u) => {
         if (u.utilizationPct > 100) return t('Views.pct_period', { pct: u.utilizationPct });
-        const pto = u.cells.filter((d) => d.pto);
-        if (pto.length) {
-            const range = pto.length === 1
-                ? moment(pto[0].date).format('ddd')
-                : `${moment(pto[0].date).format('ddd')}–${moment(pto[pto.length - 1].date).format('ddd')}`;
-            return t('Views.pto_range', { range });
+        const off = u.cells.filter((d) => d.off);
+        if (off.length) {
+            const range = off.length === 1
+                ? moment(off[0].date).format('ddd')
+                : `${moment(off[0].date).format('ddd')}–${moment(off[off.length - 1].date).format('ddd')}`;
+            return t(off.every((d) => d.pto) ? 'Views.pto_range' : 'Views.unavailable_range', { range });
         }
         return gridUnit.value === 'hours' ? t('Views.per_day', { h: u.hoursPerDay }) : capacityRuleLabel(u);
     };
@@ -379,7 +382,7 @@
         }
     };
     const onDragOver = (u, d) => {
-        if (!drag.value || d.pto) return;
+        if (!drag.value || d.off) return;
         const key = `${u.userId}|${d.date}`;
         if (dropKey.value === key) return;
         dropKey.value = key;
@@ -403,7 +406,7 @@
         const current = drag.value;
         dropKey.value = '';
         drag.value = null;
-        if (!current || d.pto) return;
+        if (!current || d.off) return;
         if (current.fromUser.userId === u.userId && current.fromDay.date === d.date) { hint.value = null; return; }
         move({ ...current, toUser: u, toDay: d });
     };
@@ -411,7 +414,7 @@
     const suggestBalance = () => {
         let worst = null;
         rows.value.forEach((u) => u.cells.forEach((d) => {
-            if (!d.pto && d.chips.length && d.capacity > 0 && planned(d) > d.capacity
+            if (!d.off && d.chips.length && d.capacity > 0 && planned(d) > d.capacity
                 && (!worst || planned(d) - d.capacity > planned(worst.d) - worst.d.capacity)) {
                 worst = { u, d };
             }
@@ -422,7 +425,7 @@
         rows.value.forEach((u) => {
             if (u.userId === worst.u.userId) return;
             const d = u.cells.find((x) => x.date === worst.d.date);
-            if (!d || d.pto || d.capacity <= 0) return;
+            if (!d || d.off || d.capacity <= 0) return;
             const room = d.capacity - planned(d);
             if (room >= size(chip) && (!target || room > target.room)) target = { u, d, room };
         });

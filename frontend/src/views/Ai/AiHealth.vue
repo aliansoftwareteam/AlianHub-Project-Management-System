@@ -229,8 +229,8 @@ onMounted(load);
 .ai-health__thresholds-btn { margin-right: 8px; }
 .ai-health__scroll { overflow-x: auto; }
 .ai-health__table { width: 100%; border-collapse: collapse; margin-top: 10px; font: var(--text-small); }
-.ai-health__table th { text-align: left; font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); padding: 6px 10px; border-bottom: 1px solid var(--hairline); white-space: nowrap; }
-.ai-health__table td { padding: 9px 10px; border-bottom: 1px solid var(--hairline); color: var(--ink); vertical-align: middle; white-space: nowrap; }
+.ai-health__table th { text-align: left; font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); padding: 6px var(--cell-pad-x, 10px); border-bottom: 1px solid var(--hairline); white-space: nowrap; }
+.ai-health__table td { padding: var(--table-pad-y, 9px) var(--cell-pad-x, 10px); font-size: var(--row-font, 12.5px); border-bottom: 1px solid var(--hairline); color: var(--ink); vertical-align: middle; white-space: nowrap; }
 .ai-health__table tr:last-child td { border-bottom: 0; }
 .ai-health__sort { border: 0; background: transparent; padding: 0; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; cursor: pointer; }
 .ai-health__sort.is-on { color: var(--ink); }

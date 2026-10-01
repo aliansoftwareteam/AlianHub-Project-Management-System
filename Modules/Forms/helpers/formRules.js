@@ -11,6 +11,7 @@ const {
     wantsOptions,
     isInput,
 } = require('./questionTypes');
+const { checkRule, MAX_CONDITIONS, MAX_DEPTH } = require('./formLogic');
 
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
 const HEX_COLOUR_PATTERN = /^#[0-9a-fA-F]{3,8}$/;
@@ -23,6 +24,22 @@ const MAX_HELP_LENGTH = 500;
 const MAX_SUCCESS_LENGTH = 500;
 const MAX_OPTIONS = 40;
 const MAX_OPTION_LENGTH = 120;
+
+/* Names the public page uses for its own fields and anchors, so no question may take one as its id. */
+const SEEN_FIELD = '_seen';
+const MORE_ANCHOR = '_more';
+const RESERVED_IDS = Object.freeze([SEEN_FIELD, MORE_ANCHOR]);
+
+const RULE_REFUSALS = Object.freeze({
+    shape: 'has a show-when rule the form cannot read.',
+    too_deep: `has a show-when rule nested more than ${MAX_DEPTH} levels deep.`,
+    too_many: `has a show-when rule with more than ${MAX_CONDITIONS} conditions.`,
+    question_missing: 'has a show-when rule that refers to a question the form does not ask.',
+    question_later: 'can only be shown by an answer to a question above it.',
+    operator: 'has a show-when rule with a comparison its question does not offer.',
+    value: 'has a show-when rule with a value that does not fit its question.',
+    option_missing: 'has a show-when rule that refers to an option its question does not have.',
+});
 
 const FORM_STATES = Object.freeze(['draft', 'live']);
 const LAYOUTS = Object.freeze(['one', 'two']);
@@ -45,12 +62,17 @@ const normalizeOptions = (raw) => {
     const list = Array.isArray(raw) ? raw.slice(0, MAX_OPTIONS) : [];
     const out = [];
     const seen = new Set();
+    const ids = new Set();
     for (let i = 0; i < list.length; i += 1) {
         const o = list[i] || {};
         const label = String(o.label === undefined ? o : o.label).trim().slice(0, MAX_OPTION_LENGTH);
         if (!label || seen.has(label)) continue;
         seen.add(label);
-        out.push({ id: String(o.id || `o${i + 1}`).slice(0, 40), label });
+        // A show-when rule names an option by its id, so two options cannot share one.
+        let id = String(o.id || `o${i + 1}`).slice(0, 40);
+        for (let n = 1; ids.has(id); n += 1) id = `o${i + 1}_${n}`;
+        ids.add(id);
+        out.push({ id, label });
     }
     return out;
 };
@@ -144,7 +166,7 @@ const normalizeQuestions = (raw) => {
         }
 
         let id = String(q.id || '').trim();
-        if (!id || seenIds.has(id) || id.length > 40) id = `q${i + 1}_${Date.now().toString(36)}`;
+        if (!id || seenIds.has(id) || id.length > 40 || RESERVED_IDS.includes(id)) id = `q${i + 1}_${Date.now().toString(36)}`;
         seenIds.add(id);
 
         const question = {
@@ -177,6 +199,23 @@ const normalizeQuestions = (raw) => {
         if (SPANS.includes(Number(q.span))) question.span = Number(q.span);
 
         questions.push(question);
+    }
+
+    // After the list is whole, so a rule that points down the form is told so
+    // instead of being told its question does not exist.
+    for (let i = 0; i < questions.length; i += 1) {
+        const question = questions[i];
+        const checked = checkRule((raw[i] || {}).showWhen, questions, i);
+        if (!checked.ok) {
+            return { valid: false, reason: `Question "${question.label}" ${RULE_REFUSALS[checked.code]}` };
+        }
+        if (!checked.rule) continue;
+        // A submission with no task name is refused, so a rule that hid the
+        // name would leave a submitter with an error and no field to fix.
+        if (question.mapTo === 'TaskName') {
+            return { valid: false, reason: `Question "${question.label}" names the task, so it is always shown.` };
+        }
+        question.showWhen = checked.rule;
     }
 
     return { valid: true, reason: '', questions };
@@ -260,6 +299,8 @@ module.exports = {
     MAX_DESCRIPTION_LENGTH,
     MAX_QUESTIONS,
     MAX_SUCCESS_LENGTH,
+    SEEN_FIELD,
+    MORE_ANCHOR,
     isObjectIdString,
     validateFormInput,
     normalizeQuestions,

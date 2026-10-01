@@ -23,7 +23,9 @@ const ADMIN = 'a00000000000000000000002';
 const ON_SPRINT = 'a00000000000000000000003';
 const OFF_SPRINT = 'a00000000000000000000004';
 const ON_TEAM = 'a00000000000000000000005';
+const GUEST = 'a00000000000000000000006';
 const MEMBER_ROLE = 3;
+const GUEST_ROLE = 0;
 
 const oid = () => new mongoose.Types.ObjectId().toString();
 
@@ -73,9 +75,11 @@ beforeEach(() => {
     myCache.flushAll();
     mockAggregateFails = false;
     mockDb = fakeMongo.create();
-    [[OWNER, 1], [ADMIN, 2], [ON_SPRINT, MEMBER_ROLE], [OFF_SPRINT, MEMBER_ROLE], [ON_TEAM, MEMBER_ROLE]].forEach(([userId, roleType]) => {
+    [[OWNER, 1], [ADMIN, 2], [ON_SPRINT, MEMBER_ROLE], [OFF_SPRINT, MEMBER_ROLE], [ON_TEAM, MEMBER_ROLE], [GUEST, GUEST_ROLE]].forEach(([userId, roleType]) => {
         mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, roleType, status: 2, isDelete: false });
     });
+    const taskRules = mockDb.seed(SCHEMA_TYPE.RULES, { key: 'task', isParent: true, roles: [{ key: MEMBER_ROLE, permission: true }, { key: GUEST_ROLE, permission: true }] });
+    mockDb.seed(SCHEMA_TYPE.RULES, { key: 'task_create', isParent: false, parentId: String(taskRules._id), roles: [{ key: MEMBER_ROLE, permission: true }, { key: GUEST_ROLE, permission: false }] });
     const team = mockDb.seed(SCHEMA_TYPE.TEAMS_MANAGEMENT, { _id: oid(), name: 'Crew', assigneeUsersArray: [ON_TEAM] });
     project = mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: oid(), ProjectName: 'Launch', isPrivateSpace: false, AssigneeUserId: [] });
     openSprint = mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: oid(), name: 'Open', projectId: String(project._id) });
@@ -162,5 +166,37 @@ describe('putting a task into an epic', () => {
         const res = await assign(OFF_SPRINT, row._id);
         expect(res.body).toMatchObject({ status: false, statusText: 'Task not found.' });
         expect(mockDb.store[SCHEMA_TYPE.TASKS].find((t) => t._id === row._id).epicId).toBeUndefined();
+    });
+});
+
+describe('a role that may not create tasks in the project', () => {
+    const epicCount = () => mockDb.store[SCHEMA_TYPE.EPICS].filter((row) => row.deletedStatusKey === 0).length;
+
+    it('reads the epics', async () => {
+        const res = await call('GET /api/v2/epics', GUEST, { query: { projectId: String(project._id) } });
+        expect(res.body.status).toBe(true);
+        expect(res.body.data).toHaveLength(1);
+    });
+
+    it.each([
+        ['create an epic', 'POST /api/v2/epics', () => ({ body: { name: 'Mine', projectId: String(project._id) } })],
+        ['edit an epic', 'PUT /api/v2/epics/:id', () => ({ params: { id: String(epic._id) }, body: { name: 'Renamed' } })],
+        ['delete an epic', 'DELETE /api/v2/epics/:id', () => ({ params: { id: String(epic._id) } })],
+        ['recount an epic', 'POST /api/v2/epics/:id/recount', () => ({ params: { id: String(epic._id) } })],
+        ['move a task between epics', 'POST /api/v2/epics/assign', () => ({ body: { taskId: String(mockDb.store[SCHEMA_TYPE.TASKS][0]._id), epicId: null } })],
+    ])('cannot %s', async (_what, path, request) => {
+        const res = await call(path, GUEST, request());
+        expect(res.statusCode).toBe(403);
+        expect(epicCount()).toBe(1);
+        expect(mockDb.store[SCHEMA_TYPE.EPICS][0]).toMatchObject({ name: 'Checkout', taskCount: 7 });
+        expect(String(mockDb.store[SCHEMA_TYPE.TASKS][0].epicId)).toBe(String(epic._id));
+    });
+
+    it('leaves a member who may create tasks able to create, edit and delete an epic', async () => {
+        const created = await call('POST /api/v2/epics', OFF_SPRINT, { body: { name: 'Mine', projectId: String(project._id) } });
+        expect(created.body.status).toBe(true);
+        const params = { id: String(created.body.data._id) };
+        expect((await call('PUT /api/v2/epics/:id', OFF_SPRINT, { params, body: { name: 'Ours' } })).body.status).toBe(true);
+        expect((await call('DELETE /api/v2/epics/:id', OFF_SPRINT, { params })).body.status).toBe(true);
     });
 });
