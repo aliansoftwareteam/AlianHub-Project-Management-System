@@ -192,10 +192,12 @@
     const taskNames = new Map();
     const rememberNames = (tasks) => tasks.forEach((task) => { if (task?._id) taskNames.set(String(task._id), task.TaskName); });
 
+    /* A task made top-level again can still carry the chain it had. */
     const chainOf = (task) => {
+        if (task?.isParentTask === true) return [];
         const chain = ancestorsOf(task);
         if (chain.length) return chain;
-        return task?.ParentTaskId && task.isParentTask !== true ? [String(task.ParentTaskId)] : [];
+        return task?.ParentTaskId ? [String(task.ParentTaskId)] : [];
     };
     const parentTrail = (ids) => (ids || []).map((id) => taskNames.get(String(id))).filter(Boolean).join(' › ');
 
