@@ -1,13 +1,31 @@
+process.env.STORAGE_TYPE = 'server';
+
 const mockDb = require('./fixtures/fakeMongo').create();
 
-jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...args) => mockDb.crud(...args) }));
+jest.mock('../utils/mongo-handler/mongoQueries', () => ({
+    MongoDbCrudOpration: (...args) => mockDb.crud(...args),
+    validateObjectId: (id) => /^[a-f0-9]{24}$/i.test(String(id)),
+}));
+jest.mock('../Config/config', () => ({ myCache: { get: () => undefined, set: () => {}, del: () => {}, keys: () => [], getTtl: () => 0 } }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
+const mockStub = () => new Proxy({}, {
+    get: (target, name) => {
+        if (name === 'then' || name === '__esModule') return undefined;
+        target[name] = target[name] || jest.fn(() => Promise.resolve({}));
+        return target[name];
+    },
+});
+jest.mock('../Modules/Sprints/controller', () => mockStub());
+jest.mock('../Modules/Comments/controller', () => mockStub());
+jest.mock('../Modules/serviceFunction', () => mockStub());
+jest.mock('../utils/planHelper', () => mockStub());
 
 const { ObjectId } = require('mongodb');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const socketEmitter = require('../event/socketEventEmitter');
-const { updateUnReadCommentsCountFun, updateSprintCount } = require('../Modules/notification-count/controller');
+const { updateUnReadCommentsCountFun } = require('../Modules/notification-count/controller');
+const { removeCommentCount } = require('../Modules/Tasks/helpers/mongo_helper');
 const { parentIdsOf } = require('../Modules/notification-count/unreadParents');
 
 const C = '6f0000000000000000000c01';
@@ -134,12 +152,20 @@ describe('marking a level-three subtask unread', () => {
 });
 
 describe('removing a row\'s unread count, as a delete or a move does', () => {
-    it('takes it off every task above the row', async () => {
+    it('takes it off the parent the caller names and the task above that', async () => {
         await comment(GRANDCHILD);
         await comment(SECOND_CHILD);
-        const rows = mockDb.store[SCHEMA_TYPE.USERID].map((row) => ({ ...row }));
-        await new Promise((resolve) => updateSprintCount(C, rows, own(GRANDCHILD), `sprint_${PROJECT}_${SPRINT}_comments`, [below(ROOT), below(CHILD)], -1, resolve));
-        expect(counts()).toMatchObject({ [below(ROOT)]: 1 });
-        expect(counts()[below(CHILD)]).toBeUndefined();
+        await removeCommentCount(C, PROJECT, SPRINT, GRANDCHILD, CHILD);
+        await settle();
+        expect(counts()).toEqual({ [own(SECOND_CHILD)]: 1, [below(ROOT)]: 1 });
+    });
+
+    it('takes it off every task above the row when the caller names no parent', async () => {
+        await comment(GRANDCHILD);
+        await comment(GRANDCHILD);
+        await comment(CHILD);
+        await removeCommentCount(C, PROJECT, SPRINT, GRANDCHILD);
+        await settle();
+        expect(counts()).toEqual({ [own(CHILD)]: 1, [below(ROOT)]: 1 });
     });
 });
