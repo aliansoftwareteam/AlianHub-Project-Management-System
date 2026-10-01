@@ -12,6 +12,9 @@
 .scroll-bottom-btn:hover { color: var(--ink); border-color: var(--brand); }
 .disable__send-button{
   background-color: var(--fill) !important;
+}
+/* The icon inside the button carries cursor-pointer, and there the utility decides. */
+.disable__send-button:where(:not(.cursor-pointer)){
   cursor: not-allowed !important;
 }
 .highlighted-message{

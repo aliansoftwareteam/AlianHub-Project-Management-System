@@ -78,6 +78,7 @@
         :isBulkConvert="placing === 'subtask'"
         :task="{}"
         :projectOptions="pickerProjects"
+        :listPicker="placing === 'list' ? listPicker : null"
         @isConvertSubtaskOPen="placing = ''"
         @bulkMoveConfirm="onDestinationPicked"
         @bulkConvertConfirm="onParentPicked"
@@ -108,6 +109,7 @@ import { bulkReport, convertTargets, moveTargets, parentTargets, placementAction
 import { priorityAppOn, projectHasApp } from "./listRowEdit.js";
 import { PHONE_INLINE_LIMIT, fitInline } from "./bulkBarFit.js";
 import { placedSprint } from "@/views/Projects/composables/taskPlacement";
+import { MAX_EXTRA_LISTS, addTargets, offersAnyTask, refusalCodeOf, refusalKey } from "@/components/organisms/TaskDetailOverlay/taskLists";
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue";
 import CalenderCompo from "@/components/atom/CalenderCompo/CalenderCompo.vue";
 
@@ -154,7 +156,7 @@ function pressed(field, value) {
 
 const placement = computed(() => placementActions(
     selectionShape(store.state.projectData, selection.selectedTaskIds.value),
-    { move: canMove.value, toSubtask: canMakeSubtasks.value, toTask: canMakeTasks.value }
+    { move: canMove.value, toSubtask: canMakeSubtasks.value, toTask: canMakeTasks.value, addToList: can("task.task_move") }
 ));
 const offered = (state) => ({ disabled: !state.enabled, title: state.enabled ? null : t(state.reason) });
 
@@ -198,7 +200,11 @@ const sprints = computed(() => {
     const here = [...direct, ...inFolders]
         .filter((sprint) => sprint && !sprint.deletedStatusKey)
         .map((sprint) => ({ id: sprint.id, label: sprint.name, raw: sprint, ...(placement.value.moveProject.enabled ? {} : move) }));
-    return [...here, { id: "another-project", label: t("List.bulk_move_project"), split: here.length > 0, ...move, action: () => place("project") }];
+    return [
+        ...here,
+        { id: "another-project", label: t("List.bulk_move_project"), split: here.length > 0, ...move, action: () => place("project") },
+        { id: "add-to-list", label: t("TaskLists.bulk_add"), split: true, ...offered(placement.value.addToList), action: () => place("list") }
+    ];
 });
 
 const tags = computed(() => (props.project?.tagsArray || []).map((tag) => {
@@ -434,7 +440,8 @@ function pickTag(option) {
 const placing = ref("");
 const otherRules = useOtherProjectRules();
 const activeProjects = computed(() => getters["projectData/onlyActiveProjects"]?.data || []);
-const TARGETS = { project: moveTargets, subtask: parentTargets, task: convertTargets };
+const TARGETS = { project: moveTargets, subtask: parentTargets, task: convertTargets, list: addTargets };
+const listPicker = computed(() => ({ title: t("TaskLists.bulk_add"), confirm: t("TaskLists.add_confirm"), note: t("TaskLists.bulk_add_note"), offers: offersAnyTask }));
 const pickerProjects = computed(() => (placing.value ? TARGETS[placing.value](activeProjects.value, otherRules.check) : []));
 
 function place(kind) {
@@ -449,7 +456,35 @@ function onDestinationPicked({ project: destination, sprint } = {}) {
     const kind = placing.value;
     placing.value = "";
     if (!destination?._id || !sprint?.id) return;
+    if (kind === "list") {
+        addToList(sprint);
+        return;
+    }
     run(kind === "task" ? "bulkConvertToTask" : "bulkMove", { sprintObj: placedSprint(sprint), projectData: destinationOf(destination) });
+}
+
+const commonestCode = (skipped) => {
+    const counts = new Map();
+    skipped.forEach((entry) => counts.set(entry?.code || "", (counts.get(entry?.code || "") || 0) + 1));
+    return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] || "";
+};
+
+/* Each task is judged alone by the server; the ones it leaves out come back with the rule that held them. */
+async function addToList(sprint) {
+    if (working.value) return;
+    working.value = true;
+    try {
+        const response = await apiRequest("post", env.V2_TASKS_BULK, { action: "bulkAddToList", taskIds: [...selection.selectedTaskIds.value], sprintId: String(sprint.id) });
+        if (response?.data?.status !== true) throw response;
+        const { added = [], skipped = [] } = response.data.data || {};
+        if (skipped.length) $toast.warning(t("TaskLists.bulk_skipped", { n: skipped.length, reason: t(refusalKey(commonestCode(skipped)), { max: MAX_EXTRA_LISTS }) }));
+        if (added.length) $toast.success(t("TaskLists.bulk_added", { n: added.length, list: sprint.name || "" }));
+        selection.clear();
+    } catch (error) {
+        $toast.error(t(refusalKey(refusalCodeOf(error)), { max: MAX_EXTRA_LISTS }));
+    } finally {
+        working.value = false;
+    }
 }
 
 function onParentPicked({ task } = {}) {

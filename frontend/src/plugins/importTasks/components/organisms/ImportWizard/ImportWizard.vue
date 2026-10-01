@@ -194,7 +194,7 @@ import { computed, inject, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useToast } from "vue-toast-notification";
-import * as XLSX from "xlsx";
+import { loadXlsx } from "@/utils/loadXlsx";
 import * as env from "@/config/env";
 import { apiRequest } from "@/services";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
@@ -368,8 +368,9 @@ function readFile(file) {
     }
     fileName.value = file.name;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
         try {
+            const XLSX = await loadXlsx();
             const workbook = XLSX.read(event.target.result, { type: "binary", codepage: 65001 });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });

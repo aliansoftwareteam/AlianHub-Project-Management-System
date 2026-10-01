@@ -3,6 +3,7 @@ import { apiRequest } from '../../services/index'
 import { tableSortStages } from '@/views/Projects/composables/customFieldQuery';
 import { groupCondition, groupCountsQuery, readGroupCounts, readGroupTotals, sprintTaskMatch } from './taskQueries';
 import { ancestorsOf } from '@taskTreeRules';
+import { homeListOf } from './listMembership';
 
 /* A second caller for a page that is already on its way gets the first one's answer. */
 const pagesInFlight = new Map();
@@ -151,11 +152,12 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
                 cursor = payload.skip;
             }
 
+            const inParent = Boolean(parentId && parentId.length);
             const queryParams = [
                 {
                     $match: {
-                        ...sprintTaskMatch({ pid, sprintId, showAllTasks, userId: payload.userId }),
-                        ...( parentId && parentId.length ?
+                        ...sprintTaskMatch({ pid, sprintId: inParent ? homeListOf(state, pid, sprintId, parentId) : sprintId, showAllTasks, userId: payload.userId }),
+                        ...( inParent ?
                             { ParentTaskId: parentId }
                         :
                             { isParentTask: true, ...groupCondition(item) }
@@ -186,7 +188,7 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
                 return;
             }
 
-            const page = apiRequest('post',`${env.TASK}/find`,{findQuery: findQuery})
+            const page = apiRequest('post',`${env.TASK}/find`,{findQuery: findQuery, ...(inParent ? {} : { inList: sprintId })})
             .then((resp) => {
                 if(resp.status === 200){
                     const response = resp.data[0];
@@ -252,7 +254,7 @@ export const refreshGroupCounts = ({state, commit}, payload) => {
     const {pid, sprintId, items = [], showAllTasks, userId, totals = []} = payload;
     if(!state.tasks?.[pid]?.sprints?.includes(sprintId) || !items.length) return Promise.resolve();
 
-    return apiRequest('post',`${env.TASK}/find`,{findQuery: groupCountsQuery({ pid, sprintId, items, showAllTasks, userId, totals })})
+    return apiRequest('post',`${env.TASK}/find`,{findQuery: groupCountsQuery({ pid, sprintId, items, showAllTasks, userId, totals }), inList: sprintId})
     .then((resp) => {
         if(resp.status !== 200) return;
         commit('mutateGroupCounts', {
@@ -395,7 +397,7 @@ export const setTableTasksFromTypesense = ({ state, commit, rootGetters }, paylo
                     $limit: batchSize,
                 },
             ]
-            apiRequest('post',`${env.TASK}/find`,{findQuery: queryDetail})
+            apiRequest('post',`${env.TASK}/find`,{findQuery: queryDetail, inList: sprintId})
             .then((result) => {
                 if(result && result.status === 200 && result?.data && result?.data.length){
                     result?.data.forEach((task) => {

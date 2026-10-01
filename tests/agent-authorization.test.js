@@ -11,7 +11,7 @@ jest.mock('../Modules/Agents/actor', () => {
     return {
         isAgent,
         resolveActor: jest.fn(async (req) => (req.agentToken
-            ? { kind: 'agent', userId: req.uid, agentId: req.agentToken.agentId, agentName: 'Reviewer', viaAccount: 'workspace' }
+            ? { kind: 'agent', userId: req.uid, agentId: req.agentToken.agentId, agentName: 'Reviewer', viaAccount: 'workspace', tokenId: req.agentToken.tokenId || null }
             : { kind: 'human', userId: req.uid })),
         attribution: (a) => (isAgent(a) ? { actorId: a.agentId, actorType: 'agent', agentId: a.agentId, label: a.agentName } : { actorId: a.userId, actorType: 'human', label: '' }),
     };
@@ -133,6 +133,13 @@ describe('AGT-05 filing a proposal', () => {
 
     it('refuses an agent filing in another agent\'s name', async () => {
         const r = await call(ctrl.createProposal, req('owner1', { agentToken: { agentId: OTHER_AGENT_ID }, body: body() }));
+        expect(r.code).toBe(403);
+        expect(rows(SCHEMA_TYPE.AGENT_PROPOSALS)).toHaveLength(0);
+    });
+
+    it('refuses a token filing a Slack message, which only a workspace agent\'s own run proposes', async () => {
+        const changes = [{ action: 'slack.message.post', params: { channelId: 'C0RELEASES1', text: 'Hello' } }];
+        const r = await call(ctrl.createProposal, req('owner1', { agentToken: { agentId: AGENT_ID, tokenId: 'tok1' }, body: body({ changes }) }));
         expect(r.code).toBe(403);
         expect(rows(SCHEMA_TYPE.AGENT_PROPOSALS)).toHaveLength(0);
     });

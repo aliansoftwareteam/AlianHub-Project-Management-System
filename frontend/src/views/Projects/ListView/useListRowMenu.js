@@ -11,6 +11,7 @@ import { snapshotTasks, undoRequests } from "./bulkUndo.js";
 import { taskMenuRights } from "@/views/Projects/composables/taskMenu";
 import { placedSprint } from "@/views/Projects/composables/taskPlacement";
 import { peopleCarried } from "@/utils/duplicatePeople";
+import { MAX_EXTRA_LISTS, refusalCodeOf, refusalKey } from "@/components/organisms/TaskDetailOverlay/taskLists";
 
 const TOAST = { position: "top-right" };
 const DUPLICATE_PARTS = ["Checklists", "Due Date", "Copy Assignees", "Copy Watchers"];
@@ -20,7 +21,7 @@ const projectRef = (project) => ({ id: project?._id, ProjectCode: project?.Proje
 /* Row menu actions through the same /tasks/bulk calls ListBulkBar makes, one task at a time,
  * so history, notifications, sockets and server permission checks are shared. */
 export function useListRowMenu(projectSource, showArchived) {
-    const { getters } = useStore();
+    const { getters, commit } = useStore();
     const { t } = useI18n();
     const $toast = useToast();
     const { getUser } = useGetterFunctions();
@@ -166,5 +167,24 @@ export function useListRowMenu(projectSource, showArchived) {
         });
     }
 
-    return { rights, moving, sidebar, archive, remove, restore, startMove, cancelMove, confirmMove, duplicate, openSidebar, closeSidebar };
+    /* The answer is written to the list on screen as a change from the server, so the row leaves it and its group counts are asked again. */
+    async function removeFromList(task, listId) {
+        if (!rights.value.removeFromList || !listId || working.value) return;
+        working.value = true;
+        try {
+            const response = await apiRequest("patch", env.V2_TASKS, { action: "removeFromList", taskId: String(task._id), sprintId: String(listId) });
+            if (response?.data?.status !== true) throw response;
+            const extraLists = (response.data.data?.extraLists || []).map((entry) => ({ projectId: entry.projectId, sprintId: entry.sprintId, addedBy: entry.addedBy, addedAt: entry.addedAt }));
+            const change = { snap: {}, op: "modified", pid: String(task.ProjectID), sprintId: String(listId), data: { ...task, extraLists }, updatedFields: { extraLists } };
+            commit("projectData/mutateUpdateFirebaseTasks", change);
+            commit("projectData/mutateTypesenseTableTasks", change);
+            $toast.success(t("TaskLists.removed_here"), TOAST);
+        } catch (error) {
+            $toast.error(t(refusalKey(refusalCodeOf(error)), { max: MAX_EXTRA_LISTS }), TOAST);
+        } finally {
+            working.value = false;
+        }
+    }
+
+    return { rights, moving, sidebar, archive, remove, restore, startMove, cancelMove, confirmMove, duplicate, removeFromList, openSidebar, closeSidebar };
 }

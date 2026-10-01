@@ -713,6 +713,7 @@ defineExpose({ pickFromComputer });
     background: none;
     border: 0;
     font: inherit;
+    font-size: 14px;
     color: inherit;
 }
 .download-all-btn:focus-visible {

@@ -46,6 +46,7 @@
                             @keydown.space.self.prevent="!showArchiveVar ? toggleTaskDetail(element) : ''"
                         >
                             <span v-if="taskKey" class="card-key">{{ taskKey }}</span>
+                            <TaskHomeMark v-if="!isSubTask" :task="element" :list="viewedList" />
                             <img v-if="element.deletedStatusKey === 2" :src="inventoryIcon" alt="inventory" class="card-title__state" />
                             <img v-if="element.deletedStatusKey === 1" :src="deleteIcon" alt="delete" class="card-title__state" />
                             {{ element.TaskName }}
@@ -233,6 +234,7 @@
     import TaskMenuSidebars from '@/views/Projects/components/taskMenu/TaskMenuSidebars.vue';
     import TaskMenuPopup from '@/views/Projects/components/taskMenu/TaskMenuPopup.vue';
     import { taskMenuItems } from '@/views/Projects/composables/taskMenu';
+    import TaskHomeMark from '@/views/Projects/components/TaskHomeMark.vue';
     import { taskUrl } from '@/views/Projects/composables/taskLink';
     import { openTemplateDialog } from '@/components/molecules/TaskTemplates/taskTemplates';
     import CalenderCompo from '@/components/atom/CalenderCompo/CalenderCompo.vue';
@@ -295,7 +297,8 @@
     const searchedTask = inject('searchedTask');
     const taskCollapsed = inject("taskCollapsed");
     const boardMenu = inject("boardTaskMenu", null);
-    const menuItems = computed(() => taskMenuItems(element.value, boardMenu?.rights.value, { canNest: depthOf(element.value) < MAX_DEPTH }));
+    const viewedList = computed(() => ({ sprintId: props.itemData?.sprintId, projectId: projectData.value?._id }));
+    const menuItems = computed(() => taskMenuItems(element.value, boardMenu?.rights.value, { canNest: depthOf(element.value) < MAX_DEPTH, listId: viewedList.value.sprintId }));
     const subtaskTree = inject("boardSubtaskTree", null);
     const subtasksOpen = computed(() => Boolean(subtaskTree?.isExpanded(element.value?._id)));
     const subtaskProgress = computed(() => (subtaskTree ? subtaskTree.progressFor(element.value) : null));
@@ -610,6 +613,7 @@
             "convert-subtask": viaSidebar,
             "convert-list": viaSidebar,
             move: viaSidebar,
+            "remove-from-list": () => boardMenu.removeFromList(element.value, viewedList.value.sprintId),
             duplicate: viaSidebar,
             "duplicate-subtasks": () => boardMenu.duplicate(element.value, { withSubtasks: true }),
             merge: viaSidebar,

@@ -5,7 +5,7 @@
 const registry = require('../registry');
 const modelPin = require('../../AICore/modelPin');
 const { tagsIn, structureErrors } = require('./skillTemplate');
-const { SKILL_VERSION, RISKS, INPUT_CATALOGUE, READER_CATALOGUE, PROMPT_PARTIALS, EMIT_ACTIONS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, MAX_EMIT_EACH, isOffered, offeredReaders } = require('./catalogues');
+const { SKILL_VERSION, RISKS, INPUT_CATALOGUE, READER_CATALOGUE, PROMPT_PARTIALS, emitActions, emitRequired, TASK_FIELDS, TEMPLATE_ROOTS, MAX_EMIT_EACH, isOffered, offeredReaders } = require('./catalogues');
 const externalReads = require('./externalReads');
 const { findSecrets } = require('./secretScan');
 
@@ -49,7 +49,7 @@ const checkPlaceholder = (path, field, declared, roots, errors) => {
     if (root === TEMPLATE_ROOTS.emitted) {
         const action = parts.slice(parts.indexOf(root) + 1).join('.');
         if (!roots.includes(root)) errors.push(error(field, 'unknown_placeholder', `"{{${path}}}" is only available in emit mappings and the summary`));
-        else if (!EMIT_ACTIONS.includes(action)) errors.push(error(field, 'unknown_action', `"{{${path}}}" counts no action a skill can emit`));
+        else if (!emitActions().includes(action)) errors.push(error(field, 'unknown_action', `"{{${path}}}" counts no action a skill can emit`));
         return;
     }
     if (root === TEMPLATE_ROOTS.answer || root === TEMPLATE_ROOTS.item) {
@@ -199,8 +199,8 @@ const validateEmit = (input, declared, errors) => {
         const action = asString(mapping.action);
         if (!action) { errors.push(error(`${at}.action`, 'required', 'required')); return; }
         if (registry.isNever(action)) { errors.push(error(`${at}.action`, 'never_listed', `Agents cannot perform ${action} (never_listed)`)); return; }
-        if (!registry.has(action)) { errors.push(error(`${at}.action`, 'unknown_action', `unknown action "${action}" (have: ${EMIT_ACTIONS.join(', ')})`)); return; }
-        if (!EMIT_ACTIONS.includes(action)) { errors.push(error(`${at}.action`, 'not_a_write', `"${action}" reads; only a write can be emitted as a change`)); return; }
+        if (!registry.has(action)) { errors.push(error(`${at}.action`, 'unknown_action', `unknown action "${action}" (have: ${emitActions().join(', ')})`)); return; }
+        if (!emitActions().includes(action)) { errors.push(error(`${at}.action`, 'not_a_write', `"${action}" reads; only a write can be emitted as a change`)); return; }
         const each = mapping.each === undefined ? null : asString(mapping.each);
         if (each !== null && !/^answer\.[a-zA-Z0-9_.]+$/.test(each)) errors.push(error(`${at}.each`, 'invalid', 'must be a path under "answer", e.g. answer.subtasks'));
         let max = each ? Math.min(MAX_EMIT_EACH, 10) : 1;
@@ -214,7 +214,7 @@ const validateEmit = (input, declared, errors) => {
         const roots = each
             ? [TEMPLATE_ROOTS.answer, TEMPLATE_ROOTS.item, TEMPLATE_ROOTS.emitted, TEMPLATE_ROOTS.fallback]
             : [TEMPLATE_ROOTS.answer, TEMPLATE_ROOTS.emitted, TEMPLATE_ROOTS.fallback];
-        (EMIT_REQUIRED[action] || []).forEach((name) => {
+        emitRequired(action).forEach((name) => {
             if (params[name] === undefined || params[name] === null || params[name] === '') errors.push(error(`${at}.params.${name}`, 'required', `required by "${action}"`));
         });
         Object.entries(params).forEach(([name, value]) => checkTemplate(value, `${at}.params.${name}`, declared, roots, errors));

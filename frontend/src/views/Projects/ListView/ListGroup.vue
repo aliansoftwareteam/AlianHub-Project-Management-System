@@ -111,6 +111,8 @@
 <script setup>
 import { computed, inject, nextTick, onBeforeUnmount, provide, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
+import { useToast } from "vue-toast-notification";
 import draggable from "vuedraggable";
 import ListRow from "./ListRow.vue";
 import ListSubtaskRows from "./ListSubtaskRows.vue";
@@ -144,6 +146,8 @@ const props = defineProps({
 const emit = defineEmits(["toggle", "open", "review-agent"]);
 
 const { getters } = useStore();
+const { t } = useI18n();
+const $toast = useToast();
 const { checkPermission } = useCustomComposable();
 const { getSprintTasks } = taskListHelper();
 const { updateTaskByGroup } = useUpdateTasks();
@@ -163,6 +167,7 @@ const { expandedIds, autoExpandedIds } = useSubtaskExpansion();
 const subtaskFor = ref("");
 
 const sprintId = computed(() => props.sprint?.id || props.sprint?._id);
+provide("viewedList", computed(() => ({ sprintId: sprintId.value, projectId: props.project?._id })));
 const canCreate = computed(() => !showArchived.value
     && !searchedTask.value
     && checkPermission("task.task_create", props.project?.isGlobalPermission) === true
@@ -396,8 +401,12 @@ provide("listGroupTree", {
     open: (task) => emit("open", task)
 });
 
+/* A reorder the List does not keep leaves the rows where they were dragged; they are put back as the store has them. */
 function onDragChange(event) {
-    applyDrag({ event, item: props.item, groupType: props.groupType, rows: rows.value, project: props.project });
+    const kept = applyDrag({ event, item: props.item, groupType: props.groupType, rows: rows.value, project: props.project, listId: sprintId.value });
+    if (kept !== false) return;
+    rows.value = [...groupTasks.value];
+    $toast.info(t("TaskLists.order_kept_at_home"), { position: "top-right" });
 }
 
 watch(creating, (on) => {

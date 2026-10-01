@@ -60,11 +60,11 @@ const storeFor = (roleType) => createStore({
 
 const RouterLink = { props: ['to'], template: '<a><slot /></a>' };
 
-const respond = ({ rows = [approval()], approvalsStatus = 200, post } = {}) => (type, url, body) => {
+const respond = ({ rows = [approval()], approvalsStatus = 200, engineOff, post } = {}) => (type, url, body) => {
     if (type === 'post') return Promise.resolve({ data: { status: true, data: post ? post(url, body) : {} } });
     if (String(url).includes('/workflows/approvals')) {
         if (approvalsStatus !== 200) return Promise.reject({ response: { status: approvalsStatus, data: { statusText: 'off' } } });
-        return Promise.resolve({ data: { status: true, data: rows } });
+        return Promise.resolve({ data: { status: true, data: rows, ...(engineOff ? { engineOff } : {}) } });
     }
     if (String(url).includes('/proposals')) return Promise.resolve({ data: { status: true, data: [], counts: { waiting: 0 } } });
     return Promise.resolve({ data: { status: true, data: {} } });
@@ -141,7 +141,13 @@ describe('AiInbox workflow approvals', () => {
         expect(wrapper.find('[data-test="approval-reassign-open"]').exists()).toBe(false);
     });
 
-    it('says the engine is not running rather than failing when the flag is off', async () => {
+    it('says the engine is not running when the list answers that it is off', async () => {
+        const wrapper = await openApprovals({ rows: [], engineOff: true });
+        expect(wrapper.find('[data-test="approvals-engine-off"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="approval-row"]').exists()).toBe(false);
+    });
+
+    it('says the same when a workflow route answers 503', async () => {
         const wrapper = await openApprovals({ approvalsStatus: 503 });
         expect(wrapper.find('[data-test="approvals-engine-off"]').exists()).toBe(true);
         expect(wrapper.find('[data-test="approval-row"]').exists()).toBe(false);

@@ -1433,6 +1433,8 @@ const schema = {
         failedReason: { type: String, required: false },
         undoUntil: { type: Date, required: false },
         auditIds: { type: Array, default: [], required: false },
+        // [{ action, ok, channelId, channelName, ts, error, at }] — what the provider answered for each connector change
+        delivery: { type: Array, required: false },
         cost: { type: Object, required: false },
         // a canned Inbox key (too_many_changes | wrong_tone | needs_person | not_now) or free text, ≤ 200 chars
         declineReason: { type: String, required: false },
@@ -1715,6 +1717,21 @@ const schema = {
         // Everyone already told that the doc names them. No default: a doc without the list predates it, and a
         // mongoose array would otherwise read as an empty list and tell everyone it names again.
         mentionsTold: { type: [String], required: false, default: undefined },
+        // People this one doc is shared with by name, whatever its project or privacy; role is 'viewer' or 'editor'.
+        // Modules/Pages/helpers/pageRules.js holds the limit and what a share gives.
+        sharedWith: {
+            type: [{
+                _id: false,
+                userId: { type: String, required: true },
+                role: { type: String, required: true },
+                by: { type: String, required: false },
+                at: { type: Date, required: false },
+            }],
+            required: false,
+            default: undefined,
+        },
+        // Everyone already told the doc was shared with them, so naming a person again tells them nothing twice.
+        sharesTold: { type: [String], required: false, default: undefined },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     // Doc history (Modules/Pages/versions.js). savedBy and savedAt are the writer and the time of the state held, not of
@@ -1971,6 +1988,27 @@ const schema = {
         updatedAt: { type: Date, required: false },
         // Moves on with every save; a save names the version it read, so two console tabs cannot drop each other's hosts.
         version: { type: Number, required: false },
+    },
+    // One row per workspace and connector (Modules/Agents/connectors). Tokens live in `secrets` by handle, never here.
+    connectorConnections: {
+        connector: { type: String, required: true },
+        // { bot_token: 'sec_…', signing_secret: 'sec_…' }
+        secretHandles: { type: Object, default: {}, required: false },
+        secretSetAt: { type: Object, default: {}, required: false },
+        team: { type: Object, required: false },
+        // [{ id, name, member }] as the provider listed them when the token was saved or the list refreshed
+        channels: { type: Array, default: [], required: false },
+        channelsFetchedAt: { type: Date, required: false },
+        // [{ id, name }] the channels an owner or admin chose; a post anywhere else is refused
+        allowedChannels: { type: Array, default: [], required: false },
+        // connected | broken
+        status: { type: String, default: 'connected', required: false },
+        brokenReason: { type: String, required: false },
+        brokenAt: { type: Date, required: false },
+        lastPostAt: { type: Date, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
     },
     // Instance-wide, in the global database: patterns the owner added to the instruction guard on top of
     // the built-in list (Modules/AICore/instructionPatterns.js).
@@ -2241,6 +2279,8 @@ const schema = {
         participants: { type: [String], required: false, default: [] },
         visibility: { type: String, required: false, default: 'project' },
         createdBy: { type: String, required: false, default: '' },
+        // Pages only: the user ids the page is shared with by name.
+        sharedWith: { type: [String], required: false, default: [] },
         // 'human' | 'agent'
         authorKind: { type: String, required: false, default: 'human' },
         // 'member' | 'agent' | 'external', the taint contract of Modules/Agents/taint.js; absent on chunks older than the field reads as not external.
@@ -2546,6 +2586,8 @@ const schema = {
             viewedBoard: { type: Boolean, required: false },
             viewedNotifications: { type: Boolean, required: false },
             importedWork: { type: Boolean, required: false },
+            openedMyWork: { type: Boolean, required: false },
+            viewedShortcuts: { type: Boolean, required: false },
             toursOffered: { type: [String], required: false, default: undefined }
         },
         navPreferences: {

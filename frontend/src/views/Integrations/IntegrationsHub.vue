@@ -256,6 +256,7 @@
                         </div>
                         <p class="ig-note">{{ $t('IntegrationsHub.slack_commands') }}</p>
                     </div>
+                    <SlackConnector v-if="connectors.includes('slack')" />
                     <details class="ig-help">
                         <summary>{{ $t('IntegrationsHub.slack_help_title') }}</summary>
                         <ol>
@@ -289,6 +290,7 @@ import { apiRequest } from '@/services';
 import { useGetterFunctions } from '@/composable';
 import * as env from '@/config/env';
 import { maskOf } from '@/utils/iconMask';
+import SlackConnector from './SlackConnector.vue';
 
 const homeIcon = require('@/assets/images/svg/Home.svg');
 
@@ -321,6 +323,7 @@ const calProjectId = ref('');
 const rules = ref([]);
 const ruleForm = reactive({ name: '', projectId: '', condPriority: '', actionPriority: 'HIGH' });
 const catalog = ref([]);
+const connectors = ref([]);
 const connections = ref([]);
 const mpSearch = ref('');
 const mpForm = reactive({ type: '', config: {} });
@@ -427,7 +430,7 @@ const removeRule = async (r) => {
 
 // AUTO-05 — integrations marketplace (consumes the AUTO-04 catalog + connections).
 const loadCatalog = async () => {
-    try { const b = (await apiRequest('get', `${env.INTEGRATIONS}/catalog`))?.data; catalog.value = (b && b.data) || []; } catch (e) { catalog.value = []; }
+    try { const b = (await apiRequest('get', `${env.INTEGRATIONS}/catalog`))?.data; catalog.value = (b && b.data) || []; connectors.value = (b && b.connectors) || []; } catch (e) { catalog.value = []; connectors.value = []; }
 };
 const loadConnections = async () => {
     try { const b = (await apiRequest('get', `${env.INTEGRATIONS}/connections`))?.data; connections.value = (b && b.data) || []; } catch (e) { connections.value = []; }

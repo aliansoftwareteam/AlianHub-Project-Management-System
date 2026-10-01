@@ -12,7 +12,7 @@
 
         <div class="ph__body" :class="`ph__body--${pane}`">
             <div class="ph__side">
-                <form class="ph__save" @submit.prevent="saveVersion">
+                <form v-if="!readOnly" class="ph__save" @submit.prevent="saveVersion">
                     <input
                         v-model="saveName"
                         type="text"
@@ -74,7 +74,7 @@
                         <button type="submit" class="ah-btn ah-btn--sm ah-btn--primary" :disabled="busy">{{ $t('Docs.history_name_save') }}</button>
                         <button type="button" class="ah-btn ah-btn--sm ah-btn--ghost" @click="renaming = false">{{ $t('Docs.comment_cancel') }}</button>
                     </form>
-                    <div v-else class="ph__tools">
+                    <div v-else-if="!readOnly" class="ph__tools">
                         <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary ph__rename" @click="startRename">{{ $t('Docs.history_name_this') }}</button>
                         <button type="button" class="ah-btn ah-btn--sm ah-btn--primary ph__restore" :disabled="busy" @click="restore">
                             <ShellIcon name="restore" :size="13" />{{ $t('Docs.history_restore') }}
@@ -171,6 +171,7 @@ const props = defineProps({
     currentTitle: { type: String, default: '' },
     currentBlocks: { type: Array, default: () => [] },
     docPrivate: { type: Boolean, default: false },
+    readOnly: { type: Boolean, default: false },
     savePending: { type: Function, default: () => Promise.resolve(true) },
     beforeRestore: { type: Function, default: () => true },
 });

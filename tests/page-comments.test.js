@@ -381,7 +381,7 @@ describe('notifications', () => {
         const fresh = mockDb.seed(SCHEMA_TYPE.NOTIFICATIONS_SETTINGS, { userId: mockIds.author });
         await ensureDocNoticeSection(C, [mockIds.member, mockIds.author]);
         await ensureDocNoticeSection(C, [mockIds.member, mockIds.author]);
-        const keys = [Notification_key.DOC_MENTION, Notification_key.DOC_COMMENT_MENTION, Notification_key.DOC_COMMENT_REPLY, Notification_key.DOC_COMMENT_ASSIGNED];
+        const keys = [Notification_key.DOC_MENTION, Notification_key.DOC_COMMENT_MENTION, Notification_key.DOC_COMMENT_REPLY, Notification_key.DOC_COMMENT_ASSIGNED, Notification_key.DOC_SHARED];
         expect(older.docs.items.map((item) => item.key)).toEqual(keys);
         expect(older.docs.items[0].browser).toBe(false);
         expect(fresh.docs.items.map((item) => item.key)).toEqual(keys);

@@ -89,7 +89,7 @@
     </div>
 </template>
 <script setup>
-    import { FormKit } from '@formkit/vue';
+    import { FormKit } from '@/plugins/customFieldView/lazyFormKit';
     import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
     import { useCustomComposable } from "@/composable";
     import DropDown from '@/components/molecules/DropDown/DropDown.vue';

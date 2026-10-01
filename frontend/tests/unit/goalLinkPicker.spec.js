@@ -1,9 +1,12 @@
 /* Task 046 M3: "Count toward a goal…" on a task and on a list. The goals a person can edit come from
-   the goals list; the picker adds the task or the list to a target by sending the target's whole set
-   of sources with it, or makes a new target, and words a refusal the way the Goals page does. */
+   the goals list, asked for when a menu holding the entry is opened and never before; the picker adds
+   the task or the list to a target by sending the target's whole set of sources with it, or makes a
+   new target, and words a refusal the way the Goals page does. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { config, flushPromises, mount } from '@vue/test-utils';
-import { ref } from 'vue';
+import { createStore } from 'vuex';
+import { routerKey } from 'vue-router';
+import { h, ref } from 'vue';
 import fs from 'fs';
 import path from 'path';
 import en from '@/locales/en';
@@ -16,7 +19,7 @@ vi.mock('@/services', () => ({ apiRequest }));
 vi.mock('vue-toast-notification', () => ({ useToast: () => toast }));
 
 import GoalLinkPicker from '@/views/Goals/GoalLinkPicker.vue';
-import { canCountTowardGoal, linkableGoals, loadLinkableGoals, noteLinked, resetLinkableGoals } from '@/views/Goals/goalLinking';
+import { FRESH_FOR_MS, linkableGoals, loadLinkableGoals, noteLinked, resetLinkableGoals, useGoalLinking } from '@/views/Goals/goalLinking';
 
 const CID = 'company-1';
 const GOALS = '/api/v2/goals';
@@ -42,11 +45,26 @@ const saved = (answer) => Promise.resolve({ data: { status: true, data: answer }
 const refused = (status, data = {}) => Promise.reject({ response: { status, data: { status: false, ...data } } });
 const writes = () => apiRequest.mock.calls.filter(([method]) => method !== 'get');
 
+const router = { hasRoute: vi.fn(() => true), push: vi.fn(() => Promise.resolve()) };
+const provided = () => ({ $companyId: ref(CID), [routerKey]: router });
+
 let wrapper;
 const open = async (source = TASK) => {
-    wrapper = mount(GoalLinkPicker, { props: { source }, global: { provide: { $companyId: ref(CID) } }, attachTo: document.body });
+    wrapper = mount(GoalLinkPicker, { props: { source }, global: { provide: provided() }, attachTo: document.body });
     await flushPromises();
     return wrapper;
+};
+/* A menu that holds the entry: it shows whether the entry is offered, and asks for the goals when pressed. */
+const menuFor = (roleType) => {
+    const Menu = {
+        setup() {
+            const { offered, prefetch } = useGoalLinking();
+            return () => h('button', { 'data-offered': String(offered.value), onClick: prefetch });
+        }
+    };
+    const store = createStore({ modules: { settings: { namespaced: true, getters: { companyUserDetail: () => (roleType === undefined ? undefined : { roleType }) } } } });
+    wrapper = mount(Menu, { global: { plugins: [store], provide: provided() } });
+    return wrapper.find('button');
 };
 const at = (name) => document.body.querySelector(`[data-test="${name}"]`);
 const optionsOf = (name) => [...at(name).querySelectorAll('option')].map((option) => [option.textContent.trim(), option.disabled]);
@@ -75,6 +93,8 @@ beforeEach(() => {
     apiRequest.mockReset();
     answerWith(() => saved(LAUNCH));
     Object.values(toast).forEach((spy) => spy.mockReset());
+    router.push.mockClear();
+    router.hasRoute.mockImplementation(() => true);
 });
 
 afterEach(() => {
@@ -83,19 +103,48 @@ afterEach(() => {
     document.body.innerHTML = '';
 });
 
+describe('the entry', () => {
+    it('is offered to anyone who could own a goal, in a build that has the Goals page', () => {
+        expect(menuFor(3).attributes('data-offered')).toBe('true');
+        wrapper.unmount();
+        expect(menuFor(1).attributes('data-offered')).toBe('true');
+    });
+
+    it('is not offered to a guest, before the person\'s role is known, or without the Goals page', () => {
+        expect(menuFor(0).attributes('data-offered')).toBe('false');
+        wrapper.unmount();
+        expect(menuFor(undefined).attributes('data-offered')).toBe('false');
+        wrapper.unmount();
+        router.hasRoute.mockImplementation(() => false);
+        expect(menuFor(3).attributes('data-offered')).toBe('false');
+        expect(router.hasRoute).toHaveBeenCalledWith('Goals');
+    });
+
+    it('asks for nobody\'s goals until a menu holding it is opened, and then once', async () => {
+        const button = menuFor(3);
+        await flushPromises();
+        expect(apiRequest).not.toHaveBeenCalled();
+
+        await button.trigger('click');
+        await button.trigger('click');
+        await flushPromises();
+        await button.trigger('click');
+        expect(apiRequest.mock.calls).toEqual([['get', GOALS]]);
+    });
+
+    it('never asks for a guest', async () => {
+        const button = menuFor(0);
+        await button.trigger('click');
+        await flushPromises();
+        expect(apiRequest).not.toHaveBeenCalled();
+    });
+});
+
 describe('the goals a person can count work toward', () => {
     it('are the ones the goals list says they can edit, and not an archived one', async () => {
-        expect(canCountTowardGoal()).toBe(false);
         await loadLinkableGoals(CID);
         expect(apiRequest.mock.calls).toEqual([['get', GOALS]]);
         expect(linkableGoals.goals.map((entry) => entry._id)).toEqual(['g-launch', 'g-brand']);
-        expect(canCountTowardGoal()).toBe(true);
-    });
-
-    it('are none for someone who can edit no goal', async () => {
-        listed = [READ_ONLY, ARCHIVED];
-        await loadLinkableGoals(CID);
-        expect(canCountTowardGoal()).toBe(false);
     });
 
     it('are read once for a workspace however many menus ask, and again for another workspace', async () => {
@@ -111,13 +160,31 @@ describe('the goals a person can count work toward', () => {
         apiRequest.mockImplementation(() => Promise.reject(new Error('offline')));
         await loadLinkableGoals(CID, { again: true });
         expect(linkableGoals.status).toBe('failed');
-        expect(canCountTowardGoal()).toBe(true);
+        expect(linkableGoals.goals).toHaveLength(2);
     });
 });
 
 describe('the picker', () => {
-    it('reads the goals again when it opens, and offers the goals the person can edit', async () => {
+    it('asks for the goals itself when no menu did, and waits for a read that is under way', async () => {
+        await open();
+        expect(apiRequest.mock.calls).toEqual([['get', GOALS]]);
+        wrapper.unmount();
+
+        resetLinkableGoals();
+        apiRequest.mockClear();
+        loadLinkableGoals(CID);
+        await open();
+        expect(apiRequest).toHaveBeenCalledTimes(1);
+        expect(optionsOf('glk-goal')).toEqual([['Brand refresh', false], ['Launch the site', false]]);
+    });
+
+    it('does not read again a list the menu read a moment ago, and does read an older one', async () => {
         await loadLinkableGoals(CID);
+        await open();
+        expect(apiRequest).toHaveBeenCalledTimes(1);
+        wrapper.unmount();
+
+        linkableGoals.loadedAt = Date.now() - FRESH_FOR_MS;
         await open();
         expect(apiRequest.mock.calls.filter(([method, url]) => method === 'get' && url === GOALS)).toHaveLength(2);
         expect(at('glk').getAttribute('role')).toBe('dialog');
@@ -210,14 +277,26 @@ describe('the picker', () => {
         expect(at('glk-save').disabled).toBe(false);
     });
 
-    it('says so when no goal is left to edit, and when the goals cannot be read', async () => {
-        listed = [READ_ONLY];
+    it('says so when the person has no goal to edit, and leads to a new one', async () => {
+        listed = [READ_ONLY, ARCHIVED];
         await open();
-        expect(at('glk-none').textContent).toBe('There is no goal you can edit.');
+        expect(at('glk-none').textContent).toContain('You have no goals you can edit.');
         expect(at('glk-save').disabled).toBe(true);
+        expect(at('glk-new-goal').textContent).toBe('New goal');
+
+        at('glk-new-goal').click();
+        expect(router.push).toHaveBeenCalledWith({ name: 'Goals', params: { cid: CID }, query: { new: '1' } });
+        expect(wrapper.emitted('close')).toHaveLength(1);
         wrapper.unmount();
 
         resetLinkableGoals();
+        router.hasRoute.mockImplementation(() => false);
+        await open();
+        expect(at('glk-none').textContent).toContain('You have no goals you can edit.');
+        expect(at('glk-new-goal')).toBeNull();
+    });
+
+    it('says so when the goals cannot be read, and reads them again when asked', async () => {
         apiRequest.mockImplementation(() => Promise.reject(new Error('offline')));
         await open();
         expect(at('glk-failed').textContent).toContain('Your goals could not be loaded.');
@@ -250,11 +329,13 @@ describe('the task panel\'s menu', () => {
     const read = (file) => fs.readFileSync(path.resolve(__dirname, '../../src', file), 'utf8');
     const actions = read('components/molecules/TaskDetailAction/TaskDetailAction.vue');
 
-    it('offers the entry only to someone who can edit a goal, and opens the picker for the task', () => {
-        expect(actions).toContain('<DropDownOption v-if="canCountTowardGoal()" data-test="task-count-toward-goal" @click="linkingGoal = true">');
+    it('offers the entry by the shared rule, asks for the goals when the menu is pressed, and opens the picker for the task', () => {
+        expect(actions).toContain('<DropDownOption v-if="goalsOffered" data-test="task-count-toward-goal" @click="linkingGoal = true">');
         expect(actions).toContain("{{$t('Goals.count_toward')}}");
         expect(actions).toContain('<GoalLinkPicker v-if="linkingGoal" :source="{ kind: \'taskIds\', id: props.task._id, name: props.task.TaskName }" @close="linkingGoal = false" />');
-        expect(actions).toContain('loadLinkableGoals(companyId?.value);');
+        expect(actions).toContain('const { offered: goalsOffered, prefetch: prefetchGoals } = useGoalLinking();');
+        expect(actions).toContain('@isVisible="(shown) => shown && prefetchGoals()"');
+        expect(actions).not.toContain('loadLinkableGoals');
         expect(en.Goals.count_toward).toBe('Count toward a goal…');
     });
 

@@ -12,20 +12,24 @@ jest.mock('../Modules/AICore/llmProvider', () => ({ getProvider: jest.fn(), isAn
 const { myCache } = require('../Config/config');
 const { gather, openProjects } = require('../Modules/AI/ask');
 const { openSources } = require('../Modules/AI/askThreads');
-const { pinnedSources } = require('../Modules/AI/askContext');
+const { pinnedSources, MAX_PINNED } = require('../Modules/AI/askContext');
 const { taskContext } = require('../Modules/AI/taskContext');
 
 const { C, PAGES, PROJECTS, TASK } = world;
 
 const EVERY_DOC = {
-    owner: ['shared', 'company', 'closed'],
-    admin: ['shared', 'company', 'closed'],
-    inside: ['insidePrivate', 'shared', 'company', 'closed'],
+    owner: ['shared', 'company', 'closed', 'namedEdit'],
+    admin: ['shared', 'company', 'closed', 'namedEdit'],
+    inside: ['insidePrivate', 'shared', 'company', 'closed', 'namedView', 'namedEdit'],
     outside: ['outsidePrivate', 'shared', 'company'],
     guest: ['shared', 'company'],
+    viewer: ['shared', 'company', 'namedView'],
+    editor: ['shared', 'company', 'namedEdit'],
 };
 
-const ONE_PROJECT = { owner: ['shared'], admin: ['shared'], inside: ['insidePrivate', 'shared'], outside: ['outsidePrivate', 'shared'], guest: ['shared'] };
+const ONE_PROJECT = {
+    owner: ['shared'], admin: ['shared'], inside: ['insidePrivate', 'shared'], outside: ['outsidePrivate', 'shared'], guest: ['shared'], viewer: ['shared'], editor: ['shared'],
+};
 
 const pagesOf = (sources) => sources.filter((source) => source.kind === 'page');
 
@@ -54,8 +58,14 @@ describe('the page readers agree on who reaches a page: Ask', () => {
     });
 
     it('reads the docs a person attached to a question', async () => {
-        const context = Object.values(PAGES).map((id) => ({ kind: 'page', id }));
-        const pinned = await world.askEveryone(async (uid) => pagesOf(await pinnedSources(C, uid, { context, projects: await openProjects(C, uid) })));
+        const ids = Object.values(PAGES);
+        const attachments = [ids.slice(0, MAX_PINNED), ids.slice(MAX_PINNED)].map((batch) => batch.map((id) => ({ kind: 'page', id })));
+        const pinned = await world.askEveryone(async (uid) => {
+            const projects = await openProjects(C, uid);
+            const read = [];
+            for (const context of attachments) read.push(...pagesOf(await pinnedSources(C, uid, { context, projects })));
+            return read;
+        });
         expect(pinned).toEqual(EVERY_DOC);
     });
 
