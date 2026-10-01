@@ -113,10 +113,10 @@ onMounted(() => { load().catch(() => {}); });
 .hwait__row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--hairline); min-width: 0; }
 .hwait__row:last-child { border-bottom: 0; }
 .hwait__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
-.hwait__what { font: 500 13px/1.35 var(--font-ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hwait__who { font: 400 11.5px/1.3 var(--font-ui); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hwait__what { font: 500 var(--fs-md, 13px)/1.35 var(--font-ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hwait__who { font: 400 var(--fs-sm, 11.5px)/1.3 var(--font-ui); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hwait__actions { display: flex; gap: 6px; flex: none; }
-.hwait__inbox { align-self: flex-start; font: 600 12.5px/1.2 var(--font-ui); color: var(--brand); text-decoration: none; }
+.hwait__inbox { align-self: flex-start; font: 600 var(--fs-md, 12.5px)/1.2 var(--font-ui); color: var(--brand); text-decoration: none; }
 .hwait__inbox:hover { text-decoration: underline; }
 @media (max-width: 767px) {
     .hwait__row { flex-wrap: wrap; }

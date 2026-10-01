@@ -47,23 +47,45 @@ const outsideFunctions = (value) => {
 const declarations = (css) => [...withoutComments(css).matchAll(/([^{}]+)\{([^{}]*)\}/g)].flatMap(([, selector, body]) =>
     body.split(';').map((d) => d.trim()).filter(Boolean).map((d) => ({ selector: selector.trim(), property: d.slice(0, d.indexOf(':')).trim(), value: d.slice(d.indexOf(':') + 1).trim() })));
 
-describe.each([HOME, LIST, PANEL])('%s', (rel) => {
-    const all = declarations(read(rel));
+const fixedFontSizes = (css) => declarations(css)
+    .filter(({ property }) => property === 'font' || property === 'font-size')
+    .filter(({ value }) => /\d(px|rem|em)\b/.test(outsideFunctions(value)))
+    .map(({ selector, property, value }) => `${selector} { ${property}: ${value} }`);
 
+describe.each([HOME, LIST, PANEL])('%s', (rel) => {
     it('sets no font size a variant cannot change', () => {
-        const fixed = all
-            .filter(({ property }) => property === 'font' || property === 'font-size')
-            .filter(({ value }) => /\d(px|rem|em)\b/.test(outsideFunctions(value)))
-            .map(({ selector, property, value }) => `${selector} { ${property}: ${value} }`);
-        expect(fixed).toEqual([]);
+        expect(fixedFontSizes(read(rel))).toEqual([]);
     });
 
     it('draws no shadow a variant cannot change', () => {
-        const fixed = all
+        const fixed = declarations(read(rel))
             .filter(({ property, value }) => property === 'box-shadow' && !value.startsWith('inset'))
             .filter(({ value }) => /\d/.test(outsideFunctions(value)))
             .map(({ selector, value }) => `${selector} { box-shadow: ${value} }`);
         expect(fixed).toEqual([]);
+    });
+});
+
+describe.each([
+    'components/molecules/Home/AssignedCommentsCard.vue',
+    'components/molecules/Home/HomeCardsMenu.vue',
+    'components/molecules/Home/HomeCatalogCard.vue',
+    'components/molecules/Home/RecentsCard.vue',
+    'components/molecules/Home/StandupCard.vue',
+    'components/molecules/Home/WaitingOnYouCard.vue',
+    'views/Projects/ListView/ListBulkBar.vue',
+    'components/organisms/TaskDetailOverlay/TaskActionItems.vue',
+    'components/organisms/TaskDetailOverlay/TaskAiRow.vue',
+    'components/organisms/TaskDetailOverlay/TaskAskPanel.vue',
+    'components/organisms/TaskDetailOverlay/TaskAssignmentSuggestion.vue',
+    'components/organisms/TaskDetailOverlay/TaskRepeatControl.vue',
+    'components/organisms/TaskDetailOverlay/TaskTimeSection.vue',
+])('%s', (rel) => {
+    it('sets no font size a variant cannot change', () => {
+        const vue = read(rel);
+        const style = vue.slice(vue.lastIndexOf('<style'), vue.lastIndexOf('</style>')).replace(/^<style[^>]*>/, '');
+        expect(style).toMatch(/\{/);
+        expect(fixedFontSizes(style)).toEqual([]);
     });
 });
 

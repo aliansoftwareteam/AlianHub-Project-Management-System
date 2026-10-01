@@ -13,6 +13,19 @@ const SCREENS = [
     'views/Home/style.css',
     'views/Projects/ListView/style.css',
     'components/organisms/TaskDetailOverlay/style.css',
+    'components/molecules/Home/AssignedCommentsCard.vue',
+    'components/molecules/Home/HomeCardsMenu.vue',
+    'components/molecules/Home/HomeCatalogCard.vue',
+    'components/molecules/Home/RecentsCard.vue',
+    'components/molecules/Home/StandupCard.vue',
+    'components/molecules/Home/WaitingOnYouCard.vue',
+    'views/Projects/ListView/ListBulkBar.vue',
+    'components/organisms/TaskDetailOverlay/TaskActionItems.vue',
+    'components/organisms/TaskDetailOverlay/TaskAiRow.vue',
+    'components/organisms/TaskDetailOverlay/TaskAskPanel.vue',
+    'components/organisms/TaskDetailOverlay/TaskAssignmentSuggestion.vue',
+    'components/organisms/TaskDetailOverlay/TaskRepeatControl.vue',
+    'components/organisms/TaskDetailOverlay/TaskTimeSection.vue',
 ];
 const VARIANTS = ['a', 'b', 'c'];
 
