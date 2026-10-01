@@ -723,6 +723,7 @@ function buildTaskDoc({ task, projectDoc, sprintDoc, statusByName, taskTypeByKey
         TaskType: taskType ? (taskType.value || taskType.name || 'task') : 'task',
         TaskTypeKey: taskType ? taskType.key : 0,
         ParentTaskId: parentTaskId ? String(parentTaskId) : '',
+        ancestors: parentTaskId ? [String(parentTaskId)] : [],
         // Taken straight from the plan and capped, so a task that was split
         // shows its slice immediately rather than waiting on the background
         // estimator — which never runs for sub-tasks at all.

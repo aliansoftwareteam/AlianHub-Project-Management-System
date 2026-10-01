@@ -29,10 +29,8 @@ const { normalizeBlockMentions, normalizeMentionHtml } = require('./helpers/page
 const { notifyNewMentions } = require('./helpers/pageMentionNotices');
 const { PageImageError, receiveImage, storePageImage, unlinkQuietly } = require('./helpers/pageImages');
 const { projectAccess, isCompanyAdmin, isCompanyMember, visibleProjectIds } = require('../../Config/contentAccess');
-
-// There is no version history. It was removed rather than fixed: it recorded a snapshot
-// per save with no way to see what changed. The `pageVersions` collection stays registered
-// so the rows already written stay readable — nothing writes to it now.
+const versionRules = require('./helpers/pageVersionRules');
+const pageVersions = require('./helpers/pageVersions');
 
 const LIST_FIELDS = 'title parentPageId ProjectID visibility createdBy linkedTasks updatedBy updatedAt createdAt order '
     + 'isWiki ownerId reviewDate reviewedAt reviewedBy createdByAgent agentName agentStatus rawText';
@@ -96,6 +94,19 @@ const announceMentions = (companyId, page, actorId, before, after) => {
         .catch((error) => logger.error(`ERROR in doc mention notices: ${error.message}`));
 };
 
+const htmlOf = (content) => String((content && content.html) || '');
+
+/* Whether a save changes what a version holds: the title or the body. */
+const changesState = (existing, update) => {
+    const next = { title: update.title !== undefined ? update.title : existing.title, content: update.content || existing.content };
+    return versionRules.snapshotOf(next).hash !== versionRules.snapshotOf(existing).hash
+        || (Boolean(update.content) && htmlOf(update.content) !== htmlOf(existing.content));
+};
+
+/* History never holds up or fails the save that feeds it. */
+const keepOutgoingVersion = (companyId, page, editorId, now) => pageVersions.keepOutgoing(companyId, page, editorId, { now })
+    .catch((error) => logger.error(`ERROR keeping a page version: ${error.message}`));
+
 /* A non-deleted (or trashed) page the caller may act on, or null. */
 const findPage = async (companyId, id, uid, { deletedStatusKey = 0, edit = false } = {}) => {
     const page = await MongoDbCrudOpration(companyId, {
@@ -151,6 +162,8 @@ exports.createPage = async (req, res) => {
             rawText: htmlToRawText(html),
             createdBy: userId,
             updatedBy: userId,
+            editedBy: userId,
+            editedAt: new Date(),
             deletedStatusKey: 0,
             order: Date.now(),
             linkedTasks: [...new Set((linkedTasks || []).map(String))].map((x) => new mongoose.Types.ObjectId(x)),
@@ -321,6 +334,12 @@ exports.updatePage = async (req, res) => {
                 return res.send({ status: false, statusText: 'linkedTasks must be a list of valid task ids.' });
             }
             update.linkedTasks = [...new Set(linkedTasks.map(String))].map((x) => new mongoose.Types.ObjectId(x));
+        }
+        if ((update.title !== undefined || update.content) && changesState(existing, update)) {
+            const now = new Date();
+            await keepOutgoingVersion(companyId, existing, userId, now);
+            update.editedBy = userId;
+            update.editedAt = now;
         }
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,

@@ -40,7 +40,7 @@ exports.init = (app) => {
             })
             .catch((error) => {
                 logger.error(`ERROR: ${error.message}`);
-                res.send({status: false, statusText: error.message});
+                sendFailure(res, error);
             });
         } catch (error) {
             logger.error(`ERROR: ${error.message}`);

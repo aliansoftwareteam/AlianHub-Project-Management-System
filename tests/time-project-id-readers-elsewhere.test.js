@@ -62,6 +62,7 @@ beforeEach(() => {
         }
         if (type === SCHEMA_TYPE.COMPANY_USERS) return method === 'findOne' ? { userId: ME, roleType: 1 } : [{ userId: ME, roleType: 1 }];
         if (type === SCHEMA_TYPE.PROJECTS) {
+            if (data[0] && data[0].isPersonal === true) return [];
             const project = { _id: oid(PROJECT), ProjectName: 'Parity', status: 'open', ProjectType: 'Fixed' };
             return method === 'findOne' ? project : [project];
         }

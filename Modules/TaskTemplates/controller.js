@@ -12,6 +12,7 @@ const { updateRemainingTime } = require('../LogTime/controllerV2/helpers');
 const { visibleProjectIds } = require('../Agents/scope');
 const access = require('./access');
 const rules = require('./templateRules');
+const { canNest } = require('../Tasks/helpers/taskTree');
 
 const { OBJECT_ID } = access;
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
@@ -274,7 +275,9 @@ exports.applyTemplate = async (req, res) => {
             return [];
         };
         const checklist = await keep('checklist', plan.checklist);
-        const subtasks = await keep('subtasks', plan.subtasks);
+        const takesSubtasks = canNest(task).ok;
+        if (!takesSubtasks && plan.subtasks.length) skipped.push('subtasks');
+        const subtasks = takesSubtasks ? await keep('subtasks', plan.subtasks) : [];
 
         const actor = await sessionActor(req);
         if (changes.length) await writeFields({ companyId, task, projectId, changes, actor, template });
