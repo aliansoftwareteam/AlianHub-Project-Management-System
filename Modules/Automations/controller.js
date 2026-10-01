@@ -16,6 +16,8 @@ const dryRunPlan = require('./helpers/dryRun');
 const assignees = require('./engine/assignees');
 const statusConditions = require('./helpers/statusConditions');
 const { loadStatuses } = require('./helpers/projectStatuses');
+const notices = require('./engine/noticeRecipients');
+const triggerState = require('./helpers/triggerState');
 
 const NOT_FOUND = 'Not found.';
 const APPLY_REFUSED = 'You cannot edit every task this automation targets.';
@@ -358,7 +360,7 @@ const runStep = (step = {}) => {
         action: step.action || undefined,
         error: step.error || undefined,
         durationMs: step.durationMs,
-        output: step.output ? definedOnly({ changed: output.changed, passed: output.passed, assigned: output.assigned, removed: output.removed, skipped: output.skipped }) : undefined,
+        output: step.output ? definedOnly({ changed: output.changed, passed: output.passed, assigned: output.assigned, removed: output.removed, notified: output.notified, skipped: output.skipped }) : undefined,
     });
 };
 
@@ -412,6 +414,15 @@ const previewAssignments = async (companyId, rule, task, plan) => {
     }
 };
 
+/* Who each notify step would tell or skip on the task. Nobody is taken to have caused the event. Reads only. */
+const previewNotices = async (companyId, task, plan) => {
+    const action = registry.getAction('notify');
+    for (const entry of plan.actions.filter((a) => a.action === 'notify' && a.params)) {
+        // eslint-disable-next-line no-await-in-loop
+        entry.notify = await action.preview({ companyId, task, config: entry.params, context: { actor: { kind: 'user', userId: null } } });
+    }
+};
+
 /* POST /api/v2/automations/:id/dry-run  body: { taskId }
  * What the saved rule would do to one stored task. Gated like an edit, because
  * the answer shows the rule's resolved action params; the task must be one the
@@ -437,11 +448,14 @@ exports.dryRun = async (req, res) => {
         const statuses = await loadStatuses(companyId, [String(task.ProjectID)]).catch(() => []);
         const plan = dryRunPlan.plan({ rule, task: task.toObject ? task.toObject() : task, uid: req.uid, triggerLabel: trigger.label, statuses });
         await previewAssignments(companyId, rule, task, plan);
+        await previewNotices(companyId, task, plan);
+        const state = await triggerState.of(companyId, trigger.key, task);
+        if (state) plan.trigger = state;
         return res.send({ status: true, statusText: plan.matched ? 'The rule would run.' : 'The rule would not run.', data: plan });
     } catch (e) { logger.error(`dryRun: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
-const NAMES_PEOPLE = /\b(?:assign|reassign|unassign|rotate|take turns)\b/i;
+const NAMES_PEOPLE = /\b(?:assign|reassign|unassign|rotate|take turns|send|notify)\b/i;
 
 const NAMES_STATUS = /\b(?:status|marked|moved to)\b/i;
 
@@ -503,9 +517,10 @@ const backtestMatch = (node) => {
 };
 
 /* POST /api/v2/automations/backtest  body: { rule }
- * Counts tasks touched in the window that the conditions match today. It does not
- * replay the event stream, and says so in `basis`. Only projects the caller can
- * open are searched, whatever scope the rule names. */
+ * Counts the tasks the trigger would have reached in the window that the conditions
+ * match today (helpers/triggerState.backtestBasis). It does not replay the event
+ * stream, and says so in `basis`. Only projects the caller can open are searched,
+ * whatever scope the rule names. */
 exports.backtest = async (req, res) => {
     try {
         const companyId = companyOf(req);
@@ -520,7 +535,8 @@ exports.backtest = async (req, res) => {
         const statuses = await loadStatuses(companyId, projectIds.map(String)).catch(() => []);
         const conditions = statusConditions.normaliseStatusConditions(rule.conditions, statuses, rule.scope).conditions;
         const conditionMatch = backtestMatch(conditions);
-        const match = { deletedStatusKey: { $ne: 1 }, updatedAt: { $gte: since } };
+        const basis = await triggerState.backtestBasis(companyId, rule.trigger && rule.trigger.event, { since, projectIds, windowDays: WINDOW_DAYS });
+        const match = { ...basis.match };
         if (Object.keys(conditionMatch).length) Object.assign(match, conditionMatch);
         const scoped = { $and: [match, { ProjectID: { $in: projectIds } }] };
         const [count, sample] = await Promise.all([
@@ -533,14 +549,21 @@ exports.backtest = async (req, res) => {
             const named = await assignees.describePeople(companyId, step.config || {});
             assignments.push({ stepId: step.id, mode: (step.config || {}).mode, roundRobin: assignees.rotates(step.config || {}), ...named });
         }
+        const notifications = [];
+        for (const step of notices.notifyStepsOf(rule)) {
+            // eslint-disable-next-line no-await-in-loop
+            notifications.push({ stepId: step.id, ...(await notices.describeRecipients(companyId, step.config || {})) });
+        }
         return res.send({
             status: true,
             data: {
                 windowDays: WINDOW_DAYS,
                 matched: Number(count) || 0,
                 assignments,
+                notifications,
                 sample: (sample || []).map((t) => ({ id: String(t._id), key: t.TaskKey || '', name: t.TaskName || '', status: statusConditions.statusNameOfTask(t, statuses) })),
-                basis: `tasks touched in the last ${WINDOW_DAYS} days whose current state matches these conditions`,
+                basis: basis.text,
+                basisKey: basis.key,
             },
         });
     } catch (e) { logger.error(`backtest: ${e.message}`); return res.send({ status: false, statusText: e.message }); }

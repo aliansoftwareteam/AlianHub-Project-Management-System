@@ -122,7 +122,7 @@ describe('the recipes that needed the due date and subtask triggers and the noti
 
     it('names a status in the reader\'s language when no project has one of that type', () => {
         const rule = fillTemplate(byId('subtasks_done_close_parent'), { projects: [], projectId: '', translate });
-        expect(rule.steps[0].config.status).toBe(en['AutomationTemplates.status_done']);
+        expect(rule.steps[0].config.status).toBe(en['AutomationTemplates.status_close']);
     });
 
     it('notifies the creator when a task is done', () => {

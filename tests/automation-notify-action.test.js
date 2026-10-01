@@ -269,6 +269,14 @@ describe('rate limit per rule and recipient', () => {
         expect(receivers()).toEqual([PRIYA]);
     });
 
+    it('counts without marking the rule as edited', async () => {
+        seedWorld();
+        await run(config);
+        const writes = mockDb.calls.filter((c) => c.type === SCHEMA_TYPE.AUTOMATION_RULES && c.method === 'findOneAndUpdate');
+        expect(writes.length).toBeGreaterThan(0);
+        writes.forEach((write) => expect(write.data[2]).toMatchObject({ timestamps: false }));
+    });
+
     it('tells them again in the next hour', async () => {
         seedWorld();
         for (let i = 0; i < notices.MAX_PER_HOUR + 1; i += 1) {

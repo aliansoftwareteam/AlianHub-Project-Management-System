@@ -212,6 +212,14 @@ describe('where it is hooked', () => {
         expect(emit).not.toHaveBeenCalled();
     });
 
+    it('does not mark the parent as edited when it records that it fired', async () => {
+        seedParent();
+        await close(seedSubtask());
+        const writes = mockDb.calls.filter((c) => c.type === SCHEMA_TYPE.TASKS && c.method !== 'find');
+        expect(writes.length).toBeGreaterThan(0);
+        writes.forEach((write) => expect(write.data[2]).toMatchObject({ timestamps: false }));
+    });
+
     it('reads and writes only in the company of the event', async () => {
         seedParent();
         await close(seedSubtask());

@@ -121,6 +121,15 @@ describe('a due date that passes while the task is open', () => {
         await tick();
         expect(emit).not.toHaveBeenCalled();
     });
+
+    it('does not mark the task as edited when it records what it fired for', async () => {
+        seedRule();
+        seedTask();
+        await tick();
+        const writes = mockDb.calls.filter((c) => c.type === SCHEMA_TYPE.TASKS && c.method !== 'find');
+        expect(writes).toHaveLength(1);
+        expect(writes[0].data[2]).toMatchObject({ timestamps: false });
+    });
 });
 
 describe('tasks it leaves alone', () => {
