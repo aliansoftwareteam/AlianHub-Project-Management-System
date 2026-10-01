@@ -330,7 +330,8 @@ describe('an editor', () => {
         await at('glp-vis-people').setValue(true);
         expect(at('glp-vis-effect').text()).toBe('Only you, until you pick someone');
         const people = all('glp-person');
-        expect(people.map((person) => person.text())).toEqual(['Ada Admin', 'Gil Guest Guest', 'Sam Carter']);
+        expect(people.map((person) => person.find('.gpp__name').text())).toEqual(['Ada Admin', 'Gil Guest', 'Sam Carter']);
+        expect(people.map((person) => person.find('.ah-chip').exists())).toEqual([false, true, false]);
 
         await people[2].find('input').setValue(true);
         expect(at('glp-vis-effect').text()).toBe('You and 1 person');
@@ -612,7 +613,8 @@ describe('a change made by someone else', () => {
         expect(socket.on).toHaveBeenCalledWith('goalsChanged', expect.any(Function));
         const [, changed] = socket.on.mock.calls.find(([event]) => event === 'goalsChanged');
 
-        vi.useFakeTimers();
+        vi.useRealTimers();
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'], now: new Date(2026, 9, 15, 10, 0) });
         changed({ type: 'update' });
         changed({ type: 'update' });
         expect(apiRequest).toHaveBeenCalledTimes(1);

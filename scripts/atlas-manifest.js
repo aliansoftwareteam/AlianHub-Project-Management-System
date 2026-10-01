@@ -17,6 +17,7 @@ const SCREENS = [
     { name: 'home', route: '/:cid', core: true, phone: true },
     { name: 'my-work', route: '/:cid/personal' },
     { name: 'everything', route: '/:cid/everything', core: true },
+    { name: 'goals', route: '/:cid/goals' },
     { name: 'inbox', route: '/:cid/inbox' },
     { name: 'planner', route: '/:cid/planner' },
     { name: 'chat', route: '/:cid/chat' },
