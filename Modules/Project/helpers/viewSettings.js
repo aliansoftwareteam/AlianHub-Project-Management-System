@@ -9,7 +9,7 @@ const SUBTASKS = ['collapsed', 'expanded'];
 const WORKLOAD_UNITS = ['hours', 'points', 'count'];
 const VIEW_DENSITIES = Object.freeze(['comfortable', 'compact']);
 const FILTER_TYPES = ['array', 'string', 'date', 'object', 'arrayOfObject', 'custom'];
-const CUSTOM_FIELD_TYPES = ['dropdown', 'checkbox', 'date', 'number', 'money', 'text', 'textarea', 'email', 'phone'];
+const CUSTOM_FIELD_TYPES = ['dropdown', 'checkbox', 'date', 'number', 'money', 'text', 'textarea', 'email', 'phone', 'people', 'url', 'rating', 'progress'];
 const CUSTOM_VALUE = /^customField\.([a-f0-9]{24})\.fieldValue$/i;
 const COMPARISONS = [':', ':!=', ':>', ':<', ':=', ':~', ':set', ':empty'];
 const CONDITIONS = ['&&', '||'];

@@ -8,7 +8,7 @@
             class="apv__rating"
             data-ai-rating
             role="img"
-            :aria-label="$t('AiFields.rating_value', { n: rating, max: RATING_MAX })"
+            :aria-label="$t('AiFields.rating_value', { n: rating, max })"
         >{{ stars }}</span>
         <span v-else-if="kind === 'date'" data-ai-date>{{ dateText }}</span>
         <span v-else class="apv__text">{{ proposal.text }}</span>
@@ -18,7 +18,7 @@
 <script setup>
 import { computed, inject, ref } from "vue";
 import moment from "moment";
-import { RATING_MAX, aiOutputOf } from "@/views/Projects/composables/aiFields";
+import { aiOutputOf, aiRatingMaxOf } from "@/views/Projects/composables/aiFields";
 import { dropdownChoices } from "@/views/Projects/composables/projectCustomFields";
 
 defineOptions({ name: "AiProposalValue" });
@@ -34,8 +34,9 @@ const KINDS = { dropdown: "options", labels: "options", rating: "rating", date: 
 
 const kind = computed(() => KINDS[aiOutputOf(props.field)] || "text");
 const choices = computed(() => dropdownChoices(props.field, props.proposal.fieldValue));
-const rating = computed(() => Math.min(Math.max(Math.round(Number(props.proposal.fieldValue) || 0), 0), RATING_MAX));
-const stars = computed(() => "★".repeat(rating.value) + "☆".repeat(RATING_MAX - rating.value));
+const max = computed(() => aiRatingMaxOf(props.field));
+const rating = computed(() => Math.min(Math.max(Math.round(Number(props.proposal.fieldValue) || 0), 0), max.value));
+const stars = computed(() => "★".repeat(rating.value) + "☆".repeat(max.value - rating.value));
 
 const dateText = computed(() => {
     const day = moment(props.proposal.text, "YYYY-MM-DD", true);

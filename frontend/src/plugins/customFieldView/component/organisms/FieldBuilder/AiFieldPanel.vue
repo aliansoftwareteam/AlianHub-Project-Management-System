@@ -139,7 +139,7 @@
             <p class="afp__hint">{{ $t(`AiFields.out_of_range_${modelValue.outOfRange === 'reject' ? 'reject' : 'clamp'}_hint`) }}</p>
         </fieldset>
 
-        <p v-if="modelValue.output === 'rating'" class="afp__hint">{{ $t('AiFields.rating_hint', { max: RATING_MAX }) }}</p>
+        <p v-if="modelValue.output === 'rating'" class="afp__hint">{{ $t('AiFields.rating_hint', { max: modelValue.ratingMax || RATING_MAX }) }}</p>
 
         <div v-if="modelValue.output === 'date'" class="ah-field">
             <label class="ah-field__label" for="ai-field-date-rule">{{ $t('AiFields.date_rule') }}</label>
