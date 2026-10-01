@@ -68,6 +68,12 @@ The tracks run side by side. Each line below is roughly one pull request ("slice
 - **A5 Platform**
   - App shell that installs and opens offline (PWA). Importer coverage for comments, attachments, fields and docs.
   - A project template gallery. Public API reference.
+  - Save a project as a template (moved here from M2 on 2026-10-01; "duplicate a project" was built in its place).
+- **A6 MCP parity** (added on 2026-10-01 at the owner's direction)
+  - An outside agent connected through MCP can do what a person does in the web app, under that person's access rules. A team can then work with Claude on its own plan without paying for AlianHub's AI API. This is a difference from ClickUp worth showing.
+  - Part 1: update, assign, move, archive and restore tasks; set a field; list fields, subtasks and members.
+  - Part 2: the list in `dogfood-findings.md`.
+  - In-app AI (the Ask card, AI fields, Write with AI, agents that run unattended) still needs an API key on the server.
 
 ### Track B — Visual refresh
 - **B0 Direction** (needs the owner's eyes; cannot be done in parallel)
@@ -121,6 +127,32 @@ On 2026-10-01 the owner said: "Don't wait for my input, you can continue work, y
 | 5 | Docs history and presence, removed earlier on purpose: bring back? | Yes, history first; presence after |
 | 6 | Forms: allow a small script on the public form page for conditional logic? | Keep it script-free; do the logic with server-rendered steps |
 | 7 | Where the working-days setting lives | Per company, with a per-project override |
+
+### Taken during the work on 2026-10-01
+
+The integrator took these while building, under the same instruction. The owner can overrule each one; the last column says how. Decisions 16, 17 and 26 are recorded from the PR descriptions; the others are in the integrator's notes. The ten hierarchy decisions are in `design-hierarchy.md`.
+
+| # | Decision | Reason | The owner can overrule it by |
+|---|---|---|---|
+| 8 | The convention rule that hard-coded colours and legacy style classes may only shrink (a new Rule 5 in `CLAUDE.md`) stays in #1210 | It keeps the visual refresh from slipping back, the way the i18n baseline does | Dropping the rule before #1210 merges |
+| 9 | Date pickers take the brand colours in light mode too (#1209) | One colour mapping serves both themes | A follow-up slice that restores the old light colours |
+| 10 | The session stays on the owner's PC and is not moved to a cloud machine | A cloud session cannot rebuild the local server or check screens on it | Saying so; the session can be moved at any time |
+| 11 | The access follow-ups were started without waiting, and local data was checked for roles with no private-projects setting (none found) | Both were open questions from the last handoff; see the private notes | Nothing to undo |
+| 12 | A company that has not chosen a week works Monday to Friday, so Gantt shifts skip weekends by default (#1225) | The shift is previewed before it is applied, and ticking all seven days brings calendar days back | Ticking all seven days in Settings > General, or asking for a seven-day default |
+| 13 | Erasure by person leaves doc version rows in place (#1231) | It matches the existing rule: erasure acts on the knowledge index only | A follow-up slice that also removes the person's versions |
+| 14 | Version rows from the old doc history are shown to anyone who can read the doc now (#1231) | They were written before private docs existed | A follow-up slice that hides them |
+| 15 | On copy and import paths, a people field keeps the people who pass the check and leaves the others out (#1236) | The task is still saved; the value is cut down, not dropped | A follow-up slice that refuses the whole value |
+| 16 | Files field (#1243): files go through the existing upload route; removing a file from the field deletes it from storage; deleting the field or the task keeps the stored files; a duplicate copies field files only when "Attachments" is ticked; a files field cannot be sorted or grouped; imports, AI fields and automations cannot write one | Each matches what task attachments do today, and no new permanent deletion was added | A follow-up slice per rule |
+| 17 | Creating a subtask under a parent in another project is refused, not followed (#1226) | The create permission is judged in the project the request names | A follow-up slice that checks both projects |
+| 18 | Migration numbers: 064 task chains, 065 catch-up, 066 repair, 067 Everything indexes | N1 and N2 merged first, N3b needed its own repair, and the Everything indexes took the next free number | Nothing to undo; the numbers are merged |
+| 19 | Nested subtasks merged as one unit: N1 and N2 first; N3a only together with N3b; then N3b, N4 (the List), and N5a (the task panel) last | A convert without chain upkeep would make a cascade carry the wrong rows, and after N3b a convert stores a third level that the List could not show yet | Nothing to undo; #1240 is the only part still open |
+| 20 | "Duplicate a project" was built now in place of F3; "save a project as a template" moves to M3 | F3 as designed had nothing to keep: neither feature existed | Moving the template slice back into M2 |
+| 21 | A duplicated project's tasks are copied by a quiet batch insert (#1257) | The normal create path would fire an event, every automation, a notification and two history lines for each row | A follow-up slice that writes history for the copies |
+| 22 | A duplicated project links the source's project-level custom fields; it does not clone them (#1257) | Values, view settings and automations keep meaning the same field. Editing a definition then changes both projects | A follow-up slice that clones the definitions |
+| 23 | A duplicated project leaves behind private lists the caller is not on, and its automations arrive switched off (#1257) | By design in #1257; the answer reports both | Turning the copied rules on; a follow-up slice for the lists |
+| 24 | Design variant B (dense: 34 px rows, regular-weight group headers, squarer cards) is the default. The former look stays as "Classic", and the switch stays in My Settings (#1259, in review) | Most rows per screen, least name truncation, closest to a work tool. A is the fallback; C is too airy for lists | Picking another look in My Settings, or not merging #1259 |
+| 25 | Under a due-date group, a task whose position is repaired goes after the project's last due-date position (#1255, in review) | A due-date group is a moving window of days, so no stored value names it | Asking for a date comparison before #1255 merges |
+| 26 | On raw timesheet and planned-hours queries, a join into tasks or comments is narrowed the way a direct read is, and a join that cannot be narrowed is refused (#1244) | See the private notes | A follow-up slice |
 
 ## Out of scope
 - A meeting notetaker bot and a desktop hotkey app.

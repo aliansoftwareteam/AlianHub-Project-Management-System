@@ -1,6 +1,6 @@
 <template>
     <div class="dropdown-custom-field">
-        <div v-show="tabIndexCheck === 1">
+        <div v-show="tabIndexCheck === 1" data-field-tab="1">
             <CustomFieldInputComponent
                 :label="$t('PlaceHolder.field_label')"
                 :type="'text'"
@@ -59,7 +59,7 @@
                 </template>
             </DropDown>
         </div>
-        <div v-show="tabIndexCheck === 2">
+        <div v-show="tabIndexCheck === 2" data-field-tab="2">
             <div class="options-area style-scroll">
                 <draggable v-model="options" item-key="id" tag="div" handle=".drag-icon">
                     <template #item="{ element, index }">
@@ -88,7 +88,7 @@
                 <span class="font-size-12 gray">{{$t('CustomField.choose_ready_made_list')}}</span>
             </div>
         </div>
-        <div v-show="tabIndexCheck === 3">
+        <div v-show="tabIndexCheck === 3" data-field-tab="3">
             <h4 class="dark-gray font-size-14">{{$t('CustomField.selected_by_default')}}</h4>
             <div class="options-area style-scroll">
                 <div v-for="(row, index) in options" :key="index" class="d-flex mb-20px cursor-pointer">

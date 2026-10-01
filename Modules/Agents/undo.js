@@ -114,9 +114,36 @@ const inverses = {
         emitPageChange(companyId, 'update', { _id: String(u.pageId), deletedStatusKey: 1, deleted: 1, ids: [String(u.pageId)] });
         return { pageId: u.pageId, deleted: true };
     },
+    async commentText(companyId, u) {
+        const updated = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.COMMENTS, data: [{ _id: oid(u.commentId) }, { $set: { message: u.previous } }, { returnDocument: 'after' }],
+        }, 'findOneAndUpdate');
+        if (updated) socketEmitter.emit('update', { type: 'update', data: updated, updatedFields: {}, module: 'comments', companyId });
+        return { commentId: u.commentId, restored: true };
+    },
+    async pageVersion(companyId, u, actor) {
+        await require('./pageRequests').restoreVersion({ companyId, uid: String((actor && actor.userId) || ''), pageId: u.pageId, versionId: u.versionId });
+        return { pageId: u.pageId, restored: u.versionId };
+    },
+    /* Newest first, each through its own undo, so each is checked for the person undoing; one that cannot be undone is reported and the rest go on. */
+    async batch(companyId, u, actor) {
+        const items = [];
+        for (const auditId of [...(u.auditIds || [])].reverse()) {
+            const row = await audit.findById(companyId, auditId);
+            const out = row ? await undoAuditRow(companyId, row, actor) : { ok: false, reason: REASON.NOT_UNDOABLE };
+            items.push({ auditId, ok: out.ok === true, ...(out.ok === true ? {} : { reason: out.reason }) });
+        }
+        return { undone: items.filter((item) => item.ok).length, items };
+    },
+    async statusChange(companyId, u, actor) {
+        const requests = require('./taskRequests');
+        await requests.setStatus({ companyId, who: requests.whoOf(actor), taskId: u.taskId, name: u.previous });
+        return { taskId: u.taskId, restored: u.previous };
+    },
     /* Archiving carries the subtasks and the list's counts, so it is put back by the handler that made it, as the person undoing. */
     async archive(companyId, u, actor) {
-        await require('./taskRequests').setArchived({ companyId, uid: String((actor && actor.userId) || ''), taskId: u.taskId, to: u.previous });
+        const requests = require('./taskRequests');
+        await requests.setArchived({ companyId, who: requests.whoOf(actor), taskId: u.taskId, to: u.previous });
         return { taskId: u.taskId, restored: u.previous };
     },
 };
@@ -163,7 +190,12 @@ const targetVisible = async (companyId, uid, u) => {
         const comment = await findRow(companyId, SCHEMA_TYPE.COMMENTS, u.commentId, { projectId: 1, sprintId: 1, taskId: 1 });
         return Boolean(comment) && (await canChangeComment(companyId, uid, comment)).allowed;
     }
-    if (u.kind === 'page') return pageVisibleTo(await findRow(companyId, SCHEMA_TYPE.PAGES, u.pageId, { visibility: 1, createdBy: 1 }), uid);
+    if (u.kind === 'commentText') {
+        const comment = await findRow(companyId, SCHEMA_TYPE.COMMENTS, u.commentId, { projectId: 1, sprintId: 1, taskId: 1 });
+        return Boolean(comment) && (await canChangeComment(companyId, uid, comment)).allowed;
+    }
+    if (u.kind === 'batch') return true;
+    if (u.kind === 'page' || u.kind === 'pageVersion') return pageVisibleTo(await findRow(companyId, SCHEMA_TYPE.PAGES, u.pageId, { visibility: 1, createdBy: 1 }), uid);
     if (u.kind === 'subtask') return taskReadable(companyId, uid, u.subtaskId);
     if (!(await taskReadable(companyId, uid, u.taskId))) return false;
     if (u.kind !== 'sprint' || isPrivileged(await getRoleType(companyId, uid))) return true;

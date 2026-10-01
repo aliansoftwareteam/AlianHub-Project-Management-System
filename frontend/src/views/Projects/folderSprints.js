@@ -1,9 +1,27 @@
-import { isLiveFolder, isOrphanFolder, subfoldersOf } from '@/utils/folderTree';
+import { folderIdOf, folderTrail, isLiveFolder, isOrphanFolder, subfoldersOf } from '@/utils/folderTree';
 
 const ARCHIVED = 2;
 const ARCHIVED_WITH_PARENT = 6;
 
 const sprintsOf = (folder) => Object.values(folder?.sprintsObj || {});
+const isLiveSprint = (sprint) => !Number(sprint?.deletedStatusKey || 0);
+
+/* The folder, when it is live and neither it nor a live subfolder of it holds a live list. */
+export function folderWithoutLists(folders, folderId) {
+    const folder = folderId ? folders?.[folderId] : null;
+    if (!folder || !isLiveFolder(folders, folder)) return null;
+    const inside = [folder, ...subfoldersOf(folders, folderIdOf(folder)).filter((sub) => isLiveFolder(folders, sub))];
+    return inside.flatMap(sprintsOf).some(isLiveSprint) ? null : folder;
+}
+
+/* What the project header names after the project: the folder in view with its parent and, when one list is shown, that list. */
+export function headerLocation({ folders, sprints, folderId }) {
+    const sprint = sprints?.length === 1 && !sprints[0]?.isFolder ? sprints[0] : null;
+    return {
+        sprint,
+        folders: folderTrail(folders, folderId || sprint?.folderId).map((folder) => ({ id: folderIdOf(folder), name: folder.name }))
+    };
+}
 
 /* An archived folder is one row; the sprints of the subfolders archived with it come back with it, so they sit in it. */
 const archivedFolderRow = (folders, folder) => ({

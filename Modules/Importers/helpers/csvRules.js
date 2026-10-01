@@ -3,7 +3,8 @@
 // { header: value } map), plus an optional column `mapping`
 // (target → source column name). Without a mapping, common column names are
 // auto-detected (same heuristics as the Jira importer). Output rows match the
-// shape createMultipleTasks expects.
+// shape createMultipleTasks expects. A row may name its parent, by the parent's
+// key or title; the rows can come in any order, since the create path orders them.
 const { isObjectIdString, fieldOf, mapPriority, mapStatusName } = require('./jiraRules');
 
 const MAX_ROWS = 2000;
@@ -11,7 +12,7 @@ const MAX_ROWS = 2000;
 // The task properties a CSV column can be pointed at (handoff 22b, mapping step).
 // `parse` is what the preview step validates a sample value against.
 const TARGETS = [
-    { key: 'taskName', label: 'Task title', parse: 'text', required: true, candidates: ['task name', 'summary', 'title', 'name'] },
+    { key: 'taskName', label: 'Task title', parse: 'text', required: true, candidates: ['task name', 'taskname', 'summary', 'title', 'name'] },
     { key: 'description', label: 'Description', parse: 'text', candidates: ['description', 'desc', 'notes'] },
     { key: 'status', label: 'Status', parse: 'status', candidates: ['status', 'state'] },
     { key: 'priority', label: 'Priority', parse: 'priority', candidates: ['priority'] },
@@ -20,10 +21,13 @@ const TARGETS = [
     { key: 'startDate', label: 'Start date', parse: 'date', candidates: ['start date', 'startdate', 'start'] },
     { key: 'estimate', label: 'Estimate (hours)', parse: 'number', candidates: ['estimate', 'story points', 'original estimate'] },
     { key: 'loggedTime', label: 'Logged time (hours)', parse: 'number', candidates: ['time spent', 'logged time', 'worklog'] },
-    { key: 'tags', label: 'Tags', parse: 'list', candidates: ['tags', 'labels'] }
+    { key: 'tags', label: 'Tags', parse: 'list', candidates: ['tags', 'labels'] },
+    { key: 'taskKey', label: 'Task key or ID', parse: 'text', candidates: ['task key', 'taskkey', 'key', 'issue key', 'task id', 'issue id', 'id'] },
+    { key: 'parent', label: 'Parent task', parse: 'text', candidates: ['parent key', 'parent task key', 'parent', 'parent task', 'parent id', 'parent task id'] }
 ];
 
 const TARGET_KEYS = TARGETS.map((target) => target.key);
+const candidatesOf = (key) => TARGETS.find((target) => target.key === key).candidates;
 
 const trimmed = (value) => (value === undefined || value === null ? '' : String(value).trim());
 
@@ -61,6 +65,33 @@ const parseDate = (raw) => {
 const parseList = (raw) => trimmed(raw).split(/[,;|]/).map((entry) => entry.trim()).filter(Boolean);
 
 const lower = (value) => trimmed(value).toLowerCase();
+
+/* Every name a row goes by. An auto-detected file may hold two (Jira's issue key and issue id), and its parent column may use either. */
+const identifiersOf = (row, mapping) => {
+    if (mapping && Object.prototype.hasOwnProperty.call(mapping, 'taskKey')) return [valueFor(row, mapping, 'taskKey')].filter(Boolean);
+    return candidatesOf('taskKey').map((candidate) => fieldOf(row, [candidate])).filter(Boolean);
+};
+
+/* Gives each named row a file-local id and resolves the parent it names to one: by key first,
+ * then by a title only one row holds. A parent that resolves to nothing is kept as written,
+ * so the create path reports it. */
+const withFileIds = (entries, mapping) => {
+    const idByKey = new Map();
+    const idsByName = new Map();
+    entries.forEach((entry) => {
+        const keys = identifiersOf(entry.row, mapping);
+        entry.id = keys.length && !idByKey.has(lower(keys[0])) ? keys[0] : `row-${entry.index + 1}`;
+        keys.forEach((key) => { if (!idByKey.has(lower(key))) idByKey.set(lower(key), entry.id); });
+        idsByName.set(lower(entry.name), [...(idsByName.get(lower(entry.name)) || []), entry.id]);
+    });
+    const parentOf = (raw) => {
+        if (!raw) return '';
+        if (idByKey.has(lower(raw))) return idByKey.get(lower(raw));
+        const named = idsByName.get(lower(raw)) || [];
+        return named.length === 1 ? named[0] : raw;
+    };
+    return entries.map((entry) => ({ ...entry, parentId: parentOf(valueFor(entry.row, mapping, 'parent', candidatesOf('parent'))) }));
+};
 
 const validateCsvInput = ({ companyId, projectId, sprintId, rows, userId }) => {
     if (!companyId) return { valid: false, reason: 'companyId is required.' };
@@ -145,32 +176,37 @@ const transformCsvRows = ({ rows, mapping = {}, statusNames, leaderId, users = [
         userByKey.set(lower(user.id), String(user.id));
     });
 
-    (rows || []).forEach((row) => {
-        const name = valueFor(row, mapping, 'taskName', ['task name', 'summary', 'title', 'name']);
-        if (!name) { skipped += 1; return; }
+    const named = [];
+    (rows || []).forEach((row, index) => {
+        const name = valueFor(row, mapping, 'taskName', candidatesOf('taskName'));
+        if (!name) skipped += 1;
+        else named.push({ row, index, name });
+    });
 
-        const due = parseDate(valueFor(row, mapping, 'dueDate', ['due date', 'duedate', 'due', 'end date']));
-        const start = parseDate(valueFor(row, mapping, 'startDate', ['start date', 'startdate', 'start']));
-        const rawStatus = valueFor(row, mapping, 'status', ['status', 'state']);
+    withFileIds(named, mapping).forEach(({ row, name, id, parentId }) => {
+        const due = parseDate(valueFor(row, mapping, 'dueDate', candidatesOf('dueDate')));
+        const start = parseDate(valueFor(row, mapping, 'startDate', candidatesOf('startDate')));
+        const rawStatus = valueFor(row, mapping, 'status', candidatesOf('status'));
         const mappedStatus = (options.statusMap && options.statusMap[rawStatus]) || rawStatus;
-        const estimate = parseNumber(valueFor(row, mapping, 'estimate', ['estimate', 'story points', 'original estimate']), options.estimateDivisor);
-        const assigneeRaw = valueFor(row, mapping, 'assignee', ['assignee', 'assigned to', 'owner']);
+        const estimate = parseNumber(valueFor(row, mapping, 'estimate', candidatesOf('estimate')), options.estimateDivisor);
+        const assigneeRaw = valueFor(row, mapping, 'assignee', candidatesOf('assignee'));
         const assigneeId = assigneeRaw
             ? userByKey.get(lower(assigneeRaw)) || (options.userMap && options.userMap[assigneeRaw]) || ''
             : '';
-        const tags = parseList(valueFor(row, mapping, 'tags', ['tags', 'labels']));
+        const tags = parseList(valueFor(row, mapping, 'tags', candidatesOf('tags')));
 
         const task = {
+            _id: id,
             TaskName: name.slice(0, 500),
             status: mapStatusName(mappedStatus, statusNames),
-            Task_Priority: mapPriority(valueFor(row, mapping, 'priority', ['priority'])),
+            Task_Priority: mapPriority(valueFor(row, mapping, 'priority', candidatesOf('priority'))),
             TaskType: 'task',
             TaskTypeKey: 1,
             Task_Leader: leaderId,
             AssigneeUserId: assigneeId ? [assigneeId] : [],
             DueDate: due ? due.toISOString() : null,
-            rawDescription: valueFor(row, mapping, 'description', ['description', 'desc', 'notes']).slice(0, 10000),
-            ParentTaskId: '',
+            rawDescription: valueFor(row, mapping, 'description', candidatesOf('description')).slice(0, 10000),
+            ParentTaskId: parentId,
         };
         if (start) task.startDate = start.toISOString();
         if (estimate !== null) task.totalEstimatedTime = Math.round(estimate * 60);

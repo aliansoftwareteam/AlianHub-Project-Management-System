@@ -11,6 +11,7 @@ const { validateAsanaInput, parseAsanaExport } = require('./helpers/asanaRules')
 const { validateMondayInput, parseMondayExport } = require('./helpers/mondayRules');
 const { validateClickUpInput, validateClickUpRows, transformClickUpRows, previewClickUpRows, clickUpStatuses, resolveStatuses, DEFAULT_LIST } = require('./helpers/clickupRules');
 const { STATUS_FALLBACK_TYPE, appendStatuses, applyImportTags } = require('./helpers/projectDetails');
+const { adjustedReport, adjustedSentences } = require('./helpers/importTree');
 const { mapStatusName } = require('./helpers/jiraRules');
 const { importTargetAccess, previewAccess, refuseImport } = require('./helpers/importAccess');
 const { findCompanyMembers, activeMemberIdSet } = require('./helpers/companyMembers');
@@ -282,7 +283,9 @@ const finishImport = async (companyId, { source, project, sprint, actor, statusA
             data: [{ _id: job._id }, { $set: { status: 'done', processed: tasks.length, created: createdCount } }],
         }, 'updateOne');
         const detail = report ? { skippedRows: report.skippedRows, unmatchedAssignees: [...unmatchedEmails, ...report.unnamedAssignees] } : {};
-        return { status: true, statusText: `Imported ${createdCount} tasks from ${source} (${skipped} skipped).`, data: { jobId: job._id, projectId: String(project._id), created: createdCount, skipped, ...detail, ...(result?.droppedFieldValues ? { droppedFieldValues: result.droppedFieldValues } : {}) } };
+        const adjusted = adjustedReport(result?.adjusted);
+        const statusText = [`Imported ${createdCount} tasks from ${source} (${skipped} skipped).`, ...adjustedSentences(adjusted)].join(' ');
+        return { status: true, statusText, data: { jobId: job._id, projectId: String(project._id), created: createdCount, skipped, ...detail, ...(adjusted ? { adjusted } : {}), ...(result?.droppedFieldValues ? { droppedFieldValues: result.droppedFieldValues } : {}) } };
     } catch (creationError) {
         logger.error(`[importers] ${source} job ${job._id} failed: ${creationError.message}`);
         await MongoDbCrudOpration(companyId, {

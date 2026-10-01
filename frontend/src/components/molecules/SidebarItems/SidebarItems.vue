@@ -1,7 +1,7 @@
 <template>
     <div
-        :class="{'bg-light-blue black': selected && highlight, 'bg-light-gray black': selected && !highlight, 'bg-white': !selected, 'bg-blue white': !selected && highlight}"
-        class="sidebar_item_main hover-bg-blue hover-white cursor-pointer d-flex align-items-center justify-content-between mobile-listuser"
+        :class="themed ? ['sb-item', {'is-selected': selected, 'is-highlight': highlight}] : ['hover-bg-blue hover-white', {'bg-light-blue black': selected && highlight, 'bg-light-gray black': selected && !highlight, 'bg-white': !selected, 'bg-blue white': !selected && highlight}]"
+        class="sidebar_item_main cursor-pointer d-flex align-items-center justify-content-between mobile-listuser"
         role="option"
         tabindex="0"
         :aria-selected="selected ? 'true' : 'false'"
@@ -15,6 +15,7 @@
             </template>
             <template v-if="item.image && !imageDisplayForPriority">
                 <UserProfile
+                    decorative
                     :showDot="false"
                     class="cursor-pointer mr-10px"
                     width="2"
@@ -117,6 +118,10 @@ defineProps({
     removeKey: {
         type: Array,
         default: () => []
+    },
+    themed: {
+        type: Boolean,
+        default: false
     }
 })
 

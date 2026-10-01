@@ -337,6 +337,7 @@ import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption
 const {isCustomFields} = customField();
 import * as env from '@/config/env';
 import { indexRepairBody, indexRepairRows, plainGroupValue } from "@/views/Projects/composables/taskGroupIndex";
+import { convertToTaskRequest } from "@/views/Projects/composables/taskPlacement";
 import { useI18n } from "vue-i18n";
 import { apiRequest } from "../../../services";
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue"
@@ -833,24 +834,14 @@ function updateItem(type,e, item) {
             });
         }else if(type === "task" && checkPermission('task.convert_to_task', props.project?.isGlobalPermission) === true) {
             if(e?.added?.element.isParentTask === false){
-                taskClass.convertToTask({
+                taskClass.convertToTask(convertToTaskRequest({
                     companyId: companyId.value,
-                    projectData: {
-                        id:pid
-                    },
-                    taskId : e?.added?.element._id,
-                    parentTaskId:e?.added?.element.ParentTaskId,
-                    sprintObj: props.sprintObject,
-                    oldSprintObj :{
-                        id:props.sprintObject.id,
-                        folderId:null
-                    },
-                    oldProject: {
-                        id : pid,
-                        taskTypeCounts : props.project.taskTypeCounts,
-                        taskStatusData : props.project.taskStatusData
-                    }
-                }).then(() => {
+                    destination: props.project,
+                    sprint: props.sprintObject,
+                    task: e.added.element,
+                    oldSprint: { id: props.sprintObject.id, folderId: null },
+                    source: props.project
+                })).then(() => {
                     commit("projectData/mutateUpdateFirebaseTasks",{
                         snap, 
                         op: "removed",
@@ -1201,7 +1192,7 @@ function prepareIndexData () {
     const rows = indexRepairRows(items.value, props.item, checkPermission('task.task_list', projectData.value?.isGlobalPermission));
     if (!rows.length) return;
 
-    commit("projectData/mutateTaskIndex", {pid: projectData.value._id, sprintId: items.value[0].sprintId, tasksArray: rows.map((row) => ({ _id: row.data })), indexName: items.value[0].indexName});
+    commit("projectData/mutateTaskIndex", {pid: projectData.value._id, sprintId: items.value[0].sprintId, tasksArray: rows.map((row) => ({ _id: row.data })), indexName: props.item.indexName});
     if (rows.length !== 1) {
         isLoading.value = true;
     }
