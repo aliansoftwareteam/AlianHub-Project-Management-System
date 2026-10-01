@@ -83,6 +83,43 @@ describe('sidebar hosts that carried their own colours', () => {
         expect(declarations(stylesOf(rel))).not.toMatch(COLOUR_LITERAL);
         expect(withoutComments(templateOf(read(rel)))).not.toMatch(COLOUR_LITERAL);
     });
+
+    const withoutShadows = (css) => css.replace(/(?:-webkit-)?box-shadow\s*:[^;}]*/g, '');
+
+    test.each([
+        'components/molecules/AddTeamSidebar/style.css',
+        'components/molecules/TaskStatusSidebar/style.css',
+        'components/molecules/EstimateHours/style.css',
+        'components/molecules/SkillsSelect/SkillsSelect.vue',
+        'components/molecules/Setting/SettingCurrencys.vue',
+        'components/molecules/CreateCompany/style.css',
+        'components/atom/CroppingTool/style.css',
+        'components/atom/PreviewTimelogScreenShot/style.css',
+        'components/atom/ProjectPermission/style.css',
+        'components/atom/TimesheetView/LogDetailView/style.css',
+        'components/atom/TimesheetView/LogDetailView/LogDetailViewBodyComponent.vue',
+        'components/atom/TimesheetView/LogDetailView/LogDetailViewHeaderComponent.vue',
+        'components/templates/CreateProject/style.css',
+        'components/templates/CreateProject/TemplateAllDetail.vue',
+        'components/templates/CreateProject/ProjectWorkspace.vue',
+    ])('the stylesheet of %s paints tokens', (rel) => {
+        expect(withoutShadows(declarations(stylesOf(rel)))).not.toMatch(COLOUR_LITERAL);
+    });
+
+    test('no host restyles the panel through the classes only a white panel carries', () => {
+        expect(stylesOf('components/molecules/AddTeamSidebar/style.css')).toMatch(/\.mainTeamSidebar \.sidebar-body \{/);
+        expect(stylesOf('components/organisms/Shell/style.css')).not.toMatch(/\.sidebar-body\.bg-white/);
+    });
+
+    test('a stylesheet loaded with one page does not turn every sidebar body light', () => {
+        expect(stylesOf('components/molecules/CreateCompany/style.css')).toMatch(/^\.sidebar-body\s*\{\s*background-color:\s*var\(--canvas\)/m);
+    });
+
+    test('the step buttons of the template wizard are filled buttons whose labels show', () => {
+        const template = templateOf(read('views/Settings/Template/CreateTemplate.vue'));
+        expect(template).toMatch(/class="conditional__template-project btn-primary /);
+        expect(template).not.toContain('btn-bg-blue');
+    });
 });
 
 describe('weak spots of the themed menu', () => {
@@ -90,6 +127,7 @@ describe('weak spots of the themed menu', () => {
         const template = templateOf(read('views/Projects/components/ProjectActionsBar.vue'));
         expect(template).not.toMatch(/<img :src="lockIcon"/);
         expect(template).toMatch(/class="ah-mask-icon [^"]*" :style="maskOf\(lockIcon\)"/);
+        expect(ruleBody(stylesOf('views/Projects/components/ProjectActionsBar.vue'), '.pab-lock')).toMatch(/width:\s*15px;\s*height:\s*20px;\s*color:\s*var\(--ink-2\)/);
     });
 
     test('count chips and checkbox marks inside a menu take tokens', () => {

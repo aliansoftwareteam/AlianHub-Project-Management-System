@@ -110,7 +110,7 @@ describe('the dropdown panel', () => {
         expect(layer).toContain(':is(.dd-tokens, .modal, .sb-tokens) :is(.black, .dark-gray, .dark-gray2, .gray4b, .color52, .color63, .darkblue) { color: var(--ink); }');
         expect(layer).toContain(':is(.dd-tokens, .modal, .sb-tokens) :is(.gray81, .gray, .gray63, .GunPowder, .color94, .colorlightgray) { color: var(--ink-2); }');
         expect(layer).toContain(':is(.dd-tokens, .modal, .sb-tokens) :is(.blue, .purple) { color: var(--brand) !important; }');
-        expect(layer).toContain(':is(.dd-tokens, .modal, .sb-tokens) .red { color: var(--danger-ink); }');
+        expect(layer).toContain(':is(.dd-tokens, .modal, .sb-tokens) :is(.red, .text-red) { color: var(--danger-ink); }');
         expect(layer).toContain(':is(.dd-tokens, .modal, .sb-tokens) .bg-white { background-color: var(--surface); }');
         expect(declarations(layer)).not.toMatch(COLOUR_LITERAL);
     });
