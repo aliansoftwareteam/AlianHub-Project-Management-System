@@ -203,7 +203,7 @@ const handleRpc = async (ctx, message) => {
             return rpcResult(id, {});
 
         case 'tools/list':
-            return rpcResult(id, { tools: tools.manifest() });
+            return rpcResult(id, { tools: tools.manifest(ctx) });
 
         case 'resources/list':
             return rpcResult(id, { resources: [] });
