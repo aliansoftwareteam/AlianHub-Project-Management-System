@@ -76,7 +76,10 @@ const call = (route, body, request = {}) => new Promise((resolve) => {
     }
 }).then(async (result) => { await settle(); return result; });
 
-const STATUS_LIST = [{ key: 1, name: 'To Do', type: 'default_active', convertStatus: { key: 1, name: 'To Do', type: 'default_active' } }];
+const STATUS_LIST = [
+    { key: 1, name: 'To Do', type: 'default_active', convertStatus: { key: 1, name: 'To Do', type: 'default_active' } },
+    { key: 2, name: 'Doing', type: 'active', convertStatus: { key: 2, name: 'Doing', type: 'active' } },
+];
 const TYPE_LIST = [{ key: 1, value: 'task', name: 'Task', taskCount: 0, convertType: { key: 1, value: 'task', name: 'Task' } }];
 
 const taskDoc = (_id, extra = {}) => ({
