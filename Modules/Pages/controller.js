@@ -227,7 +227,7 @@ exports.listPages = async (req, res) => {
         // see the project — including a task's linked docs, where they would leak by title.
         const userId = callerId(req);
         const projectIds = (await visibleProjectIds(companyId, userId)).map((id) => new mongoose.Types.ObjectId(id));
-        Object.assign(filter, pageReachFilter({ uid: userId, projectIds }));
+        Object.assign(filter, pageReachFilter({ uid: userId, projectIds, companyWide: await isCompanyMember(companyId, userId) }));
 
         const pages = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
