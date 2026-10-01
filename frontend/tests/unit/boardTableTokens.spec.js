@@ -524,7 +524,7 @@ describe('the table reads the tokens', () => {
         ['.tv2__row', 'padding', 'var(--cell-pad-y) var(--tv2-pad-x)'],
         ['.tv2__row', 'gap', 'var(--tv2-gap)'],
         ['.tv2__name', 'font', 'var(--fw-strong, 600) var(--row-font)/var(--lh-snug, 1.3) var(--font-ui)'],
-        ['.tv2__sprint-head', 'min-height', 'var(--row-h)'],
+        ['.tv2__sprint-head', 'min-height', 'max(var(--row-h), var(--hit-min))'],
         ['.tv2__sprint-head', 'padding', '0 var(--tv2-pad-x)'],
         ['.tv2__sprint-name', 'font', 'var(--text-h3)'],
         ['.tv2__group-cell', 'padding', 'calc(var(--cell-pad-y) - 1px) var(--tv2-pad-x)'],
@@ -632,6 +632,7 @@ describe('the table controls keep a full target', () => {
         ['Generate', '.tv2__gen', ['min-height']],
         ['a group\'s select-all', '.tv2__group-select', ['width', 'height']],
         ['New task', '.tv2__add', ['height']],
+        ['a sprint heading', '.tv2__sprint-head', ['min-height']],
     ])('%s is 24px or more in every look, and 40px on a phone', (_, selector, sides) => {
         sides.forEach((side) => {
             DESKTOP.forEach((look) => expect(table(selector, side, look), `${look} ${side}`).toBeGreaterThanOrEqual(FLOOR));

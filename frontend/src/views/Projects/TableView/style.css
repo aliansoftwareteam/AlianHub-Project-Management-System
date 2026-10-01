@@ -128,7 +128,7 @@
     display: flex;
     align-items: center;
     width: 100%;
-    min-height: var(--row-h);
+    min-height: max(var(--row-h), var(--hit-min));
     padding: 0 var(--tv2-pad-x);
     background: none;
     border: 0;
