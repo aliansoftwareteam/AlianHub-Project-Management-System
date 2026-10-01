@@ -12,6 +12,7 @@ jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn()
 jest.mock('../Modules/Pages/helpers/pageAi', () => ({ composePage: jest.fn(), isAiConfigured: () => false }));
 
 const { EventEmitter } = require('events');
+const { composePage } = require('../Modules/Pages/helpers/pageAi');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const world = require('./fixtures/accessWorld');
 
@@ -21,6 +22,10 @@ const { seed, rows } = world.create(mockDb);
 const P_NOWHERE = '6f0000000000000000000aff';
 const PAGE = '6f0000000000000000000e01';
 const VERSION = '6f0000000000000000000e03';
+const DRAFT = '6f0000000000000000000e04';
+const T_NOWHERE = '6f0000000000000000000dff';
+const COMPOSE = 'POST /api/v2/pages/ai';
+const CHANGE = 'PUT /api/v2/pages/:id';
 const REACHED = 'reached its handler';
 const CREATE = 'POST /api/v2/pages';
 
@@ -59,6 +64,7 @@ const NO_ACTION = {
     'marking a doc reviewed': ['PUT /api/v2/pages/:id/review', {}, { id: PAGE }],
     'taking a doc out of the trash': ['PUT /api/v2/pages/:id/restore', {}, { id: PAGE }],
     'adding an image to a doc': ['POST /api/v2/pages/:id/images', {}, { id: PAGE }],
+    'composing a doc with the assistant': [COMPOSE, { action: 'draft', title: 'Plan' }, {}],
 };
 
 const DRAFTED = {
@@ -81,14 +87,21 @@ const BEYOND_A_DRAFT = {
 
 const audits = (action) => rows(SCHEMA_TYPE.AUDIT_LOGS).filter((row) => row.action === action);
 const agentAudits = () => rows(SCHEMA_TYPE.AUDIT_LOGS).filter((row) => String(row.action).startsWith('agent.'));
-const pages = () => rows(SCHEMA_TYPE.PAGES).filter((row) => String(row._id) !== PAGE);
+const pages = () => rows(SCHEMA_TYPE.PAGES).filter((row) => ![PAGE, DRAFT].includes(String(row._id)));
+const stored = (id) => rows(SCHEMA_TYPE.PAGES).find((row) => String(row._id) === id);
+const seedDraft = () => mockDb.seed(SCHEMA_TYPE.PAGES, {
+    _id: DRAFT, title: 'Drafted doc', ProjectID: P_OPEN, visibility: 'project', createdBy: INSIDER, updatedBy: INSIDER, deletedStatusKey: 0, order: 2, createdByAgent: true, agentName: 'Claude', agentStatus: 'draft',
+});
 const AGENTS_OF = [['an owner', OWNER], ['an admin', ADMIN], ['a member', INSIDER], ['a member outside the private work', OUTSIDER], ['a guest', GUEST]];
 
 beforeEach(() => {
     seed();
     mockDb.seed(SCHEMA_TYPE.PAGES, { _id: PAGE, title: 'Existing doc', ProjectID: P_OPEN, visibility: 'project', createdBy: OWNER, updatedBy: OWNER, deletedStatusKey: 0, order: 1 });
 });
-afterEach(() => { delete process.env.MCP_TOOLS_MANAGE; });
+afterEach(() => {
+    delete process.env.MCP_TOOLS_MANAGE;
+    composePage.mockReset();
+});
 
 describe('a token created for an agent, on the doc write routes', () => {
     it.each(Object.keys(NO_ACTION).flatMap((name) => AGENTS_OF.map(([label, uid]) => [name, label, uid])))('%s is refused for the agent of %s, and recorded', async (name, label, uid) => {
@@ -115,6 +128,12 @@ describe('a token created for an agent, on the doc write routes', () => {
             expect((await send(CREATE, granted, body)).code).toBe(403);
         }
         expect(pages()).toEqual([]);
+    });
+
+    it('never reaches the assistant, whoever the agent is of', async () => {
+        for (const [, uid] of AGENTS_OF) await send(COMPOSE, agentToken(uid), { action: 'draft', title: 'Plan', pageId: PAGE });
+
+        expect(composePage).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -166,6 +185,110 @@ describe('a doc created by an agent through the create route', () => {
         expect(hidden.body).toMatchObject({ status: false, statusCode: 404 });
         expect(pages()).toEqual([]);
     });
+
+    it.each([
+        ['into a project its person cannot open', OUTSIDER, { title: 'Plan', projectId: P_PRIVATE }, 'Project not found.'],
+        ['by the agent of a guest', GUEST, { title: 'Plan', projectId: P_OPEN }, 'You do not have permission to add a doc here.'],
+        ['with no title', INSIDER, { title: '  ', projectId: P_OPEN }, expect.any(String)],
+        ['for a task its person cannot open', OUTSIDER, { title: 'Plan', projectId: P_OPEN, linkedTasks: [T_SECRET] }, 'Task not found.'],
+    ])('%s, which the doc rules turn down, is recorded as one that did not happen', async (label, uid, body, failed) => {
+        const answer = await send(CREATE, agentToken(uid), body);
+
+        expect(answer.body.status).toBe(false);
+        expect(pages()).toEqual([]);
+        expect(audits('agent.action')).toHaveLength(1);
+        expect(audits('agent.action')[0].meta).toMatchObject({ action: 'page.draft', state: 'failed', failed, undoable: false });
+    });
+});
+
+describe('the tasks a doc is linked to', () => {
+    const CALLERS = [['a signed-in member', session(OUTSIDER)], ['a personal token of a member', personalToken(OUTSIDER)], ['the agent of a member', agentToken(OUTSIDER)]];
+
+    it.each(CALLERS)('a new doc of %s for a task they cannot open is answered as one for a task that does not exist', async (label, caller) => {
+        const hidden = await send(CREATE, caller, { title: 'Plan', projectId: P_OPEN, linkedTasks: [T_SECRET] });
+        const missing = await send(CREATE, caller, { title: 'Plan', projectId: P_OPEN, linkedTasks: [T_NOWHERE] });
+
+        expect(hidden).toEqual(missing);
+        expect(hidden.body).toMatchObject({ status: false, statusCode: 404, statusText: 'Task not found.' });
+        expect(pages()).toEqual([]);
+    });
+
+    it.each(CALLERS)('a new doc of %s for a task they can open is linked to it', async (label, caller) => {
+        expect((await send(CREATE, caller, { title: 'Plan', projectId: P_OPEN, linkedTasks: [T_OPEN] })).body.status).toBe(true);
+
+        expect(pages()[0].linkedTasks.map(String)).toEqual([T_OPEN]);
+    });
+
+    it('one task of several that the person cannot open keeps the whole doc from being created', async () => {
+        const answer = await send(CREATE, session(OUTSIDER), { title: 'Plan', projectId: P_OPEN, linkedTasks: [T_OPEN, T_SECRET] });
+
+        expect(answer.body).toMatchObject({ status: false, statusCode: 404 });
+        expect(pages()).toEqual([]);
+    });
+
+    it.each([['a signed-in member', session(OUTSIDER)], ['a personal token of a member', personalToken(OUTSIDER)]])('a doc is not linked by %s to a task they cannot open', async (label, caller) => {
+        const hidden = await send(CHANGE, caller, { linkedTasks: [T_SECRET] }, { id: PAGE });
+        const missing = await send(CHANGE, caller, { linkedTasks: [T_NOWHERE] }, { id: PAGE });
+
+        expect(hidden).toEqual(missing);
+        expect(hidden.body).toMatchObject({ status: false, statusCode: 404, statusText: 'Task not found.' });
+        expect(stored(PAGE).linkedTasks || []).toEqual([]);
+        expect(stored(PAGE).updatedBy).toBe(OWNER);
+    });
+
+    it('a link the doc already holds stays when someone who cannot open that task saves the list', async () => {
+        expect((await send(CHANGE, session(INSIDER), { linkedTasks: [T_SECRET] }, { id: PAGE })).body.status).toBe(true);
+
+        expect((await send(CHANGE, session(OUTSIDER), { linkedTasks: [T_SECRET, T_OPEN] }, { id: PAGE })).body.status).toBe(true);
+        expect(stored(PAGE).linkedTasks.map(String)).toEqual([T_SECRET, T_OPEN]);
+
+        expect((await send(CHANGE, session(OUTSIDER), { linkedTasks: [T_OPEN] }, { id: PAGE })).body.status).toBe(true);
+        expect(stored(PAGE).linkedTasks.map(String)).toEqual([T_OPEN]);
+    });
+});
+
+describe('the draft mark of a doc', () => {
+    it.each([
+        ['a signed-in member', session(INSIDER)],
+        ['a personal token of a member', personalToken(INSIDER)],
+    ])('%s can ask for a draft, and it carries no agent\'s name', async (label, caller) => {
+        expect((await send(CREATE, caller, { title: 'From an answer', projectId: P_OPEN, createdByAgent: true, agentName: 'Claude' })).body.status).toBe(true);
+
+        expect(pages()).toEqual([expect.objectContaining({ title: 'From an answer', createdBy: INSIDER, createdByAgent: true, agentStatus: 'draft', agentName: '' })]);
+    });
+
+    it('a name alone marks nothing', async () => {
+        expect((await send(CREATE, session(INSIDER), { title: 'Handbook', projectId: P_OPEN, agentName: 'Claude', agentStatus: 'draft' })).body.status).toBe(true);
+
+        expect(pages()[0].createdByAgent).toBeUndefined();
+        expect(pages()[0].agentName).toBeUndefined();
+        expect(pages()[0].agentStatus).toBeUndefined();
+    });
+
+    it.each([
+        ['a signed-in member', session(INSIDER)],
+        ['a signed-in owner', session(OWNER)],
+        ['a personal token of a member', personalToken(INSIDER)],
+    ])('is not changed by %s saving the doc', async (label, caller) => {
+        seedDraft();
+
+        expect((await send(CHANGE, caller, { title: 'Renamed draft', agentStatus: 'approved' }, { id: DRAFT })).body.status).toBe(true);
+        expect((await send(CHANGE, caller, { agentStatus: 'approved' }, { id: DRAFT })).body.status).toBe(true);
+        expect((await send(CHANGE, caller, { title: 'Renamed', agentStatus: 'draft' }, { id: PAGE })).body.status).toBe(true);
+
+        expect(stored(DRAFT)).toMatchObject({ title: 'Renamed draft', agentStatus: 'draft', createdByAgent: true, agentName: 'Claude' });
+        expect(stored(DRAFT).approvedBy).toBeUndefined();
+        expect(stored(PAGE).title).toBe('Renamed');
+        expect(stored(PAGE).agentStatus).toBeUndefined();
+    });
+
+    it('is signed off through the approve route', async () => {
+        seedDraft();
+
+        expect((await send('PUT /api/v2/pages/:id/approve', session(OWNER), {}, { id: DRAFT })).body.status).toBe(true);
+
+        expect(stored(DRAFT)).toMatchObject({ agentStatus: 'approved', approvedBy: OWNER });
+    });
 });
 
 describe('everyone else on the doc routes', () => {
@@ -198,6 +321,19 @@ describe('everyone else on the doc routes', () => {
         expect(pages()[0].agentStatus).toBeUndefined();
         expect(String(pages()[0].parentPageId)).toBe(PAGE);
         expect(pages()[0].linkedTasks.map(String)).toEqual([T_OPEN, T_SECRET]);
+    });
+
+    it.each([
+        ['a signed-in member', session(INSIDER)],
+        ['a signed-in guest', session(GUEST)],
+        ['a personal token of a member', personalToken(INSIDER)],
+    ])('%s composes with the assistant as before', async (label, caller) => {
+        composePage.mockResolvedValue({ status: true, data: { html: '<p>Drafted</p>' } });
+
+        const answer = await send(COMPOSE, caller, { action: 'draft', title: 'Plan' });
+
+        expect(answer.body).toMatchObject({ status: true, data: { html: '<p>Drafted</p>' } });
+        expect(composePage).toHaveBeenCalledTimes(1);
     });
 
     it('a person changes a doc as before', async () => {

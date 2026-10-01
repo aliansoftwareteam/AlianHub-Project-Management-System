@@ -35,6 +35,7 @@ const versionRules = require('./helpers/pageVersionRules');
 const pageVersions = require('./helpers/pageVersions');
 const pageSettle = require('./helpers/pageSettle');
 const { cleanBlocks, cleanHtml } = require('../Tasks/helpers/cleanRichText');
+const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
 
 const LIST_FIELDS = 'title parentPageId ProjectID visibility createdBy linkedTasks updatedBy updatedAt createdAt order '
     + 'isWiki ownerId reviewDate reviewedAt reviewedBy createdByAgent agentName agentStatus rawText sharedWith';
@@ -62,11 +63,24 @@ const shownTo = async (companyId, page, uid) => {
     return { ...hideShares(row, uid), canEdit, canChangeProperties, canManageShares: manages, ...(manages ? { sharedCount } : {}) };
 };
 
-const AGENT_STATUSES = ['draft', 'approved'];
+const AGENT_NAME_MAX = 80;
+
+/* The draft mark of a new doc. Which agent drafted it is said on the request by the agent guard or the agent
+ * action that calls the handler, never by the body; a body can only ask for a draft a person then signs off. */
+const draftMarkOf = (req) => {
+    const agentName = req.agentDraft ? String(req.agentDraft.agentName || '').slice(0, AGENT_NAME_MAX) : '';
+    return req.agentDraft || (req.body && req.body.createdByAgent) ? { createdByAgent: true, agentName, agentStatus: 'draft' } : {};
+};
+
+/* Whether `uid` can open every one of the tasks; a hidden task and a missing one answer alike. */
+const opensEveryTask = async (companyId, uid, taskIds) => {
+    const wanted = [...new Set(taskIds.map((id) => String(id).toLowerCase()))];
+    return (await readableTaskIds(companyId, uid, wanted)).length === wanted.length;
+};
 
 /* Fields a page carries besides its body; shared by create and update. Returns the
  * validated patch, or a reason. */
-const readPageMeta = ({ visibility, isWiki, ownerId, reviewDate, agentStatus }) => {
+const readPageMeta = ({ visibility, isWiki, ownerId, reviewDate }) => {
     const patch = {};
     if (visibility !== undefined) patch.visibility = String(visibility) === 'private' ? 'private' : 'project';
     if (isWiki !== undefined) patch.isWiki = Boolean(isWiki);
@@ -80,12 +94,6 @@ const readPageMeta = ({ visibility, isWiki, ownerId, reviewDate, agentStatus }) 
         const date = parseDate(reviewDate);
         if (reviewDate && !date) return { reason: 'reviewDate must be a valid date when provided.' };
         patch.reviewDate = date;
-    }
-    if (agentStatus !== undefined) {
-        if (!AGENT_STATUSES.includes(String(agentStatus))) {
-            return { reason: `agentStatus must be one of: ${AGENT_STATUSES.join(', ')}.` };
-        }
-        patch.agentStatus = String(agentStatus);
     }
     return { patch };
 };
@@ -142,13 +150,13 @@ const findPage = async (companyId, id, uid, { deletedStatusKey = 0, edit = false
 };
 
 /* POST /api/v2/pages  body: { title, projectId?, parentPageId?, visibility?, linkedTasks?,
- *   contentBlocks?, isWiki?, ownerId?, reviewDate?, createdByAgent?, agentName? } */
+ *   contentBlocks?, isWiki?, ownerId?, reviewDate?, createdByAgent? } */
 exports.createPage = async (req, res) => {
     try {
         const companyId = tenantOf(req);
         const {
             title, projectId, parentPageId, visibility, linkedTasks, contentBlocks,
-            isWiki, ownerId, reviewDate, createdByAgent, agentName,
+            isWiki, ownerId, reviewDate,
         } = req.body || {};
         const check = validatePageInput({ companyId, title, projectId });
         if (!check.valid) {
@@ -175,6 +183,9 @@ exports.createPage = async (req, res) => {
             return place.statusCode === 403
                 ? fail(res, 'You do not have permission to add a doc here.', 403)
                 : fail(res, 'Project not found.', 404);
+        }
+        if (!(await opensEveryTask(companyId, userId, linkedTasks || []))) {
+            return fail(res, 'Task not found.', 404);
         }
         if (parentPageId) {
             const parent = await findPage(companyId, parentPageId, userId);
@@ -203,15 +214,11 @@ exports.createPage = async (req, res) => {
             linkedTasks: [...new Set((linkedTasks || []).map(String))].map((x) => new mongoose.Types.ObjectId(x)),
             visibility: 'project',
             ...meta.patch,
+            ...draftMarkOf(req),
         };
         if (doc.isWiki) {
             if (!doc.ownerId) doc.ownerId = userId;
             if (!doc.reviewDate) doc.reviewDate = nextReviewDate();
-        }
-        if (createdByAgent) {
-            doc.createdByAgent = true;
-            doc.agentName = String(agentName || '').slice(0, 80);
-            doc.agentStatus = 'draft';
         }
         if (projectId) {
             doc.ProjectID = new mongoose.Types.ObjectId(projectId);
@@ -311,7 +318,7 @@ exports.getPage = async (req, res) => {
 };
 
 /* PUT /api/v2/pages/:id  body: { title?, contentHtml?, contentBlocks?, visibility?, linkedTasks?,
- *   isWiki?, ownerId?, reviewDate?, agentStatus?, baseEditedAt?, autosave?, settle? }
+ *   isWiki?, ownerId?, reviewDate?, baseEditedAt?, autosave?, settle? }
  * baseEditedAt is the doc's editedAt as the editor last saw it ('' for none): a title or body save from an editor
  * that is behind is refused with 409, never merged. autosave defers what a save announces (helpers/pageSettle.js);
  * settle, with nothing else, says the person stopped editing. */
@@ -320,10 +327,10 @@ exports.updatePage = async (req, res) => {
         const companyId = tenantOf(req);
         const { id } = req.params;
         const {
-            title, contentHtml, contentBlocks, visibility, linkedTasks, isWiki, ownerId, reviewDate, agentStatus,
+            title, contentHtml, contentBlocks, visibility, linkedTasks, isWiki, ownerId, reviewDate,
             baseEditedAt, autosave, settle,
         } = req.body || {};
-        const meta = readPageMeta({ visibility, isWiki, ownerId, reviewDate, agentStatus });
+        const meta = readPageMeta({ visibility, isWiki, ownerId, reviewDate });
         if (meta.reason) {
             return res.send({ status: false, statusText: meta.reason });
         }
@@ -395,6 +402,11 @@ exports.updatePage = async (req, res) => {
         if (linkedTasks !== undefined) {
             if (!Array.isArray(linkedTasks) || !linkedTasks.every((x) => isObjectIdString(x))) {
                 return res.send({ status: false, statusText: 'linkedTasks must be a list of valid task ids.' });
+            }
+            // The editor sends the whole list back, so a link the doc already holds stays whoever saves.
+            const held = new Set((existing.linkedTasks || []).map((x) => String(x).toLowerCase()));
+            if (!(await opensEveryTask(companyId, userId, linkedTasks.filter((x) => !held.has(String(x).toLowerCase()))))) {
+                return fail(res, 'Task not found.', 404);
             }
             update.linkedTasks = [...new Set(linkedTasks.map(String))].map((x) => new mongoose.Types.ObjectId(x));
         }

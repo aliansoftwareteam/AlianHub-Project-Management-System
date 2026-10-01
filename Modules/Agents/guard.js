@@ -182,6 +182,26 @@ const pageCreateChecks = (req, body) => {
     return { action: 'page.create', params: { ...params, fields: Object.fromEntries(beyond.map((field) => [field, 1])) } };
 };
 
+/* What the handler answered, once it has: the handlers behind these routes answer most failures as HTTP 200
+ * with `status: false`, so the HTTP status alone does not say whether the write happened. */
+const answerOf = (res) => {
+    const answer = {};
+    ['send', 'json'].filter((name) => typeof res[name] === 'function').forEach((name) => {
+        const original = res[name];
+        res[name] = function answered(body, ...rest) {
+            if (answer.body === undefined && body && typeof body === 'object' && !Buffer.isBuffer(body)) answer.body = body;
+            return original.call(this, body, ...rest);
+        };
+    });
+    return answer;
+};
+
+const failureOf = (res, answer) => {
+    if (res.statusCode >= 400) return `HTTP ${res.statusCode}`;
+    const body = answer.body || {};
+    return body.status === false ? String(body.statusText || body.message || 'status false') : '';
+};
+
 /* `checksOf(req, body, companyId)` names the registry action, or actions, the request is; every one must be
  * allowed without a flag. A write is recorded, a read is not. */
 const routeGuard = (checksOf) => withActor(async (req, res, next, actor) => {
@@ -202,9 +222,11 @@ const routeGuard = (checksOf) => withActor(async (req, res, next, actor) => {
     } catch (e) {
         return res.status(503).json({ status: false, message: e.message, statusText: audit.AUDIT_UNAVAILABLE });
     }
+    const answer = answerOf(res);
     res.on('finish', () => {
-        const settle = res.statusCode >= 400
-            ? audit.failAction(companyId, auditId, `HTTP ${res.statusCode}`)
+        const failure = failureOf(res, answer);
+        const settle = failure
+            ? audit.failAction(companyId, auditId, failure)
             : audit.applyAction(companyId, auditId, { undo: null });
         settle.catch((e) => logger.error(`agent guard: ${e.message}`));
     });
@@ -220,7 +242,7 @@ const pageCreateChecked = routeGuard(pageCreateChecks);
 
 /* A doc an agent creates is its draft whatever the body says, so that a person signs it off. */
 const pageCreateGuard = (req, res, next) => pageCreateChecked(req, res, () => {
-    if (isAgent(req.agentActor)) req.body = { ...plain(req.body), createdByAgent: true, agentName: attribution(req.agentActor).label };
+    if (isAgent(req.agentActor)) req.agentDraft = { agentName: attribution(req.agentActor).label };
     return next();
 });
 
