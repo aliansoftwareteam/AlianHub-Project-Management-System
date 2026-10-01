@@ -127,6 +127,16 @@ describe('the sentence compiler understands the new triggers and the notify acti
     });
 });
 
+describe('the rule list', () => {
+    it('does not hand out who a rule has told and how often', async () => {
+        seedRule({ notifyWindows: { [PRIYA]: { hour: 1, count: 3 } } });
+        const { body } = await call(ctrl.listRulesV2);
+        expect(body.data).toHaveLength(1);
+        expect(body.data[0].notifyWindows).toBeUndefined();
+        expect(body.data[0].sentence).toContain('send "{{task.TaskKey}} is overdue" to the assignees');
+    });
+});
+
 describe('dry run', () => {
     it('lists who would be notified and who would be skipped, with the message filled in, and sends nothing', async () => {
         const runSpy = jest.spyOn(registry.getAction('notify'), 'run');

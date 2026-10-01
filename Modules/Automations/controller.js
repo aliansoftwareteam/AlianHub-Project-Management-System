@@ -217,14 +217,16 @@ exports.getRegistry = async (req, res) => {
 };
 
 const V1_APPLY_FIELDS = ['lastRunAt', 'lastRunCount'];
+const NOTIFY_COUNTERS = 'notifyWindows';
 
 /* Those two belong to the v1 bulk apply and are dropped here: the schema default
  * would otherwise report "never run, 0 tasks" for a rule the engine has been firing
- * on every matching event. */
+ * on every matching event. The notify counters say who a rule told and how often,
+ * which the rule list has no reason to show every member. */
 const v2Summary = (r, people = []) => {
     const raw = r.toObject ? r.toObject() : r;
     const summarised = { ...raw, summary: V2.describeV2(raw), sentence: sentences.describeRule(raw, { people }) };
-    V1_APPLY_FIELDS.forEach((field) => delete summarised[field]);
+    [...V1_APPLY_FIELDS, NOTIFY_COUNTERS].forEach((field) => delete summarised[field]);
     return summarised;
 };
 
