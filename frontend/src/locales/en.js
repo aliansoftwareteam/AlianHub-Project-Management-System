@@ -5840,6 +5840,7 @@ export default {
         duplicate_assignees: "Assignees of the tasks",
         duplicate_dates: "Dates",
         duplicate_always: "Folders, lists, statuses, views and custom fields always come along. Automations are copied switched off.",
+        duplicate_fields_shared: "The copy uses the same custom fields as the original, so a change to a field applies to both projects.",
         duplicate_working: "Duplicating…",
         duplicate_progress: "Copying tasks: {done} of {total}",
         duplicate_progress_hint: "The copy opens when its tasks are in. You can hide this; the tasks keep arriving.",

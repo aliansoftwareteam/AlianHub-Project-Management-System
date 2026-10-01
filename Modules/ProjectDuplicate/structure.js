@@ -43,11 +43,14 @@ const copyAutomations = async ({ companyId, caller, sourceId, projectId, ids, no
 /* The definitions are shared with the copy rather than cloned, so the values on copied tasks,
    the view settings and the automations that name a field keep meaning the same field. */
 const linkCustomFields = async (companyId, sourceId, projectId) => {
-    const linked = await MongoDbCrudOpration(companyId, {
+    const shared = await find(companyId, SCHEMA_TYPE.CUSTOM_FIELDS, { projectId: sourceId, global: { $ne: true } }, { _id: 1 });
+    if (!shared.length) return [];
+    await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.CUSTOM_FIELDS,
-        data: [{ projectId: sourceId, global: { $ne: true } }, { $addToSet: { projectId } }],
+        data: [{ _id: { $in: shared.map((field) => field._id) } }, { $addToSet: { projectId } }],
     }, 'updateMany');
-    if (linked && linked.modifiedCount) removeCache(`customField:${companyId}`);
+    removeCache(`customField:${companyId}`);
+    return shared.map((field) => String(field._id));
 };
 
 const copyPermissions = async (companyId, source, projectId) => {
@@ -88,14 +91,14 @@ const copyStructure = async ({ companyId, caller, source, name, include, made })
         type: SCHEMA_TYPE.PROJECTS,
         data: rules.projectCopy(source, { id: projectRef, name, code: rules.nextProjectCode(source.ProjectCode, codes.map((row) => row.ProjectCode)), caller, companyId, include, ids }),
     }, 'save');
-    await linkCustomFields(companyId, sourceId, projectId);
+    const sharedFields = await linkCustomFields(companyId, sourceId, projectId);
     made.rules = await copyAutomations({ companyId, caller, sourceId, projectId, ids, notes });
 
     const placements = new Map();
     for (const list of listRows) placements.set(String(list._id), (await sprintPlacementOf(companyId, list)).set);
 
     return {
-        project, ids, notes, placements,
+        project, ids, notes, placements, sharedFields,
         sourceListIds: sourceLists.map((list) => list._id),
         counts: { folders: folderRows.length, lists: listRows.length, tasks: 0, automations: made.rules.length },
     };

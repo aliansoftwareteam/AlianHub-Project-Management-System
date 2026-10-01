@@ -30,6 +30,7 @@
                     </fieldset>
 
                     <p class="ah-field__hint dpd__always">{{ t('Projects.duplicate_always') }}</p>
+                    <p v-if="sharedFields.length" class="ah-field__hint dpd__always" data-note="shared-fields">{{ t('Projects.duplicate_fields_shared') }}</p>
                     <p v-if="problem" class="ah-field__error" role="alert">{{ problem }}</p>
                 </template>
 
@@ -86,6 +87,20 @@ const nameInput = ref(null);
 let timer = null;
 let closed = false;
 
+const linkedTo = (field, projectId) => field.global !== true && [].concat(field.projectId || []).map(String).includes(String(projectId));
+const sharedFields = computed(() => (store.getters['settings/finalCustomFields'] || []).filter((field) => linkedTo(field, props.project._id)));
+
+/* The server links the copy to these definitions and tells no client; a list that lacked the copy would take the field off it on the next edit. */
+function shareFields(fieldIds, copyId) {
+    const known = store.getters['settings/finalCustomFields'] || [];
+    (fieldIds || []).forEach((id) => {
+        const field = known.find((item) => String(item._id) === String(id));
+        if (field && !linkedTo(field, copyId)) {
+            store.commit('settings/mutateFinalCustomFields', { op: 'modified', data: { ...field, projectId: [...[].concat(field.projectId || []), copyId] } });
+        }
+    });
+}
+
 const percent = computed(() => (job.value?.total ? Math.min(100, Math.round((job.value.processed / job.value.total) * 100)) : 0));
 
 const tasksChanged = () => { if (!include.tasks) include.assignees = false; };
@@ -125,7 +140,10 @@ async function submit() {
     busy.value = true;
     problem.value = '';
     const answer = await duplicateProject(props.project._id, { name: wanted, include: { ...include } });
-    if (answer.ok) store.commit('projectData/mutateProjects', [{ snap: null, privateSnap: false, op: 'added', data: { ...answer.project, id: answer.project._id } }]);
+    if (answer.ok) {
+        store.commit('projectData/mutateProjects', [{ snap: null, privateSnap: false, op: 'added', data: { ...answer.project, id: answer.project._id } }]);
+        shareFields(answer.sharedFields, answer.project._id);
+    }
     if (closed) return;
     if (!answer.ok) {
         busy.value = false;

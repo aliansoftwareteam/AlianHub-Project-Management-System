@@ -16,6 +16,10 @@ jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
 jest.mock('../Modules/Project/helpers/projectHistory', () => ({ recordProjectCreated: jest.fn(async () => undefined) }));
 jest.mock('../Modules/Automations/engine/matcher', () => ({ invalidate: jest.fn() }));
+jest.mock('../Modules/CustomField/helpers/customFieldHistory', () => ({
+    recordFieldCreated: jest.fn(() => Promise.resolve()),
+    recordFieldRenamed: jest.fn(() => Promise.resolve()),
+}));
 jest.mock('../Modules/Project/helpers/projectQuota', () => ({
     stepProjectCount: jest.fn(async (companyId, isPrivateSpace, step) => {
         const bucket = isPrivateSpace === true ? 'privateCount' : 'publicCount';
@@ -43,22 +47,24 @@ const MEMBER_ROLE = 3;
 const oid = () => new mongoose.Types.ObjectId().toString();
 const asId = (id) => new mongoose.Types.ObjectId(String(id));
 
-const routes = () => {
+const routesOf = (init) => {
     const table = {};
     const register = (method) => (path, ...handlers) => { table[`${method} ${path}`] = handlers.flat(); };
-    require('../Modules/ProjectDuplicate/routes').init({ get: register('GET'), post: register('POST'), put: register('PUT'), patch: register('PATCH'), delete: register('DELETE'), use: register('USE') });
+    init({ get: register('GET'), post: register('POST'), put: register('PUT'), patch: register('PATCH'), delete: register('DELETE'), use: register('USE') });
     return table;
 };
+const routes = () => routesOf(require('../Modules/ProjectDuplicate/routes').init);
+const fieldRoutes = () => routesOf(require('../Modules/CustomField/routes').init);
 
 const settle = async () => { for (let i = 0; i < 200; i += 1) await new Promise((resolve) => setImmediate(resolve)); };
 
-const run = async (route, { uid = OWNER, company = C, id, body, wait = true }) => {
+const run = async (route, { uid = OWNER, company = C, id, body, wait = true, table = routes() }) => {
     const res = { statusCode: 200, body: undefined };
     res.status = jest.fn((code) => { res.statusCode = code; return res; });
     res.json = jest.fn((payload) => { res.body = payload; return res; });
     res.send = res.json;
     const req = verified({ uid, params: { id }, body, query: {}, headers: { companyid: company } });
-    for (const handler of routes()[route]) {
+    for (const handler of table[route]) {
         let advanced = false;
         await handler(req, res, () => { advanced = true; });
         if (!advanced) break;
@@ -320,7 +326,9 @@ describe('the project itself', () => {
     it('links the project-level custom fields to the copy', async () => {
         const own = seed(SCHEMA_TYPE.CUSTOM_FIELDS, { fieldTitle: 'Shape', global: false, projectId: [launch.id] });
         const other = seed(SCHEMA_TYPE.CUSTOM_FIELDS, { fieldTitle: 'Elsewhere', global: false, projectId: [oid()] });
-        const { id } = copyOf(await duplicate(launch.id));
+        const res = await duplicate(launch.id);
+        const { id } = copyOf(res);
+        expect(res.body.data.sharedFields).toEqual([String(own._id)]);
         expect(rowsOf(SCHEMA_TYPE.CUSTOM_FIELDS).find((row) => row._id === own._id).projectId).toEqual([launch.id, id]);
         expect(rowsOf(SCHEMA_TYPE.CUSTOM_FIELDS).find((row) => row._id === other._id).projectId).toHaveLength(1);
         expect(removeCache).toHaveBeenCalledWith(`customField:${C}`);
@@ -644,21 +652,13 @@ describe('who may duplicate', () => {
         refused(await duplicate(launch.id), 404);
     });
 
-    it('enforces the project limit of the plan and gives the count back', async () => {
-        mockCompany.planFeature.maxPublicProject = 1;
+    it('counts the copy as creating a project counts one, and like a create is held to no plan limit', async () => {
+        Object.assign(mockCompany.planFeature, { project: 1, maxPublicProject: 1, maxPrivateProject: 0 });
         const res = await duplicate(launch.id);
-        expect(refused(res, 403)).toMatch(/plan/i);
-        expect(res.body.isUpgrade).toBe(true);
-        nothingCopied();
-        expect(stepProjectCount.mock.calls).toEqual([[C, false, 1], [C, false, -1]]);
-        expect(mockCompany.projectCount).toEqual({ projectCount: 1, publicCount: 1, privateCount: 0 });
-    });
-
-    it('enforces the overall project limit too, and passes under it', async () => {
-        mockCompany.planFeature.project = 1;
-        expect(refused(await duplicate(launch.id), 403)).toMatch(/plan/i);
-        mockCompany.planFeature.project = 2;
-        expect((await duplicate(launch.id)).body.status).toBe(true);
+        expect(res.body.status).toBe(true);
+        expect(copyOf(res).project.ProjectName).toBe('Launch (copy)');
+        expect(stepProjectCount.mock.calls).toEqual([[C, false, 1]]);
+        expect(mockCompany.projectCount).toEqual({ projectCount: 2, publicCount: 2, privateCount: 0 });
     });
 
     it('gives the count back when the copy fails', async () => {
@@ -704,5 +704,65 @@ describe('the request', () => {
     it('trims the name', async () => {
         const res = await run(DUPLICATE, { id: launch.id, body: { name: '  Launch two  ', include: STRUCTURE_ONLY } });
         expect(res.body.data.project.ProjectName).toBe('Launch two');
+    });
+});
+
+/* The copy shares the definition of a project-level field with its source, so what one project does to the field must not reach the other. */
+describe('a field shared with the copy', () => {
+    const WITH_TASKS = { include: { tasks: true, assignees: false, dates: false } };
+    const updateField = (id, updateObject, uid = OWNER) => run('PUT /api/v1/customField', {
+        uid, table: fieldRoutes(), body: { type: 'updateOne', key: '$set', id: String(id), updateObject },
+    });
+    const definition = (id) => rowsOf(SCHEMA_TYPE.CUSTOM_FIELDS).find((row) => String(row._id) === String(id));
+    const valuesIn = (projectId) => inProject(SCHEMA_TYPE.TASKS, projectId, 'ProjectID').map((task) => task.customField);
+
+    let field;
+    let copy;
+    const shared = async (projectExtra = {}) => {
+        launch = seedLaunch({ ProjectName: 'Fields', ProjectCode: 'FLD', ...projectExtra });
+        field = String(seed(SCHEMA_TYPE.CUSTOM_FIELDS, { fieldTitle: 'Score', fieldType: 'rating', fieldRatingMax: 5, type: 'task', isDelete: true, global: false, projectId: [launch.id] })._id);
+        seedTask(launch, launch.backlog, { TaskName: 'Scored', customField: { [field]: { fieldValue: 4, _id: field } } });
+        copy = copyOf(await duplicate(launch.id, WITH_TASKS));
+        expect(definition(field).projectId).toEqual([launch.id, copy.id]);
+        expect(valuesIn(copy.id)).toEqual([{ [field]: { fieldValue: 4, _id: field } }]);
+    };
+
+    it('stays on the copy, with its values, when it is taken off the source', async () => {
+        await shared();
+        const res = await updateField(field, { projectId: [copy.id] });
+        expect(res.statusCode).toBe(200);
+        expect(definition(field)).toMatchObject({ fieldTitle: 'Score', fieldType: 'rating', isDelete: true, global: false, projectId: [copy.id] });
+        expect(valuesIn(copy.id)).toEqual([{ [field]: { fieldValue: 4, _id: field } }]);
+        expect(valuesIn(launch.id)).toEqual([{ [field]: { fieldValue: 4, _id: field } }]);
+    });
+
+    it('stays on the source, with its values, when it is taken off the copy', async () => {
+        await shared();
+        const res = await updateField(field, { projectId: [launch.id] });
+        expect(res.statusCode).toBe(200);
+        expect(definition(field)).toMatchObject({ fieldTitle: 'Score', isDelete: true, global: false, projectId: [launch.id] });
+        expect(valuesIn(launch.id)).toEqual([{ [field]: { fieldValue: 4, _id: field } }]);
+        expect(valuesIn(copy.id)).toEqual([{ [field]: { fieldValue: 4, _id: field } }]);
+    });
+
+    it('cannot be taken off, switched off or renamed for a project by someone who cannot open that project', async () => {
+        await shared({ isPrivateSpace: true, AssigneeUserId: [OWNER, MEMBER] });
+        rowsOf(SCHEMA_TYPE.PROJECTS).find((row) => String(row._id) === copy.id).AssigneeUserId = [OWNER];
+        const before = JSON.stringify(definition(field));
+        for (const change of [{ projectId: [launch.id] }, { isDelete: false }, { fieldTitle: 'Mine now' }]) {
+            const res = await updateField(field, change, MEMBER);
+            expect([403, 404]).toContain(res.statusCode);
+            expect(JSON.stringify(definition(field))).toBe(before);
+        }
+        expect(valuesIn(copy.id)).toEqual([{ [field]: { fieldValue: 4, _id: field } }]);
+    });
+
+    it('is one definition: switching it off is for both projects, and no value is removed', async () => {
+        await shared();
+        const res = await updateField(field, { isDelete: false });
+        expect(res.statusCode).toBe(200);
+        expect(definition(field)).toMatchObject({ isDelete: false, projectId: [launch.id, copy.id] });
+        expect(valuesIn(launch.id)).toEqual([{ [field]: { fieldValue: 4, _id: field } }]);
+        expect(valuesIn(copy.id)).toEqual([{ [field]: { fieldValue: 4, _id: field } }]);
     });
 });

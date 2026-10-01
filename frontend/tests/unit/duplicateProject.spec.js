@@ -57,15 +57,21 @@ const ALPHA = { _id: 'p1', ProjectName: 'Alpha', isGlobalPermission: true, delet
 const COPY = { _id: 'p2', ProjectName: 'Alpha (copy)', ProjectCode: 'ALP2' };
 
 const commits = [];
+const fieldCommits = [];
+let fields = [];
 const store = () => createStore({
     getters: {
+        'settings/finalCustomFields': () => fields,
         'projectData/allProjects': () => ({ data: [ALPHA, { ...ALPHA, _id: 'mine', ProjectName: 'My list', isPersonal: true }] }),
         'settings/selectedCompany': () => ({}),
         'settings/companyUsers': () => [],
         'users/users': () => [],
         'settings/companyUserDetail': () => getters['settings/companyUserDetail']
     },
-    mutations: { 'projectData/mutateProjects': (state, payload) => commits.push(payload) }
+    mutations: {
+        'projectData/mutateProjects': (state, payload) => commits.push(payload),
+        'settings/mutateFinalCustomFields': (state, payload) => fieldCommits.push(payload)
+    }
 });
 
 const mounted = [];
@@ -88,6 +94,8 @@ const refusal = (status, statusText) => Object.assign(new Error(`Request failed 
 
 beforeEach(() => {
     commits.length = 0;
+    fieldCommits.length = 0;
+    fields = [];
     apiRequest.mockReset();
     push.mockClear();
     Object.values(toast).forEach((spy) => spy.mockClear());
@@ -193,6 +201,31 @@ describe('the duplicate dialog', () => {
         await flushPromises();
         expect(wrapper.emitted('close')).toHaveLength(2);
         expect(posts()).toHaveLength(0);
+    });
+});
+
+describe('the custom fields of the source', () => {
+    const SHAPE = { _id: 'f1', fieldTitle: 'Shape', global: false, projectId: ['p1'] };
+    const note = () => dialog().querySelector('[data-note="shared-fields"]');
+
+    it('are said to be shared when the project has fields of its own', () => {
+        fields = [SHAPE];
+        openDialog();
+        expect(note().textContent).toBe('The copy uses the same custom fields as the original, so a change to a field applies to both projects.');
+    });
+
+    it('are not mentioned when it has none: a company-wide field and a field of another project do not count', () => {
+        fields = [{ ...SHAPE, global: true, projectId: [] }, { ...SHAPE, _id: 'f2', projectId: ['other'] }];
+        openDialog();
+        expect(note()).toBeNull();
+    });
+
+    it('name the copy in this client too once it is made, so a later edit of the field does not take it off the copy', async () => {
+        fields = [SHAPE, { ...SHAPE, _id: 'f2', projectId: ['other'] }];
+        apiRequest.mockResolvedValue(answer({ sharedFields: ['f1', 'unknown-here'] }));
+        openDialog();
+        await submit();
+        expect(fieldCommits).toEqual([{ op: 'modified', data: { ...SHAPE, projectId: ['p1', 'p2'] } }]);
     });
 });
 

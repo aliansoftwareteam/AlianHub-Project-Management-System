@@ -12,7 +12,6 @@ const { planTasks, copyTasks } = require('./tasks');
 
 const NOT_FOUND = 'Project not found.';
 const PERSONAL = 'A personal list cannot be duplicated.';
-const OVER_LIMIT = 'Your plan does not allow another project.';
 const FAILED = 'The project could not be duplicated.';
 
 const refuse = (res, code, statusText, extra = {}) => res.status(code).send({ status: false, statusText, message: statusText, ...extra });
@@ -75,12 +74,9 @@ exports.duplicate = async (req, res) => {
         if (source.isPersonal === true) return refuse(res, 400, PERSONAL);
 
         const isPrivateSpace = source.isPrivateSpace === true;
-        const stepped = await stepProjectCount(companyId, isPrivateSpace, 1);
+        // Counted as a create counts it, and like a create held to no plan limit: one that returns belongs in a place both paths share.
+        await stepProjectCount(companyId, isPrivateSpace, 1);
         counted = isPrivateSpace;
-        if (rules.overProjectLimit(stepped && stepped.data, isPrivateSpace)) {
-            await giveBack();
-            return refuse(res, 403, OVER_LIMIT, { isUpgrade: true });
-        }
 
         const { include, name } = request;
         const copy = await copyStructure({ companyId, caller, source, name, include, made });
@@ -97,7 +93,7 @@ exports.duplicate = async (req, res) => {
         removeCache('UserProjectData:', true);
         const project = (await liveProject(companyId, made.projectId)) || copy.project;
         recordProjectCreated({ companyId, project, actorId: caller }).catch(logged('recording the creation'));
-        return res.send({ status: true, statusText: 'Project duplicated.', data: { project, counts: copy.counts, notes: copy.notes, job } });
+        return res.send({ status: true, statusText: 'Project duplicated.', data: { project, counts: copy.counts, notes: copy.notes, sharedFields: copy.sharedFields, job } });
     } catch (error) {
         logged('failed')(error);
         await discard(companyId, made).catch(logged('taking the copy back'));

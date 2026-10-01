@@ -6141,6 +6141,7 @@
     "Projects.duplicate_dates": "Dates",
     "Projects.duplicate_done": "{name} is ready.",
     "Projects.duplicate_failed": "The project could not be duplicated.",
+    "Projects.duplicate_fields_shared": "The copy uses the same custom fields as the original, so a change to a field applies to both projects.",
     "Projects.duplicate_hide": "Hide",
     "Projects.duplicate_name": "Name of the copy",
     "Projects.duplicate_name_required": "Give the copy a name.",

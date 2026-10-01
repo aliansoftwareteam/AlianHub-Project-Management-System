@@ -53,16 +53,6 @@ const parseRequest = (body) => {
     return { ok: true, name, include: { tasks, assignees, dates } };
 };
 
-/* A limit of null, or a plan with no such limit, is no limit. Read after the count has been stepped. */
-const overLimit = (limit, count) => typeof limit === 'number' && Number(count || 0) > limit;
-
-const overProjectLimit = (company, isPrivateSpace) => {
-    const plan = (company && company.planFeature) || {};
-    const counts = (company && company.projectCount) || {};
-    return overLimit(plan.project, counts.projectCount)
-        || (isPrivateSpace === true ? overLimit(plan.maxPrivateProject, counts.privateCount) : overLimit(plan.maxPublicProject, counts.publicCount));
-};
-
 const newId = () => new mongoose.Types.ObjectId();
 const idOf = (value) => String(value == null ? '' : value);
 const pick = (source, fields) => Object.fromEntries(fields.filter((field) => source[field] !== undefined).map((field) => [field, source[field]]));
@@ -204,6 +194,6 @@ const taskLevels = (rows) => {
 
 module.exports = {
     INLINE_TASK_LIMIT, BATCH, JOB_SOURCE, LIVE, TRASHED, OBJECT_ID, TASK_FIELDS, TASK_DATES,
-    parseRequest, overProjectLimit, newId, idOf, pick, remap, nextProjectCode, projectCopy,
+    parseRequest, newId, idOf, pick, remap, nextProjectCode, projectCopy,
     isLive, folderCopies, listCopies, ruleTargets, ruleCopy, permissionCopies, withoutPeople, taskLevels,
 };
