@@ -1,3 +1,4 @@
+/* eslint-env browser */
 const { test, expect, asRole } = require('../support/test');
 
 /* The suite blocks service workers (playwright.config.js); this file is the one place they run. */
