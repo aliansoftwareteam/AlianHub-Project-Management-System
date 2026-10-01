@@ -199,7 +199,7 @@ onUnmounted(() => {
 <style scoped>
 .time-entry-wrapper {
   display: inline-block;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-ui);
   font-size: 14px;
 }
 
@@ -207,21 +207,15 @@ onUnmounted(() => {
     border-radius: 7px;
     border-width: 2px;
     height: 24px;
-    font-size: 13px;
     font-family: var(--font-ui);
     font-style: normal;
     font-weight: 400;
     line-height: 23px;
     padding: 0px 8px 0px 8px;
-    margin-left: -7px;
+    margin-left: -8px;
     cursor: pointer;
 }
 
-/* .time-display:hover {
-  background: #e9ecef;
-} */
-
-/* Read-only: drop the affordance so the value does not look clickable. */
 .time-display--readonly {
   cursor: default;
 }
@@ -230,8 +224,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 2px;
-  background: white;
-  border: 1px solid #cfd0d3;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 4px 8px;
 }
@@ -244,7 +238,7 @@ onUnmounted(() => {
   text-align: center;
   font-size: 14px;
   font-weight: 500;
-  color: #495057;
+  color: var(--ink);
   background: transparent;
 }
 
@@ -256,11 +250,10 @@ onUnmounted(() => {
 
 .separator {
   font-weight: bold;
-  /* color: #007bff; */
   user-select: none;
 }
 
 .time-input::placeholder {
-  color: #adb5bd;
+  color: var(--ink-2);
 }
 </style>

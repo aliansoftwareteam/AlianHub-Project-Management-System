@@ -1,5 +1,5 @@
 .formkit__content-wrapper {
-    border-bottom: 1px solid #DFE1E6;
+    border-bottom: 1px solid var(--hairline);
 }
 .formkit__content-wrapper .formkit-wrapper {
     display: flex;
@@ -8,7 +8,7 @@
     max-width: 100%;
 }
 .formkit__content-wrapper label.formkit-label {
-    color: #505050;
+    color: var(--ink-2);
     font-family: var(--font-ui);
     font-size: 13px;
     font-style: normal;
@@ -25,11 +25,24 @@
 .formkit__content-wrapper .formkit-inner {
     width: 100%;
     box-shadow: none;
-    border-left: 1px solid #DFE1E6;
+    border-left: 1px solid var(--hairline);
     border-radius: 0px;
     padding: 10px 20px 10px;
 }
-.formkit__content-wrapper .formkit-input,.formkit__content-wrapper-project-detail .formkit-input  {
+.formkit__content-wrapper .formkit-input {
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 19.24px !important;
+    padding: 0px;
+    color: var(--ink);
+}
+.formkit__content-wrapper .formkit-input::placeholder,
+.formkit__content-wrapper a.formkit-input {
+    color: var(--ink-2);
+}
+.formkit__content-wrapper-project-detail .formkit-input {
     font-family: var(--font-ui);
     font-size: 13px;
     font-style: normal;

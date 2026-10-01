@@ -4,7 +4,7 @@
             <h3 class="custom-field__title" :class="headerClasses">
                 {{ $t('CustomField.custom_field') }}
             </h3>
-            <span v-if="props.editPermission" class="font-ui font-size-14 font-weight-500 font-normal text-decoration-underline blue cursor-pointer custom-field__add" @click="emit('isCustomField', true)">+ {{ $t('CustomField.custom_field') }}</span>
+            <button v-if="props.editPermission" type="button" class="ah-btn ah-btn--ghost ah-btn--sm custom-field__add" @click="emit('isCustomField', true)">+ {{ $t('CustomField.custom_field') }}</button>
         </div>
         
         <!-- Loading skeleton -->
