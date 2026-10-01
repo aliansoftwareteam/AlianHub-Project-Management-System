@@ -372,7 +372,7 @@ function renderFront(facts, grouped, counts) {
         '',
         '### Scopes',
         '',
-        `A token carries the scopes ${tokens.scopes.map(code).join(' and ')}. \`GET\`, \`HEAD\` and \`OPTIONS\` requests need \`read\`; every other method needs \`write\`, including a \`POST\` that only reads. A token without the scope a request needs gets a 403.`,
+        `A token carries the scopes ${tokens.scopes.map(code).join(' and ')}. \`GET\`, \`HEAD\` and \`OPTIONS\` requests need \`read\`; every other method needs \`write\`, including a \`POST\` that only reads. A token without the scope a request needs gets a 403. A token created with no scopes named holds both.`,
         '',
         '### Tokens limited to projects',
         '',
