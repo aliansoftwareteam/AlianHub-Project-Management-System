@@ -1,0 +1,1699 @@
+{
+  "source": "origin/chore/integrate-046-batch-4 84d5ffee9 Modules/Agents/registry.js and Modules/Agents/actions.js, every flag on, before the list was split into one file per group",
+  "actions": [
+    {
+      "key": "tasks.next",
+      "label": "Next assigned task",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "task.task_list"
+    },
+    {
+      "key": "tasks.search",
+      "label": "Search own tasks",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "task.task_list"
+    },
+    {
+      "key": "task.get",
+      "label": "Read a task brief",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read+summary",
+      "permission": "task.task_list"
+    },
+    {
+      "key": "task.comment",
+      "label": "Comment on a task",
+      "risk": "low",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": "task.task_comment"
+    },
+    {
+      "key": "task.status.set",
+      "label": "Set status (In progress / In review only)",
+      "risk": "low",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "constraint": "statusType must not be \"close\"; status name must be In progress or In review",
+      "permission": "task.task_status"
+    },
+    {
+      "key": "task.link",
+      "label": "Attach a PR, branch or doc",
+      "risk": "low",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": "task.task_attachments"
+    },
+    {
+      "key": "task.assign",
+      "label": "Assign a task",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": "task.task_assignee"
+    },
+    {
+      "key": "task.update",
+      "label": "Update task fields",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "fields": [
+        "TaskName",
+        "description",
+        "rawDescription",
+        "Task_Priority",
+        "DueDate",
+        "startDate",
+        "tagsArray",
+        "checklistArray",
+        "points",
+        "totalEstimatedTime"
+      ],
+      "permission": {
+        "byField": {
+          "TaskName": "task.task_name_edit",
+          "description": "task.task_description",
+          "rawDescription": "task.task_description",
+          "Task_Priority": "task.task_priority",
+          "DueDate": "task.task_due_date",
+          "startDate": "task.task_start_date",
+          "tagsArray": "task.task_tag",
+          "checklistArray": "task.task_checklist",
+          "points": "task.task_estimated_hours",
+          "totalEstimatedTime": "task.task_estimated_hours"
+        }
+      }
+    },
+    {
+      "key": "aifield.fill",
+      "label": "Fill an AI field on a task",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": "task.task_custom_field"
+    },
+    {
+      "key": "task.sprint.move",
+      "label": "Move a task between sprints",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": "task.task_move"
+    },
+    {
+      "key": "subtask.create",
+      "label": "Create a subtask",
+      "risk": "low",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": "task.sub_task_create"
+    },
+    {
+      "key": "task.create",
+      "label": "File a task (opening status, unassigned)",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "constraint": "always the project's opening status; never assigned; only in a project the token can see",
+      "permission": "task.task_create"
+    },
+    {
+      "key": "timelog.start",
+      "label": "Start a timer",
+      "risk": "low",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": "sheet_settings.user_timesheet"
+    },
+    {
+      "key": "timelog.stop",
+      "label": "Stop a timer",
+      "risk": "low",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": "sheet_settings.user_timesheet"
+    },
+    {
+      "key": "docs.read",
+      "label": "Read a linked doc",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "project.project_details"
+    },
+    {
+      "key": "page.draft",
+      "label": "Draft a page (stays a draft until approved)",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": "project.project_details"
+    },
+    {
+      "key": "chat.post",
+      "label": "Post in a channel",
+      "risk": "low",
+      "undoable": false,
+      "write": true,
+      "cost": "write",
+      "permission": "task.task_comment"
+    },
+    {
+      "key": "reminder.create",
+      "label": "Create a reminder",
+      "risk": "low",
+      "undoable": false,
+      "write": true,
+      "cost": "write",
+      "permission": {
+        "key": "task.task_list",
+        "write": false
+      }
+    },
+    {
+      "key": "deploy.staging",
+      "label": "Propose a staging deploy",
+      "risk": "high",
+      "undoable": false,
+      "write": true,
+      "cost": "write",
+      "gate": "owner_admin",
+      "proposeOnly": true,
+      "permission": "settings.settings_edit_company"
+    },
+    {
+      "key": "performance.read",
+      "label": "Read project performance numbers",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "project.project_details"
+    },
+    {
+      "key": "projects.list",
+      "label": "List projects",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "project.project_list"
+    },
+    {
+      "key": "project.get",
+      "label": "Read a project",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "project.project_details"
+    },
+    {
+      "key": "sprints.list",
+      "label": "List a project's sprints",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "project.project_list"
+    },
+    {
+      "key": "statuses.list",
+      "label": "List a project's statuses",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "task.task_list"
+    },
+    {
+      "key": "comments.list",
+      "label": "Read a task's comments",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "task.task_list"
+    },
+    {
+      "key": "pages.search",
+      "label": "Search pages",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "project.project_details"
+    },
+    {
+      "key": "page.get",
+      "label": "Read a page",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "project.project_details"
+    },
+    {
+      "key": "timesheet.read",
+      "label": "Read time entries",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": {
+        "key": "sheet_settings.user_timesheet",
+        "write": false
+      }
+    },
+    {
+      "key": "comment.create",
+      "label": "Comment on a task",
+      "risk": "low",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": "task.task_comment"
+    },
+    {
+      "key": "timelog.create",
+      "label": "Log time on a task (own time)",
+      "risk": "low",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": "sheet_settings.user_timesheet"
+    },
+    {
+      "key": "fields.list",
+      "label": "List a project's custom fields",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "task.task_list"
+    },
+    {
+      "key": "subtasks.list",
+      "label": "List a task's subtasks",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "task.task_list"
+    },
+    {
+      "key": "members.list",
+      "label": "List active members",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "task.task_list"
+    },
+    {
+      "key": "task.edit",
+      "label": "Edit a task's title, description, priority, dates or estimate",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "fields": [
+        "TaskName",
+        "rawDescription",
+        "Task_Priority",
+        "DueDate",
+        "startDate",
+        "totalEstimatedTime"
+      ],
+      "permission": {
+        "byField": {
+          "TaskName": "task.task_name_edit",
+          "rawDescription": "task.task_description",
+          "Task_Priority": "task.task_priority",
+          "DueDate": "task.task_due_date",
+          "startDate": [
+            "task.task_due_date",
+            "task.task_start_date"
+          ],
+          "totalEstimatedTime": "task.task_estimated_hours"
+        }
+      }
+    },
+    {
+      "key": "task.assignees.set",
+      "label": "Set, add or remove a task's assignees",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": "task.task_assignee"
+    },
+    {
+      "key": "task.field.set",
+      "label": "Set a custom field on a task",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": "task.task_custom_field"
+    },
+    {
+      "key": "task.move",
+      "label": "Move a task with its subtasks to another list or project",
+      "risk": "high",
+      "undoable": false,
+      "write": true,
+      "cost": "write",
+      "constraint": "only a top-level task; the destination must be one the person behind the agent can move tasks into",
+      "permission": "task.task_move"
+    },
+    {
+      "key": "task.archive",
+      "label": "Archive a task with its subtasks",
+      "risk": "high",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": "task.task_archive"
+    },
+    {
+      "key": "task.restore",
+      "label": "Restore an archived task",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": {
+        "key": "task.task_list",
+        "write": false
+      }
+    },
+    {
+      "key": "task.history",
+      "label": "Read a task's activity log",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": {
+        "key": "task.task_activity_log",
+        "write": true
+      }
+    },
+    {
+      "key": "task.links.list",
+      "label": "List a task's links",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "task.task_list"
+    },
+    {
+      "key": "task.status.change",
+      "label": "Set any status of the task's project, Done included",
+      "risk": "high",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "constraint": "only for a token its person created to manage tasks; the close is recorded as that person's, made through the agent, and unchecked",
+      "permission": "task.task_status"
+    },
+    {
+      "key": "task.add",
+      "label": "Create a task with its details",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "fields": [
+        "rawDescription",
+        "AssigneeUserId",
+        "Task_Priority",
+        "DueDate",
+        "startDate",
+        "status",
+        "TaskType",
+        "totalEstimatedTime",
+        "links"
+      ],
+      "permission": {
+        "key": "task.task_create",
+        "byField": {
+          "rawDescription": "task.task_description",
+          "AssigneeUserId": "task.task_assignee",
+          "Task_Priority": "task.task_priority",
+          "DueDate": "task.task_due_date",
+          "startDate": [
+            "task.task_due_date",
+            "task.task_start_date"
+          ],
+          "status": "task.task_status",
+          "TaskType": "task.task_type",
+          "totalEstimatedTime": "task.task_estimated_hours",
+          "links": "task.task_attachments"
+        }
+      }
+    },
+    {
+      "key": "subtask.add",
+      "label": "Create a subtask with its details",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "fields": [
+        "rawDescription",
+        "AssigneeUserId",
+        "Task_Priority",
+        "DueDate",
+        "startDate",
+        "status",
+        "TaskType",
+        "totalEstimatedTime",
+        "links"
+      ],
+      "permission": {
+        "key": "task.sub_task_create",
+        "byField": {
+          "rawDescription": "task.task_description",
+          "AssigneeUserId": "task.task_assignee",
+          "Task_Priority": "task.task_priority",
+          "DueDate": "task.task_due_date",
+          "startDate": [
+            "task.task_due_date",
+            "task.task_start_date"
+          ],
+          "status": "task.task_status",
+          "TaskType": "task.task_type",
+          "totalEstimatedTime": "task.task_estimated_hours",
+          "links": "task.task_attachments"
+        }
+      }
+    },
+    {
+      "key": "comment.update",
+      "label": "Edit a comment the agent wrote",
+      "risk": "low",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": "task.task_comment"
+    },
+    {
+      "key": "tasks.batch",
+      "label": "Record a batch of task changes as one group",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "constraint": "changes nothing itself: each change in the batch is its own action, checked and audited on its own",
+      "permission": {
+        "key": "task.task_list",
+        "write": false
+      }
+    },
+    {
+      "key": "page.create",
+      "label": "Create a doc (a draft until a person approves it)",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": {
+        "key": "project.project_details",
+        "write": false
+      }
+    },
+    {
+      "key": "page.update",
+      "label": "Change a doc's title or body",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": {
+        "key": "project.project_details",
+        "write": false
+      }
+    },
+    {
+      "key": "tags.list",
+      "label": "List a project's tags",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "task.task_list"
+    },
+    {
+      "key": "task.tags.add",
+      "label": "Add a tag to a task",
+      "risk": "low",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": "task.task_tag"
+    },
+    {
+      "key": "task.tags.remove",
+      "label": "Remove a tag from a task",
+      "risk": "low",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": "task.task_tag"
+    },
+    {
+      "key": "task.relations.list",
+      "label": "List the tasks a task is linked to",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "task.task_list"
+    },
+    {
+      "key": "task.relation.add",
+      "label": "Link two tasks",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "constraint": "both tasks must be ones the person behind the agent can open",
+      "permission": {
+        "key": "task.task_list",
+        "write": false
+      }
+    },
+    {
+      "key": "task.relation.remove",
+      "label": "Remove the link between two tasks",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "constraint": "both tasks must be ones the person behind the agent can open",
+      "permission": {
+        "key": "task.task_list",
+        "write": false
+      }
+    },
+    {
+      "key": "lists.list",
+      "label": "List a project's lists and folders",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "project.project_list"
+    },
+    {
+      "key": "list.create",
+      "label": "Create a list in a project or folder",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": "project.project_sprint_create"
+    },
+    {
+      "key": "list.rename",
+      "label": "Rename a list",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": "project.project_sprint_name_edit"
+    },
+    {
+      "key": "list.move",
+      "label": "Move a list into or out of a folder",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": {
+        "anyOf": [
+          "project.project_sprint_name_edit",
+          "project.sprint_type_change",
+          "project.project_sprint_create"
+        ]
+      }
+    },
+    {
+      "key": "page.comments.list",
+      "label": "Read a doc's comments",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "project.project_details"
+    },
+    {
+      "key": "page.comment.create",
+      "label": "Comment on a doc",
+      "risk": "low",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": {
+        "key": "project.project_details",
+        "write": false
+      }
+    },
+    {
+      "key": "page.comment.reply",
+      "label": "Reply to a comment on a doc",
+      "risk": "low",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": {
+        "key": "project.project_details",
+        "write": false
+      }
+    },
+    {
+      "key": "page.comment.assign",
+      "label": "Assign a doc comment thread",
+      "risk": "low",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "permission": {
+        "key": "project.project_details",
+        "write": false
+      }
+    },
+    {
+      "key": "goals.list",
+      "label": "List the goals the person can read",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "task.task_list"
+    },
+    {
+      "key": "goal.get",
+      "label": "Read a goal",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "task.task_list"
+    },
+    {
+      "key": "goal.target.set",
+      "label": "Report the value of a goal's target",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "constraint": "only on a goal the person behind the agent can edit; never a target counted from tasks",
+      "permission": {
+        "key": "task.task_list",
+        "write": false
+      }
+    },
+    {
+      "key": "goal.target.sources.add",
+      "label": "Count a list or task toward a goal's target",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "constraint": "only on a goal the person behind the agent can edit, and a list or task every reader of the goal can open",
+      "permission": {
+        "key": "task.task_list",
+        "write": false
+      }
+    },
+    {
+      "key": "goal.target.sources.remove",
+      "label": "Stop counting a list or task toward a goal's target",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "constraint": "only on a goal the person behind the agent can edit",
+      "permission": {
+        "key": "task.task_list",
+        "write": false
+      }
+    },
+    {
+      "key": "task.lists.list",
+      "label": "List the lists a task was added to",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "permission": "task.task_list"
+    },
+    {
+      "key": "task.lists.add",
+      "label": "Add a task to another list",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "constraint": "the task keeps its home list; the person behind the agent must be able to move it there and to open the other list; never a Scrum sprint, a backlog or a personal list",
+      "permission": "task.task_move"
+    },
+    {
+      "key": "task.lists.remove",
+      "label": "Take a task out of a list it was added to",
+      "risk": "medium",
+      "undoable": true,
+      "write": true,
+      "cost": "write",
+      "constraint": "never its home list; the person behind the agent must be able to move the task at its home or in that list's project",
+      "permission": {
+        "key": "task.task_list",
+        "write": false
+      }
+    },
+    {
+      "key": "slack.message.post",
+      "label": "Propose a Slack message",
+      "risk": "high",
+      "undoable": false,
+      "write": true,
+      "cost": "write",
+      "gate": "owner_admin",
+      "proposeOnly": true,
+      "constraint": "only to a channel on the workspace's Slack allow-list; plain text, no files; never sent without a person's approval",
+      "permission": "settings.settings_edit_company"
+    },
+    {
+      "key": "slack.channel.read",
+      "label": "Read recent messages of a Slack channel",
+      "risk": "low",
+      "undoable": false,
+      "write": false,
+      "cost": "read",
+      "constraint": "only a public channel on the workspace's Slack allow-list for reading; text only, capped per read and per run; the run is marked and makes no web fetch after it",
+      "permission": {
+        "key": "project.project_details",
+        "write": false
+      }
+    }
+  ],
+  "ratings": [
+    [
+      "tasks.next",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "workspace",
+        "money": false
+      }
+    ],
+    [
+      "tasks.search",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "workspace",
+        "money": false
+      }
+    ],
+    [
+      "task.get",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "docs.read",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "task.comment",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "task.status.set",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "task.link",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "task.assign",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "task.update",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "aifield.fill",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "subtask.create",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "timelog.start",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "timelog.stop",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "task.sprint.move",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "task.create",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "page.draft",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "chat.post",
+      {
+        "write": true,
+        "reversible": false,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "reminder.create",
+      {
+        "write": true,
+        "reversible": false,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "deploy.staging",
+      {
+        "write": true,
+        "reversible": false,
+        "scope": "workspace",
+        "money": false
+      }
+    ],
+    [
+      "performance.read",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "projects.list",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "workspace",
+        "money": false
+      }
+    ],
+    [
+      "project.get",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "sprints.list",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "statuses.list",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "comments.list",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "pages.search",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "workspace",
+        "money": false
+      }
+    ],
+    [
+      "page.get",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "timesheet.read",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "workspace",
+        "money": false
+      }
+    ],
+    [
+      "comment.create",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "timelog.create",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "fields.list",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "subtasks.list",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "members.list",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "workspace",
+        "money": false
+      }
+    ],
+    [
+      "task.edit",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "task.assignees.set",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "task.field.set",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "task.move",
+      {
+        "write": true,
+        "reversible": false,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "task.archive",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "task.restore",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "task.history",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "task.links.list",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "task.status.change",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "task.add",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "subtask.add",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "comment.update",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "tasks.batch",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "page.create",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "page.update",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "tags.list",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "task.tags.add",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "task.tags.remove",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "task.relations.list",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "task.relation.add",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "task.relation.remove",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "lists.list",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "list.create",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "list.rename",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "list.move",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "page.comments.list",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "page.comment.create",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "page.comment.reply",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "page.comment.assign",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "goals.list",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "workspace",
+        "money": false
+      }
+    ],
+    [
+      "goal.get",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "workspace",
+        "money": false
+      }
+    ],
+    [
+      "goal.target.set",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "workspace",
+        "money": false
+      }
+    ],
+    [
+      "goal.target.sources.add",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "workspace",
+        "money": false
+      }
+    ],
+    [
+      "goal.target.sources.remove",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "workspace",
+        "money": false
+      }
+    ],
+    [
+      "task.lists.list",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "task",
+        "money": false
+      }
+    ],
+    [
+      "task.lists.add",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "task.lists.remove",
+      {
+        "write": true,
+        "reversible": true,
+        "scope": "project",
+        "money": false
+      }
+    ],
+    [
+      "slack.message.post",
+      {
+        "write": true,
+        "reversible": false,
+        "scope": "workspace",
+        "money": false
+      }
+    ],
+    [
+      "slack.channel.read",
+      {
+        "write": false,
+        "reversible": true,
+        "scope": "workspace",
+        "money": false
+      }
+    ]
+  ],
+  "unflagged": [
+    "tasks.next",
+    "tasks.search",
+    "task.get",
+    "task.comment",
+    "task.status.set",
+    "task.link",
+    "task.assign",
+    "task.update",
+    "aifield.fill",
+    "task.sprint.move",
+    "subtask.create",
+    "task.create",
+    "timelog.start",
+    "timelog.stop",
+    "docs.read",
+    "page.draft",
+    "chat.post",
+    "reminder.create",
+    "deploy.staging"
+  ],
+  "byFlag": {
+    "AGENT_PERFORMANCE_READ": [
+      "tasks.next",
+      "tasks.search",
+      "task.get",
+      "task.comment",
+      "task.status.set",
+      "task.link",
+      "task.assign",
+      "task.update",
+      "aifield.fill",
+      "task.sprint.move",
+      "subtask.create",
+      "task.create",
+      "timelog.start",
+      "timelog.stop",
+      "docs.read",
+      "page.draft",
+      "chat.post",
+      "reminder.create",
+      "deploy.staging",
+      "performance.read"
+    ],
+    "MCP_TOOLS_DATA": [
+      "tasks.next",
+      "tasks.search",
+      "task.get",
+      "task.comment",
+      "task.status.set",
+      "task.link",
+      "task.assign",
+      "task.update",
+      "aifield.fill",
+      "task.sprint.move",
+      "subtask.create",
+      "task.create",
+      "timelog.start",
+      "timelog.stop",
+      "docs.read",
+      "page.draft",
+      "chat.post",
+      "reminder.create",
+      "deploy.staging",
+      "projects.list",
+      "project.get",
+      "sprints.list",
+      "statuses.list",
+      "comments.list",
+      "pages.search",
+      "page.get",
+      "timesheet.read",
+      "comment.create",
+      "timelog.create"
+    ],
+    "MCP_TOOLS_MANAGE": [
+      "tasks.next",
+      "tasks.search",
+      "task.get",
+      "task.comment",
+      "task.status.set",
+      "task.link",
+      "task.assign",
+      "task.update",
+      "aifield.fill",
+      "task.sprint.move",
+      "subtask.create",
+      "task.create",
+      "timelog.start",
+      "timelog.stop",
+      "docs.read",
+      "page.draft",
+      "chat.post",
+      "reminder.create",
+      "deploy.staging",
+      "fields.list",
+      "subtasks.list",
+      "members.list",
+      "task.edit",
+      "task.assignees.set",
+      "task.field.set",
+      "task.move",
+      "task.archive",
+      "task.restore",
+      "task.history",
+      "task.links.list",
+      "task.status.change",
+      "task.add",
+      "subtask.add",
+      "comment.update",
+      "tasks.batch",
+      "page.create",
+      "page.update"
+    ],
+    "MCP_TOOLS_WORK": [
+      "tasks.next",
+      "tasks.search",
+      "task.get",
+      "task.comment",
+      "task.status.set",
+      "task.link",
+      "task.assign",
+      "task.update",
+      "aifield.fill",
+      "task.sprint.move",
+      "subtask.create",
+      "task.create",
+      "timelog.start",
+      "timelog.stop",
+      "docs.read",
+      "page.draft",
+      "chat.post",
+      "reminder.create",
+      "deploy.staging",
+      "tags.list",
+      "task.tags.add",
+      "task.tags.remove",
+      "task.relations.list",
+      "task.relation.add",
+      "task.relation.remove",
+      "lists.list",
+      "list.create",
+      "list.rename",
+      "list.move",
+      "page.comments.list",
+      "page.comment.create",
+      "page.comment.reply",
+      "page.comment.assign",
+      "goals.list",
+      "goal.get",
+      "goal.target.set",
+      "goal.target.sources.add",
+      "goal.target.sources.remove",
+      "task.lists.list",
+      "task.lists.add",
+      "task.lists.remove"
+    ],
+    "CONNECTORS": [
+      "tasks.next",
+      "tasks.search",
+      "task.get",
+      "task.comment",
+      "task.status.set",
+      "task.link",
+      "task.assign",
+      "task.update",
+      "aifield.fill",
+      "task.sprint.move",
+      "subtask.create",
+      "task.create",
+      "timelog.start",
+      "timelog.stop",
+      "docs.read",
+      "page.draft",
+      "chat.post",
+      "reminder.create",
+      "deploy.staging",
+      "slack.message.post",
+      "slack.channel.read"
+    ]
+  },
+  "exports": {
+    "registry": [
+      "ACTIONS",
+      "NEVER",
+      "RISK",
+      "AUTONOMY",
+      "DONE_STATUS_TYPE",
+      "DONE_STATUS_TYPES",
+      "AGENT_STATUS_NAMES",
+      "CREATE_FIELDS",
+      "get",
+      "has",
+      "keys",
+      "knows",
+      "allowedActionsToStore",
+      "isNever",
+      "indexActions",
+      "evaluate",
+      "isAgentSettableStatus",
+      "mayActDirectly",
+      "manifest",
+      "permissionsFor",
+      "validate"
+    ],
+    "actions": [
+      "perform",
+      "authorizeRead",
+      "refusal",
+      "RefusedError",
+      "executors",
+      "workEntry",
+      "SCOPE",
+      "RATING_KEYS",
+      "RATINGS",
+      "rating",
+      "ratings",
+      "unrated",
+      "isCompleteRating",
+      "manifest"
+    ]
+  }
+}
