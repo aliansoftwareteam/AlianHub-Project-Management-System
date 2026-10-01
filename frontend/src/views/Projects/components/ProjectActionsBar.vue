@@ -48,7 +48,7 @@
                     </template>
                     <template #button="{ triggerAttrs }">
                         <button type="button" class="cursor-pointer dot-btn border-0" :aria-label="$t('Projects.more_features')" :title="$t('Projects.more_features')" v-bind="triggerAttrs">
-                            <img :src="clientWidth > 767 ? horizontalDots : horizontalDotsMobile" id="projectoptions_driver" alt="" aria-hidden="true"/>
+                            <ShellIcon id="projectoptions_driver" name="more" :size="clientWidth > 767 ? 20 : 24" />
                         </button>
                     </template>
                     <template #options>
@@ -205,8 +205,6 @@ const audio = require('@/assets/images/svg/Voice_Record.svg');
 const audioLinkMobile = require('@/assets/images/svg/AudioLink.svg');
 const fileLink = require('@/assets/images/svg/Files_links.svg');
 const eyeIcon = require('@/assets/images/svg/PriorityIcon/watchProjectEye.svg');
-const horizontalDots = require('@/assets/images/svg/horizontalDots.svg');
-const horizontalDotsMobile = require('@/assets/images/svg/threedot_mobile_list.svg');
 const lockIcon = require('@/assets/images/lock.png');
 const listIcon = require('@/assets/images/svg/edit_rename_icon.svg');
 const colorPalletIcon = require('@/assets/images/svg/palette.svg');

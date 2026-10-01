@@ -1,57 +1,53 @@
 import { computed, reactive } from "vue";
-import { apiRequest } from "@/services";
-import * as env from "@/config/env";
+import { openRuns, proposals as pendingProposals, subscribeAgentFeed } from "@/views/Ai/agentFeed";
 
 /**
  * Agent activity scoped to one project (handoff 28b, surfaces 2 and 3): the dark
  * header chip, and the per-card run strip / proposal line. Nothing renders when
- * there is no data.
+ * there is no data. It filters the shared agent feed, so a project page sends no
+ * agent request of its own and switching project costs none.
  */
-const state = reactive({ projectId: "", runs: [], proposals: [], summary: null });
-let poller = null;
+const state = reactive({ projectId: "" });
+let release = null;
 
-const ok = (res) => res?.data?.status === true;
+const inProject = (row) => Boolean(state.projectId) && String(row.projectId || "") === state.projectId;
+const ofTask = (taskId) => (row) => String(row.taskId || "") === String(taskId);
 
-async function fetchOnce(projectId) {
-    const [runsRes, proposalsRes] = await Promise.allSettled([
-        apiRequest("get", `${env.AGENT_RUNS}?status=open&projectId=${encodeURIComponent(projectId)}`),
-        apiRequest("get", `${env.AGENT_PROPOSALS}?status=pending`)
-    ]);
-    if (state.projectId !== projectId) return;
-    if (runsRes.status === "fulfilled" && ok(runsRes.value)) {
-        state.runs = runsRes.value.data.data || [];
-        state.summary = runsRes.value.data.summary || null;
-    }
-    if (proposalsRes.status === "fulfilled" && ok(proposalsRes.value)) {
-        state.proposals = (proposalsRes.value.data.data || []).filter((p) => String(p.projectId || "") === String(projectId));
-    }
-}
+const runs = computed(() => openRuns.value.filter(inProject));
+const proposals = computed(() => pendingProposals.value.filter(inProject));
+
+const summary = computed(() => {
+    if (!state.projectId) return null;
+    const now = Date.now();
+    const running = runs.value.filter((r) => r.status === "running");
+    return {
+        running: running.length,
+        waitingApproval: runs.value.filter((r) => r.status === "waiting_approval").length,
+        agents: new Set(runs.value.map((r) => String(r.agentId))).size,
+        elapsedMs: running.reduce((sum, r) => sum + Math.max(0, now - new Date(r.startedAt || now).getTime()), 0),
+        spendUsd: Math.round(runs.value.reduce((sum, r) => sum + Number(r.spendUsd || 0), 0) * 100) / 100
+    };
+});
 
 export function useProjectAgents() {
     const start = (projectId) => {
         const id = String(projectId || "");
         if (!id || state.projectId === id) return;
         state.projectId = id;
-        state.runs = [];
-        state.proposals = [];
-        state.summary = null;
-        fetchOnce(id).catch(() => {});
-        if (poller) clearInterval(poller);
-        poller = setInterval(() => fetchOnce(state.projectId).catch(() => {}), 30000);
+        if (!release) release = subscribeAgentFeed({ proposals: true });
     };
 
     const stop = () => {
-        if (poller) clearInterval(poller);
-        poller = null;
+        release?.();
+        release = null;
         state.projectId = "";
     };
 
-    const runFor = (taskId) => state.runs.find((r) => String(r.taskId || "") === String(taskId) && r.status === "running") || null;
-    const proposalFor = (taskId) => state.proposals.find((p) => String(p.taskId || "") === String(taskId)) || null;
+    const openRunFor = (taskId) => runs.value.find(ofTask(taskId)) || null;
+    const runFor = (taskId) => runs.value.find((r) => r.status === "running" && ofTask(taskId)(r)) || null;
+    const proposalFor = (taskId) => proposals.value.find(ofTask(taskId)) || null;
 
-    const summary = computed(() => state.summary);
-
-    return { state, start, stop, runFor, proposalFor, summary };
+    return { state, start, stop, runFor, openRunFor, proposalFor, summary };
 }
 
 export function elapsedClock(startedAt) {

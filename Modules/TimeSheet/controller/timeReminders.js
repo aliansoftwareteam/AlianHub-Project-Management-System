@@ -7,6 +7,7 @@ const logger = require("../../../Config/loggerConfig");
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const { isPrivileged } = require('../../../Config/roleTypes');
 const { ACTIVE_SEAT } = require('../../../Config/seatStatus');
+const { companyWorkingDays } = require('../../Company/helpers/companyWeek');
 
 // TIME-06 — time-entry reminders. A daily nudge (prod cron) to members who
 // haven't logged time today; the /send-reminders endpoint runs the same path
@@ -33,7 +34,7 @@ const loggedUserIdsInWindow = async (companyId, startSec, endSec) => {
 // Email a "log your time today" reminder to each SELECTED company member who
 // hasn't logged today. Governed by the per-company opt-in policy: the reminder
 // is OFF by default, and when ON it targets only the explicitly chosen users.
-const sendTimeRemindersForCompany = async (companyId) => {
+const sendTimeRemindersForCompany = async (companyId, now = new Date()) => {
     if (!companyId) return { reminded: 0, total: 0, users: [], skipped: 'no-company' };
 
     // Opt-in gate. A company must explicitly enable the reminder; disabled is
@@ -42,8 +43,8 @@ const sendTimeRemindersForCompany = async (companyId) => {
     if (!settings.enabled) return { reminded: 0, total: 0, users: [], skipped: 'disabled' };
     // Enabled but no recipients chosen ⇒ nobody to nudge.
     if (!settings.userIds.length) return { reminded: 0, total: 0, users: [], skipped: 'no-recipients' };
+    if (!(await companyWorkingDays(companyId)).includes(now.getDay())) return { reminded: 0, total: 0, users: [], skipped: 'non-working-day' };
 
-    const now = new Date();
     const start = new Date(now); start.setHours(0, 0, 0, 0);
     const end = new Date(now); end.setHours(23, 59, 59, 999);
     const loggedIds = await loggedUserIdsInWindow(

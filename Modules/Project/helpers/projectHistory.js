@@ -10,6 +10,7 @@ const { employeeNameOf, escapeText } = require('../../Tasks/helpers/taskWriteFie
 const projectSkills = require('../../settings/ProjectSkills/helper');
 const { fieldValueText, customFieldDefinitionOf } = require('../../CustomField/helpers/customFieldText');
 const { sourceOrDefault } = require('./projectSourceRules');
+const { checkWorkingDays } = require('../../Company/helpers/workingDays');
 
 /* The web app filed reopen, avatar, colour and sharing rows under the end-date key; they keep it so older rows and new ones read alike. */
 const SETTINGS_KEY = 'Project_EndDate';
@@ -31,6 +32,7 @@ const HISTORY = Object.freeze({
     SOURCE: 'Project_Source',
     PROPOSAL_ID: 'Project_ProposalId',
     SKILLS: 'Project_Skills',
+    WORKING_DAYS: 'Project_WorkingDays',
     CUSTOM_FIELD: 'Project_CustomField',
     ATTACHMENT: 'Project_Attachment',
 });
@@ -234,6 +236,21 @@ const skillsChanged = async ({ A, set, previous, skillNamesOf }) => {
     return [{ history: { key: HISTORY.SKILLS, message: `<b>${A}</b> has changed <b> Skills</b> as <b>${names.join(', ') || 'N/A'}</b>.` } }];
 };
 
+const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONDAY_FIRST = [1, 2, 3, 4, 5, 6, 0];
+const storedWeek = (value) => {
+    const week = checkWorkingDays(Array.isArray(value) ? Array.from(value) : value);
+    return week.ok ? week.days : [];
+};
+
+const workingDaysChanged = ({ A, set, previous }) => {
+    if (!has(set, 'workingDays')) return [];
+    const next = storedWeek(set.workingDays);
+    if (next.join() === storedWeek(previous.workingDays).join()) return [];
+    const named = next.length ? MONDAY_FIRST.filter((day) => next.includes(day)).map((day) => WEEKDAY_NAMES[day]).join(', ') : 'the company\'s working days';
+    return [{ history: { key: HISTORY.WORKING_DAYS, message: `<b>${A}</b> has changed <b> Working days</b> as <b>${named}</b>.` } }];
+};
+
 const CUSTOM_FIELD_PREFIX = 'customField.';
 
 const customFieldsChanged = async ({ A, set, previous, definitionOf }) => {
@@ -320,7 +337,7 @@ const viewEdited = ({ A, set, previous, arrayFilters }) => {
 
 const SET_CHANGES = [
     renamed, statusChanged, trashedOrRestored, typeChanged, currencyChanged, datesChanged, iconChanged, sharingChanged, watchModeChanged,
-    sourceChanged, proposalIdChanged, skillsChanged, customFieldsChanged, viewEdited,
+    sourceChanged, proposalIdChanged, skillsChanged, workingDaysChanged, customFieldsChanged, viewEdited,
 ];
 
 const describeProjectChanges = async ({

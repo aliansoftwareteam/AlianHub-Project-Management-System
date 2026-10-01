@@ -72,7 +72,7 @@
                 <ListAssigneeCell
                     :task="data"
                     :editable="rights.assignee"
-                    :options="rights.assignee ? edit.assigneeOptions(data) : []"
+                    :options="rights.assignee ? edit.assigneeOptions(data, parent) : []"
                     :multiple="Boolean(edit && edit.multipleAssignees.value)"
                     @change="(change) => edit.setAssignee(data, change, { row: rowEl })"
                 />
@@ -146,6 +146,7 @@ defineOptions({ name: "ListRow" });
 const props = defineProps({
     data: { type: Object, required: true },
     isSub: { type: Boolean, default: false },
+    parent: { type: Object, default: null },
     selected: { type: Boolean, default: false },
     expanded: { type: Boolean, default: false },
     canSelect: { type: Boolean, default: false },

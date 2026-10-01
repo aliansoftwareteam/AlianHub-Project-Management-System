@@ -38,7 +38,9 @@
                     :sender-src="senderSrc(row.message)"
                     :asker-name="askerName(row.message)"
                     :hour12="use12Hour"
+                    :in-thread="inThread"
                     @reply="$emit('reply', $event)"
+                    @thread="$emit('thread', $event)"
                     @copy="$emit('copy', $event)"
                     @remove="$emit('remove', $event)"
                     @retry="$emit('retry', $event)"
@@ -121,9 +123,10 @@ const props = defineProps({
     unreadCount: { type: Number, default: 0 },
     typingIds: { type: Array, default: () => [] },
     typingLabel: { type: String, default: '' },
+    inThread: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['load-older', 'reply', 'copy', 'remove', 'retry', 'preview', 'react', 'pin', 'mark-unread', 'edit', 'make-task', 'save-later', 'transcribed']);
+const emit = defineEmits(['load-older', 'reply', 'thread', 'copy', 'remove', 'retry', 'preview', 'react', 'pin', 'mark-unread', 'edit', 'make-task', 'save-later', 'transcribed']);
 
 const { getUser } = useGetterFunctions();
 const { getters } = useStore();

@@ -119,6 +119,8 @@
 .gv__chart :deep(.gantt_grid_data .gantt_row.gantt_selected) { background: var(--surface-hover); }
 .gv__chart :deep(.gantt_cell) { color: var(--ink); font-size: 12.5px; border-right: 0; }
 .gv__chart :deep(.gantt_task_cell) { border-right: 1px solid var(--hairline); }
+.gv__chart :deep(.gantt_task_cell.gv-off),
+.gv__chart :deep(.gantt_scale_cell.gv-off) { background: var(--fill); }
 .gv__chart :deep(.gantt_tree_content) { overflow: hidden; text-overflow: ellipsis; }
 
 .gv__chart :deep(.gantt_task_line) { background: var(--brand); border: 0; border-radius: 5px; opacity: .85; height: 16px !important; }
