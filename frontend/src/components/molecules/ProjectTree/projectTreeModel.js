@@ -1,3 +1,5 @@
+import { folderTrail, isLiveFolder, parentIdOf } from "@/utils/folderTree";
+
 const idOf = (item) => String(item?._id || item?.id || "");
 const live = (item) => !Number(item?.deletedStatusKey || 0);
 const countOf = (sprint) => Math.max(0, Number(sprint?.tasks) || 0);
@@ -15,8 +17,12 @@ export function identitiesOf(userId, teams) {
     return new Set([uid, ...mine.map((team) => `tId_${team._id}`)].filter(Boolean));
 }
 
+const sum = (nodes) => nodes.reduce((total, node) => total + node.count, 0);
+
 export function projectBranch({ sprints = [], folders = [] }, access) {
-    const liveFolders = folders.filter(live).map((folder) => ({ id: idOf(folder), name: folder.name, sprints: [], count: 0 }));
+    const liveFolders = folders
+        .filter((folder) => isLiveFolder(folders, folder))
+        .map((folder) => ({ id: idOf(folder), name: folder.name, parentFolderId: parentIdOf(folder), folders: [], sprints: [], count: 0 }));
     const byFolder = new Map(liveFolders.map((folder) => [folder.id, folder]));
     const rootSprints = [];
     sprints
@@ -26,9 +32,13 @@ export function projectBranch({ sprints = [], folders = [] }, access) {
             if (!node.folderId) rootSprints.push(node);
             else if (byFolder.has(node.folderId)) byFolder.get(node.folderId).sprints.push(node);
         });
-    liveFolders.forEach((folder) => { folder.count = folder.sprints.reduce((sum, sprint) => sum + sprint.count, 0); });
-    const count = liveFolders.reduce((sum, folder) => sum + folder.count, 0) + rootSprints.reduce((sum, sprint) => sum + sprint.count, 0);
-    return { folders: liveFolders, sprints: rootSprints, count };
+    const topFolders = liveFolders.filter((folder) => !folder.parentFolderId);
+    liveFolders.filter((folder) => folder.parentFolderId).forEach((folder) => {
+        folder.count = sum(folder.sprints);
+        byFolder.get(folder.parentFolderId).folders.push(folder);
+    });
+    topFolders.forEach((folder) => { folder.count = sum(folder.sprints) + sum(folder.folders); });
+    return { folders: topFolders, sprints: rootSprints, count: sum(topFolders) + sum(rootSprints) };
 }
 
 export function treeRoute(kind, { cid, projectId, folderId, id }) {
@@ -54,26 +64,29 @@ export function visibleRows(projects, { branchOf, expanded, cid }) {
         rows.push(projectRow);
         if (!projectRow.expanded || !branch) return;
 
-        const children = [
-            ...branch.folders.map((folder) => ({ kind: "folder", node: folder })),
-            ...branch.sprints.map((sprint) => ({ kind: "sprint", node: sprint }))
-        ];
-        children.forEach(({ kind, node }, at) => {
-            const row = {
-                key: `${kind}:${node.id}`, kind, id: node.id, projectId, name: node.name, count: node.count,
-                level: 2, setsize: children.length, posinset: at + 1, parentKey: projectRow.key,
-                expandable: kind === "folder", expanded: kind === "folder" && Boolean(expanded[`folder:${node.id}`]),
-                to: treeRoute(kind, { cid, projectId, id: node.id })
-            };
-            rows.push(row);
-            if (!row.expanded) return;
-            node.sprints.forEach((sprint, place) => rows.push({
-                key: `sprint:${sprint.id}`, kind: "sprint", id: sprint.id, projectId, folderId: node.id, name: sprint.name, count: sprint.count,
-                level: 3, setsize: node.sprints.length, posinset: place + 1, parentKey: row.key,
-                expandable: false, expanded: false,
-                to: treeRoute("sprint", { cid, projectId, folderId: node.id, id: sprint.id })
-            }));
-        });
+        const pushChildren = (parent, parentRow, folderId) => {
+            const children = [
+                ...parent.folders.map((folder) => ({ kind: "folder", node: folder })),
+                ...parent.sprints.map((sprint) => ({ kind: "sprint", node: sprint }))
+            ];
+            children.forEach(({ kind, node }, at) => {
+                const isFolder = kind === "folder";
+                const row = {
+                    key: `${kind}:${node.id}`, kind, id: node.id, projectId, name: node.name, count: node.count,
+                    level: parentRow.level + 1, setsize: children.length, posinset: at + 1, parentKey: parentRow.key,
+                    expandable: isFolder, expanded: isFolder && Boolean(expanded[`folder:${node.id}`]),
+                    to: treeRoute(kind, { cid, projectId, folderId, id: node.id }),
+                    ...(isFolder ? { parentFolderId: node.parentFolderId } : {}),
+                    ...(!isFolder && folderId ? { folderId } : {})
+                };
+                rows.push(row);
+                if (row.expanded) pushChildren(node, row, node.id);
+            });
+        };
+        pushChildren(branch, projectRow, "");
     });
     return rows;
 }
+
+/* The rows above a folder in the tree, so a link straight to a subfolder can open the way to it. */
+export const folderRowKeys = (folders, folderId) => folderTrail(folders || [], folderId).map((folder) => `folder:${idOf(folder)}`);

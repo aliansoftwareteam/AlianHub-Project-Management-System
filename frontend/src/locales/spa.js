@@ -5752,6 +5752,11 @@ export default {
         "new": "New",
         "new_list": "New list",
         "new_folder": "New folder",
+        "new_subfolder": "New subfolder",
+        "new_subfolder_in": "New subfolder in {folder}",
+        "move_folder": "Move folder",
+        "move_folder_hint": "Choose where {folder} goes",
+        "top_level": "Top level of the project",
         "new_menu_task": "Task",
         "menu_view": "View",
         "menu_find": "Find",
@@ -8843,6 +8848,7 @@ export default {
         "Upgrade_your_plan_you_have_reached_the_limit_for_creating_sprints": "Actualiza tu plan. Has alcanzado el límite para crear sprints.",
         "Folder created successfully": "Carpeta creada con éxito",
         "Folder updated successfully": "Carpeta actualizada con éxito",
+        "Folder_moved_successfully": "Folder moved successfully",
         "Folde restored successfully": "Carpeta restaurada con éxito",
         "Folder closed successfully": "Carpeta cerrada con éxito",
         "Folder archived successfully": "Carpeta archivada con éxito",
@@ -11290,7 +11296,8 @@ export default {
         "show": "Show the project tree",
         "hide": "Hide the project tree",
         "close": "Close the project tree",
-        "tasks": "{n} tasks"
+        "tasks": "{n} tasks",
+        "folder_actions": "Actions for {folder}"
     },
     "TaskTemplates": {
         "save_as": "Save as template",
