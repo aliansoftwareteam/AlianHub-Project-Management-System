@@ -3898,6 +3898,8 @@ const schema = {
             type: String,
             required: true
         },
+        // The first message of the thread the comment is a reply in, so a mention there opens that thread.
+        comment_parentId: { type: String, required: false },
         comment_mediaOriginalName: {
             type: String,
             required: false

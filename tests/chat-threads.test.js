@@ -50,6 +50,7 @@ const { resolveMentionIds } = require('../Modules/Comments/helpers/commentNotifi
 const { save, update, getPaginatedMessages, searchMessageFromMainChat } = require('../Modules/Comments/controller');
 const threads = require('../Modules/Comments/threads');
 const { forgetHealed } = require('../Modules/Comments/helpers/noticeItems');
+const { chatThreadPath } = require('../Modules/Comments/helpers/chatThreads');
 const { upsertRoom, removeRoom } = require('../socket/helper');
 require('../socket/controller/commentSocket');
 
@@ -112,6 +113,7 @@ beforeEach(() => {
     forgetHealed();
 
     mockDb.seed(SCHEMA_TYPE.MAIN_CHATS, { _id: CHAT_SPACE, default: true });
+    mockDb.seed(SCHEMA_TYPE.MAIN_CHATS, { _id: CHANNEL_PROJECT, default: false });
     mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: DM_SPRINT, projectId: oid(CHAT_SPACE) });
     mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: CHANNEL, projectId: oid(CHANNEL_PROJECT) });
     mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: PRIVATE_CHANNEL, projectId: oid(CHANNEL_PROJECT), private: true, AssigneeUserId: [ALICE, BOB] });
@@ -305,6 +307,13 @@ describe('a thread in a direct message', () => {
 
         expect((await reply(CAROL, message._id, 'Me too', dm)).code).toBe(404);
         expect((await repliesOf(CAROL, message._id)).code).toBe(404);
+    });
+});
+
+describe('a thread reply notice', () => {
+    it('opens the conversation with the thread beside it', () => {
+        expect(chatThreadPath({ companyId: COMPANY, projectId: CHANNEL_PROJECT, taskId: CHANNEL, changeData: { threadId: 'a b' } }))
+            .toBe(`${COMPANY}/chat/${CHANNEL_PROJECT}/${CHANNEL}?thread=a%20b`);
     });
 });
 

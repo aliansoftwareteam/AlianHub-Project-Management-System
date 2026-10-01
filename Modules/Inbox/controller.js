@@ -11,6 +11,7 @@ const { updateUnReadCommentsCountFun } = require('../notification-count/controll
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const R = require('./helpers/inboxRules');
 const S = require('./helpers/inboxState');
+const { CHAT_THREAD_REPLY } = require('../Comments/helpers/chatThreads');
 
 // The per-user counters document behind the header's red dot. `key` selects the field:
 // 5 is notification_counts, 4 is mention_counts.
@@ -36,7 +37,7 @@ const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } ca
 const routeId = (v) => (v === undefined || v === null ? undefined : String(v));
 
 // Notices rendered from their values through i18n rather than from message (Inbox.vue renderNotice).
-const STRUCTURED_CHANGES = ['agent_alert', 'agent_report', 'agent_session_assigned', 'oauth_client_approval', 'doc_mention', 'doc_comment'];
+const STRUCTURED_CHANGES = ['agent_alert', 'agent_report', 'agent_session_assigned', 'oauth_client_approval', 'doc_mention', 'doc_comment', CHAT_THREAD_REPLY];
 
 const fail = (res, statusText) => res.send({ status: false, statusText });
 
@@ -82,6 +83,7 @@ const readNotifications = async (companyId, userId, { limit, sort, match }) => {
         companyId: String(r.companyId || ''),
         changeType: String(r.changeType || ''),
         changeData: STRUCTURED_CHANGES.includes(r.changeType) && r.changeData && typeof r.changeData === 'object' ? r.changeData : undefined,
+        mainChat: r.changeType === CHAT_THREAD_REPLY,
         // Rows an agent wrote carry an agent type or key; a person never does.
         agent: String(r.type || '').toLowerCase() === 'agent' || /^agent[_-]/i.test(String(r.key || '')),
         // WHO did this, as an id — resolved to a name and picture on the client through
@@ -143,6 +145,7 @@ const readMentions = async (companyId, userId, { limit, sort, match }) => {
         type: String(r.type || ''),
         comment_id: String(r.comment_id || ''),
         mainChat: !!r.mainChat,
+        threadId: r.comment_parentId ? String(r.comment_parentId) : '',
         // The commenter. A mention row carries no denormalised name at all, which is why
         // the @ dropdown resolves this id too rather than reading the row.
         actorId: String(r.userId || ''),

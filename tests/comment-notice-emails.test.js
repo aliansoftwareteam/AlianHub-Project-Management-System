@@ -108,6 +108,21 @@ describe.each([
     });
 });
 
+describe('the email for a reply in a chat thread', () => {
+    const chatNotice = () => noticeOf('comment_reply', {
+        taskId: ids.sprint, changeType: 'chat_thread_reply', changeData: { threadId: ids.parent, commentId: ids.comment },
+    });
+
+    it('says it is a chat thread and opens the conversation with that thread', async () => {
+        await sendEmailHandlerSingle({ ...detailsOf(chatNotice()), projects: [], tasks: [] });
+        const { subject, html } = sentMail();
+        expect(subject).toBe('AlianHub - Priya Shah replied in a chat thread');
+        expect(html).toContain('The totals on row 4 look off');
+        expect(html).toContain(`href="https://hub.example.test/#/${ids.company}/chat/${ids.project}/${ids.sprint}?thread=${ids.parent}"`);
+        expect(html).not.toContain('/project/');
+    });
+});
+
 describe('HTML in a comment notice email', () => {
     it('is escaped, whether the comment was stored raw or entity-escaped', async () => {
         await sendEmailHandlerSingle(detailsOf(noticeOf('comment_reply', {
