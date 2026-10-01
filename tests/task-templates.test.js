@@ -234,6 +234,34 @@ describe('applying a template to a task', () => {
         expect(mockHistory).toHaveBeenCalledWith('task', C, ALPHA, TARGET, expect.objectContaining({ sprintId: 's1' }), expect.objectContaining({ id: MEMBER }));
     });
 
+    it('leaves out a template value that does not fit its field, and keeps the rest and the task\'s own values', async () => {
+        const LINK = 'f00000000000000000000001';
+        const SCORE = 'f00000000000000000000002';
+        const REVIEWERS = 'f00000000000000000000003';
+        [[LINK, 'url'], [SCORE, 'rating'], [REVIEWERS, 'people']].forEach(([_id, fieldType]) => {
+            mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id, fieldTitle: fieldType, fieldType, type: 'task', global: true, isDelete: true });
+        });
+        stored(SCHEMA_TYPE.TASKS, TARGET).customField = { own: { fieldValue: 'kept' } };
+        const template = seedTemplate({
+            customField: {
+                cf1: 'x',
+                [LINK]: { _id: LINK, fieldValue: 'javascript:alert(1)' },
+                [SCORE]: { _id: SCORE, fieldValue: 4 },
+                [REVIEWERS]: { _id: REVIEWERS, fieldValue: [MEMBER, OUTSIDER] },
+            },
+        });
+        const res = await apply(MEMBER, template._id, { taskId: TARGET, applyDate: '2026-10-01', tzOffsetMinutes: 0 });
+        expect(res.statusCode).toBe(200);
+        expect(stored(SCHEMA_TYPE.TASKS, TARGET).customField).toEqual({
+            own: { fieldValue: 'kept' },
+            cf1: 'x',
+            [SCORE]: { _id: SCORE, fieldValue: 4 },
+            [REVIEWERS]: { _id: REVIEWERS, fieldValue: [MEMBER] },
+        });
+        expect(res.body.data.applied).toContain('customFields');
+        expect(res.body.data.droppedFieldValues).toBe(2);
+    });
+
     it('counts the apply day in the caller\'s own time zone', async () => {
         const template = seedTemplate();
         await apply(MEMBER, template._id, { taskId: TARGET, applyDate: '2026-10-01', tzOffsetMinutes: -330 });
