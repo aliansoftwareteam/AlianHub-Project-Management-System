@@ -456,6 +456,9 @@ taskSchema.index({ AssigneeUserId: 1 });
 taskSchema.index({ ParentTaskId: 1 });
 taskSchema.index({ ancestors: 1 });
 taskSchema.index({ TaskKey: 1 });
+// An import looks up what it already brought into a project, and its undo what it created.
+taskSchema.index({ ProjectID: 1, importSourceId: 1 }, { sparse: true });
+taskSchema.index({ importJobId: 1 }, { sparse: true });
 // The due-date trigger reads a day-wide range of this every few minutes (Modules/Automations/engine/dueDateTrigger).
 taskSchema.index({ DueDate: 1 });
 // The Everything view pages across projects on these; Modules/Tasks/helpers/everythingQuery.js sorts in their order.

@@ -9,6 +9,10 @@ const schema = {
     tasks: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.
         demo: { type: Boolean, required: false },
+        // Written by the importers alone (Modules/Importers): the import job that created the task, and the id its
+        // source gave it. No client body sets either, and a copy of the task carries neither.
+        importJobId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        importSourceId: { type: String, required: false },
         "legacyId": {
             type: String,
             required: false
@@ -482,6 +486,9 @@ const schema = {
         errorList: { type: Array, default: [], required: false },
         mapping: { type: Object, required: false },
         fileName: { type: String, required: false },
+        updated: { type: Number, required: false },
+        undoneAt: { type: Date, required: false },
+        undoneBy: { type: String, required: false },
     },
     aiFieldJobs: {
         userId: { type: String, required: true },
@@ -4402,7 +4409,11 @@ const schema = {
         agentCitations: { type: Array, required: false },
         agentChanges: { type: Array, required: false },
         // The tool an importer brought the comment from (Modules/Importers); the author and the time are the file's word.
-        importedFrom: { type: String, required: false }
+        importedFrom: { type: String, required: false },
+        // The import job that saved the comment, and its time and author in the file, by which the same file imported
+        // again knows the comment is already here.
+        importJobId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        importKey: { type: String, required: false }
     },
     mainChat: {
         ProjectCode: {

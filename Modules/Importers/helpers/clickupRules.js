@@ -72,6 +72,11 @@ const ignoredColumns = (headers) => {
     return headers.filter((header) => !KNOWN.has(lower(header)) && !custom.has(header));
 };
 
+const READ = new Set(Object.values(COLUMNS).flat());
+
+/* The columns ClickUp is known to write that the importer does not bring in. */
+const unreadColumns = (headers) => headers.filter((header) => KNOWN.has(lower(header)) && !READ.has(lower(header)));
+
 const cell = (row, index, key) => trimmed(index[key] ? row[index[key]] : '');
 
 const parseList = (raw) => trimmed(raw).replace(/^\[|\]$/g, '').split(/[,;]/).map((entry) => entry.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
@@ -154,9 +159,54 @@ const validateClickUpInput = ({ companyId, projectId, sprintId, rows, userId }) 
     return validateClickUpRows(rows);
 };
 
-const SKIP_REASONS = { no_name: 'The task has no name.' };
-const skipCode = (row, index) => (cell(row, index, 'name') ? '' : 'no_name');
+const SKIP_REASONS = { no_name: 'The task has no name.', repeated_id: 'A row above has the same task id.' };
 const skipEntry = (i, code) => ({ row: i + 1, code, reason: SKIP_REASONS[code] });
+
+/* Why each row is left out, by its place in `rows`: it has no name, or a named row above it holds the same task id. */
+const skipCodes = (rows, index) => {
+    const seen = new Set();
+    return (rows || []).map((row) => {
+        if (!cell(row, index, 'name')) return 'no_name';
+        const id = cell(row, index, 'id');
+        if (id && seen.has(id)) return 'repeated_id';
+        if (id) seen.add(id);
+        return '';
+    });
+};
+
+const DATE_PAIRS = Object.freeze([['due', 'dueText'], ['start', 'startText']]);
+const DATE_KEYS = DATE_PAIRS.flat();
+const NUMERIC_DATE = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/;
+
+/* The date columns whose all-number dates only make sense day first: one of them has a day past the twelfth and none
+ * has a month past it. A column that mixes both orders is neither, and its day-first dates are reported unread. */
+const dayFirstColumns = (rows, index) => DATE_KEYS.filter((key) => {
+    const parts = (rows || []).map((row) => NUMERIC_DATE.exec(cell(row, index, key))).filter(Boolean);
+    return parts.some((part) => Number(part[1]) > 12) && parts.every((part) => Number(part[1]) <= 31 && Number(part[2]) <= 12);
+});
+
+const dayFirstFrom = (given, rows, index) => new Set(Array.isArray(given) ? given.filter((key) => DATE_KEYS.includes(key)) : dayFirstColumns(rows, index));
+
+const readDate = (raw, dayFirst) => {
+    const numeric = dayFirst ? NUMERIC_DATE.exec(trimmed(raw)) : null;
+    if (!numeric) return parseClickUpDate(raw);
+    const [day, month, year] = [Number(numeric[1]), Number(numeric[2]), Number(numeric[3])];
+    const date = new Date(year, month - 1, day);
+    return date.getDate() === day ? date : null;
+};
+
+/* Each date of a row, read from its number column or else its text column, and the cell it could not read. */
+const datesOf = (row, index, dayFirst) => {
+    const dates = {};
+    const unread = [];
+    DATE_PAIRS.forEach(([first, second]) => {
+        const read = readDate(cell(row, index, first), dayFirst.has(first)) || readDate(cell(row, index, second), dayFirst.has(second));
+        dates[first] = read;
+        const written = [first, second].find((key) => cell(row, index, key));
+        if (!read && written) unread.push({ column: index[written], value: cell(row, index, written).slice(0, 100) });
+    });
+    return { dates, unread };
+};
 
 const fieldCellsOf = (row, custom) => Object.fromEntries(custom
     .map((field) => [field.column, trimmed(row[field.column])])
@@ -167,27 +217,31 @@ const fieldCellsOf = (row, custom) => Object.fromEntries(custom
  * resolved later among the company's members only. Each row keeps the parent the file
  * names: the create path orders the levels and re-hangs what does not fit in three.
  * Comments, checklists, attachment links and field cells ride on the task as read;
- * `fields` lists the file's field columns for the importer to plan. */
-const transformClickUpRows = ({ rows, statusFor, leaderId }) => {
+ * `fields` lists the file's field columns for the importer to plan. A row with a task id carries it as
+ * `importSourceId`. `dayFirst` names the date columns to read day first; left out, the rows decide.
+ * `unreadDates` lists each date cell that could not be read, by the row's place in `rows`. */
+const transformClickUpRows = ({ rows, statusFor, leaderId, dayFirst }) => {
     const headers = headersOf(rows);
     const index = columnIndex(headers);
     const custom = customColumns(headers);
     const skippedRows = [];
+    const unreadDates = [];
     const kept = [];
+    const dayFirstKeys = dayFirstFrom(dayFirst, rows, index);
 
-    (rows || []).forEach((row, i) => {
-        const code = skipCode(row, index);
+    skipCodes(rows, index).forEach((code, i) => {
         if (code) skippedRows.push(skipEntry(i, code));
-        else kept.push({ row, id: cell(row, index, 'id') || `row-${i + 1}` });
+        else kept.push({ row: rows[i], place: i + 1, sourceId: cell(rows[i], index, 'id') });
     });
 
     const unnamedAssignees = new Set();
 
-    const tasks = kept.map(({ row, id }) => {
+    const tasks = kept.map(({ row, place, sourceId }) => {
+        const id = sourceId || `row-${place}`;
         const people = parseList(cell(row, index, 'assignees'));
         people.filter((person) => !person.includes('@')).forEach((person) => unnamedAssignees.add(person));
-        const due = parseClickUpDate(cell(row, index, 'due')) || parseClickUpDate(cell(row, index, 'dueText'));
-        const start = parseClickUpDate(cell(row, index, 'start')) || parseClickUpDate(cell(row, index, 'startText'));
+        const { dates: { due, start }, unread } = datesOf(row, index, dayFirstKeys);
+        unread.forEach((entry) => unreadDates.push({ row: place, name: cell(row, index, 'name').slice(0, 200), ...entry }));
         const estimate = parseEstimateMinutes(cell(row, index, 'estimate'), cell(row, index, 'estimateText'));
         const tagNames = [];
         parseList(cell(row, index, 'tags')).forEach((tag) => {
@@ -207,7 +261,9 @@ const transformClickUpRows = ({ rows, statusFor, leaderId }) => {
             DueDate: due ? due.toISOString() : null,
             rawDescription: cell(row, index, 'description').slice(0, 10000),
             ParentTaskId: cell(row, index, 'parent'),
+            emptyCells: ['status', 'priority'].filter((key) => !cell(row, index, key)),
         };
+        if (sourceId) task.importSourceId = sourceId;
         if (start) task.startDate = start.toISOString();
         if (estimate !== null) task.totalEstimatedTime = estimate;
         if (tagNames.length) task.tagNames = tagNames.slice(0, MAX_TAGS);
@@ -221,7 +277,7 @@ const transformClickUpRows = ({ rows, statusFor, leaderId }) => {
         return task;
     });
 
-    return { tasks, fields: custom, skipped: skippedRows.length, skippedRows, unnamedAssignees: Array.from(unnamedAssignees) };
+    return { tasks, fields: custom, skipped: skippedRows.length, skippedRows, unreadDates, unnamedAssignees: Array.from(unnamedAssignees) };
 };
 
 /* What an import would bring in, per ClickUp list, with nothing written. */
@@ -233,14 +289,20 @@ const previewClickUpRows = (rows) => {
     const emails = new Set();
     const names = new Set();
     const skippedRows = [];
-    const ids = new Set((rows || []).filter((row) => !skipCode(row, index)).map((row) => cell(row, index, 'id')).filter(Boolean));
+    const unreadDates = [];
+    const codes = skipCodes(rows, index);
+    const dayFirst = dayFirstColumns(rows, index);
+    const dayFirstKeys = new Set(dayFirst);
+    /* Each list is imported on its own, so a subtask whose parent sits in another list arrives as a task. */
+    const listOfId = new Map((rows || []).filter((row, i) => !codes[i] && cell(row, index, 'id')).map((row) => [cell(row, index, 'id'), listKey(row, index)]));
 
     (rows || []).forEach((row, i) => {
-        const code = skipCode(row, index);
+        const code = codes[i];
         if (code) {
             skippedRows.push(skipEntry(i, code));
             return;
         }
+        datesOf(row, index, dayFirstKeys).unread.forEach((entry) => unreadDates.push({ row: i + 1, name: cell(row, index, 'name').slice(0, 200), ...entry }));
         const key = listKey(row, index);
         if (!lists.has(key)) {
             lists.set(key, {
@@ -255,7 +317,7 @@ const previewClickUpRows = (rows) => {
         }
         const list = lists.get(key);
         list.rowIndexes.push(i);
-        if (ids.has(cell(row, index, 'parent'))) list.subtasks += 1;
+        if (listOfId.get(cell(row, index, 'parent')) === key) list.subtasks += 1;
         else list.tasks += 1;
         parseList(cell(row, index, 'tags')).forEach((tag) => { if (!tags.has(lower(tag))) tags.set(lower(tag), tag); });
         parseList(cell(row, index, 'assignees')).forEach((person) => (person.includes('@') ? emails.add(person.toLowerCase()) : names.add(person)));
@@ -271,6 +333,9 @@ const previewClickUpRows = (rows) => {
         customFields: customColumns(headers).map(({ name, type }) => ({ name, type })),
         assigneeEmails: Array.from(emails),
         unnamedAssignees: Array.from(names),
+        unreadDates,
+        dayFirstColumns: dayFirst,
+        unreadColumns: unreadColumns(headers),
         ignoredColumns: ignoredColumns(headers),
     };
 };

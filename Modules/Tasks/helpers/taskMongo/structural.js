@@ -28,7 +28,9 @@ const { removeLinksOfTasks } = require('../../../CustomField/helpers/fieldLinkSt
 module.exports = {
 
     /* The counts, the parent and the current state come from the stored task; the body only says which task and which state it goes to. */
-    updateArchiveDelete({companyId, projectData, task, userData, deletedStatusKey = 0}) {
+    /* `quiet` is set by the undo of an import alone, which trashes many tasks at once and notifies no one; the task
+     * routes drop it from a body. */
+    updateArchiveDelete({companyId, projectData, task, userData, deletedStatusKey = 0, quiet = false}) {
         return new Promise((resolve, reject) => {
             try {
                 const taskId = plainIdOf(task && task._id).id;
@@ -139,7 +141,7 @@ module.exports = {
                                     logger.error(`ERROR in history: ${error.message}`);
                                 });
                             }
-                            if(notificationObject && Object.keys(notificationObject).length) {
+                            if(!quiet && notificationObject && Object.keys(notificationObject).length) {
                                 HandleBothNotification({type: 'tasks', companyId, projectId, taskId, folderId: before.folderObjId || '', sprintId: before.sprintId || '',  object: notificationObject, userData})
                                 .catch((error) => {
                                     logger.error(`ERROR in add notification: ${error.message}`);
