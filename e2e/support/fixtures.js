@@ -117,6 +117,33 @@ async function listSprints(api, projectId) {
     return Array.isArray(res.body) ? res.body : (res.body && res.body.data) || [];
 }
 
+async function listFolders(api, projectId) {
+    const res = await api.get(`/api/v1/project/sprintFolder/${projectId}`, { query: { collection: 'folders' } });
+    if (res.status !== 200) throw new Error(`list folders for ${projectId} failed (${res.status}): ${JSON.stringify(res.body).slice(0, 500)}`);
+    return Array.isArray(res.body) ? res.body : (res.body && res.body.data) || [];
+}
+
+const actingUser = (user) => ({ id: user.uid || user.userId, Employee_Name: `${ROLES[user.role]?.firstName || ''} ${ROLES[user.role]?.lastName || ''}`.trim() });
+
+/* Same payloads the "New list" and "New folder" forms send. */
+async function createFolder(api, { project, name, user, parentFolderId }) {
+    const res = await api.post('/api/v1/folder', {
+        companyId: api.companyId, projectId: project._id, folderName: name, userData: actingUser(user), projectName: project.ProjectName, mainChat: true,
+        ...(parentFolderId ? { parentFolderId } : {}),
+    });
+    const body = assertOk(res, `create folder ${name}`);
+    return { _id: String(body.data._id), name };
+}
+
+async function createList(api, { project, name, user, folder }) {
+    const res = await api.post('/api/v1/sprint', {
+        companyId: api.companyId, projectId: project._id, sprintName: name, userData: actingUser(user), projectName: project.ProjectName,
+        folder: folder ? { folderId: folder._id, folderName: folder.name } : {}, private: false,
+    });
+    const body = assertOk(res, `create list ${name}`);
+    return { _id: String(body.data._id), name };
+}
+
 /* POST /createproject answers before it adds the default "List" sprint, so a
  * task created straight after a project can find no sprint yet. */
 async function firstSprint(api, projectId, { timeoutMs = 15000, intervalMs = 100 } = {}) {
@@ -246,12 +273,15 @@ module.exports = {
     STATE_FILE,
     assertOk,
     createFixtures,
+    createFolder,
+    createList,
     createProject,
     createTask,
     emailFor,
     findTasksByName,
     firstSprint,
     inviteMember,
+    listFolders,
     listSprints,
     login,
     loginAs,
