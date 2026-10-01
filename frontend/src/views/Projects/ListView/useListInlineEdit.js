@@ -18,6 +18,7 @@ import {
     COMPUTED_TYPES, customFieldPayload, emptyFieldDetail, projectFieldDefs, storedEntry, useProjectCustomFields
 } from "@/views/Projects/composables/projectCustomFields";
 import { recomputeCustomFields } from "@/plugins/customFieldView/formulaEngine.js";
+import { taskUrl } from "@/views/Projects/composables/taskLink";
 
 const ASSIGNEE_OPERATION = { add: "assigneeAdd", remove: "assigneRemove", replace: "replace" };
 const TOAST = { position: "top-right" };
@@ -371,17 +372,7 @@ export function useListRowEdit(projectRef, showArchived) {
         task, sprint: sprintOf(project.value, task), project: project.value, companyUsers: companyUsers.value
     });
 
-    function taskHref(task) {
-        const folderId = task.folderObjId || "";
-        const params = { cid: companyId.value || project.value.CompanyId, id: project.value._id, sprintId: task.sprintId, taskId: task._id };
-        if (folderId) params.folderId = folderId;
-        try {
-            const { href } = router.resolve({ name: folderId ? "ProjectFolderSprintTask" : "ProjectSprintTask", params });
-            return new URL(href, window.location.href).toString();
-        } catch (error) {
-            return "";
-        }
-    }
+    const taskHref = (task) => taskUrl(router, { companyId: companyId.value, project: project.value, task });
 
     async function copy(text, successKey) {
         try {
