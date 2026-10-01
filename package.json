@@ -126,6 +126,8 @@
     "demo:token": "node scripts/demo/sessionToken.js",
     "atlas": "node scripts/screenshot-atlas.js",
     "atlas:compare": "node scripts/screenshot-compare.js",
+    "scale:seed": "node scripts/seed-scale.js",
+    "scale:measure": "node scripts/measure-scale.js",
     "lint:commits": "commitlint --from ${BASE_BRANCH:-origin/staging} --to HEAD --verbose",
     "i18n:check": "node scripts/i18n-check.js",
     "i18n:backfill": "node scripts/i18n-backfill.js",
