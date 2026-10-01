@@ -14,7 +14,6 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { schema } = require('../utils/mongo-handler/schema');
 const scope = require('../Modules/Agents/scope');
-const { myCache } = require('../Config/config');
 
 const C = '6f0000000000000000000c01';
 const ME = '6f0000000000000000000001';
@@ -39,7 +38,6 @@ const seedComment = (taskId, userId = ME, over = {}) => mockDb.seed(SCHEMA_TYPE.
 
 /* A new process: nothing the modules held in memory is left, only what the store keeps. */
 const restart = () => {
-    myCache.flushAll();
     let fresh;
     jest.isolateModules(() => {
         fresh = {
@@ -65,6 +63,10 @@ const readKept = async (app, { uid = ME, taskIds = [TASK], kinds = ['summary', '
 };
 
 let app;
+
+/* A model call races a 60 second timer, which would keep this file open long after its last test. */
+beforeAll(() => { jest.useFakeTimers(); });
+afterAll(() => { jest.useRealTimers(); });
 
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((key) => { mockDb.store[key].length = 0; });
@@ -98,10 +100,12 @@ describe('the kept AI value collection', () => {
     });
 
     it('is never a knowledge source', () => {
-        const indexer = require('../Modules/Knowledge/ingest/indexer');
-        const collections = Object.values(indexer.RULES).map((rule) => rule.collection).filter(Boolean);
-        expect(collections.length).toBeGreaterThan(0);
-        expect(collections).not.toContain(VALUES);
+        const read = (file) => require('fs').readFileSync(require('path').join(__dirname, '..', 'Modules', file), 'utf8');
+        const indexed = [...read('Knowledge/ingest/indexer.js').matchAll(/collection: SCHEMA_TYPE\.(\w+)/g)].map((match) => match[1]);
+        expect(indexed.length).toBeGreaterThan(0);
+        expect(indexed).not.toContain('TASK_AI_VALUES');
+        expect(require('../Modules/Knowledge/sources').INDEXED_SOURCES.join()).not.toMatch(/ai|value|summary/i);
+        ['AI/ask.js', 'Knowledge/askSources.js', 'AI/publicSources.js'].forEach((file) => expect(read(file)).not.toMatch(/TASK_AI_VALUES|taskAiValues/));
     });
 });
 
@@ -230,12 +234,9 @@ describe('reading the kept values of the rows a table shows', () => {
     });
 
     it('is registered behind the sign-in guard', () => {
-        const routes = [];
-        const fake = new Proxy({}, { get: (_, method) => (path) => routes.push(`${String(method).toUpperCase()} ${path}`) });
-        require('../Modules/AI/routes').init(fake);
-        expect(routes).toContain('POST /api/v1/ai/task-values');
-        const guarded = require('fs').readFileSync(require('path').join(__dirname, '..', 'Config', 'setMiddleware.js'), 'utf8');
-        expect(guarded).toMatch(/['"]\/api\/v1\/ai\/task-values['"]/);
+        const read = (file) => require('fs').readFileSync(require('path').join(__dirname, '..', file), 'utf8');
+        expect(read('Modules/AI/routes.js')).toContain("app.post('/api/v1/ai/task-values', taskValues.keptValues);");
+        expect(read('Config/setMiddleware.js')).toMatch(/['"]\/api\/v1\/ai\/task-values['"]/);
     });
 });
 
@@ -266,10 +267,16 @@ describe('kept values follow the content they were made from', () => {
 
     it('the summary goes when a comment it was made from is deleted, and the area stays', async () => {
         await fill();
-        await app.store.onCommentEnvelope({ companyId: C, type: 'comment.updated', data: { taskId: TASK, isDeleted: false } });
-        expect(kept()).toHaveLength(3);
-        await app.store.onCommentEnvelope({ companyId: C, type: 'comment.deleted', data: { taskId: TASK, isDeleted: true } });
+        expect(await app.store.forgetSummary(C, TASK)).toBe(1);
         expect(kept().map((row) => `${row.taskId}:${row.kind}`).sort()).toEqual([`${TASK}:category`, `${OTHER}:summary`].sort());
+    });
+
+    it('the summary is marked as behind when a comment is edited, which the count alone would not show', async () => {
+        await fill();
+        await app.store.markSummaryBehind(C, TASK);
+        const opened = await app.summary.summarizeTask({ companyId: C, uid: ME, taskId: TASK, keptOnly: true });
+        expect(opened.data).toMatchObject({ summary: 'Shipping on Friday.', stale: true });
+        expect((await readKept(app)).body.data.values[TASK].summary.stale).toBe(true);
     });
 
     it('a person\'s erasure removes what they asked for and every summary of a thread they wrote in', async () => {

@@ -366,6 +366,9 @@ askThreadsSchema.index({ ownerId: 1, lastTurnAt: -1 });
 const dashboardCardAnswersSchema = new Schema(schema.dashboardCardAnswers, {strict: true, timestamps: false});
 dashboardCardAnswersSchema.index({ dashboardId: 1, cardUid: 1, userId: 1 }, { unique: true, name: 'one_per_card_viewer' });
 dashboardCardAnswersSchema.index({ userId: 1 });
+const taskAiValuesSchema = new Schema(schema.taskAiValues, {strict: true, timestamps: false});
+taskAiValuesSchema.index({ taskId: 1, kind: 1 }, { unique: true, name: 'one_per_task_kind' });
+taskAiValuesSchema.index({ madeBy: 1 });
 const aiFeedbackSchema = new Schema(schema.aiFeedback, {strict: true, timestamps: false});
 aiFeedbackSchema.index({ userId: 1, feature: 1, itemId: 1 }, { unique: true, name: 'one_per_person_item' });
 aiFeedbackSchema.index({ createdAt: -1 });
@@ -561,6 +564,7 @@ module.exports = {
     agentSessionEndpointsSchema,
     askThreadsSchema,
     dashboardCardAnswersSchema,
+    taskAiValuesSchema,
     aiFeedbackSchema,
     aiEvalRunsSchema,
     assignmentRulesSchema,

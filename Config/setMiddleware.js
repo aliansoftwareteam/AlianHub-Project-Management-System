@@ -244,6 +244,7 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/ai/meeting-notes',
     '/api/v1/ai/chat-summary',
     '/api/v1/ai/task-summary',
+    '/api/v1/ai/task-values',
     '/api/v1/ai/task-category',
     '/api/v1/ai/task-assist',
     '/api/v1/ai/task-next-steps',

@@ -1928,6 +1928,17 @@ const schema = {
         askedAt: { type: Date, required: true },
         autoAskedAt: { type: Date, required: false },
     },
+    // The summary or the area an AI column shows for a task (Modules/AI/taskAiValues): one per task and kind, with what
+    // it was made from (basis: the comment count, or a fingerprint of the task text and labels), when, and who asked.
+    // The text is derived from the task and its thread, so it is removed with them and read only through a task read.
+    taskAiValues: {
+        taskId: { type: String, required: true },
+        kind: { type: String, required: true },
+        value: { type: mongoose.Schema.Types.Mixed, required: false },
+        basis: { type: String, required: false, default: '' },
+        madeAt: { type: Date, required: true },
+        madeBy: { type: String, required: false, default: '' },
+    },
     // One person's thumbs up or down on an AI answer (Modules/AI/feedback). Never the question; the answer and its
     // cited ids only when the person ticked "include the answer" (shared).
     aiFeedback: {
