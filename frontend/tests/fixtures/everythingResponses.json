@@ -3310,5 +3310,712 @@
         }
       }
     }
+  },
+  "boardCounts": {
+    "request": {
+      "filter": {},
+      "sort": {
+        "by": "updatedAt",
+        "dir": "desc"
+      },
+      "includeSubtasks": false,
+      "includeClosedProjects": false,
+      "timezone": "Asia/Kolkata",
+      "group": "status",
+      "limit": 1
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Tasks fetched successfully.",
+      "data": {
+        "rows": [
+          {
+            "_id": "6f0000000000000000000f06",
+            "TaskName": "Archive last year",
+            "TaskKey": "OPS-6",
+            "status": {
+              "key": 3,
+              "text": "Done",
+              "type": "close"
+            },
+            "statusKey": 3,
+            "statusType": "close",
+            "Task_Priority": "MEDIUM",
+            "AssigneeUserId": [
+              "6f0000000000000000000001"
+            ],
+            "ProjectID": "6f0000000000000000000a02",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-06T09:00:00.000Z"
+          }
+        ],
+        "groups": [
+          {
+            "key": "Doing",
+            "count": 3
+          },
+          {
+            "key": "Done",
+            "count": 1
+          },
+          {
+            "key": "To Do",
+            "count": 2
+          }
+        ],
+        "nextCursor": "eyJ2IjoxNzkxMjc3MjAwMDAwLCJpIjoiNmYwMDAwMDAwMDAwMDAwMDAwMDAwZjA2IiwicSI6InZaaDdIM2VISWNqRUx5ZU9GWlFUZGxEdktrajV5Y0NTeGNRU3JLUWN0VEUifQ.nDLLT7EXrjR8P1AM2mSj94TbSbkOAaScdV1tU7AjTmE",
+        "projects": {
+          "6f0000000000000000000a02": {
+            "_id": "6f0000000000000000000a02",
+            "ProjectName": "Operations",
+            "ProjectCode": "OPS",
+            "projectIcon": {
+              "type": "color",
+              "data": "#7B68EE"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 4,
+                "name": "Waiting on a supplier",
+                "type": "active",
+                "bgColor": "#d9770635",
+                "textColor": "#d97706"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "boardDone": {
+    "request": {
+      "filter": {
+        "status": [
+          "Done"
+        ]
+      },
+      "sort": {
+        "by": "updatedAt",
+        "dir": "desc"
+      },
+      "includeSubtasks": false,
+      "includeClosedProjects": false,
+      "timezone": "Asia/Kolkata",
+      "limit": 2
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Tasks fetched successfully.",
+      "data": {
+        "rows": [
+          {
+            "_id": "6f0000000000000000000f06",
+            "TaskName": "Archive last year",
+            "TaskKey": "OPS-6",
+            "status": {
+              "key": 3,
+              "text": "Done",
+              "type": "close"
+            },
+            "statusKey": 3,
+            "statusType": "close",
+            "Task_Priority": "MEDIUM",
+            "AssigneeUserId": [
+              "6f0000000000000000000001"
+            ],
+            "ProjectID": "6f0000000000000000000a02",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-06T09:00:00.000Z"
+          }
+        ],
+        "groups": [
+          {
+            "key": null,
+            "count": 1
+          }
+        ],
+        "nextCursor": null,
+        "projects": {
+          "6f0000000000000000000a02": {
+            "_id": "6f0000000000000000000a02",
+            "ProjectName": "Operations",
+            "ProjectCode": "OPS",
+            "projectIcon": {
+              "type": "color",
+              "data": "#7B68EE"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 4,
+                "name": "Waiting on a supplier",
+                "type": "active",
+                "bgColor": "#d9770635",
+                "textColor": "#d97706"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "boardDoing": {
+    "request": {
+      "filter": {
+        "status": [
+          "Doing"
+        ]
+      },
+      "sort": {
+        "by": "updatedAt",
+        "dir": "desc"
+      },
+      "includeSubtasks": false,
+      "includeClosedProjects": false,
+      "timezone": "Asia/Kolkata",
+      "limit": 2
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Tasks fetched successfully.",
+      "data": {
+        "rows": [
+          {
+            "_id": "6f0000000000000000000f05",
+            "TaskName": "Rotate the keys",
+            "TaskKey": "OPS-5",
+            "status": {
+              "key": 2,
+              "text": "Doing",
+              "type": "active"
+            },
+            "statusKey": 2,
+            "statusType": "active",
+            "Task_Priority": "HIGH",
+            "AssigneeUserId": [
+              "6f0000000000000000000001"
+            ],
+            "ProjectID": "6f0000000000000000000a02",
+            "sprintId": "6f0000000000000000000b01",
+            "folderObjId": "6f0000000000000000000d01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-05T09:00:00.000Z"
+          },
+          {
+            "_id": "6f0000000000000000000f03",
+            "TaskName": "Fix the footer",
+            "TaskKey": "WEB-3",
+            "status": {
+              "key": 2,
+              "text": "Doing",
+              "type": "active"
+            },
+            "statusKey": 2,
+            "statusType": "active",
+            "Task_Priority": "MEDIUM",
+            "AssigneeUserId": [
+              "6f0000000000000000000002"
+            ],
+            "DueDate": "2026-10-03T18:29:59.000Z",
+            "ProjectID": "6f0000000000000000000a01",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "bug",
+            "TaskTypeKey": 2,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-03T09:00:00.000Z"
+          }
+        ],
+        "groups": [
+          {
+            "key": null,
+            "count": 3
+          }
+        ],
+        "nextCursor": "eyJ2IjoxNzkxMDE4MDAwMDAwLCJpIjoiNmYwMDAwMDAwMDAwMDAwMDAwMDAwZjAzIiwicSI6IlY5djY2QzRmNEg1MmtzNzdsNE9sdlZHSmxINFlMNTZpeUIwamJRMU52U1UifQ.l7QIEFkJ_UJgeXF2MYMlXlTL7bD39pR6MvpEOkTaWBQ",
+        "projects": {
+          "6f0000000000000000000a01": {
+            "_id": "6f0000000000000000000a01",
+            "ProjectName": "Website",
+            "ProjectCode": "WEB",
+            "projectIcon": {
+              "type": "color",
+              "data": "#2F3990"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [
+              {
+                "key": "Priority"
+              }
+            ],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          },
+          "6f0000000000000000000a02": {
+            "_id": "6f0000000000000000000a02",
+            "ProjectName": "Operations",
+            "ProjectCode": "OPS",
+            "projectIcon": {
+              "type": "color",
+              "data": "#7B68EE"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 4,
+                "name": "Waiting on a supplier",
+                "type": "active",
+                "bgColor": "#d9770635",
+                "textColor": "#d97706"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "viewsNone": {
+    "request": {
+      "method": "get",
+      "path": "/api/v2/tasks/everything/views"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Views fetched successfully.",
+      "data": []
+    }
+  },
+  "viewCreated": {
+    "request": {
+      "method": "post",
+      "path": "/api/v2/tasks/everything/views",
+      "body": {
+        "name": "My board",
+        "settings": {
+          "mode": "board",
+          "search": "",
+          "status": [],
+          "assignee": [],
+          "priority": [],
+          "taskType": [],
+          "projectIds": [],
+          "due": "",
+          "group": "none",
+          "sortBy": "updatedAt",
+          "sortDir": "desc",
+          "showSubtasks": false,
+          "hideDone": false,
+          "includeClosed": false
+        }
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "View saved.",
+      "data": {
+        "_id": "000000000000000000000011",
+        "name": "My board",
+        "settings": {
+          "mode": "board",
+          "search": "",
+          "status": [],
+          "assignee": [],
+          "priority": [],
+          "taskType": [],
+          "projectIds": [],
+          "due": "",
+          "group": "none",
+          "sortBy": "updatedAt",
+          "sortDir": "desc",
+          "showSubtasks": false,
+          "hideDone": false,
+          "includeClosed": false
+        },
+        "isDefault": false,
+        "updatedAt": null
+      }
+    }
+  },
+  "viewsOne": {
+    "request": {
+      "method": "get",
+      "path": "/api/v2/tasks/everything/views"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Views fetched successfully.",
+      "data": [
+        {
+          "_id": "000000000000000000000011",
+          "name": "My board",
+          "settings": {
+            "mode": "board",
+            "search": "",
+            "status": [],
+            "assignee": [],
+            "priority": [],
+            "taskType": [],
+            "projectIds": [],
+            "due": "",
+            "group": "none",
+            "sortBy": "updatedAt",
+            "sortDir": "desc",
+            "showSubtasks": false,
+            "hideDone": false,
+            "includeClosed": false
+          },
+          "isDefault": false,
+          "updatedAt": null
+        }
+      ]
+    }
+  },
+  "viewRenamed": {
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/tasks/everything/views/000000000000000000000011",
+      "body": {
+        "name": "Board, with done"
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "View saved.",
+      "data": {
+        "_id": "000000000000000000000011",
+        "name": "Board, with done",
+        "settings": {
+          "mode": "board",
+          "search": "",
+          "status": [],
+          "assignee": [],
+          "priority": [],
+          "taskType": [],
+          "projectIds": [],
+          "due": "",
+          "group": "none",
+          "sortBy": "updatedAt",
+          "sortDir": "desc",
+          "showSubtasks": false,
+          "hideDone": false,
+          "includeClosed": false
+        },
+        "isDefault": false,
+        "updatedAt": "2026-10-01T06:30:00.000Z"
+      }
+    }
+  },
+  "viewDefault": {
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/tasks/everything/views/000000000000000000000011",
+      "body": {
+        "isDefault": true
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "View saved.",
+      "data": {
+        "_id": "000000000000000000000011",
+        "name": "Board, with done",
+        "settings": {
+          "mode": "board",
+          "search": "",
+          "status": [],
+          "assignee": [],
+          "priority": [],
+          "taskType": [],
+          "projectIds": [],
+          "due": "",
+          "group": "none",
+          "sortBy": "updatedAt",
+          "sortDir": "desc",
+          "showSubtasks": false,
+          "hideDone": false,
+          "includeClosed": false
+        },
+        "isDefault": true,
+        "updatedAt": "2026-10-01T06:30:00.000Z"
+      }
+    }
+  },
+  "viewChanged": {
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/tasks/everything/views/000000000000000000000011",
+      "body": {
+        "settings": {
+          "mode": "table",
+          "search": "",
+          "status": [],
+          "assignee": [],
+          "priority": [],
+          "taskType": [],
+          "projectIds": [],
+          "due": "",
+          "group": "project",
+          "sortBy": "updatedAt",
+          "sortDir": "desc",
+          "showSubtasks": false,
+          "hideDone": true,
+          "includeClosed": false
+        }
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "View saved.",
+      "data": {
+        "_id": "000000000000000000000011",
+        "name": "Board, with done",
+        "settings": {
+          "mode": "table",
+          "search": "",
+          "status": [],
+          "assignee": [],
+          "priority": [],
+          "taskType": [],
+          "projectIds": [],
+          "due": "",
+          "group": "project",
+          "sortBy": "updatedAt",
+          "sortDir": "desc",
+          "showSubtasks": false,
+          "hideDone": true,
+          "includeClosed": false
+        },
+        "isDefault": true,
+        "updatedAt": "2026-10-01T06:30:00.000Z"
+      }
+    }
+  },
+  "viewRefused": {
+    "request": {
+      "method": "post",
+      "path": "/api/v2/tasks/everything/views",
+      "body": {
+        "name": "Not a view",
+        "settings": {
+          "mode": "board",
+          "search": "",
+          "status": [],
+          "assignee": [],
+          "priority": [],
+          "taskType": [],
+          "projectIds": [],
+          "due": "",
+          "group": "none",
+          "sortBy": "updatedAt",
+          "sortDir": "desc",
+          "showSubtasks": false,
+          "hideDone": false,
+          "includeClosed": false
+        },
+        "projectId": "6f0000000000000000000a01"
+      }
+    },
+    "statusCode": 400,
+    "response": {
+      "status": false,
+      "statusText": "Request refused",
+      "message": "projectId is not a known key",
+      "field": "projectId"
+    }
+  },
+  "viewDeleted": {
+    "request": {
+      "method": "delete",
+      "path": "/api/v2/tasks/everything/views/000000000000000000000011"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "View deleted."
+    }
   }
 }

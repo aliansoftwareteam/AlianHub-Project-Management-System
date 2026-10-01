@@ -1,7 +1,7 @@
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import {
-    DEFAULT_SETTINGS, PAGE_SIZE, baseRequest, boardColumns, cleanSettings, firstRequest, groupIdOf, groupRequest, groupsFrom, queryGroup
+    DEFAULT_SETTINGS, PAGE_SIZE, baseRequest, boardColumns, cleanSettings, firstRequest, groupIdOf, groupRequest, groupsFrom, queryGroup, viewBody, viewPatch
 } from '@/views/Everything/everythingRequest';
 
 const READY = 'ready';
@@ -200,19 +200,14 @@ export default {
         },
 
         async saveView({ commit, state }, { name }) {
-            const view = dataOf(await apiRequest('post', env.V2_TASKS_EVERYTHING_VIEWS, { name, settings: cleanSettings(state.settings) }));
+            const view = dataOf(await apiRequest('post', env.V2_TASKS_EVERYTHING_VIEWS, viewBody(name, state.settings)));
             commit('putView', view);
             commit('setActiveView', view._id);
             return view;
         },
 
         async updateView({ commit, state }, { id, name, isDefault, settings = false }) {
-            const body = {
-                ...(name === undefined ? {} : { name }),
-                ...(isDefault === undefined ? {} : { isDefault }),
-                ...(settings ? { settings: cleanSettings(state.settings) } : {})
-            };
-            const view = dataOf(await apiRequest('patch', viewPath(id), body));
+            const view = dataOf(await apiRequest('patch', viewPath(id), viewPatch({ name, isDefault, settings: settings ? state.settings : undefined })));
             commit('putView', view);
             return view;
         },

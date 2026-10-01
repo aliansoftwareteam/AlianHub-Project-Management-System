@@ -3,6 +3,31 @@
         <header class="ah-toolbar evr__toolbar">
             <h1 class="ah-toolbar__title">{{ $t('Everything.title') }}</h1>
             <span v-if="status === 'ready' && showTotal" class="evr__total" data-test="evr-total">{{ $t('Everything.count', { n: total }) }}</span>
+            <div class="evr__toolbar-end">
+                <EverythingViews
+                    :views="views"
+                    :active="activeView"
+                    :dirty="viewDirty"
+                    @open="openView"
+                    @save="saveView"
+                    @save-changes="saveViewChanges"
+                    @rename="renameView"
+                    @default="toggleDefaultView"
+                    @delete="deleteView"
+                />
+                <div class="ah-tabs evr__modes" role="group" :aria-label="$t('Everything.mode_label')">
+                    <button
+                        v-for="mode in MODES"
+                        :key="mode"
+                        type="button"
+                        class="ah-tab"
+                        :class="{ 'is-active': settings.mode === mode }"
+                        :aria-pressed="settings.mode === mode ? 'true' : 'false'"
+                        :data-test="`evr-mode-${mode}`"
+                        @click="apply({ mode })"
+                    >{{ $t(`Everything.mode_${mode}`) }}</button>
+                </div>
+            </div>
         </header>
 
         <div class="evr__controls" role="search">
@@ -30,7 +55,7 @@
             <button v-if="filtered" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="evr-clear-all" @click="clearFilters">{{ $t('Everything.clear_filters') }}</button>
 
             <div class="evr__view">
-                <label class="evr__pick">
+                <label v-if="settings.mode !== 'board'" class="evr__pick">
                     <span class="evr__pick-label">{{ $t('Everything.group_by') }}</span>
                     <select class="ah-input evr__select" :value="settings.group" data-test="evr-group" @change="apply({ group: $event.target.value })">
                         <option v-for="kind in GROUPS" :key="kind" :value="kind">{{ $t(`Everything.group_${kind}`) }}</option>
@@ -48,7 +73,7 @@
             </div>
         </div>
 
-        <div ref="body" class="evr__body ah-scroll" :aria-busy="status === 'loading' ? 'true' : 'false'">
+        <div ref="body" class="evr__body ah-scroll" :class="`evr__body--${shownMode}`" :aria-busy="status === 'loading' ? 'true' : 'false'">
             <div v-if="status === 'loading' || status === 'idle'" class="evr__skeleton" data-test="evr-loading" role="status" :aria-label="$t('Everything.loading')">
                 <span v-for="n in 8" :key="n" class="evr__skeleton-row"></span>
             </div>
@@ -61,6 +86,31 @@
                 <span>{{ $t(filtered ? 'Everything.empty_hint' : 'Everything.empty_none_hint') }}</span>
                 <button v-if="filtered" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="clearFilters">{{ $t('Everything.clear_filters') }}</button>
             </div>
+            <EverythingBoard
+                v-else-if="shownMode === 'board'"
+                :groups="groups"
+                :projects="projects"
+                :colorOf="colorOf"
+                @load="queueGroup"
+                @open="openRow"
+                @status="edit.setStatus"
+                @priority="edit.setPriority"
+            />
+            <EverythingTable
+                v-else-if="shownMode === 'table'"
+                :groups="groups"
+                :projects="projects"
+                :showHeads="settings.group !== 'none'"
+                :sortBy="settings.sortBy"
+                :sortDir="settings.sortDir"
+                :labelOf="labelOf"
+                :colorOf="colorOf"
+                @sort="apply"
+                @load="queueGroup"
+                @open="openRow"
+                @status="edit.setStatus"
+                @priority="edit.setPriority"
+            />
             <template v-else>
                 <EverythingGroup
                     v-for="group in groups"
@@ -84,14 +134,18 @@
 import { computed, inject, onMounted, onUnmounted, ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { onTaskClosed, openTask, useTaskSequenceSource } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 import { useGetterFunctions } from "@/composable";
 import { projectColor } from "@/components/molecules/Home/homeFormat";
 import EverythingFilterChip from "./EverythingFilterChip.vue";
 import EverythingGroup from "./EverythingGroup.vue";
-import { DEFAULT_SETTINGS, DUE_BUCKETS, GROUPS, UNASSIGNED, dueWindows } from "./everythingRequest";
-import { readSettings, writeSettings } from "./everythingSettings";
+import EverythingBoard from "./EverythingBoard.vue";
+import EverythingTable from "./EverythingTable.vue";
+import EverythingViews from "./EverythingViews.vue";
+import { DEFAULT_SETTINGS, DUE_BUCKETS, GROUPS, MODES, UNASSIGNED, dueWindows, queryGroup, sameSettings } from "./everythingRequest";
+import { readWorkingState, writeWorkingState } from "./everythingSettings";
 import { useEverythingEdit } from "./useEverythingEdit";
 import "@/views/Projects/ListView/style.css";
 import "./style.css";
@@ -101,6 +155,8 @@ defineOptions({ name: "EverythingPage" });
 const SEARCH_DELAY_MS = 300;
 const GROUPS_AT_ONCE = 3;
 const RETURN_GAP_MS = 1000;
+const PHONE_BELOW = 768;
+const TOAST = { position: "top-right" };
 const SORTS = [
     { value: "updatedAt:desc", label: "Everything.sort_updated_desc" },
     { value: "updatedAt:asc", label: "Everything.sort_updated_asc" },
@@ -112,17 +168,26 @@ const FILTER_KEYS = ["search", "status", "assignee", "priority", "taskType", "pr
 
 const store = useStore();
 const { t } = useI18n();
+const $toast = useToast();
 const { getUser } = useGetterFunctions();
 const companyId = inject("$companyId", ref(""));
 const userId = inject("$userId", ref(""));
+const clientWidth = inject("$clientWidth", ref(PHONE_BELOW));
 
 const settings = computed(() => store.getters["everything/settings"]);
 const status = computed(() => store.getters["everything/status"]);
 const groups = computed(() => store.getters["everything/groups"]);
 const projects = computed(() => store.getters["everything/projects"]);
 const total = computed(() => store.getters["everything/total"]);
+const kind = computed(() => queryGroup(settings.value));
 /* A task counts under each of its assignees, so those counts do not add up to a number of tasks. */
-const showTotal = computed(() => settings.value.group !== "assignee");
+const showTotal = computed(() => kind.value !== "assignee");
+/* A table is too wide for a phone; there it is the List's row, which already folds to one column. */
+const shownMode = computed(() => (settings.value.mode === "table" && clientWidth.value < PHONE_BELOW ? "list" : settings.value.mode));
+
+const views = computed(() => store.getters["everything/views"]);
+const activeView = computed(() => store.getters["everything/activeView"]);
+const viewDirty = computed(() => Boolean(activeView.value) && !sameSettings(settings.value, activeView.value.settings));
 
 const body = ref(null);
 const searchText = ref("");
@@ -164,24 +229,25 @@ function timeZone() {
 }
 
 function labelOf(group) {
-    const kind = settings.value.group;
-    if (kind === "assignee") return group.key === null ? t("Everything.unassigned") : (getUser(group.key)?.Employee_Name || t("Everything.someone"));
-    if (kind === "project") return projects.value[group.key]?.ProjectName || allProjects.value.find((project) => String(project._id) === group.key)?.ProjectName || "";
-    if (kind === "priority") return (store.getters["settings/companyPriority"] || []).find((priority) => priority.value === group.key)?.name || group.key;
-    if (kind === "dueDate") return t(DUE_LABELS[group.key]);
+    if (kind.value === "assignee") return group.key === null ? t("Everything.unassigned") : (getUser(group.key)?.Employee_Name || t("Everything.someone"));
+    if (kind.value === "project") return projects.value[group.key]?.ProjectName || allProjects.value.find((project) => String(project._id) === group.key)?.ProjectName || "";
+    if (kind.value === "priority") return (store.getters["settings/companyPriority"] || []).find((priority) => priority.value === group.key)?.name || group.key;
+    if (kind.value === "dueDate") return t(DUE_LABELS[group.key]);
     return group.key || "";
 }
 
 function colorOf(group) {
-    if (settings.value.group === "project") return projectColor(projects.value[group.key]);
-    if (settings.value.group === "status") return statusOptions.value.find((option) => option.value === group.key)?.color || "";
+    if (kind.value === "project") return projectColor(projects.value[group.key]);
+    if (kind.value === "status") return statusOptions.value.find((option) => option.value === group.key)?.color || "";
     return "";
 }
 
+const keepWorkingState = () => writeWorkingState(companyId.value, userId.value, settings.value, activeView.value?._id || "");
+
 function apply(patch) {
-    const next = { ...settings.value, ...patch };
-    writeSettings(companyId.value, userId.value, next);
-    return store.dispatch("everything/applySettings", { settings: patch });
+    const applied = store.dispatch("everything/applySettings", { settings: patch });
+    keepWorkingState();
+    return applied;
 }
 
 function onSearch() {
@@ -240,18 +306,61 @@ function openRow(task) {
     });
 }
 
+const loadViews = () => store.dispatch("everything/loadViews").catch(() => {});
+
+async function changeView(change, done = "") {
+    try {
+        await change();
+        keepWorkingState();
+        if (done) $toast.success(t(done), TOAST);
+    } catch (error) {
+        console.error("ERROR in everything view: ", error);
+        $toast.error(t("Everything.view_failed"), TOAST);
+    }
+}
+
+function openView(id) {
+    if (!id) {
+        store.commit("everything/setActiveView", "");
+        keepWorkingState();
+        return Promise.resolve();
+    }
+    clearTimeout(searchTimer);
+    return changeView(async () => {
+        await store.dispatch("everything/openView", { id });
+        searchText.value = settings.value.search;
+    });
+}
+
+const saveView = (name) => changeView(() => store.dispatch("everything/saveView", { name }), "Everything.view_saved");
+const saveViewChanges = (view) => changeView(() => store.dispatch("everything/updateView", { id: view._id, settings: true }), "Everything.view_saved");
+const renameView = (view, name) => changeView(() => store.dispatch("everything/updateView", { id: view._id, name }));
+const toggleDefaultView = (view) => changeView(() => store.dispatch("everything/updateView", { id: view._id, isDefault: !view.isDefault }));
+const deleteView = (view) => changeView(() => store.dispatch("everything/deleteView", view._id));
+
 const edit = useEverythingEdit({ onChanged: refresh });
 useTaskSequenceSource(body);
 const stopOnTaskClosed = onTaskClosed(refresh);
 const onVisible = () => { if (document.visibilityState === "visible") refreshOnReturn(); };
 
-onMounted(() => {
-    const saved = readSettings(companyId.value, userId.value);
-    const available = dueWindows(new Date(), timeZone()).filters;
-    store.commit("everything/setSettings", { ...saved, search: "", due: available[saved.due] ? saved.due : "" });
-    reload();
+/* What was left on screen last time wins; a person who left nothing gets their default view. */
+onMounted(async () => {
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", refreshOnReturn);
+    const working = readWorkingState(companyId.value, userId.value);
+    if (working) {
+        const available = dueWindows(new Date(), timeZone()).filters;
+        store.commit("everything/setSettings", { ...working.settings, search: "", due: available[working.settings.due] ? working.settings.due : "" });
+        reload();
+        loadViews().then(() => store.commit("everything/setActiveView", working.viewId));
+        return;
+    }
+    store.commit("everything/setSettings", { ...DEFAULT_SETTINGS });
+    store.commit("everything/setActiveView", "");
+    await loadViews();
+    const preferred = store.getters["everything/defaultView"];
+    if (preferred) openView(preferred._id);
+    else reload();
 });
 onUnmounted(() => {
     clearTimeout(searchTimer);

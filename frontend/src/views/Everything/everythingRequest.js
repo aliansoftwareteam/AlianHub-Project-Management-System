@@ -213,6 +213,17 @@ function groupIdOf(kind, row) {
 
 const sameSettings = (a, b) => JSON.stringify(cleanSettings(a)) === JSON.stringify(cleanSettings(b));
 
+/* What a saved view is sent as: a name and the page's settings, cleaned the same way. */
+const viewBody = (name, settings) => ({ name, settings: cleanSettings(settings) });
+
+function viewPatch({ name, isDefault, settings }) {
+    return {
+        ...(name === undefined ? {} : { name }),
+        ...(isDefault === undefined ? {} : { isDefault }),
+        ...(settings === undefined ? {} : { settings: cleanSettings(settings) })
+    };
+}
+
 function groupRequest(base, groupFilter, { cursor = null, limit = PAGE_SIZE } = {}) {
     return { ...base, filter: { ...base.filter, ...groupFilter }, limit, ...(cursor ? { cursor } : {}) };
 }
@@ -220,5 +231,5 @@ function groupRequest(base, groupFilter, { cursor = null, limit = PAGE_SIZE } = 
 module.exports = {
     OPEN_STATUS_TYPES, PAGE_SIZE, GROUPS, MODES, SORT_DIRECTION, DUE_BUCKETS, UNASSIGNED, DEFAULT_SETTINGS,
     cleanSettings, sameSettings, dayKey, dueWindows, foldDueDays, baseRequest, firstRequest, queryGroup, groupsFrom, groupRequest,
-    boardColumns, dropDecision, groupIdOf
+    boardColumns, dropDecision, groupIdOf, viewBody, viewPatch
 };

@@ -1,21 +1,24 @@
-import { DEFAULT_SETTINGS, cleanSettings } from './everythingRequest';
+import { cleanSettings } from './everythingRequest';
 
-/* Kept in this browser for now: a private view is tied to a project and its settings pass a cleaner
-   that knows only a project view's keys, so a view with no project needs a server change. */
+/* The working state of the page in this browser: the settings on screen and which saved view they
+   came from. Saved views themselves live on the server; this only keeps what was not saved yet, so
+   coming back to the page shows it as it was left. The search is not kept. */
 const storageKey = (companyId, userId) => `ah.everything.${companyId}.${userId}`;
 
-export function readSettings(companyId, userId) {
+export function readWorkingState(companyId, userId) {
     try {
         const raw = localStorage.getItem(storageKey(companyId, userId));
-        return raw ? cleanSettings(JSON.parse(raw)) : { ...DEFAULT_SETTINGS };
+        if (!raw) return null;
+        const saved = JSON.parse(raw);
+        return { settings: cleanSettings(saved), viewId: typeof saved?.viewId === 'string' ? saved.viewId : '' };
     } catch (error) {
-        return { ...DEFAULT_SETTINGS };
+        return null;
     }
 }
 
-export function writeSettings(companyId, userId, settings) {
+export function writeWorkingState(companyId, userId, settings, viewId = '') {
     try {
-        localStorage.setItem(storageKey(companyId, userId), JSON.stringify({ ...cleanSettings(settings), search: '' }));
+        localStorage.setItem(storageKey(companyId, userId), JSON.stringify({ ...cleanSettings(settings), search: '', viewId }));
     } catch (error) {
         // Private mode or a full store: the page works without remembering.
     }
