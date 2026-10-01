@@ -75,7 +75,8 @@ const corsGuard = () => (req, res, next) => {
 
 const installCors = (app) => {
     app.use(corsGuard());
-    app.use(cors({ origin: corsOriginDelegate }));
+    // Without this a page on another origin cannot read how long a 429 asks it to wait.
+    app.use(cors({ origin: corsOriginDelegate, exposedHeaders: ['Retry-After'] }));
 };
 
 module.exports = {

@@ -9,6 +9,7 @@ const socketEmitter = require('../../../event/socketEventEmitter');
 const { removeCache } = require('../../../utils/commonFunctions');
 const R = require('../helpers/weekRules');
 const U = require('../helpers/workloadUnits');
+const { workingDaysOf, weekendOf } = require('../../Company/helpers/companyWeek');
 
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const { acceptedMemberIds } = require('../../../utils/companyMembers');
@@ -64,7 +65,7 @@ const capacityByUser = async (companyId, userIds) => {
 
 /* Points and count read open tasks rather than the hour plan, so a task with points and no
  * hours planned still lands on its due day. */
-const unitGrid = async ({ companyId, unit, userIds, projectIds, days, rangeStart, rangeEnd, estimates, ptoByUser, names }) => {
+const unitGrid = async ({ companyId, unit, userIds, projectIds, days, rangeStart, rangeEnd, estimates, ptoByUser, names, workingDays }) => {
     const plannedDays = {};
     (estimates || []).forEach((e) => {
         const taskId = String(e.TaskId || '');
@@ -104,8 +105,9 @@ const unitGrid = async ({ companyId, unit, userIds, projectIds, days, rangeStart
         const capacityRule = (capacities[uid] || U.capacityOf())[unit];
         const grid = U.unitDays({
             days,
-            perDay: U.perDayAmount(capacityRule),
+            perDay: U.perDayAmount(capacityRule, workingDays.length),
             ptoDays: R.ptoDaysIn(ptoByUser[uid] || [], days),
+            weekendDays: weekendOf(workingDays),
             chipsByDay: chipsByUser[uid] || {},
         });
         return {
@@ -168,10 +170,11 @@ exports.getWorkloadGrid = async (req, res) => {
         ]);
         const ptoByUser = {};
         (ptoRows || []).forEach((p) => { (ptoByUser[String(p.userId)] = ptoByUser[String(p.userId)] || []).push(p); });
+        const workingDays = await workingDaysOf(companyId, projectIds.length === 1 ? projectIds[0] : null);
 
         if (unit !== 'hours') {
-            const { users, unpointed } = await unitGrid({ companyId, unit, userIds, projectIds, days, rangeStart, rangeEnd, estimates, ptoByUser, names });
-            return res.json({ status: true, statusText: 'OK', data: { start: b.start, end: b.end, days, unit, unpointed, users } });
+            const { users, unpointed } = await unitGrid({ companyId, unit, userIds, projectIds, days, rangeStart, rangeEnd, estimates, ptoByUser, names, workingDays });
+            return res.json({ status: true, statusText: 'OK', data: { start: b.start, end: b.end, days, unit, workingDays, unpointed, users } });
         }
 
         const taskIds = [...new Set((estimates || []).map((e) => String(e.TaskId || '')).filter(Boolean))];
@@ -217,13 +220,14 @@ exports.getWorkloadGrid = async (req, res) => {
             const grid = R.workloadDays({
                 days, hoursPerDay,
                 ptoDays: R.ptoDaysIn(ptoByUser[uid] || [], days),
+                weekendDays: weekendOf(workingDays),
                 chipsByDay: chipsByUser[uid] || {},
                 loggedByDay: loggedByUser[uid] || {},
             });
             return { userId: uid, name: (names[uid] && names[uid].name) || '', avatar: (names[uid] && names[uid].avatar) || '', hoursPerDay, ...grid };
         }).sort((a, b) => b.utilizationPct - a.utilizationPct);
 
-        return res.json({ status: true, statusText: 'OK', data: { start: b.start, end: b.end, days, unit, hoursPerDay, users } });
+        return res.json({ status: true, statusText: 'OK', data: { start: b.start, end: b.end, days, unit, workingDays, hoursPerDay, users } });
     } catch (e) {
         if (e instanceof TenantError) return res.status(e.statusCode).json({ status: false, statusText: e.message });
         logger.error(`getWorkloadGrid: ${e.message}`);

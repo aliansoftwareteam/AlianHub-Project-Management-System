@@ -41,7 +41,7 @@ export function placementActions(shape, rights) {
     const onlyLooseSubtasks = shape.count > 0 && shape.looseSubtasks === shape.count;
     return {
         moveProject: !rights.move ? off("BulkActions.move_denied")
-            : onlyLooseSubtasks ? off("BulkActions.reason_subtask_moves_with_its_parent") : on,
+            : onlyLooseSubtasks ? off("BulkActions.subtask_moves_hint") : on,
         toSubtask: rights.toSubtask ? on : off("BulkActions.convert_denied"),
         toTask: !rights.toTask ? off("BulkActions.convert_denied")
             : shape.subtasks === 0 ? off("List.bulk_no_subtasks") : on

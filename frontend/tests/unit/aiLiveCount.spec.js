@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { defineComponent, h } from 'vue';
+import { defineComponent, h, ref } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createMemoryHistory, createRouter } from 'vue-router';
@@ -38,7 +38,7 @@ const answer = (summaryRunning) => (type, url) => {
 
 const blank = { render: () => null };
 
-const mountWith = async (components) => {
+const mountWith = async (components, provide = {}) => {
     const router = createRouter({
         history: createMemoryHistory(),
         routes: [
@@ -52,7 +52,7 @@ const mountWith = async (components) => {
     await router.isReady();
     const store = createStore({ modules: { settings: { namespaced: true, getters: { companyUserDetail: () => ({ roleType: 1 }) } } } });
     const Host = defineComponent({ render: () => h('div', components.map((c) => h(c))) });
-    const wrapper = mount(Host, { global: { plugins: [store, router], provide: { $companyId: 'c1', $userId: 'u1' }, mocks: { $t: echo } } });
+    const wrapper = mount(Host, { global: { plugins: [store, router], provide: { $companyId: 'c1', $userId: 'u1', ...provide }, mocks: { $t: echo } } });
     await flushPromises();
     return wrapper;
 };
@@ -97,6 +97,24 @@ describe('the AI sidebar running count', () => {
             const before = teamReads();
             await vi.advanceTimersByTimeAsync(30000);
             expect(teamReads() - before).toBe(1);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('reads the runs once for the strip and the sidebar together, and again when the server says agents changed', async () => {
+        vi.useFakeTimers();
+        try {
+            const handlers = {};
+            const socket = ref({ on: (event, handler) => { handlers[event] = handler; }, off: vi.fn() });
+            apiRequest.mockImplementation(answer(0));
+            wrapper = await mountWith([AgentLiveStrip, AiSidebar], { $socket: socket });
+            const runReads = () => apiRequest.mock.calls.filter(([, url]) => url.includes('/agents/runs?')).length;
+            expect(runReads()).toBe(1);
+
+            for (let i = 0; i < 12; i += 1) handlers.agentsChanged({ kind: 'run' });
+            await vi.advanceTimersByTimeAsync(10000);
+            expect(runReads()).toBe(2);
         } finally {
             vi.useRealTimers();
         }

@@ -5,6 +5,7 @@ import Store from "@/store/index";
 import { useCustomComposable } from '@/composable';
 import * as offline from '@/offline';
 import { forgetLocalePrefs } from '@/views/Settings/Language/localePrefs';
+import { installBusyHandling } from './busy';
 const { logOut } = useAuth();
 export const SESSION_EXPIRED_KEY = "ah.sessionExpired";
 const apiHost = env.API_URI;
@@ -14,6 +15,15 @@ export const axiosInstanceWithoutCompany = axios.create({ baseURL: apiHost });
 export const axiosInstanceWithoutCompanyWithFormData = axios.create({ baseURL: apiHost });
 export const axiosInstanceWithoutSecure = axios.create({ baseURL: apiHost });
 export const axiosInstanceWithoutSecureWithFormData = axios.create({ baseURL: apiHost });
+
+[
+    axiosInstance,
+    axiosInstanceWithFormData,
+    axiosInstanceWithoutCompany,
+    axiosInstanceWithoutCompanyWithFormData,
+    axiosInstanceWithoutSecure,
+    axiosInstanceWithoutSecureWithFormData
+].forEach(installBusyHandling);
 
 
 
