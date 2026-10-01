@@ -183,6 +183,10 @@ describe('Settings → Projects card and its apps list', () => {
     test('icons drawn from files take the text colour', () => {
         expect(template).toMatch(/class="ah-mask-icon setting__dots"/);
         expect(template).toMatch(/class="ah-mask-icon pls__go-icon"/);
+        const apps = read('components/molecules/ProjectAppsList/ProjectAppsList.vue');
+        expect(apps).toMatch(/class="ah-mask-icon appl__icon" :class="\{ 'is-on': modelValue\.includes\(app\.key\) \}"/);
+        expect(apps).toMatch(/\.appl__icon\.is-on \{ color: var\(--brand\); \}/);
+        expect(apps).not.toMatch(/<img/);
     });
 
     test('labels, dividers and the sharing buttons take tokens', () => {
@@ -212,8 +216,12 @@ describe('Milestone report', () => {
         expect(ruleBody(css, '.milestone_table_filter_wrapper')).toMatch(/background-color:\s*var\(--canvas\)/);
     });
 
+    test('the black arrow of the year and month select is inverted in dark', () => {
+        expect(css).toMatch(/:root\[data-theme="dark"\] \.days-selected-dropdown \.select-option img \{\s*filter: invert\(1\) hue-rotate\(180deg\);/);
+    });
+
     test('the sticky head and the sticky first column sit on opaque token surfaces', () => {
-        expect(ruleBody(css, '.milestone-report-wrapper .milestone-report-table tr th')).toMatch(/background-color:\s*var\(--surface-2\)/);
+        expect(ruleBody(css, '.milestone-report-wrapper .milestone-report-table tr th')).toMatch(/background:\s*linear-gradient\(var\(--fill\), var\(--fill\)\) var\(--surface-2\)/);
         expect(ruleBody(css, '.milestone-report-wrapper .milestone-report-table tr th')).toMatch(/color:\s*var\(--ink\)/);
         expect(ruleBody(css, '.milestone-report-wrapper .milestone-report-table tbody td')).toMatch(/background-color:\s*var\(--surface\)/);
         expect(ruleBody(css, '.milestone-report-wrapper .milestone-report-table .mr-row--total td')).toMatch(/background:\s*linear-gradient\(var\(--fill\), var\(--fill\)\) var\(--surface\)/);
@@ -222,7 +230,7 @@ describe('Milestone report', () => {
 
     test('today is marked with the brand and the ink that reads on it', () => {
         const body = ruleBody(css, '.milestone-report-wrapper .milestone-report-table .bg-color-highlight');
-        expect(body).toMatch(/background-color:\s*var\(--brand\)\s*!important/);
+        expect(body).toMatch(/background:\s*var\(--brand\)\s*!important/);
         expect(body).toMatch(/color:\s*var\(--on-brand\)\s*!important/);
     });
 
@@ -283,6 +291,16 @@ describe('chart colours come from the tokens', () => {
             grid: 'rgba(255, 255, 255, .09)',
             surface: '#18181c',
         });
+    });
+
+    test('a token the build rewrote to another notation is handed over as the rgb() the browser computes', async () => {
+        const { readChartTokens } = await import('@/utils/chartTokens');
+        vi.spyOn(window, 'getComputedStyle').mockImplementation((el) => (el === document.documentElement
+            ? { getPropertyValue: (name) => (name === '--ink-2' ? 'hsla(0,0%,100%,.62)' : '') }
+            : { color: 'rgba(255, 255, 255, 0.62)' }));
+        expect(readChartTokens().ink2).toBe('rgba(255, 255, 255, 0.62)');
+        expect(readChartTokens().surface).toBe('');
+        expect(document.documentElement.querySelector('span')).toBeNull();
     });
 
     test('a chart that uses them is redrawn when the theme or the contrast changes', async () => {

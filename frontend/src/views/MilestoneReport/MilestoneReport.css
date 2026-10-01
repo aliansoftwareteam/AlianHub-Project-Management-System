@@ -69,14 +69,14 @@ a.milestone_reports_family {
     border-top-left-radius: 4px;
     border-top-right-radius: 4px;
     border-left: 1px solid var(--border);
-    background-color: var(--surface-2);
+    background: linear-gradient(var(--fill), var(--fill)) var(--surface-2);
 }
 .milestone-report-wrapper .milestone-report-table thead tr:nth-child(1) th.fixed {
     border-top-left-radius: 4px;
     border-top-right-radius: 4px;
 }
 .milestone-report-wrapper .milestone-report-table .bg-color-highlight {
-    background-color: var(--brand) !important;
+    background: var(--brand) !important;
     color: var(--on-brand) !important;
 }
 .milestone-report-wrapper .milestone-report-table tr th {
@@ -85,7 +85,7 @@ a.milestone_reports_family {
     font-weight: normal;
     font-family: var(--font-ui);
     color: var(--ink);
-    background-color: var(--surface-2);
+    background: linear-gradient(var(--fill), var(--fill)) var(--surface-2);
 }
 .milestone-report-wrapper .milestone-report-table tr th:first-child{
     position: sticky;
@@ -401,6 +401,10 @@ tr.fixed th {
     background: transparent;
     color: var(--ink) !important;
     position: inherit !important;
+}
+/* The select draws a black arrow image made for a white page. */
+:root[data-theme="dark"] .days-selected-dropdown .select-option img {
+    filter: invert(1) hue-rotate(180deg);
 }
 .days-selected-dropdown .select-option__label.text-ellipsis {
     font: var(--fw-strong, 500) var(--fs-lg, 16px)/23.68px var(--font-ui);
