@@ -60,6 +60,7 @@ const clearUserCaches = (companyId, uid) => {
         removeCache(`company_users:${companyId}`);
         removeCache(`UserData:${uid}`, false);
         removeCache(`UserAllData:${companyId}`);
+        if (uid) removeCache(`UserProjectData:${companyId}:${uid}`);
         invalidateRoleCache(companyId, uid);
     } catch (e) { /* cache is best-effort */ }
 };

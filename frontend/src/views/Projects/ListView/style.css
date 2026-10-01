@@ -22,7 +22,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    font-size: 12.5px;
+    font-size: var(--row-font);
 }
 
 /* The left padding is the 16px group indent plus the group card's 1px border and 12px
@@ -77,7 +77,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 9px 12px;
+    min-height: var(--hit-min);
+    padding: var(--cell-pad-y) 12px;
     background: var(--surface);
     border-bottom: 1px solid var(--hairline);
     width: 100%;
@@ -101,11 +102,13 @@
 .lv2__wip { margin-left: auto; font: 500 10px/1 var(--font-mono); color: var(--warn-ink); }
 .lv2__wip--over { color: var(--danger-ink); }
 
+/* min-height sizes the content box, so the row's padding comes off --row-h. */
 .lv2__row {
     display: grid;
     grid-template-columns: var(--lv2-cols);
     gap: 10px;
-    padding: 9px 12px;
+    min-height: calc(var(--row-h) - 2 * var(--cell-pad-y));
+    padding: var(--cell-pad-y) 12px;
     align-items: center;
     justify-items: end;
     border-bottom: 1px solid var(--hairline);
@@ -118,8 +121,8 @@
 .lv2__row.is-selected { background: var(--brand-tint); }
 .lv2__row.is-agent { box-shadow: inset 0 0 0 1.5px var(--rail); }
 .lv2__row.is-sub {
-    padding: 7px 12px;
-    font-size: 12px;
+    padding-block: max(1px, calc(var(--cell-pad-y) - 2px));
+    font-size: calc(var(--row-font) - .5px);
     color: var(--ink-2);
 }
 .lv2__row:last-child { border-bottom: 0; }
@@ -134,7 +137,7 @@
 }
 .lv2__name {
     background: none; border: 0; padding: 0;
-    font: 600 12.5px/1.3 var(--font-ui);
+    font: 600 var(--row-font)/1.3 var(--font-ui);
     color: var(--ink);
     cursor: pointer;
     text-align: left;
@@ -182,9 +185,10 @@
 
 .lv2__add {
     display: flex; align-items: center; gap: 9px;
-    padding: 8px 12px 8px 50px;
+    min-height: var(--hit-min);
+    padding: calc(var(--cell-pad-y) - 1px) 12px calc(var(--cell-pad-y) - 1px) 50px;
     color: var(--ink-2);
-    font-size: 12.5px;
+    font-size: var(--row-font);
     background: none; border: 0; width: 100%; text-align: left;
     cursor: pointer;
 }
@@ -258,7 +262,7 @@ button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status
     border: 1px solid var(--brand); border-radius: 6px;
     background: var(--surface);
     color: var(--ink);
-    font: 600 12.5px/1.3 var(--font-ui);
+    font: 600 var(--row-font)/1.3 var(--font-ui);
 }
 
 .lv2__actions { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; flex: none; }

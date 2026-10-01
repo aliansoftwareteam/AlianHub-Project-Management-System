@@ -59,7 +59,7 @@ const edit = (rights = ALL) => ({
 });
 const menu = () => ({
     rights: ref({ archive: true, delete: true, move: true, duplicate: true }),
-    archive: vi.fn(), remove: vi.fn(), startMove: vi.fn(), duplicate: vi.fn()
+    archive: vi.fn(), remove: vi.fn(), startMove: vi.fn(), duplicate: vi.fn(), openSidebar: vi.fn()
 });
 
 const COLUMNS = [
@@ -168,10 +168,14 @@ describe('a subtask row edits in place like a task row', () => {
         expect(actions).toEqual(['rename', 'copy-link', 'new-tab', 'menu']);
         await wrapper.find('[data-action="menu"]').trigger('click');
         const items = wrapper.findAll('[role="menu"] [role="menuitem"]').map((i) => i.attributes('data-item'));
-        expect(items).toEqual(expect.arrayContaining(['rename', 'copy-link', 'copy-key', 'open', 'archive', 'delete']));
-        for (const item of ['subtask', 'save-template', 'move', 'duplicate']) expect(items).not.toContain(item);
+        expect(items).toEqual(expect.arrayContaining(['rename', 'copy-link', 'copy-key', 'open', 'move', 'duplicate', 'archive', 'delete']));
+        for (const item of ['subtask', 'save-template', 'convert-subtask', 'duplicate-subtasks']) expect(items).not.toContain(item);
         await wrapper.find('[data-item="archive"]').trigger('click');
         expect(rowMenu.archive).toHaveBeenCalledWith(expect.objectContaining({ _id: 's-a' }));
+        await wrapper.find('[data-action="menu"]').trigger('click');
+        await wrapper.find('[data-item="move"]').trigger('click');
+        expect(rowMenu.openSidebar).toHaveBeenCalledWith('move', expect.objectContaining({ _id: 's-a' }));
+        expect(rowMenu.startMove).not.toHaveBeenCalled();
     });
 });
 

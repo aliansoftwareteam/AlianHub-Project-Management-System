@@ -1,5 +1,5 @@
 <template>
-<div ref="viewRoot" class="w-100 list-view-wrapper ah-page lv2" :class="{ 'lv2--sorted': !sortState.isManual.value }" :style="listGridStyle">
+<div ref="viewRoot" class="w-100 list-view-wrapper ah-page lv2" :class="{ 'lv2--sorted': !sortState.isManual.value }" :style="listGridStyle" :data-density="density">
     <div v-if="!currentCompany?.planFeature?.listView">
         <UpgradePlan
             :buttonText="$t('Upgrades.upgrade_your_plan')"
@@ -49,6 +49,7 @@
                     @isConvertSubtaskOPen="rowMenu.cancelMove"
                     @bulkMoveConfirm="rowMenu.confirmMove"
                 />
+                <TaskMenuSidebars :mode="rowMenu.sidebar.value?.mode" :task="rowMenu.sidebar.value?.task" @close="rowMenu.closeSidebar" />
                 <div class="lv2__scroll ah-scroll" id="list_scroll" role="table">
                     <div class="lv2__cols" role="row">
                         <span class="lv2__c-select" role="columnheader"><span class="ah-sr-only">{{ $t('List.col_select') }}</span></span>
@@ -61,6 +62,7 @@
                                 @move="columnState.move"
                                 @reset="columnState.reset"
                             />
+                            <ViewDensityControl :model-value="density" @update:model-value="setDensity" />
                             <ListSortControl :sort="sortState.sort.value" :options="sortOptions" @key="sortState.setKey" @dir="sortState.setDir" />
                         </span>
                         <span
@@ -169,11 +171,14 @@ import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyStat
 import { openTask, useTaskSequenceSource } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { useListRowEdit } from './useListInlineEdit.js';
 import ViewColumnChooser from '@/views/Projects/components/columns/ViewColumnChooser.vue';
+import ViewDensityControl from '@/views/Projects/components/columns/ViewDensityControl.vue';
+import { useViewSettings } from '@/views/Projects/composables/viewSettingsContext';
 import AiFieldColumnHead from '@/views/Projects/components/columns/AiFieldColumnHead.vue';
 import { isAiField, loadedViewTasks } from '@/views/Projects/composables/aiFields';
 import ListSortControl from './ListSortControl.vue';
 import ConvertToSubTaskSidebar from '@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue';
 import { useListRowMenu } from './useListRowMenu.js';
+import TaskMenuSidebars from '@/views/Projects/components/taskMenu/TaskMenuSidebars.vue';
 import { sortChoices, useListSort } from '@/views/Projects/composables/viewSort';
 import { columnCatalogue, gridTracks, listColumnClass, listColumnsAt, useViewColumns } from '@/views/Projects/composables/viewColumns';
 
@@ -203,6 +208,7 @@ const aiColumnTasks = computed(() => loadedViewTasks(getters, project.value?._id
 const rowMenu = useListRowMenu(project, showArchived);
 provide('listRowMenu', rowMenu);
 const sortState = useListSort();
+const { density, setDensity } = useViewSettings();
 provide('listSort', sortState.sort);
 const sortOptions = computed(() => sortChoices(rowEdit.fields.defs.value));
 const userNames = computed(() => new Map((getters['users/users'] || []).map((user) => [user._id, user.Employee_Name])));
