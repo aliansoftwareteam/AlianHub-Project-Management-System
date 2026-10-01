@@ -84,7 +84,8 @@
                                 </template>
                                 <div v-else>{{$t('ProjectSlider.no_result_found')}}</div>
                             </template>
-                            <div v-if="isShowProjectList === false">
+                            <p v-if="isShowProjectList === false && parentBlocked" class="convert__depth-note">{{ $t('ProjectDetails.convert_subtree_too_deep') }}</p>
+                            <div v-else-if="isShowProjectList === false && !parentRulePending">
                                 <InputText :placeHolder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" v-model="taskSearch" class="input__Search"/>
                                 <div class="overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar"  :class="[{'duplicatetask__project--sprintList':props.isDuplicate === true}]" :style="[{maxHeight : clientWidth > 767 ? 'calc(100vh - 241px)' : 'calc(100vh - 275px)'}]">
                                     <template v-if="filterFoldersSprints && Object.keys(filterFoldersSprints).length">
@@ -102,6 +103,7 @@
                                             @taskSelect="(e) => taskSelctFun(e)"
                                             @expand="selecteFolderIndex = index,sprintClick(subItem)"
                                             :item="item"
+                                            :parentRule="parentRule"
                                         />
                                     </template>
                                     <template v-if="filterSprints && filterSprints.length">
@@ -120,6 +122,7 @@
                                             @taskSelect="(e) => taskSelctFun(e)"
                                             @expand="selectedIndex = index,sprintClick(subItem)"
                                             :item="item"
+                                            :parentRule="parentRule"
                                         />
                                     </template>
                                 </div>
@@ -161,6 +164,8 @@
     import { useToast } from "vue-toast-notification"
     import ConfirmationsInTask from "@/components/atom/ConfirmationsInTask/ConfirmationsInTask.vue"
     import {useHelperFun} from "./helper"
+    import { useParentRule } from "./parentRule";
+    import { canBeParentOf, parentCandidateMatch } from "@/views/Projects/composables/taskDepth";
     import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
     import DuplicateCompo from '@/components/atom/DuplicateCompo/DuplicateCompo.vue';
     import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
@@ -295,6 +300,10 @@
         error: "",
     });
     const { checkTaskPerSprintPermisssion } = taskPlanPermission();
+    const { rule: parentRule, pending: parentRulePending, blocked: parentBlocked, load: loadParentRule } = useParentRule(
+        () => props.task,
+        () => (props.isOpenSubTask || props.openMoveSubTask) && !props.isBulkConvert
+    );
 
     const projectDatas = computed(() => {
         if(props.fromWhich !== undefined && props.fromWhich == 'dashboard') {
@@ -335,6 +344,7 @@
 
     onMounted(() => {
         task.value = props.task;
+        loadParentRule();
         getSprintFolderData(selectedProjectData.value._id).then(() => {
             sprints.value = JSON.parse(JSON.stringify(Object.values(selectedProjectData.value.sprintsObj || {}).filter((x)=>x.deletedStatusKey === undefined || x.deletedStatusKey === 0)|| {}))
             sprintFolders.value = JSON.parse(JSON.stringify(nestedFolders(selectedProjectData.value.sprintsfolders)));
@@ -385,7 +395,7 @@
             findQuery = [
                 {
                     "$match": {
-                        isParentTask : true,
+                        ...((parentRule.value && parentCandidateMatch(parentRule.value.task, parentRule.value.height)) || { isParentTask : true }),
                         deletedStatusKey : 0,
                         objId: {
                             ProjectID: selectedProjectData.value?._id
@@ -413,7 +423,9 @@
         }
         apiRequest('post',`${env.TASK}/find`,{findQuery: findQuery}).then((resp) => {
             if(resp.status === 200){
-                const result = resp.data;
+                const result = parentRule.value
+                    ? resp.data.filter((row) => canBeParentOf(row, parentRule.value.task, parentRule.value.height))
+                    : resp.data;
                 let array = []
                 result.filter((x) => {
                     array.push(x);

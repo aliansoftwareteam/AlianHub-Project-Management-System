@@ -40,6 +40,8 @@ const root = declared(block(':root'));
 const dark = declared(block(':root[data-theme="dark"]'));
 const highContrast = declared(block(':root.ah-high-contrast'));
 const variant = Object.fromEntries(VARIANTS.map((v) => [v, declared(block(`:root[data-variant="${v}"]`))]));
+/* The look the app had before B became the default: the values :root used to carry. */
+const classic = declared(block(':root[data-variant="classic"]'));
 const px = (v, name) => parseFloat(variant[v][name]);
 const step = (v, name) => {
     const ref = /^var\((--sp-\d)\)$/.exec(variant[v][name]);
@@ -96,18 +98,18 @@ describe('the three design variants', () => {
         }));
     });
 
-    it('A keeps today\'s spacing scale, radii, toolbar, chips and avatars', () => {
+    it('A keeps the classic spacing scale, radii, toolbar, chips and avatars', () => {
         ['--sp-1', '--sp-2', '--sp-3', '--sp-4', '--sp-5', '--sp-6', '--sp-7', '--sp-8', '--sp-9', '--r-modal', '--shadow-pop', '--toolbar-h', '--avatar-size', '--avatar-font', '--chip-h', '--chip-font', '--hit-min'].forEach((name) => {
-            expect(variant.a[name], name).toBe(root[name]);
+            expect(variant.a[name], name).toBe(classic[name]);
         });
-        expect(variant.a['--shadow-card']).toBe(root['--shadow-card'].replace(/rgba\([^)]*\)/, 'var(--shadow-ink)'));
+        expect(variant.a['--shadow-card']).toBe(classic['--shadow-card']);
         expect(variant.a['--shadow-surface']).toBe('none');
         [['--r-chip', '--r-sm'], ['--r-input', '--r-md'], ['--r-card', '--r-lg']].forEach(([shared, own]) => {
             expect(variant.a[shared], shared).toBe(`var(${own})`);
-            expect(variant.a[own], own).toBe(root[shared]);
+            expect(variant.a[own], own).toBe(classic[shared]);
         });
-        expect(root['--shadow-card']).toContain(root['--shadow-ink']);
-        expect(dark['--shadow-card']).toContain(dark['--shadow-ink']);
+        expect(classic['--shadow-card']).toContain('var(--shadow-ink)');
+        expect(dark['--shadow-card']).toBeUndefined();
     });
 
     it('A sets type on whole pixels', () => {
@@ -149,18 +151,19 @@ describe('the three design variants', () => {
     });
 });
 
-describe('with no variant chosen', () => {
-    const variantOnly = Object.keys(variant.a).filter((name) => !(name in root));
-    const sheets = [...SCREENS.map(read), tokens.replace(/:root\[data-variant="[abc]"\] \{[^}]*\}/g, '')];
+describe('with the classic look chosen', () => {
+    const variantOnly = Object.keys(classic).filter((name) => classic[name] === 'initial');
+    const sheets = [...SCREENS.map(read), tokens.replace(/:root[^{]*\{[^}]*\}/g, '')];
 
-    it('the variant-only tokens stay undefined on :root', () => {
+    it('the tokens the old base did not have are un-set, and :root now carries all of them', () => {
+        expect(Object.keys(variant.a).filter((name) => !(name in root))).toEqual([]);
         expect(variantOnly.length).toBeGreaterThan(10);
         ['--fs-md', '--fw-title', '--r-lg', '--shadow-panel', '--control-h', '--card-pad-y', '--page-pad-x'].forEach((name) => {
             expect(variantOnly).toContain(name);
         });
     });
 
-    it('every use of a variant-only token falls back to today\'s value', () => {
+    it('every use of one of those tokens falls back to the classic value', () => {
         const bare = [];
         sheets.forEach((css) => variantOnly.forEach((name) => {
             if (new RegExp(`var\\(\\s*${name}\\s*\\)`).test(css)) bare.push(name);
@@ -208,7 +211,7 @@ describe('a view\'s row density inside a design variant', () => {
         expect(compactAt).toBeGreaterThan(-1);
         expect(tokens.match(/[^\s{},]*\[data-density="compact"\][^{,]*/g).map((sel) => sel.trim())).toEqual(['[data-density="compact"]']);
         expect([...tokens.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]*\[data-variant[^{}]*)\{/g)].map((m) => m[1].trim()))
-            .toEqual(VARIANTS.map((v) => `:root[data-variant="${v}"]`));
+            .toEqual([...VARIANTS, 'classic'].map((v) => `:root[data-variant="${v}"]`));
         ['views/Projects/ListView/ListView.vue', 'views/Projects/TableView/TableView.vue'].forEach((rel) => {
             expect(read(rel), rel).toMatch(/class="[^"]*\bah-page (lv2|tv2)\b[^>]*:data-density="density"/);
         });

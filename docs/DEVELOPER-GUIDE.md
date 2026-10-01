@@ -59,7 +59,7 @@ npm run atlas:compare -- artifacts/atlas/<before> artifacts/atlas/<after>
 | `--only` | every screen | comma-separated screen names from the manifest |
 | `--themes` | `light,dark` | written to `localStorage 'ah.theme'` before the app loads |
 | `--sizes` | `1440x900,390x844` | viewport sizes |
-| `--variant a\|b\|c` | none | written to `localStorage 'ah.variant'` |
+| `--variant a\|b\|c\|classic` | none, which is the dense default (the same as `b`) | written to `localStorage 'ah.variant'`; `classic` is the look before the dense default |
 | `--company`, `--project` | the account's only workspace; the project with the most views | which workspace and project the `:cid` and `:projectId` routes open |
 | `--token-file` | `ATLAS_TOKEN_FILE` | file holding the session token when `ATLAS_TOKEN` is unset |
 

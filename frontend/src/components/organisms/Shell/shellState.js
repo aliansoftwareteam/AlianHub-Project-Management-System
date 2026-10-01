@@ -1,13 +1,15 @@
 import { reactive, watch } from "vue";
 import { apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
+import { DEFAULT_VARIANT, VARIANT_CHOICES, lookOf } from "./looks";
+
+export { DEFAULT_VARIANT, VARIANT_CHOICES };
 
 const THEME_KEY = "ah.theme";
 const CONTRAST_KEY = "ah.contrast";
 const CONTRAST_CHOICES = ["auto", "standard", "high"];
 const VARIANT_KEY = "ah.variant";
 const VARIANT_OFF = "off";
-export const VARIANT_CHOICES = ["a", "b", "c"];
 const NAV_KEY = "ah.nav";
 const NAV_SAVE_DELAY_MS = 800;
 
@@ -77,6 +79,8 @@ export function applyContrast(choice) {
 }
 
 const knownVariant = (value) => (VARIANT_CHOICES.includes(value) ? value : "");
+
+export const activeVariant = () => lookOf(shellState.variant);
 
 /* The router is in hash mode, so a shared link carries ?variant= inside the hash; one typed
    by hand usually has it before the hash. */
