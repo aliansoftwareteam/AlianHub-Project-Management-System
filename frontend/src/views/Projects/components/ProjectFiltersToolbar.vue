@@ -85,7 +85,7 @@
                     >
                         <ShellIcon name="ai" :size="15" />
                     </button>
-                    <DropDown mode="listbox" id="group_by" class="group_by" :title="$t('Projects.group_by')" :zIndex="sheetMode ? SHEET_MENU_Z : 7">
+                    <DropDown mode="listbox" id="group_by" themed class="group_by" :title="$t('Projects.group_by')" :zIndex="sheetMode ? SHEET_MENU_Z : 7">
                         <template #button="{ triggerAttrs }">
                             <button type="button" class="text-nowrap btn-white border-groupBy pft__pill cursor-pointer" ref="group_by_status" :title="$t('Projects.group_by')" :aria-label="$t('Projects.group_by')" v-bind="triggerAttrs">
                                 <ShellIcon name="layout" :size="14" />
@@ -93,10 +93,10 @@
                             </button>
                         </template>
                         <template #options>
-                            <DropDownOption v-for="item in groupByOptions" :key="item.id" :selected="item.id === groupBy" @click="$emit('update:groupBy', item.id); $refs.group_by_status.click()" :class="{'bg-light-gray' : item.id === groupBy}">
-                                <div>
-                                    <img :src="item.image" alt="" class="pr-10px">
-                                    <span :class="{'purple' : item.id === groupBy}">{{ groupLabel(item) }}</span>
+                            <DropDownOption v-for="item in groupByOptions" :key="item.id" :selected="item.id === groupBy" @click="$emit('update:groupBy', item.id); $refs.group_by_status.click()">
+                                <div class="pft__group-option">
+                                    <span v-if="item.image" class="ah-mask-icon pft__group-icon" :style="maskOf(item.image)" aria-hidden="true"></span>
+                                    <span>{{ groupLabel(item) }}</span>
                                 </div>
                             </DropDownOption>
                         </template>
@@ -246,6 +246,7 @@ import AutoArchiveModal from '@/components/molecules/AutoArchive/AutoArchiveModa
 import EstimationScaleModal from '@/components/molecules/EstimationScale/EstimationScaleModal.vue';
 import { ALL as DONE_BY_ALL } from '@/components/molecules/Provenance/doneByQuery';
 import { clearFilterSignal } from '@/views/Projects/composables/taskFilterSignal';
+import { maskOf } from '@/utils/iconMask';
 import ProjectFiltersSheet from './ProjectFiltersSheet.vue';
 
 const PHONE_MAX = 767;

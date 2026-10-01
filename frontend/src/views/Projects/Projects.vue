@@ -115,12 +115,10 @@
                                         <div class="d-flex view_list_scroll h-100">
                                             <div class="ph2__tablist" role="group" :aria-label="$t('Projects.views_tablist')">
                                                 <ViewsList
-                                                    v-for="(view, index) in (viewsListArray)"
+                                                    v-for="view in viewsListArray"
                                                     :key="viewKeyOf(view)"
-                                                    :id="view.keyName"
                                                     :item="view"
                                                     :active="isActiveView(view)"
-                                                    :firstChild="index === 0"
                                                     :isDeleteDisabled="viewsListArray.length == 1"
                                                     :commentCount="view.keyName === 'Comments' ? myCounts?.[`project_${projectData._id}_comments`] || 0 : 0"
                                                     @click="selectView(view)"
@@ -199,7 +197,7 @@
                                             </div>
                                         </div>
                                         <div class="d-flex align-items-center text-nowrap border-top-radius-10-px cursor-pointer view-list-wrapper h-100">
-                                            <AddViewMenu v-if="checkPermission('project.view_list',projectData.isGlobalPermission) === true" :projectData="projectData" :activeView="activeTab" tourId="projectviewlist_driver"/>
+                                            <AddViewMenu v-if="checkPermission('project.view_list',projectData.isGlobalPermission) === true" :projectData="projectData" :activeView="activeTab" tourId="projectviewlist_driver" @added="selectView"/>
                                         </div>
                                     </template>
                                 </div>
@@ -414,6 +412,7 @@
             @tourModalAccept="currentVideoUrl == 0 ? updateTourStatusInUser('isProjectAndNavbarTour') : ''"
             @tourModalClose="closeModal"
             @closeAiSidebar="openAiSidebar = false"
+            @viewAdded="selectView"
         />
     </div>
     <AppState v-else kind="forbidden" />

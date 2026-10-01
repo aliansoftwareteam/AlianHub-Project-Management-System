@@ -145,7 +145,6 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
 /* The existing ViewsList row, when Projects.vue passes it through the `views`
    slot: strip its legacy chrome so it reads as the mock's underline tabs. */
 .ph2__viewrow .wrapper { height: auto; border-radius: 0; align-items: stretch; }
-.ph2__viewrow .wrapper.bg-light-gray { background: none; }
 .ph2__viewrow .view-list {
     border: 0 !important;
     padding: 6px 10px;
@@ -153,9 +152,9 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
     align-items: center;
     border-bottom: 2px solid transparent;
 }
-.ph2__viewrow .wrapper.bg-light-gray .view-list { border-bottom: 2px solid var(--brand) !important; }
-.ph2__viewrow .wrapper.bg-light-gray .view-list .gray81 { color: var(--ink); font-weight: 600; }
-.ph2__viewrow .view-list .gray81 { color: var(--ink-2); font-size: 12.5px; }
+.ph2__viewrow .wrapper.is-active .view-list { border-bottom: 2px solid var(--brand) !important; }
+.ph2__viewrow .wrapper.is-active .view-list .view-list__name { color: var(--ink); font-weight: 600; }
+.ph2__viewrow .view-list .view-list__name { color: var(--ink-2); font-size: 12.5px; }
 
 .ph2__viewrow .view-list:focus-visible,
 .ph2__viewrow .ph2__tab:focus-visible {

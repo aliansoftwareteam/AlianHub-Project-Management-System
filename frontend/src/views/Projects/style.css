@@ -160,7 +160,7 @@
 
 .embed__dropdown .search-project-filter {
   background-color: var(--surface-2);
-  width: 669px;
+  width: auto;
   height: auto;
   padding: 0 !important;
   border-radius: 6px !important;

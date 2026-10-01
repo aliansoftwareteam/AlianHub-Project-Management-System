@@ -29,6 +29,13 @@ const MANAGER_ERROR = Object.freeze({
     [reportingLine.REASON.CYCLE]: 'That would make the reporting line loop back on itself.'
 });
 
+/* The fields of a private view its owner may change one at a time; an unusable value reads as undefined. */
+const PRIVATE_VIEW_FIELDS = Object.freeze({
+    name: (value) => (typeof value === 'string' ? value : undefined),
+    title: (value) => cleanViewTitle(value) || undefined,
+    isPin: (value) => (typeof value === 'boolean' ? value : undefined),
+});
+
 const holdsSeat = (row) => Boolean(row) && Number(row.status) === ACTIVE && row.isDelete !== true;
 const refuse = (res, code, statusText) => res.status(code).json({ status: false, statusText, message: statusText });
 const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -206,13 +213,21 @@ exports.handlePrivateView = async (req, res) => {
                 $push: { ProjectRequiredComponent: view }
             }
         } else if (operation === 'update') {
-            if(!data.id && ["name"].includes(key)) {
+            const readValue = PRIVATE_VIEW_FIELDS[key];
+            if (!readValue) {
+                return refuse(res, 400, 'This private view field cannot be changed.');
+            }
+            if (!data.id) {
                 return refuse(res, 400, `Element 'id' parameter is required.`);
             }
-            update = {
-                $set: { "ProjectRequiredComponent.$[elem].name": data.name }
+            const value = readValue(data[key]);
+            if (value === undefined) {
+                return refuse(res, 400, `A valid '${key}' is required.`);
             }
-            if (["name"].includes(key)) options = { arrayFilters: [{ "elem.id": data.id }] };
+            update = {
+                $set: { [`ProjectRequiredComponent.$[elem].${key}`]: value }
+            }
+            options = { arrayFilters: [{ "elem.id": data.id }] };
         } else if (operation === 'settings') {
             if (!data.id) {
                 return refuse(res, 400, `Element 'id' parameter is required.`);
@@ -239,7 +254,7 @@ exports.handlePrivateView = async (req, res) => {
         if (!req.uid || String(row.userId || '') !== String(req.uid)) {
             return refuse(res, 403, 'You can only change your own private views.');
         }
-        if (operation === 'settings' && !(row.ProjectRequiredComponent || []).some((view) => view && String(view.id) === String(data.id))) {
+        if (['settings', 'update'].includes(operation) && !(row.ProjectRequiredComponent || []).some((view) => view && String(view.id) === String(data.id))) {
             return refuse(res, 404, 'Private view not found.');
         }
 

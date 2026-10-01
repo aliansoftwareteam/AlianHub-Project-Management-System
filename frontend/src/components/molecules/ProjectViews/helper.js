@@ -21,12 +21,6 @@ export const groupViews = (views = []) => {
 
 export const viewTagKey = (keyName) => `ViewListTag.${keyName}`;
 
-/**
- * This function is used to add new private view
- * @param {Object} ids 
- * @param {Object} data 
- * @returns 
- */
 export const addPrivateView = (ids, data) => {
     return new Promise((resolve, reject) => {
         try {
@@ -43,6 +37,7 @@ export const addPrivateView = (ids, data) => {
                 resolve({ statusText: 'View_added_successfully', status: true })
             }).catch((error) => {
                 console.error(`Error in addPrivateView hook => ${error}`)
+                reject({ statusText: error, status: false })
             });
 
         } catch (error) {

@@ -584,6 +584,18 @@ html, body, #app {
 .ah-pop__sep { height: 1px; background: var(--hairline); margin: 6px 4px; }
 .ah-pop__label { padding: 8px 10px 4px; }
 
+/* An icon file drawn as a mask (`--mask-icon`, set by maskOf): it shows in the current text
+   colour, not the one baked into the file, so it stays readable in either theme. */
+.ah-mask-icon {
+    display: inline-block;
+    flex: none;
+    width: 14px;
+    height: 14px;
+    background-color: currentColor;
+    -webkit-mask: var(--mask-icon) center / contain no-repeat;
+    mask: var(--mask-icon) center / contain no-repeat;
+}
+
 .ah-toolbar {
     height: var(--toolbar-h);
     display: flex; align-items: center; gap: 12px;

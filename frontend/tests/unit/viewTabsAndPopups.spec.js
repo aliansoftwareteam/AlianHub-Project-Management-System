@@ -92,6 +92,7 @@ afterEach(() => {
 });
 
 const tabGlobal = () => ({
+    stubs: { ConfirmationSidebar: true },
     provide: { selectedProject: ref({ _id: 'p1', isGlobalPermission: true, ProjectRequiredComponent: [shared(), shared({ _id: SPRINT_ID, id: SPRINT_ID, title: 'Sprint' })] }), $userId: ref('user-1'), $companyId: ref('c1') },
 });
 

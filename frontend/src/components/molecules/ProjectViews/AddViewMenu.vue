@@ -7,7 +7,7 @@
             </button>
         </template>
         <template #options>
-            <ViewsDropdown :projectData="projectData" :tourId="tourId" @closeDropdown="close" />
+            <ViewsDropdown :projectData="projectData" :tourId="tourId" @closeDropdown="close" @added="$emit('added', $event)" />
         </template>
     </DropDown>
 </template>
@@ -25,6 +25,7 @@ const props = defineProps({
     activeView: { type: String, default: '' },
     tourId: { type: String, default: '' }
 });
+defineEmits(['added']);
 
 const addIcon = require('@/assets/images/Shape 614.png');
 const OTHER_PANELS = '.drop-down-menu, .custom-drop-down-menu';
