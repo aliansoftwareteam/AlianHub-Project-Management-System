@@ -75,6 +75,7 @@
     color-scheme: var(--scheme);
 }
 .sb-tokens .sidebar-head { color: var(--ink); border-color: var(--hairline); }
+.sb-tokens .assignee-headtitle { color: var(--ink); }
 .sb-tokens .sidebar-body { color: var(--ink); }
 .sb-tokens .mobile-list-inputsearch-wrapper { border-color: var(--hairline); }
 .sb-tokens .form-control { background: var(--surface); color: var(--ink); border-color: var(--border); }

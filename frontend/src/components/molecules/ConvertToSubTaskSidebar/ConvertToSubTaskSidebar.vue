@@ -36,7 +36,7 @@
                         <div v-if="isCreteTask" class="create__task-title form-group d-flex align-items-center border-bottom-mobiledrop">
                             <InputText
                                 v-model="taskData.value"
-                                class="form-control login-input text-capitalize"
+                                class="form-control login-input"
                                 :placeHolder="$t('PlaceHolder.Enter_Task_Name')"
                                 :maxLength="250"
                                 :minLength="3"

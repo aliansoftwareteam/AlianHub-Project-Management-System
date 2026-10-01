@@ -1,12 +1,12 @@
 <template>
     <template v-for="(tabs,index) in tabArray" :key="index">
-        <div class="d-flex align-items-center pt-20px mb-20px custom_field-border" role="tablist" v-if="tabs.type === props.componentDetail.cfType">
+        <div class="d-flex align-items-center pt-20px mb-20px custom_field-border custom_field-tabs" role="tablist" v-if="tabs.type === props.componentDetail.cfType">
             <button
                 v-for="(tabValue,ind) in tabs.tab" :key="ind"
                 type="button"
                 role="tab"
                 :aria-selected="tabIndex === ind + 1 ? 'true' : 'false'"
-                :class="[{'is-active' : tabIndex === ind + 1,'mr-40px':tabs.tab.length !== ind +1}]"
+                :class="{'is-active' : tabIndex === ind + 1}"
                 class="custom_field-tab"
                 @click="tabIndex = ind + 1,emit('handleIndex',ind + 1)"
             >
@@ -84,6 +84,7 @@
     });
 </script>
 <style>
+.custom_field-tabs { gap: 40px; }
 .custom_field-tab {
     margin: 0;
     padding: 0 0 7px;

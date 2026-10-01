@@ -29,6 +29,7 @@
         </component>
         </slot>
         <Sidebar
+            themed
             :title="$t('Permissions.select_priorities')"
             v-model:visible="visible"
             :value="[{...selectedPriority}]"

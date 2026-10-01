@@ -24,6 +24,13 @@
     --fk-bg-disabled: var(--fill);
     --fk-color-disabled: var(--ink-2);
 }
+/* The forms of the older field types still carry the legacy colour classes. */
+.customFieldSidebar :is(.black, .dark-gray, .GunPowder) { color: var(--ink); }
+.customFieldSidebar :is(.gray, .gray81) { color: var(--ink-2); }
+.customFieldSidebar .blue { color: var(--brand) !important; }
+.customFieldSidebar .border-gray { border-color: var(--border) !important; }
+/* The arrow of a select row is a black image. */
+:root[data-theme="dark"] .customFieldSidebar img.rotate-z-90 { filter: invert(1); }
 .customFieldSidebar .formkit-input { color: var(--ink); }
 .customFieldSidebar .formkit-input::placeholder { color: var(--ink-2); }
 .customFieldSidebar .formkit-message { color: var(--danger); }
