@@ -134,7 +134,9 @@ button.rp-row:hover .rp-row__name { color: var(--brand); text-decoration: underl
 }
 @media (max-width: 767px) {
     .rp-page { padding: 12px 14px; gap: 10px; }
-    .rp-tabs { margin-left: 0; width: 100%; order: 5; overflow-x: auto; }
+    .rp-tabs { margin-left: 0; width: 100%; order: 5; overflow-x: auto; scrollbar-width: none; }
+    .rp-tabs::-webkit-scrollbar { display: none; }
+    .rp-tab { padding: 6px 6px; }
     .rp-actions { margin-left: 0; width: 100%; }
     .rp-stats--5, .rp-stats--4 { grid-template-columns: repeat(2, 1fr); }
     .rp-thead { display: none; }

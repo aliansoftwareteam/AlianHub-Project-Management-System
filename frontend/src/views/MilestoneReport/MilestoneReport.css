@@ -585,3 +585,7 @@ tr.fixed th {
         position: relative;
     }
 }
+/* 100vh ignores the phone tab bar, which left the table's own scrollbar under the fold. */
+@media (max-width: 767px) {
+    .milestone_table_filter_wrapper { height: calc(100dvh - var(--tabbar-h) - 148px); }
+}

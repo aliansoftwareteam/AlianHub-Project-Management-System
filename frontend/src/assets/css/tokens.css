@@ -688,6 +688,10 @@ html, body, #app {
 }
 .ah-toolbar__title { margin: 0; font: 600 15px/1.2 var(--font-ui); letter-spacing: -.2px; display: flex; align-items: center; gap: 10px; }
 .ah-toolbar__spacer { flex: 1; }
+/* A page that wraps its toolbar on a phone may load before this file; a fixed height here would win and lay the second row over the page. */
+@media (max-width: 767px) {
+    .ah-toolbar { height: auto; min-height: var(--toolbar-h); }
+}
 
 .ah-empty {
     border: 1px dashed var(--border);

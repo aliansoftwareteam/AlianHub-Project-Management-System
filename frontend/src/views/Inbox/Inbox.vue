@@ -114,14 +114,14 @@
                             <span class="ibx__what">
                                 <template v-if="it.kind === 'approval'">
                                     <strong>{{ actorName(it) || $t('Inbox.someone') }}</strong> {{ $t('Inbox.requested_off', { range: dateRange(it) }) }}
-                                    <span class="ibx__dim">· {{ $t('Inbox.needs_your_approval') }}</span>
+                                    <span class="ibx__dim"><span class="ibx__dot">· </span>{{ $t('Inbox.needs_your_approval') }}</span>
                                 </template>
                                 <template v-else-if="it.kind === 'proposal'">
                                     <strong>{{ it.agentName }}</strong> {{ $t('Inbox.wants_to') }} {{ proposalTitle(t, it) }}
-                                    <span class="ibx__dim">· {{ $t('Inbox.needs_your_approval') }}</span>
+                                    <span class="ibx__dim"><span class="ibx__dot">· </span>{{ $t('Inbox.needs_your_approval') }}</span>
                                 </template>
                                 <template v-else-if="it.kind === 'reminder'">
-                                    <strong>{{ $t('Inbox.reminder') }}</strong> <span class="ibx__dim">· {{ it.unread ? $t('Inbox.due_now') : $t('Inbox.done') }}</span>
+                                    <strong>{{ $t('Inbox.reminder') }}</strong> <span class="ibx__dim"><span class="ibx__dot">· </span>{{ it.unread ? $t('Inbox.due_now') : $t('Inbox.done') }}</span>
                                 </template>
                                 <template v-else-if="it.kind === 'mention'">
                                     <strong>{{ actorName(it) || $t('Inbox.someone') }}</strong> {{ it.mainChat ? $t('Inbox.mentioned_you_chat') : $t('Inbox.mentioned_you') }}
@@ -1026,6 +1026,8 @@ onUnmounted(() => {
     .ibx__tab { height: 40px; padding: 0 10px; }
     .ibx__keys { display: none; }
     .ibx__list { padding: 10px; }
+    .ibx__what .ibx__dim { display: block; overflow: hidden; text-overflow: ellipsis; }
+    .ibx__dot { display: none; }
     .ibx .ah-btn--sm { min-height: var(--hit-min); }
     .ibx__actions .ah-btn--sm { height: 44px; padding: 0 14px; font-size: var(--fs-md, 13px); }
     .ibx__snooze { left: 8px; right: 8px; width: auto; }
