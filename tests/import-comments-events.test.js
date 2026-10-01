@@ -101,30 +101,35 @@ afterEach(() => {
 });
 
 describe('comments carried in by an import', () => {
-    it('are announced like a comment written in the app', async () => {
+    it('land on their task, marked with the importer they came through', async () => {
         const res = await importBoard();
         expect(res.body.status).toBe(true);
 
         const taskId = String(taskNamed('Discussed card')._id);
-        expect(emitted).toHaveLength(2);
-        emitted.forEach((event) => {
-            expect(event).toMatchObject({ type: 'insert', module: 'comments', companyId: COMPANY });
-            expect(String(event.data.taskId)).toBe(taskId);
-            expect(String(event.data.projectId)).toBe(PROJECT);
-            expect(String(event.data.sprintId)).toBe(SPRINT);
+        const comments = companyDb().store[SCHEMA_TYPE.COMMENTS];
+        expect(comments.map((comment) => comment.message)).toEqual(['Trello Tom: first', 'Trello Tom: second']);
+        comments.forEach((comment) => {
+            expect({ taskId: String(comment.taskId), projectId: String(comment.projectId), sprintId: String(comment.sprintId), userId: String(comment.userId), importedFrom: comment.importedFrom })
+                .toEqual({ taskId, projectId: PROJECT, sprintId: SPRINT, userId: OWNER, importedFrom: 'trello' });
         });
     });
 
-    it('count as unread for the task\'s people, not for the importer or someone who left', async () => {
+    it('keep the time they were written', async () => {
+        await importBoard([{ ...TWO_COMMENTS[0], date: '2026-01-05T09:00:00.000Z' }]);
+        expect(companyDb().store[SCHEMA_TYPE.COMMENTS][0].createdAt.toISOString()).toBe('2026-01-05T09:00:00.000Z');
+    });
+
+    it('are history, not news: no socket event is sent for them', async () => {
+        await importBoard();
+        expect(companyDb().store[SCHEMA_TYPE.COMMENTS]).toHaveLength(2);
+        expect(emitted).toEqual([]);
+    });
+
+    it('count as unread for no one', async () => {
         await importBoard();
 
         const field = `task_${PROJECT}_${SPRINT}_${String(taskNamed('Discussed card')._id)}_comments`;
-        expect(counterOf(MEMBER)[field]).toBe(2);
-        expect(counterOf(OWNER)[field]).toBeUndefined();
-        expect(counterOf(LEAVER)[field]).toBeUndefined();
-
-        const quiet = `task_${PROJECT}_${SPRINT}_${String(taskNamed('Quiet card')._id)}_comments`;
-        expect(counterOf(MEMBER)[quiet]).toBeUndefined();
+        expect([MEMBER, OWNER, LEAVER].map((uid) => counterOf(uid)[field])).toEqual([undefined, undefined, undefined]);
     });
 });
 

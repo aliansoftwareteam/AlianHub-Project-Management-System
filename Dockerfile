@@ -50,6 +50,7 @@ COPY Modules/CustomField/fieldTypes /app/Modules/CustomField/fieldTypes
 COPY Modules/Automations/templates.js /app/Modules/Automations/templates.js
 COPY Modules/Company/helpers/workingDays.js /app/Modules/Company/helpers/workingDays.js
 COPY Modules/Tasks/helpers/taskTreeRules.js /app/Modules/Tasks/helpers/taskTreeRules.js
+COPY Modules/Tasks/helpers/descriptionBlock.js /app/Modules/Tasks/helpers/descriptionBlock.js
 COPY Modules/Forms/helpers/formLogic.js /app/Modules/Forms/helpers/formLogic.js
 
 # Build the SPA bundle. webpack needs more than Node's default ~2 GB heap for

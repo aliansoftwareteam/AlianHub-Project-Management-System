@@ -21,7 +21,7 @@
             <Description
                 v-if="show.description && checkPermission('task.task_description',projectData?.isGlobalPermission) !== null && checkPermission('task.task_description',projectData?.isGlobalPermission) !== undefined && Object.keys(projectData).length > 0"
                 :isShowAi="canUseAi({ project: projectData, permitted: checkPermission('task.task_description',projectData?.isGlobalPermission) == true })"
-                :description="task?.descriptionBlock ? task.descriptionBlock : task.description"
+                :description="taskDescription"
                 :editPermission="checkPermission('task.task_description',projectData?.isGlobalPermission)"
                 :minlength="10"
                 :projectData="projectData"
@@ -51,6 +51,7 @@
                 class="mt-1"
                 @open="$emit('openDoc', $event)"
             />
+            <TaskLinks v-if="show.linkedDocs" :links="task.links" />
             <EpicPicker
                 v-if="show.epic"
                 :task="task"
@@ -141,6 +142,8 @@ import CheckListComponent from '@/components/molecules/CheckList/CheckList.vue'
 import SubTasks from '@/components/organisms/SubTasks/SubTasks.vue'
 import LinkedTasks from '@/components/organisms/LinkedTasks/LinkedTasks.vue'
 import LinkedDocs from '@/components/molecules/Pages/LinkedDocs.vue'
+import TaskLinks from '@/components/molecules/TaskLinks/TaskLinks.vue'
+import { shownDescription } from '@/utils/taskDescription'
 import EpicPicker from '@/components/molecules/Epics/EpicPicker.vue'
 import CreateTagPopup from "@/components/molecules/TagList/CreateTagPopup.vue";
 import TagChip from '@/components/atom/TagChip/TagChip.vue'
@@ -217,6 +220,7 @@ const companyOwner = computed(() => {
     return getters["settings/companyOwnerDetail"];
 });
 const checkList = computed(() => props.task.checklistArray);
+const taskDescription = computed(() => shownDescription(props.task));
 const currentCompany = computed(() => getters["settings/selectedCompany"]);
 const projectsGetter = computed(() => getters["projectData/onlyActiveProjects"]);
 const showCustomField = computed(() => checkPermission("task.task_custom_field", projectData.value?.isGlobalPermission, {gettersVal: getters}));
