@@ -4,6 +4,8 @@ const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard')
 const { visibleProjectIds } = require('../../Agents/scope');
 const { hiddenSprintIds } = require('../../Sprints/helpers/sprintVisibility');
 const { narrowingFor } = require('../../../Config/tokenNarrowing');
+const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
+const { othersPersonalListIds } = require('../../PersonalList/ownership');
 
 const MAX_LIMIT = 1000;
 const MAX_STAGES = 40;
@@ -112,13 +114,28 @@ const toObjectIds = (ids) => (ids || [])
     .filter((id) => /^[a-f0-9]{24}$/i.test(String(id)))
     .map((id) => new mongoose.Types.ObjectId(String(id)));
 
+/* Company-wide, short of what belongs to the people in it: someone else's personal list, and a chat
+ * the caller is not in. Kept under $nor so a caller that spreads the match into its own filter and
+ * then names a ProjectID keeps both exclusions. */
+const companyWideStage = async (companyId, uid) => {
+    const personalLists = idForms(await othersPersonalListIds(companyId, uid));
+    return {
+        $match: {
+            $nor: [
+                ...(personalLists.length ? [{ ProjectID: { $in: personalLists } }] : []),
+                { mainChat: true, AssigneeUserId: { $ne: String(uid) } },
+            ],
+        },
+    };
+};
+
 /* Owners and admins keep company-wide task visibility unless a token narrows them to some projects;
  * everyone else sees the projects the sidebar lists for them, minus the private sprints they are not
  * shared with. */
 const visibilityStage = async (companyId, uid) => {
     const roleType = await getRoleType(companyId, uid);
     const privileged = isPrivileged(roleType);
-    if (privileged && !narrowingFor(uid)) return null;
+    if (privileged && !narrowingFor(uid)) return companyWideStage(companyId, uid);
     const ids = roleType === null ? [] : await visibleProjectIds(companyId, uid);
     const projects = toObjectIds(ids);
     const hidden = privileged ? [] : await hiddenSprintIds(companyId, uid, projects);

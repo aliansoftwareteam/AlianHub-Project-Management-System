@@ -80,7 +80,7 @@ defineExpose({ load });
 
 <style scoped>
 .hc-assigned__title { margin: 0; }
-.hc-assigned__count { color: var(--ink-2); font-size: 11px; }
+.hc-assigned__count { color: var(--ink-2); font-size: var(--fs-xs, 11px); }
 .hc-assigned__hide { width: 26px; height: 26px; display: grid; place-items: center; flex: none; border: 0; border-radius: var(--r-chip); background: transparent; color: var(--ink-2); cursor: pointer; }
 .hc-assigned__hide:hover { background: var(--surface-hover); color: var(--ink); }
 .hc-assigned__hide:focus-visible { outline: none; box-shadow: var(--focus); }
@@ -93,8 +93,8 @@ defineExpose({ load });
 .hc-assigned__item:first-child { border-top: 0; padding-top: 0; }
 .hc-assigned__open { grid-column: 1; text-align: left; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 2px; min-width: 0; color: var(--ink); }
 .hc-assigned__open:focus-visible { outline: 2px solid var(--focus, var(--brand)); outline-offset: 2px; border-radius: 4px; }
-.hc-assigned__text { font-size: 13px; overflow-wrap: anywhere; }
-.hc-assigned__task { font-size: 11.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hc-assigned__from { grid-column: 1; font-size: 11.5px; color: var(--ink-2); }
+.hc-assigned__text { font-size: var(--fs-md, 13px); overflow-wrap: anywhere; }
+.hc-assigned__task { font-size: var(--fs-sm, 11.5px); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hc-assigned__from { grid-column: 1; font-size: var(--fs-sm, 11.5px); color: var(--ink-2); }
 .hc-assigned__resolve { grid-column: 2; grid-row: 1 / span 2; }
 </style>

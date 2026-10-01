@@ -28,6 +28,9 @@ const TEMPLATES = Object.freeze([
     recipe('done_comment', 'status', 'task.status_changed',
         { op: 'changedTo', field: 'statusRef', value: status('close') },
         [{ action: 'add_comment', config: { body: text('done_comment') } }]),
+    recipe('done_notify_creator', 'status', 'task.status_changed',
+        { op: 'changedTo', field: 'statusRef', value: status('close') },
+        [{ action: 'notify', config: { recipients: ['task_creator'], message: text('done_notify_creator') } }]),
     recipe('reopened_priority', 'status', 'task.status_changed',
         { op: 'changedFrom', field: 'statusRef', value: status('close') },
         [{ action: 'set_priority', config: { priority: 'HIGH' } }]),
@@ -38,6 +41,8 @@ const TEMPLATES = Object.freeze([
     recipe('unassigned_comment', 'assignment', 'task.assignee_changed',
         { op: 'empty', field: 'AssigneeUserId' },
         [{ action: 'add_comment', config: { body: text('unassigned_comment') } }]),
+    recipe('overdue_priority', 'dates', 'task.due_date_passed', {},
+        [{ action: 'set_priority', config: { priority: 'HIGH' } }]),
     recipe('due_date_moved_comment', 'dates', 'task.due_date_changed', {},
         [{ action: 'add_comment', config: { body: text('due_date_moved_comment') } }]),
     recipe('due_date_moved_priority', 'dates', 'task.due_date_changed',
@@ -46,6 +51,8 @@ const TEMPLATES = Object.freeze([
     recipe('high_priority_assign', 'priority', 'task.priority_changed',
         { op: 'changedTo', field: 'Task_Priority', value: 'HIGH' },
         [{ action: 'assign', config: { mode: 'add', userIds: [PERSON] } }]),
+    recipe('subtasks_done_close_parent', 'subtasks', 'task.subtasks_all_done', {},
+        [{ action: 'set_status', config: { status: status('close') } }]),
     recipe('parent_done_comment', 'subtasks', 'task.status_changed',
         { op: 'and', args: [{ op: 'changedTo', field: 'statusRef', value: status('close') }, { op: 'eq', field: 'isParentTask', value: true }] },
         [{ action: 'add_comment', config: { body: text('parent_done_comment') } }]),
@@ -83,10 +90,23 @@ const fillConditions = (node, ctx) => {
     return { ...node };
 };
 
-const fillConfig = (value, translate) => {
-    if (Array.isArray(value)) return value.filter((v) => !(isFill(v) && v.fill === 'person')).map((v) => fillConfig(v, translate));
-    if (isFill(value)) return value.fill === 'text' ? translate(value.key) : value;
-    if (value !== null && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fillConfig(v, translate)]));
+/* An action names its status, so the placeholder becomes the first status of that
+ * type among the projects the rule covers; with none to read, a word in the
+ * reader's language that the person replaces in the builder. */
+const statusName = (fill, ctx) => {
+    const found = (ctx.projects || [])
+        .filter((p) => !ctx.projectId || String(p._id) === String(ctx.projectId))
+        .flatMap((p) => statusesOf(p).filter((s) => s.type === fill.type));
+    return found.length ? String(found[0].name) : ctx.translate(`AutomationTemplates.status_${fill.type}`);
+};
+
+const fillConfig = (value, ctx) => {
+    if (Array.isArray(value)) return value.filter((v) => !(isFill(v) && v.fill === 'person')).map((v) => fillConfig(v, ctx));
+    if (isFill(value)) {
+        if (value.fill === 'text') return ctx.translate(value.key);
+        return value.fill === 'status' ? statusName(value, ctx) : value;
+    }
+    if (value !== null && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fillConfig(v, ctx)]));
     return value;
 };
 
@@ -98,7 +118,7 @@ const fillTemplate = (template, { projects = [], projectId = '', translate = (ke
     trigger: { ...template.rule.trigger },
     scope: projectId ? { allProjects: false, projectIds: [String(projectId)] } : { allProjects: true, projectIds: [] },
     conditions: fillConditions(template.rule.conditions, { projects, projectId }),
-    steps: template.rule.steps.map((step) => ({ ...step, config: fillConfig(step.config, translate) })),
+    steps: template.rule.steps.map((step) => ({ ...step, config: fillConfig(step.config, { projects, projectId, translate }) })),
 });
 
 module.exports = { TEMPLATES, CATEGORIES, FILL_KINDS, fillTemplate };

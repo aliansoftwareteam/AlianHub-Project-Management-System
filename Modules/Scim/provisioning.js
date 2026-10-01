@@ -11,6 +11,7 @@ const { ROLE_OWNER } = require('../../Config/roleTypes');
 const knowledgeEvents = require('../Knowledge/ingest/events');
 const { sharedRecordVisible } = require('./helpers/scimRules');
 const { revokeMemberTokens } = require('../ApiTokens/memberTokens');
+const { invalidateMembershipCache } = require('../../Config/jwt');
 
 // scimRules.isActive reads this back as "not active"; isDelete is what keeps the seat out of the guards.
 const SCIM_DEACTIVATED = 0;
@@ -62,6 +63,7 @@ const clearUserCaches = (companyId, uid) => {
         removeCache(`UserAllData:${companyId}`);
         if (uid) removeCache(`UserProjectData:${companyId}:${uid}`);
         invalidateRoleCache(companyId, uid);
+        if (uid) invalidateMembershipCache(String(uid), String(companyId));
     } catch (e) { /* cache is best-effort */ }
 };
 
