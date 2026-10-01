@@ -42,7 +42,7 @@ import { dismissUndoToast, runUndo, undoToast } from '@/composable/useUndoToast'
 import en from '@/locales/en';
 
 const ALL = ['rename', 'subtask', 'copy-link', 'copy-key', 'new-tab', 'open', 'save-template',
-    'convert-subtask', 'convert-list', 'move', 'duplicate', 'duplicate-subtasks', 'merge',
+    'convert-subtask', 'convert-list', 'move', 'remove-from-list', 'duplicate', 'duplicate-subtasks', 'merge',
     'archive', 'restore', 'delete'];
 
 const task = (overrides = {}) => ({
@@ -71,11 +71,11 @@ const store = () => createStore({
 
 const Sidebars = { name: 'TaskMenuSidebars', props: ['mode', 'task'], emits: ['close'], template: '<div class="sidebars" :data-mode="mode || \'\'"></div>' };
 
-function mountBoard({ data = task(), archived = false } = {}) {
-    const boardMenu = { rights: ref(rightsNow(archived)), rename: vi.fn(), duplicate: vi.fn() };
+function mountBoard({ data = task(), archived = false, listId = '' } = {}) {
+    const boardMenu = { rights: ref(rightsNow(archived)), rename: vi.fn(), duplicate: vi.fn(), removeFromList: vi.fn() };
     const toggleTaskDetail = vi.fn();
     const wrapper = mount(BoardCard, {
-        props: { data, groupValue: 0, isSubTask: false },
+        props: { data, groupValue: 0, isSubTask: false, ...(listId ? { itemData: { sprintId: listId } } : {}) },
         attachTo: document.body,
         global: {
             plugins: [store()],
@@ -98,7 +98,7 @@ function mountBoard({ data = task(), archived = false } = {}) {
     return { wrapper, boardMenu, toggleTaskDetail };
 }
 
-function mountList({ data = task(), archived = false, isSub = false } = {}) {
+function mountList({ data = task(), archived = false, isSub = false, listId = '' } = {}) {
     const rights = rightsNow(archived);
     const edit = {
         rights: ref({ status: false, assignee: false, due: false, priority: false, estimate: false, points: false, customField: false, rename: rights.rename, subtask: rights.subtask, template: rights.template }),
@@ -106,14 +106,14 @@ function mountList({ data = task(), archived = false, isSub = false } = {}) {
         taskHref: () => 'https://x/t1', assigneeOptions: () => [], copyLink: vi.fn(), copyKey: vi.fn(), rename: vi.fn()
     };
     const menu = {
-        rights: ref(rights), archive: vi.fn(), remove: vi.fn(), restore: vi.fn(), startMove: vi.fn(), duplicate: vi.fn(), openSidebar: vi.fn()
+        rights: ref(rights), archive: vi.fn(), remove: vi.fn(), restore: vi.fn(), startMove: vi.fn(), duplicate: vi.fn(), openSidebar: vi.fn(), removeFromList: vi.fn()
     };
     const wrapper = mount(ListRow, {
         props: { data, isSub },
         attachTo: document.body,
         global: {
             plugins: [store()],
-            provide: { listRowEdit: edit, listRowMenu: menu, listColumns: ref([]), selectedProject: ref(project) },
+            provide: { listRowEdit: edit, listRowMenu: menu, listColumns: ref([]), selectedProject: ref(project), ...(listId ? { viewedList: ref({ sprintId: listId, projectId: 'p1' }) } : {}) },
             stubs: { ShellIcon: true, ProvenanceBadge: true, TaskTagCell: true, ListStatusCircle: true }
         }
     });
@@ -158,7 +158,7 @@ describe('the one definition of the task menu', () => {
     });
 
     it('with every permission an open task gets everything but restore', () => {
-        expect(taskMenuItems(task(), rightsNow()).map((item) => item.id)).toEqual(ALL.filter((id) => id !== 'restore'));
+        expect(taskMenuItems(task(), rightsNow()).map((item) => item.id)).toEqual(ALL.filter((id) => id !== 'restore' && id !== 'remove-from-list'));
     });
 
     it('takes each action away with its own permission', () => {
@@ -244,6 +244,47 @@ describe('the Board card and the List row show the same menu', () => {
         expect(await listItems(list.wrapper)).toEqual(expected);
         board.wrapper.unmount();
         list.wrapper.unmount();
+    });
+});
+
+describe('a task shown in a list it was added to', () => {
+    const HERE = 's2';
+    const added = () => task({ extraLists: [{ projectId: 'p1', sprintId: HERE }] });
+
+    it('can be taken out of that list from the Board card and from the List row', async () => {
+        const board = mountBoard({ data: added(), listId: HERE });
+        const list = mountList({ data: added(), listId: HERE });
+        const expected = taskMenuItems(added(), rightsNow(), { listId: HERE }).map((item) => [item.id, item.labelKey]);
+
+        expect(expected).toContainEqual(['remove-from-list', 'TaskLists.menu_remove_here']);
+        expect(await boardItems(board.wrapper)).toEqual(expected);
+        expect(await listItems(list.wrapper)).toEqual(expected);
+        board.wrapper.unmount();
+        list.wrapper.unmount();
+    });
+
+    it('picking it asks for the removal from the list on screen', async () => {
+        const board = mountBoard({ data: added(), listId: HERE });
+        await pickBoard(board.wrapper, 'remove-from-list');
+        expect(board.boardMenu.removeFromList).toHaveBeenCalledWith(expect.objectContaining({ _id: 't1' }), HERE);
+        board.wrapper.unmount();
+
+        const list = mountList({ data: added(), listId: HERE });
+        await pickList(list.wrapper, 'remove-from-list');
+        expect(list.menu.removeFromList).toHaveBeenCalledWith(expect.objectContaining({ _id: 't1' }), HERE);
+        list.wrapper.unmount();
+    });
+
+    it('carries a mark naming the list it lives in, which a task that lives here does not', async () => {
+        const board = mountBoard({ data: added(), listId: HERE });
+        const list = mountList({ data: added(), listId: HERE });
+        const atHome = mountList({ data: task(), listId: 's1' });
+
+        expect(board.wrapper.find('[data-home-mark]').text()).toBe('Sprint 1');
+        expect(list.wrapper.find('[data-home-mark]').text()).toBe('Sprint 1');
+        expect(atHome.wrapper.find('[data-home-mark]').exists()).toBe(false);
+        expect(await listItems(atHome.wrapper)).not.toContainEqual(['remove-from-list', 'TaskLists.menu_remove_here']);
+        [board, list, atHome].forEach((mounted) => mounted.wrapper.unmount());
     });
 });
 

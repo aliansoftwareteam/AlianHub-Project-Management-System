@@ -132,6 +132,7 @@ function initializeControllers() {
     require('./Modules/Webhooks/init').init(app);
     require('./Modules/Secrets/init').init(app);
     require('./Modules/ProviderKeys/init').init(app);
+    require('./Modules/Connectors/init').init(app);
     require('./Modules/AiSwitch/init').init(app);
     require('./Modules/Reactions/init').init(app);
     require('./Modules/RecentVisits/init').init(app);

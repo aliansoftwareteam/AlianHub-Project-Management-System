@@ -117,7 +117,7 @@ provide('boardFieldTasks', customFields.allTasks);
 /* The card menu's rights and the two actions it borrows from the List, built once for the
    board rather than once per card. */
 const rowMenu = useListRowMenu(project, showArchiveVar);
-provide('boardTaskMenu', { rights: rowMenu.rights, duplicate: rowMenu.duplicate, rename: useListInlineEdit(project).rename });
+provide('boardTaskMenu', { rights: rowMenu.rights, duplicate: rowMenu.duplicate, removeFromList: rowMenu.removeFromList, rename: useListInlineEdit(project).rename });
 
 const boardSort = useListSort();
 const { density, setDensity } = useViewSettings();

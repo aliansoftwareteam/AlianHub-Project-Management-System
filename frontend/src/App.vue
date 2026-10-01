@@ -94,6 +94,7 @@ const paymentInit = inject("paymentInit");
 const logo = "/api/v1/getlogo?key=logo&type=desktop";
 import { useRoute, useRouter } from 'vue-router';
 import { applyStoredLocale } from '@/locales/main';
+import { warmWorkspaceChunks } from '@/config/warmChunks';
 import {socketHelper} from './composable/socketHelper';
 import { useFieldDefinitionsSync } from '@/plugins/customFieldView/fieldDefinitionsSync';
 import { apiRequest,apiRequestWithoutCompnay } from './services';
@@ -233,6 +234,8 @@ watch(() => getters['settings/companyUserDetail'], async(val) => {
 const shellReady = computed(() => Boolean(logged.value && rules.value && Object.keys(rules.value).length && companyUserDetail.value && Object.keys(companyUserDetail.value).length && socketSettled.value));
 // A page that loaded before maintenance began keeps its content under the banner; one whose boot calls were refused would otherwise stay blank or spin forever.
 const maintenanceBlocksPage = computed(() => maintenanceOn.value && (route.meta.requiresAuth ? !shellReady.value : !route.matched.length));
+
+watch(shellReady, (ready) => { if (ready) warmWorkspaceChunks(); }, { immediate: true });
 
 watch(() => [route.fullPath, shellReady.value, companyId.value], () => {
 	if (shellReady.value && route.params.cid && route.params.cid === companyId.value) recordRouteVisit(route);

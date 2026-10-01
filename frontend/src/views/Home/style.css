@@ -17,7 +17,9 @@
     .home:has(.home__planner) .hc-setup__body { flex: 1 1 calc(100% - 50px); order: 2; }
     .home:has(.home__planner) .hc-setup__cta { order: 3; }
     .home:has(.home__planner) .hc-setup__dismiss { order: 4; }
+    .home:has(.home__planner) .hc-setup__alt { order: 5; }
     .home:has(.home__planner) .hc-setup__steps { order: 5; }
+    .home:has(.home__planner) .hc-setup__sample { order: 6; }
 }
 @media (max-width: 991px) {
     .home__grid { grid-template-columns: 1fr; }

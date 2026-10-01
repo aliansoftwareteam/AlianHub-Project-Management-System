@@ -220,6 +220,14 @@ const EMIT_REQUIRED = Object.freeze({
     'deploy.staging': Object.freeze([]),
 });
 
+/* Connector writes are registered only while their connector is on, so they are offered beside the fixed list
+ * rather than in it. Each is propose-only: a skill that emits one files a proposal, never a message. */
+const CONNECTOR_EMIT_REQUIRED = Object.freeze({
+    'slack.message.post': Object.freeze(['channelId', 'text']),
+});
+const emitActions = () => [...EMIT_ACTIONS, ...Object.keys(CONNECTOR_EMIT_REQUIRED).filter((key) => registry.has(key))];
+const emitRequired = (action) => EMIT_REQUIRED[action] || (registry.has(action) && CONNECTOR_EMIT_REQUIRED[action]) || [];
+
 /* The task fields a template may read directly ({{TaskName}} or {{task.TaskName}}).
  * The view handed to the renderer holds these and nothing else of the task. */
 const TASK_FIELDS = Object.freeze(['_id', 'TaskKey', 'TaskName', 'description', 'Task_Priority', 'DueDate', 'startDate', 'ProjectID', 'statusType', 'status.text', 'tagsArray', 'points', 'totalEstimatedTime']);
@@ -275,11 +283,11 @@ const catalogues = () => ({
     inputs: Object.entries(INPUT_CATALOGUE).map(([key, v]) => ({ key, label: v.label, description: v.description, needs: v.needs, scope: v.scope })),
     readers: offeredReaders().map((key) => { const v = READER_CATALOGUE[key]; return { key, label: v.label, description: v.description, ...(v.external ? { external: true } : {}), params: v.params, fields: [...v.fields] }; }),
     partials: Object.entries(PROMPT_PARTIALS).map(([key, text]) => ({ key, text })),
-    actions: EMIT_ACTIONS.map((key) => { const a = registry.get(key); return { key, label: a.label, risk: a.risk, undoable: a.undoable, required: [...(EMIT_REQUIRED[key] || [])] }; }),
+    actions: emitActions().map((key) => { const a = registry.get(key); return { key, label: a.label, risk: a.risk, undoable: a.undoable, required: [...emitRequired(key)] }; }),
     taskFields: [...TASK_FIELDS],
     filters: Object.entries(FILTERS).map(([key, f]) => ({ key, label: f.label, description: f.description, args: f.args.map((a) => ({ ...a })) })),
     inputScopes: { ...workKinds.INPUT_SCOPE },
     risks: [...RISKS],
 });
 
-module.exports = { SKILL_VERSION, RISKS, INPUT_CATALOGUE, READER_CATALOGUE, EXTERNAL_READ_CAPS, LINK_INPUTS, isOffered, offeredReaders, PROMPT_PARTIALS, EMIT_ACTIONS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, FILTERS, MAX_EMIT_EACH, MIN_BRIEF_CHARS, catalogues, hasInput, plain, text };
+module.exports = { SKILL_VERSION, RISKS, INPUT_CATALOGUE, READER_CATALOGUE, EXTERNAL_READ_CAPS, LINK_INPUTS, isOffered, offeredReaders, PROMPT_PARTIALS, EMIT_ACTIONS, EMIT_REQUIRED, emitActions, emitRequired, TASK_FIELDS, TEMPLATE_ROOTS, FILTERS, MAX_EMIT_EACH, MIN_BRIEF_CHARS, catalogues, hasInput, plain, text };

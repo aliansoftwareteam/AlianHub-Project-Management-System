@@ -69,6 +69,7 @@ import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { useNavItems } from "@/components/organisms/Shell/navItems";
 import { openPalette } from "@/components/molecules/AdvanceSearch/paletteKeys";
 import { useFocusTrap } from "@/composable/useFocusTrap";
+import { onboardingRecord, saveOnboarding } from "@/composable/onboardingState";
 import {
     SHORTCUTS,
     SHORTCUT_GROUPS,
@@ -112,6 +113,7 @@ const clearSearch = () => {
 // A pointer device gets the search box focused, ready to type in; on a phone that would raise the keyboard over the list.
 watch(() => shortcutSheet.open, async (open) => {
     query.value = "";
+    if (open && myRecord.value && !onboardingRecord(myRecord.value.homeChecklist || {}).viewedShortcuts) saveOnboarding({ viewedShortcuts: true });
     if (!open || typeof window.matchMedia !== "function" || !window.matchMedia("(hover: hover)").matches) return;
     await nextTick();
     if (searchEl.value) searchEl.value.focus({ preventScroll: true });

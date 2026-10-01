@@ -39,9 +39,10 @@ const KEEP = {
         return keepWhere(docs, async (doc) => readsCompanyWide(doc, caller.uid, [])
             && (await inReadableProject(caller, doc.ProjectID)) && !hidden.has(String(doc.sprintId || '')));
     },
+    /* The trash is where a doc is restored or removed for good, which a share by name never gives. */
     docs: async (caller, docs) => {
         const open = new Set(await visibleProjectIds(caller.companyId, caller.uid));
-        return docs.filter((doc) => pageReachedBy(doc, { uid: caller.uid, inProject: (projectId) => open.has(String(projectId)) }));
+        return docs.filter((doc) => pageReachedBy(doc, { uid: caller.uid, inProject: (projectId) => open.has(String(projectId)), named: false }));
     },
 };
 

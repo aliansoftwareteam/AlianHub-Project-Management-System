@@ -4,7 +4,7 @@
             <aside class="pg__side">
                 <div class="pg__side-head">
                     <span class="pg__side-title">{{ $t('Docs.pages') }}</span>
-                    <button type="button" class="pg__icon" :title="$t('Projects.add_page')" @click="createPage(null)">
+                    <button v-if="writesDocs" type="button" class="pg__icon" :title="$t('Projects.add_page')" @click="createPage(null)">
                         <ShellIcon name="plus" :size="15" />
                     </button>
                 </div>
@@ -32,7 +32,7 @@
                         <ShellIcon :name="row.isWiki ? 'book' : 'file'" :size="13" class="pg__row-icon" />
                         <span class="pg__row-title" :title="row.title">{{ row.title || $t('Docs.untitled') }}</span>
                         <span v-if="row.isWiki && (row.reviewState === 'due' || row.reviewState === 'stale')" class="ah-dot" :class="row.reviewState === 'stale' ? 'ah-dot--danger' : 'ah-dot--warn'"></span>
-                        <button type="button" class="pg__row-add" :title="$t('Docs.add_nested_page')" @click.stop="createPage(row._id)">
+                        <button v-if="writesDocs" type="button" class="pg__row-add" :title="$t('Docs.add_nested_page')" @click.stop="createPage(row._id)">
                             <ShellIcon name="plus" :size="12" />
                         </button>
                     </div>
@@ -58,7 +58,7 @@
                     <ShellIcon name="docs" :size="40" class="pg__blank-icon" />
                     <p class="ah-h2 pg__blank-text">{{ $t('Projects.select_page') }}</p>
                     <p class="ah-small pg__blank-hint">{{ $t('Projects.pages_blank_hint') }}</p>
-                    <button type="button" class="ah-btn ah-btn--primary" @click="createPage(null)">{{ $t('Projects.add_page') }}</button>
+                    <button v-if="writesDocs" type="button" class="ah-btn ah-btn--primary" @click="createPage(null)">{{ $t('Projects.add_page') }}</button>
                 </div>
             </section>
         </div>
@@ -71,6 +71,7 @@ import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import PageDocument from "@/components/molecules/Pages/PageDocument.vue";
+import { useDocRights } from '@/components/molecules/Pages/useDocRights';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 
@@ -78,6 +79,7 @@ defineOptions({ name: 'PagesPanel' });
 
 const { t } = useI18n();
 const $toast = useToast();
+const { writesDocs } = useDocRights();
 
 const props = defineProps({
     projectData: { type: Object, default: () => ({}) },

@@ -606,6 +606,7 @@ exports.createProposal = async (req, res) => {
         if (!canActAsAgent(caller, agentId)) return fail(res, REFUSAL.ACT_AS_AGENT, 403);
         const agent = await runs.getAgent(companyId, agentId);
         if (!agent) return fail(res, 'Agent not found.', 404);
+        if (actor.tokenId && require('./connectors/slackPost').hasSlackChange(b.changes)) return fail(res, 'A Slack message is proposed only by a workspace agent\'s own run, not through a token.', 403);
         const saved = await proposals.create(companyId, { agent, runId: b.runId || actor.runId, taskId: b.taskId, projectId: b.projectId, what: b.what, why: b.why, changes: b.changes, gate: b.gate, priority: b.priority, cost: b.cost });
         return res.send({ status: true, statusText: 'Proposal filed.', data: saved });
     } catch (e) { logger.error(`createProposal: ${e.message}`); return fail(res, e.message, e.status || 500); }

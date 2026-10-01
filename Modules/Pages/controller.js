@@ -16,6 +16,9 @@ const {
     pageReachFilter,
     pageReachedBy,
     canMakePrivate,
+    hideShares,
+    sharesOf,
+    sharedWithFilter,
 } = require('./helpers/pageRules');
 const {
     emptyEditorData,
@@ -24,24 +27,39 @@ const {
     blocksToRawText,
 } = require('./helpers/pageContent');
 const { composePage, isAiConfigured } = require('./helpers/pageAi');
-const { canUsePage } = require('./helpers/pageAccess');
+const { canUsePage, canManageShares, canCreatePageIn, readsDocsOnly } = require('./helpers/pageAccess');
 const { normalizeBlockMentions, normalizeMentionHtml } = require('./helpers/pageMentions');
 const { PageImageError, receiveImage, storePageImage, unlinkQuietly } = require('./helpers/pageImages');
 const { projectAccess, isCompanyAdmin, isCompanyMember, visibleProjectIds } = require('../../Config/contentAccess');
 const versionRules = require('./helpers/pageVersionRules');
 const pageVersions = require('./helpers/pageVersions');
 const pageSettle = require('./helpers/pageSettle');
+const { cleanBlocks, cleanHtml } = require('../Tasks/helpers/cleanRichText');
 
 const LIST_FIELDS = 'title parentPageId ProjectID visibility createdBy linkedTasks updatedBy updatedAt createdAt order '
-    + 'isWiki ownerId reviewDate reviewedAt reviewedBy createdByAgent agentName agentStatus rawText';
+    + 'isWiki ownerId reviewDate reviewedAt reviewedBy createdByAgent agentName agentStatus rawText sharedWith';
 const EXCERPT_LENGTH = 160;
 
-const toListRow = (page) => {
-    const row = page && typeof page.toObject === 'function' ? page.toObject() : { ...(page || {}) };
+const plain = (page) => (page && typeof page.toObject === 'function' ? page.toObject() : { ...(page || {}) });
+
+const toListRow = (page, uid) => {
+    const row = plain(page);
     row.excerpt = String(row.rawText || '').slice(0, EXCERPT_LENGTH);
     delete row.rawText;
     row.reviewState = reviewState(row);
-    return row;
+    return hideShares(row, uid);
+};
+
+const shownTo = async (companyId, page, uid) => {
+    if (!page) return page;
+    const row = plain(page);
+    const [manages, canEdit, canChangeProperties] = await Promise.all([
+        canManageShares(companyId, row, uid),
+        canUsePage(companyId, row, uid, { edit: true }),
+        canUsePage(companyId, row, uid, { edit: true, named: false }),
+    ]);
+    const sharedCount = sharesOf(row).length;
+    return { ...hideShares(row, uid), canEdit, canChangeProperties, canManageShares: manages, ...(manages ? { sharedCount } : {}) };
 };
 
 const AGENT_STATUSES = ['draft', 'approved'];
@@ -113,13 +131,14 @@ const savedRow = (page) => ({
     editedBy: page.editedBy,
 });
 
-/* A non-deleted (or trashed) page the caller may act on, or null. */
-const findPage = async (companyId, id, uid, { deletedStatusKey = 0, edit = false } = {}) => {
+/* A non-deleted (or trashed) page the caller may act on, or null. `named: false` is for what a share by
+ * name does not give: anything but reading the doc and editing its title and body. */
+const findPage = async (companyId, id, uid, { deletedStatusKey = 0, edit = false, named = true } = {}) => {
     const page = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.PAGES,
         data: [{ _id: new mongoose.Types.ObjectId(id), deletedStatusKey }],
     }, 'findOne');
-    return (await canUsePage(companyId, page, uid, { edit })) ? page : null;
+    return (await canUsePage(companyId, page, uid, { edit, named })) ? page : null;
 };
 
 /* POST /api/v2/pages  body: { title, projectId?, parentPageId?, visibility?, linkedTasks?,
@@ -151,17 +170,26 @@ exports.createPage = async (req, res) => {
             return res.send({ status: false, statusText: meta.reason });
         }
         const userId = callerId(req);
-        if (projectId && !(await projectAccess(companyId, userId, projectId)).canEdit) {
-            return fail(res, 'Project not found.', 404);
+        const place = await canCreatePageIn(companyId, userId, projectId);
+        if (!place.allowed) {
+            return place.statusCode === 403
+                ? fail(res, 'You do not have permission to add a doc here.', 403)
+                : fail(res, 'Project not found.', 404);
         }
-        if (parentPageId && !(await findPage(companyId, parentPageId, userId))) {
-            return fail(res, 'Page not found.', 404);
+        if (parentPageId) {
+            const parent = await findPage(companyId, parentPageId, userId);
+            if (!parent) {
+                return fail(res, 'Page not found.', 404);
+            }
+            if (!(await canUsePage(companyId, parent, userId, { edit: true }))) {
+                return fail(res, 'You do not have permission to add a page under this one.', 403);
+            }
         }
-        const blocks = contentBlocks !== undefined ? normalizeBlockMentions(contentToEditorData({ blocks: contentBlocks })) : emptyEditorData();
+        const blocks = contentBlocks !== undefined ? cleanBlocks(normalizeBlockMentions(contentToEditorData({ blocks: contentBlocks })), 'doc') : emptyEditorData();
         if (contentBlocks !== undefined && contentTooLarge({ blocks })) {
             return res.send({ status: false, statusText: 'Page content is too large.' });
         }
-        const html = blocksToHtml(blocks);
+        const html = cleanHtml(blocksToHtml(blocks), 'doc');
         const doc = {
             title: String(title).trim(),
             content: { html, blocks },
@@ -202,9 +230,10 @@ exports.createPage = async (req, res) => {
     }
 };
 
-/* GET /api/v2/pages?projectId=&taskId= — list (no bodies).
+/* GET /api/v2/pages?projectId=&taskId=&scope= — list (no bodies).
  * projectId: that project's docs. taskId: docs linked to that task. Neither: the
- * company-wide docs, i.e. those with no ProjectID. */
+ * company-wide docs, i.e. those with no ProjectID. scope=all: every doc the caller reaches;
+ * scope=shared: the docs shared with the caller by name; scope=trash: the trash. */
 exports.listPages = async (req, res) => {
     try {
         const companyId = tenantOf(req);
@@ -230,6 +259,8 @@ exports.listPages = async (req, res) => {
             filter.ProjectID = new mongoose.Types.ObjectId(projectId);
         } else if (scope === 'all') {
             // Workspace index: every page this caller is allowed to see.
+        } else if (scope === 'shared') {
+            Object.assign(filter, sharedWithFilter(callerId(req)));
         } else {
             // Company-wide docs only. Omitting the clause entirely returned EVERY doc in
             // the company — including every project's, private ones among them — to any
@@ -241,13 +272,15 @@ exports.listPages = async (req, res) => {
         // see the project — including a task's linked docs, where they would leak by title.
         const userId = callerId(req);
         const projectIds = (await visibleProjectIds(companyId, userId)).map((id) => new mongoose.Types.ObjectId(id));
-        Object.assign(filter, pageReachFilter({ uid: userId, projectIds, companyWide: await isCompanyMember(companyId, userId) }));
+        const seated = await isCompanyMember(companyId, userId);
+        // The trash restores a doc or removes it for good, which a share by name does not give.
+        Object.assign(filter, pageReachFilter({ uid: userId, projectIds, companyWide: seated, named: seated && scope !== 'trash' }));
 
         const pages = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
             data: [filter, LIST_FIELDS, { sort: { order: 1 } }],
         }, 'find');
-        return res.send({ status: true, statusText: 'Pages fetched.', data: (pages || []).map(toListRow) });
+        return res.send({ status: true, statusText: 'Pages fetched.', data: (pages || []).map((page) => toListRow(page, userId)) });
     } catch (error) {
         logger.error(`ERROR in list pages: ${error.message}`);
         return fail(res, error.message, error.statusCode);
@@ -268,7 +301,7 @@ exports.getPage = async (req, res) => {
         if (!page) {
             return res.send({ status: false, statusText: 'Page not found.' });
         }
-        const data = typeof page.toObject === 'function' ? page.toObject() : page;
+        const data = await shownTo(companyId, page, callerId(req));
         data.reviewState = reviewState(data);
         return res.send({ status: true, statusText: 'Page fetched.', data });
     } catch (error) {
@@ -303,12 +336,14 @@ exports.updatePage = async (req, res) => {
                 return res.send({ status: false, statusText: check.reason });
             }
         }
+        // Cleaned here, before anything compares or keeps this body: a version and the "nothing changed" check see
+        // the body as it is stored.
         const nextContent = {};
         if (contentBlocks !== undefined) {
-            nextContent.blocks = normalizeBlockMentions(contentToEditorData({ blocks: contentBlocks }));
+            nextContent.blocks = cleanBlocks(normalizeBlockMentions(contentToEditorData({ blocks: contentBlocks })), 'doc');
         }
         if (contentHtml !== undefined) {
-            nextContent.html = normalizeMentionHtml(String(contentHtml));
+            nextContent.html = cleanHtml(normalizeMentionHtml(String(contentHtml)), 'doc');
         }
         if ((nextContent.html || nextContent.blocks) && contentTooLarge({
             html: nextContent.html,
@@ -325,6 +360,10 @@ exports.updatePage = async (req, res) => {
         }
         if (meta.patch.visibility === 'private' && !canMakePrivate(existing, userId)) {
             return fail(res, 'Only the author of a doc can make it private.', 403);
+        }
+        const changesProperties = Object.keys(meta.patch).length > 0 || linkedTasks !== undefined;
+        if (changesProperties && !(await canUsePage(companyId, existing, userId, { edit: true, named: false }))) {
+            return fail(res, 'This doc is shared with you to edit its text; its settings stay with the people who manage it.', 403);
         }
         const writesBody = title !== undefined || contentHtml !== undefined || contentBlocks !== undefined;
         if (writesBody && baseEditedAt !== undefined && stampOf(baseEditedAt) !== stampOf(existing.editedAt)) {
@@ -343,8 +382,8 @@ exports.updatePage = async (req, res) => {
         if (title !== undefined) update.title = String(title).trim();
         if (contentHtml !== undefined || contentBlocks !== undefined) {
             const merged = { ...(existing.content || {}), ...nextContent };
-            if (!merged.html && merged.blocks) merged.html = blocksToHtml(merged.blocks);
-            if (!merged.blocks && merged.html) merged.blocks = contentToEditorData({ html: merged.html });
+            if (!merged.html && merged.blocks) merged.html = cleanHtml(blocksToHtml(merged.blocks), 'doc');
+            if (!merged.blocks && merged.html) merged.blocks = cleanBlocks(contentToEditorData({ html: merged.html }), 'doc');
             update.content = merged;
             update.rawText = merged.html ? htmlToRawText(merged.html) : blocksToRawText(merged.blocks);
         }
@@ -363,7 +402,7 @@ exports.updatePage = async (req, res) => {
         const deferred = Boolean(autosave) && writesBody && bodyOnly;
         if (writesBody && bodyOnly && !incoming) {
             if (!deferred) await pageSettle.settleNow(companyId, existing, userId);
-            return res.send({ status: true, statusText: 'Page saved.', data: deferred ? savedRow(existing) : existing });
+            return res.send({ status: true, statusText: 'Page saved.', data: deferred ? savedRow(existing) : await shownTo(companyId, existing, userId) });
         }
         if (incoming) {
             const now = new Date();
@@ -388,7 +427,7 @@ exports.updatePage = async (req, res) => {
         if (writesBody) pageSettle.cancel(companyId, id);
         emitPageChange(companyId, 'update', updated);
         if (untold.length) pageSettle.tell(companyId, updated || existing, userId, untold);
-        return res.send({ status: true, statusText: 'Page saved.', data: updated });
+        return res.send({ status: true, statusText: 'Page saved.', data: await shownTo(companyId, updated, userId) });
     } catch (error) {
         logger.error(`ERROR in update page: ${error.message}`);
         return fail(res, error.message, error.statusCode);
@@ -410,7 +449,7 @@ exports.markReviewed = async (req, res) => {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
         }
         const userId = callerId(req);
-        const existing = await findPage(companyId, id, userId, { edit: true });
+        const existing = await findPage(companyId, id, userId, { edit: true, named: false });
         if (!existing) {
             return res.send({ status: false, statusText: 'Page not found.' });
         }
@@ -428,7 +467,7 @@ exports.markReviewed = async (req, res) => {
             ownerId: existing.ownerId || userId,
             updatedBy: userId,
         });
-        const data = typeof updated.toObject === 'function' ? updated.toObject() : updated;
+        const data = hideShares(plain(updated), userId);
         data.reviewState = reviewState(data, now);
         emitPageChange(companyId, 'update', data);
         return res.send({ status: true, statusText: 'Page marked as reviewed.', data });
@@ -447,7 +486,7 @@ exports.approvePage = async (req, res) => {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
         }
         const userId = callerId(req);
-        const existing = await findPage(companyId, id, userId, { edit: true });
+        const existing = await findPage(companyId, id, userId, { edit: true, named: false });
         if (!existing) {
             return res.send({ status: false, statusText: 'Page not found.' });
         }
@@ -456,7 +495,7 @@ exports.approvePage = async (req, res) => {
         }
         const updated = await patchPage(companyId, id, { agentStatus: 'approved', approvedBy: userId, updatedBy: userId });
         emitPageChange(companyId, 'update', updated);
-        return res.send({ status: true, statusText: 'Page approved.', data: updated });
+        return res.send({ status: true, statusText: 'Page approved.', data: hideShares(plain(updated), userId) });
     } catch (error) {
         logger.error(`ERROR in approve page: ${error.message}`);
         return fail(res, error.message, error.statusCode);
@@ -473,13 +512,13 @@ exports.restorePage = async (req, res) => {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
         }
         const userId = callerId(req);
-        const existing = await findPage(companyId, id, userId, { deletedStatusKey: 1, edit: true });
+        const existing = await findPage(companyId, id, userId, { deletedStatusKey: 1, edit: true, named: false });
         if (!existing) {
             return res.send({ status: false, statusText: 'Page not found in trash.' });
         }
         const updated = await patchPage(companyId, id, { deletedStatusKey: 0, updatedBy: userId });
         emitPageChange(companyId, 'insert', updated);
-        return res.send({ status: true, statusText: 'Page restored.', data: updated });
+        return res.send({ status: true, statusText: 'Page restored.', data: hideShares(plain(updated), userId) });
     } catch (error) {
         logger.error(`ERROR in restore page: ${error.message}`);
         return fail(res, error.message, error.statusCode);
@@ -503,6 +542,11 @@ exports.deletePage = async (req, res) => {
         }, 'findOne');
         if (!page) {
             return fail(res, 'Page not found.', 404);
+        }
+        if (await readsDocsOnly(companyId, userId)) {
+            return (await canUsePage(companyId, page, userId))
+                ? fail(res, 'You do not have permission to delete this page.', 403)
+                : fail(res, 'Page not found.', 404);
         }
         if (String(page.visibility || '') === 'private') {
             if (String(page.createdBy || '') !== userId && !(await isCompanyAdmin(companyId, userId))) {
@@ -533,7 +577,7 @@ exports.deletePage = async (req, res) => {
         (all || []).forEach((p) => {
             const parent = p.parentPageId ? String(p.parentPageId) : '';
             if (!parent) return;
-            if (!pageReachedBy(p, { uid: userId, inProject: (projectId) => visibleProjects.has(String(projectId)) })) return;
+            if (!pageReachedBy(p, { uid: userId, inProject: (projectId) => visibleProjects.has(String(projectId)), named: false })) return;
             if (!childrenOf.has(parent)) childrenOf.set(parent, []);
             childrenOf.get(parent).push(String(p._id));
         });

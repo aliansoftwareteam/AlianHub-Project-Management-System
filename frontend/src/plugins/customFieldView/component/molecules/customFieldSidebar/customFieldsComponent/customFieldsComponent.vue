@@ -30,7 +30,7 @@
 
 <script setup>
     import { computed, inject, nextTick, onMounted, provide, ref, unref, watch } from "vue";
-    import {FormKit} from '@formkit/vue';
+    import { FormKit } from '@/plugins/customFieldView/lazyFormKit';
     import TextComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/textComponents.vue";
     import CheckboxCustomField from "../../../atom/customFieldSidebar/customFieldSidebarComponent/checkboxCustomFields.vue";
     import PhoneComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/phoneComponent.vue";

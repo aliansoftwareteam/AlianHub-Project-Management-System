@@ -27,6 +27,7 @@
                     :zIndex="10"
                     class="h-100 w-100"
                     :bodyClassHeader="{'h-100 w-100 red': true}"
+                    @isVisible="(shown) => shown && prefetchGoals()"
                 >
                     <template #button="{ triggerAttrs }">
                         <Skelaton v-if="isSpinner" style="height: 30px;" class="w-30px border-radius-6-px"/>
@@ -53,7 +54,7 @@
                                 <span class="dropdown-label">{{$t('ProjectDetails.remind_me')}}</span>
                             </div>
                         </DropDownOption>
-                        <DropDownOption v-if="canCountTowardGoal()" data-test="task-count-toward-goal" @click="linkingGoal = true">
+                        <DropDownOption v-if="goalsOffered" data-test="task-count-toward-goal" @click="linkingGoal = true">
                             <div>
                                 <img :src="linkIcon" alt="" />
                                 <span class="dropdown-label">{{$t('Goals.count_toward')}}</span>
@@ -244,7 +245,7 @@
     import SubtaskProgressBadge from '@/components/atom/SubtaskProgressBadge/SubtaskProgressBadge.vue';
     import { openTemplateDialog } from '@/components/molecules/TaskTemplates/taskTemplates';
 
-    import { canCountTowardGoal, loadLinkableGoals } from '@/views/Goals/goalLinking';
+    import { useGoalLinking } from '@/views/Goals/goalLinking';
 
     import { computed, defineAsyncComponent, defineProps,defineEmits, ref, inject, watch } from 'vue';
     import taskClass from "@/utils/TaskOperations"
@@ -303,7 +304,7 @@
     const companyId = inject('$companyId')
     const GoalLinkPicker = defineAsyncComponent(() => import('@/views/Goals/GoalLinkPicker.vue'));
     const linkingGoal = ref(false);
-    loadLinkableGoals(companyId?.value);
+    const { offered: goalsOffered, prefetch: prefetchGoals } = useGoalLinking();
     const clientWidth = inject('$clientWidth');
     // Provided by TaskDetail.vue — { total, completed } for the subtask % badge.
     const subtaskCompletion = inject('subtaskCompletion', null);

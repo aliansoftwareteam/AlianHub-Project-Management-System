@@ -19,7 +19,7 @@ const assignedDocComments = async (companyId, uid) => {
     if (!pageIds.length) return [];
     const pages = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.PAGES,
-        data: [{ _id: { $in: pageIds.map((id) => new mongoose.Types.ObjectId(id)) }, deletedStatusKey: 0 }, { title: 1, ProjectID: 1, visibility: 1, createdBy: 1 }],
+        data: [{ _id: { $in: pageIds.map((id) => new mongoose.Types.ObjectId(id)) }, deletedStatusKey: 0 }, { title: 1, ProjectID: 1, visibility: 1, createdBy: 1, sharedWith: 1 }],
     }, 'find') || [];
     const readable = new Map();
     for (const page of pages) {

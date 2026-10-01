@@ -107,7 +107,6 @@
 </template>
 
 <script setup>
-    //import
     import { useStore } from "vuex";
     import * as env from '@/config/env';
     import AppState from '@/components/molecules/AppState/AppState.vue'
@@ -127,23 +126,18 @@
     const { t } = useI18n();
     const homeIcon = require('@/assets/images/svg/Home.svg');
     const filterIcon = require('@/assets/images/svg/filter_icon.svg');
-    // getter and permission
     const { getters,dispatch} = useStore();
     const { checkPermission } = useCustomComposable();
-    // computed
     const currentCompany = computed(() => getters["settings/selectedCompany"])
     const projectsGetter = computed(() => getters["projectData/allProjects"]);
     const companyUserDetail = computed(() => getters["settings/companyUserDetail"]);
     const settingStatus = computed(() => getters['settings/projectMilestoneStatus']);
     const settingStatusFilter = ref(settingStatus.value);
-    // watch
     watch(settingStatus, (val) => {
         settingStatusFilter.value = JSON.parse(JSON.stringify(val.filter((x) => x.value !== 'CANCELLED' && x.value !== "REFUNDED").sort((a, b) => {if (a.value < b.value) return -1;if (a.value > b.value) return 1;return 0;})));
     });
-    // inject
     const clientWidth = inject("$clientWidth");
     const companyId = inject('$companyId');
-    // Variable 
     const projects = ref([]);
     const loading = ref(false);
     const objectProjectCurrency = ref({});
@@ -250,29 +244,27 @@
                                                         resolve();
                                                     }catch(error){
                                                         loading.value = false;
-                                                        reject()
-                                                        console.error("error",error)
+                                                        reject(error)
                                                     }
                                                 }else{
                                                     objectProjectCurrency.value = {};
                                                     loading.value = false;
-                                                    reject();
+                                                    resolve();
                                                 }
                                             }else{
                                                 objectProjectCurrency.value = {};
                                                 loading.value = false;
-                                                reject();
+                                                resolve();
                                             }
-                                        }).catch(()=>{
+                                        }).catch((error)=>{
                                             objectProjectCurrency.value = {};
                                             loading.value = false;
-                                            reject();
+                                            reject(error);
                                         });
                                     } catch (error) {
                                         objectProjectCurrency.value = {};
                                         loading.value = false;
-                                        console.error(error)
-                                        reject()
+                                        reject(error)
                                     }
                                 })
                             }
@@ -357,10 +349,9 @@
                                     loading.value = false;
                                     resolve();
                                 }catch(error){
-                                    reject();
                                     loading.value = false;
-                                    console.error("error",error);
                                     objectProjectCurrency.value = {};
+                                    reject(error);
                                 }
                             }else{
                                 loading.value = false;
@@ -372,16 +363,15 @@
                             objectProjectCurrency.value = {};
                             resolve();
                         }
-                    }).catch(()=>{
+                    }).catch((error)=>{
                         loading.value = false;
                         objectProjectCurrency.value = {};
-                        reject();
+                        reject(error);
                     });
                 } catch (error) {
                     loading.value = false;
-                    console.error(error)
                     objectProjectCurrency.value = {};
-                    reject()
+                    reject(error)
                 }
             })
         }

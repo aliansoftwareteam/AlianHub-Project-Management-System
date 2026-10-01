@@ -44,6 +44,7 @@ const { removeCache } = require('../../utils/commonFunctions');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { addSprintFun } = require('../Sprints/controller');
 const { HandleHistory } = require('../Tasks/helpers/helper');
+const { cleanDescription, cleanHtml } = require('../Tasks/helpers/cleanRichText');
 const { HandleBothNotification } = require('../Tasks/helpers/handleNotification');
 const { checkProjectPlan, removeProjectCount } = require('../createProject/controller');
 const { estimateAndPersist: estimateTaskTimeWithAI } = require('../EstimatedTime/aiTaskEstimator');
@@ -561,7 +562,7 @@ function buildProjectDoc({ plan, context, companyId, uid, projectIdHint, project
         LeadUserId: leadIds,
         AssigneeUserId: assignees,
         DueDate: '',
-        description: proj.description || '',
+        description: cleanHtml(String(proj.description || ''), 'strict'),
         // Set by the controller from the user's input, never by the LLM.
         proposalId: proj.proposalId || '',
         proposalIdNumeric: proj.proposalIdNumeric || '',
@@ -709,8 +710,7 @@ function buildTaskDoc({ task, projectDoc, sprintDoc, statusByName, taskTypeByKey
     const watchers = Array.from(new Set([...assignees, String(creatorUid || '')].filter(Boolean)));
 
     const blocks = Array.isArray(task.descriptionBlocks) ? task.descriptionBlocks : [];
-    const descriptionBlock = wrapDescriptionBlock(blocks);
-    const rawDescription = blocksToText(blocks);
+    const { descriptionBlock, rawDescription } = cleanDescription({ descriptionBlock: wrapDescriptionBlock(blocks), rawDescription: blocksToText(blocks) });
 
     return {
         _id: id,

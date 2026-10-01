@@ -576,6 +576,11 @@
                     "description": "Up to 500 project ids. It can only narrow what the caller may read."
                 },
                 {
+                    "name": "filter.sprintIds",
+                    "type": "id[]",
+                    "description": "Up to 100 list ids: tasks that live in one of them or were added to one. A list the caller cannot open is ignored."
+                },
+                {
                     "name": "group",
                     "type": "string",
                     "description": "`none`, `status`, `assignee`, `project`, `priority` or `dueDate`. `none` when left out."
@@ -688,7 +693,7 @@
             "responseFields": [
                 {
                     "name": "rows",
-                    "description": "Up to `limit` tasks. Each carries `_id`, `TaskName`, `TaskKey`, `status`, `statusKey`, `statusType`, `Task_Priority`, `AssigneeUserId`, `DueDate`, `startDate`, `ProjectID`, `sprintId`, `folderObjId`, `TaskType`, `TaskTypeKey`, `tagsArray`, `subTasks`, `ancestors`, `ParentTaskId`, `isParentTask`, `createdAt` and `updatedAt`. No custom field values."
+                    "description": "Up to `limit` tasks. Each carries `_id`, `TaskName`, `TaskKey`, `status`, `statusKey`, `statusType`, `Task_Priority`, `AssigneeUserId`, `DueDate`, `startDate`, `ProjectID`, `sprintId`, `folderObjId`, `TaskType`, `TaskTypeKey`, `tagsArray`, `subTasks`, `ancestors`, `ParentTaskId`, `isParentTask`, `createdAt` and `updatedAt`. A task that was added to other lists also carries `extraLists`: each entry has `projectId`, `sprintId`, `addedBy` and `addedAt`, and `name` and `projectName` only for a list the caller can open. No custom field values."
                 },
                 {
                     "name": "groups",
@@ -2580,6 +2585,11 @@
         "GET /api/v2/provider-keys": { "stability": "internal", "summary": "Lists the workspace's AI provider keys, by handle only.", "apiToken":false },
         "PUT /api/v2/provider-keys/:provider": { "stability": "internal", "summary": "Stores a workspace AI provider key.", "apiToken":false },
         "DELETE /api/v2/provider-keys/:provider": { "stability": "internal", "summary": "Removes a workspace AI provider key.", "apiToken":false },
+        "GET /api/v2/connectors/slack": { "stability": "internal", "summary": "Shows the workspace's Slack connector: whether each secret is set and since when, the channel list and the allowed channels. Never a secret.", "apiToken":false },
+        "PUT /api/v2/connectors/slack/secrets": { "stability": "internal", "summary": "Stores the Slack bot token or signing secret in the secrets store, after checking the token with Slack.", "apiToken":false },
+        "DELETE /api/v2/connectors/slack/secrets/:key": { "stability": "internal", "summary": "Removes a Slack connector secret.", "apiToken":false },
+        "POST /api/v2/connectors/slack/channels/refresh": { "stability": "internal", "summary": "Reads the Slack channel list again.", "apiToken":false },
+        "PUT /api/v2/connectors/slack/channels": { "stability": "internal", "summary": "Sets the Slack channels agents may propose a message to.", "apiToken":false },
         "GET /api/v2/ai-switch": { "stability": "internal", "summary": "Whether AI is on for the workspace." },
         "PUT /api/v2/ai-switch": { "stability": "internal", "summary": "Turns AI on or off for the workspace.", "apiToken":false },
         "POST /api/v2/reactions": { "stability": "beta", "summary": "Adds or removes a reaction." },
@@ -2611,6 +2621,9 @@
         "PUT /api/v2/pages/:id/comments/:commentId/resolve": { "stability": "beta", "summary": "Resolves a comment thread, or reopens it." },
         "PUT /api/v2/pages/:id/comments/:commentId": { "stability": "beta", "summary": "Changes a comment." },
         "DELETE /api/v2/pages/:id/comments/:commentId": { "stability": "beta", "summary": "Deletes a comment and its replies." },
+        "GET /api/v2/pages/:id/shares": { "stability": "beta", "summary": "Lists the people a page is shared with by name." },
+        "PUT /api/v2/pages/:id/shares/:userId": { "stability": "beta", "summary": "Shares a page with a person as a viewer or an editor, or changes their role." },
+        "DELETE /api/v2/pages/:id/shares/:userId": { "stability": "beta", "summary": "Stops sharing a page with a person." },
         "PUT /api/v2/pages/:id/review": { "stability": "beta", "summary": "Marks a wiki page as reviewed." },
         "PUT /api/v2/pages/:id/approve": { "stability": "beta", "summary": "Signs off a page an agent drafted." },
         "POST /api/v2/pages/:id/images": { "stability": "beta", "summary": "Uploads an image for a page." },
