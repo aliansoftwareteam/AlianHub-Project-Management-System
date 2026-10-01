@@ -302,6 +302,59 @@ describe('private view settings', () => {
         expect(stored.title).toBe('Mine');
     });
 
+    describe('renaming and pinning', () => {
+        const update = (uid, key, data) => call(uid, { id: String(rowOf(MEMBER)._id), operation: 'update', key, data });
+        const views = () => rowOf(MEMBER).ProjectRequiredComponent;
+
+        beforeEach(() => {
+            rowOf(MEMBER).ProjectRequiredComponent = [privateList({ title: 'Old' }), privateList({ id: 'mylist0002', title: 'Other' })];
+        });
+
+        it('renames the caller\'s own private view, cleaned and capped like any view name', async () => {
+            const res = await update(MEMBER, 'title', { id: 'mylist0001', title: `  ${'x'.repeat(80)} ` });
+            expect(res.statusCode).toBe(200);
+            expect(views()[0].title).toBe('x'.repeat(60));
+            expect(views()[0].name).toBe('List');
+            expect(views()[1].title).toBe('Other');
+        });
+
+        it('refuses a name that is empty once cleaned', async () => {
+            const res = await update(MEMBER, 'title', { id: 'mylist0001', title: '   ' });
+            expect(res.statusCode).toBe(400);
+            expect(views()[0].title).toBe('Old');
+        });
+
+        it('pins and unpins the caller\'s own private view', async () => {
+            expect((await update(MEMBER, 'isPin', { id: 'mylist0002', isPin: true })).statusCode).toBe(200);
+            expect(views().map((view) => view.isPin)).toEqual([undefined, true]);
+            expect((await update(MEMBER, 'isPin', { id: 'mylist0002', isPin: false })).statusCode).toBe(200);
+            expect(views()[1].isPin).toBe(false);
+            expect((await update(MEMBER, 'isPin', { id: 'mylist0002', isPin: 'yes' })).statusCode).toBe(400);
+        });
+
+        it('answers 404 for a private view the caller does not have, and 403 on someone else\'s row', async () => {
+            expect((await update(MEMBER, 'title', { id: 'nope', title: 'New' })).statusCode).toBe(404);
+            expect((await update(TEAMMATE, 'title', { id: 'mylist0001', title: 'Theirs' })).statusCode).toBe(403);
+            expect(views()[0].title).toBe('Old');
+        });
+
+        it('changes no field it was not built to change', async () => {
+            const res = await update(MEMBER, 'projectId', { id: 'mylist0001', projectId: 'p2' });
+            expect(res.statusCode).toBe(400);
+            expect(views()[0].projectId).toBe('p1');
+            for (const key of ['constructor', '__proto__', 'toString', undefined]) {
+                expect((await update(MEMBER, key, { id: 'mylist0001', [key]: 'x' })).statusCode).toBe(400);
+            }
+        });
+
+        it('still renames an embed by its name', async () => {
+            rowOf(MEMBER).ProjectRequiredComponent = [{ id: 'ab12cd', name: 'Figma', url: 'https://example.com', isPrivate: true, projectId: 'p1' }];
+            const res = await update(MEMBER, 'name', { id: 'ab12cd', name: 'Designs' });
+            expect(res.statusCode).toBe(200);
+            expect(views()[0].name).toBe('Designs');
+        });
+    });
+
     it('writes to the caller\'s company only', async () => {
         rowOf(MEMBER).ProjectRequiredComponent = [privateList()];
         await call(MEMBER, { id: String(rowOf(MEMBER)._id), operation: 'settings', data: { id: 'mylist0001', settings: SETTINGS } });
