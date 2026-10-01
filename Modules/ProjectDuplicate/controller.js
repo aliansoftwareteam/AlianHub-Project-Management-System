@@ -41,7 +41,8 @@ exports.duplicate = async (req, res) => {
         return res.send({ status: true, statusText: 'Project duplicated.', data });
     } catch (error) {
         logged('failed')(error);
-        return refuse(res, 500, FAILED);
+        const missing = rules.refusedPaths(error);
+        return missing.length ? refuse(res, 400, `${FAILED} The source project has no valid ${missing.join(', ')}.`) : refuse(res, 500, FAILED);
     }
 };
 
