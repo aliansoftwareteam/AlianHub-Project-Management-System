@@ -134,6 +134,8 @@ recurringTasksSchema.index({ enabled: 1, deletedStatusKey: 1, nextRunAt: 1 });
 recurringTasksSchema.index({ sourceTaskId: 1, deletedStatusKey: 1 });
 const taskTemplatesSchema = new Schema(schema.task_templates, {strict: true, timestamps: true});
 taskTemplatesSchema.index({ scope: 1, ProjectID: 1, deletedStatusKey: 1 });
+const viewTemplatesSchema = new Schema(schema.view_templates, {strict: true, timestamps: true});
+viewTemplatesSchema.index({ deletedStatusKey: 1, name: 1 });
 const remindersSchema = new Schema(schema.reminders, {strict: true, timestamps: true});
 remindersSchema.index({ userId: 1, fired: 1, reminderAt: 1 });
 const notesSchema = new Schema(schema.notes, {strict: true, timestamps: true});
@@ -490,6 +492,7 @@ module.exports = {
     publicShareIndexSchema,
     recurringTasksSchema,
     taskTemplatesSchema,
+    viewTemplatesSchema,
     remindersSchema,
     notesSchema,
     generalRemindersSchema,
