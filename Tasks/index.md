@@ -49,3 +49,5 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 041 | AI UX fixes from the ClickUp AI comparison | active | high | 034 | active/041-ai-ux-fixes |
 | 042 | Non-AI UX fixes from the ClickUp comparison | active | high | 034 | active/042-non-ai-ux-fixes |
 | 043 | Advanced AI from a hands-on look at ClickUp Brain² | active | high | 041 | active/043-advanced-ai |
+| 044 | Quick gaps from the ClickUp re-check | active | high | — | active/044-clickup-quick-gaps |
+| 045 | Medium gaps from the ClickUp re-check | active | high | 044 | active/045-clickup-medium-gaps |
