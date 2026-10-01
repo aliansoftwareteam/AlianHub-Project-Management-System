@@ -86,8 +86,15 @@ const forCaller = async (ctx) => {
 
 const refuse = (reason) => Object.assign(new Error(`${NOT_VISIBLE}: ${reason}`), { notVisible: true });
 
-/* Throws unless the write's target — a task, or a project and optional sprint — is inside `vis`. */
-const assertWritable = async (companyId, vis, { taskId, projectId, sprintId } = {}) => {
+/* Throws unless the write's target — a task, a page, or a project and optional sprint — is inside `vis`. */
+const assertWritable = async (companyId, vis, { taskId, projectId, sprintId, pageId, companyWide } = {}) => {
+    if (pageId !== undefined) {
+        const page = isId(pageId)
+            ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PAGES, data: [{ _id: toOid(pageId), deletedStatusKey: { $ne: 1 } }, { ProjectID: 1, visibility: 1, createdBy: 1 }] }, 'findOne')
+            : null;
+        if (!page || !vis.allowsPage(page)) throw refuse('the page is not one the person behind this token can open');
+    }
+    if (companyWide && !vis.allowsPage({ visibility: 'project' })) throw refuse('a token kept to some projects cannot write outside them');
     if (taskId !== undefined) {
         const task = isId(taskId)
             ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: toOid(taskId), deletedStatusKey: { $ne: 1 } }, TASK_ACCESS_FIELDS] }, 'findOne')

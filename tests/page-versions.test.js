@@ -489,6 +489,38 @@ describe('restoring a version', () => {
         expect(kept().some((row) => String(row._id) === String(version._id))).toBe(true);
     });
 
+    it('adds no version when the last one already holds the state about to be replaced', async () => {
+        const version = twoBlocks();
+        at(2);
+        expect((await saveVersion(EDITOR, 'v2')).status).toBe(true);
+        const named = kept().find((row) => row.name === 'v2');
+        expect(named).toMatchObject({ reason: 'manual', rawText: 'Intro now Risks' });
+        at(5);
+
+        const restored = await restore(EDITOR, version._id);
+
+        expect(restored).toMatchObject({ status: true, data: { rawText: 'Intro then' } });
+        expect(kept()).toHaveLength(2);
+        expect(kept().some((row) => row.reason === 'restore')).toBe(false);
+        expect(kept().find((row) => row.name === 'v2').rawText).toBe('Intro now Risks');
+    });
+
+    it('keeps the replaced state again once the doc has changed since the last version', async () => {
+        const version = twoBlocks();
+        at(2);
+        await saveVersion(EDITOR, 'v2');
+        storedPage().content = { html: '<p>Intro later</p>', blocks: { blocks: [para('intro', 'Intro later')] } };
+        storedPage().rawText = 'Intro later';
+        at(5);
+
+        await restore(EDITOR, version._id);
+
+        const safety = kept().filter((row) => row.reason === 'restore');
+        expect(safety).toHaveLength(1);
+        expect(safety[0]).toMatchObject({ rawText: 'Intro later', savedBy: EDITOR });
+        expect(kept()).toHaveLength(3);
+    });
+
     it('announces the doc the way a save does, and notifies no one of an old mention', async () => {
         const version = twoBlocks();
 

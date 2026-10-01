@@ -110,7 +110,11 @@
     --hit-min: 24px;
     /* How far a child row (a subtask) steps in from its parent's name. */
     --row-indent: var(--sp-8);
+    /* The least a task name keeps in a row, however many columns are shown beside it. */
+    --row-name-min: 130px;
 
+    /* A token surface inside a host that keeps light controls (see the color-scheme list below) sets color-scheme: var(--scheme) on itself. */
+    --scheme: light;
     color-scheme: light;
 }
 
@@ -127,6 +131,7 @@
         --avatar-font: 9.5px;
         --chip-h: 18px;
         --chip-font: 10.5px;
+        --row-name-min: 110px;
     }
 }
 
@@ -165,6 +170,7 @@
     --agent-bg: rgba(168, 146, 255, .16);
     --shadow-ink: rgba(0, 0, 0, .3);
 
+    --scheme: dark;
     color-scheme: dark;
 }
 
@@ -405,9 +411,6 @@ html, body, #app {
 :root[data-theme="dark"] #my-dropdown,
 :root[data-theme="dark"] #my-image-slider,
 :root[data-theme="dark"] .bg-white,
-:root[data-theme="dark"] .pls__apps,
-:root[data-theme="dark"] .pto-card,
-:root[data-theme="dark"] .scim-card,
 :root[data-theme="dark"] .swal2-container,
 :root[data-theme="dark"] iframe { color-scheme: light; }
 :root[data-theme="dark"] .ah-app__view .ah-page,

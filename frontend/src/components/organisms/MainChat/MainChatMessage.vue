@@ -19,7 +19,7 @@
                 <span class="mc-msg-name" :data-test="isAi ? 'ai-author' : undefined">{{ isAi ? $t('AiMention.author') : displayName }}</span>
                 <span v-if="isAi" class="mc-agent-tag mc-ai-for" data-test="ai-for">{{ $t('AiMention.answered_for', { name: askerName }) }}</span>
                 <span v-else-if="isAgent" class="mc-agent-tag">{{ $t('Chat.agent') }}</span>
-                <span class="mc-msg-time">· {{ shortTime }}</span>
+                <span v-if="shortTime" class="mc-msg-time">· {{ shortTime }}</span>
                 <span v-if="message.pinnedMessage" class="mc-msg-pin"><MainChatIcon name="pin" :size="10" />{{ $t('MainChat.pinned') }}</span>
             </div>
             <div v-else-if="message.pinnedMessage" class="mc-msg-meta">

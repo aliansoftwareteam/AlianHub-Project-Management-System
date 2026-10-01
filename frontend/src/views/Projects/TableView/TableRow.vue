@@ -1,5 +1,5 @@
 <template>
-    <div ref="rowRef" class="tv2__row" :class="{ 'is-selected': selected }" role="row" :data-row="data._id" v-bind="taskNavAttrs(data)" @click="$emit('open', data)">
+    <div ref="rowRef" class="tv2__row" :class="{ 'is-selected': selected, 'is-sub': depth > 0 }" role="row" :data-row="data._id" v-bind="taskNavAttrs(data)" @click="$emit('open', data)">
         <span role="cell" data-col="select" tabindex="-1" @click.stop>
             <input
                 v-if="canSelect"
@@ -12,8 +12,18 @@
             />
         </span>
 
-        <span role="cell" class="tv2__name-cell" data-col="name" tabindex="-1">
-            <button type="button" class="tv2__name" :title="data.TaskName" @click.stop="$emit('open', data)">{{ data.TaskName }}</button>
+        <span role="cell" class="tv2__name-cell" data-col="name" tabindex="-1" :style="{ '--tv2-depth': depth }">
+            <button
+                v-if="canNest && hasSubtasks"
+                type="button"
+                class="tv2__disclose"
+                :aria-expanded="expanded"
+                :aria-label="$t('List.toggle_subtasks')"
+                @click.stop="$emit('toggle-subtasks')"
+            >{{ expanded ? '▾' : '▸' }}</button>
+            <span v-else class="tv2__disclose tv2__disclose--none" aria-hidden="true"></span>
+            <button type="button" class="tv2__name" data-cell-primary :title="data.TaskName" @click.stop="$emit('open', data)">{{ data.TaskName }}</button>
+            <span v-if="progress" class="tv2__sub-count">{{ progress.done }}/{{ progress.total }}</span>
         </span>
 
         <template v-for="column in shownColumns" :key="column.id">
@@ -84,7 +94,7 @@
             </span>
 
             <span v-else role="cell" :data-col="column.id" tabindex="-1" class="tv2__cell" :class="{ 'tv2__cell--field': column.field }">
-                <TaskColumnCell :column="column" :task="data" :rowEl="rowRef" />
+                <TaskColumnCell :column="column" :task="data" :parent="parent" :rowEl="rowRef" />
             </span>
         </template>
     </div>
@@ -106,15 +116,21 @@ import { statusChipStyle } from "@/utils/statusChipColors";
 import ListStatusCircle from "@/views/Projects/ListView/ListStatusCircle.vue";
 import TaskColumnCell from "@/views/Projects/components/columns/TaskColumnCell.vue";
 import { defaultColumns } from "@/views/Projects/composables/viewColumns";
+import { MAX_DEPTH } from "@taskTreeRules";
 
 defineOptions({ name: "TableRow" });
 
 const props = defineProps({
     data: { type: Object, required: true },
     selected: { type: Boolean, default: false },
-    canSelect: { type: Boolean, default: false }
+    canSelect: { type: Boolean, default: false },
+    depth: { type: Number, default: 0 },
+    parent: { type: Object, default: null },
+    expanded: { type: Boolean, default: false },
+    hasSubtasks: { type: Boolean, default: false },
+    progress: { type: Object, default: null }
 });
-defineEmits(["open", "select"]);
+defineEmits(["open", "select", "toggle-subtasks"]);
 
 const { t } = useI18n();
 const { getTaskStatus } = useGetterFunctions();
@@ -128,6 +144,7 @@ const rights = computed(() => edit?.rights.value || {});
 const injectedColumns = inject("tableColumns", null);
 const shownColumns = computed(() => injectedColumns?.value || defaultColumns("table"));
 const shows = (id) => shownColumns.value.some((column) => column.id === id);
+const canNest = computed(() => props.depth < MAX_DEPTH);
 
 const status = computed(() => getTaskStatus(props.data.statusKey) || { name: props.data.status?.text || "" });
 const statusStyle = computed(() => (status.value.bgColor ? statusChipStyle(status.value) : {}));

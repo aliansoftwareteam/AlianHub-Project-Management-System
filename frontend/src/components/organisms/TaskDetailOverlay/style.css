@@ -55,6 +55,11 @@
 .ah-detail__crumb-link:hover { color: var(--brand); }
 .ah-detail__crumb-sep { color: var(--ink-2); }
 .ah-detail__crumb-skeleton { width: 180px; height: 14px; border-radius: var(--r-sm, 4px); }
+.ah-detail__trail { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.ah-detail__crumb-current { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.ah-detail__trail-row { display: flex; min-width: 0; font-size: var(--fs-sm, 12px); color: var(--ink-2); }
+.ah-detail__trail-row .ah-detail__trail { flex-wrap: wrap; }
+.ah-detail__trail-row .ah-detail__crumb-link { max-width: 100%; }
 .ah-detail__key {
     font: 500 var(--fs-xs, 10.5px) var(--font-mono); color: var(--ink-2); flex: none;
     border: 0; background: transparent; padding: 3px 5px; margin: 0 -5px; border-radius: var(--r-sm, 5px); cursor: copy;
@@ -209,6 +214,7 @@
 .ah-detail__pane .epic-picker__current:hover,
 .ah-detail__pane .custom-field__add:hover { background: var(--surface-hover); color: var(--ink); }
 .ah-detail__quick-btn:focus-visible { outline: none; box-shadow: var(--focus); }
+.ah-detail__depth-note { margin: 2px 0 0; color: var(--ink-2); }
 .ah-detail__pane .linked-docs__add-row .linked-docs__create { color: var(--brand); }
 .ah-detail__pane .checklist-main__suggest { border: 0; text-decoration: none; font-size: var(--fs-sm, 12px); }
 .ah-detail__panel .priority__component > [role="button"] { min-width: 24px; min-height: 24px; justify-content: center; }
@@ -258,6 +264,7 @@
 }
 .ah-subtasks__name:hover { color: var(--brand); }
 .ah-subtasks__row.is-done .ah-subtasks__name { text-decoration: line-through; color: var(--ink-2); }
+.ah-subtasks__count { font: 500 var(--fs-xs, 10.5px) var(--font-mono); color: var(--ink-2); flex: none; }
 .ah-subtasks__hours { font: 500 var(--fs-xs, 10.5px) var(--font-mono); color: var(--ink-2); width: 44px; text-align: right; flex: none; }
 .ah-subtasks__skeleton { height: 26px; border-radius: var(--r-sm, 6px); }
 .ah-subtasks__empty { padding: 12px; font-size: var(--fs-md, 12.5px); }
