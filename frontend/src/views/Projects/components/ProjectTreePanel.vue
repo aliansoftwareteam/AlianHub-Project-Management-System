@@ -1,6 +1,6 @@
 <template>
     <template v-if="shown">
-        <aside id="project-tree-panel" class="ptp" :class="{ 'ptp--drawer': !wide }" :aria-label="$t('ProjectTree.label')" :data-density="density" @keydown.esc="closeDrawer">
+        <aside id="project-tree-panel" class="ptp" :class="{ 'ptp--drawer': !wide }" :aria-label="$t('ProjectTree.label')" @keydown.esc="closeDrawer">
             <div class="ptp__head">
                 <span class="ptp__title">{{ $t('ProjectTree.label') }}</span>
                 <button v-if="!wide" ref="closeButton" type="button" class="ptp__close" :aria-label="$t('ProjectTree.close')" :title="$t('ProjectTree.close')" @click="closeDrawer">
@@ -24,8 +24,7 @@ import { isWide, projectTreePanelState, projectTreeShown } from "./projectTreePa
 defineOptions({ name: "ProjectTreePanel" });
 
 const props = defineProps({
-    projects: { type: Array, default: null },
-    density: { type: String, default: undefined }
+    projects: { type: Array, default: null }
 });
 
 const route = useRoute();

@@ -3,7 +3,7 @@
         <template v-if="!loadingProjects && !isRuleData">
             <template v-if="projects?.length && projectData && !isFilterHasData">
                 <template v-if="isRuleData === false ? checkPermission('task.task_list',projectData.isGlobalPermission) !== null && !projectData.isRestrict : !projectData.isRestrict">
-                    <ProjectTreePanel :density="chromeDensity" />
+                    <ProjectTreePanel />
                     <div class="section-right bg-white position-re">
                         <ProjectHeader
                             ref="projectHeader"
@@ -257,7 +257,7 @@
                             ]"
                         >
                             <ProjectFiltersToolbar
-                                :data-density="chromeDensity"
+                                :data-density="toolbarDensity"
                                 :activeTab="activeTab"
                                 :projectData="projectData"
                                 :clientWidth="clientWidth"
@@ -746,7 +746,7 @@ const savedViews = useSavedViews({
 });
 provideViewSettings(savedViews);
 const DENSITY_TABS = ['ProjectListView', 'TableView'];
-const chromeDensity = computed(() => (DENSITY_TABS.includes(activeTab.value) ? savedViews.density.value : undefined));
+const toolbarDensity = computed(() => (DENSITY_TABS.includes(activeTab.value) ? savedViews.density.value : undefined));
 const { activeView, dirty: viewDirty, saving: viewSaving, save: saveView, saveForMe: saveViewForMe, saveAsNew: saveViewAsNew, reset: resetView } = savedViews;
 
 const isActiveView = (view) => (activeView.value ? viewKeyOf(view) === viewKeyOf(activeView.value) : activeTab.value === view.keyName);

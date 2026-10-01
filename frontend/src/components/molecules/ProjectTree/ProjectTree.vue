@@ -232,7 +232,8 @@ function onKeydown(event) {
 
 <style>
 .pt { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
-/* A row is a List row less one step, so the tree tightens with the look and with a compact view. */
+/* A row is a List row less one step, so the tree follows the look. It lists every project, so it
+   takes no density from the open view. */
 .pt-row {
     position: relative; display: flex; align-items: center; gap: var(--gap-row, 4px);
     min-height: max(var(--hit-min), calc(var(--row-h) - var(--sp-2)));

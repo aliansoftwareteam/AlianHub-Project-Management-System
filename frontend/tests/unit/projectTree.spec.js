@@ -193,14 +193,11 @@ describe('the tree panel on project pages', () => {
         expect(wrapper.find('[role="tree"]').exists()).toBe(false);
     });
 
-    it('carries the open view\'s density, so a compact List tightens the tree with it', async () => {
-        const { wrapper } = await mountWith(ProjectTreePanel, { projects: PROJECTS, density: 'compact' }, { width: 1280 });
-        expect(wrapper.find('#project-tree-panel').attributes('data-density')).toBe('compact');
-    });
-
-    it('has no density of its own when the page gives it none', async () => {
+    it('takes no density from the open view: it lists every project, so its rows keep one height', async () => {
         const { wrapper } = await mountWith(ProjectTreePanel, { projects: PROJECTS }, { width: 1280 });
+        expect(Object.keys(ProjectTreePanel.props)).toEqual(['projects']);
         expect(wrapper.find('#project-tree-panel').attributes('data-density')).toBeUndefined();
+        expect(wrapper.find('[data-density]').exists()).toBe(false);
     });
 
     it('is mounted by the project page', () => {

@@ -1,6 +1,6 @@
 /* The project page's chrome (filter toolbar, tree, tree panel, saved-view bar) and the shared tab,
    card and text primitives, read from the stylesheets: every size follows the look, the classic
-   look still computes the sizes it had, and compact is tighter than the default. */
+   look still computes the sizes it had, and the toolbar tightens under a compact view. */
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -377,7 +377,7 @@ describe('a tree row against a List row', () => {
     const row = (look) => size(TREE, '.pt-row', 'min-height', look);
     const listRow = (look) => px('var(--row-h)', ENV[look]);
 
-    it.each(['dense', 'compact', 'classic', 'a', 'c'])('is no taller than a List row in %s', (look) => {
+    it.each(['dense', 'classic', 'a', 'c'])('is no taller than a List row in %s', (look) => {
         expect(row(look)).toBeLessThanOrEqual(listRow(look));
     });
 
@@ -386,10 +386,11 @@ describe('a tree row against a List row', () => {
         expect(row('classic')).toBe(30);
     });
 
-    it('tightens with a compact view, and still holds the 24px target', () => {
-        expect(row('compact')).toBeLessThan(row('dense'));
-        expect(row('compact')).toBe(24);
-        expect(px(declared(TREE, '.pt-row--l2 .pt-row__link', 'font-size'), ENV.compact)).toBeLessThan(px(declared(TREE, '.pt-row--l2 .pt-row__link', 'font-size'), ENV.dense));
+    it('keeps the look\'s own height whatever the open view\'s density: nothing puts a density on the tree', () => {
+        [TREE, TREE_PANEL, TREE_MENU, TREE_RENAME, 'components/molecules/Home/HomeSidebar.vue'].forEach((rel) => {
+            expect(read(rel), rel).not.toMatch(/data-density/);
+        });
+        expect(read(TREE_PANEL)).not.toMatch(/\bdensity\b/);
     });
 
     it('is as tall as the touch floor on a phone', () => {
@@ -448,13 +449,14 @@ describe('the project tree in the classic look', () => {
    least 24 by 24 px, or its centre is at least 12px from the nearest edge of every other control. */
 describe('the tree and toolbar controls keep a 24px target', () => {
     const FLOOR = 24;
-    const DESKTOP = ['dense', 'compact', 'classic', 'a', 'c'];
+    const LOOKS = ['dense', 'classic', 'a', 'c'];
+    const DESKTOP = [...LOOKS, 'compact'];
 
     it.each(DESKTOP)('--hit-min is the floor in %s, and no density lowers it', (look) => {
         expect(px('var(--hit-min)', ENV[look])).toBeGreaterThanOrEqual(FLOOR);
     });
 
-    it.each(DESKTOP)('a tree row, its caret and its menu button are full targets in %s', (look) => {
+    it.each(LOOKS)('a tree row, its caret and its menu button are full targets in %s', (look) => {
         expect(size(TREE, '.pt-row', 'min-height', look)).toBeGreaterThanOrEqual(FLOOR);
         ['min-width', 'min-height'].forEach((side) => {
             expect(size(TREE, '.pt-row__chev', side, look)).toBeGreaterThanOrEqual(FLOOR);
@@ -462,14 +464,14 @@ describe('the tree and toolbar controls keep a 24px target', () => {
         });
     });
 
-    it.each(DESKTOP)('the 18px star keeps its centre 12px or more from the controls beside it in %s', (look) => {
+    it.each(LOOKS)('the 18px star keeps its centre 12px or more from the controls beside it in %s', (look) => {
         const template = templateOf(TREE);
         expect(template).toMatch(/<FavouriteStar\b[^>]*class="pt-row__star"[^>]*:size="12"/s);
         const star = 12 + 2 * 3;
         expect(star / 2 + size(TREE, '.pt-row', 'gap', look)).toBeGreaterThanOrEqual(FLOOR / 2);
     });
 
-    it.each(DESKTOP)('the rename field is a full target in %s and fits its row', (look) => {
+    it.each(LOOKS)('the rename field is a full target in %s and fits its row', (look) => {
         const field = size(TREE_RENAME, '.pt-row__rename', 'height', look);
         expect(field).toBeGreaterThanOrEqual(FLOOR);
         expect(field).toBeLessThanOrEqual(size(TREE, '.pt-row', 'min-height', look));
@@ -484,7 +486,7 @@ describe('the tree and toolbar controls keep a 24px target', () => {
         expect(barSize('.pft__search-scope', 'height', look)).toBeLessThanOrEqual(barSize('.pft .pft__input', 'height', look));
     });
 
-    it.each(DESKTOP)('the panel close button is a full target in %s', (look) => {
+    it.each(LOOKS)('the panel close button is a full target in %s', (look) => {
         expect(size(TREE_PANEL, '.ptp__close', 'min-width', look)).toBeGreaterThanOrEqual(FLOOR);
         expect(size(TREE_PANEL, '.ptp__close', 'min-height', look)).toBeGreaterThanOrEqual(FLOOR);
     });
@@ -497,19 +499,19 @@ describe('the tree and toolbar controls keep a 24px target', () => {
     });
 });
 
-describe('the chrome follows the open view\'s density', () => {
+describe('the open view\'s density', () => {
     const page = read(PAGE);
 
-    it('the page hands a List or Table view\'s density to the tree panel and the toolbar', () => {
-        expect(page).toMatch(/const chromeDensity = computed\(\(\) => \(DENSITY_TABS\.includes\(activeTab\.value\) \? savedViews\.density\.value : undefined\)\);/);
+    it('reaches the filter toolbar, which belongs to the view, on a List or a Table', () => {
+        expect(page).toMatch(/const toolbarDensity = computed\(\(\) => \(DENSITY_TABS\.includes\(activeTab\.value\) \? savedViews\.density\.value : undefined\)\);/);
         expect(page).toMatch(/const DENSITY_TABS = \['ProjectListView', 'TableView'\];/);
-        expect(page).toMatch(/<ProjectTreePanel :density="chromeDensity" \/>/);
-        expect(page).toMatch(/<ProjectFiltersToolbar\s+:data-density="chromeDensity"/);
+        expect(page).toMatch(/<ProjectFiltersToolbar\s+:data-density="toolbarDensity"/);
+        expect(tokens).toMatch(/@media \(min-width: 768px\) \{\s*\[data-density="compact"\] \{/);
     });
 
-    it('the panel puts it on its root, where the compact tokens apply', () => {
-        expect(templateOf(TREE_PANEL)).toMatch(/<aside id="project-tree-panel" class="ptp"[^>]*:data-density="density"/);
-        expect(tokens).toMatch(/@media \(min-width: 768px\) \{\s*\[data-density="compact"\] \{/);
+    it('does not reach the tree panel, which lists every project', () => {
+        expect(page).toMatch(/<ProjectTreePanel \/>/);
+        expect(page.match(/data-density/g)).toHaveLength(1);
     });
 
     it('the toolbar has one root, so the attribute lands on it', () => {
@@ -588,6 +590,47 @@ describe('the shared tab, card and text primitives', () => {
     it('the text tokens grow with the airy look', () => {
         expect(resolve(base['--text-small'], ENV.c)).toBe('400 13px/1.6 var(--font-ui)');
         expect(resolve(base['--text-h1'], ENV.c)).toBe('700 24px/1.25 var(--font-ui)');
+    });
+
+    /* Small text is 11.5px in the dense look. Nothing that reads it may go under 11px, in any look. */
+    describe('the small text token', () => {
+        const FLOOR = 11;
+        const sizeOf = (font) => parseFloat(/(?:^|\s)([\d.]+)px\//.exec(font)[1]);
+        const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) return walk(full);
+            return /\.(css|vue)$/.test(entry.name) ? [full] : [];
+        });
+        const users = walk(SRC).flatMap((file) => [...withoutComments(fs.readFileSync(file, 'utf8')).matchAll(/([^{}]+)\{([^{}]*var\(--text-small\)[^{}]*)\}/g)]
+            .map(([, selector, body]) => ({ where: `${path.relative(SRC, file)} ${selector.trim()}`, body })));
+
+        it.each(['dense', 'compact', 'classic', 'a', 'b', 'c', 'phone'])('is %s: 11px or more', (look) => {
+            const env = look === 'b' ? { ...base, ...custom(block(':root[data-variant="b"]')) } : ENV[look];
+            expect(sizeOf(resolve(base['--text-small'], env))).toBeGreaterThanOrEqual(FLOOR);
+        });
+
+        it('no rule that reads it then sets a smaller size of its own', () => {
+            expect(users.length).toBeGreaterThan(200);
+            const under = users.filter(({ body }) => {
+                const after = body.slice(body.lastIndexOf('var(--text-small)'));
+                const own = /font-size\s*:\s*([\d.]+)px/.exec(after);
+                return own && parseFloat(own[1]) < FLOOR;
+            });
+            expect(under.map(({ where }) => where)).toEqual([]);
+        });
+
+        it.each([
+            ['views/Ai/landing.css', '.land__sell p'],
+            ['views/Ai/parity.css', '.picker__explain p'],
+            ['views/Ai/accounts.css', '.acct-callout'],
+            ['views/Ai/accounts.css', '.acct-boundary__list'],
+            ['views/Ai/AiQuality.vue', '.ai-quality__answer'],
+            ['views/Settings/TwoFactorAuth/TwoFactorAuth.vue', '.tfa__steps'],
+            ['views/Settings/Instance/InstanceUpgrade.vue', '.in-notes'],
+        ])('%s: %s is text a person reads at length, so it is body text', (rel, selector) => {
+            expect(declared(rel, selector, 'font')).toBe('var(--text-body)');
+            expect(sizeOf(resolve(base['--text-body'], ENV.dense))).toBe(13);
+        });
     });
 
     it('no look restates a text token, so each follows the type scale it sets', () => {
