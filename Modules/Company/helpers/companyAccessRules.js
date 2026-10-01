@@ -36,7 +36,7 @@ const scopeCompanyPipeline = (findQuery, own) => {
 };
 
 const COMPANY_DETAIL_FIELDS = ['Cst_profileImage', 'Cst_CompanyName', 'Cst_Phone', 'Cst_Country', 'Cst_DialCode', 'Cst_State', 'Cst_City',
-    'Cst_LogTimeDays', 'Cst_countryCode', 'Cst_stateCode', 'trackerEstimateLimit', 'updatedAt'];
+    'Cst_LogTimeDays', 'Cst_countryCode', 'Cst_stateCode', 'trackerEstimateLimit', 'workingDays', 'updatedAt'];
 
 const isPlainObject = (value) => isPlainContainer(value) && !Array.isArray(value);
 const hasNoArrayFilters = (arrayFilters) => arrayFilters === undefined || arrayFilters === null || (Array.isArray(arrayFilters) && arrayFilters.length === 0);

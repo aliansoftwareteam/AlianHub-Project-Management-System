@@ -5,6 +5,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const pto = require('../Pto/helpers/ptoRules');   // SEC-08 — capacity = work hours − approved PTO
 const R = require('./helpers/capacityRules');
+const { companyWeekendDays } = require('../Company/helpers/companyWeek');
 
 const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 const failed = (res, where, e) => {
@@ -54,8 +55,9 @@ exports.getCapacityPlan = async (req, res) => {
         const allocMinByUser = {};
         (estRows || []).forEach((e) => { allocMinByUser[String(e.UserId)] = (allocMinByUser[String(e.UserId)] || 0) + (Number(e.EstimatedTime) || 0); });
 
+        const weekendDays = await companyWeekendDays(companyId);
         const rows = userIds.map((uid) => {
-            const cap = pto.computeAvailableCapacity({ rangeStart: q.from, rangeEnd: q.to, ptoEntries: ptoByUser[uid] || [], workingHoursPerDay: hoursPerDay });
+            const cap = pto.computeAvailableCapacity({ rangeStart: q.from, rangeEnd: q.to, ptoEntries: ptoByUser[uid] || [], workingHoursPerDay: hoursPerDay, weekendDays });
             const allocatedHours = (allocMinByUser[uid] || 0) / 60;
             const util = R.userUtilization({ capacityHours: cap.availableHours, allocatedHours });
             return {
@@ -139,12 +141,13 @@ exports.getMonthlyCapacity = async (req, res) => {
             assignees.forEach((a) => { pipeline[`${a}|${m}`] = (pipeline[`${a}|${m}`] || 0) + share; });
         });
 
+        const weekendDays = await companyWeekendDays(companyId);
         const users = {};
         userIds.forEach((uid) => {
             const byMonth = {};
             months.forEach((m) => {
                 const b = M.monthBounds(m);
-                const cap = pto.computeAvailableCapacity({ rangeStart: b.start, rangeEnd: b.end, ptoEntries: ptoByUser[uid] || [], workingHoursPerDay: hoursPerDay });
+                const cap = pto.computeAvailableCapacity({ rangeStart: b.start, rangeEnd: b.end, ptoEntries: ptoByUser[uid] || [], workingHoursPerDay: hoursPerDay, weekendDays });
                 byMonth[m] = {
                     availableHours: cap.availableHours,
                     ptoHours: cap.ptoHours,
