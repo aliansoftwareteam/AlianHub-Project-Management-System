@@ -245,7 +245,7 @@
     font: 500 var(--fs-2xs, 10px)/1 var(--font-mono);
     color: var(--ink-label);
 }
-.tv2__cell-ai:hover .tv2__source, .tv2__source.is-pinned { display: flex; }
+.tv2__cell-ai:hover .tv2__source, .tv2__source.is-pinned, .tv2__source.is-stale { display: flex; }
 .tv2__source > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tv2__pin {
     background: none; border: 0; padding: 0;
@@ -260,10 +260,11 @@
     min-height: var(--hit-min);
     background: none; border: 0; padding: 0;
     font: 400 calc(var(--row-font) - .5px)/1 var(--font-ui);
-    color: var(--brand);
+    color: var(--ink-2);
     cursor: pointer;
     white-space: nowrap;
 }
+.tv2__gen:hover, .tv2__gen:focus-visible { color: var(--brand); }
 .tv2__gen:hover { text-decoration: underline; }
 .tv2__gen:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-sm, 3px); }
 

@@ -22,6 +22,7 @@ const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
 const { taskNotFound, plainIdOf, TaskWriteRefusal } = require('../taskWriteFields');
+const keptAiValues = require('../../../AI/taskAiValues');
 const { cascadeStatus, sprintCountChange, loadSubtree, storedTask, slotUnder } = require('../taskTree');
 module.exports = {
 
@@ -354,6 +355,7 @@ module.exports = {
                             ]
                         }
                         MongoDbCrudOpration(companyId, delObj, "deleteOne");
+                        keptAiValues.forgetTask(companyId, task._id).catch((error) => logger.error(`kept AI values of converted task ${task._id}: ${error.message}`));
 
                         /* Its subtasks become tasks of the new list whatever the request says, or they
                          * would be left under a task that no longer exists; theirs stay under them. */

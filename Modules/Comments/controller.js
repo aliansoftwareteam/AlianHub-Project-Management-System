@@ -33,6 +33,17 @@ const startMentionedAgents = async (req, companyId, comment) => {
     await require("../Agents/triggers").fromComment(companyId, { authorId: comment.userId, taskId: comment.taskId, message: comment.message });
 };
 
+/* A summary kept for a task was made from its comments: it goes when one of them is deleted, and is marked as
+ * behind when one is edited. A failure here leaves a summary that says less than it should, never a failed write.
+ * Required on use: only a delete or an edit needs the store. */
+const keptSummaryFollows = async (companyId, comment, { deleted, edited }) => {
+    if (!comment.taskId || comment.taskId === 'default' || (!deleted && !edited)) return;
+    const kept = require("../AI/taskAiValues");
+    await Promise.resolve()
+        .then(() => (deleted ? kept.forgetSummary(companyId, comment.taskId) : kept.markSummaryBehind(companyId, comment.taskId)))
+        .catch((error) => logger.error(`[comments] kept summary of task ${comment.taskId}: ${error.message}`));
+};
+
 const writeOptionsFrom = (options) => {
     if (options === undefined) return {};
     const valid = Boolean(options) && typeof options === 'object' && !Array.isArray(options)
@@ -194,6 +205,7 @@ exports.update = async (req, res) => {
             socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'comments_project', companyId });
         }
         const deletionChanged = changedKeys.includes('isDeleted') && Boolean(data.isDeleted) !== Boolean(existingComment.isDeleted);
+        if (response) await keptSummaryFollows(companyId, existingComment, { deleted: deletionChanged && Boolean(data.isDeleted), edited: changes.message !== undefined });
         if (response && existingComment.parentId && deletionChanged && await isChatMessage(companyId, existingComment)) {
             await announceThread(companyId, existingComment.parentId)
                 .catch((err) => logger.error(`[comments] thread count not sent: ${err.message}`));

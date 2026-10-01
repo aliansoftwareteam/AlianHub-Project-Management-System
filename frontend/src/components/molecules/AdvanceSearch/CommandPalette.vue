@@ -145,6 +145,14 @@
                 </div>
             </div>
         </div>
+        <AskPostToChat
+            v-if="posting && answerData"
+            :question="asked.question"
+            :answer="String(answerData.answer || '')"
+            :cited="answerData.cited || []"
+            :share-token="answerData.shareToken"
+            @close="posting = false; focusInput()"
+        />
     </teleport>
 </template>
 
@@ -160,6 +168,7 @@ import { useCustomComposable } from '@/composable';
 import { useFocusTrap } from '@/composable/useFocusTrap';
 import { aiOff } from '@/composable/aiAvailability';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import AskPostToChat from '@/views/Ai/AskPostToChat.vue';
 import { toggleTheme, shellState } from '@/components/organisms/Shell/shellState';
 import { isMacPlatform } from './paletteKeys';
 import { CHIPS, RECORD_CHIPS, chipAllows, commandArgument, commandLeads, foldRecentProjects, projectPath, recentType, relativeAge, taskLocation, taskPath } from './paletteRows';
@@ -213,6 +222,7 @@ const recentSearches = ref([]);
 const recentVisits = ref([]);
 const toolbarStyle = ref({});
 const asked = ref(null);
+const posting = ref(false);
 let askController = null;
 
 useFocusTrap(dialogEl, computed(() => props.open));
@@ -357,7 +367,10 @@ const groups = computed(() => {
     };
     if (asked.value) {
         add('sources', t('Palette.group_sources'), answerSources.value.map(sourceRow), MAX_PER_CHIP);
-        add('ask', t('Inbox.group_ask'), [{ id: 'ask:continue', kind: 'continue', icon: 'ai', iconClass: 'pal__icon--brand', bold: true, title: t('Palette.ask_continue'), hint: '↵' }]);
+        add('ask', t('Inbox.group_ask'), [
+            { id: 'ask:continue', kind: 'continue', icon: 'ai', iconClass: 'pal__icon--brand', bold: true, title: t('Palette.ask_continue'), hint: '↵' },
+            ...(answerData.value && answerData.value.answer && answerData.value.shareToken ? [{ id: 'ask:post', kind: 'post', icon: 'chat', title: t('Ask.post_to_chat') }] : []),
+        ]);
         return out;
     }
     const people = () => users.value.filter((u) => matches(u.Employee_Name, u.Employee_Email)).map(personRow);
@@ -469,6 +482,7 @@ const cancelAsk = () => {
     if (askController) askController.abort();
     askController = null;
     asked.value = null;
+    posting.value = false;
 };
 const askHere = async () => {
     const question = query.value.trim();
@@ -517,6 +531,7 @@ const run = (row) => {
     remember(query.value);
     if (row.kind === 'ask') return askHere();
     if (row.kind === 'continue') return continueInAsk();
+    if (row.kind === 'post') { posting.value = true; return undefined; }
     if (row.task) { close(); openTask(row.task); return; }
     if (row.overlay) return go(row.overlay);
     if (row.to) return go(row.to);
