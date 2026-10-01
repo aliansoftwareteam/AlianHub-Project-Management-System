@@ -3,6 +3,7 @@
 
 const crypto = require('crypto');
 const { TASK_PROPERTIES, isTaskProperty, typeOf, isMulti } = require('./questionTypes');
+const { shownQuestions } = require('./formLogic');
 const { escapeHtml } = require('../../PublicShares/helpers/shareRules');
 
 /* The version the manual and AI paths both stamp on a saved block document. */
@@ -164,6 +165,9 @@ const asText = (value) => (Array.isArray(value) ? value.join(', ')
  * only looked up for a question that exists. A payload naming a field no question
  * maps to is ignored entirely — that is what stops a crafted submission writing
  * an assignee or moving the task to another project.
+ *
+ * The same goes for a question these answers do not call for: it is skipped
+ * whatever was posted for it, so it is neither required, checked nor stored.
  */
 const mapSubmission = (form, answers, opts) => {
     const questions = Array.isArray(form && form.questions) ? form.questions : [];
@@ -175,9 +179,13 @@ const mapSubmission = (form, answers, opts) => {
     const attachments = [];
     const errors = {};
 
+    const inOrder = questions.slice().sort((a, b) => ((a && a.order) || 0) - ((b && b.order) || 0));
+    const asked = new Set(shownQuestions(inOrder, body));
+    const answerable = (q) => asked.has(q) && Boolean(typeOf(q.type)) && typeOf(q.type).input !== false;
+
     for (const q of questions) {
+        if (!answerable(q)) continue;
         const meta = typeOf(q.type);
-        if (!meta || meta.input === false || q.hidden) continue;
 
         const raw = body[q.id];
         const value = coerce(q, raw, opts);
@@ -255,7 +263,7 @@ const mapSubmission = (form, answers, opts) => {
     // Every answer, keyed for storage: the response table reads these, so it does
     // not depend on the task that may or may not have been created.
     const record = questions
-        .filter((q) => typeOf(q.type) && typeOf(q.type).input !== false && !q.hidden)
+        .filter(answerable)
         .map((q) => ({ questionId: q.id, label: q.label, value: '' }));
     for (const row of record) {
         const hit = transcript.find((tItem) => tItem.questionId === row.questionId);

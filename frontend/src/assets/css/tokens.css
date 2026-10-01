@@ -116,6 +116,8 @@
     --hit-min: 24px;
     /* How far a child row (a subtask) steps in from its parent's name. */
     --row-indent: var(--sp-8);
+    /* A text row of a data table is as tall as a List row: the padding that centres one line of row type in it. */
+    --table-pad-y: calc((var(--row-h) - var(--row-font) * var(--lh-body)) / 2);
     /* The least a task name keeps in a row, however many columns are shown beside it. */
     --row-name-min: 130px;
 
@@ -340,7 +342,7 @@
     --sp-6: 14px; --sp-7: 16px; --sp-8: 20px; --sp-9: 24px;
     --row-h: 36px; --row-font: 12.5px; --hit-min: 24px;
     --avatar-size: 24px; --avatar-font: 11px; --chip-h: 22px; --chip-font: 11.5px;
-    --cell-pad-y: 9px; --cell-pad-x: initial;
+    --cell-pad-y: 9px; --cell-pad-x: initial; --table-pad-y: initial;
     --card-pad-y: initial; --card-pad-x: initial;
     --gap-row: initial; --gap-stack: initial;
     --page-pad-y: initial; --page-pad-x: initial;

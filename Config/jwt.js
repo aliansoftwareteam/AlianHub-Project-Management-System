@@ -740,4 +740,6 @@ module.exports = {
     verifyCompanyMembership: verifyCompanyMembership,
     invalidateMembershipCache: invalidateMembershipCache,
     getMembershipCacheTtlSeconds: getMembershipCacheTtlSeconds,
+    PAT_BLOCKED_PATH_PREFIX: PAT_BLOCKED_PATH_PREFIX,
+    PAT_ALLOWED_EXCEPTIONS: PAT_ALLOWED_EXCEPTIONS,
 }

@@ -4,6 +4,7 @@ const { nonMembersOf, NOT_A_MEMBER } = require('../../../Config/companyMembers')
 const { canReadProject } = require('../../../Config/projectAccess');
 const { customFieldDefinitionsOf } = require('./customFieldText');
 const { NOT_THIS_FIELD, ownFiles, stampedFiles } = require('./fieldFiles');
+const { writeLinks } = require('./fieldLinks');
 
 const CANNOT_OPEN_PROJECT = 'A person named here cannot open this project.';
 
@@ -39,6 +40,15 @@ const SERVER_CHECKS = Object.freeze({
     files: onlyFilesOfTheField,
 });
 
+const linkedTasksOf = async ({ companyId, definition, task, value, actorId }) => {
+    const written = await writeLinks({ companyId, actorId, task, definition, ids: value });
+    if (written.error) throw new FieldValueRefused(written.error);
+    return written.detail;
+};
+
+/* A type whose value is kept beside the task writes it there and answers what the task itself stores. */
+const SIDE_WRITES = Object.freeze({ relationship: linkedTasksOf });
+
 /* What is stored for a field one of the type modules handles: its checked value and nothing else. Other types are stored as sent. */
 const checkedFieldDetail = async ({ companyId, definition, task, updateDetail, actorId }) => {
     const type = typeModuleOf(definition && definition.fieldType);
@@ -46,6 +56,7 @@ const checkedFieldDetail = async ({ companyId, definition, task, updateDetail, a
     if (!isPlainObject(updateDetail)) throw new FieldValueRefused('updateDetail must be an object with a fieldValue.');
     const { value, error } = type.parse(updateDetail.fieldValue, definition);
     if (error) throw new FieldValueRefused(error);
+    if (SIDE_WRITES[type.type]) return SIDE_WRITES[type.type]({ companyId, definition, task, value, actorId });
     const fieldId = String(definition._id);
     const checked = SERVER_CHECKS[type.type] ? await SERVER_CHECKS[type.type]({ companyId, task, fieldId, value, actorId }) : undefined;
     return { fieldValue: checked === undefined ? value : checked, _id: fieldId };
@@ -78,7 +89,8 @@ const storableDetail = async ({ companyId, definition, type, task, detail }) => 
 
 /* The field values a create, a copy, an import or a template may store on `task`. A value that does not fit its field is left
  * out, so one bad value never fails the task; `dropped` names the fields whose value was left out or cut down. `definitions`
- * is carried across a batch so each field is read once. */
+ * is carried across a batch so each field is read once. A type kept beside the task has nothing to store on a new one: a
+ * copy brings its links over with copyFieldLinks, and votes are never brought over. */
 const storableFieldValues = async ({ companyId, task, customField = task && task.customField, definitions = new Map() }) => {
     if (!isPlainObject(customField)) return { customField: {}, dropped: [] };
     await customFieldDefinitionsOf(companyId, Object.keys(customField), definitions);
@@ -91,6 +103,7 @@ const storableFieldValues = async ({ companyId, task, customField = task && task
             kept[fieldId] = detail;
             continue;
         }
+        if (type.sideStored) continue;
         const stored = await storableDetail({ companyId, definition, type, task, detail });
         if (stored.detail) kept[fieldId] = stored.detail;
         if (!stored.asSent) dropped.push(fieldId);

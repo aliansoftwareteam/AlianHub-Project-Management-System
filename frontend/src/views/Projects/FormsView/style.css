@@ -162,6 +162,8 @@
 .fb__widths-label, .fb__rule-label { font: var(--text-small); color: var(--ink-2); }
 .fb__scale { display: flex; align-items: center; gap: 8px; color: var(--ink-2); }
 .fb__scale input { width: 64px; height: 28px; border: 1px solid var(--border); border-radius: 6px; padding: 0 8px; background: var(--surface); color: var(--ink); }
+.fb__logic { margin: 6px 0 0; font: var(--text-small); color: var(--ink-2); }
+.fb__logic--stale { padding: 6px 8px; border-radius: var(--r-input); background: var(--warn-bg); color: var(--warn-ink); }
 .fb__card-foot { display: flex; align-items: center; justify-content: space-between; }
 /* Sits on the form author's own buttonColor and is mirrored on the public form,
  * which renders outside the app shell — so this white stays literal. */

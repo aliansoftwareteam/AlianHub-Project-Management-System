@@ -177,3 +177,8 @@ label {
   height: 10px;
   vertical-align: middle;
 }
+@media (max-width: 576px) {
+  .totalCountActiveClose { flex-wrap: wrap-reverse; row-gap: 8px; }
+  .totalCountActiveClose .project-search { flex: 1 1 100%; max-width: 100% !important; margin-bottom: 8px; }
+  .totalCountActiveClose .tab-option { white-space: nowrap; max-width: none; }
+}

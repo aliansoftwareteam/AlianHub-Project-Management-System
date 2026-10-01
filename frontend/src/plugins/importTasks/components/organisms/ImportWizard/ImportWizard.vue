@@ -111,6 +111,7 @@
                             </div>
                             <div v-if="result" class="iw__note" :class="{ 'iw__note--ok': !result.failed }">{{ result.message }}</div>
                             <div v-for="line in (result && result.adjusted) || []" :key="line.reason" class="iw__note" data-test="iw-adjusted">{{ line.text }} <span v-if="line.names">{{ line.names }}</span></div>
+                            <div v-if="result && result.droppedFieldValues" class="iw__note" data-test="iw-dropped">{{ $t('Import.dropped_field_values', { count: result.droppedFieldValues }) }}</div>
 
                             <div v-if="report.issues.length" class="iw__rows">
                                 <div v-for="issue in report.issues.slice(0, 100)" :key="'iss' + issue.row" class="iw__rowline" :class="{ 'is-skipped': issue.errors.some((e) => e.fatal) }">
@@ -197,7 +198,7 @@ import * as XLSX from "xlsx";
 import * as env from "@/config/env";
 import { apiRequest } from "@/services";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
-import { adjustedLines, adjustedTotals, importChunks } from "@/plugins/importTasks/importTree";
+import { adjustedLines, adjustedTotals, droppedFieldValuesTotal, importChunks } from "@/plugins/importTasks/importTree";
 
 defineOptions({ name: "ImportWizard" });
 
@@ -490,7 +491,7 @@ async function runImport() {
         return;
     }
     progress.value = 100;
-    result.value = { failed: false, message: t("Import.import_done", { created, skipped }), adjusted: adjustedLines(adjustedTotals(answers), t, "Import.adjusted") };
+    result.value = { failed: false, message: t("Import.import_done", { created, skipped }), adjusted: adjustedLines(adjustedTotals(answers), t, "Import.adjusted"), droppedFieldValues: droppedFieldValuesTotal(answers) };
     emit("imported", { created, skipped });
 }
 

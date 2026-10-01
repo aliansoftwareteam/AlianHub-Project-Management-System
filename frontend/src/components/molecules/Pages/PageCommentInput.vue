@@ -9,44 +9,37 @@
             :aria-label="label || placeholder"
             role="combobox"
             aria-autocomplete="list"
+            aria-haspopup="listbox"
             :aria-expanded="Boolean(mention)"
-            :aria-controls="listId"
-            :aria-activedescendant="mention && matches.length ? `${listId}-${active}` : undefined"
             @input="onInput"
             @keydown="onKeydown"
             @click="syncMention"
-            @blur="onBlur"
+            @blur="closeMention"
         ></textarea>
-        <ul v-if="mention" :id="listId" class="pci__list" role="listbox" :aria-label="$t('Docs.comment_mention_list')">
-            <li
-                v-for="(person, index) in matches"
-                :id="`${listId}-${index}`"
-                :key="person.id"
-                class="pci__option"
-                :class="{ 'is-active': index === active }"
-                role="option"
-                :aria-selected="index === active"
-                @mousedown.prevent="pick(person)"
-                @mouseenter="active = index"
-            >
-                <span class="ah-avatar ah-avatar--sm" aria-hidden="true">{{ initials(person.name) }}</span>
-                <span class="pci__name">{{ person.name }}</span>
-            </li>
-            <li v-if="!matches.length" class="pci__option pci__option--none" role="option" aria-disabled="true">{{ $t('Docs.comment_mention_none') }}</li>
-        </ul>
+        <Teleport to="body">
+            <DocMentionPicker
+                v-if="mention"
+                :query="mention.query"
+                :position="position"
+                :sources="sources"
+                @ready="picker = $event"
+                @pick="pick"
+                @close="closeMention"
+            />
+        </Teleport>
     </div>
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref, useId } from 'vue';
-import { initials } from './docsFormat';
+import { nextTick, onMounted, ref, shallowRef } from 'vue';
+import DocMentionPicker from './DocMentionPicker.vue';
 import { insertMention, mentionQueryAt } from './pageComments';
 
 defineOptions({ name: 'PageCommentInput' });
 
 const props = defineProps({
     modelValue: { type: String, default: '' },
-    people: { type: Array, default: () => [] },
+    sources: { type: Object, required: true },
     placeholder: { type: String, default: '' },
     label: { type: String, default: '' },
     autofocus: { type: Boolean, default: false },
@@ -54,22 +47,40 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'submit', 'cancel']);
 
-const MAX_MATCHES = 6;
+const PICKER_WIDTH = 320;
+const ROOM_BELOW = 220;
+const GAP = 6;
+const EDGE = 8;
+
 const field = ref(null);
 const mention = ref(null);
-const active = ref(0);
-const listId = `pci-${useId()}`;
+const position = ref({ top: 0, left: 0 });
+const picker = shallowRef(null);
 
-const matches = computed(() => {
-    if (!mention.value) return [];
-    const query = mention.value.query.toLowerCase();
-    return props.people.filter((person) => person.name.toLowerCase().replace(/\s+/g, '').includes(query)).slice(0, MAX_MATCHES);
-});
+/* The composer sits at the foot of the panel, so the list usually opens upwards, anchored to the field's top edge. */
+function place(el) {
+    const rect = el.getBoundingClientRect();
+    const width = Math.min(PICKER_WIDTH, window.innerWidth - EDGE * 2);
+    const left = Math.max(EDGE, Math.min(rect.left, window.innerWidth - width - EDGE));
+    position.value = window.innerHeight - rect.bottom >= ROOM_BELOW
+        ? { top: rect.bottom + GAP, left }
+        : { bottom: window.innerHeight - rect.top + GAP, left };
+}
+
+function closeMention() {
+    mention.value = null;
+    picker.value = null;
+}
 
 function syncMention() {
     const el = field.value;
-    mention.value = el ? mentionQueryAt(el.value, el.selectionStart) : null;
-    active.value = 0;
+    const found = el ? mentionQueryAt(el.value, el.selectionStart) : null;
+    if (!found) {
+        closeMention();
+        return;
+    }
+    place(el);
+    mention.value = found;
 }
 
 function onInput(event) {
@@ -77,12 +88,12 @@ function onInput(event) {
     syncMention();
 }
 
-function pick(person) {
+function pick(item) {
     const el = field.value;
     if (!el || !mention.value) return;
-    const next = insertMention(el.value, mention.value.start, el.selectionStart, person);
+    const next = insertMention(el.value, mention.value.start, el.selectionStart, item);
     emit('update:modelValue', next.text);
-    mention.value = null;
+    closeMention();
     nextTick(() => {
         el.focus();
         el.setSelectionRange(next.caret, next.caret);
@@ -93,19 +104,19 @@ function onKeydown(event) {
     if (mention.value) {
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault();
-            const step = event.key === 'ArrowDown' ? 1 : -1;
-            active.value = Math.min(Math.max(active.value + step, 0), Math.max(matches.value.length - 1, 0));
+            if (picker.value) picker.value.move(event.key === 'ArrowDown' ? 1 : -1);
             return;
         }
-        if ((event.key === 'Enter' || event.key === 'Tab') && matches.value.length) {
-            event.preventDefault();
-            pick(matches.value[active.value]);
-            return;
-        }
-        if (event.key === 'Escape') {
+        if ((event.key === 'Enter' || event.key === 'Tab') && !event.isComposing) {
+            if (picker.value && picker.value.choose()) {
+                event.preventDefault();
+                return;
+            }
+            closeMention();
+        } else if (event.key === 'Escape') {
             event.preventDefault();
             event.stopPropagation();
-            mention.value = null;
+            closeMention();
             return;
         }
     }
@@ -116,10 +127,6 @@ function onKeydown(event) {
         event.preventDefault();
         emit('submit');
     }
-}
-
-function onBlur() {
-    mention.value = null;
 }
 
 function focus() {
@@ -138,18 +145,4 @@ onMounted(() => { if (props.autofocus) focus(); });
     padding: 8px 10px; resize: vertical;
     font: 400 13px/1.45 var(--font-ui);
 }
-.pci__list {
-    position: absolute; left: 0; right: 0; bottom: calc(100% + 4px); z-index: 5;
-    margin: 0; padding: 4px; list-style: none;
-    background: var(--surface); border: 1px solid var(--border); border-radius: 9px;
-    box-shadow: var(--shadow-card);
-}
-.pci__option {
-    display: flex; align-items: center; gap: 8px;
-    padding: 6px 8px; border-radius: 6px; cursor: pointer;
-    font-size: 13px; color: var(--ink);
-}
-.pci__option.is-active { background: var(--brand-tint); }
-.pci__option--none { cursor: default; color: var(--ink-2); }
-.pci__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

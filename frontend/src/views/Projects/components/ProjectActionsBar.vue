@@ -135,6 +135,12 @@
                                     <span>{{ $t('Projects.duplicate_project') }}</span>
                                 </div>
                             </DropDownOption>
+                            <DropDownOption v-if="canDuplicate" data-test="save-project-template" @click="savingTemplate = true">
+                                <div class="pab-duplicate" :class="{ 'pab-duplicate--phone': clientWidth <= 767 }">
+                                    <ShellIcon name="star" :size="clientWidth <= 767 ? 18 : 15" />
+                                    <span>{{ $t('Projects.template_save_entry') }}</span>
+                                </div>
+                            </DropDownOption>
                             <DropDownOption @click="$emit('archiveProject', 0)" v-if="checkPermission('project.project_close',projectData.isGlobalPermission) === true">
                                 <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
                                     <div class="d-flex align-items-center">
@@ -157,6 +163,7 @@
             </li>
         </ul>
         <DuplicateProjectDialog v-if="duplicating" :project="projectData" @close="duplicating = false" />
+        <SaveProjectTemplateDialog v-if="savingTemplate" :project="projectData" @close="savingTemplate = false" />
     </div>
 </template>
 
@@ -170,6 +177,7 @@ import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption
 import Assignee from '@/components/molecules/Assignee/Assignee.vue';
 import WasabiImage from '@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue';
 import DuplicateProjectDialog from '@/components/molecules/DuplicateProjectDialog/DuplicateProjectDialog.vue';
+import SaveProjectTemplateDialog from '@/components/molecules/SaveProjectTemplateDialog/SaveProjectTemplateDialog.vue';
 import { useCustomComposable } from '@/composable';
 import { maskOf } from '@/utils/iconMask';
 
@@ -184,9 +192,10 @@ const props = defineProps({
 
 const watcherCount = computed(() => Object.keys(props.projectData?.watchers || {}).length);
 
-/* The server judges a duplicate on the company's rules, as it does a create, so the project's own rules are not read here. */
+/* The server judges a duplicate and a template on the company's rules, as it does a create, so the project's own rules are not read here. */
 const canDuplicate = computed(() => props.projectData?.isPersonal !== true && checkPermission('project.project_create') === true);
 const duplicating = ref(false);
+const savingTemplate = ref(false);
 
 const { getters } = useStore();
 const route = useRoute();
