@@ -1,3 +1,4 @@
+const fs = require('fs');
 const fixture = require('./fixtures/formLogicCases.json');
 const { TYPES } = require('../Modules/Forms/helpers/questionTypes');
 const logic = require('../Modules/Forms/helpers/formLogic');
@@ -126,6 +127,13 @@ describe('answers the evaluator is handed', () => {
         expect(logic.pruneAnswers(questions, answers)).toEqual({ a: 'no' });
         expect(logic.pruneAnswers(questions, { ...answers, a: 'yes' })).toEqual({ a: 'yes', b: 'typed before it was hidden', c: 'also typed' });
         expect(answers.b).toBe('typed before it was hidden');
+    });
+
+    it('requires nothing and builds no code from a rule, so the web app can bundle it under its script policy', () => {
+        const source = fs.readFileSync(require.resolve('../Modules/Forms/helpers/formLogic'), 'utf8');
+
+        expect(source).not.toMatch(/\brequire\(|\bimport\b/);
+        expect(source).not.toMatch(/\beval\(|new Function|new RegExp|RegExp\(/);
     });
 
     it('says whether a form has any rule', () => {
