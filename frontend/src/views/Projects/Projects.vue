@@ -208,7 +208,7 @@
                                 </div>
                             </template>
                             <template #actions>
-                            <NewInProjectMenu :projectData="projectData" />
+                            <NewInProjectMenu ref="newInProject" :projectData="projectData" />
                             <ProjectActionsBar
                                 :projectData="projectData"
                                 :clientWidth="clientWidth"
@@ -308,8 +308,15 @@
                             />
                             <!-- AI Assist (AHE-3777): project-level AI task generation, opened from the toolbar. -->
                             <AiTaskCreator v-if="projectData && projectData._id" v-model="showAiTaskCreator" :projectId="String(projectData._id)" :sprints="aiSprints" :activeSprintId="aiActiveSprintId" @done="onAiTasksCreated" />
+                            <FolderEmptyState
+                                v-if="folderWithNoLists"
+                                :project="projectData"
+                                :folders="projectData.sprintsfolders"
+                                :folder="folderWithNoLists"
+                                @create="newInProject?.start('sprint')"
+                            />
                             <component
-                                v-if="(clientWidth <= 767 && isVisible == true && isRuleData == false) || (clientWidth > 767 && isRuleData == false)"
+                                v-else-if="(clientWidth <= 767 && isVisible == true && isRuleData == false) || (clientWidth > 767 && isRuleData == false)"
                                 :class="[{'showProjectDetailRight':activeTab !== 'ProjectListView' && activeTab !== 'Calendar' && activeTab != 'EmbedViewItem' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView' && activeTab !== 'WhiteboardView' && activeTab !== 'CanvasView' && activeTab !== 'MapView' && activeTab !== 'ProjectDashboard' && activeTab !== 'DocsView' && activeTab !== 'FormsView'}]"
                                 :is="getView(activeTab)"
                                 :data="selectedEmbedView"
@@ -486,10 +493,11 @@ import AiTaskCreator from '@/components/organisms/AiTaskCreator/AiTaskCreator.vu
 import ProjectSidebars from './components/ProjectSidebars.vue';
 import ProjectBottomModals from './components/ProjectBottomModals.vue';
 import ProjectEmptyState from './components/ProjectEmptyState.vue';
+import FolderEmptyState from './components/FolderEmptyState.vue';
 import { useProjectCalendar } from './composables/useProjectCalendar';
 import { useProjectRules } from './composables/useProjectRules';
-import { folderSprintList, projectSprintList } from './folderSprints';
-import { folderIdOf, folderPathLabel, folderTrail, isLiveFolder } from '@/utils/folderTree';
+import { folderSprintList, folderWithoutLists, headerLocation, projectSprintList } from './folderSprints';
+import { folderPathLabel, isLiveFolder } from '@/utils/folderTree';
 import { useProjectNameEdit } from './composables/useProjectNameEdit';
 import { useProjectAssignee } from './composables/useProjectAssignee';
 import { useEmbedViews } from './composables/useEmbedViews';
@@ -1061,9 +1069,16 @@ const sprints = ref([]);
 
 // Header (10b): the sprint in view, the star, the agent chip and the "+ Task"
 // request the views listen for.
-const headerSprint = computed(() => (sprints.value.length === 1 && !sprints.value[0]?.isFolder ? sprints.value[0] : null));
-const headerFolders = computed(() => folderTrail(projectData.value?.sprintsfolders, route.params?.folderId || headerSprint.value?.folderId)
-    .map((folder) => ({ id: folderIdOf(folder), name: folder.name })));
+const headerPlace = computed(() => headerLocation({ folders: projectData.value?.sprintsfolders, sprints: sprints.value, folderId: route.params?.folderId }));
+const headerSprint = computed(() => headerPlace.value.sprint);
+const headerFolders = computed(() => headerPlace.value.folders);
+
+/* The task views can only say that no task shows; on the page of a folder that holds no list, the missing thing is a list. */
+const TASK_VIEWS = ['ProjectListView', 'ProjectKanban', 'TableView'];
+const newInProject = ref(null);
+const folderWithNoLists = computed(() => (route.params?.folderId && !route.params?.sprintId && !showArchived.value && !sprintLoading.value && TASK_VIEWS.includes(activeTab.value)
+    ? folderWithoutLists(projectData.value?.sprintsfolders, route.params.folderId)
+    : null));
 const canAiAssist = computed(() => canUseAi({ project: projectData.value, permitted: checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true }));
 // Only shown where a view actually answers the request (the board injects
 // `addTaskRequest`); other views opt in by injecting it too.
