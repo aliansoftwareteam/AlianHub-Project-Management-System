@@ -30,6 +30,7 @@ const AGENT_DELETED = 'agent.deleted';
 const RUN_REVERTED = 'agent.run_reverted';
 const REVISION_PROMOTED = 'agent.revision_promoted';
 const REVISION_ROLLED_BACK = 'agent.revision_rolled_back';
+const PROJECT_POLICY_CHANGED = 'agent.project_policy_changed';
 
 const clip = (v, n = 2000) => {
     try { const s = JSON.stringify(v); return s.length > n ? JSON.parse(s.slice(0, n - 1) + '"') : v; } catch (e) { return String(v).slice(0, n); }
@@ -219,6 +220,16 @@ const recordRevisionChange = async (companyId, actor, { kind, agentId, agentName
     });
 };
 
+const recordProjectPolicyChange = async (companyId, actor, { projectId, projectName, from, to, ip }) => {
+    const a = attribution(actor);
+    return writeQuietly(companyId, {
+        actorId: a.actorId, actorName: a.label, ip,
+        action: PROJECT_POLICY_CHANGED,
+        entityType: 'project', entityId: String(projectId), entityName: projectName || '',
+        meta: { ...baseMeta(actor), from, to },
+    });
+};
+
 const markUndone = async (companyId, auditId, byActorId) => {
     const filter = rowFilter(auditId);
     if (!filter) return;
@@ -261,8 +272,8 @@ const findById = async (companyId, auditId) => {
 };
 
 module.exports = {
-    ACTION_DONE, ACTION_REFUSED, ACTION_UNDONE, PROPOSAL_DECIDED, AGENT_DELETED, RUN_REVERTED, REVISION_PROMOTED, REVISION_ROLLED_BACK, STATE, AUDIT_UNAVAILABLE, AUDIT_UNMARKED,
+    ACTION_DONE, ACTION_REFUSED, ACTION_UNDONE, PROPOSAL_DECIDED, AGENT_DELETED, RUN_REVERTED, REVISION_PROMOTED, REVISION_ROLLED_BACK, PROJECT_POLICY_CHANGED, STATE, AUDIT_UNAVAILABLE, AUDIT_UNMARKED,
     AuditUnavailableError, AuditUnmarkedError,
-    openAction, applyAction, failAction, recordAction, recordRefusal, recordUndo, recordProposalDecision, recordAgentDeleted, recordRunReverted, recordRevisionChange, markUndone, findById, findByIdempotencyKey,
+    openAction, applyAction, failAction, recordAction, recordRefusal, recordUndo, recordProposalDecision, recordAgentDeleted, recordRunReverted, recordRevisionChange, recordProjectPolicyChange, markUndone, findById, findByIdempotencyKey,
     undoneBefore, canRecordChange,
 };

@@ -3548,6 +3548,11 @@ const schema = {
             type: String,
             default: ""
         },
+        // { done: 'never' | 'approval' | 'yes', connected: 'propose_all' | 'single_task', updatedBy, updatedAt }; absent means the defaults (Modules/Agents/projectPolicy.js).
+        agentPolicy: {
+            type: Object,
+            required: false
+        },
         ProjectType: {
             type: String,
             required: true

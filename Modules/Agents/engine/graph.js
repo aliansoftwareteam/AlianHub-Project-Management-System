@@ -7,6 +7,7 @@ const memory = require('../memory');
 const aiProfile = require('../../AI/aiProfile');
 const skillIndex = require('../skills');
 const policy = require('../policy');
+const projectPolicy = require('../projectPolicy');
 const { rating: ratingOf } = require('../actions');
 const runs = require('../runs');
 const spendGuard = require('../spendGuard');
@@ -150,25 +151,32 @@ const targetProjectsOf = async (companyId, run, changes) => {
 
 /* Below the review level every change is proposed and no decision is recorded,
  * as before; from it, the policy reviews each change and a refusal still goes
- * through perform() so it leaves the same audit row as a registry refusal. */
+ * through perform() so it leaves the same audit row as a registry refusal. At
+ * every level the project's own rule is asked last and can only hold a change back. */
 async function review(state, config) {
     await renewLock(state, config);
-    const { companyId } = config.context;
+    const { companyId, deps } = config.context;
     const { run, agent, task, result } = state;
     const { changes: found, alreadyTracked } = await runs.changesFor(companyId, task, result);
     if (!found.length) return { alreadyTracked, outcome: `nothing new to file — ${alreadyTracked} finding(s) already tracked`, finalStatus: STATUS.DONE };
     const changes = found.map((c) => ({ ...c, rating: ratingOf(c.action) }));
-    if (Number(agent.autonomy) < policy.REVIEW_LEVEL) return { changes, alreadyTracked, toPropose: changes };
+    const reviewing = Number(agent.autonomy) >= policy.REVIEW_LEVEL;
+    const heldByProject = (change, verdict) => projectPolicy.review({ companyId, actor: deps && deps.actor, action: change.action, params: { taskId: String(task._id), ...change.params }, verdict });
 
     const decisions = [];
     const toAct = [];
     const toPropose = [];
-    const targets = taint.routes(run) ? await targetProjectsOf(companyId, run, changes) : new Map();
+    const targets = reviewing && taint.routes(run) ? await targetProjectsOf(companyId, run, changes) : new Map();
     for (const change of changes) {
-        const verdict = policy.decide({ agent, action: change.action, params: change.params, rating: change.rating, run, task, targetProjectId: targets.has(namedTaskOf(change)) ? targets.get(namedTaskOf(change)) : null });
-        decisions.push({ action: change.action, decision: verdict.decision, reason: verdict.reason, rating: verdict.rating, at: new Date() });
+        const decided = reviewing
+            ? policy.decide({ agent, action: change.action, params: change.params, rating: change.rating, run, task, targetProjectId: targets.has(namedTaskOf(change)) ? targets.get(namedTaskOf(change)) : null })
+            : { decision: policy.DECISION.PROPOSE, reason: '', rating: change.rating };
+        // eslint-disable-next-line no-await-in-loop
+        const verdict = await heldByProject(change, decided);
+        if (reviewing || verdict !== decided) decisions.push({ action: change.action, decision: verdict.decision, reason: verdict.reason, rating: verdict.rating, at: new Date() });
         if (verdict.decision === policy.DECISION.PROPOSE) toPropose.push(change); else toAct.push({ change, verdict });
     }
+    if (!reviewing && !decisions.length) return { changes, alreadyTracked, toPropose: changes };
     await runs.patch(companyId, run._id, {}, { $push: { decisions: { $each: decisions } } });
     return { changes, alreadyTracked, decisions, toAct, toPropose };
 }
