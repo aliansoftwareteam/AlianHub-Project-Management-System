@@ -33,8 +33,8 @@ beforeEach(() => {
 
 describe('the page readers agree on who reaches a page: MCP tokens', () => {
     const UNNARROWED = {
-        owner: ['shared', 'company', 'closed', 'orphaned'],
-        admin: ['shared', 'company', 'closed', 'orphaned'],
+        owner: ['shared', 'company', 'closed'],
+        admin: ['shared', 'company', 'closed'],
         inside: ['insidePrivate', 'shared', 'company', 'closed'],
         outside: ['outsidePrivate', 'shared', 'company'],
         guest: ['shared', 'company'],
@@ -43,6 +43,8 @@ describe('the page readers agree on who reaches a page: MCP tokens', () => {
     const KEPT_TO_OPEN = { owner: ['shared'], admin: ['shared'], inside: ['insidePrivate', 'shared'], outside: ['outsidePrivate', 'shared'], guest: ['shared'] };
 
     const KEPT_TO_CLOSED = { owner: ['closed'], admin: ['closed'], inside: ['closed'], outside: [], guest: [] };
+
+    const NOTHING = { owner: [], admin: [], inside: [], outside: [], guest: [] };
 
     it('a token that is not kept to some projects reads what its person can open', async () => {
         expect(await searched([])).toEqual(UNNARROWED);
@@ -54,14 +56,16 @@ describe('the page readers agree on who reaches a page: MCP tokens', () => {
         expect(await opened([PROJECTS.open])).toEqual(KEPT_TO_OPEN);
         expect(await searched([PROJECTS.closed])).toEqual(KEPT_TO_CLOSED);
         expect(await opened([PROJECTS.closed])).toEqual(KEPT_TO_CLOSED);
+        expect(await searched([PROJECTS.trashed])).toEqual(NOTHING);
+        expect(await opened([PROJECTS.trashed])).toEqual(NOTHING);
     });
 
     it('leaves another person\'s personal list out for an owner', async () => {
         mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: 'b000000000000000000000b9', ProjectName: 'Mine', isPersonal: true, personalOwner: PEOPLE.inside, isPrivateSpace: true, AssigneeUserId: [PEOPLE.inside], deletedStatusKey: 0 });
         mockDb.store[SCHEMA_TYPE.PAGES].find((page) => String(page._id) === PAGES.closed).ProjectID = 'b000000000000000000000b9';
 
-        expect(await searched([])).toEqual({ ...UNNARROWED, owner: ['shared', 'company', 'orphaned'], admin: ['shared', 'company', 'orphaned'] });
-        expect(await opened([])).toEqual({ ...UNNARROWED, owner: ['shared', 'company', 'orphaned'], admin: ['shared', 'company', 'orphaned'] });
+        expect(await searched([])).toEqual({ ...UNNARROWED, owner: ['shared', 'company'], admin: ['shared', 'company'] });
+        expect(await opened([])).toEqual({ ...UNNARROWED, owner: ['shared', 'company'], admin: ['shared', 'company'] });
     });
 
     it('writes outside every project only with a token that is not kept to some', async () => {
