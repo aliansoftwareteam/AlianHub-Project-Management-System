@@ -206,7 +206,6 @@
             </div>
         </div>
         <template v-if="isListLike">
-            <GlobalSearchModal v-model="showGlobalSearch" />
             <RecentVisitsDropdown v-model="showRecent" />
             <BurndownModal v-model="showBurndown" :projectData="projectData" />
             <EpicsPanel v-model="showEpics" :projectData="projectData" />
@@ -235,7 +234,7 @@ import ProvenanceFilter from '@/components/molecules/Provenance/ProvenanceFilter
 import MonthlyCalendarMilestone from '@/components/atom/MonthlyCalendarMilestone/MonthlyCalendarMilestone.vue';
 import BurndownModal from '@/components/molecules/Burndown/BurndownModal.vue';
 import RecentVisitsDropdown from '@/components/molecules/RecentVisits/RecentVisitsDropdown.vue';
-import GlobalSearchModal from '@/components/molecules/GlobalSearch/GlobalSearchModal.vue';
+import { openPalette } from '@/components/molecules/AdvanceSearch/paletteKeys';
 import EpicsPanel from '@/components/molecules/Epics/EpicsPanel.vue';
 import ExportTasksDropdown from '@/components/molecules/ExportTasks/ExportTasksDropdown.vue';
 import PagesPanel from '@/components/molecules/Pages/PagesPanel.vue';
@@ -259,7 +258,6 @@ InPlace.props = ['open'];
 InPlace.inheritAttrs = false;
 
 const showBurndown = ref(false);
-const showGlobalSearch = ref(false);
 const showEpics = ref(false);
 const showPages = ref(false);
 const showPublicShare = ref(false);
@@ -379,7 +377,7 @@ const moreGroups = computed(() => {
     }
     groups.push(
         { key: 'find', items: [
-            { key: 'search', label: 'Projects.global_search', open: opener(showGlobalSearch) },
+            { key: 'search', label: 'Projects.global_search', open: openPalette },
             { key: 'recent', label: 'Projects.recent_tasks', open: opener(showRecent) }
         ] },
         { key: 'insights', items: [

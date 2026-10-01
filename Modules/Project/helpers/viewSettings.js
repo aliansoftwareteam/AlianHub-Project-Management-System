@@ -6,6 +6,7 @@ const GROUP_BY = [0, 1, 2, 3];
 const CUSTOM_GROUP = /^cf:[a-f0-9]{24}$/i;
 const DONE_BY = ['all', 'human', 'agent', 'mixed', 'unchecked'];
 const SUBTASKS = ['collapsed', 'expanded'];
+const WORKLOAD_UNITS = ['hours', 'points', 'count'];
 const FILTER_TYPES = ['array', 'string', 'date', 'object', 'arrayOfObject', 'custom'];
 const CUSTOM_FIELD_TYPES = ['dropdown', 'checkbox', 'date', 'number', 'money', 'text', 'textarea', 'email', 'phone'];
 const CUSTOM_VALUE = /^customField\.([a-f0-9]{24})\.fieldValue$/i;
@@ -28,6 +29,7 @@ const DEFAULT_VIEW_SETTINGS = Object.freeze({
     filters: [],
     sort: null,
     columns: Object.freeze({ order: [], shown: [], hidden: [] }),
+    workloadUnit: 'hours',
 });
 
 const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
@@ -103,6 +105,7 @@ const cleanViewSettings = (raw) => {
         filters: (Array.isArray(settings.filters) ? settings.filters : []).slice(0, LIMITS.filters).map(cleanFilterRow).filter(Boolean),
         sort: cleanSort(settings.sort),
         columns: cleanColumns(settings.columns),
+        workloadUnit: WORKLOAD_UNITS.includes(settings.workloadUnit) ? settings.workloadUnit : DEFAULT_VIEW_SETTINGS.workloadUnit,
     };
 };
 

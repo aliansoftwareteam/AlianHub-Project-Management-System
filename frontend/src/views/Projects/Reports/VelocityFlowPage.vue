@@ -83,7 +83,8 @@ import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import ReportsTabs from './ReportsTabs.vue';
-import { forecastBand, completedSeries, hasActorSplit } from './composables/forecast';
+import { hasActorSplit } from './composables/forecast';
+import { velocityScale, fetchVelocity } from './composables/agileReports';
 
 defineOptions({ name: 'VelocityFlowPage' });
 
@@ -106,26 +107,15 @@ const headline = computed(() => [projectName.value, t('Reports.last_n_sprints', 
     .filter(Boolean).join(' · ').toUpperCase());
 
 const splitAvailable = computed(() => hasActorSplit(rows.value));
-const completedOf = (row) => {
-    if (!humanOnly.value) return Number(row.completed) || 0;
-    const human = row.completedHuman !== undefined ? row.completedHuman : row.humanCompleted;
-    return Number(human) || 0;
-};
-
-const series = computed(() => completedSeries(rows.value, { humanOnly: humanOnly.value }).filter((v) => v !== null));
-const forecast = computed(() => forecastBand(series.value, { window: SPRINT_WINDOW }));
+const scale = computed(() => velocityScale(rows.value, { humanOnly: humanOnly.value, window: SPRINT_WINDOW, barHeight: BAR_HEIGHT }));
+const completedOf = (row) => scale.value.completedOf(row);
+const heightOf = (value) => scale.value.heightOf(value);
+const forecast = computed(() => scale.value.forecast);
 const forecastRange = computed(() => (forecast.value.ok ? `${forecast.value.low}–${forecast.value.high}` : ''));
-
-const scaleMax = computed(() => Math.max(
-    1,
-    ...rows.value.map((r) => Math.max(Number(r.committed) || 0, completedOf(r))),
-    forecast.value.ok ? forecast.value.high : 0,
-));
-const heightOf = (value) => `${Math.max(2, Math.round(((Number(value) || 0) / scaleMax.value) * BAR_HEIGHT))}px`;
 
 const velocityNote = computed(() => {
     if (!rows.value.length) return '';
-    const avg = Math.round(series.value.reduce((a, b) => a + b, 0) / Math.max(1, series.value.length));
+    const avg = scale.value.average;
     return forecast.value.ok
         ? t('Reports.avg_next', { avg, low: forecast.value.low, high: forecast.value.high }).toUpperCase()
         : t('Reports.avg_only', { avg }).toUpperCase();
@@ -173,10 +163,10 @@ const load = async () => {
     if (!projectId.value) return;
     const pid = encodeURIComponent(projectId.value);
     const [vel, cfd] = await Promise.allSettled([
-        apiRequest('get', `${env.AGILE_VELOCITY}?projectId=${pid}&limit=${SPRINT_WINDOW}`),
+        fetchVelocity(projectId.value, SPRINT_WINDOW),
         apiRequest('get', `${env.AGILE_CFD}?projectId=${pid}`),
     ]);
-    if (vel.status === 'fulfilled' && vel.value?.data?.status) rows.value = vel.value.data.data.sprints || [];
+    if (vel.status === 'fulfilled') rows.value = vel.value.sprints || [];
     if (cfd.status === 'fulfilled' && cfd.value?.data?.status) cfdDays.value = cfd.value.data.data.days || [];
     if (!splitAvailable.value) humanOnly.value = false;
 };

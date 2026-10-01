@@ -5,14 +5,23 @@ const DAY = 24 * HOUR;
 export const CHIPS = ['all', 'tasks', 'projects', 'docs', 'people'];
 export const RECORD_CHIPS = ['tasks', 'projects', 'docs'];
 
-const KIND_OF_CHIP = { tasks: 'task', projects: 'project', docs: 'page', people: 'person' };
+const KINDS_OF_CHIP = { tasks: ['task'], projects: ['project', 'sprint'], docs: ['page'], people: ['person'] };
 
 const ASK_KINDS = new Set(['ask', 'source', 'continue']);
 
 /* Which rows a chip keeps. Ask AI and its answer stay under every chip so the query can always go to AI. */
 export function chipAllows(chip, kind) {
     if (chip === 'all' || ASK_KINDS.has(kind)) return true;
-    return KIND_OF_CHIP[chip] === kind;
+    return (KINDS_OF_CHIP[chip] || []).includes(kind);
+}
+
+/* Rows written before visits were typed carry only `task`. */
+export const recentType = (item) => (item && (item.type || (item.task ? 'task' : ''))) || '';
+
+/* A recent sprint already names its project and opens inside it, so the project's own row would repeat it. */
+export function foldRecentProjects(items) {
+    const withSprint = new Set((items || []).filter((item) => recentType(item) === 'sprint').map((item) => String(item.projectId)));
+    return (items || []).filter((item) => recentType(item) !== 'project' || !withSprint.has(String(item.id)));
 }
 
 const COMMAND_LEAD_MIN = 3;
