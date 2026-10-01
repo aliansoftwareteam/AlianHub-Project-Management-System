@@ -169,6 +169,7 @@
     import { taskPlanPermission } from "@/composable/commonFunction";
     import { useI18n } from "vue-i18n";
     import { apiRequest } from '../../../services';
+    import { nestedFolders } from '@/utils/folderTree';
     import * as env from '@/config/env';
     const { t } = useI18n();
     const props = defineProps({
@@ -309,7 +310,7 @@
     const isSidebarOPen = ref(props.closeSideBar);
     const selectedProjectData = ref(props.selectedProjectObject == undefined ? projectData.value : props.selectedProjectObject);
     const sprints = ref(JSON.parse(JSON.stringify(Object.values(selectedProjectData.value.sprintsObj || {}).filter((x)=>x.deletedStatusKey === undefined || x.deletedStatusKey === 0)|| {})));
-    const sprintFolders = ref(JSON.parse(JSON.stringify(Object.values(selectedProjectData.value.sprintsfolders || {}).filter((x)=>x.deletedStatusKey === undefined || x.deletedStatusKey === 0))));
+    const sprintFolders = ref(JSON.parse(JSON.stringify(nestedFolders(selectedProjectData.value.sprintsfolders))));
     const isShowProjectList = ref(false);
     const taskSearch = ref("");
     const searchData = ref([]);
@@ -335,7 +336,7 @@
         task.value = props.task;
         getSprintFolderData(selectedProjectData.value._id).then(() => {
             sprints.value = JSON.parse(JSON.stringify(Object.values(selectedProjectData.value.sprintsObj || {}).filter((x)=>x.deletedStatusKey === undefined || x.deletedStatusKey === 0)|| {}))
-            sprintFolders.value = JSON.parse(JSON.stringify(Object.values(selectedProjectData.value.sprintsfolders || {}).filter((x)=>x.deletedStatusKey === undefined || x.deletedStatusKey === 0)));
+            sprintFolders.value = JSON.parse(JSON.stringify(nestedFolders(selectedProjectData.value.sprintsfolders)));
             if(props.isMoveTask === true){
                 if(filterFoldersSprints.value.length === 0 && filterSprints.value.filter((x) => x.id !== task.value.sprintId)?.length ===0){
                     isShowProjectList.value = true;
@@ -371,7 +372,7 @@
         selectedProjectData.value = event;
         await getSprintFolderData(selectedProjectData.value._id);
         sprints.value = JSON.parse(JSON.stringify(Object.values(selectedProjectData.value.sprintsObj || {}).filter((x)=>x.deletedStatusKey === undefined || x.deletedStatusKey === 0)|| {}))
-        sprintFolders.value = JSON.parse(JSON.stringify(Object.values(selectedProjectData.value.sprintsfolders || {}).filter((x)=>x.deletedStatusKey === undefined || x.deletedStatusKey === 0)));
+        sprintFolders.value = JSON.parse(JSON.stringify(nestedFolders(selectedProjectData.value.sprintsfolders)));
         isShowProjectList.value = false;
         selectedSprintData.value = {};
     }
@@ -1073,6 +1074,7 @@
                                     deletedStatusKey: folder.deletedStatusKey,
                                     id: folder._id,
                                     _id: folder._id,
+                                    parentFolderId: folder.parentFolderId || null,
                                 };
                             }
                             return acc;

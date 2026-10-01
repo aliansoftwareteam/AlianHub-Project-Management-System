@@ -79,8 +79,19 @@ const props = defineProps({
 	subItems: {
 		type: Array,
 		default: () => []
+	},
+	parentFolderId: {
+		type: String,
+		default: ''
+	},
+	project: {
+		type: Object,
+		default: null
 	}
 })
+
+/* A host that provides `selectedProject` cannot inject it, so it hands the project over. */
+const folderProject = () => props.project || projectData?.value;
 
 const inProgress = ref(false);
 
@@ -222,7 +233,7 @@ function createEditFolder() {
 				}
 				folderIndex = props.subItems?.filter((y) => y.folderId && y.deletedStatusKey !== 1).findIndex((x) => x.name?.toLowerCase() === listName.value.value.toLowerCase() && x.folderId !== props.item.id)
 			} else {
-				folderIndex = props.subItems?.filter((y) => y.folderId && y.deletedStatusKey !== 1).findIndex((x) => x.name?.toLowerCase() === listName.value.value.toLowerCase())
+				folderIndex = props.subItems?.filter((y) => y.folderId && y.deletedStatusKey !== 1 && String(y.parentFolderId || '') === props.parentFolderId).findIndex((x) => x.name?.toLowerCase() === listName.value.value.toLowerCase())
 			}
 
 			if(folderIndex !== -1) {
@@ -233,8 +244,9 @@ function createEditFolder() {
 
 			const axiosData = {
 				companyId: companyId.value,
-				projectId: projectData.value._id,
+				projectId: folderProject()._id,
 				folderName: listName.value.value,
+				...(props.item === null && props.parentFolderId ? { parentFolderId: props.parentFolderId } : {}),
 			}
 
 			let endPoint = "";
@@ -269,7 +281,7 @@ function createEditFolder() {
 				inProgress.value = false;
 			})
 			.catch((err) => {
-				$toast.error(t(`Toast.something_went_wrong`), {position: "top-right"})
+				$toast.error(err?.response?.data?.statusText || t(`Toast.something_went_wrong`), {position: "top-right"})
 				emit('cancel');
 				inProgress.value = false;
 				console.error("Error: ", err);

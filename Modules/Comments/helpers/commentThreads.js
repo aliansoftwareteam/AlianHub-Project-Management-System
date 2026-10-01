@@ -6,6 +6,7 @@ const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard')
 const { isPerson } = require('../../Users/helpers/reportingLine');
 const { commentThreadAccess } = require('./threadAccess');
 const { threadOf } = require('./threadWriteAccess');
+const { isChannelMessage, keptRoot } = require('./chatThreads');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const isId = (value) => OBJECT_ID.test(String(value || ''));
@@ -13,6 +14,7 @@ const oid = (id) => new mongoose.Types.ObjectId(String(id));
 
 const ASSIGNMENT_FIELDS = ['assigneeId', 'assignedBy', 'assignedAt', 'resolved', 'resolvedBy', 'resolvedAt'];
 const THREAD_STATE_FIELDS = ['parentId', ...ASSIGNMENT_FIELDS];
+const SUMMARY_FIELDS = ['replyCount', 'lastReplyAt', 'replierIds'];
 const PLACEMENT_FIELDS = ['projectId', 'sprintId', 'taskId', 'folderId', 'project'];
 
 const INVALID = { allowed: false, statusCode: 400 };
@@ -25,15 +27,21 @@ const without = (data, fields) => {
     return kept;
 };
 
-/* Assignment only changes through its own routes, so a save or edit never carries it. */
-const withoutAssignment = (data) => without(data, ASSIGNMENT_FIELDS);
-const withoutThreadState = (data) => without(data, THREAD_STATE_FIELDS);
+/* Assignment only changes through its own routes, and a thread's count is worked out on every read, so a save or
+ * edit never carries either. */
+const withoutAssignment = (data) => without(data, [...ASSIGNMENT_FIELDS, ...SUMMARY_FIELDS]);
+const withoutThreadState = (data) => without(data, [...THREAD_STATE_FIELDS, ...SUMMARY_FIELDS]);
 
 const findComment = (companyId, id) => (isId(id)
     ? MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: [{ _id: oid(id), isDeleted: { $ne: true } }] }, 'findOne')
     : Promise.resolve(null));
 
 const isTaskComment = (comment) => Boolean(comment) && isId(comment.taskId) && isId(comment.projectId);
+
+/* A direct message hangs off a task row, so it already reads as a task comment; a channel message does not. */
+const canHoldThread = (comment) => isTaskComment(comment) || isChannelMessage(comment);
+
+const findThreadRoot = async (companyId, id) => (await findComment(companyId, id)) || keptRoot(companyId, id);
 
 /* A reply lives in its parent's thread: whatever thread the caller names, the ids are the parent's, so the
  * reply can be read and written by exactly the people who can read the parent. A reply to a reply joins the
@@ -43,9 +51,9 @@ const placeReply = async (companyId, data) => {
     const { parentId } = data;
     if (parentId === null || parentId === undefined || parentId === '') return { allowed: true, data: without(data, ['parentId']) };
     if (!isId(parentId)) return INVALID;
-    const parent = await findComment(companyId, parentId);
+    const parent = await findThreadRoot(companyId, parentId);
     if (!parent) return NOT_FOUND;
-    if (!isTaskComment(parent)) return INVALID;
+    if (!canHoldThread(parent)) return INVALID;
     const placed = { ...data, parentId: parent.parentId ? oid(parent.parentId) : oid(parent._id) };
     PLACEMENT_FIELDS.forEach((field) => {
         if (parent[field] === undefined || parent[field] === null) delete placed[field];
@@ -96,6 +104,8 @@ module.exports = {
     withoutThreadState,
     findComment,
     isTaskComment,
+    canHoldThread,
+    findThreadRoot,
     placeReply,
     canBeAssigned,
     canReassign,
