@@ -96,7 +96,7 @@ async function measureApi({ base, session, runs, room, log = () => {} }) {
             if (n >= WARM_UP_RUNS) samples.push(last.ms);
         }
         const rows = last.rows === undefined ? rowsOf(last.json) : last.rows;
-        const metric = { key: probe.key, label: probe.label, unit: 'ms', ...summarise(samples), bytes: last.bytes, rows, detail: `${rows} rows, ${kilobytes(last.bytes)}` };
+        const metric = { key: probe.key, label: probe.label, unit: 'ms', ...summarise(samples), bytes: last.bytes, rows, detail: `${rows} ${rows === 1 ? 'row' : 'rows'}, ${kilobytes(last.bytes)}` };
         metrics.push(metric);
         log(`${probe.label}: median ${metric.median} ms, p95 ${metric.p95} ms, ${metric.detail}`);
     }
