@@ -1,6 +1,7 @@
 /* The Comments, Checklists and Attachments cells of a ClickUp export. ClickUp's help pages name these columns without fixing
  * their shape, so each reader takes the JSON shapes ClickUp is known to write and falls back to plain text. Pure, no I/O. */
 const { parseDate } = require('./csvRules');
+const { safeHref } = require('../../CustomField/fieldTypes/url');
 
 const MAX_COMMENTS = 200;
 const MAX_COMMENT_LENGTH = 10000;
@@ -135,12 +136,13 @@ const fileNameOf = (url) => {
 
 const linkOf = (entry) => {
     const url = typeof entry === 'string' ? entry.trim() : (isPlainObject(entry) ? firstText(entry, ['url', 'link', 'href']) : '');
-    if (!HTTP_URL.test(url) || url.length > MAX_URL_LENGTH) return null;
+    if (!HTTP_URL.test(url) || url.length > MAX_URL_LENGTH || !safeHref(url)) return null;
     const title = isPlainObject(entry) ? firstText(entry, ['title', 'name', 'filename']) : '';
     return { url, label: (title || fileNameOf(url) || url).slice(0, MAX_LABEL_LENGTH) };
 };
 
-/* An attachment arrives as its name and its address in ClickUp. It becomes a link: nothing is fetched or stored. */
+/* An attachment arrives as its name and its address in ClickUp. It becomes a link: nothing is fetched or stored. The
+ * task panel's Links list draws a link when `safeHref` accepts its address, so only those are kept. */
 const parseAttachmentLinks = (raw) => {
     const text = trimmed(raw);
     if (!text) return [];

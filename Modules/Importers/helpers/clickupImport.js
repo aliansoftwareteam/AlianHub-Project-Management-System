@@ -10,9 +10,8 @@ const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard')
 const { fieldInsertFrom } = require('../../CustomField/helpers/fieldWrite');
 const { isTaskFieldOf } = require('../../CustomField/helpers/fieldValueInput');
 const { recordFieldCreated } = require('../../CustomField/helpers/customFieldHistory');
-const { escapeCommentText } = require('../../Comments/helpers/plainText');
 const { findCompanyMembers } = require('./companyMembers');
-const { MAX_COMMENT_LENGTH, saveImportedComments } = require('./importComments');
+const { saveImportedComments } = require('./importComments');
 const { transformClickUpRows } = require('./clickupRules');
 const { fieldDefinitionFrom, namedPeople } = require('./clickupFields');
 const { planClickUpList, stateAfter, mergeSummaries, fieldsSummary } = require('./clickupPlan');
@@ -23,7 +22,6 @@ const COMMENT = ['task.task_comment'];
 const EVERYTHING = Object.freeze({ fields: true, comments: true });
 const SOURCE = 'clickup';
 const LINK_KIND = 'link';
-const LINKS_HEADING = 'Attachments in ClickUp:';
 
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
 const lower = (value) => String(value === undefined || value === null ? '' : value).trim().toLowerCase();
@@ -128,21 +126,8 @@ const saveLinks = async (companyId, rows, actorId) => {
     return saved;
 };
 
-/* The task panel shows a link that a comment carries; the links stored on the task are not drawn there. */
-const linksComment = (links, actorId) => ({
-    message: escapeCommentText([LINKS_HEADING, ...links.map((link) => (link.label === link.url ? link.url : `${link.label}: ${link.url}`))].join('\n').slice(0, MAX_COMMENT_LENGTH)),
-    userId: actorId,
-    type: 'link',
-});
-
 const saveComments = (companyId, { project, sprint, rows, people, actorId }) => saveImportedComments(companyId, {
-    source: SOURCE,
-    project,
-    sprint,
-    rows,
-    actorId,
-    authorIdByEmail: people.authorIdByEmail,
-    extraFor: (row) => (Array.isArray(row.links) && row.links.length ? [linksComment(row.links, actorId)] : []),
+    source: SOURCE, project, sprint, rows, actorId, authorIdByEmail: people.authorIdByEmail,
 });
 
 /* Plans the import of one list against the project as it is, saves the field definitions, and puts the field values

@@ -38,9 +38,8 @@ const commentOf = (comment, { authorIdByEmail, actorId }) => {
 /* Imported comments are history, not news: each is saved without the socket event, the unread counts, the mention
  * notices and the agent starts a comment written in the app sets off, and is marked with the importer it came through.
  * A comment carries text alone, never a file. Each row was stamped with `createdTaskId` by the create path; a comment
- * that cannot be saved is logged and never fails the import. `extraFor` adds comments the importer writes itself,
- * which are not counted. Answers how many of the file's comments were saved. */
-const saveImportedComments = async (companyId, { source, project, sprint, rows, actorId, authorIdByEmail = new Map(), extraFor = () => [] }) => {
+ * that cannot be saved is logged and never fails the import. Answers how many comments were saved. */
+const saveImportedComments = async (companyId, { source, project, sprint, rows, actorId, authorIdByEmail = new Map() }) => {
     let saved = 0;
     for (const row of rows) {
         if (!row.createdTaskId) continue;
@@ -54,9 +53,8 @@ const saveImportedComments = async (companyId, { source, project, sprint, rows, 
         for (const comment of (Array.isArray(row.comments) ? row.comments : []).filter((entry) => entry && entry.text)) {
             if (await save(commentOf(comment, { authorIdByEmail, actorId }))) saved += 1;
         }
-        for (const comment of extraFor(row)) await save(comment);
     }
     return saved;
 };
 
-module.exports = { MAX_COMMENT_LENGTH, saveImportedComments };
+module.exports = { saveImportedComments };
