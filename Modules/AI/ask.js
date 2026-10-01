@@ -280,7 +280,7 @@ const ask = async (req, res) => {
         });
     } catch (error) {
         logger.error(`ai ask: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return res.send({ status: false, statusText: error.message, ...(typeof error.code === 'string' ? { code: error.code } : {}) });
     }
 };
 
