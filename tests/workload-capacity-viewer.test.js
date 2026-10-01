@@ -28,12 +28,16 @@ const DAY = '2026-09-02';
 
 const oid = () => new mongoose.Types.ObjectId().toString();
 
-const run = async (handler, uid, { query = {}, body = {} } = {}) => {
+const send = async (handler, uid, { query = {}, body = {} } = {}) => {
     const res = { statusCode: 200, body: undefined };
     res.status = (code) => { res.statusCode = code; return res; };
     res.json = (payload) => { res.body = payload; return res; };
     res.send = res.json;
     await handler({ uid, aud: C, params: {}, body, query, headers: { companyid: C } }, res);
+    return res;
+};
+const run = async (handler, uid, request) => {
+    const res = await send(handler, uid, request);
     expect(res.statusCode).toBe(200);
     return res.body.data;
 };
@@ -47,6 +51,9 @@ const seedRule = (section, key, permissions) => {
 let open;
 let secret;
 let list;
+let sharedWork;
+let closedDoorWork;
+let errand;
 
 const seedTask = (TaskName, project, extra = {}) => mockDb.seed(SCHEMA_TYPE.TASKS, {
     _id: oid(), TaskName, ProjectID: String(project._id), AssigneeUserId: [MATE], statusType: 'active', isParentTask: true, deletedStatusKey: 0, ...extra,
@@ -72,11 +79,13 @@ beforeEach(() => {
     const shared = mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: oid(), name: 'Shared', projectId: String(open._id) });
     const closedDoor = mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: oid(), name: 'Closed door', projectId: String(open._id), private: true, AssigneeUserId: [MATE] });
 
-    const sharedWork = seedTask('Shared work', open, { sprintId: String(shared._id) });
+    sharedWork = seedTask('Shared work', open, { sprintId: String(shared._id) });
+    closedDoorWork = seedTask('Closed door work', open, { sprintId: String(closedDoor._id) });
+    errand = seedTask('Errand', list);
     plan(MATE, sharedWork, 60);
-    plan(MATE, seedTask('Closed door work', open, { sprintId: String(closedDoor._id) }), 120);
+    plan(MATE, closedDoorWork, 120);
     plan(MATE, seedTask('Secret work', secret), 240);
-    plan(MATE, seedTask('Errand', list), 480);
+    plan(MATE, errand, 480);
     plan(SEES_OWN, sharedWork, 15);
 
     const due = { DueDate: new Date('2026-09-20T12:00:00.000Z'), points: 1 };
@@ -158,5 +167,70 @@ describe('the workload grid', () => {
     ])('counts the open tasks, by task count, for %s', async (_who, uid, tasks) => {
         const data = await run(grid.getWorkloadGrid, uid, { body: { start: '2026-09-20', end: '2026-09-20', userIds: [MATE], unit: 'count' } });
         expect(data.users.find((row) => row.userId === MATE).totalLoad).toBe(tasks);
+    });
+});
+
+describe('time off in capacity and the workload grid', () => {
+    const OFF = '2026-09-03';
+    beforeEach(() => {
+        mockDb.seed(SCHEMA_TYPE.PTO_ENTRIES, { userId: MATE, status: 'approved', deletedStatusKey: 0, startDate: new Date(`${OFF}T00:00:00.000Z`), endDate: new Date(`${OFF}T00:00:00.000Z`), hoursPerDay: 8, reason: 'Dentist' });
+    });
+    const planRow = async (uid) => (await run(capacity.getCapacityPlan, uid, { query: { from: '2026-09-01', to: '2026-09-05' } })).users.find((row) => row.userId === MATE);
+    const crewMonth = async (uid) => (await run(capacity.getMonthlyCapacity, uid, { query: { from: '2026-09', to: '2026-09' } })).teams.find((team) => team.name === 'Crew').months['2026-09'];
+    const offDay = async (uid, unit = 'hours') => (await run(grid.getWorkloadGrid, uid, { body: { start: OFF, end: OFF, userIds: [MATE], unit } })).users.find((row) => row.userId === MATE).days[0];
+
+    it.each([['an owner', OWNER], ['the person themselves', MATE]])('is named as time off to %s', async (_who, uid) => {
+        expect(await planRow(uid)).toMatchObject({ ptoHours: 8, unavailableHours: 8, capacityHours: 24 });
+        const month = await crewMonth(uid);
+        expect(month).toMatchObject({ ptoHours: 8, unavailableHours: 8 });
+        expect(month.notes).toEqual([expect.objectContaining({ userId: MATE, kind: 'pto', days: 1 })]);
+        expect(await offDay(uid)).toMatchObject({ pto: true, capacityMinutes: 0 });
+        expect(await offDay(uid, 'count')).toMatchObject({ pto: true, capacity: 0 });
+    });
+
+    it('reaches another member as unavailable time, with the same capacity and no reason', async () => {
+        const row = await planRow(SEES_EVERYONE);
+        expect(row).toMatchObject({ ptoHours: 0, unavailableHours: 8, capacityHours: 24 });
+        const month = await crewMonth(SEES_EVERYONE);
+        expect(month).toMatchObject({ ptoHours: 0, unavailableHours: 8, availableHours: (await crewMonth(OWNER)).availableHours });
+        expect(month.notes).toEqual([expect.objectContaining({ userId: MATE, kind: 'unavailable', days: 1 })]);
+        const day = await offDay(SEES_EVERYONE);
+        expect(day).toMatchObject({ pto: false, unavailable: true, capacityMinutes: 0 });
+        expect(await offDay(SEES_EVERYONE, 'count')).toMatchObject({ pto: false, unavailable: true, capacity: 0 });
+        expect(JSON.stringify([row, month, day])).not.toContain('Dentist');
+    });
+});
+
+describe('moving planned work', () => {
+    const planOf = (userId, task) => mockDb.store[SCHEMA_TYPE.ESTIMATES_TIME].find((row) => row.UserId === userId && row.TaskId === String(task._id));
+    const dayOf = (row) => row.Date.toISOString().slice(0, 10);
+    const move = (uid, task, extra = {}) => send(grid.moveWorkloadChip, uid, {
+        body: { taskId: String(task._id), fromUserId: uid, toUserId: uid, fromDate: DAY, toDate: '2026-09-04', ...extra },
+    });
+
+    it('moves a member\'s own plan on a task they can open', async () => {
+        const res = await move(SEES_OWN, sharedWork);
+        expect(res.statusCode).toBe(200);
+        expect(dayOf(planOf(SEES_OWN, sharedWork))).toBe('2026-09-04');
+    });
+
+    it('answers 404 for a task in a private sprint the caller is not on, and moves nothing', async () => {
+        plan(SEES_OWN, closedDoorWork, 30);
+        const res = await move(SEES_OWN, closedDoorWork);
+        expect(res.statusCode).toBe(404);
+        expect(dayOf(planOf(SEES_OWN, closedDoorWork))).toBe(DAY);
+        expect(mockDb.store[SCHEMA_TYPE.TASKS].find((task) => task._id === closedDoorWork._id).DueDate).toBeUndefined();
+    });
+
+    it('answers 404 to an owner for a task in a personal list that is someone else\'s', async () => {
+        const res = await move(OWNER, errand, { fromUserId: MATE, toUserId: MATE });
+        expect(res.statusCode).toBe(404);
+        expect(dayOf(planOf(MATE, errand))).toBe(DAY);
+    });
+
+    it('moves only the plan of the task and person named, whatever plan id is sent', async () => {
+        const res = await move(SEES_OWN, sharedWork, { estimateId: String(planOf(MATE, sharedWork)._id) });
+        expect(res.statusCode).toBe(200);
+        expect(dayOf(planOf(MATE, sharedWork))).toBe(DAY);
     });
 });

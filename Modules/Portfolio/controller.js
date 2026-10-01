@@ -30,12 +30,14 @@ const plain = (doc) => (doc && doc.toObject ? doc.toObject() : { ...doc });
 /* Owners and admins see every portfolio unless a token narrows them to some projects. */
 const seesEveryPortfolio = async (companyId, uid) => isPrivileged(await getRoleType(companyId, uid)) && !narrowingFor(uid);
 
+const shown = (portfolio, visible, canDelete) => ({ ...plain(portfolio), projectIds: idsOf(portfolio.projectIds).filter((id) => visible.has(id)), canDelete });
+
 /* A portfolio is seen by whoever can open one of its projects, by its creator, and by owners and
- * admins; `visible` holds the project ids the caller can open, and only those are named. */
+ * admins; `visible` holds the project ids the caller can open, and only those are named. Other
+ * people use it, so seeing it is not enough to remove it: that is for the last three. */
 const viewOf = (portfolio, uid, visible, seesAll) => {
-    const projectIds = idsOf(portfolio.projectIds).filter((id) => visible.has(id));
-    if (!projectIds.length && !seesAll && String(portfolio.createdBy || '') !== String(uid)) return null;
-    return { ...plain(portfolio), projectIds };
+    const view = shown(portfolio, visible, seesAll || String(portfolio.createdBy || '') === String(uid));
+    return view.projectIds.length || view.canDelete ? view : null;
 };
 
 const openableIn = async (companyId, uid, portfolio) => new Set(await keepVisibleProjectIds(companyId, uid, idsOf(portfolio.projectIds)));
@@ -108,7 +110,7 @@ exports.updatePortfolio = async (req, res) => {
         if (!updated) return notFound(res);
         removeCache(`portfolios:${companyId}`);
         /* Answered to the editor even when they just removed the last project that let them see it. */
-        const data = viewOf(updated, req.uid, await openableIn(companyId, req.uid, updated), true);
+        const data = shown(updated, await openableIn(companyId, req.uid, updated), found.view.canDelete);
         return res.json({ status: true, statusText: 'Portfolio updated.', data });
     } catch (e) { return failed(res, 'updatePortfolio', e); }
 };
@@ -117,7 +119,11 @@ exports.updatePortfolio = async (req, res) => {
 exports.deletePortfolio = async (req, res) => {
     try {
         const companyId = sessionTenantOf(req);
-        if (!(await findVisible(companyId, req.uid, req.params.id))) return notFound(res);
+        const found = await findVisible(companyId, req.uid, req.params.id);
+        if (!found) return notFound(res);
+        if (!found.view.canDelete) {
+            return res.status(403).json({ status: false, statusText: 'Only its creator, an owner or an admin can remove a portfolio.' });
+        }
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PORTFOLIOS,
             data: [{ _id: oid(req.params.id) }, { $set: { deletedStatusKey: 1 } }],

@@ -42,7 +42,9 @@ const cellStatus = ({ availableHours, committedHours }) => {
 /* Roll member-months up into team-months.
  *   teams: [{ teamId, name, memberIds: [] }]
  *   users: { [userId]: { name, months: { [m]: { availableHours, ptoHours, committedHours, pipelineHours, ptoDays } } } }
- * Members outside any team land in a synthetic "unassigned" team so no hours vanish. */
+ * Members outside any team land in a synthetic "unassigned" team so no hours vanish.
+ * A member-month may carry unavailableHours and unavailableDays above its pto figures: time off
+ * whose reason the reader is not told, which still counts as time away. */
 const summarizeTeams = ({ teams = [], users = {}, months = [] } = {}) => {
     const inTeam = new Set();
     const list = teams.map((t) => ({ teamId: String(t.teamId), name: t.name, memberIds: (t.memberIds || []).map(String) }));
@@ -54,22 +56,25 @@ const summarizeTeams = ({ teams = [], users = {}, months = [] } = {}) => {
     const rows = list.map((t) => {
         const byMonth = {};
         months.forEach((m) => {
-            const cell = { availableHours: 0, ptoHours: 0, committedHours: 0, pipelineHours: 0, notes: [] };
+            const cell = { availableHours: 0, ptoHours: 0, unavailableHours: 0, committedHours: 0, pipelineHours: 0, notes: [] };
             t.memberIds.forEach((id) => {
                 const u = users[id];
                 const um = u && u.months && u.months[m];
                 if (!um) return;
                 cell.availableHours += um.availableHours || 0;
                 cell.ptoHours += um.ptoHours || 0;
+                cell.unavailableHours += um.unavailableHours === undefined ? (um.ptoHours || 0) : um.unavailableHours;
                 cell.committedHours += um.committedHours || 0;
                 cell.pipelineHours += um.pipelineHours || 0;
                 if (um.ptoDays > 0) cell.notes.push({ userId: id, name: u.name, kind: 'pto', days: um.ptoDays });
+                else if (um.unavailableDays > 0) cell.notes.push({ userId: id, name: u.name, kind: 'unavailable', days: um.unavailableDays });
                 if (um.availableHours > 0 && um.committedHours > um.availableHours) {
                     cell.notes.push({ userId: id, name: u.name, kind: 'over', pct: Math.round((um.committedHours / um.availableHours) * 100) });
                 }
             });
             cell.availableHours = round1(cell.availableHours);
             cell.ptoHours = round1(cell.ptoHours);
+            cell.unavailableHours = round1(cell.unavailableHours);
             cell.committedHours = round1(cell.committedHours);
             cell.pipelineHours = round1(cell.pipelineHours);
             cell.status = cellStatus(cell);
