@@ -3968,6 +3968,7 @@ export default {
         rollup_scope: "Across",
         rollup_scope_subtasks: "Subtasks",
         rollup_scope_sprint: "Sprint",
+        rollup_help: "A rollup counts every subtask under the task, on every level, once each. On a subtask it counts the subtasks under that one. A source field counts only on the task types it is for.",
         show_as: "Show as",
         format_money: "Money",
         format_number: "Number",
