@@ -4600,6 +4600,8 @@ const schema = {
     },
     // What a relationship or a voting field holds on one task: task ids, or the ids of the people who voted.
     customFieldLinks: {
+        // "<taskId>:<fieldId>", so a task holds one document for a field
+        _id: { type: String, required: false },
         taskId: { type: String, required: true },
         fieldId: { type: String, required: true },
         // relationship | voting

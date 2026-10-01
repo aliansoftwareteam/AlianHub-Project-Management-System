@@ -87,7 +87,8 @@ describe('a vote count', () => {
         expect(tally(FIRST)).toEqual({ _id: VOTES, fieldValue: 2, revision: expect.any(Number), version: 2 });
         const votesWritten = mockDb.calls.filter((call) => call.type === SCHEMA_TYPE.CUSTOM_FIELD_LINKS);
         expect(votesWritten.map((call) => call.method)).toEqual(['findOneAndUpdate', 'findOneAndUpdate']);
-        expect(votesWritten[1].data[1]).toEqual({ $addToSet: { ids: ADMIN }, $inc: { version: 1 } });
+        expect(votesWritten[1].data[1]).toEqual({ $addToSet: { ids: ADMIN }, $inc: { version: 1 }, $setOnInsert: { _id: `${FIRST}:${VOTES}` } });
+        expect(linkOf(FIRST, VOTES)._id).toBe(`${FIRST}:${VOTES}`);
     });
 
     it('stays right when two votes reach the task in the other order', async () => {
@@ -138,7 +139,7 @@ describe('a vote count', () => {
         mockDb.crud.mockImplementation(async (companyId, query, method) => {
             if (query.type === SCHEMA_TYPE.CUSTOM_FIELD_LINKS && method === 'findOneAndUpdate' && !refused) {
                 refused += 1;
-                await real(companyId, { type: query.type, data: [query.data[0], { $addToSet: { ids: ADMIN }, $inc: { version: 1 } }, query.data[2]] }, method);
+                await real(companyId, { type: query.type, data: [query.data[0], { ...query.data[1], $addToSet: { ids: ADMIN } }, query.data[2]] }, method);
                 throw Object.assign(new Error('E11000 duplicate key'), { code: 11000 });
             }
             return real(companyId, query, method);
@@ -163,7 +164,7 @@ describe('a vote count', () => {
         const [taskCall] = mockDb.calls.filter((call) => call.type === SCHEMA_TYPE.TASKS);
         const sentVote = (await votes.driverWrites(voteCall.method, voteCall.data)).writes[0].args;
         expect(sentVote[0]).toEqual({ taskId: FIRST, fieldId: VOTES, kind: 'voting' });
-        expect(sentVote[1]).toMatchObject({ $addToSet: { ids: OWNER }, $inc: { version: 1 } });
+        expect(sentVote[1]).toMatchObject({ $addToSet: { ids: OWNER }, $inc: { version: 1 }, $setOnInsert: { _id: `${FIRST}:${VOTES}` } });
         const sentTask = (await tasks.driverWrites(taskCall.method, taskCall.data)).writes[0].args;
         expect(sentTask[0].$or).toEqual([{ [`customField.${VOTES}.version`]: { $lt: 1 } }, { [`customField.${VOTES}.version`]: { $exists: false } }]);
         expect(sentTask[1].$set[`customField.${VOTES}`]).toEqual({ _id: VOTES, fieldValue: 1, revision: expect.any(Number), version: 1 });

@@ -31,11 +31,15 @@ const storedIds = async (companyId, { taskId, fieldId, kind }) => {
     return doc ? doc.ids : [];
 };
 
-/* Two first writes for one task and field both try to insert, and the unique index refuses the later one; run again, it updates. */
+/* A document is named after its task and field. Two first writes for the same pair then ask for the same _id, whose
+ * index exists from the collection's first write, where the unique index on the pair may still be building. */
+const named = ({ taskId, fieldId }) => ({ $setOnInsert: { _id: `${taskId}:${fieldId}` } });
+
+/* The later of two such inserts is refused; run again, it finds the document and updates it. */
 const upserting = (write) => write().catch((error) => (error && error.code === DUPLICATE_KEY ? write() : Promise.reject(error)));
 
 const saveIds = (companyId, { taskId, fieldId, kind, ids }) => upserting(() => links(companyId, [
-    { taskId, fieldId }, { $set: { kind, ids } }, { upsert: true, returnDocument: 'after' },
+    { taskId, fieldId }, { $set: { kind, ids }, ...named({ taskId, fieldId }) }, { upsert: true, returnDocument: 'after' },
 ], 'findOneAndUpdate'));
 
 let lastRevision = 0;
@@ -62,7 +66,7 @@ const markTask = async (companyId, { taskId, fieldId, marker, announce = true, n
  * what comes back is the document as that write left it. Nothing is read a second time to count. Answers null when
  * there is nothing to withdraw from. */
 const changeVote = async (companyId, { taskId, fieldId }, voter, vote) => {
-    const change = { [vote ? '$addToSet' : '$pull']: { ids: String(voter) }, $inc: { version: 1 } };
+    const change = { [vote ? '$addToSet' : '$pull']: { ids: String(voter) }, $inc: { version: 1 }, ...(vote ? named({ taskId, fieldId }) : {}) };
     const after = await upserting(() => links(companyId, [{ taskId, fieldId, kind: VOTING }, change, { upsert: vote === true, returnDocument: 'after' }], 'findOneAndUpdate'));
     return after ? withIds(plain(after)) : null;
 };
