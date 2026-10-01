@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils';
-import { h, reactive, ref } from 'vue';
+import { h, ref } from 'vue';
 
 const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }));
 
@@ -12,28 +12,23 @@ import VelocityCard from '@/components/organisms/VelocityCard/VelocityCard.vue';
 import AskAQuestionCard from '@/components/organisms/AskAQuestionCard/AskAQuestionCard.vue';
 import { forgetAskAnswers } from '@/components/organisms/AskAQuestionCard/askCardCache';
 import CardSettings from '@/views/Dashboards/CardSettings.vue';
-import { CARD_META_KEY } from '@/components/organisms/DashboardCard/useCardMeta';
 import { catalogEntry, isBuiltCard } from '@/plugins/dashboard/cardCatalog';
 import { cardComponent } from '@/plugins/dashboard/cardRegistry';
 import { AI_STATE, applyAiAvailability, resetAiAvailability } from '@/composable/aiAvailability';
 import { burndownSeries, velocityScale, sprintChoices } from '@/views/Projects/Reports/composables/agileReports';
+import { ApexChart, mountInShell } from '../cardInShell';
 
 enableAutoUnmount(afterEach);
 
-const ApexChart = { name: 'ApexChart', props: ['series', 'options', 'type', 'height'], render: () => h('div', { 'data-test': 'apex' }) };
 const RouterLink = { name: 'RouterLink', props: ['to'], render() { return h('a', { 'data-test': 'cite-link' }, this.$slots.default && this.$slots.default()); } };
 
 const mountCard = async (component, props = {}, { userId = 'user-1' } = {}) => {
-    const meta = reactive({ state: 'loading', note: '', updatedAt: null, emptyText: '', emptyAction: '', error: '' });
-    const wrapper = mount(component, {
+    const { wrapper, shown } = mountInShell(component, {
         props,
-        global: {
-            provide: { [CARD_META_KEY]: meta, $userId: ref(userId), $companyId: ref('company-1') },
-            stubs: { ApexChart, RouterLink },
-        },
+        global: { provide: { $userId: ref(userId), $companyId: ref('company-1') }, stubs: { RouterLink } },
     });
     await flushPromises();
-    return { wrapper, meta };
+    return { wrapper, shown };
 };
 
 const ok = (data) => ({ data: { status: true, data } });
@@ -93,10 +88,10 @@ describe('Burndown card', () => {
     beforeEach(() => { apiRequest.mockReset(); });
 
     it('asks for a sprint rather than loading anything when none is chosen', async () => {
-        const { meta } = await mountCard(BurndownCard, { cardData: {} });
+        const { shown } = await mountCard(BurndownCard, { cardData: {} });
         expect(apiRequest).not.toHaveBeenCalled();
-        expect(meta.state).toBe('empty');
-        expect(meta.emptyText).toBe('Dash.burndown_pick_sprint');
+        expect(shown.state).toBe('empty');
+        expect(shown.emptyText).toBe('Dash.burndown_pick_sprint');
     });
 
     it('loads the chosen sprint from the burndown report and charts it', async () => {
@@ -104,29 +99,29 @@ describe('Burndown card', () => {
             { date: '2026-09-01', remainingPoints: 12, idealPoints: 12 },
             { date: '2026-09-02', remainingPoints: 7, idealPoints: 6 },
         ] }));
-        const { wrapper, meta } = await mountCard(BurndownCard, { cardData: { projectId: 'p1', sprintId: 's1' } });
+        const { wrapper, shown } = await mountCard(BurndownCard, { cardData: { projectId: 'p1', sprintId: 's1' } });
         expect(apiRequest).toHaveBeenCalledWith('get', '/api/v1/agile/burndown?sprintId=s1');
-        expect(meta.state).toBe('ready');
+        expect(shown.state).toBe('ready');
         expect(wrapper.find('[data-test="burndown-remaining"]').text()).toBe('7');
         expect(wrapper.findComponent(ApexChart).props('series')[0].data).toEqual([12, 7]);
     });
 
     it('is empty when the sprint has no tasks yet', async () => {
         apiRequest.mockResolvedValue(ok({ sprintName: 'Sprint 4', days: [] }));
-        const { meta } = await mountCard(BurndownCard, { cardData: { projectId: 'p1', sprintId: 's1' } });
-        expect(meta.state).toBe('empty');
-        expect(meta.emptyText).toBe('Dash.burndown_no_tasks');
+        const { shown } = await mountCard(BurndownCard, { cardData: { projectId: 'p1', sprintId: 's1' } });
+        expect(shown.state).toBe('empty');
+        expect(shown.emptyText).toBe('Dash.burndown_no_tasks');
     });
 
     it('reports an error it cannot read past, and reloads on the dashboard refresh', async () => {
         apiRequest.mockRejectedValue(new Error('down'));
-        const { wrapper, meta } = await mountCard(BurndownCard, { cardData: { projectId: 'p1', sprintId: 's1' } });
-        expect(meta.state).toBe('error');
+        const { wrapper, shown } = await mountCard(BurndownCard, { cardData: { projectId: 'p1', sprintId: 's1' } });
+        expect(shown.state).toBe('error');
         apiRequest.mockResolvedValue(ok({ days: [{ date: 'd', remainingPoints: 1, idealPoints: 1 }] }));
         await wrapper.setProps({ refreshTrigger: 1 });
         await flushPromises();
         expect(apiRequest).toHaveBeenCalledTimes(2);
-        expect(meta.state).toBe('ready');
+        expect(shown.state).toBe('ready');
     });
 });
 
@@ -136,17 +131,17 @@ describe('Velocity card', () => {
     const sprints = (n) => Array.from({ length: n }, (_, i) => ({ sprintId: `s${i}`, name: `Sprint ${i}`, committed: 10, completed: 8 + i }));
 
     it('asks for a project rather than loading anything when none is chosen', async () => {
-        const { meta } = await mountCard(VelocityCard, { cardData: {} });
+        const { shown } = await mountCard(VelocityCard, { cardData: {} });
         expect(apiRequest).not.toHaveBeenCalled();
-        expect(meta.state).toBe('empty');
-        expect(meta.emptyText).toBe('Dash.velocity_pick_project');
+        expect(shown.state).toBe('empty');
+        expect(shown.emptyText).toBe('Dash.velocity_pick_project');
     });
 
     it('loads the last N sprints of the chosen project and draws a bar pair for each', async () => {
         apiRequest.mockResolvedValue(ok({ sprints: sprints(4), skipped: 0 }));
-        const { wrapper, meta } = await mountCard(VelocityCard, { cardData: { projectId: 'p1', sprintCount: 4 } });
+        const { wrapper, shown } = await mountCard(VelocityCard, { cardData: { projectId: 'p1', sprintCount: 4 } });
         expect(apiRequest).toHaveBeenCalledWith('get', '/api/v1/agile/velocity?projectId=p1&limit=4');
-        expect(meta.state).toBe('ready');
+        expect(shown.state).toBe('ready');
         expect(wrapper.findAll('[data-test="velocity-sprint"]')).toHaveLength(4);
         expect(wrapper.find('[data-test="velocity-average"]').text()).toBe('10');
     });
@@ -162,10 +157,10 @@ describe('Velocity card', () => {
     it('is empty when no sprint has closed yet, and an error when the report fails', async () => {
         apiRequest.mockResolvedValue(ok({ sprints: [] }));
         const empty = await mountCard(VelocityCard, { cardData: { projectId: 'p1' } });
-        expect(empty.meta.state).toBe('empty');
+        expect(empty.shown.state).toBe('empty');
         apiRequest.mockRejectedValue(new Error('down'));
         const failed = await mountCard(VelocityCard, { cardData: { projectId: 'p1' } });
-        expect(failed.meta.state).toBe('error');
+        expect(failed.shown.state).toBe('error');
     });
 });
 
@@ -186,17 +181,17 @@ describe('Ask card', () => {
     });
 
     it('asks for a question rather than calling the model when none is saved', async () => {
-        const { meta } = await mountCard(AskAQuestionCard, { cardData: {} });
+        const { shown } = await mountCard(AskAQuestionCard, { cardData: {} });
         expect(apiRequest).not.toHaveBeenCalled();
-        expect(meta.state).toBe('empty');
-        expect(meta.emptyText).toBe('Dash.ask_pick_question');
+        expect(shown.state).toBe('empty');
+        expect(shown.emptyText).toBe('Dash.ask_pick_question');
     });
 
     it('asks the saved question through Ask and shows the answer with its citations', async () => {
         apiRequest.mockResolvedValue(answer());
-        const { wrapper, meta } = await mountCard(AskAQuestionCard, { cardData: { question: 'What is late?', projectId: 'p1' } });
+        const { wrapper, shown } = await mountCard(AskAQuestionCard, { cardData: { question: 'What is late?', projectId: 'p1' } });
         expect(apiRequest).toHaveBeenCalledWith('post', '/api/v1/ai/ask', { question: 'What is late?', mode: 'ask', projectId: 'p1' });
-        expect(meta.state).toBe('ready');
+        expect(shown.state).toBe('ready');
         expect(wrapper.find('[data-test="ask-card-answer"]').text()).toContain('Two are late');
         const cites = wrapper.findAll('[data-test="ask-card-cite"]');
         expect(cites).toHaveLength(1);
@@ -210,7 +205,7 @@ describe('Ask card', () => {
         expect(apiRequest).toHaveBeenCalledTimes(1);
         const other = await mountCard(AskAQuestionCard, { cardData: { question: 'What is late?' } }, { userId: 'user-2' });
         expect(apiRequest).toHaveBeenCalledTimes(2);
-        expect(other.meta.state).toBe('ready');
+        expect(other.shown.state).toBe('ready');
     });
 
     it('asks afresh on the dashboard refresh', async () => {
@@ -225,45 +220,45 @@ describe('Ask card', () => {
 
     it('says AI is off rather than asking', async () => {
         applyAiAvailability({ state: AI_STATE.OFF_WORKSPACE });
-        const { meta } = await mountCard(AskAQuestionCard, { cardData: { question: 'What is late?' } });
+        const { shown } = await mountCard(AskAQuestionCard, { cardData: { question: 'What is late?' } });
         expect(apiRequest).not.toHaveBeenCalled();
-        expect(meta.state).toBe('empty');
-        expect(meta.emptyText).toBe('AiAvailability.off_workspace_member');
+        expect(shown.state).toBe('empty');
+        expect(shown.emptyText).toBe('AiAvailability.off_workspace_member');
     });
 
     it('says the plan does not include AI rather than asking', async () => {
         applyAiAvailability({ planAllowsAi: false });
-        const { meta } = await mountCard(AskAQuestionCard, { cardData: { question: 'What is late?' } });
+        const { shown } = await mountCard(AskAQuestionCard, { cardData: { question: 'What is late?' } });
         expect(apiRequest).not.toHaveBeenCalled();
-        expect(meta.state).toBe('empty');
-        expect(meta.emptyText).toBe('Dash.ask_not_permitted');
+        expect(shown.state).toBe('empty');
+        expect(shown.emptyText).toBe('Dash.ask_not_permitted');
     });
 
     it('says no model is set up when Ask answers without one', async () => {
         apiRequest.mockResolvedValue(ok({ configured: false, answer: '', sources: [] }));
-        const { meta } = await mountCard(AskAQuestionCard, { cardData: { question: 'What is late?' } });
-        expect(meta.state).toBe('empty');
-        expect(meta.emptyText).toBe('AiAvailability.unconfigured_member');
+        const { shown } = await mountCard(AskAQuestionCard, { cardData: { question: 'What is late?' } });
+        expect(shown.state).toBe('empty');
+        expect(shown.emptyText).toBe('AiAvailability.unconfigured_member');
     });
 
     it('says nothing matched when the viewer can open nothing relevant', async () => {
         apiRequest.mockResolvedValue(ok({ configured: true, answer: '', sources: [], emptyCode: 'no_match' }));
-        const { meta } = await mountCard(AskAQuestionCard, { cardData: { question: 'What is late?' } });
-        expect(meta.state).toBe('empty');
-        expect(meta.emptyText).toBe('Ask.empty_no_match');
+        const { shown } = await mountCard(AskAQuestionCard, { cardData: { question: 'What is late?' } });
+        expect(shown.state).toBe('empty');
+        expect(shown.emptyText).toBe('Ask.empty_no_match');
     });
 
     it('names the spend cap when the workspace budget is used up', async () => {
         apiRequest.mockResolvedValue({ data: { status: false, statusText: 'Budget used', code: 'ai_budget_exhausted' } });
-        const { meta } = await mountCard(AskAQuestionCard, { cardData: { question: 'What is late?' } });
-        expect(meta.state).toBe('error');
-        expect(meta.error).toBe('Dash.ask_budget_exhausted');
+        const { shown } = await mountCard(AskAQuestionCard, { cardData: { question: 'What is late?' } });
+        expect(shown.state).toBe('error');
+        expect(shown.error).toBe('Dash.ask_budget_exhausted');
     });
 
     it('reports an error it cannot read past', async () => {
         apiRequest.mockRejectedValue(new Error('down'));
-        const { meta } = await mountCard(AskAQuestionCard, { cardData: { question: 'What is late?' } });
-        expect(meta.state).toBe('error');
+        const { shown } = await mountCard(AskAQuestionCard, { cardData: { question: 'What is late?' } });
+        expect(shown.state).toBe('error');
     });
 });
 
