@@ -50,9 +50,10 @@ mongoHelper.getTotalSprintCount = async () => true;
 
 const {
     CID, OWNER, ADMIN, MEMBER, OTHER, OUTSIDER, TOKEN, LOCKED_PROJECT, LOCKED_TASK, P_OPEN, P_PRIVATE, P_DEST, PL_OTHER, S_OPEN, S_NEXT, S_SECRET, S_DEST, S_PRIVATE, F,
-    BEFORE, STATUSES, TYPES, settle, ctx, olderToken, readOnly, oauth,
+    BEFORE, STATUSES, TYPES, settle, ctx, olderToken, readOnly, oauth, outside, ISSUER, CLIENT, GRANT_ID, PLAIN_SCOPES,
 } = world;
-const { rules, seed, stored, audits, snapshot, rpcThrough, listedThrough } = world.create(mockDb);
+const { rules, seed, stored, rows, audits, snapshot, rpcThrough, listedThrough, seedGrant } = world.create(mockDb);
+const jwt = require('../Config/jwt');
 const rpc = rpcThrough(server);
 const listed = listedThrough(server);
 
@@ -63,7 +64,7 @@ let fx;
 
 beforeEach(() => { fx = seed(); });
 afterEach(settle);
-afterAll(() => { delete process.env.MCP_TOOLS_MANAGE; delete process.env.MCP_TOOLS_V2; });
+afterAll(() => { ['MCP_TOOLS_MANAGE', 'MCP_TOOLS_V2', 'MCP_OAUTH', 'MCP_OAUTH_ISSUER', 'AGENT_TAINT_ROUTING'].forEach((key) => { delete process.env[key]; }); });
 
 const CALLS = {
     'task.update': (taskId) => ({ taskId, title: 'Changed' }),
@@ -95,7 +96,7 @@ describe('the flag decides whether the tools exist', () => {
             const action = tools.actionOf(name);
             expect(registry.permissionsFor(action).length).toBeGreaterThan(0);
             expect(actions.rating(action)).toMatchObject({ write: WRITES.includes(name), money: false });
-            expect(scopes.scopeForTool(name)).toMatch(WRITES.includes(name) ? /^tasks:write$/ : /:read$/);
+            expect(scopes.scopeForTool(name)).toBe('tasks:manage');
         });
         expect(tools.names().filter((name) => /delete|trash/.test(name))).toEqual([]);
         expect(registry.isNever('task.delete')).toBe(true);
@@ -127,7 +128,7 @@ describe('who lists and runs the write tools', () => {
         expect(Object.keys(await rpc(olderToken(OWNER), 'task.get', { taskId: fx.top._id }))).not.toContain('ancestors');
     });
 
-    it.each([['a token without the grant', olderToken], ['a read-only token', readOnly], ['an OAuth token', oauth]])('%s neither lists nor runs a write tool', async (_who, as) => {
+    it.each([['a token without the grant', olderToken], ['a read-only token', readOnly], ['an OAuth token without the scope', oauth]])('%s neither lists nor runs a write tool', async (_who, as) => {
         const caller = as(OWNER);
         expect((await listed(caller)).filter((name) => [...READS, ...WRITES].includes(name))).toEqual([]);
         const before = snapshot();
@@ -145,6 +146,122 @@ describe('who lists and runs the write tools', () => {
         mockDb.store[SCHEMA_TYPE.API_TOKENS].length = 0;
         token(['tasks:manage']);
         expect(await approval.refusalFor(CID, proposal, { decider: { userId: OWNER }, isPrivileged: true })).toBeNull();
+    });
+});
+
+describe('an outside client under a person\'s grant', () => {
+    const MANAGING = [...PLAIN_SCOPES, 'tasks:manage'];
+    const managing = (uid) => outside(uid, MANAGING);
+    const filedBy = (uid, taskId, action = 'task.move') => ({
+        requestedBy: uid, tokenId: '', oauthClientId: CLIENT, oauthGrantId: GRANT_ID, tokenProjectIds: [],
+        changes: [{ action, params: action === 'task.move' ? CALLS['task.move'](taskId) : { taskId } }],
+    });
+    const decided = (proposal, decider = OWNER) => approval.refusalFor(CID, proposal, { decider: { userId: decider }, isPrivileged: true });
+    const grantRow = () => rows(SCHEMA_TYPE.OAUTH_GRANTS)[0];
+    const approvalRow = () => rows(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS)[0];
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        process.env.MCP_OAUTH = 'on';
+        process.env.MCP_OAUTH_ISSUER = ISSUER;
+        delete process.env.AGENT_TAINT_ROUTING;
+    });
+
+    it('lists and runs the write tools once its grant holds the scope, as that person and no further', async () => {
+        expect(await listed(managing(MEMBER))).toEqual(expect.arrayContaining([...READS, ...WRITES]));
+        expect(await rpc(managing(MEMBER), 'task.update', { taskId: fx.top._id, title: 'Changed from outside' })).toMatchObject({ ok: true });
+        expect(stored(fx.top._id).TaskName).toBe('Changed from outside');
+        const before = snapshot();
+        for (const task of [fx.secret, fx.private, fx.personal]) {
+            expect(await rpc(managing(MEMBER), 'task.update', { taskId: task._id, title: 'x' })).toMatchObject({ isError: true });
+        }
+        expect(snapshot()).toBe(before);
+    });
+
+    it('needs no write scope beside it, and gains nothing a write scope gives', async () => {
+        const only = outside(MEMBER, ['tasks:read', 'tasks:manage']);
+        expect(await rpc(only, 'task.update', { taskId: fx.top._id, title: 'Manage alone' })).toMatchObject({ ok: true });
+        const before = snapshot();
+        expect(await rpc(only, 'task.status.set', { taskId: fx.top._id, status: 'Done' })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:write/) });
+        expect(await rpc(only, 'task.comment', { taskId: fx.top._id, body: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:write/) });
+        expect(snapshot()).toBe(before);
+    });
+
+    it('lists nothing new while the tools are switched off, whatever its grant holds', async () => {
+        process.env.MCP_TOOLS_MANAGE = 'off';
+        expect(await listed(managing(OWNER))).toEqual(BEFORE);
+        expect((await rpc(managing(OWNER), 'task.update', { taskId: fx.top._id, title: 'x' })).rpcError).toMatchObject({ code: -32601 });
+        expect(scopes.scopeForTool('task.update')).toBeNull();
+    });
+
+    it('files what reaches past one task for a person while outside calls are routed, and acts on the rest', async () => {
+        process.env.AGENT_TAINT_ROUTING = 'on';
+        const before = snapshot();
+        expect(await rpc(managing(OWNER), 'task.archive', { taskId: fx.top._id, reason: 'done with it' })).toMatchObject({ ok: false, pending: true, proposalId: 'proposal-1' });
+        expect(proposals.create).toHaveBeenCalledWith(CID, expect.objectContaining({
+            source: 'mcp', requestedBy: OWNER, tokenId: '', oauthClientId: CLIENT, oauthGrantId: GRANT_ID, tokenProjectIds: [],
+            why: expect.stringMatching(/^done with it \(.*outside client/),
+            changes: [expect.objectContaining({ action: 'task.archive', params: { taskId: fx.top._id } })],
+        }));
+        expect(snapshot()).toBe(before);
+        expect(await rpc(managing(OWNER), 'task.update', { taskId: fx.top._id, title: 'Still direct' })).toMatchObject({ ok: true });
+    });
+
+    it('is refused the same routed call without the scope, as before, and nothing is filed', async () => {
+        process.env.AGENT_TAINT_ROUTING = 'on';
+        const before = snapshot();
+        const plain = outside(OWNER, PLAIN_SCOPES);
+        expect(await rpc(plain, 'task.create', { projectId: P_OPEN, title: 'From outside' })).toMatchObject({ isError: true, refused: true, reason: expect.stringMatching(/outside client/) });
+        expect(await rpc(plain, 'task.archive', { taskId: fx.top._id })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage grant/) });
+        expect(proposals.create).not.toHaveBeenCalled();
+        expect(snapshot()).toBe(before);
+    });
+
+    it('files a move for a person where destructive calls are proposals, naming the grant that filed it', async () => {
+        process.env.MCP_TOOLS_V2 = 'on';
+        const before = snapshot();
+        expect(await rpc(managing(OWNER), 'task.move', { taskId: fx.top._id, projectId: P_OPEN, sprintId: S_NEXT })).toMatchObject({ ok: false, pending: true });
+        expect(proposals.create).toHaveBeenCalledWith(CID, expect.objectContaining({ requestedBy: OWNER, tokenId: '', oauthClientId: CLIENT, oauthGrantId: GRANT_ID }));
+        expect(snapshot()).toBe(before);
+    });
+
+    it('has its filed change approved while the grant, the scope, the approval and the seat all stand', async () => {
+        seedGrant(MEMBER, MANAGING);
+        expect(await decided(filedBy(MEMBER, fx.top._id))).toBeNull();
+        expect(await decided(filedBy(MEMBER, fx.top._id, 'task.archive'))).toBeNull();
+    });
+
+    it.each([
+        ['the grant was revoked', () => { grantRow().revokedAt = new Date(); }, /revoked/],
+        ['the grant expired', () => { grantRow().expiresAt = new Date(Date.now() - 1000); }, /expired/],
+        ['the grant is gone', () => { rows(SCHEMA_TYPE.OAUTH_GRANTS).length = 0; }, /revoked/],
+        ['the person withdrew the scope', () => { grantRow().scopes = [...PLAIN_SCOPES]; }, /no longer holds the grant/],
+        ['the grant holds the other manage scope only', () => { grantRow().scopes = [...PLAIN_SCOPES, 'docs:manage']; approvalRow().scopes.push('docs:manage'); }, /no longer holds the grant/],
+        ['the workspace revoked its approval of the client', () => { approvalRow().status = 'revoked'; }, /no longer approved/],
+        ['the workspace took the scope out of its approval', () => { approvalRow().scopes = [...PLAIN_SCOPES]; }, /no longer holds the grant/],
+        ['the grant is another person\'s', () => { grantRow().userId = OTHER; }, /revoked/],
+        ['the grant is another client\'s', () => { grantRow().clientId = 'https://other.manage.test/client.json'; }, /revoked/],
+        ['the grant is another workspace\'s', () => { grantRow().companyId = '6f00000000000000000000ff'; }, /revoked/],
+        ['the grant names another resource', () => { grantRow().resource = 'https://elsewhere.manage.test/mcp'; }, /revoked/],
+        ['the person lost their seat', () => { jwt.verifyCompanyMembership.mockResolvedValueOnce(false); }, /revoked/],
+        ['outside sign-in was switched off', () => { process.env.MCP_OAUTH = 'off'; }, /revoked/],
+    ])('has its filed change refused once %s', async (_what, change, message) => {
+        seedGrant(MEMBER, MANAGING);
+        change();
+        expect(await decided(filedBy(MEMBER, fx.top._id))).toMatchObject({ status: 403, error: expect.stringMatching(message) });
+    });
+
+    it('has a filed change refused when the grant\'s scope does not reach it, or the person can no longer open the target', async () => {
+        seedGrant(MEMBER, MANAGING);
+        expect(await decided(filedBy(MEMBER, fx.top._id, 'task.comment'))).toMatchObject({ status: 403, error: expect.stringMatching(/no longer holds the grant/) });
+        expect(await decided({ ...filedBy(MEMBER, fx.top._id), changes: [{ action: 'page.update', params: { pageId: fx.top._id } }] })).toMatchObject({ status: 403 });
+        expect(await decided(filedBy(MEMBER, fx.private._id))).toMatchObject({ status: 403, error: expect.stringMatching(/requester/) });
+    });
+
+    it('is not approved on the strength of a personal token when its grant is gone', async () => {
+        seedGrant(MEMBER, MANAGING, { revokedAt: new Date() });
+        mockDb.seed(SCHEMA_TYPE.API_TOKENS, { _id: TOKEN, userId: MEMBER, active: true, scopes: ['read', 'write'], projectIds: [], grants: ['tasks:manage'] });
+        expect(await decided({ ...filedBy(MEMBER, fx.top._id), tokenId: TOKEN })).toMatchObject({ status: 403, error: expect.stringMatching(/revoked/) });
     });
 });
 

@@ -32,3 +32,21 @@ describe.each([['off', undefined], ['on', 'true']])('personal access tokens with
 it('passes a token\'s own fine-grained scopes through and ignores unknown ones', () => {
     expect(grantedScopes(token(['tasks:read', 'admin:all']))).toEqual(['tasks:read']);
 });
+
+describe('the manage scopes', () => {
+    const MANAGE = ['tasks:manage', 'docs:manage'];
+
+    it.each([[['read']], [['write']], [['read', 'write']], [[]]])('are not among what scopes %o reach', (scopes) => {
+        expect(grantedScopes(token(scopes)).filter((scope) => MANAGE.includes(scope))).toEqual([]);
+    });
+
+    it('are not taken from a personal token\'s scope list, only from the grants it was created with', () => {
+        expect(grantedScopes(token(['read', 'write', ...MANAGE])).filter((scope) => MANAGE.includes(scope))).toEqual([]);
+        expect(grantedScopes({ ...token(['read', 'write']), grants: ['tasks:manage'] }).filter((scope) => MANAGE.includes(scope))).toEqual(['tasks:manage']);
+    });
+
+    it('are held by an OAuth token exactly as its scopes name them', () => {
+        expect(grantedScopes({ oauth: true, scopes: ['tasks:read', 'docs:manage'] })).toEqual(['tasks:read', 'docs:manage']);
+        expect(grantedScopes({ oauth: true, scopes: ['tasks:read', 'tasks:write'], grants: MANAGE })).toEqual(['tasks:read', 'tasks:write']);
+    });
+});

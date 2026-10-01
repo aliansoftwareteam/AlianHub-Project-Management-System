@@ -169,3 +169,57 @@ describe('the OAuth consent screen', () => {
         expect(wrapper.find('[data-test="consent-back"]').exists()).toBe(false);
     });
 });
+
+describe('the manage permissions on the consent screen', () => {
+    const asking = (workspaces) => details({ manageScopes: ['tasks:manage', 'docs:manage'], workspaces });
+    const one = [{ id: ALPHA, name: 'Alpha Works', approval: 'approved', eligible: true, reason: '', manageScopes: ['tasks:manage'] }];
+    const box = (wrapper, scope) => wrapper.find(`input[data-test="grant-${scope}"]`);
+
+    beforeEach(() => {
+        apiRequestWithoutCompnay.mockReset();
+        window.history.replaceState({}, '', `/oauth/consent?request=${REQUEST}#/oauth/consent`);
+    });
+    afterEach(() => { window.history.replaceState({}, '', '/'); });
+
+    it('shows none when the client asked for none', async () => {
+        const wrapper = await mountWith();
+        expect(wrapper.find('[data-test="manage-scopes"]').exists()).toBe(false);
+        expect(wrapper.findAll('input[name="grant"]')).toHaveLength(0);
+    });
+
+    it('offers each one unticked, in plain words, as a box the form carries only when it is ticked', async () => {
+        const wrapper = await mountWith({ data: asking(one) });
+        expect(wrapper.findAll('[data-test^="scope-"]').map((row) => row.text())).toEqual(['OAuthConsent.scope_tasks_read', 'OAuthConsent.scope_tasks_write']);
+        const section = wrapper.find('form[data-test="consent-form"] [data-test="manage-scopes"]');
+        expect(section.text()).toContain('OAuthConsent.manage_lead');
+        expect(section.text()).toContain('OAuthConsent.scope_tasks_manage');
+        const tasks = box(wrapper, 'tasks:manage');
+        expect(tasks.attributes()).toMatchObject({ type: 'checkbox', name: 'grant', value: 'tasks:manage' });
+        expect(tasks.element.checked).toBe(false);
+        expect(tasks.element.disabled).toBe(false);
+        await tasks.setValue(true);
+        expect(tasks.element.checked).toBe(true);
+        expect(wrapper.find('button[data-test="approve"]').attributes('disabled')).toBeUndefined();
+    });
+
+    it('does not let a permission the chosen workspace has not approved be ticked, and says why', async () => {
+        const wrapper = await mountWith({ data: asking(one) });
+        const docs = box(wrapper, 'docs:manage');
+        expect(docs.element.disabled).toBe(true);
+        expect(docs.element.checked).toBe(false);
+        expect(wrapper.find('[data-test="grant-unapproved-docs:manage"]').text()).toBe('OAuthConsent.manage_not_approved');
+        expect(wrapper.find('[data-test="grant-unapproved-tasks:manage"]').exists()).toBe(false);
+    });
+
+    it('unticks a permission when the person moves to a workspace that has not approved it', async () => {
+        const wrapper = await mountWith({ data: asking([...one, { id: BETA, name: 'Beta Labs', approval: 'approved', eligible: true, reason: '', manageScopes: [] }]) });
+        expect(box(wrapper, 'tasks:manage').element.disabled).toBe(true);
+        await wrapper.find(`input[data-test="workspace-${ALPHA}"]`).setValue(true);
+        await box(wrapper, 'tasks:manage').setValue(true);
+        expect(box(wrapper, 'tasks:manage').element.checked).toBe(true);
+        await wrapper.find(`input[data-test="workspace-${BETA}"]`).setValue(true);
+        await flushPromises();
+        expect(box(wrapper, 'tasks:manage').element.checked).toBe(false);
+        expect(box(wrapper, 'tasks:manage').element.disabled).toBe(true);
+    });
+});

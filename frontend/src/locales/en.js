@@ -12021,6 +12021,12 @@ export default {
         scope_name_docs_read: "Read documents",
         scope_name_time_read: "Read time",
         scope_name_time_write: "Log time",
+        scope_tasks_manage: "Edit, assign, move, archive and close your tasks, several at a time",
+        scope_docs_manage: "Create docs and change the ones you can edit",
+        scope_name_tasks_manage: "Manage tasks",
+        scope_name_docs_manage: "Write docs",
+        manage_lead: "It also asks for more. Tick only what you want it to do:",
+        manage_not_approved: "An owner or admin has not approved this for the workspace you chose.",
     },
     AgentClients: {
         lead: "Outside agents sign in with OAuth. Nobody in this workspace can connect one until an owner or admin approves it here, for the permissions you choose.",
@@ -12044,6 +12050,11 @@ export default {
         revoke_confirm: "Revoke {name}? Everyone's connection to it in this workspace ends now.",
         status_denied: "Denied",
         status_revoked: "Revoked",
+        manage_legend: "Wider permissions, given only if you tick them:",
+        asked_for: "Asked for",
+        change: "Change permissions",
+        save: "Save",
+        cancel: "Cancel",
     },
     ConnectedApps: {
         title: "Connected apps",
@@ -12057,6 +12068,8 @@ export default {
         revoke: "Revoke",
         revoke_confirm: "Revoke {name}? It loses access at once.",
         revoke_failed: "The app could not be revoked.",
+        withdraw: "Withdraw",
+        withdraw_failed: "The permission could not be withdrawn.",
     },
     Favourites: {
         add: "Add to favourites",

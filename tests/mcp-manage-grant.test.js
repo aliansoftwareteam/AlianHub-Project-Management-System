@@ -5,7 +5,8 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 
 const ctrl = require('../Modules/ApiTokens/controller');
-const { holdsGrant, GRANT, DOCS_GRANT } = require('../Modules/Mcp/manageFlag');
+const { holdsGrant, mayUse, managesTasks, GRANT, DOCS_GRANT } = require('../Modules/Mcp/manageFlag');
+const { grantedScopes } = require('../Modules/Mcp/scopes');
 const { schema } = require('../utils/mongo-handler/schema');
 
 const USER_ID = '6f0000000000000000000a01';
@@ -113,5 +114,39 @@ describe('a token keeps the grants it was created with', () => {
         expect((await call(ctrl.listTokens)).body.policy.grants).toEqual([GRANT, DOCS_GRANT]);
         process.env.MCP_TOOLS_MANAGE = 'off';
         expect((await call(ctrl.listTokens)).body.policy.grants).toBeUndefined();
+    });
+});
+
+describe('who holds a grant', () => {
+    const personal = (over = {}) => ({ _id: 't1', userId: USER_ID, scopes: ['read', 'write'], ...over });
+    const outside = (scopes) => ({ oauth: true, scopes });
+
+    it('is read from the grants of a personal token and from the scopes of an OAuth token, never the other way round', () => {
+        expect(holdsGrant(personal({ grants: [GRANT] }))).toBe(true);
+        expect(holdsGrant(personal({ scopes: ['read', 'write', GRANT] }))).toBe(false);
+        expect(holdsGrant(outside(['tasks:read', GRANT]))).toBe(true);
+        expect(holdsGrant({ oauth: true, scopes: ['tasks:read', 'tasks:write'], grants: [GRANT, DOCS_GRANT] })).toBe(false);
+        expect(holdsGrant(outside([DOCS_GRANT]))).toBe(false);
+        expect(holdsGrant(outside([DOCS_GRANT]), DOCS_GRANT)).toBe(true);
+    });
+
+    it('is not what the write scope gives: a personal token\'s write reaches no manage scope', () => {
+        expect(grantedScopes(personal())).toEqual(['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write']);
+        expect(grantedScopes(personal({ scopes: [] }))).not.toEqual(expect.arrayContaining([GRANT]));
+        expect(grantedScopes(personal({ scopes: ['read', 'write', GRANT, DOCS_GRANT] }))).not.toEqual(expect.arrayContaining([GRANT]));
+        expect(grantedScopes(personal({ grants: [GRANT] }))).toEqual(expect.arrayContaining([GRANT]));
+        expect(grantedScopes(personal({ grants: [GRANT] }))).not.toEqual(expect.arrayContaining([DOCS_GRANT]));
+        expect(grantedScopes(outside(['tasks:read', 'tasks:write']))).toEqual(['tasks:read', 'tasks:write']);
+    });
+
+    it('lets a caller use it only with the write scope on a personal token, and only while the tools are on', () => {
+        const ctx = (token, canWrite) => ({ token, canWrite });
+        expect(mayUse(ctx(personal({ grants: [GRANT] }), true), GRANT)).toBe(true);
+        expect(mayUse(ctx(personal({ grants: [GRANT] }), false), GRANT)).toBe(false);
+        expect(mayUse(ctx(outside(['tasks:read', GRANT]), false), GRANT)).toBe(true);
+        expect(mayUse(ctx(outside(['tasks:read', 'tasks:write']), true), GRANT)).toBe(false);
+        expect(managesTasks(ctx(outside(['tasks:read', GRANT]), false))).toBe(true);
+        process.env.MCP_TOOLS_MANAGE = 'off';
+        expect(managesTasks(ctx(outside(['tasks:read', GRANT]), false))).toBe(false);
     });
 });

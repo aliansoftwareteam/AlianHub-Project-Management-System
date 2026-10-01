@@ -27,7 +27,15 @@ Three things, in this order.
 
 3. **What the person may do.** Each call is checked against the person's role and the project's permissions, the projects and private lists they can open, and the token's own project list when it was narrowed to some projects. Another person's personal list and a conversation the person is not in are closed to everyone, owners and admins included.
 
-An agent connected through OAuth (`MCP_OAUTH`) is held to the scopes its grant names. It cannot hold either grant yet, so these tools are for personal access tokens for now.
+An agent connected through OAuth (`MCP_OAUTH`) is held to the scopes its connection names. It can hold either grant as the scope of the same name, `tasks:manage` or `docs:manage`, and only when all three of these are true:
+
+- **The app asked for it** when it sent the person to sign in.
+- **The person ticked it** on the consent screen. Both start unticked, each with a sentence saying what it allows; everything else the app asked for is granted together as before.
+- **An owner or admin approved it for that app by name** under Settings, Agent clients. Approving an app without choosing permissions never includes either one, and an app an admin registered without a list of permissions cannot be given them at all; register it again naming them.
+
+An app connected before these scopes existed, and any connection where one of the three is missing, lists and runs exactly what it did before. The write scope never stands in for a manage scope, and a manage scope never stands in for the write scope: closing a task through `task.status.set` takes both `tasks:write` and `tasks:manage`.
+
+Taking it back works at each level and takes effect on the app's next call: an owner or admin removes the permission from the app, or revokes the app, under Settings, Agent clients; the person withdraws the one permission, or revokes the whole connection, under Accounts, Connected apps.
 
 ## Creating a token
 
@@ -51,6 +59,7 @@ Revoke a token on the same screen. A revoked or expired token stops working on i
 - It runs through the same server code the web app's own actions use, so the activity log, the notifications and the counters are the ones a person's change produces. The activity log names the person and the agent: "Priya Shah (via Claude) has changed Status as Done".
 - It is recorded in the agent audit log with what it replaced. Where the result says `undoable: true`, a person can undo it from that log within the workspace's undo window.
 - With `MCP_TOOLS_V2` on, a call that cannot be undone (`task.move`) is not run. It is filed as a proposal in the Inbox, and the result says `pending: true`. A person who can open the same task and holds the same permission approves or declines it.
+- For an app connected through OAuth, with `AGENT_TAINT_ROUTING` on, a write that reaches past one task (`task.create`, `task.move`, `task.archive`, `task.restore`, `page.create`, `page.update`) is filed the same way when the connection holds the manage scope the tool needs, and refused when it does not. Approval asks the connection again: it must still be live and still hold that scope, the app must still be approved for it in the workspace, and the person must still have a seat and be able to open what the change touches. A proposal filed by a connection that has since been revoked or narrowed cannot be approved.
 - A refusal says why, and is recorded too.
 
 There is no tool that deletes a task, a doc or a comment, or moves one to the trash.
@@ -226,4 +235,4 @@ These need `docs:manage`.
 
 ## What an agent cannot do yet
 
-Hold a grant over OAuth; change a project, its lists or its members; saved views and dashboards; automations; time approval; tags, checklists, attachments and watchers; task relations; converting a task to a subtask and back, merging and duplicating; comments on a doc. Deleting is not planned.
+Change a project, its lists or its members; saved views and dashboards; automations; time approval; tags, checklists, attachments and watchers; task relations; converting a task to a subtask and back, merging and duplicating; comments on a doc. Deleting is not planned.

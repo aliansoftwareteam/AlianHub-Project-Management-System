@@ -15,6 +15,8 @@ jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn(), visibleProjects: jest.fn() }));
 jest.mock('../Config/permissionGuard', () => ({ ...jest.requireActual('../Config/permissionGuard'), getRoleType: jest.fn() }));
 jest.mock('../Modules/Agents/permissions', () => ({ holderMay: jest.fn(async () => ({ allowed: true, reason: '' })) }));
+jest.mock('../Config/jwt', () => ({ verifyCompanyMembership: jest.fn(async () => true) }));
+jest.mock('../Modules/Audit/recorder', () => ({ recordAudit: jest.fn() }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { ROLE_OWNER, ROLE_MEMBER } = require('../Config/roleTypes');
@@ -136,5 +138,77 @@ describe('approving a proposal an MCP call filed', () => {
         const p = filed();
         visible[REQUESTER] = [OTHER_P];
         await refusedUntouched(p, await approve(p._id), /requester|person behind/i);
+    });
+});
+
+describe('approving a proposal an outside client filed under a person\'s grant', () => {
+    const ISSUER = 'https://hub.approval.test';
+    const CLIENT = 'https://agent.approval.test/oauth/client.json';
+    const GRANT = 'fedcba9876543210fedcba9876543210';
+    const SCOPES = ['tasks:read', 'tasks:write', 'tasks:manage'];
+    const ENV = ['MCP_OAUTH', 'MCP_OAUTH_ISSUER', 'MCP_TOOLS_MANAGE'];
+    const savedEnv = Object.fromEntries(ENV.map((key) => [key, process.env[key]]));
+    const grantRow = () => mockDb.store[SCHEMA_TYPE.OAUTH_GRANTS][0];
+    const approvalRow = () => mockDb.store[SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS][0];
+    const filedOutside = (over = {}) => filed({
+        agentId: `oauth:${CLIENT}`, agentName: 'Outside agent (MCP)', tokenId: '', oauthClientId: CLIENT, oauthGrantId: GRANT,
+        changes: [{ action: 'task.archive', params: { taskId: T }, label: 'task.archive via MCP' }], ...over,
+    });
+
+    beforeEach(() => {
+        Object.assign(process.env, { MCP_OAUTH: 'on', MCP_OAUTH_ISSUER: ISSUER, MCP_TOOLS_MANAGE: 'on' });
+        mockDb.seed(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS, { companyId: C, clientId: CLIENT, clientKind: 'metadata_document', status: 'approved', scopes: [...SCOPES], privateSprints: false });
+        mockDb.seed(SCHEMA_TYPE.OAUTH_GRANTS, {
+            grantId: GRANT, clientId: CLIENT, companyId: C, userId: REQUESTER, scopes: [...SCOPES], resource: `${ISSUER}/mcp`,
+            createdAt: new Date(), expiresAt: new Date(Date.now() + 86400000), revokedAt: null,
+        });
+    });
+    afterAll(() => { ENV.forEach((key) => { if (savedEnv[key] === undefined) delete process.env[key]; else process.env[key] = savedEnv[key]; }); });
+
+    it('runs the change as that client acting for the person, marked as coming from outside', async () => {
+        const p = filedOutside();
+        const out = await approve(p._id);
+        expect(out.error).toBeUndefined();
+        expect(actions.perform).toHaveBeenCalledWith(expect.objectContaining({
+            action: 'task.archive',
+            actor: expect.objectContaining({ userId: REQUESTER, viaAccount: 'external', clientId: CLIENT, grantId: GRANT, delegatedBy: REQUESTER, tokenId: null }),
+            taint: { tainted: true, taintSources: [expect.objectContaining({ kind: 'client', ref: CLIENT })] },
+        }));
+        expect(statusOf(p._id)).toBe('approved');
+    });
+
+    it.each([
+        ['the person revoked the grant', () => { grantRow().revokedAt = new Date(); }],
+        ['the grant expired', () => { grantRow().expiresAt = new Date(Date.now() - 1000); }],
+        ['the person withdrew the scope', () => { grantRow().scopes = ['tasks:read', 'tasks:write']; }],
+        ['the workspace revoked its approval of the client', () => { approvalRow().status = 'revoked'; }],
+        ['the workspace took the scope out of its approval', () => { approvalRow().scopes = ['tasks:read', 'tasks:write']; }],
+        ['the person lost their seat', () => { require('../Config/jwt').verifyCompanyMembership.mockResolvedValueOnce(false); }],
+    ])('refuses once %s, and nothing runs', async (_what, change) => {
+        const p = filedOutside();
+        change();
+        await refusedUntouched(p, await approve(p._id), /connection/);
+    });
+
+    it('refuses a change the grant\'s manage scope does not reach, and a target the person can no longer open', async () => {
+        const comment = filedOutside({ changes: [{ action: 'task.comment', params: { taskId: T, body: 'x' }, label: 'task.comment via MCP' }] });
+        await refusedUntouched(comment, await approve(comment._id), /connection/);
+        const p = filedOutside();
+        visible[REQUESTER] = [OTHER_P];
+        await refusedUntouched(p, await approve(p._id), /requester|person behind/i);
+    });
+
+    it('is not carried by a live personal token of the same person', async () => {
+        const p = filedOutside({ tokenId: TOKEN });
+        grantRow().revokedAt = new Date();
+        await refusedUntouched(p, await approve(p._id), /connection/);
+    });
+
+    it('leaves a proposal a personal token filed checked against that token, as before', async () => {
+        mockDb.store[SCHEMA_TYPE.OAUTH_GRANTS].length = 0;
+        const p = filed();
+        expect((await approve(p._id)).error).toBeUndefined();
+        expect(actions.perform).toHaveBeenCalledWith(expect.objectContaining({ actor: expect.objectContaining({ viaAccount: 'personal', tokenId: TOKEN }) }));
+        expect(actions.perform.mock.calls[0][0].taint).toBeUndefined();
     });
 });

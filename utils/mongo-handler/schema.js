@@ -1328,6 +1328,9 @@ const schema = {
         tokenId: { type: String, required: false },
         // the token's project list when it filed; approval refuses a target outside it
         tokenProjectIds: { type: Array, required: false },
+        // Set instead of tokenId when an outside client filed it: the grant approval re-checks, and its client
+        oauthClientId: { type: String, required: false },
+        oauthGrantId: { type: String, required: false },
         allowedActions: { type: Array, required: false },
     },
     automationRuns: {

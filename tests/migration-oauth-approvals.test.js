@@ -62,6 +62,16 @@ describe('the oauth_client_approvals collection', () => {
         expect(doc.secret).toBeUndefined();
     });
 
+    test('stores a manage scope like any other scope, and declares the grant an outside client\'s proposal is filed under', () => {
+        const Approval = mongoose.model('s10s3ManageApprovals', createSchema.oauthClientApprovalsSchema);
+        const scopes = ['tasks:read', 'tasks:manage', 'docs:manage'];
+        expect(new Approval({ companyId: 'c1', clientId: 'x', status: 'approved', scopes, requestedScopes: scopes }).toObject()).toMatchObject({ scopes, requestedScopes: scopes });
+        const Grant = mongoose.model('s10s3ManageGrants', createSchema.oauthGrantsSchema);
+        expect(new Grant({ grantId: 'g1', scopes }).toObject().scopes).toEqual(scopes);
+        expect(schema.agentProposals.oauthGrantId).toBeDefined();
+        expect(schema.agentProposals.oauthClientId).toBeDefined();
+    });
+
     test('keeps when a grant was last used', () => {
         const Model = mongoose.model('s10s3OauthGrants', createSchema.oauthGrantsSchema);
         const lastUsedAt = new Date();

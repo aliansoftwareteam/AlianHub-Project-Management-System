@@ -117,6 +117,49 @@ describe('Settings > Agent clients', () => {
         expect(wrapper.find('[data-test="action-error"]').text()).toContain('scopes must be drawn from the list');
     });
 
+    it('never starts a manage permission ticked, even when the client asked for it, and sends it only once the admin ticks it', async () => {
+        const wrapper = await mountWith({ rows: [row({ requestedScopes: ['tasks:read', 'tasks:write', 'tasks:manage'] })] });
+        const pending = wrapper.find('[data-test="pending-row"]');
+        const checked = () => pending.findAll('input[data-test^="scope-"]').filter((box) => box.element.checked).map((box) => box.attributes('data-test'));
+        expect(checked()).toEqual(['scope-tasks:read', 'scope-tasks:write']);
+        expect(pending.find('[data-test="manage-scopes"]').text()).toContain('OAuthConsent.scope_tasks_manage');
+        expect(pending.find('[data-test="asked-tasks:manage"]').exists()).toBe(true);
+        expect(pending.find('[data-test="asked-docs:manage"]').exists()).toBe(false);
+        await pending.find('button[data-test="approve"]').trigger('click');
+        await flushPromises();
+        expect(posts()[0][2].scopes).toEqual(['tasks:read', 'tasks:write']);
+
+        await wrapper.find('[data-test="pending-row"] input[data-test="scope-tasks:manage"]').setValue(true);
+        await wrapper.find('[data-test="pending-row"] button[data-test="approve"]').trigger('click');
+        await flushPromises();
+        expect(posts()[1][2].scopes).toEqual(['tasks:read', 'tasks:write', 'tasks:manage']);
+    });
+
+    it('lets an owner or admin change what an approved client may do, starting from what it holds now', async () => {
+        const wrapper = await mountWith();
+        const approved = wrapper.find('[data-test="approved-row"]');
+        expect(approved.find('[data-test="manage-scopes"]').exists()).toBe(false);
+        await approved.find('button[data-test="change"]').trigger('click');
+        const checked = approved.findAll('input[data-test^="scope-"]').filter((box) => box.element.checked).map((box) => box.attributes('data-test'));
+        expect(checked).toEqual(['scope-tasks:read', 'scope-docs:read']);
+        expect(approved.find('input[data-test="private-sprints"]').element.checked).toBe(true);
+        await approved.find('input[data-test="scope-docs:manage"]').setValue(true);
+        await approved.find('button[data-test="save-change"]').trigger('click');
+        await flushPromises();
+        expect(posts()).toEqual([['post', '/api/v2/oauth-client-approvals/approve', { clientId: CIMD, scopes: ['tasks:read', 'docs:read', 'docs:manage'], privateSprints: true }]]);
+        expect(wrapper.find('[data-test="approved-row"] button[data-test="save-change"]').exists()).toBe(false);
+    });
+
+    it('leaves an approved client as it is when the change is cancelled', async () => {
+        const wrapper = await mountWith();
+        const approved = wrapper.find('[data-test="approved-row"]');
+        await approved.find('button[data-test="change"]').trigger('click');
+        await approved.find('input[data-test="scope-tasks:manage"]').setValue(true);
+        await approved.find('button[data-test="cancel-change"]').trigger('click');
+        expect(posts()).toEqual([]);
+        expect(approved.find('[data-test="manage-scopes"]').exists()).toBe(false);
+    });
+
     it('says so when outside agent sign-in is off on this server', async () => {
         const wrapper = await mountWith({ rows: () => Promise.reject({ response: { status: 404, data: 'Cannot GET' } }) });
         expect(wrapper.find('[data-test="oauth-off"]').text()).toBe('AgentClients.off');

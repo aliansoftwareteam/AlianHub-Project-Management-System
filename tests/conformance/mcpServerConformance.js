@@ -19,6 +19,7 @@ const SUITE_DIR = path.join(STATE_DIR, 'conformance-suite');
 const EXPECTED_FAILURES = path.join(__dirname, 'mcp-server-expected-failures.yml');
 const OUTPUT_DIR = path.join(STATE_DIR, 'conformance');
 const REDIRECT = 'http://127.0.0.1:47304/callback';
+// What a client registered without a scope list is approved for: every scope but the manage ones, which the suite has no use for.
 const ALL_SCOPES = 'tasks:read tasks:write projects:read docs:read time:read time:write';
 
 async function setupOwner(baseURL) {

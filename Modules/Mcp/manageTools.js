@@ -400,24 +400,8 @@ const TOOLS = [
     },
 ];
 
-const SCOPES = Object.freeze({
-    'fields.list': 'projects:read',
-    'subtasks.list': 'tasks:read',
-    'members.list': 'projects:read',
-    'task.update': 'tasks:write',
-    'task.assign': 'tasks:write',
-    'task.field.set': 'tasks:write',
-    'task.move': 'tasks:write',
-    'task.archive': 'tasks:write',
-    'task.restore': 'tasks:write',
-    'task.history': 'tasks:read',
-    'task.links.list': 'tasks:read',
-    'comment.update': 'tasks:write',
-    'tasks.batch': 'tasks:write',
-    // The OAuth scopes have no docs write yet; these two are reached with a personal token's docs grant only.
-    'page.create': 'tasks:write',
-    'page.update': 'tasks:write',
-});
+/* The scope a manage tool needs is the grant of the same name. */
+const SCOPES = Object.freeze(Object.fromEntries(TOOLS.map((tool) => [tool.name, tool.grant])));
 
 /* What an existing tool becomes for a caller whose token was created to manage tasks. Everyone else keeps the tool as it is. */
 const VARIANTS = Object.freeze({
