@@ -6,8 +6,12 @@ const { storedFileExists } = require(`../../../common-storage/common-${process.e
 
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const NOT_YOUR_TIME = 'You can only track your own time.';
-const NOT_THIS_TIMER = 'A capture is stored with the running timer it belongs to.';
+const NOT_THIS_TIMER = 'A capture is stored in the folder of the timer it belongs to.';
+const NOT_RUNNING = 'This timer is no longer running.';
 const ALREADY_STORED = 'A capture is already stored under this name.';
+/* The desktop tracker ends its own session on this code, so it is kept apart from every other refusal. */
+const TIMER_NOT_RUNNING = 'timer_not_running';
+const CAPTURE_ALREADY_STORED = 'capture_already_stored';
 
 const refuse = (res, status, statusText) => {
     res.status(status).send({ status: false, statusText, message: statusText });
@@ -33,8 +37,9 @@ async function capturePathRefusal(companyId, timeSheetId, session, filePath) {
     const ownFolder = Boolean(named)
         && named.timeSheetId === timeSheetId.toLowerCase()
         && named.projectId === String(session.ProjectId || '').toLowerCase();
-    if (!ownFolder || !isRunning(session)) return { code: 403, statusText: NOT_THIS_TIMER };
-    return (await storedFileExists(companyId, filePath)) ? { code: 409, statusText: ALREADY_STORED } : null;
+    if (!ownFolder) return { code: 403, statusText: NOT_THIS_TIMER };
+    if (!isRunning(session)) return { code: 403, statusText: NOT_RUNNING, reason: TIMER_NOT_RUNNING };
+    return (await storedFileExists(companyId, filePath)) ? { code: 409, statusText: ALREADY_STORED, reason: CAPTURE_ALREADY_STORED } : null;
 }
 
 /* Returns a refusal in the { code, statusText } shape the upload guards use, so it can run
@@ -60,4 +65,4 @@ async function ownSessionRefusal(req, companyId) {
     return refusal;
 }
 
-module.exports = { trackerUser, ownSessionRefusal, refuse };
+module.exports = { TIMER_NOT_RUNNING, trackerUser, ownSessionRefusal, refuse };

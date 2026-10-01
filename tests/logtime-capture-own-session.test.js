@@ -210,9 +210,11 @@ describe.each(['v2', 'v3', 'v4'])('where a %s tracker capture is stored', (versi
     const refused = async (timeSheetId, filePath) => {
         const res = await capture(version, timeSheetId, filePath);
         expect(res.status).toBe(403);
-        expect(await res.json()).toMatchObject({ status: false });
+        const body = await res.json();
+        expect(body).toMatchObject({ status: false });
         expect(mockDb.updates).toHaveLength(0);
         expect(mockUploads).toHaveLength(0);
+        return body;
     };
 
     it.each([
@@ -224,7 +226,7 @@ describe.each(['v2', 'v3', 'v4'])('where a %s tracker capture is stored', (versi
     ])('is refused for %s, and writes nothing', async (_label, pathOf) => {
         const timeSheetId = addSession(ME);
         const filePath = pathOf();
-        await refused(timeSheetId, filePath);
+        expect((await refused(timeSheetId, filePath)).code).toBeUndefined();
         expect(storedFile(filePath)).toBe(false);
     });
 
@@ -235,11 +237,16 @@ describe.each(['v2', 'v3', 'v4'])('where a %s tracker capture is stored', (versi
         expect(storedFile(filePath)).toBe(false);
     });
 
-    it('is refused for a timer that is no longer running', async () => {
+    it('is refused with its own code for a timer that is no longer running', async () => {
         const timeSheetId = addSession(ME, COMPANY, { running: false });
         const filePath = trackerPath(timeSheetId);
-        await refused(timeSheetId, filePath);
+        expect(await refused(timeSheetId, filePath)).toMatchObject({ code: 'timer_not_running', statusText: 'This timer is no longer running.' });
         expect(storedFile(filePath)).toBe(false);
+    });
+
+    it('does not use that code for a stopped timer of someone else', async () => {
+        const timeSheetId = addSession(COLLEAGUE, COMPANY, { running: false });
+        expect((await refused(timeSheetId, trackerPath(timeSheetId))).code).toBeUndefined();
     });
 
     it('leaves a stored file of a task as it was', async () => {
@@ -257,6 +264,7 @@ describe.each(['v2', 'v3', 'v4'])('where a %s tracker capture is stored', (versi
         const res = await capture(version, timeSheetId, filePath);
 
         expect(res.status).toBe(409);
+        expect(await res.json()).toMatchObject({ status: false, code: 'capture_already_stored' });
         expect(mockDb.updates).toHaveLength(0);
         expect(fs.readFileSync(file, 'utf8')).toBe('original bytes');
     });

@@ -240,6 +240,13 @@ function TimeTrackerView() {
         await TrackerController.TrackerStop();
         store.dispatch(setTrackerStopTime());
         Router.push('/project-select');
+      } else if (res.timerStoppedElsewhere && timeLogRef.current.trackerStart) {
+        const taskName = timeLogRef.current.taskName;
+        TrackerController.StopLocally();
+        dispatch(setTrackerStopTime());
+        dispatch(removeAllTimeLog());
+        try { window.ipc.send('tracker:stopped-elsewhere', { taskName }); } catch (e) { /* best-effort */ }
+        Router.push('/home');
       }
     } catch (error) {
       console.error('Screenshot capture error:', error);
