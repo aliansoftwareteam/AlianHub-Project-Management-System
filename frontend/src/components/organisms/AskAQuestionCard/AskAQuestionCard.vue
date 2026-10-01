@@ -226,19 +226,19 @@ onBeforeUnmount(() => {
 }
 .askc__answer {
     font: var(--text-small);
-    line-height: 1.55;
+    line-height: var(--lh-body, 1.55);
     color: var(--ink);
     overflow-wrap: anywhere;
 }
-.askc__answer :deep(p) { margin: 0 0 6px; }
-.askc__answer :deep(ul), .askc__answer :deep(ol) { margin: 0 0 6px; padding-left: 18px; }
+.askc__answer :deep(p) { margin: 0 0 var(--sp-2); }
+.askc__answer :deep(ul), .askc__answer :deep(ol) { margin: 0 0 var(--sp-2); padding-left: calc(var(--sp-7) + 2px); }
 .askc__answer :deep(.ask-cite) {
     font: var(--text-data);
     color: var(--brand);
     text-decoration: none;
 }
 .askc__answer :deep(a.ask-cite:hover) { text-decoration: underline; }
-.askc__cites { display: flex; flex-direction: column; gap: 4px; margin-top: auto; }
+.askc__cites { display: flex; flex-direction: column; gap: var(--sp-1); margin-top: auto; }
 .askc__ref {
     flex: none;
     font: var(--text-data);
