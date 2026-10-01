@@ -386,12 +386,15 @@ describe('display names come from stored rows, and what the request must supply 
         expect(messages()).toEqual([templates.taskAttachmentRemove({ ProjectName: 'Parity', TaskName: 'Task 01', removeFileName: 'plan.pdf' })]);
     });
 
-    test('a bulk status change escapes the status name it is sent', async () => {
-        const result = await call(BULK, { action: 'bulkUpdateStatus', taskIds: [OPEN_TASK], userData: USER, newStatus: { status: { key: 2, text: HTML, type: 'active' }, statusKey: 2, statusType: 'active' } });
+    test('a bulk status change escapes the status name its project stores', async () => {
+        mockDb.store[SCHEMA_TYPE.PROJECTS][0].taskStatusData = [{ key: 2, name: HTML, type: 'active' }];
+        const result = await call(BULK, { action: 'bulkUpdateStatus', taskIds: [OPEN_TASK], userData: USER, newStatus: { status: { key: 2, text: 'In Progress', type: 'active' }, statusKey: 2, statusType: 'active' } });
         expect(result).toMatchObject({ code: 200, body: { status: true } });
+        expect(storedTask().status.text).toBe(HTML);
         expect(messages()).toHaveLength(1);
         expect(messages()[0]).not.toContain('<img');
         expect(messages()[0]).not.toContain('undefined');
+        expect(historyRows().map((row) => row.Message).join('')).not.toContain('<img');
     });
 
     test('a bulk priority change escapes the priority names it is sent', async () => {

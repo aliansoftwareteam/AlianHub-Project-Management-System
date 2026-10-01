@@ -56,7 +56,10 @@ const projectTagsOf = async (companyId, projectId) => {
     return (project && plain(project).tagsArray) || [];
 };
 
-const projectHoldsTag = async (companyId, projectId, tagId) => (await projectTagsOf(companyId, projectId))
+const TAG_NOT_IN_PROJECT = 'The tag is not one of this project\'s tags.';
+const namesTag = (tagId) => ['string', 'number'].includes(typeof tagId) && String(tagId) !== '';
+
+const projectHoldsTag = async (companyId, projectId, tagId) => namesTag(tagId) && (await projectTagsOf(companyId, projectId))
     .some((tag) => tag && tag.uid !== undefined && tag.uid !== null && String(tag.uid) === String(tagId));
 
 const logFailure = (what) => (error) => logger.error(`${what}: ${(error && error.message) || JSON.stringify(error)}`);
@@ -92,4 +95,5 @@ module.exports = {
     recordCustomFieldValue,
     recordTaskTag,
     projectHoldsTag,
+    TAG_NOT_IN_PROJECT,
 };
