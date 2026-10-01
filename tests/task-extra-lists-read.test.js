@@ -198,6 +198,28 @@ describe('a task in extra lists is counted once, at its home', () => {
         expect(res.body.data.tasks.map((row) => [String(row._id), String(row.ProjectID), String(row.sprintId)])).toEqual([[T.TASK, P.HOME, L.HOME]]);
     });
 
+    test.each([
+        ['OWNER', 3],
+        ['ON_BOTH', 2],
+        ['HOME_ONLY', 1],
+    ])('search tells %s how many of its other lists they can open, and nothing of the rest', async (who, count) => {
+        const res = { statusCode: 200 };
+        res.status = (code) => { res.statusCode = code; return res; };
+        res.send = (body) => { res.body = body; return res; };
+
+        await globalSearch({ headers: { companyid: COMPANY }, uid: uidOf[who], body: { query: 'Write the brief' } }, res);
+
+        const [row] = res.body.data.tasks;
+        expect(row.otherLists).toBe(count);
+        expect(row).not.toHaveProperty('extraLists');
+    });
+
+    test('an Everything row names the list it lives in', async () => {
+        const [row] = (await everything('OWNER')).body.data.rows.filter((entry) => String(entry._id) === T.TASK);
+
+        expect(row.sprintArray).toMatchObject({ name: 'List' });
+    });
+
     /* Reports, exports, velocity, burndown, portfolio, dashboards, timesheets, automations and the socket
        relay all read a task by ProjectID and sprintId. None of them names the new field, so none can count
        a task under a list it does not live in; a reader that starts to must be added here on purpose.
@@ -210,6 +232,7 @@ describe('a task in extra lists is counted once, at its home', () => {
         const KNOWN = [
             'Modules/Agents/actions.js',
             'Modules/Agents/undo.js',
+            'Modules/GlobalSearch/controller.js',
             'Modules/Tasks/controller/everything.js',
             'Modules/Tasks/controller/getTabSyncTasks.js',
             'Modules/Tasks/helpers/everythingQuery.js',
