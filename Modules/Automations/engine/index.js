@@ -6,6 +6,7 @@ const { createInlineDriver } = require('./queue');
 const { createAgendaDriver } = require('./queue/agendaDriver');
 const workflows = require('../../Workflows');
 const providerContext = require('../../AICore/providerContext');
+const subtaskTrigger = require('./subtaskTrigger');
 
 // Wires the five stages together: ingest (the bus) → match → enqueue → execute → record.
 //
@@ -123,6 +124,7 @@ async function start() {
     });
     await driver.start();
     domainEventBus.bus.on('domain.event', dispatch);
+    domainEventBus.bus.on('domain.event', subtaskTrigger.onEnvelope);
     started = true;
     logger.info(`${LOG_PREFIX} started (queue=${driver.name})`);
     for (const [name, { intervalMs, handler }] of recurring) {
@@ -134,6 +136,7 @@ async function start() {
 async function stop() {
     if (!started) return;
     domainEventBus.bus.removeListener('domain.event', dispatch);
+    domainEventBus.bus.removeListener('domain.event', subtaskTrigger.onEnvelope);
     if (driver) await driver.stop();
     started = false;
 }

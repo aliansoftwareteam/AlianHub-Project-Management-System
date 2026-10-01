@@ -148,6 +148,10 @@ const schema = {
             type: Number,
             required: false,
         },
+        // The due date task.due_date_passed last fired for (Modules/Automations/engine/dueDateTrigger).
+        dueDatePassedFor: { type: Date, required: false },
+        // True while task.subtasks_all_done has fired and no subtask has been open since (Modules/Automations/engine/subtaskTrigger).
+        subtasksAllDone: { type: Boolean, required: false },
         'rawDescription': {
             type: String,
             required: false,
@@ -536,6 +540,15 @@ const schema = {
         updatedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // View templates (Modules/ViewTemplates). viewType is the view's keyName; settings is what cleanViewSettings returns.
+    view_templates: {
+        name: { type: String, required: true },
+        viewType: { type: String, required: true },
+        settings: { type: Object, default: {}, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Personal reminders (COLLAB-03) — one-shot, per-user. A node-schedule cron
     // (every minute) fires any reminder whose reminderAt has passed and that
     // hasn't fired yet, delivering an in-app notification to userId. Managed by
@@ -907,6 +920,8 @@ const schema = {
         reactToAutomation: { type: Boolean, default: false, required: false },
         // Round-robin turn per assign step id, advanced atomically by Modules/Automations/engine/assignees.
         assignCursors: { type: Object, default: {}, required: false },
+        // { [userId]: { hour, count } } — notices the rule's notify steps sent each person in the current hour (Modules/Automations/engine/noticeRecipients).
+        notifyWindows: { type: Object, default: {}, required: false },
         // [{ reason: 'unknown_status', status, step? }] — a condition naming a status no project in scope has,
         // flagged by migrations 061 (conditions) and 062 (condition steps) instead of being dropped; cleared when the rule is saved again.
         needsReview: { type: Array, default: undefined, required: false },
@@ -2202,6 +2217,8 @@ const schema = {
     users: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.
         demo: { type: Boolean, required: false },
+        // Set only by scripts/seed-scale.js; its --drop deletes no user without it.
+        scaleSeed: { type: String, required: false },
         "legacyId": {
             type: String,
             required: false
@@ -2493,6 +2510,8 @@ const schema = {
         }
     },
     companies: {
+        // { by, anchor } — set only by scripts/seed-scale.js, which writes to and drops no company without it.
+        scaleSeed: { type: Object, required: false },
         // { allowedModes: ['workspace','personal','local'], requireCheckBeforeDone }
         agentPolicy: {
             type: Object,
@@ -4661,6 +4680,10 @@ const schema = {
         legacyId : {
             type: String,
             required:false
+        },
+        parentFolderId: {
+            type: mongoose.Schema.Types.ObjectId,
+            required: false
         }
     },
     preCompanies: {

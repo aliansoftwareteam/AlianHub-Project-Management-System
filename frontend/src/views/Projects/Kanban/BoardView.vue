@@ -86,6 +86,8 @@ import { columnCatalogue, useViewColumns } from '@/views/Projects/composables/vi
 import ListSortControl from '@/views/Projects/ListView/ListSortControl.vue';
 import { sortChoices, sortTasks, useListSort } from '@/views/Projects/composables/viewSort';
 import { useProjectCustomFields } from '@/views/Projects/composables/projectCustomFields';
+import { useListRowMenu } from '@/views/Projects/ListView/useListRowMenu.js';
+import { useListInlineEdit } from '@/views/Projects/ListView/useListInlineEdit.js';
 
 // Helpers
 import { taskListHelper } from '@/views/Projects/helper.js';
@@ -116,6 +118,11 @@ const cardCatalogue = computed(() => columnCatalogue('board', { fields: customFi
 const cardFields = useViewColumns(computed(() => project.value?._id), 'board', cardCatalogue);
 provide('boardCardFields', cardFields.visibleColumns);
 provide('boardFieldTasks', customFields.allTasks);
+
+/* The card menu's rights and the two actions it borrows from the List, built once for the
+   board rather than once per card. */
+const rowMenu = useListRowMenu(project, showArchiveVar);
+provide('boardTaskMenu', { rights: rowMenu.rights, duplicate: rowMenu.duplicate, rename: useListInlineEdit(project).rename });
 
 const boardSort = useListSort();
 const sortOptions = computed(() => sortChoices(customFields.defs.value));

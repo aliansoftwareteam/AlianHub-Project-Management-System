@@ -64,6 +64,9 @@ async function loadRules(companyId) {
     }
 }
 
+/* The enabled rules a company holds on one trigger, from the same cache the matcher walks. */
+const rulesFor = async (companyId, eventType) => (await loadRules(String(companyId))).get(eventType) || [];
+
 const invalidate = (companyId) => { ruleCache.delete(String(companyId)); };
 const invalidateAll = () => { ruleCache.clear(); };
 
@@ -118,4 +121,4 @@ async function match(companyId, envelope) {
     });
 }
 
-module.exports = { match, invalidate, invalidateAll, contextFor, inScope, acceptsActor, indexRules, CACHE_TTL_MS };
+module.exports = { match, rulesFor, invalidate, invalidateAll, contextFor, inScope, acceptsActor, indexRules, CACHE_TTL_MS };

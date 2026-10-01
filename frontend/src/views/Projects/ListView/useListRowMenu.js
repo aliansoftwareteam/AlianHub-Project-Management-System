@@ -8,22 +8,10 @@ import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { showUndoToast } from "@/composable/useUndoToast";
 import { sprintOf } from "@/utils/assigneeOptions";
 import { snapshotTasks, undoRequests } from "./bulkUndo.js";
+import { taskMenuRights } from "@/views/Projects/composables/taskMenu";
 
 const TOAST = { position: "top-right" };
 const DUPLICATE_PARTS = ["Checklists", "Due Date", "Copy Assignees", "Copy Watchers"];
-
-/* The permissions the task panel's menu and the bulk bar check. Undoing a duplicate trashes
- * the copy, so it needs delete as well. */
-export function rowMenuRights(check, { archived = false } = {}) {
-    const yes = (key) => !archived && check(`task.${key}`) === true;
-    return {
-        archive: yes("task_archive"),
-        delete: yes("task_delete"),
-        move: yes("task_move"),
-        duplicate: yes("task_duplicate"),
-        undoDuplicate: yes("task_delete")
-    };
-}
 
 const projectRef = (project) => ({ id: project?._id, ProjectCode: project?.ProjectCode, ProjectName: project?.ProjectName });
 
@@ -38,8 +26,9 @@ export function useListRowMenu(projectSource, showArchived) {
     const userId = inject("$userId", ref(""));
 
     const project = computed(() => unref(projectSource) || {});
-    const rights = computed(() => rowMenuRights((path) => checkPermission(path, project.value?.isGlobalPermission), { archived: Boolean(unref(showArchived)) }));
+    const rights = computed(() => taskMenuRights((path) => checkPermission(path, project.value?.isGlobalPermission), { archived: Boolean(unref(showArchived)) }));
     const moving = ref(null);
+    const sidebar = ref(null);
     const working = ref(false);
 
     function userData() {
@@ -100,9 +89,33 @@ export function useListRowMenu(projectSource, showArchived) {
         return perform({ action: "bulkArchive" }, { task, message: t("List.row_archived"), undo: undoBulk("bulkArchive", {}, task) });
     }
 
+    /* bulkRestore always returns a task to the open list, so a task deleted out of the
+     * archive is archived again after it. */
     function remove(task) {
         if (!rights.value.delete) return Promise.resolve();
-        return perform({ action: "bulkTrash" }, { task, message: t("List.row_deleted"), undo: undoBulk("bulkTrash", {}, task) });
+        const backToArchive = (result) => [{ action: "bulkRestore", taskIds: updated(result, task) }, { action: "bulkArchive", taskIds: updated(result, task) }];
+        return perform({ action: "bulkTrash" }, {
+            task,
+            message: t("List.row_deleted"),
+            undo: task.deletedStatusKey === 2 ? backToArchive : undoBulk("bulkTrash", {}, task)
+        });
+    }
+
+    function restore(task) {
+        if (!rights.value.restore) return Promise.resolve();
+        return perform({ action: "bulkRestore" }, {
+            task,
+            message: t("List.row_restored"),
+            undo: (result) => [{ action: "bulkArchive", taskIds: updated(result, task) }]
+        });
+    }
+
+    function openSidebar(mode, task) {
+        sidebar.value = { mode, task };
+    }
+
+    function closeSidebar() {
+        sidebar.value = null;
     }
 
     function startMove(task) {
@@ -144,11 +157,11 @@ export function useListRowMenu(projectSource, showArchived) {
         }, {
             task,
             message: t("List.row_duplicated", { name }),
-            undo: (result) => (rights.value.undoDuplicate && result.newTaskIds?.length
+            undo: (result) => (rights.value.delete && result.newTaskIds?.length
                 ? [{ action: "bulkTrash", taskIds: result.newTaskIds.map(String) }]
                 : [])
         });
     }
 
-    return { rights, moving, archive, remove, startMove, cancelMove, confirmMove, duplicate };
+    return { rights, moving, sidebar, archive, remove, restore, startMove, cancelMove, confirmMove, duplicate, openSidebar, closeSidebar };
 }

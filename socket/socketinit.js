@@ -7,6 +7,7 @@ const {userNotificationCountHandler} = require('./controller/userNotificationCou
 const {generalReminderSocketHandler} = require('./controller/generalReminderSocket');
 const {callSocketHandler} = require('./controller/callSocket');
 require('./controller/agentSessionSocket').registerWhenOn();
+require('./controller/viewTemplateSocket');
 const { instrument } = require('@socket.io/admin-ui');
 const jwt = require('jsonwebtoken');
 const { handshakeToken } = require('../Config/cookies');
