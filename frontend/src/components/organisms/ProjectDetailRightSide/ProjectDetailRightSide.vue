@@ -244,7 +244,7 @@ import Currency from '@/components/atom/Currency/Currency.vue';
 import Assignee from '@/components/molecules/Assignee/Assignee.vue';
 import ProjectType from '@/components/atom/ProjectType/ProjectType.vue';
 import BillingPeriod from '@/components/atom/BillingPeriod/BillingPeriod.vue';
-import { defineProps , inject ,computed,ref,nextTick,defineEmits } from 'vue';
+import { defineProps , inject ,computed,ref,nextTick,defineEmits, provide } from 'vue';
 import DueDateCompo from '@/components/molecules/DueDateCompo/DueDateCompo.vue';
 import ProjectStatus from '@/components/molecules/ProjectStatus/ProjectStatus.vue'
 import { useConvertDate, useCustomComposable, useGetterFunctions } from '@/composable';
@@ -258,6 +258,7 @@ import ProjectSourceSelect from '@/components/molecules/ProjectSourceSelect/Proj
 import { DEFAULT_SOURCE, checkProposalId, cleanProposalId } from '@/utils/projectSource';
 
 const { checkPermission,checkApps,getAppState } = useCustomComposable();
+provide('customFieldForProject', true);
 const {convertDateFormat} = useConvertDate();
 
 const { t } = useI18n();

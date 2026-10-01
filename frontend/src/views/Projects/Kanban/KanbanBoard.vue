@@ -47,7 +47,7 @@
                     <Draggable
                         class="kanban-cards"
                         :list="column.tasksArray"
-                        :group="{ name: 'tasks', put: !column.dropDisabled }"
+                        :group="{ name: 'tasks', put: (to, from, card) => !column.dropDisabled && groupTakesTask(column, card?.dataset?.taskType) }"
                         item-key="id"
                         @change="updateEvent($event, column)"
                         @scroll="checkScroll($event, column)"
@@ -58,7 +58,7 @@
                         :emptyInsertThreshold="24"
                     >
                         <template #item="{ element }">
-                            <div class="kanban-card" :class="{ 'is-agent-run': !!runFor(element._id) }" v-bind="taskNavAttrs(element)">
+                            <div class="kanban-card" :class="{ 'is-agent-run': !!runFor(element._id) }" :data-task-type="element.TaskTypeKey" v-bind="taskNavAttrs(element)">
                                 <BoardViewDisplayCardComponent
                                     :data="element"
                                     :groupValue="groupValue"
@@ -93,6 +93,7 @@ import BoardViewDisplayCardComponent from '@/views/Projects/Kanban/BoardViewDisp
 
 // Utils
 import { useUpdateTasks } from "../helper";
+import { groupTakesTask } from "@/views/Projects/composables/customFieldQuery";
 import * as env from '@/config/env';
 import { apiRequest } from "../../../services";
 import { useCustomComposable } from "@/composable";

@@ -14,7 +14,7 @@
         class="task_right custom__field_list_view"
         @click="handleOpenInput(obj,props.task._id)"
     >
-        <template v-if="props.task.customField && Object.keys(props.task.customField).length">
+        <template v-if="appliesTo(obj.key) && props.task.customField && Object.keys(props.task.customField).length">
             <template v-for="(item, index) in Object.keys(props.task.customField)" :key="index">
                 <div v-if="obj.key === props.task.customField[item]._id" class="position-re">
                     <component
@@ -29,7 +29,7 @@
             </template>
         </template>
         <!-- Read-only computed columns (formula/rollup) are never stored on the task, so render them from the live def. -->
-        <div v-if="computedDefs[obj.key]" class="position-re">
+        <div v-if="computedDefs[obj.key] && appliesTo(obj.key)" class="position-re">
             <ComputedComponentViewColumn
                 :def="computedDefs[obj.key]"
                 :task="props.task"
@@ -58,6 +58,7 @@
     import ComputedComponentViewColumn from '../../atom/customFieldViewColumn/computedComponentViewColumn.vue';
     import { useStore } from 'vuex';
     import { useI18n } from "vue-i18n";
+    import { fieldAppliesToTask } from '@fieldTaskTypes';
     const { t } = useI18n();
 
     const {checkPermission, checkApps} = useCustomComposable();
@@ -78,6 +79,8 @@
 
     // All custom field definitions (used to resolve formula references and rollup sources).
     const finalCustomFieldsList = computed(() => getters['settings/finalCustomFields'] || []);
+
+    const appliesTo = (fieldId) => fieldAppliesToTask(finalCustomFieldsList.value.find((def) => def?._id === fieldId), props.task);
 
     // Map of computed (formula/rollup) field definitions keyed by their _id.
     const computedDefs = computed(() => {
@@ -244,7 +247,7 @@
     };
 
     const handleOpenInput = (value,id) => {
-        if(customFieldPermission.value == true){
+        if(customFieldPermission.value == true && appliesTo(value.key)){
             taskId.value = id;
             customFieldId.value = value.key;
         }

@@ -11,6 +11,7 @@ const { evaluatePermission, isWritable } = require('../../../Config/permissionGu
 const { FEATURES } = require('../../AICore/features');
 const { visibleTask } = require('../../AI/taskAccess');
 const { customFieldDefinitionOf } = require('../helpers/customFieldText');
+const { fieldAppliesToTask } = require('../helpers/fieldTaskTypes');
 const { aiConfigOf } = require('./config');
 const { readParts, hasContent, hashOf, TASK_PROJECTION } = require('./source');
 const { buildRequest, parseAnswer } = require('./prompt');
@@ -25,7 +26,7 @@ const REQUEST_TIMEOUT_MS = 60_000;
 
 const TRIGGER = Object.freeze({ MANUAL: 'manual', BULK: 'bulk', AUTO: 'auto', AGENT: 'agent' });
 
-const REFUSAL = Object.freeze({ NOT_FOUND: 'not_found', FORBIDDEN: 'forbidden', NOT_IN_PROJECT: 'not_in_project' });
+const REFUSAL = Object.freeze({ NOT_FOUND: 'not_found', FORBIDDEN: 'forbidden', NOT_IN_PROJECT: 'not_in_project', NOT_FOR_TASK_TYPE: 'not_for_task_type' });
 
 const GATE_STATUS = Object.freeze({
     [limits.STOP.AI_OFF]: 403,
@@ -64,6 +65,7 @@ async function editableTask({ companyId, uid, definition, taskId }) {
     if (!task) return { reason: REFUSAL.NOT_FOUND };
     const projectId = String(task.ProjectID);
     if (!appliesToProject(definition, projectId)) return { reason: REFUSAL.NOT_IN_PROJECT };
+    if (!fieldAppliesToTask(definition, task)) return { reason: REFUSAL.NOT_FOR_TASK_TYPE };
     const permission = await evaluatePermission(companyId, String(uid), PERMISSION, { projectId }).catch(() => null);
     if (!isWritable(permission)) return { reason: REFUSAL.FORBIDDEN };
     return { task };

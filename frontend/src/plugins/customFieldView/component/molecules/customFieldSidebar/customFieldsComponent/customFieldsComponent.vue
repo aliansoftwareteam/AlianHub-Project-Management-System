@@ -11,11 +11,12 @@
             :tabIndex="props.tabIndex"
             :componentDetail="props.componentDetail"
             :customFieldObject="props.customFieldObject"
-            @handleFunction="(val,isEdit) => emit('handleFunction',val,isEdit)"
+            @handleFunction="(val,isEdit) => emit('handleFunction',withTaskTypes(val),isEdit)"
             @tabIndexUpdate="(val) => emit('tabIndexUpdate',val)" 
             ref="childRef"
             :isType="isType"
         />
+        <FieldTaskTypesPicker v-if="forTasks" v-model="taskTypes" />
         <div class="custom_field-btn">
             <FormKit type="button" @click="handleTabCheck" :label="$t('Projects.cancel')" />
             <FormKit type="submit" @click="handleTab" :label="$t('Projects.save')" :disabled="submitted" />
@@ -25,7 +26,7 @@
 
 <script setup>
     //import
-    import { ref} from "vue";
+    import { inject, ref, watch } from "vue";
     import {FormKit} from '@formkit/vue';
     import TextComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/textComponents.vue";
     import CheckboxCustomField from "../../../atom/customFieldSidebar/customFieldSidebarComponent/checkboxCustomFields.vue";
@@ -38,6 +39,7 @@
     import EmailComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/emailComponent.vue";
     import FormulaComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/formulaComponent.vue";
     import RollupComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/rollupComponent.vue";
+    import FieldTaskTypesPicker from "../../../atom/FieldTaskTypesPicker/FieldTaskTypesPicker.vue";
     import { useToast } from "vue-toast-notification";
     import { useI18n } from "vue-i18n";
     const { t } = useI18n();
@@ -70,6 +72,16 @@
     const myForm = ref();
     const submitted = ref(false);
     const childRef = ref();
+    const taskTypes = ref([]);
+    const forTasks = !inject('customFieldForProject', false) && props.customFieldObject?.type !== 'project';
+
+    watch(() => props.customFieldObject?.fieldTaskTypes, (stored) => { taskTypes.value = [...(stored || [])]; }, { immediate: true });
+
+    /* Only a field that has or gets task types sends the list, so the other callers of this form save what they always did. */
+    const withTaskTypes = (val) => {
+        if (!forTasks || val?.type === 'project' || !(taskTypes.value.length || props.customFieldObject?.fieldTaskTypes?.length)) return val;
+        return { ...val, fieldTaskTypes: [...taskTypes.value] };
+    };
 
     //function
     // save function

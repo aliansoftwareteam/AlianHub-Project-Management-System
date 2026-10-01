@@ -18,13 +18,13 @@
                 item-key="_id"
                 tag="div"
                 role="presentation"
-                :group="{ name: 'lv2-task' }"
+                :group="{ name: 'lv2-task', put: putFrom('lv2-task', item) }"
                 :sortable="canDrag"
                 :disabled="!canDrag"
                 @change="onDragChange"
             >
                 <template #item="{ element: task }">
-                    <div role="presentation">
+                    <div role="presentation" :data-task-type="task.TaskTypeKey">
                         <ListRow
                             :data="task"
                             :selected="selection.isSelected(task._id)"
@@ -114,6 +114,7 @@ import * as env from "@/config/env";
 import { applyContext, applyTemplate, defaultTemplateOf, listTemplates } from "@/components/molecules/TaskTemplates/taskTemplates";
 import { pointsTotal } from "@/views/Projects/composables/taskPoints";
 import { MANUAL, sortTasks } from "@/views/Projects/composables/viewSort";
+import { groupTakesTask, putFrom } from "@/views/Projects/composables/customFieldQuery";
 
 defineOptions({ name: "ListGroup" });
 
@@ -309,7 +310,7 @@ function onCreated(payload) {
     if (props.groupType === 0 && created.statusKey !== props.item.key) {
         updateTaskByGroup({ ...created, _id: created._id }, props.item, 0).catch((error) => console.error("ERROR in list inline add: ", error));
     }
-    if (props.item.customFieldId && !props.item.dropDisabled && props.item.searchValue !== "" && props.item.searchValue !== false) {
+    if (props.item.customFieldId && !props.item.dropDisabled && props.item.searchValue !== "" && props.item.searchValue !== false && groupTakesTask(props.item, created.TaskTypeKey)) {
         updateTaskByGroup({ ...created }, props.item, props.groupType).catch((error) => console.error("ERROR in list inline add: ", error));
     }
 }

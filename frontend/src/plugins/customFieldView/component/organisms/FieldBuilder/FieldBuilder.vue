@@ -76,6 +76,7 @@
                     <span class="fb__panel-kind">{{ $t('Fields.type_ai') }}</span>
                 </div>
                 <AiFieldPanel v-model="aiDraft" :errors="errors" />
+                <FieldTaskTypesPicker v-model="aiDraft.fieldTaskTypes" />
                 <div class="fb__warn">{{ $t('AiFields.builder_note') }}</div>
                 <div class="fb__panel-foot">
                     <button type="button" class="ah-btn ah-btn--primary fb__save" data-ai-field-save :disabled="saving" @click="saveAi">
@@ -161,6 +162,8 @@
                     </div>
                 </div>
 
+                <FieldTaskTypesPicker v-model="draft.fieldTaskTypes" />
+
                 <div class="fb__warn">{{ isComputed(draft) ? $t('Fields.formula_rules') : $t('Fields.plain_field_note') }}</div>
 
                 <div class="fb__panel-foot">
@@ -203,6 +206,9 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import UpgradePlan from "@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue";
 import CustomFieldsSidebarComponent from "../../molecules/customFieldSidebar/customFieldsSidebarComponent/customFieldsSidebarComponent.vue";
 import AiFieldPanel from "./AiFieldPanel.vue";
+import FieldTaskTypesPicker from "../../atom/FieldTaskTypesPicker/FieldTaskTypesPicker.vue";
+import { useTaskTypeOptions } from "@/plugins/customFieldView/taskTypeOptions";
+import { fieldTaskTypes } from "@fieldTaskTypes";
 import { aiDraftFrom, aiFieldPayload, isAiField, newAiDraft, validateAiDraft } from "@/views/Projects/composables/aiFields";
 
 defineOptions({ name: "FieldBuilder" });
@@ -257,6 +263,9 @@ const fields = computed(() => (getters["settings/finalCustomFields"] || [])
     .slice()
     .sort((a, b) => new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime()));
 
+const taskTypeOptionList = useTaskTypeOptions();
+const taskTypeNames = computed(() => new Map(taskTypeOptionList.value.map((option) => [option.key, option.name])));
+
 const numericFields = computed(() => fields.value.filter((field) => NUMERIC_TYPES.includes(field.fieldType) && field._id !== draft.value?._id));
 
 const slugOf = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
@@ -268,7 +277,12 @@ const isComputed = (field) => COMPUTED_TYPES.includes(field?.fieldType);
 const isRequired = (field) => Array.isArray(field?.fieldRequired) && field.fieldRequired.length > 0;
 const typeLabel = (key) => (typeOptions.find((option) => option.key === key) || {}).label || key;
 
-const shownIn = (field) => {
+const scopeOf = (field) => {
+    const names = fieldTaskTypes(field).map((key) => taskTypeNames.value.get(key)).filter(Boolean);
+    return names.length ? ` · ${t("Fields.task_types_shown", { types: names.join(", ") })}` : "";
+};
+
+const surfacesOf = (field) => {
     if (isAiField(field)) return t(`AiFields.template_${field.fieldAi.template}`);
     if (field.fieldType === "formula") return field.formulaExpression || t("Fields.no_expression");
     if (field.fieldType === "rollup") {
@@ -278,6 +292,8 @@ const shownIn = (field) => {
     const surfaces = Array.isArray(field.fieldSurfaces) && field.fieldSurfaces.length ? field.fieldSurfaces : ["task_view"];
     return surfaces.map((surface) => t(`Fields.surface_${surface}`)).join(" · ");
 };
+
+const shownIn = (field) => `${surfacesOf(field)}${scopeOf(field)}`;
 
 // The global type catalogue is empty on a fresh install, and the legacy drawer
 // renders nothing without a cfType, so fall back to the picker's own entry.
@@ -294,7 +310,7 @@ function startNew(fieldType) {
     aiDraft.value = null;
     if (fieldType === "ai") {
         draft.value = null;
-        aiDraft.value = newAiDraft();
+        aiDraft.value = { ...newAiDraft(), fieldTaskTypes: [] };
         errors.value = {};
         return;
     }
@@ -312,7 +328,8 @@ function startNew(fieldType) {
         formulaExpression: "",
         rollupSourceFieldId: "",
         rollupFunction: "sum",
-        rollupScope: "subtask"
+        rollupScope: "subtask",
+        fieldTaskTypes: []
     };
     errors.value = {};
     preview.value = { value: null, error: "" };
@@ -323,7 +340,7 @@ function selectField(field) {
     aiDraft.value = null;
     if (isAiField(field)) {
         draft.value = null;
-        aiDraft.value = aiDraftFrom(field);
+        aiDraft.value = { ...aiDraftFrom(field), fieldTaskTypes: fieldTaskTypes(field) };
         errors.value = {};
         return;
     }
@@ -342,7 +359,8 @@ function selectField(field) {
         formulaExpression: field.formulaExpression || "",
         rollupSourceFieldId: field.rollupSourceFieldId || "",
         rollupFunction: field.rollupFunction || "sum",
-        rollupScope: field.rollupScope || "subtask"
+        rollupScope: field.rollupScope || "subtask",
+        fieldTaskTypes: fieldTaskTypes(field)
     };
     errors.value = {};
     preview.value = { value: null, error: "" };
@@ -444,6 +462,7 @@ async function save() {
             rollupSourceFieldId: draft.value.fieldType === "rollup" ? draft.value.rollupSourceFieldId : "",
             rollupFunction: draft.value.fieldType === "rollup" ? draft.value.rollupFunction : "",
             rollupScope: draft.value.fieldType === "rollup" ? draft.value.rollupScope : "",
+            fieldTaskTypes: draft.value.fieldTaskTypes || [],
             fieldImage: detail.cfIcon || "",
             fieldImageGrey: detail.cfIconGrey || "",
             fieldPrimaryColor: detail.cfPrimaryColor || "",
@@ -486,6 +505,7 @@ async function saveAi() {
         const detail = detailFor(aiField.fieldType);
         const payload = {
             ...aiField,
+            fieldTaskTypes: aiDraft.value.fieldTaskTypes || [],
             fieldImage: detail.cfIcon || "",
             fieldImageGrey: detail.cfIconGrey || "",
             fieldPrimaryColor: detail.cfPrimaryColor || "",

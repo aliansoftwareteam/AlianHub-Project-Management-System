@@ -1,5 +1,6 @@
 import moment from 'moment';
 import { dueDateBuckets } from '../taskGroups';
+import { fieldAppliesToTask, fieldTaskTypes } from '@fieldTaskTypes';
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const VALUE_PATH = /^customField\.([a-f0-9]{24})\.fieldValue$/i;
@@ -20,6 +21,11 @@ export const customFieldIdOf = (value) => {
     const id = value.slice(GROUP_PREFIX.length);
     return OBJECT_ID.test(id) ? id : null;
 };
+
+/* A task of another type keeps its stored value but does not use the field, so every query reads it as having no value. */
+const inTypes = (types) => ({ TaskTypeKey: { $in: types } });
+const valueInTypes = (condition, types) => (types.length ? { ...condition, ...inTypes(types) } : condition);
+const blankOrOtherType = (blank, valued, types) => (types.length ? { $nor: [{ ...valued, ...inTypes(types) }] } : blank);
 
 const hasId = (def) => Boolean(def && OBJECT_ID.test(String(def._id || '')));
 
@@ -47,6 +53,8 @@ const converted = (path, to) => ({ $convert: { input: `$${path}`, to, onError: n
 const millisOf = (path) => ({ $toLong: converted(path, 'date') });
 const present = (expr, ...tests) => ({ $expr: { $and: [{ $ne: [expr, null] }, ...tests] } });
 
+const DATED_BUCKETS = ['range', 'lt', 'gt'];
+
 function dateBucketCondition(bucket, path) {
     const time = millisOf(path);
     const from = bucket.seconds * 1000;
@@ -62,9 +70,10 @@ function dateBucketCondition(bucket, path) {
     }
 }
 
-const groupBase = (def) => ({
+const groupBase = (def, types) => ({
     customFieldId: String(def._id),
     customFieldType: def.fieldType,
+    ...(types.length ? { customFieldTaskTypes: types } : {}),
     searchKey: valuePath(def._id),
     indexName: 'groupByStatusIndex',
     isExpanded: true,
@@ -76,7 +85,8 @@ const groupBase = (def) => ({
 export function customFieldGroups(def, { t = (key) => key, now = new Date() } = {}) {
     if (!hasId(def)) return [];
     const path = valuePath(def._id);
-    const base = groupBase(def);
+    const types = fieldTaskTypes(def);
+    const base = groupBase(def, types);
     const none = { ...base, name: t('ViewGroups.no_value'), value: '', searchValue: '' };
 
     if (def.fieldType === 'dropdown') {
@@ -88,15 +98,15 @@ export function customFieldGroups(def, { t = (key) => key, now = new Date() } = 
                 textColor: option.color,
                 value: String(option.id),
                 searchValue: String(option.id),
-                conditions: [{ [path]: String(option.id) }]
+                conditions: [valueInTypes({ [path]: String(option.id) }, types)]
             })),
-            { ...none, conditions: [{ [path]: { $in: EMPTY_VALUES } }] }
+            { ...none, conditions: [blankOrOtherType({ [path]: { $in: EMPTY_VALUES } }, { [path]: { $nin: EMPTY_VALUES } }, types)] }
         ];
     }
     if (def.fieldType === 'checkbox') {
         return [
-            { ...base, name: t('ViewGroups.checked'), value: true, searchValue: true, conditions: [{ [path]: { $in: CHECKED } }] },
-            { ...base, name: t('ViewGroups.unchecked'), value: false, searchValue: false, conditions: [{ [path]: { $nin: CHECKED } }] }
+            { ...base, name: t('ViewGroups.checked'), value: true, searchValue: true, conditions: [valueInTypes({ [path]: { $in: CHECKED } }, types)] },
+            { ...base, name: t('ViewGroups.unchecked'), value: false, searchValue: false, conditions: [blankOrOtherType({ [path]: { $nin: CHECKED } }, { [path]: { $in: CHECKED } }, types)] }
         ];
     }
     if (def.fieldType === 'date') {
@@ -107,7 +117,9 @@ export function customFieldGroups(def, { t = (key) => key, now = new Date() } = 
             textColor: undefined,
             searchValue: bucket.value,
             dropDisabled: true,
-            conditions: [dateBucketCondition(bucket, path)]
+            conditions: [DATED_BUCKETS.includes(bucket.operation)
+                ? valueInTypes(dateBucketCondition(bucket, path), types)
+                : blankOrOtherType(dateBucketCondition(bucket, path), { $expr: { $ne: [millisOf(path), null] } }, types)]
         }));
     }
     return [];
@@ -129,7 +141,7 @@ function dateMatches(time, item) {
 }
 
 export function customGroupMatches(task, item) {
-    const value = storedValue(task, item.customFieldId);
+    const value = fieldAppliesToTask({ fieldTaskTypes: item.customFieldTaskTypes }, task) ? storedValue(task, item.customFieldId) : undefined;
     if (item.customFieldType === 'dropdown') {
         const chosen = [].concat(isBlank(value) ? [] : value).filter((id) => !isBlank(id)).map(String);
         return item.searchValue === '' ? chosen.length === 0 : chosen.includes(String(item.searchValue));
@@ -138,6 +150,13 @@ export function customGroupMatches(task, item) {
     if (item.customFieldType === 'date') return dateMatches(timeOf(value), item);
     return false;
 }
+
+/* A drop writes the group's value, which the server refuses on a task of another type; the view declines the drop instead of
+   showing the row in a group it is not in. `taskTypeKey` may be the text of a data attribute. */
+export const groupTakesTask = (item, taskTypeKey) => fieldAppliesToTask({ fieldTaskTypes: item?.customFieldTaskTypes }, { TaskTypeKey: taskTypeKey });
+
+/* Sortable reads `true` from a put function as "from any list", so an allowed drop names the one drag group it may come from. */
+export const putFrom = (groupName, item) => (to, from, dragged) => (groupTakesTask(item, dragged?.dataset?.taskType) ? [groupName] : false);
 
 /* A date group is a range, not a value, so nothing can be dropped into one. */
 export function customGroupUpdate(item) {
@@ -192,7 +211,25 @@ function dateCondition(path, comparison, raw) {
     return null;
 }
 
-export function customFilterCondition(row) {
+/* A saved filter row keeps no task types, so they are read from the field definition each time the query is built. */
+export function customFilterCondition(row, defs = []) {
+    const condition = unscopedFilterCondition(row);
+    const fieldId = fieldIdOfPath(row?.name?.filterOn);
+    const types = fieldTaskTypes((defs || []).find((def) => String(def?._id) === fieldId));
+    if (!condition || !types.length) return condition;
+    return matchesNoValue(row) ? { $or: [condition, { TaskTypeKey: { $nin: types } }] } : { ...condition, ...inTypes(types) };
+}
+
+function matchesNoValue(row) {
+    const comparison = row.comparison?.value;
+    const type = row.name.fieldType;
+    if (comparison === IS_EMPTY.value) return true;
+    if (comparison === IS_SET.value) return false;
+    if (type === 'checkbox') return !CHECKED.includes(row.values[0]);
+    return comparison === ':!=' && (type === 'dropdown' || NUMBER_TYPES.includes(type));
+}
+
+function unscopedFilterCondition(row) {
     const path = row?.name?.filterOn;
     if (!fieldIdOfPath(path) || row.name.value !== path.replace(/\.fieldValue$/, '')) return null;
     const comparison = row.comparison?.value;
@@ -221,7 +258,7 @@ export function customFilterCondition(row) {
 }
 
 export function customSortValue(def, task) {
-    if (!hasId(def)) return null;
+    if (!hasId(def) || !fieldAppliesToTask(def, task)) return null;
     const value = storedValue(task, String(def._id));
     switch (def.fieldType) {
         case 'checkbox':
@@ -246,12 +283,15 @@ export function customSortValue(def, task) {
 
 /* Numbers are kept as text, so a plain $sort puts "10" before "9"; values that are not
    numbers fall back to themselves and still sort among their own kind. */
-export function tableSortStages(sortKey) {
+export function tableSortStages(sortKey, defs = []) {
     const [field, rawDir] = String(sortKey || '').split(':');
     const dir = Number(rawDir) === -1 ? -1 : 1;
-    if (!fieldIdOfPath(field)) return [{ $sort: { [field]: dir, _id: 1 } }];
+    const fieldId = fieldIdOfPath(field);
+    if (!fieldId) return [{ $sort: { [field]: dir, _id: 1 } }];
+    const types = fieldTaskTypes((defs || []).find((def) => String(def?._id) === fieldId));
+    const value = { $convert: { input: `$${field}`, to: 'double', onError: `$${field}`, onNull: null } };
     return [
-        { $addFields: { cfSortValue: { $convert: { input: `$${field}`, to: 'double', onError: `$${field}`, onNull: null } } } },
+        { $addFields: { cfSortValue: types.length ? { $cond: [{ $in: ['$TaskTypeKey', types] }, value, null] } : value } },
         { $sort: { cfSortValue: dir, _id: 1 } }
     ];
 }
