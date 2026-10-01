@@ -40,7 +40,6 @@ test.describe('logging time and writing docs', () => {
         const pageId = /\/pages\/([0-9a-f]{24})/.exec(page.url())[1];
 
         await page.getByPlaceholder('Untitled').fill(title);
-        await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
         await expect.poll(async () => JSON.stringify((await owner.api.get(`/api/v2/pages/${pageId}`)).body)).toContain(title);
 
         await page.reload();

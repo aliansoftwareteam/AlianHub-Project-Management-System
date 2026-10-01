@@ -7,10 +7,14 @@ const escapeData = (text) => text.replace(/%/g, '%25').replace(/\r/g, '%0D').rep
 const escapeProperty = (text) => escapeData(text).replace(/:/g, '%3A').replace(/,/g, '%2C');
 const plain = (text) => String(text || '').replace(/\u001b\[[0-9;]*m/g, '');
 
-/* The shell navigation and the project picker repeat on every page and push the screen itself out of the limit. */
+/* A dialog is what a test was working in, so it comes first; the shell navigation and the project
+ * picker repeat on every page and would push it out of the limit. */
 const screenOf = (tree) => {
-    const main = tree.indexOf('- main:');
-    return tree.slice(main === -1 ? 0 : main).split('\n').filter((line) => !/^\s*- (treeitem|option) /.test(line)).join('\n');
+    const lines = tree.split('\n').filter((line) => !/^\s*- (treeitem|option) /.test(line));
+    const dialog = lines.findIndex((line) => /^\s*- dialog/.test(line));
+    const main = lines.findIndex((line) => line.startsWith('- main:'));
+    const head = dialog === -1 ? [] : lines.slice(dialog);
+    return [...head, ...lines.slice(main === -1 ? 0 : main, dialog === -1 ? undefined : dialog)].join('\n');
 };
 
 class SummaryReporter {

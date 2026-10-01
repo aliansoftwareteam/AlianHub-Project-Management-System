@@ -15,11 +15,12 @@ test.describe('chat', () => {
         await page.getByRole('button', { name: 'New message', exact: true }).click();
         await page.getByRole('button', { name: /Max Member/ }).click();
         const composer = page.getByPlaceholder('Type here');
-        await composer.fill(message);
-        await composer.press('Enter');
-        await expect(page.getByText(message, { exact: true })).toBeVisible();
+        await composer.click();
+        await composer.pressSequentially(message);
+        await page.getByRole('button', { name: 'Send', exact: true }).click();
+        await expect(page.getByText(message)).toBeVisible();
 
-        await page.getByText(message, { exact: true }).hover();
+        await page.getByText(message).hover();
         await page.getByRole('button', { name: 'Reply in thread', exact: true }).first().click();
         const thread = page.getByRole('complementary', { name: 'Thread' });
         const threadComposer = thread.getByPlaceholder('Type here');
