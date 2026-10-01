@@ -92,7 +92,7 @@ describe('atlas layout: horizontal overflow', () => {
 });
 
 describe('atlas layout: targets too small to hit', () => {
-    const control = (index, left, top, width, height, extra = {}) => ({ index, el: el('button', [`b${index}`]), left, top, width, height, inline: false, ancestors: [], clip: null, ...extra });
+    const control = (index, left, top, width, height, extra = {}) => ({ index, el: el('button', [`b${index}`]), left, top, width, height, inline: false, ancestors: [], clip: null, layer: 0, scroller: 0, ...extra });
 
     test('a small control with room around it passes', () => {
         expect(smallTargets([control(0, 10, 10, 16, 16), control(1, 60, 10, 16, 16)])).toEqual([]);
@@ -114,6 +114,18 @@ describe('atlas layout: targets too small to hit', () => {
         expect(smallTargets([control(0, 10, 10, 80, 18), control(1, 10, 30, 80, 18)]).map((found) => found.selector)).toEqual(['button.b0', 'button.b1']);
     });
 
+    test('a control in a layer floating over the page is not a neighbour of what scrolls under it', () => {
+        expect(smallTargets([control(0, 10, 10, 16, 16), control(1, 28, 10, 16, 16, { layer: 1 })])).toEqual([]);
+    });
+
+    test('a control scrolled out of its container is not measured against what lies beyond it', () => {
+        expect(smallTargets([control(0, 10, 790, 16, 16, { onScreen: false }), control(1, 28, 790, 16, 16)])).toEqual([]);
+    });
+
+    test('nor is a control in a list against the bar the list scrolls past', () => {
+        expect(smallTargets([control(0, 10, 770, 16, 16, { scroller: 2 }), control(1, 10, 788, 200, 40)])).toEqual([]);
+    });
+
     test('a link in running text, and a control inside another control, are left alone', () => {
         expect(smallTargets([control(0, 10, 10, 30, 14, { inline: true }), control(1, 42, 10, 30, 14, { inline: true })])).toEqual([]);
         expect(smallTargets([control(0, 10, 10, 200, 40), control(1, 180, 22, 16, 16, { ancestors: [0] })])).toEqual([]);
@@ -132,10 +144,14 @@ describe('atlas layout: controls cut off sideways', () => {
     test('a control inside something that scrolls sideways is reachable', () => {
         expect(cutControls([control(0, 600, 60, null)])).toEqual([]);
     });
+
+    test('a closed drawer parked left of the screen is not a finding', () => {
+        expect(cutControls([control(0, -310, 299, { left: 0, right: 390 })])).toEqual([]);
+    });
 });
 
 describe('atlas layout: text clipped to nothing', () => {
-    const text = (extra = {}) => ({ el: el('span', ['label']), text: 'Billable', visible: { width: 0, height: 16 }, chain: [], ...extra });
+    const text = (extra = {}) => ({ el: el('span', ['label']), text: 'Billable', left: 20, width: 60, visible: { width: 0, height: 16 }, chain: [], ...extra });
 
     test('text squeezed to zero width or height is a finding', () => {
         expect(clippedText([text(), text({ visible: { width: 40, height: 0 } })])).toEqual([
@@ -146,6 +162,10 @@ describe('atlas layout: text clipped to nothing', () => {
 
     test('text that shows is not', () => {
         expect(clippedText([text({ visible: { width: 12, height: 16 } })])).toEqual([]);
+    });
+
+    test('text in a closed drawer parked left of the screen is not', () => {
+        expect(clippedText([text({ left: -300, width: 80 })])).toEqual([]);
     });
 
     test('a screen-reader helper is hidden on purpose', () => {
@@ -170,13 +190,17 @@ describe('atlas layout: layers that cover the screen', () => {
         expect(coveringLayers([layer(['below'], 'sticky', 700, 1600)], VIEWPORT)).toEqual([]);
         expect(coveringLayers([layer(['toasts'], 'fixed', 0, 844, { pointerEvents: 'none' })], VIEWPORT)).toEqual([]);
     });
+
+    test('a narrow sticky column is not a cover', () => {
+        expect(coveringLayers([layer(['hours'], 'sticky', 0, 844, { right: 44 })], VIEWPORT)).toEqual([]);
+    });
 });
 
 describe('atlas layout: the findings of one screen', () => {
     const raw = {
         viewport: VIEWPORT,
         scopes: [{ kind: 'document', el: el('html'), clientWidth: 390, scrollWidth: 500, offenders: [{ index: 0, parent: -1, el: el('table'), left: 0, right: 500, width: 500 }] }],
-        controls: Array.from({ length: 30 }, (_, index) => ({ index, el: el('button', [`b${index}`]), left: 4 + index * 18, top: 10, width: 16, height: 16, inline: false, ancestors: [], clip: null })),
+        controls: Array.from({ length: 30 }, (_, index) => ({ index, el: el('button', [`b${index}`]), left: 4 + index * 18, top: 10, width: 16, height: 16, inline: false, ancestors: [], clip: null, layer: 0, scroller: 0 })),
         texts: [],
         layers: [],
     };

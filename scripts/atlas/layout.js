@@ -54,21 +54,27 @@ function overflowOf({ viewport, scopes }) {
 
 const distanceTo = (x, y, box) => Math.hypot(Math.max(box.left - x, 0, x - (box.left + box.width)), Math.max(box.top - y, 0, y - (box.top + box.height)));
 
+// A closed drawer waits left of the screen; that is where it belongs, not a control gone missing.
+const parkedLeft = (box) => box.left + box.width <= 0;
+
 const nested = (a, b) => a.ancestors.includes(b.index) || b.ancestors.includes(a.index);
 
-function smallTargets(controls) {
+/* What has scrolled out of its container sits, by its box, under whatever lies beyond, and what
+ * scrolls passes what does not: neighbours are controls that move together. */
+function smallTargets(all) {
+    const controls = all.filter((control) => control.onScreen !== false);
     return controls.flatMap((control) => {
         if (control.inline || (control.width >= TARGET_MIN && control.height >= TARGET_MIN)) return [];
         const x = control.left + control.width / 2;
         const y = control.top + control.height / 2;
-        const near = controls.find((other) => other !== control && !nested(control, other) && distanceTo(x, y, other) < TARGET_CLEARANCE);
+        const near = controls.find((other) => other !== control && other.layer === control.layer && other.scroller === control.scroller && !nested(control, other) && distanceTo(x, y, other) < TARGET_CLEARANCE);
         return near ? [{ selector: shortSelector(control.el), width: Math.round(control.width), height: Math.round(control.height), near: shortSelector(near.el) }] : [];
     });
 }
 
 function cutControls(controls) {
     return controls.flatMap((control) => {
-        if (!control.clip) return [];
+        if (!control.clip || parkedLeft(control)) return [];
         const centre = control.left + control.width / 2;
         if (centre >= control.clip.left && centre <= control.clip.right) return [];
         return [{ selector: shortSelector(control.el), left: Math.round(control.left), right: Math.round(control.left + control.width), edge: Math.round(centre < control.clip.left ? control.clip.left : control.clip.right) }];
@@ -82,7 +88,7 @@ const isHiddenHelper = ({ classes = [], clip = '', clipPath = '', position = '',
 
 function clippedText(texts) {
     return texts
-        .filter((text) => (text.visible.width <= 0 || text.visible.height <= 0) && !(text.chain || []).some(isHiddenHelper))
+        .filter((text) => (text.visible.width <= 0 || text.visible.height <= 0) && !parkedLeft(text) && !(text.chain || []).some(isHiddenHelper))
         .map((text) => ({ selector: shortSelector(text.el), text: text.text }));
 }
 
@@ -90,8 +96,9 @@ function coveringLayers(layers, viewport) {
     return layers.flatMap((layer) => {
         if (layer.pointerEvents === 'none') return [];
         const share = (Math.min(layer.bottom, viewport.height) - Math.max(layer.top, 0)) / viewport.height;
-        if (share <= COVER_SHARE) return [];
-        return [{ selector: shortSelector(layer.el), position: layer.position, share: Math.round(share * 100) / 100, width: Math.round(Math.min(layer.right, viewport.width) - Math.max(layer.left, 0)) }];
+        const width = Math.round(Math.min(layer.right, viewport.width) - Math.max(layer.left, 0));
+        if (share <= COVER_SHARE || width <= viewport.width / 2) return [];
+        return [{ selector: shortSelector(layer.el), position: layer.position, share: Math.round(share * 100) / 100, width }];
     }).sort((a, b) => b.share - a.share);
 }
 
@@ -153,26 +160,30 @@ function collectLayout({ interactive, edge, limit }) {
 
     /* What is left of a box once every ancestor that hides its overflow has cut it. An ancestor
      * that scrolls can bring the box into view, so from there on its own box stands in. */
-    const visiblePart = (start, box, startSkips) => {
+    const visiblePart = (start, box, startSkips, scrolledOutCounts = false) => {
         const part = { left: box.left, right: box.right, top: box.top, bottom: box.bottom, goneX: null, goneY: null, fixed: false };
         let skipping = startSkips;
+        part.layer = null;
         for (let node = start; node && node !== root; node = node.parentElement) {
             const style = styleOf(node);
             if (skipping && style.position === 'static' && style.transform === 'none') continue;
             skipping = false;
             const frame = boxOf(node);
+            if (!part.scroller && (scrolls(style.overflowX) || scrolls(style.overflowY))) part.scroller = node;
             if (!part.goneX) {
-                if (scrolls(style.overflowX)) Object.assign(part, { left: frame.left, right: frame.right, scrollsX: true });
+                if (scrolledOutCounts && scrolls(style.overflowX)) Object.assign(part, { left: Math.max(part.left, frame.left), right: Math.min(part.right, frame.right) });
+                else if (scrolls(style.overflowX)) Object.assign(part, { left: frame.left, right: frame.right, scrollsX: true });
                 else if (clips(style.overflowX)) Object.assign(part, { left: Math.max(part.left, frame.left), right: Math.min(part.right, frame.right) });
                 if (part.right - part.left <= 0) part.goneX = node;
             }
             if (!part.goneY) {
-                if (scrolls(style.overflowY)) Object.assign(part, { top: frame.top, bottom: frame.bottom });
+                if (scrolledOutCounts && scrolls(style.overflowY)) Object.assign(part, { top: Math.max(part.top, frame.top), bottom: Math.min(part.bottom, frame.bottom) });
+                else if (scrolls(style.overflowY)) Object.assign(part, { top: frame.top, bottom: frame.bottom });
                 else if (clips(style.overflowY)) Object.assign(part, { top: Math.max(part.top, frame.top), bottom: Math.min(part.bottom, frame.bottom) });
                 if (part.bottom - part.top <= 0) part.goneY = node;
             }
             if (style.position === 'fixed') {
-                part.fixed = true;
+                Object.assign(part, { fixed: true, layer: node });
                 break;
             }
             if (style.position === 'absolute') skipping = true;
@@ -224,17 +235,23 @@ function collectLayout({ interactive, edge, limit }) {
 
     const targets = [...document.body.querySelectorAll(interactive)].filter((element) => shown(element) && !element.disabled && element.getAttribute('aria-disabled') !== 'true' && boxOf(element).width > 1 && boxOf(element).height > 1);
     const indexOf = new Map(targets.map((element, index) => [element, index]));
+    const ids = new Map();
+    const idOf = (element) => (element ? ids.get(element) || ids.set(element, ids.size + 1).get(element) : 0);
     const controls = targets.map((element, index) => {
         const box = boxOf(element);
         const style = styleOf(element);
         const ancestors = [];
         for (let node = element.parentElement; node; node = node.parentElement) if (indexOf.has(node)) ancestors.push(indexOf.get(node));
-        const part = style.position === 'fixed' ? { left: box.left, right: box.right, fixed: true } : visiblePart(element.parentElement, box, style.position === 'absolute');
+        const part = style.position === 'fixed' ? { left: box.left, right: box.right, fixed: true, layer: element } : visiblePart(element.parentElement, box, style.position === 'absolute');
         let clip = part.scrollsX ? null : { left: part.left, right: part.right };
         if (clip && (part.fixed || !documentPans)) clip = { left: Math.max(clip.left, 0), right: Math.min(clip.right, viewport.width) };
         if (part.fixed && (box.right <= 0 || box.left >= viewport.width)) clip = null;
+        const now = style.position === 'fixed' ? box : visiblePart(element.parentElement, box, style.position === 'absolute', true);
+        const x = box.left + box.width / 2;
+        const y = box.top + box.height / 2;
+        const onScreen = x >= Math.max(now.left, 0) && x <= Math.min(now.right, viewport.width) && y >= Math.max(now.top, 0) && y <= Math.min(now.bottom, viewport.height);
         const inText = style.display === 'inline' && [...element.parentElement.childNodes].some((node) => node.nodeType === 3 && node.nodeValue.trim());
-        return { index, el: describe(element), left: box.left, top: box.top, width: box.width, height: box.height, inline: inText, ancestors, clip };
+        return { index, el: describe(element), left: box.left, top: box.top, width: box.width, height: box.height, inline: inText, ancestors, clip, layer: idOf(part.layer), scroller: idOf(part.scroller), onScreen };
     });
 
     const texts = [];
@@ -258,7 +275,7 @@ function collectLayout({ interactive, edge, limit }) {
             chain.push({ classes: classesOf(link), clip: style.clip, clipPath: style.clipPath, position: style.position, width: frame.width, height: frame.height });
             if (link === stop) break;
         }
-        texts.push({ el: describe(parent), text: content.slice(0, 40), visible: { width: part.goneX ? 0 : part.right - part.left, height: part.goneY ? 0 : part.bottom - part.top }, chain });
+        texts.push({ el: describe(parent), text: content.slice(0, 40), left: box.left, width: box.width, visible: { width: part.goneX ? 0 : part.right - part.left, height: part.goneY ? 0 : part.bottom - part.top }, chain });
     }
 
     return { viewport, scopes, controls, texts, layers };
