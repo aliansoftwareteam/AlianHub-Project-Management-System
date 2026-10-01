@@ -52,6 +52,7 @@
     import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
     import AiFieldMark from '@/components/atom/AiFieldMark/AiFieldMark.vue';
     import { isAiField } from '@/views/Projects/composables/aiFields';
+    import { fieldAppliesToTask } from '@fieldTaskTypes';
 
 
     const { getters } = useStore();
@@ -148,10 +149,11 @@
     const filteredCustomFields = computed(() => {
         if (!processedCustomFieldList.value?.length) return [];
         
-        return processedCustomFieldList.value.filter(val => 
-            val?.isDelete && 
-            val?.type === 'task' && 
-            (val?.global || val?.projectId?.includes(props?.task?.ProjectID))
+        return processedCustomFieldList.value.filter(val =>
+            val?.isDelete &&
+            val?.type === 'task' &&
+            (val?.global || val?.projectId?.includes(props?.task?.ProjectID)) &&
+            fieldAppliesToTask(val, props.task)
         );
     });
 

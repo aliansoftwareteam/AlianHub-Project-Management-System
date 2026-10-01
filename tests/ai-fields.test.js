@@ -479,6 +479,75 @@ describe('auto-refill', () => {
     });
 });
 
+describe('a field limited to task types', () => {
+    const BUG = 2;
+    const scopedField = (fieldAi = {}) => seedField({
+        fieldTaskTypes: [BUG],
+        fieldAi: { enabled: true, template: 'summary', reads: ['title'], autoRefill: true, language: '', prompt: '', ...fieldAi },
+    });
+    const retype = (task, TaskTypeKey) => db().crud(COMPANY, { type: SCHEMA_TYPE.TASKS, data: [{ _id: task._id }, { $set: { TaskTypeKey } }] }, 'updateOne');
+
+    it('previews nothing for a task of another type, without a model call', async () => {
+        const field = scopedField();
+        const task = seedTask({ TaskTypeKey: 1 });
+        modelAnswers('never');
+
+        const { proposals } = await fill.proposeFills({ companyId: COMPANY, uid: ALICE, fieldId: String(field._id), taskIds: [String(task._id)] });
+        expect(proposals).toEqual([expect.objectContaining({ taskId: String(task._id), proposalId: null, reason: 'not_for_task_type' })]);
+        expect(mockChat).not.toHaveBeenCalled();
+    });
+
+    it('does not apply a preview once the task has changed to another type, and leaves no fill mark', async () => {
+        const field = scopedField();
+        const task = seedTask({ TaskTypeKey: BUG });
+        modelAnswers('A bug summary');
+        const { proposals } = await fill.proposeFills({ companyId: COMPANY, uid: ALICE, fieldId: String(field._id), taskIds: [String(task._id)] });
+        await retype(task, 1);
+
+        const applied = await fill.applyProposals({ companyId: COMPANY, uid: ALICE, fieldId: String(field._id), proposalIds: [proposals[0].proposalId] });
+        expect(applied).toEqual({ applied: [], refused: [{ taskId: String(task._id), reason: 'not_for_task_type' }] });
+        expect(mockUpdateTaskCustomField).not.toHaveBeenCalled();
+        expect(storedTask(task._id).aiFieldFills).toBeUndefined();
+    });
+
+    it('a bulk job skips the tasks of other types, fills the rest and fails none', async () => {
+        const field = scopedField();
+        const bug = seedTask({ TaskName: 'Crash on save', TaskTypeKey: BUG });
+        const story = seedTask({ TaskName: 'New onboarding', TaskTypeKey: 1 });
+        modelAnswers('Filled');
+
+        const { job, done } = await jobs.startJob({ companyId: COMPANY, uid: ALICE, fieldId: String(field._id), taskIds: [String(story._id), String(bug._id)] });
+        await done;
+        const read = await jobs.readJob({ companyId: COMPANY, uid: ALICE, jobId: String(job._id) });
+        expect(read).toEqual(expect.objectContaining({ status: 'done', processed: 2, filled: 1, skipped: 1, failed: 0 }));
+        expect(mockChat).toHaveBeenCalledTimes(1);
+        expect(mockUpdateTaskCustomField).toHaveBeenCalledTimes(1);
+        expect(storedTask(story._id).aiFieldFills).toBeUndefined();
+        expect(storedTask(bug._id).aiFieldFills[String(field._id)].trigger).toBe('bulk');
+    });
+
+    it('auto-refill leaves a filled task alone once it is of another type', async () => {
+        const field = scopedField();
+        const task = seedTask({ TaskTypeKey: BUG });
+        modelAnswers('First');
+        const { proposals } = await fill.proposeFills({ companyId: COMPANY, uid: ALICE, fieldId: String(field._id), taskIds: [String(task._id)] });
+        await fill.applyProposals({ companyId: COMPANY, uid: ALICE, fieldId: String(field._id), proposalIds: [proposals[0].proposalId] });
+        mockChat.mockClear();
+        mockUpdateTaskCustomField.mockClear();
+        await retype(task, 1);
+        await db().crud(COMPANY, { type: SCHEMA_TYPE.TASKS, data: [{ _id: task._id }, { $set: { TaskName: 'Now a story' } }] }, 'updateOne');
+
+        autoRefill.start({ debounceMs: 0 });
+        socketEmitter.emit('update', { type: 'update', module: 'task', data: storedTask(task._id), updatedFields: { TaskName: 'Now a story' } });
+        await autoRefill.flush();
+
+        expect(mockChat).not.toHaveBeenCalled();
+        expect(mockUpdateTaskCustomField).not.toHaveBeenCalled();
+        expect(storedTask(task._id).customField[String(field._id)].fieldValue).toBe('First');
+        expect(storedTask(task._id).aiFieldFills[String(field._id)].trigger).toBe('manual');
+    });
+});
+
 describe('history', () => {
     it('says a value was filled by AI', () => {
         const entry = describeCustomFieldValue({

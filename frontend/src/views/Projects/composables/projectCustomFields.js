@@ -3,6 +3,9 @@ import { useStore } from 'vuex';
 import moment from 'moment';
 import { useCustomComposable } from '@/composable';
 import { computeCustomFieldValue } from '@/plugins/customFieldView/formulaEngine.js';
+import { fieldAppliesToTask, fieldTaskTypes } from '@fieldTaskTypes';
+
+export { fieldAppliesToTask, fieldTaskTypes };
 
 export const COMPUTED_TYPES = ['formula', 'rollup'];
 export const FIELD_TYPES = ['text', 'textarea', 'number', 'money', 'date', 'dropdown', 'checkbox', 'email', 'phone', ...COMPUTED_TYPES];
@@ -58,7 +61,7 @@ export function customFieldText(def, task, { allTasks = [], dateFormat = 'DD/MM/
 
 export function shownFieldValues(columns, task, options = {}) {
     return (columns || [])
-        .filter((column) => column?.field)
+        .filter((column) => column?.field && fieldAppliesToTask(column.field, task))
         .map((column) => ({
             id: column.id,
             label: column.label || column.field.fieldTitle || '',

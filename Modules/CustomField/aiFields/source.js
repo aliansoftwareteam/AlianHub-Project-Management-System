@@ -10,7 +10,7 @@ const COMMENT_CAP = 600;
 const MAX_COMMENTS = 30;
 const MAX_SUBTASKS = 30;
 
-const TASK_PROJECTION = Object.freeze({ TaskName: 1, description: 1, rawDescription: 1, ProjectID: 1, status: 1, customField: 1, aiFieldFills: 1, CompanyId: 1, startDate: 1 });
+const TASK_PROJECTION = Object.freeze({ TaskName: 1, description: 1, rawDescription: 1, ProjectID: 1, status: 1, customField: 1, aiFieldFills: 1, CompanyId: 1, startDate: 1, TaskTypeKey: 1 });
 
 const clamp = (value, cap) => {
     const flat = String(value == null ? '' : value).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();

@@ -767,7 +767,7 @@ export const buildFilterQuery = (queries, userID) => {
             filterBy[condition] = [];
         }
         if (query.name.type === "custom") {
-            const customCondition = customFilterCondition(query);
+            const customCondition = customFilterCondition(query, Store.getters['settings/finalCustomFields']);
             if (customCondition) filterBy[condition].push(customCondition);
         } else if (query.name.type === "arrayOfObject") {
             filterBy[condition].push({ [queryField]: { $elemMatch: { [filterOn]: { $in: query.values } } } })

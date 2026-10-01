@@ -4484,6 +4484,11 @@ const schema = {
             outOfRange: { type: String, required: false },
             // '' | after_start | not_past
             dateRule: { type: String, required: false },
+        },
+        fieldTaskTypes:{
+            type:Array,
+            required: false,
+            default:[]
         }
     },
     sprints: {

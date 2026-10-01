@@ -1,6 +1,7 @@
 const { evaluatePermission, isWritable } = require('../../../Config/permissionGuard');
 const logger = require('../../../Config/loggerConfig');
 const { normaliseAiConfig, AiConfigError } = require('../aiFields/config');
+const { cleanTaskTypeList, MAX_TASK_TYPES } = require('./fieldTaskTypes');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const SETTINGS_PERMISSION = 'settings.settings_custom_field';
@@ -26,6 +27,12 @@ const checkedAiConfig = ({ fieldAi, fieldType }) => {
     }
 };
 
+const checkedTaskTypes = (value) => {
+    const keys = cleanTaskTypeList(value);
+    if (!keys) throw new FieldWriteError(`fieldTaskTypes must be a list of at most ${MAX_TASK_TYPES} task type keys.`);
+    return keys;
+};
+
 const checkProperties = (updateObject, { insert }) => {
     if (!isPlainObject(updateObject) || !Object.keys(updateObject).length) throw new FieldWriteError('Update Object is required');
     const allowed = insert ? [...SHARED_PROPERTIES, ...INSERT_ONLY_PROPERTIES] : SHARED_PROPERTIES;
@@ -36,6 +43,7 @@ const checkProperties = (updateObject, { insert }) => {
     });
     if ('projectId' in updateObject && !isIdList(updateObject.projectId)) throw new FieldWriteError('projectId must be a list of project ids.');
     if ('fieldAi' in updateObject) updateObject.fieldAi = checkedAiConfig(updateObject);
+    if ('fieldTaskTypes' in updateObject) updateObject.fieldTaskTypes = checkedTaskTypes(updateObject.fieldTaskTypes);
     return updateObject;
 };
 
