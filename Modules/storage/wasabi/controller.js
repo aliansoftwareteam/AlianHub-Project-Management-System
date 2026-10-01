@@ -13,6 +13,7 @@ const {myCache, requestHandler} = require('../../../Config/config');
 const { updateCompanyFun, getCompanyDataFun } = require('../../Company/controller/updateCompany.js');
 const { isProfileUpload, refuseUnverifiedBucket } = require('../bucketAccess');
 const { logUploadFailures } = require('../uploadFailures');
+const { isRowTrackshotKey } = require('../../../common-storage/taskFileKeys');
 /**
  * S3 client configuration for create bucket
  */
@@ -46,6 +47,14 @@ const formatS3UploadError = (error, context = {}) => {
         `bucket=${bucket} key=${key} requestId=${requestId || ''} message=${message}`
     );
     return `Error while upload file: ${code}: ${message}`;
+};
+
+/* Every stored name starts with the time it was stored, so an upload never lands on an existing
+ * object whatever replaceFile the request carries. */
+const timestamped = (filePath, separator) => {
+    const folders = filePath.split('/');
+    const fileName = folders.pop();
+    return `${folders.join('/')}${separator}${new Date().toISOString().replace(/[-:.]/g, '')}_${fileName}`;
 };
 
 // Used function in default data create demo saas
@@ -272,25 +281,14 @@ exports.uploadThumbnailFileFromBase64 = (base64,path,name,width,height,companyId
  * @param {String} CompanyId - CompanyId in which file is need to upload
  * @param {String} Path - Path where file is uploaded in Wasabi
  * @param {Object} Base64String - Base64String Which is need to be uploaded
- * @param {Boolean} ReplaceFile - Boolean True if you want to replace existing file in Wasabi
+ * @param {Boolean} ReplaceFile - Unused: kept so callers' argument order stays the same
  * @param {String} ThumbanilKey - Thumbnail Key For Genrate Thumbnail
  * @returns {Promise<String>} A Promise that resolves with the updated file path upon successful upload.
  *                            Rejects with an error message if any issues occur during the upload process.
  */
 exports.uploadMainFileForbase64Thumbnail = (companyId, path, base64String, replaceFile, thumbanilKey, isUserProfile = false) => {
     return new Promise((resolve, reject) => {
-        let ind;
-        let updatedFilePath = ''
-        if (!(replaceFile &&  replaceFile == false)) {
-            const currentDate = new Date();
-            const timestamp = currentDate.toISOString().replace(/[-:.]/g, '');
-            const pathComponents = path.split('/');
-            const fileName = pathComponents.pop();
-            const newFileName = `${timestamp}_${fileName}`;
-            updatedFilePath = isUserProfile ? pathComponents.join('/') + newFileName : pathComponents.join('/') + '/' + newFileName;
-        } else {
-            updatedFilePath = path
-        }
+        const updatedFilePath = timestamped(path, isUserProfile ? '' : '/');
 
         let thumInd = thumbnailArray.findIndex((data)=>{
             return data.key === thumbanilKey
@@ -679,7 +677,7 @@ exports.uploadThumbnailFile = (file,x,y,path,companyId,isUserProfile = false) =>
  * @param {String} CompanyId - CompanyId in which file is need to upload
  * @param {String} Path - Path where file is uploaded in Wasabi
  * @param {Object} File - File Which is need to Upload
- * @param {Boolean} ReplaceFile - Boolean True if you want to replace existing file in Wasabi
+ * @param {Boolean} ReplaceFile - Unused: kept so callers' argument order stays the same
  * @param {Object} FileObject - File Object which is neeeded to be uploaded
  * @param {String} ThumbanilKey - Thumbnail Key For Genrate Thumbnail
  * @param {Boolean} IsUserProfile - True if it is a user profile other wise it is not required
@@ -689,21 +687,7 @@ exports.uploadThumbnailFile = (file,x,y,path,companyId,isUserProfile = false) =>
 exports.uploadFileWasabiPromise = (companyId, path, file, replaceFile, fileObject, thumbanilKey,isUserProfile = false) => {
     return new Promise(async (resolve, reject) => {
         try {
-            let updatedFilePath = ''
-            if (!isUserProfile) {
-                if (!(replaceFile &&  replaceFile == false)) {
-                    const currentDate = new Date();
-                    const timestamp = currentDate.toISOString().replace(/[-:.]/g, '');
-                    const pathComponents = path.split('/');
-                    const fileName = pathComponents.pop();
-                    const newFileName = `${timestamp}_${fileName}`;
-                    updatedFilePath = pathComponents.join('/') + '/' + newFileName;
-                } else {
-                    updatedFilePath = path
-                }
-            } else {
-                updatedFilePath = path
-            }
+            const updatedFilePath = isUserProfile ? path : timestamped(path, '/');
 
             if (thumbanilKey && thumbanilKey!== "") {
                 let thumInd = thumbnailArray.findIndex((data)=>{
@@ -1036,6 +1020,10 @@ exports.cleanUpTrackShotCompanyWise = async(companyId) => {
                 let updatedShots = [];
                 
                 for (const shot of ts.trackShots) {
+                    if (!isRowTrackshotKey(ts._id, shot.image)) {
+                        updatedShots.push({ ...shot, deleted: false });
+                        continue;
+                    }
                     try {
 
                         const command = new DeleteObjectCommand({
