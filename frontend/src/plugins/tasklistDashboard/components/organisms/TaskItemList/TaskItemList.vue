@@ -671,7 +671,7 @@ function prepareIndexData () {
     const rows = indexRepairRows(items.value, props.item, checkPermission('task.task_list', projectData.value?.isGlobalPermission));
     if (!rows.length) return;
 
-    commit("projectData/mutateTaskIndex", {pid: projectData.value._id, sprintId: items.value[0].sprintId, tasksArray: rows.map((row) => ({ _id: row.data })), indexName: items.value[0].indexName});
+    commit("projectData/mutateTaskIndex", {pid: projectData.value._id, sprintId: items.value[0].sprintId, tasksArray: rows.map((row) => ({ _id: row.data })), indexName: props.item.indexName});
     if (rows.length !== 1) {
         isLoading.value = true;
     }

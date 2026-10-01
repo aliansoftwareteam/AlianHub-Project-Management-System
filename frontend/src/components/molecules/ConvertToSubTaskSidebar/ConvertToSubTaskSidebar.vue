@@ -176,6 +176,7 @@
     import { apiRequest } from '../../../services';
     import { nestedFolders } from '@/utils/folderTree';
     import * as env from '@/config/env';
+    import { convertToTaskRequest, duplicateTaskRequest, moveTaskRequest } from '@/views/Projects/composables/taskPlacement';
     const { t } = useI18n();
     const props = defineProps({
         closeSideBar: {
@@ -605,32 +606,17 @@
             companyOwnerId: user.companyOwnerId,
         }
         isSpinner.value = true;
-        taskClass.moveTask({
+        taskClass.moveTask(moveTaskRequest({
             companyId: companyId.value,
-            projectData: {
-                id : selectedProjectData.value._id,
-                ProjectCode : selectedProjectData.value.ProjectCode,
-                ProjectName : selectedProjectData.value.ProjectName
-            },
-            sprintObj: selectedSprintData.value,
-            moveTaskId : task.value._id,
-            oldSprintObj : {
-                id : task.value.sprintId,
-                folderId : task.value.folderObjId || null,
-                name : task.value.sprintArray?.name,
-                folderName : task.value.sprintArray?.folderName || ''
-            },
-            oldProject : {
-                id : projectData.value._id,
-                taskTypeCounts : projectData.value.taskTypeCounts,
-                taskStatusData : projectData.value.taskStatusData,
-                ProjectName : projectData.value.ProjectName
-            },
+            destination: selectedProjectData.value,
+            sprint: selectedSprintData.value,
+            task: task.value,
+            source: projectData.value,
             isSubTask : selectedTaskSubTask.value.length > 1 ? true : false,
             assignee : selectedAssigneeId.value,
             watcher : selectedWatcherId.value,
             userData : userData
-        }).then((result) => {
+        })).then((result) => {
             if(result.status === true){
                 isSpinner.value = false;
                 if(route.params?.taskId){
@@ -711,33 +697,19 @@
             Employee_Name: user.Employee_Name,
             companyOwnerId: user.companyOwnerId,
         }
-        taskClass.duplicateTask({
+        taskClass.duplicateTask(duplicateTaskRequest({
             companyId: companyId.value,
-            projectData: {
-                id : selectedProjectData.value._id,
-                ProjectCode : selectedProjectData.value.ProjectCode,
-                ProjectName : selectedProjectData.value.ProjectName
-            },
-            sprintObj: selectedSprintData.value,
-            selectedTaskId : task.value._id,
-            oldProject : {
-                id : projectData.value._id,
-                taskTypeCounts : projectData.value.taskTypeCounts,
-                taskStatusData : projectData.value.taskStatusData,
-                ProjectName : projectData.value.ProjectName
-            },
+            destination: selectedProjectData.value,
+            sprint: selectedSprintData.value,
+            task: task.value,
+            source: projectData.value,
             userData : userData,
             isSubTask : duplicateSubTask.value.length > 0 ?  true : false,
             duplicateData:selectedDuplicatedItems.value,
             assignee : selectedAssigneeId.value,
             watcher : selectedWatcherId.value,
             taskName:duplicateTaskName.value ? duplicateTaskName.value : '',
-            oldSprintObj : {
-                folderId : task.value.folderObjId || null,
-                name : task.value.sprintArray?.name,
-                folderName : task.value.sprintArray?.folderName || ''
-            },
-        }).then((result) => {
+        })).then((result) => {
             if(result.data.status === true){
                 let sprintCount = (task.value.subTasks || 0) + 1;
                 const sprint = {...selectedSprintData.value,tasks: selectedSprintData.value.tasks + sprintCount};
@@ -833,24 +805,14 @@
         }
         closeSidebar();
         isSpinner.value = true;
-        taskClass.convertToTask({
+        taskClass.convertToTask(convertToTaskRequest({
             companyId: companyId.value,
-            projectData: {
-                id:selectedProjectData.value._id
-            },
-            taskId : task.value._id,
-            parentTaskId:task.value.ParentTaskId,
-            sprintObj: selectedSprintData.value,
-            oldSprintObj :{
-                id:task.value.sprintId,
-                folderId:task.value.folderObjId || null
-            },
-            oldProject: {
-                id :projectData.value._id,
-                taskTypeCounts : projectData.value.taskTypeCounts,
-                taskStatusData : projectData.value.taskStatusData
-            }
-        }).then((result) => {
+            destination: selectedProjectData.value,
+            sprint: selectedSprintData.value,
+            task: task.value,
+            oldSprint: { id: task.value.sprintId, folderId: task.value.folderObjId || null },
+            source: projectData.value
+        })).then((result) => {
             if(result.status === true){
                 isSpinner.value = false;
                 if(selectedSprintData.value._id !== task.value.sprintId) {
