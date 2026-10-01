@@ -200,8 +200,7 @@ onMounted(load);
 .vr__bar-row:disabled { cursor: default; }
 .vr__bar-row.is-active .vr__bar-name { color: var(--brand); font-weight: 600; }
 .vr__bar-name { width: 120px; flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vr__track { flex: 1; height: 20px; background: rgba(0, 0, 0, .06); border-radius: 5px; position: relative; }
-:root[data-theme="dark"] .vr__track { background: rgba(255, 255, 255, .08); }
+.vr__track { flex: 1; height: 20px; background: var(--track); border-radius: 5px; position: relative; }
 .vr__fill { display: block; height: 100%; background: var(--brand); border-radius: 5px; transition: width var(--t-state) var(--ease); }
 .vr__fill.is-danger { background: var(--danger); }
 .vr__est { position: absolute; top: -3px; bottom: -3px; border-left: 2px solid var(--ink); }
@@ -215,8 +214,7 @@ onMounted(load);
 .vr__driver { display: flex; align-items: center; gap: 10px; }
 .vr__driver-name { flex: 1; min-width: 0; }
 .vr__driver-name small { color: var(--ink-2); font-family: var(--font-mono); }
-.vr__mini { width: 110px; height: 6px; background: rgba(0, 0, 0, .07); border-radius: 99px; overflow: hidden; }
-:root[data-theme="dark"] .vr__mini { background: rgba(255, 255, 255, .1); }
+.vr__mini { width: 110px; height: 6px; background: var(--track); border-radius: 99px; overflow: hidden; }
 .vr__mini-fill { display: block; height: 100%; border-radius: 99px; background: var(--ok); }
 .vr__mini-fill.is-danger { background: var(--danger); }
 .vr__mini-fill.is-warn { background: var(--warn); }
@@ -227,6 +225,6 @@ onMounted(load);
 .vr__td { font: 500 11.5px/1.2 var(--font-mono); text-align: right; }
 .vr__td--name { font: 400 12.5px/1.3 var(--font-ui); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; flex-direction: column; }
 .vr__td--name small { color: var(--ink-2); font-size: 11px; }
-.vr__takeaway { margin-top: auto; padding: 11px 13px; border-color: rgba(47, 57, 144, .25); line-height: 1.5; }
+.vr__takeaway { margin-top: auto; padding: 11px 13px; border-color: var(--brand-border); line-height: 1.5; }
 @media (max-width: 767px) { .vr__two { grid-template-columns: 1fr; } }
 </style>

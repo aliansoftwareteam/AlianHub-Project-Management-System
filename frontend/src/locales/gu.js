@@ -5387,6 +5387,7 @@ export default {
         "no_activity_log_found": "કોઈ પ્રવૃત્તિ લોગ મળ્યો નથી"
     },
     "Projects": {
+        "not_available": "N/A",
         "filters": "Filters",
         "filters_active": "Filters, {n} active",
         "filters_close": "Close filters",
@@ -6556,6 +6557,10 @@ export default {
         "confirm_delete_title": "Are you sure you want to delete this clip?"
     },
     "Milestone": {
+        "home_link": "Home",
+        "toggle_rows": "Show or hide the rows under {name}",
+        "public_project": "Public project",
+        "no_filter": "No filter",
         "milestone": "માઇલસ્ટોન",
         "milestone_name": "માઇલસ્ટોન નામ",
         "status_date": "સ્થિતિ તારીખ",
@@ -7750,7 +7755,9 @@ export default {
         "copied": "Copied!",
         "generate": "Generate token",
         "rotate": "Regenerate token",
-        "working": "Working…"
+        "working": "Working…",
+        "saved": "Saved",
+        "failed": "Failed"
     },
     "Audit": {
         "subtitle": "An immutable record of sensitive actions in this workspace — role changes, SSO updates, and more.",

@@ -5387,6 +5387,7 @@ export default {
         "no_activity_log_found": "कोई गतिविधि लॉग नहीं मिला"
     },
     "Projects": {
+        "not_available": "N/A",
         "filters": "Filters",
         "filters_active": "Filters, {n} active",
         "filters_close": "Close filters",
@@ -6556,6 +6557,10 @@ export default {
         "confirm_delete_title": "Are you sure you want to delete this clip?"
     },
     "Milestone": {
+        "home_link": "Home",
+        "toggle_rows": "Show or hide the rows under {name}",
+        "public_project": "Public project",
+        "no_filter": "No filter",
         "milestone": "मील का पत्थर",
         "milestone_name": "मील का पत्थर नाम",
         "status_date": "स्थिति तिथि",
@@ -7750,7 +7755,9 @@ export default {
         "copied": "Copied!",
         "generate": "Generate token",
         "rotate": "Regenerate token",
-        "working": "Working…"
+        "working": "Working…",
+        "saved": "Saved",
+        "failed": "Failed"
     },
     "Audit": {
         "subtitle": "An immutable record of sensitive actions in this workspace — role changes, SSO updates, and more.",

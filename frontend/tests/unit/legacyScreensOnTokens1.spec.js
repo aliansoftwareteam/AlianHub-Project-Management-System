@@ -45,6 +45,7 @@ const SHEETS = [
     'views/MilestoneReport/MilestoneReport.css',
     'views/Timesheet/timeV2.css',
     'components/molecules/ProjectsListingSetting/style.css',
+    'views/Settings/Projects/style.css',
 ];
 
 describe('screens moved onto the design tokens', () => {
@@ -228,7 +229,7 @@ describe('Milestone report', () => {
     test('the table scrolls inside its wrapper and the wide first column lets go on a phone', () => {
         expect(ruleBody(css, '.milestone_table_filter_wrapper')).toMatch(/overflow:\s*auto/);
         const phone = css.slice(css.lastIndexOf('@media (max-width:767px)'));
-        expect(phone).toMatch(/tr th:first-child,[^{]*tr td:first-child\s*\{[^}]*position:\s*static/);
+        expect(phone).toMatch(/tr th:first-child,[^{]*tr td:first-child\s*\{[^}]*position:\s*relative/);
     });
 
     test('row toggles are buttons with a masked arrow, so the arrow shows in either theme', () => {
@@ -269,31 +270,35 @@ describe('Time area helpers shared by variance and capacity', () => {
 });
 
 describe('chart colours come from the tokens', () => {
-    afterEach(() => {
-        vi.restoreAllMocks();
-        document.documentElement.removeAttribute('data-theme');
-    });
+    afterEach(() => vi.restoreAllMocks());
 
     const stubTokens = (values) => vi.spyOn(window, 'getComputedStyle').mockReturnValue({ getPropertyValue: (name) => values[name] || '' });
 
-    test('readChartTokens resolves the series, text, grid and surface colours of the current theme', async () => {
+    test('readChartTokens resolves the series, label, grid and surface colours of the current theme', async () => {
         const { readChartTokens } = await import('@/utils/chartTokens');
-        stubTokens({ '--brand': ' #a892ff', '--ok': '#3ad29f', '--warn': '#d98324', '--agent': '#6b5ce7', '--danger': '#ff7b85', '--ink': '#f2f1f6', '--ink-2': 'rgba(255, 255, 255, .62)', '--hairline': 'rgba(255, 255, 255, .09)', '--surface': '#18181c' });
-        document.documentElement.setAttribute('data-theme', 'dark');
-        const tokens = readChartTokens();
-        expect(tokens.series).toEqual(['#a892ff', '#3ad29f', '#d98324', '#6b5ce7', '#ff7b85', 'rgba(255, 255, 255, .62)']);
-        expect(tokens.ink).toBe('#f2f1f6');
-        expect(tokens.ink2).toBe('rgba(255, 255, 255, .62)');
-        expect(tokens.grid).toBe('rgba(255, 255, 255, .09)');
-        expect(tokens.surface).toBe('#18181c');
-        expect(tokens.dark).toBe(true);
+        stubTokens({ '--brand': ' #a892ff', '--ok': '#3ad29f', '--warn': '#d98324', '--agent': '#6b5ce7', '--danger': '#ff7b85', '--ink-2': 'rgba(255, 255, 255, .62)', '--hairline': 'rgba(255, 255, 255, .09)', '--surface': '#18181c' });
+        expect(readChartTokens()).toEqual({
+            series: ['#a892ff', '#3ad29f', '#d98324', '#6b5ce7', '#ff7b85', 'rgba(255, 255, 255, .62)'],
+            ink2: 'rgba(255, 255, 255, .62)',
+            grid: 'rgba(255, 255, 255, .09)',
+            surface: '#18181c',
+        });
     });
 
-    test('in light the tooltip stays light', async () => {
-        const { readChartTokens } = await import('@/utils/chartTokens');
-        stubTokens({ '--brand': '#2F3990' });
-        expect(readChartTokens().dark).toBe(false);
-        expect(readChartTokens().series[0]).toBe('#2F3990');
+    test('a chart that uses them is redrawn when the theme or the contrast changes', async () => {
+        const { mount } = await import('@vue/test-utils');
+        const { useChartTokens } = await import('@/utils/chartTokens');
+        const values = { '--brand': '#2F3990' };
+        stubTokens(values);
+        let tokens;
+        const wrapper = mount({ template: '<i />', setup() { tokens = useChartTokens(); } });
+        expect(tokens.value.series[0]).toBe('#2F3990');
+        values['--brand'] = '#a892ff';
+        document.documentElement.setAttribute('data-theme', 'dark');
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(tokens.value.series[0]).toBe('#a892ff');
+        wrapper.unmount();
+        document.documentElement.removeAttribute('data-theme');
     });
 
     test('the custom report builds its chart options from them', () => {
@@ -302,8 +307,13 @@ describe('chart colours come from the tokens', () => {
         expect(script).toMatch(/colors:\s*chart\.value\.series/);
         expect(script).toMatch(/foreColor:\s*chart\.value\.ink2/);
         expect(script).toMatch(/grid:\s*\{\s*borderColor:\s*chart\.value\.grid\s*\}/);
-        expect(script).toMatch(/tooltip:\s*\{\s*theme:\s*chart\.value\.dark \? 'dark' : 'light'\s*\}/);
-        expect(script).toMatch(/legend:\s*\{[^}]*labels:\s*\{\s*colors:\s*chart\.value\.ink\s*\}/);
         expect(script).toMatch(/stroke:\s*\{[^}]*colors:\s*cfg\.chartType === 'pie' \? \[chart\.value\.surface\] : undefined/);
+    });
+
+    test('axes, legend and tooltip of a report chart are themed by the shared report stylesheet', () => {
+        const css = read('views/Projects/Reports/reportsV2.css');
+        expect(css).toMatch(/\.apexcharts-xaxis-label[^{]*\{ fill: var\(--ink-2\); \}/);
+        expect(css).toMatch(/\.apexcharts-tooltip\.apexcharts-theme-light \{ background: var\(--surface\)/);
+        expect(read('views/CustomReports/CustomReports.vue')).toMatch(/<style src="@\/views\/Projects\/Reports\/reportsV2\.css"><\/style>/);
     });
 });
