@@ -2,6 +2,7 @@ const { evaluatePermission, isWritable } = require('../../../Config/permissionGu
 const logger = require('../../../Config/loggerConfig');
 const { normaliseAiConfig, AiConfigError } = require('../aiFields/config');
 const { cleanTaskTypeList, MAX_TASK_TYPES } = require('./fieldTaskTypes');
+const { MODULE_FIELD_TYPES, typeModuleOf } = require('../fieldTypes');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const SETTINGS_PERMISSION = 'settings.settings_custom_field';
@@ -33,6 +34,19 @@ const checkedTaskTypes = (value) => {
     return keys;
 };
 
+/* A new field takes its type's settings with their defaults. An update names its type only when it changes it, so a setting sent
+   on its own is checked by the type that owns it. */
+const checkedTypeSettings = (updateObject) => {
+    const named = typeModuleOf(updateObject.fieldType);
+    const modules = named ? [named] : MODULE_FIELD_TYPES.map(typeModuleOf);
+    return modules.reduce((checked, type) => {
+        const { settings, error } = type.settings(updateObject);
+        if (error) throw new FieldWriteError(error);
+        const owned = Object.keys(settings).filter((name) => named || name in updateObject);
+        return { ...checked, ...Object.fromEntries(owned.map((name) => [name, settings[name]])) };
+    }, {});
+};
+
 const checkProperties = (updateObject, { insert }) => {
     if (!isPlainObject(updateObject) || !Object.keys(updateObject).length) throw new FieldWriteError('Update Object is required');
     const allowed = insert ? [...SHARED_PROPERTIES, ...INSERT_ONLY_PROPERTIES] : SHARED_PROPERTIES;
@@ -44,7 +58,7 @@ const checkProperties = (updateObject, { insert }) => {
     if ('projectId' in updateObject && !isIdList(updateObject.projectId)) throw new FieldWriteError('projectId must be a list of project ids.');
     if ('fieldAi' in updateObject) updateObject.fieldAi = checkedAiConfig(updateObject);
     if ('fieldTaskTypes' in updateObject) updateObject.fieldTaskTypes = checkedTaskTypes(updateObject.fieldTaskTypes);
-    return updateObject;
+    return Object.assign(updateObject, checkedTypeSettings(updateObject));
 };
 
 const fieldInsertFrom = (updateObject) => checkProperties(updateObject, { insert: true });

@@ -25,14 +25,22 @@ const { taskNotFound, escapeText, TaskWriteRefusal } = require('../taskWriteFiel
 const { recordCustomFieldValue, recordTaskTag } = require('../taskItemHistory');
 const { customFieldDefinitionOf } = require('../../../CustomField/helpers/customFieldText');
 const { fieldAppliesToTask } = require('../../../CustomField/helpers/fieldTaskTypes');
+const { checkedFieldDetail, FieldValueRefused } = require('../../../CustomField/helpers/fieldValueWrite');
 
 const FIELD_NOT_FOR_TASK_TYPE = 'This custom field is not used for this task type.';
 
-const refuseFieldOffType = async ({ companyId, taskId, customFieldId, storedTask }) => {
+/* The value as it is stored, or a refusal: the field is not for this task's type, or the value does not fit the field's type. */
+const fieldDetailToStore = async ({ companyId, taskId, customFieldId, storedTask, updateDetail }) => {
     const definition = await customFieldDefinitionOf(companyId, customFieldId);
-    if (!definition) return;
+    if (!definition) return updateDetail;
     const task = storedTask || await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: new mongoose.Types.ObjectId(taskId) }] }, 'findOne');
     if (!fieldAppliesToTask(definition, task)) throw new TaskWriteRefusal(400, FIELD_NOT_FOR_TASK_TYPE);
+    try {
+        return await checkedFieldDetail({ companyId, definition, task, updateDetail });
+    } catch (error) {
+        if (error instanceof FieldValueRefused) throw new TaskWriteRefusal(400, error.message);
+        throw error;
+    }
 };
 
 const storedFileName = (storedTask, data) => {
@@ -284,8 +292,8 @@ module.exports = {
         })
     },
 
-    async updateTaskCustomField({companyId,taskId,updateDetail,customFieldId,userData,storedTask,filledByAi = false}) {
-        await refuseFieldOffType({ companyId, taskId, customFieldId, storedTask });
+    async updateTaskCustomField({companyId,taskId,updateDetail: sentDetail,customFieldId,userData,storedTask,filledByAi = false}) {
+        const updateDetail = await fieldDetailToStore({ companyId, taskId, customFieldId, storedTask, updateDetail: sentDetail });
         return new Promise((resolve,reject) => {
             try {
                 const query = {

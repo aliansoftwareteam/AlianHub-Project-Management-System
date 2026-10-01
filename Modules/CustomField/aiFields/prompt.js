@@ -24,7 +24,7 @@ function systemPrompt(definition, config, context) {
         lines.push(INSTRUCTIONS[config.template](config));
         if (config.prompt) lines.push(`Also follow this guidance from the person who set up the field: ${config.prompt}`);
     }
-    if (config.template === TEMPLATES.CUSTOM || !spec.stated) lines.push(spec.format(config, context));
+    if (config.template === TEMPLATES.CUSTOM || !spec.stated) lines.push(spec.format(config, context, definition));
     lines.push(JSON_REPLY);
     return lines.join('\n');
 }
