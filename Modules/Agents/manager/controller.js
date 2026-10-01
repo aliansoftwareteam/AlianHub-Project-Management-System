@@ -9,6 +9,7 @@ const settings = require('./settings');
 const findings = require('./findings');
 const dailyLook = require('./dailyLook');
 const workQueue = require('./workQueue');
+const connectedAgents = require('../connectedAgents');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const EDIT_ACTION = 'project.agent_manager.edit';
@@ -95,7 +96,9 @@ const handOverTask = async (req, res) => {
     try {
         const companyId = person(req, res);
         if (!companyId) return undefined;
-        const handed = await workQueue.handOver(companyId, req.uid, req.params.taskId);
+        const to = (req.body || {}).to;
+        if (to !== undefined && !OBJECT_ID.test(typeof to === 'string' ? to : '')) return fail(res, 400, 'A valid person id is required.');
+        const handed = await workQueue.handOver(companyId, req.uid, req.params.taskId, new Date(), to === undefined ? {} : { to });
         if (handed.error) return fail(res, handed.status, handed.error);
         return res.json({ status: true, statusText: 'Handed to an agent.', data: handed.about });
     } catch (e) { logger.error(`handOverTask: ${e.message}`); return fail(res, 500, e.message); }
@@ -111,10 +114,22 @@ const takeBackItem = async (req, res) => {
     } catch (e) { logger.error(`takeBackItem: ${e.message}`); return fail(res, 500, e.message); }
 };
 
+/* The connected AIs of the people the caller already sees as members; with a task, only the caller's own, and only where they may hand that task to it. */
+const getConnectedAgents = async (req, res) => {
+    try {
+        const companyId = String(req.headers.companyid || '');
+        if (!companyId || !req.uid) return fail(res, 401, 'Unauthorized.');
+        if (req.apiToken) return fail(res, 403, 'Only a signed-in person can see the connected agents.');
+        const taskId = (req.query || {}).taskId;
+        const data = taskId === undefined ? await connectedAgents.listFor(companyId, req.uid) : await workQueue.pickableOn(companyId, req.uid, taskId);
+        return res.json({ status: true, statusText: 'Connected agents fetched.', data });
+    } catch (e) { logger.error(`getConnectedAgents: ${e.message}`); return fail(res, 500, e.message); }
+};
+
 const HAND_OVER_ACTION = 'queue.hand_over';
 const TAKE_BACK_ACTION = 'queue.take_back';
 
 module.exports = {
     getProjectManager, putProjectManager: [agentsRefused(EDIT_ACTION), saveProjectManager], EDIT_ACTION,
-    getTaskQueue, getHeldTasks, postHandOver: [agentsRefused(HAND_OVER_ACTION), handOverTask], postTakeBack: [agentsRefused(TAKE_BACK_ACTION), takeBackItem],
+    getConnectedAgents, getTaskQueue, getHeldTasks, postHandOver: [agentsRefused(HAND_OVER_ACTION), handOverTask], postTakeBack: [agentsRefused(TAKE_BACK_ACTION), takeBackItem],
 };
