@@ -6583,6 +6583,7 @@
     "Projects.doc_linked_tasks": "Linked tasks",
     "Projects.doc_no_linked_tasks": "Not linked to any task yet",
     "Projects.doc_private": "Private",
+    "Projects.doc_private_author_only": "Only the author can make this doc private",
     "Projects.doc_private_hint": "Only you can see this doc",
     "Projects.doc_public_link": "Share link with anyone",
     "Projects.doc_public_link_hint": "Anyone with the link can read this doc — no login needed",
