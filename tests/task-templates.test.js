@@ -256,6 +256,26 @@ describe('applying a template to a task', () => {
         expect(indexObj).toMatchObject({ indexName: 'groupByStatusIndex', searchKey: 'statusKey' });
     });
 
+    it('hands the create path the chain of the task the subtasks go under', async () => {
+        Object.assign(stored(SCHEMA_TYPE.TASKS, TARGET), { isParentTask: false, ParentTaskId: SOURCE, ancestors: [SOURCE] });
+        const template = seedTemplate();
+        const res = await apply(MEMBER, template._id, { taskId: TARGET, applyDate: '2026-10-01' });
+        expect(res.body.data.subtasksCreated).toBe(1);
+        expect(mockTaskMongo.create.mock.calls[0][0].data).toMatchObject({ ParentTaskId: TARGET, ancestors: [SOURCE, TARGET] });
+    });
+
+    it('skips the subtasks on a level-three task, which can take none, and says so', async () => {
+        const middle = 'd00000000000000000000011';
+        Object.assign(stored(SCHEMA_TYPE.TASKS, TARGET), { isParentTask: false, ParentTaskId: middle, ancestors: [SOURCE, middle] });
+        const template = seedTemplate();
+        const res = await apply(MEMBER, template._id, { taskId: TARGET, applyDate: '2026-10-01' });
+        expect(res.statusCode).toBe(200);
+        expect(mockTaskMongo.create).not.toHaveBeenCalled();
+        expect(res.body.data.skipped).toContain('subtasks');
+        expect(res.body.data.applied).not.toContain('subtasks');
+        expect(res.body.data.applied).toContain('checklist');
+    });
+
     it('appends the checklist through the checklist path, keeping its nesting', async () => {
         const template = seedTemplate();
         await apply(MEMBER, template._id, { taskId: TARGET, applyDate: '2026-10-01', tzOffsetMinutes: 0 });
