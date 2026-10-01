@@ -23,7 +23,7 @@
         <div class="formkit__form-wrapper">
             <label class="formkit-label">{{ $t('CustomField.rollup_function') }}</label>
         </div>
-        <DropDown mode="listbox" :zIndex="10" :id="rollupFunctionUniqueId" :keepSameWidth="true">
+        <DropDown themed mode="listbox" :zIndex="10" :id="rollupFunctionUniqueId" :keepSameWidth="true">
             <template #button>
                 <div class="formkit__form-wrapper" :ref="rollupFunctionUniqueId">
                     <span class="ah-sr-only">{{ $t('CustomField.rollup_function') }}</span>
@@ -48,7 +48,7 @@
             <div class="formkit__form-wrapper">
                 <label class="formkit-label">{{ $t('CustomField.rollup_source_field') }}</label>
             </div>
-            <DropDown mode="listbox" :zIndex="10" :id="rollupSourceUniqueId" :keepSameWidth="true">
+            <DropDown themed mode="listbox" :zIndex="10" :id="rollupSourceUniqueId" :keepSameWidth="true">
                 <template #button>
                     <div class="formkit__form-wrapper" :ref="rollupSourceUniqueId">
                         <span class="ah-sr-only">{{ $t('CustomField.rollup_source_field') }}</span>
@@ -74,7 +74,7 @@
                 </template>
             </DropDown>
         </div>
-        <DropDown mode="listbox" :zIndex="10" v-if="isType">
+        <DropDown themed mode="listbox" :zIndex="10" v-if="isType">
             <template #button>
                 <div class="formkit__form-wrapper" :ref="customFieldTypeUniqueId">
                     <div class="custom__field-required">

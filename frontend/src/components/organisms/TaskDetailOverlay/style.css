@@ -111,7 +111,7 @@
 .ah-agent-strip__activity { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--ink-2); }
 .ah-agent-strip__kind { height: 16px; padding: 0 5px; font-size: var(--fs-2xs, 9.5px); flex: none; }
 .ah-agent-strip__activity.is-error .ah-agent-strip__kind { color: var(--danger); }
-.ah-agent-strip__activity.is-elicitation .ah-agent-strip__kind { color: var(--agent); }
+.ah-agent-strip__activity.is-elicitation .ah-agent-strip__kind { color: var(--agent-ink); }
 .ah-agent-strip__activity-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- body ---------- */

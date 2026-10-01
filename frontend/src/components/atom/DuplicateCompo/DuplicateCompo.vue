@@ -63,7 +63,7 @@
                                         v-for="(user, index) in assigneeArray.filter((x, index) => index >= 1).map((x) => ({...x,label: x.Employee_Name, image: x.profileImage}))"
                                         :key="'user'+index"
                                     >
-                                    <UserProfile
+                                    <UserProfile decorative
                                         :showDot="true"
                                         :data="{
                                             image: user.image,
@@ -101,7 +101,7 @@
                                         v-for="(user, index) in watchersArray.filter((x, index) => index >= 1).map((x) => ({...x,label: x.Employee_Name, image: x.profileImage}))"
                                         :key="'user'+index"
                                     >
-                                    <UserProfile
+                                    <UserProfile decorative
                                         :showDot="true"
                                         :data="{
                                             image: user.image,

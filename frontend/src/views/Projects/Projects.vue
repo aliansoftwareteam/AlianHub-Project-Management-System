@@ -234,7 +234,7 @@
                                 <span>{{ $t('importTaskButton.import_processing') }}</span>
                             </div>
                         </div>
-                        <div :class="['list-view-body', activeTab === 'ProjectDetail' ? 'list-view-body--detail' : 'bg-light-gray', (clientWidth <= 767 && activeTab === 'ProjectDetail') ? 'overflow-auto' : '',
+                        <div :class="['list-view-body', TOKEN_BODY_TABS.includes(activeTab) ? 'list-view-body--detail' : 'bg-light-gray', (clientWidth <= 767 && activeTab === 'ProjectDetail') ? 'overflow-auto' : '',
                                 {
                                 'd-flex': activeTab !== 'ProjectListView' &&
                                             activeTab !== 'Calendar' &&
@@ -470,6 +470,8 @@ const CanvasViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "p
 const MapViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-map" */ '@/views/Projects/MapView/MapView.vue'));
 const DashboardViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-dashboard" */ './DashboardView/DashboardView.vue'));
 const DocsViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-docs" */ '@/views/Projects/DocsView/DocsView.vue'));
+/* The tabs whose body is the theme canvas; every other tab keeps the legacy light grey until its view is converted. */
+const TOKEN_BODY_TABS = ['ProjectDetail', 'Comments', 'ActivityLog'];
 const FormsViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-forms" */ '@/views/Projects/FormsView/FormsView.vue'));
 import NotFound from '../NotFound.vue';
 

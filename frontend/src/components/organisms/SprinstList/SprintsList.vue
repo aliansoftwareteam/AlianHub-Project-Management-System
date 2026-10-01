@@ -2,7 +2,7 @@
     <div class="sprint position-re" :id="`sprint_${sprint?.id}`">
         <div
             v-if="sprint && folderLegend"
-            class="cursor-default black position-ab bg-white border border-radius-5-px text-capitalize color52 p0x-10px sprint__foldername"
+            class="cursor-default black position-ab bg-white border border-radius-5-px color52 p0x-10px sprint__foldername"
         >
             {{folderLegend}}
         </div>

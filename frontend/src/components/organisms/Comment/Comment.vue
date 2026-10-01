@@ -20,7 +20,7 @@
                     :title="authorName"
                     aria-hidden="true"
                 >⚙</span>
-                <UserProfile
+                <UserProfile decorative
                     v-else-if="!message.sent && showUser"
                     :showDot="false"
                     class="cursor-pointer profile-image message__profile-image mr-10px"
@@ -109,7 +109,7 @@
                                                     class="ah-avatar ah-avatar--automation message__profile-image message__agent-avatar mr-10px"
                                                     aria-hidden="true"
                                                 >⚙</span>
-                                                <UserProfile
+                                                <UserProfile decorative
                                                     v-else
                                                     :showDot="false"
                                                     class="profile-image message__profile-image mr-10px"

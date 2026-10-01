@@ -38,7 +38,7 @@
                         :key="'user'+index"
                     >   
                         <div class="d-flex align-items-center" :title="user.label">
-                            <UserProfile
+                            <UserProfile decorative
                                 :showDot="false"
                                 class="cursor-pointer ml--5px"
                                 :data="user"
