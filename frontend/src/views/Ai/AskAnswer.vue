@@ -38,7 +38,7 @@
                     >
                         <ShellIcon name="check" :size="13" />{{ $t('Ask.build_tasks_open', { n: workItems.length }) }}
                     </button>
-                    <button ref="docOpener" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" aria-haspopup="dialog" data-test="ask-build-doc" @click="building = 'doc'">
+                    <button v-if="writesDocs" ref="docOpener" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" aria-haspopup="dialog" data-test="ask-build-doc" @click="building = 'doc'">
                         <ShellIcon name="docs" :size="13" />{{ $t('Ask.build_doc_open') }}
                     </button>
                     <button
@@ -108,6 +108,7 @@ import AskBuildTasks from "./AskBuildTasks.vue";
 import AskBuildDoc from "./AskBuildDoc.vue";
 import AskPostToChat from "./AskPostToChat.vue";
 import { workItemsOf } from "./askComposer";
+import { useDocRights } from "@/components/molecules/Pages/useDocRights";
 import { sourceLink } from "./askWhy";
 import { answerHtml, taskTitleOf } from "./askMarkdown";
 
@@ -122,6 +123,7 @@ const props = defineProps({
 
 const { t } = useI18n();
 const $toast = useToast();
+const { writesDocs } = useDocRights();
 const companyId = inject("$companyId", "");
 const router = getCurrentInstance()?.proxy?.$router || null;
 const linkOf = (source) => sourceLink(source, unref(companyId));
