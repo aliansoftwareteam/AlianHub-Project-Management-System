@@ -2,6 +2,7 @@ import * as env from '@/config/env';
 import { apiRequest } from '../../services/index'
 import { tableSortStages } from '@/views/Projects/composables/customFieldQuery';
 import { groupCondition, groupCountsQuery, readGroupCounts, sprintTaskMatch } from './taskQueries';
+import { ancestorsOf } from '@taskTreeRules';
 
 /* A second caller for a page that is already on its way gets the first one's answer. */
 const pagesInFlight = new Map();
@@ -140,7 +141,7 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
             if(sprintFound) {
                 cursor = state.tasks[pid][sprintId].index[indexKey] || null;
             }
-            // Opening the List asks for a group's first page only: a group that already has one is left as it is.
+            // The List opening a group, or a row opening its subtasks, wants the first page only: nothing is asked when it was read before.
             if(payload.firstPageOnly && sprintFound && state.tasks[pid][sprintId].index[indexKey] !== undefined) {
                 resolve();
                 return;
@@ -467,9 +468,10 @@ export const searchTask = ({commit}, payload) => {
             .then((resp) => {
                 if(resp.status === 200){
                     const results = resp.data;
-                    const requiredParents = results.filter((x) => !x.isParentTask).map(x => x.ParentTaskId);
-                    const availableParents = results.filter((x) => x.isParentTask).map((x) => x._id)
-                    const parentIds = requiredParents.filter((x) => !availableParents.includes(x));
+                    // A match on the second or third level is shown under every row above it, so each of those is read too.
+                    const requiredParents = results.filter((x) => !x.isParentTask).flatMap((x) => [...ancestorsOf(x), x.ParentTaskId]).filter(Boolean).map(String);
+                    const availableParents = results.map((x) => String(x._id));
+                    const parentIds = [...new Set(requiredParents)].filter((x) => !availableParents.includes(x));
                     if(parentIds?.length) {
                         let query = [
                             {
