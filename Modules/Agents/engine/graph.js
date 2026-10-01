@@ -82,12 +82,12 @@ const renewLock = (state, config) => {
 };
 
 async function gather(state, config) {
-    const { companyId } = config.context;
-    const { run, task } = state;
+    const { companyId, deps } = config.context;
+    const { run, task, agent } = state;
     const block = wantsMemory(slugOf(run))
         ? (await quietly(run._id, 'memory unavailable', () => memory.contextFor({ companyId, projectId: task.ProjectID, userId: run.startedBy }))) || ''
         : '';
-    const { out: gathered, found } = await taint.collect(() => orchestrator.gather({ skillSlug: slugOf(run), task, companyId, memory: block, startedBy: run.startedBy, runId: String(run._id) }));
+    const { out: gathered, found } = await taint.collect(() => orchestrator.gather({ skillSlug: slugOf(run), task, companyId, memory: block, startedBy: run.startedBy, runId: String(run._id), actor: deps && deps.actor, allowedActions: agent && agent.allowedActions }));
     if (gathered.status === 'skipped') return { result: gathered };
     const marked = await taint.mark(companyId, run, [
         ...taint.fromTask({ origin: await taint.originOf(companyId, task) }),

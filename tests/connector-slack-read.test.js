@@ -88,6 +88,8 @@ const rows = (type) => mockDb.store[type] || [];
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 const runRow = () => rows(SCHEMA_TYPE.AGENT_RUNS).find((r) => String(r._id) === RUN);
 const calls = () => rows(SCHEMA_TYPE.AUDIT_LOGS).filter((a) => a.action === 'connector.call');
+/* The trace as GET /agents/runs/:id builds it: from the run row and the audit rows that name the run. */
+const traceOf = (runId = RUN) => buildTrace(rows(SCHEMA_TYPE.AGENT_RUNS).find((r) => String(r._id) === runId), rows(SCHEMA_TYPE.AUDIT_LOGS).filter((a) => a.meta && a.meta.runId === runId));
 const minute = (ts) => new Date(Number(ts) * 1000).toISOString().slice(0, 16).replace('T', ' ');
 
 const res = () => {
@@ -187,7 +189,7 @@ describe('reading a channel that is allowed for reading', () => {
             actorId: OWNER, entityType: 'connector', entityId: 'slack',
             meta: { action: READ, runId: RUN, agentId: AGENT_ID, channelId: RELEASES, state: 'applied', messages: 2, chars: out.chars, truncated: false },
         });
-        const trace = buildTrace(runRow(), rows(SCHEMA_TYPE.AUDIT_LOGS));
+        const trace = traceOf();
         expect(trace).toEqual([expect.objectContaining({ kind: 'tool', event: 'connector.call', action: READ, status: 'applied', messages: 2, chars: out.chars })]);
         const kept = captured(trace);
         SAID.forEach((line) => expect(kept).not.toContain(line));
@@ -549,20 +551,22 @@ describe('with the connector off', () => {
 describe('nothing a channel said is kept', () => {
     it('is in no log line, audit row, run row, trace entry or connection row, whatever became of the read', async () => {
         await connect();
+        const other = String(mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { agentId: AGENT_ID, status: 'running', projectId: 'p1', startedBy: OWNER })._id);
         const errors = [];
         await read();
         await read({ channel: 'general' }).catch((e) => errors.push(e.message));
         mockSlack.answers['conversations.history'] = { status: 429, headers: { 'retry-after': '5' }, body: `{"ok":false,"error":"ratelimited","echo":"${SAID[0]}"}` };
         await read().catch((e) => errors.push(e.message));
         mockSlack.answers['conversations.history'] = { body: { ok: false, error: `leak ${SAID[1]}`, messages: messages() } };
-        await read({ channel: 'random' }).catch((e) => errors.push(e.message));
+        await read({ channel: 'random' }, { runId: other }).catch((e) => errors.push(e.message));
         mockSlack.answers['conversations.history'] = new Error(`socket hang up near ${TOKEN}`);
-        await read({ channel: 'random' }).catch((e) => errors.push(e.message));
+        await read({ channel: 'random' }, { runId: other }).catch((e) => errors.push(e.message));
         await settle();
 
-        expect(errors).toHaveLength(4);
-        expect(calls().length).toBeGreaterThanOrEqual(4);
-        const everything = captured(errors, buildTrace(runRow(), rows(SCHEMA_TYPE.AUDIT_LOGS)));
+        expect(errors.map((e) => e.split(':')[0])).toEqual(['channel_not_readable', 'slack_failed', 'slack_failed', 'slack_failed']);
+        expect(calls().map((a) => a.meta.state)).toEqual(['applied', 'refused', 'failed', 'failed', 'failed']);
+        expect(calls().map((a) => a.meta.error)).toEqual([undefined, undefined, 'rate_limited', 'unknown_error', 'unreachable']);
+        const everything = captured(errors, traceOf(), traceOf(other));
         SAID.forEach((line) => expect(everything).not.toContain(line));
         expect(everything).not.toContain(TOKEN);
         expect(everything).not.toContain(TOKEN.slice(5, 25));

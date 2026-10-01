@@ -45,6 +45,12 @@ const channelsOf = (list) => (Array.isArray(list) ? list : [])
     .filter((c) => c && CHANNEL_ID.test(String(c.id || '')) && typeof c.name === 'string' && c.name)
     .map((c) => ({ id: String(c.id), name: String(c.name).slice(0, 80), ...(c.member !== undefined ? { member: Boolean(c.member) } : {}) }));
 
+/* A channel an owner or admin allowed, with what agents may do there. A row saved before reading existed has no
+ * ticks and reads as post-only, which is all it could mean then. */
+const allowedOf = (list) => (Array.isArray(list) ? list : [])
+    .filter((c) => c && CHANNEL_ID.test(String(c.id || '')) && typeof c.name === 'string' && c.name)
+    .map((c) => ({ id: String(c.id), name: String(c.name).slice(0, 80), read: c.read === true, post: c.post !== false }));
+
 /* What an owner or admin sees: that each secret is set and since when, never the secret or its handle. */
 const view = (row) => {
     const handles = (row && row.secretHandles) || {};
@@ -55,11 +61,12 @@ const view = (row) => {
         team: row && row.team ? { id: String(row.team.id || ''), name: String(row.team.name || '') } : null,
         channels: channelsOf(row && row.channels),
         channelsFetchedAt: (row && row.channelsFetchedAt) || null,
-        allowedChannels: channelsOf(row && row.allowedChannels).map(({ id, name }) => ({ id, name })),
+        allowedChannels: allowedOf(row && row.allowedChannels),
         status: handles.bot_token ? (row.status || STATUS.CONNECTED) : null,
         brokenReason: row && row.status === STATUS.BROKEN ? row.brokenReason || '' : '',
         brokenAt: row && row.status === STATUS.BROKEN ? row.brokenAt || null : null,
         lastPostAt: (row && row.lastPostAt) || null,
+        lastReadAt: (row && row.lastReadAt) || null,
     };
 };
 
@@ -133,7 +140,7 @@ const saveSecrets = async (companyId, { botToken, signingSecret } = {}, actor) =
             team: { id: String(who.body.team_id || ''), name: String(who.body.team || '').slice(0, 120) },
             channels: listed.channels,
             channelsFetchedAt: new Date(),
-            allowedChannels: channelsOf(existing && existing.allowedChannels).filter((c) => ids.has(c.id)).map(({ id, name }) => ({ id, name })),
+            allowedChannels: allowedOf(existing && existing.allowedChannels).filter((c) => ids.has(c.id)),
             status: STATUS.CONNECTED,
             brokenReason: '',
             brokenAt: null,
@@ -198,34 +205,54 @@ const refreshChannels = async (companyId, actor) => {
     const ids = new Set(listed.channels.map((c) => c.id));
     const saved = await update(companyId, row, { $set: {
         channels: listed.channels, channelsFetchedAt: new Date(), updatedBy: String(actorOf(actor).id || ''),
-        allowedChannels: channelsOf(row.allowedChannels).filter((c) => ids.has(c.id)).map(({ id, name }) => ({ id, name })),
+        allowedChannels: allowedOf(row.allowedChannels).filter((c) => ids.has(c.id)),
     } });
     return view(saved);
 };
 
+/* A bare id, as the first version of the screen sent it, allows posting only. */
+const wantedChannels = (input) => {
+    const invalid = () => new ConnectionError(400, 'channels must be a list of { id, read, post }.', 'invalid_channels');
+    if (!Array.isArray(input)) throw invalid();
+    const wanted = new Map();
+    input.forEach((entry) => {
+        const given = typeof entry === 'string' ? { id: entry, read: false, post: true } : entry;
+        if (!given || typeof given !== 'object' || typeof given.id !== 'string' || typeof given.read !== 'boolean' || typeof given.post !== 'boolean') throw invalid();
+        wanted.set(given.id, { id: given.id, read: given.read, post: given.post });
+    });
+    return [...wanted.values()].filter((c) => c.read || c.post);
+};
+
 /* Only channels Slack listed for this token can be allowed, and the stored name is Slack's, not the caller's. */
-const setAllowedChannels = async (companyId, ids, actor) => {
-    if (!Array.isArray(ids) || ids.some((id) => typeof id !== 'string')) throw new ConnectionError(400, 'channelIds must be a list of channel ids.', 'invalid_channels');
-    const wanted = [...new Set(ids)];
+const setAllowedChannels = async (companyId, input, actor) => {
+    const wanted = wantedChannels(input);
     if (wanted.length > MAX_ALLOWED) throw new ConnectionError(400, `At most ${MAX_ALLOWED} channels can be allowed.`, 'too_many_channels');
     const row = await find(companyId);
     if (!row || !(row.secretHandles && row.secretHandles.bot_token)) throw new ConnectionError(409, 'Slack is not connected.', 'not_connected');
     const known = new Map(channelsOf(row.channels).map((c) => [c.id, c]));
-    const unknown = wanted.filter((id) => !known.has(id));
-    if (unknown.length) throw new ConnectionError(400, 'A channel that is not in the list Slack gave cannot be allowed. Refresh the list first.', 'unknown_channel');
-    const allowedChannels = wanted.map((id) => ({ id, name: known.get(id).name }));
+    if (wanted.some((c) => !known.has(c.id))) throw new ConnectionError(400, 'A channel that is not in the list Slack gave cannot be allowed. Refresh the list first.', 'unknown_channel');
+    const allowedChannels = wanted.map((c) => ({ id: c.id, name: known.get(c.id).name, read: c.read, post: c.post }));
     const saved = await update(companyId, row, { $set: { allowedChannels, updatedBy: String(actorOf(actor).id || '') } });
-    audit(companyId, actor, 'connector.channels_set', { channels: allowedChannels.map((c) => c.id) });
+    const idsWith = (use) => allowedChannels.filter((c) => c[use]).map((c) => c.id);
+    audit(companyId, actor, 'connector.channels_set', { channels: allowedChannels.map((c) => c.id), read: idsWith('read'), post: idsWith('post') });
     return view(saved);
 };
 
+const USE = Object.freeze({ READ: 'read', POST: 'post' });
+
+/* The channels allowed for every use named, by name. */
+const channelsFor = (row, uses) => allowedOf(row && row.allowedChannels)
+    .filter((c) => uses.every((use) => c[use]))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
 /* The allowed channel a reference names: its id, or its name with or without the #. */
-const allowedChannel = (row, ref) => {
+const allowedChannel = (row, ref, uses = [USE.POST]) => {
     const text = String(ref || '').trim();
-    const list = channelsOf(row && row.allowedChannels);
+    const list = channelsFor(row, uses);
     return list.find((c) => c.id === text) || list.find((c) => c.name.toLowerCase() === text.replace(/^#/, '').toLowerCase()) || null;
 };
 
 const notePosted = (companyId, row) => update(companyId, row, { $set: { lastPostAt: new Date() } });
+const noteRead = (companyId, row) => update(companyId, row, { $set: { lastReadAt: new Date() } });
 
-module.exports = { CONNECTOR, SECRET_KIND, SECRET_KEYS, STATUS, MAX_ALLOWED, ConnectionError, find, view, describe, saveSecrets, removeSecret, refreshChannels, setAllowedChannels, tokenFor, markBroken, allowedChannel, notePosted };
+module.exports = { CONNECTOR, SECRET_KIND, SECRET_KEYS, STATUS, MAX_ALLOWED, ConnectionError, find, view, describe, saveSecrets, removeSecret, refreshChannels, setAllowedChannels, tokenFor, markBroken, USE, channelsFor, allowedChannel, notePosted, noteRead, audit };

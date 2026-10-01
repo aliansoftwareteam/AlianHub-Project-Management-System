@@ -3,7 +3,7 @@ const egressContext = require('../engine/egressContext');
 
 const API = 'https://slack.com/api/';
 const HOST = 'slack.com';
-const METHODS = Object.freeze(['auth.test', 'conversations.list', 'chat.postMessage']);
+const METHODS = Object.freeze(['auth.test', 'conversations.list', 'conversations.info', 'conversations.history', 'chat.postMessage']);
 const TIMEOUT_MS = 8000;
 const MAX_BYTES = 512 * 1024;
 const ERROR_CODE = /^[a-z0-9_]{1,60}$/;
