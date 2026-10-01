@@ -23,13 +23,19 @@ const saveTemplate = (companyId, template) => crud(companyId, { ...template, kin
 
 const updateTemplate = (companyId, id, set) => crud(companyId, [{ _id: asId(id), ...LIVE_TEMPLATE }, { $set: set }], 'updateOne');
 
+const deleteTemplate = async (companyId, id, caller) => {
+    await updateTemplate(companyId, id, { deletedStatusKey: 1, updatedBy: caller });
+    await crud(companyId, [{ kind: rules.TASKS, templateId: asId(id) }, { $set: { deletedStatusKey: 1 } }], 'updateMany');
+};
+
 const saveTaskRows = (companyId, templateId, part, tasks) => crud(companyId, [[{ kind: rules.TASKS, templateId, part, tasks, deletedStatusKey: 0 }]], 'insertMany');
 
 const dropTaskRows = (companyId, templateId) => crud(companyId, [{ kind: rules.TASKS, templateId }], 'deleteMany');
 
-/* Every task of a template as its id, its parent and the row that holds it: enough to plan a copy without reading the tasks. */
+/* Every task of a template as its id, its parent and the row that holds it: enough to plan a copy without reading the tasks.
+   The rows of a deleted template are not planned from; a copy already under way reads its batches to the end. */
 const taskIndex = async (companyId, templateId) => {
-    const parts = (await crud(companyId, [{ kind: rules.TASKS, templateId: asId(templateId) }, { part: 1, 'tasks._id': 1, 'tasks.ParentTaskId': 1 }, { lean: true }], 'find')) || [];
+    const parts = (await crud(companyId, [{ kind: rules.TASKS, templateId: asId(templateId), deletedStatusKey: 0 }, { part: 1, 'tasks._id': 1, 'tasks.ParentTaskId': 1 }, { lean: true }], 'find')) || [];
     return parts.flatMap((row) => (row.tasks || []).map((task) => ({ _id: task._id, ParentTaskId: task.ParentTaskId, part: row.part })));
 };
 
@@ -60,6 +66,6 @@ const companyStatusKeys = async (companyId) => {
 const codeTaken = async (companyId, code) => Boolean(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ ProjectCode: code }, { _id: 1 }, { lean: true }] }, 'findOne'));
 
 module.exports = {
-    liveTemplates, liveTemplate, countTemplates, saveTemplate, updateTemplate,
+    liveTemplates, liveTemplate, countTemplates, saveTemplate, updateTemplate, deleteTemplate,
     saveTaskRows, dropTaskRows, taskIndex, tasksOf, absentPeople, companyStatusKeys, codeTaken,
 };

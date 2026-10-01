@@ -34,7 +34,19 @@ export async function createFromTemplate(templateId, body) {
     return answer.ok && answer.data?.project ? { ok: true, ...answer.data } : { ok: false, message: answer.message || '' };
 }
 
-export const countsText = (counts, t) => ['folders', 'lists', 'tasks']
+const TEAM_PREFIX = 'tId_';
+const listsOf = (project) => [
+    ...Object.values(project?.sprintsObj || {}),
+    ...Object.values(project?.sprintsfolders || {}).flatMap((folder) => Object.values(folder?.sprintsObj || {})),
+];
+
+/* Whether the project has a live private list this person is on. A list shared with a team counts: which teams a person is in
+   is the server's to say, and guessing yes only keeps the template with them until they choose otherwise. */
+export const isOnPrivateList = (project, userId) => listsOf(project).some((list) => list?.private === true
+    && !Number(list.deletedStatusKey || 0)
+    && (list.AssigneeUserId || []).map(String).some((id) => id === String(userId) || id.startsWith(TEAM_PREFIX)));
+
+export const countsText =(counts, t) => ['folders', 'lists', 'tasks']
     .map((kind) => t(`Projects.template_${kind}`, { n: Number(counts?.[kind]) || 0 }, Number(counts?.[kind]) || 0))
     .join(', ');
 

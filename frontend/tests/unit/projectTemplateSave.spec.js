@@ -116,6 +116,34 @@ describe('the save-as-template dialog', () => {
         expect(field('everyone').checked).toBe(false);
     });
 
+    it('opens kept to the person saving when the project has a private list they are on, and says why', () => {
+        const glyphs = { id: 's1', name: 'Glyphs', private: true, AssigneeUserId: ['user-1'], deletedStatusKey: 0 };
+        openDialog({ ...ALPHA, sprintsObj: { s1: glyphs } });
+        expect(field('everyone').checked).toBe(false);
+        expect(dialog().querySelector('[data-note="private-lists"]').textContent).toBe('Private lists are included only in a template that stays with you');
+    });
+
+    it('counts a private list inside a folder and one shared with a team, and no other', () => {
+        const inFolder = { sprintsfolders: { f1: { folderId: 'f1', name: 'Design', sprintsObj: { s2: { id: 's2', private: true, AssigneeUserId: ['user-1'] } } } } };
+        const withTeam = { sprintsObj: { s3: { id: 's3', private: true, AssigneeUserId: ['tId_t1'] } } };
+        const notMine = { sprintsObj: { s4: { id: 's4', private: true, AssigneeUserId: ['someone-else'] }, s5: { id: 's5', private: false, AssigneeUserId: ['user-1'] }, s6: { id: 's6', private: true, AssigneeUserId: ['user-1'], deletedStatusKey: 1 } } };
+        [[inFolder, false], [withTeam, false], [notMine, true]].forEach(([lists, offered]) => {
+            const wrapper = openDialog({ ...ALPHA, ...lists });
+            expect(field('everyone').checked).toBe(offered);
+            expect(Boolean(dialog().querySelector('[data-note="private-lists"]'))).toBe(!offered);
+            wrapper.unmount();
+            mounted.length = 0;
+        });
+    });
+
+    it('sends the choice as ticked, so a template with a private list is offered to everyone only when the person says so', async () => {
+        apiRequest.mockResolvedValue(answer({ notes: [{ code: 'private_lists_left', count: 1 }] }));
+        openDialog({ ...ALPHA, sprintsObj: { s1: { id: 's1', private: true, AssigneeUserId: ['user-1'] } } });
+        await submit();
+        expect(posts()[0][2].everyone).toBe(false);
+        expect(toast.info.mock.calls[0][0]).toBe('Private lists were left out: 1.');
+    });
+
     it('offers the assignees only with the tasks they are on', async () => {
         openDialog();
         expect(field('assignees').disabled).toBe(true);

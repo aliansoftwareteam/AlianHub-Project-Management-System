@@ -51,6 +51,7 @@
                         <span class="ah-field__hint sptd__hint">{{ t('Projects.template_everyone_hint') }}</span>
                     </span>
                 </label>
+                <p v-if="onPrivateList" class="ah-field__hint sptd__always" data-note="private-lists">{{ t('Projects.template_private_lists') }}</p>
 
                 <p v-if="problem" class="ah-field__error" role="alert">{{ problem }}</p>
 
@@ -68,12 +69,13 @@
 <script setup>
 /**
  * Saves the project it is handed as a workspace template: asks for the name, what to keep and who it is offered to.
- * A template of a private project starts out kept to the person saving it, owners and admins.
+ * A template of a private project, or of one with a private list the person saving is on, starts out kept to that
+ * person, owners and admins: the server leaves every private list out of a template that is offered to everyone.
  */
-import { nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { inject, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
-import { DESCRIPTION_LIMIT, NAME_LIMIT, saveProjectTemplate } from '@/views/Projects/projectTemplates';
+import { DESCRIPTION_LIMIT, NAME_LIMIT, isOnPrivateList, saveProjectTemplate } from '@/views/Projects/projectTemplates';
 
 const LEFT_OUT = ['private_lists_left', 'automations_skipped', 'tasks_left_out'];
 
@@ -88,7 +90,9 @@ const $toast = useToast();
 const name = ref(props.project.ProjectName || '');
 const description = ref('');
 const include = reactive({ tasks: false, assignees: false, dates: false, automations: false });
-const everyone = ref(props.project.isPrivateSpace !== true);
+const userId = inject('$userId', ref(''));
+const onPrivateList = isOnPrivateList(props.project, userId.value);
+const everyone = ref(props.project.isPrivateSpace !== true && !onPrivateList);
 const busy = ref(false);
 const problem = ref('');
 const nameInput = ref(null);

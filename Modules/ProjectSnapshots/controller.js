@@ -18,6 +18,8 @@ const FORBIDDEN = 'You do not have permission to perform this action.';
 const PERSONAL = 'A personal list cannot be saved as a template.';
 const FULL = `This workspace has as many project templates as it can hold (${rules.MAX_TEMPLATES}). Delete one to save another.`;
 const KEY_TAKEN = 'That project key is already taken.';
+const CREATOR_OFFERS = 'Only the person who saved this template can offer it to everyone.';
+const HOLDS_PRIVATE_LIST = 'This template includes a private list; save a new template without it to share it.';
 const FAILED = 'Something went wrong with the project template.';
 
 const refuse = (res, code, statusText) => res.status(code).send({ status: false, statusText, message: statusText });
@@ -64,7 +66,8 @@ exports.save = handler('save', async ({ req, res, companyId, caller }) => {
     if (source.isPersonal === true) return refuse(res, 400, PERSONAL);
     if ((await store.countTemplates(companyId)) >= rules.MAX_TEMPLATES) return refuse(res, 400, FULL);
 
-    const bundle = await readSource({ companyId, caller, source, ownersSeeAll: false });
+    const read = await readSource({ companyId, caller, source, ownersSeeAll: false });
+    const bundle = request.everyone === true ? rules.withoutPrivateLists(read) : read;
     const plan = request.include.tasks ? await planTasks(companyId, sourceId, bundle.lists.map((list) => list._id)) : planOf([]);
     if (plan.total > rules.MAX_TASKS) return refuse(res, 400, tooManyTasks(plan.total));
 
@@ -111,6 +114,10 @@ exports.edit = handler('edit', async (context) => {
     if (!request.ok) return refuse(res, 400, request.statusText);
     const found = await managed(context);
     if (!found) return undefined;
+    if (request.changes.everyone === true && found.template.everyone !== true) {
+        if (!rules.mayOffer(found.template, caller, found.privileged)) return refuse(res, 403, CREATOR_OFFERS);
+        if (rules.holdsPrivateList(found.template)) return refuse(res, 400, HOLDS_PRIVATE_LIST);
+    }
     await store.updateTemplate(companyId, found.template._id, { ...request.changes, updatedBy: caller });
     announce('update', companyId, found.template._id);
     return res.send({ status: true, statusText: 'Template updated.', data: rules.presented({ ...found.template, ...request.changes }, caller, found.privileged) });
@@ -121,7 +128,7 @@ exports.remove = handler('delete', async (context) => {
     const { res, companyId, caller } = context;
     const found = await managed(context);
     if (!found) return undefined;
-    await store.updateTemplate(companyId, found.template._id, { deletedStatusKey: 1, updatedBy: caller });
+    await store.deleteTemplate(companyId, found.template._id, caller);
     announce('delete', companyId, found.template._id);
     return res.send({ status: true, statusText: 'Template deleted.' });
 });

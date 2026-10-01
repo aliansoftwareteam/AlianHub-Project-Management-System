@@ -10,6 +10,7 @@ const LATEST_START = Date.UTC(2200, 0, 1);
 const TEMPLATE = 'template';
 const TASKS = 'tasks';
 const TEAM_PREFIX = 'tId_';
+const PRIVATE_LISTS_LEFT = 'private_lists_left';
 
 const INCLUDE_KEYS = ['tasks', 'assignees', 'dates', 'automations'];
 const DEADLINES = 'dueDateDeadLine';
@@ -249,8 +250,26 @@ const thawedTask = (row, { include, start, gone, first, fields }) => {
     }, start);
 };
 
-const canSee = (template, caller, privileged) => privileged || template.everyone === true || String(template.createdBy) === String(caller);
-const canManage = (template, caller, privileged) => privileged || String(template.createdBy) === String(caller);
+/* A template offered to everyone holds no private list: such a list stays behind with its tasks, counted with the ones the person
+   saving is not on. */
+const withoutPrivateLists = (bundle) => {
+    const lists = bundle.lists.filter((list) => list.private !== true);
+    const left = bundle.lists.length - lists.length;
+    if (!left) return bundle;
+    const counted = bundle.notes.filter((note) => note.code === PRIVATE_LISTS_LEFT).reduce((sum, note) => sum + note.count, 0);
+    return { ...bundle, lists, notes: [...bundle.notes.filter((note) => note.code !== PRIVATE_LISTS_LEFT), { code: PRIVATE_LISTS_LEFT, count: counted + left }] };
+};
+
+const holdsPrivateList = (template) => ((template.snapshot && template.snapshot.lists) || []).some((list) => list.private === true);
+
+const isCreator = (template, caller) => String(template.createdBy) === String(caller);
+
+/* Offering a template to everyone is for the person who saved it; owners and admins may do it too for one that came from a
+   public project. */
+const mayOffer = (template, caller, privileged) => isCreator(template, caller) || (privileged && template.sourcePrivate !== true);
+
+const canSee = (template, caller, privileged) => privileged || template.everyone === true || isCreator(template, caller);
+const canManage = (template, caller, privileged) => privileged || isCreator(template, caller);
 
 const presented = (template, caller, privileged) => ({
     _id: String(template._id),
@@ -270,5 +289,5 @@ module.exports = {
     MAX_TASKS, MAX_TEMPLATES, TASKS_PER_ROW, TEMPLATE, TASKS, TEAM_PREFIX, INCLUDE_KEYS, startOfDay,
     parseSave, parseEdit, parseUse, withOffsets, withDates, fieldValues, fieldIdsIn, peopleIn,
     frozenStructure, frozenTask, firstStatusOf, usableStatuses, thawedBundle, thawedTask,
-    canSee, canManage, presented,
+    withoutPrivateLists, holdsPrivateList, mayOffer, canSee, canManage, presented,
 };
