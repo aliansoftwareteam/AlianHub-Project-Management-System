@@ -26,6 +26,7 @@ const SCREENS = [
     'components/organisms/TaskDetailOverlay/TaskAssignmentSuggestion.vue',
     'components/organisms/TaskDetailOverlay/TaskRepeatControl.vue',
     'components/organisms/TaskDetailOverlay/TaskTimeSection.vue',
+    'assets/css/datepicker.css',
 ];
 const VARIANTS = ['a', 'b', 'c'];
 
@@ -65,6 +66,7 @@ describe('the three design variants', () => {
             '--r-chip', '--r-input', '--r-card', '--r-modal',
             '--shadow-card', '--shadow-surface', '--shadow-pop', '--shadow-panel',
             '--row-h', '--row-font', '--hit-min', '--cell-pad-y', '--cell-pad-x',
+            '--avatar-size', '--avatar-font', '--chip-h', '--chip-font',
             '--control-h-sm', '--control-h', '--control-h-lg', '--toolbar-h',
         ];
         expect(needed.filter((name) => !(name in variant.a))).toEqual([]);
@@ -94,8 +96,8 @@ describe('the three design variants', () => {
         }));
     });
 
-    it('A keeps today\'s spacing scale, radii and toolbar', () => {
-        ['--sp-1', '--sp-2', '--sp-3', '--sp-4', '--sp-5', '--sp-6', '--sp-7', '--sp-8', '--sp-9', '--r-modal', '--shadow-pop', '--toolbar-h'].forEach((name) => {
+    it('A keeps today\'s spacing scale, radii, toolbar, chips and avatars', () => {
+        ['--sp-1', '--sp-2', '--sp-3', '--sp-4', '--sp-5', '--sp-6', '--sp-7', '--sp-8', '--sp-9', '--r-modal', '--shadow-pop', '--toolbar-h', '--avatar-size', '--avatar-font', '--chip-h', '--chip-font', '--hit-min'].forEach((name) => {
             expect(variant.a[name], name).toBe(root[name]);
         });
         expect(variant.a['--shadow-card']).toBe(root['--shadow-card'].replace(/rgba\([^)]*\)/, 'var(--shadow-ink)'));
@@ -119,7 +121,7 @@ describe('the three design variants', () => {
         expect(variant.b['--shadow-card']).toBe('none');
         expect(variant.b['--shadow-panel']).toBe('none');
         expect(variant.b['--shadow-surface']).toBe('none');
-        ['--row-h', '--control-h-sm', '--control-h', '--control-h-lg', '--toolbar-h', '--r-sm', '--r-md', '--r-lg', '--r-modal', '--fs-sm', '--fs-lg', '--fs-xl', '--lh-body'].forEach((name) => {
+        ['--row-h', '--control-h-sm', '--control-h', '--control-h-lg', '--toolbar-h', '--r-sm', '--r-md', '--r-lg', '--r-modal', '--fs-sm', '--fs-lg', '--fs-xl', '--lh-body', '--avatar-size', '--avatar-font', '--chip-h', '--chip-font'].forEach((name) => {
             expect(px('b', name), name).toBeLessThan(px('a', name));
         });
         ['--cell-pad-y', '--cell-pad-x', '--card-pad-y', '--card-pad-x', '--gap-row', '--gap-stack', '--page-pad-y', '--page-pad-x'].forEach((name) => {
@@ -128,7 +130,7 @@ describe('the three design variants', () => {
     });
 
     it('C is airy: larger type, more room, rounder corners, a stronger title', () => {
-        ['--fs-xs', '--fs-sm', '--fs-md', '--fs-lg', '--fs-xl', '--lh-body', '--row-h', '--control-h-sm', '--control-h', '--control-h-lg', '--toolbar-h', '--r-sm', '--r-md', '--r-lg', '--r-modal'].forEach((name) => {
+        ['--fs-xs', '--fs-sm', '--fs-md', '--fs-lg', '--fs-xl', '--lh-body', '--row-h', '--control-h-sm', '--control-h', '--control-h-lg', '--toolbar-h', '--r-sm', '--r-md', '--r-lg', '--r-modal', '--avatar-size', '--avatar-font', '--chip-h', '--chip-font'].forEach((name) => {
             expect(px('c', name), name).toBeGreaterThan(px('a', name));
         });
         ['--cell-pad-y', '--cell-pad-x', '--card-pad-y', '--card-pad-x', '--gap-row', '--gap-stack', '--page-pad-y', '--page-pad-x'].forEach((name) => {
@@ -166,12 +168,17 @@ describe('with no variant chosen', () => {
         expect(bare).toEqual([]);
     });
 
-    /* The List density setting defines these on :root at today's sizes. One fallback everywhere
-       means the screens look the same whether or not it has landed. */
-    it.each([['--row-h', '36px'], ['--cell-pad-y', '9px'], ['--row-font', '12.5px'], ['--hit-min', '24px']])('%s falls back to %s wherever it is read', (name, value) => {
-        const fallbacks = SCREENS.flatMap((rel) => [...read(rel).matchAll(new RegExp(`var\\(${name}, ([^)]+)\\)`, 'g'))].map((m) => m[1]));
-        expect(fallbacks.length).toBeGreaterThan(0);
-        expect([...new Set(fallbacks)]).toEqual([value]);
+    it.each(['--row-h', '--cell-pad-y', '--row-font', '--hit-min'])('%s is a comfortable row size on :root, read without a fallback', (name) => {
+        expect(root[name]).toBeTruthy();
+        SCREENS.forEach((rel) => expect(read(rel), rel).not.toMatch(new RegExp(`var\\(${name},`)));
+        expect(read('views/Projects/ListView/style.css')).toContain(`var(${name})`);
+    });
+
+    it('the date picker popup keeps the library\'s 4px corners and no shadow', () => {
+        const picker = read('assets/css/datepicker.css');
+        expect(picker).toContain('--dp-border-radius: var(--r-md, 4px);');
+        expect(picker).toContain('--dp-cell-border-radius: var(--r-sm, 4px);');
+        expect(picker).toContain(':root .dp__menu { box-shadow: var(--shadow-surface, none); }');
     });
 
     it('every token a screen reads with a fallback is one the variants set', () => {
@@ -183,5 +190,41 @@ describe('with no variant chosen', () => {
             });
         });
         expect(unknown).toEqual([]);
+    });
+});
+
+describe('a view\'s row density inside a design variant', () => {
+    const compactAt = tokens.indexOf('[data-density="compact"]');
+    const compact = declared(tokens.slice(compactAt, tokens.indexOf('}', compactAt)));
+    const DENSITY = ['--row-h', '--cell-pad-y', '--row-font', '--avatar-size', '--avatar-font', '--chip-h', '--chip-font'];
+    const size = (v, name) => {
+        const ref = /^var\((--[\w-]+)\)$/.exec(variant[v][name]);
+        return ref ? size(v, ref[1]) : parseFloat(variant[v][name]);
+    };
+
+    /* A custom property set on the view root beats one inherited from <html>, whatever the
+       selectors weigh. That holds only while compact stays off :root and variants stay on it. */
+    it('compact is set on the view root and a variant only on <html>', () => {
+        expect(compactAt).toBeGreaterThan(-1);
+        expect(tokens.match(/[^\s{},]*\[data-density="compact"\][^{,]*/g).map((sel) => sel.trim())).toEqual(['[data-density="compact"]']);
+        expect([...tokens.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]*\[data-variant[^{}]*)\{/g)].map((m) => m[1].trim()))
+            .toEqual(VARIANTS.map((v) => `:root[data-variant="${v}"]`));
+        ['views/Projects/ListView/ListView.vue', 'views/Projects/TableView/TableView.vue'].forEach((rel) => {
+            expect(read(rel), rel).toMatch(/class="[^"]*\bah-page (lv2|tv2)\b[^>]*:data-density="density"/);
+        });
+    });
+
+    it.each(VARIANTS)('Comfortable shows variant %s\'s own row, chip and avatar sizes', (v) => {
+        DENSITY.forEach((name) => expect(size(v, name), name).toBeGreaterThan(0));
+    });
+
+    it.each(VARIANTS)('Compact is denser than Comfortable in variant %s', (v) => {
+        DENSITY.forEach((name) => expect(parseFloat(compact[name]), name).toBeLessThan(size(v, name)));
+    });
+
+    it('no variant lets a compact row under the 24px target', () => {
+        expect(compact['--hit-min']).toBeUndefined();
+        VARIANTS.forEach((v) => expect(variant[v]['--hit-min'], `variant ${v}`).toBe(root['--hit-min']));
+        expect(parseFloat(compact['--row-h']) - 2 * parseFloat(compact['--cell-pad-y'])).toBeGreaterThanOrEqual(parseFloat(root['--hit-min']));
     });
 });

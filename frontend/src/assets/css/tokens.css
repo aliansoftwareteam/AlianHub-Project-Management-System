@@ -96,7 +96,8 @@
     --hit-min: 24px;
 }
 
-/* Set on a view root by its saved density (or on :root by a design variant). Phones keep
+/* Set on a view root by its saved density. A design variant sets its comfortable sizes on
+   <html>, so this still wins inside the view whatever the variant. Phones keep
    the comfortable sizes: their rows fold onto two lines and need the height to be tapped. */
 @media (min-width: 768px) {
     [data-density="compact"] {
@@ -212,7 +213,8 @@
 
 /* Design variants (task 046 B0.2): a preview picked in Settings, applied as data-variant on <html>.
    Tokens that :root does not define exist only inside a variant, and every rule that reads one
-   carries today's value as its fallback, so with no variant chosen nothing changes. */
+   carries today's value as its fallback, so with no variant chosen nothing changes.
+   The row, chip and avatar sizes are a variant's comfortable density. */
 :root[data-variant="a"] {
     --fs-2xs: 10px; --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-lg: 14px; --fs-xl: 20px;
     --lh-tight: 1.2; --lh-snug: 1.3; --lh-body: 1.5;
@@ -221,6 +223,7 @@
     --sp-1: 4px; --sp-2: 6px; --sp-3: 8px; --sp-4: 10px; --sp-5: 12px;
     --sp-6: 14px; --sp-7: 16px; --sp-8: 20px; --sp-9: 24px;
     --row-h: 40px; --row-font: var(--fs-md); --hit-min: 24px;
+    --avatar-size: 24px; --avatar-font: 11px; --chip-h: 22px; --chip-font: 11.5px;
     --cell-pad-y: var(--sp-3); --cell-pad-x: var(--sp-5);
     --card-pad-y: var(--sp-6); --card-pad-x: var(--sp-7);
     --gap-row: var(--sp-4); --gap-stack: var(--sp-7);
@@ -246,6 +249,7 @@
     --sp-1: 2px; --sp-2: 4px; --sp-3: 6px; --sp-4: 8px; --sp-5: 10px;
     --sp-6: 12px; --sp-7: 14px; --sp-8: 16px; --sp-9: 20px;
     --row-h: 32px; --row-font: var(--fs-md); --hit-min: 24px;
+    --avatar-size: 22px; --avatar-font: 10px; --chip-h: 20px; --chip-font: 11px;
     --cell-pad-y: var(--sp-2); --cell-pad-x: var(--sp-5);
     --card-pad-y: var(--sp-5); --card-pad-x: var(--sp-6);
     --gap-row: var(--sp-2); --gap-stack: var(--sp-5);
@@ -271,6 +275,7 @@
     --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 18px;
     --sp-6: 20px; --sp-7: 24px; --sp-8: 28px; --sp-9: 32px;
     --row-h: 48px; --row-font: var(--fs-md); --hit-min: 24px;
+    --avatar-size: 28px; --avatar-font: 12px; --chip-h: 24px; --chip-font: 12px;
     --cell-pad-y: var(--sp-3); --cell-pad-x: var(--sp-4);
     --card-pad-y: var(--sp-5); --card-pad-x: var(--sp-6);
     --gap-row: var(--sp-3); --gap-stack: var(--sp-6);
