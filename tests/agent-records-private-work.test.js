@@ -125,6 +125,21 @@ describe.each(PRIVILEGED)('agent runs, for %s', (_who, uid) => {
         expect(replay.code).toBe(404);
     });
 
+    it.each(['list', 'chat', 'message'])('stopping or reverting the %s run answers 404 and leaves it running', async (key) => {
+        for (const handler of [ctrl.stopRun, ctrl.revertRun]) {
+            // eslint-disable-next-line no-await-in-loop
+            const r = await call(handler, req(uid, { params: { id: String(run[key]._id) } }));
+            expect(r.code).toBe(404);
+            expect(JSON.stringify(r.body)).not.toContain('a private question');
+        }
+        expect(rows(SCHEMA_TYPE.AGENT_RUNS).find((row) => String(row._id) === String(run[key]._id)).status).toBe('running');
+    });
+
+    it('a run on the open project is still stopped', async () => {
+        const r = await call(ctrl.stopRun, req(uid, { params: { id: String(run.open._id) } }));
+        expect(r.body).toMatchObject({ status: true, data: { status: 'stopped' } });
+    });
+
     it('the detail of a run on the open project still opens', async () => {
         const detail = await call(ctrl.getRun, req(uid, { params: { id: String(run.open._id) } }));
         expect(detail.body).toMatchObject({ status: true, data: { run: { projectId: P_OPEN } } });
