@@ -146,10 +146,10 @@ First in the order, because MCP is the main road.
 
 | PR | State | What it gave agents |
 |---|---|---|
-| #1337 | Merged | Tags (list, add, remove), links between tasks (list, add, remove), lists (list, create, rename, move into a folder), doc comments (read, write, reply, assign). All behind `MCP_TOOLS_WORK`. Each write runs the web app's own handler as the person, and leaves an audit row and an undo |
-| #1344 | Open | An agent's token follows the action list on the write routes beside the main task route too (create, relations, lists and folders, doc comments, imports). Link answers and a few input checks are made consistent |
-| #1348 | Open | Goals for outside agents: list, read, set a target's value, add or remove what a target counts. Behind `MCP_TOOLS_WORK`. No tool creates or deletes a goal |
-| #1355 | Open, on top of #1344 | The doc routes answer an agent's token the way the routes beside them do. Bulk status and bulk tag changes store the values each task's own project holds |
+| #1337 | Merged | Tags (list, add, remove), links between tasks (list, add, remove), lists (list, create, rename, move into a folder), doc comments (read, write, reply, assign). All behind `MCP_TOOLS_WORK`. Each write runs the web app's own handler as the person (`Modules/Agents/workRequests.js`), and leaves an audit row and an undo |
+| #1344 | Merged | An agent's token follows the action list on the write routes beside the main task route too (create, relations, lists and folders, doc comments, imports). Link answers and a few input checks are made consistent |
+| #1348 | Merged | Goals for outside agents: list, read, set a target's value, add or remove what a target counts. Behind `MCP_TOOLS_WORK` (`Modules/Agents/goalRequests.js`). No tool creates or deletes a goal |
+| #1355 | Merged | The doc routes answer an agent's token the way the routes beside them do. Bulk status and bulk tag changes store the values each task's own project holds |
 
 Earlier, and already on `beta` (see "Corrections" above): any status including Done, complete creates, the batch call and doc writes (#1261, #1270); the manage grant over OAuth (#1307).
 
@@ -198,7 +198,7 @@ Earlier, and already on `beta` (see "Corrections" above): any status including D
 - AI-4d: `Modules/ApiTokens/`, `Modules/OAuthServer/`, `Modules/Inbox/`, `AiAccounts.vue`, `tokenPolicy.js`, `ConnectedApps.vue`, `en.js`.
 - AI-4e: the local `.env` (the owner's), `dogfood-findings.md`.
 
-**Size:** S + M + M + S + S. **Depends on:** #1344 and #1355 merging first (they change `taskRequests.js` and the task routes). AI-4a and AI-4e need the owner.
+**Size:** S + M + M + S + S. **Depends on:** nothing in code: #1344 and #1355, which changed `taskRequests.js` and the task routes, merged on 2026-10-01. AI-4a and AI-4e need the owner.
 
 ---
 
@@ -465,7 +465,7 @@ Costs nothing: the newcomer is a QA agent of the coordinator's, not AlianHub's A
 
 **Exists**
 - The setup wizard (`frontend/src/views/Setup/SetupWizard.vue`, `Modules/Setup/`), a sample project (`Modules/Setup/demoProject.js`; #1370, open, widens it).
-- A five-step setup card and a four-stop first-visit tour, just refreshed (#1354, open, branch `feat/first-run-refresh`: `frontend/src/components/molecules/Home/SetupChecklist.vue`, `frontend/src/components/organisms/Tour/tourSteps.js`, `e2e/specs/onboarding.spec.js`).
+- A five-step setup card and a four-stop first-visit tour, just refreshed (#1354, merged on 2026-10-01: `frontend/src/components/molecules/Home/SetupChecklist.vue`, `frontend/src/components/organisms/Tour/tourSteps.js`, `e2e/specs/onboarding.spec.js`).
 - The benchmark method and the QA programme (task 034). Demo team accounts on the local build.
 
 **Missing**
@@ -486,7 +486,7 @@ Costs nothing: the newcomer is a QA agent of the coordinator's, not AlianHub's A
 - [ ] Every stop is filed as a finding with the screen and the words on it.
 - [ ] The first run spent no model budget.
 
-**Tests:** none in code; the sheet is the test. **Files:** new `newcomer-tests.md`; changed `scorecard.md`. **Size:** S. **Depends on:** nothing. Better after #1354 is in the local build.
+**Tests:** none in code; the sheet is the test. **Files:** new `newcomer-tests.md`; changed `scorecard.md`. **Size:** S. **Depends on:** nothing. Run it on a local build that includes #1354.
 
 ---
 
@@ -534,7 +534,7 @@ Costs nothing: the newcomer is a QA agent of the coordinator's, not AlianHub's A
 - New: `frontend/src/views/Ai/ConnectYourAi.vue`.
 - Changed: `SetupWizard.vue`, the sign-up flow under `frontend/src/views/Authentication/`, `SetupChecklist.vue`, `useOnboardingChecklist.js`, `Modules/Users/helpers/onboardingRules.js`, `aiAvailability.js`, the AI entry points named above, `Modules/Mcp/server.js` (the signal), `docs/MCP-AGENT-GUIDE.md`, `en.js`.
 
-**Size:** M. **Depends on:** AI-4a (a connection proven), T-3 (so the first sentence works), #1354 merging first (it changes the setup card and its rules).
+**Size:** M. **Depends on:** AI-4a (a connection proven), T-3 (so the first sentence works). It builds on the setup card and rules that #1354 changed.
 
 ---
 
@@ -561,7 +561,7 @@ Costs nothing: the newcomer is a QA agent of the coordinator's, not AlianHub's A
 - [ ] Opening a place once makes it stay on the rail for that person.
 - [ ] The switch is one click and takes effect at once, on desktop and at 390 px.
 
-**Tests:** web specs for the rail in both modes, the reveal rule and the switch; server test for the stored choice; `e2e/specs/onboarding.spec.js` extended. **Files:** `navItems.js`, `GlobalRail.vue`, `MobileTabBar.vue`, `shellState.js`, `MySettings.vue`, `Modules/Users/helpers/navPreferencesRules.js`, `schema.js`, `en.js`. **Size:** M. **Depends on:** #1354 merging first (it changes `navItems.js`, `shellState.js` and `MySettings.vue`); S-6 for where newcomers stop.
+**Tests:** web specs for the rail in both modes, the reveal rule and the switch; server test for the stored choice; `e2e/specs/onboarding.spec.js` extended. **Files:** `navItems.js`, `GlobalRail.vue`, `MobileTabBar.vue`, `shellState.js`, `MySettings.vue`, `Modules/Users/helpers/navPreferencesRules.js`, `schema.js`, `en.js`. **Size:** M. **Depends on:** S-6 for where newcomers stop. It builds on `navItems.js`, `shellState.js` and `MySettings.vue` as #1354 left them.
 
 ---
 
@@ -863,7 +863,7 @@ The person's main screen becomes a list of decisions, not a list of tasks.
 - [ ] The ten most-seen empty screens each offer a sentence.
 - [ ] Every AI line has a "Why?".
 
-**Tests:** web specs for the default order, a kept arrangement, the empty screens. **Files:** `TodayOverdue.vue`, `homeCards.js`, `WaitingOnYouCard.vue`, `Modules/Users/helpers/homeCardsRules.js`, the empty-state uses, `en.js`. **Size:** M. **Depends on:** AI-5; #1354 merging first (it changes `TodayOverdue.vue`).
+**Tests:** web specs for the default order, a kept arrangement, the empty screens. **Files:** `TodayOverdue.vue`, `homeCards.js`, `WaitingOnYouCard.vue`, `Modules/Users/helpers/homeCardsRules.js`, the empty-state uses, `en.js`. **Size:** M. **Depends on:** AI-5.
 
 ---
 
@@ -901,10 +901,10 @@ The person's main screen becomes a list of decisions, not a list of tasks.
 | Step | What | Runs side by side | Notes |
 |---|---|---|---|
 | 0, now | Writing only, and the owner's answers | S-6 first run · AI-1 sheet · S-3 test | Nothing here touches product code except the S-3 test |
-| 1 | The road in | AI-4a (needs the owner) · AI-4b · AI-4d | AI-4b after #1344 and #1355. The default-flags question is the owner's and is not planned as done |
+| 1 | The road in | AI-4a (needs the owner) · AI-4b · AI-4d | The default-flags question is the owner's and is not planned as done |
 | 2 | The agent knows the product | T-3 · then AI-4c · AI-2 over MCP with the preview card · then AI-3 | See the collision table: one holder of `registry.js` at a time |
 | 3 | Measure | AI-1 first run over MCP (needs the owner) · AI-4e · S-6 written up | The first number for the AI row |
-| 4 | The front door and the simple outside | T-1 · S-1 · S-5 · AI-2 in the web app without a model | T-1 and S-1 after #1354 |
+| 4 | The front door and the simple outside | T-1 · S-1 · S-5 · AI-2 in the web app without a model | T-1 and S-1 both change the setup card and the rail: one after the other |
 | 5 | The system looks for you | AI-5 the tab and the row · AI-6 rules and the daily look · then the work queue · AI-5 "Always do this" | AI-5 before AI-6 |
 | 6 | The teammate | S-2 · T-2 · T-4 · then T-5 · S-4 · AI-1b replay | S-2 after AI-3; T-2 and T-4 after the work queue |
 | 7 | Prove it (needs the owner) | AI-1 again · the one-week trial · the newcomer tests again | Then the scorecard is rewritten |
@@ -918,7 +918,7 @@ S-3 batches run in any step, one at a time.
 |---|---|---|
 | `Modules/Agents/registry.js` | T-3 (one read action), AI-4c, AI-2 (two actions), AI-3 (three), AI-6 (the queue), S-2 | One at a time, in that order. A first small pull request may move each group of entries into its own file, so later slices stop meeting here |
 | `Modules/Agents/actions.js`, `undo.js` | AI-3, S-2 (AI-4b changes wording in `actions.js`) | AI-4b first, then AI-3, then S-2 |
-| `Modules/Agents/taskRequests.js` | AI-4b, AI-4c, T-5, and the open #1344 and #1355 | After both merge; AI-4b, AI-4c, then T-5 |
+| `Modules/Agents/taskRequests.js` | AI-4b, AI-4c, T-5 | AI-4b, AI-4c, then T-5 |
 | `Modules/Agents/proposals.js` | AI-2 (small), AI-5, AI-6 | AI-2, AI-5, AI-6 |
 | `Modules/Agents/policy.js` | AI-4c, AI-5 | AI-4c first |
 | `Modules/Mcp/server.js`, `tools.js`, `scopes.js` | T-3, AI-2, AI-3, AI-6, T-1 (the signal) | Each slice adds its own tools file; only the lists in `tools.js` and `scopes.js` are shared. Keep both sides |
@@ -926,7 +926,7 @@ S-3 batches run in any step, one at a time.
 | `utils/mongo-handler/schema.js` | AI-4b, AI-4c, AI-5, AI-6, T-2, T-5, S-1 | Small added blocks; keep both sides |
 | `frontend/src/locales/en.js` and the locale files | Every slice | Keep both sides' keys, run the backfill again |
 | `IntentPreview` | AI-2 makes it; AI-3, S-2 and AI-5 add row kinds | AI-2 first |
-| `navItems.js`, `shellState.js`, `MySettings.vue`, `TodayOverdue.vue`, `SetupChecklist.vue`, `onboardingRules.js` | S-1, S-4, T-1, and the open #1354 | After #1354 |
+| `navItems.js`, `shellState.js`, `MySettings.vue`, `TodayOverdue.vue`, `SetupChecklist.vue`, `onboardingRules.js` | S-1, S-4, T-1 | S-1, then T-1, then S-4 |
 | `docs/MCP-AGENT-GUIDE.md` | AI-4a, T-3, AI-2, AI-3, AI-6, S-2 | One section per slice; keep both sides |
 
 **Size of the whole task:** about 34 pull requests. At the steady pace of task 046 that is four to five working days of agent time, plus the week the trial takes, plus the owner's steps.

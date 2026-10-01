@@ -71,7 +71,6 @@ The plan (`task.md`) was written. Nothing is built.
 - **Open, the owner's:** whether `MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE` and `MCP_TOOLS_WORK` are on by default. It changes a security default and needs an access review first. Not planned as done.
 - AI-1, AI-4a, AI-4e and the one-week trial need the owner: the flags on in the local build, and the owner's Claude connected with the manage grant.
 - The wave starts after batches 3 and 4 of task 046 are merged, built and looked at.
-- AI-4b and AI-4c wait for #1344 and #1355 to merge. T-1, S-1 and S-4 wait for #1354.
 
 ## Log
 
@@ -79,4 +78,5 @@ The plan (`task.md`) was written. Nothing is built.
 - Task created from the advisor review of task 046 (three notes), the coordinator's reply and the owner's decision that the agent is the person's own Claude or ChatGPT over MCP. The code was surveyed on `origin/beta` before writing; the findings are in `task.md` under "What already exists".
 - Recorded in task 046 as decisions 27 (the eighth finish line, "AI-run"), 28 (the ninth, "anyone can use it"), 29 (the tenth, "no manual") and 30 (the agent comes over MCP). The owner may overrule any of them.
 - Found while surveying: the manage grant over OAuth (#1307), any status including Done, complete creates and the batch call (#1270) are already on `beta`, behind flags that are off by default. The notes listed them as work to do. AI-4 was narrowed to what is really missing.
+- #1344, #1348, #1354 and #1355 merged into `beta` the same evening (batch 3), so no slice waits on an open pull request. None of them is in the local build yet.
 - Found while surveying: when an AI app connects, the server tells it three sentences written for a coding agent, and offers no ready-made prompts. That is the gap T-3 fills.
