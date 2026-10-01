@@ -23,7 +23,7 @@
             <div class="radio__wrapper">
                 <label  for="name-1" class="font-size-13 dark-gray2">{{$t('ViewListdescription.view_name')}} </label>
                     <div class="mt-10px">
-                    <InputText inputId="name-1" class="urlText text-capitalize border-gray border-radius-3-px" :placeHolder="$t('PlaceHolder.Enter_View_Name')" @keyup="inputValues.name.error = ''" :modelValue="inputValues.name.value" @update:modelValue="(val)=>{inputValues.name.value  = val.trim() }" />
+                    <InputText inputId="name-1" class="urlText border-gray border-radius-3-px" :placeHolder="$t('PlaceHolder.Enter_View_Name')" @keyup="inputValues.name.error = ''" :modelValue="inputValues.name.value" @update:modelValue="(val)=>{inputValues.name.value  = val.trim() }" />
                     <div class="red error font-size-11 position-ab mb-0" v-if="inputValues.name.error" >{{ inputValues.name.error }}</div>
                 </div>
             </div>
@@ -33,7 +33,7 @@
                     <label  for="r1" class="font-size-13 dark-gray2">{{$t('ViewListdescription.embed_URL')}} </label>
                 </span>
                 <div class="mt-10px">
-                    <InputText class="urlText text-capitalize border-gray border-radius-3-px" :class="{'disabled':radioValue == 'html'}" :placeHolder="$t('PlaceHolder.Enter_URL')" inputId="i1" @keyup="inputValues.url.error = ''" :modelValue="inputValues.url.value" @update:modelValue="(val)=>{inputValues.url.value  = val.trim() }" :isDisabled="radioValue == 'html'"/>
+                    <InputText class="urlText border-gray border-radius-3-px" :class="{'disabled':radioValue == 'html'}" :placeHolder="$t('PlaceHolder.Enter_URL')" inputId="i1" @keyup="inputValues.url.error = ''" :modelValue="inputValues.url.value" @update:modelValue="(val)=>{inputValues.url.value  = val.trim() }" :isDisabled="radioValue == 'html'"/>
                     <div class="red error font-size-11 position-ab mb-0" v-if="inputValues.url.error" >{{ inputValues.url.error }}</div>
                 </div>
             </div>

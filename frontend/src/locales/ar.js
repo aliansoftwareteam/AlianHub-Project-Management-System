@@ -3422,6 +3422,8 @@ export default {
         "teammate": "Teammate",
         "more_count": "+{n} more",
         "drop_here": "drop here → due {date}",
+        "subtask_title": "{name} · subtask of {parent}",
+        "subtask_of": "Subtask of {parent}",
         "tray_empty": "Nothing unscheduled. Tasks without a due date land here.",
         "col_task": "Task",
         "zoom_days": "Days",
@@ -5424,6 +5426,7 @@ export default {
         "no_activity_log_found": "No activity log found"
     },
     "Projects": {
+        "not_available": "N/A",
         "filters": "Filters",
         "filters_active": "Filters, {n} active",
         "filters_close": "Close filters",
@@ -5901,6 +5904,9 @@ export default {
         "unread_comments_open": "Unread comments: {n}, open",
         "column_empty_drop": "Drop a task here",
         "add_task_to_column": "Add a task to {name}",
+        "subtasks_progress": "Subtasks: {done} of {total} done",
+        "subtasks_total": "Subtasks: {n}",
+        "add_subtask_to": "Add a subtask to {name}",
         "archive_task": "Archive task",
         "delete_task": "Delete task",
         "confirm_word_archive": "archive",
@@ -6598,6 +6604,10 @@ export default {
         "confirm_delete_title": "Are you sure you want to delete this clip?"
     },
     "Milestone": {
+        "home_link": "Home",
+        "toggle_rows": "Show or hide the rows under {name}",
+        "public_project": "Public project",
+        "no_filter": "No filter",
         "milestone": "Milestone",
         "milestone_name": "Milestone Name",
         "status_date": "Status Date",
@@ -7798,7 +7808,9 @@ export default {
         "copied": "Copied!",
         "generate": "Generate token",
         "rotate": "Regenerate token",
-        "working": "Working…"
+        "working": "Working…",
+        "saved": "Saved",
+        "failed": "Failed"
     },
     "Audit": {
         "subtitle": "An immutable record of sensitive actions in this workspace — role changes, SSO updates, and more.",

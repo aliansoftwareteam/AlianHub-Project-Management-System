@@ -33,14 +33,14 @@
 .pv-filter { position: relative; display: inline-flex; align-items: center; flex: none; max-width: 100%; }
 .pv-filter__select {
     appearance: none;
-    height: 32px;
+    height: var(--pft-h, var(--control-h-lg, 32px));
     max-width: 100%;
-    padding: 0 28px 0 10px;
+    padding: 0 calc(var(--sp-9) + var(--sp-1)) 0 var(--sp-4);
     border: 1px solid var(--hairline);
-    border-radius: 8px;
+    border-radius: var(--r-input);
     background: var(--surface);
     color: var(--ink);
-    font: 500 12.5px/1 var(--font-ui);
+    font: var(--fw-strong, 500) var(--pft-fs, var(--fs-md, 12.5px))/1 var(--font-ui);
     cursor: pointer;
     transition: background var(--t-state) var(--ease);
 }
@@ -48,7 +48,7 @@
 .pv-filter__select:focus-visible { outline: none; box-shadow: var(--focus); }
 .pv-filter__select option { background: var(--surface); color: var(--ink); }
 .pv-filter.is-active .pv-filter__select { background: var(--brand-tint); color: var(--brand); }
-.pv-filter__caret { position: absolute; right: 10px; pointer-events: none; color: var(--ink-2); }
+.pv-filter__caret { position: absolute; right: var(--sp-4); pointer-events: none; color: var(--ink-2); }
 .pv-filter.is-active .pv-filter__caret { color: var(--brand); }
 
 .pv-roll { display: flex; flex-direction: column; gap: 12px; }
@@ -92,6 +92,8 @@
 
 @media (max-width: 768px) {
     .pv__line { display: none; }
-    .pv-filter__select { height: 40px; }
     .pv-roll__legend { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+    .pv-filter__select { height: var(--hit-min); }
 }

@@ -280,7 +280,7 @@ onMounted(fetchStatus);
 .tfa__qr { width: 120px; height: 120px; flex: none; border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: #fff; }
 .tfa__qr img { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
 .tfa__qr-empty { padding: 8px; font-size: 11px; height: 100%; box-sizing: border-box; }
-.tfa__steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font: var(--text-small); color: var(--ink); line-height: 1.5; }
+.tfa__steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font: var(--text-body); color: var(--ink); line-height: 1.5; }
 .tfa__key { margin-top: 4px; padding: 6px 9px; background: var(--surface-2); border-radius: 7px; display: flex; align-items: center; gap: 8px; }
 .tfa__copy { margin-left: auto; border: 0; background: transparent; color: var(--brand); font: 600 12px/1 var(--font-ui); cursor: pointer; padding: 4px; }
 .tfa__copy:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }

@@ -2,9 +2,9 @@
 // tests/portfolio-rules.test.js. Aggregates per-project task/milestone metrics
 // into the cross-project leadership view.
 
-// A task is done when its statusType is a completion type. The codebase uses
-// 'close' (velocity/cfd) and 'done' (dashboard) interchangeably — accept both.
-const DONE_TYPES = ['close', 'done'];
+const { CLOSED_STATUS_TYPES } = require('../../Tasks/helpers/taskSignals');
+
+const DONE_TYPES = CLOSED_STATUS_TYPES;
 const isDone = (statusType) => DONE_TYPES.includes(String(statusType || '').toLowerCase());
 
 // Open + past its due date = at risk / overdue.
