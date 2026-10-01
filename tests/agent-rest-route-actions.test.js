@@ -104,6 +104,8 @@ const NO_ACTION = {
     'resolving a doc comment': ['PUT /api/v2/pages/:id/comments/:commentId/resolve', {}, { id: PAGE, commentId: COMMENT }],
     'editing a doc comment': ['PUT /api/v2/pages/:id/comments/:commentId', { body: 'Edited' }, { id: PAGE, commentId: COMMENT }],
     'approving a drafted doc': ['PUT /api/v2/pages/:id/approve', {}, { id: PAGE }],
+    'sharing a doc with someone': ['PUT /api/v2/pages/:id/shares/:userId', { role: 'view' }, { id: PAGE, userId: INSIDER }],
+    'ending a share of a doc': ['DELETE /api/v2/pages/:id/shares/:userId', {}, { id: PAGE, userId: INSIDER }],
 };
 
 /* New tasks that carry more than a filed task does. */

@@ -5,6 +5,7 @@ const shares = require('./shares');
 const { agentsRefused } = require('../Agents/guard');
 
 const commentsByPeople = agentsRefused('page.comment');
+const sharesByPeople = agentsRefused('page.share');
 
 exports.init = (app) => {
     app.get('/api/v2/pages/ai-status', ctrl.aiStatus);
@@ -23,8 +24,8 @@ exports.init = (app) => {
     app.get('/api/v2/pages/:id/versions/:versionId', versions.getVersion);
     app.put('/api/v2/pages/:id/versions/:versionId', versions.renameVersion);
     app.get('/api/v2/pages/:id/shares', shares.listShares);
-    app.put('/api/v2/pages/:id/shares/:userId', shares.putShare);
-    app.delete('/api/v2/pages/:id/shares/:userId', shares.removeShare);
+    app.put('/api/v2/pages/:id/shares/:userId', sharesByPeople, shares.putShare);
+    app.delete('/api/v2/pages/:id/shares/:userId', sharesByPeople, shares.removeShare);
     app.put('/api/v2/pages/:id/review', ctrl.markReviewed);
     app.put('/api/v2/pages/:id/approve', agentsRefused('page.approve'), ctrl.approvePage);
     app.put('/api/v2/pages/:id/restore', ctrl.restorePage);
