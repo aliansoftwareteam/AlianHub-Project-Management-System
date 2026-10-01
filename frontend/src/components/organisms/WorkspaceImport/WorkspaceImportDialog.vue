@@ -69,9 +69,10 @@
                                 <option v-for="option in sprintOptions" :key="option.id" :value="option.id">{{ listLabel(option) }}</option>
                             </select>
                             <label class="wim__check">
-                                <input v-model="addMissing" type="checkbox" />
+                                <input v-model="addMissing" type="checkbox" :disabled="cannotAddDetails" data-test="wim-add-missing" />
                                 <span>{{ $t('WorkspaceImport.add_missing') }}</span>
                             </label>
+                            <p v-if="cannotAddDetails" class="ah-small ah-muted wim__note" data-test="wim-add-denied">{{ $t('WorkspaceImport.add_missing_denied') }}</p>
                         </template>
                     </template>
                     <p v-if="projectOptions.length === 0 && !fixedProject && (mode === 'existing' || source !== 'clickup')" class="ah-small ah-muted">{{ $t('WorkspaceImport.no_projects') }}</p>
@@ -81,6 +82,23 @@
                     <p v-if="!preview" class="ah-small ah-muted" role="status">{{ clickUp.previewError.value || $t('WorkspaceImport.previewing') }}</p>
                     <template v-else>
                         <p class="wim__total">{{ $t('WorkspaceImport.preview_total', { tasks: preview.importable, lists: preview.lists.length }) }}</p>
+                        <fieldset v-if="preview.alreadyImported" class="wim__fieldset" data-test="wim-existing">
+                            <legend class="wim__label">{{ $t('WorkspaceImport.existing_legend', { count: preview.alreadyImported }) }}</legend>
+                            <label class="wim__radio">
+                                <input v-model="clickUp.existingMode.value" type="radio" value="skip" name="wim-existing" data-test="wim-existing-skip" @change="reloadPreview" />
+                                <span>
+                                    <strong>{{ $t('WorkspaceImport.existing_skip') }}</strong>
+                                    <span class="ah-small ah-muted">{{ $t('WorkspaceImport.existing_skip_hint') }}</span>
+                                </span>
+                            </label>
+                            <label class="wim__radio">
+                                <input v-model="clickUp.existingMode.value" type="radio" value="update" name="wim-existing" data-test="wim-existing-update" @change="reloadPreview" />
+                                <span>
+                                    <strong>{{ $t('WorkspaceImport.existing_update') }}</strong>
+                                    <span class="ah-small ah-muted">{{ $t('WorkspaceImport.existing_update_hint') }}</span>
+                                </span>
+                            </label>
+                        </fieldset>
                         <table class="wim__table">
                             <thead>
                                 <tr>
@@ -107,6 +125,10 @@
                             <li v-if="preview.matchedAssignees.length">{{ $t('WorkspaceImport.fact_people', { count: preview.matchedAssignees.length }) }}</li>
                             <li v-if="preview.unmatchedAssignees.length" class="wim__warn">{{ $t('WorkspaceImport.fact_unmatched', { names: preview.unmatchedAssignees.join(', ') }) }}</li>
                             <li v-if="preview.skippedRows.length" class="wim__warn">{{ $t('WorkspaceImport.fact_skipped', { count: preview.skippedRows.length }) }}</li>
+                            <li v-for="issue in shownUnreadDates" :key="`${issue.row}-${issue.column}`" class="wim__warn" data-test="wim-unread-date">{{ $t('WorkspaceImport.fact_unread_date', issue) }}</li>
+                            <li v-if="unreadDates.length > shownUnreadDates.length" class="wim__warn">{{ $t('WorkspaceImport.fact_unread_dates_more', { count: unreadDates.length - shownUnreadDates.length }) }}</li>
+                            <li v-if="unreadColumns.length" data-test="wim-unread-columns">{{ $t('WorkspaceImport.fact_unread_columns', { names: unreadColumns.join(', ') }) }}</li>
+                            <li v-if="ignoredColumns.length" data-test="wim-ignored-columns">{{ $t('WorkspaceImport.fact_ignored_columns', { names: ignoredColumns.join(', ') }) }}</li>
                         </ul>
                         <ImportCounts v-if="preview.plan" :summary="preview.plan" planned data-test="wim-plan" />
                     </template>
@@ -122,6 +144,7 @@
 
                 <div v-else-if="step === 'done'" class="wim__body" data-test="wim-summary">
                     <p class="wim__total">{{ $t('WorkspaceImport.summary_created', { count: clickUp.totals.value.created }) }}</p>
+                    <p v-if="clickUp.totals.value.updated" class="ah-small wim__note" data-test="wim-updated">{{ $t('WorkspaceImport.summary_updated', { count: clickUp.totals.value.updated }) }}</p>
                     <ul class="ah-small wim__facts">
                         <li v-for="result in clickUp.results.value" :key="result.list" :class="{ wim__warn: !result.ok }">
                             {{ result.ok ? $t('WorkspaceImport.summary_list', { name: result.list, count: result.created || 0 }) : $t('WorkspaceImport.summary_list_failed', { name: result.list, reason: result.message }) }}
@@ -134,17 +157,24 @@
                             <li v-for="row in clickUp.skippedRows.value" :key="row.row">{{ $t('WorkspaceImport.summary_skipped_row', { row: row.row, reason: $t(`WorkspaceImport.skip_${row.code}`) }) }}</li>
                         </ul>
                     </template>
+                    <template v-if="clickUp.unreadDates.value.length">
+                        <p class="wim__label">{{ $t('WorkspaceImport.summary_unread_dates', { count: clickUp.unreadDates.value.length }) }}</p>
+                        <ul class="ah-small wim__facts">
+                            <li v-for="issue in clickUp.unreadDates.value" :key="`${issue.row}-${issue.column}`">{{ $t('WorkspaceImport.fact_unread_date', issue) }}</li>
+                        </ul>
+                    </template>
                     <p v-if="clickUp.unmatchedAssignees.value.length" class="ah-small wim__warn">{{ $t('WorkspaceImport.summary_unmatched', { names: clickUp.unmatchedAssignees.value.join(', ') }) }}</p>
                     <ul v-if="adjustedSummary.length" class="ah-small wim__facts" data-test="wim-adjusted">
                         <li v-for="line in adjustedSummary" :key="line.reason" class="wim__warn">{{ line.text }} <span v-if="line.names">{{ line.names }}</span></li>
                     </ul>
+                    <ImportUndo v-if="clickUp.undoableJobs.value.length" :job-ids="clickUp.undoableJobs.value" :count="clickUp.totals.value.created" data-test="wim-undo" />
                 </div>
 
                 <div class="wim__foot">
                     <button v-if="canGoBack" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="wim-back" @click="back">{{ $t('WorkspaceImport.back') }}</button>
                     <span class="wim__spacer"></span>
                     <button v-if="step === 'target'" type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="!targetReady" data-test="wim-next" @click="confirmTarget">{{ $t('WorkspaceImport.next') }}</button>
-                    <button v-if="step === 'preview'" type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="!preview || !preview.importable" data-test="wim-run" @click="startRun">{{ $t('WorkspaceImport.run', { count: preview ? preview.importable : 0 }) }}</button>
+                    <button v-if="step === 'preview'" type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="!toImport" data-test="wim-run" @click="startRun">{{ $t('WorkspaceImport.run', { count: toImport }) }}</button>
                     <button v-if="step === 'done'" type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="wim-finish" @click="finish">{{ $t('WorkspaceImport.finish') }}</button>
                 </div>
             </div>
@@ -163,9 +193,10 @@ import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import ImportSourceModals from "@/components/organisms/ImportDialog/ImportSourceModals.vue";
 import ImportCounts from "./ImportCounts.vue";
+import ImportUndo from "./ImportUndo.vue";
 import { useCustomComposable } from "@/composable";
 import { IMPORT_SOURCES, sprintOptionsOf } from "./workspaceImportState";
-import { useClickUpImport } from "./useClickUpImport";
+import { useClickUpImport, UPDATE_EXISTING } from "./useClickUpImport";
 import { readSheet } from "./readSheet";
 import { listLabel } from "@/utils/folderTree";
 import { adjustedLines } from "@/plugins/importTasks/importTree";
@@ -192,6 +223,7 @@ const sprintId = ref("");
 const addMissing = ref(true);
 const reading = ref(false);
 const fileError = ref("");
+const deniedProject = ref("");
 const handoff = ref(false);
 const handoffSource = ref("");
 
@@ -203,6 +235,19 @@ const sprintOptions = computed(() => sprintOptionsOf(chosenProject.value));
 const users = computed(() => getters["users/users"] || []);
 const preview = computed(() => clickUp.preview.value);
 const listCount = computed(() => preview.value?.lists?.length || 0);
+const targetProjectId = computed(() => (mode.value === "existing" && chosenProject.value ? String(chosenProject.value._id) : ""));
+const cannotAddDetails = computed(() => Boolean(targetProjectId.value) && deniedProject.value === targetProjectId.value);
+const MAX_SHOWN_DATES = 5;
+const unreadDates = computed(() => preview.value?.unreadDates || []);
+const shownUnreadDates = computed(() => unreadDates.value.slice(0, MAX_SHOWN_DATES));
+const unreadColumns = computed(() => preview.value?.unreadColumns || []);
+const ignoredColumns = computed(() => preview.value?.ignoredColumns || []);
+/* A task that is already in the project is created by no import; it counts only when it is to be updated. */
+const toImport = computed(() => {
+    if (!preview.value) return 0;
+    const leftAlone = clickUp.existingMode.value === UPDATE_EXISTING ? 0 : (preview.value.alreadyImported || 0);
+    return Math.max(0, preview.value.importable - leftAlone);
+});
 const adjustedSummary = computed(() => adjustedLines(clickUp.adjusted.value, t, "WorkspaceImport.summary"));
 
 const targetReady = computed(() => {
@@ -269,8 +314,16 @@ async function confirmTarget() {
         return;
     }
     step.value = "preview";
-    await clickUp.loadPreview(mode.value === "existing" ? String(chosenProject.value._id) : "", addMissing.value);
+    await clickUp.loadPreview(targetProjectId.value, addMissing.value);
+    if (!targetProjectId.value || clickUp.preview.value?.canAddDetails !== false) return;
+    // The server refuses an import that adds statuses and tags to a project whose details this person may not edit.
+    deniedProject.value = targetProjectId.value;
+    if (!addMissing.value) return;
+    addMissing.value = false;
+    await clickUp.loadPreview(targetProjectId.value, false);
 }
+
+const reloadPreview = () => clickUp.loadPreview(targetProjectId.value, addMissing.value);
 
 // The import may have added fields to the project; the task panel reads them from the store.
 function reloadFields() {
@@ -332,6 +385,7 @@ function finish() {
 .wim__path { display: block; }
 .wim__facts { margin: 0; padding-left: 18px; display: grid; gap: 4px; overflow-wrap: anywhere; }
 .wim__warn { color: var(--warn-ink, var(--ink)); }
+.wim__note { margin: 0; }
 .wim__bar { height: 8px; border-radius: 4px; background: var(--track, var(--surface-2)); overflow: hidden; }
 .wim__bar span { display: block; height: 100%; background: var(--brand); transition: width .2s var(--ease, ease); }
 .wim__foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

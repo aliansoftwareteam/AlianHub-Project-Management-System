@@ -32,7 +32,8 @@ describe('the summaries of several lists as one', () => {
             comments: { imported: 3, skipped: 2, reason: 'no_permission', unmatchedAuthors: ['Pat Example', 'Sam'] },
             fields: { created: ['Stage', 'Budget'], reused: ['Client'], asText: ['Site'], skipped: ['Notes'], reason: 'no_permission', valuesSet: 6, valuesDropped: 1 },
             tags: { added: ['urgent'], skipped: ['later'] },
-            people: { unmatched: ['ghost@nowhere.test'], cannotOpen: ['lee@private.test'] }
+            people: { unmatched: ['ghost@nowhere.test'], cannotOpen: ['lee@private.test'] },
+            existing: { skipped: 0, updated: 0 }
         });
     });
 
