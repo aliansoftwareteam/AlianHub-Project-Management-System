@@ -3032,7 +3032,8 @@ export default {
         "reason_carried_with_its_parent": "moved with its parent task",
         "reason_already_a_top_level_task": "already a task, not a subtask",
         "reason_subtask_moves_with_its_parent": "a subtask moves with its parent — use Convert to Task or Convert to Subtask",
-        "reason_skipped": "skipped"
+        "reason_skipped": "skipped",
+        "subtask_moves_hint": "A subtask moves with its parent — use Convert to Task or Convert to Subtask"
     },
     "Trash": {
         "title": "Trash",
@@ -3097,6 +3098,7 @@ export default {
         "bulk_due_clear": "Clear due date",
         "bulk_move_project": "Another project…",
         "bulk_convert": "Convert",
+        "bulk_more": "More",
         "bulk_no_subtasks": "Select a subtask to turn it into a task.",
         "ai_summarise": "Summarise the selected tasks",
         "ai_scope_note": "Runs on up to 10 tasks at a time.",
