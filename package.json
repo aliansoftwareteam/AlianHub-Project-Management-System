@@ -124,6 +124,8 @@
     "demo:seed": "node scripts/demo/seedDemoTeam.js",
     "demo:unseed": "node scripts/demo/unseedDemoTeam.js",
     "demo:token": "node scripts/demo/sessionToken.js",
+    "atlas": "node scripts/screenshot-atlas.js",
+    "atlas:compare": "node scripts/screenshot-compare.js",
     "lint:commits": "commitlint --from ${BASE_BRANCH:-origin/staging} --to HEAD --verbose",
     "i18n:check": "node scripts/i18n-check.js",
     "i18n:backfill": "node scripts/i18n-backfill.js",
