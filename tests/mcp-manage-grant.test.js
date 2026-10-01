@@ -5,7 +5,7 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 
 const ctrl = require('../Modules/ApiTokens/controller');
-const { holdsGrant, GRANT } = require('../Modules/Mcp/manageFlag');
+const { holdsGrant, GRANT, DOCS_GRANT } = require('../Modules/Mcp/manageFlag');
 const { schema } = require('../utils/mongo-handler/schema');
 
 const USER_ID = '6f0000000000000000000a01';
@@ -49,6 +49,19 @@ describe('creating an agent token', () => {
         expect(holdsGrant(tokens()[0])).toBe(true);
     });
 
+    it('stores the docs grant on its own, which lists the doc tools and none of the task tools', async () => {
+        const res = await mint({ grants: [DOCS_GRANT] });
+        expect(tokens()[0].grants).toEqual([DOCS_GRANT]);
+        expect(res.body.data.tools).toEqual(expect.arrayContaining(['page.create', 'page.update']));
+        expect(res.body.data.tools.filter((name) => WRITES.includes(name))).toEqual([]);
+        expect([holdsGrant(tokens()[0], DOCS_GRANT), holdsGrant(tokens()[0], GRANT)]).toEqual([true, false]);
+    });
+
+    it('stores both when both are asked for, in one order', async () => {
+        await mint({ grants: [DOCS_GRANT, GRANT, GRANT] });
+        expect(tokens()[0].grants).toEqual([GRANT, DOCS_GRANT]);
+    });
+
     it.each([
         ['an unknown grant', { grants: ['admin:all'] }, /grants must be a list/],
         ['a grant that is not a list', { grants: GRANT }, /grants must be a list/],
@@ -61,6 +74,7 @@ describe('creating an agent token', () => {
     it('refuses the grant while the tools are switched off, and on a token without the write scope', async () => {
         process.env.MCP_TOOLS_MANAGE = 'off';
         expect((await mint({ grants: [GRANT] })).body).toMatchObject({ status: false, statusText: expect.stringMatching(/not switched on/) });
+        expect((await mint({ grants: [DOCS_GRANT] })).body).toMatchObject({ status: false, statusText: expect.stringMatching(/not switched on/) });
         process.env.MCP_TOOLS_MANAGE = 'on';
         process.env.API_TOKEN_STRICT = 'true';
         expect((await mint({ grants: [GRANT], scopes: ['read'], expiresInDays: 7 })).body).toMatchObject({ status: false, statusText: expect.stringMatching(/write scope/) });
@@ -96,7 +110,7 @@ describe('a token keeps the grants it was created with', () => {
     });
 
     it('names the grant in the token policy only while the tools are on', async () => {
-        expect((await call(ctrl.listTokens)).body.policy.grants).toEqual([GRANT]);
+        expect((await call(ctrl.listTokens)).body.policy.grants).toEqual([GRANT, DOCS_GRANT]);
         process.env.MCP_TOOLS_MANAGE = 'off';
         expect((await call(ctrl.listTokens)).body.policy.grants).toBeUndefined();
     });
