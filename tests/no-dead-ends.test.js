@@ -60,16 +60,16 @@ const PROJECT = '6f0000000000000000000b01';
 const TASK = '6f0000000000000000000d01';
 const LIST = '6f0000000000000000000a01';
 
-const RUPEE = { code: 'INR', symbol: '₹', symbol_native: '₹', name: 'Indian Rupee', name_plural: 'Indian rupees', decimal_digits: 2, rounding: 0, count: 1 };
-const EURO = { code: 'EUR', symbol: '€', symbol_native: '€', name: 'Euro', name_plural: 'euros', decimal_digits: 2, rounding: 0, count: 0 };
-const DOLLAR = { code: 'USD', symbol: '$', symbol_native: '$', name: 'US Dollar', name_plural: 'US dollars', decimal_digits: 2, rounding: 0, count: 0 };
+const RUPEE = { code: 'INR', symbol: '₹', symbol_native: '₹', name: 'Indian Rupee', name_plural: 'Indian rupees', decimal_digits: 2, rounding: 0 };
+const EURO = { code: 'EUR', symbol: '€', symbol_native: '€', name: 'Euro', name_plural: 'euros', decimal_digits: 2, rounding: 0 };
+const DOLLAR = { code: 'USD', symbol: '$', symbol_native: '$', name: 'US Dollar', name_plural: 'US dollars', decimal_digits: 2, rounding: 0 };
 
 /* On a currency row `isDelete: true` means the company uses it: the settings screen sets it when a currency is added. */
 const IN_USE = { isDelete: true };
 const NOT_IN_USE = { isDelete: false };
 const asSeeded = () => {
-    mockDb.seed(SCHEMA_TYPE.CURRENCY_LIST, { ...DOLLAR, isDefault: false, ...NOT_IN_USE });
-    mockDb.seed(SCHEMA_TYPE.CURRENCY_LIST, { ...RUPEE, isDefault: true, ...IN_USE });
+    mockDb.seed(SCHEMA_TYPE.CURRENCY_LIST, { ...DOLLAR, count: 0, isDefault: false, ...NOT_IN_USE });
+    mockDb.seed(SCHEMA_TYPE.CURRENCY_LIST, { ...RUPEE, count: 1, isDefault: true, ...IN_USE });
     mockDb.seed(SCHEMA_TYPE.CURRENCY_LIST, { ...EURO, isDefault: false, ...NOT_IN_USE });
 };
 

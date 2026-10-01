@@ -49,6 +49,7 @@ const { HandleBothNotification } = require('../Tasks/helpers/handleNotification'
 const { checkProjectPlan, removeProjectCount } = require('../createProject/controller');
 const { estimateAndPersist: estimateTaskTimeWithAI } = require('../EstimatedTime/aiTaskEstimator');
 const { storableFieldValues } = require('../CustomField/helpers/fieldValueWrite');
+const { defaultCurrencyOf } = require('../Company/helpers/companyCurrency');
 const planRules = require('./planRules');
 const sseEmitter = require('./sseEmitter');
 const executeAgents = require('./executeAgents');
@@ -269,14 +270,16 @@ function safeIsoDate(value) {
 // ─── Company context loading ───────────────────────────────────────────
 
 async function loadCompanyContext(companyId) {
-    const [projectStatusDoc, taskStatusDoc, taskTypeDoc, apps, tabComponents] = await Promise.all([
+    const [projectStatusDoc, taskStatusDoc, taskTypeDoc, apps, tabComponents, currency] = await Promise.all([
         MongoDbCrudOpration(companyId, { type: dbCollections.SETTINGS, data: [{ name: settingsCollectionDocs.PROJECT_STATUS }] }, 'find'),
         MongoDbCrudOpration(companyId, { type: dbCollections.SETTINGS, data: [{ name: settingsCollectionDocs.TASK_STATUS }] }, 'find'),
         MongoDbCrudOpration(companyId, { type: dbCollections.SETTINGS, data: [{ name: settingsCollectionDocs.TASK_TYPE }] }, 'find'),
         MongoDbCrudOpration(companyId, { type: dbCollections.APPS, data: [{}] }, 'find'),
         MongoDbCrudOpration(companyId, { type: dbCollections.PROJECT_TAB_COMPONENTS, data: [{}] }, 'find'),
+        defaultCurrencyOf(companyId),
     ]);
     return {
+        currency,
         projectStatusSettings: (projectStatusDoc && projectStatusDoc[0]) || { settings: [], totalStatus: 0 },
         taskStatusSettings: (taskStatusDoc && taskStatusDoc[0]) || { settings: [], totalStatus: 0 },
         taskTypeSettings: (taskTypeDoc && taskTypeDoc[0]) || { settings: [], totalStatus: 0 },
@@ -555,7 +558,7 @@ function buildProjectDoc({ plan, context, companyId, uid, projectIdHint, project
         CompanyId: companyId,
         ProjectName: proj.ProjectName,
         ProjectCode: String(projectCode || '').toUpperCase(),
-        ProjectCurrency: { code: 'USD', symbol: '$' },
+        ProjectCurrency: context.currency || {},
         ProjectType: 'Fix',
         ProjectRequiredComponent: projectRequired,
         ProjectRequiredDefaultComponent: defaultRequired,
@@ -1570,6 +1573,7 @@ module.exports = {
     loadSprintNamesForProject,
     normalizePlanColors,
     // Exported for tests / debugging.
+    loadCompanyContext,
     buildProjectDoc,
     mergeStatusList,
     rollback,

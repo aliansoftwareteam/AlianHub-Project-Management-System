@@ -85,10 +85,8 @@ const nextProjectCode = (sourceCode, taken) => {
     return `${base.slice(0, 2)}${Math.random().toString(16).slice(2, 6).toUpperCase()}`;
 };
 
-const CURRENCY_FIELDS = ['code', 'symbol', 'symbol_native', 'name', 'name_plural', 'decimal_digits', 'rounding'];
-/* A project made before the currency was required, or by a path that skipped validation, may hold none. */
-const hasCurrency = (project) => project.ProjectCurrency != null && typeof project.ProjectCurrency === 'object';
-const currencyOf = (row) => (row ? pick(row, CURRENCY_FIELDS) : {});
+/* A project made before the currency was required, or by a path that skipped validation, may hold none, or an empty one. */
+const hasCurrency = (project) => Boolean(project.ProjectCurrency) && typeof project.ProjectCurrency === 'object' && Boolean(project.ProjectCurrency.code);
 
 const withCaller = (people, caller) => [...new Set([...(Array.isArray(people) ? people : []).map(String), String(caller)])];
 
@@ -203,6 +201,6 @@ const taskLevels = (rows) => {
 
 module.exports = {
     INLINE_TASK_LIMIT, BATCH, MAX_NAME, JOB_SOURCE, LIVE, TRASHED, OBJECT_ID, PROJECT_DATES, LIST_DATES, TASK_FIELDS, TASK_DATES,
-    isPlainObject, refusal, parseRequest, refusedPaths, newId, idOf, pick, remap, nextProjectCode, projectCopy, hasCurrency, currencyOf,
+    isPlainObject, refusal, parseRequest, refusedPaths, newId, idOf, pick, remap, nextProjectCode, projectCopy, hasCurrency,
     isLive, folderCopies, listCopies, ruleTargets, ruleCopy, permissionCopies, withoutPeople, taskLevels,
 };
