@@ -6,8 +6,9 @@ import { createStore } from 'vuex';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { ref } from 'vue';
 
-const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }));
+const { apiRequest, perms } = vi.hoisted(() => ({ apiRequest: vi.fn(), perms: {} }));
 vi.mock('@/services', () => ({ apiRequest, apiRequestWithoutCompnay: vi.fn() }));
+vi.mock('@/composable', () => ({ useCustomComposable: () => ({ checkPermission: (key) => perms[key] !== false }) }));
 
 import ProjectTree from '@/components/molecules/ProjectTree/ProjectTree.vue';
 import ProjectTreePanel from '@/views/Projects/components/ProjectTreePanel.vue';
@@ -24,10 +25,26 @@ const SPRINTS = {
         { _id: 's5', name: 'Mine', projectId: 'p1', deletedStatusKey: 0, private: true, AssigneeUserId: ['user-1'], tasks: 1 },
         { _id: 's6', name: 'Deleted sprint', projectId: 'p1', deletedStatusKey: 1, private: false, tasks: 5 }
     ],
-    p2: [{ _id: 's9', name: 'Beta list', projectId: 'p2', deletedStatusKey: 0, private: false, tasks: 0 }]
+    p2: [{ _id: 's9', name: 'Beta list', projectId: 'p2', deletedStatusKey: 0, private: false, tasks: 0 }],
+    p3: [
+        { _id: 'n1', name: 'Parent list', projectId: 'p3', folderId: 'fp', deletedStatusKey: 0, private: false, tasks: 1 },
+        { _id: 'n2', name: 'Nested list', projectId: 'p3', folderId: 'fc', deletedStatusKey: 0, private: false, tasks: 2 },
+        { _id: 'n3', name: 'Orphan list', projectId: 'p3', folderId: 'fo', deletedStatusKey: 0, private: false, tasks: 7 }
+    ]
 };
-const FOLDERS = { p1: [{ _id: 'f1', name: 'Design', projectId: 'p1', deletedStatusKey: 0 }], p2: [] };
+const FOLDERS = {
+    p1: [{ _id: 'f1', name: 'Design', projectId: 'p1', deletedStatusKey: 0 }],
+    p2: [],
+    p3: [
+        { _id: 'fp', name: 'Parent folder', projectId: 'p3', deletedStatusKey: 0, parentFolderId: null },
+        { _id: 'fc', name: 'Child folder', projectId: 'p3', deletedStatusKey: 0, parentFolderId: 'fp' },
+        { _id: 'fo', name: 'Orphan folder', projectId: 'p3', deletedStatusKey: 2, parentFolderId: 'deleted-parent' },
+        { _id: 'fe', name: 'Empty folder', projectId: 'p3', deletedStatusKey: 0, parentFolderId: null }
+    ]
+};
 const PROJECTS = [{ _id: 'p1', ProjectName: 'Alpha' }, { _id: 'p2', ProjectName: 'Beta' }];
+const NESTED = [{ _id: 'p3', ProjectName: 'Gamma', isGlobalPermission: true }, { _id: 'p1', ProjectName: 'Alpha', isGlobalPermission: true }];
+const NESTED_LIST = { name: 'ProjectFolderSprint', params: { cid: 'company-1', id: 'p3', folderId: 'fc', sprintId: 'n2' } };
 
 const blank = { render: () => null };
 const routes = [
@@ -78,6 +95,7 @@ beforeEach(() => {
 });
 afterEach(() => {
     while (mounted.length) mounted.pop().unmount();
+    Object.keys(perms).forEach((key) => { delete perms[key]; });
 });
 
 describe('the project tree', () => {
@@ -176,5 +194,108 @@ describe('the tree panel on project pages', () => {
     it('is mounted by the project page', () => {
         const source = fs.readFileSync(path.resolve(__dirname, '../../src/views/Projects/Projects.vue'), 'utf8');
         expect(source).toMatch(/<ProjectTreePanel\b/);
+    });
+});
+
+describe('subfolders in the project tree', () => {
+    const rowOf = (wrapper, name) => itemNamed(wrapper, name).element.closest('.pt-row');
+    const menuOf = (wrapper, name) => rowOf(wrapper, name).querySelector('.pt-row__more');
+    const openMenu = async (wrapper, name) => {
+        menuOf(wrapper, name).click();
+        await flushPromises();
+        return [...rowOf(wrapper, name).querySelectorAll('[role="menuitem"]')].map((item) => item.textContent.trim());
+    };
+
+    it('nests a subfolder under its folder and its lists under it, opened down to the current list', async () => {
+        const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+        const parent = itemNamed(wrapper, 'Parent folder');
+        expect(parent.attributes('aria-level')).toBe('2');
+        expect(parent.attributes('aria-expanded')).toBe('true');
+        const child = itemNamed(wrapper, 'Child folder');
+        expect(child.attributes('aria-level')).toBe('3');
+        expect(child.attributes('aria-expanded')).toBe('true');
+        expect(itemNamed(wrapper, 'Parent list').attributes('aria-level')).toBe('3');
+        const current = itemNamed(wrapper, 'Nested list');
+        expect(current.attributes('aria-level')).toBe('4');
+        expect(current.attributes('aria-current')).toBe('page');
+        expect(rowOf(wrapper, 'Nested list').className).toContain('pt-row--l4');
+    });
+
+    it('lists a folder\'s subfolders before its own lists and counts their tasks on the folder', async () => {
+        const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+        const order = items(wrapper).map((el) => el.find('.pt-row__name').text());
+        expect(order.indexOf('Child folder')).toBeLessThan(order.indexOf('Parent list'));
+        expect(order.indexOf('Parent folder')).toBeLessThan(order.indexOf('Child folder'));
+        expect(rowOf(wrapper, 'Parent folder').querySelector('.pt-row__count').textContent).toBe('3');
+        expect(rowOf(wrapper, 'Child folder').querySelector('.pt-row__count').textContent).toBe('2');
+    });
+
+    it('links a subfolder as a folder and its list through it', async () => {
+        const { wrapper, router } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+        expect(itemNamed(wrapper, 'Child folder').attributes('href')).toBe(router.resolve({ name: 'ProjectFolder', params: { cid: 'company-1', id: 'p3', folderId: 'fc' } }).href);
+        expect(itemNamed(wrapper, 'Nested list').attributes('href')).toBe(router.resolve(NESTED_LIST).href);
+    });
+
+    it('hides a subfolder whose parent is not in the list, and its lists', async () => {
+        const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+        expect(wrapper.text()).not.toContain('Orphan folder');
+        expect(wrapper.text()).not.toContain('Orphan list');
+        expect(rowOf(wrapper, 'Gamma').querySelector('.pt-row__count').textContent).toBe('3');
+    });
+
+    it('steps from a nested list back to its subfolder with the left arrow', async () => {
+        const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+        const current = itemNamed(wrapper, 'Nested list');
+        current.element.focus();
+        await current.trigger('keydown', { key: 'ArrowLeft' });
+        expect(document.activeElement.textContent).toContain('Child folder');
+    });
+
+    it('offers a new subfolder and a move on a top-level folder, and only a move on a subfolder', async () => {
+        const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+        expect(await openMenu(wrapper, 'Empty folder')).toEqual(['Projects.new_subfolder', 'Projects.move_folder']);
+        expect(await openMenu(wrapper, 'Child folder')).toEqual(['Projects.move_folder']);
+    });
+
+    it('offers no move on a folder that holds subfolders: it has nowhere to go', async () => {
+        const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+        expect(await openMenu(wrapper, 'Parent folder')).toEqual(['Projects.new_subfolder']);
+    });
+
+    it('opens a folder\'s actions from the keyboard and closes them with Escape', async () => {
+        const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+        const folder = itemNamed(wrapper, 'Empty folder');
+        folder.element.focus();
+        await folder.trigger('keydown', { key: 'F10', shiftKey: true });
+        await flushPromises();
+        expect(rowOf(wrapper, 'Empty folder').querySelector('[role="menu"]')).not.toBeNull();
+        expect(document.activeElement.getAttribute('role')).toBe('menuitem');
+        await wrapper.find('[role="menu"]').trigger('keydown', { key: 'Escape' });
+        expect(rowOf(wrapper, 'Empty folder').querySelector('[role="menu"]')).toBeNull();
+        expect(document.activeElement.textContent).toContain('Empty folder');
+    });
+
+    it('keeps folder actions to the open project', async () => {
+        const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+        await rowOf(wrapper, 'Alpha').querySelector('.pt-row__chev').click();
+        await flushPromises();
+        expect(itemNamed(wrapper, 'Design')).toBeTruthy();
+        expect(menuOf(wrapper, 'Design')).toBeNull();
+        expect(menuOf(wrapper, 'Empty folder')).not.toBeNull();
+    });
+
+    it('offers nothing to someone who may neither create nor rename folders', async () => {
+        perms['project.project_folder_create'] = false;
+        perms['project.project_folder_name_edit'] = false;
+        const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+        expect(menuOf(wrapper, 'Empty folder')).toBeNull();
+        expect(menuOf(wrapper, 'Child folder')).toBeNull();
+    });
+
+    it('lets someone who may only rename folders move one, not create one', async () => {
+        perms['project.project_folder_create'] = false;
+        const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+        expect(await openMenu(wrapper, 'Empty folder')).toEqual(['Projects.move_folder']);
+        expect(menuOf(wrapper, 'Parent folder')).toBeNull();
     });
 });

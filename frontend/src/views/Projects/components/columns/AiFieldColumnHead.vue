@@ -1,6 +1,16 @@
 <template>
     <span class="afh">
-        <span class="afh__label" :title="field.fieldTitle"><span class="afh__mark" aria-hidden="true">✦</span> {{ field.fieldTitle }}</span>
+        <button
+            v-if="sortable"
+            type="button"
+            class="tv2__sort tv2__sort--col afh__sort"
+            data-ai-column-sort
+            :title="$t('List.sort_by', { column: field.fieldTitle })"
+            @click="$emit('sort')"
+        >
+            <span class="tv2__sort-text"><span class="afh__mark" aria-hidden="true">✦</span> {{ field.fieldTitle }}</span><span class="tv2__sort-caret" :class="{ 'is-on': sortDir !== 0 }" aria-hidden="true">{{ sortDir === -1 ? '▼' : '▲' }}</span>
+        </button>
+        <span v-else class="afh__label" :title="field.fieldTitle"><span class="afh__mark" aria-hidden="true">✦</span> {{ field.fieldTitle }}</span>
         <span v-if="editable && aiOn" ref="wrapEl" class="afh__wrap">
             <button
                 ref="triggerEl"
@@ -44,8 +54,11 @@ defineOptions({ name: "AiFieldColumnHead" });
 const props = defineProps({
     field: { type: Object, required: true },
     tasks: { type: Array, default: () => [] },
-    editable: { type: Boolean, default: false }
+    editable: { type: Boolean, default: false },
+    sortable: { type: Boolean, default: false },
+    sortDir: { type: Number, default: 0 }
 });
+defineEmits(["sort"]);
 
 const project = inject("selectedProject", null);
 const aiOn = computed(() => canUseAi(project?.value ? { project: project.value } : {}));
@@ -111,6 +124,7 @@ onBeforeUnmount(() => document.removeEventListener("mousedown", onOutside));
 <style>
 .afh { display: inline-flex; align-items: center; gap: 2px; min-width: 0; max-width: 100%; }
 .afh__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.afh__sort { flex: 0 1 auto; }
 .afh__mark { color: var(--brand); }
 .afh__wrap { position: relative; display: inline-flex; flex: 0 0 auto; }
 .afh__btn {

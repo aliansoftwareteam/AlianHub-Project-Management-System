@@ -1677,7 +1677,9 @@ export default {
         "key_esc": "Esc",
         "key_enter": "Enter",
         "key_shift_enter": "Shift + Enter",
-        "key_tab": "Tab"
+        "key_tab": "Tab",
+        "server_busy": "The server is busy. Try again in a moment.",
+        "server_busy_retry_in": "The server is busy. Try again in {n} second. | The server is busy. Try again in {n} seconds."
     },
     "Time": {
         "loading": "Loading…",
@@ -2826,7 +2828,7 @@ export default {
         "schedule_report": "Report",
         "schedule_every": "How often",
         "schedule_every_option_daily": "Every day",
-        "schedule_every_option_weekdays": "Weekdays",
+        "schedule_every_option_weekdays": "Monday to Friday",
         "schedule_every_option_weekly": "Once a week",
         "schedule_weekday": "Day",
         "schedule_weekday_0": "Sunday",
@@ -2864,7 +2866,7 @@ export default {
         "schedule_error_days": "Days ahead must be a whole number from 1 to 30.",
         "schedule_error_task": "That task cannot be used.",
         "schedule_every_daily": "Every day at {at} ({zone})",
-        "schedule_every_weekdays": "Weekdays at {at} ({zone})",
+        "schedule_every_weekdays": "Monday to Friday at {at} ({zone})",
         "schedule_every_weekly": "Every {day} at {at} ({zone})",
         "schedule_off": "Paused: it will not run",
         "schedule_next_unknown": "Next run not worked out yet",
@@ -3108,7 +3110,8 @@ export default {
         "reason_carried_with_its_parent": "moved with its parent task",
         "reason_already_a_top_level_task": "already a task, not a subtask",
         "reason_subtask_moves_with_its_parent": "a subtask moves with its parent — use Convert to Task or Convert to Subtask",
-        "reason_skipped": "skipped"
+        "reason_skipped": "skipped",
+        "subtask_moves_hint": "A subtask moves with its parent — use Convert to Task or Convert to Subtask"
     },
     "Trash": {
         "title": "Trash",
@@ -3173,6 +3176,7 @@ export default {
         "bulk_due_clear": "Clear due date",
         "bulk_move_project": "Another project…",
         "bulk_convert": "Convert",
+        "bulk_more": "More",
         "bulk_no_subtasks": "Select a subtask to turn it into a task.",
         "ai_summarise": "Summarise the selected tasks",
         "ai_scope_note": "Runs on up to 10 tasks at a time.",
@@ -3260,6 +3264,10 @@ export default {
     },
     "ViewGroups": {
         "no_value": "No value",
+        "number_below": "Below {to}",
+        "number_between": "{from} to {to}",
+        "number_from": "{from} and above",
+        "number_any": "Has a value",
         "checked": "Checked",
         "unchecked": "Not checked",
         "date_past": "Past",
@@ -3356,6 +3364,7 @@ export default {
         "map_all_placed": "All tasks placed.",
         "replan_none": "Nothing on the critical path yet — link tasks with blocks / blocked by to see one.",
         "replan_chain": "Critical path: {n} tasks, {days} days, ending {date}.",
+        "replan_chain_working": "Critical path: {n} tasks, {days} working days, ending {date}.",
         "replan_late": "{task} is past its due date, so everything after it moves.",
         "shift_title": "{task} now ends later",
         "shift_intro": "{n} task that waits on it would move later: | {n} tasks that wait on it would move later:",
@@ -3972,6 +3981,7 @@ export default {
     },
     "FieldTypes": {
         "builder_note": "This field is edited on the task: in the task panel and in List and Table cells.",
+        "edit_field": "Edit the field {field}",
         "people_multiple_label": "Allow several people",
         "people_multiple_hint": "Untick to hold one person at a time.",
         "rating_max_label": "Highest rating",
@@ -5559,6 +5569,7 @@ export default {
         "expires_optional": "Expires (optional)",
         "password_optional": "Password (optional)",
         "delete_link": "Delete link",
+        "public_link_deleted": "Public link deleted",
         "password_protected": "Password protected",
         "share_expires_on": "Expires",
         "intake_inbox": "Requests",
@@ -5752,6 +5763,11 @@ export default {
         "new": "New",
         "new_list": "New list",
         "new_folder": "New folder",
+        "new_subfolder": "New subfolder",
+        "new_subfolder_in": "New subfolder in {folder}",
+        "move_folder": "Move folder",
+        "move_folder_hint": "Choose where {folder} goes",
+        "top_level": "Top level of the project",
         "new_menu_task": "Task",
         "menu_view": "View",
         "menu_find": "Find",
@@ -6183,7 +6199,16 @@ export default {
         "search_not_loaded": "That message is further back in this conversation — load earlier messages to jump to it.",
         "unread_one": "1 unread message",
         "unread_many": "{count} unread messages",
-        "marked_unread": "Marked as unread from here"
+        "marked_unread": "Marked as unread from here",
+        "reply_in_thread": "Reply in thread",
+        "thread_title": "Thread",
+        "thread_close": "Close thread",
+        "thread_replies_one": "1 reply",
+        "thread_replies_many": "{count} replies",
+        "thread_open_one": "Open the thread, 1 reply",
+        "thread_open_many": "Open the thread, {count} replies",
+        "thread_last_reply": "Last reply {when}",
+        "thread_failed": "This thread could not be opened. It may have been deleted, or you may not have access to it."
     },
     "Filters": {
         "filter": "Φίλτρο",
@@ -6512,6 +6537,10 @@ export default {
         "custom_field": "Προσαρμοσμένο Πεδίο",
         "create_custom_field": "Δημιουργία Προσαρμοσμένου Πεδίου",
         "edit_custom_field": "Edit Custom Field",
+        "min_value": "{field} must be at least {min}.",
+        "max_value": "{field} must be less than or equal to {max}.",
+        "must_be_valid_email": "{field} must be a valid email",
+        "select_field": "Select {field}",
         "formula_expression": "Formula",
         "formula_expression_placeholder": "e.g. {Estimate} * 2 + {Buffer}",
         "referenceable_fields": "Available fields",
@@ -8843,6 +8872,7 @@ export default {
         "Upgrade_your_plan_you_have_reached_the_limit_for_creating_sprints": "Αναβαθμίστε το σχέδιό σας. Έχετε φτάσει το όριο για τη δημιουργία sprints.",
         "Folder created successfully": "Ο φάκελος δημιουργήθηκε με επιτυχία",
         "Folder updated successfully": "Ο φάκελος ενημερώθηκε με επιτυχία",
+        "Folder_moved_successfully": "Folder moved successfully",
         "Folde restored successfully": "Ο φάκελος αποκαταστάθηκε με επιτυχία",
         "Folder closed successfully": "Ο φάκελος έκλεισε με επιτυχία",
         "Folder archived successfully": "Ο φάκελος αρχειοθετήθηκε με επιτυχία",
@@ -11290,7 +11320,8 @@ export default {
         "show": "Show the project tree",
         "hide": "Hide the project tree",
         "close": "Close the project tree",
-        "tasks": "{n} tasks"
+        "tasks": "{n} tasks",
+        "folder_actions": "Actions for {folder}"
     },
     "TaskTemplates": {
         "save_as": "Save as template",

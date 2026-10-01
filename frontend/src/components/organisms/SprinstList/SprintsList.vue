@@ -1,11 +1,10 @@
 <template>
     <div class="sprint position-re" :id="`sprint_${sprint?.id}`">
-        <!-- FOLDER NAME LEGEND -->
         <div
-            v-if="sprint && sprint.folderName"
+            v-if="sprint && folderLegend"
             class="cursor-default black position-ab bg-white border border-radius-5-px text-capitalize color52 p0x-10px sprint__foldername"
         >
-            {{sprint.folderName}}
+            {{folderLegend}}
         </div>
 
         <div class="spr__head" :class="{ 'is-open': sprint.isExpanded }">
@@ -356,6 +355,8 @@ import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue"
 import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp'
 import * as env from '@/config/env';
 import { useStore } from 'vuex';
+import { folderPathLabel, nestedFolders } from '@/utils/folderTree';
+import { applyFolderStatusResult, refusalReason } from '@/views/Projects/folderActions';
 import { useRoute } from 'vue-router';
 import { apiRequest } from '../../../services'
 import { useAiApiFunction } from "@/composable/aiHelper";
@@ -618,12 +619,11 @@ const startSprint = async () => {
     }
 };
 
-// LIST OF FOLDERS A SPRINT CAN BE MOVED INTO (excludes deleted folders + the sprint's own id when it is a folder)
-const folderList = computed(() => {
-    return Object.values(project.value?.sprintsfolders || {})
-        .filter((f) => !f?.deletedStatusKey && (f?.folderId || f?._id) !== props.sprint?.id)
-        .map((f) => ({ id: f.folderId || f._id, name: f.name || f.folderName || '' }));
-})
+const folderLegend = computed(() => folderPathLabel(project.value?.sprintsfolders, props.sprint?.folderId) || props.sprint?.folderName || '');
+
+const folderList = computed(() => nestedFolders(project.value?.sprintsfolders)
+    .filter((f) => f.folderId !== props.sprint?.id)
+    .map((f) => ({ id: f.folderId || f._id, name: f.name || f.folderName || '', depth: f.depth })));
 
 // MOVE SPRINT INTO A FOLDER (or back to root when folder is null)
 function moveToFolder(folder) {
@@ -729,7 +729,7 @@ function updateItem(value = null) {
             return;
         }
         if (props.sprint.isFolder) {
-            commit("projectData/mutateFolders",{op:'modified',data:{...res?.data?.data}});
+            applyFolderStatusResult({ commit, getters }, res.data);
         }
         else{
             commit("projectData/mutateSprints",{op:'modified',data:{...res?.data?.data}});
@@ -743,7 +743,7 @@ function updateItem(value = null) {
         close.value = false;
         showSidebar.value = false;
         showSpinner.value = false;
-        $toast.error(t(`Toast.something_went_wrong`), {position: "top-right"});
+        $toast.error(refusalReason(error) || t(`Toast.something_went_wrong`), {position: "top-right"});
         console.error("ERROR in updateItem: ", error);
     })
 }

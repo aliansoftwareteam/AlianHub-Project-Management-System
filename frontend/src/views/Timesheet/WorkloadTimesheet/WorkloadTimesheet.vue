@@ -116,6 +116,7 @@ import { formatHm } from '@/composable/useTimer';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import AppState from '@/components/molecules/AppState/AppState.vue';
 import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
+import { gridWeek, workingDaysOnly } from '@/views/Projects/WorkloadView/workloadUnits';
 
 defineOptions({ name: 'WorkloadTimesheet' });
 
@@ -137,6 +138,7 @@ const projectList = ref([]);
 const mode = ref('estimate');
 const users = ref([]);
 const days = ref([]);
+const answeredWeek = ref(null);
 const loading = ref(false);
 const error = ref('');
 const notice = ref('');
@@ -150,9 +152,10 @@ const endDate = computed(() => start.value.clone().add(11, 'days'));
 const startIso = computed(() => start.value.format('YYYY-MM-DD'));
 const endIso = computed(() => endDate.value.format('YYYY-MM-DD'));
 const rangeLabel = computed(() => `${start.value.format('MMM D')} – ${endDate.value.format(start.value.isSame(endDate.value, 'month') ? 'D' : 'MMM D')}`);
-const visibleDays = computed(() => days.value.filter((d) => ![0, 6].includes(moment(d).day())));
+const selectedProject = computed(() => projectList.value.find((x) => String(x._id) === projectId.value) || null);
+const visibleDays = computed(() => workingDaysOnly(days.value, gridWeek(answeredWeek.value, currentCompany.value, selectedProject.value)));
 const activeProject = computed(() => {
-    const p = projectList.value.find((x) => String(x._id) === projectId.value);
+    const p = selectedProject.value;
     return p ? { color: p.projectIcon && p.projectIcon.type === 'color' ? p.projectIcon.data : '' } : null;
 });
 const timeZone = computed(() => (getUser(uid.value) || {}).timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
@@ -187,6 +190,7 @@ const load = async () => {
         if (!body.status) throw new Error(body.statusText || 'load_failed');
         users.value = body.data.users || [];
         days.value = body.data.days || [];
+        answeredWeek.value = body.data.workingDays || null;
     } catch (e) {
         error.value = t('Time.load_failed');
     } finally {

@@ -17,7 +17,7 @@ const KINDS = {
     },
     tasks: {
         type: SCHEMA_TYPE.TASKS,
-        fields: 'TaskName TaskKey ProjectID sprintId updatedAt',
+        fields: 'TaskName TaskKey ProjectID sprintId mainChat AssigneeUserId updatedAt',
         row: (doc) => ({ title: doc.TaskName, code: doc.TaskKey, projectId: doc.ProjectID ? String(doc.ProjectID) : '' })
     },
     docs: {
