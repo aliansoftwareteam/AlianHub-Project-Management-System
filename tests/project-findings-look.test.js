@@ -252,6 +252,25 @@ describe('the daily look', () => {
         expect(filed().filter((row) => row.finding.rule === RULE.STALE)).toHaveLength(1);
     });
 
+    it('a member approves a date move, it is applied, and undo puts the dates back', async () => {
+        const blocker = task({ DueDate: day('2026-10-12') });
+        const waiting = task({ startDate: day('2026-10-09'), DueDate: day('2026-10-14'), relations: waitsOn(blocker) });
+        const now = () => rows(SCHEMA_TYPE.TASKS).find((row) => String(row._id) === String(waiting._id));
+        switchOn();
+        await dailyLook.runForCompany(CID, WEDNESDAY);
+        const move = filed().find((row) => row.finding.rule === RULE.SLIPPING);
+        const decider = { kind: 'human', userId: MEMBER };
+        const out = await proposals.approve(CID, move._id, { decider, isPrivileged: false, ip: '' });
+        await settle();
+        expect(out.applied).toMatchObject([{ action: 'task.update', ok: true }]);
+        expect(now()).toMatchObject({ startDate: day('2026-10-12'), DueDate: day('2026-10-17') });
+        expect(await proposals.undoApproval(CID, move._id, { decider, isPrivileged: false, ip: '' })).toMatchObject({ proposal: { status: 'undone' } });
+        await settle();
+        expect(now()).toMatchObject({ startDate: day('2026-10-09'), DueDate: day('2026-10-14') });
+        await dailyLook.runForCompany(CID, THURSDAY);
+        expect(ofRule(stored(), RULE.SLIPPING)).toMatchObject([{ status: findings.STATUS.DECLINED }]);
+    });
+
     it('asks no model, sends nothing outside and writes no email', () => {
         const dir = path.join(__dirname, '..', 'Modules', 'Agents', 'manager');
         const required = fs.readdirSync(dir).flatMap((file) => [...fs.readFileSync(path.join(dir, file), 'utf8').matchAll(/require\(['"]([^'"]+)['"]\)/g)].map((match) => match[1]));

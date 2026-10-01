@@ -61,7 +61,7 @@
                     <time v-if="stamp(p.createdAt)" class="aq__when" :title="p.createdAt">{{ stamp(p.createdAt) }}</time>
                 </div>
 
-                <p class="aq__why"><span class="aq__label">{{ t('Ai.why') }}</span> {{ p.why || t('Time.why_no_reason') }}</p>
+                <p class="aq__why"><span class="aq__label">{{ t('Ai.why') }}</span> {{ whyOf(p) || t('Time.why_no_reason') }}</p>
 
                 <div class="aq__label">{{ t('Inbox.queue_changes_label') }}</div>
                 <ul class="aq__changes">
@@ -155,6 +155,7 @@ import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import SlackPostPreview from '@/views/Ai/SlackPostPreview.vue';
 import { DECLINE_REASONS } from '@/views/Ai/episodeText';
 import { proposalTitle } from '@/views/Ai/plainLabels';
+import { findingFix, findingReasons } from '@/views/Projects/ProjectDetail/findingText';
 import { decideEach, decideOne } from './approvalQueue';
 
 defineOptions({ name: 'ApprovalQueue' });
@@ -167,6 +168,7 @@ const emit = defineEmits(['decided']);
 
 const SLACK_POST = 'slack.message.post';
 const SOURCE_MCP = 'mcp';
+const SOURCE_SYSTEM = 'system';
 const DECLINE_REASON_MAX = 200;
 const REVIEW_TITLE_ID = 'aq-review-title';
 const SELECT_ALL_ID = 'aq-select-all';
@@ -188,8 +190,11 @@ const declining = ref('');
 const declineReason = ref('');
 const declineNote = ref('');
 
-const titleOf = (p) => proposalTitle(t, p);
+/* A change the project's rules filed is worded here from the facts it carries; its stored text is the fallback. */
+const titleOf = (p) => (p.finding && findingFix(t, p.finding)) || proposalTitle(t, p);
+const whyOf = (p) => (p.finding && findingReasons(t, p.finding).join(' · ')) || p.why;
 const whoOf = (p) => {
+    if (p.source === SOURCE_SYSTEM) return t('Inbox.queue_system_for', { project: p.finding?.projectName || p.agentName });
     const person = p.source === SOURCE_MCP && p.requestedBy ? getUser(p.requestedBy)?.Employee_Name : '';
     return person ? t('Inbox.queue_for', { agent: p.agentName, person }) : p.agentName;
 };

@@ -40,7 +40,12 @@ let wrapper;
 const i18n = () => createI18n({ legacy: false, locale: 'en', messages: { en }, missingWarn: false, fallbackWarn: false });
 const mountCard = async (data = answer(), onPut = null) => {
     apiRequest.mockImplementation((type, url, body) => (type === 'get' ? ok(data) : (onPut || (() => ok(answer({ ...data, ...body }))))(type, url, body)));
-    wrapper = mount(ProjectManagerCard, { props: { projectId: 'p1' }, global: { plugins: [i18n()], stubs: { RouterLink: { props: ['to'], template: '<a :data-to="JSON.stringify(to)"><slot /></a>' } } } });
+    const words = i18n();
+    // The shared test setup answers $t with the key; the card is read here in the words a person sees.
+    wrapper = mount(ProjectManagerCard, {
+        props: { projectId: 'p1' },
+        global: { plugins: [words], mocks: { $t: words.global.t }, stubs: { RouterLink: { props: ['to'], template: '<a :data-to="JSON.stringify(to)"><slot /></a>' } } },
+    });
     await flushPromises();
     return wrapper;
 };
