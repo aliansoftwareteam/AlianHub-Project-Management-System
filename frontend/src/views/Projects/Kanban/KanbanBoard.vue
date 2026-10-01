@@ -152,9 +152,7 @@ const isDisabled = computed(() => {
     // scroll the column instead of picking a card up.
     const shouldDisableOnPermission = (checkPermission('task.task_list', projectData.value?.isGlobalPermission) !== true || checkPermission('task.task_status', projectData.value?.isGlobalPermission) !== true);
     const shouldDisableOnArchive = (showArchiveVar.value !== false);
-    // Disable drag when multi-select is active (>=2 selected). Multi-move
-    // happens via the BulkActionBar's "Move" action — keeps the drag
-    // behavior unambiguous for the user.
+    // With two or more cards selected, moving goes through the bulk bar, so a drag never means "move all".
     const shouldDisableOnMultiSelect = selection.count.value >= 2;
     const finalDisabled = shouldDisableOnPermission || shouldDisableOnArchive || shouldDisableOnMultiSelect;
     return finalDisabled;
