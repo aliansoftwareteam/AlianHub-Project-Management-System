@@ -19,16 +19,18 @@ beforeEach(() => {
 });
 
 describe('the page readers agree on who reaches a page: the trash', () => {
-    it('lists the trashed docs a person could open', async () => {
+    it('lists the trashed docs a person could open without being named on them', async () => {
         const trashed = world.pageRows().map((page) => ({ ...page, deletedStatusKey: 1 }));
         const listed = await world.askEveryone((uid) => visibleTrash(C, uid, 'docs', trashed));
 
         expect(listed).toEqual({
-            owner: ['shared', 'company', 'closed', 'deleted'],
-            admin: ['shared', 'company', 'closed', 'deleted'],
-            inside: ['insidePrivate', 'shared', 'company', 'closed', 'deleted'],
+            owner: ['shared', 'company', 'closed', 'deleted', 'namedEdit'],
+            admin: ['shared', 'company', 'closed', 'deleted', 'namedEdit'],
+            inside: ['insidePrivate', 'shared', 'company', 'closed', 'deleted', 'namedView', 'namedEdit'],
             outside: ['outsidePrivate', 'shared', 'company', 'deleted'],
             guest: ['shared', 'company', 'deleted'],
+            viewer: ['shared', 'company', 'deleted'],
+            editor: ['shared', 'company', 'deleted'],
         });
     });
 

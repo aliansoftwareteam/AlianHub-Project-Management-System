@@ -527,6 +527,25 @@ describe('page.create and page.update for a token created to write docs', () => 
         expect(rows(SCHEMA_TYPE.PAGE_VERSIONS)).toHaveLength(0);
     });
 
+    it('a doc shared with the person by name is read through the tools, and changed only by a named editor', async () => {
+        const nameAs = (role) => { page(fx.pagePrivate._id).sharedWith = [{ userId: MEMBER, role, by: OTHER, at: new Date() }]; };
+
+        expect(await rpc(ctx(MEMBER), 'docs.read', { pageId: fx.pagePrivate._id })).not.toMatchObject({ title: 'Hidden' });
+        nameAs('viewer');
+        const before = snapshot();
+        expect(await rpc(ctx(MEMBER), 'docs.read', { pageId: fx.pagePrivate._id })).toMatchObject({ pageId: String(fx.pagePrivate._id), title: 'Hidden' });
+        expect(await rpc(docsOnly(MEMBER), 'page.update', { pageId: fx.pagePrivate._id, title: 'Taken' })).toMatchObject({ isError: true });
+        expect(snapshot()).toBe(before);
+        expect(rows(SCHEMA_TYPE.PAGE_VERSIONS)).toHaveLength(0);
+
+        nameAs('editor');
+        expect(await rpc(docsOnly(MEMBER), 'page.update', { pageId: fx.pagePrivate._id, title: 'Agreed' })).toMatchObject({ ok: true, result: { title: 'Agreed' } });
+        expect(page(fx.pagePrivate._id)).toMatchObject({ title: 'Agreed', ProjectID: P_PRIVATE });
+        expect(await rpc(ctx(MEMBER, { projectIds: [P_OPEN], token: docsOnly(MEMBER).token }), 'page.update', { pageId: fx.pagePrivate._id, title: 'Narrowed' }))
+            .toMatchObject({ isError: true, refused: true, reason: expect.stringMatching(/^not_visible/) });
+        expect(page(fx.pagePrivate._id).title).toBe('Agreed');
+    });
+
     it('page.create refuses a project, a parent doc or a task outside what the person can open, and a narrowed token', async () => {
         const before = snapshot();
         for (const [caller, args] of [

@@ -27,8 +27,11 @@ const toOid = (v) => new mongoose.Types.ObjectId(String(v));
 /* `personalLists` is given for an owner or admin, who reads company-wide: the personal lists that are
  * someone else's. Everyone else's project list already leaves those out, and for them it stays null.
  * `taskProjectIds` are the projects whose tasks the caller may list; without them every project is.
- * Pages are read inside `pageProjectIds`, the projects the web app lists for the person. */
-const build = ({ uid, projectIds, taskProjectIds = projectIds, hidden, tokenNarrowed, personalLists = null, pageProjectIds = projectIds, seated = true }) => {
+ * Pages are read inside `pageProjectIds`, the projects the web app lists for the person. A page shared
+ * with the person by name is read wherever it is filed, but a token kept to some projects (`tokenList`)
+ * reads it only inside them. */
+const build = ({ uid, projectIds, taskProjectIds = projectIds, hidden, tokenNarrowed, personalLists = null, pageProjectIds = projectIds, seated = true, tokenList = [] }) => {
+    const namedProjectIds = tokenNarrowed ? tokenList.filter(isId) : null;
     const hiddenSet = new Set(hidden.map(String));
     const projectSet = projectIds === null ? null : new Set(projectIds.map(String));
     const taskProjectSet = taskProjectIds === null ? null : new Set(taskProjectIds.map(String));
@@ -42,7 +45,9 @@ const build = ({ uid, projectIds, taskProjectIds = projectIds, hidden, tokenNarr
     const allowsTask = (task) => Boolean(task) && listsTasksIn(task.ProjectID) && allowsSprint(task.sprintId)
         && readsCompanyWide(task, uid, [...excluded]);
     // A page outside every project is company-wide; a project-restricted token was never granted those.
-    const allowsPage = (page) => pageReachedBy(page, { uid, inProject: (id) => allowsProject(id) && pageProjectSet.has(String(id)), companyWide: seated && !tokenNarrowed });
+    const allowsPage = (page) => pageReachedBy(page, {
+        uid, inProject: (id) => allowsProject(id) && pageProjectSet.has(String(id)), companyWide: seated && !tokenNarrowed, named: seated, namedProjectIds,
+    });
 
     /* A find clause for tasks. `narrowTo` is a caller's projectId argument: it can only
      * shrink the set, so a project outside the filter matches nothing. */
@@ -61,6 +66,8 @@ const build = ({ uid, projectIds, taskProjectIds = projectIds, hidden, tokenNarr
         projectIds: pageProjectIds.map(toOid),
         companyWide: seated && !tokenNarrowed,
         exceptProjectIds: idForms([...excluded]),
+        named: seated,
+        namedProjectIds: namedProjectIds && namedProjectIds.map(toOid),
     });
 
     return { projectIds, hiddenSprintIds: [...hiddenSet], excludedProjectIds: [...excluded], allowsProject, allowsSprint, allowsTask, allowsPage, taskClause, pageClause };
@@ -79,7 +86,7 @@ const forCaller = async (ctx) => {
         const personalLists = await othersPersonalListIds(companyId, uid);
         const listed = tokenNarrowed ? tokenList.filter((id) => isId(id) && !personalLists.includes(id)) : null;
         const pageProjectIds = (await visibleProjectIds(companyId, uid)).map(String).filter(inToken);
-        return build({ uid, projectIds: listed, hidden: [], tokenNarrowed, personalLists, pageProjectIds });
+        return build({ uid, projectIds: listed, hidden: [], tokenNarrowed, personalLists, pageProjectIds, tokenList });
     }
 
     const projectIds = (await visibleProjectIds(companyId, uid)).map(String).filter(inToken);
@@ -87,7 +94,7 @@ const forCaller = async (ctx) => {
         hiddenSprintIds(companyId, uid, projectIds),
         keepTaskListProjectIds(companyId, uid, projectIds),
     ]);
-    return build({ uid, projectIds, taskProjectIds, hidden, tokenNarrowed });
+    return build({ uid, projectIds, taskProjectIds, hidden, tokenNarrowed, tokenList });
 };
 
 const refuse = (reason) => Object.assign(new Error(`${NOT_VISIBLE}: ${reason}`), { notVisible: true });
@@ -96,7 +103,7 @@ const refuse = (reason) => Object.assign(new Error(`${NOT_VISIBLE}: ${reason}`),
 const assertWritable = async (companyId, vis, { taskId, projectId, sprintId, pageId, companyWide } = {}) => {
     if (pageId !== undefined) {
         const page = isId(pageId)
-            ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PAGES, data: [{ _id: toOid(pageId), deletedStatusKey: { $ne: 1 } }, { ProjectID: 1, visibility: 1, createdBy: 1 }] }, 'findOne')
+            ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PAGES, data: [{ _id: toOid(pageId), deletedStatusKey: { $ne: 1 } }, { ProjectID: 1, visibility: 1, createdBy: 1, sharedWith: 1 }] }, 'findOne')
             : null;
         if (!page || !vis.allowsPage(page)) throw refuse('the page is not one the person behind this token can open');
     }

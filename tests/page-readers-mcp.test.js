@@ -33,18 +33,24 @@ beforeEach(() => {
 
 describe('the page readers agree on who reaches a page: MCP tokens', () => {
     const UNNARROWED = {
-        owner: ['shared', 'company', 'closed'],
-        admin: ['shared', 'company', 'closed'],
-        inside: ['insidePrivate', 'shared', 'company', 'closed'],
+        owner: ['shared', 'company', 'closed', 'namedEdit'],
+        admin: ['shared', 'company', 'closed', 'namedEdit'],
+        inside: ['insidePrivate', 'shared', 'company', 'closed', 'namedView', 'namedEdit'],
         outside: ['outsidePrivate', 'shared', 'company'],
         guest: ['shared', 'company'],
+        viewer: ['shared', 'company', 'namedView'],
+        editor: ['shared', 'company', 'namedEdit'],
     };
 
-    const KEPT_TO_OPEN = { owner: ['shared'], admin: ['shared'], inside: ['insidePrivate', 'shared'], outside: ['outsidePrivate', 'shared'], guest: ['shared'] };
+    const KEPT_TO_OPEN = {
+        owner: ['shared'], admin: ['shared'], inside: ['insidePrivate', 'shared'], outside: ['outsidePrivate', 'shared'], guest: ['shared'], viewer: ['shared'], editor: ['shared'],
+    };
 
-    const KEPT_TO_CLOSED = { owner: ['closed'], admin: ['closed'], inside: ['closed'], outside: [], guest: [] };
+    const KEPT_TO_CLOSED = {
+        owner: ['closed', 'namedEdit'], admin: ['closed', 'namedEdit'], inside: ['closed', 'namedView', 'namedEdit'], outside: [], guest: [], viewer: ['namedView'], editor: ['namedEdit'],
+    };
 
-    const NOTHING = { owner: [], admin: [], inside: [], outside: [], guest: [] };
+    const NOTHING = { owner: [], admin: [], inside: [], outside: [], guest: [], viewer: [], editor: [] };
 
     it('a token that is not kept to some projects reads what its person can open', async () => {
         expect(await searched([])).toEqual(UNNARROWED);
@@ -64,8 +70,22 @@ describe('the page readers agree on who reaches a page: MCP tokens', () => {
         mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: 'b000000000000000000000b9', ProjectName: 'Mine', isPersonal: true, personalOwner: PEOPLE.inside, isPrivateSpace: true, AssigneeUserId: [PEOPLE.inside], deletedStatusKey: 0 });
         mockDb.store[SCHEMA_TYPE.PAGES].find((page) => String(page._id) === PAGES.closed).ProjectID = 'b000000000000000000000b9';
 
-        expect(await searched([])).toEqual({ ...UNNARROWED, owner: ['shared', 'company'], admin: ['shared', 'company'] });
-        expect(await opened([])).toEqual({ ...UNNARROWED, owner: ['shared', 'company'], admin: ['shared', 'company'] });
+        expect(await searched([])).toEqual({ ...UNNARROWED, owner: ['shared', 'company', 'namedEdit'], admin: ['shared', 'company', 'namedEdit'] });
+        expect(await opened([])).toEqual({ ...UNNARROWED, owner: ['shared', 'company', 'namedEdit'], admin: ['shared', 'company', 'namedEdit'] });
+    });
+
+    it('a page shared with the person by name is read by a token kept to some projects only inside them', async () => {
+        const kept = async (projectIds) => visibility.forCaller({ companyId: C, userId: PEOPLE.viewer, projectIds });
+        const page = mockDb.store[SCHEMA_TYPE.PAGES].find((row) => String(row._id) === PAGES.namedView);
+
+        expect((await kept([])).allowsPage(page)).toBe(true);
+        expect((await kept([PROJECTS.closed])).allowsPage(page)).toBe(true);
+        expect((await kept([PROJECTS.open])).allowsPage(page)).toBe(false);
+        await expect(visibility.assertWritable(C, await kept([PROJECTS.open]), { pageId: PAGES.namedView })).rejects.toMatchObject({ notVisible: true });
+
+        delete page.ProjectID;
+        expect((await kept([])).allowsPage(page)).toBe(true);
+        expect((await kept([PROJECTS.closed])).allowsPage(page)).toBe(false);
     });
 
     it('writes outside every project only with a token that is not kept to some', async () => {

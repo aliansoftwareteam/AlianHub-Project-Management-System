@@ -1,6 +1,7 @@
 const ctrl = require('./controller');
 const comments = require('./comments');
 const versions = require('./versions');
+const shares = require('./shares');
 
 exports.init = (app) => {
     app.get('/api/v2/pages/ai-status', ctrl.aiStatus);
@@ -18,6 +19,9 @@ exports.init = (app) => {
     app.post('/api/v2/pages/:id/versions/:versionId/restore', versions.restoreVersion);
     app.get('/api/v2/pages/:id/versions/:versionId', versions.getVersion);
     app.put('/api/v2/pages/:id/versions/:versionId', versions.renameVersion);
+    app.get('/api/v2/pages/:id/shares', shares.listShares);
+    app.put('/api/v2/pages/:id/shares/:userId', shares.putShare);
+    app.delete('/api/v2/pages/:id/shares/:userId', shares.removeShare);
     app.put('/api/v2/pages/:id/review', ctrl.markReviewed);
     app.put('/api/v2/pages/:id/approve', ctrl.approvePage);
     app.put('/api/v2/pages/:id/restore', ctrl.restorePage);

@@ -135,6 +135,7 @@ pagesSchema.index({ parentPageId: 1, deletedStatusKey: 1 });
 pagesSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
 // "Which docs are attached to this task?" is asked on every task detail open.
 pagesSchema.index({ linkedTasks: 1, deletedStatusKey: 1 });
+pagesSchema.index({ 'sharedWith.userId': 1 }, { sparse: true });
 const pageVersionsSchema = new Schema(schema.pageVersions, {strict: true, timestamps: true});
 pageVersionsSchema.index({ pageId: 1, createdAt: -1 });
 const pageCommentsSchema = new Schema(schema.pageComments, {strict: true, timestamps: true});

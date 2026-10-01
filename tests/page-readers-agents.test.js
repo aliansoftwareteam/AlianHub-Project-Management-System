@@ -38,15 +38,21 @@ beforeEach(() => {
 
 describe('the page readers agree on who reaches a page: undoing an agent\'s page', () => {
     const EXPECTED = {
-        owner: ['shared', 'company', 'closed'],
-        admin: ['shared', 'company', 'closed'],
-        inside: ['insidePrivate', 'shared', 'company', 'closed'],
+        owner: ['shared', 'company', 'closed', 'namedEdit'],
+        admin: ['shared', 'company', 'closed', 'namedEdit'],
+        inside: ['insidePrivate', 'shared', 'company', 'closed', 'namedView', 'namedEdit'],
         outside: ['outsidePrivate', 'shared', 'company'],
         guest: ['shared', 'company'],
+        viewer: ['shared', 'company'],
+        editor: ['shared', 'company'],
     };
 
-    it.each(['page', 'pageVersion'])('offers undo of a %s action filed under a project the person can open', async (kind) => {
-        expect(await undoable(kind)).toEqual(EXPECTED);
+    it('offers undo of a page action, which trashes the page, to those who reach it without being named', async () => {
+        expect(await undoable('page')).toEqual(EXPECTED);
+    });
+
+    it('offers undo of a pageVersion action, which puts text back, to a named editor too', async () => {
+        expect(await undoable('pageVersion')).toEqual({ ...EXPECTED, editor: ['shared', 'company', 'namedEdit'] });
     });
 
     it('runs the undo only for a page the person can change', async () => {
