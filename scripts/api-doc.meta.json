@@ -1,1 +1,2528 @@
-{ "resources": [], "routes": {} }
+{
+    "resources": [
+        {
+            "id": "identity",
+            "title": "Identity",
+            "intro": "Who a token is, and what that person may do."
+        },
+        {
+            "id": "read-api",
+            "title": "Read-only token API",
+            "intro": "Three reads under `/api/public-v1` that accept an API token and nothing else. They are the simplest way to list projects and tasks. Every read is narrowed to what the token's person can open in the web app, and a token limited to projects reads only those."
+        },
+        {
+            "id": "tasks",
+            "title": "Tasks",
+            "intro": "Creating a task and changing one. Both routes take the bodies the web app sends, so their field names follow the stored task. To read tasks, use [Everything](#everything) or the [Read-only token API](#read-only-token-api)."
+        },
+        {
+            "id": "everything",
+            "title": "Everything",
+            "intro": "One list of tasks across every project the caller can read, with filters, grouping, sorting and a cursor, and the caller's saved views of that list."
+        },
+        {
+            "id": "projects",
+            "title": "Projects",
+            "intro": "Duplicating a project. To list projects, use `GET /api/public-v1/projects`."
+        },
+        {
+            "id": "pages",
+            "title": "Pages",
+            "intro": "Docs and wiki pages, and their version history. A page belongs to a project or to the workspace. A private page is its author's alone; any other page is open to whoever can see its project. A page the caller cannot see answers the same as one that does not exist."
+        },
+        {
+            "id": "agents",
+            "title": "Agents",
+            "intro": "Read-only views of the workspace's AI agents: who they are, what they are running and what they have proposed. Runs and proposals are narrowed to the projects and tasks the caller can read."
+        },
+        {
+            "id": "webhooks",
+            "title": "Webhooks",
+            "intro": "Managing the webhooks described under [Webhook deliveries](#webhook-deliveries) above. A webhook belongs to the person who created it: nobody else can list, change or delete it, or read its delivery log."
+        }
+    ],
+    "routes": {
+        "GET /api/v2/api-tokens/me": {
+            "resource": "identity",
+            "stability": "stable",
+            "title": "Who am I",
+            "summary": "Returns the person and the workspace behind the token, with that person's role and permissions.",
+            "description": [
+                "Call it once after connecting, to check that the token and the `companyid` header are right."
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Identity resolved.",
+                "data": {
+                    "userId": "<user id>",
+                    "companyId": "<company id>",
+                    "name": "Sample Person",
+                    "email": "person@example.com",
+                    "timeZone": "Europe/London",
+                    "roleType": 3,
+                    "permissions": {
+                        "task.task_list": true,
+                        "task.task_create": true,
+                        "project.project_create": null
+                    },
+                    "scopes": [
+                        "read",
+                        "write"
+                    ],
+                    "tokenName": "Reporting script"
+                }
+            },
+            "responseFields": [
+                {
+                    "name": "roleType",
+                    "description": "`1` is the owner, `2` an admin, `3` a member, `0` a guest."
+                },
+                {
+                    "name": "permissions",
+                    "description": "The person's workspace-wide answer for the permission keys the server checks most: `true` may change, `false` may only read, `null` has no access, and `1` or `2` mean \"own\" or \"everyone\" on the keys that take a choice. A project with its own rules can answer differently."
+                },
+                {
+                    "name": "scopes",
+                    "description": "The token's scopes. Empty when the request was made with a session."
+                }
+            ]
+        },
+        "GET /api/public-v1/projects": {
+            "resource": "read-api",
+            "stability": "stable",
+            "title": "List projects",
+            "summary": "Lists the projects the token's person can open.",
+            "response": {
+                "status": true,
+                "data": [
+                    {
+                        "_id": "<project id>",
+                        "ProjectName": "Website",
+                        "ProjectCode": "WEB",
+                        "createdAt": "2026-10-01T09:30:00.000Z"
+                    }
+                ]
+            },
+            "responseNotes": [
+                "There is no `statusText` on a success here. Projects in the trash are left out."
+            ],
+            "paging": "None. At most 200 projects are returned."
+        },
+        "GET /api/public-v1/tasks": {
+            "resource": "read-api",
+            "stability": "stable",
+            "title": "List a project's tasks",
+            "summary": "Lists the tasks of one project, most recently updated first.",
+            "query": [
+                {
+                    "name": "projectId",
+                    "type": "id",
+                    "required": true,
+                    "description": "The project."
+                },
+                {
+                    "name": "limit",
+                    "type": "number",
+                    "description": "How many tasks to return, from 1 to 500. 100 when left out."
+                }
+            ],
+            "requestPath": "/api/public-v1/tasks?projectId=<project id>&limit=50",
+            "response": {
+                "status": true,
+                "data": [
+                    {
+                        "_id": "<task id>",
+                        "TaskKey": "WEB-12",
+                        "TaskName": "Write the release notes",
+                        "status": {
+                            "key": 2,
+                            "text": "Doing",
+                            "type": "active"
+                        },
+                        "statusType": "active",
+                        "Task_Priority": "HIGH",
+                        "AssigneeUserId": [
+                            "<user id>"
+                        ],
+                        "DueDate": "2026-10-03T00:00:00.000Z",
+                        "sprintId": "<list id>",
+                        "createdAt": "2026-10-01T09:30:00.000Z",
+                        "updatedAt": "2026-10-01T09:30:00.000Z"
+                    }
+                ]
+            },
+            "responseNotes": [
+                "Each task carries these fields and `epicId` when it has one, and no others. Deleted tasks are left out, and so are tasks in lists the person cannot see."
+            ],
+            "paging": "Limit only. There is no next page: narrow by project and raise `limit`, or use `POST /api/v2/tasks/everything` to page.",
+            "errors": {
+                "400": "`projectId` is missing or is not an id.",
+                "404": "The project does not exist, or the person cannot see it."
+            }
+        },
+        "GET /api/public-v1/tasks/:key": {
+            "resource": "read-api",
+            "stability": "stable",
+            "title": "Read a task by its key",
+            "summary": "Returns one task, looked up by its key.",
+            "pathParams": [
+                {
+                    "name": "key",
+                    "type": "string",
+                    "description": "The task's key, for example `WEB-12`. At most 40 characters."
+                }
+            ],
+            "requestPath": "/api/public-v1/tasks/WEB-12",
+            "response": {
+                "status": true,
+                "data": {
+                    "_id": "<task id>",
+                    "TaskKey": "WEB-12",
+                    "TaskName": "Write the release notes",
+                    "ProjectID": "<project id>",
+                    "sprintId": "<list id>",
+                    "status": {
+                        "key": 2,
+                        "text": "Doing",
+                        "type": "active"
+                    },
+                    "statusKey": 2,
+                    "statusType": "active",
+                    "Task_Priority": "HIGH",
+                    "AssigneeUserId": [
+                        "<user id>"
+                    ],
+                    "DueDate": "2026-10-03T00:00:00.000Z",
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "updatedAt": "2026-10-01T09:30:00.000Z"
+                }
+            },
+            "responseNotes": [
+                "`data` is the whole stored task; the example shows some of its fields."
+            ],
+            "errors": {
+                "400": "The key is longer than 40 characters.",
+                "404": "No task has that key, or the person cannot see it."
+            }
+        },
+        "POST /api/v2/tasks": {
+            "resource": "tasks",
+            "stability": "beta",
+            "title": "Create a task",
+            "summary": "Creates a task, or a subtask when `data.ParentTaskId` names a parent.",
+            "description": [
+                "The body is the one the web app sends: the task under `data` and the project it goes into under `projectData`. The server sets the company and the acting person itself, whatever the body says. Under a parent, the project, list and folder are taken from the parent, and the parent must be in the project the body names.",
+                "The task's key is assigned after the task is saved, from the project's code and its next number. Read the task back to learn it."
+            ],
+            "body": [
+                {
+                    "name": "data.TaskName",
+                    "type": "string",
+                    "required": true,
+                    "description": "The task's name."
+                },
+                {
+                    "name": "data.TaskKey",
+                    "type": "string",
+                    "required": true,
+                    "description": "A placeholder such as `-`. The server replaces it with the real key."
+                },
+                {
+                    "name": "data.TaskType",
+                    "type": "string",
+                    "required": true,
+                    "description": "One of the project's task types, by its value."
+                },
+                {
+                    "name": "data.TaskTypeKey",
+                    "type": "number",
+                    "description": "The key of that task type."
+                },
+                {
+                    "name": "data.ProjectID",
+                    "type": "id",
+                    "required": true,
+                    "description": "The project the task goes into."
+                },
+                {
+                    "name": "data.sprintId",
+                    "type": "id",
+                    "description": "The list the task goes into."
+                },
+                {
+                    "name": "data.sprintArray",
+                    "type": "object",
+                    "description": "`{ id, name }` of that list, with `folderId` and `folderName` when the list sits in a folder."
+                },
+                {
+                    "name": "data.folderObjId",
+                    "type": "id",
+                    "description": "The folder, when the list sits in one."
+                },
+                {
+                    "name": "data.status",
+                    "type": "object",
+                    "description": "The status as the project defines it: `{ text, key, type }`."
+                },
+                {
+                    "name": "data.statusKey",
+                    "type": "number",
+                    "description": "The key of that status."
+                },
+                {
+                    "name": "data.statusType",
+                    "type": "string",
+                    "description": "The type of that status, for example `default_active`."
+                },
+                {
+                    "name": "data.Task_Priority",
+                    "type": "string",
+                    "description": "The priority, for example `MEDIUM`."
+                },
+                {
+                    "name": "data.AssigneeUserId",
+                    "type": "id[]",
+                    "description": "The assignees. Each must hold a seat in the workspace."
+                },
+                {
+                    "name": "data.watchers",
+                    "type": "id[]",
+                    "description": "The watchers. Each must hold a seat in the workspace."
+                },
+                {
+                    "name": "data.Task_Leader",
+                    "type": "id",
+                    "description": "The task's lead. Must hold a seat in the workspace."
+                },
+                {
+                    "name": "data.DueDate",
+                    "type": "date",
+                    "description": "The due date, or an empty string. With a date, send `data.dueDateDeadLine` as `[{ date }]`."
+                },
+                {
+                    "name": "data.startDate",
+                    "type": "date",
+                    "description": "The start date."
+                },
+                {
+                    "name": "data.ParentTaskId",
+                    "type": "id",
+                    "description": "The parent, for a subtask. Empty for a top-level task."
+                },
+                {
+                    "name": "data.isParentTask",
+                    "type": "boolean",
+                    "description": "`true` for a top-level task, `false` for a subtask."
+                },
+                {
+                    "name": "data.deletedStatusKey",
+                    "type": "number",
+                    "description": "`0` for a live task."
+                },
+                {
+                    "name": "projectData._id",
+                    "type": "id",
+                    "description": "The same project as `data.ProjectID`."
+                },
+                {
+                    "name": "projectData.ProjectName",
+                    "type": "string",
+                    "description": "The project's name, used in the notification."
+                },
+                {
+                    "name": "projectData.ProjectCode",
+                    "type": "string",
+                    "description": "The project's code. The task's key starts with it."
+                },
+                {
+                    "name": "indexObj",
+                    "type": "object",
+                    "description": "Where the task sits in the web app's grouped lists: `{ indexName, searchKey, searchValue }`. `indexName` is one of `groupByStatusIndex`, `groupByPriorityIndex`, `groupByAssigneeIndex`, `groupByDueDateIndex`."
+                }
+            ],
+            "bodyNotes": [
+                "`data` may carry any other field a stored task has. A field a task does not have is dropped. `_id`, `createdBy` and `createdAt` are refused."
+            ],
+            "request": {
+                "data": {
+                    "TaskName": "Write the release notes",
+                    "TaskKey": "-",
+                    "TaskType": "task",
+                    "TaskTypeKey": 1,
+                    "ProjectID": "<project id>",
+                    "sprintId": "<list id>",
+                    "sprintArray": {
+                        "id": "<list id>",
+                        "name": "Sprint 12"
+                    },
+                    "status": {
+                        "text": "To Do",
+                        "key": 1,
+                        "type": "default_active"
+                    },
+                    "statusKey": 1,
+                    "statusType": "default_active",
+                    "Task_Priority": "MEDIUM",
+                    "AssigneeUserId": [],
+                    "watchers": [],
+                    "DueDate": "",
+                    "dueDateDeadLine": [],
+                    "ParentTaskId": "",
+                    "isParentTask": true,
+                    "deletedStatusKey": 0
+                },
+                "projectData": {
+                    "_id": "<project id>",
+                    "ProjectName": "Website",
+                    "ProjectCode": "WEB"
+                },
+                "indexObj": {
+                    "indexName": "groupByStatusIndex",
+                    "searchKey": "statusKey",
+                    "searchValue": 1
+                }
+            },
+            "response": {
+                "status": true,
+                "statusText": "Task created successfully.",
+                "id": "<task id>"
+            },
+            "responseNotes": [
+                "The new task's id is in `id`, beside `status`, not inside `data`."
+            ],
+            "errors": {
+                "400": "The body is not an object, carries a key that is not accepted, names something that is not an id where an id is expected, names a person who holds no seat in the workspace, the parent cannot take another level of subtasks, or the workspace's plan allows no more tasks in the list.",
+                "404": "The parent task does not exist, or is not in the project the body names."
+            }
+        },
+        "PATCH /api/v2/tasks": {
+            "resource": "tasks",
+            "stability": "beta",
+            "title": "Change a task",
+            "summary": "Changes one task. `action` names the change, and the other keys of the body depend on it.",
+            "description": [
+                "Each action reads the task it changes from the id shown under Ids, and answers 404 when the caller cannot see that task. The first id listed is the task; the others are the further tasks, people or projects the action names.",
+                "The server fills in the acting person, the company and, where an action uses them, the stored names of the task and its project. Keys an action does not use are dropped rather than refused, so the bodies the web app sends keep working. Where a key is followed by names in brackets, those are the only fields of that object the action writes.",
+                "Some actions take `isUpdateTask`. Leave it out. Sent as `false` it records history for a change another request already made, and is refused with 409 unless the stored task already holds that value."
+            ],
+            "body": [
+                {
+                    "name": "action",
+                    "type": "string",
+                    "required": true,
+                    "description": "One of the actions in the table below."
+                }
+            ],
+            "actionsMatching": "^(?!bulk|create$|createMultipleTasks$|addTaskRelation$|removeTaskRelation$|getTaskRelations$|getOpenBlockers$)",
+            "actionNotes": {
+                "updateStatus": "Sets the status. `newStatus` holds the status as the project defines it.",
+                "updatePriority": "Sets the priority.",
+                "updateAssignee": "`type` is `assigneeAdd`, `assigneRemove` or `replace`.",
+                "updateTaskName": "Renames the task.",
+                "updateDescription": "Sets the description from `text.blocks` and `text.text`.",
+                "updateTaskCustomField": "Sets one custom field's value: `customFieldId`, and `updateDetail` with the field's id as `_id` and the value as `fieldValue`. A value that does not fit the field's type is refused.",
+                "updateArchiveDelete": "`deletedStatusKey` `1` deletes and needs `task.task_delete`, `2` archives and needs `task.task_archive`, `0` restores and needs `task.task_list`.",
+                "updateChecklists": "Assigning or unassigning an item needs `task.task_checklist_assign_remove`. Every other operation needs `task.task_checklist`.",
+                "createSubTaskWithAi": "Needs `task.sub_task_create` when `type` is `subTask`, otherwise `task.task_create`.",
+                "moveTask": "The key is also needed in the project the task moves to.",
+                "duplicateTask": "The key is also needed in the project the copy goes to.",
+                "mergeTask": "The key is also needed in the destination project."
+            },
+            "request": {
+                "action": "updateStatus",
+                "task": {
+                    "_id": "<task id>",
+                    "sprintId": "<list id>"
+                },
+                "newStatus": {
+                    "status": {
+                        "key": 2,
+                        "text": "Doing",
+                        "type": "active"
+                    },
+                    "statusKey": 2,
+                    "statusType": "active"
+                },
+                "prevStatus": {
+                    "taskId": "<task id>"
+                },
+                "projectData": {
+                    "_id": "<project id>"
+                }
+            },
+            "response": {
+                "status": true,
+                "statusText": "Task updated successfully.",
+                "data": {
+                    "status": true,
+                    "statusText": "Status updated successfully"
+                }
+            },
+            "responseNotes": [
+                "`data` is what the action itself answered, and differs from action to action. An action that found nothing to change answers `status: false` with its reason."
+            ],
+            "examples": [
+                {
+                    "title": "rename a task",
+                    "request": {
+                        "action": "updateTaskName",
+                        "taskData": {
+                            "_id": "<task id>",
+                            "sprintId": "<list id>"
+                        },
+                        "firebaseObj": {
+                            "TaskName": "Write and review the release notes"
+                        },
+                        "obj": {},
+                        "projectData": {
+                            "_id": "<project id>"
+                        }
+                    }
+                },
+                {
+                    "title": "add an assignee",
+                    "request": {
+                        "action": "updateAssignee",
+                        "type": "assigneeAdd",
+                        "taskData": {
+                            "_id": "<task id>",
+                            "sprintId": "<list id>"
+                        },
+                        "firebaseObj": {
+                            "AssigneeUserId": "<user id>"
+                        },
+                        "projectData": {
+                            "_id": "<project id>"
+                        }
+                    }
+                },
+                {
+                    "title": "set a custom field's value",
+                    "request": {
+                        "action": "updateTaskCustomField",
+                        "taskId": "<task id>",
+                        "customFieldId": "<custom field id>",
+                        "updateDetail": {
+                            "_id": "<custom field id>",
+                            "fieldValue": "In review"
+                        }
+                    }
+                }
+            ],
+            "errors": {
+                "400": "No `action`, an action that is not accepted, something that is not an id where an id is expected, a key that is not accepted, a value that does not fit the field, or a person named who holds no seat in the workspace.",
+                "404": "The task does not exist or the caller cannot see it. For a move or a copy, the destination project does not exist.",
+                "409": "`isUpdateTask` was `false` and the stored task does not hold the value the request names."
+            }
+        },
+        "POST /api/v2/tasks/everything": {
+            "resource": "everything",
+            "stability": "beta",
+            "title": "List tasks across projects",
+            "summary": "Lists tasks from every project the caller can read, filtered, grouped, sorted and paged.",
+            "description": [
+                "It is a read sent as a `POST`, so a token needs the `write` scope. Every key of the body is optional, and an unknown key at any level is a 400.",
+                "Whatever the body says, the server reads only projects the caller can open and whose task list their role may read, leaves out closed, archived and restricted projects, other people's personal lists, private lists the caller is not on, and deleted or archived tasks."
+            ],
+            "body": [
+                {
+                    "name": "filter.status",
+                    "type": "array",
+                    "description": "Up to 100 status names or whole-number keys. Names match exactly."
+                },
+                {
+                    "name": "filter.statusType",
+                    "type": "string[]",
+                    "description": "Any of `default_active`, `active`, `done`, `close`, `default_close`."
+                },
+                {
+                    "name": "filter.assignee",
+                    "type": "array",
+                    "description": "Up to 100 user ids, or `unassigned`."
+                },
+                {
+                    "name": "filter.priority",
+                    "type": "string[]",
+                    "description": "Up to 100 priority names."
+                },
+                {
+                    "name": "filter.dueDate",
+                    "type": "object",
+                    "description": "`{ from, to, none }`. `from` and `to` are ISO dates or times in milliseconds. `none: true` means \"no due date\" and cannot be combined with a range."
+                },
+                {
+                    "name": "filter.taskType",
+                    "type": "array",
+                    "description": "Up to 100 task type names or keys."
+                },
+                {
+                    "name": "filter.tags",
+                    "type": "string[]",
+                    "description": "Up to 100 tag ids."
+                },
+                {
+                    "name": "filter.search",
+                    "type": "string",
+                    "description": "Text of at most 200 characters."
+                },
+                {
+                    "name": "filter.projectIds",
+                    "type": "id[]",
+                    "description": "Up to 500 project ids. It can only narrow what the caller may read."
+                },
+                {
+                    "name": "group",
+                    "type": "string",
+                    "description": "`none`, `status`, `assignee`, `project`, `priority` or `dueDate`. `none` when left out."
+                },
+                {
+                    "name": "sort",
+                    "type": "object",
+                    "description": "`{ by, dir }`. `by` is `updatedAt` or `DueDate`; `dir` is `asc` or `desc`. Newest update first when left out; `DueDate` defaults to `asc`."
+                },
+                {
+                    "name": "cursor",
+                    "type": "string",
+                    "description": "The `nextCursor` of the page before."
+                },
+                {
+                    "name": "limit",
+                    "type": "number",
+                    "description": "A whole number from 1. 50 when left out, and never more than 100."
+                },
+                {
+                    "name": "includeSubtasks",
+                    "type": "boolean",
+                    "description": "`false` when left out: top-level tasks only."
+                },
+                {
+                    "name": "includeClosedProjects",
+                    "type": "boolean",
+                    "description": "`false` when left out. `true` adds back closed projects only."
+                },
+                {
+                    "name": "timezone",
+                    "type": "string",
+                    "description": "An IANA timezone name, used for due-date groups. `UTC` when left out."
+                }
+            ],
+            "request": {
+                "filter": {
+                    "statusType": [
+                        "default_active",
+                        "active"
+                    ],
+                    "assignee": [
+                        "<user id>"
+                    ]
+                },
+                "sort": {
+                    "by": "DueDate",
+                    "dir": "asc"
+                },
+                "limit": 50
+            },
+            "response": {
+                "status": true,
+                "statusText": "Tasks fetched successfully.",
+                "data": {
+                    "rows": [
+                        {
+                            "_id": "<task id>",
+                            "TaskName": "Write the release notes",
+                            "TaskKey": "WEB-12",
+                            "status": {
+                                "key": 2,
+                                "text": "Doing",
+                                "type": "active"
+                            },
+                            "statusKey": 2,
+                            "statusType": "active",
+                            "Task_Priority": "HIGH",
+                            "AssigneeUserId": [
+                                "<user id>"
+                            ],
+                            "DueDate": "2026-10-03T00:00:00.000Z",
+                            "ProjectID": "<project id>",
+                            "sprintId": "<list id>",
+                            "TaskType": "task",
+                            "TaskTypeKey": 1,
+                            "tagsArray": [],
+                            "subTasks": 0,
+                            "ancestors": [],
+                            "ParentTaskId": "",
+                            "isParentTask": true,
+                            "createdAt": "2026-10-01T09:30:00.000Z",
+                            "updatedAt": "2026-10-01T09:30:00.000Z"
+                        }
+                    ],
+                    "groups": [
+                        {
+                            "key": null,
+                            "count": 37
+                        }
+                    ],
+                    "nextCursor": "<cursor>",
+                    "projects": {
+                        "<project id>": {
+                            "_id": "<project id>",
+                            "ProjectName": "Website",
+                            "ProjectCode": "WEB",
+                            "taskStatusData": [],
+                            "taskTypeCounts": [],
+                            "apps": [],
+                            "isPersonal": false,
+                            "edit": {
+                                "status": true,
+                                "priority": true
+                            }
+                        }
+                    }
+                }
+            },
+            "responseFields": [
+                {
+                    "name": "rows",
+                    "description": "Up to `limit` tasks. Each carries `_id`, `TaskName`, `TaskKey`, `status`, `statusKey`, `statusType`, `Task_Priority`, `AssigneeUserId`, `DueDate`, `startDate`, `ProjectID`, `sprintId`, `folderObjId`, `TaskType`, `TaskTypeKey`, `tagsArray`, `subTasks`, `ancestors`, `ParentTaskId`, `isParentTask`, `createdAt` and `updatedAt`. No custom field values."
+                },
+                {
+                    "name": "groups",
+                    "description": "On the first page, a list of `{ key, count }` for the chosen `group`, counted over the same filter. `key` is `null` for \"no value\". With `group: none` it holds one entry with the total. On a later page it is `null`."
+                },
+                {
+                    "name": "nextCursor",
+                    "description": "A string when more rows exist, otherwise `null`."
+                },
+                {
+                    "name": "projects",
+                    "description": "A map by project id, for the projects the rows name. Each carries `_id`, `ProjectName`, `ProjectCode`, `projectIcon`, `taskStatusData`, `taskTypeCounts`, `apps`, `statusType`, `isPersonal` and `edit: { status, priority }`, which says whether the caller may change those two fields on that project's tasks."
+                }
+            ],
+            "paging": "Cursor. Send `nextCursor` back as `cursor`. A cursor is good only for the same workspace, person, filter, sort and the two `include` switches; with anything else it is a 400. The page size and the grouping may change between pages. Rows with no value for the sort key come last, in both directions.",
+            "errors": {
+                "400": "An unknown key, a wrong type, a value out of range, or a cursor that does not fit the request. The body is `{ status: false, statusText: \"Request refused\", message, field }`.",
+                "403": "The person holds no active seat in the workspace."
+            }
+        },
+        "GET /api/v2/tasks/everything/views": {
+            "resource": "everything",
+            "stability": "beta",
+            "title": "List saved views",
+            "summary": "Lists the caller's own saved views of the Everything list, by name.",
+            "response": {
+                "status": true,
+                "statusText": "Views fetched successfully.",
+                "data": [
+                    {
+                        "_id": "<view id>",
+                        "name": "My open work",
+                        "settings": {
+                            "mode": "list",
+                            "hideDone": true,
+                            "group": "project",
+                            "sortBy": "DueDate",
+                            "sortDir": "asc"
+                        },
+                        "isDefault": false,
+                        "updatedAt": "2026-10-01T09:30:00.000Z"
+                    }
+                ]
+            },
+            "errors": {
+                "403": "The person holds no active seat in the workspace."
+            }
+        },
+        "POST /api/v2/tasks/everything/views": {
+            "resource": "everything",
+            "stability": "beta",
+            "title": "Save a view",
+            "summary": "Saves a view: a name and the settings of the Everything list.",
+            "description": [
+                "A view belongs to the person who made it. A person can keep at most 50."
+            ],
+            "body": [
+                {
+                    "name": "name",
+                    "type": "string",
+                    "required": true,
+                    "description": "1 to 80 characters."
+                },
+                {
+                    "name": "settings",
+                    "type": "object",
+                    "required": true,
+                    "description": "An object with any of: `mode` (`list`, `board`, `table`), `search` (up to 200 characters), `status`, `assignee`, `priority`, `taskType` (lists of up to 100), `projectIds` (up to 500 ids), `due` (`overdue`, `today`, `week`, `later`, `none` or empty), `group` (`none`, `status`, `assignee`, `project`, `priority`, `dueDate`), `sortBy` (`updatedAt`, `DueDate`), `sortDir` (`asc`, `desc`), `showSubtasks`, `hideDone`, `includeClosed` (each `true` or `false`). An unknown key is refused."
+                },
+                {
+                    "name": "isDefault",
+                    "type": "boolean",
+                    "description": "Makes this the view the page opens with. Only one view is the default."
+                }
+            ],
+            "request": {
+                "name": "My open work",
+                "settings": {
+                    "mode": "list",
+                    "hideDone": true,
+                    "group": "project",
+                    "sortBy": "DueDate",
+                    "sortDir": "asc"
+                }
+            },
+            "response": {
+                "status": true,
+                "statusText": "View saved.",
+                "data": {
+                    "_id": "<view id>",
+                    "name": "My open work",
+                    "settings": {
+                        "mode": "list",
+                        "hideDone": true,
+                        "group": "project",
+                        "sortBy": "DueDate",
+                        "sortDir": "asc"
+                    },
+                    "isDefault": false,
+                    "updatedAt": "2026-10-01T09:30:00.000Z"
+                }
+            },
+            "errors": {
+                "400": "An unknown key, a missing or malformed field, or a value a setting does not take. The body names the `field`.",
+                "403": "The person holds no active seat in the workspace."
+            }
+        },
+        "PATCH /api/v2/tasks/everything/views/:id": {
+            "resource": "everything",
+            "stability": "beta",
+            "title": "Change a saved view",
+            "summary": "Changes the name, the settings or the default mark of one of the caller's views.",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The view."
+                }
+            ],
+            "body": [
+                {
+                    "name": "name",
+                    "type": "string",
+                    "description": "1 to 80 characters."
+                },
+                {
+                    "name": "settings",
+                    "type": "object",
+                    "description": "Replaces the stored settings. The same keys as when saving a view."
+                },
+                {
+                    "name": "isDefault",
+                    "type": "boolean",
+                    "description": "Makes this the default view, or stops it being the default."
+                }
+            ],
+            "bodyNotes": [
+                "At least one of the three is required."
+            ],
+            "request": {
+                "name": "My open work, by due date"
+            },
+            "response": {
+                "status": true,
+                "statusText": "View saved.",
+                "data": {
+                    "_id": "<view id>",
+                    "name": "My open work, by due date",
+                    "settings": {
+                        "mode": "list",
+                        "hideDone": true,
+                        "group": "project",
+                        "sortBy": "DueDate",
+                        "sortDir": "asc"
+                    },
+                    "isDefault": false,
+                    "updatedAt": "2026-10-01T09:30:00.000Z"
+                }
+            },
+            "errors": {
+                "400": "An unknown key, a missing or malformed field, or a value a setting does not take. The body names the `field`.",
+                "403": "The person holds no active seat in the workspace.",
+                "404": "The view does not exist, or is someone else's."
+            }
+        },
+        "DELETE /api/v2/tasks/everything/views/:id": {
+            "resource": "everything",
+            "stability": "beta",
+            "title": "Delete a saved view",
+            "summary": "Deletes one of the caller's views.",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The view."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "View deleted."
+            },
+            "errors": {
+                "403": "The person holds no active seat in the workspace.",
+                "404": "The view does not exist, or is someone else's."
+            }
+        },
+        "POST /api/v2/projects/:id/duplicate": {
+            "resource": "projects",
+            "stability": "beta",
+            "title": "Duplicate a project",
+            "summary": "Copies a project: its settings, folders, lists and automations, and its tasks when asked.",
+            "description": [
+                "The copy gets a new project code. Automations are copied switched off. Custom fields are shared with the copy, not duplicated. A personal list cannot be duplicated.",
+                "Up to 300 tasks are copied before the answer. More than that are copied afterwards as a job: the answer carries the job, and `GET /api/v2/projects/:id/duplicate` on the copy reports how far it has got."
+            ],
+            "permission": "The project must be one the caller can open",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The project to copy."
+                }
+            ],
+            "body": [
+                {
+                    "name": "name",
+                    "type": "string",
+                    "required": true,
+                    "description": "The copy's name, at most 255 characters."
+                },
+                {
+                    "name": "include.tasks",
+                    "type": "boolean",
+                    "required": true,
+                    "description": "Copy the tasks."
+                },
+                {
+                    "name": "include.assignees",
+                    "type": "boolean",
+                    "required": true,
+                    "description": "Keep the assignees of the copied tasks."
+                },
+                {
+                    "name": "include.dates",
+                    "type": "boolean",
+                    "required": true,
+                    "description": "Keep the dates of the project, its lists and its tasks."
+                }
+            ],
+            "bodyNotes": [
+                "Any other key is refused."
+            ],
+            "request": {
+                "name": "Website (copy)",
+                "include": {
+                    "tasks": true,
+                    "assignees": false,
+                    "dates": false
+                }
+            },
+            "response": {
+                "status": true,
+                "statusText": "Project duplicated.",
+                "data": {
+                    "project": {
+                        "_id": "<new project id>",
+                        "ProjectName": "Website (copy)",
+                        "ProjectCode": "WEB2"
+                    },
+                    "counts": {
+                        "folders": 2,
+                        "lists": 5,
+                        "tasks": 48,
+                        "automations": 3
+                    },
+                    "notes": [
+                        {
+                            "code": "automations_disabled",
+                            "count": 3
+                        }
+                    ],
+                    "sharedFields": [
+                        "<custom field id>"
+                    ],
+                    "job": null
+                }
+            },
+            "responseFields": [
+                {
+                    "name": "project",
+                    "description": "The whole stored copy; the example shows some of its fields."
+                },
+                {
+                    "name": "counts",
+                    "description": "What was copied. `tasks` is `0` when the tasks are being copied as a job."
+                },
+                {
+                    "name": "notes",
+                    "description": "What was left out or changed, each with a `code` and a `count` or a `name`: `tasks_left_out`, `private_lists_left`, `automations_skipped`, `automations_disabled`, `subfolder_moved_to_top`."
+                },
+                {
+                    "name": "sharedFields",
+                    "description": "The ids of the custom fields now shared with the copy."
+                },
+                {
+                    "name": "job",
+                    "description": "`null`, or `{ id, status, total, processed, created }` when the tasks are copied after the answer."
+                }
+            ],
+            "errors": {
+                "400": "The body is missing `name` or `include`, carries another key, a flag is not `true` or `false`, or the project is a personal list.",
+                "404": "The project does not exist, is in the trash, or the caller cannot see it."
+            }
+        },
+        "GET /api/v2/projects/:id/duplicate": {
+            "resource": "projects",
+            "stability": "beta",
+            "title": "Read a duplicate's progress",
+            "summary": "Reports how far the tasks of a large copy have got.",
+            "permission": "The project must be one the caller can open",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The copy, not the project it was copied from."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Duplicate progress fetched.",
+                "data": {
+                    "id": "<job id>",
+                    "status": "processing",
+                    "total": 1200,
+                    "processed": 400,
+                    "created": 400
+                }
+            },
+            "responseNotes": [
+                "`status` is `processing`, `done` or `failed`. `data` is `null` when the caller started no copy job for that project."
+            ],
+            "errors": {
+                "404": "The project does not exist, or the caller cannot see it."
+            }
+        },
+        "GET /api/v2/pages": {
+            "resource": "pages",
+            "stability": "beta",
+            "title": "List pages",
+            "summary": "Lists pages, without their bodies.",
+            "query": [
+                {
+                    "name": "projectId",
+                    "type": "id",
+                    "description": "The pages of that project."
+                },
+                {
+                    "name": "taskId",
+                    "type": "id",
+                    "description": "The pages linked to that task. It wins over `projectId`."
+                },
+                {
+                    "name": "scope",
+                    "type": "string",
+                    "description": "`all` lists every page the caller can see. `trash` lists the deleted ones."
+                }
+            ],
+            "requestPath": "/api/v2/pages?projectId=<project id>",
+            "response": {
+                "status": true,
+                "statusText": "Pages fetched.",
+                "data": [
+                    {
+                        "_id": "<page id>",
+                        "title": "Release checklist",
+                        "ProjectID": "<project id>",
+                        "visibility": "project",
+                        "isWiki": false,
+                        "linkedTasks": [],
+                        "createdBy": "<user id>",
+                        "updatedBy": "<user id>",
+                        "createdAt": "2026-10-01T09:30:00.000Z",
+                        "updatedAt": "2026-10-01T09:30:00.000Z",
+                        "order": 1759311000000,
+                        "excerpt": "Before every release, check that",
+                        "reviewState": "none"
+                    }
+                ]
+            },
+            "responseNotes": [
+                "With no parameter, the list holds the workspace's own pages: the ones that belong to no project.",
+                "`excerpt` is the first 160 characters of the page's text. `reviewState` is `none`, `verified`, `due` or `stale`."
+            ],
+            "paging": "None. The whole list is returned, in the pages' own order.",
+            "errors": {
+                "400": "`projectId` or `taskId` is not an id."
+            }
+        },
+        "POST /api/v2/pages": {
+            "resource": "pages",
+            "stability": "beta",
+            "title": "Create a page",
+            "summary": "Creates a page in a project, or in the workspace when no project is named.",
+            "permission": "With a `projectId`, the caller must be able to edit that project",
+            "body": [
+                {
+                    "name": "title",
+                    "type": "string",
+                    "required": true,
+                    "description": "Up to 200 characters."
+                },
+                {
+                    "name": "projectId",
+                    "type": "id",
+                    "description": "The project the page belongs to."
+                },
+                {
+                    "name": "parentPageId",
+                    "type": "id",
+                    "description": "The page this one sits under."
+                },
+                {
+                    "name": "contentBlocks",
+                    "type": "array",
+                    "description": "The body, as a list of blocks: `{ type, data }`. Types include `header`, `paragraph`, `list`, `checklist`, `code`, `quote`, `table`, `callout`, `delimiter`, `image` and `embed`. The body can be at most 512 KB."
+                },
+                {
+                    "name": "visibility",
+                    "type": "string",
+                    "description": "`project` (the default) or `private`."
+                },
+                {
+                    "name": "linkedTasks",
+                    "type": "id[]",
+                    "description": "Tasks the page is attached to."
+                },
+                {
+                    "name": "isWiki",
+                    "type": "boolean",
+                    "description": "Marks the page as a wiki page, which has an owner and a review date."
+                },
+                {
+                    "name": "ownerId",
+                    "type": "id",
+                    "description": "The wiki page's owner. The caller when left out."
+                },
+                {
+                    "name": "reviewDate",
+                    "type": "date",
+                    "description": "When the wiki page is next due for review. Three months from now when left out."
+                },
+                {
+                    "name": "createdByAgent",
+                    "type": "boolean",
+                    "description": "Marks the page as drafted by an agent. It starts as a draft that a person approves."
+                },
+                {
+                    "name": "agentName",
+                    "type": "string",
+                    "description": "The agent's name, up to 80 characters."
+                }
+            ],
+            "request": {
+                "title": "Release checklist",
+                "projectId": "<project id>",
+                "contentBlocks": [
+                    {
+                        "type": "header",
+                        "data": {
+                            "text": "Before every release",
+                            "level": 2
+                        }
+                    },
+                    {
+                        "type": "paragraph",
+                        "data": {
+                            "text": "Check that the changelog is up to date."
+                        }
+                    }
+                ]
+            },
+            "response": {
+                "status": true,
+                "statusText": "Page created.",
+                "data": {
+                    "_id": "<page id>",
+                    "title": "Release checklist",
+                    "ProjectID": "<project id>",
+                    "visibility": "project",
+                    "isWiki": false,
+                    "linkedTasks": [],
+                    "createdBy": "<user id>",
+                    "updatedBy": "<user id>",
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "updatedAt": "2026-10-01T09:30:00.000Z",
+                    "content": {
+                        "html": "<h2>Before every release</h2><p>Check that the changelog is up to date.</p>",
+                        "blocks": {
+                            "time": 1759311000000,
+                            "blocks": [],
+                            "version": "2.30.7"
+                        }
+                    },
+                    "rawText": "Before every release Check that the changelog is up to date."
+                }
+            },
+            "responseNotes": [
+                "`data` is the stored page. `content.blocks.blocks` holds the blocks that were sent; the example leaves them out."
+            ],
+            "errors": {
+                "400": "No title, a title over 200 characters, an id that is not an id, a review date that is not a date, or a body that is too large.",
+                "404": "The project or the parent page does not exist, or the caller may not use it."
+            }
+        },
+        "GET /api/v2/pages/:id": {
+            "resource": "pages",
+            "stability": "beta",
+            "title": "Read a page",
+            "summary": "Returns one page with its body.",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The page."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Page fetched.",
+                "data": {
+                    "_id": "<page id>",
+                    "title": "Release checklist",
+                    "ProjectID": "<project id>",
+                    "visibility": "project",
+                    "isWiki": false,
+                    "linkedTasks": [],
+                    "createdBy": "<user id>",
+                    "updatedBy": "<user id>",
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "updatedAt": "2026-10-01T09:30:00.000Z",
+                    "content": {
+                        "html": "<h2>Before every release</h2>",
+                        "blocks": {
+                            "time": 1759311000000,
+                            "blocks": [
+                                {
+                                    "type": "header",
+                                    "data": {
+                                        "text": "Before every release",
+                                        "level": 2
+                                    }
+                                }
+                            ],
+                            "version": "2.30.7"
+                        }
+                    },
+                    "rawText": "Before every release",
+                    "reviewState": "none"
+                }
+            },
+            "errors": {
+                "400": "The id is not an id.",
+                "404": "The page does not exist, or the caller cannot see it."
+            }
+        },
+        "PUT /api/v2/pages/:id": {
+            "resource": "pages",
+            "stability": "beta",
+            "title": "Change a page",
+            "summary": "Changes a page's title, body or properties. Only the keys sent are changed.",
+            "description": [
+                "When the title or the body changes, the state before the change is kept as a version."
+            ],
+            "permission": "The caller must be able to edit the page",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The page."
+                }
+            ],
+            "body": [
+                {
+                    "name": "title",
+                    "type": "string",
+                    "description": "Up to 200 characters."
+                },
+                {
+                    "name": "contentBlocks",
+                    "type": "array",
+                    "description": "The new body, as a list of blocks."
+                },
+                {
+                    "name": "contentHtml",
+                    "type": "string",
+                    "description": "The new body, as HTML. Send one of the two."
+                },
+                {
+                    "name": "visibility",
+                    "type": "string",
+                    "description": "`project` or `private`. Only the author can make a page private."
+                },
+                {
+                    "name": "linkedTasks",
+                    "type": "id[]",
+                    "description": "Replaces the tasks the page is attached to."
+                },
+                {
+                    "name": "isWiki",
+                    "type": "boolean",
+                    "description": "Marks or unmarks the page as a wiki page."
+                },
+                {
+                    "name": "ownerId",
+                    "type": "id",
+                    "description": "The wiki page's owner."
+                },
+                {
+                    "name": "reviewDate",
+                    "type": "date",
+                    "description": "When the wiki page is next due for review."
+                },
+                {
+                    "name": "agentStatus",
+                    "type": "string",
+                    "description": "`draft` or `approved`, for a page an agent drafted."
+                }
+            ],
+            "request": {
+                "title": "Release checklist (2026)"
+            },
+            "response": {
+                "status": true,
+                "statusText": "Page saved.",
+                "data": {
+                    "_id": "<page id>",
+                    "title": "Release checklist (2026)",
+                    "ProjectID": "<project id>",
+                    "visibility": "project",
+                    "isWiki": false,
+                    "linkedTasks": [],
+                    "createdBy": "<user id>",
+                    "updatedBy": "<user id>",
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "updatedAt": "2026-10-01T09:30:00.000Z"
+                }
+            },
+            "responseNotes": [
+                "`data` is the whole stored page after the change; the example shows some of its fields."
+            ],
+            "errors": {
+                "400": "A title over 200 characters, an id that is not an id, a review date that is not a date, or a body that is too large.",
+                "403": "Someone other than the author tried to make the page private.",
+                "404": "The page does not exist, or the caller may not change it."
+            }
+        },
+        "DELETE /api/v2/pages/:id": {
+            "resource": "pages",
+            "stability": "beta",
+            "title": "Delete a page",
+            "summary": "Moves a page to the trash, together with the pages under it that the caller can see.",
+            "permission": "A private page goes only by its author, an owner or an admin. Any other page needs edit rights on its project",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The page."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Page deleted.",
+                "data": {
+                    "deleted": 3
+                }
+            },
+            "responseNotes": [
+                "`deleted` counts the page and the pages under it that went with it."
+            ],
+            "errors": {
+                "400": "The id is not an id.",
+                "403": "The caller can see the page's project but may not edit it.",
+                "404": "The page does not exist, or the caller cannot see it."
+            }
+        },
+        "PUT /api/v2/pages/:id/restore": {
+            "resource": "pages",
+            "stability": "beta",
+            "title": "Restore a page",
+            "summary": "Takes a page back out of the trash. Only the page itself: the pages that went with it are restored one by one.",
+            "permission": "The caller must be able to edit the page",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The page."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Page restored.",
+                "data": {
+                    "_id": "<page id>",
+                    "title": "Release checklist",
+                    "ProjectID": "<project id>",
+                    "visibility": "project",
+                    "isWiki": false,
+                    "linkedTasks": [],
+                    "createdBy": "<user id>",
+                    "updatedBy": "<user id>",
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "updatedAt": "2026-10-01T09:30:00.000Z"
+                }
+            },
+            "errors": {
+                "400": "The id is not an id.",
+                "404": "The page is not in the trash, or the caller may not change it."
+            }
+        },
+        "GET /api/v2/pages/:id/versions": {
+            "resource": "pages",
+            "stability": "beta",
+            "title": "List a page's versions",
+            "summary": "Lists the versions kept for a page, newest first, without their bodies.",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The page."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Versions fetched.",
+                "data": [
+                    {
+                        "_id": "<version id>",
+                        "pageId": "<page id>",
+                        "title": "Release checklist",
+                        "name": "Before the rewrite",
+                        "reason": "manual",
+                        "savedBy": "<user id>",
+                        "savedAt": "2026-10-01T09:30:00.000Z",
+                        "visibility": "project"
+                    }
+                ]
+            },
+            "responseNotes": [
+                "`reason` says why the version was kept: `manual` (someone saved it), `author` (someone else was about to change the page), `interval` (ten minutes had passed since the last version), `restore` (the state before a restore) or `legacy`. `name` is empty for a version nobody named. A version kept while the page was private is shown only to the page's author."
+            ],
+            "paging": "None. A page keeps at most 100 unnamed and 30 named versions.",
+            "errors": {
+                "404": "The page does not exist, or the caller cannot see it."
+            }
+        },
+        "POST /api/v2/pages/:id/versions": {
+            "resource": "pages",
+            "stability": "beta",
+            "title": "Save a version",
+            "summary": "Keeps the page as it is now as a version, with a name when one is given.",
+            "permission": "The caller must be able to edit the page",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The page."
+                }
+            ],
+            "body": [
+                {
+                    "name": "name",
+                    "type": "string",
+                    "description": "A name for the version, up to 80 characters."
+                }
+            ],
+            "request": {
+                "name": "Before the rewrite"
+            },
+            "response": {
+                "status": true,
+                "statusText": "Version saved.",
+                "data": {
+                    "_id": "<version id>",
+                    "pageId": "<page id>",
+                    "title": "Release checklist",
+                    "name": "Before the rewrite",
+                    "reason": "manual",
+                    "savedBy": "<user id>",
+                    "savedAt": "2026-10-01T09:30:00.000Z",
+                    "visibility": "project"
+                }
+            },
+            "responseNotes": [
+                "When the newest version already holds this state, no new version is made: the answer is that version, named if a name was sent."
+            ],
+            "errors": {
+                "400": "The name is not text or is over 80 characters, the page is empty, the page already has 30 named versions, or the page is too large to keep.",
+                "403": "The caller can see the page but may not change it.",
+                "404": "The page does not exist, or the caller cannot see it."
+            }
+        },
+        "GET /api/v2/pages/:id/versions/:versionId": {
+            "resource": "pages",
+            "stability": "beta",
+            "title": "Read a version",
+            "summary": "Returns one version with its body.",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The page."
+                },
+                {
+                    "name": "versionId",
+                    "type": "id",
+                    "description": "The version."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Version fetched.",
+                "data": {
+                    "_id": "<version id>",
+                    "pageId": "<page id>",
+                    "title": "Release checklist",
+                    "name": "Before the rewrite",
+                    "reason": "manual",
+                    "savedBy": "<user id>",
+                    "savedAt": "2026-10-01T09:30:00.000Z",
+                    "visibility": "project",
+                    "blocks": [
+                        {
+                            "type": "header",
+                            "data": {
+                                "text": "Before every release",
+                                "level": 2
+                            }
+                        }
+                    ],
+                    "rawText": "Before every release"
+                }
+            },
+            "errors": {
+                "404": "The page or the version does not exist, or the caller cannot see it."
+            }
+        },
+        "PUT /api/v2/pages/:id/versions/:versionId": {
+            "resource": "pages",
+            "stability": "beta",
+            "title": "Name a version",
+            "summary": "Names a version, or clears its name.",
+            "permission": "The caller must be able to edit the page",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The page."
+                },
+                {
+                    "name": "versionId",
+                    "type": "id",
+                    "description": "The version."
+                }
+            ],
+            "body": [
+                {
+                    "name": "name",
+                    "type": "string",
+                    "description": "The name, up to 80 characters. An empty name clears it."
+                }
+            ],
+            "request": {
+                "name": "Signed off"
+            },
+            "response": {
+                "status": true,
+                "statusText": "Version named.",
+                "data": {
+                    "_id": "<version id>",
+                    "pageId": "<page id>",
+                    "title": "Release checklist",
+                    "name": "Signed off",
+                    "reason": "manual",
+                    "savedBy": "<user id>",
+                    "savedAt": "2026-10-01T09:30:00.000Z",
+                    "visibility": "project"
+                }
+            },
+            "errors": {
+                "400": "The name is not text or is over 80 characters, or the page already has 30 named versions.",
+                "403": "The caller can see the page but may not change it.",
+                "404": "The page or the version does not exist, or the caller cannot see it."
+            }
+        },
+        "POST /api/v2/pages/:id/versions/:versionId/restore": {
+            "resource": "pages",
+            "stability": "beta",
+            "title": "Restore a version",
+            "summary": "Puts a version's title and body back on the page. The page as it was is kept as a version first.",
+            "permission": "The caller must be able to edit the page",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The page."
+                },
+                {
+                    "name": "versionId",
+                    "type": "id",
+                    "description": "The version."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Version restored.",
+                "data": {
+                    "_id": "<page id>",
+                    "title": "Release checklist",
+                    "ProjectID": "<project id>",
+                    "visibility": "project",
+                    "isWiki": false,
+                    "linkedTasks": [],
+                    "createdBy": "<user id>",
+                    "updatedBy": "<user id>",
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "updatedAt": "2026-10-01T09:30:00.000Z",
+                    "reviewState": "none"
+                }
+            },
+            "responseNotes": [
+                "`data` is the whole stored page after the restore; the example shows some of its fields."
+            ],
+            "errors": {
+                "403": "The caller can see the page but may not change it.",
+                "404": "The page or the version does not exist, or the caller cannot see it."
+            }
+        },
+        "GET /api/v2/agents": {
+            "resource": "agents",
+            "stability": "beta",
+            "title": "List agents",
+            "summary": "Lists the workspace's agents, oldest first.",
+            "response": {
+                "status": true,
+                "statusText": "Agents fetched.",
+                "data": [
+                    {
+                        "_id": "<agent id>",
+                        "name": "Triage",
+                        "autonomy": 1,
+                        "paused": false,
+                        "skills": [
+                            "<skill key>"
+                        ],
+                        "spendCapUsd": 20
+                    }
+                ]
+            },
+            "responseNotes": [
+                "Each row is the whole stored agent; the example shows some of its fields."
+            ]
+        },
+        "GET /api/v2/agents/team": {
+            "resource": "agents",
+            "stability": "beta",
+            "title": "Read the team board",
+            "summary": "Returns the people and agents of the workspace, what each is on right now, and a short standup.",
+            "query": [
+                {
+                    "name": "hoursPerWeek",
+                    "type": "number",
+                    "description": "The weekly capacity each person's load is measured against. 40 when left out."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Team board fetched.",
+                "data": {
+                    "people": [
+                        {
+                            "kind": "person",
+                            "id": "<user id>",
+                            "name": "Sample Person",
+                            "email": "person@example.com",
+                            "roleType": 3,
+                            "online": true,
+                            "timer": null,
+                            "nowOn": "Write the release notes",
+                            "openTasks": 4,
+                            "loggedHours": 12,
+                            "capacityHours": 40,
+                            "load": 30,
+                            "pto": null,
+                            "status": "available"
+                        }
+                    ],
+                    "agents": [
+                        {
+                            "kind": "agent",
+                            "id": "<agent id>",
+                            "name": "Triage",
+                            "ownerId": "<user id>",
+                            "autonomy": 1,
+                            "paused": false,
+                            "skills": [
+                                "<skill key>"
+                            ],
+                            "allowedActions": [],
+                            "spend": {
+                                "usd": 1.4,
+                                "cap": 20,
+                                "runs": 9
+                            },
+                            "run": null,
+                            "nowOn": "",
+                            "status": "idle"
+                        }
+                    ],
+                    "activity": [
+                        {
+                            "at": "2026-10-01T09:30:00.000Z",
+                            "kind": "agent",
+                            "who": "Triage",
+                            "what": "done",
+                            "taskId": "<task id>",
+                            "runId": "<run id>",
+                            "status": "done"
+                        }
+                    ],
+                    "totals": {
+                        "people": 1,
+                        "agents": 1,
+                        "running": 0,
+                        "away": 0,
+                        "load": 30,
+                        "weekStart": "2026-09-28T00:00:00.000Z"
+                    },
+                    "standup": {
+                        "generatedAt": "2026-10-01T09:30:00.000Z",
+                        "lines": [
+                            "Sample Person: next up \"Write the release notes\" · 4 open tasks · 12h logged this week"
+                        ]
+                    }
+                }
+            },
+            "responseNotes": [
+                "A person's `status` is `working`, `available`, `away` or `offline`; an agent's is `running`, `paused` or `idle`. Hours and load are `null` for a caller who may not see other people's time. A task the caller cannot read is shown as hidden, without its name.",
+                "The example shows some of the fields of each row."
+            ]
+        },
+        "GET /api/v2/agents/runs": {
+            "resource": "agents",
+            "stability": "beta",
+            "title": "List agent runs",
+            "summary": "Lists agent runs, newest first, with a summary of the runs that are open now.",
+            "query": [
+                {
+                    "name": "status",
+                    "type": "string",
+                    "description": "`open` (queued, running or waiting for approval), or one of `queued`, `running`, `waiting_approval`, `done`, `skipped`, `failed`, `stopped`."
+                },
+                {
+                    "name": "projectId",
+                    "type": "id",
+                    "description": "Runs in that project."
+                },
+                {
+                    "name": "agentId",
+                    "type": "id",
+                    "description": "Runs of that agent."
+                },
+                {
+                    "name": "taskId",
+                    "type": "id",
+                    "description": "Runs on that task."
+                },
+                {
+                    "name": "errorType",
+                    "type": "string",
+                    "description": "Failed runs with that kind of provider error."
+                },
+                {
+                    "name": "limit",
+                    "type": "number",
+                    "description": "How many runs to return, from 1 to 200. 50 when left out."
+                }
+            ],
+            "requestPath": "/api/v2/agents/runs?status=open&limit=20",
+            "response": {
+                "status": true,
+                "statusText": "Runs fetched.",
+                "data": [
+                    {
+                        "_id": "<run id>",
+                        "agentId": "<agent id>",
+                        "agentName": "Triage",
+                        "taskId": "<task id>",
+                        "projectId": "<project id>",
+                        "trigger": "manual",
+                        "status": "done",
+                        "startedBy": "<user id>",
+                        "startedAt": "2026-10-01T09:30:00.000Z",
+                        "finishedAt": "2026-10-01T09:31:10.000Z",
+                        "elapsedMs": 70000,
+                        "spend": {
+                            "tokens": 1840,
+                            "usd": 0.02
+                        }
+                    }
+                ],
+                "summary": {
+                    "running": 1,
+                    "waitingApproval": 0,
+                    "agents": 1,
+                    "elapsedMs": 42000,
+                    "spendUsd": 0.01,
+                    "runs": [
+                        {
+                            "_id": "<run id>",
+                            "agentId": "<agent id>",
+                            "agentName": "Triage",
+                            "status": "running",
+                            "taskId": "<task id>",
+                            "startedAt": "2026-10-01T09:30:00.000Z",
+                            "projectId": "<project id>",
+                            "skill": null,
+                            "spendUsd": 0.01
+                        }
+                    ]
+                }
+            },
+            "responseNotes": [
+                "`summary` sits beside `data`. Each row of `data` is the whole stored run; the example shows some of its fields."
+            ],
+            "paging": "Limit only. The newest runs come first and there is no next page; narrow with the filters.",
+            "errors": {
+                "400": "`errorType` is not one of the known kinds."
+            }
+        },
+        "GET /api/v2/agents/runs/:id": {
+            "resource": "agents",
+            "stability": "beta",
+            "title": "Read an agent run",
+            "summary": "Returns one run with its steps, the audit rows of what it did, and the agent revision it ran on.",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The run."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Run fetched.",
+                "data": {
+                    "run": {
+                        "_id": "<run id>",
+                        "agentId": "<agent id>",
+                        "agentName": "Triage",
+                        "taskId": "<task id>",
+                        "projectId": "<project id>",
+                        "trigger": "manual",
+                        "status": "done",
+                        "startedBy": "<user id>",
+                        "startedAt": "2026-10-01T09:30:00.000Z",
+                        "finishedAt": "2026-10-01T09:31:10.000Z",
+                        "elapsedMs": 70000,
+                        "spend": {
+                            "tokens": 1840,
+                            "usd": 0.02
+                        },
+                        "steps": [],
+                        "agentRevision": 2,
+                        "undoable": false,
+                        "undoReason": ""
+                    },
+                    "audit": [],
+                    "revision": {
+                        "n": 2,
+                        "state": "live"
+                    },
+                    "trace": {}
+                }
+            },
+            "responseFields": [
+                {
+                    "name": "run",
+                    "description": "The stored run, with `steps`, the `agentRevision` it was pinned to, and whether it can still be undone (`undoable`, `undoUntil`, `undoReason`)."
+                },
+                {
+                    "name": "audit",
+                    "description": "Up to 200 audit rows the run wrote, oldest first."
+                },
+                {
+                    "name": "revision",
+                    "description": "The agent revision the run used."
+                },
+                {
+                    "name": "trace",
+                    "description": "The run's steps and audit rows arranged for display."
+                }
+            ],
+            "errors": {
+                "400": "The id is not an id.",
+                "404": "The run does not exist, or the caller cannot see its task. A report run is open only to the person it was made for and to owners and admins."
+            }
+        },
+        "GET /api/v2/agents/proposals": {
+            "resource": "agents",
+            "stability": "beta",
+            "title": "List agent proposals",
+            "summary": "Lists the changes agents have proposed and are waiting on a person for, newest first.",
+            "query": [
+                {
+                    "name": "status",
+                    "type": "string",
+                    "description": "`pending` when left out. `all`, or one of `pending`, `applying`, `approved`, `edited`, `declined`, `undone`, `failed`."
+                },
+                {
+                    "name": "bucket",
+                    "type": "string",
+                    "description": "`primary` or `later`."
+                },
+                {
+                    "name": "agentId",
+                    "type": "id",
+                    "description": "Proposals of that agent."
+                },
+                {
+                    "name": "limit",
+                    "type": "number",
+                    "description": "How many to return, up to 500. 100 when left out."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Proposals fetched.",
+                "data": [
+                    {
+                        "_id": "<proposal id>",
+                        "agentId": "<agent id>",
+                        "agentName": "Triage",
+                        "runId": "<run id>",
+                        "taskId": "<task id>",
+                        "projectId": "<project id>",
+                        "what": "Set the priority to High",
+                        "why": "The customer reported an outage.",
+                        "changes": [],
+                        "status": "pending",
+                        "bucket": "primary",
+                        "undoAvailable": false,
+                        "createdAt": "2026-10-01T09:30:00.000Z"
+                    }
+                ],
+                "counts": {
+                    "waiting": 1,
+                    "doneByAi": 0,
+                    "declined": 0,
+                    "undone": 0,
+                    "failed": 0,
+                    "primary": 1,
+                    "later": 0
+                }
+            },
+            "responseNotes": [
+                "`counts` sits beside `data` and is counted over everything the caller can read, whatever `status` was asked for."
+            ],
+            "paging": "Limit only. The newest proposals come first and there is no next page."
+        },
+        "GET /api/v2/webhooks/events": {
+            "resource": "webhooks",
+            "stability": "beta",
+            "title": "List webhook events",
+            "summary": "Lists the events a webhook can subscribe to.",
+            "response": {
+                "status": true,
+                "statusText": "Webhook events.",
+                "data": [
+                    "task.created",
+                    "task.updated",
+                    "task.deleted",
+                    "task.archived",
+                    "task.restored"
+                ]
+            }
+        },
+        "GET /api/v2/webhooks": {
+            "resource": "webhooks",
+            "stability": "beta",
+            "title": "List webhooks",
+            "summary": "Lists the caller's own webhooks. The signing secret is never returned here.",
+            "response": {
+                "status": true,
+                "statusText": "Webhooks fetched.",
+                "data": [
+                    {
+                        "_id": "<webhook id>",
+                        "name": "Release channel",
+                        "url": "https://hooks.example.com/alianhub",
+                        "events": [
+                            "task.created",
+                            "task.updated"
+                        ],
+                        "active": true,
+                        "format": "json",
+                        "createdBy": "<user id>",
+                        "createdAt": "2026-10-01T09:30:00.000Z",
+                        "lastStatus": 200,
+                        "lastDeliveredAt": "2026-10-01T09:30:00.000Z",
+                        "needsAttention": ""
+                    }
+                ]
+            },
+            "paging": "None. The whole list is returned."
+        },
+        "POST /api/v2/webhooks": {
+            "resource": "webhooks",
+            "stability": "beta",
+            "title": "Create a webhook",
+            "summary": "Creates a webhook and returns its signing secret, once.",
+            "body": [
+                {
+                    "name": "name",
+                    "type": "string",
+                    "required": true,
+                    "description": "Up to 80 characters."
+                },
+                {
+                    "name": "url",
+                    "type": "string",
+                    "required": true,
+                    "description": "An `http` or `https` address on a public host."
+                },
+                {
+                    "name": "events",
+                    "type": "string[]",
+                    "required": true,
+                    "description": "At least one event, or `*` for all of them."
+                },
+                {
+                    "name": "format",
+                    "type": "string",
+                    "description": "`json` (the default), `slack` or `discord`."
+                }
+            ],
+            "request": {
+                "name": "Release channel",
+                "url": "https://hooks.example.com/alianhub",
+                "events": [
+                    "task.created",
+                    "task.updated"
+                ]
+            },
+            "response": {
+                "status": true,
+                "statusText": "Webhook created. Store the secret now — it is not shown again.",
+                "data": {
+                    "_id": "<webhook id>",
+                    "name": "Release channel",
+                    "url": "https://hooks.example.com/alianhub",
+                    "events": [
+                        "task.created",
+                        "task.updated"
+                    ],
+                    "active": true,
+                    "format": "json",
+                    "createdBy": "<user id>",
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "secret": "<signing secret>"
+                }
+            },
+            "errors": {
+                "400": "No name, a name over 80 characters, an address that is not `http` or `https` or does not resolve to a public host, no events, an unknown event, or an unknown format."
+            }
+        },
+        "PUT /api/v2/webhooks/:id": {
+            "resource": "webhooks",
+            "stability": "beta",
+            "title": "Change a webhook",
+            "summary": "Changes a webhook, or switches it on or off. Only the keys sent are changed.",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The webhook."
+                }
+            ],
+            "body": [
+                {
+                    "name": "name",
+                    "type": "string",
+                    "description": "Up to 80 characters."
+                },
+                {
+                    "name": "url",
+                    "type": "string",
+                    "description": "An `http` or `https` address on a public host."
+                },
+                {
+                    "name": "events",
+                    "type": "string[]",
+                    "description": "Replaces the events."
+                },
+                {
+                    "name": "format",
+                    "type": "string",
+                    "description": "`json`, `slack` or `discord`."
+                },
+                {
+                    "name": "active",
+                    "type": "boolean",
+                    "description": "`false` stops deliveries; `true` starts them again."
+                }
+            ],
+            "request": {
+                "active": false
+            },
+            "response": {
+                "status": true,
+                "statusText": "Webhook updated.",
+                "data": {
+                    "_id": "<webhook id>",
+                    "name": "Release channel",
+                    "url": "https://hooks.example.com/alianhub",
+                    "events": [
+                        "task.created",
+                        "task.updated"
+                    ],
+                    "active": false,
+                    "format": "json",
+                    "createdBy": "<user id>",
+                    "createdAt": "2026-10-01T09:30:00.000Z"
+                }
+            },
+            "errors": {
+                "400": "The id is not an id, a value is not accepted, or the body names nothing to change.",
+                "404": "The webhook does not exist, or is someone else's."
+            }
+        },
+        "DELETE /api/v2/webhooks/:id": {
+            "resource": "webhooks",
+            "stability": "beta",
+            "title": "Delete a webhook",
+            "summary": "Deletes a webhook, its delivery log and its signing secret.",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The webhook."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Webhook deleted."
+            },
+            "errors": {
+                "400": "The id is not an id.",
+                "404": "The webhook does not exist, or is someone else's."
+            }
+        },
+        "GET /api/v2/webhooks/:id/logs": {
+            "resource": "webhooks",
+            "stability": "beta",
+            "title": "Read a webhook's delivery log",
+            "summary": "Lists a webhook's deliveries, newest first.",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The webhook."
+                }
+            ],
+            "query": [
+                {
+                    "name": "limit",
+                    "type": "number",
+                    "description": "How many rows to return, from 1 to 50. 10 when left out."
+                },
+                {
+                    "name": "skip",
+                    "type": "number",
+                    "description": "How many rows to pass over. 0 when left out."
+                }
+            ],
+            "requestPath": "/api/v2/webhooks/<id>/logs?limit=10&skip=0",
+            "response": {
+                "status": true,
+                "statusText": "Delivery log fetched.",
+                "data": [
+                    {
+                        "_id": "<log id>",
+                        "webhookId": "<webhook id>",
+                        "event": "task.updated",
+                        "statusCode": 200,
+                        "success": true,
+                        "durationMs": 180,
+                        "attempt": 1,
+                        "createdAt": "2026-10-01T09:30:00.000Z"
+                    }
+                ],
+                "hasMore": true,
+                "nextSkip": 10
+            },
+            "paging": "Skip and limit. `hasMore` and `nextSkip` sit beside `data`; send `nextSkip` back as `skip` while `hasMore` is `true`.",
+            "errors": {
+                "400": "The id is not an id.",
+                "404": "The webhook does not exist, or is someone else's."
+            }
+        },
+        "POST /api/v2/auth/login": { "stability": "internal", "summary": "Signs in with an email and a password." },
+        "POST /api/v2/auth/tracker-code": { "stability": "internal", "summary": "Issues a sign-in code for the desktop time tracker." },
+        "GET /api/v2/auth/2fa/status": { "stability": "internal", "summary": "Whether two-factor sign-in is on for the signed-in person." },
+        "POST /api/v2/auth/2fa/setup": { "stability": "internal", "summary": "Starts two-factor enrolment." },
+        "POST /api/v2/auth/2fa/verify": { "stability": "internal", "summary": "Confirms a code and turns two-factor sign-in on." },
+        "POST /api/v2/auth/2fa/disable": { "stability": "internal", "summary": "Turns two-factor sign-in off." },
+        "POST /api/v2/auth/2fa/validate": { "stability": "internal", "summary": "The second step of a two-factor sign-in." },
+        "POST /api/v2/auth/magic-link": { "stability": "internal", "summary": "Emails a sign-in link." },
+        "GET /api/v2/auth/magic-link/verify": { "stability": "internal", "summary": "Signs in from an emailed link." },
+        "PATCH /api/v2/auth/:id/change-password": { "stability": "internal", "summary": "Changes the signed-in person's password." },
+        "POST /api/v2/auth/forgot-password": { "stability": "internal", "summary": "Starts a password reset." },
+        "POST /api/v2/auth/token-verify-forgotpassword": { "stability": "internal", "summary": "Checks a password reset link." },
+        "POST /api/v2/auth/reset-password": { "stability": "internal", "summary": "Sets a new password from a reset link." },
+        "POST /api/v2/auth/invitation-preview": { "stability": "internal", "summary": "Shows what an invitation link is for." },
+        "POST /api/v2/auth/invitation-accept": { "stability": "internal", "summary": "Accepts an invitation while signed in." },
+        "DELETE /api/v2/session/delete": { "stability": "internal", "summary": "Ends the person's sessions." },
+        "DELETE /api/v2/session/delete/:id": { "stability": "internal", "summary": "Ends one session." },
+        "PUT /api/v2/session/update": { "stability": "internal", "summary": "Updates the current session's record." },
+        "POST /api/v2/generateToken": { "stability": "internal", "summary": "Exchanges a refresh token for a new access token." },
+        "POST /api/v2/logout": { "stability": "internal", "summary": "Signs out." },
+        "POST /api/v2/test": { "stability": "internal", "summary": "Used by the web app." },
+        "POST /api/v2/createUser": { "stability": "internal", "summary": "Signs up." },
+        "POST /api/v2/sendVerificationEmail": { "stability": "internal", "summary": "Emails a verification link." },
+        "POST /api/v2/verifyEmail": { "stability": "internal", "summary": "Verifies an email address from a link." },
+        "POST /api/v2/sendForgotPasswordEmail": { "stability": "internal", "summary": "Emails a password reset link." },
+        "POST /api/v2/sendInvitationEmail": { "stability": "internal", "summary": "Invites people to the workspace." },
+        "POST /api/v2/checkPermission": { "stability": "internal", "summary": "Checks an invitation link." },
+        "POST /api/v2/google-signup": { "stability": "internal", "summary": "Signs in or up with Google." },
+        "POST /api/v2/github-signup": { "stability": "internal", "summary": "Signs in or up with GitHub." },
+        "POST /api/v2/gitlab-signup": { "stability": "internal", "summary": "Signs in or up with GitLab." },
+        "GET /api/v2/sso/config": { "stability": "internal", "summary": "Reads the workspace's single sign-on settings." },
+        "PUT /api/v2/sso/config": { "stability": "internal", "summary": "Changes the workspace's single sign-on settings." },
+        "POST /api/v2/sso/config/verify-domain": { "stability": "internal", "summary": "Checks the DNS record of a single sign-on domain." },
+        "GET /api/v2/sso/public": { "stability": "internal", "summary": "What the sign-in page needs to offer single sign-on." },
+        "GET /api/v2/sso/discover": { "stability": "internal", "summary": "Finds the single sign-on workspace for an email's domain." },
+        "GET /api/v2/sso/oidc/initiate": { "stability": "internal", "summary": "Starts an OpenID Connect sign-in." },
+        "GET /api/v2/sso/oidc/callback": { "stability": "internal", "summary": "Finishes an OpenID Connect sign-in." },
+        "GET /api/v2/sso/saml/initiate": { "stability": "internal", "summary": "Starts a SAML sign-in." },
+        "POST /api/v2/sso/saml/acs": { "stability": "internal", "summary": "Receives the SAML assertion." },
+        "GET /api/v2/sso/saml/metadata": { "stability": "internal", "summary": "The SAML service provider metadata." },
+        "GET /api/v2/agents/registry": { "stability": "beta", "summary": "The actions an agent may take." },
+        "GET /api/v2/agents/manifest": { "stability": "beta", "summary": "What workflows and rules bind an agent by." },
+        "GET /api/v2/agents/spend": { "stability": "beta", "summary": "What each agent spent in a month." },
+        "GET /api/v2/agents/team/standup": { "stability": "beta", "summary": "The caller's own standup, from their activity." },
+        "GET /api/v2/agents/routable": { "stability": "beta", "summary": "Open tasks the caller can see, for routing to an agent." },
+        "GET /api/v2/agents/runnable": { "stability": "beta", "summary": "The agents the caller may start on a task." },
+        "GET /api/v2/agents/chat/usable": { "stability": "beta", "summary": "The agents the caller may mention in a conversation." },
+        "POST /api/v2/agents/chat/direct": { "stability": "beta", "summary": "Opens the caller's conversation with an agent." },
+        "GET /api/v2/agents/pipeline": { "stability": "beta", "summary": "Tasks an agent has worked on." },
+        "GET /api/v2/agents/release": { "stability": "beta", "summary": "The release candidate agents have prepared." },
+        "POST /api/v2/agents/pause-all": { "stability": "beta", "summary": "Pauses every agent." },
+        "POST /api/v2/agents/draft": { "stability": "beta", "summary": "Drafts a new agent; nothing is stored." },
+        "GET /api/v2/agents/settings": { "stability": "beta", "summary": "Reads the workspace's agent settings." },
+        "PUT /api/v2/agents/settings": { "stability": "beta", "summary": "Changes the workspace's agent settings." },
+        "GET /api/v2/agents/budget": { "stability": "beta", "summary": "This month's agent spend against the budget." },
+        "GET /api/v2/agents/models": { "stability": "beta", "summary": "The models an agent may be pinned to." },
+        "GET /api/v2/agents/routing-policy": { "stability": "beta", "summary": "Reads which model each kind of task prefers." },
+        "PUT /api/v2/agents/routing-policy": { "stability": "beta", "summary": "Changes which model each kind of task prefers." },
+        "GET /api/v2/agents/metrics": { "stability": "beta", "summary": "Agent run metrics over a window." },
+        "GET /api/v2/agents/alerts": { "stability": "beta", "summary": "Open agent incidents and recently resolved ones." },
+        "POST /api/v2/agents/alerts/evaluate": { "stability": "beta", "summary": "Runs the alert check now." },
+        "GET /api/v2/agents/skills/catalogues": { "stability": "beta", "summary": "The skill catalogues." },
+        "GET /api/v2/agents/skills/egress-check": { "stability": "beta", "summary": "Whether a host is on the workspace's allowed list.", "apiToken":false },
+        "GET /api/v2/agents/skills": { "stability": "beta", "summary": "Lists skills." },
+        "POST /api/v2/agents/skills": { "stability": "beta", "summary": "Creates a skill." },
+        "POST /api/v2/agents/skills/:key/dry-run": { "stability": "beta", "summary": "Shows what a skill would read and do, without doing it." },
+        "GET /api/v2/agents/skills/:key": { "stability": "beta", "summary": "Reads a skill." },
+        "PUT /api/v2/agents/skills/:key": { "stability": "beta", "summary": "Changes a skill." },
+        "DELETE /api/v2/agents/skills/:key": { "stability": "beta", "summary": "Retires a skill." },
+        "GET /api/v2/agents/memory/project/:projectId": { "stability": "beta", "summary": "Reads what agents remember about a project." },
+        "POST /api/v2/agents/memory/project/:projectId": { "stability": "beta", "summary": "Adds something for agents to remember about a project." },
+        "PUT /api/v2/agents/memory/:id": { "stability": "beta", "summary": "Changes a remembered item." },
+        "GET /api/v2/agents/preferences": { "stability": "beta", "summary": "Reads the caller's own agent preferences." },
+        "PUT /api/v2/agents/preferences": { "stability": "beta", "summary": "Changes the caller's own agent preferences." },
+        "GET /api/v2/agents/reports": { "stability": "beta", "summary": "The reports delivered to the caller, newest first." },
+        "GET /api/v2/agents/reports/:id": { "stability": "beta", "summary": "Reads one report." },
+        "GET /api/v2/agents/runs/summary": { "stability": "beta", "summary": "The open runs and counts by status." },
+        "POST /api/v2/agents/runs": { "stability": "beta", "summary": "Starts an agent on a task." },
+        "GET /api/v2/agents/runs/:id/replay": { "stability": "beta", "summary": "The prompts and raw responses of a run, for owners and admins." },
+        "POST /api/v2/agents/runs/:id/stop": { "stability": "beta", "summary": "Stops a run." },
+        "POST /api/v2/agents/runs/:id/revert": { "stability": "beta", "summary": "Undoes what a run changed." },
+        "POST /api/v2/agents/proposals": { "stability": "beta", "summary": "Files a proposal. Only an agent does, in its own name." },
+        "POST /api/v2/agents/proposals/:id/approve": { "stability": "beta", "summary": "Approves a proposal." },
+        "POST /api/v2/agents/proposals/:id/decline": { "stability": "beta", "summary": "Declines a proposal." },
+        "POST /api/v2/agents/proposals/:id/undo": { "stability": "beta", "summary": "Undoes an approved proposal." },
+        "GET /api/v2/agents/account": { "stability": "beta", "summary": "Reads the caller's linked AI account." },
+        "PUT /api/v2/agents/account": { "stability": "beta", "summary": "Links the caller's AI account." },
+        "DELETE /api/v2/agents/account": { "stability": "beta", "summary": "Unlinks the caller's AI account." },
+        "GET /api/v2/agents/policy": { "stability": "beta", "summary": "Reads the workspace's agent policy." },
+        "PUT /api/v2/agents/policy": { "stability": "beta", "summary": "Changes the workspace's agent policy." },
+        "POST /api/v2/agents": { "stability": "beta", "summary": "Creates an agent." },
+        "PUT /api/v2/agents/:id": { "stability": "beta", "summary": "Changes an agent." },
+        "DELETE /api/v2/agents/:id": { "stability": "beta", "summary": "Deletes an agent." },
+        "POST /api/v2/agents/:id/pause": { "stability": "beta", "summary": "Pauses an agent." },
+        "POST /api/v2/agents/:id/resume": { "stability": "beta", "summary": "Resumes an agent." },
+        "GET /api/v2/agents/:id/schedules": { "stability": "beta", "summary": "Lists an agent's schedules." },
+        "POST /api/v2/agents/:id/schedules": { "stability": "beta", "summary": "Creates a schedule for an agent." },
+        "PUT /api/v2/agents/:id/schedules/:scheduleId": { "stability": "beta", "summary": "Changes a schedule." },
+        "DELETE /api/v2/agents/:id/schedules/:scheduleId": { "stability": "beta", "summary": "Deletes a schedule." },
+        "GET /api/v2/agents/:id/revisions": { "stability": "beta", "summary": "Lists an agent's revisions." },
+        "POST /api/v2/agents/:id/revisions": { "stability": "beta", "summary": "Creates a revision of an agent." },
+        "GET /api/v2/agents/:id/revisions/:n": { "stability": "beta", "summary": "Reads one revision." },
+        "POST /api/v2/agents/:id/revisions/:n/promote": { "stability": "beta", "summary": "Makes a revision the live one." },
+        "POST /api/v2/agents/:id/revisions/:n/rollback": { "stability": "beta", "summary": "Copies an older revision forward and makes it live." },
+        "GET /api/v2/oauth-clients": { "stability": "internal", "summary": "Lists the workspace's OAuth clients.", "apiToken":false },
+        "POST /api/v2/oauth-clients": { "stability": "internal", "summary": "Registers an OAuth client.", "apiToken":false },
+        "DELETE /api/v2/oauth-clients/:clientId": { "stability": "internal", "summary": "Revokes an OAuth client.", "apiToken":false },
+        "GET /api/v2/oauth-client-approvals": { "stability": "internal", "summary": "Lists OAuth clients waiting for approval.", "apiToken":false },
+        "POST /api/v2/oauth-client-approvals/approve": { "stability": "internal", "summary": "Approves an OAuth client.", "apiToken":false },
+        "POST /api/v2/oauth-client-approvals/deny": { "stability": "internal", "summary": "Denies an OAuth client.", "apiToken":false },
+        "POST /api/v2/oauth-client-approvals/revoke": { "stability": "internal", "summary": "Revokes an approval.", "apiToken":false },
+        "GET /api/v2/oauth-grants": { "stability": "internal", "summary": "Lists the caller's own OAuth grants.", "apiToken":false },
+        "DELETE /api/v2/oauth-grants/:grantId": { "stability": "internal", "summary": "Revokes one of the caller's OAuth grants.", "apiToken":false },
+        "GET /api/v2/agent-sessions/endpoints": { "stability": "internal", "summary": "Reads where outside agents are reached." },
+        "PUT /api/v2/agent-sessions/endpoints": { "stability": "internal", "summary": "Changes where outside agents are reached." },
+        "GET /api/v2/agent-sessions": { "stability": "internal", "summary": "Lists the outside agent sessions of a task." },
+        "POST /api/v2/agent-sessions": { "stability": "internal", "summary": "Hands a task to an outside agent." },
+        "GET /api/v2/scim/config": { "stability": "internal", "summary": "Reads the workspace's SCIM settings." },
+        "PUT /api/v2/scim/config": { "stability": "internal", "summary": "Changes the workspace's SCIM settings." },
+        "POST /api/v2/scim/token": { "stability": "internal", "summary": "Issues a new SCIM token for the workspace." },
+        "GET /api/v2/automations/registry": { "stability": "beta", "summary": "The triggers and actions an automation can use." },
+        "POST /api/v2/automations/compile": { "stability": "beta", "summary": "Turns a sentence or a rule into a checked automation." },
+        "POST /api/v2/automations/draft": { "stability": "beta", "summary": "Drafts an automation from a sentence." },
+        "POST /api/v2/automations/backtest": { "stability": "beta", "summary": "Shows what a rule would have done on past events." },
+        "GET /api/v2/automations": { "stability": "beta", "summary": "Lists automations." },
+        "POST /api/v2/automations": { "stability": "beta", "summary": "Creates an automation." },
+        "PUT /api/v2/automations/:id": { "stability": "beta", "summary": "Changes an automation." },
+        "PATCH /api/v2/automations/:id/enabled": { "stability": "beta", "summary": "Switches an automation on or off." },
+        "GET /api/v2/automations/:id/runs": { "stability": "beta", "summary": "Lists an automation's runs." },
+        "POST /api/v2/automations/:id/dry-run": { "stability": "beta", "summary": "Shows what an automation would do on a task, without doing it." },
+        "DELETE /api/v2/automations/:id": { "stability": "beta", "summary": "Deletes an automation." },
+        "GET /api/v2/workflows/step-types": { "stability": "beta", "summary": "The step types a workflow can use." },
+        "POST /api/v2/workflows/dry-run": { "stability": "beta", "summary": "Shows what a workflow would do, without doing it." },
+        "GET /api/v2/workflows/definitions": { "stability": "beta", "summary": "Lists workflow definitions." },
+        "POST /api/v2/workflows/definitions": { "stability": "beta", "summary": "Creates a workflow definition." },
+        "PUT /api/v2/workflows/definitions/:id": { "stability": "beta", "summary": "Changes a workflow definition." },
+        "PATCH /api/v2/workflows/definitions/:id/enabled": { "stability": "beta", "summary": "Switches a workflow definition on or off." },
+        "DELETE /api/v2/workflows/definitions/:id": { "stability": "beta", "summary": "Deletes a workflow definition." },
+        "GET /api/v2/workflows/approvals": { "stability": "beta", "summary": "Lists workflow steps waiting for a decision." },
+        "GET /api/v2/workflows/runs": { "stability": "beta", "summary": "Lists workflow runs." },
+        "POST /api/v2/workflows/runs": { "stability": "beta", "summary": "Starts a workflow run." },
+        "GET /api/v2/workflows/runs/:id": { "stability": "beta", "summary": "Reads a workflow run and its steps." },
+        "POST /api/v2/workflows/runs/:id/steps/:stepId/retry": { "stability": "beta", "summary": "Retries a step." },
+        "POST /api/v2/workflows/runs/:id/steps/:stepId/skip": { "stability": "beta", "summary": "Skips a step." },
+        "POST /api/v2/workflows/runs/:id/steps/:stepId/resume": { "stability": "beta", "summary": "Resumes a step." },
+        "POST /api/v2/workflows/runs/:id/steps/:stepId/compensate": { "stability": "beta", "summary": "Undoes a step." },
+        "POST /api/v2/workflows/runs/:id/steps/:stepId/decide": { "stability": "beta", "summary": "Approves or rejects a step." },
+        "POST /api/v2/workflows/runs/:id/steps/:stepId/reassign": { "stability": "beta", "summary": "Hands a step's decision to someone else." },
+        "POST /api/v2/tasks/bulk": { "stability": "beta", "summary": "Changes many tasks at once." },
+        "POST /api/v2/tasks/relations": { "stability": "beta", "summary": "Links tasks, unlinks them and lists a task's links." },
+        "POST /api/v2/sprints/burndown": { "stability": "beta", "summary": "The burndown of a sprint." },
+        "POST /api/v2/sprints/hours": { "stability": "beta", "summary": "The hours logged in a sprint." },
+        "POST /api/v2/sprints/scrum": { "stability": "beta", "summary": "Sets whether a list is a scrum sprint." },
+        "POST /api/v2/sprints/start": { "stability": "beta", "summary": "Starts a sprint." },
+        "POST /api/v2/sprints/complete": { "stability": "beta", "summary": "Completes a sprint." },
+        "GET /api/v2/sprints/complete-preview": { "stability": "beta", "summary": "What completing a sprint would move." },
+        "POST /api/v2/sprints/backlog": { "stability": "beta", "summary": "Reads a project's backlog." },
+        "GET /api/v2/sprints/report": { "stability": "beta", "summary": "The report of a sprint." },
+        "GET /api/v2/calls/ice-config": { "stability": "internal", "summary": "The connection settings for a call." },
+        "POST /api/v2/calls/notes": { "stability": "beta", "summary": "Saves the notes of a call." },
+        "GET /api/v2/calls/notes": { "stability": "beta", "summary": "Lists the caller's own call notes." },
+        "GET /api/v2/calls/notes/:id": { "stability": "beta", "summary": "Reads one set of call notes." },
+        "PATCH /api/v2/calls/notes/:id": { "stability": "beta", "summary": "Changes a set of call notes." },
+        "GET /api/v2/assignment-rules/project/:projectId": { "stability": "beta", "summary": "Reads a project's assignment rules." },
+        "PUT /api/v2/assignment-rules/project/:projectId": { "stability": "beta", "summary": "Changes a project's assignment rules." },
+        "POST /api/v2/assignment-rules/project/:projectId/draft": { "stability": "beta", "summary": "Drafts assignment rules for a project." },
+        "GET /api/v2/assignment-rules/task/:taskId": { "stability": "beta", "summary": "Reads the assignment suggestions for a task." },
+        "POST /api/v2/assignment-rules/task/:taskId/decisions/:decisionId/accept": { "stability": "beta", "summary": "Accepts an assignment suggestion." },
+        "POST /api/v2/assignment-rules/task/:taskId/decisions/:decisionId/dismiss": { "stability": "beta", "summary": "Dismisses an assignment suggestion." },
+        "POST /api/v2/assignment-rules/task/:taskId/decisions/:decisionId/undo": { "stability": "beta", "summary": "Undoes an accepted assignment suggestion." },
+        "POST /api/v2/manualLogtime": { "stability": "beta", "summary": "Logs time on a task by hand." },
+        "POST /api/v2/deleteManualLogtime": { "stability": "beta", "summary": "Deletes a manual time log." },
+        "POST /api/v2/timeTracker/start": { "stability": "internal", "summary": "Starts a tracker session, for the time tracker." },
+        "POST /api/v2/timetracker/end": { "stability": "internal", "summary": "Ends a tracker session, for the time tracker." },
+        "POST /api/v2/timetracker/capture": { "stability": "internal", "summary": "Stores a tracker capture, for the time tracker." },
+        "POST /api/v2/timetracker/timelog": { "stability": "internal", "summary": "A time log request, for the time tracker." },
+        "GET /api/v2/timetracker/running": { "stability": "internal", "summary": "The caller's open tracker sessions." },
+        "POST /api/v2/timetracker/trim": { "stability": "internal", "summary": "Closes an open tracker session at a given length." },
+        "POST /api/v2/timesheet-approval/submit": { "stability": "beta", "summary": "Submits a timesheet period for approval." },
+        "GET /api/v2/timesheet-approval/status": { "stability": "beta", "summary": "The approval status of a timesheet period." },
+        "GET /api/v2/timesheet-approval/mine": { "stability": "beta", "summary": "A person's timesheet submissions." },
+        "GET /api/v2/timesheet-approval/pending": { "stability": "beta", "summary": "Submitted periods waiting for review." },
+        "GET /api/v2/timesheet-approval/queue": { "stability": "beta", "summary": "The timesheet review queue." },
+        "POST /api/v2/timesheet-approval/:id/review": { "stability": "beta", "summary": "Approves or rejects a submitted period." },
+        "POST /api/v2/timesheet-approval/bulk-review": { "stability": "beta", "summary": "Approves or rejects several submitted periods." },
+        "GET /api/v2/billing/contract": { "stability": "beta", "summary": "Reads a project's billing contract." },
+        "PUT /api/v2/billing/contract": { "stability": "beta", "summary": "Changes a project's billing contract." },
+        "POST /api/v2/billing/milestone": { "stability": "beta", "summary": "Adds a billing milestone." },
+        "PATCH /api/v2/billing/milestone/:id": { "stability": "beta", "summary": "Changes a billing milestone." },
+        "GET /api/v2/billing/hourly": { "stability": "beta", "summary": "A month's billable hours for a project." },
+        "GET /api/v2/billing/client-view": { "stability": "beta", "summary": "What a project's client sees of its billing." },
+        "POST /api/v2/billing/client-view/message": { "stability": "beta", "summary": "Sends a message from the client view." },
+        "POST /api/v2/company/create": { "stability": "internal", "summary": "Creates a workspace." },
+        "POST /api/v2/company/delete": { "stability": "internal", "summary": "Deletes a workspace.", "apiToken":false },
+        "POST /api/v2/prepare-notification-data": { "stability": "internal", "summary": "Prepares notification data for the web app." },
+        "GET /api/v2/instance/public-config": { "stability": "internal", "summary": "What the sign-in page needs to know about the instance." },
+        "GET /api/v2/instance/access": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/settings": { "stability": "internal", "summary": "Instance administration." },
+        "PUT /api/v2/instance/settings": { "stability": "internal", "summary": "Instance administration." },
+        "POST /api/v2/instance/settings/test": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/health": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/metrics": { "stability": "internal", "summary": "Instance administration." },
+        "POST /api/v2/instance/maintenance": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/upgrade": { "stability": "internal", "summary": "Instance administration." },
+        "POST /api/v2/instance/migrations/run": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/logs": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/logs/files": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/logs/download": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/backups": { "stability": "internal", "summary": "Instance administration." },
+        "POST /api/v2/instance/backups": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/backups/:name/manifest": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/backups/:name/download": { "stability": "internal", "summary": "Instance administration." },
+        "POST /api/v2/instance/backups/:name/restore": { "stability": "internal", "summary": "Instance administration." },
+        "DELETE /api/v2/instance/backups/:name": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/orphan-databases": { "stability": "internal", "summary": "Instance administration." },
+        "POST /api/v2/instance/orphan-databases/:name/drop": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/ai/providers": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/stats": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/companies": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/audit-export": { "stability": "internal", "summary": "Instance administration." },
+        "POST /api/v2/instance/audit/:companyId/redact-person": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/csp": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/enforcement": { "stability": "internal", "summary": "Instance administration." },
+        "PUT /api/v2/instance/enforcement/default": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/enforcement/:companyId/decisions": { "stability": "internal", "summary": "Instance administration." },
+        "PUT /api/v2/instance/enforcement/:companyId/mode": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/egress": { "stability": "internal", "summary": "Instance administration." },
+        "PUT /api/v2/instance/egress/:companyId": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/instruction-patterns": { "stability": "internal", "summary": "Instance administration." },
+        "POST /api/v2/instance/instruction-patterns": { "stability": "internal", "summary": "Instance administration." },
+        "DELETE /api/v2/instance/instruction-patterns/:id": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/knowledge": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/knowledge/:companyId": { "stability": "internal", "summary": "Instance administration." },
+        "POST /api/v2/instance/knowledge/:companyId/reindex": { "stability": "internal", "summary": "Instance administration." },
+        "POST /api/v2/instance/knowledge/:companyId/reindex/cancel": { "stability": "internal", "summary": "Instance administration." },
+        "POST /api/v2/instance/knowledge/:companyId/reembed": { "stability": "internal", "summary": "Instance administration." },
+        "POST /api/v2/instance/knowledge/:companyId/retry-files": { "stability": "internal", "summary": "Instance administration." },
+        "POST /api/v2/instance/knowledge/:companyId/erase/document": { "stability": "internal", "summary": "Instance administration." },
+        "POST /api/v2/instance/knowledge/:companyId/erase/person": { "stability": "internal", "summary": "Instance administration." },
+        "GET /api/v2/instance/knowledge/:companyId/exclusions": { "stability": "internal", "summary": "Instance administration." },
+        "POST /api/v2/instance/knowledge/:companyId/exclusions/:exclusionId/remove": { "stability": "internal", "summary": "Instance administration." },
+        "POST /api/v2/csp-report": { "stability": "internal", "summary": "Receives a browser's content security policy report." },
+        "POST /api/v2/support-mail": { "stability": "internal", "summary": "Sends a message to support from the web app." },
+        "GET /api/v2/users/sessions": { "stability": "internal", "summary": "Lists the person's sessions." },
+        "DELETE /api/v2/users/sessions/:sessionId": { "stability": "internal", "summary": "Ends one of the person's sessions." },
+        "PUT /api/v2/users/onboarding": { "stability": "internal", "summary": "Stores the person's onboarding progress." },
+        "PUT /api/v2/users/nav-preferences": { "stability": "internal", "summary": "Stores the person's navigation preferences." },
+        "GET /api/v2/users/favourites": { "stability": "internal", "summary": "Reads the person's favourites." },
+        "PUT /api/v2/users/favourites": { "stability": "internal", "summary": "Adds or removes a favourite." },
+        "PUT /api/v2/users/favourites/order": { "stability": "internal", "summary": "Reorders the person's favourites." },
+        "PUT /api/v2/users/home-cards": { "stability": "internal", "summary": "Stores the person's home page cards." },
+        "GET /api/v2/secrets": { "stability": "internal", "summary": "Lists the workspace's secrets, by handle only.", "apiToken":false },
+        "POST /api/v2/secrets": { "stability": "internal", "summary": "Stores a workspace secret.", "apiToken":false },
+        "POST /api/v2/secrets/:handle/rotate": { "stability": "internal", "summary": "Replaces a workspace secret.", "apiToken":false },
+        "POST /api/v2/secrets/:handle/revoke": { "stability": "internal", "summary": "Revokes a workspace secret.", "apiToken":false },
+        "GET /api/v2/provider-keys": { "stability": "internal", "summary": "Lists the workspace's AI provider keys, by handle only.", "apiToken":false },
+        "PUT /api/v2/provider-keys/:provider": { "stability": "internal", "summary": "Stores a workspace AI provider key.", "apiToken":false },
+        "DELETE /api/v2/provider-keys/:provider": { "stability": "internal", "summary": "Removes a workspace AI provider key.", "apiToken":false },
+        "GET /api/v2/ai-switch": { "stability": "internal", "summary": "Whether AI is on for the workspace." },
+        "PUT /api/v2/ai-switch": { "stability": "internal", "summary": "Turns AI on or off for the workspace.", "apiToken":false },
+        "POST /api/v2/reactions": { "stability": "beta", "summary": "Adds or removes a reaction." },
+        "POST /api/v2/recent-visits": { "stability": "internal", "summary": "Records what the person just opened." },
+        "GET /api/v2/recent-visits": { "stability": "internal", "summary": "What the person opened recently." },
+        "POST /api/v2/search": { "stability": "beta", "summary": "Searches the workspace." },
+        "POST /api/v2/epics/assign": { "stability": "beta", "summary": "Puts a task in an epic, or takes it out." },
+        "POST /api/v2/epics/:id/recount": { "stability": "beta", "summary": "Rebuilds an epic's counters from its tasks." },
+        "POST /api/v2/epics": { "stability": "beta", "summary": "Creates an epic." },
+        "GET /api/v2/epics": { "stability": "beta", "summary": "Lists a project's epics." },
+        "PUT /api/v2/epics/:id": { "stability": "beta", "summary": "Changes an epic." },
+        "DELETE /api/v2/epics/:id": { "stability": "beta", "summary": "Deletes an epic. Its tasks stay." },
+        "GET /api/v2/exports/:id/download": { "stability": "beta", "summary": "Downloads a finished export." },
+        "GET /api/v2/exports": { "stability": "beta", "summary": "Lists exports." },
+        "POST /api/v2/exports/workspace": { "stability": "beta", "summary": "Exports every project's tasks, for an owner or admin." },
+        "POST /api/v2/exports": { "stability": "beta", "summary": "Starts an export." },
+        "GET /api/v2/api-tokens/needing-expiry": { "stability": "internal", "summary": "Tokens that have no expiry, for owners and admins." },
+        "GET /api/v2/api-tokens/step-credentials": { "stability": "internal", "summary": "The live step credentials of the workspace." },
+        "GET /api/v2/api-tokens/:id/logs": { "stability": "internal", "summary": "The latest calls made with a token." },
+        "POST /api/v2/api-tokens/mcp": { "stability": "internal", "summary": "Creates a token for an AI agent." },
+        "GET /api/v2/api-tokens": { "stability": "internal", "summary": "Lists the person's tokens." },
+        "POST /api/v2/api-tokens": { "stability": "internal", "summary": "Creates a token." },
+        "PUT /api/v2/api-tokens/:id": { "stability": "internal", "summary": "Renames a token, or switches it on or off." },
+        "DELETE /api/v2/api-tokens/:id": { "stability": "internal", "summary": "Revokes a token." },
+        "GET /api/v2/pages/ai-status": { "stability": "beta", "summary": "Whether AI writing is available for pages." },
+        "POST /api/v2/pages/ai": { "stability": "beta", "summary": "Drafts or rewrites page text with AI." },
+        "GET /api/v2/pages/:id/comments": { "stability": "beta", "summary": "Lists a page's comments." },
+        "POST /api/v2/pages/:id/comments": { "stability": "beta", "summary": "Comments on a page." },
+        "PUT /api/v2/pages/:id/comments/:commentId/resolve": { "stability": "beta", "summary": "Resolves a comment thread, or reopens it." },
+        "PUT /api/v2/pages/:id/comments/:commentId": { "stability": "beta", "summary": "Changes a comment." },
+        "DELETE /api/v2/pages/:id/comments/:commentId": { "stability": "beta", "summary": "Deletes a comment and its replies." },
+        "PUT /api/v2/pages/:id/review": { "stability": "beta", "summary": "Marks a wiki page as reviewed." },
+        "PUT /api/v2/pages/:id/approve": { "stability": "beta", "summary": "Signs off a page an agent drafted." },
+        "POST /api/v2/pages/:id/images": { "stability": "beta", "summary": "Uploads an image for a page." },
+        "GET /api/v2/trash": { "stability": "beta", "summary": "Lists what is in the trash." },
+        "PUT /api/v2/trash/:kind/:id/restore": { "stability": "beta", "summary": "Restores something from the trash." },
+        "DELETE /api/v2/sample-data": { "stability": "internal", "summary": "Removes the sample data a new workspace starts with." },
+        "GET /api/v2/forms/fields": { "stability": "beta", "summary": "The kinds of question a form can ask." },
+        "POST /api/v2/forms/:id/publish": { "stability": "beta", "summary": "Publishes a form, or takes it offline." },
+        "GET /api/v2/forms/:id/submissions": { "stability": "beta", "summary": "Lists a form's submissions." },
+        "GET /api/v2/forms/:id": { "stability": "beta", "summary": "Reads a form with its questions." },
+        "PUT /api/v2/forms/:id": { "stability": "beta", "summary": "Changes a form." },
+        "DELETE /api/v2/forms/:id": { "stability": "beta", "summary": "Deletes a form." },
+        "GET /api/v2/forms": { "stability": "beta", "summary": "Lists a project's forms." },
+        "POST /api/v2/forms": { "stability": "beta", "summary": "Creates a form." },
+        "POST /api/v2/public-shares": { "stability": "beta", "summary": "Creates a public link to a list, a report or a page." },
+        "GET /api/v2/public-shares": { "stability": "beta", "summary": "Lists the public links of something." },
+        "PUT /api/v2/public-shares/:id": { "stability": "beta", "summary": "Switches a public link on or off." },
+        "DELETE /api/v2/public-shares/:id": { "stability": "beta", "summary": "Revokes a public link." },
+        "GET /api/v2/intake": { "stability": "beta", "summary": "Lists submissions waiting for review." },
+        "POST /api/v2/intake/review": { "stability": "beta", "summary": "Accepts or rejects a submission." },
+        "GET /api/v2/who-can-see/:kind/:id": { "stability": "beta", "summary": "Who can see a project, a list or a page." },
+        "POST /api/v2/imports/jira": { "stability": "beta", "summary": "Imports from Jira." },
+        "POST /api/v2/imports/csv": { "stability": "beta", "summary": "Imports tasks from a CSV file." },
+        "POST /api/v2/imports/csv/preview": { "stability": "beta", "summary": "Previews a CSV import." },
+        "POST /api/v2/imports/trello": { "stability": "beta", "summary": "Imports from Trello." },
+        "POST /api/v2/imports/asana": { "stability": "beta", "summary": "Imports from Asana." },
+        "POST /api/v2/imports/monday": { "stability": "beta", "summary": "Imports from Monday." },
+        "POST /api/v2/imports/clickup/preview": { "stability": "beta", "summary": "Previews a ClickUp import." },
+        "POST /api/v2/imports/clickup/project": { "stability": "beta", "summary": "Imports a ClickUp export as a new project." },
+        "POST /api/v2/imports/clickup": { "stability": "beta", "summary": "Imports from ClickUp." },
+        "GET /api/v2/imports": { "stability": "beta", "summary": "Lists imports." },
+        "GET /api/v2/custom-fields/formula/scope": { "stability": "beta", "summary": "The names a formula field may reference." },
+        "POST /api/v2/custom-fields/formula/validate": { "stability": "beta", "summary": "Checks a formula." },
+        "POST /api/v2/custom-fields/compute": { "stability": "beta", "summary": "Recomputes formula and rollup fields for tasks." },
+        "POST /api/v2/custom-fields/:fieldId/ai/preview": { "stability": "beta", "summary": "Previews what an AI field would fill in." },
+        "POST /api/v2/custom-fields/:fieldId/ai/apply": { "stability": "beta", "summary": "Fills an AI field in." },
+        "POST /api/v2/custom-fields/:fieldId/ai/jobs": { "stability": "beta", "summary": "Starts filling an AI field in for many tasks." },
+        "GET /api/v2/custom-fields/ai/jobs/:jobId": { "stability": "beta", "summary": "Reads the progress of an AI field job." },
+        "GET /api/v2/task-templates": { "stability": "beta", "summary": "Lists task templates." },
+        "POST /api/v2/task-templates": { "stability": "beta", "summary": "Creates a task template." },
+        "PUT /api/v2/task-templates/default": { "stability": "beta", "summary": "Sets a project's default task template." },
+        "POST /api/v2/task-templates/:id/apply": { "stability": "beta", "summary": "Applies a template to a task." },
+        "PATCH /api/v2/task-templates/:id": { "stability": "beta", "summary": "Changes a task template." },
+        "DELETE /api/v2/task-templates/:id": { "stability": "beta", "summary": "Deletes a task template." },
+        "GET /api/v2/view-templates": { "stability": "beta", "summary": "Lists view templates." },
+        "POST /api/v2/view-templates": { "stability": "beta", "summary": "Creates a view template." },
+        "PATCH /api/v2/view-templates/:id": { "stability": "beta", "summary": "Changes a view template." },
+        "DELETE /api/v2/view-templates/:id": { "stability": "beta", "summary": "Deletes a view template." },
+        "GET /api/v2/invoices": { "stability": "beta", "summary": "Lists a project's invoices." },
+        "POST /api/v2/invoices/draft-from-milestone": { "stability": "beta", "summary": "Drafts an invoice from a milestone." },
+        "POST /api/v2/invoices/draft-from-month": { "stability": "beta", "summary": "Drafts an invoice from a month of logged time." },
+        "GET /api/v2/invoices/:id": { "stability": "beta", "summary": "Reads an invoice." },
+        "PUT /api/v2/invoices/:id": { "stability": "beta", "summary": "Changes a draft invoice." },
+        "POST /api/v2/invoices/:id/send": { "stability": "beta", "summary": "Issues an invoice." },
+        "POST /api/v2/invoices/:id/paid": { "stability": "beta", "summary": "Marks an invoice as paid." },
+        "DELETE /api/v2/invoices/:id": { "stability": "beta", "summary": "Deletes a draft invoice." },
+        "GET /api/v2/changelog": { "stability": "internal", "summary": "The product changelog shown in the web app." },
+        "GET /api/v1/task/:id": { "stability": "beta", "summary": "Reads one task by its id." },
+        "GET /api/v1/project/:id": { "stability": "beta", "summary": "Reads one project by its id." },
+        "GET /api/v2/setup/status": { "stability": "internal", "summary": "Whether the instance has been set up." },
+        "POST /api/v2/setup/complete": { "stability": "internal", "summary": "Finishes the first-run setup." },
+        "GET /api/v2/setup/events/:id": { "stability": "internal", "summary": "The progress stream of the first-run setup." }
+    }
+}

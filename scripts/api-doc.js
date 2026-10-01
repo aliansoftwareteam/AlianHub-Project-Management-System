@@ -13,6 +13,7 @@ const OUTPUTS = {
 };
 const REGENERATE = 'npm run api:doc';
 const DESCRIBED_PREFIX = '/api/v2/';
+const WEB_APP_PREFIX = '/api/v1/';
 const STABILITIES = ['stable', 'beta', 'internal'];
 const INTERNAL = 'internal';
 const UNDOCUMENTED = 'undocumented';
@@ -29,7 +30,7 @@ const AUTH = Object.freeze({
 });
 
 const AUTH_LABEL = Object.freeze({
-    [AUTH.PUBLIC]: 'Public',
+    [AUTH.PUBLIC]: 'No login guard',
     [AUTH.API_TOKEN]: 'API token',
     [AUTH.SESSION_OR_TOKEN]: 'Session or token',
     [AUTH.SESSION]: 'Session',
@@ -81,7 +82,8 @@ function groupRoutes(routes, meta) {
         .filter((route) => !documentedKeys.includes(route.key))
         .map((route) => {
             const entry = meta.routes[route.key] || null;
-            return { route, entry, status: entry && entry.stability === INTERNAL ? INTERNAL : UNDOCUMENTED, summary: (entry && entry.summary) || '' };
+            const internal = entry ? entry.stability === INTERNAL : route.path.startsWith(WEB_APP_PREFIX);
+            return { route, entry, status: internal ? INTERNAL : UNDOCUMENTED, summary: (entry && entry.summary) || '' };
         })
         .sort(byPathThenMethod);
     return { resources, appendix };
@@ -111,7 +113,28 @@ function metaProblems(routes, meta) {
 const cell = (text) => String(text === undefined || text === null ? '' : text).replace(/\|/g, '\\|').replace(/\n/g, ' ');
 const code = (text) => `\`${text}\``;
 const table = (head, rows) => [`| ${head.join(' | ')} |`, `|${head.map(() => '---').join('|')}|`, ...rows.map((row) => `| ${row.map(cell).join(' | ')} |`)];
-const jsonBlock = (value) => ['```json', JSON.stringify(value, null, 2), '```'];
+const INLINE_JSON_WIDTH = 90;
+const inlineJson = (value) => {
+    if (Array.isArray(value)) return `[${value.map(inlineJson).join(', ')}]`;
+    if (value !== null && typeof value === 'object') {
+        const pairs = Object.entries(value).map(([key, item]) => `${JSON.stringify(key)}: ${inlineJson(item)}`);
+        return pairs.length ? `{ ${pairs.join(', ')} }` : '{}';
+    }
+    return JSON.stringify(value);
+};
+
+/* JSON for reading: a value that fits on one line stays on one line. */
+function readableJson(value, indent = '') {
+    const inline = inlineJson(value);
+    if (value === null || typeof value !== 'object' || indent.length + inline.length <= INLINE_JSON_WIDTH) return inline;
+    const inner = `${indent}  `;
+    const items = Array.isArray(value)
+        ? value.map((item) => `${inner}${readableJson(item, inner)}`)
+        : Object.entries(value).map(([key, item]) => `${inner}${JSON.stringify(key)}: ${readableJson(item, inner)}`);
+    return `${Array.isArray(value) ? '[' : '{'}\n${items.join(',\n')}\n${indent}${Array.isArray(value) ? ']' : '}'}`;
+}
+
+const jsonBlock = (value) => ['```json', readableJson(value), '```'];
 
 const authText = (auth) => {
     if (auth.class === AUTH.API_TOKEN) return `API token with the ${code(auth.scope)} scope`;
@@ -151,7 +174,7 @@ const requestPathOf = (route, entry) => entry.requestPath || route.path.replace(
 function requestBlock(route, entry, auth, body) {
     const lines = ['```http', `${route.method} ${requestPathOf(route, entry)}`];
     if (auth.token) lines.push('Authorization: Bearer <token>', 'companyid: <company id>');
-    if (body !== undefined && body !== null) lines.push('Content-Type: application/json', '', JSON.stringify(body, null, 2));
+    if (body !== undefined && body !== null) lines.push('Content-Type: application/json', '', readableJson(body));
     return [...lines, '```'];
 }
 
@@ -310,7 +333,7 @@ function renderFront(facts, grouped, counts) {
         '- [Rate limiting](#rate-limiting)',
         '- [Ids and dates](#ids-and-dates)',
         '- [Pagination](#pagination)',
-        '- [Webhooks](#webhooks)',
+        '- [Webhook deliveries](#webhook-deliveries)',
         '- [Stability](#stability)',
         ...grouped.resources.map((resource) => `- [${resource.title}](#${anchorOf(resource.title)})`),
         '- [Appendix: every other route](#appendix-every-other-route)',
@@ -353,7 +376,7 @@ function renderFront(facts, grouped, counts) {
         '',
         '### Tokens limited to projects',
         '',
-        'A token can be created limited to some projects. Such a token is refused, with 403 and `code: "token_limited_to_projects"`, on every route that cannot hold it to that list. The routes that accept it are:',
+        'A token can be created limited to some projects. Such a token is refused, with 403 and `code: "token_limited_to_projects"`, on every route that cannot hold it to that list. Of the routes documented here, these accept it:',
         '',
         ...held.map((key) => `- ${code(key)}`),
         '',
@@ -376,7 +399,7 @@ function renderFront(facts, grouped, counts) {
         'A success is a JSON object with `status: true`, a human-readable `statusText`, and the result in `data`:',
         '',
         '```json',
-        JSON.stringify({ status: true, statusText: 'Pages fetched.', data: [] }, null, 2),
+        readableJson({ status: true, statusText: 'Pages fetched.', data: [] }),
         '```',
         '',
         'A few routes put a value beside `data` instead of inside it (a new task\'s `id`, a list\'s `hasMore`); each route below shows its own response.',
@@ -384,7 +407,7 @@ function renderFront(facts, grouped, counts) {
         'A failure is a JSON object with `status: false` and the reason in `statusText`, `message` or both:',
         '',
         '```json',
-        JSON.stringify({ status: false, statusText: 'Page not found.' }, null, 2),
+        readableJson({ status: false, statusText: 'Page not found.' }),
         '```',
         '',
         'Some failures add `error`, a machine-readable `code`, the `permission` key that was missing, or the `field` that was refused.',
@@ -406,7 +429,7 @@ function renderFront(facts, grouped, counts) {
         `There is one limit per client address, across all API routes: ${rate.perMinute} requests per ${rate.windowSeconds} seconds unless the instance sets \`GLOBAL_RATE_LIMIT_PER_MIN\` (which can also turn it off). Static files are not counted. A request over the limit is answered with 429, a \`Retry-After\` header in seconds, and:`,
         '',
         '```json',
-        JSON.stringify({ status: false, code: rate.code, statusText: rate.text, message: rate.text, retryAfter: 12 }, null, 2),
+        readableJson({ status: false, code: rate.code, statusText: rate.text, message: rate.text, retryAfter: 12 }),
         '```',
         '',
         'On a 429, wait `retryAfter` seconds and send the same request again. The response headers `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset` show where the caller stands.',
@@ -431,20 +454,20 @@ function renderFront(facts, grouped, counts) {
         '',
         'Routes that are not in this table return the whole list.',
         '',
-        '## Webhooks',
+        '## Webhook deliveries',
         '',
-        `A webhook posts task events to a URL you choose. The events are ${webhooks.events.map(code).join(', ')}; \`*\` subscribes to all of them. The formats are ${webhooks.formats.map(code).join(', ')}. Webhooks are managed with the routes under [Webhooks](#webhooks-1).`,
+        `A webhook posts task events to a URL you choose. The events are ${webhooks.events.map(code).join(', ')}; \`*\` subscribes to all of them. The formats are ${webhooks.formats.map(code).join(', ')}. Webhooks are managed with the routes under [Webhooks](#webhooks).`,
         '',
         'A delivery in the `json` format is a `POST` with this body:',
         '',
         '```json',
-        JSON.stringify({
+        readableJson({
             event: 'task.updated',
             companyId: '<company id>',
             deliveredAt: '2026-10-01T09:30:00.000Z',
             changedFields: ['Task_Priority'],
             data: { _id: '<task id>', TaskKey: 'WEB-12', TaskName: 'Write the release notes', statusType: 'active', Task_Priority: 'HIGH', ProjectID: '<project id>', sprintId: '<list id>', AssigneeUserId: ['<user id>'], assigneeNames: ['Sample Person'], updatedAt: '2026-10-01T09:30:00.000Z' },
-        }, null, 2),
+        }),
         '```',
         '',
         '`data` is a fixed set of task fields, never the whole stored task. `previous` is added, with the same shape, when the server has delivered this task before. Each delivery carries the headers `X-AlianHub-Event`, `X-AlianHub-Delivery-Attempt` and `X-AlianHub-Signature`. The signature is `sha256=` followed by the HMAC-SHA256 of the raw request body, keyed with the secret returned when the webhook was created; compute it over the bytes received and compare before trusting a delivery. Changes to one task within a couple of seconds arrive as one delivery. A delivery that fails with a network error or a 5xx is sent once more, 30 seconds later.',
@@ -473,9 +496,9 @@ function renderDocs(grouped, context, facts) {
     lines.push(
         '## Appendix: every other route',
         '',
-        `Every route the server registers that is not documented in full above, with every optional module switched on. \`${INTERNAL}\` routes are not for integrations. \`${UNDOCUMENTED}\` routes have no description here yet; nothing about them is promised.`,
+        `Every route the server registers that is not documented in full above, with every optional module switched on. \`${INTERNAL}\` routes are not for integrations; every \`/api/v1\` route is one unless the meta file says otherwise. \`${UNDOCUMENTED}\` routes have no description here yet; nothing about them is promised.`,
         '',
-        'The Auth column is the guard the route sits behind. `Session or token` routes accept the web app\'s session or an API token. `Session` routes refuse a token. `Instance admin` routes are for the person who runs the server. `Public` routes are outside the login guard: sign-in and sign-up, pages opened by a secret link, and endpoints that check a credential of their own. A handler can refuse more than its guard does.',
+        'The Auth column is the guard the route sits behind. `Session or token` routes accept the web app\'s session or an API token. `Session` routes refuse a token. `Instance admin` routes are for the person who runs the server. `No login guard` routes are sign-in and sign-up, pages opened by a secret link, and endpoints that check a credential of their own, such as `/mcp` and `/scim/v2`. A handler can refuse more than its guard does.',
         '',
         renderAppendix(grouped.appendix, context),
     );
@@ -559,7 +582,8 @@ function build(options) {
     if (problems.length) return { problems, routes };
 
     const grouped = groupRoutes(routes, meta);
-    facts.held = routes.filter((route) => classifyAuth(route, meta.routes[route.key] || {}, context).narrowedToken).map((route) => route.key).sort();
+    facts.held = grouped.resources.flatMap((resource) => resource.routes)
+        .filter(({ route, entry }) => classifyAuth(route, entry, context).narrowedToken).map(({ route }) => route.key);
     return {
         problems,
         routes,

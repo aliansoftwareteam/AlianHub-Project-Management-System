@@ -98,9 +98,9 @@ describe('route grouping', () => {
         expect(grouped.resources[1].routes.map((r) => r.route.key)).toEqual(['POST /api/v2/tasks']);
     });
 
-    it('lists every other route in the appendix, sorted, as internal or undocumented', () => {
+    it('lists every other route in the appendix, sorted, as internal or undocumented; v1 is internal unless described', () => {
         expect(grouped.appendix.map((r) => [r.route.key, r.status])).toEqual([
-            ['GET /api/v1/task/:id', 'undocumented'],
+            ['GET /api/v1/task/:id', 'internal'],
             ['GET /api/v2/forms', 'undocumented'],
             ['GET /api/v2/secrets', 'internal'],
         ]);
@@ -213,7 +213,7 @@ describe('the appendix', () => {
         const lines = renderAppendix(grouped.appendix, context).split('\n');
         expect(lines).toContain('| `GET` | `/api/v2/secrets` | Session | internal | Workspace secrets. |');
         expect(lines).toContain('| `GET` | `/api/v2/forms` | Session or token | undocumented | Lists forms. |');
-        expect(lines).toContain('| `GET` | `/api/v1/task/:id` | Session or token | undocumented | |');
+        expect(lines).toContain('| `GET` | `/api/v1/task/:id` | Session or token | internal | |');
     });
 });
 
