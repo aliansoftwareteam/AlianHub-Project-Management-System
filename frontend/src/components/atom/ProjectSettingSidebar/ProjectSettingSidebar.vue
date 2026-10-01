@@ -1,17 +1,17 @@
  <template>
     <div>
     <SpinnerComp :is-spinner="isSpinner" v-if="isSpinner"/>
-        <Sidebar width="607px" :top ="clientWidth > 767 ? '46px' : '0px' " >
+        <Sidebar themed width="607px" :top ="clientWidth > 767 ? '46px' : '0px' " >
              <template #head-left>
-                <div class="blue font-ui text-ellipsis text-nowrap pr-15px">{{sidebarTitle === 'projectStatus' ? `${projectData.ProjectName} ${$t('Projects.status')}` : sidebarTitle === 'taskType' ? `${projectData.ProjectName} ${$t('Projects.task_type')}` : sidebarTitle === 'taskStatus' ? `${projectData.ProjectName} ${$t('Templates.task_status')}` : ''}}</div>
+                <div class="font-ui text-ellipsis text-nowrap pr-15px">{{sidebarTitle === 'projectStatus' ? `${projectData.ProjectName} ${$t('Projects.status')}` : sidebarTitle === 'taskType' ? `${projectData.ProjectName} ${$t('Projects.task_type')}` : sidebarTitle === 'taskStatus' ? `${projectData.ProjectName} ${$t('Templates.task_status')}` : ''}}</div>
             </template>
             <template #head-right>
-                <button class="bg-white cancelButtonProject blue mr-010 cursor-pointer" @click="closeSidebarFun()">{{$t('Projects.cancel')}}</button>
-                <button class="bg-blue cancelButtonProject white cursor-pointer" @click="submitData()" :disabled="isSpinnerTaskType || isSpinnerTaskStatus">{{ $t('Projects.submit') }}</button>
+                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm mr-010" @click="closeSidebarFun()">{{$t('Projects.cancel')}}</button>
+                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="submitData()" :disabled="isSpinnerTaskType || isSpinnerTaskStatus">{{ $t('Projects.submit') }}</button>
             </template>
             <template #body>
-                <div :class="{'bg-white' : clientWidth <=767}" class="h-100 pss__setting-body">
-                    <div v-if="sidebarTitle === 'projectStatus'" class="bg-white m-015 project__setting--blankproject border-radius-8-px createProjectWizardSlider pss__setting-panel" :class="{'mobile-project-taskstatus-section task-detail-mobile' : clientWidth<=767}"  :style="[{margin : clientWidth > 767 ? '15px' : '0'}]">
+                <div class="h-100 pss__setting-body">
+                    <div v-if="sidebarTitle === 'projectStatus'" class="m-015 project__setting--blankproject createProjectWizardSlider pss__setting-panel" :class="{'mobile-project-taskstatus-section task-detail-mobile' : clientWidth<=767}"  :style="[{margin : clientWidth > 767 ? '15px' : '0'}]">
                         <ProjectStatusForm
                             v-model="formData.projectStatusForm"
                             :from="'setting'"
@@ -21,7 +21,7 @@
                             @updateStatus="updateStatus"
                         />
                     </div>
-                    <div v-if="sidebarTitle === 'taskType'" class="bg-white m-015 project__setting--blankproject border-radius-8-px createProjectWizardSlider pss__setting-panel" :class="{'mobile-project-taskstatus-section task-detail-mobile' : clientWidth<=767}" :style="[{margin : clientWidth > 767 ? '15px' : '0'}]">
+                    <div v-if="sidebarTitle === 'taskType'" class="m-015 project__setting--blankproject createProjectWizardSlider pss__setting-panel" :class="{'mobile-project-taskstatus-section task-detail-mobile' : clientWidth<=767}" :style="[{margin : clientWidth > 767 ? '15px' : '0'}]">
                         <ProjectTaskTypeForm
                             v-model="formData.taskTypeForm"
                             :from="'setting'"
@@ -32,7 +32,7 @@
                             @updateStatus="updateStatus"
                         />
                     </div>
-                    <div v-if="sidebarTitle === 'taskStatus'" class="bg-white m-015 project__setting--blankproject border-radius-8-px createProjectWizardSlider pss__setting-panel" :class="{'mobile-project-taskstatus-section task-detail-mobile' : clientWidth<=767}" :style="[{margin : clientWidth > 767 ? '15px' : '0'}]">
+                    <div v-if="sidebarTitle === 'taskStatus'" class="m-015 project__setting--blankproject createProjectWizardSlider pss__setting-panel" :class="{'mobile-project-taskstatus-section task-detail-mobile' : clientWidth<=767}" :style="[{margin : clientWidth > 767 ? '15px' : '0'}]">
                         <TaskStatusForm 
                             v-model="formData.taskStatusForm" 
                             :from="'setting'" 
@@ -668,15 +668,6 @@ function confirmData () {
 </script>
 
 <style>
-.cancelButtonProject{
-    border: 1px solid #2F3990;
-    border-radius: 4px;
-    height: 30px;
-    padding: 3px 14px;
-    font-size: 16px;
-    line-height: 24px;
-    font-family: var(--font-ui);
-}
 .project__setting--blankproject{
     padding: 20px;
 }
@@ -689,6 +680,39 @@ function confirmData () {
     margin-left: auto;
 }
 input.statusInputText.form-control.edit-input:focus-visible{outline-color: none !important;}
+
+/* The three forms inside are shared with hosts that still paint a white page, so they keep their
+   light literals; this sidebar is a token surface and restates them here, scoped to its panel. */
+.pss__setting-body { background: var(--canvas); color: var(--ink); }
+.pss__setting-panel {
+    --tsf-selected: var(--brand);
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-card);
+    color: var(--ink);
+}
+.pss__setting-panel .heading_text,
+.pss__setting-panel .statusHeader > .bg-light-gray { background-color: var(--surface-2) !important; color: var(--ink); }
+.pss__setting-panel :is(h3, h4, label.task-done-status, span.taskInnerData) { color: var(--ink); }
+/* !important: the forms set these headings and labels with it. */
+.pss__setting-panel :is(.task-heading-desktop, .task-heading-mobile, .taskstatustitle-desktop, .taskstatustitle-mobile) { color: var(--ink) !important; }
+.pss__setting-panel :is(.template-label-desktop, .template-label-mobile) { color: var(--ink-2) !important; }
+.pss__setting-panel label.templetes,
+.pss__setting-panel .taskStatusLeft ul.templated_name_ul li,
+.pss__setting-panel .templated_name { color: var(--ink-2); }
+.pss__setting-panel button.add_template,
+.pss__setting-panel button.save_template,
+.pss__setting-body .pss__setting-panel .tsf-active-template { color: var(--brand); }
+.pss__setting-body .pss__setting-panel .tsf-substep-header { background: var(--surface); }
+.pss__setting-body .pss__setting-panel .tsf-save-template { background: var(--surface); border-color: var(--brand); color: var(--brand); }
+.pss__setting-panel .tsf-back-btn path { stroke: var(--brand); }
+.pss__setting-panel ul.status_ul li { border-color: var(--hairline) !important; }
+.pss__setting-panel .form-control { background: var(--surface) !important; color: var(--ink) !important; border-color: var(--border); }
+.pss__setting-panel .form-control::placeholder { color: var(--ink-2) !important; }
+.pss__setting-panel .btn-white { background: transparent; color: var(--ink); border-color: var(--border); }
+.pss__setting-panel .btn-primary { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+.pss__setting-panel .red { color: var(--danger-ink); }
+.pss__setting-panel ul.templated_name_ul { scrollbar-color: var(--border) transparent; }
 
 /* Settings sidebar: fill the body so the form panel spans the full height instead of
    leaving an empty gap below its content. Scoped to .pss__setting-* (added only here) so

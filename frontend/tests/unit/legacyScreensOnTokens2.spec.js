@@ -142,12 +142,34 @@ describe('shared pickers', () => {
         expect(stylesOf('views/MilestoneReport/MilestoneReport.css')).not.toMatch(/\.days-selected-dropdown \.select-option-value/);
     });
 
+    test('the project settings sidebar is a themed sidebar and restates the shared forms\' colours on its own panel', () => {
+        const vue = read('components/atom/ProjectSettingSidebar/ProjectSettingSidebar.vue');
+        const template = templateOf(vue);
+        expect(template).toMatch(/<Sidebar themed /);
+        expect(template).toMatch(/class="ah-btn ah-btn--secondary ah-btn--sm mr-010"/);
+        expect(template).toMatch(/class="ah-btn ah-btn--primary ah-btn--sm"/);
+        expect(classValues(template)).not.toMatch(LEGACY_CLASS);
+        const css = stylesOf('components/atom/ProjectSettingSidebar/ProjectSettingSidebar.vue');
+        expect(declarations(css)).not.toMatch(COLOUR_LITERAL);
+        expect(ruleBody(css, '.pss__setting-panel')).toMatch(/--tsf-selected:\s*var\(--brand\);\s*background:\s*var\(--surface\)/);
+        expect(css).toMatch(/\.pss__setting-panel :is\(\.task-heading-desktop, \.task-heading-mobile, \.taskstatustitle-desktop, \.taskstatustitle-mobile\) \{ color: var\(--ink\) !important; \}/);
+        expect(ruleBody(css, '.pss__setting-panel .form-control')).toMatch(/background:\s*var\(--surface\) !important;\s*color:\s*var\(--ink\) !important/);
+    });
+
+    test('the template picker marks the chosen template with a class a themed host can recolour', () => {
+        const vue = read('components/molecules/TemplateSelectForm/TemplateSelectForm.vue');
+        expect(templateOf(vue)).toMatch(/'is-selected': isSelected\(tempVal\)/);
+        expect(templateOf(vue)).not.toMatch(/:style="isSelected/);
+        expect(vue).toMatch(/\.templated_name\.is-selected \{\s*color: var\(--tsf-selected, #3845B3\) !important;/);
+    });
+
     test('the confirmation sidebar is a token surface with shared buttons', () => {
         const template = templateOf(read('components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue'));
+        expect(template).toMatch(/<Sidebar themed /);
         expect(template).toMatch(/class="ah-btn ah-btn--secondary"/);
         const css = stylesOf('components/molecules/ConfirmationSidebar/style.css');
         expect(ruleBody(css, '.conformation__sidebar-component')).toMatch(/background:\s*var\(--canvas\)/);
-        expect(ruleBody(css, '.conformation__sidebar-component')).toMatch(/color-scheme:\s*var\(--scheme, light\)/);
+        expect(ruleBody(css, '.conformation__sidebar-component')).toMatch(/color-scheme:\s*var\(--scheme\)/);
         expect(ruleBody(css, '.archive-delete-title')).toMatch(/color:\s*var\(--ink\)/);
     });
 });

@@ -394,7 +394,7 @@ onBeforeUnmount(() => resetToIdle());
     position: fixed; top: 56px; right: 16px; width: 340px; max-width: calc(100vw - 24px);
     background: var(--surface); color: var(--ink); border: 1px solid var(--hairline); border-radius: var(--r-card);
     box-shadow: var(--shadow-pop); padding: 14px 16px 16px;
-    color-scheme: var(--scheme, light);
+    color-scheme: var(--scheme);
     font-family: inherit;
 }
 .ttt__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }

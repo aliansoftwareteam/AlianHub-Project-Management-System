@@ -46,7 +46,7 @@
     background: var(--surface);
     color: var(--ink);
     border-color: var(--border);
-    color-scheme: var(--scheme, light);
+    color-scheme: var(--scheme);
 }
 .select-option.sel-tokens.cutom-select-disabled { background: var(--fill); color: var(--ink-2); }
 .sel-tokens.focused { border-color: var(--brand) !important; }

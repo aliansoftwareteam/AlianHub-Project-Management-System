@@ -1,5 +1,5 @@
 <template>
-    <Sidebar :hideHeader="true" :title="title" :visible="modelValue" @update:visible="showSpinner ? '' : $emit('update:modelValue', $event), confirmName = ''" width="607px" :top="clientWidth <= 767 ? '0px' : '46px'">
+    <Sidebar themed :hideHeader="true" :title="title" :visible="modelValue" @update:visible="showSpinner ? '' : $emit('update:modelValue', $event), confirmName = ''" width="607px" :top="clientWidth <= 767 ? '0px' : '46px'">
         <template #body>
             <div class="p-020 position-re style-scroll overflow-auto conformation__sidebar-component">
                 <div class="w-100 h-100 position-ab d-flex align-items-center justify-content-center z-index-7 conformation__busy" v-if="showSpinner">

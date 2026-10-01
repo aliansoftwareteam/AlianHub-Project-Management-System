@@ -2,7 +2,7 @@
     height:calc(100vh - 46px);
     background: var(--canvas);
     color: var(--ink);
-    color-scheme: var(--scheme, light);
+    color-scheme: var(--scheme);
 }
 .conformation__busy{
     background: var(--scrim);

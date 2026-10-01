@@ -600,6 +600,14 @@ a.ts-crumb {
   color: var(--ink);
   border-color: var(--border);
 }
+/* Here, not in the tracker's scoped block: the day field is the calendar component's own input. */
+.time_tracker__timesheet .date_format_cal.calendar-comp {
+  background: transparent;
+  color: var(--ink) !important;
+}
+.time_tracker__timesheet .date_format_cal.calendar-comp::placeholder {
+  color: var(--ink) !important;
+}
 .timesheet_view .taable_arrow {
   width: 9px;
   height: 9px;
