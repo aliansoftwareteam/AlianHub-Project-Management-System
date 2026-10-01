@@ -314,6 +314,8 @@ const create = ({ mongooseCasting = false } = {}) => {
                 if (stage.$limit) return docs.slice(0, stage.$limit);
                 if (stage.$count) return docs.length ? [{ [stage.$count]: docs.length }] : [];
                 if (stage.$facet) return [Object.fromEntries(Object.entries(stage.$facet).map(([name, sub]) => [name, run(docs, sub)]))];
+                if (stage.$unionWith) return [...docs, ...run(rows(stage.$unionWith.coll), stage.$unionWith.pipeline || [])];
+                if (stage.$unset) return docs.map((d) => Object.fromEntries(Object.entries(d).filter(([key]) => ![].concat(stage.$unset).includes(key))));
                 if (stage.$lookup) {
                     const { from, localField, foreignField, as, pipeline: inner = [] } = stage.$lookup;
                     return docs.map((d) => ({ ...d, [as]: run(rows(from).filter((f) => String(hex(read(f, foreignField))) === String(hex(read(d, localField)))), inner) }));
