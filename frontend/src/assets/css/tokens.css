@@ -242,6 +242,122 @@
 /* Many controls draw focus as a box-shadow and switch the outline off; here the outline wins. */
 :root.ah-high-contrast :focus-visible { outline: 3px solid var(--ink) !important; outline-offset: 2px !important; }
 
+/* Accent (task 046 B4): picked in Settings and applied as data-accent on <html>. With no attribute
+   the app wears indigo, whose values are the ones on :root and in the dark block. An accent restates
+   the brand family only; --focus reads --brand, and --on-brand stays the theme's. High contrast keeps
+   its own brand, which is tuned to 7:1. The rail is dark in both themes, so --rail-brand is the dark
+   shade and is set once. Each rule also paints that accent's swatch in the picker. */
+[data-accent-swatch="indigo"] { --brand: #2F3990; }
+:root[data-theme="dark"] [data-accent-swatch="indigo"] { --brand: #a892ff; }
+
+:root[data-accent="blue"]:not(.ah-high-contrast),
+[data-accent-swatch="blue"] {
+    --brand: #1a59c7;
+    --brand-deep: #12459c;
+    --brand-tint: rgba(26, 89, 199, .10);
+    --brand-ring: rgba(26, 89, 199, .12);
+    --brand-border: rgba(26, 89, 199, .35);
+    --rail-brand: #7fb2ff;
+}
+:root[data-theme="dark"][data-accent="blue"]:not(.ah-high-contrast),
+:root[data-theme="dark"] [data-accent-swatch="blue"] {
+    --brand: #7fb2ff;
+    --brand-deep: #689fee;
+    --brand-tint: rgba(127, 178, 255, .16);
+    --brand-ring: rgba(127, 178, 255, .22);
+    --brand-border: rgba(127, 178, 255, .35);
+}
+
+:root[data-accent="purple"]:not(.ah-high-contrast),
+[data-accent-swatch="purple"] {
+    --brand: #7b32c8;
+    --brand-deep: #6224a6;
+    --brand-tint: rgba(123, 50, 200, .10);
+    --brand-ring: rgba(123, 50, 200, .12);
+    --brand-border: rgba(123, 50, 200, .35);
+    --rail-brand: #d3a1ff;
+}
+:root[data-theme="dark"][data-accent="purple"]:not(.ah-high-contrast),
+:root[data-theme="dark"] [data-accent-swatch="purple"] {
+    --brand: #d3a1ff;
+    --brand-deep: #c08cf0;
+    --brand-tint: rgba(211, 161, 255, .16);
+    --brand-ring: rgba(211, 161, 255, .22);
+    --brand-border: rgba(211, 161, 255, .35);
+}
+
+:root[data-accent="teal"]:not(.ah-high-contrast),
+[data-accent-swatch="teal"] {
+    --brand: #0b6e73;
+    --brand-deep: #07565a;
+    --brand-tint: rgba(11, 110, 115, .10);
+    --brand-ring: rgba(11, 110, 115, .12);
+    --brand-border: rgba(11, 110, 115, .35);
+    --rail-brand: #48d1c6;
+}
+:root[data-theme="dark"][data-accent="teal"]:not(.ah-high-contrast),
+:root[data-theme="dark"] [data-accent-swatch="teal"] {
+    --brand: #48d1c6;
+    --brand-deep: #35bdb2;
+    --brand-tint: rgba(72, 209, 198, .16);
+    --brand-ring: rgba(72, 209, 198, .22);
+    --brand-border: rgba(72, 209, 198, .35);
+}
+
+:root[data-accent="green"]:not(.ah-high-contrast),
+[data-accent-swatch="green"] {
+    --brand: #186f40;
+    --brand-deep: #115530;
+    --brand-tint: rgba(24, 111, 64, .10);
+    --brand-ring: rgba(24, 111, 64, .12);
+    --brand-border: rgba(24, 111, 64, .35);
+    --rail-brand: #63d690;
+}
+:root[data-theme="dark"][data-accent="green"]:not(.ah-high-contrast),
+:root[data-theme="dark"] [data-accent-swatch="green"] {
+    --brand: #63d690;
+    --brand-deep: #4fc27c;
+    --brand-tint: rgba(99, 214, 144, .16);
+    --brand-ring: rgba(99, 214, 144, .22);
+    --brand-border: rgba(99, 214, 144, .35);
+}
+
+:root[data-accent="orange"]:not(.ah-high-contrast),
+[data-accent-swatch="orange"] {
+    --brand: #a54306;
+    --brand-deep: #843404;
+    --brand-tint: rgba(165, 67, 6, .10);
+    --brand-ring: rgba(165, 67, 6, .12);
+    --brand-border: rgba(165, 67, 6, .35);
+    --rail-brand: #ffa35a;
+}
+:root[data-theme="dark"][data-accent="orange"]:not(.ah-high-contrast),
+:root[data-theme="dark"] [data-accent-swatch="orange"] {
+    --brand: #ffa35a;
+    --brand-deep: #f08f45;
+    --brand-tint: rgba(255, 163, 90, .16);
+    --brand-ring: rgba(255, 163, 90, .22);
+    --brand-border: rgba(255, 163, 90, .35);
+}
+
+:root[data-accent="pink"]:not(.ah-high-contrast),
+[data-accent-swatch="pink"] {
+    --brand: #b3206a;
+    --brand-deep: #901654;
+    --brand-tint: rgba(179, 32, 106, .10);
+    --brand-ring: rgba(179, 32, 106, .12);
+    --brand-border: rgba(179, 32, 106, .35);
+    --rail-brand: #ff8fc0;
+}
+:root[data-theme="dark"][data-accent="pink"]:not(.ah-high-contrast),
+:root[data-theme="dark"] [data-accent-swatch="pink"] {
+    --brand: #ff8fc0;
+    --brand-deep: #f079ad;
+    --brand-tint: rgba(255, 143, 192, .16);
+    --brand-ring: rgba(255, 143, 192, .22);
+    --brand-border: rgba(255, 143, 192, .35);
+}
+
 /* Looks (task 046 B0.2, B0.3): picked in Settings and applied as data-variant on <html>. With no
    attribute the app wears B, whose values are also the ones on :root, so nothing is repainted
    on load; the b block stays for a browser that stored it and must equal :root.
@@ -496,7 +612,7 @@ html, body, #app {
 .ah-btn--secondary { background: var(--surface); border-color: var(--border); }
 .ah-btn--secondary:hover:not(:disabled) { background: var(--surface-hover); }
 .ah-btn--outline { border-color: var(--brand); color: var(--brand); background: var(--brand-tint); }
-.ah-btn--outline:hover:not(:disabled) { background: rgba(47, 57, 144, .16); }
+.ah-btn--outline:hover:not(:disabled) { background: color-mix(in srgb, var(--brand) 16%, transparent); }
 .ah-btn--ghost { color: var(--ink-2); }
 .ah-btn--ghost:hover:not(:disabled) { background: var(--surface-hover); color: var(--ink); }
 .ah-btn--danger { background: var(--danger); color: #fff; }
@@ -711,9 +827,9 @@ html, body, #app {
 }
 @keyframes ah-spin { to { transform: rotate(360deg); } }
 
-.ah-fade-enter-active, .ah-fade-leave-active { transition: opacity var(--t-state) var(--ease); }
+.ah-fade-enter-active, .ah-fade-leave-active { transition: opacity var(--motion-base) var(--ease-out); }
 .ah-fade-enter-from, .ah-fade-leave-to { opacity: 0; }
-.ah-slide-right-enter-active, .ah-slide-right-leave-active { transition: transform var(--t-panel) var(--ease), opacity var(--t-panel) var(--ease); }
+.ah-slide-right-enter-active, .ah-slide-right-leave-active { transition: transform var(--motion-slow) var(--ease-out), opacity var(--motion-slow) var(--ease-out); }
 .ah-slide-right-enter-from, .ah-slide-right-leave-to { transform: translateX(24px); opacity: 0; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -733,6 +849,29 @@ html, body, #app {
         animation-iteration-count: 1 !important;
     }
 }
+
+/* Motion (task 046 B4). The shared overlays (menu, dialog, drawer, toast, tooltip) run on these.
+   --t-state, --t-panel and --ease are the names the screens were first written against; they are
+   re-pointed here so both names keep one clock. */
+:root {
+    --motion-fast: 120ms;
+    --motion-base: 150ms;
+    --motion-slow: 240ms;
+    --ease-out: cubic-bezier(.2, .7, .2, 1);
+    --ease-in-out: cubic-bezier(.4, 0, .2, 1);
+    --t-state: var(--motion-base);
+    --t-panel: var(--motion-slow);
+    --ease: var(--ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+    :root { --motion-fast: .01ms; --motion-base: .01ms; --motion-slow: .01ms; }
+}
+/* Entrances move the standalone translate property, never transform: several overlays already use
+   transform to place themselves, and an animated transform would drop that placement while it runs. */
+@keyframes ah-fade-in { from { opacity: 0; } }
+@keyframes ah-drop-in { from { opacity: 0; translate: 0 -4px; } }
+@keyframes ah-rise-in { from { opacity: 0; translate: 0 8px; } }
+.ah-pop { animation: ah-drop-in var(--motion-fast) var(--ease-out); }
 
 .ah-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 

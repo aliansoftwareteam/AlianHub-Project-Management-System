@@ -155,6 +155,7 @@
                     </button>
                 </div>
             </div>
+            <AccentPicker />
             <DesignVariantPicker />
         </section>
 
@@ -283,6 +284,7 @@ import SpinnerComp from "@/components/atom/SpinnerComp/SpinnerComp.vue";
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
 import CroppingTool from "@/components/atom/CroppingTool/CroppingTool.vue";
 import AhSwitch from "@/components/molecules/Setting/AhSwitch.vue";
+import AccentPicker from "./AccentPicker.vue";
 import DesignVariantPicker from "./DesignVariantPicker.vue";
 import AskMemoryButton from "@/views/Ai/AskMemoryButton.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";

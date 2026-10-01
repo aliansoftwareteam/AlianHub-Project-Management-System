@@ -93,7 +93,7 @@ describe('the shared entrance keyframes', () => {
 });
 
 describe('the shared overlays move on the motion tokens', () => {
-    const style = (rel) => { const file = read(rel); return rel.endsWith('.vue') ? file.slice(file.indexOf('<style')) : file; };
+    const style = (rel) => { const file = read(rel); return rel.endsWith('.vue') ? file.slice(file.indexOf('>', file.indexOf('<style')) + 1) : file; };
 
     it.each([
         ['the menu', 'assets/css/tokens.css', '.ah-pop', /animation:\s*ah-drop-in var\(--motion-fast\) var\(--ease-out\)/],
