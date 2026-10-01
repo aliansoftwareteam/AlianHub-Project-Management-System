@@ -14,6 +14,7 @@ const rules = require('./taskExtraListsRules');
 
 const MOVE = 'task.task_move';
 const DELETED = 1;
+const HISTORY_KEY = 'Task_Extra_List';
 
 const LIST_FIELDS = { name: 1, projectId: 1, private: 1, AssigneeUserId: 1, isScrum: 1, isBacklog: 1, deletedStatusKey: 1 };
 const PROJECT_FIELDS = { ProjectName: 1, isPersonal: 1, statusType: 1, deletedStatusKey: 1 };
@@ -128,6 +129,31 @@ const removalOf = (task, sprintId) => ({
     update: { $pull: { extraLists: { sprintId: toObjectId(sprintId) } } },
 });
 
+const pullOfLists = (sprintIds) => ({ extraLists: { sprintId: { $in: sprintIds.map(toObjectId) } } });
+
+/* What a move of the task's home leaves of its extra lists. The new home is never one of them, and
+ * the pull names it even when the row read here holds none, so an entry added meanwhile goes too.
+ * When the project changes, an entry stays only where the rules still let that list hold the task;
+ * a list in the trash keeps its entry, which shows again once the list is restored. */
+const afterHomeMove = async (companyId, task, home) => {
+    const entries = rules.extraListsOf(task).filter((entry) => !sameId(entry.sprintId, home.sprintId));
+    if (!entries.length || sameId(task.ProjectID, home.projectId)) return { pull: pullOfLists([home.sprintId]), dropped: [] };
+    const [lists, projects] = await Promise.all([
+        findByIds(companyId, SCHEMA_TYPE.SPRINTS, entries.map((entry) => entry.sprintId), LIST_FIELDS),
+        findByIds(companyId, SCHEMA_TYPE.PROJECTS, [home.projectId, ...entries.map((entry) => entry.projectId)], PROJECT_FIELDS),
+    ]);
+    const holds = rules.canHoldExtraLists({ mainChat: task.mainChat, ParentTaskId: task.ParentTaskId }, projects.get(String(home.projectId))).ok;
+    const stays = (entry, list) => {
+        const project = projects.get(String(entry.projectId));
+        return holds && Boolean(list) && Boolean(project) && sameId(list.projectId, entry.projectId)
+            && rules.canBeExtraList({ ...list, deletedStatusKey: 0 }, project).ok;
+    };
+    const dropped = entries
+        .map((entry) => ({ entry: { projectId: String(entry.projectId), sprintId: String(entry.sprintId) }, list: lists.get(String(entry.sprintId)) || null }))
+        .filter(({ entry, list }) => !stays(entry, list));
+    return { pull: pullOfLists([home.sprintId, ...dropped.map(({ entry }) => entry.sprintId)]), dropped };
+};
+
 /* A task's extra lists as this viewer may see them. The ids are on the stored row, which every
  * reader of the task already gets; the list's name and its project's name are added only for a
  * live list the viewer can open. */
@@ -171,6 +197,6 @@ const listPhrase = (task, entry, list, escape) => {
 
 module.exports = {
     ...rules,
-    MOVE, TASK_NOT_FOUND, LIST_NOT_FOUND, NOT_IN_LIST, NOT_PERMITTED, TASK_CHANGED,
-    storedTask, storedTasks, homeJudge, destinationFor, removalFor, additionOf, removalOf, listsForViewer, listPhrase,
+    MOVE, HISTORY_KEY, TASK_NOT_FOUND, LIST_NOT_FOUND, NOT_IN_LIST, NOT_PERMITTED, TASK_CHANGED,
+    storedTask, storedTasks, homeJudge, destinationFor, removalFor, additionOf, removalOf, pullOfLists, afterHomeMove, listsForViewer, listPhrase,
 };

@@ -26,6 +26,7 @@ const { loadSubtree, rewriteDescendantAncestors, sprintCountChange, DELETED } = 
 const { storableFieldValues } = require('../../CustomField/helpers/fieldValueWrite');
 const { withDescriptionBlock } = require('./descriptionBlock');
 const { copyFieldFiles } = require('../../CustomField/helpers/fieldFiles');
+const extraLists = require('./taskExtraLists');
 
 /* ------------- TASK ------------- */
 exports.HandleTask = async (companyId, object, isUpdate, id = null, userData) => {
@@ -283,7 +284,7 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                         },
                         {
                             $set: {...obj},
-                            $unset: {...unsetObj, cascadedBy: ''}
+                            $unset: {...unsetObj, cascadedBy: '', extraLists: ''}
                         },
                         {
                             returnDocument: 'after'
@@ -291,7 +292,7 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                     ]
                 }
                 MongoDbCrudOpration(companyId, queryObj, "findOneAndUpdate").then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: obj, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: extraLists.extraListsOf(convertTask).length ? { ...obj, extraLists: [] } : obj, module: 'task' });
                     /*When a subtask is converted to another subtask within a parent task, and a subtask is removed, the count of the parent task is reduced.*/
                     if (isMainSubTask === true) {
                         let object = {
@@ -409,7 +410,10 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                     }
                 ]
             }
-            MongoDbCrudOpration(companyId, deleteObj, "findOneAndUpdate").then((result) => {
+            Promise.all([
+                MongoDbCrudOpration(companyId, deleteObj, "findOneAndUpdate"),
+                extraLists.afterHomeMove(companyId, moveTask, { projectId: projectData.id, sprintId: sprintObj.id }),
+            ]).then(([result, extras]) => {
                 socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task' });
                 let obj = {};
                 let unsetObj = {}
@@ -473,7 +477,8 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                         },
                         {
                             $set: {...obj},
-                            $unset: unsetObj
+                            $unset: unsetObj,
+                            $pull: extras.pull
                         },
                         {
                             returnDocument: 'after'
@@ -497,9 +502,17 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                 // userData.id, so any caller that omits it took the server down.
                 exports.HandleHistory('task', companyId, projectData.id, moveTask._id, historyObj, userData)
                     .catch((error) => { logger.error(`ERROR IN MOVE TASK HISTORY: ${error && error.message}`); });
+                if (extras.dropped.length) {
+                    const where = extras.dropped.map(({ entry, list }) => extraLists.listPhrase({ ProjectID: projectData.id }, entry, list, escapeHtml)).join(', ');
+                    exports.HandleHistory('task', companyId, projectData.id, moveTask._id, {
+                        key: extraLists.HISTORY_KEY,
+                        sprintId: sprintObj.id,
+                        message: `<b>${escapeHtml(moveTask.TaskName)}</b> moved to another project and is no longer in ${where}.`,
+                    }, userData).catch((error) => { logger.error(`ERROR IN MOVE TASK HISTORY: ${error && error.message}`); });
+                }
                 }
                 MongoDbCrudOpration(companyId, queryObj, "findOneAndUpdate").then((ele) => {
-                    socketEmitter.emit('update', { type: "update", data: ele , updatedFields: obj, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: ele , updatedFields: extraLists.extraListsOf(moveTask).length ? { ...obj, extraLists: extraLists.extraListsOf(ele) } : obj, module: 'task' });
                     resolve({ status: true, statusText: "MOVE" });
 
                     updateCommentCollection(companyId, moveTask,sprintObj,projectData,moveTask._id).catch((err) => { logger.error(`${err},ERROR IN ADD COMMENTS IN SUBTASK`); })
@@ -557,7 +570,7 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                     // both ends so the user sees correct numbers.
                     scheduleReconciliation(companyId, [sprintObj?.id, oldSprintObj?.id]);
                 })
-            })
+            }).catch(reject)
         } catch (error) {
             reject(error);
         }
@@ -602,6 +615,7 @@ exports.convertToListSubTask = (companyId, projectData, subTask, sprintObj, oldS
                 ancestors: [],
             }
             delete obj.cascadedBy;
+            delete obj.extraLists;
             let unsetObj = {};
             if (sprintObjData.folderId !== undefined && sprintObjData?.folderId) {
                 obj.sprintArray.folderId = sprintObjData.folderId,
@@ -623,7 +637,7 @@ exports.convertToListSubTask = (companyId, projectData, subTask, sprintObj, oldS
                     { _id: new mongoose.Types.ObjectId(parseSubTask._id) },
                     { 
                         $set: { ...obj } ,
-                        $unset: { ...unsetObj, cascadedBy: '' }
+                        $unset: { ...unsetObj, cascadedBy: '', extraLists: '' }
                     },
                 ]
             }

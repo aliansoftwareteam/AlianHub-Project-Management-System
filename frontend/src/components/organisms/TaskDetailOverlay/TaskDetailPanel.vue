@@ -296,6 +296,7 @@
                     <span class="ah-detail__prop-label">{{ $t('TaskPanel.sprint') }}</span>
                     <button type="button" class="ah-detail__prop-link" @click="open('sprint')">{{ sprintName || '—' }}</button>
                 </div>
+                <TaskListsRow v-if="projectData._id" :task="task" :project="projectData" :homeName="sprintName" @changed="(extraLists) => reflectOwnUpdate({ extraLists })" />
                 <div class="ah-detail__prop">
                     <span class="ah-detail__prop-label">{{ $t('TaskPanel.type') }}</span>
                     <span>{{ taskTypeName || '—' }}</span>
@@ -383,6 +384,7 @@ import TaskAncestorTrail from "./TaskAncestorTrail.vue";
 import TaskTimerChip from "./TaskTimerChip.vue";
 import TaskTimeSection from "./TaskTimeSection.vue";
 import TaskAgentStrip from "./TaskAgentStrip.vue";
+import TaskListsRow from "./TaskListsRow.vue";
 import AiResultPreview from "@/components/molecules/AiPreview/AiResultPreview.vue";
 import { canControlRun } from "@/views/Ai/agentAccess";
 
