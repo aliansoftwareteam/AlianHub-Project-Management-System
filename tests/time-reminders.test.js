@@ -12,6 +12,8 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: j
 jest.mock('../Modules/service', () => ({ SendEmail: jest.fn() }));
 jest.mock('../Modules/TimeSheet/helpers/reminderSettings', () => ({ getCompanySettings: jest.fn() }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
+// Every day is a working day here, so the suite passes whatever day it runs on; tests/working-days-reminders.test.js covers the days off.
+jest.mock('../Modules/Company/helpers/companyWeek', () => ({ companyWorkingDays: jest.fn(async () => [0, 1, 2, 3, 4, 5, 6]) }));
 
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { SendEmail } = require('../Modules/service');

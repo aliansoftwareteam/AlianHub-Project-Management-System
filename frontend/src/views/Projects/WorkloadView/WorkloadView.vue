@@ -168,7 +168,7 @@
     import { apiRequest } from '../../../services';
     import * as env from '@/config/env';
     import { useViewSettings } from '@/views/Projects/composables/viewSettingsContext';
-    import { WORKLOAD_UNITS, cellLoad, chipSize, dailyCapacity, plannedLoad, roundAmount } from './workloadUnits';
+    import { WORKLOAD_UNITS, cellLoad, chipSize, dailyCapacity, gridWeek, plannedLoad, roundAmount, workingDaysOnly } from './workloadUnits';
 
     defineOptions({ name: "WorkloadView" });
 
@@ -188,6 +188,7 @@
     const error = ref('');
     const users = ref([]);
     const days = ref([]);
+    const answeredWeek = ref(null);
     const dateRange = ref({});
     const selectedUserIds = ref([]);
     const filterOpen = ref(false);
@@ -243,15 +244,14 @@
         const capacity = Number(wh.capacity);
         return Number.isFinite(capacity) && capacity > 0 ? capacity : 8;
     };
+    const week = computed(() => gridWeek(answeredWeek.value, currentCompany.value, props.projectData));
     const workDaysOf = (userId) => {
         const wh = getUser(userId)?.workingHours || {};
-        return Array.isArray(wh.days) && wh.days.length ? wh.days.map(Number) : [1, 2, 3, 4, 5];
+        return Array.isArray(wh.days) && wh.days.length ? wh.days.map(Number) : week.value;
     };
     const worksOn = (userId, date) => workDaysOf(userId).includes(moment(date).day());
 
-    // Weekends are dropped from the grid: an empty Sat/Sun column costs a tenth of
-    // the width and says nothing.
-    const visibleDays = computed(() => days.value.filter((d) => ![0, 6].includes(moment(d).day())));
+    const visibleDays = computed(() => workingDaysOnly(days.value, week.value));
 
     const value = (d) => cellLoad(gridUnit.value, mode.value, d);
     const planned = (d) => plannedLoad(gridUnit.value, d);
@@ -316,6 +316,7 @@
             if (!body.status) throw new Error(body.statusText || 'load_failed');
             users.value = body.data?.users || [];
             days.value = body.data?.days || [];
+            answeredWeek.value = body.data?.workingDays || null;
             gridUnit.value = WORKLOAD_UNITS.includes(body.data?.unit) ? body.data.unit : 'hours';
             unpointed.value = Number(body.data?.unpointed) || 0;
         } catch (e) {
