@@ -1,6 +1,7 @@
 const { canReadProject } = require('../../../Config/projectAccess');
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { canSeeSprintById } = require('../../Sprints/helpers/sprintVisibility');
+const { mayListTasksIn } = require('./taskListProjects');
 
 /* A record with no project behind it has no project rule to inherit. The only such records the
  * app writes are main-chat conversations, which belong to the people in them, owners included;
@@ -14,6 +15,7 @@ const canReadTask = async (companyId, uid, task) => {
     if (project.missing) return isChatParticipant(task, uid);
     if (!project.allowed) return false;
     if (isPrivileged(await getRoleType(companyId, uid))) return true;
+    if (!(await mayListTasksIn(companyId, uid, task.ProjectID))) return false;
     return canSeeSprintById(companyId, uid, task.sprintId);
 };
 

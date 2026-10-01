@@ -2,6 +2,7 @@ const mockDb = require('./fixtures/fakeMongo').create();
 const mockChat = jest.fn();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn() }));
 jest.mock('../Modules/AICore/llmProvider', () => ({
     isAnyProviderConfigured: () => true,

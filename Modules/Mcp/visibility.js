@@ -8,6 +8,7 @@ const { hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
 const { pageVisibleTo } = require('../Pages/helpers/pageRules');
 const { othersPersonalListIds } = require('../PersonalList/ownership');
 const { companyWideMatch, readsCompanyWide } = require('../Tasks/helpers/taskQueryGuard');
+const { keepTaskListProjectIds } = require('../Tasks/helpers/taskListProjects');
 const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 
 // What an MCP caller may read or act on: exactly what the person behind the token
@@ -24,16 +25,19 @@ const isId = (v) => OBJECT_ID.test(String(v || ''));
 const toOid = (v) => new mongoose.Types.ObjectId(String(v));
 
 /* `personalLists` is given for an owner or admin, who reads company-wide: the personal lists that are
- * someone else's. Everyone else's project list already leaves those out, and for them it stays null. */
-const build = ({ uid, projectIds, hidden, tokenNarrowed, personalLists = null }) => {
+ * someone else's. Everyone else's project list already leaves those out, and for them it stays null.
+ * `taskProjectIds` are the projects whose tasks the caller may list; without them every project is. */
+const build = ({ uid, projectIds, taskProjectIds = projectIds, hidden, tokenNarrowed, personalLists = null }) => {
     const hiddenSet = new Set(hidden.map(String));
     const projectSet = projectIds === null ? null : new Set(projectIds.map(String));
+    const taskProjectSet = taskProjectIds === null ? null : new Set(taskProjectIds.map(String));
     const companyWide = personalLists !== null;
     const excluded = new Set((personalLists || []).map(String));
 
     const allowsProject = (id) => isId(id) && !excluded.has(String(id)) && (projectSet === null || projectSet.has(String(id)));
+    const listsTasksIn = (id) => allowsProject(id) && (taskProjectSet === null || taskProjectSet.has(String(id)));
     const allowsSprint = (id) => !id || !hiddenSet.has(String(id));
-    const allowsTask = (task) => Boolean(task) && allowsProject(task.ProjectID) && allowsSprint(task.sprintId)
+    const allowsTask = (task) => Boolean(task) && listsTasksIn(task.ProjectID) && allowsSprint(task.sprintId)
         && readsCompanyWide(task, uid, [...excluded]);
     // A page outside every project is company-wide; a project-restricted token was never granted those.
     const allowsPage = (page) => pageVisibleTo(page, uid)
@@ -42,8 +46,8 @@ const build = ({ uid, projectIds, hidden, tokenNarrowed, personalLists = null })
     /* A find clause for tasks. `narrowTo` is a caller's projectId argument: it can only
      * shrink the set, so a project outside the filter matches nothing. */
     const taskClause = (narrowTo) => {
-        let ids = projectIds;
-        if (isId(narrowTo)) ids = allowsProject(narrowTo) ? [String(narrowTo)] : [];
+        let ids = taskProjectIds;
+        if (isId(narrowTo)) ids = listsTasksIn(narrowTo) ? [String(narrowTo)] : [];
         return {
             ...(ids === null ? {} : { ProjectID: { $in: ids.map(toOid) } }),
             ...(hiddenSet.size ? { sprintId: { $nin: [...hiddenSet].map(toOid) } } : {}),
@@ -80,8 +84,11 @@ const forCaller = async (ctx) => {
     }
 
     const projectIds = (await visibleProjectIds(companyId, uid)).map(String).filter(inToken);
-    const hidden = await hiddenSprintIds(companyId, uid, projectIds);
-    return build({ uid, projectIds, hidden, tokenNarrowed });
+    const [hidden, taskProjectIds] = await Promise.all([
+        hiddenSprintIds(companyId, uid, projectIds),
+        keepTaskListProjectIds(companyId, uid, projectIds),
+    ]);
+    return build({ uid, projectIds, taskProjectIds, hidden, tokenNarrowed });
 };
 
 const refuse = (reason) => Object.assign(new Error(`${NOT_VISIBLE}: ${reason}`), { notVisible: true });

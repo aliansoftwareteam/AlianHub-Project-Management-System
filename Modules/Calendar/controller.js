@@ -6,6 +6,8 @@ const { tenantOf } = require('../../Config/tenant');
 const logger = require('../../Config/loggerConfig');
 const config = require('../../Config/config');
 const { visibleProjectIds } = require('../Agents/scope');
+const { taskListProjectIds } = require('../Tasks/helpers/taskListProjects');
+const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const R = require('./helpers/icalRules');
 
 const GLOBAL = SCHEMA_TYPE.GOLBAL;
@@ -144,9 +146,9 @@ const readableProjectIds = async (feed) => {
         data: [{ userId: String(feed.userId), isDelete: { $ne: true }, status: { $nin: [3] } }, { _id: 1 }],
     }, 'findOne');
     if (!member) return null;
-    const visible = await visibleProjectIds(feed.companyId, feed.userId);
-    if (feed.scope === 'project') return visible.includes(String(feed.projectId)) ? [String(feed.projectId)] : null;
-    return visible;
+    const listable = await taskListProjectIds(feed.companyId, feed.userId);
+    if (feed.scope === 'project') return listable.includes(String(feed.projectId)) ? [String(feed.projectId)] : null;
+    return listable;
 };
 
 const LIVE_FEED = { deletedStatusKey: { $ne: 1 }, enabled: { $ne: false } };
@@ -171,7 +173,12 @@ exports.getIcs = async (req, res) => {
         const feed = await findFeedByToken(token);
         const projectIds = feed ? await readableProjectIds(feed) : null;
         if (!projectIds) return res.status(404).send(FEED_NOT_FOUND);
-        const match = { DueDate: { $ne: null }, deletedStatusKey: 0, ProjectID: { $in: projectIds.map(oid).filter(Boolean) } };
+        const match = {
+            DueDate: { $ne: null },
+            deletedStatusKey: 0,
+            ProjectID: { $in: projectIds.map(oid).filter(Boolean) },
+            ...(await hiddenSprintFilter(feed.companyId, feed.userId, projectIds)),
+        };
         if (feed.scope === 'my') match.AssigneeUserId = { $in: [String(feed.userId)] };
         const tasks = await MongoDbCrudOpration(feed.companyId, {
             type: SCHEMA_TYPE.TASKS, data: [match, 'TaskName TaskKey DueDate ProjectID statusType', { limit: 1000 }],

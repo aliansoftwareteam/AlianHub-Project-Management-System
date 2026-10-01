@@ -74,7 +74,7 @@ beforeEach(() => {
     mockDb = fakeMongo.create();
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: MEMBER_ROLE, status: 2, isDelete: false });
-    seedRules({ 'project.private_projects': 1 });
+    seedRules({ 'project.private_projects': 1, 'task.task_list': true });
     hidden = mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: oid(), ProjectName: 'Secret', isPrivateSpace: true, AssigneeUserId: [OWNER] });
     mine = mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: oid(), ProjectName: 'Mine', isPrivateSpace: false, AssigneeUserId: [MEMBER] });
     mockDb.seed(SCHEMA_TYPE.TASKS, { _id: oid(), TaskKey: 'AH-1', TaskName: 'Secret task', ProjectID: String(hidden._id), deletedStatusKey: 0 });

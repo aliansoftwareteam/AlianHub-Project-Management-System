@@ -34,10 +34,13 @@ const rolePermission = (arranged, roleType, path) => {
     return match ? match.permission : null;
 };
 
+const isWritable = (permission) => permission === true || permission === 1 || permission === 2;
+const isReadable = (permission) => permission !== null && permission !== undefined && permission !== 0;
+
 const PRIVATE_PROJECTS = 'project.private_projects';
 const PRIVATE_VISIBLE_TO_EVERYONE = 2;
 
 // Any other value leaves a private project to its assignees.
 const seesEveryPrivateProject = (permission) => permission === PRIVATE_VISIBLE_TO_EVERYONE;
 
-module.exports = { arrangeRules, rolePermission, PRIVATE_PROJECTS, seesEveryPrivateProject };
+module.exports = { arrangeRules, rolePermission, isWritable, isReadable, PRIVATE_PROJECTS, seesEveryPrivateProject };

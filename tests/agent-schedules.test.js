@@ -17,6 +17,7 @@ jest.mock('../Config/permissionGuard', () => ({
     ROLE_OWNER: 1,
     ROLE_ADMIN: 2,
 }));
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 jest.mock('../Modules/Agents/scope', () => ({
     visibleProjectIds: jest.fn(async (companyId, uid) => mockState.visible[uid] || []),
     visibleProjects: jest.fn(async (companyId, uid) => (mockState.visible[uid] || []).map((_id) => ({ _id }))),

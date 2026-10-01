@@ -3,6 +3,7 @@ const mockWorld = { rows: {} };
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
 jest.mock('../Config/jwt', () => ({ verifyCompanyMembership: jest.fn(async (uid, companyId) => mockWorld.isMember(uid, companyId)) }));
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn((db, query, method) => mockWorld.crud(db, query, method)) }));
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 jest.mock('../Config/permissionGuard', () => {
     const roles = jest.requireActual('../Config/roleTypes');
     return {

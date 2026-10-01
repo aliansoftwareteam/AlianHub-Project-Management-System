@@ -22,7 +22,8 @@ const { ROLE_GUEST, isPrivileged } = require('../../Config/roleTypes');
 const { ACTIVE_SEAT } = require('../../Config/seatStatus');
 const { arrangeRules, rolePermission, PRIVATE_PROJECTS, seesEveryPrivateProject } = require('../../Config/rulePermissions');
 const { ownOrNotPersonal, othersPersonalListIds } = require('../PersonalList/ownership');
-const { companyWideMatch } = require('../Tasks/helpers/taskQueryGuard');
+const { companyWideMatch, toObjectIds } = require('../Tasks/helpers/taskQueryGuard');
+const { taskListProjectIds } = require('../Tasks/helpers/taskListProjects');
 
 // Parse a client-built advanced-filter match from the request body.
 function bodyTaskMatch(body) {
@@ -76,21 +77,38 @@ async function resolveCallerRoleType(companyId, uid) {
 }
 exports.resolveCallerRoleType = resolveCallerRoleType;
 
+/* A member's cards read their own work in the projects whose tasks they may list. It sits under
+ * $and so a card's own ProjectID filter cannot replace it. */
+const ownWorkProjects = async (companyId, uid) => ({
+    $and: [{ ProjectID: { $in: toObjectIds(await taskListProjectIds(companyId, uid)) } }],
+});
+
 /* What a company-wide card leaves out for an owner or admin: someone else's personal list, and a chat
- * they are not in. Everyone else's cards read their own work, and for them both are empty. `time` sits
+ * they are not in. Everyone else's cards read their own work where they may list tasks. `time` sits
  * under $and so a card's own ProjectId filter cannot replace it. */
 const companyWideCardScope = async (companyId, uid, isManagement) => {
     const personalLists = isManagement ? await othersPersonalListIds(companyId, uid) : [];
     return {
-        tasks: isManagement ? companyWideMatch(uid, personalLists) : {},
+        tasks: isManagement ? companyWideMatch(uid, personalLists) : await ownWorkProjects(companyId, uid),
         time: personalLists.length ? { $and: [{ ProjectId: { $nin: idForms(personalLists) } }] } : {},
     };
 };
 
+/* The same for a card that reads the caller's own tasks whatever their role: an owner or admin is held back by no rule. */
+const ownWorkScope = async (companyId, uid) => (isPrivileged(await resolveCallerRoleType(companyId, uid)) ? {} : ownWorkProjects(companyId, uid));
+
 /* The tasks a card counts: company-wide for an owner or admin; for everyone else, the tasks assigned to them. */
 const cardTaskScope = async (companyId, uid, isManagement) => (isManagement
     ? (await companyWideCardScope(companyId, uid, true)).tasks
-    : { AssigneeUserId: uid });
+    : { AssigneeUserId: uid, ...(await ownWorkProjects(companyId, uid)) });
+
+/* The projects a card names in its request, kept to the ones the caller can open and may list
+ * tasks in: the ids come from the client, so the card's own settings prove nothing. */
+const listableProjectIds = async (companyId, uid, projectIds) => {
+    const named = (Array.isArray(projectIds) ? projectIds : []).map(String);
+    const open = new Set(await taskListProjectIds(companyId, uid));
+    return toObjectIds(named.filter((id) => open.has(id)));
+};
 
 const noProject = () => ({ filter: { _id: { $in: [] } }, companyWide: false });
 
@@ -1877,9 +1895,7 @@ exports.getOnLeaveBoard = async (req, res) => {
         // callerUserId/callerRoleType in the body can no longer widen scope.
         payload.callerUserId = String(req.uid || "");
         payload.callerRoleType = await resolveCallerRoleType(companyId, req.uid);
-        const projectIds = (Array.isArray(payload.projectIds) ? payload.projectIds : [])
-            .filter((id) => mongoose.Types.ObjectId.isValid(String(id)))
-            .map((id) => new mongoose.Types.ObjectId(String(id)));
+        const projectIds = await listableProjectIds(companyId, payload.callerUserId, payload.projectIds);
         if (!projectIds.length) {
             return res.status(200).json({
                 status: true,
@@ -2019,6 +2035,7 @@ exports.getMyNextTasks = async (req, res) => {
             statusType: { $ne: "close" },
             $or: [{ AssigneeUserId: uid }, { Task_Leader: uid }],
             ...(projClause ? { ProjectID: projClause } : {}),
+            ...(await ownWorkScope(companyId, uid)),
         }, bodyTaskMatch(req.body));
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
@@ -2116,6 +2133,7 @@ exports.getMyAchievements = async (req, res) => {
             AssigneeUserId: uid,
             updatedAt: { $gte: dateFrom, $lte: dateTo },
             ...(projClause ? { ProjectID: projClause } : {}),
+            ...(await ownWorkScope(companyId, uid)),
         }, bodyTaskMatch(req.body));
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
@@ -2276,11 +2294,11 @@ exports.getMyLeave = async (req, res) => {
             return res.status(400).json({ status: false, message: "companyId header required" });
         }
         const uid = String(req.uid || "");
-        const projectIds = (Array.isArray(req.body && req.body.projectIds) ? req.body.projectIds : [])
-            .filter((id) => mongoose.Types.ObjectId.isValid(String(id)))
-            .map((id) => new mongoose.Types.ObjectId(String(id)));
+        const named = (Array.isArray(req.body && req.body.projectIds) ? req.body.projectIds : [])
+            .filter((id) => mongoose.Types.ObjectId.isValid(String(id)));
+        const projectIds = uid ? await listableProjectIds(companyId, uid, named) : [];
         if (!uid || !projectIds.length) {
-            return res.status(200).json({ status: true, data: { configured: projectIds.length > 0, rows: [] } });
+            return res.status(200).json({ status: true, data: { configured: named.length > 0, rows: [] } });
         }
 
         const leaveFilter = applyTaskMatch({
@@ -2352,6 +2370,7 @@ exports.getMyDueSoon = async (req, res) => {
             // thing that card answers.
             DueDate: req.body && req.body.includeOverdue === true ? { $lte: end } : { $gte: start, $lte: end },
             ...(projClause ? { ProjectID: projClause } : {}),
+            ...(await ownWorkScope(companyId, uid)),
         }, bodyTaskMatch(req.body));
 
         const tasks = await MongoDbCrudOpration(companyId, {

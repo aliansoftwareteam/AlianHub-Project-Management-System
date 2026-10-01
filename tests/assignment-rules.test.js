@@ -86,7 +86,7 @@ const seedRules = (grants = {}) => {
     });
 };
 
-const GRANTS = { 'project.private_projects': 1, 'project.project_details': true, 'task.task_assignee': true };
+const GRANTS = { 'project.private_projects': 1, 'project.project_details': true, 'task.task_list': true, 'task.task_assignee': true };
 
 const seedProject = (doc = {}) => mockDb.seed(SCHEMA_TYPE.PROJECTS, {
     _id: oid(), ProjectName: 'Launch', ProjectCode: 'LCH', CompanyId: C, isPrivateSpace: true,

@@ -6,6 +6,7 @@ const { hiddenSprintIds } = require('../../Sprints/helpers/sprintVisibility');
 const { narrowingFor } = require('../../../Config/tokenNarrowing');
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const { othersPersonalListIds } = require('../../PersonalList/ownership');
+const { taskListProjectIds } = require('./taskListProjects');
 
 const MAX_LIMIT = 1000;
 const MAX_STAGES = 40;
@@ -132,13 +133,13 @@ const readsCompanyWide = (task, uid, personalLists) => !personalLists.map(String
 const companyWideStage = async (companyId, uid) => ({ $match: companyWideMatch(uid, await othersPersonalListIds(companyId, uid)) });
 
 /* Owners and admins keep company-wide task visibility unless a token narrows them to some projects;
- * everyone else sees the projects the sidebar lists for them, minus the private sprints they are not
- * shared with. */
+ * everyone else sees the projects the sidebar lists for them whose task list their role holds, minus
+ * the private sprints they are not shared with. */
 const visibilityStage = async (companyId, uid) => {
     const roleType = await getRoleType(companyId, uid);
     const privileged = isPrivileged(roleType);
     if (privileged && !narrowingFor(uid)) return companyWideStage(companyId, uid);
-    const ids = roleType === null ? [] : await visibleProjectIds(companyId, uid);
+    const ids = roleType === null ? [] : await (privileged ? visibleProjectIds : taskListProjectIds)(companyId, uid);
     const projects = toObjectIds(ids);
     const hidden = privileged ? [] : await hiddenSprintIds(companyId, uid, projects);
     return { $match: { ProjectID: { $in: projects }, ...(hidden.length ? { sprintId: { $nin: hidden } } : {}) } };
