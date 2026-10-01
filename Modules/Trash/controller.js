@@ -5,6 +5,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { updateProjectInternal } = require('../Project/controller/updateProject');
 const { updateSprintFun, updateFolderFun, announceFolders } = require('../Sprints/controller');
 const { taskMongo } = require('../Tasks/helpers/task_class_Mongo');
+const { leaveLists } = require('../Tasks/helpers/taskListsLeft');
 const pages = require('../Pages/controller');
 const { emitPageChange } = require('../Pages/helpers/pageEvents');
 const rules = require('./rules');
@@ -169,7 +170,7 @@ exports.removeSampleData = async (req, res) => {
             if (docs.length) {
                 emitPageChange(companyId, 'update', { _id: String(docs[0]), deletedStatusKey: rules.TRASHED, deleted: docs.length, ids: docs.map(String) });
             }
-            await taskMongo.leaveLists({ companyId, sprintIds: lists, exceptProjectId: id });
+            await leaveLists({ companyId, sprintIds: lists, exceptProjectId: id });
             removed.fields += await switchOffSampleFields(companyId, id);
         }
         // A sample project already in the trash still counts, so its goal does not outlive it.

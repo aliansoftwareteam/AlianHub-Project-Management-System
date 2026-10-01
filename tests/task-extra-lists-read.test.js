@@ -244,6 +244,7 @@ describe('a task in extra lists is counted once, at its home', () => {
             'Modules/Tasks/helpers/mongo_helper.js',
             'Modules/Tasks/helpers/taskExtraLists.js',
             'Modules/Tasks/helpers/taskExtraListsRules.js',
+            'Modules/Tasks/helpers/taskListsLeft.js',
             'Modules/Tasks/helpers/taskMongo/extraLists.js',
             'Modules/Tasks/helpers/taskMongo/structural.js',
             'Modules/Tasks/helpers/taskQueryGuard.js',
