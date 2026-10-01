@@ -236,9 +236,9 @@ span.ProjectFirstLatter {
 }
     @media (max-width: 576px){
     .p_owner, .p_sharewith, .p_status, .p_erpApp, .p_requiredViews, .task_type_status, .task_type_status_todo {width: 100%;margin-bottom: 0px;margin-top: 0;border-right:0;}
-    .projectInfoTopLine p {max-width: 20%;}
-    .projectInfoTopLine a {font-size: 11px;}
-    .project__inToplinetextimg-wrapper{max-width: 81%;}
+    .projectInfoTopLine p {flex: 0 1 auto;min-width: 0;max-width: none;}
+    .projectInfoTopLine a {flex: none;font-size: 11px;white-space: nowrap;}
+    .project__inToplinetextimg-wrapper{flex: 1 1 auto;min-width: 0;}
     .projectInfoDiv {padding: 20px 15px;}
     .p_sharewith:after ,  .p_owner:after, .p_sharewith:after, .p_status:after, .p_erpApp:after, .p_requiredViews:after, .task_type_status:after, .task_type_status_todo:after{content: '';background: var(--border);width: 40%;height: 1px;display: block;margin: 20px auto;}
 }

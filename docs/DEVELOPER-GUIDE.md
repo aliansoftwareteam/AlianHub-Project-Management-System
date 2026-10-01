@@ -28,6 +28,7 @@ The backend serves the built SPA from `frontend/dist`; `cd frontend && npm run b
 | `cd frontend && npm run lint -- --no-fix` | Vue CLI ESLint |
 | `node scripts/unused-components.js` | `.vue` files nothing imports (must print nothing) |
 | `node scripts/env-doc.js --check` | env variables described and docs regenerated |
+| `npm run api:doc:check` | `docs/API.md` and `docs/api/openapi.json` match the routes and `scripts/api-doc.meta.json`. Not run in CI: run `npm run api:doc` and commit both files in the docs pull request that follows merges to `beta` |
 | `npm run visual` | the screenshot check of the core screens; CI only, see [Screenshot check](#screenshot-check) |
 
 `.github/workflows/ci.yml` runs all of that on every pull request to `beta`, `staging` and `main`, except the screenshot check, which has a workflow of its own. The conventions project is the place for a rule that must hold everywhere: it reads the tree and fails with the offending file, so a new rule needs no per-module wiring.
@@ -38,6 +39,7 @@ The conventions in place:
 - `tenant-scoping` — tenant ids are not read from `req.body`/`req.query`; a per-file baseline may only fall.
 - `i18n-namespaces` — no `*V2` locale namespace, and every static `t('A.b')` key exists in `frontend/src/locales/en.js`.
 - `env-doc` — every `process.env.*` and `VUE_APP_*` read is described in `scripts/env-doc.meta.json`.
+- `api-doc` — `scripts/api-doc.meta.json` is well formed and the API reference generates from the current tree, the same on every run. It does not compare the committed files, so a pull request that adds or removes a route needs to do nothing: a route with no entry is listed as undocumented until the docs pull request describes it.
 - `unused-components` — no orphaned single-file component.
 - `naming-conventions` — module folder and file naming.
 
@@ -68,6 +70,7 @@ npm run atlas:compare -- artifacts/atlas/<before> artifacts/atlas/<after>
 - **Session.** The app keeps its session in the `accessToken` cookie and in `localStorage` (`userId`, `selectedCompany`, `isLogging`); the atlas sets those from the token, so it never types a password. A demo token lasts an hour ([QA-DEMO-TEAM.md](QA-DEMO-TEAM.md)). The token is never printed or written to the output.
 - **Read-only.** Every request that is not a GET is answered with a 403 inside the browser and never reaches the server, except the POSTs the app reads with, listed with their reasons in `scripts/atlas/readOnly.js`. The script's own lookups pass through the same filter. Setup steps in the manifest may only press a shortcut, open a menu, hover, scroll and wait. Two things follow: the Personal List shows its error state (opening it creates the list on a first visit, so that call stays blocked), and AI summaries stay empty. The refused requests are listed at the end of the run and in `atlas.json`.
 - **Rate limit.** The server allows 1000 API requests a minute per address (`GLOBAL_RATE_LIMIT_PER_MIN`), and on one machine the atlas shares that count with every open tab. It reads the `RateLimit-*` headers, pauses while fewer than 300 are left and retakes a screen a 429 cut short, so a full run can stop for up to a minute at a time.
+- **Layout findings.** After each shot the atlas measures the page and writes the result under `layout` in `atlas.json`, with a one-line summary on the console and in the gallery: a document wider than the viewport and the three widest elements past the edge; containers that scroll sideways (`page: true` when the same container also scrolls the page up and down, so the whole screen pans) and containers that cut their content off; controls cut off sideways with nothing to scroll; controls under 24 by 24 px whose centre is within 12 px of another control in the same scroller; text clipped to nothing; and fixed or sticky layers over more than 40% of the height. The rules are in `scripts/atlas/layout.js` (`tests/atlas-layout.test.js`). Each screen is a fresh page load, so a stylesheet another screen would have loaded first is not there.
 - **Add a screen** with one line in `scripts/atlas-manifest.js`; `tests/atlas-manifest.test.js` fails when its route is not one the router declares. Routes left out, and why, are in `LEFT_OUT` in the same file.
 - **Compare** writes `before/`, `after/` and `diff/` images and an `index.html` ordered by the share of pixels that changed. It decodes PNGs with `sharp`, already a dependency; `--threshold` (default 8 of 255 per channel) sets how far a pixel must move to count.
 - Chromium comes from Playwright: `npx playwright install chromium` once (the e2e suite needs the same).

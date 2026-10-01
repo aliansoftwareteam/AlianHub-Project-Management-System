@@ -55,12 +55,12 @@
                     v-for="d in u.days.filter((x) => visibleDays.includes(x.date))"
                     :key="d.date"
                     class="wl__cell"
-                    :class="{ 'is-pto': d.pto, 'is-today': d.date === today, 'is-drop': dropKey === `${u.userId}|${d.date}`, 'tv-hatch': d.pto }"
+                    :class="{ 'is-pto': isOff(d), 'is-today': d.date === today, 'is-drop': dropKey === `${u.userId}|${d.date}`, 'tv-hatch': isOff(d) }"
                     @dragover.prevent="onDragOver(u, d)"
                     @dragleave="onDragLeave(u, d)"
                     @drop.prevent="onDrop(u, d)"
                 >
-                    <template v-if="d.pto"><span class="wl__pto">{{ $t('Time.pto') }}</span></template>
+                    <template v-if="isOff(d)"><span class="wl__pto">{{ d.pto ? $t('Time.pto') : $t('Time.unavailable') }}</span></template>
                     <template v-else>
                         <div class="wl__fill" :class="{ 'is-over': isOver(d), 'is-tentative': isTentative(d.date) }" :style="{ height: `${fillPct(d)}%` }">
                             <span v-if="value(d)">{{ hLabel(value(d)) }}</span>
@@ -169,13 +169,18 @@ const hLabel = (m) => {
     return `${h >= 10 || Number.isInteger(h) ? Math.round(h) : Math.round(h * 10) / 10}h`;
 };
 const value = (d) => (mode.value === 'estimate' ? d.estimated : d.logged);
+/* The server names time off as PTO to the person and to owners and admins, and as unavailable to anyone else. */
+const isOff = (d) => Boolean(d.pto || d.unavailable);
 const isOver = (d) => (d.capacityMinutes > 0 ? value(d) > d.capacityMinutes : value(d) > 0);
 const fillPct = (d) => (d.capacityMinutes > 0 ? Math.min(100, (value(d) / d.capacityMinutes) * 100) : (value(d) ? 100 : 0));
 const isTentative = (date) => moment(date).isAfter(moment().endOf('isoWeek'));
 const subLabel = (u) => {
     if (u.utilizationPct > 100) return t('Time.pct_period', { pct: u.utilizationPct });
-    const pto = u.days.filter((d) => d.pto && visibleDays.value.includes(d.date));
-    if (pto.length) return t('Time.pto_range', { range: pto.length === 1 ? moment(pto[0].date).format('ddd') : `${moment(pto[0].date).format('ddd')}–${moment(pto[pto.length - 1].date).format('ddd')}` });
+    const off = u.days.filter((d) => isOff(d) && visibleDays.value.includes(d.date));
+    if (off.length) {
+        const range = off.length === 1 ? moment(off[0].date).format('ddd') : `${moment(off[0].date).format('ddd')}–${moment(off[off.length - 1].date).format('ddd')}`;
+        return t(off.every((d) => d.pto) ? 'Time.pto_range' : 'Time.unavailable_range', { range });
+    }
     return t('Time.per_day', { h: u.hoursPerDay });
 };
 const pctAfter = (u, delta) => (u.capacityMinutes > 0 ? Math.round(((u.totalEstimated + delta) / u.capacityMinutes) * 100) : 0);
@@ -233,7 +238,7 @@ const onDragStart = (e, u, d, c) => {
     e.dataTransfer.setData('text/plain', c.taskId);
 };
 const onDragOver = (u, d) => {
-    if (!drag.value || d.pto) return;
+    if (!drag.value || isOff(d)) return;
     const key = `${u.userId}|${d.date}`;
     if (dropKey.value === key) return;
     dropKey.value = key;
@@ -252,7 +257,7 @@ const onDrop = (u, d) => {
     const current = drag.value;
     dropKey.value = '';
     drag.value = null;
-    if (!current || d.pto) return;
+    if (!current || isOff(d)) return;
     if (current.fromUser.userId === u.userId && current.fromDay.date === d.date) { hint.value = null; return; }
     move({ ...current, toUser: u, toDay: d });
 };
@@ -260,7 +265,7 @@ const onDrop = (u, d) => {
 const suggestBalance = () => {
     let worst = null;
     users.value.forEach((u) => u.days.forEach((d) => {
-        if (!d.pto && d.chips.length && d.capacityMinutes > 0 && d.estimated > d.capacityMinutes && (!worst || d.estimated - d.capacityMinutes > worst.d.estimated - worst.d.capacityMinutes)) worst = { u, d };
+        if (!isOff(d) && d.chips.length && d.capacityMinutes > 0 && d.estimated > d.capacityMinutes && (!worst || d.estimated - d.capacityMinutes > worst.d.estimated - worst.d.capacityMinutes)) worst = { u, d };
     }));
     if (!worst) { hint.value = { text: t('Time.balance_none') }; return; }
     const chip = [...worst.d.chips].sort((a, b) => b.minutes - a.minutes)[0];
@@ -268,7 +273,7 @@ const suggestBalance = () => {
     users.value.forEach((u) => {
         if (u.userId === worst.u.userId) return;
         const d = u.days.find((x) => x.date === worst.d.date);
-        if (!d || d.pto || d.capacityMinutes <= 0) return;
+        if (!d || isOff(d) || d.capacityMinutes <= 0) return;
         const room = d.capacityMinutes - d.estimated;
         if (room >= chip.minutes && (!target || room > target.room)) target = { u, d, room };
     });

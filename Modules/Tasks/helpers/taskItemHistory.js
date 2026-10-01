@@ -5,6 +5,7 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { HandleHistory } = require('./helper');
 const { escapeText } = require('./taskWriteFields');
 const { fieldValueText, fieldValueContext, customFieldDefinitionOf } = require('../../CustomField/helpers/customFieldText');
+const { typeModuleOf } = require('../../CustomField/fieldTypes');
 
 const HISTORY = Object.freeze({
     CUSTOM_FIELD_VALUE: 'Project_Category',
@@ -18,6 +19,10 @@ const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject
 
 const describeCustomFieldValue = ({ actor, definition, next, previous, viaAi = false, context = {} }) => {
     if (!definition || !next) return null;
+    /* The log is read by everyone who can open the task, and not all of them may see what such a field holds. */
+    if ((typeModuleOf(definition.fieldType) || {}).sideStored) {
+        return { key: HISTORY.CUSTOM_FIELD_VALUE, message: `<b>${actor.Employee_Name}</b> has changed the <b>${escapeText(definition.fieldTitle)}</b> Custom Field.` };
+    }
     const shown = fieldValueText(definition, next, context);
     if (previous && fieldValueText(definition, previous, context) === shown) return null;
     return {
