@@ -1,4 +1,5 @@
 import { folderPathLabel, isLiveFolder } from '@/utils/folderTree';
+import { placedSprint } from '@/views/Projects/composables/taskPlacement';
 
 export const userDataOf = (user, ownerId) => ({ id: user?.id, Employee_Name: user?.Employee_Name, companyOwnerId: ownerId });
 
@@ -10,15 +11,7 @@ export const projectDataOf = (project) => ({
     ProjectCode: project.ProjectCode
 });
 
-export const sprintObjOf = (list) => {
-    if (!list) return null;
-    const sprintObj = { id: list.id || list._id, name: list.name };
-    if (list.folderId) {
-        sprintObj.folderId = list.folderId;
-        sprintObj.folderName = list.folderName;
-    }
-    return sprintObj;
-};
+export const sprintObjOf = placedSprint;
 
 const live = (map) => Object.values(map || {}).filter((item) => item && !item.deletedStatusKey);
 
