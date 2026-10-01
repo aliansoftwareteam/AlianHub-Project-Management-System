@@ -8,8 +8,9 @@ import fs from 'fs';
 import path from 'path';
 import en from '@/locales/en';
 
-const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }));
+const { apiRequest, router } = vi.hoisted(() => ({ apiRequest: vi.fn(), router: { hasRoute: vi.fn(() => true) } }));
 vi.mock('@/services', () => ({ apiRequest }));
+vi.mock('vue-router', () => ({ useRouter: () => router }));
 
 import TaskGoals from '@/components/organisms/TaskDetailOverlay/TaskGoals.vue';
 
@@ -38,6 +39,7 @@ beforeEach(() => {
     i18n.global.setLocaleMessage('en', en);
     config.global.mocks.$t = i18n.global.t;
     apiRequest.mockReset();
+    router.hasRoute.mockImplementation(() => true);
 });
 
 afterEach(() => {
@@ -65,6 +67,17 @@ describe('the goals a task counts toward, in the task panel', () => {
         expect(first.attributes('aria-label')).toBe('Launch tasks, a target of the goal Launch the site, which is 25% reached');
         expect(JSON.parse(first.attributes('data-to'))).toEqual({ name: 'Goal', params: { cid: CID, goalId: 'goal-1' } });
         expect(JSON.parse(third.attributes('data-to'))).toEqual({ name: 'Goal', params: { cid: CID, goalId: 'goal-2' } });
+    });
+
+    it('shows the chips without links in a build that has no goal page', async () => {
+        router.hasRoute.mockImplementation(() => false);
+        apiRequest.mockImplementation(() => answer([row(1)]));
+        await show();
+        expect(router.hasRoute).toHaveBeenCalledWith('Goal');
+        expect(chips()).toHaveLength(1);
+        expect(chips()[0].element.tagName).toBe('SPAN');
+        expect(chips()[0].attributes('data-to')).toBeUndefined();
+        expect(chips()[0].find('.tgl__goal').text()).toBe('Goal 1');
     });
 
     it('has no row when no goal counts the task', async () => {

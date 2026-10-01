@@ -4,8 +4,10 @@ import {
 } from '@/views/Goals/goalRequest';
 
 export const REFETCH_DELAY_MS = 400;
-/* A count the server has started is asked for again this long after its last answer. */
+/* A count the server has started is asked for again this long after its last answer. The server gives a
+   count up after two minutes; one it still calls under way past that, with a margin, is no longer asked for. */
 export const COUNT_POLL_MS = 2000;
+export const COUNT_GIVE_UP_MS = 150000;
 
 const READY = 'ready';
 const LOADING = 'loading';
@@ -64,7 +66,8 @@ export default {
         filters: { mine: false, archived: false },
         serial: 0,
         open: closed(),
-        writing: {}
+        writing: {},
+        countGivenUp: false
     }),
     getters: {
         status: (state) => state.status,
@@ -72,6 +75,7 @@ export default {
         filters: (state) => state.filters,
         open: (state) => state.open,
         counting: (state) => state.goals.some(isCounting) || isCounting(state.open.goal),
+        countGivenUp: (state) => state.countGivenUp,
         goalById: (state) => (id) => state.goals.find((goal) => sameId(goal, id)) || null
     },
     mutations: {
@@ -99,6 +103,7 @@ export default {
             if (String(state.open.id) === String(id)) state.open = { id: state.open.id, status: state.open.status === LOADING ? MISSING : GONE, goal: null };
         },
         setOpen(state, open) { state.open = open; },
+        setCountGivenUp(state, givenUp) { state.countGivenUp = givenUp; },
         writing(state, { id, by }) {
             const count = (state.writing[id] || 0) + by;
             const others = Object.fromEntries(Object.entries(state.writing).filter(([key]) => key !== String(id)));

@@ -2,7 +2,7 @@
     <section class="hc-card hgl" data-test="goals-card" :aria-label="$t('Home.card_goals')">
         <div class="hc-card__head">
             <span class="hc-card__title">{{ $t('Home.card_goals') }}</span>
-            <router-link class="hgl__all" data-test="goals-card-all" :to="{ name: 'Goals', params: { cid: companyId } }">{{ $t('Home.goals_all') }}</router-link>
+            <router-link v-if="hasPage" class="hgl__all" data-test="goals-card-all" :to="{ name: 'Goals', params: { cid: companyId } }">{{ $t('Home.goals_all') }}</router-link>
             <button type="button" class="hgl__hide" data-test="goals-card-hide" :aria-label="$t('Home.hide_card')" :title="$t('Home.hide_card')" @click="$emit('hide')">
                 <ShellIcon name="x" :size="13" />
             </button>
@@ -18,13 +18,20 @@
             :heading-level="4"
             :message="$t(canCreate ? 'Home.goals_empty' : 'Home.goals_empty_guest')"
             :action-label="$t('Goals.new_goal')"
-            :action-allowed="canCreate"
+            :action-allowed="canCreate && hasPage"
             data-test="goals-card-empty"
             @action="newGoal"
         />
         <ul v-else class="hgl__list">
             <li v-for="goal in shown" :key="goal._id">
-                <router-link class="hgl__row" data-test="goals-card-row" :data-goal="goal._id" :to="{ name: 'Goal', params: { cid: companyId, goalId: goal._id } }">
+                <component
+                    :is="hasGoalPage ? 'router-link' : 'div'"
+                    class="hgl__row"
+                    :class="{ 'is-link': hasGoalPage }"
+                    data-test="goals-card-row"
+                    :data-goal="goal._id"
+                    v-bind="hasGoalPage ? { to: { name: 'Goal', params: { cid: companyId, goalId: goal._id } } } : {}"
+                >
                     <span class="hgl__top">
                         <span class="hgl__name">{{ goal.name }}</span>
                         <span v-if="goal.periodEnd" class="hgl__end">{{ $t('Goals.period_until', { end: formatDay(goal.periodEnd, locale) }) }}</span>
@@ -33,7 +40,7 @@
                         <GoalBar :value="goal.progressPct" :label="$t('Goals.progress_of', { name: goal.name })" />
                         <span class="hgl__pct">{{ goal.progressPct || 0 }}%</span>
                     </span>
-                </router-link>
+                </component>
             </li>
         </ul>
     </section>
@@ -65,6 +72,8 @@ const companyId = computed(() => unref(injectedCompany));
 const goals = ref([]);
 const state = ref("loading");
 
+const hasPage = computed(() => router.hasRoute("Goals"));
+const hasGoalPage = computed(() => router.hasRoute("Goal"));
 const canCreate = computed(() => getters["settings/companyUserDetail"]?.roleType !== ROLE_GUEST);
 /* The goals of the period under way come first, as on the Goals page. */
 const shown = computed(() => groupGoals(goals.value, todayOf(new Date())).flatMap((group) => group.goals).slice(0, SHOWN));
@@ -104,7 +113,7 @@ onMounted(load);
     display: flex; flex-direction: column; gap: 6px; padding: 7px 6px; min-width: 0;
     border-radius: var(--r-chip); color: var(--ink); text-decoration: none;
 }
-.hgl__row:hover { background: var(--surface-hover); }
+.hgl__row.is-link:hover { background: var(--surface-hover); }
 .hgl__row:focus-visible { outline: none; box-shadow: var(--focus); }
 .hgl__top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .hgl__name { flex: 1 1 auto; min-width: 0; font: 500 var(--fs-md, 13px)/1.35 var(--font-ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

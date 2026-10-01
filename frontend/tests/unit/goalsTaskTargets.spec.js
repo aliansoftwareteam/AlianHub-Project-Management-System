@@ -37,7 +37,7 @@ vi.mock('@/composable', () => ({
     useGetterFunctions: () => ({ getUser: (id) => ({ id, Employee_Name: NAMES[id] || 'Ghost User', Employee_profileImageURL: '' }) })
 }));
 
-import goals, { COUNT_POLL_MS, REFETCH_DELAY_MS } from '@/store/Goals';
+import goals, { COUNT_GIVE_UP_MS, COUNT_POLL_MS, REFETCH_DELAY_MS } from '@/store/Goals';
 import Goals from '@/views/Goals/Goals.vue';
 import GoalSourcePicker from '@/views/Goals/GoalSourcePicker.vue';
 
@@ -267,6 +267,37 @@ describe('a count the server is still making', () => {
         await pass(COUNT_POLL_MS * 40);
         expect(goalCalls()).toHaveLength(2 + 2 * 40);
         expect(at('glt-updating', targetOf('Release tasks')).exists()).toBe(true);
+    });
+
+    it('is no longer asked for once the server has called it under way for two and a half minutes, and is shown as failed', async () => {
+        fakeTimeouts();
+        readsAnswer('tasksReadStale');
+        await open();
+        await pass(COUNT_GIVE_UP_MS - COUNT_POLL_MS);
+        expect(at('glt-updating', targetOf('Release tasks')).exists()).toBe(true);
+        expect(at('glt-count-failed', targetOf('Release tasks')).exists()).toBe(false);
+
+        await pass(COUNT_POLL_MS * 2);
+        const asked = goalCalls().length;
+        expect(at('glt-updating', targetOf('Release tasks')).exists()).toBe(false);
+        expect(at('glt-count-failed', targetOf('Release tasks')).text()).toContain('The tasks could not be counted.');
+        expect(at('glt-recount', targetOf('Release tasks')).exists()).toBe(true);
+        await pass(COUNT_POLL_MS * 20);
+        expect(goalCalls()).toHaveLength(asked);
+    });
+
+    it('is asked for afresh once a count has come in', async () => {
+        fakeTimeouts();
+        readsAnswer('tasksReadStale');
+        await open();
+        await pass(COUNT_GIVE_UP_MS + COUNT_POLL_MS);
+        expect(store.getters['goals/countGivenUp']).toBe(true);
+
+        readsAnswer('tasksReadLeftOut');
+        await store.dispatch('goals/refresh');
+        await flushPromises();
+        expect(store.getters['goals/countGivenUp']).toBe(false);
+        expect(at('glt-count-failed', targetOf('Release tasks')).exists()).toBe(false);
     });
 
     it('stops being asked for when the page is left', async () => {

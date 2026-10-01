@@ -618,6 +618,8 @@ const schema = {
         sharedWith: { type: [String], default: [], required: false },
         color: { type: String, default: '', required: false },
         progressPct: { type: Number, default: 0, required: false },
+        reachedAt: { type: Date, default: null, required: false },
+        notifiedAt: { type: Date, required: false },
         targets: {
             type: [{
                 _id: false,
@@ -627,6 +629,7 @@ const schema = {
                 weight: { type: Number, default: 1, required: false },
                 progressPct: { type: Number, default: 0, required: false },
                 reachedAt: { type: Date, default: null, required: false },
+                notifiedAt: { type: Date, required: false },
                 start: { type: Number, required: false },
                 target: { type: Number, required: false },
                 current: { type: Number, required: false },
@@ -4107,6 +4110,10 @@ const schema = {
             required: true
         },
         docs: {
+            type: Object,
+            required: false
+        },
+        goals: {
             type: Object,
             required: false
         },
