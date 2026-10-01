@@ -20,15 +20,20 @@
         </div>
 
         <template v-if="!isLoading">
-            <TableRow
-                v-for="task in tasks"
-                :key="task._id"
-                :data="task"
-                :selected="selection.isSelected(task._id)"
-                :can-select="canGroupSelect"
-                @open="$emit('open', $event)"
-                @select="(row, event) => selection.selectFromEvent(row, event, '.tv2')"
-            />
+            <template v-for="task in tasks" :key="task._id">
+                <TableRow
+                    :data="task"
+                    :selected="selection.isSelected(task._id)"
+                    :can-select="canGroupSelect"
+                    :expanded="subtasks.isExpanded(task._id)"
+                    :has-subtasks="subtasks.hasChildren(task)"
+                    :progress="subtasks.progressFor(task)"
+                    @open="$emit('open', $event)"
+                    @select="selectRow"
+                    @toggle-subtasks="subtasks.toggle(task, data)"
+                />
+                <TableSubtaskRows :parent="task" :depth="1" />
+            </template>
         </template>
         <template v-else>
             <Skelaton v-for="i in 4" :key="i" class="tv2__skeleton" />
@@ -39,9 +44,12 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, inject, onMounted, onUnmounted, provide, ref, watch } from "vue";
 import { useStore } from "vuex";
 import TableRow from "./TableRow.vue";
+import TableSubtaskRows from "./TableSubtaskRows.vue";
+import { parentIdOf } from "@/store/ProjectData/taskTree";
+import { useSubtaskTree } from "@/views/Projects/composables/subtaskTree";
 import Skelaton from "@/components/atom/Skelaton/Skelaton.vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
@@ -62,7 +70,7 @@ const props = defineProps({
     keys: { type: String, default: "" },
     showPoints: { type: Boolean, default: false }
 });
-defineEmits(["open"]);
+const emit = defineEmits(["open"]);
 
 const { getters, dispatch } = useStore();
 const { checkPermission } = useCustomComposable();
@@ -97,9 +105,24 @@ const storeTasks = computed(() => {
     return getters["projectData/tableTasks"]?.[project.value?._id]?.[props.sprintId]?.tasks || [];
 });
 
+/* The rows of the group are its tasks. A subtask is shown under its parent, whatever group it
+   would fall in itself, and an event can put one in the Table's store. */
 const tasks = computed(() => storeTasks.value
-    .filter((task) => !task?.deletedStatusKey && taskInGroup(task, props.data))
+    .filter((task) => !task?.deletedStatusKey && !parentIdOf(task) && taskInGroup(task, props.data))
     .sort((a, b) => (props.globalSortKey ? 0 : a[props.data.indexName] - b[props.data.indexName])));
+
+const subtasks = useSubtaskTree({
+    project,
+    sprintId: computed(() => props.sprintId),
+    rows: tasks,
+    showArchived: showArchivedInj || ref(false),
+    searched: searchedTask || ref(false)
+});
+
+/* Every row is ticked alone, as in the List: the server carries a task's subtasks with it. */
+function selectRow(row, event) {
+    selection.selectFromEvent(row, event, ".tv2", { rowsAlone: true });
+}
 
 const groupPoints = computed(() => pointsTotal(tasks.value));
 const tableColumns = inject("tableColumns", null);
@@ -116,6 +139,18 @@ const groupLabel = computed(() => {
     return props.data.name;
 });
 const chipStyle = computed(() => (props.data.bgColor ? statusChipStyle(props.data) : {}));
+
+provide("tableGroupTree", {
+    isExpanded: subtasks.isExpanded,
+    childrenOf: subtasks.childrenOf,
+    hasChildren: subtasks.hasChildren,
+    progressFor: subtasks.progressFor,
+    isSelected: (taskId) => selection.isSelected(taskId),
+    canSelect: canGroupSelect,
+    select: selectRow,
+    toggle: (task) => subtasks.toggle(task, props.data),
+    open: (task) => emit("open", task)
+});
 
 function addIntersections() {
     setTimeout(() => {

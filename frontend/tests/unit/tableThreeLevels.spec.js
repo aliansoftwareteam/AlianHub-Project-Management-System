@@ -17,6 +17,7 @@ vi.mock('@/views/Projects/TableView/useTaskCategories.js', () => ({ useTaskCateg
 import '@/services';
 import Store from '@/store/index';
 import TableViewTable from '@/views/Projects/TableView/TableViewTable.vue';
+import { handleGridKey } from '@/views/Projects/TableView/gridKeyboard';
 import * as env from '@/config/env';
 import { childReads, resetServer, server } from '../fakeTaskServer';
 import { PROJECT, SPRINT, TODO_GROUP, fromSocket, readTable, seedStore, threeLevels, under } from '../threeLevelTasks';
@@ -132,6 +133,16 @@ describe('each level opens from its own row', () => {
         expect(rowOf('Parent').find('.tv2__sub-count').text()).toBe('0/2');
         expect(rowOf('Child one').find('.tv2__sub-count').text()).toBe('1/2');
         expect(rowOf('Child two').find('.tv2__sub-count').exists()).toBe(false);
+    });
+
+    it('Enter on the name cell still opens the task, not its subtasks', async () => {
+        const cell = rowOf('Parent').find('.tv2__name-cell').element;
+        const press = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true });
+        Object.defineProperty(press, 'target', { value: cell });
+        expect(handleGridKey(press, wrapper.element)).toBe(true);
+        await settle();
+        expect(wrapper.findComponent(TableViewTable).emitted('open')[0][0]._id).toBe('t1');
+        expect(names()).toEqual(['Parent', 'Loner']);
     });
 
     it('opens the task a nested row names', async () => {

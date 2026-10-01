@@ -368,6 +368,82 @@
     border-radius: 5px;
 }
 
+/* The count opens the card's subtasks, so it is a control of full size. */
+.kanban-board .card-subtasks-toggle {
+    min-width: var(--hit-min);
+    min-height: var(--hit-min);
+    justify-content: center;
+    background: none;
+    font: inherit;
+    color: var(--ink-2);
+    cursor: pointer;
+}
+.kanban-board .card-subtasks-toggle:hover,
+.kanban-board .card-subtasks-toggle[aria-expanded="true"] { color: var(--brand); border-color: var(--brand); }
+.kanban-board .card-subtasks-toggle:focus-visible { outline: none; box-shadow: var(--focus); }
+
+.kanban-board .card-subtasks { list-style: none; margin: 0; padding: 0; }
+.kanban-board .card-subtasks--root { margin-top: var(--sp-3); padding-top: var(--sp-1); border-top: 1px solid var(--hairline); }
+.kanban-board .card-subtask__row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-height: var(--hit-min);
+    padding-left: calc(var(--row-indent) * var(--card-depth));
+}
+.kanban-board .card-subtask__disclose {
+    width: var(--hit-min);
+    height: var(--hit-min);
+    flex: none;
+    border: 0;
+    background: none;
+    padding: 0;
+    font-size: var(--fs-2xs, 10px);
+    line-height: 1;
+    color: var(--ink-2);
+    cursor: pointer;
+    border-radius: var(--r-chip);
+}
+.kanban-board .card-subtask__disclose--none { visibility: hidden; }
+.kanban-board .card-subtask__dot { width: var(--sp-3); height: var(--sp-3); flex: none; border-radius: 50%; }
+.kanban-board .card-subtask__name {
+    flex: 1;
+    min-width: var(--hit-min);
+    min-height: var(--hit-min);
+    border: 0;
+    background: none;
+    padding: 0;
+    font: 400 var(--fs-sm, 12px)/var(--lh-snug, 1.3) var(--font-ui);
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-radius: var(--r-chip);
+}
+.kanban-board .card-subtask__name:hover { color: var(--brand); }
+.kanban-board .card-subtask__name.is-done { color: var(--ink-2); text-decoration: line-through; }
+.kanban-board .card-subtask__count { flex: none; font: var(--text-data); color: var(--ink-label); }
+.kanban-board .card-subtask__add {
+    width: var(--hit-min);
+    height: var(--hit-min);
+    flex: none;
+    border: 0;
+    background: none;
+    padding: 0;
+    font-size: var(--fs-lg, 14px);
+    line-height: 1;
+    color: var(--ink-2);
+    cursor: pointer;
+    border-radius: var(--r-chip);
+}
+.kanban-board .card-subtask__add:hover,
+.kanban-board .card-subtask__disclose:hover { background: var(--surface-hover); color: var(--ink); }
+.kanban-board .card-subtask__disclose:focus-visible,
+.kanban-board .card-subtask__name:focus-visible,
+.kanban-board .card-subtask__add:focus-visible { outline: none; box-shadow: var(--focus); }
+
 /* Priority reads as a chip on the card (10b), not a bare flag. */
 .kanban-board .priority__compo {
     border-radius: var(--r-chip);

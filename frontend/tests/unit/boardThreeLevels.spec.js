@@ -40,7 +40,7 @@ const CreateStub = defineComponent({
     name: 'BoardViewTaskCreate',
     props: ['taskId', 'data', 'isSubTask'],
     emits: ['toggle'],
-    setup: (props) => () => h('div', { class: 'create-stub', 'data-parent': props.taskId, 'data-column': props.data?.key })
+    setup: (props) => () => h('div', { class: 'create-stub', 'data-parent': props.taskId, 'data-column': props.data?.name })
 });
 
 const settle = async (ms = 0) => {
@@ -192,7 +192,7 @@ describe('adding a subtask from the Board', () => {
         await subRow('Child two').find('button.card-subtask__add').trigger('click');
         await settle();
         expect(creates()).toEqual(['s2']);
-        expect(wrapper.find('.create-stub').attributes('data-column')).toBe('0_0_To Do');
+        expect(wrapper.find('.create-stub').attributes('data-column')).toBe('To Do');
         expect(openedTasks).not.toHaveBeenCalled();
     });
 
