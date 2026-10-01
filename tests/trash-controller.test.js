@@ -11,8 +11,9 @@ jest.mock('../Modules/Sprints/controller', () => ({
     announceFolders: jest.fn(),
 }));
 jest.mock('../Modules/Tasks/helpers/task_class_Mongo', () => ({
-    taskMongo: { bulkRestore: jest.fn(async () => ({ totals: { updated: 1 } })), leaveLists: jest.fn(async () => 0) },
+    taskMongo: { bulkRestore: jest.fn(async () => ({ totals: { updated: 1 } })) },
 }));
+jest.mock('../Modules/Tasks/helpers/taskListsLeft', () => ({ leaveLists: jest.fn(async () => 0) }));
 jest.mock('../Modules/Pages/controller', () => ({ restorePage: jest.fn((req, res) => res.send({ status: true, statusText: 'page' })) }));
 jest.mock('../Modules/Trash/listAccess', () => ({ visibleTrash: jest.fn(async (companyId, uid, kind, docs) => docs) }));
 jest.mock('../Modules/Tasks/helpers/taskWriteFields', () => ({ sessionActor: jest.fn(async (req) => ({ id: String(req.uid), Employee_Name: 'Me' })) }));
