@@ -146,6 +146,20 @@ const commentRoom = (socket, prefix) => admitted(socket, 'joinCommentRoom', { ro
 const threadOf = (project, sprint, row) => `comments_${idOf(project)}_${idOf(sprint)}_${idOf(row)}`;
 const projectThread = (project) => `comments_project_${idOf(project)}`;
 
+const companyRoom = (socket, companyId) => admitted(socket, 'joinCompaniesRoom', { roomName: `selected_companies_${companyId}**${socket.id}` }, `selected_companies_${companyId}`);
+const ownRooms = async (socket, uid) => (await admitted(socket, 'joinUserIdNotification', { uid }, `userIdNotification_${uid}`))
+    && admitted(socket, 'joinGeneralReminder', { uid }, `generalReminder_${uid}`);
+
+const received = (socket, event, trigger) => new Promise((resolve) => {
+    const got = [];
+    socket.on(event, (payload) => got.push(payload));
+    trigger();
+    setTimeout(() => {
+        socket.off(event);
+        resolve(got);
+    }, 300);
+});
+
 const heard = async (sockets, events, trigger) => {
     const got = sockets.map(() => []);
     sockets.forEach((socket, index) => events.forEach((event) => socket.on(event, () => got[index].push(event))));
@@ -155,7 +169,7 @@ const heard = async (sockets, events, trigger) => {
     return got;
 };
 
-const taskChanged = (row) => socketEmitter.emit('update', { type: 'update', module: 'task', data: row, updatedFields: { TaskName: 'Plan v2' } });
+const taskChanged = (row, companyId = HOME) => socketEmitter.emit('update', { type: 'update', module: 'task', companyId, data: row, updatedFields: { TaskName: 'Plan v2' } });
 const messagePosted = (companyId, { project, sprint, row }) => socketEmitter.emit('insert', {
     type: 'insert',
     module: 'comments',
@@ -164,6 +178,12 @@ const messagePosted = (companyId, { project, sprint, row }) => socketEmitter.emi
 });
 const projectMessagePosted = (companyId, project) => socketEmitter.emit('insert', {
     type: 'insert', module: 'comments_project', companyId, data: { _id: NOTHING, message: 'Hello', projectId: String(project._id) },
+});
+const countChanged = (companyId, userId) => socketEmitter.emit('update', { type: 'update', module: 'userIdNotification', companyId, data: { userId, notification_counts: 3 } });
+const reminderChanged = (companyId, userId) => socketEmitter.emit('update', { type: 'update', module: 'generalReminder', companyId, data: { _id: NOTHING, userId, title: 'Call back' } });
+const companyChanged = (companyId) => socketEmitter.emit('update', { type: 'update', module: 'companies', data: { data: { _id: companyId, Cst_CompanyName: 'Renamed' } }, updatedFields: {} });
+const boardChanged = (companyId, project, sprint) => socketEmitter.emit('update', {
+    type: 'update', module: 'whiteboards', companyId, projectId: String(project._id), sprintId: String(sprint._id), boardId: NOTHING, revision: 2,
 });
 
 beforeAll(async () => {
@@ -205,7 +225,7 @@ describe('list rooms', () => {
         expect(await listRoom(neighbour, home.project, home.openList)).toBe(false);
 
         const [forMember, forNeighbour] = await heard([member, neighbour], TASK_EVENTS, () => {
-            taskChanged(elsewhere.openTask);
+            taskChanged(elsewhere.openTask, ELSEWHERE);
             taskChanged(home.openTask);
         });
         expect(forMember).toEqual([]);
@@ -257,9 +277,35 @@ describe('list rooms', () => {
         expect(await listRoom(owner, elsewhere.project, elsewhere.openList)).toBe(false);
         const heardBy = await heard([owner, admin], TASK_EVENTS, () => {
             taskChanged(home.privateTask);
-            taskChanged(elsewhere.openTask);
+            taskChanged(elsewhere.openTask, ELSEWHERE);
         });
         expect(heardBy).toEqual([['taskUpdate'], ['taskUpdate']]);
+    });
+
+    it('carry a change made in their own workspace, and one that names no workspace reaches nobody', async () => {
+        const member = await connect({ uid: MEMBER });
+        await listRoom(member, home.project, home.openList);
+        await taskRoom(member, home.openTask);
+        const [events] = await heard([member], TASK_EVENTS, () => {
+            taskChanged(home.openTask, ELSEWHERE);
+            taskChanged(home.openTask, null);
+            taskChanged(home.openTask, '');
+        });
+        expect(events).toEqual([]);
+        const [own] = await heard([member], TASK_EVENTS, () => taskChanged(home.openTask, HOME));
+        expect(own).toEqual(['taskUpdate', 'taskDetail_taskUpdate']);
+    });
+
+    it('carry the board ping only while the list can be opened', async () => {
+        const member = await connect({ uid: MEMBER });
+        await listRoom(member, home.project, home.openList);
+        const pinged = async (companyId) => (await heard([member], ['whiteboardChanged'], () => boardChanged(companyId, home.project, home.openList)))[0];
+        expect(await pinged(ELSEWHERE)).toEqual([]);
+        expect(await pinged(HOME)).toEqual(['whiteboardChanged']);
+
+        Object.assign(home.openList, { private: true, AssigneeUserId: [OWNER] });
+        forgetAccess();
+        expect(await pinged(HOME)).toEqual([]);
     });
 
     it('do not carry a chat space', async () => {
@@ -281,8 +327,8 @@ describe('task rooms', () => {
         expect(await taskRoom(owner, home.conversation)).toBe(true);
         const heardBy = await heard([member, owner], TASK_EVENTS, () => {
             taskChanged(home.conversation);
-            taskChanged(elsewhere.conversation);
-            taskChanged(elsewhere.openTask);
+            taskChanged(elsewhere.conversation, ELSEWHERE);
+            taskChanged(elsewhere.openTask, ELSEWHERE);
         });
         expect(heardBy).toEqual([[], ['taskDetail_taskUpdate']]);
     });
@@ -303,7 +349,7 @@ describe('chat rooms', () => {
         const member = await connect({ uid: MEMBER });
         expect(await chatRoom(member, elsewhere.directSpace, MEMBER)).toBe(false);
         expect(await chatRoom(member, NOTHING, MEMBER)).toBe(false);
-        const [events] = await heard([member], TASK_EVENTS, () => taskChanged(elsewhere.conversation));
+        const [events] = await heard([member], TASK_EVENTS, () => taskChanged(elsewhere.conversation, ELSEWHERE));
         expect(events).toEqual([]);
     });
 });
@@ -370,6 +416,36 @@ describe('comment rooms', () => {
     });
 });
 
+describe('typing in a thread', () => {
+    it('is told under the name of the person whose socket sent it', async () => {
+        const owner = await connect({ uid: OWNER });
+        const admin = await connect({ uid: ADMIN });
+        const thread = threadOf(home.directSpace, home.directList, home.conversation);
+        expect(await commentRoom(owner, thread)).toBe(true);
+        expect(await commentRoom(admin, thread)).toBe(true);
+        const signals = await received(owner, 'commentTyping', () => admin.emit('commentTyping', { roomPrefix: thread, userId: MEMBER, typing: true }));
+        expect(signals).toEqual([{ roomPrefix: thread, userId: ADMIN, typing: true }]);
+    });
+});
+
+describe('a person\'s own rooms', () => {
+    it('carry the counts and reminders of the workspace the socket is in', async () => {
+        seat(elsewhere.db, MEMBER, 3);
+        const here = await connect({ uid: MEMBER });
+        const there = await connect({ uid: MEMBER, companyId: ELSEWHERE });
+        expect(await ownRooms(here, MEMBER)).toBe(true);
+        expect(await ownRooms(there, MEMBER)).toBe(true);
+
+        const events = ['userIdNoticationUpdate', 'generalReminderUpdate'];
+        expect(await heard([here, there], events, () => countChanged(HOME, MEMBER))).toEqual([['userIdNoticationUpdate'], []]);
+        expect(await heard([here, there], events, () => reminderChanged(ELSEWHERE, MEMBER))).toEqual([[], ['generalReminderUpdate']]);
+        expect(await heard([here, there], events, () => {
+            countChanged(undefined, MEMBER);
+            reminderChanged(undefined, MEMBER);
+        })).toEqual([[], []]);
+    });
+});
+
 describe('a room that is already open', () => {
     const stillHears = async (socket, row) => (await heard([socket], TASK_EVENTS, () => taskChanged(row)))[0].length > 0;
 
@@ -406,6 +482,17 @@ describe('a room that is already open', () => {
         const [events] = await heard([owner], COMMENT_EVENTS, () => messagePosted(HOME, { project: home.directSpace, sprint: home.directList, row: home.conversation }));
         expect(events).toEqual([]);
     });
+
+    it('stops carrying the workspace record when the person loses their seat', async () => {
+        const owner = await connect({ uid: OWNER });
+        expect(await companyRoom(owner, HOME)).toBe(true);
+        const told = async () => (await heard([owner], ['companiesUpdate'], () => companyChanged(HOME)))[0];
+        expect(await told()).toEqual(['companiesUpdate']);
+
+        home.db.store[SCHEMA_TYPE.COMPANY_USERS].find((row) => row.userId === OWNER).isDelete = true;
+        forgetAccess();
+        expect(await told()).toEqual([]);
+    });
 });
 
 describe('what a room is sent', () => {
@@ -436,7 +523,7 @@ describe('what a room is sent', () => {
         register(undefined, `project_sprint_${home.project._id}_${home.openList._id}`);
         register(identity, `project_sprint_${home.project._id}_${home.openList._id}`);
 
-        taskChanged(elsewhere.openTask);
+        taskChanged(elsewhere.openTask, ELSEWHERE);
         taskChanged(home.conversation);
         projectMessagePosted(ELSEWHERE, elsewhere.project);
         messagePosted(ELSEWHERE, { project: elsewhere.project, sprint: elsewhere.openList, row: elsewhere.openTask });

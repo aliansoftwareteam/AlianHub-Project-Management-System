@@ -6,7 +6,7 @@ const {
     findRoomsByPrefix,
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
-const { onJoin, prefixOfOwnRoom, isCompanyMember } = require('../roomAccess');
+const { onJoin, prefixOfOwnRoom, isCompanyMember, mayReceiveCompany, inOrder } = require('../roomAccess');
 
 const COMPANY_ROOM = 'selected_companies_';
 
@@ -36,32 +36,25 @@ function setEventName(type) {
     }
 }
 
-const handleCompaniesChange = (changeData, includeUpdatedFields = false) => {
-    if (changeData.module !== 'companies') return;
-
-    try {
-        const companiesIdentifier = `selected_companies_${changeData.data.data._id}`;
-        // SOCKET-PERFORMANCE-PLAN #1 (Phase 2): O(1) prefix lookup.
-        const relatedRooms = findRoomsByPrefix(companiesIdentifier);
-        if (!relatedRooms.length) return;
-
-        const eventName = setEventName(changeData.type);
-        const emitData = {
-            fullDocument: changeData.data.data,
-            ...(includeUpdatedFields && { updatedFields: changeData.updatedFields }),
-        };
-
-        const companyId = String(changeData.data.data._id);
-        relatedRooms.forEach(data => {
-            const identity = data.socket.identity;
-            if (!identity || identity.companyId !== companyId || !data.socket.rooms.has(data.roomName)) return;
-            data.namespace.to(data.roomName).emit(eventName, emitData);
-        });
-    } catch (error) {
-        console.error(error);
+const relayCompanyChange = async (company, rooms, eventName, emitData) => {
+    for (const room of rooms) {
+        // eslint-disable-next-line no-await-in-loop
+        if (!(await mayReceiveCompany(room.socket.identity, company._id))) continue;
+        if (room.socket.rooms.has(room.roomName)) room.namespace.to(room.roomName).emit(eventName, emitData);
     }
 };
 
-// SOCKET-PERFORMANCE-PLAN #2: scoped to the `companies` module only.
+const handleCompaniesChange = (changeData, includeUpdatedFields = false) => {
+    const company = changeData && changeData.module === 'companies' && changeData.data && changeData.data.data;
+    if (!company || !company._id) return undefined;
+    const rooms = findRoomsByPrefix(`${COMPANY_ROOM}${company._id}`);
+    if (!rooms.length) return undefined;
+    const emitData = {
+        fullDocument: company,
+        ...(includeUpdatedFields && { updatedFields: changeData.updatedFields }),
+    };
+    return inOrder(() => relayCompanyChange(company, rooms, setEventName(changeData.type), emitData));
+};
+
 socketEmitter.on('companies:update', changeData => handleCompaniesChange(changeData, true));
 socketEmitter.on('companies:insert', changeData => handleCompaniesChange(changeData, false));

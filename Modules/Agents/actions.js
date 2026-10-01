@@ -136,9 +136,9 @@ const manifest = () => {
 
 const clampDepth = (depth) => Math.max(0, Number(depth) || 0);
 
-const emitTask = (doc, updatedFields, actor, depth) => {
+const emitTask = (companyId, doc, updatedFields, actor, depth) => {
     socketEmitter.emit('update', {
-        type: 'update', module: 'task', data: doc, updatedFields,
+        type: 'update', module: 'task', companyId, data: doc, updatedFields,
         actor: { kind: 'agent', userId: actor.userId || null, agentId: actor.agentId || null },
         depth: clampDepth(depth) + 1,
     });
@@ -284,7 +284,7 @@ const executors = {
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS, data: [{ _id: task._id }, { $push: { links: link } }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
-        emitTask(updated, { links: updated.links }, actor, depth);
+        emitTask(companyId, updated, { links: updated.links }, actor, depth);
         return { result: { linkId: String(link._id), kind: link.kind }, undo: { kind: 'link', taskId: String(task._id), linkId: String(link._id) }, entityId: task._id, entityName: task.TaskName };
     },
 

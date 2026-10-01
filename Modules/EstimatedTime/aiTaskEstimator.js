@@ -656,7 +656,7 @@ async function persistEstimate(companyId, taskId, minutes, opts = {}) {
                 type: 'update',
                 data: result,
                 updatedFields: { totalEstimatedTime: finalMinutes },
-                module: 'task',
+                module: 'task', companyId,
             });
         } catch (_e) { /* socket emit best-effort */ }
 

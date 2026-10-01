@@ -55,7 +55,7 @@ const setTask = async (companyId, taskId, set, unset, pull) => {
     const updated = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS, data: [{ _id: oid(taskId) }, update, { returnDocument: 'after' }],
     }, 'findOneAndUpdate');
-    if (updated) socketEmitter.emit('update', { type: 'update', module: 'task', data: updated, updatedFields: set, actor: { kind: 'user' }, depth: 1 });
+    if (updated) socketEmitter.emit('update', { type: 'update', module: 'task', companyId, data: updated, updatedFields: set, actor: { kind: 'user' }, depth: 1 });
     return updated;
 };
 

@@ -81,7 +81,7 @@ const updateStoredTasks = async (companyId, { rows, projectId, statusArray }) =>
             }, 'findOneAndUpdate');
             if (!task) continue;
             updated += 1;
-            socketEmitter.emit('update', { type: 'update', data: task, updatedFields: set, module: 'task' });
+            socketEmitter.emit('update', { type: 'update', data: task, updatedFields: set, module: 'task', companyId });
         } catch (error) {
             logger.error(`[importers] task ${row.storedTask.id} not updated: ${(error && error.message) || error}`);
         }

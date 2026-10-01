@@ -396,7 +396,7 @@ exports.computeFields = async (req, res) => {
                 data: [{ _id: task._id }, { $set }]
             }, "updateOne");
 
-            socketEmitter.emit("update", { type: "update", data: { _id: task._id }, updatedFields: { customField: $set }, module: "task" });
+            socketEmitter.emit("update", { type: "update", data: { _id: task._id }, updatedFields: { customField: $set }, module: "task", companyId });
             out[String(task._id)] = result.values;
             if (Object.keys(result.errors).length) errors[String(task._id)] = result.errors;
         }
