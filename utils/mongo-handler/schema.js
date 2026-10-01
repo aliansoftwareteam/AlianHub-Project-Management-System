@@ -2602,6 +2602,13 @@ const schema = {
             required: false,
             default: true
         },
+        // Weekday numbers (0 = Sunday) the company works; absent reads as Monday to Friday
+        // (Modules/Company/helpers/workingDays.js). No default, so only a chosen week is stored.
+        workingDays: {
+            type: [Number],
+            required: false,
+            default: undefined
+        },
         Cst_Phone: {
             type: String,
             required: false
@@ -3349,6 +3356,12 @@ const schema = {
             type: Boolean,
             required: true,
             default : true
+        },
+        // The project's own working week, overriding the company's; absent, null or empty uses the company's.
+        workingDays: {
+            type: [Number],
+            required: false,
+            default: undefined
         },
         lastProjectActivity: {
             type: Number,

@@ -165,10 +165,10 @@ describe('time off and capacity count the company\'s working days', () => {
         const july = async () => {
             const res = response();
             await capacityCtrl.getMonthlyCapacity(request(OWNER, { query: { from: '2026-07', to: '2026-07' } }), res);
-            return res.body.data;
+            return res.body.data.teams[0].months['2026-07'];
         };
-        const before = JSON.stringify(await july());
+        expect(await july()).toMatchObject({ availableHours: 534, ptoHours: 18 });
         await saveWeek(OWNER, MON_TO_SAT);
-        expect(JSON.stringify(await july())).not.toBe(before);
+        expect(await july()).toMatchObject({ availableHours: 621, ptoHours: 27 });
     });
 });

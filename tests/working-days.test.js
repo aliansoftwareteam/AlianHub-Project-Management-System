@@ -158,6 +158,15 @@ describe('the strict schemas declare workingDays', () => {
         expect(new Project({ workingDays: FRI_TO_SUN }).toObject().workingDays).toEqual(FRI_TO_SUN);
     });
 
+    /* getCompanyDataFun keeps hydrated company documents in node-cache, which clones them on the way in and out. */
+    test('a cached company document still gives its week', () => {
+        const NodeCache = require('node-cache');
+        const cache = new NodeCache();
+        cache.set('company', Company.hydrate({ _id: new mongoose.Types.ObjectId(), Cst_CompanyName: 'Acme', workingDays: SUN_TO_THU }));
+        expect(workingDaysFor(cache.get('company'))).toEqual(SUN_TO_THU);
+        expect(weekendDaysFor(cache.get('company'))).toEqual([5, 6]);
+    });
+
     test('neither invents a week for a document that never chose one', () => {
         expect(new Company({}).toObject().workingDays).toBeUndefined();
         expect(new Project({}).toObject().workingDays).toBeUndefined();
