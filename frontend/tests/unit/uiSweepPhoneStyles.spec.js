@@ -84,7 +84,7 @@ describe('phone touch targets', () => {
         const phone = phoneBlocks(css);
         expect(ruleBody(phone, '.home .ah-tbtn--icon')).toMatch(/width:\s*40px/);
         for (const selector of ['.hc-tab', '.hc-agenda__nav button', '.hp-days button']) {
-            expect(ruleBody(css, selector), selector).toMatch(/min-height:\s*var\(--hit-min, 24px\)/);
+            expect(ruleBody(css, selector), selector).toMatch(/min-height:\s*var\(--hit-min\)/);
             expect(ruleBody(phone, selector), selector).not.toMatch(/min-height/);
         }
         expect(ruleBody(phone, '.hp-panel__close')).toMatch(/padding:\s*13px/);

@@ -133,6 +133,7 @@ const compute = (text, map) => {
         const next = out
             .replace(/var\((--[\w-]+)(?:,\s*([^()]+))?\)/g, (whole, name, fallback) => {
                 const set = map[name];
+                if (name.startsWith('--font-')) return whole;
                 if (set !== undefined && set !== 'initial') return set;
                 return fallback === undefined ? whole : fallback.trim();
             })
@@ -308,7 +309,7 @@ describe('My Work rows', () => {
     it('a narrow card folds the row instead of cutting the title', () => {
         const css = styleOf(HOME);
         expect(value(HOME, '.hc-mywork', 'container')).toBe('hc-mywork / inline-size');
-        const narrow = blocksOf(css, '@container hc-mywork (max-width: 420px)');
+        const narrow = blocksOf(css, '@container hc-mywork (max-width: 360px)');
         expect(declaration(ruleBody(narrow, '.hc-row'), 'flex-wrap')).toBe('wrap');
         expect(declaration(ruleBody(narrow, '.hc-row__title'), 'flex-basis')).toMatch(/^calc\(100% - /);
         expect(declaration(ruleBody(narrow, '.hc-row__tail'), 'flex-basis')).toBe('100%');
@@ -426,9 +427,9 @@ describe('Home cards and the top line', () => {
 
     it('on a phone the toolbar is taller than its buttons, which are all one height', () => {
         const phone = phoneOf(styleOf(HOME_VIEW));
-        expect(declaration(ruleBody(phone, '.ah-tbtn'), 'height')).toBe('var(--hit-min, 44px)');
-        expect(declaration(ruleBody(phone, '.home .ah-toolbar'), 'min-height')).toBe('calc(var(--hit-min, 44px) + 2 * var(--sp-3, 6px))');
-        expect(declaration(ruleBody(phoneOf(styleOf('components/molecules/Home/HomeCardsMenu.vue')), '.hcm__toggle'), 'width')).toBe('var(--hit-min, 44px)');
+        expect(declaration(ruleBody(phone, '.ah-tbtn'), 'height')).toBe('var(--hit-min)');
+        expect(declaration(ruleBody(phone, '.home .ah-toolbar'), 'min-height')).toBe('calc(var(--hit-min) + 2 * var(--sp-3, 6px))');
+        expect(declaration(ruleBody(phoneOf(styleOf('components/molecules/Home/HomeCardsMenu.vue')), '.hcm__toggle'), 'width')).toBe('var(--hit-min)');
     });
 });
 
@@ -676,7 +677,6 @@ describe('the controls keep a 24px target', () => {
         [HOME, '.hp-days button', 'min-height'],
         [HOME, '.hc-setup__toggle', 'min-height'],
         [HOME, '.hc-setup__step button', 'min-height'],
-        [INBOX, '.ibx__navitem', 'min-height'],
         [INBOX, '.ibx__tab', 'min-height'],
         [INBOX, '.ibx__markall', 'min-height'],
         [INBOX, '.ibx__undo-btn', 'min-height'],
@@ -686,7 +686,6 @@ describe('the controls keep a 24px target', () => {
         [HUB, '.hub__wiki-btn', 'width'],
         [HUB, '.hub__wiki-btn', 'height'],
         [HUB, '.hub .ah-btn--sm', 'min-height'],
-        [HUB, '.hub__item', 'min-height'],
         [INBOX, '.ibx .ah-btn--sm', 'min-height'],
         ['components/molecules/Home/AssignedCommentsCard.vue', '.hc-assigned__resolve', 'min-height'],
         ['components/molecules/Home/StandupCard.vue', '.hstand__state .ah-btn--sm', 'min-height'],

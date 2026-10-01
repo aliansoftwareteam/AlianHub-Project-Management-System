@@ -81,11 +81,12 @@ defineExpose({ load });
 <style scoped>
 .hc-assigned__title { margin: 0 auto 0 0; }
 .hc-assigned__count { color: var(--ink-2); font-size: var(--fs-xs, 11px); }
-.hc-assigned__hide { width: 26px; height: 26px; display: grid; place-items: center; flex: none; border: 0; border-radius: var(--r-chip); background: transparent; color: var(--ink-2); cursor: pointer; }
+.hc-assigned__hide { width: var(--control-h, 26px); height: var(--control-h, 26px); display: grid; place-items: center; flex: none; border: 0; border-radius: var(--r-chip); background: transparent; color: var(--ink-2); cursor: pointer; }
 .hc-assigned__hide:hover { background: var(--surface-hover); color: var(--ink); }
 .hc-assigned__hide:focus-visible { outline: none; box-shadow: var(--focus); }
 @media (max-width: 767px) {
     .hc-assigned__hide { width: 44px; height: 44px; }
+    .hc-assigned__resolve { min-height: var(--hit-min); }
 }
 .hc-assigned__hint { margin: 0; }
 .hc-assigned__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }

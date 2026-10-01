@@ -9,7 +9,7 @@
 
         <template v-else-if="activeTab === 'to_do'">
             <div class="hc-group">
-                <span>{{ $t('Home.group_today') }} · {{ groups.today.length }}</span>
+                <span>{{ $t('Home.group_today') }}<span class="hc-group__count">{{ groups.today.length }}</span></span>
                 <button type="button" class="hc-group__sort" @click="cycleSort">{{ $t('Home.sort', { by: $t(`Home.sort_${work.sortBy.value}`) }) }} · +</button>
             </div>
             <template v-if="groups.today.length">
@@ -28,30 +28,30 @@
             </form>
 
             <template v-if="groups.overdue.length">
-                <div class="hc-group hc-group--danger"><span>{{ $t('Home.group_overdue') }} · {{ groups.overdue.length }}</span></div>
+                <div class="hc-group hc-group--danger"><span>{{ $t('Home.group_overdue') }}<span class="hc-group__count">{{ groups.overdue.length }}</span></span></div>
                 <TaskRow v-for="task in groups.overdue" :key="task._id" v-bind="rowProps(task)" @toggle="$emit('complete', task)" @open="$emit('open', task)" @timer="$emit('timer', task)" @set-date="$emit('set-date', task)" />
             </template>
 
             <template v-if="groups.next.length">
-                <div class="hc-group"><span>{{ $t('Home.group_next') }} · {{ groups.next.length }}<template v-if="firstRun && sampleProject"> · {{ $t('Home.from_sample') }}</template></span></div>
+                <div class="hc-group"><span>{{ $t('Home.group_next') }}<span class="hc-group__count">{{ groups.next.length }}</span><template v-if="firstRun && sampleProject"> · {{ $t('Home.from_sample') }}</template></span></div>
                 <TaskRow v-for="task in groups.next" :key="task._id" v-bind="rowProps(task)" @toggle="$emit('complete', task)" @open="$emit('open', task)" @timer="$emit('timer', task)" @set-date="$emit('set-date', task)" />
             </template>
 
             <template v-if="groups.unscheduled.length">
-                <div class="hc-group"><span>{{ $t('Home.group_unscheduled') }} · {{ groups.unscheduled.length }}</span></div>
+                <div class="hc-group"><span>{{ $t('Home.group_unscheduled') }}<span class="hc-group__count">{{ groups.unscheduled.length }}</span></span></div>
                 <TaskRow v-for="task in groups.unscheduled" :key="task._id" v-bind="rowProps(task)" dim @toggle="$emit('complete', task)" @open="$emit('open', task)" @timer="$emit('timer', task)" @set-date="$emit('set-date', task)" />
             </template>
         </template>
 
         <template v-else-if="activeTab === 'done'">
-            <div class="hc-group"><span>{{ $t('Home.group_done') }} · {{ work.done.value.length }}</span></div>
+            <div class="hc-group"><span>{{ $t('Home.group_done') }}<span class="hc-group__count">{{ work.done.value.length }}</span></span></div>
             <p v-if="!work.doneLoaded.value" class="hc-loading">{{ $t('Home.loading') }}</p>
             <div v-else-if="!work.done.value.length" class="hc-empty">{{ $t('Home.empty_done') }}</div>
             <TaskRow v-for="task in work.done.value" :key="task._id" v-bind="rowProps(task)" done :timer="false" :draggable="false" @toggle="$emit('reopen', task)" @open="$emit('open', task)" />
         </template>
 
         <template v-else>
-            <div class="hc-group"><span>{{ $t('Home.group_delegated') }} · {{ work.delegated.value.length }}</span></div>
+            <div class="hc-group"><span>{{ $t('Home.group_delegated') }}<span class="hc-group__count">{{ work.delegated.value.length }}</span></span></div>
             <div v-if="!work.delegated.value.length" class="hc-empty">{{ $t('Home.empty_delegated') }}</div>
             <TaskRow v-for="task in work.delegated.value" :key="task._id" v-bind="rowProps(task)" :timer="false" :set-date="false" :draggable="false" @toggle="$emit('complete', task)" @open="$emit('open', task)" />
         </template>
