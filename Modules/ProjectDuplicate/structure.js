@@ -8,6 +8,7 @@ const { sprintPlacementOf } = require('../Tasks/helpers/sprintPlacement');
 const { canManageRules } = require('../Automations/helpers/ruleAccess');
 const matcher = require('../Automations/engine/matcher');
 const { asList, announceFields } = require('../CustomField/helpers/fieldProjects');
+const { removeLinksOfTasks } = require('../CustomField/helpers/fieldLinkStore');
 const rules = require('./rules');
 
 const asId = (id) => new mongoose.Types.ObjectId(String(id));
@@ -116,7 +117,9 @@ const discard = async (companyId, made) => {
     const projectRef = made.projectId;
     const projectId = String(projectRef);
     const drop = (type, filter) => MongoDbCrudOpration(companyId, { type, data: [filter] }, 'deleteMany');
+    const copied = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ ProjectID: projectRef }, { _id: 1 }, { lean: true }] }, 'find').catch(() => []);
     await Promise.allSettled([
+        removeLinksOfTasks(companyId, (copied || []).map((row) => row._id)),
         drop(SCHEMA_TYPE.TASKS, { ProjectID: projectRef }),
         drop(SCHEMA_TYPE.SPRINTS, { projectId: projectRef }),
         drop(SCHEMA_TYPE.FOLDERS, { projectId: projectRef }),

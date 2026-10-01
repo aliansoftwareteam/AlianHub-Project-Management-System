@@ -126,6 +126,8 @@ aiFieldJobsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 6
 const customFieldLinksSchema = new Schema(schema.customFieldLinks, {strict: true, timestamps: true});
 customFieldLinksSchema.index({ taskId: 1, fieldId: 1 }, { unique: true });
 customFieldLinksSchema.index({ fieldId: 1, ids: 1 });
+customFieldLinksSchema.index({ fieldId: 1, kind: 1 });
+customFieldLinksSchema.index({ ids: 1 });
 const epicsSchema = new Schema(schema.epics, {strict: true, timestamps: true});
 epicsSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
 const pagesSchema = new Schema(schema.pages, {strict: true, timestamps: true});

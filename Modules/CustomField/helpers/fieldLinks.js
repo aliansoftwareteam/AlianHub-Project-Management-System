@@ -1,27 +1,25 @@
-const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
-const socketEmitter = require('../../../event/socketEventEmitter');
+const { evaluatePermission, isReadable } = require('../../../Config/permissionGuard');
 const relationship = require('../fieldTypes/relationship');
 const voting = require('../fieldTypes/voting');
 const { customFieldDefinitionOf, customFieldDefinitionsOf } = require('./customFieldText');
 const { fieldAppliesToTask } = require('./fieldTaskTypes');
 const { isTaskFieldOf } = require('./fieldValueInput');
+const { RELATIONSHIP, VOTING, oid, pathOf, linkDocs, storedIds, saveIds, markerOf, markTask, changeVote, storeTally } = require('./fieldLinkStore');
 const { openableTasks } = require('../../Tasks/helpers/taskReadAccess');
 const { QueryRefused } = require('../../Tasks/helpers/taskQueryGuard');
 
-/* What a relationship or a voting field holds on one task is kept here, not on the task: a task document goes whole to
- * everyone who can open that task (the task query, the socket, webhooks), and a linked task or a voter is shown only to
- * a viewer entitled to it. The task itself carries a marker, { _id, fieldValue, revision }: fieldValue is '' for a
- * relationship and the number of votes for a voting field, and revision moves on every write so an open view asks again. */
+/* Who may read and write what helpers/fieldLinkStore.js keeps. */
 
-const RELATIONSHIP = relationship.type;
-const VOTING = voting.type;
 const CONDITION = 'fieldLinks';
 const CONDITIONS_MAX = 10;
 const RESOLVE_MAX = 200;
 /* A writer keeps the links they cannot see, so a field can hold more than its cap; it never holds more than this. */
 const STORED_MAX = 100;
+/* A query that names more projects than this is answered from the field's links across the company. */
+const BOUNDED_PROJECTS_MAX = 50;
+const FIELD_PERMISSION = 'task.task_custom_field';
 
 const NOT_OPENABLE = 'A task named here is not one you can open.';
 const OUT_OF_SCOPE = 'A task named here is outside the project or list this field links to.';
@@ -29,51 +27,14 @@ const ITSELF = 'A task cannot be linked to itself.';
 const FULL = 'This field cannot hold more linked tasks.';
 const NOT_FOUND = 'not_found';
 const NOT_A_VOTING_FIELD = 'not_a_voting_field';
+const FIELDS_HIDDEN = 'fields_hidden';
 
 const LINK_FIELDS = Object.freeze({ TaskName: 1, TaskKey: 1, status: 1, statusKey: 1, statusType: 1, ProjectID: 1, sprintId: 1, folderObjId: 1 });
 const VOTED_TASK_FIELDS = Object.freeze({ ProjectID: 1, TaskTypeKey: 1 });
 
 const { isId } = relationship;
-const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
-const oid = (id) => new mongoose.Types.ObjectId(String(id));
 const idOf = (row) => String(row._id);
 const text = (value) => (value === undefined || value === null ? '' : String(value));
-const pathOf = (fieldId) => `customField.${fieldId}`;
-
-const linkDocs = async (companyId, filter) => ((await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.CUSTOM_FIELD_LINKS, data: [filter] }, 'find')) || [])
-    .map(plain)
-    .map((doc) => ({ ...doc, ids: (doc.ids || []).map(String) }));
-
-/* A field whose type was changed leaves ids of the other kind behind; they are never read as this kind. */
-const storedIds = async (companyId, { taskId, fieldId, kind }) => {
-    const [doc] = await linkDocs(companyId, { taskId, fieldId, kind });
-    return doc ? doc.ids : [];
-};
-
-const DUPLICATE_KEY = 11000;
-
-/* Two first writes for one task and field both try to insert, and the unique index refuses the later one; run again, it updates. */
-const upserting = (write) => write().catch((error) => (error && error.code === DUPLICATE_KEY ? write() : Promise.reject(error)));
-
-const saveIds = (companyId, { taskId, fieldId, kind, ids }) => upserting(() => MongoDbCrudOpration(companyId, {
-    type: SCHEMA_TYPE.CUSTOM_FIELD_LINKS,
-    data: [{ taskId, fieldId }, { $set: { kind, ids } }, { upsert: true, returnDocument: 'after' }],
-}, 'findOneAndUpdate'));
-
-let lastRevision = 0;
-const nextRevision = () => {
-    lastRevision = Math.max(Date.now(), lastRevision + 1);
-    return lastRevision;
-};
-
-const markerOf = (fieldId, fieldValue = '') => ({ _id: String(fieldId), fieldValue, revision: nextRevision() });
-
-const markTask = async (companyId, { taskId, fieldId, marker, announce = true }) => {
-    const change = marker ? { $set: { [pathOf(fieldId)]: marker } } : { $unset: { [pathOf(fieldId)]: '' } };
-    const updated = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: oid(taskId) }, change, { returnDocument: 'after' }] }, 'findOneAndUpdate');
-    if (updated && announce) socketEmitter.emit('update', { type: 'update', data: updated, updatedFields: { [pathOf(fieldId)]: marker || null }, module: 'task' });
-    return updated;
-};
 
 const inScope = (definition, row) => {
     const { scope, projectId, sprintId } = relationship.scopeOf(definition);
@@ -145,37 +106,63 @@ const resolveFor = async ({ companyId, uid, taskIds }) => {
     return resolved;
 };
 
-const votersOf = async (companyId, key) => storedIds(companyId, { ...key, kind: VOTING });
-
-/* One person's own vote on one task. It needs the right to open the task and nothing more, and the voter is always the
- * caller. The count on the task is what the stored voters number once the vote is in. */
+/* One person's own vote on one task, cast as the caller and nobody else. It needs the right to open the task and to see
+ * its custom fields: a role the permission matrix gives no access to them is shown no field at all, this one included. */
 const castVote = async ({ companyId, uid, taskId, fieldId, vote }) => {
     const voter = String(uid || '');
     const [task] = isId(taskId) && isId(voter) ? await openableTasks(companyId, voter, [taskId], { projection: VOTED_TASK_FIELDS }) : [];
     if (!task) return { refused: NOT_FOUND };
+    if (!isReadable(await evaluatePermission(companyId, voter, FIELD_PERMISSION, { projectId: text(task.ProjectID) }))) return { refused: FIELDS_HIDDEN };
     const definition = isId(fieldId) ? await customFieldDefinitionOf(companyId, fieldId) : null;
     if (!definition || definition.fieldType !== VOTING || !isTaskFieldOf(definition, task.ProjectID) || !fieldAppliesToTask(definition, task)) return { refused: NOT_A_VOTING_FIELD };
-    const key = { taskId: idOf(task), fieldId: String(definition._id) };
-    await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.CUSTOM_FIELD_LINKS, data: [{ ...key, kind: { $ne: VOTING } }, { $set: { kind: VOTING, ids: [] } }] }, 'updateOne');
-    await upserting(() => MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.CUSTOM_FIELD_LINKS,
-        data: [key, vote ? { $addToSet: { ids: voter }, $set: { kind: VOTING } } : { $pull: { ids: voter } }, { upsert: vote === true }],
-    }, 'updateOne'));
-    const store = async () => {
-        const count = (await votersOf(companyId, key)).length;
-        await markTask(companyId, { ...key, marker: count ? markerOf(key.fieldId, count) : null });
-        return count;
-    };
-    let count = await store();
-    /* Two people voting at once each store the count they read; the later read settles it. */
-    if ((await votersOf(companyId, key)).length !== count) count = await store();
-    return { count, voted: vote === true };
+    const after = await changeVote(companyId, { taskId: idOf(task), fieldId: String(definition._id) }, voter, vote === true);
+    if (!after) return { count: 0, voted: false };
+    await storeTally(companyId, after);
+    return { count: after.ids.length, voted: after.ids.includes(voter) };
 };
 
 const sourcesOf = (docs) => [...new Set(docs.map((doc) => doc.taskId))].filter(isId);
 
+const isObjectId = (value) => Boolean(value) && value._bsontype === 'ObjectId';
+const namesIds = (list) => Array.isArray(list) && list.length > 0 && list.every((id) => isObjectId(id) || isId(id));
+
+const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
+    && [Object.prototype, null].includes(Object.getPrototypeOf(value));
+
+/* Every condition a match requires at once: its own keys, and those of each part of its $and. */
+const required = (match) => [match, ...(Array.isArray(match.$and) ? match.$and.filter(isPlainObject).flatMap(required) : [])];
+
+const projectIdsOf = (condition) => {
+    if (isObjectId(condition) || isId(condition)) return [String(condition)];
+    const only = isPlainObject(condition) && Object.keys(condition).length === 1 ? condition : {};
+    if (namesIds(only.$in)) return only.$in.map(String);
+    return isObjectId(only.$eq) || isId(only.$eq) ? [String(only.$eq)] : null;
+};
+
+/* The projects a task query keeps to, read from what its first stage requires of ProjectID; null when it names none
+ * or too many. Every later stage only narrows, so a task outside them is never in the answer. */
+const projectsOf = (stages) => {
+    const first = Array.isArray(stages) && isPlainObject(stages[0]) ? stages[0].$match : null;
+    if (!isPlainObject(first)) return null;
+    const named = required(first).filter((part) => 'ProjectID' in part).map((part) => projectIdsOf(part.ProjectID)).filter(Boolean);
+    const fewest = named.sort((a, b) => a.length - b.length)[0];
+    return fewest && fewest.length <= BOUNDED_PROJECTS_MAX ? fewest : null;
+};
+
+/* The relationship values a "has a value" question reads. Inside named projects they are those of the tasks that carry
+ * the field's marker there, found through the tasks' own project so a moved task is never missed. */
+const relationshipDocs = async (companyId, fieldId, projects) => {
+    const held = { fieldId, kind: RELATIONSHIP, 'ids.0': { $exists: true } };
+    if (!projects) return linkDocs(companyId, held);
+    const marked = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS,
+        data: [{ ProjectID: { $in: projects.map(oid) }, [pathOf(fieldId)]: { $exists: true } }, { _id: 1 }, { lean: true }],
+    }, 'find');
+    return marked && marked.length ? linkDocs(companyId, { ...held, taskId: { $in: marked.map(idOf) } }) : [];
+};
+
 /* The tasks a filter or a group on one of these fields asks for, as this viewer would see them. */
-const sourcesFor = async ({ companyId, uid, field, is, task }) => {
+const sourcesFor = async ({ companyId, uid, projects, field, is, task }) => {
     const fieldId = isId(field) ? field.toLowerCase() : '';
     if (!fieldId) throw new QueryRefused(CONDITION, 'it must name a custom field');
     if (is === 'mine') return sourcesOf(await linkDocs(companyId, { fieldId, kind: VOTING, ids: String(uid) }));
@@ -185,13 +172,10 @@ const sourcesFor = async ({ companyId, uid, field, is, task }) => {
         return open ? sourcesOf(await linkDocs(companyId, { fieldId, kind: RELATIONSHIP, ids: idOf(open) })) : [];
     }
     if (is !== 'set' && is !== 'empty') throw new QueryRefused(CONDITION, 'it must ask for set, empty, has or mine');
-    const docs = await linkDocs(companyId, { fieldId, kind: RELATIONSHIP, 'ids.0': { $exists: true } });
+    const docs = await relationshipDocs(companyId, fieldId, projects);
     const open = new Set((await openableTasks(companyId, uid, docs.flatMap((doc) => doc.ids))).map(idOf));
     return sourcesOf(docs.filter((doc) => doc.ids.some((id) => open.has(id))));
 };
-
-const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
-    && [Object.prototype, null].includes(Object.getPrototypeOf(value));
 
 const isCondition = (value) => isPlainObject(value) && Object.keys(value).length === 1 && isPlainObject(value[CONDITION]);
 
@@ -200,11 +184,12 @@ const isCondition = (value) => isPlainObject(value) && Object.keys(value).length
  * as the ids of the tasks that qualify. The query then runs under the caller's own visibility like any other. */
 const withLinkConditions = async (companyId, uid, stages) => {
     let conditions = 0;
+    const projects = projectsOf(stages);
     /* A grouped view asks the same question in its rows, its counts and its "no value" group. */
     const answered = new Map();
     const sourcesOnce = (condition) => {
         const asked = JSON.stringify([condition.field, condition.is, condition.task]);
-        if (!answered.has(asked)) answered.set(asked, sourcesFor({ companyId, uid, ...condition }));
+        if (!answered.has(asked)) answered.set(asked, sourcesFor({ companyId, uid, projects, ...condition }));
         return answered.get(asked);
     };
     const walk = async (value) => {
@@ -246,6 +231,6 @@ const copyFieldLinks = async ({ companyId, actorId, pairs, announce = true }) =>
 };
 
 module.exports = {
-    CONDITION, RESOLVE_MAX, NOT_FOUND, NOT_A_VOTING_FIELD,
+    CONDITION, RESOLVE_MAX, NOT_FOUND, NOT_A_VOTING_FIELD, FIELDS_HIDDEN,
     writeLinks, resolveFor, castVote, withLinkConditions, copyFieldLinks,
 };

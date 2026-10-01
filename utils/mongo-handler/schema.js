@@ -4742,11 +4742,15 @@ const schema = {
     },
     // What a relationship or a voting field holds on one task: task ids, or the ids of the people who voted.
     customFieldLinks: {
+        // "<taskId>:<fieldId>", so a task holds one document for a field
+        _id: { type: String, required: false },
         taskId: { type: String, required: true },
         fieldId: { type: String, required: true },
         // relationship | voting
         kind: { type: String, required: true },
         ids: { type: [String], default: [], required: false },
+        // steps on every vote, so the count a task shows is the one from the latest
+        version: { type: Number, required: false },
     },
     sprints: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.
