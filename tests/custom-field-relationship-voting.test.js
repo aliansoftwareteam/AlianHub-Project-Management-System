@@ -16,7 +16,9 @@ const { fieldInsertFrom, fieldUpdateFrom, FieldWriteError } = require('../Module
 const { typeModuleOf, MODULE_FIELD_TYPES } = require('../Modules/CustomField/fieldTypes');
 const { storableFieldValues } = require('../Modules/CustomField/helpers/fieldValueWrite');
 const { storedValueOf } = require('../Modules/CustomField/helpers/fieldValueInput');
-const { copyFieldLinks } = require('../Modules/CustomField/helpers/fieldLinks');
+const { copyFieldLinks, castVote } = require('../Modules/CustomField/helpers/fieldLinks');
+const { customFieldLinksSchema, customFieldsSchema, taskSchema } = require('../utils/mongo-handler/createSchema');
+const { realModelStore } = require('./fixtures/realModelStore');
 const { describeCustomFieldValue } = require('../Modules/Tasks/helpers/taskItemHistory');
 const { cleanViewSettings } = require('../Modules/Project/helpers/viewSettings');
 const { normaliseAiConfig, AiConfigError } = require('../Modules/CustomField/aiFields/config');
@@ -210,5 +212,51 @@ describe('copying a task that has linked tasks and votes', () => {
         await copyFieldLinks({ companyId: CID, actorId: OWNER, pairs: new Map([[OUTSIDE, SOURCE_COPY]]) });
         expect(links()).toHaveLength(3);
         expect(storedTask(SOURCE_COPY).customField).toBeUndefined();
+    });
+});
+
+/* fakeMongo keeps whatever a writer passes. These replay the same writes through Mongoose and the real schemas, where a
+   strict schema drops a field it does not declare. */
+describe('what the schemas keep of both fields', () => {
+    const stores = {
+        [SCHEMA_TYPE.CUSTOM_FIELD_LINKS]: realModelStore('customFieldLinksStoredForm', customFieldLinksSchema),
+        [SCHEMA_TYPE.TASKS]: realModelStore('tasksStoredForm', taskSchema),
+    };
+    const stored = async (type) => {
+        const updates = [];
+        for (const call of mockDb.calls.filter((made) => made.type === type && ['findOneAndUpdate', 'updateOne'].includes(made.method))) {
+            const { writes, error } = await stores[type].driverWrites(call.method, call.data);
+            expect(error).toBeNull();
+            writes.forEach(({ args }) => updates.push({ filter: args[0], update: args[1] }));
+        }
+        return updates;
+    };
+
+    it('keeps the linked ids, the voters and their kind on the collection', async () => {
+        mockDb.calls.length = 0;
+        await copyFieldLinks({ companyId: CID, actorId: OWNER, pairs: new Map([[CHILD, CHILD_COPY]]) });
+        await castVote({ companyId: CID, uid: MEMBER, taskId: OUTSIDE, fieldId: VOTES, vote: true });
+        const updates = await stored(SCHEMA_TYPE.CUSTOM_FIELD_LINKS);
+        expect(updates).toEqual(expect.arrayContaining([
+            { filter: { taskId: CHILD_COPY, fieldId: CLIENT }, update: expect.objectContaining({ $set: expect.objectContaining({ kind: 'relationship', ids: [SOURCE] }) }) },
+            { filter: { taskId: OUTSIDE, fieldId: VOTES }, update: expect.objectContaining({ $addToSet: { ids: MEMBER }, $set: expect.objectContaining({ kind: 'voting' }) }) },
+        ]));
+    });
+
+    it('keeps the marker and the vote count on the task', async () => {
+        mockDb.calls.length = 0;
+        await copyFieldLinks({ companyId: CID, actorId: OWNER, pairs: new Map([[CHILD, CHILD_COPY]]) });
+        await castVote({ companyId: CID, uid: MEMBER, taskId: OUTSIDE, fieldId: VOTES, vote: true });
+        const sets = (await stored(SCHEMA_TYPE.TASKS)).map(({ update }) => update.$set);
+        expect(sets).toEqual(expect.arrayContaining([
+            expect.objectContaining({ [`customField.${CLIENT}`]: { _id: CLIENT, fieldValue: '', revision: expect.any(Number) } }),
+            expect.objectContaining({ [`customField.${VOTES}`]: { _id: VOTES, fieldValue: 1, revision: expect.any(Number) } }),
+        ]));
+    });
+
+    it('keeps the settings on a field definition', () => {
+        const CustomField = stores[SCHEMA_TYPE.TASKS].Model.db.model('customFieldsStoredForm', customFieldsSchema);
+        const saved = new CustomField({ fieldTitle: 'Client', fieldType: 'relationship', type: 'task', ...relationship.settings({ fieldLinkMax: 4, fieldLinkScope: 'list', fieldLinkProjectId: OPEN_PROJECT, fieldLinkSprintId: SPRINT }).settings, ...voting.settings({ fieldVotersShown: false }).settings }).toObject();
+        expect(saved).toMatchObject({ fieldLinkMax: 4, fieldLinkScope: 'list', fieldLinkProjectId: OPEN_PROJECT, fieldLinkSprintId: SPRINT, fieldVotersShown: false });
     });
 });

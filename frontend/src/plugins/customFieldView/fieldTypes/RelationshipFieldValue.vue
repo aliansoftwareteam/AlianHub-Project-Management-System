@@ -79,7 +79,7 @@ import { computed, inject, nextTick, onBeforeUnmount, ref, unref, watch } from "
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { openTask } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 import { linksOf, maxOf } from "@fieldTypes/relationship";
-import { linkedValue } from "./fieldLinks";
+import { linkIsCurrent, linkedValue, patchLinkedValue, reloadLinks } from "./fieldLinks";
 import { useTaskSearch } from "./taskSearch";
 
 defineOptions({ name: "RelationshipFieldValue" });
@@ -103,11 +103,9 @@ const root = ref(null);
 const trigger = ref(null);
 const picking = ref(false);
 const popStyle = ref({});
-/* What the person just chose, shown until the server's answer for the new marker arrives. */
-const chosen = ref(null);
 
 const revision = computed(() => props.task?.customField?.[props.def._id]?.revision);
-const links = computed(() => chosen.value || linksOf(linkedValue(props.task, props.def._id)));
+const links = computed(() => linksOf(linkedValue(props.task, props.def._id)));
 const max = computed(() => maxOf(props.def));
 const full = computed(() => links.value.length >= max.value);
 const shown = computed(() => (props.compact ? links.value.slice(0, 1) : links.value));
@@ -120,8 +118,9 @@ const { query, results, searching, onSearch, clear } = useTaskSearch({
 
 const nameOf = (link) => [link.key, link.title].filter(Boolean).join(" ");
 
+/* A change that was refused puts the marker back where it was, and what was shown for it is asked for again. */
 watch(revision, (now) => {
-    if (typeof now === "number") chosen.value = null;
+    if (typeof now === "number" && linkIsCurrent(props.task, props.def._id)) reloadLinks(props.task);
 });
 
 function open(link) {
@@ -129,7 +128,7 @@ function open(link) {
 }
 
 function write(next) {
-    chosen.value = next;
+    patchLinkedValue(props.task, props.def._id, next);
     emit("change", next.map((link) => link.id));
 }
 

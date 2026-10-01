@@ -50,10 +50,15 @@ const storedIds = async (companyId, { taskId, fieldId, kind }) => {
     return doc ? doc.ids : [];
 };
 
-const saveIds = (companyId, { taskId, fieldId, kind, ids }) => MongoDbCrudOpration(companyId, {
+const DUPLICATE_KEY = 11000;
+
+/* Two first writes for one task and field both try to insert, and the unique index refuses the later one; run again, it updates. */
+const upserting = (write) => write().catch((error) => (error && error.code === DUPLICATE_KEY ? write() : Promise.reject(error)));
+
+const saveIds = (companyId, { taskId, fieldId, kind, ids }) => upserting(() => MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.CUSTOM_FIELD_LINKS,
     data: [{ taskId, fieldId }, { $set: { kind, ids } }, { upsert: true, returnDocument: 'after' }],
-}, 'findOneAndUpdate');
+}, 'findOneAndUpdate'));
 
 let lastRevision = 0;
 const nextRevision = () => {
@@ -152,10 +157,10 @@ const castVote = async ({ companyId, uid, taskId, fieldId, vote }) => {
     if (!definition || definition.fieldType !== VOTING || !isTaskFieldOf(definition, task.ProjectID) || !fieldAppliesToTask(definition, task)) return { refused: NOT_A_VOTING_FIELD };
     const key = { taskId: idOf(task), fieldId: String(definition._id) };
     await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.CUSTOM_FIELD_LINKS, data: [{ ...key, kind: { $ne: VOTING } }, { $set: { kind: VOTING, ids: [] } }] }, 'updateOne');
-    await MongoDbCrudOpration(companyId, {
+    await upserting(() => MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.CUSTOM_FIELD_LINKS,
         data: [key, vote ? { $addToSet: { ids: voter }, $set: { kind: VOTING } } : { $pull: { ids: voter } }, { upsert: vote === true }],
-    }, 'updateOne');
+    }, 'updateOne'));
     const store = async () => {
         const count = (await votersOf(companyId, key)).length;
         await markTask(companyId, { ...key, marker: count ? markerOf(key.fieldId, count) : null });

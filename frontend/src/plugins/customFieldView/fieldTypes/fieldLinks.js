@@ -55,19 +55,34 @@ function ask(task) {
     if (!sending) sending = Promise.resolve().then(send);
 }
 
+const taskIdOf = (task) => (task?._id ? String(task._id) : '');
+
+/* Whether what was answered for the field is as new as the marker this copy of the task carries. */
+export function linkIsCurrent(task, fieldId) {
+    const answer = answers[taskIdOf(task)];
+    return Boolean(answer) && rank(answer.revisions[fieldId]) >= revisionOf(task, fieldId);
+}
+
 /* What this viewer was given for the field on the task: the linked tasks, or the tally of a vote. null until the first
    answer; reading it is what asks. */
 export function linkedValue(task, fieldId) {
-    const taskId = task?._id ? String(task._id) : '';
+    const taskId = taskIdOf(task);
     if (!taskId) return null;
+    if (!linkIsCurrent(task, fieldId) && !queued.has(taskId) && !flying.has(taskId)) ask(task);
     const answer = answers[taskId];
-    const current = answer && rank(answer.revisions[fieldId]) >= revisionOf(task, fieldId);
-    if (!current && !queued.has(taskId) && !flying.has(taskId)) ask(task);
     return answer ? (answer.fields[fieldId] ?? NOTHING) : null;
 }
 
 export function reloadLinks(task) {
-    if (task?._id) ask(task);
+    if (taskIdOf(task)) ask(task);
+}
+
+/* What this person just changed themselves, shown at once; the server's answer replaces it when the marker moves. */
+export function patchLinkedValue(task, fieldId, value) {
+    const taskId = taskIdOf(task);
+    if (!taskId) return;
+    const answer = answers[taskId] || { revisions: {}, fields: {} };
+    answers[taskId] = { revisions: answer.revisions, fields: { ...answer.fields, [fieldId]: value } };
 }
 
 export function resetFieldLinks() {

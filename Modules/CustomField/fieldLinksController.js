@@ -16,7 +16,7 @@ const handle = (label, work) => async (req, res) => {
         if (error instanceof TenantError) return refuse(res, error.statusCode, error.message);
         if (error instanceof QueryRefused) return refuse(res, 400, error.message);
         logger.error(`[field-links] ${label}: ${(error && error.message) || error}`);
-        return refuse(res, 500, 'The field could not be read.');
+        return refuse(res, 500, 'The request could not be completed.');
     }
 };
 

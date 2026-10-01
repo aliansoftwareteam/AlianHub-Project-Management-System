@@ -427,6 +427,26 @@ describe('voting', () => {
         expect(await shown(MEMBER, [PRIVATE_SOURCE])).toEqual({});
     });
 
+    it('lands when two people cast the first vote on a task at once', async () => {
+        const real = mockDb.crud.getMockImplementation();
+        let refusedOnce = false;
+        mockDb.crud.mockImplementation(async (companyId, query, method) => {
+            const firstVote = query.type === SCHEMA_TYPE.CUSTOM_FIELD_LINKS && method === 'updateOne' && query.data[2] && query.data[2].upsert === true;
+            if (firstVote && !refusedOnce) {
+                refusedOnce = true;
+                throw Object.assign(new Error('E11000 duplicate key'), { code: 11000 });
+            }
+            return real(companyId, query, method);
+        });
+        try {
+            expect(await vote(MEMBER, SOURCE)).toEqual({ count: 1, voted: true });
+        } finally {
+            mockDb.crud.mockImplementation(real);
+        }
+        expect(refusedOnce).toBe(true);
+        expect(idsOf(SOURCE, VOTES)).toEqual([MEMBER]);
+    });
+
     it('starts over on a field that was a relationship before', async () => {
         definition(CLIENT).fieldType = 'voting';
         expect(await vote(MEMBER, SOURCE, true, CLIENT)).toEqual({ count: 1, voted: true });

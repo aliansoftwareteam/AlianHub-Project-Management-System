@@ -31,7 +31,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequest } from "@/services";
 import { useGetterFunctions } from "@/composable";
 import { countOf, tallyOf } from "@fieldTypes/voting";
-import { linkedValue, reloadLinks } from "./fieldLinks";
+import { linkedValue, patchLinkedValue } from "./fieldLinks";
 
 defineOptions({ name: "VotingFieldValue" });
 
@@ -75,7 +75,7 @@ async function toggle() {
         const response = await apiRequest("post", `/api/v2/custom-fields/${props.def._id}/vote`, { taskId: props.task._id, vote: !voted.value });
         if (response?.data?.status !== true) throw new Error("vote refused");
         cast.value = { count: countOf(response.data.data?.count), voted: response.data.data?.voted === true };
-        reloadLinks(props.task);
+        patchLinkedValue(props.task, props.def._id, { ...tally.value, ...cast.value });
     } catch (error) {
         $toast.error(error?.response?.data?.statusText || t("FieldTypes.voting_failed"), { position: "top-right" });
     } finally {

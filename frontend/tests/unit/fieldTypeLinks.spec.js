@@ -189,6 +189,21 @@ describe('a relationship value', () => {
         expect(wrapper.emitted('change')).toEqual([[[INVOICE]]]);
     });
 
+    it('shows a change at once, and asks again when the change is refused and the marker comes back', async () => {
+        const wrapper = shown({ editable: true });
+        await flushPromises();
+        await wrapper.get('[data-link-add]').trigger('click');
+        await wrapper.findAll('[data-link-remove]')[0].trigger('click');
+        expect(wrapper.findAll('[data-link]').map((chip) => chip.text())).toEqual(['CRM-2 Invoice']);
+        await wrapper.setProps({ task: task(3, { customField: { [CLIENT]: { _id: CLIENT, fieldValue: [INVOICE] } } }) });
+        await flushPromises();
+        expect(apiRequest).toHaveBeenCalledTimes(1);
+        await wrapper.setProps({ task: task() });
+        await flushPromises();
+        expect(apiRequest).toHaveBeenCalledTimes(2);
+        expect(wrapper.findAll('[data-link]').map((chip) => chip.text())).toEqual(['CRM-1 Contract', 'CRM-2 Invoice']);
+    });
+
     it('searches tasks the viewer can open and adds the one picked', async () => {
         const wrapper = shown({ editable: true });
         await flushPromises();
@@ -247,6 +262,7 @@ describe('a voting value', () => {
         expect(wrapper.get('[data-vote]').attributes('aria-pressed')).toBe('false');
         expect(wrapper.get('[data-vote]').text()).toBe('2');
         expect(wrapper.emitted('change')).toBeUndefined();
+        expect(linkedValue(task(), VOTES)).toMatchObject({ voted: false, count: 2 });
     });
 
     it('names the voters in the task panel when the field shows them', async () => {
