@@ -227,7 +227,8 @@ describe('a task in extra lists is counted once, at its home', () => {
        the Everything rows and the relay are here because they show a task under a list it was added
        to, each only to a reader of the task's home (tests/task-find-extra-lists.test.js,
        tests/socket-extra-list-relay.test.js); the agent tools are here because they run the web's own
-       handlers as the person and search inside the caller's own clause (tests/mcp-extra-lists.test.js). */
+       handlers as the person and search inside the caller's own clause (tests/mcp-extra-lists.test.js);
+       the welcome project's seeder is here because it calls addToList as the owner and reads nothing. */
     test('no other server file reads the field', () => {
         const ROOT = path.join(__dirname, '..');
         const KNOWN = [
@@ -243,6 +244,7 @@ describe('a task in extra lists is counted once, at its home', () => {
             'Modules/Tasks/helpers/mongo_helper.js',
             'Modules/Tasks/helpers/taskExtraLists.js',
             'Modules/Tasks/helpers/taskExtraListsRules.js',
+            'Modules/Tasks/helpers/taskListsLeft.js',
             'Modules/Tasks/helpers/taskMongo/extraLists.js',
             'Modules/Tasks/helpers/taskMongo/structural.js',
             'Modules/Tasks/helpers/taskQueryGuard.js',
@@ -252,6 +254,7 @@ describe('a task in extra lists is counted once, at its home', () => {
             'socket/controller/taskSocket.js',
             'utils/mongo-handler/createSchema.js',
             'utils/mongo-handler/schema.js',
+            'utils/sampleExtras.js',
         ];
         const files = [];
         const walk = (dir) => fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).forEach((entry) => {

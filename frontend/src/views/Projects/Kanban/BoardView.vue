@@ -53,6 +53,7 @@
                         v-if="project?.deletedStatusKey !== 2"
                         :title="$t(emptyTitleKey)"
                         :message="$t(emptyMessageKey)"
+                        :sentence="emptySentenceKey ? $t(emptySentenceKey) : ''"
                         helpPath="tasks"
                     />
                 </div>
@@ -108,7 +109,7 @@ const { groupBy } = taskListHelper();
 const showArchiveVar = inject("showArchived");
 const searchedTask = inject('searchedTask');
 const project = inject('selectedProject');
-const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
+const { emptyTitleKey, emptyMessageKey, emptySentenceKey } = useTaskEmptyState(project);
 
 const customFields = useProjectCustomFields(project, { archived: showArchiveVar });
 const cardCatalogue = computed(() => columnCatalogue('board', { fields: customFields.defs.value }));

@@ -137,6 +137,7 @@
                     :title="$t(emptyTitleKey)"
                     :message="$t(emptyMessageKey)"
                     :actionLabel="canCreate ? $t('EmptyState.no_tasks_action') : ''"
+                    :sentence="canCreate && emptySentenceKey ? $t(emptySentenceKey) : ''"
                     helpPath="tasks"
                     @action="createTask = true"
                 />
@@ -207,7 +208,7 @@ const tagsOn = computed(() => checkApps('tags') && checkPermission('task.task_ta
 const companyId = inject('$companyId');
 const searchedTask = inject('searchedTask');
 const showArchiveVar = inject("showArchived");
-const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
+const { emptyTitleKey, emptyMessageKey, emptySentenceKey } = useTaskEmptyState(project);
 
 const rowEdit = useListRowEdit(project, showArchiveVar);
 const aiColumnTasks = computed(() => loadedViewTasks(getters, project.value?._id, { table: true, searched: Boolean(searchedTask?.value) }));

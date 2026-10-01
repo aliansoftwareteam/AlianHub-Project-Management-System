@@ -3,6 +3,7 @@
         :title="t('EmptyState.no_lists_in_folder_title', { folder: path })"
         :message="t('EmptyState.no_lists_in_folder_msg')"
         :actionLabel="canCreate ? t('Projects.new_list') : ''"
+        :sentence="canCreate ? t('EmptyState.say_list') : ''"
         @action="emit('create')"
     />
 </template>

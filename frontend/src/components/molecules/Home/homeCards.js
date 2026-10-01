@@ -31,17 +31,22 @@ export function resolveHomeLayout(stored) {
     return [...new Set(source.filter((id) => typeof id === "string" && homeCardInfo(id)))];
 }
 
-export const homeCards = reactive({ userId: null, layout: [...DEFAULT_HOME_LAYOUT] });
+export const isHomeArranged = (stored) => Array.isArray(stored?.layout) || (Array.isArray(stored?.hidden) && stored.hidden.length > 0);
+
+/* `arranged` is read once, when the person's record arrives, so a card does not move under them the moment they first change Home. */
+export const homeCards = reactive({ userId: null, layout: [...DEFAULT_HOME_LAYOUT], arranged: false });
 
 export function resetHomeCards() {
     homeCards.userId = null;
     homeCards.layout = [...DEFAULT_HOME_LAYOUT];
+    homeCards.arranged = false;
 }
 
 export function syncHomeCards(userId, stored) {
     if (!userId || homeCards.userId === userId) return;
     homeCards.userId = userId;
     homeCards.layout = resolveHomeLayout(stored);
+    homeCards.arranged = isHomeArranged(stored);
 }
 
 export const isHomeCardShown = (id) => homeCards.layout.includes(id);
