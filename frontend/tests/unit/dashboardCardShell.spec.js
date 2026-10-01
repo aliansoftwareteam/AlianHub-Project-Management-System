@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { enableAutoUnmount, flushPromises } from '@vue/test-utils';
-import { h } from 'vue';
+import { h, ref } from 'vue';
 import { createStore } from 'vuex';
 
 const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }));
@@ -10,7 +10,6 @@ vi.mock('@/components/organisms/TaskDetailOverlay/useTaskOverlay', () => ({ open
 
 import BurndownCard from '@/components/organisms/BurndownCard/BurndownCard.vue';
 import VelocityCard from '@/components/organisms/VelocityCard/VelocityCard.vue';
-import { forgetAskAnswers } from '@/components/organisms/AskAQuestionCard/askCardCache';
 import { BUILT_CARDS } from '@/plugins/dashboard/cardCatalog';
 import { cardComponent } from '@/plugins/dashboard/cardRegistry';
 import { AI_STATE, applyAiAvailability, resetAiAvailability } from '@/composable/aiAvailability';
@@ -39,7 +38,7 @@ const deferred = () => {
 
 const instanceOf = (wrapper, component) => wrapper.findComponent(component).vm.$.uid;
 
-const inShell = (body, cardData = {}) => mountInShell(body, { props: { cardData }, global: { plugins: [store()] } });
+const inShell = (body, cardData = {}) => mountInShell(body, { props: { cardData }, global: { plugins: [store()], provide: { dashboardId: ref('dash-1') } } });
 
 const sprints = (n) => Array.from({ length: n }, (_, i) => ({ sprintId: `s${i}`, name: `Sprint ${i}`, committed: 10, completed: 8 + i }));
 const burndown = () => ok({ sprintName: 'Sprint 4', totalPoints: 12, days: [
@@ -261,16 +260,20 @@ describe('every card the catalogue can add', () => {
         VelocityCard: { projectId: 'p1' },
         AskAQuestionCard: { question: 'What is late?' },
     };
+    /* The Ask card reads the answer it kept and asks only when it has none, so here it has one. */
+    const REPLY = {
+        AskAQuestionCard: { stored: { question: 'What is late?', projectId: '', answer: 'Two are late.', cited: [], askedAt: Date.now() }, stale: false, refreshDue: false },
+    };
 
     beforeEach(() => {
         apiRequest.mockReset();
         apiRequest.mockResolvedValue(ok({}));
-        forgetAskAnswers();
         resetAiAvailability();
         applyAiAvailability({ state: AI_STATE.ON, planAllowsAi: true });
     });
 
     it.each(BUILT_CARDS.map((c) => c.key))('%s reports through the shell, loads once on mount, once more on refresh, and never in a loop', async (key) => {
+        if (REPLY[key]) apiRequest.mockResolvedValue(ok(REPLY[key]));
         const { shown, refresh } = inShell(cardComponent(key), CARD_DATA[key] || {});
         await settle();
 
