@@ -794,7 +794,7 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject, 
 }
 
 /* `chain` is the copy's `ancestors`: the copies above it, root first. The source's own subtasks are copied under the copy. */
-exports.duplicateSubTaskFunction = (companyId, projectData, sprintObj, subtask, parentId, userData, oldProject, duplicateData, chain = [String(parentId)]) => {
+exports.duplicateSubTaskFunction = (companyId, projectData, sprintObj, subtask, parentId, userData, oldProject, duplicateData, chain = [String(parentId)], copied = null) => {
     return new Promise((resolve, reject) => {
         try {
             let obj = {};
@@ -870,6 +870,7 @@ exports.duplicateSubTaskFunction = (companyId, projectData, sprintObj, subtask, 
                 socketEmitter.emit('update', { type: "update", data: response , updatedFields: {taskTypeCounts: response.taskTypeCounts,lastTaskId: response.lastTaskId}, module: 'task' });
                 obj.TaskKey = projectData.ProjectCode + '-' +  response.lastTaskId;
                 exports.HandleTask(companyId, obj, false, null, userData).then(async (taskResult) => {
+                    if (copied) copied.set(String(subtask._id), String(taskResult.id));
                     if(duplicateData.includes('Attachments')){
                         copyFieldFiles({ companyId, source: subtask, target: { _id: taskResult.id, ProjectID: projectData.id } })
                             .catch((error) => logger.error(`field files copy on duplicate: ${error && error.message}`));
@@ -931,7 +932,7 @@ exports.duplicateSubTaskFunction = (companyId, projectData, sprintObj, subtask, 
                         type: SCHEMA_TYPE.TASKS,
                         data: [{ ParentTaskId: String(subtask._id), deletedStatusKey: { $nin: [1] } }],
                     }, 'find').catch(() => []);
-                    await Promise.allSettled((ownSubtasks || []).map((own) => exports.duplicateSubTaskFunction(companyId, projectData, sprintObj, own, taskResult.id, userData, oldProject, duplicateData, [...chain, String(taskResult.id)])));
+                    await Promise.allSettled((ownSubtasks || []).map((own) => exports.duplicateSubTaskFunction(companyId, projectData, sprintObj, own, taskResult.id, userData, oldProject, duplicateData, [...chain, String(taskResult.id)], copied)));
                     resolve({ status: true, statusText: "Duplicate Task Added"});
                     try {
                         if (duplicateData.includes('Activity')) {

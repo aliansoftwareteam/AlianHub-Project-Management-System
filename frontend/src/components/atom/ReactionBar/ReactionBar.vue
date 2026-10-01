@@ -1,5 +1,5 @@
 <template>
-    <div class="reaction-bar d-flex align-items-center">
+    <div class="reaction-bar d-flex align-items-center" :class="{ 'reaction-bar--themed': themed }">
         <span
             v-for="group in groupedReactions"
             :key="'reaction-'+group.emoji"
@@ -21,7 +21,7 @@
              clip or overlap it (right-aligned comments sit at the edge). -->
         <Teleport to="body">
             <span v-if="pickerOpen" class="reaction-bar__overlay" @click.stop="pickerOpen = false"></span>
-            <span v-if="pickerOpen" class="reaction-bar__picker" :style="pickerStyle">
+            <span v-if="pickerOpen" class="reaction-bar__picker" :class="{ 'reaction-bar__picker--themed': themed }" :style="pickerStyle">
                 <span
                     v-for="emoji in REACTION_EMOJIS"
                     :key="'pick-'+emoji"
@@ -55,6 +55,11 @@ const props = defineProps({
         default: () => []
     },
     compact: {
+        type: Boolean,
+        default: false
+    },
+    // The task comment list and chat keep their fixed light colours; a themed surface asks for the design tokens.
+    themed: {
         type: Boolean,
         default: false
     }
@@ -134,6 +139,22 @@ function pick(emoji) {
 .reaction-bar__add--compact {
     font-size: 13px;
 }
+.reaction-bar--themed .reaction-bar__chip {
+    border-color: var(--border);
+    background: var(--surface);
+    color: var(--ink);
+}
+.reaction-bar--themed .reaction-bar__chip--mine {
+    border-color: var(--brand);
+    background: var(--brand-tint);
+}
+.reaction-bar--themed .reaction-bar__count,
+.reaction-bar--themed .reaction-bar__add {
+    color: var(--ink-2);
+}
+.reaction-bar--themed .reaction-bar__add:hover {
+    color: var(--ink);
+}
 </style>
 
 <style>
@@ -162,5 +183,13 @@ function pick(emoji) {
 }
 .reaction-bar__picker-emoji:hover {
     background: #f0f0f0;
+}
+.reaction-bar__picker--themed {
+    background: var(--surface);
+    border-color: var(--border);
+    box-shadow: var(--shadow-pop);
+}
+.reaction-bar__picker--themed .reaction-bar__picker-emoji:hover {
+    background: var(--surface-hover);
 }
 </style>
