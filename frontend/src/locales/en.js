@@ -3208,6 +3208,10 @@ export default {
     },
     ViewGroups: {
         no_value: "No value",
+        number_below: "Below {to}",
+        number_between: "{from} to {to}",
+        number_from: "{from} and above",
+        number_any: "Has a value",
         checked: "Checked",
         unchecked: "Not checked",
         date_past: "Past",

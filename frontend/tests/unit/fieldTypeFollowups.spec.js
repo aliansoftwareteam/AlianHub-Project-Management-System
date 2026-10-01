@@ -24,7 +24,7 @@ import CustomFieldDrawer from '@/plugins/customFieldView/component/molecules/cus
 import CustomFieldRender from '@/plugins/customFieldView/component/molecules/customFieldTaskView/customFieldRender.vue';
 import AiFieldColumnHead from '@/views/Projects/components/columns/AiFieldColumnHead.vue';
 import {
-    customFieldGroups, customGroupMatches, customGroupOptions, customGroupUpdate, valuePath
+    customFieldGroups, customGroupMatches, customGroupOptions, customGroupUpdate, needsProjectRange, numberRangeStages, rangeFromRows, valuePath
 } from '@/views/Projects/composables/customFieldQuery';
 
 const i18n = createI18n({ legacy: false, locale: 'en', messages: { en }, missingWarn: false, fallbackWarn: false });
@@ -227,7 +227,8 @@ describe('grouping by a number field', () => {
         const placed = (row) => groups.map((group) => customGroupMatches(row, group));
         expect(placed(task('12'))).toEqual([true, false, false, false, false, false]);
         expect(placed(task('20'))).toEqual([false, true, false, false, false, false]);
-        expect(placed(task('1,200'))).toEqual([false, false, false, false, true, false]);
+        expect(placed(task('1200'))).toEqual([false, false, false, false, true, false]);
+        expect(placed(task('1,200'))).toEqual([false, false, false, false, false, true]);
         expect(placed(task('-5'))).toEqual([true, false, false, false, false, false]);
         expect(placed(task(''))).toEqual([false, false, false, false, false, true]);
         expect(placed(task('n/a'))).toEqual([false, false, false, false, false, true]);
@@ -245,6 +246,24 @@ describe('grouping by a number field', () => {
         expect(names(customFieldGroups(size, { t, tasks: [task('1'), task('3')] }))).toEqual(['ViewGroups.number_below:2', 'ViewGroups.number_from:2', 'ViewGroups.no_value']);
         expect(names(customFieldGroups(size, { t, tasks: [task('7'), task('7')] }))).toEqual(['ViewGroups.number_any', 'ViewGroups.no_value']);
         expect(names(customFieldGroups(size, { t, tasks: [] }))).toEqual(['ViewGroups.number_any', 'ViewGroups.no_value']);
+    });
+
+    it('asks the project for its lowest and highest value, unless the field fixes its own ends', () => {
+        expect(needsProjectRange(size)).toBe(true);
+        expect(needsProjectRange({ ...size, fieldMinimum: '0', fieldMaximum: '10' })).toBe(false);
+        expect(needsProjectRange({ _id: SIZE, fieldType: 'progress' })).toBe(false);
+        expect(numberRangeStages(size, 'p1')).toEqual([
+            { $match: { $and: [{ ProjectID: { objId: { $in: ['p1'] } } }, { deletedStatusKey: { $in: [0] } }] } },
+            { $group: { _id: null, min: { $min: asNumber }, max: { $max: asNumber } } }
+        ]);
+        expect(rangeFromRows([{ _id: null, min: 0, max: 50 }])).toEqual([0, 50]);
+        expect(rangeFromRows([{ _id: null, min: null, max: null }])).toBeNull();
+        expect(rangeFromRows([])).toBeNull();
+    });
+
+    it('cuts the bands from the range of the project when it has one, before the loaded tasks', () => {
+        const groups = customFieldGroups(size, { t, range: [0, 50], tasks: loaded });
+        expect(names(groups).slice(0, 2)).toEqual(['ViewGroups.number_below:10', 'ViewGroups.number_between:10,20']);
     });
 
     it('bands a progress field from 0 to 100 without looking at the tasks', () => {
