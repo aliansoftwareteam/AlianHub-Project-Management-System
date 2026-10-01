@@ -289,19 +289,19 @@ describe('the field builder', () => {
         apiRequest.mockImplementation((method) => Promise.resolve(method === 'get' ? { data: { data: { names: [] } } } : { status: 200, data: { _id: 'new' } }));
         const wrapper = mount(FieldBuilder, { global });
         await wrapper.get('[data-field-type-option="files"]').trigger('click');
-        await wrapper.get('#fb-title').setValue('Contracts');
+        await wrapper.get('#fb-title').setValue('Invoices');
         await wrapper.get('[data-files-max]').setValue('5');
         await wrapper.get('[data-files-kind]').setValue('documents');
         await wrapper.get('.fb__save').trigger('click');
         await flushPromises();
-        expect(saved()).toMatchObject({ fieldTitle: 'Contracts', fieldType: 'files', fieldFilesMax: 5, fieldFilesKind: 'documents' });
+        expect(saved()).toMatchObject({ fieldTitle: 'Invoices', fieldType: 'files', fieldFilesMax: 5, fieldFilesKind: 'documents' });
     });
 
     it('refuses a cap outside 1 to 20 before asking the server', async () => {
         apiRequest.mockImplementation((method) => Promise.resolve(method === 'get' ? { data: { data: { names: [] } } } : { status: 200, data: { _id: 'new' } }));
         const wrapper = mount(FieldBuilder, { global });
         await wrapper.get('[data-field-type-option="files"]').trigger('click');
-        await wrapper.get('#fb-title').setValue('Contracts');
+        await wrapper.get('#fb-title').setValue('Invoices');
         await wrapper.get('[data-files-max]').setValue('40');
         await wrapper.get('.fb__save').trigger('click');
         await flushPromises();

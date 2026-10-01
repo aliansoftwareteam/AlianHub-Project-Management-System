@@ -22,6 +22,7 @@
                 :value="detail.fieldValue"
                 :editable="editable"
                 :label="detail.fieldTitle || ''"
+                v-bind="taskPropFor(detail.fieldType, task)"
                 @change="$emit('change', $event)"
             />
         </span>
@@ -31,12 +32,13 @@
 <script setup>
 import { computed } from "vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
-import { fieldTypeUi } from "@/plugins/customFieldView/fieldTypes";
+import { fieldTypeUi, taskPropFor } from "@/plugins/customFieldView/fieldTypes";
 
 defineOptions({ name: "ModuleFieldListing" });
 
 const props = defineProps({
     detail: { type: Object, required: true },
+    task: { type: Object, default: () => ({}) },
     editable: { type: Boolean, default: false }
 });
 defineEmits(["change", "edit"]);
