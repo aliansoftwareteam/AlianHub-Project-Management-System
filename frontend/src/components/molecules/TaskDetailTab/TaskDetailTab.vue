@@ -153,6 +153,7 @@ import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { canUseAi } from '@/composable/aiAvailability';
 import taskClass from '@/utils/TaskOperations';
 import { customFieldPayload } from '@/views/Projects/composables/projectCustomFields';
+import { fieldTypeCatalogue } from '@/plugins/customFieldView/fieldTypes';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock.vue';
 import {storageQueryBuilder,generateFileName} from '@/utils/storageQueryBuild.js';
@@ -756,7 +757,7 @@ function openSeeAll (value) {
 }
 const editCustomField = (val) => {
     if(showCustomField.value === true && currentCompany.value?.planFeature?.customFields === true){
-        componentDetail.value = CustomFieldData.value.find((x)=> x.cfType === val.fieldType);
+        componentDetail.value = fieldTypeCatalogue(CustomFieldData.value, t).find((x)=> x.cfType === val.fieldType);
         customFieldObject.value = val;
         if(componentDetail.value && Object.keys(componentDetail.value).length){            
             isCustomField.value = true;

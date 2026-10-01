@@ -86,6 +86,7 @@ const options = computed(() => peopleOptions({
     project: project.value,
     seats: getters["settings/companyUsers"],
     teams: getters["settings/teams"],
+    rules: getters["settings/rules"],
     current: ids.value
 }));
 

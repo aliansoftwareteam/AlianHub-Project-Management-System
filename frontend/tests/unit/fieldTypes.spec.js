@@ -401,7 +401,7 @@ describe('filter, group and sort', () => {
     });
 
     it('groups by person, with a group for no one', () => {
-        expect(customGroupOptions(DEFS).map((option) => option.fieldType)).toEqual(['people', 'rating']);
+        expect(customGroupOptions(DEFS).map((option) => option.fieldType)).toEqual(['people', 'rating', 'progress']);
         const groups = customFieldGroups(people, { people: [{ id: OLIVIA, name: 'Olivia Owner' }, { id: MAX, name: 'Max Member' }] });
         expect(groups.map((group) => [group.name, group.searchValue])).toEqual([['Olivia Owner', OLIVIA], ['Max Member', MAX], ['ViewGroups.no_value', '']]);
         expect(groups[1].conditions).toEqual([{ [valuePath(PEOPLE)]: MAX }]);
@@ -419,7 +419,7 @@ describe('filter, group and sort', () => {
         expect(customGroupMatches(task({ [SCORE]: '' }), groups[5])).toBe(true);
         expect(customGroupUpdate(groups[0])).toEqual({ fieldValue: 5, _id: SCORE });
         expect(customGroupUpdate(groups[5])).toEqual({ fieldValue: '', _id: SCORE });
-        expect(customFieldGroups(done)).toEqual([]);
+        expect(customFieldGroups(link)).toEqual([]);
     });
 
     it('sorts people by the first person\'s name, and ratings and progress as numbers', () => {
@@ -455,9 +455,9 @@ describe('an AI rating', () => {
         expect(payload).not.toHaveProperty('fieldMaximum');
     });
 
-    it('made in the builder is still a number field from 1 to 5', () => {
-        const payload = aiFieldPayload({ ...newAiDraft(), fieldTitle: 'Risk', output: 'rating', template: 'custom', prompt: 'How risky?' });
-        expect(payload).toMatchObject({ fieldType: 'number', fieldMinimum: '1', fieldMaximum: '5' });
+    it('made in the builder is a rating field with its maximum', () => {
+        const payload = aiFieldPayload({ ...newAiDraft(), fieldTitle: 'Risk', output: 'rating', template: 'custom', prompt: 'How risky?', fieldRatingMax: '10' });
+        expect(payload).toMatchObject({ fieldType: 'rating', fieldRatingMax: 10 });
         expect(aiRatingMaxOf({ fieldType: 'number' })).toBe(5);
     });
 });

@@ -45,6 +45,7 @@
                                 :key="sub._id"
                                 :data="sub"
                                 is-sub
+                                :parent="task"
                                 :selected="selection.isSelected(sub._id)"
                                 :can-select="canSelect"
                                 @open="$emit('open', sub)"
@@ -106,6 +107,7 @@ import { taskListHelper, useUpdateTasks } from "@/views/Projects/helper.js";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
 import { useListDragDrop } from "./useListDragDrop.js";
 import { useProjectAgentActivity } from "./useProjectAgentActivity.js";
+import { useSubtaskExpansion } from "./subtaskExpansion.js";
 import { hasSubtasks, indexProgress, pendingExpandIds, progressQuery, progressSignature } from "./subtaskProgress";
 import { groupLabel, groupRows, listSourceTasks, searchExpandIds } from "./listFilter";
 import { apiRequest } from "@/services";
@@ -142,7 +144,7 @@ const listSortContext = inject("listSortContext", ref({}));
 const creating = ref(false);
 const templates = ref([]);
 const templateId = ref("");
-const expandedIds = ref([]);
+const { expandedIds, autoExpandedIds } = useSubtaskExpansion();
 const subtaskFor = ref("");
 
 const sprintId = computed(() => props.sprint?.id || props.sprint?._id);
@@ -236,23 +238,29 @@ function toggleSubtasks(task) {
 /* The toolbar's expand / collapse control drives every row at once, and has to keep doing
  * so for rows that arrive later -- a group opened after the toggle was flipped loads its
  * tasks only then. */
-const autoExpandedIds = ref([]);
-watch([taskCollapsed, rows], () => {
+function expandArrivedRows() {
     if (searchedTask.value) {
         expandedIds.value = [...new Set([...expandedIds.value, ...searchExpandIds(rows.value)])];
         return;
     }
-    if (taskCollapsed.value) {
-        expandedIds.value = [];
-        autoExpandedIds.value = [];
-        return;
-    }
+    if (taskCollapsed.value) return;
     const pending = pendingExpandIds(rows.value, autoExpandedIds.value);
     if (!pending.length) return;
     autoExpandedIds.value = [...autoExpandedIds.value, ...pending];
     expandedIds.value = [...new Set([...expandedIds.value, ...pending])];
     rows.value.filter((task) => pending.includes(String(task._id))).forEach(loadSubtasks);
-}, { immediate: true });
+}
+/* Rows are replaced on every change to a task or a subtask in the group, so only the
+ * toolbar switch itself may close what the user opened by hand. */
+watch(rows, expandArrivedRows, { immediate: true });
+watch(taskCollapsed, (collapsed) => {
+    if (collapsed && !searchedTask.value) {
+        expandedIds.value = [];
+        autoExpandedIds.value = [];
+        return;
+    }
+    expandArrivedRows();
+});
 
 /* A searched parent carries only its matching subtasks; when none matched, expanding it
    shows the full set loaded into the sprint's own copy of the task. */

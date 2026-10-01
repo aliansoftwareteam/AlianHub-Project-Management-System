@@ -1,9 +1,11 @@
-/* Critical-path maths for the Gantt view. Pure and dependency-free (CommonJS so the
- * jest suite in tests/critical-path.test.js can require it directly).
+/* Critical-path maths for the Gantt view. Pure (CommonJS so the jest suite in
+ * tests/critical-path.test.js can require it directly).
  *
  * Input rows are the task shape the Gantt already has: an id, a start and due date,
  * and the ids this task blocks. Cycles are tolerated — a relation pair that loops
  * would otherwise hang the topological walk. */
+
+const { workingDaySet, workingDaysBetween } = require('./workingCalendar');
 
 const DAY_MS = 86400000;
 
@@ -13,23 +15,26 @@ const toTime = (value) => {
     return Number.isNaN(t) ? NaN : t;
 };
 
-const durationDays = (start, end) => {
+/* workingDays: weekday numbers (0 = Sunday) that count; a seven-day week, or none, counts every day. */
+const durationDays = (start, end, workingDays) => {
     const s = toTime(start);
     const e = toTime(end);
     if (Number.isNaN(s) || Number.isNaN(e)) return 1;
-    return Math.max(1, Math.round((e - s) / DAY_MS) + 1);
+    const working = workingDaySet(workingDays);
+    if (!working) return Math.max(1, Math.round((e - s) / DAY_MS) + 1);
+    return Math.max(1, workingDaysBetween(new Date(s), new Date(e), working));
 };
 
 /* [{ id, startDate, DueDate, blocks: [id] }] → nodes keyed by id, edges deduped and
  * pointing only at ids that are actually in the set. */
-const buildNodes = (tasks) => {
+const buildNodes = (tasks, workingDays) => {
     const nodes = new Map();
     (tasks || []).forEach((t) => {
         const id = String((t && (t.id !== undefined ? t.id : t._id)) || '');
         if (!id || nodes.has(id)) return;
         nodes.set(id, {
             id,
-            duration: Number(t.duration) > 0 ? Number(t.duration) : durationDays(t.startDate || t.start, t.DueDate || t.end),
+            duration: Number(t.duration) > 0 ? Number(t.duration) : durationDays(t.startDate || t.start, t.DueDate || t.end, workingDays),
             succs: [],
             preds: [],
         });
@@ -73,8 +78,8 @@ const topoOrder = (nodes) => {
 
 /* Forward/backward pass. Times are in days relative to the first task, not calendar
  * dates: the chart draws real dates, this only decides what has slack. */
-const schedule = (tasks) => {
-    const nodes = buildNodes(tasks);
+const schedule = (tasks, options = {}) => {
+    const nodes = buildNodes(tasks, options.workingDays);
     const order = topoOrder(nodes);
     const es = new Map();
     const ef = new Map();
@@ -115,8 +120,8 @@ const schedule = (tasks) => {
 
 /* The longest chain, in order, so the chart can draw it as one run rather than a
  * scatter of red bars. Ties resolve on the longer remaining chain. */
-const criticalPath = (tasks) => {
-    const { nodes, total } = schedule(tasks);
+const criticalPath = (tasks, options = {}) => {
+    const { nodes, total } = schedule(tasks, options);
     if (!nodes.size) return { path: [], ids: [], durationDays: 0, nodes };
     const critical = [...nodes.values()].filter((n) => n.critical);
     if (!critical.length) return { path: [], ids: [], durationDays: total, nodes };
@@ -153,6 +158,6 @@ const criticalPath = (tasks) => {
 };
 
 /* Convenience for the view: the set of ids to paint red. */
-const criticalTaskIds = (tasks) => new Set(criticalPath(tasks).path);
+const criticalTaskIds = (tasks, options) => new Set(criticalPath(tasks, options).path);
 
 module.exports = { DAY_MS, durationDays, schedule, criticalPath, criticalTaskIds };
