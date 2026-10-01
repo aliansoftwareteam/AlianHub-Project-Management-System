@@ -6,8 +6,9 @@ const { removeCache } = require('../../../utils/commonFunctions');
 const socketEmitter = require('../../../event/socketEventEmitter');
 const reportingLine = require('../../Users/helpers/reportingLine');
 const { getRoleType, isPrivileged, invalidateRoleCache, ROLE_OWNER } = require('../../../Config/permissionGuard');
-const { judgeMemberUpdate, judgeInvitationAcceptance, memberRowView } = require('./membershipGuard');
-const { SEAT_CANCELLED, SEAT_PENDING } = require('../../../Config/seatStatus');
+const { judgeMemberUpdate, judgeInvitationAcceptance } = require('./membershipGuard');
+const { COLLEAGUE, viewerOf, memberRowFor, colleagueFieldsOf, countFilterOf, inUseFilterOf } = require('./memberRowRules');
+const { SEAT_CANCELLED, SEAT_PENDING, SEAT_ACTIVE } = require('../../../Config/seatStatus');
 const knowledgeEvents = require('../../Knowledge/ingest/events');
 const { recordPrivateViewChange } = require('./privateViewHistory');
 const { cleanViewSettings, cleanViewTitle } = require('../../Project/helpers/viewSettings');
@@ -69,35 +70,31 @@ const clearMemberCaches = (companyId, userId) => {
     removeCache(`UserAllData:${companyId}`);
 };
 
-/**
- * This endpoint is used to get member users of company
- * @param {*} req
- * @param {*} res
- * @returns
- */
+const cachedMemberRows = (companyId) => {
+    const cached = myCache.get(`company_users:${companyId}`);
+    return cached ? JSON.parse(cached) : null;
+};
+
 exports.getMembers = async (req, res) => {
     try {
         const companyId = req.headers['companyid'];
-        let params = {
-            type: SCHEMA_TYPE.COMPANY_USERS,
-            data: []
-        }
-
         const cacheKey = `company_users:${companyId}`;
-        const hasCache = myCache.get(cacheKey);
-        if (hasCache) {
+        const rowView = memberRowFor(await viewerOf(companyId, req.uid));
+
+        const cached = cachedMemberRows(companyId);
+        if (cached) {
             res.set({
                 'FromCache': 'true',
                 'cacheExpireTime': myCache.getTtl(cacheKey)
             });
-            return res.status(200).json({ status: true, data: JSON.parse(hasCache).map(memberRowView) });
+            return res.status(200).json({ status: true, data: cached.map(rowView) });
         }
 
-        const response = await MongoDbCrudOpration(companyId, params, 'find');
+        const response = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMPANY_USERS, data: [] }, 'find');
         myCache.set(cacheKey, JSON.stringify(response), 604800);
 
         if (response) {
-            return res.status(200).json({ status: true, data: response.map(memberRowView) });
+            return res.status(200).json({ status: true, data: response.map(rowView) });
         } else {
             return res.status(404).json({ status: false });
         }
@@ -110,49 +107,34 @@ exports.getMembers = async (req, res) => {
     }
 }
 
+exports.getMembersById = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'];
+        const id = String(req.params.id || '');
+        const rowView = memberRowFor(await viewerOf(companyId, req.uid));
+        const cacheKey = `company_users:${companyId}`;
 
-/**
- * This endpoint is used to get member user of company by its id
- * @param {*} req
- * @param {*} res
- * @returns
- */
-exports.getMembersById = async (req,res) => {
-    const companyId = req.headers['companyid'];
-    const id = req.params.id;
-    const cacheKey = `company_users:${companyId}`;
-    const hasCache = myCache.get(cacheKey);
-    if (hasCache) {
-        let CompanyUsers = JSON.parse(hasCache);
-        let member = CompanyUsers.find((x)=> x.userId === id);
+        const member = (cachedMemberRows(companyId) || []).find((row) => row.userId === id && Number(row.status) === SEAT_ACTIVE);
         if (member) {
             res.set({
                 'FromCache': 'true',
                 'cacheExpireTime': myCache.getTtl(cacheKey)
             });
-            return res.status(200).json(member);
+            return res.status(200).json(rowView(member));
         }
+        const response = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.COMPANY_USERS,
+            data: [{ userId: id, status: SEAT_ACTIVE }]
+        }, 'findOne');
+        return res.status(200).json(rowView(response));
+    } catch (error) {
+        return res.status(500).json({
+            message: "An error occurred while get the company user",
+            error: error.message || error
+        });
     }
-    let params = {
-        type: SCHEMA_TYPE.COMPANY_USERS,
-        data: [
-            {
-                userId: id
-            }
-        ]
-    }
-    const response = await MongoDbCrudOpration(companyId, params, 'findOne');
-    res.status(200).json(response);
-
 }
 
-
-/**
- * This endpoint is used to check either role or designation is assigned with any company user or not
- * @param {*} req
- * @param {*} res
- * @returns
- */
 exports.checkRoleOrDesignationAssignedWithUsers = async (req, res) => {
     try {
         const { key, value } = req.params;
@@ -164,24 +146,20 @@ exports.checkRoleOrDesignationAssignedWithUsers = async (req, res) => {
                 message: `'value' parameter is required.`
             });
         }
+        const filter = inUseFilterOf(key, value);
+        if (!filter) {
+            return res.status(400).json({
+                status: false,
+                message: 'Only a role or a designation can be checked.'
+            });
+        }
 
-        const query = {
+        const response = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMPANY_USERS,
-            data: [
-                {
-                    [key]: value
-                }
-            ]
-        }
+            data: [filter, { _id: 1 }]
+        }, 'findOne');
 
-        const response = await MongoDbCrudOpration(companyId, query, 'findOne');
-
-        if (response) {
-            return res.status(200).json({ isUsed: true });
-        } else {
-            return res.status(200).json({ isUsed: false });
-        }
-
+        return res.status(200).json({ isUsed: Boolean(response) });
     } catch (error) {
         return res.status(500).json({
             message: "An error occurred while check role or designation is assigned with any company users",
@@ -399,8 +377,8 @@ exports.updateMember = async (req, res) => {
         }
         socketEmitter.emit('update', {
             type: 'update',
-            data: { data: memberRowView(response) },
-            updatedFields: { ...data },
+            data: { data: memberRowFor(COLLEAGUE)(response) },
+            updatedFields: colleagueFieldsOf(data),
             module: 'companyUsers'
         });
 
@@ -411,7 +389,8 @@ exports.updateMember = async (req, res) => {
             });
         } catch (e) { /* audit is best-effort */ }
 
-        return res.status(200).json({ status: true, statusText: 'Member updated.', data: memberRowView(response) });
+        const rowView = memberRowFor(await viewerOf(companyId, req.uid));
+        return res.status(200).json({ status: true, statusText: 'Member updated.', data: rowView(response) });
     } catch (error) {
         return res.status(500).json({
             status: false,
@@ -421,13 +400,6 @@ exports.updateMember = async (req, res) => {
     }
 }
 
-/**
- * This is common function for update member user
- * @param {*} method
- * @param {*} queryObject
- * @param {*} companyId
- * @returns
- */
 exports.updateMemberFunction = (companyId, queryObject, method) => {
     return new Promise(async (resolve, reject) => {
         try {
@@ -501,12 +473,13 @@ exports.rootUpdateMember = async (req, res) => {
         if (holdsSeat(response) && !holdsSeat(invite)) knowledgeEvents.publishMemberActivated(companyId, req.uid);
         socketEmitter.emit('update', {
             type: 'update',
-            data: { data: response },
+            data: { data: memberRowFor(COLLEAGUE)(response) },
             updatedFields: accepted,
             module: 'companyUsers'
         });
 
-        return res.status(200).json({ status: true, statusText: 'Invitation accepted.', data: response || {} });
+        const rowView = memberRowFor(await viewerOf(companyId, req.uid));
+        return res.status(200).json({ status: true, statusText: 'Invitation accepted.', data: rowView(response) });
     } catch (error) {
         return res.status(500).json({
             status: false,
@@ -519,7 +492,10 @@ exports.rootUpdateMember = async (req, res) => {
 exports.getMembersCount = async (req, res) => {
     try {
         const companyId = req.headers["companyid"];
-        const query = req.body.query || {};
+        const query = countFilterOf((req.body || {}).query);
+        if (!query) {
+            return refuse(res, 400, 'Members can be counted by role, designation, status or removal only.');
+        }
 
         const mongoQuery = [
             {
