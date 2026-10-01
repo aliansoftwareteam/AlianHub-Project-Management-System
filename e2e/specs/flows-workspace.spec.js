@@ -6,7 +6,7 @@ async function projectWithTask({ owner, state, label, suffix }) {
     const project = await createProject(owner.api, { name: `${label} ${suffix}`, assigneeIds: [owner.uid], createdBy: owner.uid });
     const name = `${label} task ${suffix}`;
     const task = await createTask(owner.api, { project, name, user: state.users.owner, companyOwnerId: owner.uid });
-    return { project, task, name };
+    return { project: { _id: String(project._id), code: project.ProjectCode }, task, name };
 }
 
 test.describe('finding work across the workspace', () => {
@@ -15,14 +15,15 @@ test.describe('finding work across the workspace', () => {
 
     test('a task found in the command palette opens from its result', async ({ page, state, loginAs }) => {
         const owner = await loginAs('owner');
-        const { name } = await projectWithTask({ owner, state, label: 'Palette', suffix: uniqueSuffix() });
+        const { name, project } = await projectWithTask({ owner, state, label: 'Palette', suffix: uniqueSuffix() });
 
         await page.goto(`/#/${state.companyId}`);
         await page.getByRole('button', { name: 'Search or ask AI' }).focus();
         await page.keyboard.press('Meta+k');
         const palette = page.getByRole('dialog', { name: 'Command palette' });
+        await palette.getByRole('button', { name: 'Tasks', exact: true }).click();
         await palette.getByRole('combobox', { name: 'Search, go to or run a command' }).fill(name);
-        await palette.getByRole('option', { name: new RegExp(name) }).click();
+        await palette.getByRole('option', { name: new RegExp(`^${project.code}-\\d+${name}`) }).click();
 
         await expect(palette).toBeHidden();
         await expect(taskPanel(page).getByRole('heading', { level: 2, name })).toBeVisible();
@@ -36,7 +37,7 @@ test.describe('finding work across the workspace', () => {
 
         await page.goto(`/#/${state.companyId}/everything`);
         await expect(page.getByRole('heading', { level: 1, name: 'Everything' })).toBeVisible();
-        await page.getByRole('textbox', { name: 'Search tasks' }).fill(suffix);
+        await page.getByRole('searchbox', { name: 'Search tasks' }).fill(suffix);
 
         const rows = page.getByRole('listitem').filter({ hasText: suffix });
         await expect(rows).toHaveCount(2);

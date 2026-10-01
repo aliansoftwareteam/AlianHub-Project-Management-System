@@ -90,7 +90,7 @@ Every spec in `e2e/specs` fails when the page throws an uncaught error or writes
 2. If the test provokes the error on purpose (a refusal it then asserts), name it where it happens: `test.use({ expectedConsoleErrors: [/403 .*\/api\/v2\/sso\/config/] })`. A pattern is matched against the line the guard prints, which ends with the address of the resource.
 3. If the message is not a defect anywhere in the suite, add it to `ALLOWED` in `e2e/support/consoleGuard.js` with the reason. Keep that list short.
 
-`test.use({ consoleGuard: false })` switches the guard off for a file or a `describe`; write the reason beside it. When a test fails in CI, the log also holds the accessibility tree of each open page under `[page tree]`, so a locator that found nothing can be diagnosed without downloading the report.
+A test that cannot pass yet because of a product bug calls `skipConsoleGuard('<what the page logs>')` (from `e2e/support/test.js`) on its first line: the guard is off for that test only, and the reason shows beside it in the report. When a test fails in CI, the log also holds the accessibility tree of each open page under `[page tree]`, so a locator that found nothing can be diagnosed without downloading the report.
 
 Which flows have a spec is in [E2E-FLOWS.md](E2E-FLOWS.md).
 

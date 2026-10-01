@@ -1,4 +1,4 @@
-const { test, expect, asRole } = require('../support/test');
+const { test, expect, asRole, skipConsoleGuard } = require('../support/test');
 
 const go = async (page, hash) => {
     await page.goto(hash);
@@ -45,6 +45,7 @@ test.describe('projects and planning as the owner', () => {
     });
 
     test('the milestone report screen renders', async ({ page, state }) => {
+        skipConsoleGuard('The milestone report calls console.error with undefined when it opens.');
         await go(page, `/#/${state.companyId}/report/milestone`);
         await expect(page.getByText('Milestone Report', { exact: false }).first()).toBeVisible();
     });

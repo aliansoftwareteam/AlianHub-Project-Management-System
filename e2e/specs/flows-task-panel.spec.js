@@ -18,10 +18,10 @@ test.describe('everyday flows in the task panel', () => {
     test.use(asRole('owner'));
     test.beforeEach(async ({ page }) => skipFirstRun(page));
 
-    test('subtasks nest three levels deep and the third level takes no more', async ({ page, state, loginAs }) => {
+    test('a task takes a subtask and that subtask takes one more, and the third level takes none', async ({ page, state, loginAs }) => {
         const { owner, project, task, panel, suffix } = await openTaskPanel({ page, state, loginAs, label: 'Tree' });
         const addSubtask = panel.getByRole('group', { name: 'Quick actions' }).getByRole('button', { name: 'Add subtask' });
-        const names = [1, 2, 3].map((level) => `Level ${level} ${suffix}`);
+        const names = [2, 3].map((level) => `Level ${level} ${suffix}`);
 
         for (const name of names) {
             await addSubtask.click();
