@@ -62,6 +62,7 @@
                     <div :class="[{'pointer-event-none opacity-5 blur-3-px':!currentCompany?.planFeature?.customFields}]">
                         <CustomFieldRenderViewComponent
                             @blurUpdate="submitHandler"
+                            @fieldValue="submitFieldValue"
                             @editCustomField="editCustomField"
                             :task="props.task"
                             @isCustomField="isCustomField = true"
@@ -151,6 +152,7 @@ import * as env from '@/config/env';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { canUseAi } from '@/composable/aiAvailability';
 import taskClass from '@/utils/TaskOperations';
+import { customFieldPayload } from '@/views/Projects/composables/projectCustomFields';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock.vue';
 import {storageQueryBuilder,generateFileName} from '@/utils/storageQueryBuild.js';
@@ -640,6 +642,22 @@ const submitHandler = async (value,detail,id,edit) => {
             }
         }
     }
+};
+const submitFieldValue = (def, input) => {
+    if(showCustomField.value !== true) return;
+    const payload = customFieldPayload(def, input);
+    if(payload.invalid){
+        $toast.error(t('ViewColumns.field_invalid', { field: def.fieldTitle || '' }), {position: 'top-right' });
+        return;
+    }
+    const customField = { ...(props.task.customField || {}) };
+    taskClass.updateTaskCustomField({taskId: props.task._id, customFieldId: def._id, updateDetail: payload, companyId: companyId.value, taskObj: props.task}).then(() => {
+        $toast.success(t("Toast.Custom_field_updated_successfully"), {position: 'top-right' });
+    }).catch((err) => {
+        console.error('Error in updating the custom field',err);
+        commit('projectData/mutateUpdateFirebaseTasks', {snap: null, op: 'modified', pid: props.task.ProjectID || '', sprintId: props.task?.sprintId || '', data: {...props.task, customField}, updatedFields: {customField}});
+        $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
+    });
 };
 const insertCustomField = (detail) => {
     let updateDetail = {};

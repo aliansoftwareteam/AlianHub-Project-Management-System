@@ -4498,7 +4498,11 @@ const schema = {
             type:Array,
             required: false,
             default:[]
-        }
+        },
+        // people fields: false holds one person
+        fieldMultiple: { type: Boolean, required: false },
+        // rating fields: 3 to 10
+        fieldRatingMax: { type: Number, required: false }
     },
     sprints: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.
@@ -4666,6 +4670,10 @@ const schema = {
         legacyId : {
             type: String,
             required:false
+        },
+        parentFolderId: {
+            type: mongoose.Schema.Types.ObjectId,
+            required: false
         }
     },
     preCompanies: {
