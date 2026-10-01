@@ -1,5 +1,5 @@
 {
-  "source": "origin/beta fea5e063184a8e4e9c2804c80a0dd4313354830c Modules/Agents/registry.js, Modules/Agents/actions.js and Modules/Mcp/tools.js",
+  "source": "origin/beta fea5e063184a8e4e9c2804c80a0dd4313354830c Modules/Agents/registry.js, Modules/Agents/actions.js and Modules/Mcp/tools.js, plus aifield.fill from task 044 slice 4",
   "registryKeys": [
     "tasks.next",
     "tasks.search",
@@ -9,6 +9,7 @@
     "task.link",
     "task.assign",
     "task.update",
+    "aifield.fill",
     "task.sprint.move",
     "subtask.create",
     "task.create",
@@ -119,6 +120,15 @@
             "totalEstimatedTime": "task.task_estimated_hours"
           }
         }
+      },
+      {
+        "key": "aifield.fill",
+        "label": "Fill an AI field on a task",
+        "risk": "medium",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "task.task_custom_field"
       },
       {
         "key": "task.sprint.move",
@@ -409,6 +419,21 @@
         }
       },
       {
+        "key": "aifield.fill",
+        "label": "Fill an AI field on a task",
+        "risk": "medium",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "task.task_custom_field",
+        "rating": {
+          "write": true,
+          "reversible": true,
+          "scope": "task",
+          "money": false
+        }
+      },
+      {
         "key": "task.sprint.move",
         "label": "Move a task between sprints",
         "risk": "medium",
@@ -669,6 +694,12 @@
       "money": false
     },
     "task.update": {
+      "write": true,
+      "reversible": true,
+      "scope": "task",
+      "money": false
+    },
+    "aifield.fill": {
       "write": true,
       "reversible": true,
       "scope": "task",

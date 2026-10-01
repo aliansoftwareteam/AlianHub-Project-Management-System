@@ -30,7 +30,9 @@ vi.mock('@/components/molecules/Home/WaitingOnYouCard.vue', () => stub('WaitingO
 vi.mock('@/components/molecules/Home/StandupCard.vue', () => stub('StandupCard'));
 vi.mock('@/components/molecules/Home/StatusChip.vue', () => stub('StatusChip'));
 vi.mock('@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue', () => stub('ConfirmationSidebar'));
-vi.mock('@/components/molecules/Home/homeCards', () => ({ isHomeCardShown: () => false, setHomeCardShown: vi.fn(), syncHomeCards: vi.fn() }));
+vi.mock('@/components/molecules/Home/RecentsCard.vue', () => stub('RecentsCard'));
+vi.mock('@/components/molecules/Home/HomeCatalogCard.vue', () => stub('HomeCatalogCard'));
+vi.mock('@/components/molecules/Home/homeCards', () => ({ homeCards: { layout: [] }, setHomeCardShown: vi.fn(), syncHomeCards: vi.fn() }));
 vi.mock('@/composable/blockingSurface', () => ({ useBlockingSurface: () => ref(false) }));
 vi.mock('@/composable/useOnboardingChecklist', () => ({
     useOnboardingChecklist: () => ({

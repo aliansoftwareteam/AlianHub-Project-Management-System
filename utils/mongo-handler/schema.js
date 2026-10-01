@@ -2322,8 +2322,10 @@ const schema = {
             default: undefined
         },
         // Written only by PUT /api/v2/users/home-cards (Modules/Users/homeCards.js).
+        // A saved layout replaces hidden, which only users who never rearranged Home still carry.
         homeCards: {
-            hidden: { type: [String], required: false, default: undefined }
+            hidden: { type: [String], required: false, default: undefined },
+            layout: { type: [String], required: false, default: undefined }
         },
         languageCode: {
             type: String,

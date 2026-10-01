@@ -40,6 +40,7 @@ const ACTIONS = Object.freeze([
           Task_Priority: 'task.task_priority', DueDate: 'task.task_due_date', startDate: 'task.task_start_date',
           tagsArray: 'task.task_tag', checklistArray: 'task.task_checklist', points: 'task.task_estimated_hours', totalEstimatedTime: 'task.task_estimated_hours',
       } } },
+    { key: 'aifield.fill', label: 'Fill an AI field on a task', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'task.task_custom_field' },
     { key: 'task.sprint.move', label: 'Move a task between sprints', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'task.task_move' },
     { key: 'subtask.create', label: 'Create a subtask', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'task.sub_task_create' },
     { key: 'task.create', label: 'File a task (opening status, unassigned)', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',

@@ -416,9 +416,6 @@
         />
     </div>
     <AppState v-else kind="forbidden" />
-    <!-- List and Table ship their own bulk bar (ListBulkBar); the legacy one would
-         otherwise mount on top of it. -->
-    <BulkActionBar v-if="!hasOwnBulkBar" />
 </template>
 
 <script setup>
@@ -438,7 +435,6 @@ import { canUseAi } from '@/composable/aiAvailability';
 
 // COMPONENTS
 import ConfirmationSidebar from '@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue';
-import BulkActionBar from '@/components/molecules/BulkActionBar/BulkActionBar.vue';
 import WasabiImage from '@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue';
 import AddViewMenu from '@/components/molecules/ProjectViews/AddViewMenu.vue';
 import UpgradYourPlanComponent from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
@@ -1040,8 +1036,6 @@ const headerSprint = computed(() => (sprints.value.length === 1 && !sprints.valu
 const canAiAssist = computed(() => canUseAi({ project: projectData.value, permitted: checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true }));
 // Only shown where a view actually answers the request (the board injects
 // `addTaskRequest`); other views opt in by injecting it too.
-const OWN_BULK_BAR_VIEWS = ['ProjectListView', 'TableView', 'ProjectKanban'];
-const hasOwnBulkBar = computed(() => OWN_BULK_BAR_VIEWS.includes(activeTab.value));
 const ADD_TASK_VIEWS = ['ProjectKanban'];
 const canAddTask = computed(() => ADD_TASK_VIEWS.includes(activeTab.value) && checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true);
 const addTaskRequest = ref(0);

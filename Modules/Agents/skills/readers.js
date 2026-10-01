@@ -5,6 +5,8 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
+const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
+const { reviewState } = require('../../Pages/helpers/pageRules');
 const { DONE_STATUS_TYPES } = require('../registry');
 const memoryStore = require('../memory');
 const taint = require('../taint');
@@ -208,6 +210,63 @@ const READERS = Object.freeze({
         if (!page) return { skip: 'no document is attached to this task' };
         // A page a member or an agent wrote is the workspace's own; only an inbound origin marks the run.
         return { title: page.title || '', text: plain(page.rawText || '').slice(0, params.maxChars), taint: taint.fromTask(page) };
+    },
+
+    async 'task.ai_fields'(companyId, { task }, params) {
+        const projectId = String(task.ProjectID || '');
+        if (!projectId) return { skip: 'the task has no project' };
+        const { aiConfigOf } = require('../../CustomField/aiFields/config');
+        const { appliesToProject } = require('../../CustomField/aiFields/fill');
+        const definitions = (await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.CUSTOM_FIELDS,
+            data: [{ 'fieldAi.enabled': true, isDelete: { $ne: false } }, { fieldTitle: 1, fieldType: 1, fieldAi: 1, global: 1, projectId: 1 }],
+        }, 'find')) || [];
+        const fields = definitions.filter((d) => aiConfigOf(d) && appliesToProject(d, projectId)).slice(0, params.limit);
+        if (!fields.length) return { skip: 'no AI field applies to this task\'s project' };
+        const stored = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: oid(task._id) }, { customField: 1 }] }, 'findOne');
+        const values = (stored && stored.customField) || {};
+        const hasValue = (id) => {
+            const v = values[id] && values[id].fieldValue;
+            return Array.isArray(v) ? v.length > 0 : String(v === undefined || v === null ? '' : v).trim() !== '';
+        };
+        const rows = fields.map((d) => ({ id: String(d._id), title: String(d.fieldTitle || '').slice(0, 80), template: aiConfigOf(d).template, filled: hasValue(String(d._id)) }));
+        return {
+            count: rows.length,
+            empty: rows.filter((r) => !r.filled).length,
+            list: rows.map((r) => `- ${r.id}: ${r.title} (${r.template}, ${r.filled ? 'has a value' : 'empty'})`).join('\n'),
+            ids: rows.map((r) => r.id),
+        };
+    },
+
+    async 'project.pages'(companyId, { task }, params) {
+        const projectId = String(task.ProjectID || '');
+        if (!projectId) return { skip: 'the task has no project' };
+        const pages = (await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PAGES,
+            data: [{ ProjectID: { $in: idForms(projectId) }, visibility: { $ne: 'private' }, deletedStatusKey: { $ne: 1 }, agentStatus: { $ne: 'draft' } },
+                   { title: 1, isWiki: 1, reviewDate: 1, reviewedAt: 1, updatedAt: 1, rawText: 1, origin: 1 },
+                   { sort: { updatedAt: 1 }, limit: 400 }],
+        }, 'find')) || [];
+        if (!pages.length) return { skip: 'the project has no shared pages yet' };
+        const now = Date.now();
+        const day = (value) => new Date(value).toISOString().slice(0, 10);
+        const why = (page) => {
+            const state = reviewState(page);
+            if (state === 'due' || state === 'stale') return `wiki review ${state}${page.reviewDate ? ` since ${day(page.reviewDate)}` : ''}`;
+            const updated = Date.parse(page.updatedAt);
+            return Number.isFinite(updated) && updated < now - params.staleDays * DAY_MS ? `not updated since ${day(updated)}` : '';
+        };
+        const stale = pages.map((page) => ({ page, reason: why(page) })).filter((s) => s.reason);
+        if (!stale.length) return { skip: `no page in the project is past its review date or older than ${params.staleDays} days` };
+        const listed = stale.slice(0, params.limit);
+        const excerpt = (page) => plain(page.rawText || '').slice(0, params.excerptChars);
+        return {
+            count: pages.length,
+            stale: stale.length,
+            list: listed.map(({ page, reason }) => `- ${String(page.title || 'Untitled').slice(0, 120)} [${reason}]${excerpt(page) ? `: ${excerpt(page)}` : ''}`).join('\n'),
+            titles: listed.map(({ page }) => String(page.title || 'Untitled')),
+            taint: taint.fromRows(listed.map(({ page }) => page)),
+        };
     },
 
     url: declaredRead('url'),

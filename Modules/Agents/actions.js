@@ -12,6 +12,7 @@ const stepCredential = require('../Workflows/stepCredential');
 const completionStore = require('../Tasks/helpers/completionStore');
 const { sprintPlacementOf, followSprintMove } = require('../Tasks/helpers/sprintPlacement');
 const { emitPageChange } = require('../Pages/helpers/pageEvents');
+const { markdownToEditorData, blocksToHtml } = require('../Pages/helpers/pageContent');
 const { escapeCommentText } = require('../Comments/helpers/plainText');
 const { isPeriodLocked } = require('../TimesheetApproval/helpers/lockGuard');
 const { canPostToThread } = require('../Comments/helpers/threadWriteAccess');
@@ -49,6 +50,7 @@ const RATINGS = Object.freeze({
     'task.link': write(SCOPE.TASK),
     'task.assign': write(SCOPE.TASK),
     'task.update': write(SCOPE.TASK),
+    'aifield.fill': write(SCOPE.TASK),
     'subtask.create': write(SCOPE.TASK),
     'timelog.start': write(SCOPE.TASK),
     'timelog.stop': write(SCOPE.TASK),
@@ -153,6 +155,12 @@ const timelogEntry = (params) => {
     return { start: Math.floor(start.toSeconds()), minutes };
 };
 
+/* The editor opens a page from `content`, so a draft saved as text alone would open empty. */
+const contentOfText = (text) => {
+    const blocks = markdownToEditorData(String(text || '').slice(0, 20000));
+    return { html: blocksToHtml(blocks), blocks };
+};
+
 const executors = {
     async 'task.comment'(args) {
         return commentOn(args, 'task.comment', args.params.body);
@@ -234,6 +242,27 @@ const executors = {
         return { result: { fields: Object.keys(fields) }, undo: { kind: 'update', taskId: String(task._id), previous }, entityId: task._id, entityName: task.TaskName, task: r.task };
     },
 
+    /* Run as the person behind the agent through the AI-field fill, so its access checks, prompt, caps and spend ledger apply. */
+    async 'aifield.fill'({ companyId, actor, params }) {
+        const aiFields = require('../CustomField/aiFields/fill');
+        const task = await tools.getTask(companyId, params.taskId);
+        let outcome;
+        let definition;
+        try {
+            const loaded = await aiFields.loadDefinition(companyId, params.fieldId);
+            definition = loaded.definition;
+            outcome = await aiFields.fillTask({ companyId, uid: String(actor.userId || ''), definition, config: loaded.config, taskId: String(task._id), trigger: aiFields.TRIGGER.AGENT });
+        } catch (e) {
+            if (e instanceof aiFields.AiFieldError) throw new tools.DeterministicError(e.message);
+            throw e;
+        }
+        const fieldId = String(definition._id);
+        if (outcome.outcome !== 'filled') throw new tools.DeterministicError(`${definition.fieldTitle || 'the AI field'} was not filled: ${outcome.reason || outcome.outcome}`);
+        const was = (group) => (task[group] && task[group][fieldId] !== undefined ? task[group][fieldId] : null);
+        const previous = { [`customField.${fieldId}`]: was('customField'), [`aiFieldFills.${fieldId}`]: was('aiFieldFills') };
+        return { result: { fieldId }, undo: { kind: 'update', taskId: String(task._id), previous }, entityId: task._id, entityName: task.TaskName };
+    },
+
     async 'task.sprint.move'({ companyId, actor, params, depth }) {
         const task = await tools.getTask(companyId, params.taskId);
         const target = oid(params.sprintId);
@@ -311,7 +340,7 @@ const executors = {
         const linked = (params.taskId && oid(params.taskId)) ? [oid(params.taskId)] : [];
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
-            data: { title, rawText: String(params.text || '').slice(0, 20000), content: params.content || { blocks: [] },
+            data: { title, rawText: String(params.text || '').slice(0, 20000), content: params.content || contentOfText(params.text),
                     ProjectID: params.projectId && oid(params.projectId) ? oid(params.projectId) : undefined,
                     createdBy: String(actor.userId || a.actorId), linkedTasks: linked, visibility: 'project',
                     createdByAgent: true, agentName: a.label, agentStatus: 'draft', deletedStatusKey: 0 },
