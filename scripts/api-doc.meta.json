@@ -700,7 +700,7 @@
                 },
                 {
                     "name": "projects",
-                    "description": "A map by project id, for the projects the rows name. Each carries `_id`, `ProjectName`, `ProjectCode`, `projectIcon`, `taskStatusData`, `taskTypeCounts`, `apps`, `statusType`, `isPersonal` and `edit: { status, priority }`, which says whether the caller may change those two fields on that project's tasks."
+                    "description": "A map by project id, for the projects the rows name. Each carries `_id`, `ProjectName`, `ProjectCode`, `projectIcon`, `taskStatusData`, `taskTypeCounts`, `apps`, `statusType`, `isPersonal` and `edit: { status, priority }`, which says whether the caller may change those two fields on that project's tasks. With `group: project` it also names every project counted; one that has no row on the page carries only `_id`, `ProjectName`, `ProjectCode`, `projectIcon`, `statusType` and `isPersonal`."
                 }
             ],
             "paging": "Cursor. Send `nextCursor` back as `cursor`. A cursor is good only for the same workspace, person, filter, sort and the two `include` switches; with anything else it is a 400. The page size and the grouping may change between pages. Rows with no value for the sort key come last, in both directions.",
