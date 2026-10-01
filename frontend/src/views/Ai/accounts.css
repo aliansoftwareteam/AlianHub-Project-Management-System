@@ -10,7 +10,7 @@
 .acct-stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .acct-where { font: var(--text-data); color: var(--ink-2); display: block; margin-top: 4px; word-break: break-all; }
 
-.acct-callout { padding: 12px 14px; border-radius: var(--r-card); font: var(--text-small); line-height: 1.6; }
+.acct-callout { padding: 12px 14px; border-radius: var(--r-card); font: var(--text-body); line-height: 1.6; }
 .acct-callout--ok { background: var(--ok-bg); color: var(--ok-ink); }
 .acct-callout--quiet { background: var(--surface-2); color: var(--ink-label); }
 .acct-callout--brand { background: var(--surface); border: 1px solid var(--brand-ring); color: var(--ink-label); }
@@ -52,7 +52,7 @@
 .acct-boundary__half--sees { background: var(--ok-bg); color: var(--ok-ink); }
 .acct-boundary__half--yours { background: var(--surface-2); color: var(--ink-label); }
 .acct-boundary__title { font: var(--text-label); text-transform: uppercase; letter-spacing: .06em; }
-.acct-boundary__list { margin: 0; padding-left: 15px; font: var(--text-small); line-height: 1.6; }
+.acct-boundary__list { margin: 0; padding-left: 15px; font: var(--text-body); line-height: 1.6; }
 .acct-boundary__list li { margin: 0; }
 
 .acct-fact { display: flex; align-items: flex-start; gap: 8px; font: var(--text-body); color: var(--ink-label); }

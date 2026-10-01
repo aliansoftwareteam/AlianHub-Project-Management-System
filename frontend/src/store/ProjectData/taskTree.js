@@ -57,6 +57,9 @@ export function loadedChildren(bucket, taskId) {
     return found ? childrenOf(found.row) : bucket.waiting?.[String(taskId)] || [];
 }
 
+/* Whether the loader read a task's subtasks under a group. Rows that only arrived as events do not say so. */
+export const childrenWereRead = (bucket, taskId, item) => bucket?.index?.[`${taskId}_${item?.searchKey}_${item?.searchValue}`] !== undefined;
+
 function adopt(bucket, row) {
     const held = bucket.waiting?.[idOf(row)];
     if (!held) return;

@@ -1,7 +1,7 @@
 <template>
     <ul class="appl" :class="{ 'is-disabled': disabled }">
         <li v-for="app in apps" :key="app.key" class="appl__row">
-            <img :src="iconFor(app.key)" alt="" class="appl__icon" />
+            <span class="ah-mask-icon appl__icon" :class="{ 'is-on': modelValue.includes(app.key) }" :style="maskOf(iconFor(app.key))" aria-hidden="true"></span>
             <label class="appl__text" :for="`appl-${uid}-${app.key}`">
                 <span class="appl__title">{{ label(app, 'title') }}</span>
                 <span class="ah-small ah-muted">{{ label(app, 'desc') }}</span>
@@ -22,6 +22,7 @@ import { defineProps, defineEmits } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Toggle from '@/components/atom/Toggle/Toggle.vue';
 import { projectAppsIcons } from '@/composable/commonFunction';
+import { maskOf } from '@/utils/iconMask';
 import { useCustomComposable } from '@/composable';
 
 const props = defineProps({
@@ -58,7 +59,8 @@ const onToggle = (key) => {
 .appl { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-family: var(--font-ui); }
 .appl__row { display: flex; align-items: center; gap: 12px; padding: 8px 6px; border-radius: 8px; }
 .appl__row:hover { background: var(--surface-hover); }
-.appl__icon { width: 18px; height: 18px; flex: none; }
+.appl__icon { width: 18px; height: 18px; color: var(--ink-2); }
+.appl__icon.is-on { color: var(--brand); }
 .appl__text { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; margin: 0; cursor: pointer; }
 .appl__title { font: 500 13px/1.3 var(--font-ui); color: var(--ink); }
 .appl.is-disabled { opacity: .6; }

@@ -38,6 +38,7 @@
 .dd-tokens .mobile-title-header,
 .dd-tokens > .border-bottom { border-bottom-color: var(--hairline) !important; }
 .dd-tokens .drop-down-item { color: var(--ink-2); }
+.dd-tokens .project-mobile-desc { color: inherit; }
 .dd-tokens .drop-down-item.bg-gray91 { background-color: var(--fill); }
 .dd-tokens .drop-down-item:hover { background-color: var(--surface-hover) !important; color: var(--ink) !important; }
 .dd-tokens .drop-down-item[aria-selected="true"] { background-color: var(--brand-tint); color: var(--brand); }

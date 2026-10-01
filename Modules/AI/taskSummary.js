@@ -138,10 +138,12 @@ async function askModel(userMessage, spend) {
 /**
  * Summarise a task's comment thread. Cached per task + comment count, so a
  * new comment invalidates naturally and an unchanged thread costs nothing.
+ * With `keptOnly` the model is never called: a thread with comments and no
+ * cached summary answers `pending`, for the caller to offer writing one.
  *
  * @returns {Promise<{status:boolean, data?:{summary:string, commentCount:number, updatedAt:string, cached:boolean}, reason?:string}>}
  */
-async function summarizeTask({ companyId, uid, taskId, force = false }) {
+async function summarizeTask({ companyId, uid, taskId, force = false, keptOnly = false }) {
     if (!companyId || !taskId || !mongoose.Types.ObjectId.isValid(taskId)) {
         return { status: false, reason: 'taskId is required' };
     }
@@ -158,8 +160,9 @@ async function summarizeTask({ companyId, uid, taskId, force = false }) {
         }
 
         const key = cacheKey(companyId, taskId, total);
-        const hit = !force && myCache.get(key);
+        const hit = (keptOnly || !force) && myCache.get(key);
         if (hit) return { status: true, data: { ...hit, cached: true } };
+        if (keptOnly) return { status: true, data: { summary: '', commentCount: total, updatedAt: '', cached: false, pending: true } };
 
         const names = await resolveNames(companyId, comments.map((c) => c.userId));
         const summary = await askModel(buildThread({ task, comments, names }), { feature: FEATURES.TASK_SUMMARY, companyId });

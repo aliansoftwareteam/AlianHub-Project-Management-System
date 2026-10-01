@@ -9,7 +9,7 @@
             <label :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('ProjectSlider.project_name') }}<span class="text-red asterisk">*</span></label>
             <div class="input-field-group">
                 <InputText
-                    class="form-control login-input text-capitalize"
+                    class="form-control login-input"
                     :placeHolder="$t('PlaceHolder.Enter_Project_Name')"
                     autocomplete="off"
                     v-model.trim="theModel.projectName.value"
@@ -32,7 +32,7 @@
             <label :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('ProjectDetails.key') }}<span class="text-red asterisk">*</span></label>
             <div class="input-field-group">
                 <InputText
-                    class="form-control login-input text-capitalize"
+                    class="form-control login-input"
                     :placeHolder="$t('PlaceHolder.Enter_Key_Name')"
                     autocomplete="off"
                     v-model.trim="theModel.projectCode.value"
