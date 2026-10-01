@@ -114,8 +114,9 @@ New collections: `connector_connections` (above, with the calendar id and sync t
 2. **OAuth & Permissions**, **Bot Token Scopes**: add `channels:history`, `channels:read`, `chat:write`.
 3. **Install to Workspace**, allow. No redirect URL is needed for this.
 4. In Slack, invite the bot to one test channel: `/invite @<app name>`.
-5. In AlianHub, **Integrations**, **Slack**: paste the **Bot User OAuth Token** (starts `xoxb-`) and, from **Basic Information**, **App Credentials**, the **Signing Secret**; list the test channel. Both are sealed in the secrets store and never shown again.
-6. Only if you choose an OAuth install instead (decision 3): the redirect URL would be `https://<PRODUCTION-API-HOST>/api/v1/connector-oauth/slack/callback`, Slack accepts HTTPS only so localhost needs a tunnel, and the values go in `.env` as `CONNECTOR_SLACK_CLIENT_ID`, `CONNECTOR_SLACK_CLIENT_SECRET` (secret) and `CONNECTOR_SLACK_SIGNING_SECRET` (secret).
+5. In AlianHub, as an owner or admin, open **Integrations & Automation**, **Slack**, and the card **Slack messages from agents**. Next to **Bot token** press **Set**, paste the **Bot User OAuth Token** (starts `xoxb-`) and **Save**. Do the same for **Signing secret** with the value from the Slack app's **Basic Information**, **App Credentials**. Each is checked with Slack, sealed in the secrets store and never shown again.
+6. On the same card, under **Channels agents may post to**, tick the test channel and press **Save allowed channels**. A channel marked "the app is not in this channel yet" still needs step 4.
+7. Only if you choose an OAuth install instead (decision 3): the redirect URL would be `https://<PRODUCTION-API-HOST>/api/v1/connector-oauth/slack/callback`, Slack accepts HTTPS only so localhost needs a tunnel, and the values go in `.env` as `CONNECTOR_SLACK_CLIENT_ID`, `CONNECTOR_SLACK_CLIENT_SECRET` (secret) and `CONNECTOR_SLACK_SIGNING_SECRET` (secret).
 
 **C. Google OAuth client** (needed from slice 3; from memory, as of 2026; check on screen)
 
@@ -146,6 +147,27 @@ Each is one pull request. Every one is built and fully tested against a fake pro
 | 7 | **Gmail read.** `gmail.search`, `gmail.thread.read`, text only, capped | Your Google account |
 | 8 | **Gmail draft by approval.** `gmail.draft.create`, the card with recipients, subject and body | Your Google account |
 | 9 | **Production.** Calendar push channels, the slash command moved to the signing secret, Google verification | A public HTTPS host |
+
+## Decisions (2026-10-01)
+
+Taken by the owner; numbers follow section 7.
+
+1. **Gmail's restricted scopes:** left open until slice 7. Slack and Calendar are built first.
+2. **Google client:** a separate OAuth client for connectors, never the sign-in client.
+3. **Slack:** a bot token pasted per workspace, no OAuth install, and Slack is built first.
+4. **Gmail drafts:** always by approval.
+5. **Private-list tasks:** never synced to a calendar in the first version, the person's own included.
+6. **Web fetch after a connector read:** none.
+
+## Slice 1 as built
+
+- `CONNECTORS=slack` switches it on. It stays off, with one startup log line and the same reasons on the screen, unless `SECRETS_STORE` has a usable `SECRETS_KEY` and `AGENT_TAINT_ROUTING` is on. Off means no route, no registry action and no section on the screen.
+- The connection is one row in `connector_connections` (`Modules/Agents/connectors/slackConnection.js`); the bot token and the signing secret are in the secrets store under the kind `connector`, which the stored-secrets screen can revoke and cannot rotate. The signing secret is stored and not used yet: the slash command moves to it in slice 9.
+- `slack.message.post` is propose-only with the existing owner-or-admin gate. The channel and the text limits are checked when the proposal is filed and again when it is applied; the proposal keeps the channel id, Slack's name for it and the exact text, and after approval the message timestamp or the error (`delivery`).
+- **Internal agents only in this slice.** A data skill emits the action; there is no MCP tool for it and a token cannot file it through the proposals route, so `docs/MCP-AGENT-GUIDE.md` is unchanged.
+- The post goes through `engine/agentFetch.js` inside the workspace's egress context. While `AGENT_EGRESS_ALLOWLIST` is on and the workspace has a host list, `slack.com` must be on it.
+- One attempt per approval. A token Slack refuses marks the connection broken until it is replaced; a rate limit or an unreachable Slack is recorded and shown, and the message is not sent later on its own. Sending an approved message again needs a new proposal; a "send again" control is a possible follow-up.
+- The two lines of copy on the Connections page (`Parity.grant_slack`, `Parity.grant_calendar`) are unchanged: that page lists the slash-command connection, not this one.
 
 ## 7. Risks and what to decide
 

@@ -117,6 +117,7 @@ const FLAGGED_RATINGS = Object.freeze({
     'goal.target.set': write(SCOPE.WORKSPACE),
     'goal.target.sources.add': write(SCOPE.WORKSPACE),
     'goal.target.sources.remove': write(SCOPE.WORKSPACE),
+    'slack.message.post': write(SCOPE.WORKSPACE, false),
 });
 
 const ratingTable = () => ({ ...RATINGS, ...Object.fromEntries(Object.entries(FLAGGED_RATINGS).filter(([k]) => registry.has(k))) });
@@ -414,6 +415,10 @@ const executors = {
         }, 'save');
         emitPageChange(companyId, 'insert', saved);
         return { result: { pageId: String(saved._id) }, undo: { kind: 'page', pageId: String(saved._id) }, entityType: 'page', entityId: saved._id, entityName: title };
+    },
+
+    async 'slack.message.post'({ companyId, actor, params }) {
+        return require('./connectors/slackPost').post({ companyId, actor, params });
     },
 
     async 'chat.post'({ companyId, actor, params, depth }) {

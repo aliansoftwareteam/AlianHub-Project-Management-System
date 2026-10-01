@@ -383,6 +383,8 @@ const permissionDecisionsSchema = new Schema(schema.permissionDecisions, {strict
 permissionDecisionsSchema.index({ day: 1, mode: 1, method: 1, route: 1, permission: 1, role: 1, scope: 1, reason: 1 }, { unique: true, name: 'decision_key' });
 permissionDecisionsSchema.index({ day: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
 const egressAllowlistsSchema = new Schema(schema.egressAllowlists, {strict: true, timestamps: false});
+const connectorConnectionsSchema = new Schema(schema.connectorConnections, {strict: true, timestamps: true});
+connectorConnectionsSchema.index({ connector: 1, deletedStatusKey: 1 });
 const instructionPatternsSchema = new Schema(schema.instructionPatterns, {strict: true, timestamps: false});
 const agentSessionsSchema = new Schema(schema.agentSessions, {strict: true, timestamps: false});
 agentSessionsSchema.index({ taskId: 1, createdAt: -1 });
@@ -597,6 +599,7 @@ module.exports = {
     auditRedactionsSchema,
     auditChainKeySchema,
     egressAllowlistsSchema,
+    connectorConnectionsSchema,
     instructionPatternsSchema,
     agentSessionsSchema,
     agentSessionEndpointsSchema,

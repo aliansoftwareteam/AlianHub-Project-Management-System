@@ -1433,6 +1433,8 @@ const schema = {
         failedReason: { type: String, required: false },
         undoUntil: { type: Date, required: false },
         auditIds: { type: Array, default: [], required: false },
+        // [{ action, ok, channelId, channelName, ts, error, at }] — what the provider answered for each connector change
+        delivery: { type: Array, required: false },
         cost: { type: Object, required: false },
         // a canned Inbox key (too_many_changes | wrong_tone | needs_person | not_now) or free text, ≤ 200 chars
         declineReason: { type: String, required: false },
@@ -1986,6 +1988,27 @@ const schema = {
         updatedAt: { type: Date, required: false },
         // Moves on with every save; a save names the version it read, so two console tabs cannot drop each other's hosts.
         version: { type: Number, required: false },
+    },
+    // One row per workspace and connector (Modules/Agents/connectors). Tokens live in `secrets` by handle, never here.
+    connectorConnections: {
+        connector: { type: String, required: true },
+        // { bot_token: 'sec_…', signing_secret: 'sec_…' }
+        secretHandles: { type: Object, default: {}, required: false },
+        secretSetAt: { type: Object, default: {}, required: false },
+        team: { type: Object, required: false },
+        // [{ id, name, member }] as the provider listed them when the token was saved or the list refreshed
+        channels: { type: Array, default: [], required: false },
+        channelsFetchedAt: { type: Date, required: false },
+        // [{ id, name }] the channels an owner or admin chose; a post anywhere else is refused
+        allowedChannels: { type: Array, default: [], required: false },
+        // connected | broken
+        status: { type: String, default: 'connected', required: false },
+        brokenReason: { type: String, required: false },
+        brokenAt: { type: Date, required: false },
+        lastPostAt: { type: Date, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
     },
     // Instance-wide, in the global database: patterns the owner added to the instruction guard on top of
     // the built-in list (Modules/AICore/instructionPatterns.js).

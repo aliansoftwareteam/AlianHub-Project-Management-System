@@ -38,7 +38,10 @@ const managerOrRefuse = async (req, res) => {
 };
 
 exports.listCatalog = async (req, res) => {
-    try { return res.send({ status: true, data: R.getCatalog() }); }
+    try {
+        const connectors = require('../Agents/connectors/flag').requested();
+        return res.send({ status: true, data: R.getCatalog(), ...(connectors.length ? { connectors } : {}) });
+    }
     catch (e) { logger.error(`listCatalog: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
