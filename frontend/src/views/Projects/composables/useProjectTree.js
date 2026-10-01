@@ -1,9 +1,10 @@
-import { computed, inject, onMounted, ref, watch } from 'vue';
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';
 import { useToast } from 'vue-toast-notification';
 import { i18n } from '@/locales/main';
 import { useProjectsHelper } from '../helper';
+import { FOLDERS_CHANGED_EVENT, refreshFolders } from '../folderActions';
 
 const byId = (list, id) => (list || []).find((item) => String(item._id) === String(id));
 
@@ -30,6 +31,9 @@ export function useProjectTree(projectData) {
     const userId = inject('$userId');
     const companyId = inject('$companyId');
     const { projects } = useProjectsHelper();
+
+    const socket = inject('$socket', ref(null));
+    const foldedFolderIds = new Map();
 
     const sprintLoading = ref(false);
     const companyUserDetail = computed(() => getters['settings/companyUserDetail']);
@@ -67,8 +71,14 @@ export function useProjectTree(projectData) {
                 }
             });
 
+            /* The map may hold folders this fold never added; only the ones it added earlier and the
+               list no longer returns (deleted in another tab) are dropped. */
+            const earlier = foldedFolderIds.get(id) || new Set();
+            const kept = Object.fromEntries(Object.entries(project.sprintsfolders || {}).filter(([key]) => !earlier.has(key) || folders[key]));
+            foldedFolderIds.set(id, new Set(Object.keys(folders)));
+
             project.sprintsObj = sprints;
-            project.sprintsfolders = { ...(project.sprintsfolders || {}), ...folders };
+            project.sprintsfolders = { ...kept, ...folders };
             commit('projectData/mutateProjects', [{ snap: null, privateSnap: false, userId: userId.value, roleType: companyUserDetail.value?.roleType, op: 'modified', data: { ...project } }]);
         } catch (error) {
             console.error('ERROR in loading sprints and folders', error);
@@ -112,6 +122,25 @@ export function useProjectTree(projectData) {
     watch(() => getters['projectData/sprints'], () => { if (projectData.value?._id) loadSprintFolderData(projectData.value._id, true); });
     watch(() => getters['projectData/folders'], () => { if (projectData.value?._id) loadSprintFolderData(projectData.value._id, true); });
     onMounted(resolveRouteProject);
+
+    /* The event says only that a folder changed somewhere in the company, so the open project's are read again. */
+    let boundSocket = null;
+    const onFoldersChanged = () => { if (projectData.value?._id) refreshFolders({ commit, getters }, projectData.value._id); };
+    function unbindSocket() {
+        boundSocket?.off?.(FOLDERS_CHANGED_EVENT, onFoldersChanged);
+        boundSocket = null;
+    }
+    function bindSocket() {
+        const live = socket?.value;
+        if (live === boundSocket) return;
+        unbindSocket();
+        if (!live?.on) return;
+        boundSocket = live;
+        live.on(FOLDERS_CHANGED_EVENT, onFoldersChanged);
+    }
+    onMounted(bindSocket);
+    watch(() => socket?.value, bindSocket);
+    onBeforeUnmount(unbindSocket);
 
     return { sprintLoading, loadSprintFolderData, selectProject, resolveRouteProject };
 }

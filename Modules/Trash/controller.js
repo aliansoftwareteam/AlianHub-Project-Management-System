@@ -3,7 +3,7 @@ const logger = require('../../Config/loggerConfig');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { updateProjectInternal } = require('../Project/controller/updateProject');
-const { updateSprintFun } = require('../Sprints/controller');
+const { updateSprintFun, updateFolderFun } = require('../Sprints/controller');
 const { taskMongo } = require('../Tasks/helpers/task_class_Mongo');
 const pages = require('../Pages/controller');
 const rules = require('./rules');
@@ -75,6 +75,25 @@ const restoreList = async (companyId, id, userData) => {
     await restoreChildren(companyId, 'lists', id);
 };
 
+const restoreFolder = async (companyId, id, userData) => {
+    const folder = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.FOLDERS, data: [{ _id: new ObjectId(id) }] }, 'findOne');
+    if (!folder) throw new Error('Folder not found');
+    if (folder.deletedStatusKey !== rules.TRASHED) throw Object.assign(new Error('That folder is not in the trash.'), { statusCode: 400 });
+    const projectId = String(folder.projectId || '');
+    const project = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: new ObjectId(projectId) }, 'ProjectName'] }, 'findOne');
+    const { answer, cascade } = await updateFolderFun({
+        companyId,
+        id,
+        updateObject: { $set: { deletedStatusKey: 0 } },
+        folderName: folder.name,
+        projectData: { id: projectId, ProjectName: project ? project.ProjectName : '' },
+        userData,
+        fromTrash: true,
+    });
+    if (!answer || answer.status === false) throw new Error((answer && answer.statusText) || 'Folder not restored');
+    await cascade;
+};
+
 exports.restore = async (req, res) => {
     const companyId = companyOrRefuse(req, res);
     if (!companyId) return undefined;
@@ -84,6 +103,7 @@ exports.restore = async (req, res) => {
     try {
         if (kind === 'docs') return pages.restorePage(req, res);
         if (kind === 'projects') await restoreProject(companyId, id);
+        else if (kind === 'folders') await restoreFolder(companyId, id, await sessionActor(req));
         else if (kind === 'lists') await restoreList(companyId, id, await sessionActor(req));
         else await taskMongo.bulkRestore({ companyId, userData: await sessionActor(req), taskIds: [id] });
         return res.send({ status: true, statusText: 'Restored.', data: { kind, id } });

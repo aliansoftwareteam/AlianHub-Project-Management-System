@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
+const { opensProject, withoutHidden } = require('../../TimeSheet/helpers/timeScope');
 
 const MAX_ESTIMATE_MINUTES = 24 * 60;
 
@@ -53,12 +54,20 @@ const readEstimateWrite = (body) => {
     };
 };
 
+const NOT_THIS_PROJECT = 'You cannot plan time on this project.';
+
 /* Owners and admins, and the roles the matrix grants Everyone on the workload or
  * project timesheet, plan for anyone; everyone else plans their own time only, and
  * both stop at the projects they can open. */
 const authorize = (plan, scope) => {
     if (!scope.everyone && plan.userId !== scope.uid) refuse('You can only plan your own time.', 403);
-    if (scope.visible && !scope.visible.includes(plan.projectId)) refuse('You cannot plan time on this project.', 403);
+    if (!opensProject(scope, plan.projectId)) refuse(NOT_THIS_PROJECT, 403);
+};
+
+/* The project a plan names comes from the request, so where the scope leaves projects out the
+ * task's own project is held to it as well. */
+const authorizeTaskProject = (task, scope) => {
+    if (task && !opensProject(scope, task.ProjectID)) refuse(NOT_THIS_PROJECT, 403);
 };
 
 const buildEstimateWrite = (body, scope) => {
@@ -79,7 +88,7 @@ const buildEstimateWrite = (body, scope) => {
      * the caller may already reach — the scope stays in the filter so a stolen id
      * matches nothing. */
     const filter = plan.id
-        ? { _id: new mongoose.Types.ObjectId(plan.id), ...(scope.everyone ? {} : ownRowsMatch(scope)), ...(scope.visible ? { ProjectId: { $in: idForms(scope.visible) } } : {}) }
+        ? { _id: new mongoose.Types.ObjectId(plan.id), ...(scope.everyone ? {} : ownRowsMatch(scope)), ...(scope.visible ? { ProjectId: { $in: idForms(scope.visible) } } : withoutHidden(scope)) }
         : { userId: plan.userId, Date: plan.date, TaskId: plan.taskId };
 
     return {
@@ -92,4 +101,5 @@ module.exports = {
     EstimateWriteRefused,
     MAX_ESTIMATE_MINUTES,
     buildEstimateWrite,
+    authorizeTaskProject,
 };

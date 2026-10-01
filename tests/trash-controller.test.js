@@ -5,7 +5,10 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: j
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../Modules/Project/controller/updateProject', () => ({ updateProjectInternal: jest.fn(async () => ({})) }));
-jest.mock('../Modules/Sprints/controller', () => ({ updateSprintFun: jest.fn(async () => ({ status: true })) }));
+jest.mock('../Modules/Sprints/controller', () => ({
+    updateSprintFun: jest.fn(async () => ({ status: true })),
+    updateFolderFun: jest.fn(async () => ({ answer: { status: true }, cascade: Promise.resolve() })),
+}));
 jest.mock('../Modules/Tasks/helpers/task_class_Mongo', () => ({ taskMongo: { bulkRestore: jest.fn(async () => ({ totals: { updated: 1 } })) } }));
 jest.mock('../Modules/Pages/controller', () => ({ restorePage: jest.fn((req, res) => res.send({ status: true, statusText: 'page' })) }));
 jest.mock('../Modules/Trash/listAccess', () => ({ visibleTrash: jest.fn(async (companyId, uid, kind, docs) => docs) }));
@@ -13,7 +16,7 @@ jest.mock('../Modules/Tasks/helpers/taskWriteFields', () => ({ sessionActor: jes
 
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { updateProjectInternal } = require('../Modules/Project/controller/updateProject');
-const { updateSprintFun } = require('../Modules/Sprints/controller');
+const { updateSprintFun, updateFolderFun } = require('../Modules/Sprints/controller');
 const { taskMongo } = require('../Modules/Tasks/helpers/task_class_Mongo');
 const pages = require('../Modules/Pages/controller');
 const rules = require('../Modules/Trash/rules');
@@ -30,8 +33,9 @@ const req = (over = {}) => verified({ uid: USER, headers: { companyid: COMPANY }
 beforeEach(() => jest.clearAllMocks());
 
 describe('rules', () => {
-    test('four kinds, every row carries the same shape', () => {
-        expect(rules.KINDS).toEqual(['projects', 'lists', 'tasks', 'docs']);
+    test('five kinds, every row carries the same shape', () => {
+        expect(rules.KINDS).toEqual(['projects', 'folders', 'lists', 'tasks', 'docs']);
+        expect(rules.toRow('folders', { _id: ID, name: 'Design', projectId: PROJECT, updatedAt: 'now' })).toEqual({ _id: String(ID), kind: 'folders', title: 'Design', code: '', projectId: String(PROJECT), updatedAt: 'now' });
         const row = rules.toRow('tasks', { _id: ID, TaskName: 'Fix', TaskKey: 'AH-1', ProjectID: PROJECT, updatedAt: 'now' });
         expect(row).toEqual({ _id: String(ID), kind: 'tasks', title: 'Fix', code: 'AH-1', projectId: String(PROJECT), updatedAt: 'now' });
         expect(Object.keys(rules.toRow('docs', { _id: ID, title: 'Doc' })).sort()).toEqual(Object.keys(row).sort());
@@ -46,6 +50,7 @@ describe('rules', () => {
         expect(rules.childRestoreFilter('projects', String(ID), mongoose.Types.ObjectId)).toEqual({ ProjectID: ID, deletedStatusKey: { $in: [1, 7] } });
         expect(rules.childRestoreFilter('lists', String(ID), mongoose.Types.ObjectId)).toEqual({ sprintId: ID, deletedStatusKey: 1 });
         expect(rules.childRestoreFilter('tasks', String(ID), mongoose.Types.ObjectId)).toBeNull();
+        expect(rules.childRestoreFilter('folders', String(ID), mongoose.Types.ObjectId)).toBeNull();
         expect(rules.childRestoreFilter('docs', String(ID), mongoose.Types.ObjectId)).toBeNull();
     });
 });
@@ -53,7 +58,7 @@ describe('rules', () => {
 describe('GET /api/v2/trash', () => {
     test('rejects an unknown kind', async () => {
         const res = mockRes();
-        await ctrl.list(req({ query: { kind: 'folders' } }), res);
+        await ctrl.list(req({ query: { kind: 'comments' } }), res);
         expect(res.status).toHaveBeenCalledWith(400);
         expect(res.send).toHaveBeenCalledWith(expect.objectContaining({ status: false }));
     });
@@ -115,6 +120,47 @@ describe('PUT /api/v2/trash/:kind/:id/restore', () => {
         await ctrl.restore(req({ params: { kind: 'lists', id: String(ID) } }), res);
         expect(res.status).toHaveBeenCalledWith(500);
         expect(res.send).toHaveBeenCalledWith(expect.objectContaining({ status: false }));
+    });
+
+    test('folders: the folder write restores it, with what went to the trash with it, and is waited for', async () => {
+        MongoDbCrudOpration
+            .mockResolvedValueOnce({ _id: ID, name: 'Design', projectId: PROJECT, deletedStatusKey: 1 })
+            .mockResolvedValueOnce({ ProjectName: 'Proj' });
+        let settled = false;
+        updateFolderFun.mockResolvedValueOnce({ answer: { status: true }, cascade: new Promise((resolve) => setTimeout(() => { settled = true; resolve(); }, 5)) });
+        const res = mockRes();
+        await ctrl.restore(req({ params: { kind: 'folders', id: String(ID) }, body: { userData: { id: 'u', Employee_Name: 'Forged' } } }), res);
+        expect(updateFolderFun).toHaveBeenCalledWith({
+            companyId: COMPANY,
+            id: String(ID),
+            updateObject: { $set: { deletedStatusKey: 0 } },
+            folderName: 'Design',
+            projectData: { id: String(PROJECT), ProjectName: 'Proj' },
+            userData: { id: USER, Employee_Name: 'Me' },
+            fromTrash: true,
+        });
+        expect(settled).toBe(true);
+        expect(res.send).toHaveBeenCalledWith({ status: true, statusText: 'Restored.', data: { kind: 'folders', id: String(ID) } });
+    });
+
+    test('folders: one that is not in the trash is refused and nothing is written', async () => {
+        MongoDbCrudOpration.mockResolvedValueOnce({ _id: ID, name: 'Design', projectId: PROJECT, deletedStatusKey: 2 });
+        const res = mockRes();
+        await ctrl.restore(req({ params: { kind: 'folders', id: String(ID) } }), res);
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.send).toHaveBeenCalledWith(expect.objectContaining({ status: false }));
+        expect(updateFolderFun).not.toHaveBeenCalled();
+    });
+
+    test('folders: a refusal of the folder write keeps its reason and status', async () => {
+        MongoDbCrudOpration
+            .mockResolvedValueOnce({ _id: ID, name: 'Icons', projectId: PROJECT, deletedStatusKey: 1 })
+            .mockResolvedValueOnce({ ProjectName: 'Proj' });
+        updateFolderFun.mockRejectedValueOnce(Object.assign(new Error('The parent folder is archived or deleted. Restore the parent folder first.'), { statusCode: 400 }));
+        const res = mockRes();
+        await ctrl.restore(req({ params: { kind: 'folders', id: String(ID) } }), res);
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.send).toHaveBeenCalledWith({ status: false, statusText: 'The parent folder is archived or deleted. Restore the parent folder first.' });
     });
 
     test('tasks: goes through bulkRestore as the signed-in user', async () => {

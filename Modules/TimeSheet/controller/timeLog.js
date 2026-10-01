@@ -1,7 +1,7 @@
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { resolveSheetScope, scopedTimeMatch, asList, SHEET_PERMISSION } = require("../helpers/timeScope");
-const { checkStages, isPlainObject, TimesheetQueryRefused } = require("../helpers/timesheetQueryScope");
+const { checkStages, withJoinScope, isPlainObject, TimesheetQueryRefused } = require("../helpers/timesheetQueryScope");
 
 const STAGE_OF_PARAMETER = Object.freeze([['sort', '$sort'], ['group', '$group'], ['addFields', '$addFields'], ['facet', '$facet']]);
 
@@ -32,7 +32,8 @@ exports.getTimeLogTimeSheet = async(req,res) => {
 
         let query;
         try {
-            query = [{ $match: timeQuery }, ...checkStages(namedStages(body), scope)];
+            const named = STAGE_OF_PARAMETER.map(([parameter]) => body[parameter]);
+            query = [{ $match: timeQuery }, ...(await withJoinScope(req.headers['companyid'], scope, named, (joinScope) => checkStages(namedStages(body), joinScope)))];
         } catch (error) {
             if (!(error instanceof TimesheetQueryRefused)) throw error;
             return res.status(400).json({ status: false, statusText: "Bad Request", message: error.message });

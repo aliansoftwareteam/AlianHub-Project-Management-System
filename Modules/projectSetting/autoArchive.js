@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const logger = require('../../Config/loggerConfig');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { HandleHistory } = require('../Tasks/helpers/mongo_helper');
+const { cascadeStatus, sprintCountChange } = require('../Tasks/helpers/taskTree');
 
 // Per-project auto-archive rule: completed tasks (status type 'close') that
 // haven't been touched for `afterDays` days get archived (deletedStatusKey 2,
@@ -69,20 +70,11 @@ async function setAutoArchive(req, res) {
     }
 }
 
-/* Archive one parent task: children first, then the task itself, then the
- * sprint counters (same fields the manual archive flow maintains), history,
- * and a socket emit so open boards drop the task live. */
+/* Archive one parent task: the task itself, then every level of its subtasks
+ * through the same cascade the manual archive uses (so a restore brings them
+ * back), then the sprint counters, history, and a socket emit per row so open
+ * boards drop them live. */
 async function archiveOneTask(companyId, task, afterDays) {
-    const childCount = (task.subTasks || 0);
-
-    await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.TASKS,
-        data: [
-            { ParentTaskId: String(task._id), deletedStatusKey: 0 },
-            { $set: { deletedStatusKey: 2 } },
-        ],
-    }, 'updateMany');
-
     const updated = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS,
         data: [
@@ -94,15 +86,14 @@ async function archiveOneTask(companyId, task, afterDays) {
     if (!updated) {
         return false;
     }
+    const carried = await cascadeStatus(companyId, { _id: task._id, deletedStatusKey: 0 }, 2);
 
-    // Sprint counters mirror the manual archive flow (structural.js):
-    // archived tasks move from `tasks` into `archiveTaskCount`.
     if (task.sprintId) {
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.SPRINTS,
             data: [
                 { _id: task.sprintId },
-                { $inc: { archiveTaskCount: childCount + 1, tasks: -1 * (childCount + 1) } },
+                { $inc: sprintCountChange(0, 2, 1 + carried.length) },
             ],
         }, 'updateOne').catch((error) => {
             logger.error(`${LOG_PREFIX} sprint counter update failed for task ${task._id}: ${error.message}`);
@@ -110,6 +101,7 @@ async function archiveOneTask(companyId, task, afterDays) {
     }
 
     socketEmitter.emit('update', { type: "update", data: updated, updatedFields: { deletedStatusKey: 2 }, module: 'task' });
+    carried.forEach((row) => socketEmitter.emit('update', { type: "update", data: row, updatedFields: { deletedStatusKey: row.deletedStatusKey }, module: 'task' }));
 
     HandleHistory('task', companyId, task.ProjectID, task._id, {
         key: 'Task_Archive',
