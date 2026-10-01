@@ -129,6 +129,7 @@ describe('a save from an editor that is behind', () => {
     });
 
     it('is written as before by a caller that names no base, and a property change never needs one', async () => {
+        jest.setSystemTime(T0.getTime() + 60 * SECOND);
         expect(await save(BOB, [para('a', 'One, from Bob')])).toMatchObject({ status: true });
         expect(await call(pages.updatePage, AUTHOR, { isWiki: true, baseEditedAt: T0.toISOString() })).toMatchObject({ status: true });
         expect(storedPage()).toMatchObject({ rawText: 'One, from Bob', isWiki: true });

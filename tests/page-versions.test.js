@@ -13,7 +13,7 @@ jest.mock('../Modules/notification/prepare-notification-data/controllerV2', () =
 jest.mock('../Modules/notification/docNotices', () => ({ ensureDocNoticeSection: jest.fn(async () => undefined) }));
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../Modules/Pages/helpers/pageAi', () => ({ composePage: jest.fn(), isAiConfigured: () => false }));
-jest.mock('../Modules/Pages/helpers/pageMentionNotices', () => ({ notifyNewMentions: jest.fn(async () => undefined) }));
+jest.mock('../Modules/Pages/helpers/pageMentionNotices', () => ({ notifyMentioned: jest.fn(async () => undefined) }));
 jest.mock('../Config/contentAccess', () => ({
     projectAccess: jest.fn(async (companyId, uid, projectId) => {
         const inCompany = String(companyId) === mockIds.company;
@@ -46,7 +46,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { schema } = require('../utils/mongo-handler/schema');
 const socketEmitter = require('../event/socketEventEmitter');
-const { notifyNewMentions } = require('../Modules/Pages/helpers/pageMentionNotices');
+const { notifyMentioned } = require('../Modules/Pages/helpers/pageMentionNotices');
 const pages = require('../Modules/Pages/controller');
 const history = require('../Modules/Pages/versions');
 const comments = require('../Modules/Pages/comments');
@@ -614,7 +614,7 @@ describe('restoring a version', () => {
         expect(pageEvents()).toHaveLength(1);
         expect(pageEvents()[0]).toMatchObject({ type: 'update', module: 'pages', companyId: C, data: { title: 'Launch plan (draft)', rawText: 'Intro then' } });
         expect(String(pageEvents()[0].data._id)).toBe(mockIds.page);
-        expect(notifyNewMentions).not.toHaveBeenCalled();
+        expect(notifyMentioned).not.toHaveBeenCalled();
     });
 
     it('is refused to a reader, and leaves the doc alone when the current state cannot be kept first', async () => {

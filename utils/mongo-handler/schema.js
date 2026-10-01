@@ -1573,6 +1573,9 @@ const schema = {
         // say who wrote the state a version keeps.
         editedBy: { type: String, required: false },
         editedAt: { type: Date, required: false },
+        // Everyone already told that the doc names them. No default: a doc without the list predates it, and a
+        // mongoose array would otherwise read as an empty list and tell everyone it names again.
+        mentionsTold: { type: [String], required: false, default: undefined },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     // Doc history (Modules/Pages/versions.js). savedBy and savedAt are the writer and the time of the state held, not of
