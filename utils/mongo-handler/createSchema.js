@@ -419,6 +419,8 @@ taskSchema.index({ sprintId: 1, deletedStatusKey: 1 });
 taskSchema.index({ AssigneeUserId: 1 });
 taskSchema.index({ ParentTaskId: 1 });
 taskSchema.index({ TaskKey: 1 });
+// The due-date trigger reads a day-wide range of this every few minutes (Modules/Automations/engine/dueDateTrigger).
+taskSchema.index({ DueDate: 1 });
 
 // comments: every comment is fetched by task/sprint/project triplet.
 commentSchema.index({ 'objId.taskId': 1, deletedStatusKey: 1 });

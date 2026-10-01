@@ -155,6 +155,7 @@
                     </button>
                 </div>
             </div>
+            <DesignVariantPicker />
         </section>
 
         <section class="ah-card" data-test="keyboard-prefs">
@@ -282,6 +283,7 @@ import SpinnerComp from "@/components/atom/SpinnerComp/SpinnerComp.vue";
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
 import CroppingTool from "@/components/atom/CroppingTool/CroppingTool.vue";
 import AhSwitch from "@/components/molecules/Setting/AhSwitch.vue";
+import DesignVariantPicker from "./DesignVariantPicker.vue";
 import AskMemoryButton from "@/views/Ai/AskMemoryButton.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { useAgentPreferences } from "@/views/Ai/useAgentPreferences";
