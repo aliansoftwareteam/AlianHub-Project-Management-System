@@ -7,7 +7,7 @@ test.describe('inbox as the owner', () => {
     test('renders the Inbox and shows the empty state on a fresh workspace', async ({ page, state }) => {
         await page.goto(`/#/${state.companyId}/inbox`);
         await expect(page.locator('.ah-toolbar__title')).toHaveText('Inbox');
-        await expect(page.locator('.ibx__zero-title')).toHaveText("You're all caught up");
+        await expect(page.locator('.ibx__zero').getByRole('heading', { level: 2 })).toHaveText("You're all caught up");
     });
 });
 

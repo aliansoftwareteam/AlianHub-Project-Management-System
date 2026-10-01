@@ -56,7 +56,7 @@ describe('MCP tools answer only for what the caller can open in the web app', ()
         member = await loginAs('member');
         const build = async (label, { isPrivate = false, assignees, privateSprintFor = null }) => {
             const project = await createProject(owner.api, { assigneeIds: assignees.map((s) => s.uid), createdBy: owner.uid, isPrivate });
-            const task = await withRetry(() => createTask(owner.api, { project, name: `${tag} ${label}`, user: state.users.owner, companyOwnerId: owner.uid, assigneeIds: [member.uid] }));
+            const task = await withRetry(() => createTask(owner.api, { project, name: `${tag} ${label}`, user: state.users.owner, companyOwnerId: owner.uid, assigneeIds: [(assignees.includes(member) ? member : owner).uid] }));
             if (privateSprintFor) await makeSprintPrivate(owner, project._id, privateSprintFor.map((s) => s.uid));
             return { projectId: String(project._id), taskId: String(task._id) };
         };
