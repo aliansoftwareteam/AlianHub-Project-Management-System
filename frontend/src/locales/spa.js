@@ -1912,6 +1912,8 @@ export default {
         "pct_period": "{pct}% this period",
         "pto_range": "PTO {range}",
         "pto": "PTO",
+        "unavailable_range": "Unavailable {range}",
+        "unavailable": "Unavailable",
         "legend_estimated": "estimated",
         "legend_logged": "logged",
         "legend_tentative": "next week, tentative",
@@ -1936,6 +1938,7 @@ export default {
         "gap_title": "{month} gap:",
         "gap_body": "{team} is committed to {committed}h against {available}h available",
         "gap_pto": "{name} off {days}d",
+        "gap_unavailable": "{name} unavailable {days}d",
         "gap_over": "{name} at {pct}% already",
         "no_gaps": "No gaps — every team has room in every month shown.",
         "options": "✦ Options:",
@@ -3419,6 +3422,7 @@ export default {
         "filter_pto": "PTO",
         "filter_sprints": "sprints",
         "pto": "PTO",
+        "unavailable": "Unavailable",
         "teammate": "Teammate",
         "more_count": "+{n} more",
         "drop_here": "drop here → due {date}",
@@ -3501,6 +3505,7 @@ export default {
         "legend_over": "over capacity",
         "pct_period": "{pct}% this period",
         "pto_range": "PTO {range}",
+        "unavailable_range": "Unavailable {range}",
         "per_day": "{h}h/day",
         "workload_unit": "Measure workload in",
         "unit_hours": "Hours",
@@ -3755,7 +3760,8 @@ export default {
         "capacity_week": "Capacity this week",
         "n_people": "{n} people",
         "no_capacity": "No capacity recorded for this week.",
-        "pto_h": "PTO {h}h"
+        "pto_h": "PTO {h}h",
+        "unavailable_h": "Unavailable {h}h"
     },
     "Dash": {
         "dashboards": "Dashboards",

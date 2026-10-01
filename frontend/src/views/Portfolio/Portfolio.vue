@@ -88,6 +88,7 @@
                         </span>
                         <span class="rp-meter__pct" :class="{ 'is-over': u.status === 'over' }">{{ u.utilizationPct }}%</span>
                         <span v-if="u.ptoHours" class="rp-row__data">{{ $t('Reports.pto_h', { h: Math.round(u.ptoHours) }) }}</span>
+                        <span v-else-if="u.unavailableHours" class="rp-row__data">{{ $t('Reports.unavailable_h', { h: Math.round(u.unavailableHours) }) }}</span>
                     </div>
                     <span v-if="!capacityRows.length" class="ah-small">{{ $t('Reports.no_capacity') }}</span>
                 </div>
@@ -113,7 +114,7 @@
                         {{ busy ? $t('Reports.saving') : $t('Reports.save') }}
                     </button>
                     <button type="button" class="ah-btn ah-btn--ghost" @click="showForm = false">{{ $t('Reports.cancel') }}</button>
-                    <button v-if="editing" type="button" class="ah-btn ah-btn--ghost" @click="removeSelected">{{ $t('Reports.delete') }}</button>
+                    <button v-if="editing && selected && selected.canDelete" type="button" class="ah-btn ah-btn--ghost" @click="removeSelected">{{ $t('Reports.delete') }}</button>
                 </div>
             </div>
         </div>
