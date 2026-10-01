@@ -64,7 +64,7 @@ describe('the three design variants', () => {
             '--sp-1', '--sp-2', '--sp-3', '--sp-4', '--sp-5', '--sp-6', '--sp-7', '--sp-8', '--sp-9',
             '--r-chip', '--r-input', '--r-card', '--r-modal',
             '--shadow-card', '--shadow-surface', '--shadow-pop', '--shadow-panel',
-            '--row-h', '--row-font', '--cell-pad-y', '--cell-pad-x',
+            '--row-h', '--row-font', '--hit-min', '--cell-pad-y', '--cell-pad-x',
             '--control-h-sm', '--control-h', '--control-h-lg', '--toolbar-h',
         ];
         expect(needed.filter((name) => !(name in variant.a))).toEqual([]);
@@ -141,6 +141,7 @@ describe('the three design variants', () => {
 
     it('a list row is a 24px control plus its cell padding in every variant', () => {
         VARIANTS.forEach((v) => {
+            expect(variant[v]['--hit-min'], `variant ${v}`).toBe('24px');
             expect(px(v, '--row-h'), `variant ${v}`).toBe(24 + 2 * step(v, '--cell-pad-y'));
         });
     });
@@ -167,7 +168,7 @@ describe('with no variant chosen', () => {
 
     /* The List density setting defines these on :root at today's sizes. One fallback everywhere
        means the screens look the same whether or not it has landed. */
-    it.each([['--row-h', '36px'], ['--cell-pad-y', '9px'], ['--row-font', '12.5px']])('%s falls back to %s wherever it is read', (name, value) => {
+    it.each([['--row-h', '36px'], ['--cell-pad-y', '9px'], ['--row-font', '12.5px'], ['--hit-min', '24px']])('%s falls back to %s wherever it is read', (name, value) => {
         const fallbacks = SCREENS.flatMap((rel) => [...read(rel).matchAll(new RegExp(`var\\(${name}, ([^)]+)\\)`, 'g'))].map((m) => m[1]));
         expect(fallbacks.length).toBeGreaterThan(0);
         expect([...new Set(fallbacks)]).toEqual([value]);

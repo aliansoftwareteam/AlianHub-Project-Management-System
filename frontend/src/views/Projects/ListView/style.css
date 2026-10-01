@@ -78,6 +78,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    min-height: var(--hit-min, 24px);
     padding: var(--cell-pad-y, 9px) var(--cell-pad-x, 12px);
     background: var(--surface);
     border-bottom: 1px solid var(--hairline);
@@ -185,6 +186,7 @@
 
 .lv2__add {
     display: flex; align-items: center; gap: 9px;
+    min-height: var(--hit-min, 24px);
     padding: calc(var(--cell-pad-y, 9px) - 1px) var(--cell-pad-x, 12px) calc(var(--cell-pad-y, 9px) - 1px) 50px;
     color: var(--ink-2);
     font-size: var(--row-font, 12.5px);

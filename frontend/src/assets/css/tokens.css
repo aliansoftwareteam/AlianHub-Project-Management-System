@@ -193,7 +193,7 @@
 
     --sp-1: 4px; --sp-2: 6px; --sp-3: 8px; --sp-4: 10px; --sp-5: 12px;
     --sp-6: 14px; --sp-7: 16px; --sp-8: 20px; --sp-9: 24px;
-    --row-h: 40px; --row-font: var(--fs-md);
+    --row-h: 40px; --row-font: var(--fs-md); --hit-min: 24px;
     --cell-pad-y: var(--sp-3); --cell-pad-x: var(--sp-5);
     --card-pad-y: var(--sp-6); --card-pad-x: var(--sp-7);
     --gap-row: var(--sp-4); --gap-stack: var(--sp-7);
@@ -218,7 +218,7 @@
 
     --sp-1: 2px; --sp-2: 4px; --sp-3: 6px; --sp-4: 8px; --sp-5: 10px;
     --sp-6: 12px; --sp-7: 14px; --sp-8: 16px; --sp-9: 20px;
-    --row-h: 32px; --row-font: var(--fs-md);
+    --row-h: 32px; --row-font: var(--fs-md); --hit-min: 24px;
     --cell-pad-y: var(--sp-2); --cell-pad-x: var(--sp-5);
     --card-pad-y: var(--sp-5); --card-pad-x: var(--sp-6);
     --gap-row: var(--sp-2); --gap-stack: var(--sp-5);
@@ -243,7 +243,7 @@
 
     --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 18px;
     --sp-6: 20px; --sp-7: 24px; --sp-8: 28px; --sp-9: 32px;
-    --row-h: 48px; --row-font: var(--fs-md);
+    --row-h: 48px; --row-font: var(--fs-md); --hit-min: 24px;
     --cell-pad-y: var(--sp-3); --cell-pad-x: var(--sp-4);
     --card-pad-y: var(--sp-5); --card-pad-x: var(--sp-6);
     --gap-row: var(--sp-3); --gap-stack: var(--sp-6);

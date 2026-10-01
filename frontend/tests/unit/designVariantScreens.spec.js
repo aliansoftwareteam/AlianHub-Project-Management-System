@@ -126,6 +126,8 @@ describe('the reference screens take their density, type and elevation from the 
         [LIST, '.lv2__rename', 'font', ['--fw-strong', '--row-font', '--lh-snug']],
         [LIST, '.lv2__add', 'padding', ['--cell-pad-y', '--cell-pad-x']],
         [LIST, '.lv2__add', 'font-size', ['--row-font']],
+        [LIST, '.lv2__add', 'min-height', ['--hit-min']],
+        [LIST, '.lv2__group-head', 'min-height', ['--hit-min']],
         [LIST, '.lv2__skeleton', 'height', ['--cell-pad-y']],
         [LIST, '.lv2__group', 'border-radius', ['--r-card']],
         [LIST, '.lv2__group', 'box-shadow', ['--shadow-surface']],
