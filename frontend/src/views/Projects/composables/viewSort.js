@@ -65,7 +65,7 @@ function valueReader(key, { priorities = [], statuses = [], fields = [], userNam
     const fieldId = customFieldIdOf(key);
     if (fieldId) {
         const def = fields.find((field) => String(field?._id) === fieldId);
-        return (task) => (def ? customSortValue(def, task) : null);
+        return (task) => (def ? customSortValue(def, task, { userName }) : null);
     }
     if (key === 'due') return (task) => timeOf(task.DueDate);
     if (key === 'assignee') return (task) => (firstAssignee(task) ? userName(firstAssignee(task)) || null : null);

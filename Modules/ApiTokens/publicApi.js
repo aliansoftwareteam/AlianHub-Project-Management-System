@@ -51,8 +51,8 @@ const tokenAuth = async (req, res, next) => {
 
 const tokenUid = (req) => String((req.apiToken && req.apiToken.userId) || '');
 
-/* Empty for an owner or admin, who read company-wide; otherwise the projects and sprints
- * the token owner may open, as a filter to spread into a task read. */
+/* What the token owner may open, as a filter to spread into a task read: for an owner or admin
+ * it names no ProjectID, for everyone else it lists their projects and leaves out hidden sprints. */
 const taskVisibility = async (req) => {
     const stage = await visibilityStage(req.apiCompanyId, tokenUid(req));
     return stage ? stage.$match : {};
