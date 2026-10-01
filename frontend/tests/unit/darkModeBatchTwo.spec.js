@@ -66,6 +66,8 @@ const hardCodedColours = (source) => {
     });
     return found;
 };
+/* At phone widths the base .form-control sets a fixed grey with !important. */
+const PHONE_PROOF_INK = /color:\s*var\(--ink\) !important/;
 const LEGACY_COLOUR_CLASS = /(?<![\w-])(?:bg-white|bg-light-gray|black|gray81|dark-gray|GunPowder)(?![\w-])/;
 const classValues = (source) => [...source.matchAll(/(?<![\w-]):?class="([^"]*)"/g)].map((match) => match[1]);
 const legacyClasses = (rel) => classValues(template(rel)).filter((value) => LEGACY_COLOUR_CLASS.test(value));
@@ -145,6 +147,11 @@ describe('the project details page paints from tokens', () => {
         expect(read('views/Projects/ProjectDetail/ProjectDetail.vue')).toMatch(/<style src="\.\/theme\.css"><\/style>/);
     });
 
+    test('a text field on the page keeps theme ink at phone width', () => {
+        expect(ruleBody(read('views/Projects/ProjectDetail/theme.css'), '.project__detail-component .form-control')).toMatch(PHONE_PROOF_INK);
+        expect(ruleBody(read('components/organisms/ProjectDetailRightSide/style.css'), '.projectRightside .form-control')).toMatch(PHONE_PROOF_INK);
+    });
+
     test('custom field rows in the details column take label and value colours from tokens', () => {
         expect(hardCodedColours(read('plugins/customFieldView/component/atom/customFieldTaskView/customFieldListing/style.css'))).toEqual([]);
     });
@@ -201,7 +208,7 @@ describe('the custom field drawer', () => {
     });
     const SidebarStub = {
         name: 'SidebarStub',
-        props: ['visible', 'title', 'themed'],
+        props: ['visible', 'title', 'themed', 'closeOnBackDrop'],
         template: '<section v-if="visible" role="dialog" :aria-label="title"><header><slot name="head-left" /><slot name="head-right" /></header><slot name="body" /></section>'
     };
     const stubs = { Sidebar: SidebarStub, CustomFieldInputComponent: true, DropDown: true, TaskTypeIcon: true, ShellIcon: true };
@@ -239,6 +246,14 @@ describe('the custom field drawer', () => {
         expect(close.attributes('type')).toBe('button');
         expect(wrapper.find('header img').exists()).toBe(false);
         await close.trigger('click');
+        expect(wrapper.emitted('handleClose')).toHaveLength(1);
+    });
+
+    test('Escape closes it, a click outside the form does not', async () => {
+        const wrapper = await drawer();
+        const sidebar = wrapper.getComponent(SidebarStub);
+        expect(sidebar.props('closeOnBackDrop')).toBe(false);
+        sidebar.vm.$emit('update:visible', false);
         expect(wrapper.emitted('handleClose')).toHaveLength(1);
     });
 
@@ -331,7 +346,7 @@ describe('the legacy pickers follow the theme', () => {
         expect(hardCodedColours(css.slice(css.indexOf('.sb-tokens')))).toEqual([]);
         expect(ruleBody(css, '.sb-tokens')).toMatch(/background:\s*var\(--surface\)/);
         expect(ruleBody(css, '.sb-tokens')).toMatch(/color:\s*var\(--ink\)/);
-        expect(css).toMatch(/\.sb-tokens \.form-control[^{]*\{[^}]*color:\s*var\(--ink\)/);
+        expect(ruleBody(css, '.sb-tokens .form-control')).toMatch(PHONE_PROOF_INK);
         const rows = read('components/molecules/SidebarItems/style.css');
         expect(ruleBody(rows, '.sb-item')).toMatch(/color:\s*var\(--ink\)/);
         expect(ruleBody(rows, '.sb-item.is-selected')).toMatch(/background:\s*var\(--brand-tint\)/);

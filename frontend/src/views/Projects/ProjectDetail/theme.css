@@ -4,6 +4,7 @@
 .project__detail-component :is(.black, .dark-gray, .GunPowder) { color: var(--ink); }
 .project__detail-component :is(.gray, .gray81) { color: var(--ink-2); }
 .project__detail-component .blue { color: var(--brand) !important; }
+.project__detail-component .bg-colorlightgray { background-color: var(--fill); }
 
 .project__detail-component .checklist-main { border-bottom-color: var(--hairline); }
 .project__detail-component .sticky_item-wrapper { background-color: var(--canvas); }
@@ -17,19 +18,18 @@
 .project__detail-component .checklist-main input[type=checkbox] { border-color: var(--border); }
 .project__detail-component .checklist-main input[type=checkbox]:checked { background-color: var(--brand); border-color: var(--brand); }
 .project__detail-component .checklist-main input[type=checkbox]:before { border-color: var(--on-brand); }
-.project__detail-component .checklist-main :is(.input-edit-checklist, .input-section textarea) {
-    background: transparent;
-    color: var(--ink);
-    border-bottom-color: var(--border);
-}
-.project__detail-component .checklist-main :is(.input-edit-checklist, .input-section textarea)::placeholder { color: var(--ink-2) !important; }
 
-.project__detail-component .milestone__fixhourly-wrapper .form-control {
+/* !important: at phone widths the base .form-control forces its fixed greys with it. */
+.project__detail-component .form-control {
     border-color: var(--border);
     background: var(--surface);
-    color: var(--ink);
+    color: var(--ink) !important;
 }
-.project__detail-component .milestone__fixhourly-wrapper .form-control::placeholder { color: var(--ink-2); }
+.project__detail-component .form-control::placeholder { color: var(--ink-2) !important; }
+.project__detail-component .checklist-main :is(.input-edit-checklist, .input-section textarea) {
+    background: transparent;
+    border-bottom-color: var(--border);
+}
 
 @media (max-width: 767px) {
     .project__detail-component .sticky_item-wrapper { background-color: var(--surface); }

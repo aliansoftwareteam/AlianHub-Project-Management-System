@@ -7,6 +7,7 @@
         :zIndex="8"
         :className="'customFieldSidebar'"
         :title="title"
+        :closeOnBackDrop="false"
         @update:visible="handleClose()"
     >
         <template #head-left>

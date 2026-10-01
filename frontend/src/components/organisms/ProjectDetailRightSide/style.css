@@ -69,6 +69,9 @@
     font-size: 13px !important;
 }
 .projectRightside input::placeholder { color: var(--ink-2); }
+/* !important: at phone widths the base .form-control forces its fixed greys with it. */
+.projectRightside .form-control { background: var(--surface); border-color: var(--border); color: var(--ink) !important; }
+.projectRightside .form-control::placeholder { color: var(--ink-2) !important; }
 .hover__on-projectrightside .dp__theme_light {
     line-height: 16px !important;
 }
