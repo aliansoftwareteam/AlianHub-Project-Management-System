@@ -72,6 +72,8 @@ const plainIdOf = (value) => {
 };
 
 const STATUS_FIELDS = ['status', 'statusKey', 'statusType'];
+const PLACED_NAME_LIMIT = 255;
+const PLACED_ID_LIMIT = 64;
 
 const valueAt = (body, path) => path.reduce((node, key) => (isPlainObject(node) ? node[key] : undefined), body);
 
@@ -335,6 +337,55 @@ const checkObject = (path, value) => {
     if (!isPlainObject(value)) refuse(400, `${nameOf(path)} must be an object.`);
 };
 
+const isNone = (value) => value === undefined || value === null || value === '';
+
+/* None (null or '') is how a client says a list sits at the project root; it is kept as sent. */
+const placedId = (path, value) => {
+    if (!isNone(value) && (typeof value !== 'string' || value.length > PLACED_ID_LIMIT)) refuse(400, `${nameOf(path)} must be an id.`);
+    return value;
+};
+
+/* The name is the one the client shows and is cut, not refused: it is only repeated on the task and in its history. */
+const placedName = (path, value) => {
+    if (value === undefined || value === null) return undefined;
+    if (typeof value !== 'string') refuse(400, `${nameOf(path)} must be text.`);
+    return value.slice(0, PLACED_NAME_LIMIT);
+};
+
+const definedOnly = (fields) => Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
+
+/* A picker hands over the stored list with its people, counters and flags, and the handlers store what they are
+ * given as the task's sprintArray; they read these four. A stored list names itself by _id. */
+const placedList = (path, value, dropped) => {
+    if (!isPlainObject(value)) refuse(400, `${nameOf(path)} must be an object.`);
+    const folderId = placedId([...path, 'folderId'], value.folderId);
+    const placed = definedOnly({
+        id: placedId([...path, 'id'], value.id === undefined ? value._id : value.id),
+        name: placedName([...path, 'name'], value.name),
+        folderId,
+        folderName: isNone(folderId) ? undefined : placedName([...path, 'folderName'], value.folderName),
+    });
+    dropped.push(...Object.keys(value).filter((key) => !Object.hasOwn(placed, key)).map((key) => `${nameOf(path)}.${key}`));
+    return placed;
+};
+
+const placedFolder = (path, value, dropped) => {
+    if (!isPlainObject(value)) refuse(400, `${nameOf(path)} must be an object.`);
+    const folderId = placedId([...path, 'folderId'], value.folderId);
+    if (isNone(folderId)) return null;
+    dropped.push(...Object.keys(value).filter((key) => !['folderId', 'name'].includes(key)).map((key) => `${nameOf(path)}.${key}`));
+    return definedOnly({ folderId, name: placedName([...path, 'name'], value.name) });
+};
+
+/* Where an action that places a task takes the list from, and where a conversion to a list takes its folder. */
+const LIST_PATHS = [['sprintObj'], ['sprint'], ['data', 'sprintArray']];
+const FOLDER_PATHS = [['folderData']];
+
+const cutTo = (payload, paths, cut, dropped) => paths.forEach((path) => {
+    const value = valueAt(payload, path);
+    if (value !== undefined && value !== null) setAt(payload, path, cut(path, value, dropped));
+});
+
 /* Each id is written back as the plain id it names, so a handler never sees an object where it filters by id. */
 const resolveIds = (payload, path) => {
     const star = path.indexOf('*');
@@ -397,6 +448,10 @@ const prepareTaskWrite = (req, taskSpec, label) => {
     taskSpec.scalars.forEach((path) => checkScalar(path, valueAt(payload, path)));
     taskSpec.numbers.forEach((path) => checkNumber(path, valueAt(payload, path)));
     taskSpec.ids.forEach((path) => resolveIds(payload, path));
+    if (taskSpec.owns.includes('sprintArray')) {
+        cutTo(payload, LIST_PATHS, placedList, dropped);
+        cutTo(payload, FOLDER_PATHS, placedFolder, dropped);
+    }
     /* updateStartDate reads the flag loosely; only a literal false may skip the write, because only that is checked against the stored task. */
     if (taskSpec.params.includes('isUpdateTask')) payload.isUpdateTask = payload.isUpdateTask !== false;
 
