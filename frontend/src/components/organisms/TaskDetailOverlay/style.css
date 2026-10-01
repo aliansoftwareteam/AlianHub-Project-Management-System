@@ -313,7 +313,7 @@
     padding: var(--card-pad-x, 16px); display: flex; flex-direction: column; gap: var(--gap-row, 12px);
     background: var(--surface-2); overflow-y: auto; min-height: 0; font-size: var(--fs-md, 12.5px);
 }
-.ah-detail__prop { display: flex; align-items: center; min-height: 24px; gap: 6px; }
+.ah-detail__prop { display: flex; align-items: center; flex-shrink: 0; min-height: 24px; gap: 6px; }
 .ah-detail__prop-label { width: 82px; flex: none; color: var(--ink-2); }
 .ah-detail__prop-link { border: 0; background: transparent; padding: 0; font: inherit; color: var(--ink); cursor: pointer; text-align: left; }
 .ah-detail__prop-link:hover { color: var(--brand); }
