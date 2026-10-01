@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const registry = require('./registry');
+const projectPolicy = require('./projectPolicy');
 const audit = require('./agentAudit');
 const { resolveActor, isAgent, attribution } = require('./actor');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
@@ -106,6 +107,9 @@ const evaluateOnRoute = (action, params) => {
     if (check.allowed && !registry.ACTIONS.includes(check.action)) return { allowed: false, reason: `Agents cannot perform ${action} on this route` };
     return check;
 };
+
+/* A route cannot file a proposal, so what a project holds for a person is refused here and named as the MCP tool's to file. */
+const heldOnRoute = (rule) => (rule.decision === projectPolicy.DECISION.PROPOSE ? `${rule.reason}, and a route cannot propose one: the agent's MCP tool files it for approval` : rule.reason);
 
 const plain = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
 const named = (value) => [].concat(value === undefined || value === null ? [] : value).map((entry) => idText(entry) || String(entry || '')).filter(Boolean);
@@ -215,6 +219,10 @@ const routeGuard = (checksOf) => withActor(async (req, res, next, actor) => {
         writes = writes || Boolean(check.action.write);
     }
     if (!writes) return next();
+    for (const { action, params } of checks) {
+        const rule = await projectPolicy.ask({ companyId, actor, action, params });
+        if (rule.decision !== projectPolicy.DECISION.ACT) return refuse(req, res, actor, { action, reason: heldOnRoute(rule), params, entityId: params.taskId });
+    }
     const [{ action, params }] = checks;
     let auditId;
     try {

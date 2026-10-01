@@ -8,6 +8,7 @@ const registry = require('./registry');
 const groups = require('./registryGroups');
 const { SCOPE, read, write } = require('./registryKit');
 const permissions = require('./permissions');
+const projectPolicy = require('./projectPolicy');
 const audit = require('./agentAudit');
 const { attribution, isAgent } = require('./actor');
 const { shownAs } = require('./actingAgent');
@@ -490,8 +491,9 @@ const liveStep = async (companyId, actor, { action, params, ip, taint }) => {
 
 /* Run one action for an actor. Refusals are audited and thrown as RefusedError.
  * A policy `decision` of refuse is honoured before the registry check, so a
- * policy refusal leaves the same audit row as a registry one. */
-const perform = async ({ companyId, actor, action, params = {}, reason = '', cost = null, ip = '', allowedActions, decision = null, depth = 0, taint = null }) => {
+ * policy refusal leaves the same audit row as a registry one. `approved` is an
+ * argument and never read from `params`, so only the approval of a proposal sets it. */
+const perform = async ({ companyId, actor, action, params = {}, reason = '', cost = null, ip = '', allowedActions, decision = null, depth = 0, taint = null, approved = false }) => {
     await liveStep(companyId, actor, { action, params, ip, taint });
     if (decision && decision.decision === 'refuse') throw await refusal(companyId, actor, { action, params, reason: decision.reason, ip, taint });
     const check = registry.evaluate(action, params, { allowedActions });
@@ -501,6 +503,11 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
     if (!(await threadMay(companyId, actor, action, params))) throw await refusal(companyId, actor, { action, params, reason: THREAD_REFUSAL, ip, taint });
     const closed = await targetRefusal(companyId, actor, action, params) || await draftRefusal(companyId, actor, action, params);
     if (closed) throw await refusal(companyId, actor, { action, params, reason: closed, ip, taint });
+    const rule = await projectPolicy.ask({ companyId, actor, action, params, approved });
+    if (rule.decision !== projectPolicy.DECISION.ACT) {
+        const held = rule.decision === projectPolicy.DECISION.PROPOSE ? `${rule.reason}, so it waits for a person's approval` : rule.reason;
+        throw await refusal(companyId, actor, { action, params, reason: held, ip, taint });
+    }
     if (!check.action.write) return { result: null, auditId: null, undo: null };
     const exec = executors[action];
     if (!exec) throw new tools.DeterministicError(`${action} has no executor`);

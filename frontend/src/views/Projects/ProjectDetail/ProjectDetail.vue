@@ -27,6 +27,10 @@
                 v-if="checkPermission('project.project_details',projectData.isGlobalPermission) === true && projectData?._id && !projectData.isPersonal"
                 :projectId="String(projectData._id)"
             />
+            <ProjectAgentPolicyCard
+                v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
+                :projectId="String(projectData._id)"
+            />
             <AssignmentRulesCard
                 v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
                 :projectId="String(projectData._id)"
@@ -98,6 +102,7 @@
     import Description  from '@/components/atom/Description/Description.vue';
     import ProjectMemoryCard from './ProjectMemoryCard.vue';
     import ProjectDefaultTemplateCard from './ProjectDefaultTemplateCard.vue';
+    import ProjectAgentPolicyCard from './ProjectAgentPolicyCard.vue';
     import AssignmentRulesCard from './AssignmentRulesCard.vue';
     import Attachments from '@/components/atom/Attachments/Attachments.vue';
     import FixMilestone from '@/components/organisms/FixMilestone/FixMilestone.vue';

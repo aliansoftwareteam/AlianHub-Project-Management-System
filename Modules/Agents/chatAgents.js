@@ -19,6 +19,7 @@ const lazy = {
     get aiMention() { return require('../AI/aiMention'); },
     get runs() { return require('./runs'); },
     get policy() { return require('./policy'); },
+    get projectPolicy() { return require('./projectPolicy'); },
     get scope() { return require('./scope'); },
 };
 const KIND = 'chat';
@@ -201,9 +202,13 @@ const settleChanges = async (companyId, { agent, run, askerId, changes }) => {
         // eslint-disable-next-line no-await-in-loop
         const target = await projectOfChange(companyId, rated);
         if (!target.projectId) continue;
-        if (Number(agent.autonomy) < lazy.policy.REVIEW_LEVEL) { toPropose.push({ ...rated, projectId: target.projectId }); continue; }
-        const verdict = lazy.policy.decide({ agent, action: rated.action, params: rated.params, rating: rated.rating, run, task: target.task ? { ...target.task, ProjectID: target.projectId } : null });
-        decisions.push({ action: rated.action, decision: verdict.decision, reason: verdict.reason, rating: verdict.rating, at: new Date() });
+        const reviewing = Number(agent.autonomy) >= lazy.policy.REVIEW_LEVEL;
+        const decided = reviewing
+            ? lazy.policy.decide({ agent, action: rated.action, params: rated.params, rating: rated.rating, run, task: target.task ? { ...target.task, ProjectID: target.projectId } : null })
+            : { decision: lazy.policy.DECISION.PROPOSE, reason: '', rating: rated.rating };
+        // eslint-disable-next-line no-await-in-loop
+        const verdict = await lazy.projectPolicy.review({ companyId, actor, action: rated.action, params: rated.params, verdict: decided });
+        if (reviewing || verdict !== decided) decisions.push({ action: rated.action, decision: verdict.decision, reason: verdict.reason, rating: verdict.rating, at: new Date() });
         if (verdict.decision === lazy.policy.DECISION.PROPOSE) { toPropose.push({ ...rated, projectId: target.projectId }); continue; }
         try {
             // eslint-disable-next-line no-await-in-loop

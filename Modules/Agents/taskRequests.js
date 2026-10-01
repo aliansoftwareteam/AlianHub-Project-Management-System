@@ -305,9 +305,6 @@ const setStatus = async ({ companyId, who, taskId, name, agent = null }) => {
     const patch = await tools.resolveStatus(companyId, task.ProjectID, name);
     const from = { name: (task.status && task.status.text) || '', statusType: task.statusType || '' };
     if (patch.statusKey === task.statusKey) return { task, from, patch, changed: false };
-    if (agent && require('./registry').DONE_STATUS_TYPES.includes(String(patch.statusType)) && (await require('./accounts').getPolicy(companyId)).requireCheckBeforeDone) {
-        throw refuse('this workspace has a person check an agent\'s work before it is closed, so a person closes this task');
-    }
     const rows = flatStatuses(await storedProject(companyId, task.ProjectID));
     const current = rows.find((row) => row.key === task.statusKey) || {};
     const next = rows.find((row) => row.key === patch.statusKey) || {};
