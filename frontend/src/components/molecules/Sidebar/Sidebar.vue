@@ -113,7 +113,8 @@
 
 <script setup>
 // PACKAGES
-import { computed, defineComponent, defineProps, defineEmits, ref, watch, nextTick, onMounted, onUnmounted } from "vue";
+import { computed, defineComponent, defineProps, defineEmits, inject, ref, watch, nextTick, onMounted, onUnmounted } from "vue";
+import { routeLocationKey } from "vue-router";
 
 // COMPONENTS
 import SidebarItems from "../SidebarItems/SidebarItems.vue";
@@ -257,6 +258,12 @@ const sidebar_search = ref(null);
 // eslint-disable-next-line
 const visible = ref(false);
 useEscapeLayer(() => props.visible, () => emit('update:visible', false));
+
+// Injected, not useRoute(), so a sheet mounted without a router still renders.
+const route = inject(routeLocationKey, null);
+watch([() => route?.path, () => route?.query?.task], () => {
+    if (props.visible) emit('update:visible', false);
+});
 // FILTER OPTIONS
 const filteredOptions = ref();
 

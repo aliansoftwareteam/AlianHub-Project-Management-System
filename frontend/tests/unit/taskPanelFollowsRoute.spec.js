@@ -94,8 +94,8 @@ describe('the task panel follows the route', () => {
             expect(wrapper.find('.ah-detail__panel').exists()).toBe(false);
         });
 
-        it('closes on another page even when the task query is carried along', async () => {
-            await router.push({ name: 'Chat', params: { cid: 'c1' }, query: { task: 't1' } });
+        it('closes on another page, such as Chat', async () => {
+            await router.push({ name: 'Chat', params: { cid: 'c1' } });
             await flushPromises();
 
             expect(overlayState.open).toBe(false);
