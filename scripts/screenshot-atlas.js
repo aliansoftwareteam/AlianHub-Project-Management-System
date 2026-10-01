@@ -11,6 +11,7 @@ const { galleryHtml } = require('./atlas/gallery');
 const { newBudget, noteBudget, roomToLoad } = require('./atlas/pace');
 const { coreScreens, inCore } = require('./atlas/core');
 const { SHELL, SHELL_TIMEOUT_MS, routeOf, settle, runStep } = require('./atlas/browser');
+const { measureLayout, summaryOf } = require('./atlas/layout');
 
 const ROOT = path.resolve(__dirname, '..');
 const NAVIGATION_TIMEOUT_MS = 45000;
@@ -124,9 +125,10 @@ async function capture(context, { baseUrl, screen, route, file, budget }) {
         if (limited) throw new RateLimited();
         if (screen.auth !== false && landed.startsWith('/login')) throw new SessionRefused();
         await page.screenshot({ path: file, animations: 'disabled', caret: 'hide' });
+        const layout = await measureLayout(page);
         const wanted = route.split('?')[0].replace(/\/$/, '') || '/';
         const notes = [landed === wanted ? null : `landed on ${landed}`, note].filter(Boolean);
-        return notes.length ? { note: notes.join('; ') } : {};
+        return { ...(notes.length ? { note: notes.join('; ') } : {}), layout };
     } finally {
         await page.close();
     }
@@ -174,19 +176,19 @@ function mergeWithEarlierRun(outDir, shots, failures) {
 const versionsSeen = (earlier, ...current) => [...new Set([...(earlier ? earlier.split(', ') : []), ...current].filter(Boolean))].join(', ') || null;
 
 /* The folder is the record: every shot on disk is listed, so a run that was cut short
- * still gets a gallery from the next one. atlas.json only adds the notes. */
+ * still gets a gallery from the next one. atlas.json only adds the notes and the layout findings. */
 function writeIndex(outDir, { meta, shots, failures }) {
-    const notes = new Map(shots.filter((shot) => shot.note).map((shot) => [shot.file, shot.note]));
+    const measured = new Map(shots.map((shot) => [shot.file, { ...(shot.note ? { note: shot.note } : {}), ...(shot.layout ? { layout: shot.layout } : {}) }]));
     const order = SCREENS.map((screen) => screen.name);
     const listed = fs.readdirSync(outDir).filter(parseFileName)
-        .map((file) => ({ ...parseFileName(file), file, ...(notes.has(file) ? { note: notes.get(file) } : {}) }))
+        .map((file) => ({ ...parseFileName(file), file, ...measured.get(file) }))
         .sort((a, b) => order.indexOf(a.screen) - order.indexOf(b.screen) || a.size.localeCompare(b.size) || a.theme.localeCompare(b.theme));
     const onDisk = new Set(listed.map(keyOf));
     const stillFailing = failures.filter((failure) => !onDisk.has(keyOf(failure)));
     fs.writeFileSync(path.join(outDir, 'atlas.json'), `${JSON.stringify({ ...meta, shots: listed, failures: stillFailing }, null, 2)}\n`);
     fs.writeFileSync(path.join(outDir, 'index.html'), galleryHtml({
         title: `Screenshot atlas${meta.variant ? ` (variant ${meta.variant})` : ''}`,
-        shots: listed,
+        shots: listed.map((shot) => ({ ...shot, findings: summaryOf(shot.layout) })),
         failures: stillFailing,
         meta: [meta.version && `build ${meta.version}`, meta.baseUrl, meta.createdAt],
     }));
@@ -234,7 +236,8 @@ async function main() {
                     try {
                         const result = await captureWithRetry(screen.auth === false ? signedOut : signedIn, { baseUrl: args.baseUrl, screen, route, file: path.join(outDir, file), budget });
                         shots.push({ ...entry, file, ...result });
-                        process.stdout.write(`ok    ${file}${result.note ? `  (${result.note})` : ''}\n`);
+                        const findings = summaryOf(result.layout);
+                        process.stdout.write(`ok    ${file}${result.note ? `  (${result.note})` : ''}${findings ? `  [${findings}]` : ''}\n`);
                     } catch (error) {
                         if (error instanceof SessionRefused && !shots.some((shot) => SCREENS.find((known) => known.name === shot.screen).auth !== false)) throw error;
                         failures.push({ ...entry, reason: firstLine(error) });
