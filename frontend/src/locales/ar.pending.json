@@ -5164,6 +5164,7 @@
     "Instance.feature_task_category": "Task category",
     "Instance.feature_task_estimate": "Task estimate",
     "Instance.feature_task_summary": "Task summary",
+    "Instance.feature_transcription": "Talk to Text",
     "Instance.feature_unknown": "Untagged",
     "Instance.feature_workload_summary": "Workload summary",
     "Instance.feature_writing_assist": "Improve and split text",

@@ -11706,6 +11706,7 @@ export default {
         feature_automation_draft: "Automation drafts",
         feature_ai_field: "AI fields",
         feature_agent_builder: "Agent builder",
+        feature_transcription: "Talk to Text",
         feature_unknown: "Untagged",
         agent_provider: "Model provider",
         agent_provider_none: "No provider configured",

@@ -1270,6 +1270,11 @@ const schema = {
         costUsd: { type: Number, required: false },
         priced: { type: Boolean, default: false, required: false },
         billedToWorkspace: { type: Boolean, default: true, required: false },
+        // Set on a call priced by something other than tokens: unit 'audio_minute', quantity in that unit,
+        // estimated when the quantity came from the upload's size rather than its length
+        unit: { type: String, required: false },
+        quantity: { type: Number, required: false },
+        estimated: { type: Boolean, required: false },
         runId: { type: String, required: false },
         userId: { type: String, required: false },
         at: { type: Date, required: true },
