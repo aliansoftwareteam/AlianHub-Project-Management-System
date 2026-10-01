@@ -31,16 +31,11 @@ const reasonOf = (refusal) => refusal?.error?.response?.data?.statusText || refu
    `failure` is the message shown then, unless the server gave its reason; without it the caller speaks. */
 export function instantEdit({ task, fields, send, failure = "" }) {
     let edit;
+    let sending;
     try {
         const stored = storedRow(task) || task;
         edit = holdOwnEdit(task._id, fields, Object.fromEntries(Object.keys(fields).map((field) => [field, stored[field]])));
         show(task, fields);
-    } catch (error) {
-        edit?.confirm();
-        return Promise.reject({ status: false, error });
-    }
-    let sending;
-    try {
         sending = send();
     } catch (error) {
         sending = Promise.reject({ status: false, error });
@@ -49,7 +44,7 @@ export function instantEdit({ task, fields, send, failure = "" }) {
         edit.confirm();
         return answer;
     }, (refusal) => {
-        const restore = edit.refuse();
+        const restore = edit ? edit.refuse() : {};
         if (Object.keys(restore).length) show({ ...task, ...fields }, restore);
         const serverReason = reasonOf(refusal);
         if (failure) useToast().error(serverReason || i18n.global.t(failure), { position: "top-right" });

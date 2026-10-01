@@ -132,7 +132,7 @@ describe('undo in the task panel', () => {
         await flushPromises();
         const undo = lastCall(ops.updatePriority);
         expect(undo.firebaseObj).toEqual({ Task_Priority: 'LOW' });
-        expect(undo.priorityObj).toMatchObject({ priorityName: 'High', newPriorityName: 'Low' });
+        expect(await undo.priorityObj).toMatchObject({ priorityName: 'High', newPriorityName: 'Low' });
     });
 
     it('undoes a first due date by clearing it', async () => {

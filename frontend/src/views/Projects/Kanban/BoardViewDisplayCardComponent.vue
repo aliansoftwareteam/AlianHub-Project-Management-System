@@ -430,7 +430,7 @@
     })
     function updatePriority(val = null) {
         if(!val) return;
-        updateTaskByGroup(element.value, val, 2);
+        updateTaskByGroup(element.value, val, 2).catch((error) => console.error("ERROR in updatePriority: ", error));
     }
     function getUserData() {
         const user = getUser(userId.value);
@@ -472,14 +472,12 @@
             taskData: props.data,
             employeeName: getUser(value.id).Employee_Name,
             type: operation,
-            userData
+            userData,
+            announce: true
         })
         .then(() => {
             if(operation === "assigneRemove"){
-                let taskData = props.data;
-                let index = taskData.AssigneeUserId.findIndex((x) => x === value.id);
-                taskData.AssigneeUserId.splice(index,1);
-                commit("projectData/mutateSearchTask", {op:"modified", data: [taskData]});
+                commit("projectData/mutateSearchTask", {op:"modified", data: [{...props.data, AssigneeUserId: (props.data.AssigneeUserId || []).filter((x) => x !== value.id)}]});
             }
             $toast.success(t(`Toast.Assignee ${type === "add" || type === "replace" ? 'added' : 'removed'} successfully`), {position: "top-right"})
         })
@@ -526,8 +524,7 @@
     const updateDueDate = (event) => {
         try {
             if(!event?.dateVal) return;
-            element.value.DueDate = event?.dateVal;
-            updateTaskByGroup(props.data, {seconds: new Date(event.dateVal).getTime()/1000}, 3);
+            updateTaskByGroup(props.data, {seconds: new Date(event.dateVal).getTime()/1000}, 3).catch((error) => console.error("ERROR in updateDueDate: ", error));
         } catch (error) {
             console.error("ERROR in updateDueDate: ", error);
         }

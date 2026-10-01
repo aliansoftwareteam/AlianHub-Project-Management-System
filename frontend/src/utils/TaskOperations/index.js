@@ -191,20 +191,23 @@ class Task {
 
     /* -------------- UPDATE PRIORITY FUNCTION FOR TASK -----------------*/
 
+    /* `priorityObj` may be a promise: the icon links it carries are for the history entry, and the row does not wait for them. */
     updatePriority({ firebaseObj ,projectData ,taskData ,priorityObj, userData,isUpdateTask = true, announce = false}) {
         return instantEdit({
             task: taskData,
             fields: firebaseObj,
             failure: announce ? "Toast.Priority_not_updated" : "",
-            send: () => patchTask({
+            send: () => Promise.resolve(priorityObj).then((history) => patchTask({
                 action: "updatePriority",
                 firebaseObj,
                 projectData,
                 taskData,
-                priorityObj,
+                priorityObj: history,
                 isUpdateTask,
                 userData: actorOf(userData)
-            }, "Task priority updated successfully")
+            }, "Task priority updated successfully"), (error) => {
+                throw {status: false, error};
+            })
         });
     }
 

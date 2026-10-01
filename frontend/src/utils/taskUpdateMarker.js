@@ -10,6 +10,8 @@ export const isOwnTabUpdate = (marker) => marker?.user === TAB_ID;
    The tab keeps what it has sent and not yet had answered instead: an event that left the
    server before the answer must not put an older value back. */
 const editsInFlight = new Map();
+/* A request that is cancelled never answers; its edit must not hold the task for good. */
+const HOLD_MS = 30000;
 
 const dropEdit = (id, edit) => {
     const left = (editsInFlight.get(id) || []).filter((other) => other !== edit);
@@ -19,7 +21,7 @@ const dropEdit = (id, edit) => {
 
 export function holdOwnEdit(taskId, fields, before) {
     const id = String(taskId);
-    const edit = { fields, before: { ...before } };
+    const edit = { fields, before: { ...before }, at: Date.now() };
     editsInFlight.set(id, [...(editsInFlight.get(id) || []), edit]);
     return {
         confirm: () => dropEdit(id, edit),
@@ -40,4 +42,6 @@ export function holdOwnEdit(taskId, fields, before) {
     };
 }
 
-export const ownEditsInFlight = (taskId) => Object.assign({}, ...(editsInFlight.get(String(taskId)) || []).map((edit) => edit.fields));
+export const ownEditsInFlight = (taskId) => Object.assign({}, ...(editsInFlight.get(String(taskId)) || [])
+    .filter((edit) => Date.now() - edit.at < HOLD_MS)
+    .map((edit) => edit.fields));

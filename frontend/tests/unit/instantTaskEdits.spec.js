@@ -1,14 +1,24 @@
 /* Task 046 — status, priority, assignee, due date and title change on screen before the server
    answers, return to what they were when it refuses, and are not moved again by their own echo. */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises } from '@vue/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
+import { defineComponent, ref } from 'vue';
 
 const h = vi.hoisted(() => ({
     apiRequest: vi.fn(),
     toast: { success: vi.fn(), error: vi.fn() }
 }));
 
-vi.mock('@/composable/index.js', () => ({ useCustomComposable: () => ({ checkPermission: () => true }) }));
+vi.mock('@/composable/index.js', () => ({
+    useCustomComposable: () => ({ checkPermission: () => true, getWasabiImageLink: () => Promise.resolve(''), sanitizeInput: (value) => value }),
+    useGetterFunctions: () => ({
+        getUser: (id) => ({ id, Employee_Name: `User ${id}`, companyOwnerId: 'u1' }),
+        getTaskStatus: () => ({ name: 'Open', bgColor: '', textColor: '' }),
+        getPriority: () => ({ value: 'LOW', image: '' }),
+        getTaskType: () => ({})
+    }),
+    useMoment: () => ({ changeDateFormate: () => '' })
+}));
 vi.mock('@/services', () => ({ apiRequest: h.apiRequest }));
 vi.mock('@/locales/main', () => ({ i18n: { global: { t: (key) => key } } }));
 vi.mock('vue-toast-notification', () => ({ useToast: () => h.toast }));
@@ -18,7 +28,21 @@ vi.mock('@/store/index', async () => {
     const { mutateUpdateFirebaseTasks } = await import('@/store/ProjectData/mutations');
     return {
         default: createStore({
-            modules: { projectData: { namespaced: true, state: () => ({ tasks: {} }), mutations: { mutateUpdateFirebaseTasks } } }
+            getters: { 'settings/companyOwnerDetail': () => ({ userId: 'u1' }), 'settings/companyPriority': () => [] },
+            modules: {
+                projectData: {
+                    namespaced: true,
+                    state: () => ({ tasks: {}, tableTasks: {}, searchedTasks: [] }),
+                    getters: { tableTasks: (state) => state.tableTasks, searchedTasks: (state) => state.searchedTasks },
+                    mutations: {
+                        mutateUpdateFirebaseTasks,
+                        mutateTypesenseTableTasks: (state, { pid, sprintId, data }) => {
+                            const rows = state.tableTasks[pid][sprintId].tasks;
+                            rows.splice(rows.findIndex((task) => task._id === data._id), 1, data);
+                        }
+                    }
+                }
+            }
         })
     };
 });
@@ -26,6 +50,8 @@ vi.mock('@/store/index', async () => {
 import Store from '@/store/index';
 import taskClass from '@/utils/TaskOperations';
 import { onInstantEdit } from '@/utils/instantTaskEdit';
+import { useListInlineEdit } from '@/views/Projects/ListView/useListInlineEdit';
+import { useUpdateTasks } from '@/views/Projects/helper';
 
 const PID = 'p1';
 const SPRINT = 's1';
@@ -106,6 +132,7 @@ describe.each(EDITS)('an edit of the $name', ({ write, shown, before, after, sta
     it('changes the row before the server answers', async () => {
         const done = write();
         expect(shown()).toEqual(after);
+        await flushPromises();
         expect(pending).toHaveLength(1);
         answer();
         await expect(done).resolves.toMatchObject({ status: true });
@@ -114,6 +141,7 @@ describe.each(EDITS)('an edit of the $name', ({ write, shown, before, after, sta
 
     it('puts the old value back and says so when the write fails', async () => {
         const done = write({ announce: true });
+        await flushPromises();
         refuse();
         await expect(done).rejects.toMatchObject({ status: false, announced: true });
         expect(shown()).toEqual(before);
@@ -123,6 +151,7 @@ describe.each(EDITS)('an edit of the $name', ({ write, shown, before, after, sta
 
     it('leaves the toast to a caller that shows its own', async () => {
         const done = write();
+        await flushPromises();
         refuse();
         await expect(done).rejects.toMatchObject({ status: false, announced: false });
         expect(shown()).toEqual(before);
@@ -133,6 +162,7 @@ describe.each(EDITS)('an edit of the $name', ({ write, shown, before, after, sta
         const done = write();
         echo(stale);
         expect(shown()).toEqual(after);
+        await flushPromises();
         answer();
         await done;
         expect(shown()).toEqual(after);
@@ -140,10 +170,26 @@ describe.each(EDITS)('an edit of the $name', ({ write, shown, before, after, sta
 
     it('follows the server again once the write is answered', async () => {
         const done = write();
+        await flushPromises();
         answer();
         await done;
         echo(stale);
         expect(shown()).toEqual(before);
+    });
+});
+
+describe('a write that is never answered', () => {
+    afterEach(() => vi.useRealTimers());
+
+    it('stops holding the row after half a minute', () => {
+        vi.useFakeTimers();
+        setStatus(DONE);
+        vi.advanceTimersByTime(29000);
+        echo(OPEN);
+        expect(row().statusKey).toBe(2);
+        vi.advanceTimersByTime(2000);
+        echo(OPEN);
+        expect(row().statusKey).toBe(1);
     });
 });
 
@@ -268,5 +314,69 @@ describe('a view that keeps its own copy of the task', () => {
         taskClass.updateTaskName({ firebaseObj: { TaskName: 'New title' }, projectData: PROJECT, taskData: { _id: 't9', TaskName: 'Old title', ProjectID: PID, sprintId: SPRINT }, obj: {}, userData: USER });
         expect(heard).toEqual([['t9', { TaskName: 'New title' }]]);
         stop();
+    });
+});
+
+const PROVIDE = { $userId: ref('u1'), $companyId: ref('c1'), $dateFormat: ref('DD/MM/YYYY'), searchedTask: ref(false) };
+const STATUSES = [{ key: 1, name: 'Open', type: 'default_active', value: 'open' }, { key: 2, name: 'Done', type: 'close', value: 'done' }];
+
+describe('a row of the List', () => {
+    let list;
+    const tableRow = () => Store.state.projectData.tableTasks[PID][SPRINT].tasks[0];
+
+    beforeEach(() => {
+        Store.state.projectData.tableTasks = { [PID]: { [SPRINT]: { tasks: [{ _id: 't1', statusKey: 1 }] } } };
+        const Host = defineComponent({ setup() { list = useListInlineEdit(ref({ ...PROJECT, taskStatusData: STATUSES })); return () => null; } });
+        mount(Host, { global: { plugins: [Store], provide: PROVIDE } });
+    });
+
+    it('returns to its status, in the List and in the Table copy, with one message that gives the server\'s reason', async () => {
+        const done = list.setStatus(sent(), STATUSES[1]);
+        expect(row().statusKey).toBe(2);
+        expect(tableRow().statusKey).toBe(2);
+        refuse(0, 'This status is not part of the project.');
+        await done;
+        expect(row().statusKey).toBe(1);
+        expect(tableRow().statusKey).toBe(1);
+        expect(h.toast.error).toHaveBeenCalledTimes(1);
+        expect(h.toast.error).toHaveBeenCalledWith('This status is not part of the project.', TOAST);
+        expect(h.toast.success).not.toHaveBeenCalled();
+    });
+
+    it('shows a new priority without waiting for the icon links of the history entry', () => {
+        list.setPriority(sent(), { value: 'HIGH' });
+        expect(row().Task_Priority).toBe('HIGH');
+        expect(pending).toHaveLength(0);
+    });
+
+    it('shows a person picked in place of another at once', () => {
+        list.setAssignee(sent(), { type: 'replace', uid: 'u2' });
+        expect(row().AssigneeUserId).toEqual(['u2']);
+    });
+});
+
+describe('a Board card, or a row dropped into another group', () => {
+    let updateTaskByGroup;
+
+    beforeEach(() => {
+        const Host = defineComponent({ setup() { ({ updateTaskByGroup } = useUpdateTasks(ref(PROJECT))); return () => null; } });
+        mount(Host, { global: { provide: PROVIDE } });
+    });
+
+    it.each([
+        ['status', 0, { key: 2, name: 'Done', type: 'close' }, () => row().statusKey, 1, 2, 'Toast.Status_not_updated'],
+        ['assignee', 1, { value: 'u2' }, () => row().AssigneeUserId, ['u1'], ['u2'], 'Toast.Assignee_not_updated'],
+        ['priority', 2, { value: 'HIGH', image: '' }, () => row().Task_Priority, 'LOW', 'HIGH', 'Toast.Priority_not_updated'],
+        ['due date', 3, { seconds: NEW_DUE.getTime() / 1000 }, () => new Date(row().DueDate).toISOString(), OLD_DUE, NEW_DUE.toISOString(), 'Toast.Due_date_not_updated']
+    ])('shows the new %s at once and puts the old one back, with one message, when the server refuses', async (name, groupType, to, shown, before, after, failure) => {
+        const done = updateTaskByGroup(sent(), to, groupType);
+        expect(shown()).toEqual(after);
+        await flushPromises();
+        refuse();
+        await expect(done).rejects.toMatchObject({ announced: true });
+        expect(shown()).toEqual(before);
+        expect(h.toast.error).toHaveBeenCalledTimes(1);
+        expect(h.toast.error).toHaveBeenCalledWith(failure, TOAST);
+        expect(h.toast.success).not.toHaveBeenCalled();
     });
 });
