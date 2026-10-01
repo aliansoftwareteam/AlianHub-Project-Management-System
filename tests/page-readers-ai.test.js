@@ -14,23 +14,17 @@ const { openSources } = require('../Modules/AI/askThreads');
 const { pinnedSources } = require('../Modules/AI/askContext');
 const { taskContext } = require('../Modules/AI/taskContext');
 
-const { C, PAGES, TASK } = world;
+const { C, PAGES, PROJECTS, TASK } = world;
 
-const IN_PROJECTS_ONLY = {
-    owner: ['shared', 'closed'],
-    admin: ['shared', 'closed'],
-    inside: ['insidePrivate', 'shared', 'closed'],
-    outside: ['outsidePrivate', 'shared'],
-    guest: ['shared'],
-};
-
-const WITH_COMPANY_WIDE = {
+const EVERY_DOC = {
     owner: ['shared', 'company', 'closed'],
     admin: ['shared', 'company', 'closed'],
     inside: ['insidePrivate', 'shared', 'company', 'closed'],
     outside: ['outsidePrivate', 'shared', 'company'],
     guest: ['shared', 'company'],
 };
+
+const ONE_PROJECT = { owner: ['shared'], admin: ['shared'], inside: ['insidePrivate', 'shared'], outside: ['outsidePrivate', 'shared'], guest: ['shared'] };
 
 const pagesOf = (sources) => sources.filter((source) => source.kind === 'page');
 
@@ -43,23 +37,29 @@ beforeEach(() => {
 describe('the page readers agree on who reaches a page: Ask', () => {
     it('gathers the docs a question may cite', async () => {
         const cited = await world.askEveryone(async (uid) => pagesOf((await gather(C, uid, { question: 'atlas', limit: 20 })).sources));
-        expect(cited).toEqual(IN_PROJECTS_ONLY);
+        expect(cited).toEqual(EVERY_DOC);
+    });
+
+    it('stays inside a project the question is scoped to, and inside the projects a token is kept to', async () => {
+        const gathered = (options) => world.askEveryone(async (uid) => pagesOf((await gather(C, uid, { question: 'atlas', limit: 20, ...options })).sources));
+        expect(await gathered({ projectId: PROJECTS.open })).toEqual(ONE_PROJECT);
+        expect(await gathered({ tokenProjectIds: [PROJECTS.open] })).toEqual(ONE_PROJECT);
     });
 
     it('re-opens the docs a saved answer cited', async () => {
         const cites = Object.values(PAGES).map((sourceId) => ({ kind: 'page', sourceId }));
         const open = await world.askEveryone(async (uid) => [...(await openSources(C, uid, cites)).keys()].map((key) => key.split(':')[1]));
-        expect(open).toEqual(IN_PROJECTS_ONLY);
+        expect(open).toEqual(EVERY_DOC);
     });
 
     it('reads the docs a person attached to a question', async () => {
         const context = Object.values(PAGES).map((id) => ({ kind: 'page', id }));
         const pinned = await world.askEveryone(async (uid) => pagesOf(await pinnedSources(C, uid, { context, projects: await openProjects(C, uid) })));
-        expect(pinned).toEqual(WITH_COMPANY_WIDE);
+        expect(pinned).toEqual(EVERY_DOC);
     });
 
     it('reads the docs linked to a task', async () => {
         const linked = await world.askEveryone(async (uid) => (await taskContext({ companyId: C, uid, taskId: TASK })).docs);
-        expect(linked).toEqual(WITH_COMPANY_WIDE);
+        expect(linked).toEqual(EVERY_DOC);
     });
 });

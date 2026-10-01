@@ -102,7 +102,7 @@ const openSources = async (companyId, uid, cites) => {
         }, 'find') : [],
         pageIds.length ? MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
-            data: [{ _id: { $in: objectIds(pageIds) }, deletedStatusKey: { $ne: 1 }, ...pageReachFilter({ uid, projectIds, companyWide: false }) }, 'title ProjectID', { lean: true }],
+            data: [{ _id: { $in: objectIds(pageIds) }, deletedStatusKey: { $ne: 1 }, ...pageReachFilter({ uid, projectIds }) }, 'title ProjectID', { lean: true }],
         }, 'find') : [],
     ]);
     const add = (kind, row, title) => found.set(`${kind}:${String(row._id)}`, { title: String(title || ''), projectId: String(row.ProjectID || ''), project: nameById[String(row.ProjectID)] || '' });
