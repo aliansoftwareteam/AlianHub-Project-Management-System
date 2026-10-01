@@ -102,6 +102,41 @@ describe('automation rule templates', () => {
     });
 });
 
+describe('the recipes that needed the due date and subtask triggers and the notify action', () => {
+    const byId = (id) => TEMPLATES.find((t) => t.id === id);
+    const filled = (id, projectId = 'p1') => fillTemplate(byId(id), { projects: PROJECTS, projectId, translate });
+
+    it('raises the priority when a due date passes', () => {
+        const rule = filled('overdue_priority');
+        expect(byId('overdue_priority').category).toBe('dates');
+        expect(rule.trigger).toEqual({ type: 'event', event: 'task.due_date_passed' });
+        expect(rule.steps).toEqual([{ id: 's1', type: 'action', action: 'set_priority', config: { priority: 'HIGH' } }]);
+    });
+
+    it('moves the parent to the chosen project\'s done status when all its subtasks are done', () => {
+        expect(byId('subtasks_done_close_parent').category).toBe('subtasks');
+        expect(filled('subtasks_done_close_parent').trigger.event).toBe('task.subtasks_all_done');
+        expect(filled('subtasks_done_close_parent', 'p1').steps[0]).toMatchObject({ action: 'set_status', config: { status: 'Shipped' } });
+        expect(filled('subtasks_done_close_parent', 'p2').steps[0].config.status).toBe('Complete');
+    });
+
+    it('names a status in the reader\'s language when no project has one of that type', () => {
+        const rule = fillTemplate(byId('subtasks_done_close_parent'), { projects: [], projectId: '', translate });
+        expect(rule.steps[0].config.status).toBe(en['AutomationTemplates.status_done']);
+    });
+
+    it('notifies the creator when a task is done', () => {
+        const rule = filled('done_notify_creator');
+        expect(byId('done_notify_creator').category).toBe('status');
+        expect(rule.trigger.event).toBe('task.status_changed');
+        expect(rule.steps[0]).toMatchObject({ action: 'notify', config: { recipients: ['task_creator'], message: en['AutomationTemplates.done_notify_creator_text'] } });
+    });
+
+    it('keeps the recipes that stood in for them', () => {
+        ['due_date_moved_priority', 'parent_done_comment', 'done_back_to_creator'].forEach((id) => expect(byId(id)).toBeDefined());
+    });
+});
+
 describe('filling a template', () => {
     const doneTemplate = () => TEMPLATES.find((t) => conditionNodes(t.rule.conditions).some((n) => n.field === 'statusRef' && n.value.type === 'close'));
 
