@@ -317,8 +317,8 @@ onMounted(load);
 .ai-quality__scroll { overflow-x: auto; min-width: 0; }
 .ai-quality__table { width: 100%; border-collapse: collapse; margin-top: 6px; font: var(--text-small); }
 .ai-quality__caption { text-align: left; font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); padding: 4px 0; }
-.ai-quality__table th { text-align: left; font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); padding: 6px 10px; border-bottom: 1px solid var(--hairline); white-space: nowrap; }
-.ai-quality__table td { padding: 8px 10px; border-bottom: 1px solid var(--hairline); color: var(--ink); white-space: nowrap; }
+.ai-quality__table th { text-align: left; font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); padding: 6px var(--cell-pad-x, 10px); border-bottom: 1px solid var(--hairline); white-space: nowrap; }
+.ai-quality__table td { padding: var(--table-pad-y, 8px) var(--cell-pad-x, 10px); font-size: var(--row-font, 12.5px); border-bottom: 1px solid var(--hairline); color: var(--ink); white-space: nowrap; }
 .ai-quality__table tfoot th, .ai-quality__table tfoot td { border-bottom: 0; }
 .ai-quality__disliked { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .ai-quality__item { border: 1px solid var(--hairline); border-radius: 9px; padding: 10px 12px; background: var(--surface); min-width: 0; }
@@ -327,7 +327,7 @@ onMounted(load);
 .ai-quality__reasons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .ai-quality__notes { margin: 8px 0 0; padding-left: 18px; font: var(--text-small); color: var(--ink-2); overflow-wrap: anywhere; }
 .ai-quality__shared { margin-top: 10px; padding: 8px 10px; border-radius: 7px; background: var(--fill); }
-.ai-quality__answer { margin: 4px 0 0; font: var(--text-small); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); max-height: 180px; overflow: auto; }
+.ai-quality__answer { margin: 4px 0 0; font: var(--text-body); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); max-height: 180px; overflow: auto; }
 .ai-quality__sources { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; color: var(--ink-2); }
 .ai-quality__pass { margin: 4px 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
 .ai-quality__figure { font-size: 18px; font-weight: 600; color: var(--ink); }

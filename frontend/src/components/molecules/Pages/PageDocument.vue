@@ -141,6 +141,7 @@
                     :blocks="contentBlocks && contentBlocks.blocks"
                     :focus-id="focusCommentId"
                     :pick-block="mode === 'edit' ? currentBlock : null"
+                    :before-leave="confirmDiscard"
                     @count="openComments = $event"
                     @threads="markCommented"
                     @jump="jumpToBlock"

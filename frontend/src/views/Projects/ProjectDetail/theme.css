@@ -1,11 +1,7 @@
 /* Unscoped on purpose: the description, checklist and attachments blocks are child components the
-   task panel shares, and they still carry the legacy colour classes and fixed greys. Every selector
-   starts at .project__detail-component, so those blocks keep their own colours everywhere else. */
-.project__detail-component :is(.black, .dark-gray, .GunPowder) { color: var(--ink); }
-.project__detail-component :is(.gray, .gray81) { color: var(--ink-2); }
-.project__detail-component .blue { color: var(--brand) !important; }
-.project__detail-component .bg-colorlightgray { background-color: var(--fill); }
-
+   task panel shares, and they still paint fixed greys. Every selector starts at
+   .project__detail-component, so those blocks keep their own colours everywhere else. Their legacy
+   colour classes are mapped for the whole tab body in views/Projects/style.css. */
 .project__detail-component .checklist-main { border-bottom-color: var(--hairline); }
 .project__detail-component .sticky_item-wrapper { background-color: var(--canvas); }
 .project__detail-component .tree_main .ul-sub-items li,
@@ -33,4 +29,9 @@
 
 @media (max-width: 767px) {
     .project__detail-component .sticky_item-wrapper { background-color: var(--surface); }
+    /* The page drops its own padding at this width, for the blocks that run edge to edge. The bordered cards are not such blocks. */
+    .project__detail-component.showProjectDetailRight > :is(.pm, .pdt, .arc) {
+        margin-left: var(--page-pad-x, 16px);
+        margin-right: var(--page-pad-x, 16px);
+    }
 }

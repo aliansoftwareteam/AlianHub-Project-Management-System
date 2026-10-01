@@ -5,7 +5,7 @@
     <td v-if="props.editfixMilestone !== 0.1 || !permissionData"></td>
     <!-- milestoneName -->
     <td @click="permissionData ? emit('editMilestonetd','edit',fixMilestoneIndex,true) : '',permissionData?focusInputForFix('milestonename',fixMilestoneIndex,'milestonename'):''">
-        <span class="Dot_Change text-capitalize milestone__name" :title="fixMilestoneProps.milestoneName">{{fixMilestoneProps.milestoneName}}</span>    
+        <span class="Dot_Change milestone__name" :title="fixMilestoneProps.milestoneName">{{fixMilestoneProps.milestoneName}}</span>    
     </td>
     <!-- startDate -->
     <td @click="permissionData ? $emit('editMilestonetd','edit',fixMilestoneIndex,true) : '',permissionData ? focusInputForFix('start',fixMilestoneIndex,'start'):''">
@@ -24,7 +24,7 @@
         <div>
             <div class="d-flex align-items-center">
                 <span @click="permissionData ? $emit('editMilestonetd','edit',fixMilestoneIndex,true) : '',permissionData ? focusInputForFix('amount',fixMilestoneIndex,'amount') : ''" :class="[{'paymentcancelled':fixMilestoneProps.statusArray && fixMilestoneProps.statusArray.length > 0 ? fixMilestoneProps.statusArray[fixMilestoneProps.statusArray.length - 1].milestoneStatusColor.includes('CANCELLED'):''}]">{{currencyMilestone.symbol}} {{getCommaSeperatedNumber(fixMilestoneProps.amount)}}</span>
-                <DropDown v-if="fixMilestoneProps.refundedAmount && fixMilestoneProps.refundedAmount.length" :id="dropdownId('fix_milestone_refunds')" mode="menu" class="status_change_dropdown" :bodyClass="{ milestone_refund_panel: true }">
+                <DropDown themed v-if="fixMilestoneProps.refundedAmount && fixMilestoneProps.refundedAmount.length" :id="dropdownId('fix_milestone_refunds')" mode="menu" class="status_change_dropdown" :bodyClass="{ milestone_refund_panel: true }">
                     <template #button="{ triggerAttrs }">
                         <button type="button" class="cursor-pointer dot-btn border-0" :aria-label="$t('Milestone.refund_details')" v-bind="triggerAttrs">
                             <img v-if="props.planCondition" :src="detaildropdown" alt="" class="left_space_wrapper" />
@@ -33,18 +33,18 @@
                     <template #options>
                         <DropDownOption v-if="fixMilestoneProps.refundedAmount && fixMilestoneProps.refundedAmount.length">
                             <div>
-                                <div class="border-bottom-black">
+                                <div class="milestone_refund_rule">
                                     <span class="d-block dropdown_span" v-for="(temp,ind) in fixMilestoneProps.refundedAmount" :key="ind">
                                         {{currencyMilestone.symbol}} {{getCommaSeperatedNumber(temp.amount)}} {{$t('Milestone.partially_refunded')}}
                                     </span>
                                 </div>
-                                <div class="border-bottom-black">
+                                <div class="milestone_refund_rule">
                                     <span class="d-block dropdown_span">{{currencyMilestone.symbol}} {{getCommaSeperatedNumber(refundedTotalValue(fixMilestoneProps.refundedAmount,fixMilestoneProps.amount))}}
                                         <span v-if="(fixMilestoneProps?.refundedAmount && fixMilestoneProps.refundedAmount?.length > 0 ? Number(refundedTotalValue(fixMilestoneProps.refundedAmount,fixMilestoneProps.amount)) : '') === (fixMilestoneProps.amount)">{{ $t('Milestone.all_amount_refunded') }}</span>
                                         <span v-else>{{$t('Milestone.total_partially_refunded')}}</span>    
                                     </span>
                                 </div>
-                                <div class="border-bottom-black">
+                                <div class="milestone_refund_rule">
                                     <span class="d-block dropdown_span">{{currencyMilestone.symbol}} {{getCommaSeperatedNumber(fixMilestoneProps.amount)}}  ({{$t('Milestone.actual_amount')}})</span>
                                     <span class="d-block dropdown_span">{{currencyMilestone.symbol}} {{'-'}} {{getCommaSeperatedNumber(refundedTotalValue(fixMilestoneProps.refundedAmount,fixMilestoneProps.amount))}} ({{ $t('Milestone.refund_amount') }})</span>
                                 </div>
@@ -99,7 +99,7 @@
                 </div>
             </template>
             <div class="statushistory">
-                <DropDown :id="dropdownId('fix_milestone_status')" mode="menu" class="status_change_dropdown" :bodyClass="{ milestone_status_panel: true }">
+                <DropDown themed :id="dropdownId('fix_milestone_status')" mode="menu" class="status_change_dropdown" :bodyClass="{ milestone_status_panel: true }">
                     <template #button="{ triggerAttrs }">
                         <button type="button" class="cursor-pointer dot-btn border-0" :aria-label="$t('Milestone.status_history')" v-bind="triggerAttrs">
                             <img v-if="props.planCondition" :src="statushistory" alt="" @click="props.planCondition ? $emit('valueBody',true) : $emit('valueBody',false)">
