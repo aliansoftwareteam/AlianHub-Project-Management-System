@@ -57,6 +57,25 @@
 .ah-cp__foot { margin-top: auto; display: flex; gap: 8px; justify-content: flex-end; padding-top: 4px; }
 .ah-cp__empty { padding: 18px 12px; font: var(--text-small); color: var(--ink-2); }
 .ah-cp__spin { display: flex; justify-content: center; padding: 24px; }
+.ah-cp__saved { display: flex; flex-direction: column; gap: 6px; flex: none; }
+.ah-cp__saved-row { display: flex; flex-direction: column; gap: 2px; }
+.ah-cp__saved-body { min-width: 0; }
+.ah-cp__saved-line { display: block; overflow-wrap: anywhere; }
+.ah-cp__saved-actions { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 6px; }
+.ah-cp__link { padding: 4px 6px; border: 0; border-radius: var(--r-input); background: transparent; color: var(--brand); font: var(--text-small); cursor: pointer; }
+.ah-cp__link:hover:not(:disabled) { background: var(--surface-hover); }
+.ah-cp__link:focus-visible { outline: none; box-shadow: var(--focus); }
+.ah-cp__link:disabled { opacity: .6; cursor: default; }
+.ah-cp__link--danger { color: var(--danger); }
+.ah-cp__saved-form { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--hairline); border-radius: 10px; background: var(--surface); }
+.ah-input.ah-cp__saved-input { height: 34px; font-size: 12.5px; }
+.ah-input.ah-cp__saved-text { height: auto; min-height: 52px; padding-top: 6px; padding-bottom: 6px; resize: vertical; line-height: 1.4; }
+.ah-cp__choices { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.ah-cp__check.is-off { color: var(--ink-2); cursor: default; }
+.ah-cp__progress { display: flex; flex-direction: column; gap: 10px; }
+.ah-cp__progress-text { margin: 0; font-size: 13.5px; }
+.ah-cp__bar { height: 6px; border-radius: 3px; background: var(--fill); overflow: hidden; }
+.ah-cp__bar-fill { display: block; height: 100%; background: var(--brand); transition: width .3s ease; }
 .ah-cp .dp__input { height: 40px; border: 1.5px solid var(--border); border-radius: var(--r-input); font: 400 13.5px/1 var(--font-ui); background: var(--surface); color: var(--ink); }
 .ah-cp .dp__input:focus { border-color: var(--brand); box-shadow: var(--focus); }
 /* Source and Skills are shared with legacy white forms and hard-code a white field; here they take the dialog's input chrome. */

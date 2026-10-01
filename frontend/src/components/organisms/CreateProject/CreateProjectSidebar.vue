@@ -36,7 +36,8 @@
                                     </span>
                                 </button>
                             </template>
-                            <div v-if="search && !shownGlobal.length && !shownCustom.length" class="ah-cp__empty">{{ $t('Auth.no_templates_match') }}</div>
+                            <SavedProjectTemplates :templates="shownSaved" :selected-id="selected.saved ? selected._id : ''" :users="users" @pick="select" @changed="loadSaved" />
+                            <div v-if="search && !shownGlobal.length && !shownCustom.length && !shownSaved.length" class="ah-cp__empty">{{ $t('Auth.no_templates_match') }}</div>
                         </template>
                         <button v-if="canUseAi()" type="button" class="ah-cp__tpl" @click="aiOpen = true">
                             <span class="ah-cp__tpl-icon ah-cp__tpl-icon--agent"><ShellIcon name="ai" :size="15" /></span>
@@ -54,7 +55,12 @@
                     </div>
 
                     <div class="ah-card ah-cp__sample">
-                        <template v-if="sampleCount">
+                        <template v-if="selected.saved">
+                            <div class="ah-label">{{ $t('Projects.template_holds') }}</div>
+                            <div class="ah-cp__sample-row">{{ countsText(selected.counts, t) }}</div>
+                            <div v-if="selected.Description" class="ah-cp__sample-row ah-cp__sample-row--more">{{ selected.Description }}</div>
+                        </template>
+                        <template v-else-if="sampleCount">
                             <div class="ah-label">{{ $t('Auth.sample_tasks_label', { n: sampleCount }) }}</div>
                             <div v-for="name in (selected.sampleTaskNames || []).slice(0, 3)" :key="name" class="ah-cp__sample-row"><span class="ah-cp__box"></span>{{ name }}<span class="ah-mono">1h</span></div>
                             <div v-if="sampleCount > 3" class="ah-cp__sample-row ah-cp__sample-row--more"><span class="ah-cp__box"></span>{{ $t('Auth.more_tasks', { n: sampleCount - 3 }) }}</div>
@@ -62,8 +68,18 @@
                         <div v-else class="ah-cp__sample-row ah-cp__sample-row--more">{{ $t('Auth.no_sample') }}</div>
                     </div>
 
-                    <form class="ah-cp__form" novalidate @submit.prevent="submit">
-                        <div v-if="banner" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ banner }}</div>
+                    <div v-if="templateJob" class="ah-cp__progress">
+                        <p class="ah-cp__progress-text">{{ $t('Projects.duplicate_progress', { done: templateJob.processed, total: templateJob.total }) }}</p>
+                        <div class="ah-cp__bar" role="progressbar" aria-valuemin="0" :aria-valuemax="templateJob.total" :aria-valuenow="templateJob.processed" :aria-label="$t('Projects.duplicate_progress', { done: templateJob.processed, total: templateJob.total })">
+                            <span class="ah-cp__bar-fill" :style="{ width: `${templatePercent}%` }"></span>
+                        </div>
+                        <p class="ah-field__hint">{{ $t('Projects.template_progress_hint') }}</p>
+                        <div class="ah-cp__foot">
+                            <button type="button" class="ah-btn ah-btn--secondary" @click="close">{{ $t('Projects.duplicate_hide') }}</button>
+                        </div>
+                    </div>
+                    <form v-else class="ah-cp__form" novalidate :data-template-form="selected.saved ? '' : null" @submit.prevent="submit">
+                        <div v-if="banner" class="ah-field__error" role="alert"><ShellIcon name="x" :size="12" />{{ banner }}</div>
                         <div class="ah-field">
                             <label class="ah-field__label" for="cp-name">{{ $t('Auth.project_name') }}</label>
                             <input
@@ -94,6 +110,19 @@
                                 </select>
                             </div>
                         </div>
+                        <template v-if="selected.saved">
+                            <fieldset v-if="templateChoices.length" class="ah-cp__choices" :disabled="busy">
+                                <label v-for="choice in templateChoices" :key="choice" class="ah-cp__check" :class="{ 'is-off': choice === 'assignees' && !templateInclude.tasks }">
+                                    <input v-model="templateInclude[choice]" type="checkbox" class="ah-check" :data-include="choice" :disabled="choice === 'assignees' && !templateInclude.tasks" @change="tasksChanged" />
+                                    <span>{{ $t(`Projects.template_include_${choice}`) }}</span>
+                                </label>
+                            </fieldset>
+                            <div v-if="templateInclude.dates" class="ah-field">
+                                <label class="ah-field__label" for="cp-start">{{ $t('Projects.template_start') }}</label>
+                                <input id="cp-start" v-model="templateStart" type="date" class="ah-input" data-field="start" />
+                            </div>
+                        </template>
+                        <template v-else>
                         <div class="ah-cp__row">
                             <div class="ah-field">
                                 <label class="ah-field__label">{{ $t('ProjectDetails.source') }}</label>
@@ -136,6 +165,7 @@
                             <input v-model="form.includeSamples" type="checkbox" class="ah-check" />
                             <span>{{ $t('Auth.include_samples', { n: sampleCount }) }} <span class="ah-muted">{{ $t('Auth.include_samples_hint') }}</span></span>
                         </label>
+                        </template>
                         <div class="ah-cp__foot">
                             <button type="button" class="ah-btn ah-btn--secondary" :disabled="busy" @click="close">{{ $t('Projects.cancel') }}</button>
                             <button type="submit" class="ah-btn ah-btn--primary" :disabled="busy" id="createprojectbtn_driver">
@@ -175,6 +205,9 @@ import * as helper from "@/components/templates/CreateProject/helper.js";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { blankTemplate, templateGlyph, colorForName, keyFromName, statusTone } from "./templates";
+import SavedProjectTemplates from "./SavedProjectTemplates.vue";
+import { useTemplateProject } from "./templateProject";
+import { countsText, useProjectTemplates } from "@/views/Projects/projectTemplates";
 
 const props = defineProps({
     isActiveCreateSidebar: { type: Boolean, default: false },
@@ -230,6 +263,9 @@ const matches = (tpl) => {
 };
 const shownGlobal = computed(() => globalTemplates.value.filter((tpl) => matches(tpl) && (filter.value !== "focus" || tpl.focus === teamFocus.value)));
 const shownCustom = computed(() => customTemplates.value.filter(matches));
+const { templates: savedTemplates, load: loadSaved } = useProjectTemplates();
+const asPickable = (tpl) => ({ ...tpl, saved: true, TemplateName: tpl.name, Description: tpl.description || "", taskStatusData: tpl.statuses || [], sampleTaskCount: 0 });
+const shownSaved = computed(() => savedTemplates.value.map(asPickable).filter(matches));
 const sampleCount = computed(() => Number(selected.value.sampleTaskCount) || 0);
 const shortDescription = (tpl) => {
     const text = String(tpl.Description || "").replace(/\s+/g, " ").trim();
@@ -260,7 +296,17 @@ const select = (tpl) => {
     selected.value = tpl;
     form.includeSamples = (Number(tpl.sampleTaskCount) || 0) > 0;
     form.apps = defaultAppsFor(tpl);
+    if (!tpl.saved) return;
+    form.isPrivate = tpl.sourcePrivate === true;
+    resetTemplateChoices(tpl);
 };
+/* The picked template is a copy of a row of the list: a rename shows in the preview, and one that is deleted gives way to Blank. */
+watch(savedTemplates, (rows) => {
+    if (!selected.value.saved) return;
+    const current = rows.find((row) => row._id === selected.value._id);
+    if (current) selected.value = asPickable(current);
+    else select(blank);
+});
 const onNameInput = () => {
     errors.name = "";
     if (!form.keyTouched) { form.key = keyFromName(form.name); errors.key = ""; }
@@ -295,10 +341,29 @@ const userData = () => {
     return { id: user.id, Employee_Name: user.Employee_Name, companyid: user.AssignCompany, companyData: [], companyOwnerId: user.companyOwnerId };
 };
 
+const openMade = (project) => {
+    busy.value = false;
+    close();
+    if (props.isAdvanceFilterApplied) return;
+    router.replace({ name: "Project", params: { cid: route.params?.cid, id: project._id }, query: { ...route.query, tab: project.ProjectRequiredDefaultComponent || "ProjectListView" } });
+};
+const {
+    include: templateInclude, start: templateStart, job: templateJob, percent: templatePercent, offered: templateChoices,
+    reset: resetTemplateChoices, tasksChanged, create: createFromSaved
+} = useTemplateProject({ store: { getters, commit }, toast: $toast, t, onReady: openMade });
+
+/* While the tasks of a large one arrive the dialog can be hidden, so it stops being busy as soon as the project exists. */
+const submitFromSaved = async () => {
+    const answer = await createFromSaved(selected.value, { name: form.name, code: form.key, isPrivate: form.isPrivate });
+    if (!answer.ok) banner.value = answer.message || t("Auth.project_failed");
+    if (!answer.ok || answer.job) busy.value = false;
+};
+
 const submit = async () => {
     if (!validate() || busy.value) return;
     busy.value = true;
     banner.value = "";
+    if (selected.value.saved) { await submitFromSaved(); return; }
     try {
         const tpl = selected.value;
         const leadIds = form.leads.map((x) => x.id);

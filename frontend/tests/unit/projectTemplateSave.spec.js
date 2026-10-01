@@ -127,7 +127,7 @@ describe('the save-as-template dialog', () => {
     });
 
     it('sends the name, the description and the choices, says it is saved and closes without leaving the page', async () => {
-        apiRequest.mockResolvedValue(answer());
+        apiRequest.mockResolvedValue(answer({ template: { ...SAVED, name: 'Launch plan' } }));
         const wrapper = openDialog();
         await type('name', '  Launch plan ');
         await type('description', ' How we launch ');
