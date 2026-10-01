@@ -72,6 +72,7 @@ const PROJECT_DOC = '6f0000000000000000000d11';
 const COMPANY_DOC = '6f0000000000000000000d12';
 const HIDDEN_DOC = '6f0000000000000000000d13';
 const PRIVATE_DOC = '6f0000000000000000000d14';
+const TRASHED_DOC = '6f0000000000000000000d15';
 const MISSING_DOC = '6f0000000000000000000dff';
 
 const key = {
@@ -110,6 +111,14 @@ const key = {
     hiddenDocImage: `Pages/${HIDDEN_DOC}/0a1b2c3d4e5f60718293a4b5.png`,
     privateDocImage: `Pages/${PRIVATE_DOC}/0a1b2c3d4e5f60718293a4b5.png`,
     missingDocImage: `Pages/${MISSING_DOC}/0a1b2c3d4e5f60718293a4b5.png`,
+    docCommentFile: `Pages/${PROJECT_DOC}/Comments/1234_brief.pdf`,
+    docCommentThumbnail: `Pages/${PROJECT_DOC}/Comments/1234_shot-200x200.png`,
+    companyDocCommentFile: `Pages/${COMPANY_DOC}/Comments/1234_brief.pdf`,
+    hiddenDocCommentFile: `Pages/${HIDDEN_DOC}/Comments/1234_secret.pdf`,
+    privateDocCommentFile: `Pages/${PRIVATE_DOC}/Comments/1234_secret.pdf`,
+    trashedDocCommentFile: `Pages/${TRASHED_DOC}/Comments/1234_old.pdf`,
+    missingDocCommentFile: `Pages/${MISSING_DOC}/Comments/1234_gone.pdf`,
+    nestedDocCommentFile: `Pages/${PROJECT_DOC}/Comments/deeper/1234_brief.pdf`,
     outsideLayouts: 'backups/company.zip',
     unknownProjectFolder: `Project/${OPEN_PROJECT}/Exports/all.csv`,
 };
@@ -170,6 +179,7 @@ beforeEach(() => {
             { _id: COMPANY_DOC, visibility: 'project', createdBy: OTHER_MEMBER, deletedStatusKey: 0 },
             { _id: HIDDEN_DOC, ProjectID: HIDDEN_PROJECT, visibility: 'project', createdBy: OWNER, deletedStatusKey: 0 },
             { _id: PRIVATE_DOC, ProjectID: OPEN_PROJECT, visibility: 'private', createdBy: OTHER_MEMBER, deletedStatusKey: 0 },
+            { _id: TRASHED_DOC, ProjectID: OPEN_PROJECT, visibility: 'project', createdBy: MEMBER, deletedStatusKey: 1 },
         ],
         forms: [{ _id: FORM, ProjectID: OPEN_PROJECT, deletedStatusKey: 0 }, { _id: HIDDEN_FORM, ProjectID: HIDDEN_PROJECT, deletedStatusKey: 0 }],
         form_submissions: [{ _id: SUBMISSION, formId: FORM, taskId: FORM_TASK }],
@@ -260,6 +270,10 @@ const CALLERS = [
     ['doc image in a project doc the caller can read', MEMBER, key.docImage],
     ['doc image in a company-wide doc', MEMBER, key.companyDocImage],
     ['doc image in a private doc, for its author', OTHER_MEMBER, key.privateDocImage],
+    ['doc comment file in a project doc the caller can read', MEMBER, key.docCommentFile],
+    ['doc comment file thumbnail', MEMBER, key.docCommentThumbnail],
+    ['doc comment file in a company-wide doc', MEMBER, key.companyDocCommentFile],
+    ['doc comment file in a private doc, for its author', OTHER_MEMBER, key.privateDocCommentFile],
 ];
 
 const REFUSED = [
@@ -278,6 +292,11 @@ const REFUSED = [
     ['an image in a doc of a project the caller cannot open', key.hiddenDocImage],
     ["an image in a colleague's private doc", key.privateDocImage],
     ['an image of a doc that does not exist', key.missingDocImage],
+    ['a comment file of a doc in a project the caller cannot open', key.hiddenDocCommentFile],
+    ["a comment file of a colleague's private doc", key.privateDocCommentFile],
+    ['a comment file of a doc in the trash', key.trashedDocCommentFile],
+    ['a comment file of a doc that does not exist', key.missingDocCommentFile],
+    ['a file in a folder under a doc comment folder', key.nestedDocCommentFile],
     ['a key outside every layout', key.outsideLayouts],
     ['a folder of a project the app never writes', key.unknownProjectFolder],
 ];
@@ -299,6 +318,19 @@ describe.each(ROUTE_NAMES)('%s', (routeName) => {
         const hidden = await ask(MEMBER, key.hiddenTaskAttachment);
         const missing = await ask(MEMBER, key.missingTaskAttachment);
         expect(hidden).toEqual(missing);
+    });
+
+    it("keeps a private doc's comment file from an owner who is not its author", async () => {
+        const out = await ask(OWNER, key.privateDocCommentFile);
+        expect(out.status).toBe(404);
+        expect(out).toEqual(await ask(OWNER, key.missingDocCommentFile));
+    });
+
+    it('holds a doc comment file to its rule whatever the download switch says', async () => {
+        delete process.env.STORAGE_DOWNLOAD_SCOPE;
+        expect((await ask(MEMBER, key.privateDocCommentFile)).status).toBe(404);
+        expect((await ask(OWNER, key.privateDocCommentFile)).status).toBe(404);
+        expect(signed(await ask(MEMBER, key.docCommentFile))).toBe(true);
     });
 });
 

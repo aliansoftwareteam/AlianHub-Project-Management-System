@@ -4,7 +4,7 @@ import { REPORT_KEYS } from "@/views/Ai/agentSchedule";
 import { commentPlainText } from "@/utils/commentHtml";
 
 const clip = (value, max = 200) => String(value === undefined || value === null ? "" : value).slice(0, max);
-const DOC_COMMENT_KEYS = ["doc_comment_mention", "doc_comment_reply"];
+const DOC_COMMENT_KEYS = ["doc_comment_mention", "doc_comment_reply", "doc_comment_assigned"];
 
 /* The HTML the Inbox shows for one row. Rows the app writes from data (AI alerts, agent client approval requests,
  * delegations to an outside agent, notices an automation sends) are rendered from an i18n string whose values are escaped; every other row's

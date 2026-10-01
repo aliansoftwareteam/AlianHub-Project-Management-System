@@ -333,6 +333,7 @@ module.exports = {
                             'customField': task.customField || {},
                             'descriptionBlock': task.descriptionBlock || {},
                             'rawDescription': task.rawDescription || '',
+                            'checklistArray': task.checklistArray || [],
                             ...importedDetails(task),
                         };
                         if(sprint.folderId) {
@@ -347,6 +348,7 @@ module.exports = {
                             setNotif: true
                         }).then((taskResult) => {
                             idMapping[task._id] = taskResult.id;
+                            task.createdTaskId = taskResult.id;
                             droppedFieldValues += taskResult.droppedFieldValues || 0;
                             completedTasks++;
                             updateProgress();
