@@ -16,7 +16,7 @@
             ref="childRef"
             :isType="isType"
         />
-        <FieldTaskTypesPicker v-if="forTasks" v-model="taskTypes" />
+        <FieldTaskTypesPicker v-if="forTasks" v-model="taskTypes" :projectIds="taskTypeProjectIds" />
         <div class="custom_field-btn">
             <FormKit type="button" @click="handleTabCheck" :label="$t('Projects.cancel')" />
             <FormKit type="submit" @click="handleTab" :label="$t('Projects.save')" :disabled="submitted" />
@@ -26,7 +26,7 @@
 
 <script setup>
     //import
-    import { inject, ref, watch } from "vue";
+    import { computed, inject, ref, unref, watch } from "vue";
     import {FormKit} from '@formkit/vue';
     import TextComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/textComponents.vue";
     import CheckboxCustomField from "../../../atom/customFieldSidebar/customFieldSidebarComponent/checkboxCustomFields.vue";
@@ -40,6 +40,7 @@
     import FormulaComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/formulaComponent.vue";
     import RollupComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/rollupComponent.vue";
     import FieldTaskTypesPicker from "../../../atom/FieldTaskTypesPicker/FieldTaskTypesPicker.vue";
+    import { fieldProjectIds } from "@/plugins/customFieldView/taskTypeOptions";
     import { useToast } from "vue-toast-notification";
     import { useI18n } from "vue-i18n";
     const { t } = useI18n();
@@ -74,6 +75,13 @@
     const childRef = ref();
     const taskTypes = ref([]);
     const forTasks = !inject('customFieldForProject', false) && props.customFieldObject?.type !== 'project';
+
+    /* Settings (isType) saves a new field company-wide; a task panel or a List saves it to the project it is open in. */
+    const hostProject = inject('selectedProject', null);
+    const taskTypeProjectIds = computed(() => {
+        if (props.customFieldObject?._id) return fieldProjectIds(props.customFieldObject);
+        return props.isType ? [] : fieldProjectIds({ projectId: unref(hostProject)?._id });
+    });
 
     watch(() => props.customFieldObject?.fieldTaskTypes, (stored) => { taskTypes.value = [...(stored || [])]; }, { immediate: true });
 

@@ -116,13 +116,13 @@ async function act(action) {
     border-radius: var(--r-input, 8px);
     background: var(--brand-tint);
     color: var(--ink);
-    font: 400 12.5px/1.4 var(--font-ui);
+    font: 400 var(--fs-md, 12.5px)/1.4 var(--font-ui);
     max-width: 100%;
     box-sizing: border-box;
 }
 .tas__chip--applied { background: var(--surface-2); border: 1px solid var(--border); }
 .tas__text { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
-.tas__tag { margin-left: 6px; font-size: 11.5px; color: var(--ink-2); }
+.tas__tag { margin-left: 6px; font-size: var(--fs-sm, 11.5px); color: var(--ink-2); }
 .tas__reason { color: var(--ink-2); margin-left: 4px; }
 .tas__reason::before { content: "\2014\00a0"; }
 .tas__actions { display: inline-flex; gap: 6px; flex: none; }
@@ -133,7 +133,7 @@ async function act(action) {
     border: 1px solid var(--border);
     background: var(--surface);
     color: var(--ink);
-    font: 600 12px/1 var(--font-ui);
+    font: 600 var(--fs-sm, 12px)/1 var(--font-ui);
     cursor: pointer;
 }
 .tas__btn--primary { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }

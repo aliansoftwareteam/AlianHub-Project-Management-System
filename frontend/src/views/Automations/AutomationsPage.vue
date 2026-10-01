@@ -56,7 +56,7 @@
                     <div class="au__slots">
                         <span class="au__kw">{{ $t('Automations.when') }}</span>
                         <select v-model="draft.trigger.event" class="au__slot" @change="onRuleEdit">
-                            <option v-for="trigger in manifest.triggers" :key="trigger.key" :value="trigger.key">{{ trigger.label }}</option>
+                            <option v-for="trigger in manifest.triggers" :key="trigger.key" :value="trigger.key">{{ triggerLabel(trigger, $t) }}</option>
                         </select>
 
                         <span class="au__kw">{{ $t('Automations.in') }}</span>
@@ -85,14 +85,16 @@
                         </template>
                         <button type="button" class="au__add" @click="addCondition">{{ $t('Automations.add_condition') }}</button>
                     </div>
+                    <p v-if="triggerHelp" class="ah-small au__help" data-test="trigger-help">{{ $t(triggerHelp) }}</p>
 
                     <div class="au__slots">
                         <template v-for="(s, i) in draft.steps" :key="s.id">
                             <span class="au__kw">{{ i === 0 ? $t('Automations.then') : $t('Parity.and') }}</span>
                             <select v-model="s.action" class="au__slot" @change="resetConfig(s)">
-                                <option v-for="a in manifest.actions" :key="a.key" :value="a.key">{{ a.label }}</option>
+                                <option v-for="a in manifest.actions" :key="a.key" :value="a.key">{{ actionLabel(a, $t) }}</option>
                             </select>
                             <AssignActionEditor v-if="s.action === 'assign'" v-model="s.config" :trigger="draft.trigger.event" @change="onRuleEdit" />
+                            <NotifyActionEditor v-else-if="s.action === 'notify'" v-model="s.config" @change="onRuleEdit" />
                             <template v-else>
                                 <template v-for="(spec, field) in schemaOf(s.action)" :key="field">
                                     <select v-if="spec.options" v-model="s.config[field]" class="au__slot" @change="onRuleEdit">
@@ -105,6 +107,7 @@
                         </template>
                         <button type="button" class="au__add" @click="addStep">{{ $t('Automations.add_action') }}</button>
                     </div>
+                    <p v-for="key in actionHelps" :key="key" class="ah-small au__help" data-test="action-help">{{ $t(key) }}</p>
 
                     <p v-if="changeOpWarning" class="au__warn">{{ changeOpWarning }}</p>
 
@@ -117,11 +120,17 @@
                             {{ backtest ? $t('Parity.backtest_result', { n: backtest.matched, days: backtest.windowDays }) : $t('Parity.test_30_days') }}
                         </button>
                     </div>
-                    <p v-if="backtest" class="ah-small">{{ backtest.basis }}</p>
+                    <p v-if="backtest" class="ah-small" data-test="backtest-basis">{{ backtestBasis }}</p>
                     <ul v-if="backtest && backtest.assignments && backtest.assignments.length" class="au__plan-reasons" data-test="backtest-assign">
                         <li v-for="a in backtest.assignments" :key="a.stepId">
                             {{ $t(a.roundRobin ? 'Automations.assign_backtest_turns' : 'Automations.assign_backtest_people', { people: peopleText(a.people, $t) }) }}
                             <template v-if="a.skipped.length"> · {{ skippedText(a.skipped, $t) }}</template>
+                        </li>
+                    </ul>
+                    <ul v-if="backtest && backtest.notifications && backtest.notifications.length" class="au__plan-reasons" data-test="backtest-notify">
+                        <li v-for="n in backtest.notifications" :key="n.stepId">
+                            {{ $t('Automations.notify_backtest_people', { people: peopleText(n.people, $t) }) }}
+                            <template v-if="n.skipped.length"> · {{ skippedText(n.skipped, $t) }}</template>
                         </li>
                     </ul>
 
@@ -149,6 +158,7 @@
                             </span>
                             <ul class="au__plan-reasons">
                                 <li v-for="(reason, i) in dryRunResult.reasons" :key="i">{{ reason }}</li>
+                                <li v-if="dryRunResult.trigger" data-test="dry-run-trigger">{{ $t(`Automations.dry_run_trigger_${dryRunResult.trigger.reason}`, { open: dryRunResult.trigger.open, total: dryRunResult.trigger.total }) }}</li>
                             </ul>
                             <ol class="au__plan-actions">
                                 <li v-for="step in dryRunResult.actions" :key="step.id" class="au__plan-action" data-test="dry-run-action">
@@ -157,7 +167,7 @@
                                     <span class="ah-chip" :class="step.wouldRun ? 'ah-chip--ok' : ''">
                                         {{ step.wouldRun ? $t('Automations.dry_run_would_run') : $t('Automations.dry_run_would_not_run') }}
                                     </span>
-                                    <dl v-if="step.params && Object.keys(step.params).length && !step.assign" class="au__plan-params">
+                                    <dl v-if="step.params && Object.keys(step.params).length && !step.assign && !step.notify" class="au__plan-params">
                                         <template v-for="(value, key) in step.params" :key="key">
                                             <dt>{{ paramLabel(step.action, key) }}</dt>
                                             <dd>{{ shownParam(value) }}</dd>
@@ -167,6 +177,11 @@
                                         <p>{{ step.assign.wouldAssign.length ? $t('Automations.assign_would_assign', { people: peopleText(step.assign.wouldAssign, $t) }) : $t('Automations.assign_would_assign_nobody') }}</p>
                                         <p v-if="step.assign.wouldRemove && step.assign.wouldRemove.length">{{ $t('Automations.assign_would_remove', { people: peopleText(step.assign.wouldRemove, $t) }) }}</p>
                                         <p v-if="step.assign.skipped.length">{{ skippedText(step.assign.skipped, $t) }}</p>
+                                    </div>
+                                    <div v-if="step.notify" class="ah-small au__plan-note" data-test="dry-run-notify">
+                                        <p>{{ step.params.message }}</p>
+                                        <p>{{ step.notify.wouldNotify.length ? $t('Automations.notify_would_notify', { people: peopleText(step.notify.wouldNotify, $t) }) : $t('Automations.notify_would_notify_nobody') }}</p>
+                                        <p v-if="step.notify.skipped.length">{{ skippedText(step.notify.skipped, $t) }}</p>
                                     </div>
                                     <p v-if="step.note" class="ah-small au__plan-note">{{ step.note }}</p>
                                 </li>
@@ -230,10 +245,12 @@ import AutomationAiDraft from './AutomationAiDraft.vue';
 import AutomationTemplateGallery from './AutomationTemplateGallery.vue';
 import { assignPeopleText, assignSkippedText } from './assignText';
 import { choicesFor, refsFor } from './statusChoices';
+import { triggerLabel, actionLabel, triggerHelpKey, actionHelpKey } from './registryText';
 import { fillTemplate } from '@automationTemplates';
 
 // Loaded on first use: most rules never assign, and the people picker pulls in the shared DropDown.
 const AssignActionEditor = defineAsyncComponent(() => import('./AssignActionEditor.vue'));
+const NotifyActionEditor = defineAsyncComponent(() => import('./NotifyActionEditor.vue'));
 
 // Automations (handoff 13d). You describe the rule in a sentence; the compiled
 // rule sits beside it and either can be edited. The compiler is a deterministic
@@ -310,6 +327,12 @@ const { t } = useI18n();
 const canManage = computed(() => [1, 2].includes(Number(getters['settings/companyUserDetail']?.roleType)));
 const activeCount = computed(() => rules.value.filter((r) => r.enabled).length);
 const triggerDef = computed(() => manifest.triggers.find((t) => t.key === draft.trigger.event) || null);
+const triggerHelp = computed(() => triggerHelpKey(draft.trigger.event));
+const actionHelps = computed(() => [...new Set(draft.steps.map((step) => actionHelpKey(step.action)).filter(Boolean))]);
+const backtestBasis = computed(() => {
+    if (!backtest.value) return '';
+    return backtest.value.basisKey ? t(`Automations.backtest_basis_${backtest.value.basisKey}`, { days: backtest.value.windowDays }) : backtest.value.basis;
+});
 
 // The same check the server runs, surfaced while the user is still typing: a
 // "changed to" condition on a trigger with no before/after can never match.
@@ -353,6 +376,7 @@ const onScopeChange = () => {
 const resetConfig = (step) => {
     step.config = {};
     if (step.action === 'assign') step.config = { mode: 'add', userIds: [] };
+    else if (step.action === 'notify') step.config = { recipients: [], message: '' };
     else {
         Object.entries(schemaOf(step.action)).forEach(([field, spec]) => {
             step.config[field] = spec.options ? spec.options[0] : '';

@@ -20,6 +20,9 @@ const CANON_TRIGGERS = [
     { event: 'task.assignee_changed', phrase: 'a task assignee changes', re: /^a task is (re)?assigned$/i },
     { event: 'task.lead_changed', phrase: 'a task lead changes', re: /^a task('s)? lead changes$/i },
     { event: 'task.due_date_changed', phrase: 'a task due date changes', re: /^a task('s)? due date changes$/i },
+    { event: 'task.due_date_passed', phrase: 'a task due date passes', re: /^a task('s)? due date (passes|has passed)$/i },
+    { event: 'task.due_date_passed', phrase: 'a task due date passes', re: /^a task (is|becomes) overdue$/i },
+    { event: 'task.subtasks_all_done', phrase: 'all subtasks of a task are done', re: /^all (the )?subtasks of a task are (done|closed|complete|finished)$/i },
     { event: 'task.sprint_changed', phrase: 'a task moves sprint', re: /^a task (moves sprint|changes sprint)$/i },
     { event: 'task.renamed', phrase: 'a task is renamed', re: /^a task is renamed$/i },
     { event: 'task.created', phrase: 'a task is created', re: /^a task is created$/i },
@@ -49,6 +52,7 @@ const ACTION_PATTERNS = [
     { re: /^post a comment saying\s+(.+)$/i, build: (m) => ({ action: 'add_comment', config: { body: unquote(m[1]) } }) },
     { re: /^create a subtask called\s+(.+)$/i, build: (m) => ({ action: 'create_subtask', config: { title: unquote(m[1]) } }) },
     { re: /^run the\s+([a-z0-9.-]+)\s+agent(?:\s+as\s+(.+))?$/i, build: (m) => ({ action: 'run_agent', config: m[2] ? { skill: m[1], agent: unquote(m[2]) } : { skill: m[1] } }) },
+    { re: /^(?:send|notify)\s+(["“'‘].*["”'’])\s+to\s+(.+)$/i, build: (m) => ({ action: 'notify', config: { recipients: [], message: unquote(m[1]) }, names: [m[2]] }) },
     { re: /^(?:unassign (?:everyone|everybody)|clear the assignees)$/i, build: () => assignStep('clear') },
     { re: /^reassign in turn to\s+(.+)$/i, build: (m) => assignStep('replace', m[1], true) },
     { re: /^reassign to\s+(.+)$/i, build: (m) => assignStep('replace', m[1]) },
@@ -68,12 +72,19 @@ const ROLE_PHRASES = [
     { role: 'form_submitter', phrase: 'the form submitter', re: /^(?:the )?(?:form )?submitter$/i },
 ];
 
+const NOTIFY_ROLE_PHRASES = [
+    { role: 'task_assignees', phrase: 'the assignees', re: /^(?:the |its )?assignees?$/i },
+    { role: 'task_creator', phrase: 'the task creator', re: /^(?:the )?(?:task )?creator$/i },
+    { role: 'task_watchers', phrase: 'the watchers', re: /^(?:the |its )?watchers?$/i },
+];
+const INCLUDE_ACTOR = { phrase: 'even if they caused it', re: /^even (?:if|when) they caused it$/i };
+
 const folded = (s) => unquote(s).replace(/\s+/g, ' ').toLowerCase();
 
 /* A full name, or a first name only one person has. Anything else is an error naming the choices. */
-const resolvePerson = (raw, people) => {
+const resolvePerson = (raw, people, roles = ROLE_PHRASES) => {
     const wanted = folded(raw);
-    const role = ROLE_PHRASES.find((r) => r.re.test(wanted));
+    const role = roles.find((r) => r.re.test(wanted));
     if (role) return { id: role.role };
     const exact = people.filter((p) => folded(p.name) === wanted);
     const matches = exact.length ? exact : people.filter((p) => folded(p.name).split(' ')[0] === wanted);
@@ -239,10 +250,13 @@ const parseSentence = (sentence, { name, people = [], statuses = [], scope } = {
         steps.push(step);
     });
     steps.filter((step) => step.names).forEach((step) => {
+        const notifies = step.action === 'notify';
+        const target = notifies ? step.config.recipients : step.config.userIds;
         step.names.forEach((who) => {
-            const found = resolvePerson(who, people);
+            if (notifies && INCLUDE_ACTOR.re.test(folded(who))) { step.config.includeActor = true; return; }
+            const found = resolvePerson(who, people, notifies ? NOTIFY_ROLE_PHRASES : ROLE_PHRASES);
             if (found.error) errors.push(found.error);
-            else if (!step.config.userIds.includes(found.id)) step.config.userIds.push(found.id);
+            else if (!target.includes(found.id)) target.push(found.id);
         });
         delete step.names;
     });
@@ -292,9 +306,11 @@ const conditionSentence = (node) => {
 const ROLE_BY_ID = Object.fromEntries(ROLE_PHRASES.map((r) => [r.role, r.phrase]));
 
 /* Names for the people an assign step holds. Without a name for someone the sentence still reads, as a count. */
-const peopleSentence = (ids, people) => {
+const NOTIFY_ROLE_BY_ID = Object.fromEntries(NOTIFY_ROLE_PHRASES.map((r) => [r.role, r.phrase]));
+
+const peopleSentence = (ids, people, roles = ROLE_BY_ID) => {
     const byId = new Map(people.map((p) => [String(p.id), p.name]));
-    const named = ids.map((id) => ROLE_BY_ID[id] || byId.get(String(id))).filter(Boolean);
+    const named = ids.map((id) => roles[id] || byId.get(String(id))).filter(Boolean);
     const unnamed = ids.length - named.length;
     if (unnamed) named.push(named.length ? `${unnamed} other ${unnamed === 1 ? 'person' : 'people'}` : `${unnamed} ${unnamed === 1 ? 'person' : 'people'}`);
     return joinWords(named);
@@ -311,10 +327,16 @@ const assignSentence = (config, people) => {
     }
 };
 
+const notifySentence = (config, people) => {
+    const who = peopleSentence(Array.isArray(config.recipients) ? config.recipients.map(String) : [], people, NOTIFY_ROLE_BY_ID);
+    return `send "${config.message}" to ${who}${config.includeActor === true ? `, ${INCLUDE_ACTOR.phrase}` : ''}`;
+};
+
 const actionSentence = (step, people = []) => {
     const config = step.config || {};
     switch (step.action) {
         case 'assign': return assignSentence(config, people);
+        case 'notify': return notifySentence(config, people);
         case 'set_status': return `set the status to ${config.status}`;
         case 'set_priority': return `set the priority to ${config.priority}`;
         case 'add_comment': return `post a comment saying "${config.body}"`;
@@ -358,6 +380,8 @@ const grammar = () => ({
         'assign to <person> and <person>', 'assign to the task creator', 'assign to the form submitter',
         'rotate between <person> and <person>', 'reassign to <person>', 'reassign in turn to <person> and <person>',
         'unassign <person>', 'unassign everyone',
+        'send "<text>" to the assignees, the task creator, the watchers and <person>',
+        'send "<text>" to <person>, even if they caused it',
     ],
     shape: 'When <event>, if <condition> and <condition>, <action> and <action>.',
 });

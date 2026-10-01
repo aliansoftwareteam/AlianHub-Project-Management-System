@@ -3,17 +3,15 @@ import { inject, reactive } from 'vue';
 export const CARD_META_KEY = 'dashboardCardMeta';
 
 /**
- * The channel a card body uses to talk to the chrome around it (DashboardCard):
- * which state to render, the freshness line, and the empty-state copy.
+ * How a card body reports to the DashboardCard around it. The body stays mounted and the shell
+ * draws what it reports, so a body sets `state` on every load: 'loading' when it starts, then
+ * 'ready', 'empty' or 'error'. A body that never sets it is shown as failed after a timeout.
  *
- * Falls back to a detached object when the body is rendered outside a
- * DashboardCard (the legacy Home grid), so the same card works in both.
+ * `note` is the footer caption, `emptyText` and `emptyAction` replace the catalogue's empty
+ * copy, and `error` replaces the generic error line.
  *
- *   const meta = useCardMeta();
- *   meta.state = 'loading' | 'ready' | 'empty' | 'error';
- *   meta.note  = 'top 4 of 19';
- *   meta.updatedAt = Date.now();
+ * Outside a DashboardCard the body gets a detached object, so it still renders on its own.
  */
 export function useCardMeta() {
-    return inject(CARD_META_KEY, () => reactive({ state: 'loading', note: '', updatedAt: null, emptyText: '', emptyAction: '' }), true);
+    return inject(CARD_META_KEY, () => reactive({ state: '', note: '', updatedAt: null, emptyText: '', emptyAction: '', error: '' }), true);
 }

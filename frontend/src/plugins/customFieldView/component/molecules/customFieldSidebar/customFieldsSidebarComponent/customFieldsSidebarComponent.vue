@@ -7,7 +7,7 @@
         :className="'customFieldSidebar'"
     >
         <template #head-left>
-            <span class="font-weight-bold font-size-18">{{$t('CustomField.create_custom_field')}}</span>
+            <span class="font-weight-bold font-size-18">{{ customFieldObjects?._id ? $t('CustomField.edit_custom_field') : $t('CustomField.create_custom_field') }}</span>
         </template>
         <template #head-right>
             <img :src="closeBlueImage" alt="closeButton" class="cursor-pointer" @click="handleClose()"/>
