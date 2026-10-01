@@ -3,6 +3,7 @@ const { MongoDbCrudOpration,validateObjectId } = require("../../../utils/mongo-h
 const { mongoose } = require("mongoose");
 const logger = require("../../../Config/loggerConfig");
 const { isPrivileged } = require("../../../Config/roleTypes");
+const { ACTIVE_SEAT } = require("../../../Config/seatStatus");
 const { sprintIdentities, visibleSprintClause } = require("../../Sprints/helpers/sprintVisibility");
 
 
@@ -99,7 +100,7 @@ exports.getSprintFolder = async (req,res) => {
         const companyObj = {
             type: SCHEMA_TYPE.COMPANY_USERS,
             data: [
-                { userId: uid },
+                { userId: uid, ...ACTIVE_SEAT },
                 { roleType: 1, _id: 0 }
             ]
         };

@@ -14,8 +14,19 @@ exports.getProjectList = async (req, res) => {
         if (!uid || !companyId) {
             return res.status(404).json({ message: "UID or companyId not found" });
         }
-        const cacheKey = `UserProjectData:${companyId}:${uid}`;
+        // Read on every call, ahead of the cache: only an active seat has a list.
+        const seat = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.COMPANY_USERS,
+            data: [
+                { userId: uid, ...ACTIVE_SEAT },
+                { roleType: 1, _id: 0 }
+            ]
+        }, 'findOne');
+        if (!seat) {
+            return res.status(200).json([]);
+        }
 
+        const cacheKey = `UserProjectData:${companyId}:${uid}`;
         const value = myCache.get(cacheKey);
         if (value) {
             res.set({
@@ -24,31 +35,17 @@ exports.getProjectList = async (req, res) => {
             });
             return res.status(200).json(JSON.parse(value));
         }
-        const teamObj = {
+
+        const teams = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TEAMS_MANAGEMENT,
             data: [
                 { assigneeUsersArray: { $in: [uid] } },
                 { _id: 1 }
             ]
-        };
-
-        const companyObj = {
-            type: SCHEMA_TYPE.COMPANY_USERS,
-            data: [
-                { userId: uid, ...ACTIVE_SEAT },
-                { roleType: 1, _id: 0 }
-            ]
-        };
-        const [teams, companyUsers] = await Promise.all([
-            MongoDbCrudOpration(companyId, teamObj, 'find'),
-            MongoDbCrudOpration(companyId, companyObj, 'findOne')
-        ]);
-        if (!companyUsers) {
-            return res.status(200).json([]);
-        }
+        }, 'find');
 
         const teamIds = teams.map((team) => 'tId_' + team._id);
-        const { roleType } = companyUsers;
+        const { roleType } = seat;
 
         // The same rule as decideProjectAccess in Config/projectAccess.js, so the list never names a project the caller cannot open.
         const everyPrivateProject = isPrivileged(roleType)
