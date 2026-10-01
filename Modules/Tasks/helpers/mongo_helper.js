@@ -276,6 +276,7 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                         ...obj,
                     }
                 }
+                const hadLists = extraLists.extraListsOf(convertTask).map((entry) => ({ projectId: String(entry.projectId), sprintId: String(entry.sprintId) }));
                 let queryObj = {
                     type: SCHEMA_TYPE.TASKS,
                     data: [
@@ -292,7 +293,7 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                     ]
                 }
                 MongoDbCrudOpration(companyId, queryObj, "findOneAndUpdate").then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: extraLists.extraListsOf(convertTask).length ? { ...obj, extraLists: [] } : obj, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: hadLists.length ? { ...obj, extraLists: [] } : obj, module: 'task', ...(hadLists.length ? { leftLists: hadLists } : {}) });
                     /*When a subtask is converted to another subtask within a parent task, and a subtask is removed, the count of the parent task is reduced.*/
                     if (isMainSubTask === true) {
                         let object = {
@@ -512,7 +513,7 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                 }
                 }
                 MongoDbCrudOpration(companyId, queryObj, "findOneAndUpdate").then((ele) => {
-                    socketEmitter.emit('update', { type: "update", data: ele , updatedFields: extraLists.extraListsOf(moveTask).length ? { ...obj, extraLists: extraLists.extraListsOf(ele) } : obj, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: ele , updatedFields: extraLists.extraListsOf(moveTask).length ? { ...obj, extraLists: extraLists.extraListsOf(ele) } : obj, module: 'task', ...(extras.dropped.length ? { leftLists: extras.dropped.map(({ entry }) => entry) } : {}) });
                     resolve({ status: true, statusText: "MOVE" });
 
                     updateCommentCollection(companyId, moveTask,sprintObj,projectData,moveTask._id).catch((err) => { logger.error(`${err},ERROR IN ADD COMMENTS IN SUBTASK`); })
