@@ -234,13 +234,14 @@ describe('the metadata columns are sized for content and right-aligned', () => {
     });
 
     test('the header gutter matches the indent, border and padding under it', () => {
-        expect(css).toMatch(/\.lv2__cols \{[^}]*padding: 14px 13px 8px 29px/);
+        expect(css).toMatch(/\.lv2__cols \{[^}]*padding: 14px calc\(var\(--cell-pad-x, 12px\) \+ 1px\) 8px calc\(var\(--cell-pad-x, 12px\) \+ 17px\)/);
+        expect(css).toMatch(/\.lv2__row \{[^}]*padding: var\(--cell-pad-y, 9px\) var\(--cell-pad-x, 12px\)/);
         expect(css).toMatch(/\.lv2__sprint > \.lv2__group,\s*\.lv2__sprint \.lv2__collapsed-item \{ margin-left: 16px; \}/);
     });
 
     /* A sticky box cannot rise above its containing block, so a padded scroller would
        leave a strip of rows on show above the pinned header. */
     test('the scroller keeps no top padding for the sticky header to be trapped under', () => {
-        expect(css).toMatch(/\.lv2__scroll \{[^}]*padding: 0 20px 24px/);
+        expect(css).toMatch(/\.lv2__scroll \{[^}]*padding: 0 var\(--page-pad-x, 20px\) 24px/);
     });
 });
