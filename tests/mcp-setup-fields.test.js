@@ -50,8 +50,8 @@ const tools = require('../Modules/Mcp/tools');
 const scopes = require('../Modules/Mcp/scopes');
 const server = require('../Modules/Mcp/server');
 
-const { CID, OWNER, INSIDER, OUTSIDER, GUEST, P_OPEN, P_PRIVATE, P_PERSONAL, T_OPEN, TOKEN, MISSING, BEFORE, FLAGS, ctx, narrowed, readOnly, routeTable, asPerson, settle } = world;
-const { seed, rows, stored, audits, setRule, rpcThrough, listedThrough } = world.create(mockDb);
+const { CID, OWNER, INSIDER, OUTSIDER, GUEST, P_OPEN, P_PRIVATE, P_PERSONAL, T_OPEN, TOKEN, MISSING, BEFORE, FLAGS, GRANT_ID, ctx, narrowed, readOnly, outside, routeTable, asPerson, settle } = world;
+const { seed, rows, stored, audits, setRule, rpcThrough, listedThrough, seedGrant } = world.create(mockDb);
 const rpc = rpcThrough(server);
 const listed = listedThrough(server);
 const web = asPerson(routeTable(require('../Modules/CustomField/routes').init));
@@ -196,6 +196,21 @@ describe('who may ask for a field', () => {
         expect(await rpc({ ...as(INSIDER), projectIds: narrowed(INSIDER, [P_OPEN]).projectIds }, TOOL, args(P_PRIVATE))).toMatchObject({ refused: true, reason: NO_PROJECT });
         expect(await rpc(readOnly(OWNER), TOOL, args(P_OPEN))).toMatchObject({ isError: true, error: 'This token is read-only.' });
         expect(waiting()).toHaveLength(0);
+    });
+
+    it('files for an outside client only under the manage scope its person granted, which approval asks again', async () => {
+        const args = { projectId: P_OPEN, fields: [{ name: 'Client', type: 'text' }] };
+        expect(await rpc(outside(INSIDER, ['tasks:write']), TOOL, args)).toMatchObject({ refused: true, reason: expect.stringMatching(/needs a person's approval/) });
+        expect(waiting()).toHaveLength(0);
+        const scopesHeld = ['tasks:read', 'tasks:write', 'tasks:manage'];
+        const grant = seedGrant(INSIDER, scopesHeld);
+        const id = await filed(outside(INSIDER, scopesHeld), args);
+        expect(waiting()[0]).toMatchObject({ requestedBy: INSIDER, oauthGrantId: GRANT_ID });
+        grant.revokedAt = new Date();
+        expect(await approve(id)).toMatchObject({ error: expect.stringMatching(/revoked/) });
+        grant.revokedAt = null;
+        expect((await approve(id)).applied[0]).toMatchObject({ ok: true, result: { made: 1 } });
+        expect(fieldNamed('Client')).toMatchObject({ projectId: [P_OPEN], userId: INSIDER });
     });
 
     it('takes only the types the field form offers, and says what is wrong with each field', async () => {
