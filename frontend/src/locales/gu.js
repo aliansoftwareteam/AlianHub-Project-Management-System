@@ -1577,7 +1577,10 @@ export default {
         "primary_nav": "Primary",
         "inbox_unread": "Inbox, {n} unread",
         "everything": "Everything",
-        "goals": "Goals"
+        "goals": "Goals",
+        "my_work": "My work",
+        "ask": "Ask",
+        "more_places": "More places"
     },
     "Everything": {
         "title": "Everything",
@@ -7769,6 +7772,13 @@ export default {
         "accent_green": "Green",
         "accent_orange": "Orange",
         "accent_pink": "Pink",
+        "nav_mode": "How much to show",
+        "nav_mode_hint": "This only changes what is on the menu. Every page stays open to you, from search and from More.",
+        "nav_mode_simple": "Simple",
+        "nav_mode_simple_hint": "Five places: Home, My work, Projects, Inbox and Ask. A place you open joins them.",
+        "nav_mode_full": "Full",
+        "nav_mode_full_hint": "Every place on the menu, all the time.",
+        "nav_mode_failed": "Your choice could not be saved. Try again.",
         "look_title": "Look",
         "look_note": "Dense is the default. The other looks are a preview on this browser only: nothing is saved to your account and nobody else sees it.",
         "variant_dense": "Dense (default)",
