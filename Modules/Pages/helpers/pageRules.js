@@ -43,31 +43,24 @@ const pageVisibleTo = (page, uid) => Boolean(page)
 
 const pageVisibilityFilter = (uid) => ({ $or: [{ visibility: { $ne: 'private' } }, { createdBy: String(uid || '') }] });
 
-const inReachableProjects = ({ projectIds, everyProject, companyWide, projectField }) => {
-    if (everyProject) return companyWide ? null : { [projectField]: { $nin: [null, undefined] } };
-    const inProjects = { [projectField]: { $in: projectIds } };
-    return companyWide ? { $or: [inProjects, { [projectField]: { $in: [null, undefined] } }] } : inProjects;
-};
-
 /* Who reaches a page, as a query: the private-doc rule, then where the page is filed. A page under
  * no project is the company's, and `companyWide` says whether this reader takes those. `projectIds`
  * go into the query as given, so the caller casts them the way its own query needs.
  * pageReachedBy is the same rule over a loaded row: change both together. */
-const pageReachFilter = ({ uid, projectIds = [], everyProject = false, companyWide = true, projectField = 'ProjectID', exceptProjectIds = [] }) => {
-    const filed = inReachableProjects({ projectIds, everyProject, companyWide, projectField });
+const pageReachFilter = ({ uid, projectIds = [], companyWide = true, projectField = 'ProjectID', exceptProjectIds = [] }) => {
+    const inProjects = { [projectField]: { $in: projectIds } };
     return {
         $and: [
             pageVisibilityFilter(uid),
-            ...(filed ? [filed] : []),
+            companyWide ? { $or: [inProjects, { [projectField]: { $in: [null, undefined] } }] } : inProjects,
             ...(exceptProjectIds.length ? [{ [projectField]: { $nin: exceptProjectIds } }] : []),
         ],
     };
 };
 
-const pageReachedBy = (page, { uid, inProject = () => false, everyProject = false, companyWide = true }) => {
+const pageReachedBy = (page, { uid, inProject = () => false, companyWide = true }) => {
     if (!pageVisibleTo(page, uid)) return false;
-    if (!page.ProjectID) return companyWide;
-    return everyProject || Boolean(inProject(page.ProjectID));
+    return page.ProjectID ? Boolean(inProject(page.ProjectID)) : companyWide;
 };
 
 /* Whoever can read a doc may comment on it; a doc in the trash is read-only. */

@@ -26,11 +26,13 @@ const toOid = (v) => new mongoose.Types.ObjectId(String(v));
 
 /* `personalLists` is given for an owner or admin, who reads company-wide: the personal lists that are
  * someone else's. Everyone else's project list already leaves those out, and for them it stays null.
- * `taskProjectIds` are the projects whose tasks the caller may list; without them every project is. */
-const build = ({ uid, projectIds, taskProjectIds = projectIds, hidden, tokenNarrowed, personalLists = null }) => {
+ * `taskProjectIds` are the projects whose tasks the caller may list; without them every project is.
+ * Pages are read inside `pageProjectIds`, the projects the web app lists for the person. */
+const build = ({ uid, projectIds, taskProjectIds = projectIds, hidden, tokenNarrowed, personalLists = null, pageProjectIds = projectIds, seated = true }) => {
     const hiddenSet = new Set(hidden.map(String));
     const projectSet = projectIds === null ? null : new Set(projectIds.map(String));
     const taskProjectSet = taskProjectIds === null ? null : new Set(taskProjectIds.map(String));
+    const pageProjectSet = new Set(pageProjectIds.map(String));
     const companyWide = personalLists !== null;
     const excluded = new Set((personalLists || []).map(String));
 
@@ -40,7 +42,7 @@ const build = ({ uid, projectIds, taskProjectIds = projectIds, hidden, tokenNarr
     const allowsTask = (task) => Boolean(task) && listsTasksIn(task.ProjectID) && allowsSprint(task.sprintId)
         && readsCompanyWide(task, uid, [...excluded]);
     // A page outside every project is company-wide; a project-restricted token was never granted those.
-    const allowsPage = (page) => pageReachedBy(page, { uid, inProject: allowsProject, companyWide: !tokenNarrowed });
+    const allowsPage = (page) => pageReachedBy(page, { uid, inProject: (id) => allowsProject(id) && pageProjectSet.has(String(id)), companyWide: seated && !tokenNarrowed });
 
     /* A find clause for tasks. `narrowTo` is a caller's projectId argument: it can only
      * shrink the set, so a project outside the filter matches nothing. */
@@ -56,9 +58,8 @@ const build = ({ uid, projectIds, taskProjectIds = projectIds, hidden, tokenNarr
 
     const pageClause = () => pageReachFilter({
         uid,
-        projectIds: (projectIds || []).map(toOid),
-        everyProject: projectIds === null,
-        companyWide: !tokenNarrowed,
+        projectIds: pageProjectIds.map(toOid),
+        companyWide: seated && !tokenNarrowed,
         exceptProjectIds: idForms([...excluded]),
     });
 
@@ -73,11 +74,12 @@ const forCaller = async (ctx) => {
     const inToken = (id) => !tokenNarrowed || tokenList.includes(String(id));
 
     const roleType = await getRoleType(companyId, uid);
-    if (roleType === null) return build({ uid, projectIds: [], hidden: [], tokenNarrowed });
+    if (roleType === null) return build({ uid, projectIds: [], hidden: [], tokenNarrowed, seated: false });
     if (isPrivileged(roleType)) {
         const personalLists = await othersPersonalListIds(companyId, uid);
         const listed = tokenNarrowed ? tokenList.filter((id) => isId(id) && !personalLists.includes(id)) : null;
-        return build({ uid, projectIds: listed, hidden: [], tokenNarrowed, personalLists });
+        const pageProjectIds = (await visibleProjectIds(companyId, uid)).map(String).filter(inToken);
+        return build({ uid, projectIds: listed, hidden: [], tokenNarrowed, personalLists, pageProjectIds });
     }
 
     const projectIds = (await visibleProjectIds(companyId, uid)).map(String).filter(inToken);

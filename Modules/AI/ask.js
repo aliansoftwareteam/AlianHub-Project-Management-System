@@ -102,7 +102,7 @@ const gather = async (companyId, uid, { question, projectId, limit = MAX_PER_TYP
     const textMatch = orRegex(terms, ['TaskName', 'TaskKey', 'rawDescription']);
     if (textMatch) Object.assign(taskMatch, textMatch);
 
-    const pageMatch = { deletedStatusKey: { $ne: 1 }, ...pageReachFilter({ uid, projectIds: searchIds, companyWide: false }) };
+    const pageMatch = { deletedStatusKey: { $ne: 1 }, ...pageReachFilter({ uid, projectIds: searchIds, companyWide: !named && !projectId && !tokenProjectIds.length }) };
     const pageText = orRegex(terms, ['title']);
     if (pageText) pageMatch.$and.push(pageText);
 
