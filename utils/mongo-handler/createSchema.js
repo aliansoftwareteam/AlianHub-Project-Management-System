@@ -110,6 +110,9 @@ importJobsSchema.index({ userId: 1, createdAt: -1 });
 const aiFieldJobsSchema = new Schema(schema.aiFieldJobs, {strict: true, timestamps: true});
 aiFieldJobsSchema.index({ userId: 1, createdAt: -1 });
 aiFieldJobsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+const customFieldLinksSchema = new Schema(schema.customFieldLinks, {strict: true, timestamps: true});
+customFieldLinksSchema.index({ taskId: 1, fieldId: 1 }, { unique: true });
+customFieldLinksSchema.index({ fieldId: 1, ids: 1 });
 const epicsSchema = new Schema(schema.epics, {strict: true, timestamps: true});
 epicsSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
 const pagesSchema = new Schema(schema.pages, {strict: true, timestamps: true});
@@ -136,6 +139,9 @@ const taskTemplatesSchema = new Schema(schema.task_templates, {strict: true, tim
 taskTemplatesSchema.index({ scope: 1, ProjectID: 1, deletedStatusKey: 1 });
 const viewTemplatesSchema = new Schema(schema.view_templates, {strict: true, timestamps: true});
 viewTemplatesSchema.index({ deletedStatusKey: 1, name: 1 });
+const projectSnapshotsSchema = new Schema(schema.project_snapshots, {strict: true, timestamps: true});
+projectSnapshotsSchema.index({ kind: 1, deletedStatusKey: 1 });
+projectSnapshotsSchema.index({ templateId: 1, part: 1 });
 const everythingViewsSchema = new Schema(schema.everything_views, {strict: true, timestamps: true});
 everythingViewsSchema.index({ userId: 1, deletedStatusKey: 1 });
 const remindersSchema = new Schema(schema.reminders, {strict: true, timestamps: true});
@@ -493,6 +499,7 @@ module.exports = {
     exportJobsSchema,
     importJobsSchema,
     aiFieldJobsSchema,
+    customFieldLinksSchema,
     epicsSchema,
     pagesSchema,
     pageVersionsSchema,
@@ -503,6 +510,7 @@ module.exports = {
     recurringTasksSchema,
     taskTemplatesSchema,
     viewTemplatesSchema,
+    projectSnapshotsSchema,
     everythingViewsSchema,
     remindersSchema,
     notesSchema,

@@ -87,10 +87,10 @@ const global = {
 };
 
 describe('the types the "create custom field" drawer offers', () => {
-    it('adds the four new types to the catalogue, once', () => {
+    it('adds the new types to the catalogue, once', () => {
         const t = (key) => key;
         const types = fieldTypeCatalogue(getters['settings/customFields'](), t);
-        expect(types.map((type) => type.cfType)).toEqual(['text', 'people', 'url', 'rating', 'progress', 'files']);
+        expect(types.map((type) => type.cfType)).toEqual(['text', 'people', 'url', 'rating', 'progress', 'files', 'relationship', 'voting']);
         expect(types.find((type) => type.cfType === 'rating')).toMatchObject({ cfTitle: 'Fields.type_rating', cfDescrption: 'Fields.hint_rating', icon: 'star' });
         const already = fieldTypeCatalogue([{ cfType: 'rating', cfTitle: 'Stars' }], t);
         expect(already.filter((type) => type.cfType === 'rating')).toEqual([{ cfType: 'rating', cfTitle: 'Stars' }]);
@@ -98,7 +98,7 @@ describe('the types the "create custom field" drawer offers', () => {
 
     it('lists them, opens the type\'s own editor and saves the field', async () => {
         const drawer = mount(CustomFieldDrawer, { props: { componentDetails: {}, pageInd: 0, customFieldObject: {} }, global });
-        expect(drawer.findAll('[data-field-type]').map((row) => row.attributes('data-field-type'))).toEqual(['text', 'people', 'url', 'rating', 'progress', 'files']);
+        expect(drawer.findAll('[data-field-type]').map((row) => row.attributes('data-field-type'))).toEqual(['text', 'people', 'url', 'rating', 'progress', 'files', 'relationship', 'voting']);
 
         await drawer.get('[data-field-type="rating"]').trigger('click');
         const editor = drawer.getComponent(ModuleFieldEditor);
