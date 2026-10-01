@@ -342,6 +342,9 @@ describe('private view settings', () => {
             const res = await update(MEMBER, 'projectId', { id: 'mylist0001', projectId: 'p2' });
             expect(res.statusCode).toBe(400);
             expect(views()[0].projectId).toBe('p1');
+            for (const key of ['constructor', '__proto__', 'toString', undefined]) {
+                expect((await update(MEMBER, key, { id: 'mylist0001', [key]: 'x' })).statusCode).toBe(400);
+            }
         });
 
         it('still renames an embed by its name', async () => {

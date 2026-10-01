@@ -132,10 +132,6 @@
   right: 2px;
   top: -6px;
 }
-.activeViewList img.position-ab.list_make_as_defaultimg {
-  top: 9px;
-  right: 2px;
-}
 .audio_dropdown button.cursor-pointer.dot-btn {
   padding: 0;
   background: transparent;
@@ -158,21 +154,21 @@
   min-width: 186px !important;
 }
 
+/* The Add view panel is only a frame for .view__list-dropdown, which brings the surface, border and width. */
 .embed__dropdown .search-project-filter {
-  background-color: var(--surface-2);
   width: auto;
   height: auto;
   padding: 0 !important;
-  border-radius: 6px !important;
+  border-radius: var(--r-card) !important;
 }
 .embed__dropdown {
-  border-radius: 6px !important;
+  border-radius: var(--r-card) !important;
   box-shadow: var(--shadow-pop);
   border: 0 !important;
 }
 .embed__dropdown .drop-down-options {
   max-height: none!important;
-  border-radius: 6px 0px 0px 6px!important;
+  border-radius: var(--r-card) !important;
 }
 
 .embed-option{
@@ -312,8 +308,7 @@
   .viewlist-mobile-dropdown {border: 0 !important;}
   .viewlist-mobile-dropdown .drop-down-item {padding: 7.5px 10px !important;}
   .viewlist-mobile-dropdown .mobileCloseIcon {display: none;}
-  .mobile-defaultview-text img.list_make_as_defaultimg {margin-right: 10px;margin-bottom: 1px;}
-  .activeTab-tick{height: 10px;width: 10px;}
+  .activeTab-tick{height: 12px;width: 12px;flex: none;color: var(--brand);}
   .showProjectDetailRight .description-main, .showProjectDetailRight .checklist-main, .showProjectDetailRight .project__detail-atttachment{padding: 10px 20px 0px 20px;background-color: var(--surface);border-bottom: 0;}
   .showProjectDetailRight .project__detail-atttachment{padding-bottom: 20px;padding-top: 15px;}
   .showProjectDetailRight{width:100%;order: 2;padding: 0 !important;height: calc(100% - 0px);}

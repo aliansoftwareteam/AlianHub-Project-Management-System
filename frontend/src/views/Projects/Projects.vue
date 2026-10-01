@@ -57,7 +57,7 @@
                                                     <img v-else class="vertical-middle profile-sm-square mobile-projectlist-icon" :src="projectData.projectIcon.data" alt=""/>
                                                 </template>
                                             </div>
-                                            <DropDown mode="listbox" id="project_avail_views" maxHeight="90vh" :title="$t('Projects.all_views')" :bodyClass="{'viewlist-mobile-dropdown' : true}">
+                                            <DropDown mode="listbox" themed id="project_avail_views" maxHeight="90vh" :title="$t('Projects.all_views')" :bodyClass="{'viewlist-mobile-dropdown' : true}">
                                                 <template #button>
                                                     <div
                                                         class="d-flex align-items-center text-nowrap border-top-radius-10-px cursor-pointer h-100"
@@ -65,36 +65,40 @@
                                                     >
                                                         <img :src="publicIcon" v-if="!projectData.isPrivateSpace" class="pr-10px vertical-middle" alt="public-folder"/>
                                                         <span class="font-size-14 text-ellipsis d-inline-block gray81 project__requirement">
-                                                            <img :src="activeTab !== 'EmbedView'
-                                                                    ? projectComponentsIcons(projectData?.ProjectRequiredComponent?.find(x => x.keyName === activeTab)?.keyName)?.icon
-                                                                    : projectComponentsIcons(projectData?.ProjectRequiredComponent?.find(x => x.name === embedViewName)?.type)?.icon" alt="" class="mr-5px">
-                                                            {{activeTab !== 'EmbedView' ? viewLabel(projectData?.ProjectRequiredComponent?.find(x => x.keyName === activeTab)?.name) : embedViewName || "N/A"}}
+                                                            <span v-if="activeTab !== 'EmbedView' && projectComponentsIcons(activeTab)?.icon" class="ah-mask-icon phone-view__icon mr-5px" :style="maskOf(projectComponentsIcons(activeTab).icon)" aria-hidden="true"></span>
+                                                            <img v-else-if="activeTab === 'EmbedView' && icons[selectedEmbedView?.type]" :src="icons[selectedEmbedView.type]" alt="" class="mr-5px">
+                                                            {{activeTab !== 'EmbedView' ? (shownView?.title || viewLabel(shownView?.name)) : embedViewName || "N/A"}}
                                                         </span>
                                                         <img :src="listDropIcon" alt="" :style="[{marginLeft : clientWidth <=375 ? '2px' : '10px'}]"/>
                                                     </div>
                                                 </template>
                                                 <template #options>
                                                     <DropDownOption
-                                                        v-for="view in projectData.ProjectRequiredComponent"
-                                                        :key="view.id"
-                                                        :selected="activeTab === 'EmbedView' ? !view?.keyName && view.name === embedViewName : isActiveView(view)"
+                                                        v-for="view in phoneViews"
+                                                        :key="viewKeyOf(view)"
+                                                        :selected="isPhoneViewActive(view)"
                                                         @click="$refs[projectView].click(),handleView(view),!view?.keyName ? openEmbedView(view) : ''"
                                                     >
                                                         <div class="d-flex align-items-center justify-content-between w-100">
                                                             <div class="viewlistIcon d-flex align-items-center">
-                                                                <span class="d-flex align-items-center justify-content-center border-radius-6-px mr-20px bg-white border-gray view__activeproject-name">
-                                                                    <img :src="view?.keyName ? activeTab === view.keyName ? projectComponentsIcons(view?.keyName)?.activeIcon || '' : projectComponentsIcons(view?.keyName)?.icon || '' : icons?.[view?.type] || ''" alt="" class="mr-0">
+                                                                <span class="d-flex align-items-center justify-content-center border-radius-6-px mr-20px view__activeproject-name">
+                                                                    <span v-if="projectComponentsIcons(view?.keyName)?.icon" class="ah-mask-icon" :style="maskOf(projectComponentsIcons(view.keyName).icon)" aria-hidden="true"></span>
+                                                                    <img v-else-if="icons?.[view?.type]" :src="icons[view.type]" alt="" class="mr-0">
                                                                 </span>
-                                                                <span class="font-size-16 font-weight-500 text-ellipsis d-inline-block gray81 mw-66" @click="handleViewName(view.name)">{{ view.title || $t(`ViewList.${view.name}`) }}</span>
+                                                                <span class="font-size-16 font-weight-500 text-ellipsis d-inline-block mw-66" @click="handleViewName(view.name)">{{ view.title || viewLabel(view.name) }}</span>
+                                                                <span v-if="view.isPrivate" class="phone-view__mark" role="img" :aria-label="$t('Projects.private_view')" :title="$t('Projects.private_view')">
+                                                                    <ShellIcon name="lock" :size="13" />
+                                                                </span>
                                                             </div>
-                                                            <span v-if="view.setAsDefault" class="mobile-defaultview-text font-size-12 font-weight-400 darkblue"><img class="list_make_as_defaultimg" :src="viewDefaultIcon"/>
+                                                            <span v-if="view.setAsDefault" class="mobile-defaultview-text font-size-12 font-weight-400">
+                                                                <ShellIcon name="home" :size="12" />
                                                                 {{ $t('Projects.default_view') }}
                                                             </span>
-                                                            <img class="ml-20px activeTab-tick" v-if="isActiveView(view)" :src="viewDefaultActive"/>
+                                                            <ShellIcon v-if="isPhoneViewActive(view)" name="check" :size="14" class="ml-20px activeTab-tick" />
                                                         </div>
                                                     </DropDownOption>
                                                     <DropDownOption class="position-sti border d-flex justify-content-center addview__dropdown" @click="$refs[projectView].click(), $refs.bottomModals.openAllViews()">
-                                                        <div class="blue font-size-18 font-weight-700">
+                                                        <div class="addview__label font-size-18 font-weight-700">
                                                             + {{ $t('Projects.add_view') }}
                                                         </div>
                                                     </DropDownOption>
@@ -494,6 +498,8 @@ import { useProjectTree } from './composables/useProjectTree';
 import { splitProjectViews } from './composables/projectViewBar';
 import { useSavedViews } from './composables/useSavedViews';
 import { viewKeyOf } from './composables/savedViewSettings';
+import { maskOf } from '@/utils/iconMask';
+import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { provideViewSettings } from './composables/viewSettingsContext';
 import { VIEW_FILTER_ROWS } from './composables/taskFilterSignal';
 import { useProjectCustomFields } from './composables/projectCustomFields';
@@ -654,8 +660,6 @@ const filterFavorites = ref(localStorage.getItem('favoriteFilter') == 'true');
 const clientWidth = inject('$clientWidth');
 const route = useRoute();
 const router = useRouter();
-const viewDefaultIcon = require('@/assets/images/svg/list_home_icon.svg');
-const viewDefaultActive = require('@/assets/images/svg/blue_tick.svg');
 
 const companyId = inject('$companyId');
 const { checkPermission, makeUniqueId } = useCustomComposable();
@@ -742,6 +746,11 @@ provideViewSettings(savedViews);
 const { activeView, dirty: viewDirty, saving: viewSaving, save: saveView, saveForMe: saveViewForMe, saveAsNew: saveViewAsNew, reset: resetView } = savedViews;
 
 const isActiveView = (view) => (activeView.value ? viewKeyOf(view) === viewKeyOf(activeView.value) : activeTab.value === view.keyName);
+
+/* The phone's view switcher lists what the desktop tab bar and its embed menu list, private views included. */
+const phoneViews = computed(() => [...viewsListArray.value, ...embedViews.value]);
+const isPhoneViewActive = (view) => (activeTab.value === 'EmbedView' ? !view?.keyName && view.name === embedViewName.value : Boolean(view?.keyName) && isActiveView(view));
+const shownView = computed(() => activeView.value || viewsListArray.value.find((view) => view.keyName === activeTab.value));
 
 const settleView = (task, message) => task()
     .then(() => toast.success(t(message), { position: 'top-right' }))
@@ -1390,6 +1399,29 @@ function closeModal() {
 .view__activeproject-name{
     width:35px;
     height:35px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink-2);
+}
+.phone-view__mark{
+    display: inline-flex;
+    flex: none;
+    margin-left: 8px;
+    color: var(--ink-2);
+}
+.ah-mask-icon.phone-view__icon{
+    width: 12px;
+    height: 12px;
+    vertical-align: middle;
+}
+.mobile-defaultview-text{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--brand);
+}
+.addview__label{
+    color: var(--brand);
 }
 .addview__dropdown{
     border-color: var(--brand);

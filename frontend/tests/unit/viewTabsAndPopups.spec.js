@@ -4,14 +4,15 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { ref } from 'vue';
 
-const { apiRequest, toast, commit, editView, deleteView, addView, state } = vi.hoisted(() => ({
+const { apiRequest, toast, commit, editView, deleteView, addView, router, state } = vi.hoisted(() => ({
     apiRequest: vi.fn(),
     toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
     commit: vi.fn(),
     editView: vi.fn(),
     deleteView: vi.fn(),
     addView: vi.fn(),
-    state: { ids: 0, memberRow: null, permissions: new Set() },
+    router: { push: vi.fn(), replace: vi.fn() },
+    state: { ids: 0, memberRow: null, permissions: new Set(), route: { params: {}, query: {} } },
 }));
 
 vi.mock('@/services', () => ({ apiRequest }));
@@ -26,7 +27,7 @@ vi.mock('@/composable', () => ({
 vi.mock('@/composable/commonFunction', () => ({ projectComponentsIcons: () => ({ icon: 'icon.svg', activeIcon: 'active.svg' }) }));
 vi.mock('@/components/molecules/EmbedView/helper', () => ({ addView, editView, deleteView }));
 vi.mock('@/components/molecules/EmbedView/helper.js', () => ({ addView, editView, deleteView }));
-vi.mock('vue-router', () => ({ useRoute: () => ({ params: {}, query: {} }), useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
+vi.mock('vue-router', () => ({ useRoute: () => state.route, useRouter: () => router }));
 vi.mock('vuex', async (importOriginal) => ({
     ...(await importOriginal()),
     useStore: () => ({ getters: { 'settings/companyUsers': [state.memberRow], 'projectData/projects': { data: [] } }, commit }),
@@ -73,6 +74,8 @@ const settle = async () => {
 beforeEach(() => {
     state.ids = 0;
     state.permissions = new Set(['project.view_list']);
+    state.route = { params: {}, query: {} };
+    router.replace.mockReset();
     state.memberRow = { _id: 'row-1', userId: 'user-1', ProjectRequiredComponent: [mine(), { id: 'other00001', projectId: 'p9' }] };
     templates = [{ _id: 't-list', name: 'Sprint list', viewType: 'ProjectListView', canManage: false }];
     added = { status: true, data: ADDED, leftOut: [] };
@@ -256,6 +259,19 @@ describe('the other options of a private view', () => {
         expect(calls('post', PRIVATE_VIEW_URL)[0][2]).toEqual({ id: 'row-1', operation: 'delete', data: { id: 'mine000001' } });
         const [, stored] = commit.mock.calls.find(([name]) => name === 'settings/mutateCompanyUsers');
         expect(stored.data.ProjectRequiredComponent.map((view) => view.id)).toEqual(['other00001']);
+        expect(router.replace).not.toHaveBeenCalled();
+    });
+
+    it('opens the shared view of its kind when the deleted private view was the open one', async () => {
+        state.route = { params: {}, query: { tab: 'ProjectListView', view: 'mine000001' } };
+        await mountTab(mine());
+        await openMenu();
+        menuItem('delete-view').click();
+        await settle();
+        wrapper.findComponent(ConfirmationSidebar).vm.$emit('confirm');
+        await settle();
+
+        expect(router.replace).toHaveBeenCalledWith({ query: { tab: 'ProjectListView' } });
     });
 });
 
@@ -414,5 +430,13 @@ describe('the view tabs and their popups in the source', () => {
     it('the project page gives each tab a key and an id of its own', () => {
         const page = source('views/Projects/Projects.vue');
         expect(page).not.toMatch(/<ViewsList\b[^>]*:id="view\.keyName"/s);
+    });
+
+    it('the phone view switcher lists what the tab bar lists, private views included, in a themed sheet', () => {
+        const page = source('views/Projects/Projects.vue');
+        expect(page).toMatch(/const phoneViews = computed\(\(\) => \[\.\.\.viewsListArray\.value, \.\.\.embedViews\.value\]\)/);
+        expect(page).toMatch(/v-for="view in phoneViews"/);
+        expect(page).toMatch(/<DropDown\b[^>]*\bthemed\b[^>]*id="project_avail_views"/);
+        expect(page).toMatch(/v-if="view\.isPrivate"[^>]*role="img"[^>]*:aria-label="\$t\('Projects\.private_view'\)"/);
     });
 });

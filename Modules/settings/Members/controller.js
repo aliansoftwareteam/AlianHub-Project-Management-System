@@ -30,11 +30,11 @@ const MANAGER_ERROR = Object.freeze({
 });
 
 /* The fields of a private view its owner may change one at a time; an unusable value reads as undefined. */
-const PRIVATE_VIEW_FIELDS = Object.freeze({
-    name: (value) => (typeof value === 'string' ? value : undefined),
-    title: (value) => cleanViewTitle(value) || undefined,
-    isPin: (value) => (typeof value === 'boolean' ? value : undefined),
-});
+const PRIVATE_VIEW_FIELDS = new Map([
+    ['name', (value) => (typeof value === 'string' ? value : undefined)],
+    ['title', (value) => cleanViewTitle(value) || undefined],
+    ['isPin', (value) => (typeof value === 'boolean' ? value : undefined)],
+]);
 
 const holdsSeat = (row) => Boolean(row) && Number(row.status) === ACTIVE && row.isDelete !== true;
 const refuse = (res, code, statusText) => res.status(code).json({ status: false, statusText, message: statusText });
@@ -213,7 +213,7 @@ exports.handlePrivateView = async (req, res) => {
                 $push: { ProjectRequiredComponent: view }
             }
         } else if (operation === 'update') {
-            const readValue = PRIVATE_VIEW_FIELDS[key];
+            const readValue = PRIVATE_VIEW_FIELDS.get(key);
             if (!readValue) {
                 return refuse(res, 400, 'This private view field cannot be changed.');
             }

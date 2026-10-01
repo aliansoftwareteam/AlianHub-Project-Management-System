@@ -114,7 +114,7 @@
 </template>
 
 <script setup>
-import { defineProps, defineEmits, ref, inject, computed, nextTick } from 'vue';
+import { ref, inject, computed, nextTick } from 'vue';
 import { escapeHtml } from '@/utils/notificationHtml';
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
@@ -259,19 +259,27 @@ async function saveRename(keepFocus) {
     }
 }
 
+const openAnother = (views) => {
+    const next = views.find((view) => view.setAsDefault) || views.find((view) => view.viewStatus) || views[0];
+    router.replace({ query: { tab: next ? next.keyName : 'ProjectListView' } });
+};
+
 async function removeMine() {
     const row = memberRow();
     if (!row) throw new Error('The member row is not loaded.');
     await deletePrivateView(row._id, props.item.id);
     storeMine(row, (views) => views.filter((view) => view.id !== props.item.id));
+    if (String(route.query.view || '') === String(props.item.id)) {
+        const shared = project.value?.ProjectRequiredComponent || [];
+        const sameKind = shared.filter((view) => view.keyName === props.item.keyName);
+        openAnother(sameKind.length ? sameKind : shared);
+    }
     toast.success(t('Toast.View_Deleted_Successfully'), { position: 'top-right' });
 }
 
 async function removeShared() {
     if (route.query.tab == props.item?.keyName) {
-        const others = (project.value?.ProjectRequiredComponent || []).filter((view) => view.keyName !== props.item?.keyName);
-        const next = others.find((view) => view.setAsDefault) || others.find((view) => view.viewStatus) || others[0];
-        router.replace({ query: { tab: next ? next.keyName : 'ProjectListView' } });
+        openAnother((project.value?.ProjectRequiredComponent || []).filter((view) => view.keyName !== props.item?.keyName));
     }
     const res = await deleteView(projectIds(), props.item);
     commit('projectData/projectLocalUpdate', { itemData: res.data, projectId: project.value?._id, key: 'ProjectView', subKey: 'delete', userId: '' });
