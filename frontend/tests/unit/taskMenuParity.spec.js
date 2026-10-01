@@ -48,7 +48,7 @@ const ALL = ['rename', 'subtask', 'copy-link', 'copy-key', 'new-tab', 'open', 's
 const task = (overrides = {}) => ({
     _id: 't1', TaskName: 'Write the brief', TaskKey: 'P1-4', ProjectID: 'p1', sprintId: 's1',
     sprintArray: { id: 's1', name: 'Sprint 1' }, statusKey: 1, isParentTask: true, subTasks: 2,
-    AssigneeUserId: [], watchers: [], tagsArray: [], deletedStatusKey: 0,
+    AssigneeUserId: [], watchers: [], tagsArray: [], deletedStatusKey: 0, Task_Priority: 'HIGH',
     ...overrides
 });
 const project = { _id: 'p1', ProjectCode: 'P1', ProjectName: 'Project one', isGlobalPermission: true, viewColumn: [], tagsArray: [], taskStatusData: [], sprintsObj: { s1: { id: 's1', name: 'Sprint 1' } } };
@@ -74,7 +74,7 @@ const Option = { name: 'DropDownOption', emits: ['click'], template: '<div role=
 const Sidebars = { name: 'TaskMenuSidebars', props: ['mode', 'task'], emits: ['close'], template: '<div class="sidebars" :data-mode="mode || \'\'"></div>' };
 
 function mountBoard({ data = task(), archived = false } = {}) {
-    const boardMenu = { rights: ref(rightsNow(archived)), rename: vi.fn(), taskHref: vi.fn(() => 'https://x/t1'), duplicate: vi.fn() };
+    const boardMenu = { rights: ref(rightsNow(archived)), rename: vi.fn(), duplicate: vi.fn() };
     const toggleTaskDetail = vi.fn();
     const wrapper = mount(BoardCard, {
         props: { data, groupValue: 0, isSubTask: false },
@@ -277,7 +277,7 @@ describe('what the Board gained', () => {
         await pickBoard(wrapper, 'open');
         expect(toggleTaskDetail).toHaveBeenCalledWith(expect.objectContaining({ _id: 't1' }));
         await pickBoard(wrapper, 'new-tab');
-        expect(opened).toHaveBeenCalledWith('https://x/t1', '_blank', 'noopener');
+        expect(opened).toHaveBeenCalledWith(new URL('/t1', window.location.href).toString(), '_blank', 'noopener');
         opened.mockRestore();
         wrapper.unmount();
     });

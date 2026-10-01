@@ -3171,6 +3171,7 @@ export default {
         menu_duplicate_subtasks: "Duplicate with subtasks",
         copy_of: "Copy of {name}",
         row_archived: "Task archived.",
+        row_restored: "Task restored.",
         row_deleted: "Task moved to the trash.",
         row_moved: "Task moved to {project}.",
         row_duplicated: "Created “{name}”.",
@@ -3219,6 +3220,11 @@ export default {
         estimate_placeholder: "1h 30m",
         estimate_undo_reason: "Undid an estimate change from the task list.",
         field_not_for_type: "{field} is not used for this task type"
+    },
+    ViewDensity: {
+        title: "Row density",
+        comfortable: "Comfortable",
+        compact: "Compact"
     },
     Views: {
         desktop_only_title: "Open this on a desktop",
