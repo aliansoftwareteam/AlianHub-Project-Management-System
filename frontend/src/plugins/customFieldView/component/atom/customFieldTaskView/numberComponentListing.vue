@@ -131,7 +131,7 @@
         }
     }
     const handleKeyUp = () => {
-        const check = textModel.value.replace(/,/g, '');
+        const check = String(textModel.value ?? '').replace(/,/g, '');
         if(props?.detail?.fieldMinimum || props?.detail?.fieldMaximum){
             if(props?.detail?.fieldMinimum && Number(props?.detail?.fieldMinimum) > Number(check)){
                 error.value = `Must be at least ${props?.detail?.fieldMinimum} ${props?.detail?.fieldTitle}.`

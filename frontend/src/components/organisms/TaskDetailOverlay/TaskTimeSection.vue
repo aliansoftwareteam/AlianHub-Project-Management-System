@@ -267,7 +267,7 @@ defineExpose({ refresh });
 <style scoped>
 .ah-time { display: flex; flex-direction: column; gap: 8px; }
 .ah-time__head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.ah-time__total { color: var(--ink); font-size: 12px; }
+.ah-time__total { color: var(--ink); font-size: var(--fs-sm, 12px); }
 .ah-time__bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
 .ah-time__fill { display: block; height: 100%; background: var(--ok); border-radius: inherit; }
 .ah-time__bar.is-over .ah-time__fill { background: var(--danger); }
@@ -277,20 +277,20 @@ defineExpose({ refresh });
 .ah-time__form { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
 .ah-time__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .ah-time__field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.ah-time__caption { font: 500 11px var(--font-ui); color: var(--ink-label); }
+.ah-time__caption { font: 500 var(--fs-xs, 11px) var(--font-ui); color: var(--ink-label); }
 .ah-time__input {
     width: 100%; min-height: 32px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 7px;
-    background: var(--surface); color: var(--ink); font: 400 13px var(--font-ui);
+    background: var(--surface); color: var(--ink); font: 400 var(--fs-md, 13px) var(--font-ui);
 }
-.ah-time__check { display: inline-flex; align-items: center; gap: 6px; font: 400 13px var(--font-ui); color: var(--ink); }
-.ah-time__error { margin: 0; color: var(--danger); font: 500 12px var(--font-ui); }
+.ah-time__check { display: inline-flex; align-items: center; gap: 6px; font: 400 var(--fs-md, 13px) var(--font-ui); color: var(--ink); }
+.ah-time__error { margin: 0; color: var(--danger); font: 500 var(--fs-sm, 12px) var(--font-ui); }
 .ah-time__form-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .ah-time__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .ah-time__entry { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-top: 1px solid var(--hairline); }
 .ah-time__entry-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.ah-time__who { font: 500 12.5px var(--font-ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ah-time__who { font: 500 var(--fs-md, 12.5px) var(--font-ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ah-time__when, .ah-time__note { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ah-time__minutes { font-size: 12px; color: var(--ink); flex: none; }
+.ah-time__minutes { font-size: var(--fs-sm, 12px); color: var(--ink); flex: none; }
 .ah-time__flag { display: inline-flex; align-items: center; color: var(--ink-2); flex: none; }
 .ah-time__entry-actions { display: inline-flex; gap: 2px; flex: none; }
 .ah-time__icon-btn {

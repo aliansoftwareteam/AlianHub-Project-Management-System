@@ -92,6 +92,7 @@ exports.updateCompany = async(req,res) => {
         }
 
         removeCache(`companyData_${companyId}`,true);
+        socketEmitter.emit('update', { type: 'update', data: { data: company }, updatedFields: mongoObj.data[1].$set, module: 'companies' });
 
         return res.status(200).json(company);
     } catch (error) {

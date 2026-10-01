@@ -11,7 +11,7 @@
                     class="ah-input dpick__search"
                     :placeholder="$t('Dash.search_cards')"
                 />
-                <button type="button" class="dpick__close" :title="$t('Dash.close')" @click="$emit('close')">
+                <button type="button" class="dpick__close" :title="$t('Dash.close')" :aria-label="$t('Dash.close')" @click="$emit('close')">
                     <ShellIcon name="x" :size="15" />
                 </button>
             </header>
@@ -114,9 +114,8 @@ onMounted(() => searchInput.value && searchInput.value.focus());
     overflow: hidden;
 }
 .dpick__head {
-    position: relative;
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto 1fr auto auto;
     align-items: center;
     gap: 10px;
     padding: 16px 20px;
@@ -125,9 +124,6 @@ onMounted(() => searchInput.value && searchInput.value.focus());
 .dpick__lede { margin: 0; font: var(--text-small); color: var(--ink-2); }
 .dpick__search { width: 220px; height: 34px; }
 .dpick__close {
-    position: absolute;
-    top: 12px;
-    right: 12px;
     width: 28px;
     height: 28px;
     display: grid;
@@ -171,7 +167,9 @@ onMounted(() => searchInput.value && searchInput.value.focus());
 @media (max-width: 768px) {
     .dpick { padding: 0; }
     .dpick__panel { max-height: 100vh; height: 100%; border-radius: 0; }
-    .dpick__head { grid-template-columns: 1fr; }
-    .dpick__search { width: 100%; }
+    .dpick__head { grid-template-columns: 1fr auto; }
+    .dpick__close { grid-area: 1 / 2; }
+    .dpick__lede { grid-column: 1 / -1; }
+    .dpick__search { grid-column: 1 / -1; width: 100%; }
 }
 </style>
