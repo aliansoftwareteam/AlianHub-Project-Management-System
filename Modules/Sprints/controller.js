@@ -212,7 +212,8 @@ const LIST_NAME_LIMIT = 50;
 
 exports.editSprintName = (req, res) => {
     try {
-        const {companyId, projectId, userData, mainChat = false} = req.body;
+        const { projectId, userData, mainChat = false } = req.body;
+        const companyId = String(req.headers['companyid'] || '');
         const { id } = req.params;
         const sprintName = typeof req.body.sprintName === 'string' ? req.body.sprintName.trim() : '';
         if (!sprintName || sprintName.length > LIST_NAME_LIMIT) {
