@@ -60,7 +60,7 @@ const reads = () => apiRequest.mock.calls.filter(([, url]) => url === TASKS);
 const sent = () => reads().map(([, , body]) => body);
 const sentNames = () => sent().map(recordedAs);
 
-const projectList = Object.values({ ...fixture.projectCounts.response.data.projects }).map((card) => ({ ...card, deletedStatusKey: 0 }));
+const projectList = Object.values({ ...fixture.withSubtasks.response.data.projects }).map((card) => ({ ...card, deletedStatusKey: 0 }));
 
 const newStore = () => createStore({
     modules: {

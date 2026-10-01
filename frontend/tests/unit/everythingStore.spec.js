@@ -277,7 +277,7 @@ describe('a quiet refresh, on focus and after an edit', () => {
 });
 
 describe('the board', () => {
-    const allProjects = { data: Object.values(fixture.projectCounts.response.data.projects) };
+    const allProjects = { data: Object.values(fixture.withSubtasks.response.data.projects) };
     const boardStore = () => {
         store = createStore({ modules: { everything, projectData: { namespaced: true, getters: { allProjects: () => allProjects } } } });
         store.commit('everything/setPageSize', 2);

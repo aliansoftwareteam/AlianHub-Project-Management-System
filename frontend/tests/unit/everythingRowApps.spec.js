@@ -20,7 +20,7 @@ import { useCustomComposable } from '@/composable';
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src/views/Everything');
 const WEB = '6f0000000000000000000a01';
 const OPS = '6f0000000000000000000a02';
-const cards = fixture.projectCounts.response.data.projects;
+const cards = fixture.withSubtasks.response.data.projects;
 const taskIn = (projectId, over = {}) => ({
     ...fixture.withDone.response.data.rows[0], ProjectID: projectId, TaskKey: projectId === WEB ? 'WEB-9' : 'OPS-9', AssigneeUserId: [], Task_Priority: 'HIGH', ...over
 });
