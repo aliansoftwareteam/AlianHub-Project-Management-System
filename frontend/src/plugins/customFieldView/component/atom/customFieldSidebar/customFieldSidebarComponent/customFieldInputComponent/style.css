@@ -5,11 +5,11 @@
     font-weight: 500 !important;
     line-height: 20.72px;
     padding: 0px 0px 10px 0px;
-    color: #3A3A3A;
+    color: var(--ink);
 }
 .formkit__form-wrapper .formkit-inner {
     border-radius: 5px;
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
     box-shadow: none;
 }
 .formkit__form-wrapper .formkit-input {
@@ -30,7 +30,7 @@
     width: 30px;
     height: 15px;
     box-shadow: none !important;
-    background: #CFCFCF;
+    background: var(--track);
     border-radius: 10px;
     cursor: pointer;
 }
@@ -38,7 +38,7 @@
     max-height: 200px !important;
 }
 .formkit__form-wrapper .customCheckbox [data-type="checkbox"] .formkit-input:checked ~ .formkit-decorator, .formkit__form-wrapper .customCheckbox [data-type="radio"] .formkit-input:checked ~ .formkit-decorator {
-    background: #3845B3;
+    background: var(--brand);
 }
 .formkit__form-wrapper .customCheckbox [data-type="checkbox"] .formkit-input ~ .formkit-decorator .formkit-icon, .formkit__form-wrapper .customCheckbox [data-type="radio"] .formkit-input ~ .formkit-decorator .formkit-icon {
     width: 0px;
@@ -47,7 +47,7 @@
     top: 2px;
     left: 2px;
     transform: inherit;
-    background: white;
+    background: var(--knob);
     border-radius: 20px;
 }
 .formkit__form-wrapper .customCheckbox [data-type="checkbox"] .formkit-input:checked ~ .formkit-decorator .formkit-icon, .formkit__form-wrapper .customCheckbox [data-type="radio"] .formkit-input:checked ~ .formkit-decorator .formkit-icon {
@@ -55,7 +55,7 @@
     height: 0;
     right: 2px !important;
     left: inherit;
-    background: white;
+    background: var(--on-brand);
 }
 .formkit__form-wrapper .helpCheckbox .formkit-fieldset, .formkit__form-wrapper .custom__field-checkbox .formkit-fieldset , .formkit__form-wrapper .custom__field-radio-help .formkit-fieldset, .formkit__form-wrapper .custom__field-radio-time-formate .formkit-fieldset{
     display: flex;
@@ -70,12 +70,12 @@
     font-style: normal;
     font-weight: 400;
     line-height: 17.76px;
-    color: #959595;
+    color: var(--ink-2);
     margin-bottom: 0px !important;
 }
 .formkit__form-wrapper .custom__field-required .formkit-label:after {
     content: "*";
-    color: red;
+    color: var(--danger);
 }
 .formkit__form-wrapper textarea {
     resize: none;
@@ -104,7 +104,7 @@
 .dropdown-custom-field .dropdown-select,
 .checkbox-custom-field .checkbox-select {
     padding: 5px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border);
     border-radius: 4px;
     cursor: pointer;
     user-select: none;
@@ -117,7 +117,7 @@
 .dropdown-custom-field .arrow-dropdown::before,
 .checkbox-custom-field .arrow-dropdown::before {
     content: "";
-    border: solid black;
+    border: solid var(--ink);
     border-width: 0 2px 2px 0;
     display: inline-block;
     padding: 3px;
@@ -165,7 +165,7 @@
 } */
 .formkit__form-wrapper .custom__field-radio [data-type="radio"] .formkit-input:checked ~ .formkit-decorator {
     border-radius: 4px;
-    background: #2F3990;
+    background: var(--brand);
     border: none;
     box-shadow: none;
     width: 100%;
@@ -195,7 +195,7 @@
     padding: 9px 5px;
     display: flex;
     border-radius: 4px;
-    border: 1px solid #2F3990;
+    border: 1px solid var(--brand);
     align-items: center;
 }
 .formkit__form-wrapper .custom__field-radio li.formkit-option {
@@ -203,7 +203,7 @@
     margin: 0px !important;
 }
 .formkit__form-wrapper .custom__field-radio label.formkit-wrapper[data-checked="true"] .formkit-label {
-    color: white;
+    color: var(--on-brand);
 }
 .formkit__form-wrapper .custom__field-radio.custom__field-Separator ul.formkit-options {
     width: 117px;
@@ -216,14 +216,14 @@
     line-height: normal;
     z-index: 1;
     cursor: pointer;
-    color: #2F3990;
+    color: var(--brand);
     padding: 0px;
 }
 .formkit__form-wrapper .custom__field-checkbox [data-type="checkbox"] .formkit-input:checked ~ .formkit-decorator .formkit-icon {
-    color: white;
+    color: var(--on-brand);
 }
 .formkit__form-wrapper .custom__field-checkbox [data-type="checkbox"] .formkit-input:checked ~ .formkit-decorator {
-    background-color: #2F3990;
+    background-color: var(--brand);
     width: 15px;
     height: 15px;
     border: none;
@@ -240,10 +240,10 @@
     margin-bottom: 10px !important;
 }
 .formkit__form-wrapper .custom__field-checkbox [data-type="checkbox"] .formkit-input ~ .formkit-decorator {
-    background-color: white;
+    background-color: var(--surface);
     width: 13px;
     height: 13px;
-    border: 1px solid #2F3990;
+    border: 1px solid var(--brand);
     box-shadow: none;
     border-radius: 2px;
     cursor: pointer;
@@ -253,10 +253,10 @@
 }
 .formkit__form-wrapper .custom__field-checkbox .formkit-outer {
     padding-bottom: 10px !important;
-    border-bottom: 1px solid #DFE1E6;
+    border-bottom: 1px solid var(--hairline);
 }
 .formkit__form-wrapper .custom__field-checkbox .formkit-wrapper .formkit-label {
-    color: #3B3B3B;
+    color: var(--ink);
     font-family: var(--font-ui);
     font-size: 12px !important;
     font-style: normal;

@@ -49,8 +49,9 @@
     font-weight: 400;
     line-height: 19.24px !important;
     padding: 0px;
-    color: #505050;
+    color: var(--ink);
 }
+.formkit__content-wrapper-project-detail .formkit-input::placeholder { color: var(--ink-2); }
 .formkit__content-padding {
     padding: 9.5px;
 }
@@ -79,7 +80,7 @@
     line-height: 20.72px;
     font-size: 14px;
     font-weight: 500;
-    color: #000000;
+    color: var(--ink);
     font-family: var(--font-ui);
     display: flex;
     justify-content: space-between;
@@ -105,7 +106,7 @@
     padding: 5px 10px;
 }
 .formkit__content-wrapper-project-detail .formkit-inner:focus-within {
-    box-shadow: 0 0 0 2px #0275ff;
+    box-shadow: var(--focus);
 }
 .formkit__content-wrapper-project-detail .formkit-outer {
     margin: 0px;

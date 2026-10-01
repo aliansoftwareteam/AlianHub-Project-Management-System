@@ -1,6 +1,6 @@
 <template>
     <div>
-        <span class="black project-billing-name cursor-pointer" @click="checkMilestone" :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}" :style="[{padding : clientWidth > 767 ? '0' : '10px 0px'}]" :title="props.projectData.BillingPeriod ? props.projectData.BillingPeriod : ''">{{props.projectData.BillingPeriod ? props.projectData.BillingPeriod :"'N/A'" }}</span>
+        <span class="project-billing-name cursor-pointer" @click="checkMilestone" :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}" :style="[{padding : clientWidth > 767 ? '0' : '10px 0px'}]" :title="props.projectData.BillingPeriod ? props.projectData.BillingPeriod : ''">{{props.projectData.BillingPeriod ? props.projectData.BillingPeriod :"'N/A'" }}</span>
         <Sidebar
             v-model:visible="isVisible"
             :title="$t('Projects.select_billing_period')"
