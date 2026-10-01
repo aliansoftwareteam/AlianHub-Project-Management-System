@@ -37,9 +37,9 @@
                 role="listbox"
                 @click.stop
                 @keydown.esc.prevent="closeDropdown"
-                class="bg-white gray box-shadow-5 custom-drop-down-menu cls-custom-dd"
+                class="box-shadow-5 custom-drop-down-menu cls-custom-dd"
                 :style="[{'z-index':zindexCustomDrop}]"
-                :class="{'drop-down-hide' : !bind, 'desktop-view position-fi' : clientWidth > 767, 'mobile-view position-fi' : clientWidth <= 767, ...bodyClass}"
+                :class="{'dd-tokens': themed, 'bg-white gray': !themed, 'drop-down-hide' : !bind, 'desktop-view position-fi' : clientWidth > 767, 'mobile-view position-fi' : clientWidth <= 767, ...bodyClass}"
                 v-if="dropdownVisible"
             >
                 <slot name="head" v-if="clientWidth > 767"></slot>
@@ -67,7 +67,7 @@
                     </div>
                 </div>
                 <div class="search-project-filter w-100vw" :class="props.className" :style="{'max-width' : maxWidth}">
-                    <div class="overflow-y-auto overflow-x-hidden drop-down-options black" :style="{'max-height' : maxHeight}">
+                    <div class="overflow-y-auto overflow-x-hidden drop-down-options" :class="{'black': !themed}" :style="{'max-height' : maxHeight}">
                         <slot name="options">
                         </slot>
                     </div>
@@ -121,6 +121,10 @@ const props = defineProps({
     className: {
         type:String,
         default:''
+    },
+    themed: {
+        type: Boolean,
+        default: false
     }
 });
 
