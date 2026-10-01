@@ -7973,6 +7973,7 @@ export default {
         unsaved_later: "Removed from saved",
         reply: "Reply",
         agent: "AGENT",
+        agent_unavailable: "This agent is not available to message.",
         review_inbox: "Review in AI Inbox",
         pick_up: "Pick up where you left off",
         members: "Members",
@@ -10731,6 +10732,14 @@ export default {
         ask_again: "Ask again to post this answer.",
         not_shared: "This answer uses items some members can't see, so it was not posted.",
         close: "Close",
+    },
+    AgentChat: {
+        replying: "The agent is replying…",
+        could_not_reply: "The agent could not reply to this.",
+        change_done: "DONE",
+        change_proposed: "WAITING FOR APPROVAL",
+        change_refused: "NOT ALLOWED",
+        change_failed: "FAILED",
     },
     AiAvailability: {
         off_title: "AI is turned off",

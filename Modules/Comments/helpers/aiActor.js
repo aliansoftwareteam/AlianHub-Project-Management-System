@@ -2,7 +2,7 @@
  * a mention recipient or someone a notification is about. */
 const AI_ACTOR = 'ai';
 
-const AI_FIELDS = ['aiAsk', 'aiAskerId', 'aiQuestionId', 'aiCitations'];
+const AI_FIELDS = ['aiAsk', 'aiAskerId', 'aiQuestionId', 'aiCitations', 'agentAsk', 'agentCitations', 'agentChanges'];
 
 const isAiAuthored = (row) => Boolean(row) && (row.actorType === AI_ACTOR || String(row.userId || '') === AI_ACTOR);
 

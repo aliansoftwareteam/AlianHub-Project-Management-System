@@ -79,6 +79,7 @@
             :disabled="!sendMessageAllowed"
             :disabled-reason="composerLockReason"
             :user-ids="watchers"
+            :agents="mentionableAgents"
             :conversation-key="conversationKey"
             @typing="setTyping"
             @send="onSend"
@@ -213,6 +214,7 @@ import { shellState } from '@/components/organisms/Shell/shellState';
 import CallIcon from '@/components/organisms/CallOverlay/CallIcon.vue';
 import { useCall } from '@/composable/useCall';
 import { useMainChatConversation } from './useMainChatConversation';
+import { fetchChatAgents } from '@/views/Ai/useRunnableAgents';
 
 const props = defineProps({
     // conversation target
@@ -234,6 +236,8 @@ const props = defineProps({
     icon: { type: Object, default: () => ({}) },
     sendMessageAllowed: { type: Boolean, default: true },
     linkedProject: { type: Object, default: null },
+    // Set on a direct conversation with an agent: every message there goes to it.
+    agentId: { type: String, default: '' },
 });
 
 // Attachment previews, search and the details pane are all owned here rather than
@@ -285,12 +289,26 @@ const effectiveTaskId = computed(() => {
 
 const conversationKey = computed(() => `${(projectData && projectData.value && projectData.value._id) || ''}:${props.sprintId}:${effectiveTaskId.value || props.taskId}`);
 
+const mentionableAgents = ref([]);
+async function loadMentionableAgents() {
+    const taskId = effectiveTaskId.value;
+    const key = conversationKey.value;
+    if (props.agentId || !canUseAi() || !projectId.value || !props.sprintId || !taskId) {
+        mentionableAgents.value = [];
+        return;
+    }
+    const agents = await fetchChatAgents({ projectId: projectId.value, sprintId: props.sprintId, taskId });
+    if (key === conversationKey.value) mentionableAgents.value = agents;
+}
+watch([conversationKey, () => canUseAi()], loadMentionableAgents, { immediate: true });
+
 // ─── Calling ────────────────────────────────────────────────────────────────────
 // One-to-one only, and only once the conversation task exists — the server authorises
 // a call by loading that task and checking the caller is one of its two participants,
 // so there is nothing to authorise against before the first message is sent.
 const { startCall, isBusy: callBusy, isSupported: callSupported, isSecure: callSecure } = useCall();
 const canCall = computed(() => !props.isChannel
+    && !props.agentId
     && isDefaultProject.value
     && !!effectiveTaskId.value
     && effectiveTaskId.value !== 'default'
