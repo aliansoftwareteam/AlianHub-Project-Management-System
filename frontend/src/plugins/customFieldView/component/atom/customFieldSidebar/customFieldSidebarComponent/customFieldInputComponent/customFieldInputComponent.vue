@@ -92,9 +92,10 @@
             type: Boolean,
             default: false
         },
+        /* Left empty, the field takes an id of its own; a fixed default gave every field in the form the same one. */
         id:{
             type: String,
-            default: "text"
+            default: ""
         }
     });
 </script>

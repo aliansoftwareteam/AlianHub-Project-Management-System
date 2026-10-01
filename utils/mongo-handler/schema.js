@@ -199,7 +199,7 @@ const schema = {
         // Provenance of Done — written only by Modules/Tasks/helpers/completion.js:
         // { workBy: [{ actorId, actorType, agentId?, viaAccount, hours }],
         //   checkedBy: { actorId, actorType:'human', at } | null,
-        //   closedBy:  { actorId, actorType:'human', at } | null,
+        //   closedBy:  { actorId, actorType:'human', at, viaAgent? } | null,
         //   badge: 'HUMAN'|'AGENT'|'MIXED'|'UNCHECKED'|null, reopenCount }
         'completion': {
             type: Object,

@@ -1,8 +1,8 @@
 <template>
     <div class="mt-1 custom-field__bg" :class="[{'custom-field__height':props.planPermission === false && (!customFieldList || customFieldList?.filter((val)=>(val?.isDelete) && (val?.global || val?.projectId === props?.projectDetail?._id))?.length < 3)}]">
         <div class="d-flex justify-content-between mb-1" v-if="props.editPermission === true">
-            <h5 class="font-ui text-right font-size-14 font-weight-700 font-normal black">{{$t('CustomField.custom_field')}}</h5>
-            <h5 class="font-ui text-right font-size-14 font-weight-500 font-normal text-decoration-underline blue cursor-pointer" @click="emit('isCustomField',true)">+ {{$t('CustomField.custom_field')}}</h5>
+            <h5 class="custom-field__title">{{$t('CustomField.custom_field')}}</h5>
+            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm custom-field__add" @click="emit('isCustomField',true)">+ {{$t('CustomField.custom_field')}}</button>
         </div>
         <template v-if="customFieldList && customFieldList.length">
             <template v-for="(item, index) in customFieldList?.filter((val)=>(val?.isDelete) && (val?.type === 'project') && (val?.global || val?.projectId?.includes(props?.projectDetail?._id)))" :key="index">
