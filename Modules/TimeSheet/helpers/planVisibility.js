@@ -20,4 +20,11 @@ const withoutHiddenSprintPlans = async (companyId, uid, estimates) => {
     return rows.filter((row) => !unseen.has(String(row.TaskId)));
 };
 
-module.exports = { withoutHiddenSprintPlans };
+/* Approved time off lowers a person's capacity for everyone who plans around them, but that it
+ * is time off is theirs to share: the PTO list shows it to the person and to owners and admins,
+ * and so does a workload scope. Anyone else is told the time is unavailable, and no more. */
+const namesTimeOff = (scope, userId) => Boolean(scope.companyWide) || String(userId) === scope.uid;
+
+const asUnavailableDays = (days) => (days || []).map(({ pto, ...day }) => ({ ...day, pto: false, unavailable: Boolean(pto) }));
+
+module.exports = { withoutHiddenSprintPlans, namesTimeOff, asUnavailableDays };
