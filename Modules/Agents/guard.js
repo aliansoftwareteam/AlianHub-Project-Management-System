@@ -112,4 +112,4 @@ const agentPerimeter = withActor(async (req, res, next, actor) => {
     return refuse(req, res, actor, { action: hit.action, reason: `Agents cannot perform ${hit.action}`, params: {} });
 });
 
-module.exports = { requireHumanActor, agentActionGuard, taskPatchGuard, taskPatchActionOf, agentPerimeter, TASK_PATCH_ACTIONS };
+module.exports = { requireHumanActor, agentActionGuard, taskPatchGuard, taskPatchActionOf, agentPerimeter, TASK_PATCH_ACTIONS, PERIMETER };

@@ -7,17 +7,18 @@ const context = {
     ],
     tokenBlockedPrefix: '/api/v2/api-tokens',
     tokenAllowedPaths: ['/api/v2/api-tokens/me'],
+    agentPerimeter: [{ test: (method) => method === 'DELETE', action: 'delete' }],
 };
 
 const route = (key, extra = {}) => {
     const [method, path] = key.split(' ');
-    return { key, method, path, guard: 'company', ownAuth: null, permissions: [], taskWrites: null, source: 'Modules/Sample/init', ...extra };
+    return { key, method, path, guard: 'company', ownAuth: null, agentPerimeter: true, permissions: [], taskNeeds: null, actions: null, source: 'Modules/Sample/init', ...extra };
 };
 
 describe('auth classification', () => {
     it('reads a route behind no guard as public', () => {
         expect(classifyAuth(route('POST /api/v2/auth/login', { guard: null }), {}, context)).toEqual({
-            class: AUTH.PUBLIC, token: false, narrowedToken: false, scope: null, companyHeader: 'none',
+            class: AUTH.PUBLIC, token: false, narrowedToken: false, agentToken: false, scope: null, companyHeader: 'none',
         });
     });
 
@@ -48,13 +49,19 @@ describe('auth classification', () => {
         expect(classifyAuth(route('GET /api/v2/tasks/everything'), {}, context).narrowedToken).toBe(false);
     });
 
+    it('keeps an agent token off the routes the agent perimeter refuses', () => {
+        expect(classifyAuth(route('DELETE /api/v2/pages/:id'), {}, context).agentToken).toBe(false);
+        expect(classifyAuth(route('PUT /api/v2/pages/:id'), {}, context).agentToken).toBe(true);
+        expect(classifyAuth(route('DELETE /api/v2/session/delete', { guard: 'user', agentPerimeter: false }), {}, context).agentToken).toBe(true);
+    });
+
     it('reads the instance guard as session only', () => {
         expect(classifyAuth(route('GET /api/v2/instance/settings', { guard: 'instance-admin' }), {}, context)).toMatchObject({ class: AUTH.INSTANCE_ADMIN, token: false, scope: null });
     });
 
     it('reads a route that checks the token itself as token only', () => {
         expect(classifyAuth(route('GET /api/public-v1/tasks', { guard: null, ownAuth: 'api-token' }), {}, context)).toEqual({
-            class: AUTH.API_TOKEN, token: true, narrowedToken: true, scope: 'read', companyHeader: 'required',
+            class: AUTH.API_TOKEN, token: true, narrowedToken: true, agentToken: true, scope: 'read', companyHeader: 'required',
         });
     });
 });
@@ -156,7 +163,7 @@ describe('one route as markdown', () => {
         response: { status: true, statusText: 'Task created successfully.', id: '<task id>' },
         errors: { 400: 'The body is not an object.', 404: 'The project does not exist.' },
     };
-    const created = route('POST /api/v2/tasks', { taskWrites: { needs: [{ key: 'task.task_create', write: true }], tokenEnforced: true } });
+    const created = route('POST /api/v2/tasks', { taskNeeds: [{ key: 'task.task_create', write: true }] });
     const text = renderRoute(created, entry, classifyAuth(created, entry, context));
 
     it('opens with the title, the method and path and the stability', () => {
@@ -166,6 +173,7 @@ describe('one route as markdown', () => {
     it('states who may call it and with what', () => {
         expect(text).toContain('| Auth | Session or API token with the `write` scope |');
         expect(text).toContain('| Token limited to projects | Refused |');
+        expect(text).toContain('| Agent token | Accepted |');
         expect(text).toContain('| Permission | `task.task_create` |');
     });
 
@@ -210,18 +218,22 @@ describe('the appendix', () => {
 });
 
 describe('the OpenAPI document', () => {
-    const doc = openApiOf(groupRoutes(routes, meta), context);
+    const withRead = { ...meta, routes: { ...meta.routes, 'GET /api/v2/pages/:id': { stability: 'beta', summary: 'Reads a page.' } } };
+    const doc = openApiOf(groupRoutes([...routes, route('GET /api/v2/pages/:id')], withRead), context);
 
-    it('carries the paths, methods, tags and auth of every route that is not internal', () => {
+    it('carries the paths, methods, tags and auth of every described route that is not internal', () => {
         expect(doc.openapi).toBe('3.1.0');
-        expect(Object.keys(doc.paths).sort()).toEqual(['/api/v1/task/{id}', '/api/v2/forms', '/api/v2/pages', '/api/v2/tasks']);
-        expect(doc.paths['/api/v2/pages'].get).toMatchObject({ summary: 'Lists pages.', tags: ['Pages'], security: [{ apiToken: [], companyId: [] }], 'x-stability': 'beta' });
+        expect(Object.keys(doc.paths)).toEqual(['/api/v2/forms', '/api/v2/pages', '/api/v2/pages/{id}', '/api/v2/tasks']);
+        expect(doc.paths['/api/v2/pages'].get).toMatchObject({ summary: 'Lists pages.', tags: ['Pages'], security: [{ apiToken: [], companyId: [] }], 'x-stability': 'beta', 'x-documented': true });
+        expect(Object.keys(doc.paths['/api/v2/pages'])).toEqual(['get', 'post']);
         expect(doc.paths['/api/v2/tasks'].post['x-token-scope']).toBe('write');
-        expect(doc.paths['/api/v1/task/{id}'].get.parameters).toEqual([{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }]);
+        expect(doc.paths['/api/v2/forms'].get).toMatchObject({ tags: ['Not documented in full'], 'x-documented': false });
+        expect(doc.paths['/api/v2/pages/{id}'].get.parameters).toEqual([{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }]);
     });
 
-    it('leaves internal routes out', () => {
+    it('leaves out internal routes and routes the meta file does not describe', () => {
         expect(doc.paths['/api/v2/secrets']).toBeUndefined();
+        expect(doc.paths['/api/v1/task/{id}']).toBeUndefined();
     });
 });
 
