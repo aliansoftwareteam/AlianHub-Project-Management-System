@@ -51,6 +51,8 @@
 </script>
 
 <style scoped>
+/* w-100 plus the side padding made the wall 30px wider than the page under it. */
+.upw { box-sizing: border-box; }
 .upw__image { max-width: 100%; height: auto; }
 .upw__title { color: var(--ink); }
 .upw__accent { color: var(--brand); }
