@@ -8,13 +8,15 @@
  *   text(value, definition, context)        the value as one line of text, '' for nothing
  *   sortValue(value, definition, context)   a number or a string to order by, null for nothing
  *   fromInput(typed)                        optional: what a person typed, as the value to parse
+ *   sortable                                optional: false for a type no view sorts by
  */
 const people = require('./people');
 const url = require('./url');
 const rating = require('./rating');
 const progress = require('./progress');
+const files = require('./files');
 
-const MODULES = Object.freeze({ people, url, rating, progress });
+const MODULES = Object.freeze({ people, url, rating, progress, files });
 const MODULE_FIELD_TYPES = Object.freeze(Object.keys(MODULES));
 
 const typeModuleOf = (fieldType) => (MODULE_FIELD_TYPES.includes(fieldType) ? MODULES[fieldType] : null);

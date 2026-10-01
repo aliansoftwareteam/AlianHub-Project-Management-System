@@ -5,6 +5,7 @@ const { canEditProject, FIELD_PERMISSIONS, DETAILS } = require('../../Config/pro
 const { canSeeSprintById } = require('../Sprints/helpers/sprintVisibility');
 const { canUsePage } = require('../Pages/helpers/pageAccess');
 const { canChangeComment, canPostToThread } = require('../Comments/helpers/threadWriteAccess');
+const { isThreadFile } = require('../Comments/helpers/commentFileKeys');
 const { countReported } = require('../../common-storage/storedFileScope');
 const { USER_PROFILES_BUCKET, refuseUnverifiedBucket } = require('./bucketAccess');
 const logger = require('../../Config/loggerConfig');
@@ -33,7 +34,6 @@ const DIRECT_MESSAGES = 'chat.one_to_one_chat';
 const SPRINT_WRITE = ['project.project_sprint_create', 'project.project_sprint_name_edit', 'project.sprint_type_change'];
 
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
-const isId = (value) => OBJECT_ID.test(String(value || ''));
 const same = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
 
 const held = (ctx, permission, projectId) => evaluatePermission(ctx.companyId, ctx.uid, permission, projectId ? { projectId: String(projectId) } : {}).catch(() => null);
@@ -97,28 +97,17 @@ const taskFieldFile = async (ctx, [, , taskId]) => {
     return task ? changesTask(ctx, task, CUSTOM_FIELD) : NOT_FOUND;
 };
 
-const COMMENT_FOLDERS = Object.freeze({
-    task_comment: {
-        thread: ([, projectId, sprintId, taskId]) => ({ projectId, sprintId, taskId }),
-        owns: (comment, [, , , taskId]) => same(comment.taskId, taskId),
-    },
-    channel_comment: {
-        thread: ([, projectId, channelId]) => ({ projectId, sprintId: channelId, taskId: MAIN_CHAT_TASK }),
-        owns: (comment, [, , channelId]) => same(comment.sprintId, channelId) && !isId(comment.taskId),
-    },
-    project_comment: {
-        thread: ([, projectId]) => ({ projectId }),
-        owns: (comment, [, projectId]) => same(comment.projectId, projectId) && !isId(comment.sprintId) && !isId(comment.taskId),
-    },
+const COMMENT_THREADS = Object.freeze({
+    task_comment: ([, projectId, sprintId, taskId]) => ({ projectId, sprintId, taskId }),
+    channel_comment: ([, projectId, channelId]) => ({ projectId, sprintId: channelId, taskId: MAIN_CHAT_TASK }),
+    project_comment: ([, projectId]) => ({ projectId }),
 });
 
-/* A comment names whatever key its writer sent, so it only owns a file stored in its own thread's
- * folder. A task that moved keeps its files where they were, hence the match on the deepest id. */
-const removesCommentFile = (type) => async (ctx, match, key) => {
+const removesCommentFile = async (ctx, _match, key) => {
     if (!(await opens(ctx, key))) return NOT_FOUND;
     const comments = await scope.find(ctx, SCHEMA_TYPE.COMMENTS, { mediaURL: { $in: scope.keysFor(key) } }, 'projectId sprintId taskId userId', 'find') || [];
     let outcome = NOT_FOUND;
-    for (const comment of comments.filter((row) => COMMENT_FOLDERS[type].owns(row, match))) {
+    for (const comment of comments.filter((row) => isThreadFile(row, key))) {
         if (!(await canChangeComment(ctx.companyId, ctx.uid, comment)).allowed) continue;
         if (same(comment.userId, ctx.uid) || await scope.privileged(ctx)) return true;
         outcome = READ_ONLY;
@@ -134,7 +123,7 @@ const startsDirectMessage = async (ctx, spaceId) => {
 };
 
 const uploadsCommentFile = (type) => async (ctx, match, key) => {
-    const thread = COMMENT_FOLDERS[type].thread(match);
+    const thread = COMMENT_THREADS[type](match);
     if ((await canPostToThread(ctx.companyId, ctx.uid, thread)).allowed && await opens(ctx, key)) return true;
     return type === 'project_comment' ? startsDirectMessage(ctx, thread.projectId) : NOT_FOUND;
 };
@@ -182,9 +171,9 @@ const both = (rule) => ({ [REMOVE]: rule, [UPLOAD]: rule });
 const RULES = Object.freeze({
     task_attachment: { [REMOVE]: taskAttachment(removesSprintFile), [UPLOAD]: taskAttachment(uploadsSprintFile) },
     task_field_file: both(taskFieldFile),
-    task_comment: { [REMOVE]: removesCommentFile('task_comment'), [UPLOAD]: uploadsCommentFile('task_comment') },
-    channel_comment: { [REMOVE]: removesCommentFile('channel_comment'), [UPLOAD]: uploadsCommentFile('channel_comment') },
-    project_comment: { [REMOVE]: removesCommentFile('project_comment'), [UPLOAD]: uploadsCommentFile('project_comment') },
+    task_comment: { [REMOVE]: removesCommentFile, [UPLOAD]: uploadsCommentFile('task_comment') },
+    channel_comment: { [REMOVE]: removesCommentFile, [UPLOAD]: uploadsCommentFile('channel_comment') },
+    project_comment: { [REMOVE]: removesCommentFile, [UPLOAD]: uploadsCommentFile('project_comment') },
     project_attachment: both(editsProject(attachmentKeys)),
     project_icon: { [REMOVE]: editsProject(iconKeys), [UPLOAD]: editsProject(iconKeys, createsProject) },
     channel_image: { [REMOVE]: readOnly, [UPLOAD]: editsProject(sprintKeys, managesChannels) },

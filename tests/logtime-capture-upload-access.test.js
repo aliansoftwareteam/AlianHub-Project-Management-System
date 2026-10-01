@@ -7,7 +7,7 @@ jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({
     MongoDbCrudOpration: async (dbName, { type, data }) => {
         const [query] = data;
-        if (type === 'timesheets') return { Loggeduser: mockAccess.sessionOwner };
+        if (type === 'timesheets') return { Loggeduser: mockAccess.sessionOwner, ProjectId: mockAccess.project, startTimeTracker: 1 };
         const seated = type === 'company_users' && query.status === 2 && (mockAccess.seats[dbName] || []).includes(String(query.userId));
         return seated ? { _id: 'seat' } : null;
     },
@@ -49,7 +49,9 @@ const SCREENSHOT = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA
 const PROFILE_IMAGE = `${USER}_${hex()}.png`;
 
 const tempFiles = () => (fs.existsSync(WASABI_TEMP) ? fs.readdirSync(WASABI_TEMP).sort() : []);
-const trackerPath = () => `Project/${hex()}/Sprint/${hex()}/TimeLog/${hex()}/${Date.now()}.png`;
+const TIMER = hex();
+const PROJECT = hex();
+const trackerPath = () => `Project/${PROJECT}/Sprint/${hex()}/TimeLog/${TIMER}/${Date.now()}.png`;
 
 afterAll(() => {
     for (const dir of [COMPANY_A, COMPANY_B]) fs.rmSync(path.join(STORAGE_ROOT, dir), { recursive: true, force: true });
@@ -60,6 +62,7 @@ beforeEach(() => {
     mockAccess.assigned = { [USER]: [COMPANY_A, COMPANY_B] };
     mockAccess.seats = { [COMPANY_A]: [USER], [COMPANY_B]: [USER] };
     mockAccess.sessionOwner = USER;
+    mockAccess.project = PROJECT;
 });
 
 /* Same fields, in the same order, as TrackerController.ScreenShotCapture in time-tracker-app. */
@@ -69,14 +72,14 @@ function trackerForm({ companyId, filePath, fileFirst = false }) {
     if (fileFirst) appendFile();
     form.append('strokes', '[]');
     form.append('companyId', companyId);
-    form.append('timeSheetId', hex());
+    form.append('timeSheetId', TIMER);
     form.append('imageName', path.basename(filePath));
     form.append('prevscreenShot', String(Date.now()));
     form.append('memoName', 'qa capture');
     form.append('screenShotTime', String(Date.now()));
     form.append('key', '0');
     form.append('type', 'timesheets');
-    form.append('projectId', hex());
+    form.append('projectId', PROJECT);
     form.append('path', filePath);
     if (!fileFirst) appendFile();
     form.append('actionTime', String(Math.floor(Date.now() / 1000)));

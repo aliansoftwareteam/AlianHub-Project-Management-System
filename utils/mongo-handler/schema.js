@@ -4553,7 +4553,10 @@ const schema = {
         // people fields: false holds one person
         fieldMultiple: { type: Boolean, required: false },
         // rating fields: 3 to 10
-        fieldRatingMax: { type: Number, required: false }
+        fieldRatingMax: { type: Number, required: false },
+        // files fields: 1 to 20 files, and any | images | documents
+        fieldFilesMax: { type: Number, required: false },
+        fieldFilesKind: { type: String, required: false }
     },
     sprints: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.
