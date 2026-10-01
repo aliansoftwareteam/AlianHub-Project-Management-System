@@ -422,6 +422,9 @@ taskSchema.index({ ancestors: 1 });
 taskSchema.index({ TaskKey: 1 });
 // The due-date trigger reads a day-wide range of this every few minutes (Modules/Automations/engine/dueDateTrigger).
 taskSchema.index({ DueDate: 1 });
+// The Everything view pages across projects on these; Modules/Tasks/helpers/everythingQuery.js sorts in their order.
+taskSchema.index({ ProjectID: 1, deletedStatusKey: 1, updatedAt: -1, _id: 1 });
+taskSchema.index({ ProjectID: 1, deletedStatusKey: 1, DueDate: 1, _id: 1 });
 
 // comments: every comment is fetched by task/sprint/project triplet.
 commentSchema.index({ 'objId.taskId': 1, deletedStatusKey: 1 });
