@@ -1,8 +1,8 @@
 
 .timelogtracker{
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
     padding: 5.5px 20px;
-    background-color: #DFE1E6;
+    background-color: var(--fill);
     border-top-left-radius: 4px;
     border-top-right-radius: 4px;
     top: 98px;
@@ -31,14 +31,14 @@
     font-size: 18px;
 }
 .mainTableDiv .time-logtable tbody tr {
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
     height: 50px;
 }
 .mainDetail{
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
     border-top: 0;
     padding: 0px 0px 20px;
-    background-color: #fff;
+    background-color: var(--surface);
     border-bottom-left-radius: 2px;
     border-bottom-right-radius: 2px;
 }
@@ -92,7 +92,7 @@
 .timecheckbox input[type="checkbox"] {
     width: 15px !important;
     height: 15px !important;
-    border: 1px solid #DFE1E6 !important;
+    border: 1px solid var(--border) !important;
     margin: 0 0 0 0;
     min-width: 15px;
     position: relative;
@@ -107,8 +107,8 @@
     top: 2px;
 }
 .timecheckbox input[type="checkbox"]:checked {
-    background-color: #2F3990 !important;
-    border: 1px solid #2F3990 !important;
+    background-color: var(--brand) !important;
+    border: 1px solid var(--brand) !important;
 }
 .timecheckbox input[type=checkbox]:before {
     content: '';
@@ -117,7 +117,7 @@
     top: 47%;
     width: 4px;
     height: 9px;
-    border: solid #FFF;
+    border: solid var(--surface);
     border-width: 0 1px 1px 0;
     margin: -1px -1px 0 -1px;
     transform: rotate(45deg) translate(-50%, -50%);

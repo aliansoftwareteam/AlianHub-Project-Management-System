@@ -177,8 +177,8 @@ const toggle = (slug) => {
     max-width: 100%;
 }
 .skills-select__chip {
-    background: #EEF0FB;
-    color: #2F3990;
+    background: var(--brand-tint);
+    color: var(--brand);
     border-radius: 4px;
     padding: 2px 8px;
     font-size: 12px;
@@ -192,16 +192,16 @@ const toggle = (slug) => {
 }
 /* Matches the sibling .form-control inputs in the create-project form. */
 .skills-select__chips--field {
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
     border-radius: 6px;
     height: 30px;
     padding: 0 10px;
     box-sizing: border-box;
-    background: #ffffff;
+    background: var(--surface);
     cursor: pointer;
 }
 .skills-select__chips--field:hover {
-    border-color: #B3B9C4;
+    border-color: var(--ink-2);
 }
 /* Must come after --field so height: auto beats its fixed height. */
 .skills-select__chips--wrap {
@@ -218,7 +218,7 @@ const toggle = (slug) => {
     max-width: 100%;
 }
 .skills-select__placeholder {
-    color: #818181;
+    color: var(--ink-2);
     font-size: 13px;
 }
 .skills-select__search {

@@ -111,8 +111,7 @@
 }
 .ah-sheet .ah-pop__item { min-height: 44px; }
 
-.tour_sidebar .black.sidebar-body.bg-white { background-color: #fff !important; }
-.tour_sidebar .tour-box-card { border: 1px solid rgba(223, 225, 230, 1); border-radius: 10px; padding: 9px; }
+.tour_sidebar .tour-box-card { border: 1px solid var(--border); border-radius: 10px; padding: 9px; }
 .tour_sidebar .tour_image { width: 40px; height: 40px; object-fit: fill; min-width: 40px; }
 .tour_sidebar .comment__notification-message { width: calc(100% - 45px); }
 .tour_sidebar .tour__title { line-height: 24px; }

@@ -5,7 +5,7 @@
 :is(.dd-tokens, .modal, .sb-tokens) :is(.black, .dark-gray, .dark-gray2, .gray4b, .color52, .color63, .darkblue) { color: var(--ink); }
 :is(.dd-tokens, .modal, .sb-tokens) :is(.gray81, .gray, .gray63, .GunPowder, .color94, .colorlightgray) { color: var(--ink-2); }
 :is(.dd-tokens, .modal, .sb-tokens) :is(.blue, .purple) { color: var(--brand) !important; }
-:is(.dd-tokens, .modal, .sb-tokens) .red { color: var(--danger-ink); }
+:is(.dd-tokens, .modal, .sb-tokens) :is(.red, .text-red) { color: var(--danger-ink); }
 :is(.dd-tokens, .modal, .sb-tokens) .green { color: var(--ok-ink); }
 :is(.dd-tokens, .modal, .sb-tokens) .bg-white { background-color: var(--surface); }
 :is(.dd-tokens, .modal, .sb-tokens) :is(.bg-light-gray, .bg-light-gray-v1, .bg-lowlight-gray) { background-color: var(--surface-2); }
