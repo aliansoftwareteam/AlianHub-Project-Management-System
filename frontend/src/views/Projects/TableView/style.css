@@ -100,6 +100,7 @@
 /* The cell controls the Table borrows from the List are full targets here on a phone too. */
 .tv2 .lv2__cell-btn { min-width: var(--hit-min); min-height: var(--hit-min); }
 .tv2__points-total { font: var(--text-data); color: var(--ink-label); }
+.tv2__points-total::before { content: "\00b7"; margin-inline-end: 6px; }
 .tv2__row:hover .lv2__cell-empty, .tv2__row:focus-within .lv2__cell-empty { opacity: 1; }
 .tv2__sort {
     display: inline-flex;

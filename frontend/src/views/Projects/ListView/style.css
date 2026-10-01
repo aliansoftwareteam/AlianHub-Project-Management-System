@@ -65,6 +65,7 @@
 .lv2__cols > .lv2__head-title { display: flex; align-items: center; gap: 6px; overflow: visible; }
 .lv2__chooser { margin-left: auto; }
 .lv2__c-field { justify-self: stretch; min-width: 0; }
+.lv2__cols > .lv2__c-done { justify-self: start; }
 .lv2__group-points::before { content: "\00b7"; margin-right: 6px; }
 
 .lv2__sprint { display: flex; flex-direction: column; gap: var(--gap-stack, 12px); }

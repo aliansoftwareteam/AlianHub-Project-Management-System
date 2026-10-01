@@ -254,14 +254,16 @@ function addWritten(type) {
     if (!canWrite.value || notesFull.value) return;
     const step = (written.value.length % 8) * GAP;
     const id = newElementId();
+    const size = NEW_SIZE[type];
+    const board = boardEl.value;
     putElement({
         id,
         type,
         text: '',
         ...(type === 'note' ? { tone: NOTE_TONES[0] } : {}),
-        x: (boardEl.value?.scrollLeft || 0) + 40 + step,
-        y: (boardEl.value?.scrollTop || 0) + 40 + step,
-        ...NEW_SIZE[type],
+        x: Math.max(0, (board?.scrollLeft || 0) + ((board?.clientWidth || 0) - size.w) / 2) + step,
+        y: Math.max(0, (board?.scrollTop || 0) + ((board?.clientHeight || 0) - size.h) / 2) + step,
+        ...size,
         z: topLayer.value + 1,
     });
     selectedId.value = id;
