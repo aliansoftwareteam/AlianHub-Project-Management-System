@@ -19,22 +19,42 @@ const automationsChanged = (companyId) => {
     matcher.invalidate(companyId);
 };
 
-/* Owners and admins read past list privacy; anyone else leaves behind the private lists they are not on. */
-const listsTheCallerSees = async (companyId, caller, sourceId, lists) => {
-    if (isPrivileged(await getRoleType(companyId, caller))) return lists;
+/* Owners and admins read past list privacy unless told not to; anyone else leaves behind the private lists they are not on. */
+const listsTheCallerSees = async ({ companyId, caller, sourceId, lists, ownersSeeAll }) => {
+    if (ownersSeeAll && isPrivileged(await getRoleType(companyId, caller))) return lists;
     const hidden = new Set((await hiddenSprintIds(companyId, caller, [sourceId])).map(String));
     return lists.filter((list) => !hidden.has(String(list._id)));
 };
 
-const copyAutomations = async ({ companyId, caller, sourceId, projectId, ids, notes }) => {
-    const all = await find(companyId, SCHEMA_TYPE.AUTOMATION_RULES, { deletedStatusKey: { $ne: rules.TRASHED } });
-    const mine = all.filter((rule) => rules.ruleTargets(rule, sourceId));
-    if (!mine.length) return [];
+/* What a copy is made from: the project and the rows around it that the caller may take. Nothing is written. */
+const readSource = async ({ companyId, caller, source, ownersSeeAll = true }) => {
+    const sourceId = String(source._id);
+    const sourceRef = asId(sourceId);
+    const ownRules = source.isGlobalPermission === false;
+    const [folders, allLists, permissions, fields, allRules] = await Promise.all([
+        find(companyId, SCHEMA_TYPE.FOLDERS, { projectId: sourceRef }),
+        find(companyId, SCHEMA_TYPE.SPRINTS, { projectId: sourceRef }),
+        ownRules ? find(companyId, SCHEMA_TYPE.PROJECT_RULES, { projectId: { $in: [sourceId, sourceRef] } }) : [],
+        find(companyId, SCHEMA_TYPE.CUSTOM_FIELDS, { projectId: sourceId, global: { $ne: true } }, { _id: 1 }),
+        find(companyId, SCHEMA_TYPE.AUTOMATION_RULES, { deletedStatusKey: { $ne: rules.TRASHED } }),
+    ]);
+    const liveLists = allLists.filter(rules.isLive);
+    const lists = await listsTheCallerSees({ companyId, caller, sourceId, lists: liveLists, ownersSeeAll });
+    return {
+        source, folders, lists, permissions,
+        fieldIds: fields.map((field) => String(field._id)),
+        rules: allRules.filter((rule) => rules.ruleTargets(rule, sourceId)),
+        notes: lists.length < liveLists.length ? [{ code: 'private_lists_left', count: liveLists.length - lists.length }] : [],
+    };
+};
+
+const copyAutomations = async ({ companyId, caller, sourceRules, projectId, ids, notes }) => {
+    if (!sourceRules.length) return [];
     if (!(await canManageRules(companyId, caller))) {
-        notes.push({ code: 'automations_skipped', count: mine.length });
+        notes.push({ code: 'automations_skipped', count: sourceRules.length });
         return [];
     }
-    const copies = mine.map((rule) => rules.ruleCopy(rule, { projectId, caller, ids }));
+    const copies = sourceRules.map((rule) => rules.ruleCopy(rule, { projectId, caller, ids }));
     await insert(companyId, SCHEMA_TYPE.AUTOMATION_RULES, copies);
     automationsChanged(companyId);
     notes.push({ code: 'automations_disabled', count: copies.length });
@@ -43,57 +63,41 @@ const copyAutomations = async ({ companyId, caller, sourceId, projectId, ids, no
 
 /* The definitions are shared with the copy rather than cloned, so the values on copied tasks,
    the view settings and the automations that name a field keep meaning the same field. */
-const linkCustomFields = async (companyId, sourceId, projectId) => {
-    const shared = await find(companyId, SCHEMA_TYPE.CUSTOM_FIELDS, { projectId: sourceId, global: { $ne: true } }, { _id: 1 });
-    if (!shared.length) return [];
+const linkCustomFields = async (companyId, fieldIds, projectId) => {
+    if (!fieldIds.length) return [];
     await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.CUSTOM_FIELDS,
-        data: [{ _id: { $in: shared.map((field) => field._id) } }, { $addToSet: { projectId } }],
+        data: [{ _id: { $in: fieldIds.map(asId) } }, { $addToSet: { projectId } }],
     }, 'updateMany');
     removeCache(`customField:${companyId}`);
-    return shared.map((field) => String(field._id));
+    return fieldIds;
 };
 
-const copyPermissions = async (companyId, source, projectId) => {
-    if (source.isGlobalPermission !== false) return;
+/* Everything of a project but its tasks, written from what readSource answers. `made` names what was written, so a failure later can take it back. */
+const writeStructure = async ({ companyId, caller, bundle, name, code, include, made }) => {
+    const { source } = bundle;
     const sourceId = String(source._id);
-    const rows = await find(companyId, SCHEMA_TYPE.PROJECT_RULES, { projectId: { $in: [sourceId, asId(sourceId)] } });
-    await insert(companyId, SCHEMA_TYPE.PROJECT_RULES, rules.permissionCopies(rows, projectId));
-};
-
-/* Everything of a project but its tasks. `made` names what was written, so a failure later can take it back. */
-const copyStructure = async ({ companyId, caller, source, name, include, made }) => {
-    const sourceId = String(source._id);
-    const sourceRef = asId(sourceId);
     const projectRef = made.projectId;
     const projectId = String(projectRef);
     const ids = new Map([[sourceId, projectId]]);
-    const notes = [];
+    const notes = [...bundle.notes];
 
-    const [folders, allLists, codes] = await Promise.all([
-        find(companyId, SCHEMA_TYPE.FOLDERS, { projectId: sourceRef }),
-        find(companyId, SCHEMA_TYPE.SPRINTS, { projectId: sourceRef }),
-        find(companyId, SCHEMA_TYPE.PROJECTS, {}, { ProjectCode: 1 }),
-    ]);
-    const liveLists = allLists.filter(rules.isLive);
-    const seen = await listsTheCallerSees(companyId, caller, sourceId, liveLists);
-    if (seen.length < liveLists.length) notes.push({ code: 'private_lists_left', count: liveLists.length - seen.length });
-
-    const { copies: folderRows, moved } = rules.folderCopies(folders, projectRef, ids);
+    const codes = await find(companyId, SCHEMA_TYPE.PROJECTS, {}, { ProjectCode: 1 });
+    const { copies: folderRows, moved } = rules.folderCopies(bundle.folders, projectRef, ids);
     moved.forEach((folderName) => notes.push({ code: 'subfolder_moved_to_top', name: folderName }));
-    const listRows = rules.listCopies(seen, projectRef, ids, include);
-    const sourceLists = seen.filter((list) => ids.has(String(list._id)));
+    const listRows = rules.listCopies(bundle.lists, projectRef, ids, include);
+    const sourceLists = bundle.lists.filter((list) => ids.has(String(list._id)));
 
     await insert(companyId, SCHEMA_TYPE.FOLDERS, folderRows);
     await insert(companyId, SCHEMA_TYPE.SPRINTS, listRows);
-    await copyPermissions(companyId, source, projectId);
+    await insert(companyId, SCHEMA_TYPE.PROJECT_RULES, rules.permissionCopies(bundle.permissions, projectId));
 
     const project = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.PROJECTS,
-        data: rules.projectCopy(source, { id: projectRef, name, code: rules.nextProjectCode(source.ProjectCode, codes.map((row) => row.ProjectCode)), caller, companyId, include, ids }),
+        data: rules.projectCopy(source, { id: projectRef, name, code: code || rules.nextProjectCode(source.ProjectCode, codes.map((row) => row.ProjectCode)), caller, companyId, include, ids }),
     }, 'save');
-    const sharedFields = await linkCustomFields(companyId, sourceId, projectId);
-    made.rules = await copyAutomations({ companyId, caller, sourceId, projectId, ids, notes });
+    const sharedFields = await linkCustomFields(companyId, bundle.fieldIds, projectId);
+    made.rules = await copyAutomations({ companyId, caller, sourceRules: bundle.rules, projectId, ids, notes });
 
     const placements = new Map();
     for (const list of listRows) placements.set(String(list._id), (await sprintPlacementOf(companyId, list)).set);
@@ -105,7 +109,7 @@ const copyStructure = async ({ companyId, caller, source, name, include, made })
     };
 };
 
-/* Takes back what a failed duplicate wrote. Every filter names the copy's own id, which nothing else carries. */
+/* Takes back what a failed copy wrote. Every filter names the copy's own id, which nothing else carries. */
 const discard = async (companyId, made) => {
     const projectRef = made.projectId;
     const projectId = String(projectRef);
@@ -124,4 +128,4 @@ const discard = async (companyId, made) => {
     ]);
 };
 
-module.exports = { copyStructure, discard };
+module.exports = { readSource, writeStructure, discard };

@@ -63,7 +63,7 @@ import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
-import { duplicateProject, duplicateProgress } from '@/views/Projects/duplicateProject';
+import { duplicateProject, duplicateProgress, linkedTo, shareFields } from '@/views/Projects/duplicateProject';
 
 const POLL_MS = 1500;
 
@@ -87,19 +87,7 @@ const nameInput = ref(null);
 let timer = null;
 let closed = false;
 
-const linkedTo = (field, projectId) => field.global !== true && [].concat(field.projectId || []).map(String).includes(String(projectId));
 const sharedFields = computed(() => (store.getters['settings/finalCustomFields'] || []).filter((field) => linkedTo(field, props.project._id)));
-
-/* The server links the copy to these definitions and tells no client; a list that lacked the copy would take the field off it on the next edit. */
-function shareFields(fieldIds, copyId) {
-    const known = store.getters['settings/finalCustomFields'] || [];
-    (fieldIds || []).forEach((id) => {
-        const field = known.find((item) => String(item._id) === String(id));
-        if (field && !linkedTo(field, copyId)) {
-            store.commit('settings/mutateFinalCustomFields', { op: 'modified', data: { ...field, projectId: [...[].concat(field.projectId || []), copyId] } });
-        }
-    });
-}
 
 const percent = computed(() => (job.value?.total ? Math.min(100, Math.round((job.value.processed / job.value.total) * 100)) : 0));
 
@@ -142,7 +130,7 @@ async function submit() {
     const answer = await duplicateProject(props.project._id, { name: wanted, include: { ...include } });
     if (answer.ok) {
         store.commit('projectData/mutateProjects', [{ snap: null, privateSnap: false, op: 'added', data: { ...answer.project, id: answer.project._id } }]);
-        shareFields(answer.sharedFields, answer.project._id);
+        shareFields(store, answer.sharedFields, answer.project._id);
     }
     if (closed) return;
     if (!answer.ok) {

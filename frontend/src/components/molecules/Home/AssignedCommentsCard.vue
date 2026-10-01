@@ -13,7 +13,8 @@
             <li v-for="item in items" :key="item._id" class="hc-assigned__item" data-test="assigned-comment">
                 <button type="button" class="hc-assigned__open" @click="open(item)">
                     <span class="hc-assigned__text">{{ snippet(item) }}</span>
-                    <span class="hc-assigned__task">{{ item.taskKey ? `${item.taskKey} · ` : '' }}{{ item.taskName || $t('Home.untitled_task') }}</span>
+                    <span v-if="isDocComment(item)" class="hc-assigned__task">{{ item.pageTitle || $t('Docs.untitled') }}</span>
+                    <span v-else class="hc-assigned__task">{{ item.taskKey ? `${item.taskKey} · ` : '' }}{{ item.taskName || $t('Home.untitled_task') }}</span>
                 </button>
                 <span class="hc-assigned__from">{{ $t('Home.assigned_by', { name: nameOf(item.assignedBy) }) }}</span>
                 <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm hc-assigned__resolve" :disabled="busy === item._id" @click="resolve(item)">{{ $t('Comments.resolve') }}</button>
@@ -23,17 +24,21 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from "vue";
+import { inject, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 import { useGetterFunctions } from "@/composable";
 import { commentPlainText } from "@/utils/commentHtml";
-import { loadAssignedToMe, resolveComment } from "@/composable/commentThreads";
+import { isDocComment, loadAssignedToMe, resolveComment, resolveDocComment } from "@/composable/commentThreads";
+import { docRoute } from "@/components/molecules/Pages/docRoute";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 
 defineOptions({ name: "AssignedCommentsCard" });
 
 const emit = defineEmits(["open", "hide"]);
 const { t } = useI18n();
+const router = useRouter();
+const companyId = inject("$companyId", ref(""));
 const { getUser } = useGetterFunctions();
 
 const items = ref([]);
@@ -59,13 +64,17 @@ async function load() {
 }
 
 function open(item) {
+    if (isDocComment(item)) {
+        router.push(docRoute(companyId.value, item.pageId, { comment: String(item._id) })).catch(() => {});
+        return;
+    }
     emit("open", { _id: String(item.taskId), ProjectID: String(item.projectId), sprintId: String(item.sprintId || "") });
 }
 
 async function resolve(item) {
     busy.value = item._id;
     try {
-        await resolveComment(item, true);
+        await (isDocComment(item) ? resolveDocComment(item, true) : resolveComment(item, true));
         items.value = items.value.filter((row) => row._id !== item._id);
     } catch (e) {
         load();

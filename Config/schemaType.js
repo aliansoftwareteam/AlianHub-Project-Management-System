@@ -74,6 +74,7 @@ const SCHEMA_TYPE = {
     RECURRING_TASKS: "recurring_tasks",
     TASK_TEMPLATES: "task_templates",
     VIEW_TEMPLATES: "view_templates",
+    PROJECT_SNAPSHOTS: "project_snapshots",
     EVERYTHING_VIEWS: "everything_views",
     REMINDERS: "reminders",
     NOTES: "notes",
