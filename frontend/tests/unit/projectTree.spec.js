@@ -193,6 +193,16 @@ describe('the tree panel on project pages', () => {
         expect(wrapper.find('[role="tree"]').exists()).toBe(false);
     });
 
+    it('carries the open view\'s density, so a compact List tightens the tree with it', async () => {
+        const { wrapper } = await mountWith(ProjectTreePanel, { projects: PROJECTS, density: 'compact' }, { width: 1280 });
+        expect(wrapper.find('#project-tree-panel').attributes('data-density')).toBe('compact');
+    });
+
+    it('has no density of its own when the page gives it none', async () => {
+        const { wrapper } = await mountWith(ProjectTreePanel, { projects: PROJECTS }, { width: 1280 });
+        expect(wrapper.find('#project-tree-panel').attributes('data-density')).toBeUndefined();
+    });
+
     it('is mounted by the project page', () => {
         const source = fs.readFileSync(path.resolve(__dirname, '../../src/views/Projects/Projects.vue'), 'utf8');
         expect(source).toMatch(/<ProjectTreePanel\b/);
