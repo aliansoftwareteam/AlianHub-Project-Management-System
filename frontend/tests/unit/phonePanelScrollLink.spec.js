@@ -14,7 +14,8 @@ vi.mock('@/composable', () => ({
         makeUniqueId: () => 'id',
         checkBucketStorage: () => true
     }),
-    useGetterFunctions: () => ({ getUser: (id) => ({ id }) })
+    useGetterFunctions: () => ({ getUser: (id) => ({ id }) }),
+    useConvertDate: () => ({ convertDateFormat: (value) => String(value || '') })
 }));
 vi.mock('@/composables/useClipRecorder', () => ({ useClipRecorder: () => ({ openRecorder: vi.fn() }) }));
 vi.mock('@/composable/cloudPicker', () => ({ importCloudFile: vi.fn() }));
