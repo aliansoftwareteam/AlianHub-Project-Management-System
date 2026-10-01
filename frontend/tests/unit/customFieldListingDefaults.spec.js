@@ -68,7 +68,7 @@ const show = (component, detail, more = {}) => {
     const failed = vi.fn();
     const wrapper = mount(component, {
         props: { detail },
-        global: { plugins: [store()], provide: { $clientWidth: ref(1280) }, config: { errorHandler: failed }, stubs: { ToolTip: true, Sidebar: true, ...more } }
+        global: { plugins: [store()], provide: { $clientWidth: ref(1280), $defaultUserAvatar: '' }, config: { errorHandler: failed }, stubs: { ToolTip: true, Sidebar: true, ...more } }
     });
     mounted.push(wrapper);
     return { wrapper, failed };
@@ -129,7 +129,7 @@ describe('a date field with no past/future setting', () => {
         const failed = vi.fn();
         const wrapper = mount(CustomFieldRender, {
             props: { task: { _id: 't1', ProjectID: 'p1', TaskTypeKey: 1, customField: {} }, editPermission: true },
-            global: { plugins: [store([DUE])], provide: { $clientWidth: ref(1280) }, config: { errorHandler: failed }, stubs: { ToolTip: true, AiFieldMark: true, Skelaton: true } }
+            global: { plugins: [store([DUE])], provide: { $clientWidth: ref(1280), $defaultUserAvatar: '' }, config: { errorHandler: failed }, stubs: { ToolTip: true, AiFieldMark: true, Skelaton: true } }
         });
         mounted.push(wrapper);
         await vi.waitFor(() => expect(picker(wrapper).exists()).toBe(true), { timeout: 4000 });

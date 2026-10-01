@@ -75,31 +75,30 @@ const render = ref(true);
 
 const editIconImage = require("@/assets/images/editing.png");
 
-// Watches
+const optionsOf = (detail) => JSON.parse(JSON.stringify(Array.isArray(detail?.fieldOptions) ? detail.fieldOptions : []));
+
 watch(() => props.detail, (newVal) => {
     if(newVal){
-        items.value = JSON.parse(JSON.stringify(newVal?.fieldOptions))?.filter(x => newVal?.fieldValue?.includes(x.id)) || [];
-        checkDefault.value = JSON.parse(JSON.stringify(newVal?.fieldOptions))?.filter((x) => x.selected === true) || [];
+        items.value = optionsOf(newVal).filter(x => newVal?.fieldValue?.includes(x.id));
+        checkDefault.value = optionsOf(newVal).filter((x) => x.selected === true);
         details.value = newVal;
     }
 });
 
-// Initialize data
 onMounted(() => {
     render.value = false;
     nextTick(()=>{
         if(props.detail && props?.detail?.fieldValue) {
             details.value = props.detail;
-            items.value = JSON.parse(JSON.stringify(props.detail?.fieldOptions)).filter(x => props.detail?.fieldValue?.includes(x.id)) || [];
+            items.value = optionsOf(props.detail).filter(x => props.detail?.fieldValue?.includes(x.id));
         }
-        checkDefault.value = JSON.parse(JSON.stringify(props.detail?.fieldOptions)).filter((x) => x?.selected === true) || [];
+        checkDefault.value = optionsOf(props.detail).filter((x) => x?.selected === true);
         render.value = true;
     });
 })
 
-// This function is used to get selected option from sidebar
 const selectedObj = (obj) => {
-    items.value = props.detail?.fieldOptions.filter(x => x.id === obj.id);
+    items.value = optionsOf(props.detail).filter(x => x.id === obj.id);
     emit('blurUpdate', obj, props.detail, "");
 }
 
