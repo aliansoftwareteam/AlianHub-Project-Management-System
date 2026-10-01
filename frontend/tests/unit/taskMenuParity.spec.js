@@ -69,8 +69,6 @@ const store = () => createStore({
     }
 });
 
-const OptionsDropDown = { name: 'DropDown', template: '<div><slot name="button" :triggerAttrs="{}" /><div class="menu-options"><slot name="options" /></div></div>' };
-const Option = { name: 'DropDownOption', emits: ['click'], template: '<div role="menuitem" @click="$emit(\'click\')"><slot /></div>' };
 const Sidebars = { name: 'TaskMenuSidebars', props: ['mode', 'task'], emits: ['close'], template: '<div class="sidebars" :data-mode="mode || \'\'"></div>' };
 
 function mountBoard({ data = task(), archived = false } = {}) {
@@ -91,8 +89,8 @@ function mountBoard({ data = task(), archived = false } = {}) {
                 $dateFormat: ref('DD/MM/YYYY')
             },
             stubs: {
-                DropDown: OptionsDropDown, DropDownOption: Option, TaskMenuSidebars: Sidebars,
-                Assignee: true, Priority: true, DueDateCompo: true, ProvenanceBadge: true, BoardViewTaskCreate: true,
+                TaskMenuSidebars: Sidebars,
+                Assignee: true, Priority: true, CalenderCompo: true, ProvenanceBadge: true, BoardViewTaskCreate: true,
                 ConfirmationSidebar: true, TagChip: true, CreateTagPopup: true
             }
         }
@@ -122,12 +120,19 @@ function mountList({ data = task(), archived = false, isSub = false } = {}) {
     return { wrapper, edit, menu };
 }
 
-const boardItems = (wrapper) => wrapper.findAll('.menu-options [data-item]').map((item) => [item.attributes('data-item'), item.text()]);
+async function boardItems(wrapper) {
+    await wrapper.find('.option-list__trigger').trigger('click');
+    return [...document.body.querySelectorAll('.task-menu [role="menuitem"]')].map((item) => [item.dataset.item, item.textContent]);
+}
 async function listItems(wrapper) {
     await wrapper.find('[data-action="menu"]').trigger('click');
     return wrapper.findAll('[role="menu"] [role="menuitem"]').map((item) => [item.attributes('data-item'), item.text()]);
 }
-const pickBoard = (wrapper, id) => wrapper.find(`.menu-options [data-item="${id}"]`).trigger('click');
+async function pickBoard(wrapper, id) {
+    await wrapper.find('.option-list__trigger').trigger('click');
+    document.body.querySelector(`.task-menu [data-item="${id}"]`).click();
+    await nextTick();
+}
 async function pickList(wrapper, id) {
     await wrapper.find('[data-action="menu"]').trigger('click');
     await wrapper.find(`[role="menu"] [data-item="${id}"]`).trigger('click');
@@ -223,7 +228,7 @@ describe('the Board card and the List row show the same menu', () => {
         const board = mountBoard({ data: task(overrides) });
         const list = mountList({ data: task(overrides) });
         const expected = taskMenuItems(task(overrides), rightsNow()).map((item) => [item.id, item.labelKey]);
-        expect(boardItems(board.wrapper)).toEqual(expected);
+        expect(await boardItems(board.wrapper)).toEqual(expected);
         expect(await listItems(list.wrapper)).toEqual(expected);
         board.wrapper.unmount();
         list.wrapper.unmount();
@@ -235,7 +240,7 @@ describe('the Board card and the List row show the same menu', () => {
         const list = mountList({ data, archived: true });
         const expected = taskMenuItems(data, rightsNow(true)).map((item) => [item.id, item.labelKey]);
         expect(expected.map(([id]) => id)).toContain('restore');
-        expect(boardItems(board.wrapper)).toEqual(expected);
+        expect(await boardItems(board.wrapper)).toEqual(expected);
         expect(await listItems(list.wrapper)).toEqual(expected);
         board.wrapper.unmount();
         list.wrapper.unmount();
