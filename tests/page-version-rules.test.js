@@ -44,7 +44,7 @@ describe('the state a version holds', () => {
 });
 
 describe('when the outgoing state is kept', () => {
-    const latest = (over = {}) => ({ savedBy: ALICE, savedAt: ago(8 * MINUTE), hash: 'other', ...over });
+    const latest = (over = {}) => ({ savedBy: ALICE, savedAt: ago(HOUR), createdAt: ago(8 * MINUTE), hash: 'other', ...over });
 
     it('is kept when someone else wrote it', () => {
         expect(rules.reasonToKeep({ page: page(), editorId: BOB, latest: latest(), now: NOW })).toBe('author');
@@ -54,9 +54,9 @@ describe('when the outgoing state is kept', () => {
         expect(rules.reasonToKeep({ page: page(), editorId: ALICE, latest: latest(), now: NOW })).toBe('');
     });
 
-    it('is kept once the last version is more than ten minutes old', () => {
+    it('is kept once the last version was kept more than ten minutes ago', () => {
         expect(rules.VERSION_INTERVAL_MS).toBe(10 * MINUTE);
-        expect(rules.reasonToKeep({ page: page(), editorId: ALICE, latest: latest({ savedAt: ago(11 * MINUTE) }), now: NOW })).toBe('interval');
+        expect(rules.reasonToKeep({ page: page(), editorId: ALICE, latest: latest({ createdAt: ago(11 * MINUTE) }), now: NOW })).toBe('interval');
     });
 
     it('measures from the creation of a doc that has no version yet', () => {
@@ -69,7 +69,7 @@ describe('when the outgoing state is kept', () => {
     });
 
     it('is not kept twice', () => {
-        const same = latest({ hash: rules.snapshotOf(page()).hash, savedAt: ago(DAY) });
+        const same = latest({ hash: rules.snapshotOf(page()).hash, createdAt: ago(DAY) });
         expect(rules.reasonToKeep({ page: page(), editorId: BOB, latest: same, now: NOW })).toBe('');
     });
 

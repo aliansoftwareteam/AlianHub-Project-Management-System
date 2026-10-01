@@ -182,7 +182,7 @@ describe('when a version is kept', () => {
         expect(storedPage().rawText).toBe('Three');
     });
 
-    it('keeps the state being replaced once the last version is more than ten minutes old, under the time it was written', async () => {
+    it('keeps the state being replaced once ten minutes have passed since a version was kept, under the time it was written', async () => {
         at(3);
         await save(AUTHOR, [para('a', 'Two')]);
         at(12);
@@ -197,6 +197,10 @@ describe('when a version is kept', () => {
         at(15);
         await save(AUTHOR, [para('a', 'Four')]);
         expect(kept()).toHaveLength(1);
+
+        at(23);
+        await save(AUTHOR, [para('a', 'Five')]);
+        expect(kept().map((row) => [row.rawText, row.savedAt])).toEqual([['Two', new Date(T0 + 3 * MINUTE)], ['Four', new Date(T0 + 15 * MINUTE)]]);
     });
 
     it('keeps what one person wrote when another person edits', async () => {
