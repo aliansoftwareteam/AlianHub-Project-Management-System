@@ -111,7 +111,8 @@ The hierarchy design is in `design-hierarchy.md`. F3 was replaced by "duplicate 
 - [ ] Dark mode batch 2
 - [ ] In review (#1265): a new list is created in the folder you are in
 - [ ] The List title column keeps a minimum width; the task type image that answers 404
-- [ ] The Ask card does not ask twice; small bugs in the automation builder
+- [ ] In review (#1266): the Ask card keeps its answer instead of asking again on every open
+- [ ] Small bugs in the automation builder
 
 ## M3 Depth, M4 Lead and proof
 Not started, apart from the A3 and A4 slices listed above. The slices are in `task.md`. "Save a project as a template" moved here from M2 (decision 20).

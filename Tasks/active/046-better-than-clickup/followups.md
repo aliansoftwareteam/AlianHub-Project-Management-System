@@ -212,9 +212,9 @@ How to read this file:
 - #1224: each of the 11 card bodies inside the shell, in light and dark (pass 3 saw eight cards). Pass 3 saw no request for "Free Resources".
 
 **Left**
-- #1224: the Ask card can send two requests when the user id arrives after availability; it waits forever when AI availability never resolves. A fix is running.
+- #1224: the Ask card can send two requests when the user id arrives after availability; it waits forever when AI availability never resolves. Both are fixed in #1266 (in review).
 - #1224: "Try again" does not re-import a failed cards chunk.
-- #1188: the Ask card asks once per viewer per open (30 minute cache).
+- #1188: the Ask card asks once per viewer per open. #1266 (in review) keeps the answer per viewer and asks again only on a refresh, a changed question or an old answer.
 - #1199: Burndown, Velocity and Ask are not offered on Home; a changed layout is not pushed to other devices; no touch drag.
 - #1221: `/personal` shows an error state for a first-time visitor in the atlas's read-only mode.
 

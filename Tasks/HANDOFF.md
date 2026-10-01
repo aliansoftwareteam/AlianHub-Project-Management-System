@@ -52,6 +52,7 @@ Builds 649 to 670 are tasks 044 and 045 (22 PRs); see "Earlier" below. The rest,
 | #1210 | B1.1: colours and legacy classes may only shrink | The open visual PRs. Then its baseline is regenerated against `beta` once. It adds Rule 5 to `CLAUDE.md` |
 | #1263 | The member list returns the fields the app shows | The integrator's review. Access PRs are read before they are queued |
 | #1265 | A new list is created in the folder you are in | Its checks and a review |
+| #1266 | The Ask card keeps its answer instead of asking again on every open | Its checks and a review. It adds a route and a collection |
 | This PR | Task docs, the beta log and this handoff | Its checks |
 
 ## Running when this was written
@@ -60,7 +61,7 @@ Ten agents, by branch where the notes name one:
 
 - Dark mode batch 2 (`fix/dark-mode-batch-2`).
 - The List title column's minimum width and the task type image (`fix/list-title-min-width`); the same agent opened #1265.
-- The Ask card and the automation builder (`fix/ask-card-does-not-reask`, `fix/automation-builder-small-bugs`).
+- The automation builder's small bugs (`fix/automation-builder-small-bugs`); the same agent opened #1266.
 - Access fix 6; #1263 is its first PR.
 - N5b: Board, Table, Calendar and the legacy list with three levels.
 - N6: import and rollups with three levels.
@@ -91,10 +92,10 @@ A new session cannot see these agents. Look for their branches and PRs with `gh 
 ## Next ten things, in order
 
 1. Merge #1264, then sync and merge #1240, #1255 and #1259 as their checks pass.
-2. Review #1263 and #1265 and queue them.
+2. Review #1263, #1265 and #1266 and queue them.
 3. Rebuild the local server from `beta` (dry-run the migrations first) and tell the owner which build is live.
 4. QA pass 4 on that build, starting with every upload and removal path (#1253), then nested subtasks in the List (#1254), the Everything page (#1260, #1262), duplicate a project (#1257), folder actions (#1247), the files field (#1243) and the dense default look (#1259). The lists are in `followups.md`.
-5. Collect, review and merge what the running agents open: dark mode batch 2, the List and Ask card fixes, N5b, N6, MCP parity part 2, B1.3 and B2.1.
+5. Collect, review and merge what the running agents open: dark mode batch 2, the List title fix, the automation builder fixes, N5b, N6, MCP parity part 2, B1.3 and B2.1.
 6. Regenerate #1210's baseline against `beta` once the visual PRs are in, and merge it.
 7. E4: measure the Everything view and the List at 10,000 tasks (`npm run scale:measure`), record the numbers in `docs/PERFORMANCE.md`, and fix what misses its budget.
 8. Get the owner's answers on the download switch and the MCP flags. With the flags on, use the new tools to keep AP-441 current.
