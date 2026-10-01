@@ -180,14 +180,31 @@ describe('saving a board', () => {
         expect(write.data[1].$set.revision).toBe(2);
     });
 
-    it('refuses a new card for a task that is not in this list, is deleted, or that the writer may not open', async () => {
+    it('leaves out a new card for a task that is not in this list, is deleted, or that the writer may not open', async () => {
         seedTask(taskId(40), { sprintId: OTHER_LIST });
         seedTask(taskId(41), { deletedStatusKey: 1 });
         for (const id of [taskId(40), taskId(41), taskId(99)]) {
-            await expect(save(ANA, { baseRevision: 0, upsert: [card('x', id)] })).rejects.toMatchObject({ field: 'upsert.taskId' });
+            expect(await save(ANA, { baseRevision: 0, upsert: [card('x', id)] })).toEqual({ saved: true, board: null });
         }
-        await expect(save(ANA, { baseRevision: 0, upsert: [card('x', T1)] }, { admits: () => false })).rejects.toMatchObject({ field: 'upsert.taskId' });
-        expect(boards().every((board) => board.revision === 0 && board.elements.length === 0)).toBe(true);
+        expect(await save(ANA, { baseRevision: 0, upsert: [card('x', T1)] }, { admits: () => false })).toEqual({ saved: true, board: null });
+        expect(boards()).toEqual([]);
+
+        const mixed = await save(ANA, { baseRevision: 0, upsert: [card('a', T1), card('x', taskId(40)), card('y', T2)] }, { admits: (task) => String(task._id) !== T2 });
+        expect(mixed.board.elements.map((element) => element.id)).toEqual(['a']);
+    });
+
+    it('keeps a card that is already on the board when the writer may not open its task', async () => {
+        await save(ANA, { baseRevision: 0, upsert: [card('a', T1), card('b', T2)] });
+        const { board } = await save(BEN, { baseRevision: 1, upsert: [card('a', T1, 5, 5)] }, { admits: (task) => String(task._id) !== T2 });
+        expect(board.elements.map((element) => element.id)).toEqual(['a', 'b']);
+    });
+
+    it('writes nothing, and tells nobody, when a save leaves the board as it was', async () => {
+        await save(ANA, { baseRevision: 0, upsert: [card('a', T1, 7, 7)] });
+        socketEmitter.emit.mockClear();
+        const same = await save(BEN, { baseRevision: 1, upsert: [card('a', T1, 7, 7), card('x', taskId(99))] });
+        expect(same).toMatchObject({ saved: true, board: { revision: 1, updatedBy: ANA } });
+        expect(socketEmitter.emit).not.toHaveBeenCalled();
     });
 
     it('drops the cards whose task has left the list when the next save is written', async () => {
@@ -311,7 +328,8 @@ describe('the change relay', () => {
         await save(ANA, { baseRevision: 0, upsert: [card('a', T1)] });
         socketEmitter.emit.mockClear();
         await save(BEN, { baseRevision: 0, upsert: [card('b', T2)] });
-        await expect(save(BEN, { baseRevision: 1, upsert: [card('x', taskId(99))] })).rejects.toBeInstanceOf(BoardRefused);
+        const full = Array.from({ length: MAX_ELEMENTS }, (_, n) => card(`c${n}`, taskId(n + 100)));
+        await expect(save(BEN, { baseRevision: 1, upsert: full })).rejects.toBeInstanceOf(BoardRefused);
         expect(socketEmitter.emit).not.toHaveBeenCalled();
     });
 

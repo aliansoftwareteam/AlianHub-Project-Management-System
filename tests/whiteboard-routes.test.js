@@ -243,15 +243,19 @@ describe('a card and the task behind it', () => {
         });
     });
 
-    it('refuses a new card for a task the writer may not open, or one outside the list, with one answer', async () => {
+    it('leaves out a new card for a task the writer may not open, or one outside the list, with one answer', async () => {
         const answers = [];
         for (const taskId of [CHAT, P1, K1, 'e000000000000000000000ff']) {
             const res = await save(TEAMMATE, [OPEN, LIST], { baseRevision: 0, upsert: [card('x', taskId)] });
             answers.push({ statusCode: res.statusCode, body: res.body });
         }
-        expect(answers[0]).toEqual({ statusCode: 400, body: { status: false, statusText: 'Request refused', message: 'A card must stand for a task in this list.', field: 'upsert.taskId' } });
+        expect(answers[0]).toMatchObject({ statusCode: 200, body: { status: true, data: { boardId: null, revision: 0, elements: [] } } });
         answers.forEach((answer) => expect(answer).toEqual(answers[0]));
         expect(boards()).toEqual([]);
+
+        const mixed = await save(TEAMMATE, [OPEN, LIST], { baseRevision: 0, upsert: [card('a', T2), card('x', CHAT), card('y', P1)] });
+        expect(mixed.body.data.elements.map((element) => element.id)).toEqual(['a']);
+        expect(boards()[0].elements.map((element) => element.taskId)).toEqual([T2]);
     });
 });
 

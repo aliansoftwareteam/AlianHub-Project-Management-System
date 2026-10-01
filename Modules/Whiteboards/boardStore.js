@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const socketEmitter = require('../../event/socketEventEmitter');
-const { BoardRefused, MAX_SNAPSHOTS, applyPatch, reasonToKeep, snapshotOf } = require('./boardRules');
+const { MAX_SNAPSHOTS, applyPatch, reasonToKeep, snapshotOf } = require('./boardRules');
 
 const SOCKET_MODULE = 'whiteboards';
 const TASK_FIELDS = { ProjectID: 1, sprintId: 1, mainChat: 1, AssigneeUserId: 1, TaskName: 1, TaskKey: 1 };
@@ -68,7 +68,11 @@ const startBoard = async (companyId, projectId, sprintId, uid) => {
 
 const conflictWith = async (companyId, projectId, sprintId) => ({ conflict: true, board: await readBoard(companyId, projectId, sprintId) });
 
-/* `admits(task)` says whether the writer may open a task; a new card is refused for a task they may not. */
+const sameScene = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
+
+/* `admits(task)` says whether the writer may open a task. A new card is left out, with no word of why, when its
+ * task is not a live task of this list or is one the writer may not open: a client whose task list is a moment
+ * behind then loses that one card and not the whole save, and the answer is the same for either reason. */
 const saveBoard = async ({ companyId, projectId, sprintId, uid, patch, admits = () => true, now = new Date() }) => {
     const current = await readBoard(companyId, projectId, sprintId);
     const revision = current ? current.revision : 0;
@@ -77,9 +81,8 @@ const saveBoard = async ({ companyId, projectId, sprintId, uid, patch, admits = 
     const held = new Set(((current && current.elements) || []).map((element) => element.id));
     const next = applyPatch(current ? current.elements : [], patch);
     const tasks = await tasksOnBoard(companyId, projectId, sprintId, next);
-    const strangers = next.filter((element) => !held.has(element.id) && !(tasks.has(element.taskId) && admits(tasks.get(element.taskId))));
-    if (strangers.length) throw new BoardRefused('upsert.taskId', 'A card must stand for a task in this list.');
-    const elements = next.filter((element) => tasks.has(element.taskId));
+    const elements = next.filter((element) => tasks.has(element.taskId) && (held.has(element.id) || admits(tasks.get(element.taskId))));
+    if (current ? sameScene(current.elements, elements) : !elements.length) return { saved: true, board: current };
 
     const board = current || await startBoard(companyId, projectId, sprintId, uid);
     if (!board || board.revision !== revision) return { conflict: true, board };
