@@ -101,8 +101,8 @@
         <CustomFieldInputComponent
             :label="$t('CustomField.past_and_future')"
             :type="'checkbox'"
-            :options="fieldPastFuture"
-            :bindValue="props.customFieldObject?.fieldPastFuture ? props.customFieldObject.fieldPastFuture : fieldPastFuture"
+            :options="pastFutureOptions"
+            :bindValue="pastFutureValue"
             :validationVisibility="'blur'"
             :name="'fieldPastFuture'"
             :help="$t('CustomField.select_dates_past_future')"
@@ -122,13 +122,15 @@
 </template>
 
 <script setup>
-    import { ref,watch } from "vue";
+    import { computed, ref, watch } from "vue";
     import { useCustomComposable } from '@/composable';
     import DropDown from '@/components/molecules/DropDown/DropDown.vue';
     import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
     import CustomFieldInputComponent from "../../customFieldSidebar/customFieldSidebarComponent/customFieldInputComponent/customFieldInputComponent.vue";
     const {makeUniqueId} = useCustomComposable();
     import { useI18n } from "vue-i18n";
+    import { PAST, FUTURE } from '@datePastFuture';
+    import { storedPastFuture } from '@/plugins/customFieldView/dateFieldLimits';
     const { t } = useI18n();
     const dropDownArrow = require('@/assets/images/svg/triangleBlack.svg');
 
@@ -156,7 +158,9 @@
     //FIRST Tab
     const fieldLabel = ref('');
     const fieldSeparatorSelected = ref('-');
-    const fieldPastFuture = ref([t('CustomField.past'),t('CustomField.future')]);
+    const pastFutureOptions = [{ value: PAST, label: t('CustomField.past') }, { value: FUTURE, label: t('CustomField.future') }];
+    /* The input resets to its bound value whenever that changes identity, so the ticks are computed once per field. */
+    const pastFutureValue = computed(() => storedPastFuture(props.customFieldObject));
     const fieldDescription = ref('');
     const fieldSeparator = ref(['-', '/', '.']);
     const fieldDateFormate = ref(['MM-DD-YYYY','DD-MM-YYYY','YYYY-MM-DD']);

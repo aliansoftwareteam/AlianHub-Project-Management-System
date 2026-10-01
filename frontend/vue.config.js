@@ -47,6 +47,7 @@ module.exports = defineConfig({
         '@passwordRule': path.resolve(__dirname, '../Modules/Auth/helpers/passwordRule.js'),
         '@viewSettings': path.resolve(__dirname, '../Modules/Project/helpers/viewSettings.js'),
         '@fieldTaskTypes': path.resolve(__dirname, '../Modules/CustomField/helpers/fieldTaskTypes.js'),
+        '@datePastFuture': path.resolve(__dirname, '../Modules/CustomField/helpers/datePastFuture.js'),
         '@fieldTypes': path.resolve(__dirname, '../Modules/CustomField/fieldTypes'),
         '@automationTemplates': path.resolve(__dirname, '../Modules/Automations/templates.js'),
       },

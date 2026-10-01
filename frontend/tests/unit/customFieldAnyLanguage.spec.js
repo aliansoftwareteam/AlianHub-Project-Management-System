@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { config, flushPromises, mount, shallowMount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import { createStore } from 'vuex';
-import { plugin as formKit, defaultConfig } from '@formkit/vue';
+import { FormKit, plugin as formKit, defaultConfig } from '@formkit/vue';
 import en from '@/locales/en';
 import fr from '@/locales/fr';
 
@@ -80,7 +80,7 @@ describe('the date settings form in French', () => {
     };
     const limitBoxes = (wrapper) => wrapper.findAll('input[type="checkbox"][name="fieldPastFuture"]');
     const save = async (wrapper) => {
-        const node = wrapper.findComponent({ name: 'FormKit' }).vm.node;
+        const node = wrapper.findComponent(FormKit).vm.node;
         node.at('fieldTitle').input('Échéance', false);
         node.at('fieldDescription').input('Date de livraison prévue', false);
         await node.settled;
@@ -107,7 +107,7 @@ describe('the date settings form in French', () => {
 describe('the messages of a field in the task panel', () => {
     const zz = {
         CustomField: {
-            min_value: 'zz {field} >= {min}', max_value: 'zz {field} <= {max}', must_be_valid_email: 'zz {field} @', select_field: 'zz pick {field}'
+            min_value: 'zz {field} >= {min}', max_value: 'zz {field} <= {max}', must_be_valid_email: 'zz {field} mail', select_field: 'zz pick {field}'
         }
     };
     const other = createI18n({ legacy: false, locale: 'zz', fallbackLocale: 'en', messages: { en, zz }, missingWarn: false, fallbackWarn: false });
@@ -129,7 +129,7 @@ describe('the messages of a field in the task panel', () => {
         const wrapper = keep(shallowMount(EmailComponentListing, { props: { detail: field('email') }, global }));
         wrapper.findComponent(CustomFieldListing).vm.$emit('inputUpdate', 'not an email');
         await flushPromises();
-        expect(wrapper.findComponent(CustomFieldListing).props('customValidationMessage')).toEqual({ is: 'zz Points @' });
+        expect(wrapper.findComponent(CustomFieldListing).props('customValidationMessage')).toEqual({ is: 'zz Points mail' });
     });
 
     it('a dropdown field names its option list', async () => {
