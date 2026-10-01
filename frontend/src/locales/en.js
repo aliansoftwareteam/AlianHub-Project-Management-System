@@ -4123,6 +4123,7 @@ export default {
         plain_field_note: "This field is edited on the task. Required and visibility settings live in the field sidebar.",
         saving: "Saving…",
         save_field: "Save field",
+        save_and_add_another: "Save and add another",
         test: "Test",
         cancel: "Cancel",
         surface_task_view: "Task view",
@@ -7033,6 +7034,7 @@ export default {
         field_name: "Field Name",
         date_created: "Date Created",
         add_another_item: "Add another item",
+        options_keyboard_hint: "Press Enter for the next option. Enter on an empty option saves the field. Pasting several lines makes one option per line.",
         choose_ready_made_list:
             "Choose a ready-made list of option (e.g., days, months, etc.)",
         predefined_options: "Predefined Options",

@@ -13,7 +13,7 @@
         @closeSidebar="handleCloseSidebar"
         :componentDetail="componentDetail && Object.keys(componentDetail).length ? componentDetail : {}"
         :customFieldObject="componentDetail && Object.keys(componentDetail).length ? customFieldObject : {}"
-        :isCustomField="visible"
+        v-model:isCustomField="visible"
         @handleClose="handleClose()"
         :isType="true"
     />

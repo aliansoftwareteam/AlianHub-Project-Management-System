@@ -67,7 +67,7 @@ const store = (fields = []) => createStore({
     }
 });
 
-const Sidebar = { props: ['visible', 'className'], template: '<section v-if="visible" class="drawer"><slot name="head-left" /><slot name="body" /></section>' };
+const Sidebar = { props: ['visible', 'className'], template: '<section v-if="visible" class="drawer"><slot name="head-left" /><slot name="head-right" /><slot name="body" /></section>' };
 const stubs = { Sidebar, DropDown: true, TaskTypeIcon: true, ToolTip: true, ShellIcon: true, FieldTaskTypesPicker: true, UpgradePlan: true, AiFieldPanel: true };
 const global = (fields) => ({ plugins: [i18n, store(fields), [formKit, defaultConfig()], customFieldPlugin], provide: { selectedProject: ref({ _id: 'p1' }), $userId: ref('u1') }, stubs });
 
@@ -226,7 +226,7 @@ describe('Save and add another', () => {
         await nameOf(wrapper).setValue('Cost');
         await wrapper.get('[data-field-save-another]').trigger('click');
         await new Promise((resolve) => setTimeout(resolve, 400));
-        wrapper.findComponent(CustomFieldsSidebarComponent).vm.$emit('handleClose');
+        await wrapper.get('.sidebar-close').trigger('click');
         await flushPromises();
         expect(wrapper.vm.open).toBe(false);
         expect(wrapper.find('.drawer').exists()).toBe(false);

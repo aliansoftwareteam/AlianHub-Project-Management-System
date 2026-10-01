@@ -35,6 +35,16 @@ const checkedTaskTypes = (value) => {
     return keys;
 };
 
+const checkedTitle = (value) => {
+    if (typeof value !== 'string' || !value.trim()) throw new FieldWriteError('A custom field needs a name.');
+    return value.trim();
+};
+
+const OPTIONAL_TEXT = ['fieldPlaceholder', 'fieldDescription'];
+
+const hasLabelledOption = (options) => Array.isArray(options)
+    && options.some((option) => option && typeof option.label === 'string' && option.label.trim());
+
 const checkedPastFuture = (value) => {
     const allowed = cleanPastFuture(value);
     if (!allowed) throw new FieldWriteError(`fieldPastFuture must be a list of ${PAST} and ${FUTURE}.`);
@@ -63,6 +73,13 @@ const checkProperties = (updateObject, { insert }) => {
         if (name in updateObject && typeof updateObject[name] !== 'boolean') throw new FieldWriteError(`${name} must be true or false.`);
     });
     if ('projectId' in updateObject && !isIdList(updateObject.projectId)) throw new FieldWriteError('projectId must be a list of project ids.');
+    if (insert || 'fieldTitle' in updateObject) updateObject.fieldTitle = checkedTitle(updateObject.fieldTitle);
+    OPTIONAL_TEXT.forEach((name) => {
+        if (name in updateObject && typeof updateObject[name] !== 'string') throw new FieldWriteError(`${name} must be text.`);
+    });
+    if (updateObject.fieldType === 'dropdown' && (insert || 'fieldOptions' in updateObject) && !hasLabelledOption(updateObject.fieldOptions)) {
+        throw new FieldWriteError('A dropdown field needs at least one option.');
+    }
     if ('fieldAi' in updateObject) updateObject.fieldAi = checkedAiConfig(updateObject);
     if ('fieldTaskTypes' in updateObject) updateObject.fieldTaskTypes = checkedTaskTypes(updateObject.fieldTaskTypes);
     if ('fieldPastFuture' in updateObject) updateObject.fieldPastFuture = checkedPastFuture(updateObject.fieldPastFuture);

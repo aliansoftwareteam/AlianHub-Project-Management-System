@@ -15,20 +15,18 @@
                 :label="$t('PlaceHolder.placeholder')"
                 :type="'text'"
                 :placeholder="$t('PlaceHolder.Enter_Placeholder')"
-                :validations="'required:trim'"
+                :validations="''"
                 :bindValue="props.customFieldObject?.fieldPlaceholder ? props.customFieldObject.fieldPlaceholder : fieldPlaceholder"
                 :validationVisibility="'blur'"
-                :className="'custom__field-required'"
                 :name="'fieldPlaceholder'"
             />
             <CustomFieldInputComponent
                 :label="$t('Description.description')"
                 :type="'textarea'"
                 :placeholder="$t('PlaceHolder.Enter_Description')"
-                :validations="'required:trim|length:10'"
+                :validations="''"
                 :bindValue="props.customFieldObject?.fieldDescription ? props.customFieldObject.fieldDescription : fieldDescription"
                 :validationVisibility="'blur'"
-                :className="'custom__field-required'"
                 :name="'fieldDescription'"
             />
             <DropDown themed mode="listbox" :zIndex="10" v-if="isType">
@@ -180,7 +178,7 @@
     const dropDownArrow = require('@/assets/images/svg/triangleBlack.svg');
     // Redirect to the tab where the validation error message is displayed.
     const handleTabComp = (node) => {
-        if(!(node._value.fieldDescription && node._value.fieldTitle && node._value.fieldPlaceholder)){
+        if(!node._value.fieldTitle){
             tabIndexCheck.value = 1;
             emit('tabIndexUpdate',tabIndexCheck.value)
         }else if(!node._value.fieldMoneyCode){
@@ -200,9 +198,9 @@
         object.fieldMoneyCode = currencyObj.value.code;
         object.fieldImage = props.componentDetail.cfIcon;
         object.fieldImageGrey = props.componentDetail.cfIconGrey;
-        object.fieldPlaceholder = object.fieldPlaceholder.trim();
+        object.fieldPlaceholder = (object.fieldPlaceholder || '').trim();
         object.fieldTitle = object.fieldTitle.trim();
-        object.fieldDescription = object.fieldDescription.trim();
+        object.fieldDescription = (object.fieldDescription || '').trim();
         if(props.isType === true){
             object.type = type.value;
         }
