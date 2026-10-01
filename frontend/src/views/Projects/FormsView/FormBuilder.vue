@@ -371,6 +371,7 @@ import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useToast } from 'vue-toast-notification';
+import { folderPathLabel } from '@/utils/folderTree';
 import FormField from './FormField.vue';
 import FormIcon from './FormIcon.vue';
 import FormSubmissions from './FormSubmissions.vue';
@@ -500,7 +501,7 @@ const sprints = computed(() => {
     add(p.sprintsObj);
     for (const fid of Object.keys(p.sprintsfolders || {})) {
         const folder = p.sprintsfolders[fid] || {};
-        add(folder.sprintsObj, folder.name || '');
+        add(folder.sprintsObj, folderPathLabel(p.sprintsfolders, folder));
     }
     return out;
 });

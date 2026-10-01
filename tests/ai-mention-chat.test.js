@@ -207,6 +207,64 @@ describe('@ai in a chat message', () => {
     });
 });
 
+describe('@ai in a chat thread', () => {
+    const postIn = async (uid, message, parentId, thread = channel) => {
+        const r = await call(save, uid, { data: {
+            parentId: String(parentId), message, type: 'text', project: false,
+            ...(thread.taskId === 'default' ? { taskId: 'default' } : {}),
+            objId: { projectId: thread.projectId, sprintId: thread.sprintId, ...(thread.taskId === 'default' ? {} : { taskId: thread.taskId }) },
+        } });
+        await aiMention.settled();
+        return r;
+    };
+    const threadCounts = () => socketEmitter.emit.mock.calls.filter(([, payload]) => payload.module === 'comments_thread').map(([, payload]) => payload.data);
+
+    it('answers in that thread, from the thread and what every reader of the channel can open', async () => {
+        mockChat.mockImplementation(async (args) => ({ content: args.messages[0].content, model: 'echo' }));
+        const root = seedMessage(db(), { ...channel, userId: BOB, text: 'Where are we on the alpha acquisition and pricing launch?' });
+
+        const r = await postIn(ALICE, '@ai alpha acquisition or pricing launch?', root._id);
+
+        expect(r.code).toBe(200);
+        const [answer] = aiRows();
+        expect(String(answer.parentId)).toBe(String(root._id));
+        expect(answer).toMatchObject({ userId: 'ai', aiAskerId: ALICE, aiQuestionId: String(r.body.data._id), taskId: 'default' });
+        expect(answer.hasReply).toBeUndefined();
+        expect(String(answer.sprintId)).toBe(CHANNEL);
+
+        const prompt = promptSent();
+        expect(prompt).toContain('WEB-7');
+        expect(prompt).not.toMatch(/ALP-1|Alpha acquisition plan|SEC-1|merger/);
+        expect(answer.message).not.toMatch(/ALP-1|Alpha acquisition plan/);
+        expect(prompt).toContain('Bob: Where are we on the alpha acquisition and pricing launch?');
+        expect(prompt).not.toMatch(/We agreed to launch pricing on Friday|private channel plans/);
+        expect(threadCounts().pop()).toMatchObject({ _id: root._id, replyCount: 2, replierIds: expect.arrayContaining(['ai', ALICE]) });
+    });
+
+    it('uses only what both people can open in a direct message thread', async () => {
+        mockChat.mockImplementation(async (args) => ({ content: args.messages[0].content, model: 'echo' }));
+        const root = seedMessage(db(), { ...dm, userId: BOB, text: 'About the launch' });
+
+        await postIn(ALICE, '@ai alpha acquisition or pricing launch?', root._id, dm);
+
+        const [answer] = aiRows();
+        expect(String(answer.parentId)).toBe(String(root._id));
+        expect(String(answer.taskId)).toBe(DM_TASK);
+        expect(promptSent()).toContain('WEB-7');
+        expect(promptSent()).not.toMatch(/ALP-1|Alpha acquisition plan|secret for Alice/);
+    });
+
+    it('never answers in a thread of a channel the asker cannot open', async () => {
+        const root = seedMessage(db(), { projectId: CHANNEL_PROJECT, sprintId: PRIVATE_CHANNEL, taskId: 'default', userId: BOB, text: 'Private thread' });
+
+        const r = await postIn(CAROL, '@ai what are the plans?', root._id);
+
+        expect(r.code).toBe(404);
+        expect(mockChat).not.toHaveBeenCalled();
+        expect(aiRows()).toHaveLength(0);
+    });
+});
+
 describe('Ask about this channel', () => {
     const askChannel = (uid, question, thread = channel, companyId = COMPANY) => call(chatAskHandler, uid, { ...thread, question }, companyId);
 

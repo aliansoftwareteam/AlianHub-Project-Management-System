@@ -38,7 +38,7 @@
                     <label v-if="lists.length > 1" class="qct__field">
                         <span class="qct__label">{{ $t('QuickCreate.list') }}</span>
                         <select v-model="sprintId" class="qct__select" data-field="list">
-                            <option v-for="l in lists" :key="l.id" :value="l.id">{{ l.folderName ? `${l.folderName} / ${l.name}` : l.name }}</option>
+                            <option v-for="l in lists" :key="l.id" :value="l.id">{{ listLabel(l) }}</option>
                         </select>
                     </label>
                     <label v-if="templates.length" class="qct__field">
@@ -125,6 +125,7 @@ import { usePersonalList } from "@/components/molecules/Home/usePersonalList";
 import { openTask } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 import { isMacPlatform } from "@/components/molecules/AdvanceSearch/paletteKeys";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import { listLabel } from "@/utils/folderTree";
 import { applyContext, applyTemplate, defaultTemplateOf, dayFromOffset, listTemplates, localDay, renderTitle } from "@/components/molecules/TaskTemplates/taskTemplates";
 import {
     closeQuickCreate,

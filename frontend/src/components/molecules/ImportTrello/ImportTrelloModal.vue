@@ -20,7 +20,7 @@
                 <span class="font-size-13 font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
                 <select v-model="selectedSprintId" class="timport__select font-size-13">
                     <option v-for="sprint in sprintOptions" :key="'tr-'+sprint.id" :value="sprint.id">
-                        {{ sprint.folderName ? sprint.folderName + ' / ' : '' }}{{ sprint.name }}
+                        {{ listLabel(sprint) }}
                     </option>
                 </select>
                 <button class="btn-primary font-size-13 ml-10px" :disabled="isImporting || !selectedSprintId" @click="startImport">
@@ -35,6 +35,7 @@
 
 <script setup>
 import { computed, defineProps, inject, ref, watch } from "vue";
+import { folderPathLabel, listLabel } from "@/utils/folderTree";
 import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
 import { apiRequest } from '@/services';
@@ -67,7 +68,7 @@ const sprintOptions = computed(() => {
     });
     Object.values(props.projectData?.sprintsfolders || {}).forEach((folder) => {
         Object.values(folder?.sprintsObj || {}).forEach((sprint) => {
-            if (sprint?.id) options.push({ id: sprint.id, name: sprint.name || 'Sprint', folderName: folder.folderName || '', folderId: folder.folderId });
+            if (sprint?.id) options.push({ id: sprint.id, name: sprint.name || 'Sprint', folderName: folder.folderName || '', folderPath: folderPathLabel(props.projectData?.sprintsfolders, folder), folderId: folder.folderId });
         });
     });
     return options;
