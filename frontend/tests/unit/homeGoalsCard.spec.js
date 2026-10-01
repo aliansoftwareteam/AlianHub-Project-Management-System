@@ -9,7 +9,7 @@ import en from '@/locales/en';
 const { apiRequest, apiRequestWithoutCompnay, router } = vi.hoisted(() => ({
     apiRequest: vi.fn(),
     apiRequestWithoutCompnay: vi.fn(),
-    router: { push: vi.fn(() => Promise.resolve()), replace: vi.fn(), hasRoute: () => true }
+    router: { push: vi.fn(() => Promise.resolve()), replace: vi.fn(), hasRoute: vi.fn(() => true) }
 }));
 
 vi.mock('@/services', () => ({ apiRequest, apiRequestWithoutCompnay }));
@@ -42,6 +42,7 @@ beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 15, 10, 0) });
     apiRequest.mockReset();
     router.push.mockClear();
+    router.hasRoute.mockImplementation(() => true);
 });
 
 afterEach(() => {
@@ -105,6 +106,20 @@ describe('the Goals card on Home', () => {
         await at('goals-card-failed').find('button').trigger('click');
         await flushPromises();
         expect(rows()).toHaveLength(1);
+    });
+
+    it('links nowhere in a build without the Goals pages: the goals are shown, and nothing leads off Home', async () => {
+        router.hasRoute.mockImplementation(() => false);
+        await show({ goals: [goal(1)] });
+        expect(rows()).toHaveLength(1);
+        expect(rows()[0].element.tagName).toBe('DIV');
+        expect(rows()[0].attributes('data-to')).toBeUndefined();
+        expect(rows()[0].find('.hgl__name').text()).toBe('Goal 1');
+        expect(at('goals-card-all').exists()).toBe(false);
+        wrapper.unmount();
+
+        await show();
+        expect(at('goals-card-empty').find('button').exists()).toBe(false);
     });
 
     it('asks to be hidden from its own button', async () => {

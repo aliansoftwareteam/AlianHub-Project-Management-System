@@ -14,6 +14,7 @@ const { withProgress } = require('./helpers/goalProgress');
 const { LIVE, ARCHIVED, crud, announce, writeAtRevision } = require('./goalStore');
 const sources = require('./goalSources');
 const counts = require('./goalCounts');
+const reached = require('./goalReached');
 
 const { GoalRefused } = rules;
 
@@ -39,23 +40,26 @@ const sameId = (a, b) => String(a) === String(b);
 
 /* A reader is given the sources the number is built from, which every reader can open. The ones left out
  * are named for those who can change them; a reader learns only how many there are. */
-const presentCount = (target, { canEdit, live, now }) => {
+const presentCount = (target, { canEdit, live, now, timedOutAt }) => {
     const all = sources.sourcesOf(target);
     const counted = target.counted || {};
     const skipped = { ...sources.none(), ...(counted.skipped || {}) };
     const kept = (kind) => all[kind].filter((id) => !skipped[kind].map(String).includes(id));
+    const due = live && counts.isDue(target, now);
+    const timedOut = due && Boolean(timedOutAt);
+    const stored = counted.failedAt ? { failedAt: counted.failedAt, failedCode: counted.failedCode || counts.COUNT_ERROR } : {};
     return {
         sources: canEdit ? all : { sprintIds: kept('sprintIds'), taskIds: kept('taskIds') },
         counted: {
             done: counted.done || 0,
             total: counted.total || 0,
             at: counted.at || null,
-            ...(counted.failedAt ? { failedAt: counted.failedAt, failedCode: counted.failedCode || counts.COUNT_ERROR } : {}),
+            ...(timedOut ? { failedAt: timedOutAt, failedCode: counts.TIMED_OUT } : stored),
         },
         notCounted: skipped.sprintIds.length + skipped.taskIds.length,
         ...(canEdit ? { notCountedSources: { sprintIds: skipped.sprintIds.map(String), taskIds: skipped.taskIds.map(String) } } : {}),
         dirty: target.dirty === true,
-        updating: live && counts.isDue(target, now),
+        updating: due && !timedOut,
     };
 };
 
@@ -86,7 +90,7 @@ const presentTarget = (target, view) => ({
 /* The people a goal is shared with are listed for those who manage the list; a reader learns only whether they are on it. */
 const present = (goal, caller, now = new Date()) => {
     const canEdit = access.canEdit(goal, caller);
-    const view = { canEdit, live: goal.deletedStatusKey === LIVE, now };
+    const view = { canEdit, live: goal.deletedStatusKey === LIVE, now, timedOutAt: counts.timedOutAt(caller.companyId, goal._id, now) };
     return {
         _id: String(goal._id),
         name: goal.name,
@@ -194,9 +198,12 @@ const mutate = async (caller, id, allowed, change, { archivedToo = false } = {})
         const goal = await visibleGoal(caller, id);
         if (!allowed(goal, caller)) throw stop(403, FORBIDDEN);
         if (!archivedToo && goal.deletedStatusKey !== LIVE) throw stop(409, IS_ARCHIVED);
-        const set = await change(goal);
-        const saved = await writeAtRevision(caller.companyId, goal, { ...set, updatedBy: caller.uid });
-        if (saved) return { was: goal, saved };
+        const crossing = reached.stamped(goal, await change(goal));
+        const saved = await writeAtRevision(caller.companyId, goal, { ...crossing.set, updatedBy: caller.uid });
+        if (saved) {
+            reached.tell(caller.companyId, saved, crossing.due, caller.uid);
+            return { was: goal, saved };
+        }
     }
     throw stop(409, BUSY);
 };
@@ -322,14 +329,16 @@ exports.createGoal = handled('create', async (req, res, caller) => {
         if (target.kind === rules.TASKS) await sources.requireCountable(caller.companyId, caller.uid, goal, target.sources, `targets.${index}.sources`);
     }
     const targets = await counts.recounted(caller.companyId, { ...goal, targets: newTargets.map((target) => newTarget(target, caller, now)) }, { now });
+    const crossing = reached.stamped(null, withProgress(targets, now), now);
     const saved = plain(await crud(caller.companyId, {
         ...goal,
-        ...withProgress(targets, now),
+        ...crossing.set,
         revision: 0,
         createdBy: caller.uid,
         updatedBy: caller.uid,
         deletedStatusKey: LIVE,
     }, 'save'));
+    reached.tell(caller.companyId, saved, crossing.due, caller.uid);
     announce('insert', caller.companyId);
     audit(req, 'goal.create', saved);
     return sent(res, 'Goal saved.', saved, caller);

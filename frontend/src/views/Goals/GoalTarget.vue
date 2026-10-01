@@ -59,7 +59,7 @@
                 </div>
                 <div v-else class="glt__value">
                     <span class="glt__now" data-test="glt-counted">{{ $t('Goals.tasks_done', { done: tally.done, total: tally.total }) }}</span>
-                    <span v-if="target.updating" class="glt__saving" role="status" data-test="glt-updating">{{ $t('Goals.updating') }}</span>
+                    <span v-if="target.updating && !givenUp" class="glt__saving" role="status" data-test="glt-updating">{{ $t('Goals.updating') }}</span>
                 </div>
                 <div v-if="countFailed" class="glt__failed" role="status" data-test="glt-count-failed">
                     <span>{{ $t(changeable ? 'Goals.count_failed' : 'Goals.count_failed_wait') }}</span>
@@ -93,6 +93,7 @@
 <script setup>
 import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import GoalBar from "./GoalBar.vue";
 import GoalSourceChips from "./GoalSourceChips.vue";
@@ -111,6 +112,7 @@ const props = defineProps({
 });
 
 const { t, locale } = useI18n();
+const store = useStore();
 const { personOf } = useGoalPeople();
 const { write } = useGoalWrite();
 const uid = `glt-${Math.random().toString(36).slice(2, 8)}`;
@@ -156,8 +158,10 @@ const countedAt = computed(() => {
     return when ? t("Goals.counted_at", { when }) : "";
 });
 
-/* The server stops calling a count under way once it has failed, and tries it again on a later read. */
-const countFailed = computed(() => view.value === "counted" && !unlinked.value && Boolean(props.target.counted?.failedAt) && !props.target.updating);
+/* The server stops calling a count under way once it has failed, and tries it again on a later read.
+   One it calls under way for longer than the page will wait is shown as failed too. */
+const givenUp = computed(() => store.getters["goals/countGivenUp"] === true);
+const countFailed = computed(() => view.value === "counted" && !unlinked.value && (props.target.updating ? givenUp.value : Boolean(props.target.counted?.failedAt)));
 
 const showStored = () => { draft.value = text(props.target.current); };
 const resetDraft = () => { showStored(); error.value = ""; };

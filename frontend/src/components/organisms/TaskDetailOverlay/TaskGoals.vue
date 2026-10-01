@@ -3,11 +3,13 @@
         <span class="ah-label">{{ $t('TaskPanel.counts_toward') }}</span>
         <ul class="tgl">
             <li v-for="item in goals" :key="`${item.goalId}-${item.targetId}`" class="tgl__item">
-                <router-link
+                <component
+                    :is="linked ? 'router-link' : 'span'"
                     class="tgl__chip"
+                    :class="{ 'is-link': linked }"
                     data-test="task-goal"
                     :data-goal="item.goalId"
-                    :to="{ name: 'Goal', params: { cid: companyId, goalId: item.goalId } }"
+                    v-bind="linked ? { to: { name: 'Goal', params: { cid: companyId, goalId: item.goalId } } } : {}"
                     :aria-label="$t('TaskPanel.counts_toward_goal', { target: item.targetName, goal: item.goalName, pct: item.progressPct })"
                     :title="$t('TaskPanel.counts_toward_goal', { target: item.targetName, goal: item.goalName, pct: item.progressPct })"
                 >
@@ -15,7 +17,7 @@
                     <span class="tgl__goal">{{ item.goalName }}</span>
                     <span class="tgl__target">{{ item.targetName }}</span>
                     <span class="tgl__pct">{{ item.progressPct }}%</span>
-                </router-link>
+                </component>
             </li>
         </ul>
     </div>
@@ -23,6 +25,7 @@
 
 <script setup>
 import { computed, inject, ref, unref, watch } from "vue";
+import { useRouter } from "vue-router";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequest } from "@/services";
 import { forTaskRequest } from "@/views/Goals/goalRequest";
@@ -33,8 +36,10 @@ const props = defineProps({
     taskId: { type: String, required: true }
 });
 
+const router = useRouter();
 const injectedCompany = inject("$companyId", "");
 const companyId = computed(() => unref(injectedCompany));
+const linked = computed(() => Boolean(router?.hasRoute?.("Goal")));
 const goals = ref([]);
 let asked = 0;
 
@@ -64,7 +69,7 @@ watch(() => props.taskId, load, { immediate: true });
     border: 1px solid var(--border); border-radius: var(--r-chip); background: var(--surface); color: var(--ink);
     font: 500 var(--fs-sm, 12px)/1.3 var(--font-ui); text-decoration: none;
 }
-.tgl__chip:hover { background: var(--surface-hover); border-color: var(--brand); }
+.tgl__chip.is-link:hover { background: var(--surface-hover); border-color: var(--brand); }
 .tgl__chip:focus-visible { outline: none; box-shadow: var(--focus); }
 .tgl__icon { flex: none; color: var(--ink-2); }
 .tgl__goal, .tgl__target { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

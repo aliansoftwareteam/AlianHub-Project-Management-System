@@ -35,5 +35,9 @@ export const renderNotice = (it, { t, changeText }) => {
         const doc = escapeHtml(t("Inbox.doc_mention", { doc: clip(data.pageTitle) || t("Docs.untitled") }));
         return it.message ? `${doc}: ${escapeHtml(it.message)}` : doc;
     }
+    if (it.changeType === "goal_reached" && data.goalId) {
+        const key = `Inbox.${data.targetId ? "goal_target_reached" : "goal_reached"}${data.byCount ? "" : "_by"}`;
+        return escapeHtml(t(key, { goal: clip(data.goalName), target: clip(data.targetName) }));
+    }
     return changeText(notificationHtml(it.message || ""));
 };

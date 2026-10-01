@@ -405,11 +405,106 @@ describe('a count that failed', () => {
         const id = res.body.data._id;
         after(10 * MINUTE);
         const restore = failing(new Error('the database went away'));
-        await expect(counts.refresh(C, id)).rejects.toThrow('the database went away');
+        await expect(counts.refresh(C, id)).resolves.toBe(false);
         restore();
         const [countedTarget, numberTarget] = goalRow(id).targets;
         expect(countedTarget.counted.failedCode).toBe('error');
         expect(numberTarget.counted).toBeUndefined();
+    });
+});
+
+describe('a count that never comes in', () => {
+    const TWO_MINUTES = counts.COUNT_TIMEOUT_MS;
+    const turn = () => new Promise((resolve) => setImmediate(resolve));
+    const stale = async () => {
+        task(open, openList, { statusType: 'close' });
+        const id = await counting({ sprintIds: [openList] });
+        task(open, openList);
+        after(10 * MINUTE);
+        return id;
+    };
+    const during = (answer) => {
+        const original = mockDb.crud.getMockImplementation();
+        mockDb.crud.mockImplementation((companyId, query, method) => answer(query, method) || original(companyId, query, method));
+        return () => mockDb.crud.mockImplementation(original);
+    };
+
+    beforeEach(() => counts.forgetTries());
+
+    it('is given up after two minutes and stored as failed, so the reads stop being told it is on its way', async () => {
+        const id = await stale();
+        const restore = during((query, method) => (method === 'aggregate' ? new Promise(() => {}) : null));
+        expect((await read(id)).targets[0]).toMatchObject({ updating: true });
+        await turn();
+
+        jest.advanceTimersByTime(TWO_MINUTES - 1);
+        await turn();
+        expect((await read(id)).targets[0]).toMatchObject({ updating: true });
+        expect(goalRow(id).targets[0].counted.failedAt).toBeUndefined();
+
+        jest.advanceTimersByTime(1);
+        await counts.idle();
+        restore();
+        const failedAt = new Date(T0.getTime() + 10 * MINUTE + TWO_MINUTES);
+        expect(goalRow(id).targets[0].counted).toMatchObject({ done: 1, total: 1, failedAt, failedCode: 'timeout' });
+        expect((await read(id)).targets[0]).toMatchObject({ updating: false, progressPct: 100, counted: { failedAt, failedCode: 'timeout' } });
+    });
+
+    it('does not hold up the count of the next goal in line', async () => {
+        const first = await stale();
+        const second = await counting({ sprintIds: [openList] }, { name: 'Second' });
+        after(10 * MINUTE);
+        let hung = false;
+        const restore = during((query, method) => {
+            if (hung || method !== 'aggregate') return null;
+            hung = true;
+            return new Promise(() => {});
+        });
+        await call(goals.listGoals, AUTHOR);
+        await turn();
+        jest.advanceTimersByTime(TWO_MINUTES);
+        await counts.idle();
+        restore();
+        const totals = [first, second].map((id) => goalRow(id).targets[0].counted);
+        expect(totals.filter((counted_) => counted_.failedCode === 'timeout')).toHaveLength(1);
+        expect(totals.filter((counted_) => !counted_.failedCode && counted_.total === 2)).toHaveLength(1);
+    });
+
+    it('is said to have failed after two minutes even when the failure cannot be stored, and heals when the store answers', async () => {
+        const id = await stale();
+        const restore = during((query, method) => {
+            if (method === 'aggregate') return Promise.reject(new Error('the database went away'));
+            return query.type === SCHEMA_TYPE.GOALS && method === 'findOneAndUpdate' ? Promise.reject(new Error('read only')) : null;
+        });
+        const started = Date.now();
+        expect((await read(id)).targets[0]).toMatchObject({ updating: true });
+        await counts.idle();
+        expect(goalRow(id).targets[0].counted.failedAt).toBeUndefined();
+
+        after(TWO_MINUTES - 1);
+        expect((await read(id)).targets[0]).toMatchObject({ updating: true });
+        await counts.idle();
+
+        after(1);
+        const told = (await read(id)).targets[0];
+        expect(told).toMatchObject({ updating: false, counted: { done: 1, total: 1, failedAt: new Date(started + TWO_MINUTES), failedCode: 'timeout' } });
+        await counts.idle();
+        expect(goalRow(id).targets[0].counted.failedAt).toBeUndefined();
+
+        restore();
+        await read(id);
+        await counts.idle();
+        const healed = (await read(id)).targets[0];
+        expect(healed).toMatchObject({ updating: false, progressPct: 50, counted: { done: 1, total: 2 } });
+        expect('failedAt' in healed.counted).toBe(false);
+        expect(counts.timedOutAt(C, id, new Date())).toBeNull();
+    });
+
+    it('is never said of a count that is not due', async () => {
+        const id = await counting({ sprintIds: [openList] });
+        expect(counts.timedOutAt(C, id, new Date(Date.now() + 60 * MINUTE))).toBeNull();
+        expect((await read(id)).targets[0]).toMatchObject({ updating: false });
+        expect('failedAt' in (await read(id)).targets[0].counted).toBe(false);
     });
 });
 
