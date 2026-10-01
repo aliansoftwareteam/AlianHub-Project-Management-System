@@ -53,6 +53,7 @@ module.exports = defineConfig({
         '@workingDays': path.resolve(__dirname, '../Modules/Company/helpers/workingDays.js'),
         '@taskTreeRules': path.resolve(__dirname, '../Modules/Tasks/helpers/taskTreeRules.js'),
         '@descriptionBlock': path.resolve(__dirname, '../Modules/Tasks/helpers/descriptionBlock.js'),
+        '@richTextAllowlist': path.resolve(__dirname, '../Modules/Tasks/helpers/richTextAllowlist.js'),
         '@formLogic': path.resolve(__dirname, '../Modules/Forms/helpers/formLogic.js'),
       },
     },

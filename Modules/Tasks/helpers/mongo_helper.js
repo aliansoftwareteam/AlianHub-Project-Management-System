@@ -25,6 +25,7 @@ const { reconcileSprintTaskCount, scheduleReconciliation } = require('./reconcil
 const { loadSubtree, rewriteDescendantAncestors, sprintCountChange, DELETED } = require('./taskTree');
 const { storableFieldValues } = require('../../CustomField/helpers/fieldValueWrite');
 const { withDescriptionBlock } = require('./descriptionBlock');
+const { cleanDescription } = require('./cleanRichText');
 const { copyFieldFiles } = require('../../CustomField/helpers/fieldFiles');
 
 /* ------------- TASK ------------- */
@@ -68,6 +69,8 @@ exports.HandleTask = async (companyId, object, isUpdate, id = null, userData) =>
                     object.dueDateDeadLine = object.dueDateDeadLine.map((x) => new Date(x.date));
                     object.DueDate = new Date(object.DueDate);
                 }
+
+                cleanDescription(object);
 
                 /* Every new task document is saved here: a create, an import row, a form, a template, a copy. */
                 let droppedFieldValues = 0;

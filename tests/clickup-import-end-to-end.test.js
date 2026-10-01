@@ -277,7 +277,7 @@ describe('the sample export imported by an owner into one list of an existing pr
             { type: 'paragraph', data: { text: 'Relaunch the site before the trade fair.' } },
             { type: 'list', data: { style: 'unordered', items: [{ content: 'New home page', items: [] }, { content: 'Pricing in € and £', items: [] }] } },
             { type: 'paragraph', data: { text: '**Deadline:** 1 December' } },
-            { type: 'paragraph', data: { text: 'See the brief (<a href="https://docs.example.test/brief">https://docs.example.test/brief</a>)' } },
+            { type: 'paragraph', data: { text: 'See the brief (<a href="https://docs.example.test/brief" target="_blank" rel="noopener noreferrer">https://docs.example.test/brief</a>)' } },
             { type: 'paragraph', data: { text: '&lt;b&gt;not bold&lt;/b&gt;' } },
         ]);
         expect(taskNamed('Tag the buttons').descriptionBlock).toEqual({});

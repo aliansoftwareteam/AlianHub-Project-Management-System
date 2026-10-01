@@ -13,6 +13,7 @@ const { REPORT, scopeMode, countReported } = require('../../../common-storage/st
 const { tenantOf, TenantError } = require('../../../Config/tenant');
 const { canReadTask } = require('./taskReadAccess');
 const { loadSubtree } = require('./taskTree');
+const { RichTextLimitError } = require('./cleanRichText');
 const { CANNOT_OPEN_PROJECT, peopleWhoOpen, cannotOpen } = require('../../../Config/projectPeople');
 const { openProject, isChatSpace, listOf, listRef, readableTaskIds, coveredByMapping, moveMappingInto } = require('./taskWritePlacement');
 
@@ -730,6 +731,7 @@ const prepareOrRefuse = async (req, res, taskSpec, label) => {
 
 const sendFailure = (res, error) => {
     if (error instanceof TaskWriteRefusal) return sendRefusal(res, error);
+    if (error instanceof RichTextLimitError) return res.status(error.statusCode).send({ status: false, statusText: error.message });
     return res.send({ status: false, statusText: error && error.message });
 };
 

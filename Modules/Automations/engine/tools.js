@@ -8,6 +8,7 @@ const knowledgeEvents = require('../../Knowledge/ingest/events');
 const { canPostToThread } = require('../../Comments/helpers/threadWriteAccess');
 const { sprintPlacementOf } = require('../../Tasks/helpers/sprintPlacement');
 const { slotUnder } = require('../../Tasks/helpers/taskTree');
+const { cleanDescription, cleanHtml } = require('../../Tasks/helpers/cleanRichText');
 
 // The only way an action is allowed to touch data.
 //
@@ -79,6 +80,7 @@ const updateTask = async (companyId, taskId, set, context = {}, unset = null) =>
     const _id = oid(taskId);
     if (!_id) throw new DeterministicError(`invalid task id "${taskId}"`);
     if (!set || !Object.keys(set).length) return { changed: false };
+    cleanDescription(set);
 
     const updated = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS,
@@ -265,7 +267,7 @@ const createSubtask = async (companyId, parentTaskId, { title, description = '' 
             _id,
             TaskName: name.slice(0, 200),
             TaskKey: `${parent.TaskKey || 'TASK'}-${Date.now().toString(36).slice(-4)}`,
-            description: String(description || '').slice(0, 4000),
+            description: cleanHtml(String(description || '').slice(0, 4000), 'strict'),
             rawDescription: String(description || '').slice(0, 4000),
             CompanyId: String(companyId),
             sprintArray: {},
@@ -356,7 +358,7 @@ const createTask = async (companyId, projectId, { title, description = '', sprin
             _id,
             TaskName: name.slice(0, 250),
             TaskKey: '--',
-            description: String(description || '').slice(0, 4000),
+            description: cleanHtml(String(description || '').slice(0, 4000), 'strict'),
             rawDescription: String(description || '').slice(0, 4000),
             CompanyId: String(companyId),
             ProjectID: String(project._id),

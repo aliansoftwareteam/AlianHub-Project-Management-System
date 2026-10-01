@@ -13,6 +13,7 @@ const completionStore = require('../Tasks/helpers/completionStore');
 const { sprintPlacementOf, followSprintMove, moveDescendants } = require('../Tasks/helpers/sprintPlacement');
 const { emitPageChange } = require('../Pages/helpers/pageEvents');
 const { markdownToEditorData, blocksToHtml } = require('../Pages/helpers/pageContent');
+const { cleanPageContent } = require('../Tasks/helpers/cleanRichText');
 const { escapeCommentText } = require('../Comments/helpers/plainText');
 const { isPeriodLocked } = require('../TimesheetApproval/helpers/lockGuard');
 const { canPostToThread } = require('../Comments/helpers/threadWriteAccess');
@@ -384,7 +385,7 @@ const executors = {
         const linked = (params.taskId && oid(params.taskId)) ? [oid(params.taskId)] : [];
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
-            data: { title, rawText: String(params.text || '').slice(0, 20000), content: params.content || contentOfText(params.text),
+            data: { title, rawText: String(params.text || '').slice(0, 20000), content: cleanPageContent(params.content || contentOfText(params.text)),
                     ProjectID: params.projectId && oid(params.projectId) ? oid(params.projectId) : undefined,
                     createdBy: String(actor.userId || a.actorId), linkedTasks: linked, visibility: 'project',
                     createdByAgent: true, agentName: a.label, agentStatus: 'draft', deletedStatusKey: 0 },
