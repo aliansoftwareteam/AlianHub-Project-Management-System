@@ -12,7 +12,6 @@
     text-align: center;
     color: var(--ink);
     margin-top: 24px;
-    margin-bottom: 5px;
 }
 .archive-delete-desc {
     font: 400 var(--fs-lg, 16px)/24px var(--font-ui);
