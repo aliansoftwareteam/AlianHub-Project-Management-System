@@ -15,6 +15,20 @@ export function storedPastFuture(field) {
     return stored.length && !allowed.length ? [PAST, FUTURE] : allowed;
 }
 
+export const holdsTime = (field) => Boolean(field?.fieldTimeFormate);
+
+/*
+ * The picker hands back the picked day at the current time of day. A field without a time keeps the start
+ * of that day instead, the instant the List cell stores, so every place that shows or groups it reads one day.
+ */
+export function pickedDateValue(field, picked) {
+    if (!picked || holdsTime(field)) return picked;
+    const day = new Date(picked);
+    if (Number.isNaN(day.getTime())) return picked;
+    day.setHours(0, 0, 0, 0);
+    return day;
+}
+
 export function dateFieldLimits(field) {
     const allowed = storedPastFuture(field);
     return {

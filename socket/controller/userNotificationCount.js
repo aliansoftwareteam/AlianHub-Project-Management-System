@@ -4,20 +4,18 @@ const {
     findRoomsByPrefix,
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
-const { onJoin, roomFor, isSelf, sameCompany } = require('../roomAccess');
+const { onJoin, roomFor, isSelf, toSeated } = require('../roomAccess');
 
 const handleUserNotificationChange = (changeData) => {
-    if (changeData.module !== 'userIdNotification') return;
+    if (changeData.module !== 'userIdNotification') return undefined;
     // A findOneAndUpdate that matched nothing resolves to null, and sending it would replace the client's whole count store.
-    if (!changeData.data || !changeData.data.userId) return;
+    if (!changeData.data || !changeData.data.userId) return undefined;
 
     const emitData = { fullDocument: changeData.data };
 
     // The room is named by the user alone, and a person in two companies has one in each.
-    findRoomsByPrefix(`userIdNotification_${changeData.data.userId}`).forEach(data => {
-        if (!sameCompany(data.socket.identity, changeData) || !data.socket.rooms.has(data.roomName)) return;
-        data.namespace.to(data.roomName).emit('userIdNoticationUpdate', emitData);
-    });
+    return toSeated(findRoomsByPrefix(`userIdNotification_${changeData.data.userId}`), changeData.companyId,
+        (data) => data.namespace.to(data.roomName).emit('userIdNoticationUpdate', emitData));
 };
 
 exports.userNotificationCountHandler = ({ socket, namespace }) => {

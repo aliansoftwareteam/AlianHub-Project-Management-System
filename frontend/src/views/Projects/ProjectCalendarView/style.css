@@ -39,10 +39,10 @@
 .cv__body { flex: 1; display: flex; min-height: 0; isolation: isolate; }
 .cv__main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: var(--sp-6) var(--page-pad-x, 16px); gap: var(--sp-2); }
 
-.cv__bands { position: relative; height: 22px; margin: 0 var(--sp-1); flex: none; }
+.cv__bands { --lane-h: 22px; position: relative; height: calc(var(--lanes, 1) * var(--lane-h)); margin: 0 var(--sp-1); flex: none; }
 .cv__band {
-    position: absolute; top: 2px; height: 18px;
-    display: flex; align-items: center;
+    position: absolute; top: calc(var(--lane, 0) * var(--lane-h) + 2px); height: 18px;
+    display: block; line-height: 18px;
     padding: 0 var(--sp-3);
     border-radius: var(--r-sm, 5px);
     background: var(--fill);
@@ -51,6 +51,7 @@
     letter-spacing: .04em;
     white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
 }
 .cv__band.is-current { background: var(--brand-tint); color: var(--brand); }
 
@@ -175,6 +176,5 @@
 }
 @media (max-width: 767px) {
     .cv__main { padding: var(--sp-4); }
-    .cv__bands { display: none; }
     .cv__filter { height: var(--hit-min); }
 }

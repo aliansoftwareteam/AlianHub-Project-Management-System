@@ -137,6 +137,7 @@
     import { useI18n } from "vue-i18n";
     import { folderPathLabel } from "@/utils/folderTree";
     import { maskOf } from "@/utils/iconMask";
+    import { defaultStatus } from "@/components/organisms/QuickCreateTask/quickCreateTask";
     const { t } = useI18n();
     const caretIcon = require("@/assets/images/table_arrow.png");
     const closeIcon = require("@/assets/images/crossBoardTaskIcon.png");
@@ -237,11 +238,8 @@
             taskType.value = taskTypes.value[taskTypeIndex]
         }
 
-        // SELECT DEFAULT STATUS
-        let statusIndex = project.value.taskStatusData && project.value.taskStatusData.length ? project.value.taskStatusData.findIndex((x) => x.type === "default_active") : -1
-        if (statusIndex !== -1) {
-            status.value = project.value.taskStatusData[statusIndex];
-        }
+        const opening = defaultStatus(project.value);
+        if (opening) status.value = opening;
 
         assignee.value = defaultAssignee();
 

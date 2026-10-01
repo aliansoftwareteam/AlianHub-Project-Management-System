@@ -11,6 +11,7 @@ exports.init = (app) => {
     // Mints the scoped token a CLI agent pastes into its MCP client. Before /:id
     // so "mcp" is never read as a token id.
     app.post('/api/v2/api-tokens/mcp', ctrl.createMcpToken);
+    app.post('/api/v2/api-tokens/:id/renew', ctrl.renewToken);
     app.get('/api/v2/api-tokens', ctrl.listTokens);
     app.post('/api/v2/api-tokens', ctrl.createToken);
     app.put('/api/v2/api-tokens/:id', ctrl.updateToken);

@@ -372,12 +372,13 @@ const storeComputed = async ({ companyId, tasks, rows, everyDefinition, bySprint
         });
 
         // eslint-disable-next-line no-await-in-loop
-        await MongoDbCrudOpration(companyId, {
+        const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
-            data: [{ _id: task._id }, { $set }]
-        }, "updateOne");
+            data: [{ _id: task._id }, { $set }, { returnDocument: "after" }]
+        }, "findOneAndUpdate");
 
-        socketEmitter.emit("update", { type: "update", data: { _id: task._id }, updatedFields: { customField: $set }, module: "task", companyId });
+        // The relay places a change by the row's project, list and people, so the stored row is what is sent.
+        if (updated) socketEmitter.emit("update", { type: "update", data: updated, updatedFields: $set, module: "task", companyId });
         out[String(task._id)] = result.values;
         if (Object.keys(result.errors).length) errors[String(task._id)] = result.errors;
     }

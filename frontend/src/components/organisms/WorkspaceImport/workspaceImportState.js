@@ -1,5 +1,5 @@
 import { reactive } from "vue";
-import { folderPathLabel } from "@/utils/folderTree";
+import { folderPathLabel, isLiveFolder } from "@/utils/folderTree";
 
 export const IMPORT_SOURCES = [
     { key: "clickup", mark: "C", tint: "#7b68ee" },
@@ -26,4 +26,20 @@ export function sprintOptionsOf(project) {
         });
     });
     return options;
+}
+
+const DELETED = 1;
+
+export function listsOfTree({ sprints = [], folders = [] }) {
+    const sprintsfolders = {};
+    folders.filter((folder) => folder?._id && isLiveFolder(folders, folder)).forEach((folder) => {
+        sprintsfolders[folder._id] = { folderId: folder._id, id: folder._id, _id: folder._id, name: folder.name, parentFolderId: folder.parentFolderId || null, deletedStatusKey: folder.deletedStatusKey, sprintsObj: {} };
+    });
+    const sprintsObj = {};
+    sprints.filter((sprint) => sprint?._id && Number(sprint.deletedStatusKey || 0) !== DELETED).forEach((sprint) => {
+        const list = { ...sprint, id: sprint._id };
+        if (!sprint.folderId) sprintsObj[sprint._id] = list;
+        else if (sprintsfolders[sprint.folderId]) sprintsfolders[sprint.folderId].sprintsObj[sprint._id] = list;
+    });
+    return { sprintsObj, sprintsfolders };
 }

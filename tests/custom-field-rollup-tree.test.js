@@ -130,4 +130,13 @@ describe('POST /api/v2/custom-fields/compute', () => {
         const told = socketEmitter.emit.mock.calls.filter(([event, payload]) => event === 'update' && payload.module === 'task').map(([, payload]) => String(payload.data._id));
         expect(told.sort()).toEqual([ROOT, CHILD, GRANDCHILD].sort());
     });
+
+    it('sends each written task as it is stored, with its place and the values that changed', async () => {
+        await compute([CHILD]);
+        const sent = socketEmitter.emit.mock.calls.map(([, payload]) => payload).find((payload) => payload.module === 'task' && String(payload.data._id) === CHILD);
+        expect(sent).toMatchObject({ type: 'update', companyId: CID, data: { TaskName: CHILD, ParentTaskId: ROOT } });
+        expect(String(sent.data.ProjectID)).toBe(PROJECT);
+        expect(sent.data.customField[TOTAL].fieldValue).toBe(7);
+        expect(Object.keys(sent.updatedFields).sort()).toEqual([`customField.${ROWS}`, `customField.${TOTAL}`].sort());
+    });
 });

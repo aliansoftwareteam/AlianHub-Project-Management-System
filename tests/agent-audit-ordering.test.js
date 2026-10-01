@@ -11,6 +11,10 @@ jest.mock('../Config/permissionGuard', () => ({ ROLE_OWNER: 1, ROLE_ADMIN: 2, ge
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../Modules/Tasks/helpers/completionStore', () => ({ forStatusChange: jest.fn(async () => null), recordWork: jest.fn(async () => null) }));
 jest.mock('../Modules/Agents/permissions', () => ({ holderMay: jest.fn(async () => ({ allowed: true, reason: '' })) }));
+jest.mock('../Modules/Tasks/helpers/taskWritePlacement', () => ({
+    ...jest.requireActual('../Modules/Tasks/helpers/taskWritePlacement'),
+    readableTaskIds: jest.fn(async (companyId, uid, ids) => ids.map(String)),
+}));
 jest.mock('../Modules/Agents/engine/orchestrator', () => ({ gather: jest.fn(async () => ({ status: 'gathered', context: {} })), analyse: jest.fn() }));
 jest.mock('../Modules/Agents/engine/findingMemory', () => ({ load: jest.fn(async () => new Map()), decide: jest.fn(), record: jest.fn(), touch: jest.fn() }));
 jest.mock('../Modules/Agents/memory', () => ({

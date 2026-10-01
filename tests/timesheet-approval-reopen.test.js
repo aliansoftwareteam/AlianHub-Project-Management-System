@@ -9,6 +9,7 @@ jest.mock('../Config/permissionGuard', () => ({
     getRoleType: jest.fn(async (companyId, userId) => mockRoles[userId]),
     isPrivileged: (roleType) => roleType === 1 || roleType === 2,
 }));
+jest.mock('../Modules/LogTime/controllerV2/helpers', () => ({ updateProjectForTimelog: jest.fn(), updateRemainingTime: jest.fn() }));
 
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
@@ -16,6 +17,7 @@ const { schema } = require('../utils/mongo-handler/schema.js');
 const socketEmitter = require('../event/socketEventEmitter');
 const approval = require('../Modules/TimesheetApproval/controller');
 const { isPeriodLocked } = require('../Modules/TimesheetApproval/helpers/lockGuard');
+const webTimer = require('../Modules/LogTime/controllerV2/webTimer');
 
 const C = '6f0000000000000000000c01';
 const OWNER = '6f0000000000000000000a01';
@@ -157,6 +159,67 @@ describe('reopening an approved week', () => {
         const week = sheet({ status: 'submitted', reviewedAt: null, reviewedBy: '', reviewerName: '' });
         await review(OWNER, week._id, { action: 'reject', reason: 'Friday is missing' });
         expect(stored(week._id).history).toBeUndefined();
+    });
+});
+
+describe('the review card of a reopened week', () => {
+    const logged = (day, minutes, over = {}) => mockDb.seed(SCHEMA_TYPE.TIMESHEET, {
+        Loggeduser: MEMBER, LogStartTime: Math.floor(new Date(2026, 0, day, 10, 0).getTime() / 1000), LogTimeDuration: minutes, billable: true, ...over,
+    });
+    const card = async () => (await call(approval.listQueue, OWNER)).body.data[0];
+
+    it('totals the week as it stands, with the time logged after the reopening, as its billable split does', async () => {
+        const week = sheet({ totalMinutes: 91, entryCount: 1 });
+        logged(6, 91);
+        await reopen(OWNER, week._id);
+        logged(8, 91);
+        logged(9, 30, { billable: false });
+
+        const row = await card();
+        expect(row).toMatchObject({ billableMinutes: 182, nonBillableMinutes: 30, totalMinutes: 212, entryCount: 3 });
+        expect(row.totalMinutes).toBe(row.billableMinutes + row.nonBillableMinutes);
+    });
+
+    it('leaves out time logged outside the week and by someone else', async () => {
+        sheet({ status: 'submitted', totalMinutes: 60, entryCount: 1 });
+        logged(6, 60);
+        logged(13, 45);
+        logged(7, 20, { Loggeduser: ADMIN });
+
+        expect(await card()).toMatchObject({ billableMinutes: 60, nonBillableMinutes: 0, totalMinutes: 60, entryCount: 1 });
+    });
+});
+
+describe('starting the web timer', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const midnight = (offsetDays) => { const d = new Date(Date.now() + offsetDays * DAY); d.setHours(0, 0, 0, 0); return d; };
+    const thisWeek = (over = {}) => sheet({ periodStart: midnight(-2), periodEnd: midnight(2), ...over });
+    const start = (uid) => call(webTimer.canStartTimer, uid);
+
+    it('is refused on a day in an approved week, with the reason the desktop tracker gives', async () => {
+        thisWeek();
+        const res = await start(MEMBER);
+
+        expect(res.body).toMatchObject({ status: false, code: 'period_locked' });
+        expect(res.body.statusText).toMatch(/approved and locked/);
+    });
+
+    it('is allowed once the week is reopened', async () => {
+        const week = thisWeek();
+        await reopen(OWNER, week._id);
+
+        expect((await start(MEMBER)).body.status).toBe(true);
+    });
+
+    it('is allowed when the approved week is someone else\'s, or is another week', async () => {
+        thisWeek({ userId: ADMIN });
+        sheet();
+
+        expect((await start(MEMBER)).body.status).toBe(true);
+    });
+
+    it('needs a signed-in person', async () => {
+        expect((await start('')).body.status).toBe(false);
     });
 });
 

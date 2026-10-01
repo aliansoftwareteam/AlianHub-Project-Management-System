@@ -12,6 +12,7 @@ vi.mock('@/views/Ai/AiSidebar.vue', () => ({ default: { name: 'AiSidebar', rende
 vi.mock('@/views/Ai/AccountAttribution.vue', () => ({ default: { name: 'AccountAttribution', render: () => null } }));
 
 import AiAccounts from '@/views/Ai/AiAccounts.vue';
+import { tokenFormProblem } from '@/views/Ai/tokenPolicy';
 import en from '@/locales/en.js';
 
 const i18n = config.global.plugins[0];
@@ -72,22 +73,24 @@ beforeEach(() => {
 });
 
 describe('the token form under strict mode', () => {
-    it('asks for no expiry or scopes when strict mode is off, and sends what it sent before', async () => {
+    it('asks for no scopes when strict mode is off, and sends the default lifetime', async () => {
         const wrapper = await openTokens({ strict: false });
         await startMinting(wrapper);
-        expect(wrapper.find('[data-test="token-expiry"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="token-expiry"]').element.value).toBe('30');
         expect(wrapper.find('[data-test="token-scope-read"]').exists()).toBe(false);
         await create(wrapper);
         expect(mintCalls()).toHaveLength(1);
-        expect(mintCalls()[0][2]).toEqual({ name: 'Laptop', mode: 'personal', provider: 'claude-code', projectIds: [] });
+        expect(mintCalls()[0][2]).toEqual({ name: 'Laptop', mode: 'personal', provider: 'claude-code', projectIds: [], expiresInDays: 30 });
     });
 
-    it('refuses to send a token without an expiry', async () => {
+    it('offers no way to leave the expiry out: the default is already chosen', async () => {
         const wrapper = await openTokens({ strict: true });
         await startMinting(wrapper);
+        expect(wrapper.find('[data-test="token-expiry"]').findAll('option').every((option) => Number(option.element.value) > 0)).toBe(true);
         await create(wrapper);
-        expect(mintCalls()).toHaveLength(0);
-        expect(wrapper.text()).toContain(t('Accounts.token_expiry_required'));
+        expect(mintCalls()).toHaveLength(1);
+        expect(mintCalls()[0][2]).toMatchObject({ expiresInDays: 30, scopes: ['read', 'write'] });
+        expect(tokenFormProblem({ name: 'Laptop', expiresInDays: '', scopes: ['read'] }, { strict: true })).toEqual({ field: 'expiry', key: 'Accounts.token_expiry_required' });
     });
 
     it('refuses to send a token with no scope ticked', async () => {

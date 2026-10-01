@@ -55,8 +55,7 @@ describe('one running timer for the panel, Home and Time', () => {
 
     it('the panel sees a timer started on Home, stored per user', async () => {
         const { panel, home } = await load();
-        home.useTimer().start(TASK, { ProjectName: 'Launch' });
-        await Promise.resolve();
+        await home.useTimer().start(TASK, { ProjectName: 'Launch' });
         expect(panel.isTimerFor('task-1')).toBe(true);
         expect(JSON.parse(localStorage.getItem('ah.timer.user-1'))).toMatchObject({ taskId: 'task-1', projectName: 'Launch' });
         expect(localStorage.getItem('ah.timer')).toBeNull();

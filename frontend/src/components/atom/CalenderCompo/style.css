@@ -323,7 +323,7 @@ button.dp__btn.dp__month_year_select {
     }
 }
 @media(max-width:  767px){
-    .task-detail-right-side-label .calendar-comp {background-position: calc(100% - 130px);text-align: right;font-size: 16px;padding-right: 0 !important;padding-left: 0 !important;}
+    .task-detail-right-side-label .calendar-comp {background-image: none;text-align: right;font-size: 16px;padding-right: 0 !important;padding-left: 0 !important;}
     .task-detail-right-side-label .calendar-comp::placeholder, .task-detail-right-side-label input#inputId::placeholder{color: #000 !important;font-size: 16px !important;}
     body:has(.tab-list-header .tab-list-header-ul li:last-child.active) .dp--menu-wrapper{
         left: 10px !important;

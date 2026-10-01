@@ -56,24 +56,31 @@ const elsewhereTitle = computed(() => entry.value ? t("TaskPanel.timer_running_e
 
 async function start() {
     const user = getUser(userId.value) || {};
-    const stopped = await startTimer({
-        taskId: props.task._id,
-        taskKey: props.task.TaskKey,
-        taskName: props.task.TaskName,
-        projectId: props.task.ProjectID,
-        projectName: props.project?.ProjectName || "",
-        sprintId: props.task.sprintId,
-        companyId: companyId.value,
-        userId: userId.value,
-        userName: user.Employee_Name || "",
-        dateFormat: getters["settings/companyDateFormat"]?.dateFormat || "DD/MM/YYYY",
-        companyOwnerId: getters["settings/companyOwnerDetail"]?._id || "",
-        timeZone: user.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-        timeFormat: user.timeFormat || "24",
-        description: t("TaskPanel.timer_log_description")
-    });
+    let stopped;
+    try {
+        stopped = await startTimer({
+            taskId: props.task._id,
+            taskKey: props.task.TaskKey,
+            taskName: props.task.TaskName,
+            projectId: props.task.ProjectID,
+            projectName: props.project?.ProjectName || "",
+            sprintId: props.task.sprintId,
+            companyId: companyId.value,
+            userId: userId.value,
+            userName: user.Employee_Name || "",
+            dateFormat: getters["settings/companyDateFormat"]?.dateFormat || "DD/MM/YYYY",
+            companyOwnerId: getters["settings/companyOwnerDetail"]?._id || "",
+            timeZone: user.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+            timeFormat: user.timeFormat || "24",
+            description: t("TaskPanel.timer_log_description")
+        });
+    } catch (error) {
+        $toast.error(t(timeLogFailureKey(error, "Time.action_failed")), { position: "top-right" });
+        return;
+    }
     if (stopped) {
         $toast.info(t("TaskPanel.timer_stopped_previous", { key: stopped.taskKey || "" }), { position: "top-right" });
+        if (stopped.tooShort) $toast.info(t("TaskPanel.timer_too_short"), { position: "top-right" });
         if (stopped.logged) emit("logged", stopped);
     }
 }

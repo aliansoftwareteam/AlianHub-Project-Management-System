@@ -248,7 +248,7 @@ describe('the table the rule reads', () => {
     });
 
     it('leaves no guard exported that no route mounts', () => {
-        const mounted = ['Modules/Tasks/routes.js', 'Modules/Agents/routes.js', 'Modules/Pages/routes.js'].map((file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')).join('\n');
+        const mounted = ['Modules/Tasks/routes.js', 'Modules/Agents/routes.js', 'Modules/Pages/routes.js', 'Modules/Goals/routes.js'].map((file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')).join('\n');
 
         Object.entries(guard).filter(([, value]) => typeof value === 'function').forEach(([name]) => {
             expect(mounted).toMatch(new RegExp(`\\b${name}\\b`));
@@ -274,6 +274,12 @@ describe('the paths no agent reaches', () => {
         expect(await through(agentToken(OWNER), 'PATCH', '/api/v2/tasks', { action: 'updatePriority' })).toBe('passed');
         expect(await through(scriptToken(OWNER), 'POST', '/api/v2/tasks/bulk')).toBe('passed');
         expect(await through(session(OWNER), 'PUT', '/api/v2/sso/config')).toBe('passed');
+    });
+
+    it('refuses an agent the renewal of a token, its own included', async () => {
+        const renew = `/api/v2/api-tokens/${agentToken(OWNER).apiToken._id}/renew`;
+        expect(await through(agentToken(OWNER), 'POST', renew)).toBe(403);
+        expect(await through(session(OWNER), 'POST', renew)).toBe('passed');
     });
 
     it('stand in front of every module, so no route is registered ahead of them', () => {

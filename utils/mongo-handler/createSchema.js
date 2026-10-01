@@ -385,6 +385,7 @@ permissionDecisionsSchema.index({ day: 1 }, { expireAfterSeconds: 30 * 24 * 60 *
 const egressAllowlistsSchema = new Schema(schema.egressAllowlists, {strict: true, timestamps: false});
 const connectorConnectionsSchema = new Schema(schema.connectorConnections, {strict: true, timestamps: true});
 connectorConnectionsSchema.index({ connector: 1, deletedStatusKey: 1 });
+connectorConnectionsSchema.index({ userId: 1, connector: 1, deletedStatusKey: 1 });
 const instructionPatternsSchema = new Schema(schema.instructionPatterns, {strict: true, timestamps: false});
 const agentSessionsSchema = new Schema(schema.agentSessions, {strict: true, timestamps: false});
 agentSessionsSchema.index({ taskId: 1, createdAt: -1 });

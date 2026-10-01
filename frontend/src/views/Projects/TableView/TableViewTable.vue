@@ -39,6 +39,19 @@
             <Skelaton v-for="i in 4" :key="i" class="tv2__skeleton" />
         </template>
 
+        <div v-if="showTotals" role="row" class="tv2__totals" data-group-totals>
+            <span role="cell" class="tv2__c-select"></span>
+            <span role="cell" class="tv2__c-name tv2__totals-label">{{ $t('List.group_total') }}</span>
+            <span
+                v-for="column in tableColumns"
+                :key="column.id"
+                role="cell"
+                class="tv2__totals-cell"
+                :data-total="column.id"
+                :title="totalOf(column) ? $t('List.group_total_of', { field: column.field ? column.label : $t(column.labelKey), value: totalOf(column) }) : null"
+            >{{ totalOf(column) }}</span>
+        </div>
+
         <div :id="`table_list_item_${sprintId}_${data.key}`" class="tv2__sentinel"></div>
     </div>
 </template>
@@ -58,7 +71,7 @@ import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { taskInGroup } from "@/views/Projects/ListView/listFilter";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
 import { statusChipStyle } from "@/utils/statusChipColors";
-import { pointsTotal } from "@/views/Projects/composables/taskPoints";
+import { groupTotalsOf, isPartialGroup, loadedTotals, totalCellText, totalColumnsOf } from "@/views/Projects/composables/groupTotals";
 import { indexRepairBody, indexRepairRows } from "@/views/Projects/composables/taskGroupIndex";
 
 defineOptions({ name: "TableViewTable" });
@@ -126,9 +139,36 @@ function selectRow(row, event) {
     selection.selectFromEvent(row, event, ".tv2", { rowsAlone: true });
 }
 
-const groupPoints = computed(() => pointsTotal(tasks.value));
-const tableColumns = inject("tableColumns", null);
-const columnCount = computed(() => (tableColumns?.value?.length || 0) + 2);
+const tableColumnsRef = inject("tableColumns", null);
+const tableColumns = computed(() => tableColumnsRef?.value || []);
+const columnCount = computed(() => tableColumns.value.length + 2);
+
+const tableTotals = inject("tableTotals", null);
+const rowEdit = inject("listRowEdit", null);
+const totalColumns = computed(() => tableTotals?.columns.value || totalColumnsOf(tableColumns.value));
+const counts = computed(() => getters["projectData/tableGroupCounts"]?.[project.value?._id]?.[props.sprintId] || null);
+const found = computed(() => (searchedTask?.value ? null : counts.value?.found?.[`${props.data.searchKey}_${props.data.searchValue}`] ?? null));
+const awaitingCounts = computed(() => !searchedTask?.value && found.value === null);
+const groupTotals = computed(() => (awaitingCounts.value ? null : groupTotalsOf({
+    rows: tasks.value,
+    count: found.value,
+    server: counts.value?.totals?.[`${props.data.searchKey}_${props.data.searchValue}`] || null,
+    totals: totalColumns.value,
+    allTasks: rowEdit?.fields?.allTasks.value || [],
+    defs: rowEdit?.fields?.defs.value || []
+})));
+const groupPoints = computed(() => groupTotals.value?.points || 0);
+const showTotals = computed(() => totalColumns.value.length > 0 && tasks.value.length > 0 && !isLoading.value);
+const totalOf = (column) => totalCellText(totalColumns.value, groupTotals.value, column.id);
+
+/* A partly loaded group cannot add up an edit itself, so the server is asked again when the sum of its loaded rows moves. */
+const loadedSum = computed(() => JSON.stringify(loadedTotals(tasks.value, totalColumns.value, {
+    allTasks: rowEdit?.fields?.allTasks.value || [],
+    defs: rowEdit?.fields?.defs.value || []
+})));
+watch(loadedSum, () => {
+    if (totalColumns.value.length && isPartialGroup(tasks.value, found.value) > 0) tableTotals?.refresh();
+});
 
 const groupTaskIds = computed(() => tasks.value.map((task) => String(task._id)).filter(Boolean));
 const groupCheckboxState = computed(() => selection.groupState(groupTaskIds.value));
@@ -224,6 +264,7 @@ function repairIndexes({ hideRows = false } = {}) {
 watch(tasks, () => repairIndexes());
 
 onMounted(() => {
+    if (totalColumns.value.length) tableTotals?.refresh();
     if (observerRef.value) observerRef.value.disconnect();
     addIntersections();
     repairIndexes({ hideRows: true });

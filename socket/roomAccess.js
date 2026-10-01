@@ -6,6 +6,7 @@ const { getRoleType, isPrivileged } = require('../Config/permissionGuard');
 const { canSeeSprint, canSeeSprintById, sprintIdentities } = require('../Modules/Sprints/helpers/sprintVisibility');
 const { canUsePage } = require('../Modules/Pages/helpers/pageAccess');
 const { mayListTasksIn } = require('../Modules/Tasks/helpers/taskListProjects');
+const { findRoomsByPrefix } = require('./helper');
 const logger = require('../Config/loggerConfig');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -217,6 +218,28 @@ const inOrder = (send) => {
     return sends;
 };
 
+const COMPANY_ROOM = 'selected_companies_';
+
+/* One `send(entry)` for each of `rooms` whose socket is in `companyId` and still holds a seat there: a room
+ * outlives the seat it was joined on. */
+const toSeated = (rooms, companyId, send) => {
+    const id = String(companyId || '');
+    if (!id || !rooms.length) return undefined;
+    return inOrder(async () => {
+        for (const entry of rooms) {
+            // eslint-disable-next-line no-await-in-loop
+            if (!entry.socket || !(await mayReceiveCompany(entry.socket.identity, id))) continue;
+            if (entry.socket.rooms.has(entry.roomName)) send(entry);
+        }
+    });
+};
+
+/* `only` keeps a send to some of the people in the company's room. */
+const toCompanyRoom = (companyId, send, only = () => true) => toSeated(
+    findRoomsByPrefix(`${COMPANY_ROOM}${String(companyId || '')}`).filter((entry) => entry.socket && entry.socket.identity && only(entry.socket.identity)),
+    companyId, send,
+);
+
 module.exports = {
     identityOf,
     roomFor,
@@ -235,6 +258,9 @@ module.exports = {
     mayReceiveComments,
     mayReceiveList,
     mayReceiveCompany,
+    toSeated,
+    toCompanyRoom,
+    COMPANY_ROOM,
     inOrder,
     forgetVerdicts: () => verdicts.clear(),
 };

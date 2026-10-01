@@ -9,7 +9,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const { updateUnReadCommentsCountFun } = require('../notification-count/controller');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
-const { privateWorkOf, proposalClause } = require('../Agents/privateWork');
+const queue = require('./helpers/approvalQueue');
 const R = require('./helpers/inboxRules');
 const S = require('./helpers/inboxState');
 const { CHAT_THREAD_REPLY } = require('../Comments/helpers/chatThreads');
@@ -38,7 +38,7 @@ const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } ca
 const routeId = (v) => (v === undefined || v === null ? undefined : String(v));
 
 // Notices rendered from their values through i18n rather than from message (Inbox.vue renderNotice).
-const STRUCTURED_CHANGES = ['agent_alert', 'agent_report', 'agent_session_assigned', 'oauth_client_approval', 'doc_mention', 'doc_comment', 'doc_shared', 'automation_notify', 'goal_reached', CHAT_THREAD_REPLY];
+const STRUCTURED_CHANGES = ['agent_alert', 'agent_report', 'agent_session_assigned', 'oauth_client_approval', 'doc_mention', 'doc_comment', 'doc_shared', 'automation_notify', 'goal_reached', 'credential_expiring', CHAT_THREAD_REPLY];
 
 const fail = (res, statusText) => res.send({ status: false, statusText });
 
@@ -166,45 +166,20 @@ const mentionStateFor = (r, userId) => {
     };
 };
 
-/**
- * Time-off requests waiting on this user. Only an owner or admin can decide
- * them (Modules/Pto), so nobody else sees them; a person's own request is
- * never something they approve.
- */
-/* Pending agent proposals (Modules/Agents). The handoff puts "asking permission" in
- * this Inbox; until now they lived only under AI › Inbox and the owner never saw them. */
 const readProposals = async (companyId, userId) => {
     try {
-        const roleType = await getRoleType(companyId, userId);
-        if (!isPrivileged(roleType)) return [];
-        const notPrivate = proposalClause(await privateWorkOf(companyId, userId));
-        const rows = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.AGENT_PROPOSALS,
-            data: [{ status: 'pending', ...notPrivate }, {}, { sort: { createdAt: -1 }, limit: 20 }],
-        }, 'find');
-        return (rows || []).map((r) => ({
-            sourceType: 'proposal',
-            sourceId: String(r._id),
-            proposalId: String(r._id),
-            kind: 'proposal',
-            agentName: r.agentName || 'Agent',
-            agentId: r.agentId ? String(r.agentId) : '',
-            what: r.what || '',
-            why: r.why || '',
-            changes: Array.isArray(r.changes) ? r.changes.length : 0,
-            cost: r.cost || null,
-            gate: r.gate || null,
-            taskId: r.taskId ? String(r.taskId) : '',
-            projectId: r.projectId ? String(r.projectId) : '',
-            createdAt: r.createdAt,
-            unread: true,
-        }));
+        return await queue.readQueue(companyId, userId);
     } catch (e) {
         logger.error(`${LOG_PREFIX} readProposals: ${e.message}`);
         return [];
     }
 };
 
+/**
+ * Time-off requests waiting on this user. Only an owner or admin can decide
+ * them (Modules/Pto), so nobody else sees them; a person's own request is
+ * never something they approve.
+ */
 const readApprovals = async (companyId, userId) => {
     try {
         const roleType = await getRoleType(companyId, userId);
@@ -289,12 +264,13 @@ exports.list = async (req, res) => {
         // more button that adds nothing when clicked.
         const window = skip + limit;
         const probe = window + 1;
-        const wantApprovals = tab === 'primary' && skip === 0 && (kind === 'all' || kind === 'approval');
+        const waiting = tab === R.APPROVAL_TAB;
+        const wantRows = !waiting && kind !== 'approval';
         const [notifications, mentions, approvals, proposals] = await Promise.all([
-            plan.notifications && kind !== 'approval' ? readNotifications(companyId, userId, { sort, limit: probe, match: R.notificationMatch(userId, scope) }) : [],
-            plan.mentions && kind !== 'approval' ? readMentions(companyId, userId, { sort, limit: probe, match: R.mentionMatch(userId, scope) }) : [],
-            wantApprovals ? readApprovals(companyId, userId) : [],
-            wantApprovals ? readProposals(companyId, userId) : [],
+            wantRows && plan.notifications ? readNotifications(companyId, userId, { sort, limit: probe, match: R.notificationMatch(userId, scope) }) : [],
+            wantRows && plan.mentions ? readMentions(companyId, userId, { sort, limit: probe, match: R.mentionMatch(userId, scope) }) : [],
+            waiting ? readApprovals(companyId, userId) : [],
+            waiting ? readProposals(companyId, userId) : [],
         ]);
 
         // The two sources arrive already sorted; this only re-orders the merge of them,
@@ -397,7 +373,7 @@ exports.counts = async (req, res) => {
             count(SCHEMA_TYPE.NOTIFICATIONS, R.notificationMatch(userId, { tab: 'later', now }), notificationGroup),
             count(SCHEMA_TYPE.MENTIONS, R.mentionMatch(userId, { tab: 'later', now }), mentionGroup),
             readApprovals(companyId, userId).then((rows) => rows.length),
-            readProposals(companyId, userId).then((rows) => rows.length),
+            readProposals(companyId, userId).then(queue.waitingCount),
             S.nextWakeAt(companyId, userId, now),
         ]);
 
@@ -410,7 +386,8 @@ exports.counts = async (req, res) => {
                 // Archive is read rows; a badge there would count things already dealt with.
                 archive: 0,
                 // Done and Cleared hold rows already dealt with, so they carry no badge.
-                primary: notifications + mentions + approvals + proposals,
+                primary: notifications + mentions,
+                approval: approvals + proposals,
                 other,
                 approvals,
                 proposals,
@@ -553,6 +530,7 @@ exports.markAllRead = async (req, res) => {
         if (!companyId || !userId) return fail(res, 'companyId and an authenticated user are required.');
 
         const tab = R.normalizeTab(req.body && req.body.tab);
+        if (tab === R.APPROVAL_TAB) return fail(res, 'What waits for approval is decided, not marked read.');
         if (['archive', 'done', 'later', 'cleared'].includes(tab)) return fail(res, 'Those are already read.');
         const plan = R.planFor(tab);
         const now = new Date();

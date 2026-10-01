@@ -29,6 +29,7 @@ const { withoutImportMark } = require('./importMark');
 const { cleanDescription } = require('./cleanRichText');
 const { copyFieldFiles } = require('../../CustomField/helpers/fieldFiles');
 const extraLists = require('./taskExtraLists');
+const { historyFields } = require('../../Agents/actingAgent');
 
 /* ------------- TASK ------------- */
 exports.HandleTask = async (companyId, object, isUpdate, id = null, userData, { importMark = null } = {}) => {
@@ -170,6 +171,7 @@ exports.HandleHistory = (type, companyId, projectId, taskId, object, userData) =
                 'ProjectId': projectId,
                 'TaskId': taskId !== null ? taskId : "",
                 'Message': object.message,
+                ...historyFields(),
             }
             let typeSchema = SCHEMA_TYPE.HISTORY
           
@@ -885,7 +887,6 @@ exports.duplicateSubTaskFunction = (companyId, projectData, sprintObj, subtask, 
                 ]
             }
             MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then((response) => {
-                socketEmitter.emit('update', { type: "update", data: response , updatedFields: {taskTypeCounts: response.taskTypeCounts,lastTaskId: response.lastTaskId}, module: 'task', companyId });
                 obj.TaskKey = projectData.ProjectCode + '-' +  response.lastTaskId;
                 exports.HandleTask(companyId, obj, false, null, userData).then(async (taskResult) => {
                     if (copied) copied.set(String(subtask._id), String(taskResult.id));

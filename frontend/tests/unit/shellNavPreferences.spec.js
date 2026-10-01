@@ -124,7 +124,7 @@ describe('pins kept in this browser belong to the user who made them', () => {
         shellState.nav.pinned.push('chat');
         await nextTick();
 
-        expect(JSON.parse(localStorage.getItem(NAV_KEY))).toEqual({ pinned: ['chat'], uid: 'user-1' });
+        expect(JSON.parse(localStorage.getItem(NAV_KEY))).toEqual({ pinned: ['chat'], mode: 'full', uid: 'user-1' });
     });
 
     it('neither shows nor uploads another user\'s pins', async () => {

@@ -84,3 +84,24 @@ describe('TSK-06 the activity log follows project visibility', () => {
         expect((await readLog({ fromProject: 'false', projectId: VISIBLE })).statusCode).toBe(400);
     });
 });
+
+describe('047 AI-4b the activity log can be narrowed to changes an agent made', () => {
+    it.each([['a project', { fromProject: 'true' }, 2], ['a task', { fromProject: 'false', taskId: TASK }, 3]])('adds the agent clause to the log of %s, inside the same project', async (_what, query, clauses) => {
+        const res = await readLog({ ...query, projectId: VISIBLE, madeBy: 'agent' });
+        expect(res.statusCode).toBe(200);
+        expect(matchOf()).toHaveLength(clauses + 1);
+        expect(matchOf()[1]).toEqual({ ProjectId: { $in: idForms(VISIBLE) } });
+        expect(matchOf()[clauses]).toEqual({ actorType: 'agent' });
+    });
+
+    it.each([[undefined], [''], ['person'], [{ $ne: 'agent' }], [['agent']]])('reads everything for madeBy %j', async (madeBy) => {
+        await readLog({ fromProject: 'true', projectId: VISIBLE, ...(madeBy === undefined ? {} : { madeBy }) });
+        expect(matchOf()).toEqual([{ Type: 'project' }, { ProjectId: { $in: idForms(VISIBLE) } }]);
+    });
+
+    it('still answers 404 for a project the caller cannot see', async () => {
+        const res = await readLog({ fromProject: 'true', projectId: HIDDEN, madeBy: 'agent' });
+        expect(res.statusCode).toBe(404);
+        expect(MongoDbCrudOpration).not.toHaveBeenCalled();
+    });
+});

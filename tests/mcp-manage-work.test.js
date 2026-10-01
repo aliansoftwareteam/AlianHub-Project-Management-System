@@ -213,7 +213,7 @@ describe('task.status.set for a token created to manage tasks', () => {
         expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'task', updatedFields: expect.objectContaining({ statusKey: 3, statusType: 'close' }) }));
         expect(socketEmitter.emit.mock.calls.filter(([, event]) => event.updatedFields && event.updatedFields.statusKey === 3).every(([, event]) => event.actor === undefined)).toBe(true);
         expect(notifications.HandleBothNotification).toHaveBeenCalledWith(expect.objectContaining({ changeType: 'status', taskId: fx.top._id, projectId: P_OPEN }));
-        expect(history(fx.top._id).map((entry) => entry.Message)).toEqual(['<b>Olivia Owner (via Claude)</b> has changed <b> Status</b> as <b>Done</b>.']);
+        expect(history(fx.top._id).map((entry) => entry.Message)).toEqual(['<b>Claude, for Olivia Owner</b> has changed <b> Status</b> as <b>Done</b>.']);
         expect(history(fx.top._id)[0]).toMatchObject({ Key: 'Task_Status', UserId: OWNER });
 
         expect(stored(fx.top._id).completion).toMatchObject({
@@ -303,7 +303,7 @@ describe('task.create and subtask.create in one call', () => {
             ['https://example.com/acme/app/pull/12', 'pr', 'PR 12', 'agent'], ['https://example.com/spec', 'doc', '', 'agent'],
         ]);
         expect(mockDb.store[SCHEMA_TYPE.PROJECTS].find((project) => String(project._id) === P_OPEN).lastTaskId).toBe(11);
-        expect(history(task._id)[0].Message).toMatch(/^<b>Olivia Owner \(via Claude\)<\/b> has created new <b>Ship the importer<\/b>/);
+        expect(history(task._id)[0].Message).toMatch(/^<b>Claude, for Olivia Owner<\/b> has created new <b>Ship the importer<\/b>/);
         expect(audits('task.add')[0].meta.undo).toEqual({ kind: 'task', taskId: out.result.taskId, projectId: P_OPEN });
     });
 
@@ -365,8 +365,8 @@ describe('task.history, task.links.list and task.get', () => {
         const out = await rpc(ctx(MEMBER), 'task.history', { taskId: fx.top._id });
         expect(out.taskId).toBe(fx.top._id);
         expect(out.entries.map((entry) => entry.text).sort()).toEqual([
-            'Olivia Owner (via Claude) has changed Status as Done.',
-            'Olivia Owner (via Claude) has changed Task name from Task OPN-1 to Renamed <b>x</b>.',
+            'Claude, for Olivia Owner has changed Status as Done.',
+            'Claude, for Olivia Owner has changed Task name from Task OPN-1 to Renamed <b>x</b>.',
         ]);
         expect(out.entries[0]).toMatchObject({ userId: OWNER, kind: expect.any(String) });
         expect((await rpc(ctx(MEMBER), 'task.history', { taskId: fx.top._id, limit: 1 })).entries).toHaveLength(1);

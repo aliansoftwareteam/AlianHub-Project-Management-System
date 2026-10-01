@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
-const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const socketEmitter = require('../../event/socketEventEmitter');
 const registry = require('./registry');
 const actions = require('./actions');
@@ -12,7 +11,6 @@ const findingMemory = require('./engine/findingMemory');
 const persistence = require('../AICore/persistence');
 const logger = require('../../Config/loggerConfig');
 const access = require('./access');
-const { proposalClause } = require('./privateWork');
 const taint = require('./taint');
 const { externalClientActor } = require('./actor');
 const aiFeedback = require('../AI/feedback');
@@ -35,7 +33,7 @@ const REAPER = Object.freeze({ kind: 'human', userId: 'system', personName: 'Sys
 // descriptor either way, so a longer window costs nothing.
 const UNDO_WINDOW_MS = 15 * 60 * 1000;
 const PRIMARY_AGE_MS = 24 * 60 * 60 * 1000;
-const GATE_OWNER_ADMIN = 'owner_admin';
+const { GATE_OWNER_ADMIN } = access;
 // The canned decline reasons the Inbox offers; only these can grow into a user preference.
 const DECLINE_REASONS = Object.freeze(Object.keys(memory.DECLINE_REASON_TEXT));
 const DECLINE_REASON_MAX = 200;
@@ -174,11 +172,7 @@ const skillSourcesOfRuns = async (companyId, rows) => {
 /* projectIds, when given, is the caller's visible set, hiddenTaskIds the tasks in it they cannot read,
  * and privateWork what is someone else's alone; the counts follow the same scope. */
 const list = async (companyId, { status, bucket, agentId, limit = 100, projectIds, hiddenTaskIds, privateWork } = {}) => {
-    const scoped = {
-        ...(Array.isArray(projectIds) ? { projectId: { $in: idForms(projectIds.map(String)) } } : {}),
-        ...(Array.isArray(hiddenTaskIds) && hiddenTaskIds.length ? { taskId: { $nin: hiddenTaskIds.map(String) } } : {}),
-        ...(privateWork ? proposalClause(privateWork) : {}),
-    };
+    const scoped = access.proposalScopeClause({ projectIds, hiddenTaskIds, privateWork });
     const match = { ...scoped };
     if (status) match.status = String(status);
     if (agentId) match.agentId = String(agentId);

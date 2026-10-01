@@ -150,6 +150,7 @@ import Skelatons from '@/components/atom/Skelaton/Skelaton.vue';
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
 import taskClass from "@/utils/TaskOperations";
+import { removePerson } from "@/utils/assigneeOptions";
 
 // UTILS
 const {makeUniqueId, checkPermission,debouncerWithPromise} = useCustomComposable();
@@ -634,8 +635,7 @@ async function changeAssignee(type, {user, data}) {
     if(type === "add") {
         assignee.push(user.id);
     } else if(type === 'remove') {
-        const index = assignee.findIndex((x) => x === user.id)
-        assignee.splice(index, 1);
+        removePerson(assignee, user.id);
     } else if(type === 'replace') {
         assignee = [];
         assignee.push(user.id);

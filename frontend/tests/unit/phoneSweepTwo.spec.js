@@ -67,7 +67,13 @@ describe('Inbox on a phone', () => {
     test('"needs your approval" drops to a line of its own instead of hiding behind the ellipsis', () => {
         expect(ruleBody(phone(vue), '.ibx__what .ibx__dim')).toMatch(/display:\s*block/);
         expect(ruleBody(phone(vue), '.ibx__dot')).toMatch(/display:\s*none/);
-        expect(vue.match(/<span class="ibx__dim"><span class="ibx__dot">· <\/span>/g)).toHaveLength(3);
+        expect(vue.match(/<span class="ibx__dim"><span class="ibx__dot">· <\/span>/g)).toHaveLength(2);
+    });
+
+    test('a proposal in the approval queue wraps what it wants to do instead of cutting it off', () => {
+        const queue = read('views/Inbox/ApprovalQueue.vue');
+        expect(ruleBody(queue, '.aq__what')).toMatch(/overflow-wrap:\s*anywhere/);
+        expect(ruleBody(queue, '.aq__what')).not.toMatch(/text-overflow/);
     });
 });
 

@@ -215,12 +215,18 @@ const overlapText = (row) => {
     return names.length ? t('Time.leave_overlap', { names: [...new Set(names)].join(', ') }) : '';
 };
 
+// The stored total is the week as first submitted; the split beside it is the week as it stands, so the card shows their sum.
+const weekMinutes = (row) => (row.billableMinutes == null && row.nonBillableMinutes == null
+    ? row.totalMinutes
+    : (Number(row.billableMinutes) || 0) + (Number(row.nonBillableMinutes) || 0));
+const oldestFirst = (list) => list.sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0));
+
 const cards = computed(() => {
     const ts = timesheets.value.map((row) => ({
         kind: 'timesheet', key: `ts-${row._id}`, row, at: row.submittedAt, own: String(row.userId) === String(uid.value),
         name: row.userName || nameOf(row.userId), avatar: row.userAvatar, color: colorFor(row.userId),
         title: t('Time.ts_card_title', { name: row.userName || nameOf(row.userId) }),
-        sub: t('Time.week_of', { date: moment(row.periodStart).format('MMM D'), h: formatHm(row.totalMinutes) }),
+        sub: t('Time.week_of', { date: moment(row.periodStart).format('MMM D'), h: formatHm(weekMinutes(row)) }),
     }));
     const lv = leave.value.map((row) => {
         const days = Number(row.totalDays) || 0;
@@ -237,7 +243,7 @@ const cards = computed(() => {
         kind: 'agent', key: `ag-${row.id}`, row, at: row.createdAt, name: row.agentName, avatar: '', color: 'var(--agent)',
         title: row.summary, sub: `${row.agentName}${row.reversible ? ` · ${t('Time.reversible')}` : ''}`,
     }));
-    return [...ts, ...lv, ...ag].sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0));
+    return [ts, lv, ag].flatMap(oldestFirst);
 });
 const visibleCards = computed(() => cards.value.filter((c) => filter.value === 'all' || c.kind === filter.value));
 const count = computed(() => cards.value.length);

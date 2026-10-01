@@ -386,6 +386,11 @@ const schema = {
             type: String,
             required: true,
         },
+        // Only on a change an agent made (Modules/Agents/actingAgent): UserId stays the person, so every
+        // reader that filters by person still finds the row. A person's own change has none of the three.
+        actorType: { type: String, required: false },
+        agentName: { type: String, required: false },
+        actedFor: { type: String, required: false },
         // BUG-046 / #100: createdAt/updatedAt are populated by Mongoose
         // (`timestamps: true` on historySchema). Keep the field
         // declarations so older code paths that still reference the
@@ -446,6 +451,10 @@ const schema = {
         projectIds: { type: Array, default: [], required: false },
         // What the token was created to do beyond its scopes (Modules/Mcp/manageFlag.js); never changed afterwards.
         grants: { type: Array, default: [], required: false },
+        // When the secret in use was issued by a renewal; the lifetime is counted from here.
+        renewedAt: { type: Date, required: false },
+        // Set when the owner was told the token is about to end, so they are told once; a renewal clears it.
+        expiryNoticeAt: { type: Date, required: false },
     },
     // Per-call audit of token-authenticated API requests
     apiActivityLogs: {
@@ -627,6 +636,11 @@ const schema = {
         progressPct: { type: Number, default: 0, required: false },
         reachedAt: { type: Date, default: null, required: false },
         notifiedAt: { type: Date, required: false },
+        aiSummary: {
+            text: { type: String, required: false },
+            basis: { type: String, required: false },
+            madeAt: { type: Date, required: false },
+        },
         targets: {
             type: [{
                 _id: false,
@@ -1943,6 +1957,8 @@ const schema = {
         revokedAt: { type: Date, required: false },
         revokedReason: { type: String, required: false },
         lastUsedAt: { type: Date, required: false },
+        // Set when the person was told the grant is about to end, so they are told once.
+        expiryNoticeAt: { type: Date, required: false },
     },
     // kind is code, access, refresh or consent (an answered consent request). purgeAt drives the TTL index; a code outlives its expiry there so a replay is recognised.
     oauthTokens: {
@@ -1992,10 +2008,13 @@ const schema = {
         // Moves on with every save; a save names the version it read, so two console tabs cannot drop each other's hosts.
         version: { type: Number, required: false },
     },
-    // One row per workspace and connector (Modules/Agents/connectors). Tokens live in `secrets` by handle, never here.
+    // One row per workspace and connector, or per person and connector when the connection is a person's own
+    // (Modules/Agents/connectors). Tokens live in `secrets` by handle, never here.
     connectorConnections: {
         connector: { type: String, required: true },
-        // { bot_token: 'sec_…', signing_secret: 'sec_…' }
+        // The person a personal connection belongs to; absent on a workspace connection.
+        userId: { type: String, required: false },
+        // { bot_token: 'sec_…', signing_secret: 'sec_…' } or { refresh_token: 'sec_…', access_token: 'sec_…' }
         secretHandles: { type: Object, default: {}, required: false },
         secretSetAt: { type: Object, default: {}, required: false },
         team: { type: Object, required: false },
@@ -2005,10 +2024,22 @@ const schema = {
         // [{ id, name, read, post }] the channels an owner or admin chose and what agents may do in each; a row
         // without the two ticks is from before reading existed and means post only
         allowedChannels: { type: Array, default: [], required: false },
-        // connected | broken
+        // connected | broken, and for a person's connection also pending | revoked
         status: { type: String, default: 'connected', required: false },
         brokenReason: { type: String, required: false },
         brokenAt: { type: Date, required: false },
+        // What the provider granted, and { email, sub } of the account the person connected
+        scopes: { type: [String], default: undefined, required: false },
+        account: { type: Object, required: false },
+        accessExpiresAt: { type: Date, required: false },
+        connectedAt: { type: Date, required: false },
+        lastUsedAt: { type: Date, required: false },
+        lastRefreshedAt: { type: Date, required: false },
+        // { stateHash, verifier, sessionId, origin } of a connect attempt in progress; cleared when it is used
+        oauth: { type: Object, required: false },
+        disconnectedAt: { type: Date, required: false },
+        // self | admin | member_removed
+        disconnectedBy: { type: String, required: false },
         lastPostAt: { type: Date, required: false },
         lastReadAt: { type: Date, required: false },
         createdBy: { type: String, required: false },
@@ -2595,8 +2626,10 @@ const schema = {
             viewedShortcuts: { type: Boolean, required: false },
             toursOffered: { type: [String], required: false, default: undefined }
         },
+        // mode has no default on purpose: see newAccountNavPreferences in Modules/Users/helpers/navPreferencesRules.js.
         navPreferences: {
-            pinned: { type: [String], required: false, default: undefined }
+            pinned: { type: [String], required: false, default: undefined },
+            mode: { type: String, required: false }
         },
         accessibilityPreferences: {
             singleKeyShortcuts: { type: Boolean, required: false }
