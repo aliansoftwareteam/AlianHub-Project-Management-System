@@ -18,6 +18,7 @@ const { notifyReply } = require("./helpers/threadNotices");
 const { parseAgentMentionIds } = require("./helpers/parseMentions");
 const { withoutAiFields } = require("./helpers/aiActor");
 const { bumpUnreadCounts } = require("./helpers/unreadBumps");
+const { isChatMessage, holdsThreads, replyLookup, withThreadSummary, readable, keptRootIds, announceThread } = require("./helpers/chatThreads");
 
 /* A comment an agent run writes never starts agents, so agents cannot start each other.
  * Required on use: the agent modules are only needed by a comment that names an agent. */
@@ -35,13 +36,6 @@ const writeOptionsFrom = (options) => {
     return valid ? options : null;
 };
 
-
-/**
- * This endpoint is used to save data in comments collection
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
 exports.save = async (req, res) => {
     try {
         const { data } = req.body
@@ -55,6 +49,7 @@ exports.save = async (req, res) => {
         const thread = threadOf(convertData);
         const access = await canPostToThread(companyId, req.uid, thread);
         if (!access.allowed) return refuseThread(res, access);
+        const chatThread = Boolean(placement.parent) && await isChatMessage(companyId, placement.parent);
         const mentionIds = await resolveMentionIds(companyId, convertData.userId, thread, convertData.message);
         const query = {
             type: SCHEMA_TYPE.COMMENTS,
@@ -89,8 +84,12 @@ exports.save = async (req, res) => {
                 .catch((err) => logger.error(`[mentions] delivery failed: ${err.message}`));
         }
         if (placement.parent && response && response._id) {
-            notifyReply(companyId, response, placement.parent, mentionIds)
+            notifyReply(companyId, response, placement.parent, mentionIds, { chat: chatThread })
                 .catch((err) => logger.error(`[comments] reply notice failed: ${err.message}`));
+        }
+        if (chatThread && saved) {
+            await announceThread(companyId, saved.parentId)
+                .catch((err) => logger.error(`[comments] thread count not sent: ${err.message}`));
         }
         const ai = response && response._id
             ? await require("../AI/aiMention").acceptFromComment(req, companyId, response)
@@ -114,12 +113,6 @@ exports.save = async (req, res) => {
     }
 }
 
-/**
- * This endpoint is used to update data in comments collection
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
 exports.update = async (req, res) => {
     try {
         const { id, isProjectComment } = req.body;
@@ -192,6 +185,11 @@ exports.update = async (req, res) => {
         }else{
             socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'comments_project', companyId });
         }
+        const deletionChanged = changedKeys.includes('isDeleted') && Boolean(data.isDeleted) !== Boolean(existingComment.isDeleted);
+        if (response && existingComment.parentId && deletionChanged && await isChatMessage(companyId, existingComment)) {
+            await announceThread(companyId, existingComment.parentId)
+                .catch((err) => logger.error(`[comments] thread count not sent: ${err.message}`));
+        }
         if (response) {
             return res.status(200).json({ status: true,data: response || {} });
         } else {
@@ -206,26 +204,6 @@ exports.update = async (req, res) => {
     }
 }
 
-const replyCountStages = (taskId) => (/^[a-f0-9]{24}$/i.test(String(taskId || '')) ? [
-    {
-        $lookup: {
-            from: SCHEMA_TYPE.COMMENTS,
-            localField: '_id',
-            foreignField: 'parentId',
-            as: 'replyRows',
-            pipeline: [{ $match: { isDeleted: { $ne: true } } }, { $project: { _id: 1 } }],
-        },
-    },
-    { $addFields: { replyCount: { $size: '$replyRows' } } },
-    { $project: { replyRows: 0 } },
-] : []);
-
-/**
- * This endpoint is used to get message form comments collection
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
 exports.getPaginatedMessages = async (req, res) => {
     try {
         const {
@@ -239,20 +217,26 @@ exports.getPaginatedMessages = async (req, res) => {
             tabLeaveTime = null
         } = req.query;
 
-        const access = await commentThreadAccess(req.headers['companyid'], req.uid, { projectId, sprintId, taskId });
+        const companyId = req.headers['companyid'];
+        const thread = { projectId, sprintId, taskId };
+        const access = await commentThreadAccess(companyId, req.uid, thread);
         if (!access.allowed) return refuseThread(res, access);
+
+        const threaded = holdsThreads(taskId);
+        const keptRoots = threaded && String(mainChat) === 'true' && await isChatMessage(companyId, thread)
+            ? await keptRootIds(companyId, thread)
+            : [];
 
         const searchResultMatch = {
             $match: {
                 $and: [
                     { projectId: new mongoose.Types.ObjectId(projectId) },
                     access.match,
-                    // BUG-032 / #86 fix: align soft-delete handling with the other
-                    // comment-listing endpoints (searchMessageFromMainChat /
-                    // searchComments). Without this filter, soft-deleted comments
-                    // (isDeleted === true) reappeared in main-chat pagination.
-                    // `$ne: true` keeps documents whose flag is missing/false.
-                    { isDeleted: { $ne: true } },
+                    // `$ne: true` keeps documents written before the flag existed. A deleted chat message
+                    // that still has thread replies stays, as a placeholder for its thread.
+                    keptRoots.length
+                        ? { $or: [{ isDeleted: { $ne: true } }, { _id: { $in: keptRoots } }] }
+                        : { isDeleted: { $ne: true } },
                     { parentId: null },
                     ...(sprintId ? [{ sprintId: new mongoose.Types.ObjectId(sprintId) }] : []),
                     ...(tabLeaveTime ? [{ updatedAt: { $gte: new Date(Number(tabLeaveTime)) } }] : []),
@@ -276,16 +260,16 @@ exports.getPaginatedMessages = async (req, res) => {
 
         const limitStage = tabLeaveTime ? null : { $limit: parseInt(batchLimit) };
         
-        const aggregationPipeline = [searchResultMatch, sortOption, skipStage, ...(limitStage ? [limitStage] : []), ...replyCountStages(taskId)];
+        const aggregationPipeline = [searchResultMatch, sortOption, skipStage, ...(limitStage ? [limitStage] : []), ...(threaded ? [replyLookup] : [])];
 
         const params = {
             type: SCHEMA_TYPE.COMMENTS,
             data: [aggregationPipeline],
         };
 
-        const response = await MongoDbCrudOpration(req.headers['companyid'], params, 'aggregate');
+        const response = await MongoDbCrudOpration(companyId, params, 'aggregate');
 
-        return res.status(200).json({ status: true, data: response || [] });
+        return res.status(200).json({ status: true, data: (response || []).map((row) => readable(withThreadSummary(row))) });
 
     } catch (error) {
         return res.status(500).json({

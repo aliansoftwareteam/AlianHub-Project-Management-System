@@ -1,3 +1,5 @@
+import { folderPathLabel, isLiveFolder } from '@/utils/folderTree';
+
 export const userDataOf = (user, ownerId) => ({ id: user?.id, Employee_Name: user?.Employee_Name, companyOwnerId: ownerId });
 
 export const projectDataOf = (project) => ({
@@ -23,12 +25,13 @@ const live = (map) => Object.values(map || {}).filter((item) => item && !item.de
 /* The project's lists, loose and inside folders, in the shape sprintObjOf takes. */
 export function listsOfProject(project) {
     const lists = live(project?.sprintsObj).map((sprint) => ({ id: String(sprint._id || sprint.id || ""), name: sprint.name }));
-    live(project?.sprintsfolders).forEach((folder) => {
+    live(project?.sprintsfolders).filter((folder) => isLiveFolder(project.sprintsfolders, folder)).forEach((folder) => {
         live(folder.sprintsObj).forEach((sprint) => lists.push({
             id: String(sprint._id || sprint.id || ""),
             name: sprint.name,
             folderId: String(folder._id || folder.folderId || folder.id || ""),
-            folderName: folder.name
+            folderName: folder.name,
+            folderPath: folderPathLabel(project.sprintsfolders, folder)
         }));
     });
     return lists.filter((list) => list.id);

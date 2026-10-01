@@ -143,6 +143,7 @@
     import { useValidation } from "@/composable/Validation";
     import { useToast } from "vue-toast-notification";
     import { useI18n } from "vue-i18n";
+    import { folderPathLabel } from "@/utils/folderTree";
     const { t } = useI18n();
     const clientWidth = inject("$clientWidth");
     const companyId = inject("$companyId");
@@ -215,7 +216,7 @@
             Object.values(folder?.sprintsObj || {}).forEach((sprint) => {
                 sprintsArray.push({ ...sprint })
             })
-            sprints.push({ sprints: sprintsArray, isFolderExpand: false, folderName: folder.name, isFolderSprint: true })
+            sprints.push({ sprints: sprintsArray, isFolderExpand: false, folderName: folderPathLabel(projectData.value.sprintsfolders, folder), isFolderSprint: true })
         })
         taskOption.value = sprints
         if (props.sprintData && Object.keys(props.sprintData).length > 0) {

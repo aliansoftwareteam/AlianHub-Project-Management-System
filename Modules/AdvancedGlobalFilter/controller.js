@@ -7,6 +7,13 @@ const { escapeRegex } = require("../../utils/escapeRegex");
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const { sprintIdentities, visibleSprintClause } = require('../Sprints/helpers/sprintVisibility');
 const savedFilters = require("./helpers/savedFilters");
+const { keepVisibleProjectIds } = require('../../Config/projectAccess');
+const { visibleProjectIds } = require('../Agents/scope');
+
+/* The files and links searches name their projects in the saved filter when there is one, so those ids
+ * are kept to the projects the caller can open as the route does for `pids`. */
+const visibleObjectIds = async (req, ids) => (await keepVisibleProjectIds(String(req.headers['companyid'] || ''), req.uid, ids))
+    .map((id) => new mongoose.Types.ObjectId(id));
 
 /**
  * Helper functions
@@ -215,6 +222,8 @@ exports.searchProjects = async (req, res) => {
         const searchStr = searchText.toString();
         const parsedFilterQuery = typeof filterQuery === 'string' ? JSON.parse(filterQuery) : filterQuery;
         const additionalFilter = parsedFilterQuery && Object.keys(parsedFilterQuery).length ? { ...parsedFilterQuery } : {};
+        // The public and private matches come from the request, so they can only narrow what the caller can open.
+        const visibleProjects = (await visibleProjectIds(req.headers['companyid'], req.uid)).map((id) => new mongoose.Types.ObjectId(id));
 
         const searchResultMatch = {
             $match: {
@@ -227,7 +236,8 @@ exports.searchProjects = async (req, res) => {
                         : []),
                     {
                         $or: [publicQuery, privateQuery]
-                    }
+                    },
+                    { _id: { $in: visibleProjects } }
                 ]
             }
         }
@@ -289,8 +299,7 @@ exports.searchFiles = async (req, res) => {
 
         let additionalFilter = [];
         if(Object.keys(parsedFilterQuery).length) {
-            const extractIds = parsedFilterQuery["$and"][0]["_id"]["objId"]["$in"];
-            additionalFilter = extractIds.map(id => new mongoose.Types.ObjectId(id));
+            additionalFilter = await visibleObjectIds(req, parsedFilterQuery["$and"][0]["_id"]["objId"]["$in"]);
         }
 
         // Construct additional filter
@@ -415,8 +424,7 @@ exports.searchLinks = async (req, res) => {
 
         let additionalFilter = [];
         if (Object.keys(parsedFilterQuery).length) {
-            const extractIds = parsedFilterQuery["$and"][0]["_id"]["objId"]["$in"];
-            additionalFilter = extractIds.map(id => new mongoose.Types.ObjectId(id));
+            additionalFilter = await visibleObjectIds(req, parsedFilterQuery["$and"][0]["_id"]["objId"]["$in"]);
         }
 
         // Construct additional filter

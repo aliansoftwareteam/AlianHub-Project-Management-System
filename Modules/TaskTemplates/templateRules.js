@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
+const { ancestorsFor } = require('../Tasks/helpers/taskTree');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const NAME_MAX = 120;
@@ -256,6 +257,7 @@ const subtaskData = ({ sub, parent, project, companyId, actorId, assignees }) =>
         TaskType: type.value || type.name || 'task',
         TaskTypeKey: Number(type.key),
         ParentTaskId: String(parent._id),
+        ancestors: ancestorsFor(parent),
         ProjectID: String(parent.ProjectID),
         CompanyId: companyId,
         status: { text: status.name, key: status.key, value: status.value, type: status.type },

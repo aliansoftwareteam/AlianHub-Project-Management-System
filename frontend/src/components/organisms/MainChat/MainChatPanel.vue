@@ -61,6 +61,7 @@
             :typing-label="typingLabel"
             @load-older="loadOlder"
             @reply="replyTo = $event"
+            @thread="openThread($event)"
             @copy="copyMessage"
             @remove="confirmRemove"
             @retry="retry"
@@ -121,6 +122,28 @@
         @close="rightPane = ''"
         @open="openSearchHit"
         @unpin="onUnpinFromList"
+    />
+
+    <MainChatThread
+        v-else-if="rightPane === 'thread' && threadRootId"
+        :key="threadRootId"
+        ref="threadPane"
+        :root="threadRoot"
+        :target="conversationTarget"
+        :where="sourceLabel"
+        :user-ids="watchers"
+        :agents="mentionableAgents"
+        :conversation-key="conversationKey"
+        :disabled="!sendMessageAllowed"
+        :disabled-reason="composerLockReason"
+        :sender="sender"
+        :focus-id="threadFocusId"
+        @close="closeThread"
+        @copy="copyMessage"
+        @remove="confirmRemove($event, threadPane && threadPane.remove)"
+        @preview="openPreview"
+        @make-task="openTaskSheet($event && $event.text)"
+        @command="onCommand"
     />
 
     <MainChatSummary
@@ -191,6 +214,7 @@
  */
 import { computed, defineProps, defineEmits, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useStore } from 'vuex';
+import { useRoute, useRouter } from 'vue-router';
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
 import Swal from 'sweetalert2';
@@ -206,6 +230,7 @@ import MainChatMessageList from './MainChatMessageList.vue';
 import MainChatComposer from './MainChatComposer.vue';
 import MainChatInfo from './MainChatInfo.vue';
 import MainChatSearch from './MainChatSearch.vue';
+import MainChatThread from './MainChatThread.vue';
 import MainChatSummary from './MainChatSummary.vue';
 import MakeTaskSheet from './MakeTaskSheet.vue';
 import { canUseAi, loadAiAvailability } from '@/composable/aiAvailability';
@@ -261,7 +286,7 @@ const list = ref(null);
 const replyTo = ref(null);
 const editingMessage = ref(null);
 
-// '' | 'info' | 'search' — the right-hand column holds one pane at a time.
+// '' | 'info' | 'search' | 'pinned' | 'thread' — the right-hand column holds one pane at a time.
 const rightPane = ref('');
 function toggleRightPane(which) {
     rightPane.value = rightPane.value === which ? '' : which;
@@ -352,6 +377,26 @@ const composerLockReason = computed(() => {
 });
 
 
+const conversationTarget = computed(() => ({
+    projectId: projectId.value,
+    sprintId: props.sprintId,
+    taskId: effectiveTaskId.value,
+    folderId: props.folderId,
+    isDefaultProject: isDefaultProject.value,
+}));
+
+const sender = computed(() => {
+    const me = getUser(userId.value) || {};
+    const owner = getters['settings/companyOwnerDetail'];
+    return {
+        id: me._id || me.id,
+        Employee_Name: me.Employee_Name,
+        companyOwnerId: owner && owner.userId,
+    };
+});
+
+const threadPane = ref(null);
+
 const {
     messages, loading, loadingOlder, hasMore,
     load, loadOlder, catchUp, typingUsers, setTyping,
@@ -361,29 +406,61 @@ const {
     socket,
     companyId,
     userId,
-    target: () => ({
-        projectId: (projectData && projectData.value && projectData.value._id) || '',
-        sprintId: props.sprintId,
-        taskId: effectiveTaskId.value,
-        folderId: props.folderId,
-        isDefaultProject: isDefaultProject.value,
-    }),
+    target: () => conversationTarget.value,
+    observe: (doc) => { if (threadPane.value) threadPane.value.receive(doc); },
     // A brand-new DM has no watchers list yet — both participants are known from
     // the target user and me.
     participants: () => (props.watchers && props.watchers.length
         ? props.watchers
         : [userId.value, props.taskId].filter(Boolean)),
     watcherPrefs: () => (projectData && projectData.value && projectData.value.watchers) || {},
-    currentUser: () => {
-        const me = getUser(userId.value) || {};
-        const owner = getters['settings/companyOwnerDetail'];
-        return {
-            id: me._id || me.id,
-            Employee_Name: me.Employee_Name,
-            companyOwnerId: owner && owner.userId,
-        };
-    },
+    currentUser: () => sender.value,
 });
+
+/* ------------------------------------------------------------------ *
+ * threads
+ *
+ * A thread opens in the right-hand column, which is a full-width sheet on a phone. The
+ * page is remounted for each conversation, so a thread never outlives the one it is in.
+ * ------------------------------------------------------------------ */
+const route = useRoute();
+const router = useRouter();
+const threadRootId = ref('');
+const threadFocusId = ref('');
+
+const threadRoot = computed(() => messages.value.find((m) => String(m._id || '') === threadRootId.value)
+    || { _id: threadRootId.value });
+
+function openThread(message, focusId = '') {
+    const id = String((message && message._id) || '');
+    if (!id) return;
+    threadRootId.value = id;
+    threadFocusId.value = focusId;
+    rightPane.value = 'thread';
+}
+
+/* A notice links to a thread with ?thread=<id>; once that thread is closed the link is spent. */
+function forgetThreadLink() {
+    if (!router || !route || !route.query || !route.query.thread) return;
+    const query = { ...route.query };
+    delete query.thread;
+    Promise.resolve(router.replace({ query })).catch(() => {});
+}
+
+function closeThread() {
+    if (rightPane.value === 'thread') rightPane.value = '';
+}
+
+watch(rightPane, (pane) => {
+    if (pane === 'thread' || !threadRootId.value) return;
+    threadRootId.value = '';
+    threadFocusId.value = '';
+    forgetThreadLink();
+});
+
+watch(() => (route && route.query ? route.query.thread : ''), (id) => {
+    if (id) openThread({ _id: String(id) });
+}, { immediate: true });
 
 const fileExtentions = computed(() => getters['settings/fileExtentions'] || []);
 
@@ -643,6 +720,7 @@ function onWindowFocus() {
     // while it was in the background — the socket dropped, or an event simply did not
     // land — this pulls it in. Cheap and idempotent, so it costs one request.
     catchUp();
+    if (threadPane.value) threadPane.value.refresh();
 
     if (keepUnread || !engaged) return;
     if (unreadCount.value > 0) readConversation();
@@ -714,6 +792,7 @@ watch(() => (socket ? socket.value : null), (instance) => {
     // A replaced instance means we were disconnected — recover whatever was sent while
     // we were away, not just future messages.
     catchUp();
+    if (threadPane.value) threadPane.value.refresh();
 });
 
 onMounted(() => window.addEventListener('focus', onWindowFocus));
@@ -1054,14 +1133,19 @@ async function openPreview(message) {
 /**
  * Act on a search result.
  *
- * An attachment opens straight in the previewer. A text hit scrolls to the
- * message and flashes it — but only when that message is in the loaded
+ * A reply opens its thread at that reply. An attachment opens straight in the
+ * previewer. A text hit scrolls to the message and flashes it — but only when that message is in the loaded
  * transcript; the search reaches the whole conversation, so a hit can easily be
  * older than what has been paged in. Rather than silently doing nothing, say
  * where it is.
  */
 async function openSearchHit(message) {
     if (!message) return;
+
+    if (message.parentId) {
+        openThread({ _id: message.parentId }, idOf(message));
+        return;
+    }
 
     if (!['text', 'link'].includes(message.type) && message.mediaURL) {
         await openPreview(message);
@@ -1097,7 +1181,7 @@ function copyMessage(message) {
         .catch(() => $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' }));
 }
 
-function confirmRemove(message) {
+function confirmRemove(message, remove = removeMessage) {
     Swal.fire({
         title: t('MainChat.confirm_delete'),
         icon: 'warning',
@@ -1107,7 +1191,7 @@ function confirmRemove(message) {
         cancelButtonText: t('MainChat.cancel'),
         confirmButtonText: t('MainChat.confirm_delete_yes'),
     }).then((result) => {
-        if (result.isConfirmed) removeMessage(message);
+        if (result.isConfirmed && remove) remove(message);
     });
 }
 
