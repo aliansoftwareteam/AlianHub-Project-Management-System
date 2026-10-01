@@ -3079,7 +3079,18 @@ export default {
         "sort_created": "Created",
         "sort_updated": "Updated",
         "sort_name": "Name",
-        "sort_status": "Status"
+        "sort_status": "Status",
+        "sort_assignee": "Assignee",
+        "sort_points": "Points",
+        "sort_estimate": "Estimate",
+        "sort_fields": "Custom fields"
+    },
+    "ViewGroups": {
+        "no_value": "No value",
+        "checked": "Checked",
+        "unchecked": "Not checked",
+        "date_past": "Past",
+        "custom_fields": "Custom fields"
     },
     "ViewColumns": {
         "title": "Columns",
@@ -5979,7 +5990,15 @@ export default {
         "select_project_types": "选择项目类型",
         "unselect_all": "取消全选",
         "are_you_suredelete": "您确定要删除吗？",
-        "Not_Equals_To": "不是"
+        "Not_Equals_To": "不是",
+        "cf_contains": "Contains",
+        "cf_on": "Is on",
+        "cf_before": "Is before",
+        "cf_after": "Is after",
+        "cf_is_set": "Is set",
+        "cf_is_empty": "Is empty",
+        "cf_value": "Value",
+        "cf_choose": "Choose one or more options"
     },
     "conformationmsg": {
         "archive": "列表可以被归档以隐藏，但随时可以恢复。归档列表后，所有任务都将保留并可搜索。",

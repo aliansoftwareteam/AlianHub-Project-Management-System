@@ -3079,7 +3079,18 @@ export default {
         "sort_created": "Created",
         "sort_updated": "Updated",
         "sort_name": "Name",
-        "sort_status": "Status"
+        "sort_status": "Status",
+        "sort_assignee": "Assignee",
+        "sort_points": "Points",
+        "sort_estimate": "Estimate",
+        "sort_fields": "Custom fields"
+    },
+    "ViewGroups": {
+        "no_value": "No value",
+        "checked": "Checked",
+        "unchecked": "Not checked",
+        "date_past": "Past",
+        "custom_fields": "Custom fields"
     },
     "ViewColumns": {
         "title": "Columns",
@@ -5979,7 +5990,15 @@ export default {
         "select_project_types": "Seleccionar Tipos de Proyecto",
         "unselect_all": "Desmarcar todo",
         "are_you_suredelete": "¿Estás seguro de que deseas eliminar?",
-        "Not_Equals_To": "No es"
+        "Not_Equals_To": "No es",
+        "cf_contains": "Contains",
+        "cf_on": "Is on",
+        "cf_before": "Is before",
+        "cf_after": "Is after",
+        "cf_is_set": "Is set",
+        "cf_is_empty": "Is empty",
+        "cf_value": "Value",
+        "cf_choose": "Choose one or more options"
     },
     "conformationmsg": {
         "archive": "Una lista se puede archivar para ocultarla de la vista, pero se puede restaurar en cualquier momento. Todas las tareas se mantienen y siguen siendo buscables cuando archivas una lista.",

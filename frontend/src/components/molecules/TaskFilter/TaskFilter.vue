@@ -49,6 +49,7 @@
                             :users="users"
                             :mainOptions="keysArray"
                             :dueDateOptions="dueDateOptions"
+                            :customFields="customFieldDefs"
                             @delete="deleteRow"
                         />
                     </div>
@@ -109,6 +110,8 @@ import { useI18n } from "vue-i18n";
 const { t } = useI18n();
 import { buildFilterQuery } from "@/composable/commonFunction";
 import { clearFilterSignal, VIEW_FILTER_ROWS } from "@/views/Projects/composables/taskFilterSignal";
+import { useProjectCustomFields } from "@/views/Projects/composables/projectCustomFields";
+import { comparisonsFor, customFilterOptions, needsValue } from "@/views/Projects/composables/customFieldQuery";
 
 // Utils
 const { getUser } = useGetterFunctions();
@@ -186,8 +189,11 @@ const dueDateOptions = ref(
     ]
 )
 
+const { defs: customFieldDefs } = useProjectCustomFields(computed(() => props.projectData));
+const customOptions = computed(() => customFilterOptions(customFieldDefs.value));
+
 const keysArray = computed(() => {
-    return mainOptions.value.filter(option => {
+    return [...mainOptions.value, ...customOptions.value].filter(option => {
         if(!inputs.value.some(input => input.name.value === option.value)) {
             return option;
         }
@@ -279,7 +285,7 @@ const handleUpdate = async (obj) => {
  * @param {String} type 
  */
  const manageArray = (type) => {
-    let arrayData = [];
+    let arrayData = { value: [] };
     if(type === "statusKey") {
         arrayData = statusArray;
     } else if (type === "Task_Priority") {
@@ -301,7 +307,8 @@ const handleUpdate = async (obj) => {
  * Populate the value in comparision array based on key
  * @param {String} key 
  */
-const manageComparisonArray = (key) => {
+const manageComparisonArray = (key, name = {}) => {
+    if (name.type === "custom") return comparisonsFor(name.fieldType);
     const arraykeys = ["statusKey", "Task_Priority", "Task_Leader", "TaskTypeKey", "tagsArray"];
     const dateKeys = ["DueDate"];
     let arrayData = [];
@@ -334,7 +341,12 @@ const validateItems = () => {
         if (typeof item.comparison !== "object" || Object.keys(item.comparison).length === 0) {
             item.isValidate = false;
         }
-        if (item.name.value === "DueDate") {
+        if (item.name.type === "custom") {
+            const value = item.values?.[0];
+            if (needsValue(item.comparison?.value) && (!Array.isArray(item.values) || !item.values.length || value === "" || value === null)) {
+                item.isValidate = false;
+            }
+        } else if (item.name.value === "DueDate") {
             if (item.values.length === 0) {
                 item.isValidate = false;
             }
@@ -407,7 +419,7 @@ const applyFilter = (data) => {
         isEdit.value = true;
         selectedRow.value = data.item;
         queries = JSON.parse(JSON.stringify(data.item.filters));
-        queries.map(x => x.comparisonsData = manageComparisonArray(x.name.value));
+        queries.map(x => x.comparisonsData = manageComparisonArray(x.name.value, x.name));
         queries.map(x => manageArray(x.name.value).value.filter(v => x.values.includes(v.finalValue)));
         nextTick(() => {
             inputs.value = queries
@@ -448,7 +460,7 @@ const loadRows = (rows) => {
             ...JSON.parse(JSON.stringify(row)),
             isAllChecked: false,
             isValidate: true,
-            comparisonsData: manageComparisonArray(row.name.value),
+            comparisonsData: manageComparisonArray(row.name.value, row.name),
             displayData: (manageArray(row.name.value).value || []).filter((option) => row.values.includes(option.finalValue)),
         }));
         isApplyed.value = true;

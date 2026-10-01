@@ -3079,7 +3079,18 @@ export default {
         "sort_created": "Created",
         "sort_updated": "Updated",
         "sort_name": "Name",
-        "sort_status": "Status"
+        "sort_status": "Status",
+        "sort_assignee": "Assignee",
+        "sort_points": "Points",
+        "sort_estimate": "Estimate",
+        "sort_fields": "Custom fields"
+    },
+    "ViewGroups": {
+        "no_value": "No value",
+        "checked": "Checked",
+        "unchecked": "Not checked",
+        "date_past": "Past",
+        "custom_fields": "Custom fields"
     },
     "ViewColumns": {
         "title": "Columns",
@@ -5979,7 +5990,15 @@ export default {
         "select_project_types": "Выберите типы проектов",
         "unselect_all": "Отменить выбор всех",
         "are_you_suredelete": "Вы уверены, что хотите удалить?",
-        "Not_Equals_To": "Не является"
+        "Not_Equals_To": "Не является",
+        "cf_contains": "Contains",
+        "cf_on": "Is on",
+        "cf_before": "Is before",
+        "cf_after": "Is after",
+        "cf_is_set": "Is set",
+        "cf_is_empty": "Is empty",
+        "cf_value": "Value",
+        "cf_choose": "Choose one or more options"
     },
     "conformationmsg": {
         "archive": "Список можно архивировать, чтобы скрыть его, но он может быть восстановлен в любой момент. Все задачи сохраняются и остаются доступными для поиска после архивации списка.",

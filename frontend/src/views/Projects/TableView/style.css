@@ -85,7 +85,9 @@
 }
 .tv2__sort:hover { color: var(--ink); }
 .tv2__sort:focus-visible { outline: none; box-shadow: var(--focus); color: var(--ink); }
-.tv2__sort-caret { font-size: 8px; opacity: 0; transition: opacity var(--t-state) var(--ease); }
+.tv2__sort--col { max-width: 100%; min-width: 0; }
+.tv2__sort-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tv2__sort-caret { flex: none; font-size: 8px; opacity: 0; transition: opacity var(--t-state) var(--ease); }
 .tv2__sort-caret.is-on { opacity: 1; color: var(--brand); }
 .tv2__sort:hover .tv2__sort-caret, .tv2__sort:focus-visible .tv2__sort-caret { opacity: 1; }
 

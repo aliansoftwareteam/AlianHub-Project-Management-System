@@ -3079,7 +3079,18 @@ export default {
         "sort_created": "Created",
         "sort_updated": "Updated",
         "sort_name": "Name",
-        "sort_status": "Status"
+        "sort_status": "Status",
+        "sort_assignee": "Assignee",
+        "sort_points": "Points",
+        "sort_estimate": "Estimate",
+        "sort_fields": "Custom fields"
+    },
+    "ViewGroups": {
+        "no_value": "No value",
+        "checked": "Checked",
+        "unchecked": "Not checked",
+        "date_past": "Past",
+        "custom_fields": "Custom fields"
     },
     "ViewColumns": {
         "title": "Columns",
@@ -5979,7 +5990,15 @@ export default {
         "select_project_types": "प्रोजेक्ट प्रकार चुनें",
         "unselect_all": "सभी चयन हटाएं",
         "are_you_suredelete": "क्या आप सुनिश्चित हैं कि आप इसे हटाना चाहते हैं?",
-        "Not_Equals_To": "नहीं है"
+        "Not_Equals_To": "नहीं है",
+        "cf_contains": "Contains",
+        "cf_on": "Is on",
+        "cf_before": "Is before",
+        "cf_after": "Is after",
+        "cf_is_set": "Is set",
+        "cf_is_empty": "Is empty",
+        "cf_value": "Value",
+        "cf_choose": "Choose one or more options"
     },
     "conformationmsg": {
         "archive": "एक सूची को संग्रहित किया जा सकता है ताकि इसे दृश्य से छुपाया जा सके, लेकिन इसे किसी भी समय पुनर्स्थापित किया जा सकता है। जब आप एक सूची को संग्रहित करते हैं, तो सभी कार्यों को रखा जाता है और खोज योग्य रहते हैं।",

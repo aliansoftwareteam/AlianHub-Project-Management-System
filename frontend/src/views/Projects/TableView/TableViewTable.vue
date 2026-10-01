@@ -55,7 +55,7 @@ defineOptions({ name: "TableViewTable" });
 
 const props = defineProps({
     data: { type: Object, required: true },
-    group: { type: Number, default: 0 },
+    group: { type: [Number, String], default: 0 },
     sprintId: { type: String, default: "" },
     globalSortKey: { type: String, default: "" },
     keys: { type: String, default: "" },
