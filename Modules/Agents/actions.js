@@ -5,6 +5,8 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const socketEmitter = require('../../event/socketEventEmitter');
 const tools = require('../Automations/engine/tools');
 const registry = require('./registry');
+const groups = require('./registryGroups');
+const { SCOPE, read, write } = require('./registryKit');
 const permissions = require('./permissions');
 const audit = require('./agentAudit');
 const { attribution, isAgent } = require('./actor');
@@ -41,10 +43,7 @@ const { LINK_KINDS } = require('./taskRequests');
 // only on a reversible, task-scoped write with no money in it; everything else
 // is proposed. `reversible` follows the registry's undoable flag so the rating
 // and the Inbox's "reversible" badge never disagree.
-const SCOPE = Object.freeze({ TASK: 'task', PROJECT: 'project', WORKSPACE: 'workspace' });
 const RATING_KEYS = Object.freeze(['write', 'reversible', 'scope', 'money']);
-const read = (scope) => Object.freeze({ write: false, reversible: true, scope, money: false });
-const write = (scope, reversible = true) => Object.freeze({ write: true, reversible, scope, money: false });
 const RATINGS = Object.freeze({
     'tasks.next': read(SCOPE.WORKSPACE),
     'tasks.search': read(SCOPE.WORKSPACE),
@@ -68,64 +67,7 @@ const RATINGS = Object.freeze({
 });
 
 // Rated only while the registry holds them, so a flag that is off leaves no rating behind.
-const FLAGGED_RATINGS = Object.freeze({
-    'performance.read': read(SCOPE.PROJECT),
-    'projects.list': read(SCOPE.WORKSPACE),
-    'project.get': read(SCOPE.PROJECT),
-    'sprints.list': read(SCOPE.PROJECT),
-    'statuses.list': read(SCOPE.PROJECT),
-    'comments.list': read(SCOPE.TASK),
-    'pages.search': read(SCOPE.WORKSPACE),
-    'page.get': read(SCOPE.PROJECT),
-    'timesheet.read': read(SCOPE.WORKSPACE),
-    'comment.create': write(SCOPE.TASK),
-    'timelog.create': write(SCOPE.TASK),
-    'fields.list': read(SCOPE.PROJECT),
-    'subtasks.list': read(SCOPE.TASK),
-    'members.list': read(SCOPE.WORKSPACE),
-    'task.edit': write(SCOPE.TASK),
-    'task.assignees.set': write(SCOPE.TASK),
-    'task.field.set': write(SCOPE.TASK),
-    'task.move': write(SCOPE.PROJECT, false),
-    'task.archive': write(SCOPE.PROJECT),
-    'task.restore': write(SCOPE.PROJECT),
-    'task.history': read(SCOPE.TASK),
-    'task.links.list': read(SCOPE.TASK),
-    'task.status.change': write(SCOPE.TASK),
-    'task.add': write(SCOPE.PROJECT),
-    'subtask.add': write(SCOPE.TASK),
-    'comment.update': write(SCOPE.TASK),
-    'tasks.batch': write(SCOPE.TASK),
-    'page.create': write(SCOPE.PROJECT),
-    'page.update': write(SCOPE.PROJECT),
-    'tags.list': read(SCOPE.PROJECT),
-    'task.tags.add': write(SCOPE.TASK),
-    'task.tags.remove': write(SCOPE.TASK),
-    'task.relations.list': read(SCOPE.TASK),
-    // A link is written on both tasks, which may sit in two projects.
-    'task.relation.add': write(SCOPE.PROJECT),
-    'task.relation.remove': write(SCOPE.PROJECT),
-    'lists.list': read(SCOPE.PROJECT),
-    'list.create': write(SCOPE.PROJECT),
-    'list.rename': write(SCOPE.PROJECT),
-    'list.move': write(SCOPE.PROJECT),
-    'page.comments.list': read(SCOPE.PROJECT),
-    'page.comment.create': write(SCOPE.PROJECT),
-    'page.comment.reply': write(SCOPE.PROJECT),
-    'page.comment.assign': write(SCOPE.PROJECT),
-    'goals.list': read(SCOPE.WORKSPACE),
-    'goal.get': read(SCOPE.WORKSPACE),
-    // A goal belongs to no project and is read by everyone it is shared with.
-    'goal.target.set': write(SCOPE.WORKSPACE),
-    'goal.target.sources.add': write(SCOPE.WORKSPACE),
-    'goal.target.sources.remove': write(SCOPE.WORKSPACE),
-    'task.lists.list': read(SCOPE.TASK),
-    // The other list may sit in another project.
-    'task.lists.add': write(SCOPE.PROJECT),
-    'task.lists.remove': write(SCOPE.PROJECT),
-    'slack.message.post': write(SCOPE.WORKSPACE, false),
-    'slack.channel.read': read(SCOPE.WORKSPACE),
-});
+const FLAGGED_RATINGS = Object.freeze(Object.assign({}, ...groups.map((g) => g.ratings)));
 
 const ratingTable = () => ({ ...RATINGS, ...Object.fromEntries(Object.entries(FLAGGED_RATINGS).filter(([k]) => registry.has(k))) });
 
