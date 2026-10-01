@@ -123,8 +123,8 @@ const reset = () => {
     mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: SPRINT, name: 'Sprint 1', projectId: OPEN_PROJECT });
     mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: OTHER_SPRINT, name: 'Sprint 2', projectId: OPEN_PROJECT });
     mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: FIELD, fieldTitle: 'Customer', fieldType: 'text', type: 'task', global: true, isDelete: true });
-mockDb.seed('tasks', taskDoc(OPEN_TASK));
-    mockDb.seed('tasks', taskDoc(OPEN_TASK_2));
+    mockDb.seed('tasks', taskDoc(OPEN_TASK));
+    mockDb.seed('tasks', taskDoc(OPEN_TASK_2, { extraLists: [{ projectId: OPEN_PROJECT, sprintId: OTHER_SPRINT, addedBy: OWNER }] }));
 };
 
 beforeEach(reset);
@@ -171,6 +171,9 @@ const CRAFTED = {
     pullRelationEntry: () => ({ action: 'pullRelationEntry', companyId: CID, taskId: OPEN_TASK }),
     bulkUpdateStartDate: () => ({ action: 'bulkUpdateStartDate', taskIds: [OPEN_TASK], userData: USER, startDate: '2026-10-01' }),
     bulkRestore: () => ({ action: 'bulkRestore', taskIds: [OPEN_TASK], userData: USER }),
+    addToList: () => ({ action: 'addToList', taskId: OPEN_TASK, sprintId: OTHER_SPRINT, userData: USER }),
+    removeFromList: () => ({ action: 'removeFromList', taskId: OPEN_TASK_2, sprintId: OTHER_SPRINT, userData: USER }),
+    bulkAddToList: () => ({ action: 'bulkAddToList', taskIds: [OPEN_TASK], sprintId: OTHER_SPRINT, userData: USER }),
     _bulkArchiveDelete: () => ({ action: '_bulkArchiveDelete', companyId: CID, taskIds: [OPEN_TASK], userData: USER, deletedStatusKey: 2 }),
     bulkDuplicate: () => ({ action: 'bulkDuplicate', taskIds: [OPEN_TASK], userData: USER, projectData: projectData(), sprintObj: sprintObj(), oldProject: projectData(), duplicateData: [], taskName: 'Copy', oldSprintObj: sprintObj() }),
     create: () => {

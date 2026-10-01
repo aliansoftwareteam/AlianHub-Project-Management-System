@@ -105,6 +105,8 @@ exports.init = (app) => {
     app.patch('/api/v2/tasks/everything/views/:id', everythingViewsCtrl.updateView);
     app.delete('/api/v2/tasks/everything/views/:id', everythingViewsCtrl.deleteView);
 
+    app.get('/api/v2/tasks/:id/lists', getTaskCtrl.getTaskLists);
+
     app.post('/api/v2/tasks/relations', requireTaskActionPermission(RELATION_ACTIONS), async (req, res) => {
         try {
             const relation = actionEntry(RELATION_ACTIONS, req.body && req.body.action);

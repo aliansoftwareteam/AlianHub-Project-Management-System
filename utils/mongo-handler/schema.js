@@ -64,6 +64,19 @@ const schema = {
             type: String,
             required: false,
         },
+        // The other lists the task also shows in; its home stays ProjectID and sprintId, and the home alone
+        // decides who reads it. Written only by Modules/Tasks/helpers/taskExtraLists.js, never taken from a client.
+        'extraLists': {
+            type: [{
+                _id: false,
+                projectId: { type: mongoose.Schema.Types.ObjectId, required: true },
+                sprintId: { type: mongoose.Schema.Types.ObjectId, required: true },
+                addedBy: { type: String, required: false },
+                addedAt: { type: Date, required: false },
+            }],
+            default: undefined,
+            required: false,
+        },
         'ProjectID': {
             type: mongoose.Schema.Types.ObjectId,
             required: true,

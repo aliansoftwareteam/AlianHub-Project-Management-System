@@ -35,7 +35,7 @@ class TaskWriteRefusal extends Error {
     }
 }
 
-const refuse = (statusCode, message) => { throw new TaskWriteRefusal(statusCode, message); };
+const refuse = (statusCode, message, code) => { throw new TaskWriteRefusal(statusCode, message, code); };
 const ATTACHMENT_KEY_REFUSED = 'ATTACHMENT_KEY_NOT_OWN';
 const CANNOT_OPEN_DESTINATION = 'Only people who can open the project a copy lands in can be copied to it.';
 const taskNotFound = () => new TaskWriteRefusal(404, 'Task not found');
@@ -153,10 +153,11 @@ const holdsTaskType = (payload, stored) => {
  * another project. `people` returns the user ids the write newly names, each of whom must hold a live seat in the
  * company and be able to open the project; `carries` are the lists of people a move or copy takes along. `landing`
  * returns the user ids stored on a task the write creates in the destination, each of whom must be able to open that
- * project. `actor` are the params that receive the signed-in user.
+ * project. `actor` are the params that receive the signed-in user. `strict` refuses a body key the action does not
+ * take, for an action no existing client sends extra fields to.
  */
-const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, others = [], listed = null, project = [], taskIds = [], taskNames = [], projectNames = [], stored = false, held = null, destination = null, chat = null, list = null, mapping = null, attachments = null, people = null, carries = [], landing = null, actor }) => Object.freeze({
-    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, others, listed, project, taskIds, taskNames, projectNames, stored, held, destination, chat, list, mapping, attachments, people, carries, landing,
+const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, others = [], listed = null, project = [], taskIds = [], taskNames = [], projectNames = [], stored = false, held = null, destination = null, chat = null, list = null, mapping = null, attachments = null, people = null, carries = [], landing = null, strict = false, actor }) => Object.freeze({
+    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, others, listed, project, taskIds, taskNames, projectNames, stored, held, destination, chat, list, mapping, attachments, people, carries, landing, strict,
     actor: actor || (params.includes('userData') ? ['userData'] : []),
 });
 
@@ -171,6 +172,9 @@ const TASK_NAME = [['taskData', 'TaskName']];
 const PROJECT_NAME = [['project', 'ProjectName']];
 const PROJECT_DATA_NAME = [['projectData', 'ProjectName']];
 const TASK_IDS = [['taskIds', '*']];
+const LIST_ID = [['sprintId']];
+/* Both spellings of the company a client may send; each is replaced by the validated one. */
+const TENANT = ['companyId', 'CompanyId'];
 const PROJECT_DATA = [['projectData', '_id']];
 const PROJECT = [['project', '_id']];
 const PROJECT_ID = [['projectId']];
@@ -179,7 +183,7 @@ const DESTINATION_LIST = Object.freeze({ id: ['sprintObj', 'id'], ref: ['sprintO
 const LISTED_TASKS = Object.freeze({ path: ['taskIds'] });
 const CARRIED = Object.freeze(['assignee', 'watcher']);
 
-const CREATE_DATA_FIELDS = Object.freeze(Object.keys(schema.tasks).filter((field) => !['_id', 'createdBy', 'createdAt', 'ancestors', 'cascadedBy'].includes(field)));
+const CREATE_DATA_FIELDS = Object.freeze(Object.keys(schema.tasks).filter((field) => !['_id', 'createdBy', 'createdAt', 'ancestors', 'cascadedBy', 'extraLists'].includes(field)));
 
 const CREATE = spec({
     params: ['data', 'user', 'projectData', 'indexObj', 'setNotif'],
@@ -239,6 +243,10 @@ const TASK_ACTION_FIELDS = Object.freeze({
     getTaskRelations: spec({ params: ['companyId', 'taskId'], company: companyId, ids: TASK_ID, task: TASK_ID[0], actor: HISTORY_USER }),
     getOpenBlockers: spec({ params: ['companyId', 'taskId'], company: companyId, ids: TASK_ID, task: TASK_ID[0], actor: HISTORY_USER }),
 
+    /* The handlers read the task and the list from the database and judge both, so neither is resolved here. */
+    addToList: spec({ params: [...TENANT, 'taskId', 'sprintId', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ...LIST_ID], strict: true }),
+    removeFromList: spec({ params: [...TENANT, 'taskId', 'sprintId', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ...LIST_ID], strict: true }),
+
     bulkUpdateStatus: spec({ params: ['companyId', 'taskIds', 'newStatus', ...HISTORY_USER], writes: { newStatus: STATUS_FIELDS }, company: companyId, ids: TASK_IDS, listed: LISTED_TASKS }),
     bulkUpdatePriority: spec({ params: ['companyId', 'taskIds', 'firebaseObj', 'priorityObj', ...HISTORY_USER], writes: { firebaseObj: ['Task_Priority', 'Updated_At'] }, company: companyId, ids: TASK_IDS, listed: LISTED_TASKS }),
     bulkUpdateDueDate: spec({ params: ['companyId', 'taskIds', 'DueDate', 'commonDateFormatString', ...HISTORY_USER], company: companyId, ids: TASK_IDS, listed: LISTED_TASKS }),
@@ -253,6 +261,7 @@ const TASK_ACTION_FIELDS = Object.freeze({
     bulkMove: spec({ params: ['companyId', 'taskIds', 'sprintObj', 'projectData', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, DESTINATION], destination: DESTINATION, listed: LISTED_TASKS, list: DESTINATION_LIST }),
     bulkConvertToSubTask: spec({ params: ['companyId', 'taskIds', 'parentTaskId', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, ['parentTaskId']], listed: LISTED_TASKS, others: [['parentTaskId']] }),
     bulkConvertToTask: spec({ params: ['companyId', 'taskIds', 'sprintObj', 'projectData', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, DESTINATION], destination: DESTINATION, listed: LISTED_TASKS, list: DESTINATION_LIST }),
+    bulkAddToList: spec({ params: [...TENANT, 'taskIds', 'sprintId', ...HISTORY_USER], company: companyId, ids: [...TASK_IDS, ...LIST_ID], strict: true }),
     bulkDuplicate: spec({ params: ['companyId', 'taskIds', 'sprintObj', 'oldProject', 'projectData', 'isSubTask', 'duplicateData', 'assignee', 'watcher', 'taskName', 'oldSprintObj', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, DESTINATION], destination: DESTINATION, people: PEOPLE.bulkDuplicate, listed: LISTED_TASKS, list: DESTINATION_LIST, landing: peopleOnCopy }),
 });
 
@@ -469,6 +478,7 @@ const prepareTaskWrite = (req, taskSpec, label) => {
         if (key === 'action') {
             payload.action = body.action;
         } else if (!taskSpec.params.includes(key)) {
+            if (taskSpec.strict) refuse(400, `${printable(key)} is not accepted by this action.`, 'UNKNOWN_FIELD');
             dropped.push(key);
         } else {
             payload[key] = Object.hasOwn(taskSpec.writes, key) ? cleanWrite(key, body[key], taskSpec, dropped) : body[key];

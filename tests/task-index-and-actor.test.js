@@ -171,6 +171,9 @@ const CRAFTED = {
     openBlockers: () => ({ action: 'openBlockers', taskId: OPEN_TASK }),
     bulkUpdateStartDate: () => ({ action: 'bulkUpdateStartDate', taskIds: [OPEN_TASK], userData: USER, startDate: '2026-10-01' }),
     bulkRestore: () => ({ action: 'bulkRestore', taskIds: [OPEN_TASK], userData: USER }),
+    addToList: () => ({ action: 'addToList', taskId: OPEN_TASK, sprintId: OTHER_SPRINT }),
+    removeFromList: () => ({ action: 'removeFromList', taskId: OPEN_TASK, sprintId: OTHER_SPRINT }),
+    bulkAddToList: () => ({ action: 'bulkAddToList', taskIds: [OPEN_TASK], sprintId: OTHER_SPRINT }),
     bulkDuplicate: () => ({ action: 'bulkDuplicate', taskIds: [OPEN_TASK], userData: USER, projectData: projectData(), sprintObj: { id: SPRINT, name: 'Sprint 1', folderId: null }, oldProject: projectData(), duplicateData: [], taskName: 'Copy', oldSprintObj: { id: SPRINT } }),
 };
 
