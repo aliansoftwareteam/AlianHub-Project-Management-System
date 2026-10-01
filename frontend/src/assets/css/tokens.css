@@ -1,4 +1,6 @@
-/* Design tokens — single source of truth for the redesign (handoff turn 12f). */
+/* Design tokens — single source of truth for the redesign (handoff turn 12f).
+   The sizes on :root are the dense look (task 046 B0.3), which is the default; the other looks
+   override them from :root[data-variant] further down. */
 :root {
     --brand: #2F3990;
     --brand-deep: #1e2666;
@@ -58,17 +60,28 @@
     --text-label: 600 10.5px/1.2 var(--font-mono);
     --text-data: 500 11.5px/1.2 var(--font-mono);
 
-    --sp-1: 4px; --sp-2: 6px; --sp-3: 8px; --sp-4: 10px; --sp-5: 12px;
-    --sp-6: 14px; --sp-7: 16px; --sp-8: 20px; --sp-9: 24px;
+    --fs-2xs: 10px; --fs-xs: 10.5px; --fs-sm: 11.5px; --fs-md: 13px; --fs-lg: 13px; --fs-xl: 17px;
+    --lh-tight: 1.2; --lh-snug: 1.25; --lh-body: 1.4;
+    --fw-strong: 500; --fw-title: 600;
 
-    --r-chip: 6px;
-    --r-input: 8px;
-    --r-card: 12px;
-    --r-modal: 16px;
+    --sp-1: 2px; --sp-2: 4px; --sp-3: 6px; --sp-4: 8px; --sp-5: 10px;
+    --sp-6: 12px; --sp-7: 14px; --sp-8: 16px; --sp-9: 20px;
+    --cell-pad-x: var(--sp-5);
+    --card-pad-y: var(--sp-5); --card-pad-x: var(--sp-6);
+    --gap-row: var(--sp-2); --gap-stack: var(--sp-5);
+    --page-pad-y: var(--sp-6); --page-pad-x: var(--sp-8);
+
+    --r-sm: 3px; --r-md: 4px; --r-lg: 6px;
+    --r-chip: var(--r-sm);
+    --r-input: var(--r-md);
+    --r-card: var(--r-lg);
+    --r-modal: 8px;
 
     --shadow-ink: rgba(0, 0, 0, .04);
-    --shadow-card: 0 2px 6px rgba(0, 0, 0, .04);
-    --shadow-pop: 0 18px 44px rgba(0, 0, 0, .18);
+    --shadow-card: none;
+    --shadow-surface: none;
+    --shadow-pop: 0 6px 16px rgba(0, 0, 0, .14);
+    --shadow-panel: none;
     --shadow-modal: 0 30px 80px rgba(0, 0, 0, .35);
     /* A solid 2px brand ring: the 12% tint it replaced measured about 1.2:1 against white (WCAG 1.4.11 needs 3:1). */
     --focus: 0 0 0 2px var(--brand);
@@ -76,7 +89,8 @@
     --rail-w: 60px;
     --sidebar-w: 236px;
     --sidebar-w-narrow: 220px;
-    --toolbar-h: 52px;
+    --toolbar-h: 44px;
+    --control-h-sm: 24px; --control-h: 26px; --control-h-lg: 32px;
     --panel-w: 300px;
     --detail-w: 760px;
     --tabbar-h: 56px;
@@ -87,14 +101,14 @@
 
     /* Row density of the List and the Table: the comfortable sizes. --row-h is a floor, and
        --hit-min is the smallest a control in a row may get, so no density overrides it. */
-    --row-h: 36px;
-    --cell-pad-y: 9px;
-    --row-font: 12.5px;
+    --row-h: 32px;
+    --cell-pad-y: 4px;
+    --row-font: 13px;
     --row-lines: 2;
-    --avatar-size: 24px;
-    --avatar-font: 11px;
-    --chip-h: 22px;
-    --chip-font: 11.5px;
+    --avatar-size: 22px;
+    --avatar-font: 10px;
+    --chip-h: 20px;
+    --chip-font: 11px;
     --hit-min: 24px;
     /* How far a child row (a subtask) steps in from its parent's name. */
     --row-indent: var(--sp-8);
@@ -104,9 +118,9 @@
     color-scheme: light;
 }
 
-/* Set on a view root by its saved density. A design variant sets its comfortable sizes on
-   <html>, so this still wins inside the view whatever the variant. Phones keep
-   the comfortable sizes: their rows fold onto two lines and need the height to be tapped. */
+/* Set on a view root by its saved density. A look sets its comfortable sizes on <html>, so
+   this still wins inside the view whatever the look, and it is denser than the densest of them.
+   Phones keep the comfortable sizes: their rows fold onto two lines and need the height to be tapped. */
 @media (min-width: 768px) {
     [data-density="compact"] {
         --row-h: 28px;
@@ -155,7 +169,6 @@
     --agent-bg: rgba(168, 146, 255, .16);
     --agent-ink: #b3a4ff;
     --shadow-ink: rgba(0, 0, 0, .3);
-    --shadow-card: 0 2px 6px rgba(0, 0, 0, .3);
 
     --scheme: dark;
     color-scheme: dark;
@@ -225,10 +238,10 @@
 /* Many controls draw focus as a box-shadow and switch the outline off; here the outline wins. */
 :root.ah-high-contrast :focus-visible { outline: 3px solid var(--ink) !important; outline-offset: 2px !important; }
 
-/* Design variants (task 046 B0.2): a preview picked in Settings, applied as data-variant on <html>.
-   Tokens that :root does not define exist only inside a variant, and every rule that reads one
-   carries today's value as its fallback, so with no variant chosen nothing changes.
-   The row, chip and avatar sizes are a variant's comfortable density. */
+/* Looks (task 046 B0.2, B0.3): picked in Settings and applied as data-variant on <html>. With no
+   attribute the app wears B, whose values are also the ones on :root, so nothing is repainted
+   on load; the b block stays for a browser that stored it and must equal :root.
+   The row, chip and avatar sizes are a look's comfortable density. */
 :root[data-variant="a"] {
     --fs-2xs: 10px; --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-lg: 14px; --fs-xl: 20px;
     --lh-tight: 1.2; --lh-snug: 1.3; --lh-body: 1.5;
@@ -305,6 +318,34 @@
 
     --control-h-sm: 30px; --control-h: 34px; --control-h-lg: 42px;
     --toolbar-h: 56px;
+}
+
+/* The look before B became the default. The type, radius-step, padding and control tokens did not
+   exist then: `initial` un-sets them, so every rule draws the fallback it carries, which is that look. */
+:root[data-variant="classic"] {
+    --fs-2xs: initial; --fs-xs: initial; --fs-sm: initial; --fs-md: initial; --fs-lg: initial; --fs-xl: initial;
+    --lh-tight: initial; --lh-snug: initial; --lh-body: initial;
+    --fw-strong: initial; --fw-title: initial;
+
+    --sp-1: 4px; --sp-2: 6px; --sp-3: 8px; --sp-4: 10px; --sp-5: 12px;
+    --sp-6: 14px; --sp-7: 16px; --sp-8: 20px; --sp-9: 24px;
+    --row-h: 36px; --row-font: 12.5px; --hit-min: 24px;
+    --avatar-size: 24px; --avatar-font: 11px; --chip-h: 22px; --chip-font: 11.5px;
+    --cell-pad-y: 9px; --cell-pad-x: initial;
+    --card-pad-y: initial; --card-pad-x: initial;
+    --gap-row: initial; --gap-stack: initial;
+    --page-pad-y: initial; --page-pad-x: initial;
+
+    --r-sm: initial; --r-md: initial; --r-lg: initial;
+    --r-chip: 6px; --r-input: 8px; --r-card: 12px; --r-modal: 16px;
+
+    --shadow-card: 0 2px 6px var(--shadow-ink);
+    --shadow-surface: initial;
+    --shadow-pop: 0 18px 44px rgba(0, 0, 0, .18);
+    --shadow-panel: initial;
+
+    --control-h-sm: initial; --control-h: initial; --control-h-lg: initial;
+    --toolbar-h: 52px;
 }
 
 html, body, #app {
@@ -435,11 +476,11 @@ html, body, #app {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    height: 36px;
-    padding: 0 14px;
+    height: var(--control-h-lg, 36px);
+    padding: 0 var(--sp-6);
     border-radius: var(--r-input);
     border: 1px solid transparent;
-    font: 600 13px/1 var(--font-ui);
+    font: 600 var(--fs-md, 13px)/1 var(--font-ui);
     color: var(--ink);
     background: transparent;
     cursor: pointer;
@@ -458,8 +499,8 @@ html, body, #app {
 .ah-btn--ghost { color: var(--ink-2); }
 .ah-btn--ghost:hover:not(:disabled) { background: var(--surface-hover); color: var(--ink); }
 .ah-btn--danger { background: var(--danger); color: #fff; }
-.ah-btn--sm { height: 30px; padding: 0 10px; font-size: 12.5px; }
-.ah-btn--lg { height: 42px; padding: 0 18px; font-size: 14px; }
+.ah-btn--sm { height: var(--control-h, 30px); padding: 0 var(--sp-4); font-size: var(--fs-sm, 12.5px); }
+.ah-btn--lg { height: calc(var(--control-h-lg, 36px) + 6px); padding: 0 calc(var(--sp-6) + 4px); font-size: var(--fs-lg, 14px); }
 .ah-btn--block { width: 100%; }
 .ah-btn--dark { background: var(--rail); color: #fff; }
 
@@ -473,13 +514,13 @@ html, body, #app {
 }
 .ah-input {
     width: 100%;
-    height: 38px;
-    padding: 0 12px;
+    height: calc(var(--control-h-lg, 36px) + 2px);
+    padding: 0 var(--sp-5);
     border: 1.5px solid var(--border);
     border-radius: var(--r-input);
     background: var(--surface);
     color: var(--ink);
-    font: 400 13.5px/1 var(--font-ui);
+    font: 400 var(--fs-md, 13.5px)/1 var(--font-ui);
     transition: border-color var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease);
     box-sizing: border-box;
 }
@@ -494,7 +535,13 @@ html, body, #app {
     color: var(--danger-ink);
 }
 .ah-field__hint { font: var(--text-small); color: var(--ink-2); }
-.ah-textarea { min-height: 80px; padding: 10px 12px; line-height: 1.5; resize: vertical; }
+.ah-textarea { min-height: 80px; padding: var(--sp-4) var(--sp-5); line-height: 1.5; resize: vertical; }
+
+/* A dense control is sized for a pointer. On a phone the touch floor is 40px and every look uses the
+   control heights the app had before the dense default; they sit on body so they beat what a look sets on <html>. */
+@media (max-width: 767px) {
+    body { --hit-min: 40px; --control-h-sm: 28px; --control-h: 30px; --control-h-lg: 36px; }
+}
 
 .ah-chip {
     display: inline-flex;

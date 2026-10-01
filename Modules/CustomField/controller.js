@@ -194,7 +194,8 @@ exports.getCustomField = async (req, res) => {
 const socketEmitter = require("../../event/socketEventEmitter");
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { evaluateFormula, extractReferences, FUNCTIONS, ROLLUP_FUNCTIONS } = require("./helpers/formula");
-const { computeTaskFields, validateFormulaDefinition, slug, builtinScope } = require("./helpers/computeFields");
+const { computeTaskFields, descendantsOf, validateFormulaDefinition, slug, builtinScope } = require("./helpers/computeFields");
+const { MAX_DEPTH } = require("../Tasks/helpers/taskTreeRules");
 
 const isObjectIdString = (value) => typeof value === "string" && /^[a-f\d]{24}$/i.test(value);
 
@@ -290,10 +291,43 @@ exports.formulaScope = async (req, res) => {
     }
 };
 
+const liveTasks = async (companyId, filter) => await MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.TASKS,
+    data: [{ ...filter, deletedStatusKey: { $ne: 1 } }]
+}, "find") || [];
+
+/* A rollup counts every level under its task, so a change on one row moves the rollups of each task above it. */
+const withTasksAbove = async (companyId, tasks) => {
+    const all = [...tasks];
+    const known = new Set(all.map((task) => String(task._id)));
+    let level = tasks;
+    for (let step = 0; step < MAX_DEPTH && level.length; step += 1) {
+        const wanted = [...new Set(level.map((task) => String(task.ParentTaskId || "")))].filter((id) => isObjectIdString(id) && !known.has(id));
+        // eslint-disable-next-line no-await-in-loop
+        level = wanted.length ? await liveTasks(companyId, { _id: { $in: wanted.map((id) => new mongoose.Types.ObjectId(id)) } }) : [];
+        level.forEach((task) => { known.add(String(task._id)); all.push(task); });
+    }
+    return all;
+};
+
+const rowsBelow = async (companyId, tasks) => {
+    const rows = [];
+    const known = new Set();
+    let level = tasks.map((task) => String(task._id));
+    for (let step = 0; step < MAX_DEPTH && level.length; step += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        const found = (await liveTasks(companyId, { ParentTaskId: { $in: level } })).filter((row) => !known.has(String(row._id)));
+        found.forEach((row) => { known.add(String(row._id)); rows.push(row); });
+        level = found.map((row) => String(row._id));
+    }
+    return rows;
+};
+
 /* POST /api/v2/custom-fields/compute
  * body: { projectId, taskIds: [], scope?: 'subtask' | 'sprint' }
- * Evaluates every formula/rollup field for the given tasks and STORES the result
- * on each task, so the value a client renders was computed on the server. */
+ * Evaluates every formula/rollup field for the given tasks, and for the tasks above them,
+ * and STORES the result on each task, so the value a client renders was computed on the server.
+ * A rollup counts every subtask under its task, on every level, each once. */
 exports.computeFields = async (req, res) => {
     try {
         const companyId = req.headers["companyid"];
@@ -308,28 +342,21 @@ exports.computeFields = async (req, res) => {
         const computed = definitions.filter((definition) => ["formula", "rollup"].includes(definition.fieldType));
         if (!computed.length) return res.send({ status: true, statusText: "Nothing to compute.", data: { updated: 0, values: {} } });
 
-        const objectIds = ids.map((id) => new mongoose.Types.ObjectId(id));
-        const tasks = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.TASKS,
-            data: [{ _id: { $in: objectIds }, deletedStatusKey: { $ne: 1 } }]
-        }, "find") || [];
-
+        const asked = await liveTasks(companyId, { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } });
         const bySprint = scope === "sprint";
-        const parentQuery = bySprint
-            ? { sprintId: { $in: [...new Set(tasks.map((task) => task.sprintId).filter(Boolean))] } }
-            : { ParentTaskId: { $in: ids } };
-        const children = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.TASKS,
-            data: [{ ...parentQuery, deletedStatusKey: { $ne: 1 } }]
-        }, "find") || [];
+        const tasks = bySprint ? asked : await withTasksAbove(companyId, asked);
+        const rows = bySprint
+            ? await liveTasks(companyId, { sprintId: { $in: [...new Set(tasks.map((task) => task.sprintId).filter(Boolean))] } })
+            : await rowsBelow(companyId, tasks);
 
         const out = {};
         const errors = {};
         for (const task of tasks) {
             const kids = bySprint
-                ? children.filter((child) => String(child.sprintId) === String(task.sprintId) && String(child._id) !== String(task._id))
-                : children.filter((child) => String(child.ParentTaskId) === String(task._id));
-            const result = computeTaskFields({ definitions, task, children: kids });
+                ? rows.filter((row) => String(row.sprintId) === String(task.sprintId) && String(row._id) !== String(task._id))
+                : descendantsOf(task, rows);
+            const subtasks = bySprint ? kids : kids.filter((row) => String(row.ParentTaskId) === String(task._id));
+            const result = computeTaskFields({ definitions, task, children: kids, subtasks });
 
             const $set = {};
             computed.forEach((definition) => {

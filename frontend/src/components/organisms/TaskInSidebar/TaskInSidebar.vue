@@ -91,6 +91,7 @@ import { taskPlanPermission } from "@/composable/commonFunction";
 import { useI18n } from "vue-i18n";
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { treeRefusalReason } from '@/views/Projects/composables/taskDepth';
 const { t } = useI18n();
 const emit = defineEmits([
     'dataToParent','closeTaskSidebar','mergeTask','taskSelect'
@@ -511,6 +512,7 @@ const convertTaskToSub = () => {
     .catch((err) => {
         console.error(err);
         isSpiner.value = false;
+        $toast.error(treeRefusalReason(err) || t('Toast.something_went_wrong'), {position: 'top-right'});
     })
 }
 

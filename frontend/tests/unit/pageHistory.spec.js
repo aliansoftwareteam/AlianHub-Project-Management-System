@@ -51,7 +51,15 @@ beforeEach(() => {
         v1: { _id: 'v1', title: 'Draft', blocks: [para('a', '<img src=x onerror="steal()">Intro <span class="mention" data-mention="user" data-id="6f0000000000000000000a01">@Old name</span>')] },
     };
     vi.spyOn(window, 'confirm').mockReturnValue(true);
+    document.body.innerHTML = '<div id="my-modal"></div>';
 });
+
+/* The app's confirm dialog renders into #my-modal, outside the panel. */
+const confirmDialog = () => document.querySelector('#my-modal .modal');
+const answer = async (accept) => {
+    confirmDialog().querySelector(accept ? '.btn-primary' : '.outline-secondary').click();
+    await flushPromises();
+};
 
 describe('the doc history panel', () => {
     it('is a labelled dialog that lists each version with who, when and its name', async () => {
@@ -139,7 +147,13 @@ describe('the doc history panel', () => {
         await wrapper.find('.ph__restore').trigger('click');
         await flushPromises();
 
-        expect(window.confirm).toHaveBeenCalledWith('Docs.history_restore_confirm');
+        expect(window.confirm).not.toHaveBeenCalled();
+        expect(confirmDialog().getAttribute('role')).toBe('dialog');
+        expect(confirmDialog().textContent).toContain('Docs.history_restore_confirm');
+        expect(calls('post', '/versions/v3/restore')).toHaveLength(0);
+
+        await answer(true);
+        expect(confirmDialog()).toBeNull();
         expect(calls('post', '/versions/v3/restore')).toHaveLength(1);
         expect(wrapper.emitted('restored')[0][0]).toMatchObject({ _id: 'p1', title: 'Plan' });
         wrapper.unmount();
@@ -152,24 +166,29 @@ describe('the doc history panel', () => {
 
         await wrapper.find('.ph__restore').trigger('click');
         await flushPromises();
-        expect(window.confirm).toHaveBeenLastCalledWith('Docs.history_restore_private_confirm');
+        expect(confirmDialog().textContent).toContain('Docs.history_restore_private_confirm');
+        await answer(false);
 
         await wrapper.setProps({ docPrivate: true });
         await wrapper.find('.ph__restore').trigger('click');
         await flushPromises();
-        expect(window.confirm).toHaveBeenLastCalledWith('Docs.history_restore_confirm');
+        expect(confirmDialog().textContent).toContain('Docs.history_restore_confirm');
+        expect(confirmDialog().textContent).not.toContain('Docs.history_restore_private_confirm');
+        expect(window.confirm).not.toHaveBeenCalled();
         wrapper.unmount();
     });
 
     it('does not restore when the reader says no, or when leaving unsaved edits is refused', async () => {
-        window.confirm.mockReturnValue(false);
         const wrapper = await mountPanel();
         await wrapper.find('.ph__restore').trigger('click');
+        await flushPromises();
+        await answer(false);
+        expect(confirmDialog()).toBeNull();
 
-        window.confirm.mockReturnValue(true);
         await wrapper.setProps({ beforeRestore: () => false });
         await wrapper.find('.ph__restore').trigger('click');
         await flushPromises();
+        await answer(true);
 
         expect(calls('post', '/restore')).toHaveLength(0);
         expect(wrapper.emitted('restored')).toBeUndefined();
