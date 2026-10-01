@@ -11853,6 +11853,12 @@ export default {
         "removed": "Removed. The agent asks again.",
         "remove_failed": "It was not removed."
     },
+    "AgentWork": {
+        "mark_label": "{name} is working on this, since {time}",
+        "mark_label_no_time": "{name} is working on this",
+        "filter": "Agent working",
+        "filter_hint": "Show only the tasks an agent is working on now"
+    },
     "ProjectManager": {
         "title": "Project manager",
         "lead": "On each working day AlianHub looks at this project and lists what needs attention: slipping dates, blocked work, tasks nobody owns. It follows fixed rules and uses no AI.",

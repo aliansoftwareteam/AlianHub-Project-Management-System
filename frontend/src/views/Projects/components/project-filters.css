@@ -75,6 +75,8 @@
     white-space: nowrap; cursor: pointer;
 }
 .pft .pft__pill svg { color: var(--ink-2); flex: none; }
+.pft .pft__pill.is-active { background: var(--brand-tint); color: var(--brand); }
+.pft .pft__pill.is-active svg { color: var(--brand); }
 .pft__group-label { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
 /* The options are teleported out of .pft, so these take no .pft prefix. */
 .pft__group-option { display: flex; align-items: center; gap: var(--sp-4); }

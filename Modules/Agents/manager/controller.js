@@ -83,6 +83,14 @@ const getTaskQueue = async (req, res) => {
     } catch (e) { logger.error(`getTaskQueue: ${e.message}`); return fail(res, 500, e.message); }
 };
 
+const getHeldTasks = async (req, res) => {
+    try {
+        const companyId = String(req.headers.companyid || '');
+        if (!companyId || !req.uid) return fail(res, 401, 'Unauthorized.');
+        return res.json({ status: true, statusText: 'Held tasks fetched.', data: await workQueue.heldTasks(companyId, req.uid) });
+    } catch (e) { logger.error(`getHeldTasks: ${e.message}`); return fail(res, 500, e.message); }
+};
+
 const handOverTask = async (req, res) => {
     try {
         const companyId = person(req, res);
@@ -108,5 +116,5 @@ const TAKE_BACK_ACTION = 'queue.take_back';
 
 module.exports = {
     getProjectManager, putProjectManager: [agentsRefused(EDIT_ACTION), saveProjectManager], EDIT_ACTION,
-    getTaskQueue, postHandOver: [agentsRefused(HAND_OVER_ACTION), handOverTask], postTakeBack: [agentsRefused(TAKE_BACK_ACTION), takeBackItem],
+    getTaskQueue, getHeldTasks, postHandOver: [agentsRefused(HAND_OVER_ACTION), handOverTask], postTakeBack: [agentsRefused(TAKE_BACK_ACTION), takeBackItem],
 };
