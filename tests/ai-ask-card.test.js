@@ -6,7 +6,7 @@ const mockDbFor = (companyId) => {
 };
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (companyId, q, method) => mockDbFor(companyId).crud(companyId, q, method) }));
-jest.mock('../Modules/Agents/scope', () => ({ visibleProjects: jest.fn() }));
+jest.mock('../Modules/Agents/scope', () => ({ visibleProjects: jest.fn(), visibleProjectIds: jest.fn() }));
 jest.mock('../Modules/AICore/llmProvider', () => ({ getProvider: jest.fn(), isAnyProviderConfigured: jest.fn() }));
 jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(async () => 3), isPrivileged: (roleType) => roleType === 1 || roleType === 2 }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
@@ -17,7 +17,9 @@ jest.mock('../Modules/Knowledge/askSources', () => ({ askSources: jest.fn() }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { schema } = require('../utils/mongo-handler/schema');
-const { visibleProjects } = require('../Modules/Agents/scope');
+const { visibleProjects, visibleProjectIds } = require('../Modules/Agents/scope');
+const knowledgeFlag = require('../Modules/Knowledge/flag');
+const { askSources } = require('../Modules/Knowledge/askSources');
 const { getProvider, isAnyProviderConfigured } = require('../Modules/AICore/llmProvider');
 const askCard = require('../Modules/AI/askCard');
 const cardStore = require('../Modules/AI/askCardStore');
@@ -84,6 +86,8 @@ beforeEach(() => {
     jest.clearAllMocks();
     isAnyProviderConfigured.mockReturnValue(true);
     visibleProjects.mockResolvedValue([{ _id: OPS, ProjectName: 'Ops' }]);
+    visibleProjectIds.mockResolvedValue([OPS]);
+    knowledgeFlag.enabledFor.mockResolvedValue(false);
     seedDashboard();
     seedTask(OPS);
 });
@@ -367,6 +371,48 @@ describe('who a kept answer belongs to', () => {
         const later = (await read()).body.data.stored;
         expect(later.cited).toEqual([]);
         expect(JSON.stringify(later.cited)).not.toContain('Budget review');
+    });
+
+    describe('a cited passage of the knowledge store', () => {
+        const passage = (comment) => ({
+            kind: 'comment', id: String(comment._id), ref: `comment:${String(comment._id).slice(-6)}`, title: 'The budget is 12k', project: 'Ops', projectId: OPS,
+            detail: 'The budget is 12k', updatedAt: new Date('2026-09-01T00:00:00Z'), permission: { visibility: 'project', via: 'task' }, origin: 'chunk',
+        });
+        const withPassage = () => {
+            const task = db().store[SCHEMA_TYPE.TASKS][0];
+            const comment = db().seed(SCHEMA_TYPE.COMMENTS, {
+                _id: new (require('mongoose').Types.ObjectId)('6f0000000000000000000e01'), taskId: task._id, projectId: OPS, userId: BOB,
+                message: 'The budget is 12k', type: 'text', updatedAt: new Date('2026-09-02T00:00:00Z'),
+            });
+            knowledgeFlag.enabledFor.mockResolvedValue(true);
+            askSources.mockResolvedValue([passage(comment)]);
+            answering(() => `It is 12k [${passage(comment).ref}].`);
+            return { task, comment };
+        };
+
+        it('is kept by its source id and listed again on a later open, read from the live row', async () => {
+            const { comment } = withPassage();
+            await ask();
+            expect(kept()[0].cited).toEqual([{ kind: 'comment', sourceId: String(comment._id), ref: passage(comment).ref }]);
+
+            const later = (await read()).body.data.stored;
+            expect(later.cited).toEqual([expect.objectContaining({ kind: 'comment', id: String(comment._id), ref: passage(comment).ref, title: 'The budget is 12k', available: true })]);
+        });
+
+        it('is left out once the reader can no longer retrieve it', async () => {
+            const { comment } = withPassage();
+            await ask();
+            expect((await read()).body.data.stored.cited).toHaveLength(1);
+
+            visibleProjectIds.mockResolvedValue([HR]);
+            const moved = (await read()).body.data.stored;
+            expect(moved.cited).toEqual([]);
+            expect(JSON.stringify(moved.cited)).not.toContain('12k');
+
+            visibleProjectIds.mockResolvedValue([OPS]);
+            db().store[SCHEMA_TYPE.COMMENTS].find((row) => String(row._id) === String(comment._id)).isDeleted = true;
+            expect((await read()).body.data.stored.cited).toEqual([]);
+        });
     });
 
     it('keeps the ids of what it cited, not their titles', async () => {
