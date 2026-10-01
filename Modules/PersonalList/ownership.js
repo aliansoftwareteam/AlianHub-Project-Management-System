@@ -5,6 +5,8 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
  * decideProjectAccess applies in Config/projectAccess.js, as a clause for a project query. */
 const ownOrNotPersonal = (uid) => ({ $or: [{ isPersonal: { $ne: true } }, { personalOwner: String(uid) }] });
 
+const isSomeoneElsesPersonalList = (project, uid) => Boolean(project) && project.isPersonal === true && String(project.personalOwner || '') !== String(uid);
+
 const othersPersonalListIds = async (companyId, uid) => {
     const lists = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.PROJECTS,
@@ -13,4 +15,4 @@ const othersPersonalListIds = async (companyId, uid) => {
     return (lists || []).map((list) => String(list._id));
 };
 
-module.exports = { ownOrNotPersonal, othersPersonalListIds };
+module.exports = { ownOrNotPersonal, isSomeoneElsesPersonalList, othersPersonalListIds };
