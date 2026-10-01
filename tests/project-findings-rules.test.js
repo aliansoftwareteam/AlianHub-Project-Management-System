@@ -1,4 +1,7 @@
 /* Task 047, AI-6: what the daily look finds in a project. Every finding is a rule over stored rows; no model is asked. */
+jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn(() => { throw new Error('a rule reads no database'); }) }));
+jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
+
 const rules = require('../Modules/Agents/manager/rules');
 
 const { RULE, STALE_WORKING_DAYS, QUIET_BLOCKER_WORKING_DAYS, HOURS_PER_DAY } = rules;

@@ -122,7 +122,14 @@ const projectOfTask = async (companyId, taskId) => {
 // A proposal filed by an MCP call names the token's person, not a workspace agent,
 // and runs as that person once approved.
 const SOURCE_MCP = 'mcp';
+// A proposal a project's daily look filed (Modules/Agents/manager). No agent and no person is behind it: once
+// approved it runs on the approver's own rights, inside the actions it was filed with.
+const SOURCE_SYSTEM = 'system';
+const SYSTEM_DECIDER = 'system';
 const asStrings = (list) => (Array.isArray(list) ? list.map(String) : []);
+const systemFields = ({ source, allowedActions, finding }) => (source === SOURCE_SYSTEM
+    ? { source, allowedActions: asStrings(allowedActions), ...(finding ? { finding } : {}) }
+    : {});
 const mcpFields = ({ source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId }) => (source === SOURCE_MCP
     ? {
         source, requestedBy: String(requestedBy || ''), tokenId: String(tokenId || ''), tokenProjectIds: asStrings(tokenProjectIds), allowedActions: asStrings(allowedActions),
@@ -135,7 +142,7 @@ const mcpActor = async (p) => (p.oauthGrantId
     ? { ...(await externalClientActor({ userId: p.requestedBy, clientId: p.oauthClientId, clientName: p.agentName, grantId: p.oauthGrantId })), source: SOURCE_MCP }
     : { kind: 'agent', userId: p.requestedBy, agentId: null, agentName: p.agentName, runId: null, viaAccount: 'personal', tokenId: p.tokenId || null, source: SOURCE_MCP });
 
-const create = async (companyId, { agent, runId, taskId, projectId, what, why, changes, gate, priority, cost, taint: marker, source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId }) => {
+const create = async (companyId, { agent, runId, taskId, projectId, what, why, changes, gate, priority, cost, taint: marker, source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId, finding }) => {
     if (typeof what !== 'string' || !what.trim()) throw Object.assign(new Error('what is required: say in one sentence what the proposal does.'), { status: 400 });
     const check = validateChanges(changes);
     if (!check.valid) throw Object.assign(new Error(check.reason), { status: 400 });
@@ -150,6 +157,7 @@ const create = async (companyId, { agent, runId, taskId, projectId, what, why, c
             status: STATUS.PENDING, gate: gateOf(changes, gate), priority: priority || 'normal', cost: cost || null, auditIds: [],
             ...(marker && marker.reason ? { taint: { sources: Array.isArray(marker.sources) ? marker.sources : [], reason: String(marker.reason).slice(0, 2000) } } : {}),
             ...mcpFields({ source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId }),
+            ...systemFields({ source, allowedActions, finding }),
         },
     }, 'save');
     emit(companyId, saved);
@@ -242,7 +250,8 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     }
 
     const runs = require('./runs');
-    const agent = fromMcp ? { allowedActions: p.allowedActions || [] } : await runs.getAgent(companyId, p.agentId);
+    const fromSystem = p.source === SOURCE_SYSTEM;
+    const agent = fromMcp || fromSystem ? { allowedActions: p.allowedActions || [] } : await runs.getAgent(companyId, p.agentId);
     if (!agent) return { error: 'This agent was deleted — decline the proposal instead.', status: 409 };
     const run = p.runId ? await runOf(companyId, p.runId) : null;
     if (p.runId && !run) return { error: 'The run behind this proposal no longer exists — decline it instead.', status: 409, reason: REASON.RUN_MISSING };
@@ -258,7 +267,7 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         : null);
     const agentActor = fromMcp
         ? await mcpActor(p)
-        : { kind: 'agent', userId: decider.userId, agentId: p.agentId, agentName: p.agentName, runId: p.runId, viaAccount: 'workspace', tokenId: null, ...runTrace };
+        : { kind: 'agent', userId: decider.userId, agentId: fromSystem ? null : p.agentId, agentName: p.agentName, runId: p.runId, viaAccount: 'workspace', tokenId: null, ...runTrace };
     const auditIds = [];
     const applied = [];
     for (const c of changes) {
@@ -304,6 +313,11 @@ const decline = async (companyId, id, { decider, ip, reason }) => {
     await quietly(`decline feedback for ${id}`, () => aiFeedback.fromDecline(companyId, decider.userId, { proposalId: id, runId: p.runId, reason: declineReason }));
     return { proposal: updated };
 };
+
+/* Takes back a proposal nobody has decided, when what it answered is gone. It is not a person's refusal, so nothing learns from it. */
+const withdraw = async (companyId, id, reason) => setStatus(companyId, id, {
+    status: STATUS.DECLINED, decidedBy: SYSTEM_DECIDER, decidedAt: new Date(), declineReason: String(reason || '').slice(0, DECLINE_REASON_MAX),
+}, { onlyIf: STATUS.PENDING });
 
 /* Undo within the window: every audited action, newest first. */
 const undoApproval = async (companyId, id, { decider, isPrivileged, ip }) => {
@@ -363,4 +377,4 @@ const reapStuck = async (companyId, { olderThanMs = stuckThresholdMs(), now = ne
     return { reaped };
 };
 
-module.exports = { STATUS, REASON, SOURCE_MCP, REAPED_PREFIX, UNDO_WINDOW_MS, GATE_OWNER_ADMIN, DECLINE_REASONS, validateChanges, create, list, get, approve, decline, undoApproval, bucketOf, reapStuck, stuckThresholdMs };
+module.exports = { STATUS, REASON, SOURCE_MCP, SOURCE_SYSTEM, SYSTEM_DECIDER, REAPED_PREFIX, UNDO_WINDOW_MS, GATE_OWNER_ADMIN, DECLINE_REASONS, validateChanges, create, list, get, approve, decline, withdraw, undoApproval, bucketOf, reapStuck, stuckThresholdMs };

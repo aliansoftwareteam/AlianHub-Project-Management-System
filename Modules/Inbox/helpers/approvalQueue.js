@@ -3,6 +3,7 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { ROLE_GUEST } = require('../../../Config/roleTypes');
 const access = require('../../Agents/access');
+const permissions = require('../../Agents/permissions');
 
 // The queue is a view of the proposals the agent API already lists for this person
 // (access.readScopeOf), never a wider one. Deciding still goes through that API, so a row
@@ -10,6 +11,7 @@ const access = require('../../Agents/access');
 
 const QUEUE_LIMIT = 100;
 const SOURCE_MCP = 'mcp';
+const SOURCE_SYSTEM = 'system';
 const PROJECT_PARAMS = Object.freeze(['projectId', 'listProjectId']);
 
 const plain = (row) => (row && typeof row.toObject === 'function' ? row.toObject() : row);
@@ -31,6 +33,7 @@ const toRow = (caller) => (proposal) => ({
     agentName: proposal.agentName || 'Agent',
     agentId: proposal.agentId ? String(proposal.agentId) : '',
     source: proposal.source || '',
+    ...(proposal.finding ? { finding: proposal.finding } : {}),
     requestedBy: proposal.requestedBy ? String(proposal.requestedBy) : '',
     what: proposal.what || '',
     why: proposal.why || '',
@@ -49,6 +52,13 @@ const toRow = (caller) => (proposal) => ({
     unread: true,
 });
 
+/* A change the system filed runs on the approver's own rights, so it is offered only to a person who could make it by hand. */
+const heldToOwnRights = (companyId, userId) => async (row) => {
+    if (row.source !== SOURCE_SYSTEM || row.locked) return row;
+    const answers = await Promise.all(row.changes.map((change) => permissions.holderMay(companyId, { userId: String(userId) }, change.action, change.params)));
+    return answers.every((answer) => answer.allowed) ? row : { ...row, locked: true };
+};
+
 const readQueue = async (companyId, userId) => {
     const roleType = await getRoleType(companyId, userId);
     if (roleType === null || roleType === undefined || roleType === ROLE_GUEST) return [];
@@ -58,7 +68,7 @@ const readQueue = async (companyId, userId) => {
         type: SCHEMA_TYPE.AGENT_PROPOSALS,
         data: [{ status: 'pending', ...access.proposalScopeClause(scope) }, {}, { sort: { createdAt: -1 }, limit: QUEUE_LIMIT }],
     }, 'find');
-    return (rows || []).map(plain).filter(staysInside(scope.projectIds)).map(toRow(caller));
+    return Promise.all((rows || []).map(plain).filter(staysInside(scope.projectIds)).map(toRow(caller)).map(heldToOwnRights(companyId, userId)));
 };
 
 const waitingCount = (rows) => rows.filter((row) => !row.locked).length;
