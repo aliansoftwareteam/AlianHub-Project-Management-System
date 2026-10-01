@@ -46,8 +46,8 @@ const BUG = 2;
 
 const COST_TOTAL = { id: `cf:${COST}`, path: `customField.${COST}`, wrapped: true, taskTypes: [] };
 const POINTS_TOTAL = { id: 'points', path: 'points', wrapped: false, taskTypes: [] };
-const todo = { searchKey: 'statusKey', searchValue: 1, conditions: [{ statusKey: { $eq: 1 } }] };
-const done = { searchKey: 'statusKey', searchValue: 2, conditions: [{ statusKey: { $eq: 2 } }] };
+const todo = { searchKey: 'statusKey', searchValue: 1, conditions: [{ statusKey: 1 }] };
+const done = { searchKey: 'statusKey', searchValue: 2, conditions: [{ statusKey: 2 }] };
 
 const cost = (fieldValue) => ({ [COST]: { fieldValue, _id: COST } });
 const task = (over) => mockDb.seed(SCHEMA_TYPE.TASKS, {

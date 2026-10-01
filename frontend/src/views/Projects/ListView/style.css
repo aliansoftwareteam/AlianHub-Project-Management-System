@@ -256,6 +256,21 @@
 .lv2__more-btn:hover:not(:disabled) { text-decoration: underline; }
 .lv2__more-btn:disabled { color: var(--ink-2); cursor: default; }
 .lv2__more-hint { color: var(--ink-2); }
+.lv2__totals {
+    --lv2-row-tint: transparent;
+    display: grid;
+    grid-template-columns: var(--lv2-cols);
+    gap: 10px;
+    padding: var(--cell-pad-y) var(--cell-pad-x, 12px);
+    align-items: center;
+    justify-items: end;
+    border-bottom: 1px solid var(--hairline);
+    background: var(--surface);
+    font: 600 var(--fs-sm, 11.5px)/1.2 var(--font-mono);
+    color: var(--ink);
+}
+.lv2__totals-label { color: var(--ink-2); }
+.lv2__totals-cell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv2__add-plus { color: var(--brand); }
 .lv2__create { padding: calc(var(--cell-pad-y) - 1px) var(--cell-pad-x, 12px); }
 .lv2__template { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px; max-width: 100%; color: var(--ink-label); font: 500 var(--fs-xs, 11px)/1.2 var(--font-ui); }
@@ -409,7 +424,7 @@ button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status
 }
 @media (max-width: 1024px) {
     .lv2 { --lv2-cols: 28px var(--lv2-title-track) minmax(56px, .45fr) 56px 64px 72px; }
-    .lv2__c-est, .lv2__c-risk, .lv2__c-extra { display: none; }
+    .lv2__c-est, .lv2__c-risk, .lv2__c-extra, .lv2__totals { display: none; }
 }
 /* At phone width the title takes the whole first line and assignee, due date and priority
    fold into a meta line under it, one max-content track each, with the tags in what is left. */

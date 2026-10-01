@@ -3294,6 +3294,8 @@ export default {
         "sprint_total_hint": "Every task in this sprint, subtasks included. Reports and the burndown count parent tasks only.",
         "add_task_to": "Add task to {group}…",
         "group_empty": "Nothing in this group yet.",
+        "group_total": "Total",
+        "group_total_of": "Sum of {field}: {value}",
         "select_group": "Select every task in this group",
         "select_group_loaded": "Select the {n} loaded tasks in this group ({total} in all)",
         "load_more": "Load more ({n} left)",

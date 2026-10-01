@@ -5560,6 +5560,8 @@
     "List.due_group_tomorrow": "Tomorrow",
     "List.esc": "Esc",
     "List.group_empty": "Nothing in this group yet.",
+    "List.group_total": "Total",
+    "List.group_total_of": "Sum of {field}: {value}",
     "List.load_more": "Load more ({n} left)",
     "List.load_more_sorted": "Only the {n} loaded tasks are sorted.",
     "List.loading_more": "Loading…",

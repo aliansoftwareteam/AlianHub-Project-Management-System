@@ -1,7 +1,8 @@
 /* 046: a grouped List totals its number columns per group, for the whole group and not only the rows it holds. */
 import { describe, expect, test, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { config, flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
+import { createI18n } from 'vue-i18n';
 import { defineComponent, h, reactive, ref } from 'vue';
 
 vi.mock('@/composable', () => ({
@@ -21,6 +22,11 @@ import ListGroup from '@/views/Projects/ListView/ListGroup.vue';
 import { loadedTotals, totalColumnsOf, totalText } from '@/views/Projects/composables/groupTotals';
 import { columnCatalogue } from '@/views/Projects/composables/viewColumns';
 import { MANUAL } from '@/views/Projects/composables/viewSort';
+import en from '@/locales/en';
+
+const i18n = createI18n({ legacy: false, locale: 'en', messages: { en }, missingWarn: false, fallbackWarn: false });
+config.global.plugins = [];
+config.global.mocks = {};
 
 const COST = { _id: 'a'.repeat(24), fieldTitle: 'Cost', fieldType: 'number' };
 const BUDGET = { _id: 'b'.repeat(24), fieldTitle: 'Budget', fieldType: 'money', fieldMoneySymbol: '₹' };
@@ -95,7 +101,7 @@ describe('the totals row of a List group', () => {
         const wrapper = mount(ListGroup, {
             props: { item, sprint: { id: SPRINT }, project: { _id: PID, taskStatusData: [] }, groupType: 0 },
             global: {
-                plugins: [store],
+                plugins: [store, i18n],
                 provide: {
                     searchedTask: ref(false), showArchived: ref(false), taskCollapsed: ref(true), listSort: ref(MANUAL), listColumns,
                     listTotals: { columns: ref(totalColumnsOf(listColumns.value)), refresh }
@@ -110,7 +116,8 @@ describe('the totals row of a List group', () => {
 
     test('adds the loaded rows when the whole group is loaded, under each column', async () => {
         const { wrapper, refresh } = await group({ found: 3 });
-        expect(wrapper.find('[data-group-totals]').exists()).toBe(true);
+        expect(wrapper.get('[data-group-totals] .lv2__totals-label').text()).toBe('Total');
+        expect(wrapper.get(`[data-total="${idOf(COST)}"]`).attributes('title')).toBe('Sum of Cost: 150');
         expect(cell(wrapper, idOf(COST))).toBe('150');
         expect(cell(wrapper, idOf(BUDGET))).toBe('₹1000');
         expect(cell(wrapper, 'points')).toBe('8');
@@ -130,7 +137,7 @@ describe('the totals row of a List group', () => {
         expect(cell(wrapper, idOf(COST))).toBe('4200');
         expect(cell(wrapper, idOf(BUDGET))).toBe('₹9000');
         expect(cell(wrapper, 'points')).toBe('61');
-        expect(wrapper.get('.lv2__group-points').text()).toContain('61');
+        expect(wrapper.get('.lv2__group-points').text()).toBe('61 pts');
         expect(refresh).toHaveBeenCalled();
     });
 
