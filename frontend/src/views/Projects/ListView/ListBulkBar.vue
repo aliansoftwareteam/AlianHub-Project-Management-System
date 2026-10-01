@@ -113,6 +113,7 @@ import { useOtherProjectRules } from "@/composable/otherProjectRules";
 import { snapshotTasks, statusPayload, undoRequests } from "./bulkUndo.js";
 import { bulkReport, convertTargets, moveTargets, parentTargets, placementActions, selectionShape } from "./bulkPlacement.js";
 import { priorityAppOn, projectHasApp } from "./listRowEdit.js";
+import { placedSprint } from "@/views/Projects/composables/taskPlacement";
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue";
 import CalenderCompo from "@/components/atom/CalenderCompo/CalenderCompo.vue";
 
@@ -351,7 +352,7 @@ function pickAssignee(option) {
 
 function pickSprint(option) {
     run("bulkMove", {
-        sprintObj: option.raw,
+        sprintObj: placedSprint(option.raw),
         projectData: { id: props.project._id, ProjectCode: props.project.ProjectCode, ProjectName: props.project.ProjectName }
     });
 }
@@ -379,7 +380,7 @@ function onDestinationPicked({ project: destination, sprint } = {}) {
     const kind = placing.value;
     placing.value = "";
     if (!destination?._id || !sprint?.id) return;
-    run(kind === "task" ? "bulkConvertToTask" : "bulkMove", { sprintObj: sprint, projectData: destinationOf(destination) });
+    run(kind === "task" ? "bulkConvertToTask" : "bulkMove", { sprintObj: placedSprint(sprint), projectData: destinationOf(destination) });
 }
 
 function onParentPicked({ task } = {}) {

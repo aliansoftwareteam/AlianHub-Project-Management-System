@@ -1,3 +1,5 @@
+import { placedSprint } from "@/views/Projects/composables/taskPlacement";
+
 const FIELDS = ["statusKey", "AssigneeUserId", "tagsArray", "sprintId", "deletedStatusKey", "Task_Priority", "DueDate", "isParentTask", "ParentTaskId"];
 
 export function* storedTasks(projectData = {}) {
@@ -143,7 +145,7 @@ export function undoRequests({ action, payload = {}, before = {}, updatedIds = [
         const projectData = { id: project?._id, ProjectCode: project?.ProjectCode, ProjectName: project?.ProjectName };
         return [...groups].flatMap(([sprintId, taskIds]) => {
             const sprintObj = sprints.find((sprint) => String(sprint.id) === sprintId);
-            return sprintObj ? [{ action, taskIds, sprintObj, projectData }] : [];
+            return sprintObj ? [{ action, taskIds, sprintObj: placedSprint(sprintObj), projectData }] : [];
         });
     }
 

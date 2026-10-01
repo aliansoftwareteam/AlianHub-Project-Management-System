@@ -104,11 +104,11 @@ describe('the list a task lands in', () => {
             .toEqual({ id: 's3', name: 'List s3', folderId: 'f1', folderName: 'Design' });
     });
 
-    test('keeps the value a task stores of its list and reads a list that only has _id', async () => {
+    test('reads a list that only has _id, and is nothing when no list was picked', async () => {
         const { placedSprint } = await placement();
 
-        expect(placedSprint({ id: 's1', name: 'Sprint 1', value: 'sprint_1' })).toEqual({ id: 's1', name: 'Sprint 1', value: 'sprint_1' });
         expect(placedSprint(storedList('s9'))).toEqual({ id: 's9', name: 'List s9' });
+        expect(placedSprint(null)).toBeNull();
     });
 
     test('never carries the groups a view hangs on it', async () => {
@@ -117,6 +117,26 @@ describe('the list a task lands in', () => {
 
         expect(JSON.stringify(placedSprint(grouped))).not.toContain('$');
         expect(placedSprint(grouped)).toEqual({ id: 's1', name: 'Sprint 1' });
+    });
+});
+
+describe('a subtask dragged out in the legacy list', () => {
+    test('names the list it is shown under without the groups the view hangs on it', async () => {
+        const { convertToTaskRequest } = await placement();
+        const shown = project();
+        const grouped = { id: 's1', name: 'Sprint 1', isExpanded: true, tasks: 4, items: [{ conditions: [{ statusKey: { $eq: 1 } }], tasksArray: [task()] }] };
+
+        const body = convertToTaskRequest({ companyId: 'company-1', destination: shown, sprint: grouped, task: task({ _id: 't2', ParentTaskId: 't1' }), oldSprint: { id: 's1', folderId: null }, source: shown });
+
+        expect(body).toEqual({
+            companyId: 'company-1',
+            projectData: { id: 'p1' },
+            taskId: 't2',
+            parentTaskId: 't1',
+            sprintObj: { id: 's1', name: 'Sprint 1' },
+            oldSprintObj: { id: 's1', folderId: null },
+            oldProject: { id: 'p1', taskTypeCounts: shown.taskTypeCounts, taskStatusData: shown.taskStatusData }
+        });
     });
 });
 
