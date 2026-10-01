@@ -36,18 +36,23 @@ const problemAt = (path, schema, value) => {
         if (schema.maxItems !== undefined && value.length > schema.maxItems) return `${path} must have at most ${schema.maxItems} items`;
         if (schema.items) return value.map((item, at) => problemAt(`${path}[${at}]`, schema.items, item)).find(Boolean) || '';
     }
+    if (isPlainObject(value) && schema.properties) return within(path, schema, value);
     return '';
+};
+
+const within = (path, schema, value) => {
+    const at = (key) => (path ? `${path}.${key}` : key);
+    const unknown = Object.keys(value).filter((key) => !Object.hasOwn(schema.properties, key));
+    if (unknown.length) return `${list(unknown.map(at))} not an argument of this tool`;
+    const missing = (schema.required || []).filter((key) => value[key] === undefined);
+    if (missing.length) return `${list(missing.map(at))} required`;
+    return Object.keys(value).filter((key) => value[key] !== undefined).map((key) => problemAt(at(key), schema.properties[key], value[key])).find(Boolean) || '';
 };
 
 /* '' when `args` fit `schema`; otherwise the first thing wrong with them. `also` are properties the caller adds to every such tool. */
 const problemIn = (schema, args, also = {}) => {
     if (!isPlainObject(args)) return 'the arguments must be an object';
-    const properties = { ...(schema.properties || {}), ...also };
-    const unknown = Object.keys(args).filter((key) => !Object.hasOwn(properties, key));
-    if (unknown.length) return `${list(unknown)} not an argument of this tool`;
-    const missing = (schema.required || []).filter((key) => args[key] === undefined);
-    if (missing.length) return `${list(missing)} required`;
-    return Object.keys(args).filter((key) => args[key] !== undefined).map((key) => problemAt(key, properties[key], args[key])).find(Boolean) || '';
+    return within('', { ...schema, properties: { ...(schema.properties || {}), ...also } }, args);
 };
 
 module.exports = { problemIn };

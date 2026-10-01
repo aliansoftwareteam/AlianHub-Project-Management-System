@@ -1,6 +1,7 @@
 <template>
     <div>
         <Sidebar
+            themed
             :value="filterUsers.map((x) => ({value: x}))"
             :multiSelect="true"
             :enableSearch="true"

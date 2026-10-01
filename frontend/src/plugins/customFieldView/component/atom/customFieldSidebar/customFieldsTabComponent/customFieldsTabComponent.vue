@@ -1,20 +1,22 @@
-<template>    
+<template>
     <template v-for="(tabs,index) in tabArray" :key="index">
-        <div class="d-flex align-items-center pt-20px mb-20px custom_field-border" v-if="tabs.type === props.componentDetail.cfType">
-            <h4 
+        <div class="d-flex align-items-center pt-20px mb-20px custom_field-border custom_field-tabs" role="tablist" v-if="tabs.type === props.componentDetail.cfType">
+            <button
                 v-for="(tabValue,ind) in tabs.tab" :key="ind"
-                :class="[{'activeClass' : tabIndex === ind + 1,'mr-40px':tabs.tab.length !== ind +1}]" 
-                class="font-ui font-size-14 font-weight-500 line-height-30px m-0 GunPowder cursor-pointer pb-7px" 
+                type="button"
+                role="tab"
+                :aria-selected="tabIndex === ind + 1 ? 'true' : 'false'"
+                :class="{'is-active' : tabIndex === ind + 1}"
+                class="custom_field-tab"
                 @click="tabIndex = ind + 1,emit('handleIndex',ind + 1)"
             >
                 {{tabValue}}
-            </h4>
+            </button>
         </div>
     </template>
 </template>
 
 <script setup>
-    //import
     import { ref, watch } from "vue";
     import { useI18n } from "vue-i18n";
     const { t } = useI18n();
@@ -81,3 +83,18 @@
         tabIndex.value = val;
     });
 </script>
+<style>
+.custom_field-tabs { gap: 40px; }
+.custom_field-tab {
+    margin: 0;
+    padding: 0 0 7px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--ink-2);
+    font: 500 14px/30px var(--font-ui);
+    cursor: pointer;
+}
+.custom_field-tab.is-active { border-bottom-color: var(--brand); color: var(--ink); }
+.custom_field-tab:focus-visible { outline: none; border-radius: 4px; box-shadow: var(--focus); }
+</style>

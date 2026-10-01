@@ -141,6 +141,7 @@ div.au__errors ul { margin: 4px 0 0; padding-left: 14px; }
 .au__try { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--hairline); }
 .au__try .ah-small { margin: 0; }
 .au__plan { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-card); }
+.au__plan-head { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font: var(--text-small); color: var(--ink); overflow-wrap: anywhere; }
 .au__plan-reasons { margin: 0; padding-left: 18px; font: var(--text-small); color: var(--ink-2); overflow-wrap: anywhere; }
 .au__plan-actions { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; width: 100%; }
 .au__plan-action { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font: var(--text-body); }
