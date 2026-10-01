@@ -46,16 +46,20 @@ const placementFrom = (root) => Object.fromEntries(PLACEMENT_FIELDS
 
 /* Orders rows that name their parent by a file-local `_id` into the passes that create them,
  * parents first. A row below level three goes under its level-two ancestor; a row whose parent
- * is not among the rows, or whose chain loops, becomes a task. Each is listed in `adjusted`. */
-const levelRows = (rows) => {
+ * is not among the rows, or whose chain loops, becomes a task. Each is listed in `adjusted`.
+ * `stored` maps an id a row may name to a task already saved, as `{ id, ancestors }`: a chain that
+ * ends on one hangs under it, and `storedParentOf` holds the saved id a row goes under. */
+const levelRows = (rows, stored = new Map()) => {
     const byId = new Map(rows.filter((row) => row._id !== undefined && row._id !== null && row._id !== '').map((row) => [String(row._id), row]));
     const parentNamedBy = (row) => (row.ParentTaskId ? String(row.ParentTaskId) : '');
     const levels = Array.from({ length: MAX_DEPTH + 1 }, () => []);
     const parentIdOf = new Map();
+    const storedParentOf = new Map();
     const adjusted = [];
-    const place = (row, level, parentId, reason) => {
+    const place = (row, level, parent, reason) => {
         levels[level].push(row);
-        parentIdOf.set(row, parentId);
+        parentIdOf.set(row, (parent && parent.row) || '');
+        if (parent && parent.stored) storedParentOf.set(row, parent.stored);
         if (reason) adjusted.push({ _id: row._id, TaskName: row.TaskName, reason });
     };
     rows.forEach((row) => {
@@ -67,12 +71,17 @@ const levelRows = (rows) => {
             seen.add(byId.get(id));
             id = parentNamedBy(byId.get(id));
         }
-        if (byId.has(id)) place(row, 0, '', 'CYCLE');
-        else if (!above.length) place(row, 0, '', parentNamedBy(row) ? 'PARENT_MISSING' : null);
-        else if (above.length > MAX_DEPTH) place(row, MAX_DEPTH, above[above.length - MAX_DEPTH], 'TOO_DEEP');
-        else place(row, above.length, above[0], null);
+        if (byId.has(id)) return place(row, 0, null, 'CYCLE');
+        const anchor = stored.get(id);
+        const chain = [
+            ...(anchor ? [...(anchor.ancestors || []), anchor.id].map((saved) => ({ stored: String(saved) })) : []),
+            ...above.slice().reverse().map((fileId) => ({ row: fileId })),
+        ];
+        if (!chain.length) return place(row, 0, null, parentNamedBy(row) ? 'PARENT_MISSING' : null);
+        if (chain.length > MAX_DEPTH) return place(row, MAX_DEPTH, chain[MAX_DEPTH - 1], 'TOO_DEEP');
+        return place(row, chain.length, chain[chain.length - 1], null);
     });
-    return { levels, parentIdOf, adjusted };
+    return { levels, parentIdOf, storedParentOf, adjusted };
 };
 
 const LIVE = 0;

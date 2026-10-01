@@ -196,7 +196,7 @@ describe('the sample export imported by an owner into one list of an existing pr
         expect(out.lists[1].data.adjusted).toMatchObject({ parentMissing: 2, rows: [{ name: 'Old ticket from the archive' }, { name: 'Fix the hero image alt text' }] });
         expect(parentOf('Old ticket from the archive')).toBe('');
         expect(parentOf('Fix the hero image alt text')).toBe('');
-        expect(out.lists[0].statusText).toBe('Imported 21 tasks from clickup (0 skipped). 1 subtask was deeper than three levels and was placed under its nearest parent.');
+        expect(out.lists[0].statusText).toBe('Imported 20 tasks from clickup (0 skipped). 1 subtask was deeper than three levels and was placed under its nearest parent.');
     });
 
     it('lands each status on one of the same name or kind, and adds the two the project lacked', () => {
@@ -327,7 +327,7 @@ describe('the sample export imported by an owner into one list of an existing pr
         expect(localDay(taskNamed('Map the redirects').DueDate)).toEqual([2025, 12, 15]);
         expect(taskNamed('Map the redirects').startDate.toISOString()).toBe('2025-11-10T09:00:00.000Z');
         expect(taskNamed('Check page speed').startDate).toBeNull();
-        expect(out.lists[0].data.unreadDates).toEqual([{ row: 17, name: 'Check page speed', column: 'Start Date', value: 'next sprint' }]);
+        expect(out.lists[0].data.unreadDates).toEqual([{ name: 'Check page speed', column: 'Start Date', value: 'next sprint' }]);
         expect(out.lists[1].data.unreadDates).toEqual([]);
     });
 

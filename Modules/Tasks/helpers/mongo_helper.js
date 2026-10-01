@@ -25,25 +25,25 @@ const { reconcileSprintTaskCount, scheduleReconciliation } = require('./reconcil
 const { loadSubtree, rewriteDescendantAncestors, sprintCountChange, DELETED } = require('./taskTree');
 const { storableFieldValues } = require('../../CustomField/helpers/fieldValueWrite');
 const { withDescriptionBlock } = require('./descriptionBlock');
+const { withoutImportMark } = require('./importMark');
 const { copyFieldFiles } = require('../../CustomField/helpers/fieldFiles');
 
 /* ------------- TASK ------------- */
-exports.HandleTask = async (companyId, object, isUpdate, id = null, userData) => {
+exports.HandleTask = async (companyId, object, isUpdate, id = null, userData, { importMark = null } = {}) => {
     return new Promise(async (resolve, reject) => {
         try {
             const hasPermission = await exports.getTotalSprintCount(companyId, object.sprintId);
             if(hasPermission){
-                // Check if is update
                 if (isUpdate && id === null) {
                     reject("Id field should not be empty or undefined.");
                     return;
                 }
-    
-                // Required keys for validation
+
                 let keys = ["TaskName", "TaskKey", "TaskType", "ProjectID", "CompanyId"];
                 let valid = "";
-    
-                object = JSON.parse(JSON.stringify(object));
+
+                object = withoutImportMark(JSON.parse(JSON.stringify(object)));
+                if (importMark && !isUpdate) Object.assign(object, importMark);
     
                 keys.forEach(key => {
                     if (typeof object[key] !== "object" && (object[key] === undefined || !object[key].length)) {
