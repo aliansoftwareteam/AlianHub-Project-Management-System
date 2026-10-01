@@ -162,8 +162,9 @@ export function useProjectCustomFields(projectRef, { archived } = {}) {
     const project = computed(() => unref(projectRef) || {});
     const permission = computed(() => checkPermission('task.task_custom_field', project.value?.isGlobalPermission));
 
+    // The project is named because the project page provides it to its children and so cannot inject it itself.
     const enabled = computed(() => Boolean(project.value?._id)
-        && checkApps('CustomFields')
+        && checkApps('CustomFields', project.value)
         && Boolean(getters['settings/selectedCompany']?.planFeature?.customFields)
         && permission.value !== null && permission.value !== undefined);
 
