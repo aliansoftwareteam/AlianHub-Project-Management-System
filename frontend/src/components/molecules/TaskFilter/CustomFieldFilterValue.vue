@@ -1,9 +1,9 @@
 <template>
     <div v-if="field && needsValue(comparison)" class="cffv">
-        <div v-if="field.fieldType === 'dropdown'" class="cffv__options" role="group" :aria-label="$t('Filters.cf_choose')">
+        <div v-if="LIST_TYPES.includes(field.fieldType)" class="cffv__options" role="group" :aria-label="$t('Filters.cf_choose')">
             <label v-for="option in options" :key="option.id" class="cffv__option">
                 <input type="checkbox" :value="String(option.id)" :checked="chosen.includes(String(option.id))" @change="toggle(String(option.id), $event.target.checked)" />
-                <span class="cffv__swatch" :style="{ background: option.color || 'var(--ink-3)' }" aria-hidden="true"></span>
+                <span v-if="field.fieldType === 'dropdown'" class="cffv__swatch" :style="{ background: option.color || 'var(--ink-3)' }" aria-hidden="true"></span>
                 <span class="cffv__text">{{ option.label || option.value }}</span>
             </label>
             <p v-if="!options.length" class="cffv__empty">{{ $t('Filters.no_data_found') }}</p>
@@ -39,14 +39,25 @@ defineOptions({ name: "CustomFieldFilterValue" });
 const props = defineProps({
     field: { type: Object, default: null },
     comparison: { type: String, default: "" },
-    modelValue: { type: Array, default: () => [] }
+    modelValue: { type: Array, default: () => [] },
+    people: { type: Array, default: () => [] }
 });
 const emit = defineEmits(["update:modelValue"]);
 
-const options = computed(() => (props.field?.fieldOptions || []).filter((option) => option && option.id !== undefined && option.id !== null));
+const LIST_TYPES = ["dropdown", "people"];
+const NUMBER_TYPES = ["number", "money", "rating", "progress"];
+const USER_ID = /^[a-f0-9]{24}$/i;
+
+/* The assignee filter's list also carries "me" and teams; a people field holds people only. */
+const peopleOptions = computed(() => props.people
+    .filter((person) => USER_ID.test(String(person?.value || "")))
+    .map((person) => ({ id: person.value, label: person.name })));
+const options = computed(() => (props.field?.fieldType === "people"
+    ? peopleOptions.value
+    : (props.field?.fieldOptions || []).filter((option) => option && option.id !== undefined && option.id !== null)));
 const chosen = computed(() => props.modelValue.map(String));
 const inputType = computed(() => {
-    if (["number", "money"].includes(props.field?.fieldType)) return "number";
+    if (NUMBER_TYPES.includes(props.field?.fieldType)) return "number";
     if (props.field?.fieldType === "date") return "date";
     return "text";
 });

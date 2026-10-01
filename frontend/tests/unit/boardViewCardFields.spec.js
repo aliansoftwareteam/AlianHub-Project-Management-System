@@ -10,7 +10,8 @@ const composable = vi.hoisted(() => ({
     useCustomComposable: () => ({
         checkPermission: (path) => (path === 'task.task_custom_field' ? access.fieldPermission : true),
         checkApps: (app) => (app === 'CustomFields' ? access.fieldsApp : true)
-    })
+    }),
+    useGetterFunctions: () => ({ getUser: () => null })
 }));
 vi.mock('@/composable', () => composable);
 vi.mock('@/composable/index', () => composable);

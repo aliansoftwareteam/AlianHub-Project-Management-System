@@ -536,6 +536,15 @@ const schema = {
         updatedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // View templates (Modules/ViewTemplates). viewType is the view's keyName; settings is what cleanViewSettings returns.
+    view_templates: {
+        name: { type: String, required: true },
+        viewType: { type: String, required: true },
+        settings: { type: Object, default: {}, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Personal reminders (COLLAB-03) — one-shot, per-user. A node-schedule cron
     // (every minute) fires any reminder whose reminderAt has passed and that
     // hasn't fired yet, delivering an in-app notification to userId. Managed by
@@ -4491,7 +4500,11 @@ const schema = {
             type:Array,
             required: false,
             default:[]
-        }
+        },
+        // people fields: false holds one person
+        fieldMultiple: { type: Boolean, required: false },
+        // rating fields: 3 to 10
+        fieldRatingMax: { type: Number, required: false }
     },
     sprints: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.
@@ -4659,6 +4672,10 @@ const schema = {
         legacyId : {
             type: String,
             required:false
+        },
+        parentFolderId: {
+            type: mongoose.Schema.Types.ObjectId,
+            required: false
         }
     },
     preCompanies: {

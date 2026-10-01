@@ -79,6 +79,8 @@ exports.updateTeam = async(req,res) => {
             return res.status(400).json({ message: "Team not updated" });
         }
         removeCache(teamsCachePrefix(req.headers['companyid']), true);
+        // Team membership decides which private projects a member's list holds.
+        removeCache(`UserProjectData:${req.headers['companyid']}:`, true);
         return res.status(200).json(team);
 
     } catch (error) {

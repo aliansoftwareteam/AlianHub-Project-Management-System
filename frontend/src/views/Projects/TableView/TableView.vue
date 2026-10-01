@@ -8,7 +8,7 @@
             :message="$t('Upgrades.the_feature_not_available')"
         />
     </div>
-    <div v-else ref="viewRoot" class="w-100 ah-page tv2">
+    <div v-else ref="viewRoot" class="w-100 ah-page tv2" :data-density="density">
         <ListBulkBar v-if="project" :project="project" />
         <div class="tv2__bar">
             <button
@@ -56,6 +56,7 @@
                             @move="columnState.move"
                             @reset="columnState.reset"
                         />
+                        <ViewDensityControl :model-value="density" @update:model-value="setDensity" />
                     </span>
                     <template v-for="column in columnState.visibleColumns.value" :key="column.id">
                         <span v-if="column.id === 'status'" role="columnheader" :aria-sort="ariaSort('statusKey')">
@@ -140,6 +141,7 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import ListBulkBar from '@/views/Projects/ListView/ListBulkBar.vue';
 import ViewColumnChooser from '@/views/Projects/components/columns/ViewColumnChooser.vue';
+import ViewDensityControl from '@/views/Projects/components/columns/ViewDensityControl.vue';
 import AiFieldColumnHead from '@/views/Projects/components/columns/AiFieldColumnHead.vue';
 import { isAiField, loadedViewTasks } from '@/views/Projects/composables/aiFields';
 
@@ -219,6 +221,7 @@ function onGridKey(event) {
 
 const createTask = ref(false);
 const viewSettings = useViewSettings();
+const { density, setDensity } = viewSettings;
 const globalSortKey = computed(() => (viewSettings.sort.value ? `${viewSettings.sort.value.field}: ${viewSettings.sort.value.dir}` : ''));
 const groupedTasks = ref([]);
 const expandedSprints = ref([]);

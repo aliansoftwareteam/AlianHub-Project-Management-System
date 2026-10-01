@@ -58,24 +58,8 @@
                 v-if="edit && !renaming"
                 :task="data"
                 :href="edit.taskHref(data)"
-                :can-rename="rights.rename"
-                :can-subtask="!isSub && rights.subtask"
-                :can-template="!isSub && rights.template"
-                :can-archive="menuRights.archive"
-                :can-delete="menuRights.delete"
-                :can-move="!isSub && menuRights.move"
-                :can-duplicate="!isSub && menuRights.duplicate"
-                @rename="startRename"
-                @add-subtask="$emit('add-subtask', data)"
-                @copy-link="edit.copyLink(data)"
-                @copy-key="edit.copyKey && edit.copyKey(data)"
-                @open="open"
-                @save-template="openTemplateDialog({ mode: 'save', task: data })"
-                @archive="menu.archive(data)"
-                @delete="menu.remove(data)"
-                @move="menu.startMove(data)"
-                @duplicate="menu.duplicate(data)"
-                @duplicate-subtasks="menu.duplicate(data, { withSubtasks: true })"
+                :items="menuItems"
+                @choose="runMenu"
             />
         </div>
 
@@ -155,6 +139,7 @@ import { taskNavAttrs } from "@/components/organisms/TaskDetailOverlay/taskNavig
 import EstimateCell from "@/views/Projects/components/columns/EstimateCell.vue";
 import TaskColumnCell from "@/views/Projects/components/columns/TaskColumnCell.vue";
 import { defaultColumns, listColumnClass } from "@/views/Projects/composables/viewColumns";
+import { taskMenuItems } from "@/views/Projects/composables/taskMenu";
 
 defineOptions({ name: "ListRow" });
 
@@ -176,7 +161,8 @@ const NO_RIGHTS = { status: false, assignee: false, due: false, priority: false,
 const edit = inject("listRowEdit", null);
 const rights = computed(() => edit?.rights.value || NO_RIGHTS);
 const menu = inject("listRowMenu", null);
-const menuRights = computed(() => menu?.rights.value || {});
+const menuRights = computed(() => ({ rename: rights.value.rename, subtask: rights.value.subtask, template: rights.value.template, ...menu?.rights.value }));
+const menuItems = computed(() => taskMenuItems(props.data, menuRights.value, { isSub: props.isSub }));
 const statuses = computed(() => edit?.statuses.value || []);
 const showPriority = computed(() => (edit ? edit.showPriority.value : true));
 const rowEl = ref(null);
@@ -256,5 +242,30 @@ function cancelRename() {
 
 function onSelect(event) {
     emit("select", props.data, event);
+}
+
+/* A subtask moves and duplicates through the sidebars the Board uses: the List's own
+ * move and duplicate are bulk calls that place whole tasks. */
+function runMenu(id) {
+    const task = props.data;
+    const viaSidebar = () => menu.openSidebar(id, task);
+    const actions = {
+        rename: startRename,
+        subtask: () => emit("add-subtask", task),
+        "copy-link": () => edit.copyLink(task),
+        "copy-key": () => edit.copyKey?.(task),
+        open,
+        "save-template": () => openTemplateDialog({ mode: "save", task }),
+        "convert-subtask": viaSidebar,
+        "convert-list": viaSidebar,
+        move: props.isSub ? viaSidebar : () => menu.startMove(task),
+        duplicate: props.isSub ? viaSidebar : () => menu.duplicate(task),
+        "duplicate-subtasks": () => menu.duplicate(task, { withSubtasks: true }),
+        merge: viaSidebar,
+        archive: () => menu.archive(task),
+        restore: () => menu.restore(task),
+        delete: () => menu.remove(task)
+    };
+    actions[id]?.();
 }
 </script>
