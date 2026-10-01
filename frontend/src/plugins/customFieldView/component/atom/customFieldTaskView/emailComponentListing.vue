@@ -9,7 +9,7 @@
         :validations="error ? 'is' : props.detail?.fieldValidation"
         :placeholder="props.detail?.fieldPlaceholder"
         :detail="props.detail"
-        :customValidationMessage="error ? {is:`${props.detail?.fieldTitle} must be a valid email`} : {}"
+        :customValidationMessage="error ? {is: $t('CustomField.must_be_valid_email', { field: props.detail?.fieldTitle })} : {}"
         @handleEdit="(val) => emit('handleEdit',val)"
     />
 </template>
