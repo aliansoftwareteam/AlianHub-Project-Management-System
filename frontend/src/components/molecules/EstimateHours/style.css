@@ -30,7 +30,7 @@
     width: calc(100% - 150px);
 }
 .due-date.duedate__estimate .dp__main {
-    border: 1px solid #DFE1E6 !important;
+    border: 1px solid var(--border) !important;
     border-radius: 6px;
     height: 30px;
 

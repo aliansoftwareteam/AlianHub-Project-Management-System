@@ -1,10 +1,7 @@
-.dp__preset_range:active{
-    background-color: #e5e5e5 !important;
-}
 .WrapperPresetRange .isActive {
-    background-color: #2f3990;
-    color: #fff;
-}   
+    background-color: var(--brand);
+    color: var(--on-brand);
+}
 .WrapperPresetRange {
     list-style: none;
     width: 100%;
@@ -34,15 +31,13 @@
     justify-content: center;
 }
 .btn.btn-success{
-    background-color: #28a745;
-    color: #fff;
+    background-color: var(--brand);
+    color: var(--on-brand);
 }
 .btn.btn-cansal{
-    background-color: #6c757d;
-    color: #fff;
-}
-.dp__action_row{
-    border-top: 1px solid #ddd;
+    background-color: var(--surface);
+    color: var(--ink);
+    box-shadow: inset 0 0 0 1px var(--border);
 }
 .dp__menu_transitioned {
     transition: none !important;
@@ -52,7 +47,7 @@ body:has(.calender-menu-class-duedate):after {
     position: fixed;
     height: 100%;
     width: 100%;
-    background-color: #ffffff00;
+    background-color: transparent;
     left: 0;
     right: 0;
     top: 0;
@@ -84,7 +79,7 @@ body:has(.calender-menu-class-duedate):after {
     justify-content: center;
     border-radius: 5px;
     height: 30px;
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
     padding-left: 35px;
     background-size: 24% 100%;
     width: 100%;
@@ -95,7 +90,7 @@ body:has(.calender-menu-class-duedate):after {
 .dp__cell_inner.dp__pointer.dp__range_between, 
 .dp__calendar_header_item {
     border-color: transparent;
-    color: #000;
+    color: var(--ink);
     border-radius: 0;
     white-space: nowrap;
     text-align: center;
@@ -117,37 +112,36 @@ body:has(.calender-menu-class-duedate):after {
 }
 .dp__today {
     border: 0;
-    background: #ebf4f8;
+    background: var(--brand-tint);
     font-weight: 700;
 }
 .dp__action_row {
-    border-top: 1px solid #DFE1E6;
+    border-top: 1px solid var(--border);
     padding: 8px 10px;
 }
 .dp__cell_inner.dp__cell_disabled {
     pointer-events: none;
-    background-color: #eee;
+    background-color: var(--fill);
     opacity: .6;
 }
 .dp__cell_inner.dp__cell_offset.dp__cell_disabled {
     background: transparent;
 }
 .dp__sidebar_left{
-    border-right: 1px solid #DFE1E6;
-
+    border-right: 1px solid var(--border);
 }
 .dp__action_buttons .btn {
     margin: 0 0 0 10px;
 }
 .dp__cell_inner.dp__pointer.dp__range_between, 
 .dp__cell_inner.dp__cell_disabled.dp__range_between {
-    background-color: #ebf4f8;
+    background-color: var(--brand-tint);
     border-color: transparent;
 }
 .dp__cell_inner.dp__cell_offset.dp__cell_disabled, 
 .dp__cell_inner.dp__cell_disabled , 
 .dp__cell_inner.dp__cell_disabled.dp__range_between{
-    color: #999;
+    color: var(--ink-2);
     cursor: not-allowed;
     text-decoration: line-through;
     min-width: 32px;
@@ -158,7 +152,7 @@ body:has(.calender-menu-class-duedate):after {
     font-family: var(--font-ui);
 }
 .dp__cell_inner.dp__pointer.dp__range_start {
-    background-color: #2f3990;
+    background-color: var(--brand);
     font-size: 12px;
     line-height: 24px;
     height: 29px;
@@ -167,7 +161,7 @@ body:has(.calender-menu-class-duedate):after {
 .dp__month_year_wrap button.dp__btn.dp__month_year_select {
     padding: 2px !important;
     font-size: 14px;
-    color: #000;
+    color: var(--ink);
     font-family: var(--font-ui);
 }
 .dp__cell_inner.dp__pointer,
@@ -182,7 +176,7 @@ body:has(.calender-menu-class-duedate):after {
 .dp__cell_inner.dp__cell_disabled.dp__range_end,
 .dp__overlay_cell_active,
 .dp__cell_inner.dp__pointer.dp__range_end{
-    background-color: #2f3990;
+    background-color: var(--brand);
     font-size: 12px;
     padding: 2px;
     font-family: var(--font-ui);
@@ -192,19 +186,19 @@ body:has(.calender-menu-class-duedate):after {
 }
 
 .dp__cell_inner.dp__cell_offset.dp__pointer {
-    color: #999;
+    color: var(--ink-2);
 }
 .dp__month_year_select:hover, .dp__inner_nav:hover, .dp__overlay_cell:hover{
     background: transparent !important;
 }
 .dp__inner_nav svg path {
-    fill: #000 !important;
+    fill: var(--ink) !important;
 }
 .dp__calendar_item {
     min-width: 32px;
     border-radius: 50% !important;
     font-size: 14px;
-    color: #000;
+    color: var(--ink);
     font-family: var(--font-ui);
     font-weight: 500;
 }
@@ -218,18 +212,14 @@ span.vc-day-content.vc-focusable.is-disabled {
     cursor: not-allowed;
     pointer-events: none!important;
 }
-.dp__cell_inner.dp__cell_disabled{
-    color: #cbd5e0;
-}
-
 .dp__cell_inner.dp__pointer.dp__date_hover:hover {
-    background-color: rgba(204,214,224,.3);
+    background-color: var(--fill);
 }
 .dp__calendar_header_separator {
     display: none;
 }
 .dp__calendar_header_item {
-    color: #a0aec0;
+    color: var(--ink-2);
 }
 .dp__month_year_select:hover{
     background: transparent !important;
@@ -238,15 +228,20 @@ button.dp__btn.dp__month_year_select {
     padding: 0 !important;
     font-size: 18px;
     font-family: var(--font-ui);
-    color: #000;
+    color: var(--ink);
 }
 .dp__overlay_cell.dp__overlay_cell_pad {
     padding: 5px !important;
     background: transparent;
 }
 .dp__cell_inner.dp__pointer.dp__today.dp__active_date{
-    background: #2F3990;
+    background: var(--brand);
     border: 0;
+}
+/* Last of the three-class cell rules, so an other-month or disabled cell that is selected keeps the on-brand text. */
+.dp__calendar_item .dp__cell_inner:is(.dp__range_start, .dp__range_end, .dp__active_date) {
+    background-color: var(--brand);
+    color: var(--on-brand);
 }
 .dp__overlay_col {
     font-family: var(--font-ui);
@@ -293,8 +288,8 @@ button.dp__btn.dp__month_year_select {
     right: 10px;
 }
 .btn-disabled-calendar {
-    background-color: #ccc !important;
-    color: #666 !important;
+    background-color: var(--fill) !important;
+    color: var(--ink-2) !important;
     cursor: not-allowed !important;
 }
 @media (max-width:  1199px){

@@ -37,7 +37,15 @@
                     </div>
                 </section>
 
-                <p v-if="!visibleGroups.length" class="view__empty">{{$t('Projects.no_views_match')}}</p>
+                <ViewTemplateList
+                    v-if="visibleTemplates.length"
+                    :templates="visibleTemplates"
+                    :adding="addingFromTemplate"
+                    @pick="addFromTemplate"
+                    @changed="loadTemplates"
+                />
+
+                <p v-if="!visibleGroups.length && !visibleTemplates.length" class="view__empty">{{$t('Projects.no_views_match')}}</p>
             </template>
         </div>
 
@@ -57,12 +65,15 @@
 // UTILS
 import { addView } from '@/components/molecules/EmbedView/helper.js'
 import { addPrivateView, groupViews, viewTagKey } from './helper.js'
+import { addViewFromTemplate, errorText, fittingTemplates, leftOutText, useViewTemplates } from './viewTemplates'
+import { createPrivateView } from '@/views/Projects/composables/savedViewApi'
 import { useCustomComposable } from "@/composable";
 import * as env from '@/config/env';
 import { projectComponentsIcons } from '@/composable/commonFunction';
 
 // COMPONENTS
 import EmbedView from '@/components/molecules/EmbedView/EmbedView.vue'
+import ViewTemplateList from './ViewTemplateList.vue'
 
 // PACKAGES
 import { ref, onMounted, inject, computed, watch } from 'vue'
@@ -165,6 +176,53 @@ const visibleGroups = computed(() => {
     });
     return groupViews(matches);
 });
+
+const { templates, load: loadTemplates } = useViewTemplates()
+const addingFromTemplate = ref(false)
+const PRIVATE_COPIED_FIELDS = ['_id', 'keyName', 'name', 'value', 'icon', 'activeIcon', 'sortIndex']
+
+const visibleTemplates = computed(() => {
+    const term = query.value.trim().toLowerCase();
+    const fitting = fittingTemplates(templates.value, Array.isArray(navOptions.value) ? navOptions.value : []);
+    return !term ? fitting : fitting.filter((template) => String(template.name).toLowerCase().includes(term)
+        || t(`ViewList.${template.viewName}`).toLowerCase().includes(term));
+});
+
+/* The server fits the template to this project and hands the view back; a private one is stored on the member row, as every private view is. */
+const keepPrivately = async (draft) => {
+    const row = companyUserData.value.find((item) => userId.value === item.userId);
+    const view = {
+        ...Object.fromEntries(PRIVATE_COPIED_FIELDS.filter((field) => draft[field] !== undefined).map((field) => [field, draft[field]])),
+        id: makeUniqueId(10),
+        isPrivate: true,
+        isPin: isPin.value,
+        projectId: Data.value._id,
+        sourceViewId: draft._id,
+        title: draft.title,
+        settings: draft.settings,
+        createdAt: new Date(),
+    };
+    await createPrivateView(row._id, view);
+    commit('settings/mutateCompanyUsers', { data: { ...row, ProjectRequiredComponent: [...(row.ProjectRequiredComponent || []), view] }, op: 'modified' });
+};
+
+const addFromTemplate = async (template) => {
+    if (addingFromTemplate.value) return;
+    addingFromTemplate.value = true;
+    try {
+        const response = await addViewFromTemplate(Data.value._id, { templateId: template._id, isPin: isPin.value, isPrivate: isPrivate.value });
+        if (isPrivate.value) await keepPrivately(response.data);
+        else commit('projectData/projectLocalUpdate', { itemData: response.data, projectId: Data.value._id, key: 'ProjectView', subKey: 'add', userId: '' });
+        const leftOut = leftOutText(response.leftOut, t);
+        if (leftOut) toast.warning(leftOut, { position: 'top-right' });
+        else toast.success(t('Toast.View_added_successfully'), { position: 'top-right' });
+        emits('closeDropdown');
+    } catch (error) {
+        toast.error(errorText(error, t('ViewTemplates.add_failed')), { position: 'top-right' });
+    } finally {
+        addingFromTemplate.value = false;
+    }
+};
 
 const selectView = (item) => {
     if (item.keyName === 'Embed') {

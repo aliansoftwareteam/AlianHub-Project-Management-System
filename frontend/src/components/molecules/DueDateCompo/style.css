@@ -1,19 +1,7 @@
-/* .calender-menu-class-duedate .dp__arrow_top {
-    left: 5%;
-    top: -1px;
-    height: 11px;
-    width: 11px;
-} */
-/* .calender-menu-class-duedate .dp__arrow_bottom{
-    left: 5%;
-    bottom: -1px;
-    height: 11px;
-    width: 11px;
-} */
 .dp__arrow_top{display: none;}
 .priority__component--wrapper .due-date .dp__main span {
     font-size: 12px !important;
-    color: #818181 !important;
+    color: var(--ink-2) !important;
     position: relative;
     top: 1px;
     font-family: var(--font-ui);

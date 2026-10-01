@@ -422,7 +422,7 @@ span.font-size-12.font-weight-400 {
     padding: 2px 12px 2px 35px !important;
 }
 .calender-comp-filter  .dp__input:hover:not(.dp__input_focus) {
-    border-color:#ddd !important;
+    border-color: var(--border) !important;
 }
 .calender-comp-filter  .dp__input_icon {
     top: 51%;

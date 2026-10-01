@@ -7,6 +7,7 @@ const CUSTOM_GROUP = /^cf:[a-f0-9]{24}$/i;
 const DONE_BY = ['all', 'human', 'agent', 'mixed', 'unchecked'];
 const SUBTASKS = ['collapsed', 'expanded'];
 const WORKLOAD_UNITS = ['hours', 'points', 'count'];
+const VIEW_DENSITIES = Object.freeze(['comfortable', 'compact']);
 const FILTER_TYPES = ['array', 'string', 'date', 'object', 'arrayOfObject', 'custom'];
 const CUSTOM_FIELD_TYPES = ['dropdown', 'checkbox', 'date', 'number', 'money', 'text', 'textarea', 'email', 'phone'];
 const CUSTOM_VALUE = /^customField\.([a-f0-9]{24})\.fieldValue$/i;
@@ -30,6 +31,7 @@ const DEFAULT_VIEW_SETTINGS = Object.freeze({
     sort: null,
     columns: Object.freeze({ order: [], shown: [], hidden: [] }),
     workloadUnit: 'hours',
+    density: 'comfortable',
 });
 
 const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
@@ -106,6 +108,7 @@ const cleanViewSettings = (raw) => {
         sort: cleanSort(settings.sort),
         columns: cleanColumns(settings.columns),
         workloadUnit: WORKLOAD_UNITS.includes(settings.workloadUnit) ? settings.workloadUnit : DEFAULT_VIEW_SETTINGS.workloadUnit,
+        density: VIEW_DENSITIES.includes(settings.density) ? settings.density : DEFAULT_VIEW_SETTINGS.density,
     };
 };
 
@@ -113,4 +116,4 @@ const printable = (value) => [...value].filter((char) => char.charCodeAt(0) >= 3
 
 const cleanViewTitle = (raw) => printable(text(raw, LIMITS.title * 4)).trim().slice(0, LIMITS.title);
 
-module.exports = { DEFAULT_VIEW_SETTINGS, LIMITS, isPlainObject, cleanViewSettings, cleanViewTitle, cleanFilterRow };
+module.exports = { DEFAULT_VIEW_SETTINGS, VIEW_DENSITIES, LIMITS, isPlainObject, cleanViewSettings, cleanViewTitle, cleanFilterRow };
