@@ -30,9 +30,18 @@ utils/data.js seed (keyName `WhiteboardView`, sortIndex 14). Existing companies 
 ## Guards / non-regression
 - Does **not** mutate task data — only card positions, stored in the `whiteboards` collection. A card holds a task id and a place, never the task's name.
 - A board is read by whoever can open its list and changed under the rule a project's docs and forms use; anyone else gets 404.
-- Lightweight: custom pointer-drag (no external lib); global mousemove/up listeners cleaned up on unmount.
+- Sticky notes and plain text sit beside the cards: text is kept as typed and always shown as text, a note's tone is one of six names mapped to design tokens, and any other field is refused.
+- A board is as open as its list: gone while the list, a folder above it or the project is in the trash, read-only while any of them is archived or closed, back as it was on restore.
+- Lightweight: custom drag on pointer events (no external lib), so a finger and a pen work; window listeners are removed when a drag ends and on unmount.
 - Reuses the GanttView data harness; deleted tasks excluded.
-- Additive: new view + registration only.
+
+| # | Scenario | Steps | Expected |
+|---|----------|-------|----------|
+| N1 | Add a note | "Add note", type, click away | the note is saved with its text; another browser shows it |
+| N2 | Markup | type `<b>x</b>` into a note | shown as those characters, never as bold |
+| N3 | Move, resize, tone, delete | select a note and use its tools and corner handle | each change is saved; Delete removes it |
+| N4 | Touch | on a phone, drag a card and a note; drag empty space | the element moves and the page does not scroll; empty space scrolls the board |
+| N5 | Read-only | open the board of an archived list | notes and cards are shown, nothing can be changed, the board can be panned |
 
 ## Follow-up
-Free-form elements (notes, shapes, images), live cursors, and carrying a board when a project is duplicated.
+Shapes and images, converting a note to a task, live cursors, and carrying a board when a project is duplicated.
