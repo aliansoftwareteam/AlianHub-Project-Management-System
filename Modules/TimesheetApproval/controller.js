@@ -211,17 +211,28 @@ const reviewOne = async (req, { id, action, reason, reviewerName = reviewerNameO
     }
 
     const reviewed = action !== 'reopen';
+    const actorName = await reviewerName(uid);
     const update = {
         status: transition.to,
         rejectionReason: action === 'reject' ? String(reason).trim() : '',
         reviewedAt: reviewed ? new Date() : null,
         reviewedBy: reviewed ? uid : '',
-        reviewerName: reviewed ? await reviewerName(uid) : '',
+        reviewerName: reviewed ? actorName : '',
+    };
+    // A reopening clears the review it undoes, so the week's history keeps both: who reopened it and whose review that was.
+    const write = reviewed ? { $set: update } : {
+        $set: update,
+        $push: {
+            history: {
+                action, from: doc.status, to: transition.to, by: uid, byName: actorName, at: new Date(),
+                reviewedBy: doc.reviewedBy || '', reviewerName: doc.reviewerName || '', reviewedAt: doc.reviewedAt || null,
+            },
+        },
     };
     // Matching on the status that was read keeps a second reviewer from overwriting a review that landed in between.
     const updated = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TIMESHEET_APPROVAL,
-        data: [{ _id, status: doc.status, deletedStatusKey: 0 }, { $set: update }, { returnDocument: 'after' }],
+        data: [{ _id, status: doc.status, deletedStatusKey: 0 }, write, { returnDocument: 'after' }],
     }, 'findOneAndUpdate');
     if (!updated) return refused('wrong_state', 'This timesheet was reviewed by someone else just now.');
     socketEmitter.emit('update', { type: 'update', data: updated, module: 'timesheetApproval' });
