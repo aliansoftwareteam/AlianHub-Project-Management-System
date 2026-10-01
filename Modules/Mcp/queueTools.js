@@ -1,9 +1,13 @@
+const actions = require('../Agents/actions');
+const projectPolicy = require('../Agents/projectPolicy');
 const workQueue = require('../Agents/manager/workQueue');
 const { RULE } = require('../Agents/manager/rules');
 const { HANDED_OVER } = require('../Agents/manager/findings');
 
 // The work queue a connected agent pulls from (Modules/Agents/manager/workQueue.js). Listing reads through the
 // caller's filter; taking and giving back are registry writes, so the project's policy is asked like for any other.
+// Where the project holds a connected agent's writes for a person, a claim is refused instead of filed: a marker
+// waiting in the Inbox would ask a person to approve twice, once for the claim and once for the change itself.
 
 const NO_ITEM = Object.freeze({ ok: false, error: workQueue.REFUSAL.NO_ITEM });
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -46,12 +50,18 @@ const itemRow = ({ row, task, claim, project }) => ({
     ...(claim ? { yours: true, claimedUntil: new Date(claim.until).toISOString() } : {}),
 });
 
+const HELD = 'so no item is claimed here. Work from queue.list without a claim: each change you file waits for a person';
+
 /* Names the item's task and project for the checks every write meets; an id the caller cannot read answers as a missing one. */
-const named = async (ctx, args, vis) => {
+const named = (action) => async (ctx, args, vis) => {
     const item = await workQueue.itemFor({ companyId: ctx.companyId, uid: ctx.userId, itemId: args.itemId, allowsProject: vis.allowsProject, allowsTask: vis.allowsTask });
-    return item
-        ? { args: { ...args, itemId: String(item.row._id), taskId: String(item.row.taskId), projectId: String(item.row.projectId) } }
-        : { answer: { ...NO_ITEM } };
+    if (!item) return { answer: { ...NO_ITEM } };
+    const params = { itemId: String(item.row._id), projectId: String(item.row.projectId) };
+    const rule = await projectPolicy.ask({ companyId: ctx.companyId, actor: ctx.actor, action, params });
+    if (rule.decision !== projectPolicy.DECISION.ACT) {
+        throw await actions.refusal(ctx.companyId, ctx.actor, { action, params, reason: `${rule.reason}, ${HELD}`, ip: ctx.ip, taint: ctx.taint });
+    }
+    return { args: { ...args, ...params, taskId: String(item.row.taskId) } };
 };
 
 const itemTarget = (args) => ({ taskId: str(args.taskId, 40) });
@@ -84,7 +94,7 @@ const TOOLS = [
         description: `Take one item from queue.list, so no other agent works on it. It is yours for ${workQueue.CLAIM_MINUTES} minutes; claim it again to keep it longer. `
             + 'A claim gives you no extra rights: make the change with the usual tools, which are checked and approved as always. The person can take the item back at any time.',
         input: input({ itemId: ITEM, ...REASON }, ['itemId']),
-        prepare: named,
+        prepare: named('queue.claim'),
         params: (args) => ({ itemId: str(args.itemId, 40), projectId: str(args.projectId, 40) }),
     },
     {
@@ -95,7 +105,7 @@ const TOOLS = [
         target: itemTarget,
         description: 'Give back an item you hold. With finished true it leaves the queue: you made the change, or filed it for a person to approve. Without it the item is free for another agent.',
         input: input({ itemId: ITEM, finished: { type: 'boolean', description: 'True when your part is done' }, ...REASON }, ['itemId']),
-        prepare: named,
+        prepare: named('queue.release'),
         params: (args) => ({ itemId: str(args.itemId, 40), projectId: str(args.projectId, 40), finished: args.finished === true }),
     },
 ];

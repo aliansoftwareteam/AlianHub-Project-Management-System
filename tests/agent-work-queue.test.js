@@ -238,6 +238,14 @@ describe('a claim', () => {
         expect(audits('queue.claim', 'applied')).toHaveLength(1);
     });
 
+    it('by an outside client belongs to its grant and names the client', async () => {
+        const { itemId } = await orphanItem();
+        expect(await claim(world.outside(OTHER, PLAIN_SCOPES), itemId)).toMatchObject({ ok: true });
+        expect(rowOf(itemId).claim).toMatchObject({ by: `grant:${world.GRANT_ID}`, userId: OTHER, name: 'Outside agent, for Priya Other' });
+        expect(await claim(agent(OTHER), itemId)).toMatchObject({ isError: true, error: workQueue.REFUSAL.TAKEN });
+        expect(await claim(world.outside(OTHER, ['tasks:read']), itemId)).toMatchObject({ isError: true, error: expect.stringContaining('tasks:write') });
+    });
+
     it('hides the item from every other connection and marks it for its holder', async () => {
         const { itemId } = await orphanItem();
         await claim(agent(OTHER), itemId);
@@ -332,20 +340,24 @@ describe('the project\'s rule for agents is asked for a claim, as for any write'
         expect(await claim(agent(OTHER), itemId)).toMatchObject({ ok: true });
     });
 
-    it('a project where connected agents propose everything holds the claim for a person, and nothing is taken', async () => {
+    it.each([
+        ['a personal token', () => agent(OTHER)],
+        ['an outside client', () => world.outside(OTHER, PLAIN_SCOPES)],
+    ])('a project where connected agents propose everything refuses a claim by %s, files nothing, and still lists the item', async (_who, caller) => {
         const { itemId } = await orphanItem();
         project(P_OPEN).agentPolicy = { done: 'approval', connected: 'propose_all' };
-        const out = await claim(agent(OTHER), itemId);
-        expect(out).toMatchObject({ ok: false, pending: true, proposalId: expect.any(String) });
+        const out = await claim(caller(), itemId);
+        expect(out).toMatchObject({ refused: true, reason: expect.stringContaining('this project has connected agents propose every change') });
         expect(rowOf(itemId).claim).toBeUndefined();
-        expect(await queue(agent(OWNER, TOKEN_2))).toMatchObject([{ itemId }]);
+        expect(rows(SCHEMA_TYPE.AGENT_PROPOSALS)).toEqual([]);
+        expect(audits('queue.claim', 'applied')).toEqual([]);
+        expect(await queue(caller())).toMatchObject([{ itemId }]);
     });
 
-    it('there, an outside client without the manage grant is refused', async () => {
+    it('an in-product agent, which is no connection, is refused by the queue itself', async () => {
         const { itemId } = await orphanItem();
-        project(P_OPEN).agentPolicy = { done: 'approval', connected: 'propose_all' };
-        const out = await claim(world.outside(OTHER, PLAIN_SCOPES), itemId);
-        expect(out).toMatchObject({ refused: true });
+        const inProduct = { kind: 'agent', userId: OTHER, agentId: '6f0000000000000000000a01', agentName: 'Reporter', viaAccount: 'workspace' };
+        await expect(actions.perform({ companyId: CID, actor: inProduct, action: 'queue.claim', params: { itemId, projectId: P_OPEN } })).rejects.toThrow(workQueue.REFUSAL.NOT_CONNECTED);
         expect(rowOf(itemId).claim).toBeUndefined();
     });
 });
