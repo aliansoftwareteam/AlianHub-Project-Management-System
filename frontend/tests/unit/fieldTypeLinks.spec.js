@@ -1,7 +1,7 @@
 /* Task 046 slice A1 — relationship and voting custom fields. The task carries a marker (and a vote count); what a viewer
    may see of the linked tasks and the voters is asked of the server and kept beside the tasks. */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { config, flushPromises, mount } from '@vue/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { config, enableAutoUnmount, flushPromises, mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import { createStore } from 'vuex';
 import { ref } from 'vue';
@@ -78,10 +78,13 @@ const store = createStore({
         'settings/companyUsers': () => [],
         'settings/teams': () => [],
         'projectData/allProjects': () => [{ _id: PROJECT, ProjectName: 'CRM' }],
-        'projectData/onlyActiveProjects': () => [{ _id: PROJECT, ProjectName: 'CRM', sprintsObj: { [LIST]: { id: LIST, name: 'Deals' } } }]
+        'projectData/onlyActiveProjects': () => ({ data: [{ _id: PROJECT, ProjectName: 'CRM', sprintsObj: { [LIST]: { id: LIST, name: 'Deals' } } }] })
     }
 });
 const global = { plugins: [store], provide: { $dateFormat: ref('DD/MM/YYYY'), selectedProject: ref({ _id: PROJECT }), $clientWidth: ref(1280), $companyId: ref('co1') }, stubs: { AiFieldMark: true } };
+
+/* A value left mounted would ask again when the next test empties what was answered. */
+enableAutoUnmount(afterEach);
 
 beforeEach(() => {
     apiRequest.mockReset();
@@ -196,7 +199,7 @@ describe('a relationship value', () => {
         await wrapper.get('[data-link-search]').setValue('ren');
         await flushPromises();
         const [, , body] = apiRequest.mock.calls.find((call) => call[1].endsWith('/find'));
-        expect(JSON.stringify(body.findQuery)).not.toContain('ProjectID');
+        expect(Object.keys(body.findQuery[0].$match)).toEqual(['deletedStatusKey', 'mainChat', '$or']);
         const results = wrapper.findAll('[data-link-result]');
         expect(results.map((result) => result.text())).toEqual(['CRM-9 Renewal']);
         await results[0].trigger('click');

@@ -215,6 +215,7 @@ import FieldTaskTypesPicker from "../../atom/FieldTaskTypesPicker/FieldTaskTypes
 import { fieldProjectIds, useTaskTypeOptions } from "@/plugins/customFieldView/taskTypeOptions";
 import { fieldTaskTypes } from "@fieldTaskTypes";
 import { fieldTypeUi, moduleFieldDraft, moduleFieldSettings, moduleFieldSettingsError } from "@/plugins/customFieldView/fieldTypes";
+import { MODULE_FIELD_TYPES } from "@fieldTypes";
 import { aiDraftFrom, aiFieldPayload, isAiField, newAiDraft, validateAiDraft } from "@/views/Projects/composables/aiFields";
 
 defineOptions({ name: "FieldBuilder" });
@@ -243,7 +244,7 @@ const typeOptions = [
     { key: "checkbox", label: t("Fields.type_checkbox"), hint: t("Fields.hint_checkbox") },
     { key: "email", label: t("Fields.type_email"), hint: t("Fields.hint_email") },
     { key: "phone", label: t("Fields.type_phone"), hint: t("Fields.hint_phone") },
-    ...["people", "url", "rating", "progress", "files"].map((key) => ({ key, label: t(`Fields.type_${key}`), hint: t(`Fields.hint_${key}`), icon: fieldTypeUi(key).icon })),
+    ...MODULE_FIELD_TYPES.map((key) => ({ key, label: t(`Fields.type_${key}`), hint: t(`Fields.hint_${key}`), icon: fieldTypeUi(key).icon })),
     { key: "formula", label: t("Fields.type_formula"), hint: t("Fields.hint_formula"), computed: true },
     { key: "rollup", label: t("Fields.type_rollup"), hint: t("Fields.hint_rollup"), computed: true },
     { key: "ai", label: t("Fields.type_ai"), hint: t("Fields.hint_ai"), ai: true }

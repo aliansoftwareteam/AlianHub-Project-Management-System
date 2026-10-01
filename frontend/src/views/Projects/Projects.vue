@@ -783,6 +783,8 @@ const CUSTOM_GROUP_ICONS = {
     number: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldNumberGrey.svg'),
     money: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldMoneyGrey.svg'),
     progress: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldNumberGrey.svg'),
+    voting: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldNumberGrey.svg'),
+    relationship: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldDropdownGrey.svg'),
 };
 const { defs: projectFieldDefs } = useProjectCustomFields(projectData);
 const groupByOptions = computed(() => [
