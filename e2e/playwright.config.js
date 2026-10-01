@@ -14,6 +14,9 @@ module.exports = defineConfig({
     use: {
         trace: 'on-first-retry',
         screenshot: 'only-on-failure',
+        // Each test opens a fresh browser, which would install the app's worker and download the whole
+        // bundle again. specs/app-shell.spec.js allows them for itself.
+        serviceWorkers: 'block',
     },
     projects: [
         { name: 'chromium', use: { ...devices['Desktop Chrome'] } },

@@ -22,11 +22,14 @@ const WORKER_HEADERS = Object.freeze({
     'Service-Worker-Allowed': '/',
 });
 
+/* The app reads this before it registers: a page that registered again would undo the unregistration. */
+const WITHDRAWN_HEADERS = Object.freeze({ ...WORKER_HEADERS, 'X-App-Shell-Worker': 'withdrawn' });
+
 const isWithdrawn = (env = process.env) => OFF.includes(String(env.APP_SHELL_WORKER || '').trim().toLowerCase());
 
 const workerRoute = (file, env = process.env) => (req, res, next) => {
     if (isWithdrawn(env)) {
-        res.set(WORKER_HEADERS).send(WITHDRAWAL_WORKER);
+        res.set(WITHDRAWN_HEADERS).send(WITHDRAWAL_WORKER);
         return;
     }
     fs.access(file, fs.constants.R_OK, (missing) => {
@@ -40,4 +43,4 @@ const install = (app, distDir, env = process.env) => {
     app.get(WORKER_ROUTE, workerRoute(path.join(distDir, 'sw.js'), env));
 };
 
-module.exports = { WORKER_ROUTE, WORKER_HEADERS, WITHDRAWAL_WORKER, isWithdrawn, workerRoute, install };
+module.exports = { WORKER_ROUTE, WORKER_HEADERS, WITHDRAWN_HEADERS, WITHDRAWAL_WORKER, isWithdrawn, workerRoute, install };

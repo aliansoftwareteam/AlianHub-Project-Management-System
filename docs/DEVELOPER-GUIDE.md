@@ -117,6 +117,24 @@ Read them once at module load (`process.env.NAME || default`), describe the key 
 
 `t('Namespace.key')` with a literal key; when the key is built at run time, end the literal with `_` or `.` (`t('Inbox.tab_' + kind)`) so the audit can resolve the prefix. `node scripts/i18n-rename-namespace.js <From> <To>` moves a namespace and rewrites every reference.
 
+### The installed app and its service worker
+
+The web app can be installed (`frontend/public/manifest.webmanifest`, icons drawn from `frontend/public/logo.png` by `node scripts/make-app-icons.js` and committed) and its shell opens with no network. A production build writes `sw.js` (`frontend/shellWorkerPlugin.js`): the list of the build's files, then `frontend/src/serviceWorker/rules.js` and `worker.js` as they are, unminified. The worker is hand-written and has no dependency. The dev server has no worker, and the app registers one only in a production build, in a browser, on a secure address (`registration.js`); the desktop app never does.
+
+**What it holds.** At install: `index.html`, the manifest, and every file under `js/`, `css/`, `fonts/` and `icons/`, except source maps and licence files. That is the whole bundle (about 33 MB uncompressed today), fetched four files at a time; a later build copies the files whose names did not change and downloads the rest. As they are asked for: the hashed images under `img/`. Nothing else, ever.
+
+**What it never touches.** `routeFor` in `rules.js` is the whole route table, and anything it does not name goes to the network without the worker answering: every request that is not a GET, any other origin, any address with a query string, any request carrying `Authorization`, `refresh-token`, `companyid`, `x-api-key` or `Range`, and every path the server answers itself (`RESERVED_SEGMENTS`: `/api`, `/socket.io`, `/share`, `/form`, `/oauth`, `/.well-known`, `/mcp`, `/scim`, `/pickers`, …). So API answers, downloads, stored files, socket traffic and sign-in endpoints are never held and fail visibly offline; the app's own offline store (`frontend/src/offline`) is unchanged. A page load is answered only for `/` and `/index.html`, so the server-rendered share, form and consent pages load exactly as before. `tests/app-shell-worker.test.js` scans the server's routes and fails when a new top-level path is missing from `RESERVED_SEGMENTS`.
+
+**Sign-out.** On sign-out and on a workspace switch the app tells the worker to delete every cache except the builds', and deletes the same caches from the page (`dropWorkerRuntimeCaches`).
+
+**How a new build reaches people.** A page load is answered by the network whenever there is one, so a load after a release runs the new build; the held document is only for when the network gives no answer. The server sends `sw.js` with `Cache-Control: no-cache`, and an open tab asks for it again when it is looked at after an hour. A new worker waits; it takes over only when a tab tells it to. A tab already on the new build tells it at once (nothing to reload). A tab still on the earlier build shows "A new version is ready" with Reload and Later, and reloads only on Reload. No tab is ever reloaded by itself.
+
+**Withdrawing it.** `APP_SHELL_WORKER=off` makes `/sw.js` answer with a worker that deletes every cache of the address, unregisters itself and handles no request (`Config/appShellWorker.js`), and with an `X-App-Shell-Worker: withdrawn` header. Each browser installs that worker on its next page load; the app asks for the header (one `HEAD /sw.js` per load) before it registers, and when it is there removes the registration and the caches itself and does not register again. Unset the variable to bring the worker back.
+
+**Push.** The Firebase push worker keeps its own scope (`/firebase-cloud-messaging-push-scope`); a scope holds one worker, and `/` is the shell's.
+
+The end-to-end suite blocks service workers (`e2e/playwright.config.js`), because every test opens a fresh browser that would download the whole bundle again; `e2e/specs/app-shell.spec.js` turns them on for itself.
+
 ## Where things are
 
 `.claude/ARCHITECTURE.md` (request pipeline, multi-tenancy, sockets), `.claude/CONVENTIONS.md` (naming, module layout, response shape), `.claude/FOLDER-STRUCTURE.md` (the tree), `BRANCHING.md` and `CONTRIBUTING.md` (how a change lands).

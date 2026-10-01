@@ -6,6 +6,9 @@ const RUNTIME_CACHE = 'ah-runtime-v1';
 const SHELL_DOCUMENT = '/index.html';
 const SHELL_PATHS = ['/', SHELL_DOCUMENT];
 const WORKER_PATH = '/sw.js';
+// Sent by Config/appShellWorker.js with the worker that withdraws this one.
+const WITHDRAWN_HEADER = 'x-app-shell-worker';
+const WITHDRAWN_VALUE = 'withdrawn';
 
 const MESSAGE = Object.freeze({
     ACTIVATE: 'ah:activate-waiting',
@@ -106,7 +109,7 @@ const isStorable = (path, response) => {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        SHELL_CACHE_PREFIX, RUNTIME_CACHE, SHELL_DOCUMENT, SHELL_PATHS, WORKER_PATH, MESSAGE, ROUTE, RESERVED_SEGMENTS, CREDENTIAL_HEADERS,
+        SHELL_CACHE_PREFIX, RUNTIME_CACHE, SHELL_DOCUMENT, SHELL_PATHS, WORKER_PATH, WITHDRAWN_HEADER, WITHDRAWN_VALUE, MESSAGE, ROUTE, RESERVED_SEGMENTS, CREDENTIAL_HEADERS,
         reasonToStayOut, routeFor, isPrecachedAsset, shellAssetsOf, isShellCache, isStorable,
     };
 }

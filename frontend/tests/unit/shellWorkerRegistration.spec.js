@@ -95,6 +95,50 @@ describe('where the worker is registered', () => {
     });
 });
 
+describe('a worker the server has withdrawn', () => {
+    const answering = (win, headers) => {
+        win.fetch = vi.fn().mockResolvedValue({ headers: { get: (name) => headers[name] || null } });
+        return win;
+    };
+    const withdrawn = (win) => answering(win, { 'x-app-shell-worker': 'withdrawn' });
+
+    it('is asked about with a HEAD request that no cache answers', async () => {
+        const win = answering(fakeWindow(), {});
+        await registerShellWorker(win, production);
+        expect(win.fetch).toHaveBeenCalledWith('/sw.js', { method: 'HEAD', cache: 'no-store' });
+        expect(win.container.register).toHaveBeenCalledTimes(1);
+    });
+
+    it('is not registered again, and the page removes the registration and every cache it can reach', async () => {
+        const win = withdrawn(fakeWindow({ cacheNames: ['ah-shell-build-1', 'ah-runtime-v1'] }));
+        const existing = { active: { scriptURL: `${ORIGIN}/sw.js` }, unregister: vi.fn().mockResolvedValue(true) };
+        win.container.getRegistration = vi.fn().mockResolvedValue(existing);
+
+        expect(await registerShellWorker(win, production)).toBe(null);
+
+        expect(win.container.register).not.toHaveBeenCalled();
+        expect(win.container.getRegistration).toHaveBeenCalledWith('/');
+        expect(existing.unregister).toHaveBeenCalledTimes(1);
+        expect([...win.held]).toEqual([]);
+    });
+
+    it('leaves another worker registered for the site alone', async () => {
+        const win = withdrawn(fakeWindow());
+        const other = { active: { scriptURL: `${ORIGIN}/firebase-messaging-sw.js` }, unregister: vi.fn() };
+        win.container.getRegistration = vi.fn().mockResolvedValue(other);
+
+        await registerShellWorker(win, production);
+        expect(other.unregister).not.toHaveBeenCalled();
+    });
+
+    it('registers as usual when the question cannot be asked, as with no network', async () => {
+        const win = fakeWindow();
+        win.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+        await registerShellWorker(win, production);
+        expect(win.container.register).toHaveBeenCalledTimes(1);
+    });
+});
+
 describe('main.js', () => {
     const main = fs.readFileSync(path.resolve(__dirname, '../../src/main.js'), 'utf8');
 
@@ -158,6 +202,20 @@ describe('a new build arriving in an open tab', () => {
         win.container.controller = next;
         await win.container.emit('controllerchange');
         expect(win.location.reload).not.toHaveBeenCalled();
+    });
+
+    it('notices a worker that began installing before the registration call returned', async () => {
+        const win = fakeWindow({ controller: fakeWorker(['/js/app.11111111.js']) });
+        const next = fakeWorker(['/js/app.22222222.js']);
+        win.registration.installing = next;
+        await registerShellWorker(win, production);
+
+        next.state = 'installed';
+        win.registration.waiting = next;
+        await next.emit('statechange');
+        await flushPromises();
+
+        expect(updateReady.value).toBe(true);
     });
 
     it('does not reload a tab when another tab accepted; it shows the prompt there', async () => {

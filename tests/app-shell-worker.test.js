@@ -38,8 +38,8 @@ const serve = async (env = {}, dir = distDir) => {
     app.use(express.static(dir));
     const server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
     servers.push(server);
-    return async (route) => {
-        const res = await fetch(`http://127.0.0.1:${server.address().port}${route}`);
+    return async (route, method = 'GET') => {
+        const res = await fetch(`http://127.0.0.1:${server.address().port}${route}`, { method });
         return { status: res.status, headers: Object.fromEntries(res.headers), body: await res.text() };
     };
 };
@@ -100,6 +100,16 @@ describe('APP_SHELL_WORKER=off', () => {
             expect(res.headers['cache-control']).toBe('no-cache');
             expect(res.headers['content-type']).toMatch(/^text\/javascript/);
         }
+    });
+
+    it('says so in the header the app reads before it registers, and only while withdrawn', async () => {
+        const env = { APP_SHELL_WORKER: 'off' };
+        const get = await serve(env);
+        expect((await get('/sw.js', 'HEAD')).headers[rules.WITHDRAWN_HEADER]).toBe(rules.WITHDRAWN_VALUE);
+        env.APP_SHELL_WORKER = 'on';
+        const back = await get('/sw.js', 'HEAD');
+        expect(back.status).toBe(200);
+        expect(back.headers[rules.WITHDRAWN_HEADER]).toBeUndefined();
     });
 
     it('follows the setting on each request, without a rebuild', async () => {

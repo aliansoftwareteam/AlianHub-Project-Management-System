@@ -2,7 +2,7 @@ import { ref } from 'vue';
 import rules from './rules';
 import { STEP, isPageCurrent, pageScriptPaths, updateStep, controllerChangeStep, shouldCheckForUpdate } from './updateRules';
 
-const { MESSAGE, WORKER_PATH, isShellCache } = rules;
+const { MESSAGE, WORKER_PATH, WITHDRAWN_HEADER, WITHDRAWN_VALUE, isShellCache } = rules;
 const DESCRIBE_TIMEOUT_MS = 3000;
 
 export const updateReady = ref(false);
@@ -39,15 +39,17 @@ const onWaiting = async (worker, win) => {
 };
 
 const watchForWaiting = (container, win) => {
-    // With no controller the installing worker is this device's first; it replaces nothing.
-    if (registration.waiting && container.controller) onWaiting(registration.waiting, win);
-    registration.addEventListener('updatefound', () => {
-        const installing = registration.installing;
+    const follow = (installing) => {
         if (!installing) return;
         installing.addEventListener('statechange', () => {
+            // With no controller the installing worker is this device's first; it replaces nothing.
             if (installing.state === 'installed' && container.controller) onWaiting(installing, win);
         });
-    });
+    };
+    if (registration.waiting && container.controller) onWaiting(registration.waiting, win);
+    // register() itself starts the check, so the new worker may be installing before anyone listens for updatefound.
+    follow(registration.installing);
+    registration.addEventListener('updatefound', () => follow(registration.installing));
 };
 
 const watchForTakeover = (container, win) => {
@@ -75,9 +77,34 @@ const checkWhenLookedAt = (win) => {
     });
 };
 
+const isWithdrawn = async (win) => {
+    try {
+        const answer = await win.fetch(WORKER_PATH, { method: 'HEAD', cache: 'no-store' });
+        return answer.headers.get(WITHDRAWN_HEADER) === WITHDRAWN_VALUE;
+    } catch {
+        return false;
+    }
+};
+
+const isShellRegistration = (found, win) => [found.active, found.waiting, found.installing]
+    .some((worker) => worker && new URL(worker.scriptURL, win.location.origin).pathname === WORKER_PATH);
+
+/* The server also answers /sw.js with a worker that removes itself, which the browser installs on its
+ * own. Registering here again would bring the registration straight back, so the page stays out and
+ * removes what it can reach. */
+const withdraw = async (container, win) => {
+    const found = await container.getRegistration('/');
+    if (found && isShellRegistration(found, win)) await found.unregister();
+    if (win.caches) await Promise.all((await win.caches.keys()).map((name) => win.caches.delete(name)));
+};
+
 export const registerShellWorker = async (win = window, { production = process.env.NODE_ENV === 'production' } = {}) => {
     const container = win.navigator.serviceWorker;
     if (!shouldRegister({ production, supported: Boolean(container), secure: win.isSecureContext, userAgent: win.navigator.userAgent })) return null;
+    if (await isWithdrawn(win)) {
+        await withdraw(container, win).catch(() => {});
+        return null;
+    }
     try {
         registration = await container.register(WORKER_PATH, { scope: '/', updateViaCache: 'none' });
     } catch (error) {
