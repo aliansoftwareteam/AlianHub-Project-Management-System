@@ -408,9 +408,6 @@ html, body, #app {
 :root[data-theme="dark"] #my-dropdown,
 :root[data-theme="dark"] #my-image-slider,
 :root[data-theme="dark"] .bg-white,
-:root[data-theme="dark"] .pls__apps,
-:root[data-theme="dark"] .pto-card,
-:root[data-theme="dark"] .scim-card,
 :root[data-theme="dark"] .swal2-container,
 :root[data-theme="dark"] iframe { color-scheme: light; }
 :root[data-theme="dark"] .ah-app__view .ah-page,

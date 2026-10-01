@@ -54,9 +54,11 @@ describe('Settings → Templates in dark mode', () => {
 describe('Settings → Time off and SCIM cards', () => {
     const styles = (rel) => { const vue = read(rel); return vue.slice(vue.indexOf('<style')); };
 
-    test('the white cards carry dark ink, so dark mode does not put light text on them', () => {
-        expect(ruleBody(styles('views/Settings/TimeOff/TimeOff.vue'), '.pto-card')).toMatch(/color:\s*#17161c/);
-        expect(ruleBody(styles('views/Settings/Scim/ScimSettings.vue'), '.scim-card')).toMatch(/color:\s*#17161c/);
+    test('the cards are the shared card, so they take the surface and ink of the theme', () => {
+        expect(read('views/Settings/TimeOff/TimeOff.vue')).toMatch(/class="ah-card pto-card"/);
+        expect(read('views/Settings/Scim/ScimSettings.vue')).toMatch(/class="ah-card scim-card"/);
+        expect(ruleBody(styles('views/Settings/TimeOff/TimeOff.vue'), '.pto-card')).not.toMatch(/color/);
+        expect(ruleBody(styles('views/Settings/Scim/ScimSettings.vue'), '.scim-card')).not.toMatch(/color/);
     });
 
     test('hints and empty text drop the 2.6:1 grey', () => {
@@ -296,12 +298,12 @@ describe('Settings → Projects apps column', () => {
         expect(read('components/molecules/AdvanceSearch/style.css')).toMatch(/^\.pal \{[^}]*max-height/m);
     });
 
-    test('apps get their own row as a grid, in dark ink on the white card', () => {
+    test('apps get their own row as a grid, in the ink of the themed card', () => {
         const css = read('components/molecules/ProjectsListingSetting/style.css');
         const last = css.slice(css.lastIndexOf('.project_status_info_area {'));
         expect(ruleBody(last, '.p_erpApp')).toMatch(/flex:\s*1 0 100%/);
         expect(last).toMatch(/\.p_erpApp \.p__erpApp-wrapper \.pls__apps \{ display: grid; grid-template-columns: repeat\(auto-fill, minmax\(220px, 1fr\)\)/);
-        expect(last).toMatch(/\.pls__apps \{ --ink: #17161c;/);
+        expect(css).not.toMatch(/\.pls__apps \{ --ink/);
     });
 });
 
