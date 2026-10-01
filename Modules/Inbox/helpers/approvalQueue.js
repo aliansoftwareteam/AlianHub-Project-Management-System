@@ -5,6 +5,7 @@ const { ROLE_GUEST } = require('../../../Config/roleTypes');
 const access = require('../../Agents/access');
 const permissions = require('../../Agents/permissions');
 const intentPreview = require('../../Agents/intentPreview');
+const standingApprovals = require('../../Agents/standingApprovals');
 const logger = require('../../../Config/loggerConfig');
 
 // The queue is a view of the proposals the agent API already lists for this person
@@ -12,6 +13,7 @@ const logger = require('../../../Config/loggerConfig');
 // shown here that the person may not decide is refused there.
 
 const QUEUE_LIMIT = 100;
+const APPLIED_LIMIT = 20;
 const SOURCE_MCP = 'mcp';
 const SOURCE_SYSTEM = 'system';
 const PROJECT_PARAMS = Object.freeze(['projectId', 'listProjectId']);
@@ -26,6 +28,12 @@ const namedProjects = (proposal) => (Array.isArray(proposal.changes) ? proposal.
 /* projectIds is null for an owner or admin, who opens every project. */
 const staysInside = (projectIds) => (proposal) => !Array.isArray(projectIds)
     || namedProjects(proposal).every((id) => projectIds.includes(id));
+
+/* Whether "Always do this" is offered on the row, and the kind of change it would cover. */
+const alwaysOf = (caller, proposal) => {
+    const offered = access.mayDecideProposal(caller, proposal) && standingApprovals.offerable(proposal);
+    return offered ? { always: true, alwaysKind: standingApprovals.labelOf(proposal.changes[0].action) } : { always: false };
+};
 
 const toRow = (caller, previews) => (proposal) => ({
     sourceType: 'proposal',
@@ -46,6 +54,7 @@ const toRow = (caller, previews) => (proposal) => ({
     cost: proposal.cost || null,
     gate: proposal.gate || null,
     locked: !access.mayDecideProposal(caller, proposal),
+    ...alwaysOf(caller, proposal),
     // approval.refusalFor refuses an edited approval of a change a connected agent filed.
     editable: proposal.source !== SOURCE_MCP,
     tainted: Boolean(proposal.taint && proposal.taint.reason),
@@ -82,4 +91,19 @@ const readQueue = async (companyId, userId) => {
 
 const waitingCount = (rows) => rows.filter((row) => !row.locked).length;
 
-module.exports = { readQueue, waitingCount, QUEUE_LIMIT };
+/* What the person's own standing approvals applied, while each can still be undone from here. */
+const readApplied = async (companyId, userId) => {
+    const roleType = await getRoleType(companyId, userId);
+    if (roleType === null || roleType === undefined || roleType === ROLE_GUEST) return [];
+    const caller = { actor: { kind: 'human', userId: String(userId) }, human: true, privileged: isPrivileged(roleType) };
+    const scope = await access.readScopeOf(companyId, caller);
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AGENT_PROPOSALS,
+        data: [{ status: 'approved', decidedBy: String(userId), standingApprovalId: { $exists: true }, undoUntil: { $gt: new Date() }, ...access.proposalScopeClause(scope) }, {}, { sort: { createdAt: -1 }, limit: APPLIED_LIMIT }],
+    }, 'find');
+    const listed = (rows || []).map(plain).filter(staysInside(scope.projectIds));
+    const previews = await intentPreview.forProposals(companyId, userId, listed).catch(() => new Map());
+    return listed.map(toRow(caller, previews)).map((row, at) => ({ ...row, always: false, unread: false, undoUntil: listed[at].undoUntil }));
+};
+
+module.exports = { readQueue, readApplied, waitingCount, QUEUE_LIMIT };

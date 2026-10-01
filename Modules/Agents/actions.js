@@ -504,7 +504,7 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
     if (!(await threadMay(companyId, actor, action, params))) throw await refusal(companyId, actor, { action, params, reason: THREAD_REFUSAL, ip, taint });
     const closed = await targetRefusal(companyId, actor, action, params) || await draftRefusal(companyId, actor, action, params);
     if (closed) throw await refusal(companyId, actor, { action, params, reason: closed, ip, taint });
-    const rule = await projectPolicy.ask({ companyId, actor, action, params, approved });
+    const rule = await projectPolicy.ask({ companyId, actor, action, params, approved, taint, standing: true });
     if (rule.decision !== projectPolicy.DECISION.ACT) {
         const held = rule.decision === projectPolicy.DECISION.PROPOSE ? `${rule.reason}, so it waits for a person's approval` : rule.reason;
         throw await refusal(companyId, actor, { action, params, reason: held, ip, taint });
@@ -513,7 +513,11 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
     const exec = executors[action];
     if (!exec) throw new tools.DeterministicError(`${action} has no executor`);
 
-    const auditId = await audit.openAction(companyId, actor, { action, reason, params, cost, ip, entityId: params.taskId, taint });
+    const standing = rule.standing || null;
+    const auditId = await audit.openAction(companyId, actor, {
+        action, params, cost, ip, entityId: params.taskId, taint, standing,
+        reason: standing ? `${reason || action} (standing approval ${standing.id}, made by ${standing.madeBy})` : reason,
+    });
     let out;
     try {
         out = await exec({ companyId, actor, params, depth: clampDepth(depth) });
@@ -525,7 +529,11 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
         await completionStore.recordWork(companyId, params.taskId, workEntry(actor, 0));
     }
     await audit.applyAction(companyId, auditId, { undo: out.undo, entityType: out.entityType || 'task', entityId: out.entityId, entityName: out.entityName });
-    return { result: out.result, auditId, undo: out.undo, task: out.task || null };
+    if (standing) {
+        await require('./standingApprovals').recordUse(companyId, standing, { action, params, auditId, reason })
+            .catch((e) => logger.error(`[standing-approval] ${standing.id} applied ${action} (audit ${auditId}) but its use was not recorded: ${e.message}`));
+    }
+    return { result: out.result, auditId, undo: out.undo, task: out.task || null, ...(standing ? { standing } : {}) };
 };
 
 /* Reads still go through the registry so a refusal is logged the same way. */

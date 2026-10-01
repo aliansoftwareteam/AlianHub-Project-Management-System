@@ -56,12 +56,14 @@
                         </template>
                         <template v-else>
                             <span class="pm__text">{{ row.text }}</span>
+                            <span v-if="row.agentName" class="ah-small" data-test="note-agent">{{ $t('Memory.declined_for', { agent: row.agentName }) }}</span>
                             <span v-if="Number(row.occurrences) > 1" class="ah-small ah-mono" :title="$t('Memory.seen_n', { n: row.occurrences })">×{{ row.occurrences }}</span>
                             <span v-if="row.status === 'retired'" class="ah-chip ah-chip--dark">{{ $t('Memory.retired') }}</span>
                             <template v-if="privileged">
                                 <template v-if="row.status !== 'retired'">
                                     <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" data-test="edit" @click="startEdit(row)">{{ $t('Memory.edit') }}</button>
-                                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" data-test="retire" @click="retire(row)">{{ $t('Memory.retire') }}</button>
+                                    <button v-if="isDeclinedNote(row)" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" data-test="remove-note" @click="removeNote(row)">{{ $t('Memory.remove') }}</button>
+                                    <button v-else type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" data-test="retire" @click="retire(row)">{{ $t('Memory.retire') }}</button>
                                 </template>
                                 <button v-else type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" data-test="restore" @click="restore(row)">{{ $t('Memory.restore') }}</button>
                             </template>
@@ -104,7 +106,8 @@ defineOptions({ name: "ProjectMemoryCard" });
 
 const props = defineProps({ projectId: { type: String, required: true } });
 
-const ORIGIN_KEYS = { brief: "brief", "proposal.approve": "approved", owner: "owner", run: "run" };
+const ORIGIN_KEYS = { brief: "brief", "proposal.approve": "approved", "proposal.decline": "declined", owner: "owner", run: "run" };
+const KIND_CHIPS = { constraint: "ah-chip--warn", decision: "ah-chip--brand", declined: "" };
 
 const { getters } = useStore();
 const { t } = useI18n();
@@ -129,8 +132,9 @@ const retiredRows = computed(() => rows.value.filter((r) => r.status === "retire
 const visibleRows = computed(() => (showRetired.value ? rows.value : activeRows.value));
 const empty = computed(() => !guide.value && !assumptions.value.length && !rows.value.length && !episodes.value.length);
 
-const kindKey = (kind) => (String(kind || "").endsWith("constraint") ? "constraint" : "decision");
-const kindChip = (kind) => (kindKey(kind) === "constraint" ? "ah-chip--warn" : "ah-chip--brand");
+const kindKey = (kind) => ["constraint", "declined"].find((key) => String(kind || "").endsWith(key)) || "decision";
+const kindChip = (kind) => KIND_CHIPS[kindKey(kind)];
+const isDeclinedNote = (row) => kindKey(row.kind) === "declined";
 const originKey = (source) => ORIGIN_KEYS[source?.origin] || "other";
 const when = (at) => (at ? convertDateFormat(at, "", { showDayName: false }) : "");
 
@@ -177,6 +181,10 @@ const saveEdit = async (row) => {
 };
 
 const retire = (row) => attempt(() => retireRow(row.id, props.projectId));
+// A typed reason is a person's own words, so removing it deletes it; there is nothing to restore.
+const removeNote = async (row) => {
+    if (await attempt(() => retireRow(row.id, props.projectId))) rows.value = rows.value.filter((kept) => kept.id !== row.id);
+};
 const restore = (row) => attempt(() => updateRow(row.id, { projectId: props.projectId, status: "active" }));
 
 watch(() => props.projectId, (id) => {

@@ -8,7 +8,7 @@ export const decideOne = async (send, id, verb, body, fallback) => {
         const res = await send(id, verb, body);
         if (!res?.data?.status) return { id, ok: false, error: refusalOf(res, fallback) };
         const data = res.data.data || {};
-        return { id, ok: true, undo: Boolean(data.undoUntil), unapplied: unappliedOf(data) };
+        return { id, ok: true, undo: Boolean(data.undoUntil), unapplied: unappliedOf(data), standing: data.standing || null };
     } catch (error) {
         return { id, ok: false, error: refusalOf(error, fallback) };
     }

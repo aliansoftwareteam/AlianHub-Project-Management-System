@@ -1495,6 +1495,33 @@ const schema = {
         oauthClientId: { type: String, required: false },
         oauthGrantId: { type: String, required: false },
         allowedActions: { type: Array, required: false },
+        // Set on a change a standing approval applied: it is filed already approved, by the person who made that approval.
+        standingApprovalId: { type: String, required: false },
+    },
+    // "Always do this": one kind of change, by one connection, in one project — managed by Modules/Agents/standingApprovals.js.
+    agentStandingApprovals: {
+        projectId: { type: String, required: true },
+        action: { type: String, required: true },
+        label: { type: String, required: false },
+        // the connection it covers: a personal token, or an outside client's grant
+        tokenId: { type: String, required: false },
+        oauthClientId: { type: String, required: false },
+        oauthGrantId: { type: String, required: false },
+        // the person behind that connection
+        requestedBy: { type: String, required: true },
+        agentId: { type: String, required: false },
+        agentName: { type: String, required: false },
+        madeBy: { type: String, required: true },
+        madeAt: { type: Date, required: true },
+        proposalId: { type: String, required: false },
+        expiresAt: { type: Date, required: true },
+        // active | ended
+        status: { type: String, default: 'active', required: true },
+        endedAt: { type: Date, required: false },
+        endedBy: { type: String, required: false },
+        endedBecause: { type: String, required: false },
+        uses: { type: Number, default: 0, required: false },
+        lastUsedAt: { type: Date, required: false },
     },
     automationRuns: {
         ruleId: { type: String, required: true },

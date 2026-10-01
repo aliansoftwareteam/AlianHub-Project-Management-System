@@ -139,8 +139,11 @@ const closes = async (companyId, action, params) => {
 /* What the projects a write reaches hold it to: act as the caller's other rules allow, wait for a person, or
  * not at all. `approved` is true only where a person has approved this very change. A write that names no
  * project, a goal's for one, is outside every project's rule. An action the registry marks proposeOnly waits
- * for a person whatever a project is set to: answered here, a caller files it instead of meeting the registry's refusal. */
-const ask = async ({ companyId, actor, action, params = {}, approved = false }) => {
+ * for a person whatever a project is set to: answered here, a caller files it instead of meeting the registry's refusal.
+ * `standing` is passed only by a caller that names the standing approval in the change's audit row. A standing
+ * approval turns one answer, a connected agent's change that would wait, into "act" and comes back with it;
+ * it never answers for a close, for a refusal, or for a proposeOnly action. */
+const ask = async ({ companyId, actor, action, params = {}, approved = false, standing = false, taint = null }) => {
     const entry = registry.get(action);
     if (!isAgent(actor) || !entry || !entry.write || ASKS_NOTHING.has(entry.key)) return act;
     if (entry.proposeOnly && !approved) return { decision: DECISION.PROPOSE, reason: REASON.PROPOSE_ONLY };
@@ -151,7 +154,8 @@ const ask = async ({ companyId, actor, action, params = {}, approved = false }) 
     if (!projectIds.length) return act;
     const policies = await Promise.all(projectIds.map((id) => read(companyId, id)));
 
-    if (mayClose && await closes(companyId, entry.key, given)) {
+    const closing = mayClose && await closes(companyId, entry.key, given);
+    if (closing) {
         const company = await accounts.getPolicy(companyId);
         const workspace = company.requireCheckBeforeDone ? WORKSPACE_CHECK_HOLDS_TO : DONE.YES;
         const done = policies.map((policy) => policy.done).reduce(stricterDone, workspace);
@@ -159,10 +163,17 @@ const ask = async ({ companyId, actor, action, params = {}, approved = false }) 
         if (done === DONE.APPROVAL && !approved) return { decision: DECISION.PROPOSE, reason: REASON.APPROVAL };
     }
     if (!approved && isConnected(actor) && policies.some((policy) => policy.connected === CONNECTED.PROPOSE_ALL)) {
-        return { decision: DECISION.PROPOSE, reason: REASON.PROPOSE_ALL };
+        const covered = standing && !closing
+            ? await require('./standingApprovals').covering({ companyId, actor, action: entry.key, params: given, projectIds, taint })
+            : null;
+        return covered ? { ...act, standing: covered } : { decision: DECISION.PROPOSE, reason: REASON.PROPOSE_ALL };
     }
     return act;
 };
+
+/* Whether a project now holds agents back where it did not before. */
+const tightened = (from, to) => DONE_BY_STRICTNESS.indexOf(to.done) > DONE_BY_STRICTNESS.indexOf(from.done)
+    || (from.connected !== CONNECTED.PROPOSE_ALL && to.connected === CONNECTED.PROPOSE_ALL);
 
 /* The stricter of a verdict already reached and what the project holds the change to, in the verdict's shape. */
 const review = async ({ companyId, actor, action, params, verdict }) => {
@@ -171,4 +182,4 @@ const review = async ({ companyId, actor, action, params, verdict }) => {
     return holds ? { ...verdict, decision: rule.decision, reason: rule.reason } : verdict;
 };
 
-module.exports = { DONE, CONNECTED, DEFAULTS, DECISION, REASON, read, effective, save, ask, review, isConnected };
+module.exports = { DONE, CONNECTED, DEFAULTS, DECISION, REASON, STATUS_ACTIONS, ASKS_NOTHING, read, effective, save, ask, review, isConnected, closes, projectsOf, tightened };

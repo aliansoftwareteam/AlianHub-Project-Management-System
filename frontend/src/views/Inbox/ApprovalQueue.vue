@@ -114,6 +114,23 @@
                         <button type="button" class="aq__skip" :disabled="busy" data-test="queue-decline-skip" @click="decline(p, '')">{{ t('Ai.decline_no_reason') }}</button>
                     </div>
                 </div>
+                <div
+                    v-else-if="alwaysFor === p.proposalId"
+                    :ref="holdAlwaysPanel"
+                    class="aq__decline aq__always"
+                    role="group"
+                    tabindex="-1"
+                    :aria-label="t('Inbox.always_title')"
+                    data-test="queue-always-panel"
+                >
+                    <div class="aq__label">{{ t('Inbox.always_title') }}</div>
+                    <p class="aq__lead">{{ t('Inbox.always_body', { agent: whoOf(p), kind: p.alwaysKind }) }}</p>
+                    <p class="aq__lead">{{ t('Inbox.always_limits', { days: STANDING_DAYS }) }}</p>
+                    <div class="aq__actions">
+                        <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" data-test="queue-always-confirm" @click="approveAlways(p)">{{ t('Inbox.always_confirm') }}</button>
+                        <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" data-test="queue-always-cancel" @click="alwaysFor = ''">{{ t('Ai.cancel') }}</button>
+                    </div>
+                </div>
                 <div v-else class="aq__actions">
                     <button
                         type="button"
@@ -141,9 +158,41 @@
                         :aria-label="t('Inbox.queue_decline_named', { what: titleOf(p) })"
                         @click="openDecline(p)"
                     >{{ t('Inbox.decline') }}</button>
+                    <button
+                        v-if="p.always"
+                        type="button"
+                        class="ah-btn ah-btn--ghost ah-btn--sm"
+                        :disabled="busy || reviewing || isEditing(p)"
+                        data-test="queue-always"
+                        :aria-label="t('Inbox.always_named', { what: titleOf(p) })"
+                        @click="openAlways(p)"
+                    >{{ t('Inbox.always') }}</button>
                 </div>
             </li>
         </ul>
+
+        <div v-if="applied.length" class="aq__done" data-test="queue-applied-list">
+            <h2 class="aq__review-title">{{ t('Inbox.always_done_title') }}</h2>
+            <p class="aq__lead">{{ t('Inbox.always_done_lead') }}</p>
+            <ul class="aq__list">
+                <li v-for="p in applied" :key="p.proposalId" class="aq__row aq__row--done" data-test="queue-applied" :data-id="p.proposalId">
+                    <div class="aq__head">
+                        <span class="ah-avatar ah-avatar--agent" aria-hidden="true"><ShellIcon name="agent" :size="12" /></span>
+                        <span class="aq__what"><strong>{{ whoOf(p) }}</strong> {{ t('Inbox.always_did') }} {{ titleOf(p) }}</span>
+                        <time v-if="stamp(p.createdAt)" class="aq__when" :title="p.createdAt">{{ stamp(p.createdAt) }}</time>
+                        <button
+                            type="button"
+                            class="ah-btn ah-btn--secondary ah-btn--sm"
+                            :disabled="busy"
+                            data-test="queue-applied-undo"
+                            :aria-label="t('Inbox.always_undo_named', { what: titleOf(p) })"
+                            @click="undoApplied(p)"
+                        >{{ t('Inbox.undo') }}</button>
+                    </div>
+                    <p v-if="errors[p.proposalId]" class="ah-field__error aq__error" role="alert">{{ errors[p.proposalId] }}</p>
+                </li>
+            </ul>
+        </div>
     </section>
 </template>
 
@@ -165,14 +214,16 @@ defineOptions({ name: 'ApprovalQueue' });
 
 const props = defineProps({
     proposals: { type: Array, required: true },
+    applied: { type: Array, default: () => [] },
     stamp: { type: Function, default: () => '' },
 });
-const emit = defineEmits(['decided']);
+const emit = defineEmits(['decided', 'undone']);
 
 const SLACK_POST = 'slack.message.post';
 const SOURCE_MCP = 'mcp';
 const SOURCE_SYSTEM = 'system';
 const DECLINE_REASON_MAX = 200;
+const STANDING_DAYS = 90;
 const REVIEW_TITLE_ID = 'aq-review-title';
 const SELECT_ALL_ID = 'aq-select-all';
 
@@ -192,6 +243,9 @@ const kept = ref([]);
 const declining = ref('');
 const declineReason = ref('');
 const declineNote = ref('');
+const alwaysFor = ref('');
+let alwaysPanel = null;
+const holdAlwaysPanel = (el) => { alwaysPanel = el; };
 
 // A connected agent's proposal is filed under its tool's name and description, which is no sentence for a person.
 const onlyPreview = (p) => (p.source === SOURCE_MCP && (p.changes || []).length === 1 ? p.changes[0].preview : null);
@@ -249,6 +303,7 @@ const pickReason = (key) => {
 };
 const declineValue = computed(() => declineReason.value || declineNote.value.slice(0, DECLINE_REASON_MAX));
 const openDecline = (p) => {
+    alwaysFor.value = '';
     declining.value = p.proposalId;
     declineReason.value = '';
     declineNote.value = '';
@@ -262,10 +317,37 @@ const decline = async (p, reason) => {
     settle(p, 'decline', result);
 };
 
+const openAlways = async (p) => {
+    declining.value = '';
+    alwaysFor.value = p.proposalId;
+    await nextTick();
+    alwaysPanel?.focus();
+};
+const approveAlways = async (p) => {
+    busy.value = true;
+    summary.value = '';
+    const result = await send(p.proposalId, 'approve', { always: true });
+    busy.value = false;
+    if (result.ok) {
+        alwaysFor.value = '';
+        summary.value = result.standing ? t('Inbox.always_made', { agent: whoOf(p) }) : failuresLine(result.unapplied);
+    }
+    settle(p, 'approve', result);
+};
+const undoApplied = async (p) => {
+    busy.value = true;
+    const result = await send(p.proposalId, 'undo', {});
+    busy.value = false;
+    if (!result.ok) { errors[p.proposalId] = result.error; return; }
+    delete errors[p.proposalId];
+    emit('undone', { id: p.proposalId });
+};
+
 const openReview = async () => {
     reviewIds.value = [...pickedIds.value];
     editing.value = '';
     declining.value = '';
+    alwaysFor.value = '';
     reviewing.value = true;
     await nextTick();
     reviewEl.value?.focus();
@@ -315,7 +397,9 @@ const approveReviewed = async () => {
 .aq__review-list { display: flex; flex-direction: column; gap: var(--sp-3, 8px); max-height: 40dvh; overflow: auto; }
 .aq__review-item { padding-top: var(--sp-3, 8px); border-top: 1px solid var(--hairline); display: flex; flex-direction: column; gap: 4px; }
 .aq__row { border-left: 3px solid var(--agent); display: flex; flex-direction: column; gap: var(--gap-row, 7px); min-width: 0; }
-.aq__row.is-locked { border-left-color: var(--border); }
+.aq__row.is-locked, .aq__row--done { border-left-color: var(--border); }
+.aq__done { display: flex; flex-direction: column; gap: var(--sp-3, 8px); padding-top: var(--sp-3, 8px); }
+.aq__always:focus-visible { outline: none; box-shadow: var(--focus); }
 .aq__head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .aq__what { flex: 1 1 12ch; min-width: 0; overflow-wrap: anywhere; color: var(--ink); }
 .aq__what strong { font-weight: 600; }
