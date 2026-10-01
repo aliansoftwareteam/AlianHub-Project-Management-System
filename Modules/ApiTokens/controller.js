@@ -99,18 +99,18 @@ exports.createToken = async (req, res) => {
 
 const GRANT_REFUSALS = Object.freeze({
     unknown: 'grants must be a list drawn from: ',
-    off: 'The task management tools are not switched on for this server (MCP_TOOLS_MANAGE).',
-    readOnly: 'A token can manage tasks only when it has the write scope.',
+    off: 'The management tools are not switched on for this server (MCP_TOOLS_MANAGE).',
+    readOnly: 'A token can be given a grant only when it has the write scope.',
 });
 
 /* The grants a new agent token is created with, or why the request is refused. */
 const grantsFor = (asked, scopes) => {
     if (asked === undefined || asked === null) return { grants: [] };
-    if (!Array.isArray(asked) || asked.some((grant) => grant !== manageFlag.GRANT)) return { refusal: `${GRANT_REFUSALS.unknown}${manageFlag.GRANT}.` };
+    if (!Array.isArray(asked) || asked.some((grant) => !manageFlag.GRANTS.includes(grant))) return { refusal: `${GRANT_REFUSALS.unknown}${manageFlag.GRANTS.join(', ')}.` };
     if (!asked.length) return { grants: [] };
     if (!manageFlag.enabled()) return { refusal: GRANT_REFUSALS.off };
     if (!scopes.includes('write')) return { refusal: GRANT_REFUSALS.readOnly };
-    return { grants: [manageFlag.GRANT] };
+    return { grants: manageFlag.GRANTS.filter((grant) => asked.includes(grant)) };
 };
 
 /* POST /api/v2/api-tokens/mcp  body: { name, mode?, provider?, projectIds?, expiresInDays?, grants?, scopes? (strict mode only) }
@@ -179,7 +179,7 @@ exports.listTokens = async (req, res) => {
             strict, minExpiryDays: MIN_EXPIRY_DAYS, maxExpiryDays: maxExpiryDaysFor({ strict }), scopes: [...SCOPES], graceDays: STRICT_GRACE_DAYS,
             strictSince: since,
             ...(stepCredentialsEnabled() ? { stepCredentials: true } : {}),
-            ...(manageFlag.enabled() ? { grants: [manageFlag.GRANT] } : {}),
+            ...(manageFlag.enabled() ? { grants: [...manageFlag.GRANTS] } : {}),
         };
         const lifetimes = await lifetimeStandings(tokens || [], { strict, now });
         const data = (tokens || []).map((doc, i) => maskToken(doc, graceStanding(doc, { strict, strictSince: since, now }), lifetimes[i]));

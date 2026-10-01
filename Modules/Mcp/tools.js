@@ -25,6 +25,8 @@ const { taskRow, planRow } = require('./taskRows');
 const str = (v, max = 500) => String(v === undefined || v === null ? '' : v).slice(0, max);
 const clampLimit = (v, def = 10, max = 50) => Math.min(Math.max(parseInt(v, 10) || def, 1), max);
 
+const { managesTasks } = manageFlag;
+
 const taskFilter = (ctx, vis, narrowTo, extra = {}) => ({
     CompanyId: String(ctx.companyId), deletedStatusKey: { $ne: 1 }, ...extra, ...vis.taskClause(narrowTo),
 });
@@ -87,7 +89,7 @@ const TOOLS = [
             const filter = taskFilter(ctx, vis, args.projectId);
             if (args.query) filter.TaskName = { $regex: str(args.query, 120).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
             if (args.status) filter.status = { $regex: `^${str(args.status, 60)}$`, $options: 'i' };
-            const planning = manageFlag.enabled();
+            const planning = managesTasks(ctx);
             if (planning) {
                 const more = manageTools.searchFilter(args);
                 if (more.error) return { error: more.error };
@@ -111,7 +113,9 @@ const TOOLS = [
         visibility: 'filtered',
         run: async (ctx, args, vis) => {
             const brief = await buildBrief(ctx, str(args.taskId, 40), vis);
-            return v2.enabled() && brief && !brief.error ? briefWithNames(ctx, brief) : brief;
+            if (!brief || brief.error) return brief;
+            const named = v2.enabled() ? await briefWithNames(ctx, brief) : brief;
+            return managesTasks(ctx) ? manageTools.planBrief(ctx, named) : named;
         },
     },
     {
@@ -246,16 +250,24 @@ const FLAGGED_TOOLS = [
 
 const SEARCH_FOR_PLANNING = 'Search tasks you can see by text, status, project, list, assignee or due date. Each task carries its assignees, dates, estimate, subtask count and the tasks above it.';
 
-const withPlanning = (t) => (t.name === 'tasks.search' && manageFlag.enabled()
-    ? { ...t, description: SEARCH_FOR_PLANNING, input: { ...t.input, properties: { ...t.input.properties, ...manageTools.SEARCH_INPUT } } }
-    : t);
+const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...dataTools.offered(), ...manageTools.offered(), ...sessionTools.offered()];
 
-const offered = () => [...TOOLS.map(withPlanning), ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...dataTools.offered(), ...manageTools.offered(), ...sessionTools.offered()];
-
-const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...dataTools.TOOLS, ...manageTools.TOOLS, ...sessionTools.TOOLS];
+const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...dataTools.TOOLS, ...manageTools.TOOLS, ...Object.values(manageTools.VARIANTS), ...sessionTools.TOOLS];
 
 /* A tool that needs a grant is one only a write token created with that grant lists or runs. */
-const holdsGrantFor = (ctx, tool) => !tool.grant || (Boolean(ctx) && Boolean(ctx.canWrite) && manageFlag.holdsGrant(ctx.token));
+const holdsGrantFor = (ctx, tool) => !tool.grant || (Boolean(ctx) && Boolean(ctx.canWrite) && manageFlag.holdsGrant(ctx.token, tool.grant));
+
+/* For a caller whose token was created to manage tasks, an existing tool is its fuller form; for everyone else it is as it was. */
+const formFor = (ctx, tool) => {
+    const variant = manageTools.variantOf(tool.name);
+    if (variant && holdsGrantFor(ctx, variant)) return variant;
+    if (tool.name === 'tasks.search' && managesTasks(ctx)) {
+        return { ...tool, description: SEARCH_FOR_PLANNING, input: { ...tool.input, properties: { ...tool.input.properties, ...manageTools.SEARCH_INPUT } } };
+    }
+    return tool;
+};
+
+const toolsFor = (ctx) => offered().filter((tool) => holdsGrantFor(ctx, tool)).map((tool) => formFor(ctx, tool));
 
 const toolNames = () => offered().map((t) => t.name);
 
@@ -266,7 +278,7 @@ const PAGE_INPUT = Object.freeze({
 
 /* With a caller, the tools that caller may use; without one (the public manifest), every tool this server offers. */
 const manifest = (ctx = null) => {
-    const listed = ctx ? offered().filter((t) => holdsGrantFor(ctx, t)) : offered();
+    const listed = ctx ? toolsFor(ctx) : offered();
     if (!v2.enabled()) return listed.map((t) => ({ name: t.name, description: t.description, inputSchema: t.input }));
     return listed.map((t) => ({
         name: t.name,
@@ -277,7 +289,7 @@ const manifest = (ctx = null) => {
 };
 
 const actionOf = (name) => { const tool = offered().find((t) => t.name === String(name)); return tool ? tool.action : null; };
-const actionsOffered = () => offered().map((t) => t.action);
+const actionsOffered = () => [...offered(), ...Object.values(manageTools.VARIANTS).filter((t) => registry.has(t.action))].map((t) => t.action);
 
 /* An OAuth token is held to the one scope the tool needs; a personal token keeps its read/write rule. */
 const PAGE_ARGS = Object.freeze({ cursor: { type: 'string', maxLength: 2000 }, limit: { type: 'integer', minimum: 1, maximum: cursor.PAGE_MAX } });
@@ -289,7 +301,8 @@ const refuseBadArguments = (tool, args) => {
 };
 
 const scopeRefusal = (ctx, tool, write) => {
-    if (!holdsGrantFor(ctx, tool)) return `This token was not created with the ${tool.grant} grant, which ${tool.name} needs.`;
+    if (tool.grant && !manageFlag.holdsGrant(ctx.token, tool.grant)) return `This token was not created with the ${tool.grant} grant, which ${tool.name} needs.`;
+    if (tool.grant && !ctx.canWrite) return 'This token is read-only.';
     if (ctx.token && ctx.token.oauth) {
         const needed = scopes.scopeForTool(tool.name);
         return needed && scopes.grantedScopes(ctx.token).includes(needed) ? '' : `This token lacks the ${needed || 'required'} scope.`;
@@ -302,8 +315,9 @@ const scopeRefusal = (ctx, tool, write) => {
  * writes go through actions.perform, so they are audited and undoable. */
 const call = async (ctx, name, args = {}) => {
     if (sessionTools.owns(name)) return sessionTools.call(ctx, name, args);
-    const tool = offered().find((t) => t.name === String(name));
-    if (!tool) throw Object.assign(new Error(`Unknown tool "${name}"`), { code: -32601 });
+    const plain = offered().find((t) => t.name === String(name));
+    if (!plain) throw Object.assign(new Error(`Unknown tool "${name}"`), { code: -32601 });
+    const tool = formFor(ctx, plain);
     await require('../Workflows/externalSession').checkToolCall(ctx, tool.name);
     if (!['filtered', 'none'].includes(tool.visibility)) throw new Error(`${tool.name} declares no visibility`);
     const filtered = tool.visibility === 'filtered';
@@ -322,6 +336,7 @@ const call = async (ctx, name, args = {}) => {
     const refused = scopeRefusal(ctx, tool, true);
     if (refused) throw Object.assign(new Error(refused), { code: -32004 });
     refuseBadArguments(tool, args);
+    if (tool.batch) return runBatch(ctx, tool, args);
     const params = tool.params(args);
     if (filtered) {
         try {
@@ -348,5 +363,36 @@ const call = async (ctx, name, args = {}) => {
     });
     return { ok: true, auditId: out.auditId, result: out.result || null, undoable: Boolean(out.undo) };
 };
+
+/* One operation of a batch: a write tool this caller has, run exactly as a call of its own, with its outcome instead of a throw. */
+const batchItem = async (ctx, operation) => {
+    const name = String(operation.tool);
+    const tool = toolsFor(ctx).find((t) => t.name === name);
+    if (!tool || tool.run || tool.batch || sessionTools.owns(name)) return { ok: false, error: `${name} is not a write tool a batch can run` };
+    try {
+        return await call(ctx, name, operation.arguments);
+    } catch (error) {
+        if (error instanceof actions.RefusedError) return { ok: false, refused: true, reason: error.message, auditId: error.auditId || null };
+        return { ok: false, error: error.message };
+    }
+};
+
+async function runBatch(ctx, tool, args) {
+    const items = [];
+    for (const [index, operation] of args.operations.entries()) {
+        items.push({ index, tool: String(operation.tool), ...(await batchItem(ctx, operation)) });
+    }
+    const applied = items.filter((item) => item.ok === true && item.auditId);
+    const first = applied.length ? args.operations[applied[0].index].arguments : {};
+    const group = applied.length ? await actions.perform({
+        companyId: ctx.companyId, actor: ctx.actor, action: tool.action, ip: ctx.ip, allowedActions: ctx.allowedActions,
+        params: { auditIds: applied.map((item) => item.auditId), tools: applied.map((item) => item.tool), ...(first.taskId ? { taskId: str(first.taskId, 40) } : {}), ...(first.projectId ? { projectId: str(first.projectId, 40) } : {}) },
+        reason: str(args.reason, 500) || `${tool.name} via MCP`,
+    }) : null;
+    return {
+        ok: items.every((item) => item.ok === true), applied: applied.length, notApplied: items.length - applied.length,
+        auditId: group ? group.auditId : null, undoable: Boolean(group && group.undo), items,
+    };
+}
 
 module.exports = { TOOLS, names: toolNames, manifest, call, registered, actionOf, actionsOffered };

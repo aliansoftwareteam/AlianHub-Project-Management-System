@@ -5,8 +5,8 @@
             <img v-else :src="getImageData(props.cfIcon)" :alt="props.cfTitle">
         </div>
         <div class="custom_field__wrapper-tittle">
-            <h5 class="font-ui font-size-14 font-weight-500 line-height-22px">{{props.cfTitle}}</h5>
-            <span class="font-ui font-size-13 font-weight-400 gray">{{props.cfDescrption}}</span>
+            <h5 class="font-ui font-size-14 font-weight-500 line-height-22px custom_field__wrapper-name">{{props.cfTitle}}</h5>
+            <span class="font-ui font-size-13 font-weight-400 custom_field__wrapper-hint">{{props.cfDescrption}}</span>
         </div>
     </div>
 </template>
@@ -41,4 +41,6 @@ const { getImageData } = useCustomFieldImage();
 <style scoped>
     @import './style.css';
     .custom_field__wrapper-icon { display: block; margin: 0 auto; color: var(--ink-2); }
+    .custom_field__wrapper-name { color: var(--ink); }
+    .custom_field__wrapper-hint { color: var(--ink-2); }
 </style>

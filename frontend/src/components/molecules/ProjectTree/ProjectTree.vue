@@ -2,8 +2,15 @@
     <ul ref="treeEl" class="pt" role="tree" :aria-label="label" @keydown="onKeydown" @focusin="onFocusin">
         <li v-for="row in rows" :key="row.key" role="none">
             <div role="none" class="pt-row" :class="[`pt-row--l${row.level}`, { 'is-current': row.key === currentKey }]">
+                <SprintRenameInput
+                    v-if="row.key === renamingKey && row.kind === 'sprint'"
+                    :project="openProject"
+                    :sprint="{ id: row.id, name: row.name, folderId: row.folderId || '' }"
+                    :sprints="openSprints"
+                    @done="endRename(row.key)"
+                />
                 <FolderRenameInput
-                    v-if="row.key === renamingKey"
+                    v-else-if="row.key === renamingKey"
                     :project="openProject"
                     :folder="{ id: row.id, name: row.name, parentFolderId: row.parentFolderId }"
                     :folders="openFolders"
@@ -52,6 +59,15 @@
                     @reveal="expanded[`folder:${$event}`] = true"
                     @rename="renamingKey = row.key"
                 />
+                <SprintRowMenu
+                    v-if="row.kind === 'sprint' && row.projectId === openProjectId && row.key !== renamingKey"
+                    :ref="(el) => setMenuRef(row.key, el)"
+                    :project="openProject"
+                    :sprint="{ id: row.id, name: row.name, folderId: row.folderId || '' }"
+                    :folders="openFolders"
+                    @reveal="revealFolder"
+                    @rename="renamingKey = row.key"
+                />
                 <button
                     v-if="row.expandable"
                     type="button"
@@ -81,6 +97,8 @@ import { projectColor } from "@/components/molecules/Home/homeFormat";
 import { folderIdOf, isLiveFolder } from "@/utils/folderTree";
 import FolderRenameInput from "./FolderRenameInput.vue";
 import FolderRowMenu from "./FolderRowMenu.vue";
+import SprintRenameInput from "./SprintRenameInput.vue";
+import SprintRowMenu from "./SprintRowMenu.vue";
 import { treeCache, loadProjectTree } from "./projectTreeData";
 import { folderRowKeys, identitiesOf, projectBranch, treeRoute, visibleRows } from "./projectTreeModel";
 
@@ -131,7 +149,7 @@ const currentKey = computed(() => {
 
 const colorOf = (id) => projectColor(props.projects.find((project) => String(project._id) === id) || {});
 
-/* Folder actions read the project's permission rules, and the store holds those of the open project alone. */
+/* Folder and list actions read the project's permission rules, and the store holds those of the open project alone. */
 const openProjectId = computed(() => String(route.params?.id || ""));
 const openProject = computed(() => props.projects.find((project) => String(project._id) === openProjectId.value) || { _id: openProjectId.value });
 const openFolders = computed(() => sourceOf(openProjectId.value)?.folders || []);
@@ -168,6 +186,10 @@ function setExpanded(key, open) {
 
 function toggle(row) {
     setExpanded(row.key, !row.expanded);
+}
+
+function revealFolder(folderId) {
+    folderRowKeys(openFolders.value, folderId).forEach((key) => { expanded[key] = true; });
 }
 
 watch(() => [route.params?.id, route.params?.folderId, openFolders.value.length], ([id, folderId]) => {

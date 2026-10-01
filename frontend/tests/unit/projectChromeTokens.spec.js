@@ -436,6 +436,7 @@ describe('the project tree in the classic look', () => {
         expect(size(TREE, '.pt-row--l4 .pt-row__link', 'padding-left', 'classic')).toBe(52);
         expect(size(TREE_RENAME, '.pt-row__rename', 'margin-left', 'classic')).toBe(16);
         expect(size(TREE_RENAME, '.pt-row--l3 .pt-row__rename', 'margin-left', 'classic')).toBe(30);
+        expect(size(TREE_RENAME, '.pt-row--l4 .pt-row__rename', 'margin-left', 'classic')).toBe(44);
     });
 
     it('the rename field and the close button keep their sizes', () => {

@@ -262,13 +262,13 @@ describe('subfolders in the project tree', () => {
 
     it('offers every action on a top-level folder, and all but a new subfolder on a subfolder', async () => {
         const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
-        expect(await openMenu(wrapper, 'Empty folder')).toEqual(['Projects.new_subfolder', 'Projects.rename', 'Projects.move_folder', 'Projects.archive', 'Projects.delete']);
-        expect(await openMenu(wrapper, 'Child folder')).toEqual(['Projects.rename', 'Projects.move_folder', 'Projects.archive', 'Projects.delete']);
+        expect(await openMenu(wrapper, 'Empty folder')).toEqual(['Projects.new_list', 'Projects.new_subfolder', 'Projects.rename', 'Projects.move_folder', 'Projects.archive', 'Projects.delete']);
+        expect(await openMenu(wrapper, 'Child folder')).toEqual(['Projects.new_list', 'Projects.rename', 'Projects.move_folder', 'Projects.archive', 'Projects.delete']);
     });
 
     it('offers no move on a folder that holds subfolders: it has nowhere to go', async () => {
         const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
-        expect(await openMenu(wrapper, 'Parent folder')).toEqual(['Projects.new_subfolder', 'Projects.rename', 'Projects.archive', 'Projects.delete']);
+        expect(await openMenu(wrapper, 'Parent folder')).toEqual(['Projects.new_list', 'Projects.new_subfolder', 'Projects.rename', 'Projects.archive', 'Projects.delete']);
     });
 
     it('opens a folder\'s actions from the keyboard and closes them with Escape', async () => {
@@ -296,21 +296,21 @@ describe('subfolders in the project tree', () => {
     const deny = (...keys) => keys.forEach((key) => { perms[`project.${key}`] = false; });
 
     it('offers nothing to someone who holds no folder permission', async () => {
-        deny('project_folder_create', 'project_folder_name_edit', 'folder_archive', 'folder_delete');
+        deny('project_sprint_create', 'project_folder_create', 'project_folder_name_edit', 'folder_archive', 'folder_delete');
         const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
         expect(menuOf(wrapper, 'Empty folder')).toBeNull();
         expect(menuOf(wrapper, 'Child folder')).toBeNull();
     });
 
     it('lets someone who may only rename folders rename and move one', async () => {
-        deny('project_folder_create', 'folder_archive', 'folder_delete');
+        deny('project_sprint_create', 'project_folder_create', 'folder_archive', 'folder_delete');
         const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
         expect(await openMenu(wrapper, 'Empty folder')).toEqual(['Projects.rename', 'Projects.move_folder']);
         expect(await openMenu(wrapper, 'Parent folder')).toEqual(['Projects.rename']);
     });
 
     it('lets someone who may only archive folders archive one', async () => {
-        deny('project_folder_create', 'project_folder_name_edit', 'folder_delete');
+        deny('project_sprint_create', 'project_folder_create', 'project_folder_name_edit', 'folder_delete');
         const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
         expect(await openMenu(wrapper, 'Child folder')).toEqual(['Projects.archive']);
     });

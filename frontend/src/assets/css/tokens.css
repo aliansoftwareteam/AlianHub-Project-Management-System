@@ -114,6 +114,8 @@
     /* A text row of a data table is as tall as a List row: the padding that centres one line of row type in it. */
     --table-pad-y: calc((var(--row-h) - var(--row-font) * var(--lh-body)) / 2);
 
+    /* A token surface inside a host that keeps light controls (see the color-scheme list below) sets color-scheme: var(--scheme) on itself. */
+    --scheme: light;
     color-scheme: light;
 }
 
@@ -168,6 +170,7 @@
     --agent-bg: rgba(168, 146, 255, .16);
     --shadow-ink: rgba(0, 0, 0, .3);
 
+    --scheme: dark;
     color-scheme: dark;
 }
 
