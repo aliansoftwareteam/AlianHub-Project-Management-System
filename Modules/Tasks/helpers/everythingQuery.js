@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { ownOrNotPersonal } = require('../../PersonalList/ownership');
+const { arrangeRules, rolePermission } = require('../../../Config/rulePermissions');
 
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 50;
@@ -14,6 +15,8 @@ const PLAIN_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const UNASSIGNED = 'unassigned';
 
 const GROUPS = Object.freeze(['none', 'status', 'assignee', 'project', 'priority', 'dueDate']);
+const STATUS_TYPES = Object.freeze(['default_active', 'active', 'done', 'close', 'default_close']);
+const TASK_LIST = 'task.task_list';
 const DEFAULT_DIRECTION = Object.freeze({ updatedAt: 'desc', DueDate: 'asc' });
 /* The direction _id takes next to an ascending sort key, as the two indexes of migration 067 store
  * it: { updatedAt: -1, _id: 1 } and { DueDate: 1, _id: 1 }. Following it, in either direction,
@@ -32,7 +35,7 @@ const ROW_FIELDS = Object.freeze({
 });
 
 const TOP_KEYS = ['filter', 'group', 'sort', 'cursor', 'limit', 'includeSubtasks', 'includeClosedProjects', 'timezone'];
-const FILTER_KEYS = ['status', 'assignee', 'priority', 'dueDate', 'taskType', 'tags', 'search', 'projectIds'];
+const FILTER_KEYS = ['status', 'statusType', 'assignee', 'priority', 'dueDate', 'taskType', 'tags', 'search', 'projectIds'];
 const SORT_OPTION_KEYS = ['by', 'dir'];
 const DUE_DATE_KEYS = ['from', 'to', 'none'];
 
@@ -123,6 +126,7 @@ const filterOf = (value) => {
     onlyKeys(filter, FILTER_KEYS, 'filter');
     return {
         status: namesAndKeys(filter.status, 'filter.status'),
+        statusType: someOf(filter.statusType, 'filter.statusType', (type) => STATUS_TYPES.includes(type), `any of ${STATUS_TYPES.join(', ')}`),
         assignee: assigneeOf(filter.assignee),
         priority: someOf(filter.priority, 'filter.priority', isText, 'priority names'),
         dueDate: dueDateOf(filter.dueDate),
@@ -197,9 +201,30 @@ const scopedProjectIds = (visibleIds, namedIds) => {
 const projectMatch = (projectIds, uid, includeClosedProjects) => ({
     _id: { $in: projectIds.map(objectId) },
     deletedStatusKey: { $nin: [PROJECT_TRASHED, PROJECT_ARCHIVED] },
+    isRestrict: { $ne: true },
     ...(includeClosedProjects ? {} : { statusType: { $ne: 'close' } }),
     ...ownOrNotPersonal(uid),
 });
+
+/* The project page shows no task to a role whose task list permission is unset, in the project's own
+ * rules when it has them and in the company's otherwise (usesProjectRules in Config/permissionGuard.js).
+ * Read-only still reads. The caller's own personal list is theirs whatever their role allows elsewhere. */
+const taskListProjectIds = (projects, roleType, companyRules, projectRules) => {
+    const readable = (rules) => {
+        const permission = rolePermission(arrangeRules(rules), roleType, TASK_LIST);
+        return permission !== null && permission !== undefined && permission !== 0;
+    };
+    const rulesOf = new Map();
+    (projectRules || []).forEach((rule) => {
+        const id = String(rule.projectId);
+        rulesOf.set(id, [...(rulesOf.get(id) || []), rule]);
+    });
+    const companyWide = readable(companyRules);
+    return projects
+        .filter((project) => project.isPersonal === true
+            || (project.isGlobalPermission === false ? readable(rulesOf.get(String(project._id)) || []) : companyWide))
+        .map((project) => String(project._id));
+};
 
 const anyOf = (clauses) => (clauses.length === 1 ? clauses[0] : { $or: clauses });
 const inList = (field, values) => (values.length ? [{ [field]: { $in: values } }] : []);
@@ -209,6 +234,7 @@ const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const filterClauses = (filter) => {
     const clauses = [];
     if (filter.status) clauses.push(anyOf([...inList('status.text', filter.status.names), ...inList('statusKey', filter.status.keys)]));
+    if (filter.statusType) clauses.push({ statusType: { $in: filter.statusType } });
     if (filter.assignee) {
         clauses.push(anyOf([
             ...inList('AssigneeUserId', filter.assignee.ids),
@@ -335,11 +361,13 @@ module.exports = {
     MAX_LIMIT,
     DEFAULT_LIMIT,
     GROUPS,
+    STATUS_TYPES,
     ROW_FIELDS,
     EverythingRefused,
     parseRequest,
     scopedProjectIds,
     projectMatch,
+    taskListProjectIds,
     buildMatch,
     pagePipeline,
     positionOf,
