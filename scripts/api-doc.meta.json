@@ -2499,6 +2499,7 @@
         "POST /api/v2/timetracker/capture": { "stability": "internal", "summary": "Stores a tracker capture, for the time tracker." },
         "POST /api/v2/timetracker/timelog": { "stability": "internal", "summary": "A time log request, for the time tracker." },
         "GET /api/v2/timetracker/running": { "stability": "internal", "summary": "The caller's open tracker sessions." },
+        "GET /api/v2/timetracker/can-start": { "stability": "internal", "summary": "Whether the caller may start a timer today; refused in an approved timesheet period." },
         "POST /api/v2/timetracker/trim": { "stability": "internal", "summary": "Closes an open tracker session at a given length." },
         "POST /api/v2/timesheet-approval/submit": { "stability": "beta", "summary": "Submits a timesheet period for approval." },
         "GET /api/v2/timesheet-approval/status": { "stability": "beta", "summary": "The approval status of a timesheet period." },

@@ -68,6 +68,7 @@ const ROUTES = [
     ['GET /api/v1/timesheet/workload-grid', workloadGrid.getWorkloadGrid],
     ['POST /api/v1/timesheet/workload-grid/move', workloadGrid.moveWorkloadChip],
     ['GET /api/v2/timetracker/running', webTimer.listRunningTimers],
+    ['GET /api/v2/timetracker/can-start', webTimer.canStartTimer],
     ['POST /api/v2/timetracker/trim', webTimer.trimTimer],
     ['GET /api/v2/billing/contract', milestoneBilling.getBillingContract],
     ['POST /api/v2/billing/milestone', milestoneBilling.createBillingMilestone],
