@@ -33,6 +33,14 @@
                     tabindex="-1"
                     aria-hidden="true"
                 />
+                <FolderRowMenu
+                    v-if="row.kind === 'folder' && row.projectId === openProjectId"
+                    :ref="(el) => setMenuRef(row.key, el)"
+                    :project="openProject"
+                    :folder="{ id: row.id, name: row.name, parentFolderId: row.parentFolderId }"
+                    :folders="openFolders"
+                    @reveal="expanded[`folder:${$event}`] = true"
+                />
                 <button
                     v-if="row.expandable"
                     type="button"
@@ -59,8 +67,9 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import FavouriteStar from "@/components/atom/FavouriteStar/FavouriteStar.vue";
 import { isOwnerOrAdmin } from "@/utils/roles";
 import { projectColor } from "@/components/molecules/Home/homeFormat";
+import FolderRowMenu from "./FolderRowMenu.vue";
 import { treeCache, loadProjectTree } from "./projectTreeData";
-import { identitiesOf, projectBranch, visibleRows } from "./projectTreeModel";
+import { folderRowKeys, identitiesOf, projectBranch, visibleRows } from "./projectTreeModel";
 
 defineOptions({ name: "ProjectTree" });
 
@@ -108,6 +117,17 @@ const currentKey = computed(() => {
 
 const colorOf = (id) => projectColor(props.projects.find((project) => String(project._id) === id) || {});
 
+/* Folder actions read the project's permission rules, and the store holds those of the open project alone. */
+const openProjectId = computed(() => String(route.params?.id || ""));
+const openProject = computed(() => props.projects.find((project) => String(project._id) === openProjectId.value) || { _id: openProjectId.value });
+const openFolders = computed(() => sourceOf(openProjectId.value)?.folders || []);
+
+const menuRefs = {};
+const setMenuRef = (key, el) => {
+    if (el) menuRefs[key] = el;
+    else delete menuRefs[key];
+};
+
 function setExpanded(key, open) {
     expanded[key] = open;
     if (open && key.startsWith("project:")) loadProjectTree(key.slice("project:".length));
@@ -117,9 +137,11 @@ function toggle(row) {
     setExpanded(row.key, !row.expanded);
 }
 
-watch(() => [route.params?.id, route.params?.folderId], ([id, folderId]) => {
+watch(() => [route.params?.id, route.params?.folderId, openFolders.value.length], ([id, folderId]) => {
     if (id) setExpanded(`project:${id}`, true);
-    if (folderId) expanded[`folder:${folderId}`] = true;
+    if (!folderId) return;
+    expanded[`folder:${folderId}`] = true;
+    folderRowKeys(openFolders.value, folderId).forEach((key) => { expanded[key] = true; });
 }, { immediate: true });
 
 // Until the reader moves, the tab stop follows the current location, which may load after the projects.
@@ -156,7 +178,11 @@ function onKeydown(event) {
     const row = list[at];
     if (!row) return;
 
-    if (MOVES[event.key]) {
+    if ((event.key === "F10" && event.shiftKey) || event.key === "ContextMenu") {
+        if (!menuRefs[row.key]) return;
+        event.preventDefault();
+        menuRefs[row.key].open();
+    } else if (MOVES[event.key]) {
         event.preventDefault();
         focusRow(MOVES[event.key](list, at).key);
     } else if (event.key === "ArrowRight" && row.expandable) {
@@ -188,6 +214,7 @@ function onKeydown(event) {
 .pt-row__link:focus-visible { outline: none; box-shadow: var(--focus); }
 .pt-row--l2 .pt-row__link { padding-left: 24px; font-size: 12.5px; color: var(--ink-label); }
 .pt-row--l3 .pt-row__link { padding-left: 38px; font-size: 12.5px; color: var(--ink-label); }
+.pt-row--l4 .pt-row__link { padding-left: 52px; font-size: 12.5px; color: var(--ink-label); }
 .pt-row.is-current .pt-row__link { color: var(--brand); font-weight: 600; }
 .pt-row__dot { width: 7px; height: 7px; border-radius: 2px; flex: none; }
 .pt-row__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

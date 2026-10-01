@@ -74,6 +74,7 @@
 
 <script setup>
 import { computed, inject, ref, watch } from "vue";
+import { folderPathLabel } from "@/utils/folderTree";
 import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
 
@@ -128,7 +129,7 @@ const sprintOptions = computed(() => {
     };
     Object.values(props.projectData?.sprintsObj || {}).forEach((sprint) => add(sprint));
     Object.values(props.projectData?.sprintsfolders || {}).forEach((folder) => {
-        Object.values(folder?.sprintsObj || {}).forEach((sprint) => add(sprint, folder.folderName));
+        Object.values(folder?.sprintsObj || {}).forEach((sprint) => add(sprint, folderPathLabel(props.projectData?.sprintsfolders, folder) || folder.folderName));
     });
     return options;
 });
