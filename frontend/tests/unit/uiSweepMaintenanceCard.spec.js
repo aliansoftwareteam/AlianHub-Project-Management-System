@@ -22,7 +22,10 @@ vi.mock('@/composable/index', () => ({ languageTranslateHelper: () => ({ selecte
 vi.mock('@/composable/commonFunction', () => ({ fcmToken: vi.fn() }));
 vi.mock('@/composable/socketHelper', () => ({ socketHelper: () => ({ connectServer: vi.fn() }) }));
 vi.mock('@/utils/tabSyncs.js', () => ({ tabSyncHelper: () => ({ tabSync: vi.fn() }) }));
-vi.mock('@/offline', () => ({ initOffline: vi.fn() }));
+vi.mock('@/offline', async () => {
+    const { ref } = await import('vue');
+    return { initOffline: vi.fn(), away: ref(false), pageUnavailable: ref(false) };
+});
 vi.mock('@/components/offline/OfflineBanner.vue', () => stub('OfflineBanner'));
 vi.mock('@/components/organisms/Tour/TourComponet.vue', () => stub('TourCom'));
 vi.mock('@/components/organisms/Shell/GlobalRail.vue', () => stub('GlobalRail'));
