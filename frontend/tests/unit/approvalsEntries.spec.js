@@ -1,7 +1,7 @@
 /* Task 046: the Approvals page had no way in but its address. It is reached from the Timesheets
    tabs, the rail's More menu and the command palette, by the people who may approve. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { config, flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { defineComponent, ref } from 'vue';
 
@@ -26,6 +26,8 @@ import { useNavItems } from '@/components/organisms/Shell/navItems';
 import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
 import CommandPalette from '@/components/molecules/AdvanceSearch/CommandPalette.vue';
 import { canApprove } from '@/views/Approvals/approvalAccess';
+
+config.global.plugins[0].global.setLocaleMessage('en', en);
 
 const OWNER = 1;
 const ADMIN = 2;

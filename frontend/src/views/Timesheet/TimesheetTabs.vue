@@ -13,12 +13,15 @@
 
 <script setup>
 import { computed, inject } from 'vue';
+import { useStore } from 'vuex';
 import { useCustomComposable } from '@/composable';
+import { canApprove } from '@/views/Approvals/approvalAccess';
 
 defineOptions({ name: 'TimesheetTabs' });
 const props = defineProps({ active: { type: String, default: 'mine' } });
 const companyId = inject('$companyId');
 const { checkPermission } = useCustomComposable();
+const { getters } = useStore();
 
 const cid = computed(() => (companyId && companyId.value) || companyId || '');
 const allowed = (key) => checkPermission(key) !== null && checkPermission(key) !== undefined;
@@ -27,5 +30,6 @@ const tabs = computed(() => [
     { key: 'project', label: 'Time.tab_project', route: 'project Timesheet', show: allowed('sheet_settings.project_timesheet') },
     { key: 'workload', label: 'Time.tab_workload', route: 'Workload Timesheet', show: allowed('sheet_settings.workload_timesheet') },
     { key: 'tracker', label: 'Time.tab_tracker', route: 'Tracker Timesheet', show: allowed('sheet_settings.tracker_timesheet') },
+    { key: 'approvals', label: 'Time.approvals', route: 'Approvals', show: canApprove(getters['settings/companyUserDetail']) },
 ].filter((t) => t.show || t.key === props.active));
 </script>
