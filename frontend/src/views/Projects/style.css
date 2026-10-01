@@ -93,6 +93,12 @@
   color: var(--ink);
   color-scheme: var(--scheme);
 }
+/* The blocks inside (description, checklist, attachments, the comment feed, the activity list) are
+   shared with the task panel and still carry the legacy colour classes. */
+.list-view-body--detail :is(.black, .dark-gray, .GunPowder, .color52, .color63) { color: var(--ink); }
+.list-view-body--detail :is(.gray, .gray81) { color: var(--ink-2); }
+.list-view-body--detail .blue { color: var(--brand) !important; }
+.list-view-body--detail .bg-colorlightgray { background-color: var(--fill); }
 .showProjectDetailRight{
   width: calc(100% - 375px);
   overflow: auto;

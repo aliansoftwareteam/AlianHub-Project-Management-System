@@ -114,6 +114,15 @@ export const loadActionItems = async ({ projectId, sprintId, taskId }) => {
     return response?.data?.status ? response.data.data || [] : [];
 };
 
+/* The assigned list holds task comments and doc comments; a doc comment names its doc and is resolved on the doc's own route. */
+export const isDocComment = (row) => Boolean(row) && row.kind === "doc" && Boolean(row.pageId);
+
+export const resolveDocComment = async (comment, resolved = true) => {
+    const response = await apiRequest("put", `${env.PAGES}/${comment.pageId}/comments/${idOf(comment)}/resolve`, { resolved });
+    if (!response?.data?.status) throw new Error(response?.data?.statusText || "resolve");
+    return response.data.data;
+};
+
 export const loadAssignedToMe = async () => {
     const response = await apiRequest("get", `${env.API_COMMENTS}/assigned-to-me`);
     return response?.data?.status ? response.data.data || [] : [];

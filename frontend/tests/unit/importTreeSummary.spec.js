@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { adjustedLines, adjustedTotals, importChunks } from '@/plugins/importTasks/importTree';
+import { adjustedLines, adjustedTotals, droppedFieldValuesTotal, importChunks } from '@/plugins/importTasks/importTree';
 
 const t = (key, values) => `${key}:${values.count}`;
 
@@ -30,6 +30,13 @@ describe('what an import says about the subtask tree', () => {
 
     it('writes nothing when every row kept its place', () => {
         expect(adjustedLines(adjustedTotals([{ created: 2 }]), t, 'Import.adjusted')).toEqual([]);
+    });
+});
+
+describe('the field values an import left out', () => {
+    it('adds up what each request dropped', () => {
+        expect(droppedFieldValuesTotal([{ created: 2, droppedFieldValues: 3 }, { created: 1 }, { droppedFieldValues: 2 }])).toBe(5);
+        expect(droppedFieldValuesTotal([{ created: 2 }])).toBe(0);
     });
 });
 

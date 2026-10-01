@@ -4,38 +4,19 @@ const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const socketEmitter = require('../../event/socketEventEmitter');
 const { validateEpicInput, validateAssignInput, countDeltas, isObjectIdString, EPIC_STATUSES, EPIC_PRIORITIES, parseEpicDates } = require('./helpers/epicRules');
+const { getRoleType } = require('../../Config/permissionGuard');
+const { isPrivileged } = require('../../Config/roleTypes');
+const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
+const { isClosedTask } = require('../Tasks/helpers/taskSignals');
+const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
 
-// Epics: a grouping layer above tasks with progress roll-up. Tasks carry an
-// optional epicId.
-//
-// Progress is COMPUTED FROM THE TASKS on every read — see countsForProject.
-// The stored taskCount/completedCount fields are a cache only; nothing renders
-// them directly any more.
-//
-// Why (AHE-3853): those stored fields were maintained by $inc in the assign flow
-// alone, using the task's status at the moment it joined the epic. Nothing told
-// an epic that one of its tasks had since been completed, deleted, restored, or
-// bulk-moved — so `completedCount` froze at whatever it was on assignment and
-// every epic sat at 0%. Keeping counters correct by hooking every writer is what
-// failed: `statusType` is written from six places across mongo_helper.js,
-// mergeDuplicate.js, structural.js and bulk.js, and any path that forgets the
-// hook corrupts the number silently and permanently. One aggregation at read
-// time cannot drift, and epics-per-project is small enough that the cost is
-// irrelevant.
+/* Progress is counted from the tasks on every read (AHE-3853): the stored taskCount and
+ * completedCount were kept by $inc in the assign flow alone, so a task completed, deleted or
+ * moved afterwards left them frozen. They remain as a cache that covers every task. */
 
-/**
- * Live task/completed counts for every epic in a project, as
- * { [epicId]: { taskCount, completedCount } }.
- *
- * One aggregation for the whole project rather than a query per epic. Excludes
- * soft-deleted tasks, which is what makes a deleted task stop inflating its
- * epic. "Completed" is statusType === 'close', the same definition /recount and
- * the assign flow use.
- *
- * Never throws: progress is decoration, so a failure here must not take the
- * epic list down with it — the caller falls back to the stored values.
- */
-const countsForProject = async (companyId, projectId) => {
+/* { [epicId]: { taskCount, completedCount } } for the tasks of a project that `uid` can open, or
+ * null when the count fails. */
+const countsForProject = async (companyId, uid, projectId) => {
     try {
         const rows = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
@@ -45,30 +26,40 @@ const countsForProject = async (companyId, projectId) => {
                         ProjectID: new mongoose.Types.ObjectId(projectId),
                         epicId: { $exists: true, $ne: null },
                         deletedStatusKey: { $ne: 1 },
+                        mainChat: { $ne: true },
+                        ...(await hiddenSprintFilter(companyId, uid, [projectId])),
                     },
                 },
-                {
-                    $group: {
-                        _id: '$epicId',
-                        taskCount: { $sum: 1 },
-                        completedCount: { $sum: { $cond: [{ $eq: ['$statusType', 'close'] }, 1, 0] } },
-                    },
-                },
+                { $group: { _id: { epicId: '$epicId', statusType: '$statusType' }, n: { $sum: 1 } } },
             ]],
         }, 'aggregate');
         const map = {};
         (rows || []).forEach((row) => {
-            if (!row || !row._id) return;
-            map[String(row._id)] = {
-                taskCount: Number(row.taskCount) || 0,
-                completedCount: Number(row.completedCount) || 0,
-            };
+            if (!row || !row._id || !row._id.epicId) return;
+            const key = String(row._id.epicId);
+            const counts = map[key] || (map[key] = { taskCount: 0, completedCount: 0 });
+            const n = Number(row.n) || 0;
+            counts.taskCount += n;
+            if (isClosedTask({ statusType: row._id.statusType })) counts.completedCount += n;
         });
         return map;
     } catch (error) {
         logger.error(`ERROR in epic count aggregation: ${error.message}`);
         return null;
     }
+};
+
+/* The epics as `uid` may see them. The stored counters cover every task, so when the live count
+ * fails they are left only to someone who reads past sprint privacy. */
+const withViewerCounts = async (companyId, uid, projectId, epics) => {
+    const counts = await countsForProject(companyId, uid, projectId);
+    const keepStored = !counts && isPrivileged(await getRoleType(companyId, uid));
+    return (epics || []).map((epic) => {
+        const plain = epic && epic.toObject ? epic.toObject() : { ...epic };
+        if (keepStored) return plain;
+        const live = counts && counts[String(plain._id)];
+        return { ...plain, taskCount: live ? live.taskCount : 0, completedCount: live ? live.completedCount : 0 };
+    });
 };
 
 /* POST /api/v2/epics  body: { name, description?, color?, projectId, userData } */
@@ -126,20 +117,7 @@ exports.listEpics = async (req, res) => {
             ],
         }, 'find');
 
-        // Overlay live counts. If the aggregation failed we fall through to the
-        // stored values rather than reporting zeros — stale is better than wrong.
-        const counts = await countsForProject(companyId, projectId);
-        const data = (epics || []).map((epic) => {
-            const plain = epic && epic.toObject ? epic.toObject() : { ...epic };
-            const live = counts && counts[String(plain._id)];
-            if (counts) {
-                // An epic with no matching tasks is absent from the aggregation,
-                // which legitimately means zero — don't leave a stale count there.
-                plain.taskCount = live ? live.taskCount : 0;
-                plain.completedCount = live ? live.completedCount : 0;
-            }
-            return plain;
-        });
+        const data = await withViewerCounts(companyId, req.uid, projectId, epics);
         return res.send({ status: true, statusText: 'Epics fetched.', data });
     } catch (error) {
         logger.error(`ERROR in list epics: ${error.message}`);
@@ -190,7 +168,8 @@ exports.updateEpic = async (req, res) => {
         if (!updated) {
             return res.send({ status: false, statusText: 'Epic not found.' });
         }
-        return res.send({ status: true, statusText: 'Epic updated.', data: updated });
+        const [data] = await withViewerCounts(companyId, req.uid, String(updated.ProjectID), [updated]);
+        return res.send({ status: true, statusText: 'Epic updated.', data });
     } catch (error) {
         logger.error(`ERROR in update epic: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
@@ -236,7 +215,7 @@ exports.assignTask = async (req, res) => {
             type: SCHEMA_TYPE.TASKS,
             data: [{ _id: taskObjId, deletedStatusKey: { $ne: 1 } }],
         }, 'findOne');
-        if (!task) {
+        if (!task || !(await canReadTask(companyId, req.uid, task))) {
             return res.send({ status: false, statusText: 'Task not found.' });
         }
 
@@ -264,7 +243,7 @@ exports.assignTask = async (req, res) => {
         const deltas = countDeltas({
             oldEpicId: task.epicId,
             newEpicId: targetEpicId,
-            isCompleted: task.statusType === 'close',
+            isCompleted: isClosedTask(task),
         });
         for (const delta of deltas) {
             // eslint-disable-next-line no-await-in-loop
@@ -294,15 +273,19 @@ exports.recountEpic = async (req, res) => {
         const epicObjId = new mongoose.Types.ObjectId(id);
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
-            data: [{ epicId: epicObjId, deletedStatusKey: { $ne: 1 } }, 'statusType'],
+            data: [{ epicId: epicObjId, deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true } }, 'statusType'],
         }, 'find');
         const taskCount = (tasks || []).length;
-        const completedCount = (tasks || []).filter((task) => task.statusType === 'close').length;
+        const completedCount = (tasks || []).filter(isClosedTask).length;
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.EPICS,
             data: [{ _id: epicObjId }, { $set: { taskCount, completedCount } }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
-        return res.send({ status: true, statusText: 'Epic counters rebuilt.', data: updated });
+        if (!updated) {
+            return res.send({ status: false, statusText: 'Epic not found.' });
+        }
+        const [data] = await withViewerCounts(companyId, req.uid, String(updated.ProjectID), [updated]);
+        return res.send({ status: true, statusText: 'Epic counters rebuilt.', data });
     } catch (error) {
         logger.error(`ERROR in recount epic: ${error.message}`);
         return res.send({ status: false, statusText: error.message });

@@ -8,6 +8,7 @@ const ID = '([a-f0-9]{24})';
 const TASK_FOLDER = new RegExp(`^Project/${ID}/${ID}/${ID}/Comments/([^/]+)$`, 'i');
 const CHANNEL_FOLDER = new RegExp(`^Project/${ID}/${ID}/default/Comments/([^/]+)$`, 'i');
 const PROJECT_FOLDER = new RegExp(`^Project/${ID}/Comments/([^/]+)$`, 'i');
+const DOC_FOLDER = new RegExp(`^Pages/${ID}/Comments/([^/]+)$`, 'i');
 const NOT_THIS_THREAD = 'A comment can only carry a file stored for its own thread.';
 
 const isId = (value) => OBJECT_ID.test(String(value || ''));
@@ -27,6 +28,13 @@ const isThreadFile = (comment, key) => {
     if (channel) return same(comment.sprintId, channel[2]) && !isId(comment.taskId);
     const project = named(PROJECT_FOLDER, key);
     return Boolean(project) && same(comment.projectId, project[1]) && !isId(comment.sprintId) && !isId(comment.taskId);
+};
+
+/* A doc comment's thread is its doc. The doc id comes from the doc the write was authorised on,
+ * never from the request, and a doc comment carries nothing else: no link, no clip. */
+const isDocCommentFile = (pageId, key) => {
+    const doc = named(DOC_FOLDER, key);
+    return Boolean(doc) && isId(pageId) && same(pageId, doc[1]);
 };
 
 /* The first file of a new direct conversation is uploaded before its thread exists, into the
@@ -54,4 +62,4 @@ const mayCarryMedia = async (companyId, uid, comment, key) => {
 
 const refuseMedia = (res) => res.status(400).json({ status: false, statusText: NOT_THIS_THREAD, message: NOT_THIS_THREAD });
 
-module.exports = { NOT_THIS_THREAD, isThreadFile, mayCarryMedia, refuseMedia };
+module.exports = { NOT_THIS_THREAD, isThreadFile, isDocCommentFile, mayCarryMedia, refuseMedia };
