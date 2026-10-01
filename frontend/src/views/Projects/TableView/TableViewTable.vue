@@ -50,6 +50,7 @@ import { taskInGroup } from "@/views/Projects/ListView/listFilter";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
 import { statusChipStyle } from "@/utils/statusChipColors";
 import { pointsTotal } from "@/views/Projects/composables/taskPoints";
+import { indexRepairBody, indexRepairRows } from "@/views/Projects/composables/taskGroupIndex";
 
 defineOptions({ name: "TableViewTable" });
 
@@ -161,21 +162,20 @@ watch(() => props.globalSortKey, () => {
     });
 });
 
-/* Rows created before the group index existed have no sort index; the server
- * backfills one so ordering and drag targets stay stable. */
+/* A row loses its group index when its group value changes elsewhere, and a row made
+ * outside a view may never have had one; the server gives it one so ordering stays stable. */
 function prepareIndexData() {
-    const withoutIndex = tasks.value.filter((task) => (task[props.data.indexName] === undefined || task[props.data.indexName] === null) && task.TaskKey !== "--");
-    if (!withoutIndex.length) return;
+    const rows = indexRepairRows(tasks.value, props.data, checkPermission("task.task_list", project.value?.isGlobalPermission));
+    if (!rows.length) return;
 
-    if (withoutIndex.length > 1) isLoading.value = true;
+    if (rows.length > 1) isLoading.value = true;
 
-    const rows = withoutIndex.map((task) => ({ data: task._id, item: props.data, taskKey: task.TaskKey }));
     const next = (index) => {
         if (index >= rows.length) {
             isLoading.value = false;
             return;
         }
-        apiRequest("post", env.ONLOAD_UPDATE_TASK_INDEX, { taskUpdate: rows[index], companyId: companyId.value })
+        apiRequest("post", env.ONLOAD_UPDATE_TASK_INDEX, indexRepairBody(rows[index], companyId.value))
             .then(() => next(index + 1))
             .catch((error) => {
                 console.error("ERROR in update task index: ", error);

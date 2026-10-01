@@ -5,7 +5,8 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const { replaceObjectKey } = require("../Auth/helper");
 const { escapeRegex } = require("../../utils/escapeRegex");
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
-const { sprintIdentities, visibleSprintClause } = require('../Sprints/helpers/sprintVisibility');
+const { sprintIdentities, visibleSprintClause, hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
+const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const savedFilters = require("./helpers/savedFilters");
 const { keepVisibleProjectIds } = require('../../Config/projectAccess');
 const { visibleProjectIds } = require('../Agents/scope');
@@ -14,6 +15,15 @@ const { visibleProjectIds } = require('../Agents/scope');
  * are kept to the projects the caller can open as the route does for `pids`. */
 const visibleObjectIds = async (req, ids) => (await keepVisibleProjectIds(String(req.headers['companyid'] || ''), req.uid, ids))
     .map((id) => new mongoose.Types.ObjectId(id));
+
+/* The files and links searches join a project's tasks and comments, so each join starts by leaving out
+ * the private sprints the caller is not on. Owners and admins read past sprint privacy. */
+const visibleSprintStages = async (req, projectIds) => {
+    const companyId = String(req.headers['companyid'] || '');
+    if (isPrivileged(await getRoleType(companyId, req.uid))) return [];
+    const hidden = await hiddenSprintIds(companyId, req.uid, projectIds.map(String));
+    return hidden.length ? [{ $match: { sprintId: { $nin: idForms(hidden.map(String)) } } }] : [];
+};
 
 /**
  * Helper functions
@@ -306,8 +316,8 @@ exports.searchFiles = async (req, res) => {
         const defaultFilterParams = Object.keys(parsedFilterQuery).length
             ? { $and: [{ _id: { $in: additionalFilter } }] }
             : { $and: [{ _id: { $in: convertedProjectIds } }] };
+        const visibleSprints = await visibleSprintStages(req, defaultFilterParams.$and[0]._id.$in);
 
-        // Aggregation pipeline
         const query = [
             { $match: defaultFilterParams },
             {
@@ -316,7 +326,7 @@ exports.searchFiles = async (req, res) => {
                     localField: "_id",
                     foreignField: "ProjectID",
                     as: "taskData",
-                    pipeline: [{ $match: { $expr: { $ne: ["$attachments", []] } } }],
+                    pipeline: [...visibleSprints, { $match: { $expr: { $ne: ["$attachments", []] } } }],
                 },
             },
             {
@@ -325,7 +335,7 @@ exports.searchFiles = async (req, res) => {
                     localField: "_id",
                     foreignField: "projectId",
                     as: "commentData",
-                    pipeline: [{ $match: { type: { $nin: ["text", "link"] } } }],
+                    pipeline: [...visibleSprints, { $match: { type: { $nin: ["text", "link"] } } }],
                 },
             },
             {
@@ -431,8 +441,8 @@ exports.searchLinks = async (req, res) => {
         const defaultFilterParams = Object.keys(parsedFilterQuery).length
             ? { $and: [{ _id: { $in: additionalFilter } }] }
             : { $and: [{ _id: { $in: convertedProjectIds } }] };
+        const visibleSprints = await visibleSprintStages(req, defaultFilterParams.$and[0]._id.$in);
 
-        // Aggregation pipeline
         const query = [
             {
                 $match: { ...defaultFilterParams }
@@ -443,6 +453,7 @@ exports.searchLinks = async (req, res) => {
                     localField: "_id",
                     foreignField: "ProjectID",
                     pipeline: [
+                        ...visibleSprints,
                         {
                             $match: {
                                 rawDescription: { $exists: true, $ne: null }
@@ -467,6 +478,7 @@ exports.searchLinks = async (req, res) => {
                     localField: "_id",
                     foreignField: "projectId",
                     pipeline: [
+                        ...visibleSprints,
                         {
                             $match: {
                                 type: "link"

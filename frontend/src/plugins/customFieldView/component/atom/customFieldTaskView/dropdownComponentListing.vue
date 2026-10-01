@@ -31,7 +31,7 @@
         </div>
         <Sidebar
             v-model:visible="isVisible"
-            :title="`Select ${detail.fieldTitle}`"
+            :title="$t('CustomField.select_field', { field: detail.fieldTitle })"
             :enable-search="true"
             :options="detail.fieldOptions || []"
             @selected="selectedObj($event)"

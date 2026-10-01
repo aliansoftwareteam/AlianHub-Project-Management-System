@@ -9,7 +9,7 @@
         </DropDownTrigger>
         <teleport to="#my-dropdown" v-if="dropdownVisible">
             <div class="position-fi dropdown-back-drop cursor-default" :style="[{'z-index':zIndex}]" v-if="dropdownVisible && !hover" @click.stop="buttonClick()"/>
-            <div :id="panelId" v-bind="panelAttrs" @click.stop="onPanelClick" @keydown="onPanelKeydown" @keyup="onPanelKeyup" @focusin="rememberFocus" class="bg-white gray border border-radius-8-px box-shadow-serach drop-down-menu" :style="[{'z-index':zIndex}]" :class="{'drop-down-hide' : !bind, 'desktop-view position-fi' : clientWidth > 767, 'mobile-view position-fi' : clientWidth <= 767, ...bodyClass}" v-if="dropdownVisible">
+            <div :id="panelId" v-bind="panelAttrs" @click.stop="onPanelClick" @keydown="onPanelKeydown" @keyup="onPanelKeyup" @focusin="rememberFocus" class="border-radius-8-px box-shadow-serach drop-down-menu" :style="[{'z-index':zIndex}]" :class="{'dd-tokens': themed, 'bg-white gray border': !themed, 'drop-down-hide' : !bind, 'desktop-view position-fi' : clientWidth > 767, 'mobile-view position-fi' : clientWidth <= 767, ...bodyClass}" v-if="dropdownVisible">
                 <slot name="head" v-if="clientWidth > 767">
                 </slot>
                 <div class="border-bottom-mobiledrop cursor-default mobile-title-header p-20px box-sizing-box" v-else :style="{height : clientWidth <=767 ? '64px' : ''}">
@@ -32,10 +32,10 @@
                     </div>
                 </div>
                 <div v-if="options" :style="`padding: ${clientWidth > 767 ? '10px 10px 10px' : '20px;'}`"  class="search-project-filter dropdown_option font-size-12">
-                    <div v-if="$slots.search" class="drop-down-search black">
+                    <div v-if="$slots.search" class="drop-down-search" :class="{'black': !themed}">
                         <slot name="search"></slot>
                     </div>
-                    <div :id="listRole ? listId : undefined" :role="listRole" :aria-labelledby="listRole ? triggerId : undefined" :aria-multiselectable="listRole === 'listbox' && multiselectable ? 'true' : undefined" class="overflow-y-auto overflow-x-hidden drop-down-options black" :class="[{'dropDownScroll':props.dropDownClass}]" :style="{'max-height' : maxHeight}">
+                    <div :id="listRole ? listId : undefined" :role="listRole" :aria-labelledby="listRole ? triggerId : undefined" :aria-multiselectable="listRole === 'listbox' && multiselectable ? 'true' : undefined" class="overflow-y-auto overflow-x-hidden drop-down-options" :class="[{'dropDownScroll':props.dropDownClass, 'black': !themed}]" :style="{'max-height' : maxHeight}">
                         <slot name="options">
                         </slot>
                     </div>
@@ -110,6 +110,10 @@ const props = defineProps({
         default:false
     },
     headDismisses: {
+        type: Boolean,
+        default: false
+    },
+    themed: {
         type: Boolean,
         default: false
     }

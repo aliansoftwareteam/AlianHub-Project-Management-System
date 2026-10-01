@@ -1,12 +1,13 @@
 <template>
     <div :class="`overflow-auto custom_field_content style-scroll ${pageIndex === 1 ? 'custom_field_content_field' : ''}`">
         <template v-if="pageIndex === 0">
-            <div v-for="(item,index) in CustomFieldData" :key="index" @click="pageIndex= pageIndex+1,componentDetail=item">
+            <div v-for="(item,index) in fieldTypes" :key="index" :data-field-type="item.cfType" @click="pageIndex= pageIndex+1,componentDetail=item">
                 <CustomFieldComponentStructure
                     :cfTitle="item.cfTitle"
                     :cfDescrption="item.cfDescrption"
                     :cfIcon="item.cfIcon"
                     :cfPrimaryColor="item.cfPrimaryColor"
+                    :icon="item.icon"
                 />
             </div>
         </template>
@@ -18,23 +19,33 @@
                         :cfDescrption="componentDetail.cfDescrption"
                         :cfIcon="componentDetail.cfIcon"
                         :cfPrimaryColor="componentDetail.cfPrimaryColor"
+                        :icon="componentDetail.icon"
                     />
                 </div>
                 <div class="ml-20px mr-20px">
-                    <CustomFieldsTabComponent
-                        :tabIndexComp="tabIndex"
-                        :componentDetail="componentDetail"
-                        @handleIndex="(val) => tabIndex = val"
+                    <ModuleFieldEditor
+                        v-if="fieldTypeUi(componentDetail.cfType)"
+                        :fieldType="componentDetail.cfType"
+                        :field="props.customFieldObject"
+                        @save="customFieldStore"
+                        @cancel="backToTypes(false)"
                     />
-                    <CustomFieldsComponent
-                        :tabIndex='tabIndex'
-                        :componentDetail="componentDetail"
-                        :customFieldObject="props.customFieldObject"
-                        @handleFunction="customFieldStore"
-                        @tabIndexUpdate="(val) => tabIndex = val"
-                        @closeSidebar="(val) => {emit('closeSidebar',val,pageIndex);pageIndex = pageIndex-1;tabIndex = 1;}"
-                        :isType="isType"
-                    />
+                    <template v-else>
+                        <CustomFieldsTabComponent
+                            :tabIndexComp="tabIndex"
+                            :componentDetail="componentDetail"
+                            @handleIndex="(val) => tabIndex = val"
+                        />
+                        <CustomFieldsComponent
+                            :tabIndex='tabIndex'
+                            :componentDetail="componentDetail"
+                            :customFieldObject="props.customFieldObject"
+                            @handleFunction="customFieldStore"
+                            @tabIndexUpdate="(val) => tabIndex = val"
+                            @closeSidebar="backToTypes"
+                            :isType="isType"
+                        />
+                    </template>
                 </div>
             </div>
             <div v-else>
@@ -50,18 +61,18 @@
     </div>
 </template>
 <script setup>
-    // import
     import { useStore } from 'vuex';
-    import { ref,computed } from "vue";
-    
-    
+    import { ref, computed, inject } from "vue";
+    import { useI18n } from "vue-i18n";
     import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
     import CustomFieldsComponent from "../../molecules/customFieldSidebar/customFieldsComponent/customFieldsComponent.vue";
     import CustomFieldsTabComponent from "../../atom/customFieldSidebar/customFieldsTabComponent/customFieldsTabComponent.vue"
     import CustomFieldComponentStructure from "../../atom/customFieldSidebar/customFieldComponentStructure/customFieldComponentStructure.vue";
-    // store
+    import ModuleFieldEditor from "@/plugins/customFieldView/fieldTypes/ModuleFieldEditor.vue";
+    import { fieldTypeCatalogue, fieldTypeUi } from "@/plugins/customFieldView/fieldTypes";
+
     const {getters} = useStore();
-    //props
+    const { t } = useI18n();
     const props = defineProps({
         componentDetails:{
             type:Object,
@@ -80,15 +91,14 @@
             default:false
         }
     });
-    // ref
     const tabIndex = ref(1);
     const pageIndex = ref(props.pageInd);
     const componentDetail = ref(props.componentDetails);
-    
-    // computed
-    const CustomFieldData = computed(() => getters["settings/customFields"]);
+
+    /* Project fields are shown by the older per-type components only, so the types the registry adds are offered for task fields. */
+    const forProject = inject('customFieldForProject', false);
+    const fieldTypes = computed(() => (forProject ? getters["settings/customFields"] : fieldTypeCatalogue(getters["settings/customFields"], t)));
     const currentCompany = computed(() => getters["settings/selectedCompany"])
-    // emit
     const emit = defineEmits(['customFieldStore','closeSidebar']);
     const customFieldStore = (val,isEdit) => {
         val.fieldPrimaryColor = componentDetail.value.cfPrimaryColor;
@@ -96,6 +106,11 @@
         val.isDelete = true;
         emit('customFieldStore',val,isEdit);
     }
+    const backToTypes = (val) => {
+        emit('closeSidebar',val,pageIndex.value);
+        pageIndex.value = pageIndex.value - 1;
+        tabIndex.value = 1;
+    };
 </script>
 <style scoped>
     @import "./style.css";

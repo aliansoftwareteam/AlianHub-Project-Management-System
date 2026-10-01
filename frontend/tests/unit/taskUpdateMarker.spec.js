@@ -151,6 +151,17 @@ describe('drag writers mark their update with the per-tab id, never a credential
     });
 });
 
+describe("a drag in a person's group names the person as one plain value", () => {
+    // helper.js groupBy gives a person's group its member as a one-item list, which the index route refuses.
+    const person = { ...GROUPS[1], searchValue: ['u1'] };
+    const sentGroupValues = () => h.apiRequest.mock.calls.filter(([, url]) => url === '/api/v1/taskIndex').map(([, , body]) => body.relevantKey);
+
+    it.each([['list view', dragWithList], ['kanban', dragOnKanban], ['legacy list', dragInList]])('%s drag', async (_, drag) => {
+        await drag(person);
+        expect(sentGroupValues()).toEqual(['u1']);
+    });
+});
+
 describe('the realtime echo check', () => {
     const boardWith = (task) => ({ tasks: { [PROJECT]: { groupBy: null, sprints: [SPRINT], [SPRINT]: { tasks: [task], found: {} } } } });
 
