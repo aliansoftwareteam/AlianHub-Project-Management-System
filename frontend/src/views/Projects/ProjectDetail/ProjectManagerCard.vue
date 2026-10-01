@@ -40,6 +40,17 @@
                                 :to="{ name: 'inbox', params: { cid: route.params.cid }, query: { tab: 'approval' } }"
                             >{{ $t('ProjectManager.review') }}</RouterLink>
                         </p>
+                        <p v-if="finding.claim" class="pmc__claim" data-test="finding-claim" role="status">
+                            <span>{{ $t('ProjectManager.claimed_by', { name: finding.claim.name }) }}</span>
+                            <button
+                                v-if="finding.canTakeBack"
+                                type="button"
+                                class="ah-btn ah-btn--ghost ah-btn--sm"
+                                data-test="finding-take-back"
+                                :disabled="busy"
+                                @click="takeBack(finding)"
+                            >{{ $t('ProjectManager.take_back') }}</button>
+                        </p>
                     </li>
                 </ul>
             </div>
@@ -140,6 +151,23 @@ async function save(next) {
         busy.value = false;
     }
 }
+
+async function takeBack(finding) {
+    const pid = props.projectId;
+    busy.value = true;
+    error.value = "";
+    try {
+        const res = await apiRequest("post", `${env.AGENT_WORK_QUEUE}/${encodeURIComponent(finding.id)}/take-back`, {});
+        if (res?.data?.status !== true) throw new Error(res?.data?.statusText || t("ProjectManager.take_back_failed"));
+        const data = await request("get", pid, undefined, "ProjectManager.load_failed");
+        if (pid === props.projectId) take(data);
+        $toast.success(t("ProjectManager.taken_back"), { position: "top-right" });
+    } catch (e) {
+        error.value = e?.response?.data?.statusText || e.message || t("ProjectManager.take_back_failed");
+    } finally {
+        busy.value = false;
+    }
+}
 </script>
 
 <style scoped>
@@ -161,6 +189,7 @@ async function save(next) {
 .pmc__subject { color: var(--ink); font: 500 12.5px/1.35 var(--font-ui); min-width: 0; overflow-wrap: anywhere; }
 .pmc__reason { display: flex; flex-direction: column; gap: 2px; margin: 0; color: var(--ink); font: 400 12px/1.4 var(--font-ui); overflow-wrap: anywhere; }
 .pmc__offer { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0; color: var(--ink-2); font: 400 12px/1.4 var(--font-ui); overflow-wrap: anywhere; }
+.pmc__claim { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; color: var(--ink-2); font: 400 12px/1.4 var(--font-ui); overflow-wrap: anywhere; }
 .pmc__review { color: var(--brand); font-weight: 600; text-decoration: none; }
 .pmc__review:hover { text-decoration: underline; }
 .pmc__review:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }

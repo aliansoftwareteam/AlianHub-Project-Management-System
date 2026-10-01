@@ -17,6 +17,7 @@ export const findingReasons = (t, finding) => {
         case "untriaged": return [t("ProjectManager.reason_untriaged", { origin: t(facts.origin === "form" ? "ProjectManager.origin_form" : "ProjectManager.origin_email") })];
         case "no_owner": return [t("ProjectManager.reason_no_owner")];
         case "no_estimate": return [t("ProjectManager.reason_no_estimate")];
+        case "handed_over": return [t("ProjectManager.reason_handed_over")];
         default: return [];
     }
 };
