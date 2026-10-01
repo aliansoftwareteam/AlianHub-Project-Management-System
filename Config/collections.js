@@ -78,6 +78,7 @@ const dbCollections = {
     PROJECT_SNAPSHOTS: "project_snapshots",
     EVERYTHING_VIEWS: "everything_views",
     GOALS: "goals",
+    WHITEBOARDS: "whiteboards",
     REMINDERS: "reminders",
     NOTES: "notes",
     GENERAL_REMINDERS: "general_reminders",

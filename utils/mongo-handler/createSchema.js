@@ -160,6 +160,8 @@ everythingViewsSchema.index({ userId: 1, deletedStatusKey: 1 });
 const goalsSchema = new Schema(schema.goals, {strict: true, timestamps: true});
 goalsSchema.index({ deletedStatusKey: 1, ownerUserId: 1 });
 goalsSchema.index({ deletedStatusKey: 1, visibility: 1 });
+const whiteboardsSchema = new Schema(schema.whiteboards, {strict: true, timestamps: true});
+whiteboardsSchema.index({ projectId: 1, sprintId: 1 }, { unique: true, partialFilterExpression: { deletedStatusKey: 0 } });
 const remindersSchema = new Schema(schema.reminders, {strict: true, timestamps: true});
 remindersSchema.index({ userId: 1, fired: 1, reminderAt: 1 });
 const notesSchema = new Schema(schema.notes, {strict: true, timestamps: true});
@@ -531,6 +533,7 @@ module.exports = {
     projectSnapshotsSchema,
     everythingViewsSchema,
     goalsSchema,
+    whiteboardsSchema,
     remindersSchema,
     notesSchema,
     generalRemindersSchema,

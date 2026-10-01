@@ -81,6 +81,7 @@ const {
     projectSnapshotsSchema,
     everythingViewsSchema,
     goalsSchema,
+    whiteboardsSchema,
     remindersSchema,
     generalRemindersSchema,
     generalReminderQueueSchema,
@@ -307,6 +308,8 @@ exports.checkType = (type) => {
             return everythingViewsSchema
         case SCHEMA_TYPE.GOALS:
             return goalsSchema
+        case SCHEMA_TYPE.WHITEBOARDS:
+            return whiteboardsSchema
         case SCHEMA_TYPE.REMINDERS:
             return remindersSchema
         case SCHEMA_TYPE.GENERAL_REMINDERS:
@@ -603,6 +606,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.EVERYTHING_VIEWS}`
         case SCHEMA_TYPE.GOALS:
                 return `${dbCollections.GOALS}`
+        case SCHEMA_TYPE.WHITEBOARDS:
+                return `${dbCollections.WHITEBOARDS}`
         case SCHEMA_TYPE.REMINDERS:
                 return `${dbCollections.REMINDERS}`
         case SCHEMA_TYPE.GENERAL_REMINDERS:

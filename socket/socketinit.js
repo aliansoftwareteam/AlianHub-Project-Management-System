@@ -9,6 +9,7 @@ const {callSocketHandler} = require('./controller/callSocket');
 require('./controller/agentSessionSocket').registerWhenOn();
 require('./controller/viewTemplateSocket');
 require('./controller/goalSocket');
+require('./controller/whiteboardSocket');
 require('./controller/projectTemplateSocket');
 require('./controller/agentSocket');
 require('./controller/folderSocket');

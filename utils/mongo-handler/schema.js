@@ -658,6 +658,20 @@ const schema = {
         updatedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // A list's whiteboard (Modules/Whiteboards). elements is what applyPatch returns: cards that name a task by id
+    // and never carry its title. history holds the states earlier saves replaced, capped by MAX_SNAPSHOTS.
+    whiteboards: {
+        projectId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        sprintId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        elements: { type: Array, default: [], required: false },
+        revision: { type: Number, default: 0, required: false },
+        history: { type: Array, default: [], required: false },
+        historyKeptAt: { type: Date, required: false },
+        savedAt: { type: Date, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Personal reminders (COLLAB-03) — one-shot, per-user. A node-schedule cron
     // (every minute) fires any reminder whose reminderAt has passed and that
     // hasn't fired yet, delivering an in-app notification to userId. Managed by

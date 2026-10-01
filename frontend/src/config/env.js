@@ -116,6 +116,7 @@ module.exports.VERSION_UPDATE_NOTIFY = 'api/v1/versionUpdateNotify';
 module.exports.PROJECT_TEMPLATE = '/api/v1/project/template/custom';
 module.exports.TASK_TEMPLATES = '/api/v2/task-templates';
 module.exports.VIEW_TEMPLATES = '/api/v2/view-templates';
+module.exports.WHITEBOARDS = '/api/v2/whiteboards';
 module.exports.PROJECTS_CHECKLIST = '/api/v1/project/checklist';
 module.exports.API_PROJECT_STATUS_TEMPLATE = '/api/v1/project-status-template';
 module.exports.RESTRICTED_EXTENSIONS = '/api/v1/restricted-extensions';
