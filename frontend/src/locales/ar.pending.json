@@ -3123,6 +3123,8 @@
     "Common.select_all_tasks": "Select all tasks in group",
     "Common.select_task": "Select task",
     "Common.select_task_named": "Select {name}",
+    "Common.server_busy": "The server is busy. Try again in a moment.",
+    "Common.server_busy_retry_in": "The server is busy. Try again in {n} second. | The server is busy. Try again in {n} seconds.",
     "Company.company_created": "Your company was created. We have set up the initial steps. Please wait a moment.",
     "Company.creating_company": "Creating Company",
     "Company.fill_company_details": "Fill in your company details",
