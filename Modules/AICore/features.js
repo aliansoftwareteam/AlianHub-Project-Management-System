@@ -29,10 +29,15 @@ const FEATURES = Object.freeze({
     AGENT_BUILDER: 'agent_builder',
 });
 
+/* Priced by the audio minute, so outside the token features and the task classes that route them. */
+const AUDIO_FEATURES = Object.freeze({ TRANSCRIPTION: 'transcription' });
+
 const UNKNOWN_FEATURE = 'unknown';
 
 const FEATURE_LIST = Object.freeze(Object.values(FEATURES));
 
 const isFeature = (value) => FEATURE_LIST.includes(value);
 
-module.exports = { FEATURES, FEATURE_LIST, UNKNOWN_FEATURE, isFeature };
+const isAudioFeature = (value) => Object.values(AUDIO_FEATURES).includes(value);
+
+module.exports = { FEATURES, FEATURE_LIST, AUDIO_FEATURES, UNKNOWN_FEATURE, isFeature, isAudioFeature };

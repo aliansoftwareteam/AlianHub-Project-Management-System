@@ -4,7 +4,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const usage = require('./usage');
 const replay = require('./replay');
-const { isFeature, UNKNOWN_FEATURE } = require('./features');
+const { isFeature, isAudioFeature, UNKNOWN_FEATURE } = require('./features');
 const { isProviderError } = require('./providerError');
 const { resolveModel, routerEnabled } = require('./llmProvider/normalise');
 const { preflight } = require('./estimate');
@@ -31,10 +31,10 @@ const loud = (message) => {
     logger.warn(`${LOG_PREFIX} ${message}`);
 };
 
-function contextOf(opts) {
+function contextOf(opts, known = isFeature) {
     const given = (opts && opts.spend) || {};
     let feature = given.feature;
-    if (!isFeature(feature)) {
+    if (!known(feature)) {
         loud(`model call without a known feature tag (${feature === undefined ? 'none' : JSON.stringify(feature)}); booked as "${UNKNOWN_FEATURE}"`);
         feature = UNKNOWN_FEATURE;
     }
@@ -188,6 +188,46 @@ function metered(adapter) {
     return provider;
 }
 
+const AUDIO_MINUTE = 'audio_minute';
+const audioUsd = (seconds, usdPerMinute) => Math.round((Number(seconds || 0) / 60) * Number(usdPerMinute || 0) * 1e6) / 1e6;
+
+/* Audio is priced by the minute, not by the token, so its row carries the minutes as `quantity` of `unit` and
+ * no tokens. `seconds` is what the caller measured and is what the budget holds; `call` answers `{ seconds }`
+ * when the vendor reported the length, and that is then what is booked. */
+async function audio({ spend, model, provider, usdPerMinute, seconds, estimated = false }, call) {
+    const context = contextOf({ spend }, isAudioFeature);
+    await aiSwitch.assertAllowed(context.companyId);
+    const hold = { priced: true, costUsd: audioUsd(seconds, usdPerMinute), model, inputTokens: 0, outputTokens: 0 };
+    const ticket = await reservation.reserve(context, hold, provider);
+    if (!ticket.ok) throw Object.assign(new Error(ticket.reason), { code: ticket.code, feature: context.feature });
+    let result;
+    try {
+        result = await asCompany(context, call);
+    } catch (error) {
+        await reservation.release(ticket);
+        throw error;
+    }
+    const reported = Number(result && result.seconds);
+    const vendorTimed = Number.isFinite(reported) && reported > 0;
+    const booked = vendorTimed ? reported : Number(seconds || 0);
+    const costUsd = audioUsd(booked, usdPerMinute);
+    const row = {
+        companyId: context.companyId, feature: context.feature, model: model || null, provider: provider || null,
+        inputTokens: 0, outputTokens: 0, totalTokens: 0, costUsd, priced: true, billedToWorkspace: context.billedToWorkspace,
+        unit: AUDIO_MINUTE, quantity: Math.round((booked / 60) * 1e4) / 1e4, estimated: !vendorTimed && estimated === true,
+        runId: context.runId, userId: context.userId, at: new Date(),
+    };
+    try {
+        await MongoDbCrudOpration(context.companyId || dbCollections.GLOBAL, { type: SCHEMA_TYPE.AI_USAGE, data: row }, 'save');
+    } catch (e) {
+        if (strict()) throw e;
+        logger.error(`${LOG_PREFIX} ${context.companyId}: ${context.feature} spent ${row.quantity} audio minutes that could not be booked: ${e.message}`);
+    }
+    await reservation.reconcile(ticket, { inputTokens: 0, outputTokens: 0, priced: true, costUsd });
+    await alert(context);
+    return result;
+}
+
 const monthRange = (month) => {
     const from = new Date(`${month}-01T00:00:00.000Z`);
     return { from, to: new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + 1, 1)) };
@@ -214,4 +254,4 @@ async function monthly(companyId, month) {
     return { usedUsd: money(features.reduce((s, f) => s + f.usd, 0)), features };
 }
 
-module.exports = { metered, monthly, contextOf, ensurePriced };
+module.exports = { metered, audio, monthly, contextOf, ensurePriced, AUDIO_MINUTE };

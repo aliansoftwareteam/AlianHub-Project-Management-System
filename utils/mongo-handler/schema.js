@@ -776,8 +776,10 @@ const schema = {
         reviewedAt: { type: Date, required: false },
         reviewedBy: { type: String, required: false },
         reviewerName: { type: String, required: false },
+        // The standing approval was given by the person whose week it is
+        selfApproved: { type: Boolean, default: false, required: false },
         rejectionReason: { type: String, required: false },
-        // One entry per reopening: who reopened the week and when, and the review that undid.
+        // One entry per approval (who, when, and whether it was their own week) and per reopening (who, when, and the review that undid).
         history: {
             type: [{
                 _id: false,
@@ -787,6 +789,7 @@ const schema = {
                 by: { type: String, required: true },
                 byName: { type: String, required: false },
                 at: { type: Date, required: true },
+                selfApproved: { type: Boolean, required: false },
                 reviewedBy: { type: String, required: false },
                 reviewerName: { type: String, required: false },
                 reviewedAt: { type: Date, required: false },
@@ -1270,6 +1273,11 @@ const schema = {
         costUsd: { type: Number, required: false },
         priced: { type: Boolean, default: false, required: false },
         billedToWorkspace: { type: Boolean, default: true, required: false },
+        // Set on a call priced by something other than tokens: unit 'audio_minute', quantity in that unit,
+        // estimated when the quantity came from the upload's size rather than its length
+        unit: { type: String, required: false },
+        quantity: { type: Number, required: false },
+        estimated: { type: Boolean, required: false },
         runId: { type: String, required: false },
         userId: { type: String, required: false },
         at: { type: Date, required: true },
