@@ -7,6 +7,7 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({
 jest.mock('../Config/config', () => ({ myCache: { get: () => undefined, set: () => {}, del: () => {}, keys: () => [], getTtl: () => 0 } }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
 jest.mock('../Modules/TimeSheet/helpers/timeScope', () => ({
+    ...jest.requireActual('../Modules/TimeSheet/helpers/timeScope'),
     resolveSheetScope: jest.fn(),
     SHEET_PERMISSION: { workload: 'sheet_settings.workload_timesheet', project: 'sheet_settings.project_timesheet' },
     scopedEstimateMatch: () => ({}),

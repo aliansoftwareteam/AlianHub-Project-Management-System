@@ -7,6 +7,7 @@ const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const registry = require('./registry');
 const scope = require('./scope');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
+const { privateWorkOf, proposalClause } = require('./privateWork');
 
 // Reads behind the pipeline (28a) and the release screen (28c). Both are views
 // of the same boundary: what an agent may do, what it may only propose, and what
@@ -121,6 +122,7 @@ const releaseCandidate = async (companyId, uid, { since } = {}) => {
     const privileged = isPrivileged(roleType);
     const keys = gatedKeys();
     const sprints = visible.length ? await hiddenSprintFilter(companyId, uid, visible) : {};
+    const proposalScope = privileged ? proposalClause(await privateWorkOf(companyId, uid)) : { projectId: { $in: idForms(visible) } };
 
     const doneTasks = visible.length
         ? await MongoDbCrudOpration(companyId, {
@@ -137,7 +139,7 @@ const releaseCandidate = async (companyId, uid, { since } = {}) => {
             : Promise.resolve([]),
         MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AGENT_PROPOSALS,
-            data: [{ ...(privileged ? {} : { projectId: { $in: idForms(visible) } }), $or: [{ gate: { $ne: null } }, { 'changes.action': { $in: keys } }] }, {}, { sort: { createdAt: -1 }, limit: 50 }],
+            data: [{ ...proposalScope, $or: [{ gate: { $ne: null } }, { 'changes.action': { $in: keys } }] }, {}, { sort: { createdAt: -1 }, limit: 50 }],
         }, 'find').catch(() => []),
         MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS, data: [{ deletedStatusKey: { $ne: 1 }, status: 'connected' }, 'type name status'],

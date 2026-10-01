@@ -1,6 +1,8 @@
 const { scopedTimeMatch, scopedEstimateMatch } = require('./timeScope');
-const { toObjectIds } = require('../../Tasks/helpers/taskQueryGuard');
+const { toObjectIds, companyWideMatch } = require('../../Tasks/helpers/taskQueryGuard');
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
+const { dbCollections } = require('../../../Config/collections');
+const { privateWorkOf, commentClause } = require('../../Agents/privateWork');
 
 const REFUSED_OPERATORS = Object.freeze(['$out', '$merge', '$unionWith', '$graphLookup', '$function', '$accumulator', '$where']);
 
@@ -20,11 +22,38 @@ const isPlainObject = (value) => value !== null && typeof value === 'object' && 
 /* Tasks, folders and sprints store the project as an ObjectId, and an aggregate never casts. */
 const inVisibleProjects = (field, scope) => ({ $match: { [field]: { $in: [...toObjectIds(scope.visible), ...scope.visible] } } });
 
+/* What a company-wide caller's join leaves out of the two collections that hold private work: someone
+ * else's personal list, and a chat the caller is not in. */
+const PRIVATE_WORK_IN = Object.freeze({
+    [dbCollections.TASKS]: (privateWork) => companyWideMatch(privateWork.uid, privateWork.personalLists),
+    [dbCollections.COMMENTS]: (privateWork) => commentClause(privateWork),
+});
+
+/* An owner or admin may join any collection. A join into tasks or comments starts with the exclusion a
+ * direct read of them gets; one it cannot be put in front of is refused rather than let through. */
+const companyWideLookup = (spec, scope, joinable) => {
+    if (!isPlainObject(spec) || typeof spec.from !== 'string') {
+        throw new TimesheetQueryRefused('A join in a timesheet query names its collection as text.');
+    }
+    const exclusion = Object.prototype.hasOwnProperty.call(PRIVATE_WORK_IN, spec.from) ? PRIVATE_WORK_IN[spec.from] : null;
+    if (!exclusion) return walk(spec, scope, joinable);
+    if (spec.pipeline !== undefined && !Array.isArray(spec.pipeline)) {
+        throw new TimesheetQueryRefused(`A join into ${spec.from} takes its pipeline as a list of stages.`);
+    }
+    if (!scope.privateWork) throw new TimesheetQueryRefused(`A join into ${spec.from} cannot be scoped for this request.`);
+    const { pipeline = [], ...rest } = spec;
+    const leading = exclusion(scope.privateWork);
+    return {
+        ...walk(rest, scope, joinable),
+        pipeline: [...(Object.keys(leading).length ? [{ $match: leading }] : []), ...walk(pipeline, scope, joinable)],
+    };
+};
+
 /* A $lookup reads another collection, so the $match put in front of the pipeline does
  * not cover it: a non-admin may join tasks, and from inside that join the folders and
  * sprints they sit in, each limited to the projects the caller can open. */
 const scopeLookup = (spec, scope, joinable) => {
-    if (scope.companyWide) return walk(spec, scope, joinable);
+    if (scope.companyWide) return companyWideLookup(spec, scope, joinable);
     const from = isPlainObject(spec) ? spec.from : undefined;
     const projectField = typeof from === 'string' && Object.prototype.hasOwnProperty.call(joinable, from) ? joinable[from] : null;
     if (!projectField || !Array.isArray(spec.pipeline)) {
@@ -80,6 +109,21 @@ const scopePipeline = (query, scope, ownRowsMatch) => {
     return Object.keys(own).length ? [{ $match: own }, ...checked] : checked;
 };
 
+const mentions = (value, key) => (Array.isArray(value)
+    ? value.some((item) => mentions(item, key))
+    : isPlainObject(value) && Object.entries(value).some(([name, inner]) => name === key || mentions(inner, key)));
+
+const NO_PRIVATE_WORK = Object.freeze({ uid: '', personalLists: [], directSpaces: [], myChats: [] });
+
+/* `build(scope)` turns the request into its pipeline. What a company-wide caller's joins are narrowed
+ * with is read only when the query has a join, and only after a first pass has refused what it must,
+ * so a refused query reads nothing. */
+const withJoinScope = async (companyId, scope, query, build) => {
+    if (!scope.companyWide || !mentions(query, '$lookup')) return build(scope);
+    build({ ...scope, privateWork: NO_PRIVATE_WORK });
+    return build({ ...scope, privateWork: await privateWorkOf(companyId, scope.uid) });
+};
+
 const scopeTimesheetPipeline = (query, scope) => scopePipeline(query, scope, scopedTimeMatch);
 const scopeEstimatePipeline = (query, scope) => scopePipeline(query, scope, scopedEstimateMatch);
 
@@ -88,6 +132,7 @@ module.exports = {
     TimesheetQueryRefused,
     isPlainObject,
     checkStages,
+    withJoinScope,
     scopeTimesheetPipeline,
     scopeEstimatePipeline,
 };
