@@ -578,7 +578,7 @@ onMounted(() => {
 .ig__redirect .ah-field__hint { width: 100%; }
 .ig__reqs { margin: 0; padding-left: 18px; font: var(--text-small); color: var(--ink-label); line-height: 1.5; }
 .ig__note { padding: 10px 12px; border-color: rgba(47, 57, 144, .25); font: 400 12px/1.5 var(--font-ui); color: var(--ink); display: flex; align-items: flex-start; gap: 8px; }
-.ig__note-icon { color: var(--agent); flex: none; margin-top: 1px; }
+.ig__note-icon { color: var(--agent-ink); flex: none; margin-top: 1px; }
 @media (max-width: 767px) {
     .ig__form-grid { grid-template-columns: 1fr; }
     .ig__head-actions { margin-left: 0; }

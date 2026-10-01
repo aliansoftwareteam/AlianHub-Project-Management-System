@@ -11,7 +11,7 @@
     display: block;
     margin: 0 10px;
 }
-/* The search field of the country and currency menus, which are legacy panels that stay white in dark. */
+/* The fixed colours are for the column menus of the legacy list, which are still white panels. */
 .customfield__form-control {
     height: 30px;
     max-width: 100%;
@@ -25,6 +25,13 @@
     font-size: 13px;
     margin: 0px 0px 5px 0px;
 }
+.dd-tokens .customfield__form-control {
+    background: var(--surface);
+    color: var(--ink);
+    border-color: var(--border);
+}
+.dd-tokens .customfield__form-control::placeholder { color: var(--ink-2); }
+.dd-tokens .customfield__form-control:focus-visible { outline: none; border-color: var(--brand); box-shadow: var(--focus); }
 .custom-field__height{
     height: 200px;
 }
@@ -36,8 +43,7 @@
     margin: 0px;
 }
 @media (max-width:767px) {
-    /* The search field of the country and currency menus, which are legacy panels that stay white in dark. */
-.customfield__form-control {
+    .customfield__form-control {
         margin: 0px 0px 15px 0px;
     }
     .custom-field__bg {
