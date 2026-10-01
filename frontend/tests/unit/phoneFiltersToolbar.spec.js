@@ -110,4 +110,13 @@ describe('the project filters toolbar on a desktop', () => {
         expect(wrapper.find('.pft .task-filter-assignee #group_by_trigger').exists()).toBe(true);
         expect(wrapper.find('.pft .manage__filter-users').exists()).toBe(true);
     });
+
+    it('takes the density the page hands it on its root, and draws its controls from its own classes', async () => {
+        await mountToolbar({ clientWidth: 1280, 'data-density': 'compact' });
+        expect(wrapper.element.classList.contains('pft')).toBe(true);
+        expect(wrapper.attributes('data-density')).toBe('compact');
+        expect(wrapper.find('#group_by_trigger').classes()).toEqual(expect.arrayContaining(['pft__ctl', 'pft__pill']));
+        expect(wrapper.findAll('.pft__seg .pft__seg-btn')).toHaveLength(2);
+        expect(wrapper.find('.pft__input').classes()).not.toContain('form-control');
+    });
 });

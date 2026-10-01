@@ -1,7 +1,7 @@
 <template>
     <div :class="`overflow-auto custom_field_content style-scroll ${pageIndex === 1 ? 'custom_field_content_field' : ''}`">
         <template v-if="pageIndex === 0">
-            <div v-for="(item,index) in fieldTypes" :key="index" :data-field-type="item.cfType" @click="pageIndex= pageIndex+1,componentDetail=item">
+            <button v-for="(item,index) in fieldTypes" :key="index" type="button" class="custom_field_type" :data-field-type="item.cfType" @click="pageIndex= pageIndex+1,componentDetail=item">
                 <CustomFieldComponentStructure
                     :cfTitle="item.cfTitle"
                     :cfDescrption="item.cfDescrption"
@@ -9,7 +9,7 @@
                     :cfPrimaryColor="item.cfPrimaryColor"
                     :icon="item.icon"
                 />
-            </div>
+            </button>
         </template>
         <div v-else-if="pageIndex === 1">
             <div v-if="currentCompany?.planFeature?.customFields">

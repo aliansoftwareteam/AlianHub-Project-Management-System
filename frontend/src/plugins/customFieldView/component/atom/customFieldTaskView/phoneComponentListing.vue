@@ -23,7 +23,7 @@
                 </div>
             </template>
             <template #prefix>
-                <DropDown mode="listbox" v-if="checkCountrySelect && checkCountrySelect.length" @isVisible="search='',allCountriesArray = allCountries" :id="'security'+makeUniqueId(6)">
+                <DropDown themed mode="listbox" v-if="checkCountrySelect && checkCountrySelect.length" @isVisible="search='',allCountriesArray = allCountries" :id="'security'+makeUniqueId(6)">
                     <template #button>
                         <div class="d-flex align-items-center align-items-center justify-content-between phone_pipeline">
                             <span class="ah-sr-only">{{$t('CustomField.country_code')}}</span>
@@ -53,7 +53,7 @@
                         </div>
                     </template>
                 </DropDown>
-                <DropDown mode="listbox" @isVisible="search='',allCountriesArray = allCountries" v-else-if="!(checkCountrySelect && checkCountrySelect.length) && props?.detail?.fieldCode && countryCode && props?.detail?.fieldCode !== countryCode" :id="'security'+makeUniqueId(6)">
+                <DropDown themed mode="listbox" @isVisible="search='',allCountriesArray = allCountries" v-else-if="!(checkCountrySelect && checkCountrySelect.length) && props?.detail?.fieldCode && countryCode && props?.detail?.fieldCode !== countryCode" :id="'security'+makeUniqueId(6)">
                     <template #button>
                         <div class="d-flex align-items-center align-items-center justify-content-between phone_pipeline">
                             <span class="ah-sr-only">{{$t('CustomField.country_code')}}</span>
