@@ -1108,7 +1108,7 @@
                 {
                     "name": "linkedTasks",
                     "type": "id[]",
-                    "description": "Tasks the page is attached to."
+                    "description": "Tasks the page is attached to. Each must be a task the caller can open."
                 },
                 {
                     "name": "isWiki",
@@ -1128,12 +1128,7 @@
                 {
                     "name": "createdByAgent",
                     "type": "boolean",
-                    "description": "Marks the page as drafted by an agent. It starts as a draft that a person approves."
-                },
-                {
-                    "name": "agentName",
-                    "type": "string",
-                    "description": "The agent's name, up to 80 characters."
+                    "description": "Marks the page as a draft that a person approves. A page an agent token creates is always one, under the token's own name."
                 }
             ],
             "request": {
@@ -1279,7 +1274,7 @@
                 {
                     "name": "linkedTasks",
                     "type": "id[]",
-                    "description": "Replaces the tasks the page is attached to."
+                    "description": "Replaces the tasks the page is attached to. A task added here must be one the caller can open."
                 },
                 {
                     "name": "isWiki",
@@ -1295,11 +1290,6 @@
                     "name": "reviewDate",
                     "type": "date",
                     "description": "When the wiki page is next due for review."
-                },
-                {
-                    "name": "agentStatus",
-                    "type": "string",
-                    "description": "`draft` or `approved`, for a page an agent drafted."
                 }
             ],
             "request": {
