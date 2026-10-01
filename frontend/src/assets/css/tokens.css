@@ -46,18 +46,21 @@
     --danger-ink: #9c1f2e;
     --agent: #6b5ce7;
     --agent-bg: #eeebfd;
+    /* --agent is a fill (the agent avatar, white on it). Text takes --agent-ink, which reads on --agent-bg and on a surface. */
+    --agent-ink: #5747d6;
 
     --font-ui: "Inter Tight", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
     --font-mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
 
     --text-display: 700 30px/1.12 var(--font-ui);
-    --text-h1: 600 20px/1.2 var(--font-ui);
-    --text-h2: 600 19px/1.2 var(--font-ui);
-    --text-h3: 600 13.5px/1.3 var(--font-ui);
-    --text-body: 400 13px/1.5 var(--font-ui);
-    --text-small: 400 12.5px/1.5 var(--font-ui);
-    --text-label: 600 10.5px/1.2 var(--font-mono);
-    --text-data: 500 11.5px/1.2 var(--font-mono);
+    /* Each reads the type scale, so a look that sets the scale sets these; a fallback is the classic size. */
+    --text-h1: var(--fw-title, 600) var(--fs-xl, 20px)/var(--lh-tight, 1.2) var(--font-ui);
+    --text-h2: var(--fw-title, 600) var(--fs-xl, 19px)/var(--lh-tight, 1.2) var(--font-ui);
+    --text-h3: var(--fw-title, 600) var(--fs-lg, 13.5px)/var(--lh-snug, 1.3) var(--font-ui);
+    --text-body: 400 var(--fs-md, 13px)/var(--lh-body, 1.5) var(--font-ui);
+    --text-small: 400 var(--fs-sm, 12.5px)/var(--lh-body, 1.5) var(--font-ui);
+    --text-label: 600 var(--fs-xs, 10.5px)/var(--lh-tight, 1.2) var(--font-mono);
+    --text-data: 500 var(--fs-sm, 11.5px)/var(--lh-tight, 1.2) var(--font-mono);
 
     --fs-2xs: 10px; --fs-xs: 10.5px; --fs-sm: 11.5px; --fs-md: 13px; --fs-lg: 13px; --fs-xl: 17px;
     --lh-tight: 1.2; --lh-snug: 1.25; --lh-body: 1.4;
@@ -173,6 +176,7 @@
     /* Dark --danger is a light red: white on it is 2.6:1. */
     --on-danger: #111114;
     --agent-bg: rgba(168, 146, 255, .16);
+    --agent-ink: #b3a4ff;
     --shadow-ink: rgba(0, 0, 0, .3);
 
     --scheme: dark;
@@ -207,6 +211,7 @@
     --danger: #a00d18;
     --danger-ink: #7a0f1b;
     --agent: #4a3cc2;
+    --agent-ink: #372b9c;
     --focus: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink);
 }
 
@@ -236,6 +241,7 @@
     --danger: #ff9ea5;
     --danger-ink: #ffb8bd;
     --agent-bg: rgba(201, 189, 255, .2);
+    --agent-ink: #d6cdff;
 }
 
 /* Many controls draw focus as a box-shadow and switch the outline off; here the outline wins. */
@@ -461,11 +467,11 @@ html, body, #app {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
-    padding: 12px 16px;
+    gap: var(--sp-4);
+    padding: var(--card-pad-y, 12px) var(--card-pad-x, 16px);
     border-bottom: 1px solid var(--hairline);
 }
-.ah-card__body { padding: 14px 16px; }
+.ah-card__body { padding: var(--card-pad-y, 14px) var(--card-pad-x, 16px); }
 
 .ah-btn {
     display: inline-flex;
@@ -555,7 +561,7 @@ html, body, #app {
 .ah-chip--warn { background: var(--warn-bg); color: var(--warn-ink); }
 .ah-chip--danger { background: var(--danger-bg); color: var(--danger-ink); }
 .ah-chip--brand { background: var(--brand-tint); color: var(--brand); }
-.ah-chip--agent { background: var(--agent-bg); color: var(--agent); }
+.ah-chip--agent { background: var(--agent-bg); color: var(--agent-ink); }
 .ah-chip--automation { background: var(--fill); color: var(--ink-2); }
 .ah-chip--mono { font: var(--text-data); }
 .ah-chip--dark { background: var(--rail); color: var(--rail-ink-strong, #fff); }
@@ -617,10 +623,10 @@ html, body, #app {
 }
 .ah-check:focus-visible { outline: none; box-shadow: var(--focus); }
 
-.ah-tabs { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--track, rgba(0, 0, 0, .05)); }
+.ah-tabs { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--r-input); background: var(--track, rgba(0, 0, 0, .05)); }
 .ah-tab {
-    height: 26px; padding: 0 10px; border-radius: 6px; border: 0; background: transparent;
-    font: 600 12px/1 var(--font-ui); color: var(--ink-2); cursor: pointer;
+    height: var(--control-h, 26px); padding: 0 var(--sp-4); border-radius: var(--r-chip); border: 0; background: transparent;
+    font: var(--fw-strong, 600) var(--fs-sm, 12px)/1 var(--font-ui); color: var(--ink-2); cursor: pointer;
     transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease);
 }
 .ah-tab.is-active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-card); }

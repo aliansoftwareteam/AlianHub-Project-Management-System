@@ -29,7 +29,7 @@
                 <div class="bottom-filter-section">
                     <div class="d-flex justify-content-between w-100 mb-13px" v-if="clientWidth > 767">
                         <div class="filter-title">
-                            <h2 class="m-0 font-size-18 text-capitalize">{{ isEdit === true ? selectedRow.name : $t('Filters.filter')}}</h2>
+                            <h2 class="m-0 font-size-18">{{ isEdit === true ? selectedRow.name : $t('Filters.filter')}}</h2>
                         </div>
                         <div class="filter-info d-flex">
                             <a href="https://help.alianhub.com/" target="_blank">

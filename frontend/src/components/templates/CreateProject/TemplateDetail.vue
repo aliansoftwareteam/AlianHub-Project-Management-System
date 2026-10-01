@@ -51,7 +51,7 @@
             </div>
             <div class="templateName_detail_wrapper">
             <div class="templateName_detail">
-                <span class="text-capitalize">{{templateView.TemplateName}}</span>
+                <span >{{templateView.TemplateName}}</span>
             </div>
             <div class="templateName_detail pr-20px pt-3px">
                 <p v-if="templateView.Description !== undefined" :class="[{'para-overflow': (templateView.Description.length > 496 && showMore)}]">{{showMore ? templateView.Description.slice(0,496) : templateView.Description}}
