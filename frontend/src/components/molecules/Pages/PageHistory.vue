@@ -184,7 +184,7 @@ const COMPARE = [
     { id: 'current', label: 'Docs.history_compare_current' },
 ];
 const MARK = { added: 'Docs.history_added', removed: 'Docs.history_removed', changed: 'Docs.history_changed' };
-const REASONS = ['author', 'interval', 'restore', 'manual'];
+const REASONS = ['author', 'interval', 'rewrite', 'restore', 'manual'];
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -384,7 +384,7 @@ function restore() {
 async function confirmRestore() {
     restoreQuestion.value = '';
     if (!selected.value || busy.value) return;
-    if (!props.beforeRestore()) return;
+    if (!(await props.beforeRestore())) return;
     const page = await write('post', `${base()}/${selected.value._id}/restore`);
     if (!page) return;
     $toast.success(t('Docs.history_restored'), { position: 'top-right' });

@@ -1,6 +1,12 @@
 <template>
-    <div class="pd" :class="`pd--${layout}`">
+    <div class="pd" :class="`pd--${layout}`" @focusout="onFocusOut">
         <template v-if="page">
+            <div v-if="isBehind" class="pd__banner" role="alert">
+                <ShellIcon name="alert" :size="14" />
+                <span class="pd__banner-text">{{ $t('Docs.conflict_banner') }}</span>
+                <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" :disabled="isResolving" @click="keepMineAsCopy">{{ $t('Docs.conflict_keep_copy') }}</button>
+                <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" :disabled="isResolving" @click="reloadSaved">{{ $t('Docs.conflict_reload') }}</button>
+            </div>
             <div v-if="needsAttention" class="pd__banner" :class="`pd__banner--${reviewStateValue}`">
                 <ShellIcon name="alert" :size="14" />
                 <span class="pd__banner-text">{{ $t('Docs.stale_banner') }}</span>
@@ -43,7 +49,7 @@
                                 <ShellIcon name="share" :size="13" />{{ $t('Docs.share') }}
                             </button>
                         </template>
-                        <button type="button" class="ah-btn ah-btn--sm ah-btn--primary" :disabled="!isDirty || isSaving" @click="savePage">
+                        <button type="button" class="ah-btn ah-btn--sm ah-btn--primary" :disabled="!isDirty || isSaving || isBehind" :title="$t('Docs.save_now_hint')" @click="savePage">
                             {{ isSaving ? $t('Docs.saving') : $t('Docs.save') }}
                         </button>
                         <button type="button" class="pd__icon pd__icon--danger" :title="$t('Docs.delete')" @click="deletePage">
@@ -88,9 +94,9 @@
                             <button type="button" class="pd__unlink" :title="$t('Docs.unlink')" @click="unlinkTask(task.id)">✕</button>
                         </span>
                     </span>
-                    <span class="pd__prop pd__prop--muted">
-                        <span class="ah-dot" :class="isDirty ? 'ah-dot--warn' : 'ah-dot--ok'"></span>
-                        {{ isDirty ? $t('Docs.unsaved') : $t('Docs.updated', { when: relativeTime(page.updatedAt, t) }) }}
+                    <span class="pd__prop pd__prop--muted pd__save-state" role="status" :title="saveError || null">
+                        <span class="ah-dot" :class="saveDot"></span>
+                        {{ saveLabel }}
                     </span>
                 </div>
 
@@ -122,7 +128,7 @@
                     :editor-key="editorKey"
                     :project-id="projectId"
                     :page-id="String(page._id)"
-                    :before-leave="confirmDiscard"
+                    :before-leave="saveBeforeLeaving"
                     @change="onBlockChange"
                     @ready="onEditorReady"
                 />
@@ -141,7 +147,7 @@
                     :blocks="contentBlocks && contentBlocks.blocks"
                     :focus-id="focusCommentId"
                     :pick-block="mode === 'edit' ? currentBlock : null"
-                    :before-leave="confirmDiscard"
+                    :before-leave="saveBeforeLeaving"
                     @count="openComments = $event"
                     @threads="markCommented"
                     @jump="jumpToBlock"
@@ -203,7 +209,7 @@
                 :current-blocks="currentBlocks"
                 :doc-private="isPrivate"
                 :save-pending="savePending"
-                :before-restore="confirmDiscard"
+                :before-restore="savePending"
                 @close="showHistory = false"
                 @restored="onRestored"
             />
@@ -249,6 +255,7 @@ import { relativeTime, shortDate, toDateInput, reviewChipClass, reviewLabelKey, 
 import { decorateMentions } from './docMentions';
 import { hydrateDocImages } from './docImages';
 import { useMentionLinks } from './useMentionLinks';
+import { createDocAutosave } from './docAutosave';
 
 const { contentToEditorData, blocksToRawText, TASK_TOKEN_PATTERN } = pageContent.default || pageContent;
 
@@ -269,7 +276,7 @@ const props = defineProps({
     closable: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['loaded', 'saved', 'deleted', 'close', 'outline', 'dirty']);
+const emit = defineEmits(['loaded', 'saved', 'deleted', 'close', 'outline']);
 
 const page = ref(null);
 const loadFailed = ref(false);
@@ -278,6 +285,8 @@ const contentHtml = ref('');
 const contentBlocks = ref(null);
 const savedSnapshot = ref({ title: '', html: '' });
 const isSaving = ref(false);
+const isResolving = ref(false);
+const savedHere = ref(false);
 const blockEditor = ref(null);
 const composeRail = ref(null);
 const editorSeed = ref(null);
@@ -323,9 +332,45 @@ const privateHint = computed(() => {
 });
 const shareUrl = computed(() => (share.value ? `${window.location.origin}/share/${share.value.token}` : ''));
 
-// Saving is deliberate: Save button or Ctrl/Cmd+S, never an autosave.
 const isDirty = computed(() => !!page.value
     && (draftTitle.value !== savedSnapshot.value.title || contentHtml.value !== savedSnapshot.value.html));
+
+const autosave = createDocAutosave({
+    draft: () => (page.value
+        ? { pageId: String(page.value._id), title: draftTitle.value, html: contentHtml.value, blocks: contentBlocks.value }
+        : null),
+    isDirty: () => isDirty.value,
+    send: (pageId, body) => apiRequest('put', `${env.PAGES}/${pageId}`, body),
+    onSaved,
+});
+const { saveState } = autosave;
+const isBehind = computed(() => saveState.value === 'conflict');
+const saveError = computed(() => (saveState.value === 'failed' ? autosave.lastError.value : ''));
+const saveDot = computed(() => {
+    if (saveState.value === 'saved') return 'ah-dot--ok';
+    return saveState.value === 'saving' ? 'ah-dot--warn' : 'ah-dot--danger';
+});
+const saveLabel = computed(() => {
+    if (saveState.value === 'saving') return t('Docs.saving');
+    if (saveState.value === 'offline') return t('Docs.autosave_offline');
+    if (saveState.value === 'failed' || saveState.value === 'conflict') return t('Docs.autosave_not_saved');
+    return savedHere.value ? t('Docs.saved') : t('Docs.updated', { when: relativeTime(page.value.updatedAt, t) });
+});
+
+/* The doc tree and the page header follow a save through `saved`; an autosave that leaves the title alone tells
+   them nothing new, and would have the tree fetched again on every pause. */
+function onSaved(sent, data, { settled }) {
+    if (!page.value || String(page.value._id) !== sent.pageId) return;
+    const renamed = sent.title !== savedSnapshot.value.title;
+    savedSnapshot.value = { title: sent.title, html: sent.html };
+    page.value = { ...page.value, ...data, content: page.value.content };
+    savedHere.value = true;
+    if (settled || renamed) emit('saved', page.value);
+}
+
+watch([draftTitle, contentHtml], () => {
+    if (page.value && !baselinePending.value && isDirty.value) autosave.changed();
+});
 
 const nameOf = (id) => (id ? (getUser(String(id))?.Employee_Name || '—') : '—');
 
@@ -338,14 +383,20 @@ const reviewLine = computed(() => {
     return t('Docs.review_due_line', { when: shortDate(page.value.reviewDate), who: owner });
 });
 
-watch(isDirty, (dirty) => emit('dirty', dirty));
 watch(contentBlocks, (blocks) => emit('outline', headingsOf(blocks)), { deep: true });
 
-function confirmDiscard() {
-    return !isDirty.value || window.confirm(t('Projects.page_discard_confirm'));
+/* Nothing asks before leaving any more: the doc is saved on the way out, and what cannot be saved stays on
+   this device for the next time the doc is opened. */
+function saveBeforeLeaving() {
+    autosave.flush({ settled: true });
+    return true;
 }
 
-const { onMentionClick, onMentionKeydown } = useMentionLinks({ beforeLeave: confirmDiscard });
+function onFocusOut(event) {
+    if (!event.currentTarget.contains(event.relatedTarget)) autosave.flush({ settled: true });
+}
+
+const { onMentionClick, onMentionKeydown } = useMentionLinks({ beforeLeave: saveBeforeLeaving });
 
 const personName = (id) => {
     const user = getUser(String(id));
@@ -382,6 +433,16 @@ function loadPage(id) {
             editorSeed.value = page.value.content || { html: contentHtml.value };
             editorKey.value = reloads ? `${id}-r${reloads}` : String(id);
             baselinePending.value = true;
+            savedHere.value = false;
+            const unsaved = autosave.opened(page.value);
+            if (unsaved) {
+                draftTitle.value = unsaved.title || '';
+                contentHtml.value = unsaved.html || '';
+                contentBlocks.value = unsaved.blocks || contentToEditorData({ html: contentHtml.value });
+                editorSeed.value = { blocks: contentBlocks.value };
+                baselinePending.value = false;
+                autosave.changed();
+            }
             isPrivate.value = String(page.value.visibility || '') === 'private';
             linkedTasks.value = (page.value.linkedTasks || []).map((x) => ({ id: String(x), key: '' }));
             mode.value = 'edit';
@@ -399,6 +460,7 @@ function loadPage(id) {
 }
 
 watch(() => props.pageId, (id) => {
+    autosave.flush({ settled: true });
     reloads = 0;
     loadPage(id);
 }, { immediate: true });
@@ -426,34 +488,55 @@ function onTitleEnter(event) {
     if (!event.isComposing) event.preventDefault();
 }
 
-function savePage() {
-    if (!page.value || isSaving.value || !isDirty.value) return Promise.resolve(false);
+/* Save now: the same save the doc makes by itself, without waiting for a pause. */
+async function savePage() {
+    if (!page.value || isSaving.value || !isDirty.value || isBehind.value) return false;
     isSaving.value = true;
-    const sent = { title: draftTitle.value, html: contentHtml.value };
-    return apiRequest('put', `${env.PAGES}/${page.value._id}`, {
-        title: sent.title,
-        contentHtml: sent.html,
-        contentBlocks: contentBlocks.value,
-    }).then((response) => {
-        if (response.data?.status) {
-            // Compare against what was SENT: anything typed during the request stays dirty.
-            savedSnapshot.value = sent;
-            if (response.data.data) page.value = { ...page.value, ...response.data.data, content: page.value.content };
-            $toast.success(response.data.statusText, { position: 'top-right' });
-            emit('saved', page.value);
-            return true;
-        }
-        $toast.error(response.data?.statusText || t('Toast.something_went_wrong'), { position: 'top-right' });
-        return false;
-    }).catch((error) => {
-        console.error('ERROR in save page: ', error);
-        return false;
-    }).finally(() => { isSaving.value = false; });
+    const saved = await autosave.flush({ settled: true });
+    isSaving.value = false;
+    if (saved) $toast.success(t('Docs.saved'), { position: 'top-right' });
+    else if (!isBehind.value) $toast.error(autosave.lastError.value || t('Docs.autosave_not_saved'), { position: 'top-right' });
+    return saved;
 }
 
-/* A version holds the saved doc, so edits still in the editor are saved before one is kept. */
+/* A version holds the saved doc, so edits still in the editor are saved before one is kept or restored over. */
 function savePending() {
-    return isDirty.value ? savePage() : Promise.resolve(true);
+    return autosave.flush({ settled: true });
+}
+
+function reloadSaved() {
+    if (!page.value) return Promise.resolve();
+    autosave.discardUnsaved(String(page.value._id));
+    reloads += 1;
+    return loadPage(String(page.value._id));
+}
+
+/* The doc on the server is someone else's newer text and is left as it is; this person's text becomes a doc of
+   its own beside it. */
+async function keepMineAsCopy() {
+    if (!page.value || isResolving.value) return;
+    isResolving.value = true;
+    try {
+        const response = await apiRequest('post', env.PAGES, {
+            title: t('Docs.conflict_copy_title', { title: draftTitle.value || t('Docs.untitled') }).slice(0, 200),
+            contentBlocks: contentBlocks.value,
+            ...(page.value.ProjectID ? { projectId: String(page.value.ProjectID) } : {}),
+            ...(page.value.parentPageId ? { parentPageId: String(page.value.parentPageId) } : {}),
+            ...(isPrivate.value ? { visibility: 'private' } : {}),
+        });
+        if (!response.data?.status) {
+            $toast.error(response.data?.statusText || t('Toast.something_went_wrong'), { position: 'top-right' });
+            return;
+        }
+        $toast.success(t('Docs.conflict_copy_kept', { title: response.data.data.title }), { position: 'top-right' });
+        await reloadSaved();
+        if (page.value) emit('saved', page.value);
+    } catch (error) {
+        console.error('ERROR in keeping a copy of the doc: ', error);
+        $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
+    } finally {
+        isResolving.value = false;
+    }
 }
 
 function deletePage() {
@@ -470,7 +553,7 @@ function deletePage() {
 }
 
 function requestClose() {
-    if (!confirmDiscard()) return;
+    saveBeforeLeaving();
     emit('close');
 }
 
@@ -710,7 +793,7 @@ function jumpToBlock(blockId) {
 
 watch(focusCommentId, (id) => { if (id) showComments.value = true; }, { immediate: true });
 
-defineExpose({ openShare, present, askAi, scrollToHeading, confirmDiscard, isDirty });
+defineExpose({ openShare, present, askAi, scrollToHeading, saveBeforeLeaving, isDirty });
 
 function onKeydown(e) {
     if (!page.value) return;
@@ -726,8 +809,29 @@ function onKeydown(e) {
         if (props.closable) requestClose();
     }
 }
-onMounted(() => document.addEventListener('keydown', onKeydown));
-onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
+function onPageHide() {
+    autosave.keepNow();
+    autosave.flush({ settled: true });
+}
+
+function onVisibility() {
+    if (document.visibilityState === 'hidden') autosave.flush({ settled: true });
+}
+
+onMounted(() => {
+    document.addEventListener('keydown', onKeydown);
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('beforeunload', onPageHide);
+    window.addEventListener('online', autosave.online);
+});
+onBeforeUnmount(() => {
+    document.removeEventListener('keydown', onKeydown);
+    document.removeEventListener('visibilitychange', onVisibility);
+    window.removeEventListener('beforeunload', onPageHide);
+    window.removeEventListener('online', autosave.online);
+    autosave.flush({ settled: true });
+    autosave.dispose();
+});
 </script>
 
 <style scoped>
@@ -745,7 +849,8 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
     border-bottom: 1px solid var(--hairline);
 }
 .pd__banner--stale { background: var(--danger-bg); color: var(--danger-ink); }
-.pd__banner-text { flex: 1; }
+.pd__banner { flex-wrap: wrap; }
+.pd__banner-text { flex: 1 1 220px; }
 
 .pd__head { padding: 18px 20px 6px; display: flex; flex-direction: column; gap: 10px; flex: none; }
 .pd--page .pd__head { padding: 26px 40px 8px; }

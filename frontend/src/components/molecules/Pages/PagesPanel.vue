@@ -49,7 +49,6 @@
                     :closable="!embedded && !workspace"
                     @saved="fetchPages"
                     @deleted="onDeleted"
-                    @dirty="isDirty = $event"
                     @close="requestClose"
                 />
                 <div v-else class="pg__blank">
@@ -92,7 +91,6 @@ const emit = defineEmits(['update:modelValue']);
 
 const pages = ref([]);
 const currentId = ref('');
-const isDirty = ref(false);
 const doc = ref(null);
 const query = ref('');
 const expanded = ref(new Set());
@@ -154,7 +152,6 @@ watch(() => props.openDocId, (id) => {
 
 watch(projectId, (id, previous) => {
     if (props.workspace || !id || !previous || id === previous) return;
-    if (isDirty.value) $toast.warning(t('Projects.page_unsaved_lost_on_switch'), { position: 'top-right' });
     currentId.value = '';
     pages.value = [];
     expanded.value = new Set();
@@ -178,18 +175,17 @@ function fetchPages() {
         .catch((error) => console.error('ERROR in fetch pages: ', error));
 }
 
-function confirmDiscard() {
-    return !doc.value || doc.value.confirmDiscard();
+function saveOpenDoc() {
+    if (doc.value) doc.value.saveBeforeLeaving();
 }
 
 function openPage(id) {
     if (currentId.value === String(id)) return;
-    if (!confirmDiscard()) return;
     currentId.value = String(id);
 }
 
 function createPage(parentPageId) {
-    if (!confirmDiscard()) return;
+    saveOpenDoc();
     apiRequest('post', env.PAGES, {
         title: t('Docs.untitled'),
         ...(projectId.value ? { projectId: projectId.value } : {}),
@@ -211,12 +207,11 @@ function createPage(parentPageId) {
 
 function onDeleted() {
     currentId.value = '';
-    isDirty.value = false;
     fetchPages();
 }
 
 function requestClose() {
-    if (!confirmDiscard()) return;
+    saveOpenDoc();
     emit('update:modelValue', false);
 }
 </script>
