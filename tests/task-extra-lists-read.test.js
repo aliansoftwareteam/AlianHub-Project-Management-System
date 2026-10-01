@@ -204,12 +204,15 @@ describe('a task in extra lists is counted once, at its home', () => {
        The writers that move or convert a task are here because they take entries away; the list rows,
        the Everything rows and the relay are here because they show a task under a list it was added
        to, each only to a reader of the task's home (tests/task-find-extra-lists.test.js,
-       tests/socket-extra-list-relay.test.js). */
+       tests/socket-extra-list-relay.test.js); the agent tools are here because they run the web's own
+       handlers as the person and search inside the caller's own clause (tests/mcp-extra-lists.test.js). */
     test('no other server file reads the field', () => {
         const ROOT = path.join(__dirname, '..');
         const KNOWN = [
             'Modules/Agents/actions.js',
             'Modules/Agents/undo.js',
+            'Modules/Agents/workRequests.js',
+            'Modules/Mcp/workTools.js',
             'Modules/Tasks/controller/everything.js',
             'Modules/Tasks/controller/getTabSyncTasks.js',
             'Modules/Tasks/helpers/everythingQuery.js',
