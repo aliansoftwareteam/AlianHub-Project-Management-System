@@ -128,6 +128,19 @@
                 </div>
             </div>
         </div>
+
+        <ConfirmModal
+            id="doc-history-restore"
+            :modelValue="Boolean(restoreQuestion)"
+            :title="$t('Docs.history_restore')"
+            :acceptButtonText="$t('Docs.history_restore')"
+            @accept="confirmRestore"
+            @close="restoreQuestion = ''"
+        >
+            <template #body>
+                <p class="ph__confirm">{{ restoreQuestion ? $t(restoreQuestion) : '' }}</p>
+            </template>
+        </ConfirmModal>
     </section>
 </template>
 
@@ -136,6 +149,7 @@ import { computed, inject, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import ConfirmModal from '@/components/atom/Modal/Modal.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
@@ -198,6 +212,7 @@ const compare = ref('previous');
 const pane = ref('list');
 const saveName = ref('');
 const renaming = ref(false);
+const restoreQuestion = ref('');
 const nameDraft = ref('');
 
 useFocusTrap(dialogEl, ref(true));
@@ -360,10 +375,15 @@ async function submitName() {
     $toast.success(t('Docs.history_named'), { position: 'top-right' });
 }
 
-async function restore() {
+function restore() {
     if (!selected.value || busy.value) return;
     const goesPublic = selected.value.visibility === 'private' && !props.docPrivate;
-    if (!window.confirm(t(goesPublic ? 'Docs.history_restore_private_confirm' : 'Docs.history_restore_confirm'))) return;
+    restoreQuestion.value = goesPublic ? 'Docs.history_restore_private_confirm' : 'Docs.history_restore_confirm';
+}
+
+async function confirmRestore() {
+    restoreQuestion.value = '';
+    if (!selected.value || busy.value) return;
     if (!props.beforeRestore()) return;
     const page = await write('post', `${base()}/${selected.value._id}/restore`);
     if (!page) return;
@@ -372,6 +392,7 @@ async function restore() {
 }
 
 watch(() => props.pageId, () => {
+    restoreQuestion.value = '';
     versions.value = [];
     bodies.value = {};
     selectedId.value = '';
@@ -406,6 +427,7 @@ watch(() => props.pageId, () => {
 .ph__save { display: flex; gap: 6px; padding: 12px; border-bottom: 1px solid var(--hairline); flex: none; }
 .ph__save-name { flex: 1 1 auto; min-width: 0; height: 30px; font-size: 12.5px; }
 .ph__empty { margin: 0; padding: 16px 14px; font: var(--text-small); color: var(--ink-2); }
+.ph__confirm { margin: 0; max-width: 46ch; font: var(--text-body); line-height: 1.5; color: var(--ink); }
 .ph__list { list-style: none; margin: 0; padding: 8px; flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 .ph__item {
     width: 100%; border: 1px solid transparent; border-radius: 9px; padding: 9px 10px; background: transparent;
