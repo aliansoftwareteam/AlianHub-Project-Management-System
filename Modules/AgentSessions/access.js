@@ -6,7 +6,7 @@ const { canSeeSprint, sprintIdentities } = require('../Sprints/helpers/sprintVis
 const { toOid } = require('./store');
 
 const EDIT_KEYS = ['task.task_assignee', 'task.task_status'];
-const TASK_FIELDS = { ProjectID: 1, sprintId: 1, AssigneeUserId: 1, TaskName: 1, TaskKey: 1, CompanyId: 1 };
+const TASK_FIELDS = { ...visibility.TASK_ACCESS_FIELDS, TaskName: 1, TaskKey: 1, CompanyId: 1 };
 
 const taskOf = async (companyId, taskId) => {
     const _id = toOid(taskId);
