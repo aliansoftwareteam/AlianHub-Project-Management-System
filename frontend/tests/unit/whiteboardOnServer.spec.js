@@ -170,6 +170,18 @@ describe('saving a move', () => {
         expect(['a', 'b']).not.toContain(card.id);
     });
 
+    it('sends a move still waiting to the list it was made on when the view turns to another list', async () => {
+        await open();
+        await drag('t1', [40, 50]);
+        await wrapper.setProps({ sprints: [{ id: 's2' }] });
+        await settle();
+        expect(bodies()).toEqual([{ baseRevision: 1, upsert: [{ id: 'a', type: 'task', taskId: 't1', x: 40, y: 50, z: 0 }] }]);
+        expect(calls('get', '/api/v2/whiteboards/p1/s2')).toHaveLength(1);
+        expect(localStorage.getItem(unsavedKeyOf('p1', 's1'))).toBeNull();
+        await afterTheDelay();
+        expect(calls('patch', '/api/v2/whiteboards/p1/s2')).toHaveLength(0);
+    });
+
     it('sends every card when the board is auto-arranged', async () => {
         await open();
         await wrapper.find('[data-wb-arrange]').trigger('click');

@@ -271,6 +271,17 @@ export function useWhiteboardBoard({ projectId, sprintId, socket }) {
         live.on(WHITEBOARD_EVENT, onChanged);
     }
 
+    /* Moves still waiting when the view turns to another list are sent for the list they were made on. If that
+       save does not land they stay in this browser under that list's key and go in the next time it is opened. */
+    const sendOff = (project, sprint) => {
+        if (!pending.size || !canEdit.value || usesLocal.value || inFlight || !project || !sprint) return;
+        const key = unsavedKeyOf(project, sprint);
+        const kept = localStorage.getItem(key);
+        apiRequest('patch', `${env.WHITEBOARDS}/${project}/${sprint}`, { baseRevision: revision.value, upsert: cardsFor(pending) })
+            .then(() => { if (localStorage.getItem(key) === kept) writeStored(key, null); })
+            .catch(() => {});
+    };
+
     const onOnline = () => (phase.value === 'ready' ? flush() : load());
 
     const reset = () => {
@@ -296,7 +307,9 @@ export function useWhiteboardBoard({ projectId, sprintId, socket }) {
     });
     watch(() => socket?.value, bind);
     watch(() => [projectId.value, sprintId.value], ([project, sprint], [oldProject, oldSprint]) => {
-        if (project !== oldProject || sprint !== oldSprint) reset();
+        if (project === oldProject && sprint === oldSprint) return;
+        sendOff(oldProject, oldSprint);
+        reset();
     });
     onBeforeUnmount(() => {
         unbind();
