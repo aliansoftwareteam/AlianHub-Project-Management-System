@@ -37,7 +37,7 @@
                             <div v-for="(item, index) in chatContent" :key="index" class="chat-content">
                                 <div v-if="item.role === 'user'">
                                     <div class="d-flex align-items-center pb-13px">
-                                        <UserProfile
+                                        <UserProfile decorative
                                             :showDot="false"
                                             class="cursor-pointer mr-10px"
                                             width="30px"
