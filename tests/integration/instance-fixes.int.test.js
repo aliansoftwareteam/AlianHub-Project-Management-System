@@ -146,7 +146,9 @@ describe('INS-10 private views', () => {
         const user = await freshUser('member');
         const id = `qa-${uniqueSuffix()}`;
         expect((await user.api.post('/api/v1/members/private-view', { id: user.companyUserId, operation: 'push', data: { id, name: '[QA instance fix] view' } })).body.status).toBe(true);
-        expect((await memberRow(user.userId)).ProjectRequiredComponent.map((v) => v.id)).toContain(id);
+        const own = (await user.api.get(`/api/v1/members/${user.userId}`)).body;
+        expect(own.ProjectRequiredComponent.map((v) => v.id)).toContain(id);
+        expect((await memberRow(user.userId)).ProjectRequiredComponent).toBeUndefined();
         expect((await user.api.post('/api/v1/members/private-view', { id: user.companyUserId, operation: 'delete', data: { id } })).body.status).toBe(true);
     });
 });
