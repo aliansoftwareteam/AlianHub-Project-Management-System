@@ -35,7 +35,11 @@ const DASHBOARDS = {
     d2: { _id: 'd2', title: 'Second board', visibility: 'workspace', canEdit: true, isMine: true, cards: [
         { uid: 'c2', componentId: 'BurndownCard', config: { cardData: { projectId: 'p2', sprintId: 's2' }, position } },
     ] },
+    d3: { _id: 'd3', title: 'Third board', visibility: 'private', canEdit: true, isMine: true, cards: [
+        { uid: 'c3', componentId: 'MyTimeCard', config: { cardData: { timerange: 3 }, position } },
+    ] },
 };
+const MY_TIME = '/api/v1/dashboard/my-time';
 const VELOCITY = ok({ sprints: [{ sprintId: 's0', name: 'Sprint 0', committed: 10, completed: 8 }, { sprintId: 's1', name: 'Sprint 1', committed: 10, completed: 9 }] });
 const BURNDOWN = ok({ sprintName: 'Sprint 2', totalPoints: 5, days: [{ date: '2026-09-01', remainingPoints: 5, idealPoints: 5 }] });
 
@@ -45,6 +49,7 @@ const answerByUrl = (overrides = {}) => (method, url) => {
     if (dashboard) return Promise.resolve(ok(DASHBOARDS[dashboard[1]]));
     if (url.startsWith('/api/v1/agile/velocity')) return Promise.resolve(VELOCITY);
     if (url.startsWith('/api/v1/agile/burndown')) return Promise.resolve(BURNDOWN);
+    if (url === MY_TIME) return Promise.resolve(ok({ plannedMinutes: 120, loggedMinutes: 45 }));
     return Promise.resolve(ok({}));
 };
 const callsTo = (prefix) => apiRequest.mock.calls.filter(([, url]) => url.startsWith(prefix)).map(([, url]) => url);
@@ -97,6 +102,41 @@ describe('a dashboard\'s cards in the real view', () => {
 
         await settle();
         expect(callsTo('/api/v1/agile/velocity')).toHaveLength(1);
+    });
+
+    it('ask once more for the card\'s refresh, and once more when its settings are saved', async () => {
+        const { wrapper } = await open('d1');
+
+        await wrapper.find('.dcard__tool[title="Dash.refresh"]').trigger('click');
+        await settle();
+        expect(callsTo('/api/v1/agile/velocity')).toHaveLength(2);
+
+        await wrapper.find('.dcard__tool[title="Dash.card_settings"]').trigger('click');
+        await wrapper.find('[data-test="csf-projectId"]').setValue('p2');
+        await wrapper.find('.dash__modal form').trigger('submit');
+        await settle();
+
+        expect(callsTo('/api/v1/agile/velocity')).toEqual([
+            '/api/v1/agile/velocity?projectId=p1&limit=6',
+            '/api/v1/agile/velocity?projectId=p1&limit=6',
+            '/api/v1/agile/velocity?projectId=p2&limit=6',
+        ]);
+        expect(wrapper.find('.dcard__scope').text()).toBe('App');
+        expect(wrapper.findAll('[data-test="velocity-sprint"]')).toHaveLength(2);
+        expect(apiRequest).toHaveBeenCalledWith('put', '/api/v1/dashboards/d1/cards', expect.anything());
+    });
+
+    it('ask once more when the card\'s period changes', async () => {
+        const { wrapper } = await open('d3');
+        expect(callsTo(MY_TIME)).toHaveLength(1);
+        expect(wrapper.find('[data-test="dcard-skeleton"]').exists()).toBe(false);
+
+        await wrapper.find('.dcard__period').setValue('6');
+        await settle();
+
+        expect(callsTo(MY_TIME)).toHaveLength(2);
+        const ranges = apiRequest.mock.calls.filter(([, url]) => url === MY_TIME).map(([, , body]) => body.dateFrom);
+        expect(ranges[1]).not.toBe(ranges[0]);
     });
 });
 
