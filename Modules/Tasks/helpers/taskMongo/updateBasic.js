@@ -339,7 +339,8 @@ module.exports = {
 
     /* -------------- UPDATE STATUS FUNCTION FOR TASK -----------------*/
 
-    updateStatus({newStatus, prevStatus, projectData, task, userData, isUpdateTask}) {
+    /* `recordsCompletion` is false for a caller that writes the Done record itself, under the actor it knows. */
+    updateStatus({newStatus, prevStatus, projectData, task, userData, isUpdateTask, recordsCompletion = true}) {
         return new Promise((resolve,reject) => {
             try {
                 if (isUpdateTask === false) {
@@ -414,7 +415,7 @@ module.exports = {
 
                         socketEmitter.emit('update', { type: "update", data: result , updatedFields: newStatus, module: 'task' });
                         resolve({status: true, statusText: "Status updated successfully"});
-                        recordCompletion({ companyId: projectData.CompanyId, taskId, task, newStatus, userData });
+                        if (recordsCompletion) recordCompletion({ companyId: projectData.CompanyId, taskId, task, newStatus, userData });
 
                         const shown = shownStatus(prevStatus, newStatus);
                         let obj = { 'ProjectName': projectData.ProjectName, 'taskName': result.TaskName, ...shown.template }

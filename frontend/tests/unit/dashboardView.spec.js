@@ -9,6 +9,7 @@ const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }));
 vi.mock('@/services', () => ({ apiRequest }));
 
 import DashboardView from '@/views/Dashboards/DashboardView.vue';
+import { AI_STATE, applyAiAvailability, resetAiAvailability } from '@/composable/aiAvailability';
 
 enableAutoUnmount(afterEach);
 
@@ -37,6 +38,9 @@ const DASHBOARDS = {
     ] },
     d3: { _id: 'd3', title: 'Third board', visibility: 'private', canEdit: true, isMine: true, cards: [
         { uid: 'c3', componentId: 'MyTimeCard', config: { cardData: { timerange: 3 }, position } },
+    ] },
+    d4: { _id: 'd4', title: 'Fourth board', visibility: 'workspace', canEdit: true, isMine: true, cards: [
+        { uid: 'c4', componentId: 'AskAQuestionCard', config: { cardData: { question: 'What is late?' }, position } },
     ] },
 };
 const MY_TIME = '/api/v1/dashboard/my-time';
@@ -206,5 +210,48 @@ describe('changing the dashboard in the address', () => {
         await go('d2');
 
         expect(wrapper.find('.dash__modal').exists()).toBe(false);
+    });
+});
+
+describe('an Ask card in the real view', () => {
+    const CARD = '/api/v1/ai/ask/card/d4/c4';
+    let kept;
+    const requests = (method) => apiRequest.mock.calls.filter(([m, url]) => m === method && url === CARD);
+
+    beforeEach(() => {
+        kept = null;
+        resetAiAvailability();
+        applyAiAvailability({ state: AI_STATE.ON, loaded: true, planAllowsAi: true });
+        apiRequest.mockReset();
+        apiRequest.mockImplementation((method, url, body) => {
+            if (url !== CARD) return answerByUrl()(method, url);
+            if (method === 'get') return Promise.resolve(ok({ stored: kept, stale: false, refreshDue: false }));
+            kept = { question: body.question, projectId: '', answer: 'Two are late.', cited: [], askedAt: Date.now() };
+            return Promise.resolve(ok({ configured: true, answer: kept.answer, cited: [], askedAt: kept.askedAt }));
+        });
+    });
+    afterEach(() => { resetAiAvailability(); });
+
+    it('is told which dashboard it is on, asks once, and shows the kept answer on every later open', async () => {
+        const first = await open('d4');
+        expect(first.wrapper.find('[data-test="ask-card-answer"]').text()).toContain('Two are late');
+        expect(requests('post')).toHaveLength(1);
+        first.wrapper.unmount();
+
+        for (let opens = 0; opens < 3; opens += 1) {
+            const again = await open('d4');
+            expect(again.wrapper.find('[data-test="ask-card-answer"]').text()).toContain('Two are late');
+            again.wrapper.unmount();
+        }
+        expect(requests('post')).toHaveLength(1);
+        expect(requests('get')).toHaveLength(4);
+        expect(callsTo('/api/v1/ai/ask').filter((url) => url === '/api/v1/ai/ask')).toEqual([]);
+    });
+
+    it('asks once more when its refresh is pressed', async () => {
+        const { wrapper } = await open('d4');
+        await wrapper.find('.dcard__tool[title="Dash.refresh"]').trigger('click');
+        await settle();
+        expect(requests('post').map(([, , body]) => body)).toEqual([{ question: 'What is late?' }, { question: 'What is late?', fresh: true }]);
     });
 });
