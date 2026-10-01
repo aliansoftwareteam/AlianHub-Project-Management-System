@@ -8,6 +8,10 @@ const { recordFieldCreated, recordFieldRenamed } = require("./helpers/customFiel
 const { withFieldDefaults } = require("./helpers/fieldDefaults");
 const { PROJECTS_CHANGED, PROJECTS_CHANGED_TEXT, linkPlan, applyLinks, announceFields } = require("./helpers/fieldProjects");
 
+const ROLLUP_KEYS = ['fieldType', 'rollupFunction', 'rollupSourceFieldId'];
+const rollupChanged = (previous, update) => ROLLUP_KEYS.some((key) => key in update && String(update[key] ?? '') !== String(previous[key] ?? ''));
+const logFill = (error) => logger.error(`rollup fill: ${(error && error.message) || error}`);
+
 exports.insertCustomField = async (req, res) => {
     try {
         const { updateObject, type } = req.body;
@@ -24,6 +28,7 @@ exports.insertCustomField = async (req, res) => {
         }
 
         const response = await this.insertCustomFieldPromise(updateObject, type, companyId);
+        await this.fillRollup(companyId, response).catch(logFill);
         recordFieldCreated({ companyId, field: response, actorId: req.uid })
             .catch((error) => logger.error(`custom field created history: ${error && error.message}`));
 
@@ -130,6 +135,10 @@ exports.updateCustomField = async (req, res) => {
         const response = await MongoDbCrudOpration(companyId, query, type);
         if (previous) await applyLinks(companyId, previous, links);
         announceFields(companyId, 'update');
+        if (previous && (rollupChanged(previous, updateObject) || links.add.length || links.clears)) {
+            const current = await MongoDbCrudOpration(companyId, { type: dbCollections.CUSTOM_FIELDS, data: [filter] }, 'findOne');
+            await this.fillRollup(companyId, current).catch(logFill);
+        }
         removeCache(`aiFieldAutoRefill:${companyId}`);
         if (previous) {
             recordFieldRenamed({ companyId, previous, next: updateObject, actorId: req.uid })
@@ -336,6 +345,76 @@ const rowsBelow = async (companyId, tasks) => {
     return rows;
 };
 
+/* Works out every formula and rollup of each task from `rows`, stores it on the task and tells the open clients. */
+const storeComputed = async ({ companyId, tasks, rows, everyDefinition, bySprint = false }) => {
+    const out = {};
+    const errors = {};
+    for (const task of tasks) {
+        const definitions = definitionsOf(everyDefinition, task.ProjectID);
+        const computed = definitions.filter((definition) => COMPUTED_TYPES.includes(definition.fieldType));
+        if (!computed.length) continue;
+        const kids = bySprint
+            ? rows.filter((row) => String(row.sprintId) === String(task.sprintId) && String(row._id) !== String(task._id))
+            : descendantsOf(task, rows);
+        const subtasks = bySprint ? kids : kids.filter((row) => String(row.ParentTaskId) === String(task._id));
+        const result = computeTaskFields({ definitions, task, children: kids, subtasks });
+
+        const $set = {};
+        computed.forEach((definition) => {
+            const id = String(definition._id);
+            const value = result.values[id];
+            $set[`customField.${id}`] = {
+                fieldValue: value === null || value === undefined ? "" : value,
+                fieldTitle: definition.fieldTitle || "",
+                fieldType: definition.fieldType,
+                computedAt: new Date()
+            };
+        });
+
+        // eslint-disable-next-line no-await-in-loop
+        await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [{ _id: task._id }, { $set }]
+        }, "updateOne");
+
+        socketEmitter.emit("update", { type: "update", data: { _id: task._id }, updatedFields: { customField: $set }, module: "task", companyId });
+        out[String(task._id)] = result.values;
+        if (Object.keys(result.errors).length) errors[String(task._id)] = result.errors;
+    }
+    return { out, errors };
+};
+
+const ROLLUP_FILL_LIMIT = 500;
+exports.ROLLUP_FILL_LIMIT = ROLLUP_FILL_LIMIT;
+
+const hasValue = { $exists: true, $nin: ["", null] };
+
+/* A rollup made or changed after its source values were entered has nothing stored, and a task shows a dash until
+ * one of its subtasks is saved again. The tasks above a subtask that holds a source value are computed here, from at
+ * most ROLLUP_FILL_LIMIT such subtasks; past that the rest fill in as their subtasks change. */
+exports.fillRollup = async (companyId, field) => {
+    if (!companyId || !field || field.fieldType !== "rollup") return 0;
+    const projectIds = field.global === true ? null : [].concat(field.projectId || []).map(String).filter(isObjectIdString);
+    if (projectIds && !projectIds.length) return 0;
+    const inProjects = projectIds ? { ProjectID: { $in: projectIds.map((id) => new mongoose.Types.ObjectId(id)) } } : {};
+    const sourceId = isObjectIdString(String(field.rollupSourceFieldId || "")) ? String(field.rollupSourceFieldId) : "";
+
+    const holders = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS,
+        data: [
+            { ...inProjects, deletedStatusKey: { $ne: 1 }, ParentTaskId: hasValue, ...(sourceId ? { [`customField.${sourceId}.fieldValue`]: hasValue } : {}) },
+            { ParentTaskId: 1, ancestors: 1 },
+            { limit: ROLLUP_FILL_LIMIT, lean: true }
+        ]
+    }, "find") || [];
+    const above = [...new Set(holders.flatMap((row) => [row.ParentTaskId, ...(Array.isArray(row.ancestors) ? row.ancestors : [])]).map(String))].filter(isObjectIdString);
+    if (!above.length) return 0;
+
+    const tasks = await liveTasks(companyId, { ...inProjects, _id: { $in: above.map((id) => new mongoose.Types.ObjectId(id)) } });
+    const { out } = await storeComputed({ companyId, tasks, rows: await rowsBelow(companyId, tasks), everyDefinition: await loadDefinitions(companyId, null) });
+    return Object.keys(out).length;
+};
+
 /* POST /api/v2/custom-fields/compute
  * body: { taskIds: [], scope?: 'subtask' | 'sprint' }
  * Evaluates every formula/rollup field of each task's own project for the given tasks, and for the tasks above
@@ -366,40 +445,7 @@ exports.computeFields = async (req, res) => {
             ? await liveTasks(companyId, { sprintId: { $in: [...new Set(tasks.map((task) => task.sprintId).filter(Boolean))] } })
             : await rowsBelow(companyId, tasks);
 
-        const out = {};
-        const errors = {};
-        for (const task of tasks) {
-            const definitions = definitionsOf(everyDefinition, task.ProjectID);
-            const computed = definitions.filter((definition) => COMPUTED_TYPES.includes(definition.fieldType));
-            if (!computed.length) continue;
-            const kids = bySprint
-                ? rows.filter((row) => String(row.sprintId) === String(task.sprintId) && String(row._id) !== String(task._id))
-                : descendantsOf(task, rows);
-            const subtasks = bySprint ? kids : kids.filter((row) => String(row.ParentTaskId) === String(task._id));
-            const result = computeTaskFields({ definitions, task, children: kids, subtasks });
-
-            const $set = {};
-            computed.forEach((definition) => {
-                const id = String(definition._id);
-                const value = result.values[id];
-                $set[`customField.${id}`] = {
-                    fieldValue: value === null || value === undefined ? "" : value,
-                    fieldTitle: definition.fieldTitle || "",
-                    fieldType: definition.fieldType,
-                    computedAt: new Date()
-                };
-            });
-
-            // eslint-disable-next-line no-await-in-loop
-            await MongoDbCrudOpration(companyId, {
-                type: SCHEMA_TYPE.TASKS,
-                data: [{ _id: task._id }, { $set }]
-            }, "updateOne");
-
-            socketEmitter.emit("update", { type: "update", data: { _id: task._id }, updatedFields: { customField: $set }, module: "task", companyId });
-            out[String(task._id)] = result.values;
-            if (Object.keys(result.errors).length) errors[String(task._id)] = result.errors;
-        }
+        const { out, errors } = await storeComputed({ companyId, tasks, rows, everyDefinition, bySprint });
 
         return res.send({ status: true, statusText: "Computed fields updated.", data: { updated: Object.keys(out).length, values: out, errors } });
     } catch (error) {

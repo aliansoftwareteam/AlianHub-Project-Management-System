@@ -76,6 +76,11 @@ const linkCustomFields = async (companyId, fieldIds, projectId) => {
     return fieldIds;
 };
 
+/* What creating a project picks when no currency is chosen: the company's default, or none. */
+const defaultCurrency = async (companyId) => rules.currencyOf(await MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.CURRENCY_LIST, data: [{ isDefault: true, isDelete: { $ne: true } }, null, { lean: true }],
+}, 'findOne'));
+
 /* Everything of a project but its tasks, written from what readSource answers. `made` names what was written, so a failure later can take it back. */
 const writeStructure = async ({ companyId, caller, bundle, name, code, include, made }) => {
     const { source } = bundle;
@@ -95,9 +100,10 @@ const writeStructure = async ({ companyId, caller, bundle, name, code, include, 
     await insert(companyId, SCHEMA_TYPE.SPRINTS, listRows);
     await insert(companyId, SCHEMA_TYPE.PROJECT_RULES, rules.permissionCopies(bundle.permissions, projectId));
 
+    const currency = rules.hasCurrency(source) ? undefined : await defaultCurrency(companyId);
     const project = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.PROJECTS,
-        data: rules.projectCopy(source, { id: projectRef, name, code: code || rules.nextProjectCode(source.ProjectCode, codes.map((row) => row.ProjectCode)), caller, companyId, include, ids }),
+        data: rules.projectCopy(source, { id: projectRef, name, code: code || rules.nextProjectCode(source.ProjectCode, codes.map((row) => row.ProjectCode)), caller, companyId, include, ids, currency }),
     }, 'save');
     const sharedFields = await linkCustomFields(companyId, bundle.fieldIds, projectId);
     made.rules = await copyAutomations({ companyId, caller, sourceRules: bundle.rules, projectId, ids, notes });

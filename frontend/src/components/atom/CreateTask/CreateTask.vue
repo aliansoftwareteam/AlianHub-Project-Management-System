@@ -440,7 +440,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-input#inputId::placeholder {
+input.form-control.create__task-inputtext::placeholder {
     color: #959595;
     font-size: 12px;
     font-weight: 400;

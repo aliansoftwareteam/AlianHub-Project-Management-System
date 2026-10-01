@@ -2,7 +2,7 @@
     <div class="dc-body tbs">
         <div class="dc-metric">
             <span class="dc-num">{{ total }}</span>
-            <span class="dc-sub">{{ $t('Dash.tbs_sub', { n: projects.length }) }}</span>
+            <span class="dc-sub">{{ $t('Dash.tbs_sub', { n: projects.length, tasks: $t('Dash.tbs_tasks', total) }, projects.length) }}</span>
         </div>
 
         <div class="tbs__rows">
