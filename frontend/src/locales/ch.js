@@ -6335,7 +6335,7 @@ export default {
         "yes_delete": "是的，删除！",
         "task_will_become_subtasks_of": "任务将成为以下任务的子任务",
         "Are_you_sure_you_want_to_delete": "您确定要删除",
-        "subtasks_will_become_subtasks_of": "子任务将成为以下任务的子任务",
+        "subtasks_will_become_subtasks_of": "subtasks stay under it and move with it under",
         "unlock_board_view": "解锁看板视图",
         "unlock_project_detail_view": "解锁项目详情视图",
         "unlock_table_view": "解锁表格视图",

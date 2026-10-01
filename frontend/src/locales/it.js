@@ -6335,7 +6335,7 @@ export default {
         "yes_delete": "Sì, eliminalo!",
         "task_will_become_subtasks_of": "l'attività diventerà sottoattività di",
         "Are_you_sure_you_want_to_delete": "Sei sicuro di voler eliminare",
-        "subtasks_will_become_subtasks_of": "Le sottoattività diventeranno sottoattività di",
+        "subtasks_will_become_subtasks_of": "subtasks stay under it and move with it under",
         "unlock_board_view": "Per sbloccare la vista Board",
         "unlock_project_detail_view": "Per sbloccare la vista Dettagli del progetto",
         "unlock_table_view": "Per sbloccare la vista Tabella",
