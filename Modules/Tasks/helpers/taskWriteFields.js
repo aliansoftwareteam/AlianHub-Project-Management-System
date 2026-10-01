@@ -33,6 +33,7 @@ class TaskWriteRefusal extends Error {
 
 const refuse = (statusCode, message) => { throw new TaskWriteRefusal(statusCode, message); };
 const ATTACHMENT_KEY_REFUSED = 'ATTACHMENT_KEY_NOT_OWN';
+const CANNOT_OPEN_DESTINATION = 'Only people who can open the project a copy lands in can be copied to it.';
 const taskNotFound = () => new TaskWriteRefusal(404, 'Task not found');
 
 const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
@@ -117,6 +118,14 @@ const PEOPLE = Object.freeze({
     bulkDuplicate: (payload) => [...namedIds(payload.assignee || []), ...namedIds(payload.watcher || [])],
 });
 
+/* Read as the duplicate handler reads it, so whoever it would store is whoever is checked. */
+const copiesPart = (payload, part) => Boolean(payload.duplicateData) && typeof payload.duplicateData.includes === 'function' && payload.duplicateData.includes(part);
+
+const peopleOnCopy = (payload) => namedIds([
+    ...(copiesPart(payload, 'Copy Assignees') ? namedIds(payload.assignee || []) : []),
+    ...(copiesPart(payload, 'Copy Watchers') ? namedIds(payload.watcher || []) : []),
+]);
+
 const holdsTaskType = (payload, stored) => {
     const claimed = ['TaskType', 'TaskTypeKey'].filter((field) => valueAt(payload, ['newStatus', field]) !== undefined);
     return claimed.length > 0 && claimed.every((field) => sameValue(payload.newStatus[field], stored[field]));
@@ -133,10 +142,11 @@ const holdsTaskType = (payload, stored) => {
  * the stored row as `storedTask`. `held` tells whether the stored task already has the value the body names; an action that takes
  * isUpdateTask records history without writing only when it does. `destination` names the project a move or copy writes
  * into, which must exist. `people` returns the user ids the write newly names, each of whom must hold a live seat in
- * the company. `actor` are the params that receive the signed-in user.
+ * the company. `landing` returns the user ids stored on a task the write creates in the destination, each of whom must
+ * be able to open that project. `actor` are the params that receive the signed-in user.
  */
-const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, project = [], taskIds = [], taskNames = [], projectNames = [], stored = false, held = null, destination = null, attachments = null, people = null, actor }) => Object.freeze({
-    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, project, taskIds, taskNames, projectNames, stored, held, destination, attachments, people,
+const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, project = [], taskIds = [], taskNames = [], projectNames = [], stored = false, held = null, destination = null, attachments = null, people = null, landing = null, actor }) => Object.freeze({
+    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, project, taskIds, taskNames, projectNames, stored, held, destination, attachments, people, landing,
     actor: actor || (params.includes('userData') ? ['userData'] : []),
 });
 
@@ -206,7 +216,7 @@ const TASK_ACTION_FIELDS = Object.freeze({
     convertToList: spec({ params: ['companyId', 'projectData', 'taskId', 'folderData', 'sprintObj', 'isSubTask', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_ID, DESTINATION], task: TASK_ID[0], destination: DESTINATION }),
     moveTask: spec({ params: ['companyId', 'projectData', 'sprintObj', 'moveTaskId', 'oldSprintObj', 'oldProject', 'isSubTask', 'assignee', 'watcher', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['moveTaskId'], DESTINATION], task: ['moveTaskId'], destination: DESTINATION, people: PEOPLE.carried }),
     mergeTask: spec({ params: ['companyId', 'projectData', 'taskId', 'mergeTaskId', 'oldProject', 'isSubTask', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_ID, ['mergeTaskId']], task: TASK_ID[0] }),
-    duplicateTask: spec({ params: ['companyId', 'projectData', 'sprintObj', 'selectedTaskId', 'oldProject', 'isSubTask', 'duplicateData', 'assignee', 'watcher', 'taskName', 'oldSprintObj', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['selectedTaskId'], DESTINATION], task: ['selectedTaskId'], destination: DESTINATION, people: PEOPLE.carried }),
+    duplicateTask: spec({ params: ['companyId', 'projectData', 'sprintObj', 'selectedTaskId', 'oldProject', 'isSubTask', 'duplicateData', 'assignee', 'watcher', 'taskName', 'oldSprintObj', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['selectedTaskId'], DESTINATION], task: ['selectedTaskId'], destination: DESTINATION, people: PEOPLE.carried, landing: peopleOnCopy }),
 
     addTaskRelation: spec({ params: ['companyId', 'taskId', 'relatedTaskId', 'type', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ['relatedTaskId']], task: TASK_ID[0] }),
     removeTaskRelation: spec({ params: ['companyId', 'taskId', 'relatedTaskId', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ['relatedTaskId']], task: TASK_ID[0] }),
@@ -227,7 +237,7 @@ const TASK_ACTION_FIELDS = Object.freeze({
     bulkMove: spec({ params: ['companyId', 'taskIds', 'sprintObj', 'projectData', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, DESTINATION], destination: DESTINATION }),
     bulkConvertToSubTask: spec({ params: ['companyId', 'taskIds', 'parentTaskId', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, ['parentTaskId']] }),
     bulkConvertToTask: spec({ params: ['companyId', 'taskIds', 'sprintObj', 'projectData', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, DESTINATION], destination: DESTINATION }),
-    bulkDuplicate: spec({ params: ['companyId', 'taskIds', 'sprintObj', 'oldProject', 'projectData', 'isSubTask', 'duplicateData', 'assignee', 'watcher', 'taskName', 'oldSprintObj', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, DESTINATION], destination: DESTINATION, people: PEOPLE.bulkDuplicate }),
+    bulkDuplicate: spec({ params: ['companyId', 'taskIds', 'sprintObj', 'oldProject', 'projectData', 'isSubTask', 'duplicateData', 'assignee', 'watcher', 'taskName', 'oldSprintObj', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, DESTINATION], destination: DESTINATION, people: PEOPLE.bulkDuplicate, landing: peopleOnCopy }),
 });
 
 /* The pre-v2 class writes through prevStatus.taskId and priorityObj.taskId, not the task object. */
@@ -580,6 +590,9 @@ const prepareTaskRequest = async (req, taskSpec, label) => {
         const projectId = valueAt(payload, taskSpec.destination);
         if (typeof projectId !== 'string' || !projectId) refuse(400, `${nameOf(taskSpec.destination)} is required.`);
         if (!(await storedProjectOf(company, projectId))) throw new TaskWriteRefusal(404, 'Project not found');
+        for (const id of taskSpec.landing ? taskSpec.landing(payload) : []) {
+            if (!(await canReadProject(company, id, projectId)).allowed) refuse(400, CANNOT_OPEN_DESTINATION);
+        }
     }
     await checkAttachmentKeys(taskSpec, prepared);
     return prepared;

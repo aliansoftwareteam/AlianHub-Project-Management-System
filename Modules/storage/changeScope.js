@@ -4,6 +4,7 @@ const { evaluatePermission, isReadable, isWritable } = require('../../Config/per
 const { canEditProject, FIELD_PERMISSIONS, DETAILS } = require('../../Config/projectAccess');
 const { canSeeSprintById } = require('../Sprints/helpers/sprintVisibility');
 const { canUsePage } = require('../Pages/helpers/pageAccess');
+const { pageTakesComments } = require('../Pages/helpers/pageRules');
 const { canChangeComment, canPostToThread } = require('../Comments/helpers/threadWriteAccess');
 const { isThreadFile } = require('../Comments/helpers/commentFileKeys');
 const { countReported } = require('../../common-storage/storedFileScope');
@@ -149,9 +150,34 @@ const managesChannels = async (ctx, spaceId) => {
 };
 
 const editsDoc = async (ctx, [, pageId]) => {
-    const page = await scope.find(ctx, SCHEMA_TYPE.PAGES, { _id: oid(pageId), deletedStatusKey: 0 }, 'ProjectID visibility createdBy');
+    const page = await scope.liveDoc(ctx, pageId);
     if (!page || !(await canUsePage(ctx.companyId, page, ctx.uid))) return NOT_FOUND;
     return (await canUsePage(ctx.companyId, page, ctx.uid, { edit: true })) || READ_ONLY;
+};
+
+const commentsOnDoc = async (ctx, pageId) => {
+    const page = await scope.liveDoc(ctx, pageId);
+    return pageTakesComments(page) && canUsePage(ctx.companyId, page, ctx.uid);
+};
+
+const docCommentCarrying = (ctx, pageId, key, byAuthor = {}) => scope.find(ctx, SCHEMA_TYPE.PAGE_COMMENTS, {
+    pageId: oid(pageId),
+    mediaURL: { $in: scope.keysFor(key) },
+    ...byAuthor,
+}, '_id');
+
+/* Whoever may comment on a doc adds files to its comment folder, but never over a file a colleague's comment carries. */
+const uploadsDocCommentFile = async (ctx, [, pageId], key) => {
+    if (!(await commentsOnDoc(ctx, pageId))) return NOT_FOUND;
+    return (await docCommentCarrying(ctx, pageId, key, { userId: { $ne: ctx.uid } })) ? READ_ONLY : true;
+};
+
+/* Any comment on the doc may name the key, so its author removes the file only while no colleague's comment carries it too. */
+const removesDocCommentFile = async (ctx, [, pageId], key) => {
+    if (!(await commentsOnDoc(ctx, pageId))) return NOT_FOUND;
+    if (await scope.privileged(ctx)) return (await docCommentCarrying(ctx, pageId, key)) ? true : NOT_FOUND;
+    if (await docCommentCarrying(ctx, pageId, key, { userId: { $ne: ctx.uid } })) return READ_ONLY;
+    return (await docCommentCarrying(ctx, pageId, key, { userId: ctx.uid })) ? true : NOT_FOUND;
 };
 
 const ownFolder = async (ctx, [, companyId, userId], key) => (same(companyId, ctx.companyId) && same(userId, ctx.uid)) || readOnly(ctx, null, key);
@@ -180,6 +206,7 @@ const RULES = Object.freeze({
     clip: both(ownFolder),
     reminder_attachment: both(ownFolder),
     doc_image: { [REMOVE]: editsDoc, [UPLOAD]: readOnly },
+    doc_comment_file: { [REMOVE]: removesDocCommentFile, [UPLOAD]: uploadsDocCommentFile },
     company_asset: { [REMOVE]: managesCompany, [UPLOAD]: uploadsCompanyAsset },
     tracker_screenshot: both(readOnly),
     form_upload: both(readOnly),

@@ -564,6 +564,26 @@ const schema = {
         updatedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Project templates saved from a project (Modules/ProjectSnapshots). A `template` row is the template: `snapshot` holds the rows a
+    // duplicate would write, under ids of their own, with dates as milliseconds from the project's start. Its tasks sit in `tasks` rows
+    // of a few each that name it by templateId, so no one document grows with the project.
+    project_snapshots: {
+        kind: { type: String, required: true },
+        name: { type: String, required: false },
+        description: { type: String, default: '', required: false },
+        everyone: { type: Boolean, default: false, required: false },
+        sourcePrivate: { type: Boolean, default: false, required: false },
+        include: { type: Object, default: {}, required: false },
+        counts: { type: Object, default: {}, required: false },
+        statuses: { type: Array, default: undefined, required: false },
+        snapshot: { type: Object, required: false },
+        templateId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        part: { type: Number, required: false },
+        tasks: { type: Array, default: undefined, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // A person's saved views of the Everything page (Modules/Tasks/controller/everythingViews.js). userId is the
     // one person who can read or change the row; settings is what parseViewSettings returns.
     everything_views: {
@@ -1651,11 +1671,18 @@ const schema = {
         blockId: { type: String, required: false },
         parentId: { type: mongoose.Schema.Types.ObjectId, required: false },
         userId: { type: String, required: true },
-        message: { type: String, required: true },
+        message: { type: String, required: false, default: '' },
         mentionIds: { type: [String], required: false, default: [] },
+        assigneeId: { type: String, required: false },
+        assignedBy: { type: String, required: false },
+        assignedAt: { type: Date, required: false },
         resolved: { type: Boolean, required: false },
         resolvedBy: { type: String, required: false },
         resolvedAt: { type: Date, required: false },
+        reactions: { type: Array, required: false, default: [] },
+        mediaURL: { type: String, required: false },
+        mediaOriginalName: { type: String, required: false },
+        mediaSize: { type: Number, required: false },
         editedAt: { type: Date, required: false },
         isDeleted: { type: Boolean, required: false },
         deletedBy: { type: String, required: false },

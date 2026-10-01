@@ -136,6 +136,9 @@ const taskTemplatesSchema = new Schema(schema.task_templates, {strict: true, tim
 taskTemplatesSchema.index({ scope: 1, ProjectID: 1, deletedStatusKey: 1 });
 const viewTemplatesSchema = new Schema(schema.view_templates, {strict: true, timestamps: true});
 viewTemplatesSchema.index({ deletedStatusKey: 1, name: 1 });
+const projectSnapshotsSchema = new Schema(schema.project_snapshots, {strict: true, timestamps: true});
+projectSnapshotsSchema.index({ kind: 1, deletedStatusKey: 1 });
+projectSnapshotsSchema.index({ templateId: 1, part: 1 });
 const everythingViewsSchema = new Schema(schema.everything_views, {strict: true, timestamps: true});
 everythingViewsSchema.index({ userId: 1, deletedStatusKey: 1 });
 const goalsSchema = new Schema(schema.goals, {strict: true, timestamps: true});
@@ -506,6 +509,7 @@ module.exports = {
     recurringTasksSchema,
     taskTemplatesSchema,
     viewTemplatesSchema,
+    projectSnapshotsSchema,
     everythingViewsSchema,
     goalsSchema,
     remindersSchema,

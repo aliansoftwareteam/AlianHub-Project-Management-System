@@ -8,18 +8,29 @@ const rules = require('./rules');
 const asId = (id) => new mongoose.Types.ObjectId(String(id));
 const chunks = (rows, size) => Array.from({ length: Math.ceil(rows.length / size) }, (unused, at) => rows.slice(at * size, (at + 1) * size));
 
-/* Which live tasks of the copied lists will be copied, level by level, read as ids and parents only. */
-const planTasks = async (companyId, sourceId, sourceListIds) => {
-    if (!sourceListIds.length) return { levels: [], childrenOf: new Map(), total: 0, left: 0 };
-    const rows = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.TASKS,
-        data: [{ ProjectID: asId(sourceId), sprintId: { $in: sourceListIds.map(asId) }, deletedStatusKey: rules.LIVE }, { ParentTaskId: 1 }, { lean: true }],
-    }, 'find') || [];
+/* The levels a copy keeps of `rows` (ids and parents), and how many rows it leaves out. */
+const planOf = (rows) => {
     const { levels, childrenOf } = rules.taskLevels(rows);
     const kept = levels.slice(0, MAX_DEPTH + 1);
     const total = kept.reduce((sum, level) => sum + level.length, 0);
     return { levels: kept, childrenOf, total, left: rows.length - total };
 };
+
+/* Which live tasks of the copied lists will be copied, level by level, read as ids and parents only. */
+const planTasks = async (companyId, sourceId, sourceListIds) => {
+    if (!sourceListIds.length) return planOf([]);
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS,
+        data: [{ ProjectID: asId(sourceId), sprintId: { $in: sourceListIds.map(asId) }, deletedStatusKey: rules.LIVE }, { ParentTaskId: 1 }, { lean: true }],
+    }, 'find') || [];
+    return planOf(rows);
+};
+
+/* Reads a batch of planned tasks in full from the project they are copied from. */
+const sourceRows = (companyId, sourceId) => async (batch) => (await MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.TASKS,
+    data: [{ _id: { $in: batch.map((row) => row._id) }, ProjectID: asId(sourceId) }, null, { lean: true }],
+}, 'find')) || [];
 
 /* The numbers a task create takes from its project: the next keys, and the count of each task type. */
 const reserveKeys = async (companyId, projectRef, rows) => {
@@ -65,8 +76,9 @@ const countOnLists = (companyId, docs) => {
 
 /* Written straight to the collection in batches: the create path would fire the task-created event,
    a notification and two history lines for every row, and run every automation of the company on a copy.
-   What that path sets on the server is set here: key, type counts, list counts, chain, subtask count. */
-const copyTasks = async ({ companyId, caller, sourceId, copy, plan, include, onProgress = async () => {} }) => {
+   What that path sets on the server is set here: key, type counts, list counts, chain, subtask count.
+   `readRows` answers a batch of the plan in full, from wherever the copy is made. */
+const copyTasks = async ({ companyId, caller, copy, plan, include, readRows, onProgress = async () => {} }) => {
     const projectRef = copy.project._id;
     const code = copy.project.ProjectCode;
     const made = new Map();
@@ -74,10 +86,7 @@ const copyTasks = async ({ companyId, caller, sourceId, copy, plan, include, onP
     let created = 0;
     for (const [depth, level] of plan.levels.entries()) {
         for (const batch of chunks(level, rules.BATCH)) {
-            const rows = await MongoDbCrudOpration(companyId, {
-                type: SCHEMA_TYPE.TASKS,
-                data: [{ _id: { $in: batch.map((row) => row._id) }, ProjectID: asId(sourceId) }, null, { lean: true }],
-            }, 'find') || [];
+            const rows = await readRows(batch);
             const placed = rows
                 .map((row) => ({ row, parent: row.ParentTaskId ? made.get(String(row.ParentTaskId)) : null, placement: copy.placements.get(copy.ids.get(String(row.sprintId))) }))
                 .filter(({ row, parent, placement }) => placement && (row.ParentTaskId ? parent && canNest(parent).ok : true));
@@ -101,4 +110,4 @@ const copyTasks = async ({ companyId, caller, sourceId, copy, plan, include, onP
     return created;
 };
 
-module.exports = { planTasks, copyTasks };
+module.exports = { chunks, planOf, planTasks, sourceRows, copyTasks };
