@@ -627,6 +627,11 @@ const schema = {
         progressPct: { type: Number, default: 0, required: false },
         reachedAt: { type: Date, default: null, required: false },
         notifiedAt: { type: Date, required: false },
+        aiSummary: {
+            text: { type: String, required: false },
+            basis: { type: String, required: false },
+            madeAt: { type: Date, required: false },
+        },
         targets: {
             type: [{
                 _id: false,

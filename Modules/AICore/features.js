@@ -8,6 +8,7 @@ const FEATURES = Object.freeze({
     CLARIFIER: 'clarifier',
     MEETING_NOTES: 'meeting_notes',
     TASK_SUMMARY: 'task_summary',
+    GOAL_SUMMARY: 'goal_summary',
     DESCRIPTION: 'description',
     TASK_CATEGORY: 'task_category',
     TASK_ESTIMATE: 'task_estimate',

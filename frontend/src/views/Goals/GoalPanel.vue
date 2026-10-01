@@ -51,6 +51,8 @@
                 <span class="glp__reached">{{ reached }}</span>
             </div>
 
+            <GoalSummary :goal="goal" />
+
             <label v-if="editable" class="ah-field">
                 <span class="ah-field__label">{{ $t('Goals.description') }}</span>
                 <textarea
@@ -176,6 +178,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import GoalBar from "./GoalBar.vue";
 import GoalOwner from "./GoalOwner.vue";
 import GoalSharing from "./GoalSharing.vue";
+import GoalSummary from "./GoalSummary.vue";
 import GoalTarget from "./GoalTarget.vue";
 import GoalTargetForm from "./GoalTargetForm.vue";
 import { GOAL_COLORS, periodLabel } from "./goalFormat";

@@ -1,6 +1,6 @@
 import { apiRequest } from '@/services';
 import {
-    addTargetRequest, archiveRequest, createRequest, editTargetRequest, listRequest, readRequest, removeTargetRequest, restoreRequest, sourcesRequest, updateRequest, valueOf, valueRequest
+    addTargetRequest, archiveRequest, createRequest, editTargetRequest, listRequest, readRequest, removeTargetRequest, restoreRequest, sourcesRequest, summariseRequest, updateRequest, valueOf, valueRequest
 } from '@/views/Goals/goalRequest';
 
 export const REFETCH_DELAY_MS = 400;
@@ -189,6 +189,19 @@ export default {
                 return goal || null;
             } catch (error) {
                 throw failure(error);
+            }
+        },
+
+        /* The one request that makes a model call, sent only from the button. A refusal is thrown to the caller with its code. */
+        async summarise({ commit, dispatch }, id) {
+            try {
+                const goal = await send(summariseRequest(id));
+                if (goal) commit('put', goal);
+                return goal || null;
+            } catch (error) {
+                const refused = failure(error);
+                if (READ_AGAIN.includes(refused.kind)) await dispatch('read', id);
+                throw refused;
             }
         },
 

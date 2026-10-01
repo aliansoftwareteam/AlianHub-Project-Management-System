@@ -15,6 +15,7 @@ const { LIVE, ARCHIVED, crud, announce, writeAtRevision } = require('./goalStore
 const sources = require('./goalSources');
 const counts = require('./goalCounts');
 const reached = require('./goalReached');
+const summary = require('./goalSummary');
 
 const { GoalRefused } = rules;
 
@@ -30,6 +31,7 @@ const NARROWED = 'A token limited to some projects cannot read or change goals.'
 const IS_ARCHIVED = 'This goal is archived. Restore it to change it.';
 const BUSY = 'This goal was changed at the same moment. Try again.';
 const FAILED = 'Something went wrong with the goal.';
+const BUDGET_EXHAUSTED = 'ai_budget_exhausted';
 
 const refuse = (res, statusCode, statusText, message, extra = {}) => res.status(statusCode).json({ status: false, statusText, message, ...extra });
 const stop = (statusCode, statusText) => Object.assign(new Error(statusText), { statusCode, stopped: true });
@@ -104,6 +106,7 @@ const present = (goal, caller, now = new Date()) => {
         isOwner: access.isOwner(goal, caller),
         color: goal.color || '',
         progressPct: goal.progressPct || 0,
+        summary: summary.keptView(goal) || undefined,
         targets: (goal.targets || []).map((target) => presentTarget(target, view)),
         archived: goal.deletedStatusKey === ARCHIVED,
         canEdit,
@@ -374,6 +377,23 @@ const archiveState = (where, deletedStatusKey, action, statusText) => handled(wh
     announce('update', caller.companyId);
     audit(req, action, saved, { was });
     return sent(res, statusText, saved, caller);
+});
+
+/* Whoever can edit the goal may ask for a summary; a goal the caller cannot read answers as a missing one before anything else is said. */
+exports.summariseGoal = handled('summarise', async (req, res, caller) => {
+    requireNoBody(req.body);
+    const goal = await visibleGoal(caller, req.params.id);
+    if (!access.canEdit(goal, caller)) throw stop(403, FORBIDDEN);
+    if (goal.deletedStatusKey !== LIVE) throw stop(409, IS_ARCHIVED);
+    const made = await summary.summariseGoal({ companyId: caller.companyId, uid: caller.uid, goal });
+    if (!made.status) {
+        const reason = made.reason || FAILED;
+        if (made.aiState) return refuse(res, 409, 'AI unavailable', reason, { code: 'ai_unavailable', aiState: made.aiState });
+        if (reason.startsWith(BUDGET_EXHAUSTED)) return refuse(res, 402, 'AI budget spent', reason, { code: BUDGET_EXHAUSTED });
+        return refuse(res, 502, 'Summary failed', reason, { code: 'summary_failed' });
+    }
+    announce('update', caller.companyId);
+    return sent(res, 'Summary saved.', await visibleGoal(caller, req.params.id), caller);
 });
 
 exports.archiveGoal = archiveState('archive', ARCHIVED, 'goal.archive', 'Goal archived.');
