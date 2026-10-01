@@ -19,6 +19,7 @@ const { withoutAssignment, withoutThreadState, placeReply } = require("./helpers
 const { notifyReply } = require("./helpers/threadNotices");
 const { parseAgentMentionIds } = require("./helpers/parseMentions");
 const { withoutAiFields } = require("./helpers/aiActor");
+const { withoutImportFields } = require("./helpers/importFields");
 const { bumpUnreadCounts } = require("./helpers/unreadBumps");
 const { isChatMessage, holdsThreads, replyLookup, withThreadSummary, readable, keptRootIds, announceThread } = require("./helpers/chatThreads");
 
@@ -42,7 +43,7 @@ exports.save = async (req, res) => {
     try {
         const { data } = req.body
         const companyId = req.headers['companyid'];
-        const placement = await placeReply(companyId, withoutAiFields(withoutAssignment(escapeCommentFields(replaceObjectKey(data, ["objId"])))));
+        const placement = await placeReply(companyId, withoutImportFields(withoutAiFields(withoutAssignment(escapeCommentFields(replaceObjectKey(data, ["objId"]))))));
         if (!placement.allowed) return refuseThread(res, placement);
         const convertData = placement.data;
         // SEC (AHE-3834) — the author is the authenticated caller, never a client-supplied
@@ -119,7 +120,7 @@ exports.save = async (req, res) => {
 exports.update = async (req, res) => {
     try {
         const { id, isProjectComment } = req.body;
-        const data = withoutAiFields(withoutThreadState(escapeCommentFields(req.body.data)));
+        const data = withoutImportFields(withoutAiFields(withoutThreadState(escapeCommentFields(req.body.data))));
 
         if (!id) {
             return res.status(400).json({
