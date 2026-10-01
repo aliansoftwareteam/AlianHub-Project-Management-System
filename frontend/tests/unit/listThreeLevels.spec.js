@@ -288,15 +288,15 @@ describe('the name takes the room of an empty Tags column', () => {
 
     it('keeps Tags narrow while no row shown has a tag', async () => {
         await openList();
-        expect(tracks()).toContain('minmax(0, 1fr) 56px');
+        expect(tracks()).toContain('var(--lv2-title-track) 56px');
     });
 
     it('gives Tags its share again once a row has one, on any level', async () => {
         stored('g1').tagsArray = ['tag1'];
         await openList();
-        expect(tracks()).toContain('minmax(0, 1fr) 56px');
+        expect(tracks()).toContain('var(--lv2-title-track) 56px');
         await open('Parent');
         await open('Child one');
-        expect(tracks()).toContain('minmax(0, 1fr) minmax(0, .45fr)');
+        expect(tracks()).toContain('var(--lv2-title-track) minmax(56px, .45fr)');
     });
 });

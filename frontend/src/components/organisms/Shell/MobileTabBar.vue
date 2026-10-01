@@ -31,7 +31,7 @@
                     <div class="ah-sheet" role="menu" @click.stop>
                         <div class="ah-sheet__grab"></div>
                         <div class="ah-sheet__me">
-                            <UserProfile :showDot="false" :data="{ image: me.Employee_profileImageURL, title: me.Employee_Name }" width="36px" :thumbnail="'35x35'" />
+                            <UserProfile decorative :showDot="false" :data="{ image: me.Employee_profileImageURL, title: me.Employee_Name }" width="36px" :thumbnail="'35x35'" />
                             <div class="ah-rail__me-text">
                                 <strong>{{ me.Employee_Name }}</strong>
                                 <span class="ah-small">{{ me.Employee_Email }}</span>

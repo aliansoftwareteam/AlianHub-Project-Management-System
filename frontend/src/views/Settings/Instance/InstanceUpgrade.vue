@@ -125,5 +125,5 @@ onMounted(load);
 .in-release { padding: 10px 0; border-top: 1px solid var(--hairline); display: flex; flex-direction: column; gap: 6px; }
 .in-build { display: grid; grid-template-columns: 3ch minmax(0, auto) auto 5ch minmax(0, 1fr) auto; align-items: baseline; column-gap: 10px; padding: 6px 0; }
 .in-build__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--text-small); color: var(--ink); }
-.in-notes { margin: 0; padding-left: 18px; font: var(--text-small); color: var(--ink); }
+.in-notes { margin: 0; padding-left: 18px; font: var(--text-body); color: var(--ink); }
 </style>
