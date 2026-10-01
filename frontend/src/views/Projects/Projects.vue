@@ -10,6 +10,7 @@
                             :project="projectData"
                             :projects="projects"
                             :sprint="headerSprint"
+                            :folders="headerFolders"
                             :agentSummary="agentSummary"
                             :showAiAssist="canAiAssist"
                             :showAddTask="canAddTask"
@@ -487,7 +488,8 @@ import ProjectBottomModals from './components/ProjectBottomModals.vue';
 import ProjectEmptyState from './components/ProjectEmptyState.vue';
 import { useProjectCalendar } from './composables/useProjectCalendar';
 import { useProjectRules } from './composables/useProjectRules';
-import { folderSprintList } from './folderSprints';
+import { folderSprintList, projectSprintList } from './folderSprints';
+import { folderIdOf, folderPathLabel, folderTrail, isLiveFolder } from '@/utils/folderTree';
 import { useProjectNameEdit } from './composables/useProjectNameEdit';
 import { useProjectAssignee } from './composables/useProjectAssignee';
 import { useEmbedViews } from './composables/useEmbedViews';
@@ -568,12 +570,11 @@ const buildAiSprints = () => {
     // Root-level sprints first, so the common case stays at the top.
     Object.values(project.sprintsObj || {}).forEach((s) => push(s, ''));
 
-    // Then each folder's sprints. Folders are keyed by id, and a deleted folder's
-    // sprints are not offered.
-    Object.values(project.sprintsfolders || {}).forEach((folder) => {
-        if (!isLive(folder)) return;
-        const folderName = folder.name || 'Folder';
-        Object.values(folder.sprintsObj || {}).forEach((s) => push(s, folderName));
+    const folders = project.sprintsfolders || {};
+    Object.values(folders).forEach((folder) => {
+        if (!isLiveFolder(folders, folder)) return;
+        const folderPath = folderPathLabel(folders, folder) || 'Folder';
+        Object.values(folder.sprintsObj || {}).forEach((s) => push(s, folderPath));
     });
 
     return out;
@@ -1058,6 +1059,8 @@ const sprints = ref([]);
 // Header (10b): the sprint in view, the star, the agent chip and the "+ Task"
 // request the views listen for.
 const headerSprint = computed(() => (sprints.value.length === 1 && !sprints.value[0]?.isFolder ? sprints.value[0] : null));
+const headerFolders = computed(() => folderTrail(projectData.value?.sprintsfolders, route.params?.folderId || headerSprint.value?.folderId)
+    .map((folder) => ({ id: folderIdOf(folder), name: folder.name })));
 const canAiAssist = computed(() => canUseAi({ project: projectData.value, permitted: checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true }));
 // Only shown where a view actually answers the request (the board injects
 // `addTaskRequest`); other views opt in by injecting it too.
@@ -1089,34 +1092,7 @@ watch([projectData, route, () => getters['projectData/searchedTasks']], () => {
 
     try {
         if (route.name === 'Projects' || route.name === 'Project') {
-            tmp = project?.sprintsObj && Object.values(project?.sprintsObj).length ? Object.values(project.sprintsObj).filter((x) => checkSprint(x)) : [];
-            Object.values(project.sprintsfolders || {}).forEach((value) => {
-                try {
-                    if (showArchived.value && value?.deletedStatusKey === 2) {
-                        tmp.push({
-                            name: value.name,
-                            id: value.folderId,
-                            isExpanded: false,
-                            items: [],
-                            archivedSprintList: value.sprintsObj || {},
-                            deletedStatusKey: 2,
-                            isFolder: true,
-                        });
-                    } else if (showArchived.value && !value?.deletedStatusKey) {
-                        tmp = [
-                            ...tmp,
-                            ...(Object.values(value?.sprintsObj || {})?.length ? Object.values(value.sprintsObj || {}).filter((x) => checkSprint(x)) : []),
-                        ];
-                    } else if (!showArchived.value && !value?.deletedStatusKey) {
-                        tmp = [
-                            ...tmp,
-                            ...(Object.values(value?.sprintsObj || {})?.length ? Object.values(value?.sprintsObj || {}).filter((x) => checkSprint(x)) : []),
-                        ];
-                    }
-                } catch (error) {
-                    console.error('ERROR: ', error, value);
-                }
-            });
+            tmp = projectSprintList({ project, showArchived: showArchived.value, includeSprint: checkSprint });
         } else if (route.name.includes('ProjectFolder')) {
             tmp = folderSprintList({
                 folders: project.sprintsfolders,

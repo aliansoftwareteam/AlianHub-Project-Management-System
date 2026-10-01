@@ -5,6 +5,7 @@ const {
 } = require('../../../Config/notificationKey');
 const { formatNotificationDate } = require('../../../utils/dateHelpers');
 const { AI_ACTOR } = require('../../Comments/helpers/aiActor');
+const { CHAT_THREAD_REPLY, chatThreadPath } = require('../../Comments/helpers/chatThreads');
 const { subjectText, urlSegment } = require('../../Template/emailText');
 const mainTemplate = require('../../Template/emailTemplate/main-template');
 const { docLink } = require('./docMentionEmail');
@@ -19,6 +20,8 @@ const DOC_KEYS = [DOC_COMMENT_MENTION, DOC_COMMENT_REPLY];
 const SOMEONE = 'Someone';
 const A_TASK = 'a task';
 const A_DOC = 'a doc';
+const CHAT = 'Chat';
+const chatThreadHeadline = (who) => `${who} replied in a chat thread`;
 const OPEN_COMMENT = 'Open comment';
 
 const isCommentNotice = (key) => Object.prototype.hasOwnProperty.call(COMMENT_NOTICE_TEXT, key);
@@ -41,6 +44,9 @@ const trailOf = (task) => {
 const docCommentLink = ({ companyId, changeData = {} }) => `${docLink(companyId, changeData.pageId)}?comment=${urlSegment(changeData.commentId)}`;
 
 const placeOf = (notification, projects, tasks) => {
+    if (notification.changeType === CHAT_THREAD_REPLY) {
+        return { headline: chatThreadHeadline, header: { title: CHAT, description: [] }, link: `${config.WEBURL}/#/${chatThreadPath(notification)}` };
+    }
     if (DOC_KEYS.includes(notification.key)) {
         const title = (notification.changeData && notification.changeData.pageTitle) || '';
         return { label: subjectText(title) || A_DOC, header: { title, description: [] }, link: docCommentLink(notification) };
@@ -60,7 +66,7 @@ const commentNoticeEmail = ({ notification = {}, projects = [], tasks = [] }) =>
     if (!text || String(notification.userId || '') === AI_ACTOR) return null;
     const place = placeOf(notification, projects, tasks);
     const who = subjectText(notification.User_Employee_Name) || SOMEONE;
-    const headline = text.headline(who, place.label);
+    const headline = place.headline ? place.headline(who) : text.headline(who, place.label);
     const html = mainTemplate.renderHTML({
         templateHeader: place.header,
         templateBody: [{

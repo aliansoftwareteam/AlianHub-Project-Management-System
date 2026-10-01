@@ -52,7 +52,7 @@ export function useProjectTree(projectData) {
 
             const folders = (foldersResult || []).reduce((acc, folder) => {
                 if (folder.projectId !== id) return acc;
-                acc[folder._id] = { folderId: folder._id, name: folder.name, sprintsObj: {}, deletedStatusKey: folder.deletedStatusKey, legacyId: folder?.legacyId || '', id: folder._id, _id: folder._id };
+                acc[folder._id] = { folderId: folder._id, name: folder.name, sprintsObj: {}, deletedStatusKey: folder.deletedStatusKey, legacyId: folder?.legacyId || '', id: folder._id, _id: folder._id, parentFolderId: folder.parentFolderId || null };
                 return acc;
             }, {});
             const sprints = {};

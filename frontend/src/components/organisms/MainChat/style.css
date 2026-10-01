@@ -398,11 +398,32 @@ a.mc-agent-change-label { color: var(--brand); }
 .mts-foot { display: flex; gap: 8px; justify-content: flex-end; }
 .mts select.ah-input { appearance: auto; }
 
+/* ---------------- threads ---------------- */
+.mc-thread-foot {
+    display: inline-flex; align-items: center; gap: 8px; max-width: 100%; min-height: 28px; margin-top: 4px; padding: 2px 8px 2px 4px;
+    border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--ink-2);
+    font: 500 12px/1.2 var(--font-ui); cursor: pointer; text-align: left;
+}
+.mc-thread-foot:hover { background: var(--surface); border-color: var(--border); }
+.mc-thread-foot:focus-visible { outline: none; box-shadow: var(--focus); }
+.mc-thread-avs { display: inline-flex; flex: none; }
+.mc-thread-avs .mc-av + .mc-av { margin-left: -6px; }
+.mc-thread-count { flex: none; color: var(--brand); font-weight: 600; }
+.mc-thread-last { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-info.mc-thread { width: min(420px, 100%); }
+.mc-thread-where { margin-left: 6px; font-weight: 500; color: var(--ink-2); }
+.mc-thread-note { margin: 0; padding: 16px; font-size: 12.5px; line-height: 1.45; color: var(--ink-2); }
+.mc-thread .mc-feed-wrap { flex: 1; min-height: 0; }
+.mc-thread .mc-comp-row .mc-tool span { display: none; }
+.mc-thread .mc-comp-hint { display: none; }
+
 /* ---------------- responsive ---------------- */
 @media (max-width: 1279px) {
     .mc-info { position: absolute; right: 0; top: 0; bottom: 0; z-index: 7; box-shadow: var(--shadow-pop); }
 }
 @media (max-width: 767px) {
+    .mc-info.mc-thread { width: 100%; }
+    .mc-thread-foot { min-height: 36px; }
     .mc-head { padding: 0 8px 0 4px; }
     .mc-head-ai span { display: none; }
     .mc-info { width: 100%; }

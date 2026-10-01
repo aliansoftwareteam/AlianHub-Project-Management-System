@@ -4,7 +4,6 @@ require('./Config/buildInfo').start();
 const express = require("express");
 const fs = require("fs");
 const path = require('path');
-const rateLimit = require('express-rate-limit');
 
 const bodyParser = require("body-parser");
 const config =  require('./Config/config.js');
@@ -26,20 +25,7 @@ installCors(app);
 
 require('./Config/securityHeaders').install(app);
 
-// API traffic only: static assets and socket.io are never counted, so an SPA cold
-// load cannot trip the limit. 0 / off disables it for internal deployments.
-const rawGlobalLimit = String(process.env.GLOBAL_RATE_LIMIT_PER_MIN ?? '1000').trim().toLowerCase();
-if (!['0', 'off', 'false', 'no', 'disabled'].includes(rawGlobalLimit)) {
-    const STATIC_ASSET_RX = /\.(js|mjs|css|map|svg|png|jpe?g|gif|ico|webp|avif|woff2?|ttf|otf|eot|html?|mp4|webm|mp3|wav|pdf)$/i;
-    app.use(rateLimit({
-        windowMs: 60 * 1000,
-        max: Math.max(1, Number(rawGlobalLimit) || 1000),
-        standardHeaders: true,
-        legacyHeaders: false,
-        skip: (req) => req.path.startsWith('/socket.io/') || STATIC_ASSET_RX.test(req.path)
-            || req.path === '/' || req.path.startsWith('/assets/') || req.path.startsWith('/static/'),
-    }));
-}
+require('./Config/globalRateLimit').install(app);
 // 2MB covers every JSON body the app sends; uploads go through multer with their
 // own limits. BODY_LIMIT raises it for bulk imports.
 const BODY_LIMIT = process.env.BODY_LIMIT || '2mb';

@@ -98,9 +98,10 @@ const i18n = config.global.plugins[0];
 i18n.global.setLocaleMessage('en', en);
 const t = i18n.global.t;
 
-function mountPanel({ roleType = 1, userId = 'u1', socket = null, nav = null, width = 1280, stubs = {} } = {}) {
+function mountPanel({ roleType = 1, userId = 'u1', socket = null, nav = null, width = 1280, stubs = {}, folders = [] } = {}) {
     const store = createStore({
         getters: {
+            'projectData/folders': () => ({ 'proj-1': folders }),
             'settings/companyUserDetail': () => ({ roleType }),
             'settings/companyOwnerDetail': () => ({}),
             'projectData/gettaskDetailData': () => null,
@@ -495,6 +496,36 @@ describe('TaskDetailPanel', () => {
                 expect(worstContrast(inkOf(style), style.background, 'light'), chip.text()).toBeGreaterThanOrEqual(4.5);
                 expect(worstContrast(style.getPropertyValue('--status-ink-dark'), style.background, 'dark'), chip.text()).toBeGreaterThanOrEqual(4.5);
             }
+        });
+    });
+
+    describe('the breadcrumb of a task in a subfolder', () => {
+        const subfolder = { _id: 'f-sub', name: 'Icons', projectId: 'proj-1', deletedStatusKey: 0, parentFolderId: 'f-top' };
+        const parent = { _id: 'f-top', name: 'Design', projectId: 'proj-1', deletedStatusKey: 0, parentFolderId: null };
+        const crumbs = (wrapper) => wrapper.findAll('nav.ah-detail__crumb .ah-detail__crumb-link').map((crumb) => crumb.text());
+
+        beforeEach(() => {
+            projectPayload.ProjectName = 'Alpha';
+            projectPayload.sprintsObj = [{ _id: 'sprint-1', name: 'Sprint 1', projectId: 'proj-1', folderId: 'f-sub' }];
+            projectPayload.sprintsfolders = [subfolder];
+            projectPayload.tasks[0] = { _id: 'task-1', TaskName: 'Write spec', TaskKey: 'AH-1', statusKey: 'st-open', statusType: 'open', AssigneeUserId: [], isParentTask: true, sprintId: 'sprint-1', folderObjId: 'f-sub', sprintArray: { name: 'Sprint 1', folderName: 'Icons' } };
+        });
+        afterEach(() => {
+            delete projectPayload.ProjectName;
+            projectPayload.sprintsObj = [];
+            projectPayload.sprintsfolders = [];
+        });
+
+        it('names the parent folder before the subfolder when the project\'s folders are loaded', async () => {
+            const wrapper = mountPanel({ folders: [parent, subfolder] });
+            await flushPromises();
+            expect(crumbs(wrapper)).toEqual(['Alpha', 'Design', 'Icons', 'Sprint 1']);
+        });
+
+        it('names the task\'s own folder alone when they are not', async () => {
+            const wrapper = mountPanel();
+            await flushPromises();
+            expect(crumbs(wrapper)).toEqual(['Alpha', 'Icons', 'Sprint 1']);
         });
     });
 });
