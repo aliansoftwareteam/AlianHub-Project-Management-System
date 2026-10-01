@@ -25,7 +25,7 @@ Started 2026-10-01 at about 15:20 IST, after the owner asked why this work is no
 - The guide is `docs/MCP-AGENT-GUIDE.md`.
 
 ## To use it locally (waiting for the owner)
-1. Set `MCP_TOOLS_MANAGE=on` and `MCP_TOOLS_DATA=on` in the local `.env`.
+1. Set `MCP_TOOLS_MANAGE=on`, `MCP_TOOLS_DATA=on` and, for the part 3 tools, `MCP_TOOLS_WORK=on` in the local `.env`.
 2. Restart the server.
 3. Create a new token with "Let this agent manage tasks" ticked.
 
@@ -57,6 +57,45 @@ Deleting is not planned.
 - Behind `MCP_TOOLS_WORK` (off by default), for every token that reads or writes, with no grant: `tags.list`, `task.tags.add`, `task.tags.remove` (item 6, tags); `task.relations.list`, `task.relation.add`, `task.relation.remove` (item 7); `lists.list`, `list.create`, `list.rename`, `list.move` (item 9, lists); `page.comments.list`, `page.comment.create`, `page.comment.reply`, `page.comment.assign`.
 - Checked and covered by a test, with nothing to fix: `subtask.create` under a subtask (three levels, no deeper) and `task.link` on a subtask, with and without the grant.
 - Still missing from the list above, nearest first, each one web route away: watchers (item 12), checklists (item 6), folder create, rename and move (item 9), resolving a doc comment, reactions (item 17). Then: list archive and restore and the sprint lifecycle (item 9), converting, merging and duplicating (item 8), editing a project (item 10), attachments (item 11), saved views, dashboards and automations (items 13 to 15), time edits and approval (item 16).
+
+## Hand checks on build 754 (2026-10-01, about 21:00)
+Done by the integrator in its own browser tab at 1440 px, right after #1332 merged and the local server was rebuilt. An earlier check on build 752 covered the Everything page in light and dark, a List parent opening to its subtask, and the level-two task panel (parent crumb, "Add subtask", "Summarise this thread" on request); nothing was wrong there.
+
+**Checked, with no console error on any screen**
+- Home: the empty state "Your day is clear".
+- Goals: a private goal was created; its panel opens beside the list on its own address.
+- A project's List in the dense look, and the list menu on headings and in the tree (Rename, Copy link, Move to folder…, Complete sprint, Sprint settings, Archive, Delete).
+- Board in dark: chips and the density control.
+- Gantt in dark. Calendar in dark. Chat in dark. Dashboards in dark. The Docs hub in dark.
+- My Settings in dark: the accent swatches change the colour live; the Look and Keyboard sections are there.
+- Doc autosave: typing sent a save by itself and the indicator read "Saved".
+
+**The one defect found**
+- On the Calendar tab in dark, collapsed lists sat on a white card. The dark rule applied only when the calendar grid was inside the card. Fixed on `fix/calendar-collapsed-lists-dark` (one rule and a spec), which is inside #1357.
+
+**Notes**
+- After a reload under an emulated viewport the page rendered tiny; clearing the viewport and setting it again fixed it. It is the tool, not the app.
+- `/docs` is not an address; the Docs hub is `/pages`.
+- Left in the data: the private goal `[QA 046] goal`, and the text "Autosave check on build 754" in `[QA 046] doc 2`.
+
+**Screens still to check by hand**
+- The Table view; List group totals; quick field create; relationship and voting fields.
+- The whiteboard and its notes; doc comment assignment, reactions and files; form logic.
+- AI columns ("Generate") and "Post to chat".
+- Themed sidebars, alerts and dialogs; the Inbox empty state.
+- The Everything page at desktop width.
+- Duplicate a project; subfolders; project templates.
+- Every upload and removal path (after #1253).
+- The import dialog, with re-import and undo.
+- Phone, 390 px: the screens of the two phone sweeps.
+- A first paint in a language other than English (needs build 755 or later).
+- The MCP tools through the local endpoint (needs the flags and a new token).
+- Everything in #1357 once it merges and the server is rebuilt. The per-PR lists are in `followups.md`.
+
+The local server was rebuilt to build 757 at about 21:50. Home loads and Goals is in the navigation, with no console error. A second local session is hand-checking the second batch (#1333 to #1341) on it.
+
+**The tracker**
+- The subtasks of AP-441 for the PRs merged inside #1332 and #1343 still read "In Review". Setting them to Done is owed, a few calls at a time.
 
 ## Oddities to fix along the way
 - `tasks.search` returns `estimateHours` as the stored minutes divided by 3,600.
