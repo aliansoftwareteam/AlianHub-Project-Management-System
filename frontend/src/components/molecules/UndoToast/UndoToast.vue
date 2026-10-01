@@ -25,6 +25,7 @@
 <script setup>
 import { onBeforeUnmount, onMounted } from "vue";
 import { undoToast, runUndo, dismissUndoToast, holdUndoToast, releaseUndoToast } from "@/composable/useUndoToast";
+import { shortcutKey } from "@/composable/shortcuts";
 
 defineOptions({ name: "UndoToast" });
 
@@ -33,7 +34,7 @@ const EDITABLE = "input, textarea, select, [contenteditable]:not([contenteditabl
 // Ctrl/Cmd+Z in a text field is the field's own undo, so the shortcut only applies outside one.
 function onKeydown(event) {
     if (!undoToast.current || event.defaultPrevented || event.altKey || event.shiftKey) return;
-    if (!(event.ctrlKey || event.metaKey) || String(event.key).toLowerCase() !== "z") return;
+    if (!(event.ctrlKey || event.metaKey) || String(event.key).toLowerCase() !== shortcutKey("undo")) return;
     const target = event.target && event.target.nodeType === 1 ? event.target : null;
     if (target && (target.isContentEditable || target.closest(EDITABLE))) return;
     event.preventDefault();

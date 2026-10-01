@@ -73,11 +73,8 @@
 .pal__answer-body.is-wait { display: flex; align-items: center; gap: 8px; color: var(--ink-label); }
 .pal__answer-body.is-error { color: var(--danger); }
 
-.pal__empty { padding: 22px 16px 16px; display: flex; flex-direction: column; gap: 6px; }
-.pal__empty--idle { padding: 18px 16px; }
-.pal__empty-title { font-size: 13px; font-weight: 600; }
+.pal__empty { padding: 18px 16px; }
 .pal__empty-sub { color: var(--ink-label); line-height: 1.45; }
-.pal__empty-actions { display: flex; gap: 6px; margin-top: 6px; }
 
 .pal__foot {
     display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 9px 16px; border-top: 1px solid var(--hairline);

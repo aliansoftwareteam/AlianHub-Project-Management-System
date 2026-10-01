@@ -132,6 +132,7 @@
                 <EmptyState
                     v-else-if="project?.deletedStatusKey !== 2"
                     :image="noSearchResult"
+                    :illustration="emptyTitleKey === 'EmptyState.no_match_title' ? 'search' : 'tasks'"
                     :title="showArchived ? $t('ProjectSlider.no_archived') : $t(emptyTitleKey)"
                     :message="showArchived ? '' : $t(emptyMessageKey)"
                     :actionLabel="emptyActionLabel"

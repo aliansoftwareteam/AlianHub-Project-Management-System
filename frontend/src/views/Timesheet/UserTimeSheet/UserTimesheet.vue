@@ -61,10 +61,17 @@
             </div>
             <div v-if="!displayRows.length" class="ut2-empty">
                 <div v-if="loading" class="ah-small">{{ $t('Time.loading') }}</div>
-                <div v-else class="tv-empty">
-                    <span>{{ $t('Time.empty_week') }}</span>
-                    <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openLog()">{{ $t('Time.log_time') }}</button>
-                </div>
+                <EmptyState
+                    v-else
+                    compact
+                    illustration="time"
+                    data-test="time-empty"
+                    :heading-level="2"
+                    :title="$t('Time.empty_week_title')"
+                    :message="$t('Time.empty_week')"
+                    :action-label="$t('Time.log_time')"
+                    @action="openLog()"
+                />
             </div>
             <div v-for="row in displayRows" :key="row.taskId" class="ut2-row">
                 <div class="ut2-task">
@@ -125,6 +132,7 @@
 <script setup>
 import { ref, computed, inject, onMounted, watch } from 'vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';

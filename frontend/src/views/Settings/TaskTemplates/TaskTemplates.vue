@@ -4,7 +4,7 @@
         <p class="stt__hint">{{ $t('TaskTemplates.settings_hint') }}</p>
         <p v-if="error" class="stt__error" role="alert">{{ error }}</p>
         <p v-if="loading" class="stt__hint" role="status">{{ $t('TaskTemplates.loading') }}</p>
-        <p v-else-if="!templates.length" class="stt__empty">{{ $t('TaskTemplates.settings_empty') }}</p>
+        <EmptyState v-else-if="!templates.length" compact illustration="tasks" data-test="task-templates-empty" :title="$t('TaskTemplates.settings_empty')" />
         <ul v-else class="stt__list">
             <li v-for="template in templates" :key="template._id" class="stt__row" :data-template-row="template._id">
                 <div class="stt__main">
@@ -47,6 +47,7 @@
 <script setup>
 import { nextTick, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { deleteTemplate, errorText, listTemplates, renameTemplate } from "@/components/molecules/TaskTemplates/taskTemplates";
 
 defineOptions({ name: "TaskTemplatesSettings" });
@@ -109,7 +110,7 @@ async function removeTemplate(template) {
 <style scoped>
 .stt { display: flex; flex-direction: column; gap: 10px; padding: 20px 16px; max-width: 760px; color: var(--ink); font-family: var(--font-ui); }
 .stt__title { margin: 0; font: 600 18px/1.3 var(--font-ui); }
-.stt__hint, .stt__empty { margin: 0; color: var(--ink-2); font-size: 12.5px; }
+.stt__hint { margin: 0; color: var(--ink-2); font-size: 12.5px; }
 .stt__error { margin: 0; color: var(--danger); font-size: 12.5px; }
 .stt__list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
 .stt__row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 12px; border-bottom: 1px solid var(--hairline); }

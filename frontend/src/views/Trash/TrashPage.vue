@@ -24,6 +24,8 @@
 
         <EmptyState
             v-else-if="!rows.length"
+            data-test="trash-empty"
+            :heading-level="2"
             :title="$t('Trash.empty_title')"
             :message="$t('Trash.empty_message', { kind: $t(`Trash.empty_${kind}`) })"
         />

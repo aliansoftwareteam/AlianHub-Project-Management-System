@@ -95,6 +95,7 @@
                                 </span>
                                 <span v-if="row.age" class="pal__age">{{ row.age }}</span>
                                 <span v-else-if="row.hint" class="pal__hint">{{ row.hint }}</span>
+                                <KeyHint v-else-if="row.shortcut" :shortcut="row.shortcut" />
                             </div>
                         </div>
                     </div>
@@ -122,16 +123,19 @@
                         </button>
                     </div>
 
-                    <div v-if="!flat.length && query.trim().length >= 2 && !searching" class="pal__empty">
-                        <span class="pal__icon pal__icon--brand"><ShellIcon name="search" :size="13" /></span>
-                        <div class="pal__empty-title">{{ $t('Inbox.search_nothing', { q: query.trim() }) }}</div>
-                        <div class="pal__empty-sub">{{ $t('Inbox.search_nothing_sub', { n: sourceCount }) }}</div>
-                        <div class="pal__empty-actions">
-                            <button v-if="hasAi" type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="askAi()">✦ {{ $t('Inbox.ask_ai') }}</button>
-                            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="clearQuery">{{ $t('Inbox.clear_search') }}</button>
-                        </div>
-                    </div>
-                    <div v-else-if="!flat.length" class="pal__empty pal__empty--idle">
+                    <EmptyState
+                        v-if="!flat.length && query.trim().length >= 2 && !searching"
+                        compact
+                        illustration="search"
+                        data-test="palette-none"
+                        :title="$t('Inbox.search_nothing', { q: query.trim() })"
+                        :message="$t('Inbox.search_nothing_sub', { n: sourceCount })"
+                        :action-label="$t('Inbox.clear_search')"
+                        :secondary-label="hasAi ? `✦ ${$t('Inbox.ask_ai')}` : ''"
+                        @action="clearQuery"
+                        @secondary="askAi()"
+                    />
+                    <div v-else-if="!flat.length" class="pal__empty">
                         <div class="pal__empty-sub">{{ chip === 'all' ? $t('Inbox.search_idle') : $t('Palette.type_to_search', { type: $t('Palette.chip_' + chip) }) }}</div>
                     </div>
                 </div>
@@ -169,6 +173,8 @@ import { useFocusTrap } from '@/composable/useFocusTrap';
 import { aiOff } from '@/composable/aiAvailability';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import AskPostToChat from '@/views/Ai/AskPostToChat.vue';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
+import KeyHint from '@/components/atom/KeyHint/KeyHint.vue';
 import { toggleTheme, shellState } from '@/components/organisms/Shell/shellState';
 import { isMacPlatform } from './paletteKeys';
 import { CHIPS, RECORD_CHIPS, chipAllows, commandArgument, commandLeads, foldRecentProjects, projectPath, recentType, relativeAge, taskLocation, taskPath } from './paletteRows';
@@ -275,7 +281,7 @@ const canNewDoc = computed(() => {
 });
 
 const COMMANDS = computed(() => [
-    { key: 'new-task', label: t('Inbox.cmd_new_task'), icon: 'plus' },
+    { key: 'new-task', label: t('Inbox.cmd_new_task'), icon: 'plus', shortcut: 'create-task' },
     { key: 'new-doc', label: t('Docs.new_doc'), icon: 'docs', show: canNewDoc.value },
     { key: 'new-project', label: t('Inbox.cmd_new_project'), icon: 'projects', show: allowed('project.project_list'), takesName: true },
     { key: 'start-timer', label: t('Inbox.cmd_start_timer'), icon: 'play', show: !!timesheetRoute() },
@@ -328,7 +334,7 @@ const navRow = (n) => ({ id: `nav:${n.key}`, kind: 'nav', icon: n.icon, title: n
 const nameFor = (c) => (c.takesName ? commandArgument(query.value, [c.label, c.alias]) : '');
 const commandRow = (c) => {
     const name = nameFor(c);
-    return { id: `cmd:${c.key}`, kind: 'command', icon: c.icon, title: c.label, sub: name, command: c.key, name };
+    return { id: `cmd:${c.key}`, kind: 'command', icon: c.icon, title: c.label, sub: name, command: c.key, name, shortcut: c.shortcut };
 };
 
 const sourceRow = (s) => {

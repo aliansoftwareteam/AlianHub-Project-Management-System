@@ -15,12 +15,21 @@
             <template v-if="groups.today.length">
                 <TaskRow v-for="task in groups.today" :key="task._id" v-bind="rowProps(task)" @toggle="$emit('complete', task)" @open="$emit('open', task)" @timer="$emit('timer', task)" @set-date="$emit('set-date', task)" />
             </template>
-            <div v-else class="hc-empty">
+            <EmptyState
+                v-else
+                compact
+                illustration="tasks"
+                data-test="mywork-empty-today"
+                :heading-level="2"
+                :title="$t('Home.empty_today_title')"
+                :action-label="$t('Home.empty_today_action')"
+                @action="focusAdd"
+            >
                 <i18n-t v-if="sampleProject" keypath="Home.empty_today" tag="span">
-                    <template #project><button type="button" @click="$emit('open-project', sampleProject)">{{ sampleProject.ProjectName }}</button></template>
+                    <template #project><button type="button" class="hc-empty-link" @click="$emit('open-project', sampleProject)">{{ sampleProject.ProjectName }}</button></template>
                 </i18n-t>
-                <span v-else>{{ $t('Home.empty_today_generic') }}</span>
-            </div>
+                <template v-else>{{ $t('Home.empty_today_generic') }}</template>
+            </EmptyState>
             <form v-if="showAdd || addUsed || !groups.today.length" class="hc-add" @submit.prevent="submitAdd">
                 <span class="hc-add__plus">+</span>
                 <input ref="addInput" v-model="draft" type="text" :placeholder="$t('Home.add_task_today')" :readonly="adding" :aria-busy="adding ? 'true' : 'false'" maxlength="250" />
@@ -46,13 +55,13 @@
         <template v-else-if="activeTab === 'done'">
             <div class="hc-group"><span>{{ $t('Home.group_done') }}<span class="hc-group__count">{{ work.done.value.length }}</span></span></div>
             <p v-if="!work.doneLoaded.value" class="hc-loading">{{ $t('Home.loading') }}</p>
-            <div v-else-if="!work.done.value.length" class="hc-empty">{{ $t('Home.empty_done') }}</div>
+            <EmptyState v-else-if="!work.done.value.length" compact illustration="tasks" data-test="mywork-empty-done" :heading-level="2" :title="$t('Home.empty_done_title')" :message="$t('Home.empty_done')" />
             <TaskRow v-for="task in work.done.value" :key="task._id" v-bind="rowProps(task)" done :timer="false" :draggable="false" @toggle="$emit('reopen', task)" @open="$emit('open', task)" />
         </template>
 
         <template v-else>
             <div class="hc-group"><span>{{ $t('Home.group_delegated') }}<span class="hc-group__count">{{ work.delegated.value.length }}</span></span></div>
-            <div v-if="!work.delegated.value.length" class="hc-empty">{{ $t('Home.empty_delegated') }}</div>
+            <EmptyState v-if="!work.delegated.value.length" compact illustration="people" data-test="mywork-empty-delegated" :heading-level="2" :title="$t('Home.empty_delegated_title')" :message="$t('Home.empty_delegated')" />
             <TaskRow v-for="task in work.delegated.value" :key="task._id" v-bind="rowProps(task)" :timer="false" :set-date="false" :draggable="false" @toggle="$emit('complete', task)" @open="$emit('open', task)" />
         </template>
     </section>
@@ -61,6 +70,7 @@
 <script setup>
 import { computed, defineEmits, defineProps, ref } from "vue";
 import TaskRow from "./TaskRow.vue";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 
 defineOptions({ name: "MyWorkCard" });
 
@@ -110,5 +120,7 @@ function submitAdd() {
     draft.value = "";
 }
 
-defineExpose({ focusAdd: () => addInput.value?.focus() });
+const focusAdd = () => addInput.value?.focus();
+
+defineExpose({ focusAdd });
 </script>

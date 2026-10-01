@@ -190,3 +190,23 @@ describe('browser-stored Later from before', () => {
         expect(listCalls()[0][1]).not.toContain('exclude=');
     });
 });
+
+describe('Inbox with nothing in a tab', () => {
+    it('shows inbox zero, with the way back to Primary only on the other tabs', async () => {
+        rowsByTab = {};
+        await mountInbox();
+        const zero = () => wrapper.find('[data-test="inbox-zero"]');
+        expect(zero().find('svg').attributes('data-illustration')).toBe('inbox');
+        expect(zero().find('h2').text()).toBe('Inbox.zero_primary');
+        expect(zero().find('button').exists()).toBe(false);
+
+        await topTabs().find('[data-tab="other"]').trigger('click');
+        await flushPromises();
+        expect(zero().find('h2').text()).toBe('Inbox.zero_other');
+        expect(zero().find('.empty-state__btn').text()).toBe('Inbox.back_to_primary');
+
+        await zero().find('.empty-state__btn').trigger('click');
+        await flushPromises();
+        expect(topTabs().find('[data-tab="primary"]').attributes('aria-selected')).toBe('true');
+    });
+});

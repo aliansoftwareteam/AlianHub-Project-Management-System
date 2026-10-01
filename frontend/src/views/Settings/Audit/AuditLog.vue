@@ -28,7 +28,17 @@
         <div class="al__body ah-scroll">
             <div v-if="error" class="ah-empty">{{ error }}</div>
             <div v-else-if="busy && !rows.length" class="ah-empty">{{ $t('Audit.loading') }}</div>
-            <div v-else-if="!rows.length" class="ah-empty">{{ $t('Audit.none') }}</div>
+            <EmptyState
+                v-else-if="!rows.length"
+                :illustration="search ? 'search' : 'generic'"
+                data-test="audit-empty"
+                :heading-level="2"
+                :title="search ? $t('Audit.none_match') : $t('Audit.none')"
+                :message="search ? '' : $t('Audit.none_msg')"
+                :action-label="$t('Audit.clear_search')"
+                :action-allowed="Boolean(search)"
+                @action="clearSearch"
+            />
 
             <table v-else class="al__table">
                 <thead>
@@ -111,6 +121,7 @@ import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import moment from "moment";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { apiRequest } from "@/services";
 import { useGetterFunctions } from "@/composable";
 import * as env from "@/config/env";
@@ -213,6 +224,7 @@ const load = async ({ append = false } = {}) => {
 const reload = () => { page.value = 1; load(); };
 const setScope = (key) => { scope.value = key; reload(); };
 const clearProject = () => { projectFilter.value = null; reload(); };
+const clearSearch = () => { search.value = ""; reload(); };
 const loadMore = () => { page.value += 1; load({ append: true }); };
 
 const undo = async (row) => {
