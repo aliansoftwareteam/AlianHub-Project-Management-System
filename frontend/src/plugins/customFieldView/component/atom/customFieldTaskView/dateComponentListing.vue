@@ -19,6 +19,7 @@
                     :daysWeekDisable="props.detail?.fieldDaysDisable || []"
                     @update:modelValue="($event) => emit('blurUpdate',$event,props.detail)"
                     :isShowDateAndicon="true"
+                    :valueAsText="true"
                     :hideExtraLayouts="props.detail.fieldTimeFormate ? [] : ['time' ,'minutes' , 'hours' , 'seconds']"
                     :timeFormate="props.detail.fieldTimeFormate ? props.detail.fieldTimeFormate === 'AM/PM' ? false : true : false"
                     :showTimeFormate="props.detail.fieldTimeFormate ? true : false"

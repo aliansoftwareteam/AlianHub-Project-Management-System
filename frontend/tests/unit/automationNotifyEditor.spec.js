@@ -226,7 +226,8 @@ describe('AutomationsPage with the new triggers and a notify step', () => {
         expect(text).toContain('Gone Person');
         expect(text).toContain('Automations.assign_skip_not_a_member');
         expect(text).toContain('Automations.assign_skip_no_task_access');
-        expect(wrapper.find('[data-test="dry-run-trigger"]').text()).toContain('Automations.dry_run_trigger_not_due_yet');
+        expect(wrapper.find('[data-test="dry-run-verdict"]').text()).toBe('Automations.dry_run_not_now');
+        expect(wrapper.find('[data-test="dry-run-headline"]').text()).toContain('Automations.dry_run_trigger_not_due_yet');
         expect(wrapper.find('.au__plan-params').exists()).toBe(false);
     });
 

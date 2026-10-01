@@ -93,6 +93,9 @@ const props = defineProps({
 /* A host that provides `selectedProject` cannot inject it, so it hands the project over. */
 const folderProject = () => props.project || projectData?.value;
 
+/* A folder entry carries its own id as `folderId` and its lists in `sprintsObj`; a list carries the id of the folder it is in. */
+const isSiblingOfNewList = (x) => x.deletedStatusKey !== 1 && !x.sprintsObj && String(x?.folderId || '') === String(props.folder?.folderId || '');
+
 const inProgress = ref(false);
 
 const listName = ref({
@@ -116,7 +119,7 @@ function createEditSprint() {
 	if(inProgress.value) {
 		return
 	}
-	checkPerProjectSprintPermission(projectData.value._id,dbCollections.SPRINTS).then((result) => {
+	checkPerProjectSprintPermission(folderProject()._id,dbCollections.SPRINTS).then((result) => {
 		if(result){
 			if(listName?.value?.value?.length) {
 				listName.value.value = listName.value.value.trim();
@@ -136,7 +139,7 @@ function createEditSprint() {
 						}
 						sprintIndex = props.subItems.filter((x) => x.deletedStatusKey !== 1 && !x?.folderId).findIndex((x) => x.name?.toLowerCase() === listName.value.value.toLowerCase() && x.id !== props.item.id)
 					} else {
-						sprintIndex = props.subItems.filter((x) => x.deletedStatusKey !== 1 && !x?.folderId).findIndex((x) => x.name?.toLowerCase() === listName.value.value.toLowerCase())
+						sprintIndex = props.subItems.filter(isSiblingOfNewList).findIndex((x) => x.name?.toLowerCase() === listName.value.value.toLowerCase())
 					}
 		
 					if(sprintIndex !== -1) {
@@ -147,7 +150,7 @@ function createEditSprint() {
 		
 					const axiosData = {
 						companyId: companyId.value,
-						projectId: projectData.value._id,
+						projectId: folderProject()._id,
 						sprintName: listName.value.value,
 					}
 		
