@@ -120,7 +120,7 @@
                                     </td>
                                     <td class="ewr-td-name">
                                         <div class="ewr-name-cell">
-                                            <UserProfile
+                                            <UserProfile decorative
                                                 :data="{ image: getUserProfile(row._id).Employee_profileImageURL, title: row.name }"
                                                 :showDot="getUserProfile(row._id).isOnline"
                                                 width="28px"

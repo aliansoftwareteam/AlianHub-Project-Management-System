@@ -182,7 +182,7 @@
                                         {{ items?.find(e => e[props.matchField] === item[props.matchField])?.Employee_Name.charAt(0) }}
                                     </span>
                                 </div>
-                                <UserProfile 
+                                <UserProfile decorative 
                                     v-else
                                     :showDot="false" 
                                     :isBorder="false" 

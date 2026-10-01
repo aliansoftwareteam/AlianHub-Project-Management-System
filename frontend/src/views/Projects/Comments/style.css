@@ -101,3 +101,25 @@
 audio {width: 225px !important;}
 .upload-body-dragged.media__extension.chat__drag-drop{width: calc(98.8% - 8px);}
 }
+
+/* On the project's Comments tab the feed sits on the theme canvas (.list-view-body--detail). The task
+   panel paints its own copy of the feed in TaskDetailOverlay/style.css. */
+.list-view-body--detail .commments__component-wrapper { background: transparent; }
+.list-view-body--detail .message_id-sent { color: var(--ink); }
+.list-view-body--detail .message_id-sent.bg-white { background-color: var(--surface); }
+.list-view-body--detail .message_id-sent.bg-light-blue { background-color: var(--brand-tint); }
+.list-view-body--detail .show__user { color: var(--ink); }
+.list-view-body--detail .message_replay { background-color: var(--fill); }
+.list-view-body--detail :is(.show__userlist, .reply-box) { background-color: var(--surface); color: var(--ink); }
+/* An id, to outweigh the rule that keeps .bg-white on light controls in dark. */
+.list-view-body--detail #comment_footer {
+  background-color: var(--surface);
+  border-color: var(--hairline);
+  color-scheme: var(--scheme);
+}
+.list-view-body--detail .write-message { border-color: var(--border); background: var(--surface); color: var(--ink); }
+.list-view-body--detail .write-message::placeholder { color: var(--ink-2); }
+.list-view-body--detail .write-message:focus { border-color: var(--brand); }
+.list-view-body--detail .write-message.disabled,
+.list-view-body--detail .disable__send-button { background-color: var(--fill) !important; }
+.list-view-body--detail .msg__initaluser { background-color: var(--surface); color: var(--ink); }
