@@ -15,7 +15,7 @@ const NOT_TRASHED = { $ne: TRASHED };
 
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
 const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
-const find = async (companyId, type, filter, fields) => ((await MongoDbCrudOpration(companyId, { type, data: [filter, fields] }, 'find')) || []).map(plain);
+const find = async (companyId, type, filter, fields, options) => ((await MongoDbCrudOpration(companyId, { type, data: [filter, fields, ...(options ? [options] : [])] }, 'find')) || []).map(plain);
 const eitherForm = (ids) => [...ids, ...ids.map(oid)];
 const listed = (tasks) => tasks.slice(0, MAX_LISTED).map((task) => ({ id: String(task._id), name: task.TaskName }));
 
@@ -50,18 +50,23 @@ const trash = async (companyId, { tasks, project, actor }) => {
     }
 };
 
-const isUsed = async (companyId, fieldId) => Boolean(await MongoDbCrudOpration(companyId, {
-    type: SCHEMA_TYPE.TASKS,
-    data: [{ [`customField.${fieldId}`]: { $exists: true }, deletedStatusKey: NOT_TRASHED }, { _id: 1 }],
-}, 'findOne'));
+/* Asked inside the projects the field belongs to and for one task, so the read stays on the tasks' project index: no
+ * index covers a field's values, and a read across the company would walk every task. */
+const isUsed = async (companyId, field) => {
+    const projects = (field.projectId || []).filter((id) => mongoose.isValidObjectId(id)).map(oid);
+    if (!projects.length) return false;
+    const holders = await find(companyId, SCHEMA_TYPE.TASKS, { ProjectID: { $in: projects }, [`customField.${field._id}`]: { $exists: true }, deletedStatusKey: NOT_TRASHED }, { _id: 1 }, { limit: 1 });
+    return holders.length > 0;
+};
 
-/* A field the import created is switched off, as the field form does it, once no task outside the trash holds a value. */
+/* A field the import created is switched off, as the field form does it, once no task outside the trash holds a value.
+ * One that has since been made a field of every project is someone's own change, and stays. */
 const removeUnusedFields = async (companyId, jobId) => {
-    const created = (await find(companyId, SCHEMA_TYPE.CUSTOM_FIELDS, { importJobId: oid(jobId) }, { fieldTitle: 1, isDelete: 1 })).filter((field) => field.isDelete !== false);
+    const created = (await find(companyId, SCHEMA_TYPE.CUSTOM_FIELDS, { importJobId: oid(jobId) }, { fieldTitle: 1, isDelete: 1, global: 1, projectId: 1 })).filter((field) => field.isDelete !== false);
     const removed = [];
     const kept = [];
     for (const field of created) {
-        if (await isUsed(companyId, String(field._id))) {
+        if (field.global === true || await isUsed(companyId, field)) {
             kept.push(field.fieldTitle);
             continue;
         }

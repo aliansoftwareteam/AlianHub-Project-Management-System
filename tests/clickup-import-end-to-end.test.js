@@ -472,8 +472,11 @@ describe('the same file imported a second time', () => {
 
         expect(jobs().map(({ total, created, updated }) => [total, created, updated || 0])).toEqual([[20, 20, 0], [18, 18, 0], [20, 0, 20], [18, 0, 18]]);
         expect(taskNotices.HandleBothNotification).not.toHaveBeenCalled();
-        expect(store(SCHEMA_TYPE.HISTORY)).toHaveLength(before.history);
-        expect(countBy(socketEmitter.emit.mock.calls, ([event, payload]) => `${event}:${payload && payload.module}`)['update:task']).toBe(38);
+        // The one status the file changed went the way a person's change does: a history line, and who closed the task.
+        expect(store(SCHEMA_TYPE.HISTORY).slice(before.history).map((line) => [line.Key, String(line.TaskId)])).toEqual([['Task_Status', before.id]]);
+        expect(launch.completion.closedBy).toMatchObject({ actorId: OWNER, actorType: 'human' });
+        expect(second.lists.map((list) => list.data.skippedCells)).toEqual([[], []]);
+        expect(countBy(socketEmitter.emit.mock.calls, ([event, payload]) => `${event}:${payload && payload.module}`)['update:task']).toBe(38 + 2);
     });
 });
 

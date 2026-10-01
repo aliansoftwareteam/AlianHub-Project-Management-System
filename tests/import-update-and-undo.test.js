@@ -39,6 +39,7 @@ const assignmentRules = require('../Modules/AssignmentRules/engine');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const importers = require('../Modules/Importers/controller');
 const { taskMongo } = require('../Modules/Tasks/helpers/task_class_Mongo');
+const { TASK_ACTION_FIELDS } = require('../Modules/Tasks/helpers/taskWriteFields');
 const guardFixture = require('./fixtures/taskWriteGuard');
 
 mongoHelper.getTotalSprintCount = async () => true;
@@ -147,6 +148,10 @@ describe('a status the file changed, on a task that is already here', () => {
         });
     });
 
+    it('is quiet on the importer\'s word alone: a task route passes no such word on from a body', () => {
+        expect(TASK_ACTION_FIELDS.updateStatus.params).not.toContain('quiet');
+    });
+
     it('still answers a person\'s own status change: that one is no import', async () => {
         await moveByHand('Draw the hero', DONE);
         const [moved] = taskEmits('Draw the hero').filter((payload) => 'statusKey' in payload.updatedFields);
@@ -195,6 +200,19 @@ describe('a status the project does not have', () => {
         expect(taskNamed('Book the venue')).toMatchObject({ statusKey: 2, statusType: 'active' });
         expect(historyOf('Write the copy')).toEqual([]);
         expect(store(SCHEMA_TYPE.PROJECTS).find((row) => row._id === PROJECT).taskStatusData).toHaveLength(3);
+    });
+});
+
+describe('a status that cannot be saved', () => {
+    it('leaves the rest of the update in place and names the cell', async () => {
+        const failing = jest.spyOn(taskMongo, 'updateStatus').mockRejectedValueOnce(new Error('write refused'));
+
+        const out = await updateFrom(fileRows({ c1: 'complete' }).map((row) => (row['Task ID'] === 'c1' ? { ...row, 'Task Name': 'Write the final copy' } : row)));
+
+        failing.mockRestore();
+        expect(out.data.updated).toBe(3);
+        expect(out.data.skippedCells).toEqual([{ name: 'Write the final copy', column: 'status', value: 'complete', code: 'STATUS_NOT_SAVED' }]);
+        expect(taskNamed('Write the final copy')).toMatchObject({ statusKey: 1, statusType: 'default_active' });
     });
 });
 
