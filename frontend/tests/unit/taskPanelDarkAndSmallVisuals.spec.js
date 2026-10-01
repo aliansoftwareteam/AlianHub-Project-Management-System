@@ -273,7 +273,8 @@ describe('the task panel in both themes', () => {
 
     test('every property value is set in the row size', () => {
         const values = ['.task-created-by', '.priority-comp.taskdetail-label', '.story-points', '.calendar-comp', '.ah-repeat__summary', '.time-display', '.task-esitmate-hours', '.remaining-estimate-text', '.task-detail-empty'];
-        expect(style('.ah-detail__props').fontSize).toBe('var(--row-font)');
+        // The column's own size is the same number: --row-font is --fs-md in a variant and 12.5px without one.
+        expect(style('.ah-detail__props').fontSize).toBe('var(--fs-md, 12.5px)');
         for (const selector of values) expect(`${selector} ${style(selector).fontSize}`).toBe(`${selector} var(--row-font)`);
     });
 

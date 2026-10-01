@@ -300,7 +300,7 @@
 /* ---------- properties column ---------- */
 .ah-detail__props {
     padding: var(--card-pad-x, 16px); display: flex; flex-direction: column; gap: var(--gap-row, 12px);
-    background: var(--surface-2); overflow-y: auto; min-height: 0; font-size: var(--row-font);
+    background: var(--surface-2); overflow-y: auto; min-height: 0; font-size: var(--fs-md, 12.5px);
 }
 .ah-detail__prop { display: flex; align-items: center; min-height: 24px; gap: 6px; }
 .ah-detail__prop-label { width: 82px; flex: none; color: var(--ink-2); }
