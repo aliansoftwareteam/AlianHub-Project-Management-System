@@ -181,14 +181,6 @@
 .hourly_wrapper_value:last-child {
     border-bottom: none;
 }
-/* .milestone-date .dp__main.dp__theme_light {
-    background: #FFFFFF;
-    border: 1px solid #DFE1E6;
-    border-radius: 4px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-} */
 img {
     max-width: 100%;
     width: auto;
