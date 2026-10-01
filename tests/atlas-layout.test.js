@@ -235,14 +235,14 @@ describe('atlas layout: what a patched stylesheet moved', () => {
             changed: [
                 pair(['filter'], box(15, 170, 400, 38), box(15, 170, 358, 38)),
                 pair(['row'], box(15, 220, 358, 40), box(15, 218, 358, 40)),
-                pair(['cell'], box(20, 300, 120, 44), box(20, 298, 96, 24)),
+                pair(['cell'], box(20, 300, 120, 44), box(20, 298, 96, 34)),
             ],
         });
         expect(impact).toEqual({
             total: 900,
             resized: 2,
             shifted: 1,
-            biggest: [{ selector: 'div.filter', width: -42, height: 0 }, { selector: 'div.cell', width: -24, height: -20 }],
+            biggest: [{ selector: 'div.filter', width: -42, height: 0 }, { selector: 'div.cell', width: -24, height: -10 }],
         });
     });
 

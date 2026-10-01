@@ -11,7 +11,7 @@ const { galleryHtml } = require('./atlas/gallery');
 const { newBudget, noteBudget, roomToLoad } = require('./atlas/pace');
 const { coreScreens, inCore, stepsFor } = require('./atlas/core');
 const { SHELL, SHELL_TIMEOUT_MS, routeOf, settle, runStep } = require('./atlas/browser');
-const { measureLayout, summaryOf } = require('./atlas/layout');
+const { measureLayout, patchCss, summaryOf } = require('./atlas/layout');
 
 const ROOT = path.resolve(__dirname, '..');
 const NAVIGATION_TIMEOUT_MS = 45000;
@@ -118,7 +118,7 @@ async function capture(context, { baseUrl, screen, size, route, file, budget, cs
         if (screen.auth !== false) await shellOrSignIn(page);
         let { note } = await settle(page);
         // After the page has settled, so the patch follows every stylesheet the screen loads lazily.
-        if (css) await page.addStyleTag({ content: css });
+        const cssMoved = css ? await patchCss(page, css) : null;
         const steps = stepsFor(screen, size);
         for (const step of steps) await runStep(page, step);
         if (steps.length || css) ({ note } = await settle(page));
@@ -131,7 +131,7 @@ async function capture(context, { baseUrl, screen, size, route, file, budget, cs
         const layout = await measureLayout(page);
         const wanted = route.split('?')[0].replace(/\/$/, '') || '/';
         const notes = [landed === wanted ? null : `landed on ${landed}`, note].filter(Boolean);
-        return { ...(notes.length ? { note: notes.join('; ') } : {}), layout };
+        return { ...(notes.length ? { note: notes.join('; ') } : {}), layout, ...(cssMoved ? { cssMoved } : {}) };
     } finally {
         await page.close();
     }
@@ -181,7 +181,7 @@ const versionsSeen = (earlier, ...current) => [...new Set([...(earlier ? earlier
 /* The folder is the record: every shot on disk is listed, so a run that was cut short
  * still gets a gallery from the next one. atlas.json only adds the notes and the layout findings. */
 function writeIndex(outDir, { meta, shots, failures }) {
-    const measured = new Map(shots.map((shot) => [shot.file, { ...(shot.note ? { note: shot.note } : {}), ...(shot.layout ? { layout: shot.layout } : {}) }]));
+    const measured = new Map(shots.map((shot) => [shot.file, { ...(shot.note ? { note: shot.note } : {}), ...(shot.layout ? { layout: shot.layout } : {}), ...(shot.cssMoved ? { cssMoved: shot.cssMoved } : {}) }]));
     const order = SCREENS.map((screen) => screen.name);
     const listed = fs.readdirSync(outDir).filter(parseFileName)
         .map((file) => ({ ...parseFileName(file), file, ...measured.get(file) }))
@@ -240,7 +240,8 @@ async function main() {
                     try {
                         const result = await captureWithRetry(screen.auth === false ? signedOut : signedIn, { baseUrl: args.baseUrl, screen, size, route, file: path.join(outDir, file), budget, css });
                         shots.push({ ...entry, file, ...result });
-                        const findings = summaryOf(result.layout);
+                        const moved = result.cssMoved && (result.cssMoved.resized || result.cssMoved.shifted) ? `; css resized ${result.cssMoved.resized}, shifted ${result.cssMoved.shifted}` : '';
+                        const findings = `${summaryOf(result.layout)}${moved}`.replace(/^; /, '');
                         process.stdout.write(`ok    ${file}${result.note ? `  (${result.note})` : ''}${findings ? `  [${findings}]` : ''}\n`);
                     } catch (error) {
                         if (error instanceof SessionRefused && !shots.some((shot) => SCREENS.find((known) => known.name === shot.screen).auth !== false)) throw error;
