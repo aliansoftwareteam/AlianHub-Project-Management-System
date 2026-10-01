@@ -73,6 +73,8 @@ exports.saveViewSettings = async (req, res) => {
 
 const isCopyable = (view) => Boolean(view && view.keyName) && viewIdOf(view).length > EMBED_ID_LENGTH;
 
+exports.isCopyable = isCopyable;
+
 const copiedFrom = (source) => Object.fromEntries(COPIED_FIELDS.filter((field) => source[field] !== undefined).map((field) => [field, source[field]]));
 
 const copyProblem = ({ sourceViewId, title, settings }) => {

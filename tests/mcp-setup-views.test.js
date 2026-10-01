@@ -184,7 +184,7 @@ describe('who may ask for a view', () => {
             expect(await rpc(as(uid), TOOL, { projectId, name: 'Nowhere' })).toMatchObject({ refused: true, reason: NO_PROJECT });
         }
         expect(await rpc({ ...as(INSIDER), projectIds: narrowed(INSIDER, [P_OPEN]).projectIds }, TOOL, { projectId: P_PRIVATE, name: 'Nowhere' })).toMatchObject({ refused: true, reason: NO_PROJECT });
-        expect((await rpc(readOnly(OWNER), TOOL, { projectId: P_OPEN, name: 'Nowhere' })).rpcError).toMatchObject({ code: -32004 });
+        expect(await rpc(readOnly(OWNER), TOOL, { projectId: P_OPEN, name: 'Nowhere' })).toMatchObject({ isError: true, error: 'This token is read-only.' });
         expect(waiting()).toHaveLength(0);
     });
 

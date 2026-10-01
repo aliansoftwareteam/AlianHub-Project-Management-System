@@ -194,7 +194,7 @@ describe('who may ask for a field', () => {
             expect(await rpc(as(uid), TOOL, args(projectId))).toMatchObject({ refused: true, reason: NO_PROJECT });
         }
         expect(await rpc({ ...as(INSIDER), projectIds: narrowed(INSIDER, [P_OPEN]).projectIds }, TOOL, args(P_PRIVATE))).toMatchObject({ refused: true, reason: NO_PROJECT });
-        expect((await rpc(readOnly(OWNER), TOOL, args(P_OPEN))).rpcError).toMatchObject({ code: -32004 });
+        expect(await rpc(readOnly(OWNER), TOOL, args(P_OPEN))).toMatchObject({ isError: true, error: 'This token is read-only.' });
         expect(waiting()).toHaveLength(0);
     });
 
