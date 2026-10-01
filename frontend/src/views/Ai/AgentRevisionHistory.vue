@@ -156,8 +156,8 @@ onMounted(load);
 .ai-revisions__lead { margin: 6px 0 12px; }
 .ai-revisions__scroll { overflow-x: auto; }
 .ai-revisions__table { width: 100%; border-collapse: collapse; font: var(--text-small); }
-.ai-revisions__table th { text-align: left; font-weight: 600; color: var(--ink-2); padding: 6px 8px; border-bottom: 1px solid var(--hairline); white-space: nowrap; }
-.ai-revisions__table td { padding: 8px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+.ai-revisions__table th { text-align: left; font-weight: 600; color: var(--ink-2); padding: 6px var(--cell-pad-x, 8px); border-bottom: 1px solid var(--hairline); white-space: nowrap; }
+.ai-revisions__table td { padding: var(--table-pad-y, 8px) var(--cell-pad-x, 8px); font-size: var(--row-font, 12.5px); border-bottom: 1px solid var(--hairline); vertical-align: top; }
 .ai-revisions__pick { width: 44px; text-align: center; }
 .ai-revisions__row.is-live { background: var(--brand-tint); }
 .ai-revisions__row.is-highlight td { box-shadow: inset 3px 0 0 var(--brand); }
