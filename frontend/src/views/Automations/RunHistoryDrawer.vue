@@ -23,7 +23,7 @@
                                 <span data-test="run-when">{{ when(run) }}</span>
                                 <span class="ah-mono" data-test="run-duration">{{ duration(run) ? $t(duration(run).key, { n: duration(run).n }) : '—' }}</span>
                             </div>
-                            <div class="ah-small au-runs__trigger" data-test="run-trigger">{{ triggerLabel(run.eventType) }}</div>
+                            <div class="ah-small au-runs__trigger" data-test="run-trigger">{{ triggerText(run.eventType, $t) }}</div>
                             <div class="au-runs__task" data-test="run-task">
                                 <button v-if="taskOf(run).id" type="button" class="au-runs__key ah-mono" @click="openRunTask(run)">{{ taskOf(run).key || '—' }}</button>
                                 <span v-else class="ah-mono">—</span>
@@ -34,8 +34,9 @@
                                 <span v-if="stoppedAt(run)" class="ah-small">{{ $t('Automations.stopped_at_condition', { id: stoppedAt(run) }) }}</span>
                                 <ul v-if="actionSteps(run).length" class="au-runs__steps">
                                     <li v-for="step in actionSteps(run)" :key="step.id">
-                                        {{ actionLabel(step.action) }}<template v-if="step.output && step.output.changed === false"> · {{ $t('Automations.step_no_change') }}</template>
+                                        {{ actionText(step.action, $t) }}<template v-if="step.output && step.output.changed === false"> · {{ $t('Automations.step_no_change') }}</template>
                                         <template v-if="step.output && step.output.assigned && step.output.assigned.length"> · {{ $t('Automations.assign_assigned', { people: assignPeopleText(step.output.assigned, $t) }) }}</template>
+                                        <template v-if="step.output && step.output.notified && step.output.notified.length"> · {{ $t('Automations.notify_notified', { people: assignPeopleText(step.output.notified, $t) }) }}</template>
                                         <template v-if="step.output && step.output.skipped && step.output.skipped.length"> · <span data-test="run-skipped">{{ assignSkippedText(step.output.skipped, $t) }}</span></template>
                                         <span v-if="step.error" class="au-runs__error"> · {{ step.error }}</span>
                                     </li>
@@ -58,6 +59,7 @@ import * as env from '@/config/env';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { assignPeopleText, assignSkippedText } from './assignText';
+import { triggerLabel, actionLabel } from './registryText';
 
 defineOptions({ name: 'RunHistoryDrawer' });
 
@@ -98,8 +100,8 @@ const duration = (run) => {
     return { key: 'Automations.duration_min', n: Number((ms / 60000).toFixed(1)) };
 };
 
-const triggerLabel = (eventType) => props.triggers.find((trigger) => trigger.key === eventType)?.label || eventType || '—';
-const actionLabel = (key) => props.actions.find((action) => action.key === key)?.label || key;
+const triggerText = (eventType, t) => triggerLabel(props.triggers.find((trigger) => trigger.key === eventType), t) || eventType || '—';
+const actionText = (key, t) => actionLabel(props.actions.find((action) => action.key === key), t) || key;
 
 const taskOf = (run) => {
     const entity = run.entity || {};

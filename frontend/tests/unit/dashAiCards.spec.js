@@ -1,6 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
-import { reactive } from 'vue';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { enableAutoUnmount, flushPromises } from '@vue/test-utils';
 
 const { apiRequest, openTask } = vi.hoisted(() => ({ apiRequest: vi.fn(), openTask: vi.fn() }));
 
@@ -10,16 +9,17 @@ vi.mock('@/components/organisms/TaskDetailOverlay/useTaskOverlay', () => ({ open
 
 import AtRiskTodayCard from '@/components/organisms/AtRiskTodayCard/AtRiskTodayCard.vue';
 import AgentSpendCard from '@/components/organisms/AgentSpendCard/AgentSpendCard.vue';
-import { CARD_META_KEY } from '@/components/organisms/DashboardCard/useCardMeta';
 import { catalogEntry, isBuiltCard } from '@/plugins/dashboard/cardCatalog';
 import { cardComponent } from '@/plugins/dashboard/cardRegistry';
 import { AI_STATE, applyAiAvailability, resetAiAvailability } from '@/composable/aiAvailability';
+import { mountInShell } from '../cardInShell';
+
+enableAutoUnmount(afterEach);
 
 const mountCard = async (component) => {
-    const meta = reactive({ state: 'loading', note: '', updatedAt: null, emptyText: '', emptyAction: '' });
-    const wrapper = mount(component, { global: { provide: { [CARD_META_KEY]: meta } } });
+    const { wrapper, shown } = mountInShell(component);
     await flushPromises();
-    return { wrapper, meta };
+    return { wrapper, shown };
 };
 
 describe('the dashboard catalogue', () => {
@@ -42,9 +42,9 @@ describe('At-risk card', () => {
 
     it('asks the at-risk endpoint in the viewer\'s time zone and lists each task with its reason', async () => {
         apiRequest.mockResolvedValue({ data: { status: true, data: { counts: { overdue: 1, blocked: 1, stalled: 0, total: 2 }, tasks: [row('a'), row('b', { reasons: ['blocked'], daysLate: 0 })] } } });
-        const { wrapper, meta } = await mountCard(AtRiskTodayCard);
+        const { wrapper, shown } = await mountCard(AtRiskTodayCard);
         expect(apiRequest).toHaveBeenCalledWith('post', '/api/v1/dashboard/at-risk', { tz: expect.any(Number) });
-        expect(meta.state).toBe('ready');
+        expect(shown.state).toBe('ready');
         expect(wrapper.find('[data-test="risk-total"]').text()).toBe('2');
         const items = wrapper.findAll('[data-test="risk-row"]');
         expect(items).toHaveLength(2);
@@ -61,14 +61,14 @@ describe('At-risk card', () => {
 
     it('is empty when nothing is at risk', async () => {
         apiRequest.mockResolvedValue({ data: { status: true, data: { counts: { overdue: 0, blocked: 0, stalled: 0, total: 0 }, tasks: [] } } });
-        const { meta } = await mountCard(AtRiskTodayCard);
-        expect(meta.state).toBe('empty');
+        const { shown } = await mountCard(AtRiskTodayCard);
+        expect(shown.state).toBe('empty');
     });
 
     it('reports an error it cannot read past', async () => {
         apiRequest.mockRejectedValue(new Error('down'));
-        const { meta } = await mountCard(AtRiskTodayCard);
-        expect(meta.state).toBe('error');
+        const { shown } = await mountCard(AtRiskTodayCard);
+        expect(shown.state).toBe('error');
     });
 });
 
@@ -87,9 +87,9 @@ describe('Agent spend card', () => {
             { agentId: 'a2', name: 'Triage', usd: 31, cap: 30, paused: true },
             { agentId: 'a3', name: 'Uncapped', usd: 4, cap: 0, paused: false },
         ]));
-        const { wrapper, meta } = await mountCard(AgentSpendCard);
+        const { wrapper, shown } = await mountCard(AgentSpendCard);
         expect(apiRequest).toHaveBeenCalledWith('get', '/api/v2/agents/spend');
-        expect(meta.state).toBe('ready');
+        expect(shown.state).toBe('ready');
         expect(wrapper.find('[data-test="spend-total"]').text()).toBe('$47.50');
         expect(wrapper.find('[data-test="spend-cap"]').text()).toContain('Dash.spend_of_caps');
         const rows = wrapper.findAll('[data-test="spend-row"]');
@@ -101,21 +101,21 @@ describe('Agent spend card', () => {
 
     it('is empty when the workspace has no agents', async () => {
         apiRequest.mockResolvedValue(spend([]));
-        const { meta } = await mountCard(AgentSpendCard);
-        expect(meta.state).toBe('empty');
+        const { shown } = await mountCard(AgentSpendCard);
+        expect(shown.state).toBe('empty');
     });
 
     it('says AI is off rather than asking for spend', async () => {
         applyAiAvailability({ state: AI_STATE.OFF_INSTANCE });
-        const { meta } = await mountCard(AgentSpendCard);
+        const { shown } = await mountCard(AgentSpendCard);
         expect(apiRequest).not.toHaveBeenCalled();
-        expect(meta.state).toBe('empty');
-        expect(meta.emptyText).toBe('Dash.spend_ai_off');
+        expect(shown.state).toBe('empty');
+        expect(shown.emptyText).toBe('Dash.spend_ai_off');
     });
 
     it('reports an error it cannot read past', async () => {
         apiRequest.mockRejectedValue(new Error('down'));
-        const { meta } = await mountCard(AgentSpendCard);
-        expect(meta.state).toBe('error');
+        const { shown } = await mountCard(AgentSpendCard);
+        expect(shown.state).toBe('error');
     });
 });

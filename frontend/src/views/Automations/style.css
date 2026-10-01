@@ -65,6 +65,8 @@ div.au__errors ul { margin: 4px 0 0; padding-left: 14px; }
 .au__x { border: 0; background: none; color: var(--ink-2); font-size: 17px; line-height: 1; cursor: pointer; padding: 0 4px; }
 .au__x:hover { color: var(--danger-ink); }
 .au__warn { margin: 0; font: var(--text-small); color: var(--warn-ink); background: var(--warn-bg); border-radius: 6px; padding: 7px 10px; }
+.au__help { margin: 0; color: var(--ink-2); overflow-wrap: anywhere; }
+.au-notify__message { min-width: 200px; flex: 1 1 200px; }
 .au__save { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .au-assign { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .au-assign__people { display: inline-block; min-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

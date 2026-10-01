@@ -65,7 +65,7 @@ const activePto = async (companyId) => {
     return rows || [];
 };
 
-/* The filter the viewer's own task list applies: {} for company-wide readers. */
+/* The filter the viewer's own task list applies; it names no ProjectID for company-wide readers. */
 const taskFilterFor = async (companyId, viewerId) => {
     const stage = await visibilityStage(companyId, viewerId);
     return stage ? stage.$match : {};

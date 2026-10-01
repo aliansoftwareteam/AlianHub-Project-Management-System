@@ -198,7 +198,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, provide, onMounted, onBeforeUnmount, inject } from 'vue';
+import { ref, reactive, computed, provide, watch, onMounted, onBeforeUnmount, inject } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
@@ -452,22 +452,46 @@ const destroy = async () => {
 const closeMenus = () => { menuOpen.value = false; };
 
 const load = async () => {
+    const id = route.params.dashboardId;
+    const isStale = () => route.params.dashboardId !== id;
     loading.value = true;
+    loadError.value = '';
     try {
-        const doc = await fetchDashboard(route.params.dashboardId);
+        const doc = await fetchDashboard(id);
+        if (isStale()) return;
         dashboard.value = doc || {};
         const all = Array.isArray(doc && doc.cards) ? doc.cards : [];
         const renderable = all.filter((c) => cardComponent(c.componentId));
         hiddenCount.value = all.length - renderable.length;
         cards.value = renderable.map(toLayoutItem);
     } catch (e) {
+        if (isStale()) return;
         loadError.value = (e && e.response && e.response.status === 403)
             ? t('Dash.no_access')
             : t('Dash.load_failed');
     } finally {
-        loading.value = false;
+        if (!isStale()) loading.value = false;
     }
 };
+
+const showAnotherDashboard = () => {
+    dashboard.value = { title: '', canEdit: false, visibility: 'private', ownerName: '' };
+    cards.value = [];
+    hiddenCount.value = 0;
+    locked.value = true;
+    moving.value = false;
+    menuOpen.value = false;
+    pickerOpen.value = false;
+    settingsOpen.value = false;
+    settingsCard.value = null;
+    Object.keys(refreshKeys).forEach((uid) => delete refreshKeys[uid]);
+    load();
+};
+
+// The router reuses this view when only the dashboard id changes, so nothing remounts.
+watch(() => route.params.dashboardId, (id, previous) => {
+    if (id && id !== previous) showAnotherDashboard();
+});
 
 onMounted(() => {
     document.addEventListener('click', closeMenus);

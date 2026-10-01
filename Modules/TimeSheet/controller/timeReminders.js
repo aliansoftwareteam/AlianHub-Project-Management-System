@@ -6,6 +6,7 @@ const reminderSettings = require("../helpers/reminderSettings");
 const logger = require("../../../Config/loggerConfig");
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const { isPrivileged } = require('../../../Config/roleTypes');
+const { ACTIVE_SEAT } = require('../../../Config/seatStatus');
 const { companyWorkingDays } = require('../../Company/helpers/companyWeek');
 
 // TIME-06 — time-entry reminders. A daily nudge (prod cron) to members who
@@ -93,7 +94,7 @@ const isCompanyOwner = async (companyId, userId) => {
     try {
         const record = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMPANY_USERS,
-            data: [{ userId: String(userId) }, { _id: 1, roleType: 1 }],
+            data: [{ userId: String(userId), ...ACTIVE_SEAT }, { _id: 1, roleType: 1 }],
         }, 'findOne');
         // Owner (1) or Admin (2) may manage this setting.
         return !!record && isPrivileged(Number(record.roleType));

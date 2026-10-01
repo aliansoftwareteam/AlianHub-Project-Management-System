@@ -78,7 +78,7 @@
                     <span class="fb__panel-kind">{{ $t('Fields.type_ai') }}</span>
                 </div>
                 <AiFieldPanel v-model="aiDraft" :errors="errors" />
-                <FieldTaskTypesPicker v-model="aiDraft.fieldTaskTypes" />
+                <FieldTaskTypesPicker v-model="aiDraft.fieldTaskTypes" :projectIds="selectedProjectIds" />
                 <div class="fb__warn">{{ $t('AiFields.builder_note') }}</div>
                 <div class="fb__panel-foot">
                     <button type="button" class="ah-btn ah-btn--primary fb__save" data-ai-field-save :disabled="saving" @click="saveAi">
@@ -167,7 +167,7 @@
 
                 <component :is="draftUi.settings" v-if="draftUi?.settings" v-model="draft" :error="errors.settings" />
 
-                <FieldTaskTypesPicker v-model="draft.fieldTaskTypes" />
+                <FieldTaskTypesPicker v-model="draft.fieldTaskTypes" :projectIds="selectedProjectIds" />
 
                 <div class="fb__warn">{{ draftNote }}</div>
 
@@ -212,7 +212,7 @@ import UpgradePlan from "@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import CustomFieldsSidebarComponent from "../../molecules/customFieldSidebar/customFieldsSidebarComponent/customFieldsSidebarComponent.vue";
 import AiFieldPanel from "./AiFieldPanel.vue";
 import FieldTaskTypesPicker from "../../atom/FieldTaskTypesPicker/FieldTaskTypesPicker.vue";
-import { useTaskTypeOptions } from "@/plugins/customFieldView/taskTypeOptions";
+import { fieldProjectIds, useTaskTypeOptions } from "@/plugins/customFieldView/taskTypeOptions";
 import { fieldTaskTypes } from "@fieldTaskTypes";
 import { typeModuleOf } from "@fieldTypes";
 import { fieldTypeUi } from "@/plugins/customFieldView/fieldTypes";
@@ -272,6 +272,7 @@ const fields = computed(() => (getters["settings/finalCustomFields"] || [])
     .sort((a, b) => new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime()));
 
 const taskTypeOptionList = useTaskTypeOptions();
+const selectedProjectIds = computed(() => fieldProjectIds(fields.value.find((field) => selectedId.value && field._id === selectedId.value)));
 const taskTypeNames = computed(() => new Map(taskTypeOptionList.value.map((option) => [option.key, option.name])));
 
 const numericFields = computed(() => fields.value.filter((field) => NUMERIC_TYPES.includes(field.fieldType) && field._id !== draft.value?._id));

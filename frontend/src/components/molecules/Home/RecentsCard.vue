@@ -91,8 +91,8 @@ onMounted(load);
 .hrec__row:focus-visible { outline: none; box-shadow: var(--focus); }
 .hrec__icon { flex: none; color: var(--ink-2); }
 .hrec__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
-.hrec__title { font: 500 13px/1.35 var(--font-ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hrec__meta { font: 400 11.5px/1.3 var(--font-ui); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hrec__title { font: 500 var(--fs-md, 13px)/1.35 var(--font-ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hrec__meta { font: 400 var(--fs-sm, 11.5px)/1.3 var(--font-ui); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 767px) {
     .hrec__row { min-height: 44px; }
     .hrec__hide { width: 44px; height: 44px; }
