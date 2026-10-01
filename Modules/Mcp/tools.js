@@ -20,6 +20,7 @@ const dataTools = require('./dataTools');
 const manageFlag = require('./manageFlag');
 const manageTools = require('./manageTools');
 const workTools = require('./workTools');
+const workFlag = require('./workFlag');
 const argsSchema = require('./argsSchema');
 const { taskRow, planRow } = require('./taskRows');
 
@@ -91,12 +92,16 @@ const TOOLS = [
             if (args.query) filter.TaskName = { $regex: str(args.query, 120).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
             if (args.status) filter.status = { $regex: `^${str(args.status, 60)}$`, $options: 'i' };
             const planning = managesTasks(ctx);
+            const named = args.sprintId !== undefined && args.sprintId !== '';
+            const inList = workFlag.enabled() && named ? await workTools.listRows(ctx, vis, args.sprintId) : null;
+            if (inList && inList.error) return { error: inList.error };
             if (planning) {
-                const more = manageTools.searchFilter(args);
+                const more = manageTools.searchFilter(inList ? { ...args, sprintId: undefined } : args);
                 if (more.error) return { error: more.error };
                 // Added beside the caller's own clause: a filter on the same field must narrow it, never replace it.
                 filter.$and = [...(filter.$and || []), more.filter];
             }
+            if (inList) filter.$and = [...(filter.$and || []), inList.filter];
             const row = planning ? planRow : taskRow;
             if (v2.enabled()) return taskPage(ctx, 'tasks.search', args, filter, { updatedAt: -1, _id: -1 }, row);
             const rows = await MongoDbCrudOpration(ctx.companyId, {
@@ -249,6 +254,7 @@ const FLAGGED_TOOLS = [
     },
 ];
 
+const SEARCH_BY_LIST = 'Search tasks you can see by text, status, project or list. A list answers the tasks that live in it and the tasks added to it.';
 const SEARCH_FOR_PLANNING = 'Search tasks you can see by text, status, project, list, assignee or due date. Each task carries its assignees, dates, estimate, subtask count and the tasks above it.';
 
 const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...dataTools.offered(), ...manageTools.offered(), ...workTools.offered(), ...sessionTools.offered()];
@@ -262,10 +268,12 @@ const holdsGrantFor = (ctx, tool) => !tool.grant || manageFlag.mayUse(ctx, tool.
 const formFor = (ctx, tool) => {
     const variant = manageTools.variantOf(tool.name);
     if (variant && holdsGrantFor(ctx, variant)) return variant;
-    if (tool.name === 'tasks.search' && managesTasks(ctx)) {
-        return { ...tool, description: SEARCH_FOR_PLANNING, input: { ...tool.input, properties: { ...tool.input.properties, ...manageTools.SEARCH_INPUT } } };
-    }
-    return tool;
+    if (tool.name !== 'tasks.search') return tool;
+    const planning = managesTasks(ctx);
+    const byList = workFlag.enabled();
+    if (!planning && !byList) return tool;
+    const more = { ...(planning ? manageTools.SEARCH_INPUT : {}), ...(byList ? workTools.SEARCH_INPUT : {}) };
+    return { ...tool, description: planning ? SEARCH_FOR_PLANNING : SEARCH_BY_LIST, input: { ...tool.input, properties: { ...tool.input.properties, ...more } } };
 };
 
 const toolsFor = (ctx) => offered().filter((tool) => holdsGrantFor(ctx, tool)).map((tool) => formFor(ctx, tool));

@@ -77,6 +77,7 @@ const place = (id, lists, addedBy = OWNER) => {
     task(id).extraLists = lists.map((sprintId) => ({ projectId: PROJECT_OF[sprintId] || P_OPEN, sprintId, addedBy, addedAt: new Date('2026-09-30T00:00:00.000Z') }));
 };
 const into = (taskId, sprintId, extra = {}) => ({ taskId, projectId: PROJECT_OF[sprintId], sprintId, ...extra });
+const paramsOf = ({ taskId, projectId, sprintId }) => ({ taskId, listProjectId: projectId, sprintId });
 const tasksNow = () => JSON.stringify(mockDb.store[SCHEMA_TYPE.TASKS]);
 const inProduct = (uid) => ({ kind: 'agent', userId: uid, agentName: 'Workspace agent' });
 const found = async (caller, args) => ((await rpc(caller, 'tasks.search', { limit: 50, ...args })).tasks || []).map((row) => row.taskId).sort();
@@ -132,7 +133,7 @@ describe('task.lists.add', () => {
         expect(placed(T_OPEN)).toEqual(placed(T_TWIN));
         expect(placed(T_OPEN)).toEqual([[P_OPEN, L_OPEN_2, INSIDER]]);
         expect(task(T_OPEN).sprintId).toBe(L_OPEN);
-        expect(audits('task.lists.add', 'applied')[0].meta).toMatchObject({ onBehalfOf: INSIDER, undo: { kind: 'extraList', taskId: T_OPEN, projectId: P_OPEN, sprintId: L_OPEN_2, operation: 'add' } });
+        expect(audits('task.lists.add', 'applied')[0].meta).toMatchObject({ onBehalfOf: INSIDER, undo: { kind: 'extraList', taskId: T_OPEN, listProjectId: P_OPEN, sprintId: L_OPEN_2, operation: 'add' } });
     });
 
     it.each(EVERYONE)('lets %s add a task of the open list to another open list', async (label, uid) => {
@@ -222,6 +223,20 @@ describe('task.lists.add', () => {
         await settle();
         expect(placed(T_OPEN)).toEqual([]);
     });
+
+    it('is not undone by a person who can open the list but not the task\'s home', async () => {
+        await rpc(ctx(INSIDER), 'task.lists.add', into(T_PRIVATE, L_OPEN));
+        const [row] = audits('task.lists.add', 'applied');
+        expect(await undoStateOf(CID, row, { userId: OUTSIDER }, { undoHours: 24, run: null })).toMatchObject({ undoable: false, projectId: P_PRIVATE });
+        expect(await undoStateOf(CID, row, { userId: INSIDER }, { undoHours: 24, run: null })).toMatchObject({ undoable: true, projectId: P_PRIVATE });
+    });
+
+    it('is not undone by a person who can open the task but not the list', async () => {
+        await rpc(ctx(INSIDER), 'task.lists.add', into(T_OPEN, L_PRIVATE));
+        const [row] = audits('task.lists.add', 'applied');
+        expect(await undoStateOf(CID, row, { userId: OUTSIDER }, { undoHours: 24, run: null })).toMatchObject({ undoable: false, reason: 'target_not_visible', projectId: P_OPEN });
+        expect(await undoStateOf(CID, row, { userId: INSIDER }, { undoHours: 24, run: null })).toMatchObject({ undoable: true });
+    });
 });
 
 describe('task.lists.remove', () => {
@@ -234,7 +249,7 @@ describe('task.lists.remove', () => {
         expect(placed(T_OPEN)).toEqual(placed(T_TWIN));
         expect(placed(T_OPEN)).toEqual([[P_PRIVATE, L_PRIVATE, OWNER]]);
         const [row] = audits('task.lists.remove', 'applied');
-        expect(row.meta).toMatchObject({ onBehalfOf: OUTSIDER, undo: { kind: 'extraList', taskId: T_OPEN, projectId: P_OPEN, sprintId: L_OPEN_2, operation: 'remove' } });
+        expect(row.meta).toMatchObject({ onBehalfOf: OUTSIDER, undo: { kind: 'extraList', taskId: T_OPEN, listProjectId: P_OPEN, sprintId: L_OPEN_2, operation: 'remove' } });
         await inverses.extraList(CID, row.meta.undo, { userId: OUTSIDER });
         await settle();
         expect(placed(T_OPEN)).toEqual([[P_PRIVATE, L_PRIVATE, OWNER], [P_OPEN, L_OPEN_2, OUTSIDER]]);
@@ -377,9 +392,22 @@ describe('the actions, reached without an MCP token', () => {
         await expect(perform('task.lists.add', { taskId: T_OPEN, sprintId: L_PRIVATE })).rejects.toThrow('List not found');
         await expect(perform('task.lists.add', { taskId: T_OPEN, sprintId: L_SECRET })).rejects.toThrow('List not found');
         await expect(perform('task.lists.add', { taskId: T_OPEN, sprintId: MISSING })).rejects.toThrow('List not found');
-        await expect(perform('task.lists.add', { taskId: T_OPEN, projectId: P_OPEN, sprintId: L_PRIVATE })).rejects.toThrow('that list was not found in that project');
         await expect(perform('task.lists.remove', { taskId: T_SECRET, sprintId: L_OPEN })).rejects.toThrow('Task not found');
+        await expect(perform('task.lists.remove', { taskId: T_PRIVATE, sprintId: L_OPEN })).rejects.toThrow('Task not found');
         expect(tasksNow()).toBe(before);
+    });
+
+    it('answer a list named beside a project it is not in as the route answers a list that is not there', async () => {
+        place(T_OPEN, [L_PRIVATE]);
+        const before = tasksNow();
+        const perform = (action, params) => actions.perform({ companyId: CID, actor: inProduct(INSIDER), action, params });
+        await expect(perform('task.lists.add', { taskId: T_OPEN, listProjectId: P_PRIVATE, sprintId: L_OPEN_2 })).rejects.toThrow('List not found');
+        await expect(perform('task.lists.add', { taskId: T_OPEN, listProjectId: P_OPEN, sprintId: MISSING })).rejects.toThrow('List not found');
+        await expect(perform('task.lists.remove', { taskId: T_OPEN, listProjectId: P_OPEN, sprintId: L_PRIVATE })).rejects.toThrow('The task is not in that list.');
+        expect(tasksNow()).toBe(before);
+        expect(await perform('task.lists.add', { taskId: T_OPEN, sprintId: L_OPEN_2 })).toMatchObject({ result: { taskId: T_OPEN, projectId: P_OPEN, sprintId: L_OPEN_2, added: true } });
+        expect(await perform('task.lists.remove', { taskId: T_OPEN, sprintId: L_PRIVATE })).toMatchObject({ result: { projectId: P_PRIVATE, removed: true } });
+        expect(placed(T_OPEN)).toEqual([[P_OPEN, L_OPEN_2, INSIDER]]);
     });
 });
 
@@ -400,15 +428,22 @@ describe('an outside client under taint routing', () => {
         const before = tasksNow();
         expect(await rpc(outside(OWNER, ['tasks:write', 'tasks:manage']), 'task.lists.add', { ...args, reason: 'Planned for the launch too' })).toMatchObject({ ok: false, pending: true, proposalId: 'proposal-1' });
         expect(proposals.create).toHaveBeenCalledWith(CID, expect.objectContaining({
-            source: 'mcp', requestedBy: OWNER, tokenId: '', changes: [expect.objectContaining({ action: 'task.lists.add', params: args })],
+            source: 'mcp', requestedBy: OWNER, tokenId: '', changes: [expect.objectContaining({ action: 'task.lists.add', params: paramsOf(args) })], taskId: T_OPEN, projectId: null,
         }));
         expect(tasksNow()).toBe(before);
 
+        const filed = (uid, at) => filedBy(uid, 'task.lists.add', paramsOf(at));
         seedGrant(OUTSIDER, ['tasks:write', 'tasks:manage']);
-        expect(await decided(filedBy(OUTSIDER, 'task.lists.add', args))).toBeNull();
-        expect(await decided(filedBy(OUTSIDER, 'task.lists.add', into(T_OPEN, L_PRIVATE)))).toMatchObject({ status: 403, error: expect.stringMatching(/can no longer open/) });
-        expect(await decided(filedBy(OUTSIDER, 'task.lists.add', into(T_SECRET, L_OPEN_2)))).toMatchObject({ status: 403, error: expect.stringMatching(/can no longer open/) });
-        expect(await decided(filedBy(OUTSIDER, 'task.lists.add', args), GUEST)).toBeNull();
-        expect(await decided(filedBy(INSIDER, 'task.lists.add', into(T_OPEN, L_PRIVATE)), GUEST)).toMatchObject({ status: 403 });
+        expect(await decided(filed(OUTSIDER, args))).toBeNull();
+        expect(await decided(filed(OUTSIDER, into(T_OPEN, L_PRIVATE)))).toMatchObject({ status: 403, error: expect.stringMatching(/can no longer open/) });
+        expect(await decided(filed(OUTSIDER, into(T_SECRET, L_OPEN_2)))).toMatchObject({ status: 403, error: expect.stringMatching(/can no longer open/) });
+        expect(await decided(filed(OUTSIDER, args), GUEST)).toBeNull();
+        expect(await decided(filed(OUTSIDER, into(T_OPEN, L_SECRET)))).toMatchObject({ status: 403, error: expect.stringMatching(/can no longer open/) });
+
+        mockDb.store[SCHEMA_TYPE.OAUTH_GRANTS].length = 0;
+        mockDb.store[SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS].length = 0;
+        seedGrant(INSIDER, ['tasks:write', 'tasks:manage']);
+        expect(await decided(filed(INSIDER, into(T_OPEN, L_PRIVATE)))).toBeNull();
+        expect(await decided(filed(INSIDER, into(T_OPEN, L_PRIVATE)), GUEST)).toMatchObject({ status: 403, error: expect.stringMatching(/approver cannot open/) });
     });
 });

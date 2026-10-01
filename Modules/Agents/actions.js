@@ -117,6 +117,10 @@ const FLAGGED_RATINGS = Object.freeze({
     'goal.target.set': write(SCOPE.WORKSPACE),
     'goal.target.sources.add': write(SCOPE.WORKSPACE),
     'goal.target.sources.remove': write(SCOPE.WORKSPACE),
+    'task.lists.list': read(SCOPE.TASK),
+    // The other list may sit in another project.
+    'task.lists.add': write(SCOPE.PROJECT),
+    'task.lists.remove': write(SCOPE.PROJECT),
     'slack.message.post': write(SCOPE.WORKSPACE, false),
 });
 
