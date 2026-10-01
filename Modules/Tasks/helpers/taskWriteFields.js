@@ -14,7 +14,7 @@ const { tenantOf, TenantError } = require('../../../Config/tenant');
 const { canReadTask } = require('./taskReadAccess');
 const { loadSubtree } = require('./taskTree');
 const { CANNOT_OPEN_PROJECT, peopleWhoOpen, cannotOpen } = require('../../../Config/projectPeople');
-const { openProject, isChatSpace, listOf, listRef, readableTaskIds, coveredByMapping, moveMappingInto } = require('./taskWritePlacement');
+const { openProject, isChatSpace, listOf, listRef, readableTaskIds, flatStatus, coveredByMapping, moveMappingInto } = require('./taskWritePlacement');
 
 const { IMPORT_MARK_FIELDS } = require('./importMark');
 
@@ -158,8 +158,8 @@ const holdsTaskType = (payload, stored) => {
  * project. `actor` are the params that receive the signed-in user. `strict` refuses a body key the action does not
  * take, for an action no existing client sends extra fields to.
  */
-const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, others = [], listed = null, project = [], taskIds = [], taskNames = [], projectNames = [], stored = false, held = null, destination = null, chat = null, list = null, mapping = null, attachments = null, people = null, carries = [], landing = null, strict = false, actor }) => Object.freeze({
-    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, others, listed, project, taskIds, taskNames, projectNames, stored, held, destination, chat, list, mapping, attachments, people, carries, landing, strict,
+const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, others = [], listed = null, project = [], taskIds = [], taskNames = [], projectNames = [], stored = false, status = null, held = null, destination = null, chat = null, list = null, mapping = null, attachments = null, people = null, carries = [], landing = null, strict = false, actor }) => Object.freeze({
+    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, others, listed, project, taskIds, taskNames, projectNames, stored, status, held, destination, chat, list, mapping, attachments, people, carries, landing, strict,
     actor: actor || (params.includes('userData') ? ['userData'] : []),
 });
 
@@ -208,7 +208,7 @@ const TASK_ACTION_FIELDS = Object.freeze({
     createSubTaskWithAi: spec({ params: ['companyId', 'userId', 'subTitles', 'sprintObj', 'projectData', 'userData', 'parentTask', 'type'], owns: PLACEMENT_FIELDS, company: [...companyId, ...projectCompany], ids: [['parentTask', 'id'], ['parentTask', 'ProjectID']], others: [['parentTask', 'id']], destination: ['parentTask', 'ProjectID'], list: { id: ['sprintObj', 'id'], ref: null } }),
     createMultipleTasks: spec({ params: ['tasks', 'userData', 'projectData', 'indexObj', 'statusArray', 'sprint', 'eventId'], owns: PLACEMENT_FIELDS, company: projectCompany, fieldNames: [['indexObj', 'indexName']], ids: PROJECT_DATA, objects: [['indexObj']], attachments: 'imported', people: PEOPLE.createMultipleTasks }),
 
-    updateStatus: spec({ params: ['newStatus', 'prevStatus', 'projectData', 'task', 'isUpdateTask', ...HISTORY_USER], writes: { newStatus: STATUS_FIELDS }, company: projectCompany, ids: [...TASK, ['prevStatus', 'taskId']], task: TASK[0], project: PROJECT_DATA, taskIds: [...TASK, ['prevStatus', 'taskId']], taskNames: [['prevStatus', 'taskName']], projectNames: PROJECT_DATA_NAME, held: holdsField(['newStatus', 'statusKey'], 'statusKey') }),
+    updateStatus: spec({ params: ['newStatus', 'prevStatus', 'projectData', 'task', 'isUpdateTask', ...HISTORY_USER], writes: { newStatus: STATUS_FIELDS }, status: ['newStatus'], company: projectCompany, ids: [...TASK, ['prevStatus', 'taskId']], task: TASK[0], project: PROJECT_DATA, taskIds: [...TASK, ['prevStatus', 'taskId']], taskNames: [['prevStatus', 'taskName']], projectNames: PROJECT_DATA_NAME, held: holdsField(['newStatus', 'statusKey'], 'statusKey') }),
     updatePriority: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'priorityObj', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['Task_Priority', 'Updated_At'] }, company: projectCompany, ids: [...TASK_DATA, ['priorityObj', 'taskId']], task: TASK_DATA[0], project: PROJECT_DATA, taskIds: [...TASK_DATA, ['priorityObj', 'taskId']], taskNames: [['priorityObj', 'taskName']], projectNames: PROJECT_DATA_NAME, held: holdsField(['firebaseObj', 'Task_Priority'], 'Task_Priority') }),
     updateDueDate: spec({ params: ['commonDateFormatString', 'timeZone', 'firebaseObj', 'project', 'task', 'obj', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['DueDate', 'dueDateDeadLine'] }, company: [['project', 'CompanyId']], ids: TASK, task: TASK[0], project: PROJECT, taskNames: [['task', 'TaskName']], projectNames: PROJECT_NAME, stored: true, held: holdsField(['firebaseObj', 'DueDate'], 'DueDate', sameInstant) }),
     updateStartDate: spec({ params: ['commonDateFormatString', 'timeZone', 'firebaseObj', 'project', 'task', 'obj', 'isUpdateTask', 'isHistory', ...HISTORY_USER], writes: { firebaseObj: ['startDate'] }, company: [['project', 'CompanyId']], ids: TASK, task: TASK[0], project: PROJECT, taskNames: [['task', 'TaskName']], projectNames: PROJECT_NAME, stored: true, held: holdsField(['firebaseObj', 'startDate'], 'startDate', sameInstant) }),
@@ -567,6 +567,19 @@ const keepListed = async (req, company, payload, { path, id }) => {
     return readable;
 };
 
+const NOT_A_PROJECT_STATUS = 'The status is not one of this project\'s statuses.';
+
+/* The body chooses a status by its key; its type and name are the ones the task's project stores for that key. */
+const statusAsStored = async (company, task, sent) => {
+    if (!isPlainObject(sent)) return sent;
+    const shown = isPlainObject(sent.status) ? sent.status : {};
+    const key = sent.statusKey === undefined ? shown.key : sent.statusKey;
+    const project = await storedProjectOf(company, String(task.ProjectID));
+    const stored = ((project && project.taskStatusData) || []).map(flatStatus).filter(Boolean).find((row) => isScalar(key) && key !== null && String(row.key) === String(key));
+    if (!stored) refuse(400, NOT_A_PROJECT_STATUS);
+    return { ...sent, statusKey: stored.key, statusType: stored.type, status: { ...shown, key: stored.key, text: stored.name, type: stored.type } };
+};
+
 const projectNotFound = () => new TaskWriteRefusal(404, 'Project not found');
 
 /* Where a create, move or copy lands: a project the caller can open and, when the action names one, a list
@@ -698,6 +711,7 @@ const prepareTaskRequest = async (req, taskSpec, label) => {
         }
         if (taskSpec.stored) payload.storedTask = stored;
         if (payload.isUpdateTask === false && !(taskSpec.held && taskSpec.held(payload, stored))) refuse(409, 'The task does not hold the change this request records.');
+        if (taskSpec.status) setAt(payload, taskSpec.status, await statusAsStored(company, stored, valueAt(payload, taskSpec.status)));
     }
     for (const path of taskSpec.others) {
         const otherId = valueAt(payload, path);

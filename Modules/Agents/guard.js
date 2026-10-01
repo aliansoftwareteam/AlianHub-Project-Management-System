@@ -5,6 +5,8 @@ const { resolveActor, isAgent } = require('./actor');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
+const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
+const { canReadProject } = require('../../Config/projectAccess');
 
 // Middleware that applies the registry to the ordinary REST routes when the
 // caller is an agent token. Humans pass straight through — the guard never
@@ -42,7 +44,9 @@ const storedRow = (companyId, type, id, fields) => (idText(id)
     ? MongoDbCrudOpration(companyId, { type, data: [{ _id: new mongoose.Types.ObjectId(idText(id)) }, fields] }, 'findOne')
     : null);
 
-const projectOfTask = async (companyId, taskId) => {
+/* The project of a task the person behind the token can open; a task they cannot open reads as a missing one. */
+const projectOfTask = async (companyId, uid, taskId) => {
+    if (!(await readableTaskIds(companyId, uid, [idText(taskId)])).length) return '';
     const task = await storedRow(companyId, SCHEMA_TYPE.TASKS, taskId, { ProjectID: 1 });
     return task && task.ProjectID ? String(task.ProjectID).toLowerCase() : '';
 };
@@ -63,9 +67,9 @@ const ARCHIVE_ACTIONS = { 0: 'task.restore', 2: 'task.archive' };
 
 /* The registry key, or keys, each task action is; every one must be allowed. An action absent here is refused. */
 const TASK_PATCH_ACTIONS = {
-    updateStatus: async (body, { companyId, taskId }) => {
+    updateStatus: async (body, { companyId, uid, taskId }) => {
         const sent = body.newStatus && typeof body.newStatus === 'object' ? body.newStatus : {};
-        const stored = await storedStatus(companyId, await projectOfTask(companyId, taskId), sent.statusKey);
+        const stored = await storedStatus(companyId, await projectOfTask(companyId, uid, taskId), sent.statusKey);
         return [stored, { statusType: sent.statusType, name: sent.status && sent.status.text }]
             .map((status) => ({ action: 'task.status.set', params: { taskId, status } }));
     },
@@ -81,8 +85,8 @@ const TASK_PATCH_ACTIONS = {
     updateTaskTotalEstimate: fields('totalEstimatedTime'),
     updateChecklists: fields('checklistArray'),
     updateTags: fields('tagsArray'),
-    moveTask: async (body, { companyId, taskId }) => {
-        const home = await projectOfTask(companyId, taskId);
+    moveTask: async (body, { companyId, uid, taskId }) => {
+        const home = await projectOfTask(companyId, uid, taskId);
         const stays = Boolean(home) && idText(body.projectData && body.projectData.id) === home;
         return { action: stays ? 'task.sprint.move' : 'task.move', params: { taskId } };
     },
@@ -103,15 +107,82 @@ const evaluateOnRoute = (action, params) => {
     return check;
 };
 
-/* `taskIdOf(body)` is the task the route's own preparation will write. */
-const taskPatchGuard = (taskIdOf) => withActor(async (req, res, next, actor) => {
+const plain = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
+const named = (value) => [].concat(value === undefined || value === null ? [] : value).map((entry) => idText(entry) || String(entry || '')).filter(Boolean);
+
+/* What a task an agent files may carry besides where it lands: the fields task.update lets it write afterwards. */
+const FILED_FIELDS = new Set([
+    ...registry.get('task.update').fields,
+    'CompanyId', 'ProjectID', 'sprintId', 'sprintArray', 'folderObjId', 'ParentTaskId', 'isParentTask',
+    'status', 'statusKey', 'statusType', 'TaskType', 'TaskTypeKey', 'AssigneeUserId', 'Task_Leader', 'watchers', 'deletedStatusKey',
+]);
+const OPENING_STATUS_TYPE = 'default_active';
+
+/* The project a new task names, when the person behind the token can open it; one they cannot open reads as a missing one. */
+const openProjectOf = async (companyId, uid, projectId) => {
+    if (!idText(projectId) || !(await canReadProject(companyId, uid, idText(projectId))).allowed) return null;
+    return storedRow(companyId, SCHEMA_TYPE.PROJECTS, projectId, { taskStatusData: 1, taskTypeCounts: 1 });
+};
+
+/* The fields of a new task that task.create does not cover: someone assigned, led or watching other than the
+ * person behind the token, a status other than the project's opening one, a type other than its first. */
+const fieldsBeyondFiling = async (companyId, uid, data) => {
+    const beyond = Object.keys(data).filter((field) => !FILED_FIELDS.has(field));
+    if (named(data.AssigneeUserId).length) beyond.push('AssigneeUserId');
+    ['Task_Leader', 'watchers'].forEach((field) => { if (named(data[field]).some((id) => id !== String(uid).toLowerCase())) beyond.push(field); });
+    if (data.deletedStatusKey !== undefined && data.deletedStatusKey !== 0) beyond.push('deletedStatusKey');
+
+    const sentStatus = plain(data.status);
+    const statusKey = data.statusKey === undefined ? sentStatus.key : data.statusKey;
+    const sentTypes = [data.statusType, sentStatus.type].filter((type) => type !== undefined);
+    const namesStatus = statusKey !== undefined || sentTypes.length > 0 || data.status !== undefined;
+    const namesType = data.TaskType !== undefined || data.TaskTypeKey !== undefined;
+    if (!namesStatus && !namesType) return beyond;
+
+    const project = await openProjectOf(companyId, uid, data.ProjectID);
+    const statuses = ((project && project.taskStatusData) || []).map(flatStatus).filter(Boolean);
+    const stored = statuses.find((status) => String(status.key) === String(statusKey));
+    const opening = Boolean(stored) && stored.type === OPENING_STATUS_TYPE && sentTypes.every((type) => type === OPENING_STATUS_TYPE)
+        && (sentStatus.key === undefined || String(sentStatus.key) === String(statusKey));
+    if (namesStatus && !opening) beyond.push('status');
+
+    const [firstType] = (project && project.taskTypeCounts) || [];
+    const sameType = Boolean(firstType)
+        && (data.TaskTypeKey === undefined || String(data.TaskTypeKey) === String(firstType.key))
+        && (data.TaskType === undefined || String(data.TaskType) === String(firstType.value));
+    if (namesType && !sameType) beyond.push('TaskType');
+    return beyond;
+};
+
+const taskCreateChecks = async (req, body, companyId) => {
+    const data = plain(body.data);
+    const kind = idText(data.ParentTaskId) ? 'subtask' : 'task';
+    const params = { projectId: idText(data.ProjectID), ...(kind === 'subtask' ? { taskId: idText(data.ParentTaskId) } : {}) };
+    const beyond = await fieldsBeyondFiling(companyId, req.uid, data);
+    if (!beyond.length) return { action: `${kind}.create`, params };
+    return { action: `${kind}.add`, params: { ...params, fields: Object.fromEntries(beyond.map((field) => [field, 1])) } };
+};
+
+const RELATION_ROUTE_ACTIONS = { list: 'task.get', openBlockers: 'task.get', add: 'task.relation.add', remove: 'task.relation.remove' };
+
+const relationChecks = (req, body) => {
+    const name = typeof body.action === 'string' && Object.hasOwn(RELATION_ROUTE_ACTIONS, body.action) ? body.action : '';
+    return { action: name ? RELATION_ROUTE_ACTIONS[name] : 'task.relation.unknown', params: { taskId: idText(body.taskId) } };
+};
+
+/* `checksOf(req, body, companyId)` names the registry action, or actions, the request is; every one must be
+ * allowed without a flag. A write is recorded, a read is not. */
+const routeGuard = (checksOf) => withActor(async (req, res, next, actor) => {
     const companyId = req.headers['companyid'] || '';
     const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const checks = await taskPatchChecks(body, { companyId, taskId: taskIdOf(body) });
+    const checks = [].concat(await checksOf(req, body, companyId));
+    let writes = false;
     for (const { action, params } of checks) {
         const check = evaluateOnRoute(action, params);
         if (!check.allowed) return refuse(req, res, actor, { action, reason: check.reason, params, entityId: params.taskId });
+        writes = writes || Boolean(check.action.write);
     }
+    if (!writes) return next();
     const [{ action, params }] = checks;
     let auditId;
     try {
@@ -127,6 +198,14 @@ const taskPatchGuard = (taskIdOf) => withActor(async (req, res, next, actor) => 
     });
     return next();
 });
+
+/* `taskIdOf(body)` is the task the route's own preparation will write. */
+const taskPatchGuard = (taskIdOf) => routeGuard((req, body, companyId) => taskPatchChecks(body, { companyId, uid: req.uid, taskId: taskIdOf(body) }));
+const taskCreateGuard = routeGuard(taskCreateChecks);
+const relationGuard = routeGuard(relationChecks);
+
+/* For a write route the registry has no action for: `action` names it in the refusal and its audit row. */
+const agentsRefused = (action) => routeGuard(() => ({ action, params: {} }));
 
 /* The perimeter: paths no agent token may reach whatever the body says. These
  * correspond to the actions absent from the registry. */
@@ -152,4 +231,4 @@ const agentPerimeter = withActor(async (req, res, next, actor) => {
     return refuse(req, res, actor, { action: hit.action, reason: `Agents cannot perform ${hit.action}`, params: {} });
 });
 
-module.exports = { taskPatchGuard, agentPerimeter, TASK_PATCH_ACTIONS };
+module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, agentsRefused, agentPerimeter, TASK_PATCH_ACTIONS };
