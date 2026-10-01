@@ -19,6 +19,8 @@
                 <p class="parity-lead">{{ $t('Parity.connections_lead') }}</p>
                 <p v-if="error" class="ah-field__error">{{ error }}</p>
 
+                <GoogleConnection v-if="hasGoogle && (view === 'all' || view === 'apps')" />
+
                 <div class="conn__grid">
                     <article v-for="card in visible" :key="card.key" class="ah-card conn__card">
                         <div class="conn__top">
@@ -82,6 +84,7 @@ import { apiRequest, apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AiSidebar from "@/views/Ai/AiSidebar.vue";
+import GoogleConnection from "./GoogleConnection.vue";
 
 // Connections (13e). Only what this workspace can actually connect to is listed:
 // the integrations catalogue the server serves, and the MCP server this product
@@ -96,6 +99,8 @@ const cid = computed(() => route.params.cid);
 const tabs = ["all", "apps", "mcp", "agents"];
 const view = ref("all");
 const catalog = ref([]);
+const connectors = ref([]);
+const hasGoogle = computed(() => connectors.value.includes("google_calendar"));
 const connections = ref([]);
 const mcpManifest = ref({});
 const minted = ref(null);
@@ -212,6 +217,7 @@ onMounted(async () => {
             apiRequestWithoutCompnay("get", env.MCP_MANIFEST)
         ]);
         catalog.value = cat?.data?.status ? cat.data.data || [] : [];
+        connectors.value = cat?.data?.status ? cat.data.connectors || [] : [];
         connections.value = conns?.data?.status ? conns.data.data || [] : [];
         mcpManifest.value = manifest?.data?.status ? manifest.data.data || {} : {};
         await loadTokens();
