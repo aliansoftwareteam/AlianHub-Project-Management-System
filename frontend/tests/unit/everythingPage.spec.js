@@ -450,3 +450,28 @@ describe('remembered settings', () => {
         expect(sentNames().at(-1)).toBe('all');
     });
 });
+
+/* Task 047, S-1: "My work" on the Simple rail is this page, opened narrowed to the person. */
+describe('My work', () => {
+    it('opens narrowed to the person when the address asks for it', async () => {
+        route.query = { mine: '1' };
+        await open();
+        expect(sent()).toHaveLength(1);
+        expect(sent()[0].filter.assignee).toEqual(['user-1']);
+        expect(test('evr-me').attributes('aria-pressed')).toBe('true');
+    });
+
+    it('narrows what was left on screen last time and keeps its other settings', async () => {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify({ group: 'status', assignee: ['6f0000000000000000000002'] }));
+        route.query = { mine: '1' };
+        await open();
+        expect(sent().at(-1)).toMatchObject({ group: 'status' });
+        expect(sent().at(-1).filter.assignee).toEqual(['user-1']);
+    });
+
+    it('leaves the page as it was without it', async () => {
+        await open();
+        expect(sent()[0].filter).not.toHaveProperty('assignee');
+        expect(test('evr-me').attributes('aria-pressed')).toBe('false');
+    });
+});

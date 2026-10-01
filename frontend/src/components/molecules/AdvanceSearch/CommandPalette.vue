@@ -251,6 +251,8 @@ const timesheetRoute = () => ['User Timesheet', 'project Timesheet', 'Workload T
 
 const NAV = computed(() => [
     { key: 'home', label: t('Shell.home'), icon: 'home', route: 'Home' },
+    { key: 'everything', label: t('Shell.everything'), icon: 'layers', route: 'Everything' },
+    { key: 'goals', label: t('Shell.goals'), icon: 'target', route: 'Goals' },
     { key: 'planner', label: t('Shell.planner'), icon: 'planner', route: 'Planner' },
     { key: 'chat', label: t('Shell.chat'), icon: 'chat', route: 'chats', show: allowed('chat') },
     { key: 'inbox', label: t('Inbox.title'), icon: 'inbox', route: 'inbox' },

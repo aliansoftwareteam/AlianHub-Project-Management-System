@@ -2626,8 +2626,10 @@ const schema = {
             viewedShortcuts: { type: Boolean, required: false },
             toursOffered: { type: [String], required: false, default: undefined }
         },
+        // mode has no default on purpose: see newAccountNavPreferences in Modules/Users/helpers/navPreferencesRules.js.
         navPreferences: {
-            pinned: { type: [String], required: false, default: undefined }
+            pinned: { type: [String], required: false, default: undefined },
+            mode: { type: String, required: false }
         },
         accessibilityPreferences: {
             singleKeyShortcuts: { type: Boolean, required: false }

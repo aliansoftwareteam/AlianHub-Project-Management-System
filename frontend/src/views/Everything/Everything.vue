@@ -137,7 +137,8 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted, onUnmounted, ref } from "vue";
+import { computed, inject, onMounted, onUnmounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
@@ -174,6 +175,7 @@ const DUE_LABELS = { overdue: "List.due_group_overdue", today: "List.due_group_t
 const FILTER_KEYS = ["search", "status", "assignee", "priority", "taskType", "projectIds", "due"];
 
 const store = useStore();
+const route = useRoute();
 const { t } = useI18n();
 const $toast = useToast();
 const { getUser } = useGetterFunctions();
@@ -350,23 +352,28 @@ useTaskSequenceSource(body);
 const stopOnTaskClosed = onTaskClosed(refresh);
 const onVisible = () => { if (document.visibilityState === "visible") refreshOnReturn(); };
 
+/* "My work" is this page asked for with ?mine=1: whatever else is on screen, it shows the person's own tasks. */
+const askedForMine = () => route.query.mine === "1" && Boolean(userId.value);
+watch(() => route.query.mine, () => { if (askedForMine() && !onlyMe.value) toggleMe(); });
+
 /* What was left on screen last time wins; a person who left nothing gets their default view. */
 onMounted(async () => {
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", refreshOnReturn);
+    const mine = askedForMine() ? { assignee: [userId.value] } : {};
     const working = readWorkingState(companyId.value, userId.value);
     if (working) {
         const available = dueWindows(new Date(), timeZone()).filters;
-        store.commit("everything/setSettings", { ...working.settings, search: "", due: available[working.settings.due] ? working.settings.due : "" });
+        store.commit("everything/setSettings", { ...working.settings, search: "", due: available[working.settings.due] ? working.settings.due : "", ...mine });
         reload();
         loadViews().then(() => store.commit("everything/setActiveView", working.viewId));
         return;
     }
-    store.commit("everything/setSettings", { ...DEFAULT_SETTINGS });
+    store.commit("everything/setSettings", { ...DEFAULT_SETTINGS, ...mine });
     store.commit("everything/setActiveView", "");
     await loadViews();
     const preferred = store.getters["everything/defaultView"];
-    if (preferred) openView(preferred._id);
+    if (preferred && !mine.assignee) openView(preferred._id);
     else reload();
 });
 onUnmounted(() => {
