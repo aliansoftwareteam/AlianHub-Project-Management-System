@@ -195,6 +195,8 @@ const declineNote = ref('');
 const onlyPreview = (p) => (p.source === SOURCE_MCP && (p.changes || []).length === 1 ? p.changes[0].preview : null);
 const titleOf = (p) => intentTitle(t, onlyPreview(p)) || proposalTitle(t, p);
 const changeText = (change) => intentSummary(t, change.preview) || change.label;
+// The preview is the server's reading of a change for this viewer, never part of the change sent back.
+const asFiled = (change) => Object.fromEntries(Object.entries(change).filter(([key]) => key !== 'preview'));
 const whoOf = (p) => {
     const person = p.source === SOURCE_MCP && p.requestedBy ? getUser(p.requestedBy)?.Employee_Name : '';
     return person ? t('Inbox.queue_for', { agent: p.agentName, person }) : p.agentName;
@@ -230,7 +232,7 @@ const approve = async (p) => {
     const edited = isEditing(p) && kept.value.length !== (p.changes || []).length;
     busy.value = true;
     summary.value = '';
-    const result = await send(p.proposalId, 'approve', edited ? { changes: kept.value.map((change) => ({ ...change })) } : {});
+    const result = await send(p.proposalId, 'approve', edited ? { changes: kept.value.map(asFiled) } : {});
     busy.value = false;
     if (result.ok) { editing.value = ''; summary.value = failuresLine(result.unapplied); }
     settle(p, 'approve', result);

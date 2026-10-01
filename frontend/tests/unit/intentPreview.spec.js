@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import en from '@/locales/en';
 
@@ -38,7 +38,7 @@ const line = (kind) => wrapper.find(`[data-test="intent-line"][data-kind="${kind
 const label = (kind) => line(kind).find('dt').text();
 const value = (kind) => line(kind).find('dd').text();
 
-afterEach(() => { wrapper?.unmount(); wrapper = null; });
+afterEach(() => { wrapper?.unmount(); wrapper = null; sendProposalDecision.mockReset(); });
 
 describe('the preview card for a task an agent wants to create', () => {
     it('says it is a new task, its title, and each thing it will be created with on a line of its own', () => {
@@ -154,6 +154,18 @@ describe('the card in a row of the Inbox approval queue', () => {
         mountQueue([row([taskAdd, { ...taskAdd, preview: create({ title: 'Second' }) }], { what: 'Two tasks from the meeting' })]);
         expect(wrapper.findAll('[data-test="intent-preview"]')).toHaveLength(2);
         expect(wrapper.find('[data-test="queue-row"]').text()).toContain('Two tasks from the meeting');
+    });
+
+    it('sends an edited approval without the preview, which is not part of the change', async () => {
+        sendProposalDecision.mockResolvedValue({ data: { status: true, data: { applied: [{ ok: true }] } } });
+        const second = { ...taskAdd, params: { projectId: 'p-web', title: 'Second' }, preview: create({ title: 'Second' }) };
+        mountQueue([row([taskAdd, second], { source: '', editable: true, what: 'Two tasks from the meeting' })]);
+        await wrapper.find('[data-test="queue-edit"]').trigger('click');
+        expect(wrapper.findAll('[data-test="intent-preview"]')).toHaveLength(2);
+        await wrapper.findAll('[data-test="queue-drop"]')[1].trigger('click');
+        await wrapper.find('[data-test="queue-approve"]').trigger('click');
+        await flushPromises();
+        expect(sendProposalDecision).toHaveBeenCalledWith('p1', 'approve', { changes: [{ action: 'task.add', params: { projectId: 'p-web', title: 'Fix the login bug' }, label: 'task.create via MCP', reversible: true }] });
     });
 
     it('still marks a change that cannot be undone', () => {
