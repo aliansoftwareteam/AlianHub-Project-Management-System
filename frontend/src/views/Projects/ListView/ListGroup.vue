@@ -18,7 +18,7 @@
                 item-key="_id"
                 tag="div"
                 role="presentation"
-                :group="{ name: 'lv2-task', put: (to, from, row) => groupTakesTask(item, row?.dataset?.taskType) }"
+                :group="{ name: 'lv2-task', put: putFrom('lv2-task', item) }"
                 :sortable="canDrag"
                 :disabled="!canDrag"
                 @change="onDragChange"
@@ -114,7 +114,7 @@ import * as env from "@/config/env";
 import { applyContext, applyTemplate, defaultTemplateOf, listTemplates } from "@/components/molecules/TaskTemplates/taskTemplates";
 import { pointsTotal } from "@/views/Projects/composables/taskPoints";
 import { MANUAL, sortTasks } from "@/views/Projects/composables/viewSort";
-import { groupTakesTask } from "@/views/Projects/composables/customFieldQuery";
+import { groupTakesTask, putFrom } from "@/views/Projects/composables/customFieldQuery";
 
 defineOptions({ name: "ListGroup" });
 

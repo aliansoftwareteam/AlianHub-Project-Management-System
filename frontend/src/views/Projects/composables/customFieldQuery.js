@@ -155,6 +155,9 @@ export function customGroupMatches(task, item) {
    showing the row in a group it is not in. `taskTypeKey` may be the text of a data attribute. */
 export const groupTakesTask = (item, taskTypeKey) => fieldAppliesToTask({ fieldTaskTypes: item?.customFieldTaskTypes }, { TaskTypeKey: taskTypeKey });
 
+/* Sortable reads `true` from a put function as "from any list", so an allowed drop names the one drag group it may come from. */
+export const putFrom = (groupName, item) => (to, from, dragged) => (groupTakesTask(item, dragged?.dataset?.taskType) ? [groupName] : false);
+
 /* A date group is a range, not a value, so nothing can be dropped into one. */
 export function customGroupUpdate(item) {
     if (!item?.customFieldId || item.dropDisabled) return null;
