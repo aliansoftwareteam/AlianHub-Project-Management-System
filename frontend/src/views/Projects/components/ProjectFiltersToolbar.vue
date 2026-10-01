@@ -138,7 +138,7 @@
                     <ProvenanceFilter :modelValue="doneBy" @update:modelValue="(v) => $emit('update:doneBy', v)" />
                 </template>
                 <span v-else class="pft__mode-chip">{{ $t('ProjectSlider.archived_list') }}</span>
-                <DropDown mode="menu" id="more_features" :title="$t('Projects.more_features')" :zIndex="sheetMode ? SHEET_MENU_Z : 10">
+                <DropDown mode="menu" id="more_features" themed :title="$t('Projects.more_features')" :zIndex="sheetMode ? SHEET_MENU_Z : 10">
                     <template #button="{ triggerAttrs }">
                         <button type="button" class="border-groupBy pft__icon-btn cursor-pointer" :title="$t('Projects.more_features')" :aria-label="$t('Projects.more_features')" v-bind="triggerAttrs">
                             <ShellIcon name="dots" :size="15" />

@@ -1,7 +1,7 @@
 <template>
     <div class="projectRightside overflow-y-auto style-scroll">
-        <div :class="{'border-bottom-mobiledrop' : clientWidth > 767}" :style="[{paddingBottom : clientWidth > 767 ? '5px' : '0px'}]" v-if="checkPermission('project.project_details',projectData?.isGlobalPermission)!== null">
-            <h4 class="black font-ui detailsHead" :class="`${clientWidth > 767 ? 'font-size-14 font-weight-700' : 'font-size-16 font-weight-600'}`">{{$t('ProjectDetails.details')}}</h4>
+        <div class="projectRightside__details" v-if="checkPermission('project.project_details',projectData?.isGlobalPermission)!== null">
+            <h4 class="font-ui detailsHead" :class="`${clientWidth > 767 ? 'font-size-14 font-weight-700' : 'font-size-16 font-weight-600'}`">{{$t('ProjectDetails.details')}}</h4>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_status_change',projectData?.isGlobalPermission)!== null">
                 <h4 :class="{'font-size-14 font-weight-500 status__title' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.status')}}</h4>
                 <ProjectStatus
@@ -10,10 +10,10 @@
                     @update:projectstatus="(val,val1) => updateStatus(val1)"
                 />
             </div>
-             <!-- v-if="checkPermission('project.project_status_change',projectData?.isGlobalPermission)!== null" -->
             <div class="d-flex project-right-side-label" v-if="projectData?.projectCreatedBy">
                 <h4 :class="{'font-size-14 font-weight-500 status__title' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('Comment.created_by')}}</h4>
                 <UserProfile
+                    decorative
                     :showDot="false"
                     class="user__profile cursor-pointer mr-10px"
                     :data="{
@@ -25,7 +25,7 @@
                     :thumbnail="'30x30'"
                 />
                 <span 
-                    class="black project-type-name text-ellipsis project-created-by"
+                    class="project-type-name text-ellipsis project-created-by"
                     :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}"
                     :title="createdByUser?.Employee_Name || 'N/A'">
                     {{ createdByUser?.Employee_Name || 'N/A' }}
@@ -47,7 +47,7 @@
             </div>
             <div class="d-flex project-right-side-label">
                 <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.key')}}</h4>
-                <span class="black projectKeyClass hover__on-projectrightside text-ellipsis cursor-default" :class="{'font-size-13 font-weight-400' : clientWidth > 767 ,'font-size-16' : clientWidth <=767}"
+                <span class="projectKeyClass hover__on-projectrightside text-ellipsis cursor-default" :class="{'font-size-13 font-weight-400' : clientWidth > 767 ,'font-size-16' : clientWidth <=767}"
                     :style="[{padding : clientWidth > 767 ? '10px 10px 10px 0' : '10px 0px'}]"
                     :title="projectData.ProjectCode"
                 >{{projectData.ProjectCode ? projectData.ProjectCode : 'N/A'}}</span>
@@ -70,7 +70,7 @@
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_amount',projectData?.isGlobalPermission) !== null">
                 <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.amount')}}</h4>
-                <span class="black project-amount cursor-pointer  hover__on-projectrightside text-ellipsis" :class="{'font-size-13 font-weight-400' : clientWidth > 767 ,'font-size-16' : clientWidth <=767}"
+                <span class="project-amount cursor-pointer hover__on-projectrightside text-ellipsis" :class="{'font-size-13 font-weight-400' : clientWidth > 767 ,'font-size-16' : clientWidth <=767}"
                 :style="[{padding : clientWidth > 767 ? '2px' : '10px 0px'}]" :title="projectData?.ProjectCurrency?.symbol + ' ' + (projectData.milestoneAmount ? getCommaSeperatedNumber(projectData.milestoneAmount) : 0) ">{{projectData?.ProjectCurrency?.symbol}} {{projectData.milestoneAmount ? getCommaSeperatedNumber(projectData.milestoneAmount) : 0}}</span>
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_source',projectData?.isGlobalPermission) !== null">
@@ -102,7 +102,7 @@
                     @enter="updateProposalId"
                 />
                 <span v-else
-                    class="black projectKeyClass hover__on-projectrightside text-ellipsis"
+                    class="projectKeyClass hover__on-projectrightside text-ellipsis"
                     :class="[{'font-size-13 font-weight-400' : clientWidth > 767 ,'font-size-16' : clientWidth <=767}, canEditDetails ? 'cursor-pointer' : 'cursor-default']"
                     :style="[{padding : clientWidth > 767 ? '10px 10px 10px 0' : '10px 0px'}]"
                     :title="projectData.proposalId || proposalIdHint"
@@ -135,8 +135,8 @@
                     :position="`right`"
                 ></StartEndDate>
                 <template v-else>
-                    <span class="font-size-13 font-weight-400 black hover__on-projectrightside" v-if="projectData.StartDate">{{convertDateFormat(projectData.StartDate)}}</span>
-                    <span class="font-size-13 font-weight-400 black hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_start_date')}}</span>
+                    <span class="font-size-13 font-weight-400 hover__on-projectrightside" v-if="projectData.StartDate">{{convertDateFormat(projectData.StartDate)}}</span>
+                    <span class="font-size-13 font-weight-400 hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_start_date')}}</span>
                 </template>
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_end_date',projectData?.isGlobalPermission) !== null">
@@ -155,8 +155,8 @@
                     :position="`right`"
                 ></StartEndDate>
                 <template v-else>
-                    <span class="font-size-13 font-weight-400 black hover__on-projectrightside" v-if="projectData.EndDate">{{convertDateFormat(projectData.EndDate)}}</span>
-                    <span class="font-size-13 font-weight-400 black hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_end_date')}}</span>
+                    <span class="font-size-13 font-weight-400 hover__on-projectrightside" v-if="projectData.EndDate">{{convertDateFormat(projectData.EndDate)}}</span>
+                    <span class="font-size-13 font-weight-400 hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_end_date')}}</span>
                 </template>
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_due_date',projectData?.isGlobalPermission) !== null">
@@ -171,8 +171,8 @@
                     :position="`right`"
                 />
                 <template v-else>
-                    <span class="font-size-13 font-weight-400 black hover__on-projectrightside" v-if="projectData.DueDate">{{convertDateFormat(projectData.DueDate)}}</span>
-                    <span class="font-size-13 font-weight-400 black hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_due_date')}}</span>
+                    <span class="font-size-13 font-weight-400 hover__on-projectrightside" v-if="projectData.DueDate">{{convertDateFormat(projectData.DueDate)}}</span>
+                    <span class="font-size-13 font-weight-400 hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_due_date')}}</span>
                 </template>
             </div>
             <ProjectWorkingDays

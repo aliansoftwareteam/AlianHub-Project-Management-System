@@ -111,6 +111,8 @@
     /* How far a child row (a subtask) steps in from its parent's name. */
     --row-indent: var(--sp-8);
 
+    /* A token surface inside a host that keeps light controls (see the color-scheme list below) sets color-scheme: var(--scheme) on itself. */
+    --scheme: light;
     color-scheme: light;
 }
 
@@ -165,6 +167,7 @@
     --agent-bg: rgba(168, 146, 255, .16);
     --shadow-ink: rgba(0, 0, 0, .3);
 
+    --scheme: dark;
     color-scheme: dark;
 }
 

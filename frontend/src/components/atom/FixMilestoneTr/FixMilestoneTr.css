@@ -1,9 +1,9 @@
 .fix-milestone-wrapper input:focus {
-    border: 1px solid cornflowerblue;
+    border: 1px solid var(--brand);
 }
 .startdateinput:focus {
     border-radius: 5px;
-    border: 1px solid cornflowerblue;
+    border: 1px solid var(--brand);
 }
 .table_width {
     width: 100%;
@@ -35,7 +35,7 @@
     font-size: 14px;
     -webkit-text-decoration-line: underline;
     text-decoration-line: underline;
-    color: #2F3990;
+    color: var(--brand);
 }
 .refund_wrapper{
     padding-top: 70px;
@@ -78,13 +78,13 @@
 .currency {
     height: 28px;
     width: 30px;
-    background-color: #2f3990;
+    background-color: var(--brand);
     display: inline-block;
     border-radius: 4px;
     position: absolute;
     top: 1px;
     left: 1px;
-    color: #fff;
+    color: var(--on-brand);
     font-size: 14px;
     text-align: center;
     line-height: 30px;
