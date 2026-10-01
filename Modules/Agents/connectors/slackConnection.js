@@ -255,4 +255,4 @@ const allowedChannel = (row, ref, uses = [USE.POST]) => {
 const notePosted = (companyId, row) => update(companyId, row, { $set: { lastPostAt: new Date() } });
 const noteRead = (companyId, row) => update(companyId, row, { $set: { lastReadAt: new Date() } });
 
-module.exports = { CONNECTOR, SECRET_KIND, SECRET_KEYS, STATUS, MAX_ALLOWED, ConnectionError, find, view, describe, saveSecrets, removeSecret, refreshChannels, setAllowedChannels, tokenFor, markBroken, USE, channelsFor, allowedChannel, notePosted, noteRead, audit };
+module.exports = { CONNECTOR, SECRET_KIND, SECRET_KEYS, STATUS, MAX_ALLOWED, ConnectionError, find, view, describe, saveSecrets, removeSecret, refreshChannels, setAllowedChannels, tokenFor, markBroken, USE, channelsFor, allowedChannel, notePosted, noteRead };
