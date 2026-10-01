@@ -15,7 +15,8 @@ const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const { acceptedMemberIds } = require('../../../utils/companyMembers');
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const { resolveSheetScope, scopedEstimateMatch, scopedTimeMatch, openProjects, SHEET_PERMISSION } = require('../helpers/timeScope');
-const { withoutHiddenSprintPlans } = require('../helpers/planVisibility');
+const { withoutHiddenSprintPlans, namesTimeOff, asUnavailableDays } = require('../helpers/planVisibility');
+const { canReadTask } = require('../../Tasks/helpers/taskReadAccess');
 const { visibilityStage } = require('../../Tasks/helpers/taskQueryGuard');
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 const safeZone = (z) => (z && DateTime.local().setZone(z).isValid ? z : 'UTC');
@@ -180,11 +181,12 @@ exports.getWorkloadGrid = async (req, res) => {
         const ptoByUser = {};
         (ptoRows || []).forEach((p) => { (ptoByUser[String(p.userId)] = ptoByUser[String(p.userId)] || []).push(p); });
         const workingDays = await workingDaysOf(companyId, projectIds.length === 1 ? projectIds[0] : null);
+        const asShownToCaller = (rows) => rows.map((row) => (namesTimeOff(scope, row.userId) ? row : { ...row, days: asUnavailableDays(row.days) }));
 
         if (unit !== 'hours') {
             const openToCaller = (await visibilityStage(companyId, req.uid)).$match;
             const { users, unpointed } = await unitGrid({ companyId, unit, userIds, inProjects, openToCaller, days, rangeStart, rangeEnd, estimates, ptoByUser, names, workingDays });
-            return res.json({ status: true, statusText: 'OK', data: { start: b.start, end: b.end, days, unit, workingDays, unpointed, users } });
+            return res.json({ status: true, statusText: 'OK', data: { start: b.start, end: b.end, days, unit, workingDays, unpointed, users: asShownToCaller(users) } });
         }
 
         const taskIds = [...new Set((estimates || []).map((e) => String(e.TaskId || '')).filter(Boolean))];
@@ -237,7 +239,7 @@ exports.getWorkloadGrid = async (req, res) => {
             return { userId: uid, name: (names[uid] && names[uid].name) || '', avatar: (names[uid] && names[uid].avatar) || '', hoursPerDay, ...grid };
         }).sort((a, b) => b.utilizationPct - a.utilizationPct);
 
-        return res.json({ status: true, statusText: 'OK', data: { start: b.start, end: b.end, days, unit, workingDays, hoursPerDay, users } });
+        return res.json({ status: true, statusText: 'OK', data: { start: b.start, end: b.end, days, unit, workingDays, hoursPerDay, users: asShownToCaller(users) } });
     } catch (e) {
         if (e instanceof TenantError) return res.status(e.statusCode).json({ status: false, statusText: e.message });
         logger.error(`getWorkloadGrid: ${e.message}`);
@@ -298,17 +300,23 @@ exports.moveWorkloadChip = async (req, res) => {
         const sameDate = b.fromDate === b.toDate;
         if (sameUser && sameDate) return res.json({ status: true, statusText: 'Nothing to move.', data: null });
 
+        const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: taskId }] }, 'findOne');
+        if (!task || !(await canReadTask(companyId, req.uid, task))) {
+            return res.status(404).json({ status: false, statusText: 'Task not found.' });
+        }
+
         const from = dayBounds(b.fromDate);
-        const estimateFilter = b.estimateId && oid(b.estimateId)
-            ? { _id: oid(b.estimateId) }
-            : { TaskId: String(b.taskId), UserId: fromUserId, Date: { $gte: from.start, $lte: from.end } };
+        /* A plan id only picks among the plans of the task and person just checked. */
+        const estimateFilter = {
+            TaskId: String(b.taskId),
+            UserId: fromUserId,
+            ...(b.estimateId && oid(b.estimateId) ? { _id: oid(b.estimateId) } : { Date: { $gte: from.start, $lte: from.end } }),
+        };
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.ESTIMATES_TIME,
             data: [estimateFilter, { $set: { UserId: toUserId, Date: dayBounds(b.toDate).start } }],
         }, 'updateMany');
 
-        const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: taskId }] }, 'findOne');
-        if (!task) return res.status(404).json({ status: false, statusText: 'Task not found.' });
         const set = {};
         if (!sameDate) set.DueDate = dayBounds(b.toDate).end;
         if (!sameUser) {

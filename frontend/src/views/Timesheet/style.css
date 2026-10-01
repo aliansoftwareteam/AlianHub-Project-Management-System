@@ -564,7 +564,7 @@ body:has(.time_tracker__timesheet){
     width: -moz-fit-content !important;
     width: fit-content !important;
 }
-.wf_filter {max-width: 100%;margin-left: 0;margin-top: 15px;margin-bottom: 5px;}
+.wf_filter {max-width: 100%;margin-left: 0;margin-top: 15px;margin-bottom: 5px;box-sizing: border-box;}
 .timesheetDropdown_wrapper{margin-top: 0;margin-left: 0;}
 table.table.timesheet_table.isWeeked tr td.fixed.make-width-small, table.table.timesheet_table.isWeeked tr th.fixed.make-width-small{
   left: -480px!important;
