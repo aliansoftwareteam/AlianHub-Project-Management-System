@@ -63,6 +63,7 @@ const SCHEMA_TYPE = {
     EXPORT_JOBS: "exportJobs",
     IMPORT_JOBS: "importJobs",
     AI_FIELD_JOBS: "aiFieldJobs",
+    CUSTOM_FIELD_LINKS: "customFieldLinks",
     EPICS: "epics",
     PAGES: "pages",
     PAGE_VERSIONS: "pageVersions",

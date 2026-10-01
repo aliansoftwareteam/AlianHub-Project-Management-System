@@ -3,6 +3,8 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { MAX_DEPTH, ancestorsFor, canNest } = require('../Tasks/helpers/taskTree');
 const { storableFieldValues } = require('../CustomField/helpers/fieldValueWrite');
+const { copyFieldLinks } = require('../CustomField/helpers/fieldLinks');
+const logger = require('../../Config/loggerConfig');
 const rules = require('./rules');
 
 const asId = (id) => new mongoose.Types.ObjectId(String(id));
@@ -98,6 +100,8 @@ const copyTasks = async ({ companyId, caller, sourceId, copy, plan, include, onP
             await onProgress(created);
         }
     }
+    await copyFieldLinks({ companyId, actorId: caller, pairs: new Map([...made].map(([source, copy]) => [source, copy._id])), announce: false })
+        .catch((error) => logger.error(`field links copy on project duplicate: ${error && error.message}`));
     return created;
 };
 
