@@ -1,5 +1,5 @@
 <template>
-    <section class="hc-card hc-agenda" style="flex: 1">
+    <section class="hc-card hc-agenda">
         <div class="hc-card__head">
             <span class="hc-card__title">{{ $t('Home.agenda') }}</span>
             <span class="hc-agenda__nav">
@@ -11,13 +11,13 @@
         <router-link v-if="!connected" class="hc-connect" :to="connectTo">
             <span class="hc-connect__ico"></span>{{ $t('Home.connect_calendar') }}
         </router-link>
-        <p v-if="!items.length" class="hc-hint" style="margin: 0">{{ firstRun ? $t('Home.agenda_hint') : $t('Home.agenda_empty') }}</p>
+        <p v-if="!items.length" class="hc-hint hc-agenda__hint">{{ firstRun ? $t('Home.agenda_hint') : $t('Home.agenda_empty') }}</p>
         <div v-for="item in items" :key="item.id" class="hc-agenda__item">
             <span class="hc-agenda__time">{{ item.start.format('HH:mm') }}</span>
             <div class="hc-block" :class="`hc-block--${item.kind}`" :title="item.title">
                 <template v-if="item.kind === 'reminder'">{{ $t('Home.reminder_prefix', { title: item.title }) }}</template>
                 <template v-else-if="item.kind === 'focus'">{{ $t('Home.focus_prefix', { title: item.title || durationLabel(item) }) }}</template>
-                <template v-else>{{ item.title }} <span class="ah-mono" style="color: var(--ink-2); font-size: 10.5px">({{ durationLabel(item) }})</span></template>
+                <template v-else>{{ item.title }} <span class="hc-block__dur">({{ durationLabel(item) }})</span></template>
             </div>
         </div>
     </section>
@@ -27,6 +27,7 @@
 import { computed, defineEmits, defineProps, inject } from "vue";
 import moment from "moment";
 import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import { fmtEstimate } from "./homeFormat";
 
 defineOptions({ name: "AgendaCard" });
@@ -40,9 +41,10 @@ const props = defineProps({
 defineEmits(["shift"]);
 
 const router = useRouter();
+const { t } = useI18n();
 const companyId = inject("$companyId");
 
-const dayLabel = computed(() => (moment(props.day).isSame(moment(), "day") ? "TODAY" : moment(props.day).format("ddd D").toUpperCase()));
+const dayLabel = computed(() => (moment(props.day).isSame(moment(), "day") ? t("Home.group_today") : moment(props.day).format("ddd D")).toUpperCase());
 const connectTo = computed(() => ({ name: router.hasRoute("IntegrationsHub") ? "IntegrationsHub" : "Setting", params: { cid: companyId.value } }));
 const durationLabel = (item) => fmtEstimate(item.end.diff(item.start, "minutes"));
 </script>

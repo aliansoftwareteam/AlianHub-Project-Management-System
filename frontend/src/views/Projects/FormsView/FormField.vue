@@ -71,9 +71,13 @@ const props = defineProps({
     live: { type: Boolean, default: false },
 });
 
+const emit = defineEmits(['update:answer']);
+
 const answer = ref('');
 const multi = ref([]);
 watch(() => props.question.id, () => { answer.value = ''; multi.value = []; });
+watch(answer, (value) => emit('update:answer', value));
+watch(multi, (value) => emit('update:answer', [...value]), { deep: true });
 
 const options = computed(() => (Array.isArray(props.question.options) ? props.question.options : []));
 const stars = computed(() => Number(props.question.max) || 5);

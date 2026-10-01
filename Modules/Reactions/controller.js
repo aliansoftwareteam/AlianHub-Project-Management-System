@@ -3,7 +3,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const socketEmitter = require('../../event/socketEventEmitter');
-const { validateReactionInput } = require('./helpers/reactionRules');
+const { validateReactionInput, reactionToggle } = require('./helpers/reactionRules');
 const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
 const { canChangeComment } = require('../Comments/helpers/threadWriteAccess');
 
@@ -41,10 +41,7 @@ exports.toggleReaction = async (req, res) => {
             return res.status(404).json({ status: false, statusText: 'Target not found.' });
         }
 
-        const alreadyReacted = (doc.reactions || []).some((reaction) => reaction.emoji === emoji && String(reaction.userId) === userId);
-        const updateObj = alreadyReacted
-            ? { $pull: { reactions: { emoji, userId } } }
-            : { $push: { reactions: { emoji, userId, createdAt: new Date() } } };
+        const { removes: alreadyReacted, change: updateObj } = reactionToggle(doc, emoji, userId);
 
         // `timestamps: false`: a reaction is metadata about a message, not an edit
         // of it. Without this Mongoose bumps `updatedAt`, and every UI that infers
