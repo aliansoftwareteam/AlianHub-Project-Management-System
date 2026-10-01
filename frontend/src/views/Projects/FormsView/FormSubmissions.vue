@@ -41,7 +41,12 @@
                     <tbody>
                         <tr v-for="row in submissions" :key="row._id">
                             <td class="fs__when">{{ when(row.submittedAt) }}</td>
-                            <td v-if="anyTask" class="fs__task">{{ row.taskKey || '—' }}</td>
+                            <td v-if="anyTask" class="fs__task">
+                                <button v-if="row.task && row.taskKey" type="button" class="fs__task-link"
+                                    data-test="form-task-link" :title="$t('Projects.form_open_task')"
+                                    @click="openSubmissionTask(row.task)">{{ row.taskKey }}</button>
+                                <template v-else>{{ row.taskKey || '—' }}</template>
+                            </td>
                             <td v-for="c in columns" :key="c.id">
                                 <button v-if="row.files && row.files[c.id]" type="button" class="fs__file"
                                     :disabled="opening === `${row._id}:${c.id}`"
@@ -77,6 +82,7 @@ import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import { downloadExport } from '@/composable/exportDownload';
 import { storageHelper } from '@/composable/commonFunction';
+import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import FormIcon from './FormIcon.vue';
 
 const { t } = useI18n();
@@ -110,6 +116,14 @@ const when = (value) => {
     const d = new Date(value);
     return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString();
 };
+
+const openSubmissionTask = (task) => openTask({
+    companyId: (companyId && companyId.value) || companyId,
+    projectId: task.projectId,
+    sprintId: task.sprintId,
+    folderId: task.folderId,
+    taskId: task.id,
+});
 
 const opening = ref('');
 
@@ -251,6 +265,10 @@ watch(() => props.formId, () => { term.value = ''; load(1); });
 .fs__table tbody tr:last-child td { border-bottom: 0; }
 .fs__table tbody tr:hover td { background: var(--surface-hover); }
 .fs__when, .fs__task { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.fs__task-link { border: 0; background: none; padding: 2px 4px; margin: -2px -4px; border-radius: var(--r-input);
+    font: inherit; color: var(--brand); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.fs__task-link:hover { background: var(--brand-tint); }
+.fs__task-link:focus-visible { outline: none; box-shadow: var(--focus); }
 .fs__val { display: inline-block; max-width: 320px; overflow: hidden; text-overflow: ellipsis;
     vertical-align: bottom; }
 .fs__blank { color: var(--ink-2); }
@@ -272,5 +290,6 @@ watch(() => props.formId, () => { term.value = ''; load(1); });
 @media (max-width: 820px) {
     .fs__head { flex-wrap: wrap; }
     .fs__search { flex: 1 1 100%; order: 3; }
+    .fs__task-link { padding: 8px 6px; margin: -8px -6px; }
 }
 </style>

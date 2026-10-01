@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { generateShareToken } = require('../PublicShares/helpers/shareRules');
 const { projectAccess } = require('../../Config/contentAccess');
+const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
 const { menu, TYPES, TASK_PROPERTIES, SPANS, GRID_COLUMNS, resolveSpan } = require('./helpers/questionTypes');
 const {
     PRIORITIES,
@@ -239,6 +240,37 @@ const SUBMISSIONS_EXPORT_CAP = 5000;
  * metacharacters — otherwise a stray "(" is a 500 and ".*" scans everything. */
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const DELETED = 1;
+
+/* Only what the task panel needs to open a task, and only for one the caller could open
+ * through GET /api/v1/task/:id; anything else answers null, as a missing task would. The
+ * task is read where it lives now, since it may have moved since the submission. */
+const taskLinks = async (companyId, uid, rows) => {
+    const ids = [...new Set(rows.map((row) => String(row.taskId || '')).filter(isObjectIdString))];
+    const links = new Map();
+    if (!ids.length) return links;
+    const tasks = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS,
+        data: [
+            { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) }, deletedStatusKey: { $ne: DELETED } },
+            { ProjectID: 1, sprintId: 1, folderObjId: 1, mainChat: 1, AssigneeUserId: 1 },
+        ],
+    }, 'find').catch(() => []);
+    const decided = new Map();
+    for (const task of tasks || []) {
+        const place = task.mainChat === true ? String(task._id) : `${task.ProjectID}:${task.sprintId || ''}`;
+        if (!decided.has(place)) decided.set(place, canReadTask(companyId, uid, task).catch(() => false));
+        if (!(await decided.get(place))) continue;
+        links.set(String(task._id), {
+            id: String(task._id),
+            projectId: String(task.ProjectID),
+            sprintId: task.sprintId ? String(task.sprintId) : '',
+            folderId: task.folderObjId ? String(task.folderObjId) : '',
+        });
+    }
+    return links;
+};
+
 exports.listSubmissions = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
@@ -296,6 +328,7 @@ exports.listSubmissions = async (req, res) => {
             }
         }
 
+        const links = await taskLinks(companyId, callerId(req), rows || []);
         const data = (rows || []).map((row) => {
             const values = {};
             const files = {};
@@ -315,11 +348,13 @@ exports.listSubmissions = async (req, res) => {
                     };
                 }
             }
+            const task = links.get(String(row.taskId || '')) || null;
             return {
                 _id: row._id,
                 submittedAt: row.createdAt,
                 taskKey: row.taskKey || '',
-                taskId: row.taskId || '',
+                ...(task ? { taskId: task.id } : {}),
+                task,
                 values,
                 files,
             };

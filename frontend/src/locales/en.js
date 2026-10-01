@@ -5279,6 +5279,7 @@ export default {
         form_no_submissions: "No submissions yet. Share the form link to start collecting responses.",
         form_submitted_at: "Submitted",
         form_task: "Task",
+        form_open_task: "Open the task this response created",
         form_question_removed: "This question is no longer on the form",
         form_create_task: "Create a task for each submission",
         form_needs_task_name: "This form creates a task for each submission, so one question must be mapped to Task Name.",

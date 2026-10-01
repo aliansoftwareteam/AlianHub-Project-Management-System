@@ -5964,6 +5964,7 @@
     "Projects.form_no_submissions": "No submissions yet. Share the form link to start collecting responses.",
     "Projects.form_open": "Open form",
     "Projects.form_open_file": "Open the attached file",
+    "Projects.form_open_task": "Open the task this response created",
     "Projects.form_option": "Option",
     "Projects.form_page_of": "Page {page} of {pages}",
     "Projects.form_pick_sprint": "Choose a sprint…",
