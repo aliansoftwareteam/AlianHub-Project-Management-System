@@ -143,6 +143,10 @@ Every response carries `X-Request-Id`; `Config/requestLog.js` writes one line pe
 4. New collections go in `Config/schemaType.js`, `Config/collections.js` and `utils/mongo-handler/schema.js` together.
 5. A `tests/<name>-rules.test.js` for the helpers; controllers are covered by conventions.
 
+### API reference
+
+After adding or changing a route, describe it in `scripts/api-doc.meta.json` (what it takes, what it answers, who may call it) and run `npm run api:doc`; commit `docs/API.md` and `docs/api/openapi.json` with the change. `node scripts/api-doc.js --check` lists the routes that still have no entry.
+
 ### Add a view
 
 1. The page under `frontend/src/views/<Area>/`, lazy-loaded from `frontend/src/router/<area>/index.js` (`requiresAuth`, `meta.title`).
