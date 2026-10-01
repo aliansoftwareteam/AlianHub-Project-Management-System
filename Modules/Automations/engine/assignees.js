@@ -188,9 +188,15 @@ const activePeople = async (companyId) => {
 
 const assignStepsOf = (rule = {}) => (Array.isArray(rule.steps) ? rule.steps : []).filter((step) => step && step.action === 'assign');
 
-/* Names for the people the assign steps of `rules` hold, so their sentences read with names. */
+/* Names for the people the assign and notify steps of `rules` hold, so their sentences read with names. */
+const namedIn = (step = {}) => {
+    const config = step.config || {};
+    if (step.action === 'assign') return listed(config);
+    return step.action === 'notify' && Array.isArray(config.recipients) ? config.recipients.map(String) : [];
+};
+
 const peopleNamedIn = async (rules = []) => {
-    const ids = [...new Set(rules.flatMap((rule) => assignStepsOf(rule).flatMap((step) => listed(step.config || {}))).filter((id) => OBJECT_ID.test(id)))];
+    const ids = [...new Set(rules.flatMap((rule) => (Array.isArray(rule && rule.steps) ? rule.steps : []).flatMap(namedIn)).filter((id) => OBJECT_ID.test(id)))];
     if (!ids.length) return [];
     const names = await namesOf(ids);
     return ids.filter((id) => names[id]).map((id) => ({ id, name: names[id] }));
