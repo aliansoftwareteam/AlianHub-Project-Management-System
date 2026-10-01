@@ -682,6 +682,9 @@ const schema = {
         revision: { type: Number, default: 0, required: false },
         createdBy: { type: String, required: false },
         updatedBy: { type: String, required: false },
+        // Written by the welcome project's seeder alone, with that project's id: removing the sample takes this goal and no goal a person made.
+        sample: { type: Boolean, required: false },
+        sampleProjectId: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     // A list's whiteboard (Modules/Whiteboards). elements is what applyPatch returns: cards that name a task by id

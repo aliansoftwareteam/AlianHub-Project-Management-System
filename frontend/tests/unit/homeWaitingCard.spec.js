@@ -111,6 +111,26 @@ describe('Waiting on you (Home card)', () => {
         expect(wrapper.text()).not.toContain('Change p1');
     });
 
+    it('says why on every line an agent proposed, and that none was given when it gave none', async () => {
+        serverProposals = [proposal('p1', { why: 'The date slipped twice.' }), proposal('p2')];
+        serverApprovals = [approval('a1')];
+        const { wrapper } = await open();
+        const whys = rows(wrapper).map((row) => row.find('[data-test="waiting-why"]'));
+        expect(whys[0].text()).toContain('Ai.why');
+        expect(whys[0].text()).toContain('The date slipped twice.');
+        expect(whys[1].text()).toContain('Time.why_no_reason');
+        expect(whys[2].exists()).toBe(false);
+    });
+
+    it('tells Home how many things it holds, and again once one is decided', async () => {
+        serverProposals = [proposal('p1'), proposal('p2')];
+        const { wrapper } = await open();
+        expect(wrapper.emitted('count').at(-1)).toEqual([2]);
+        await rows(wrapper)[0].find('[data-test="waiting-approve"]').trigger('click');
+        await flushPromises();
+        expect(wrapper.emitted('count').at(-1)).toEqual([1]);
+    });
+
     it('is hidden when nothing is waiting', async () => {
         const { wrapper } = await open();
         expect(wrapper.find('[data-test="waiting-card"]').exists()).toBe(false);

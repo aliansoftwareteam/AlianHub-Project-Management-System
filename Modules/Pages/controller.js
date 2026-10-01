@@ -149,6 +149,50 @@ const findPage = async (companyId, id, uid, { deletedStatusKey = 0, edit = false
     return (await canUsePage(companyId, page, uid, { edit, named })) ? page : null;
 };
 
+const CONTENT_TOO_LARGE = 'Page content is too large.';
+
+/* The write of a new doc once the caller has been judged; the welcome project's seeder has no caller to judge.
+ * `draftMark` is draftMarkOf(req) on the route and nothing anywhere else: no body field reaches it. */
+const savePage = async (companyId, userId, { title, projectId, parentPageId, linkedTasks, contentBlocks, meta = { patch: {} }, draftMark = {} }) => {
+    const blocks = contentBlocks !== undefined ? cleanBlocks(normalizeBlockMentions(contentToEditorData({ blocks: contentBlocks })), 'doc') : emptyEditorData();
+    if (contentBlocks !== undefined && contentTooLarge({ blocks })) {
+        return { refused: CONTENT_TOO_LARGE };
+    }
+    const html = cleanHtml(blocksToHtml(blocks), 'doc');
+    const doc = {
+        title: String(title).trim(),
+        content: { html, blocks },
+        rawText: htmlToRawText(html),
+        createdBy: userId,
+        updatedBy: userId,
+        editedBy: userId,
+        editedAt: new Date(),
+        deletedStatusKey: 0,
+        order: Date.now(),
+        linkedTasks: [...new Set((linkedTasks || []).map(String))].map((x) => new mongoose.Types.ObjectId(x)),
+        visibility: 'project',
+        ...meta.patch,
+        ...draftMark,
+    };
+    if (doc.isWiki) {
+        if (!doc.ownerId) doc.ownerId = userId;
+        if (!doc.reviewDate) doc.reviewDate = nextReviewDate();
+    }
+    if (projectId) {
+        doc.ProjectID = new mongoose.Types.ObjectId(projectId);
+    }
+    if (parentPageId) {
+        doc.parentPageId = new mongoose.Types.ObjectId(parentPageId);
+    }
+    doc.mentionsTold = pageSettle.namedIn(doc.content);
+    const created = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PAGES, data: doc }, 'save');
+    emitPageChange(companyId, 'insert', created);
+    pageSettle.tell(companyId, created, userId, doc.mentionsTold);
+    return { created };
+};
+
+exports.savePage = savePage;
+
 /* POST /api/v2/pages  body: { title, projectId?, parentPageId?, visibility?, linkedTasks?,
  *   contentBlocks?, isWiki?, ownerId?, reviewDate?, createdByAgent? } */
 exports.createPage = async (req, res) => {
@@ -196,41 +240,11 @@ exports.createPage = async (req, res) => {
                 return fail(res, 'You do not have permission to add a page under this one.', 403);
             }
         }
-        const blocks = contentBlocks !== undefined ? cleanBlocks(normalizeBlockMentions(contentToEditorData({ blocks: contentBlocks })), 'doc') : emptyEditorData();
-        if (contentBlocks !== undefined && contentTooLarge({ blocks })) {
-            return res.send({ status: false, statusText: 'Page content is too large.' });
+        const saved = await savePage(companyId, userId, { title, projectId, parentPageId, linkedTasks, contentBlocks, meta, draftMark: draftMarkOf(req) });
+        if (saved.refused) {
+            return res.send({ status: false, statusText: saved.refused });
         }
-        const html = cleanHtml(blocksToHtml(blocks), 'doc');
-        const doc = {
-            title: String(title).trim(),
-            content: { html, blocks },
-            rawText: htmlToRawText(html),
-            createdBy: userId,
-            updatedBy: userId,
-            editedBy: userId,
-            editedAt: new Date(),
-            deletedStatusKey: 0,
-            order: Date.now(),
-            linkedTasks: [...new Set((linkedTasks || []).map(String))].map((x) => new mongoose.Types.ObjectId(x)),
-            visibility: 'project',
-            ...meta.patch,
-            ...draftMarkOf(req),
-        };
-        if (doc.isWiki) {
-            if (!doc.ownerId) doc.ownerId = userId;
-            if (!doc.reviewDate) doc.reviewDate = nextReviewDate();
-        }
-        if (projectId) {
-            doc.ProjectID = new mongoose.Types.ObjectId(projectId);
-        }
-        if (parentPageId) {
-            doc.parentPageId = new mongoose.Types.ObjectId(parentPageId);
-        }
-        doc.mentionsTold = pageSettle.namedIn(doc.content);
-        const created = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PAGES, data: doc }, 'save');
-        emitPageChange(companyId, 'insert', created);
-        pageSettle.tell(companyId, created, userId, doc.mentionsTold);
-        return res.send({ status: true, statusText: 'Page created.', data: created });
+        return res.send({ status: true, statusText: 'Page created.', data: saved.created });
     } catch (error) {
         logger.error(`ERROR in create page: ${error.message}`);
         return fail(res, error.message, error.statusCode);

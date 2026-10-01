@@ -1,5 +1,5 @@
 <template>
-    <section class="hc-card hc-mywork">
+    <section ref="root" class="hc-card hc-mywork">
         <div class="hc-card__head">
             <span class="hc-card__title">{{ $t('Home.my_work') }}</span>
             <button v-for="tab in tabs" :key="tab" type="button" class="hc-tab" :class="{ 'is-active': activeTab === tab }" @click="switchTab(tab)">{{ $t(`Home.${tab}`) }}</button>
@@ -8,7 +8,7 @@
         <p v-if="work.loading.value && !work.loaded.value" class="hc-loading">{{ $t('Home.loading') }}</p>
 
         <template v-else-if="activeTab === 'to_do'">
-            <div class="hc-group">
+            <div class="hc-group" data-test="mywork-today" tabindex="-1">
                 <span>{{ $t('Home.group_today') }}<span class="hc-group__count">{{ groups.today.length }}</span></span>
                 <button type="button" class="hc-group__sort" @click="cycleSort">{{ $t('Home.sort', { by: $t(`Home.sort_${work.sortBy.value}`) }) }} · +</button>
             </div>
@@ -23,6 +23,7 @@
                 :heading-level="2"
                 :title="$t('Home.empty_today_title')"
                 :action-label="$t('Home.empty_today_action')"
+                :sentence="$t('EmptyState.say_today')"
                 @action="focusAdd"
             >
                 <i18n-t v-if="sampleProject" keypath="Home.empty_today" tag="span">
@@ -37,7 +38,7 @@
             </form>
 
             <template v-if="groups.overdue.length">
-                <div class="hc-group hc-group--danger"><span>{{ $t('Home.group_overdue') }}<span class="hc-group__count">{{ groups.overdue.length }}</span></span></div>
+                <div class="hc-group hc-group--danger" data-test="mywork-overdue" tabindex="-1"><span>{{ $t('Home.group_overdue') }}<span class="hc-group__count">{{ groups.overdue.length }}</span></span></div>
                 <TaskRow v-for="task in groups.overdue" :key="task._id" v-bind="rowProps(task)" @toggle="$emit('complete', task)" @open="$emit('open', task)" @timer="$emit('timer', task)" @set-date="$emit('set-date', task)" />
             </template>
 
@@ -68,7 +69,7 @@
 </template>
 
 <script setup>
-import { computed, defineEmits, defineProps, ref } from "vue";
+import { computed, defineEmits, defineProps, nextTick, ref } from "vue";
 import TaskRow from "./TaskRow.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 
@@ -88,6 +89,7 @@ const tabs = ["to_do", "done", "delegated"];
 const activeTab = ref("to_do");
 const draft = ref("");
 const addInput = ref(null);
+const root = ref(null);
 // Once used, the field stays even after today's list fills, so the next task needs no click.
 const addUsed = ref(false);
 
@@ -122,5 +124,14 @@ function submitAdd() {
 
 const focusAdd = () => addInput.value?.focus();
 
-defineExpose({ focusAdd });
+async function showGroup(name) {
+    activeTab.value = "to_do";
+    await nextTick();
+    const heading = root.value?.querySelector(`[data-test="mywork-${name}"]`);
+    if (!heading) return;
+    heading.scrollIntoView?.({ block: "nearest" });
+    heading.focus();
+}
+
+defineExpose({ focusAdd, showGroup });
 </script>

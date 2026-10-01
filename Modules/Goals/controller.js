@@ -327,11 +327,11 @@ exports.goalsForTask = handled('for task', async (req, res, caller) => {
     return res.status(200).json({ status: true, statusText: 'Goals fetched successfully.', data });
 });
 
-exports.createGoal = handled('create', async (req, res, caller) => {
-    if (!access.canCreate(caller)) return refuse(res, 403, FORBIDDEN, FORBIDDEN);
-    const body = isObject(req.body) && req.body.targets !== undefined
-        ? { ...req.body, targets: await inCompanyCurrency(caller.companyId, req.body.targets) }
-        : req.body;
+/* The write of a new goal once the caller has been judged. `stamp` is stored beside the goal's own fields; the welcome project's seeder marks its goal with it. */
+const saveGoal = async (caller, given, stamp = {}) => {
+    const body = isObject(given) && given.targets !== undefined
+        ? { ...given, targets: await inCompanyCurrency(caller.companyId, given.targets) }
+        : given;
     const { targets: newTargets = [], ...fields } = rules.parseGoalBody(body, { creating: true });
     const goal = { description: '', periodStart: '', periodEnd: '', visibility: access.PRIVATE, sharedWith: [], color: '', ...fields, ownerUserId: caller.uid };
     rules.requirePeriodInOrder(goal);
@@ -339,7 +339,7 @@ exports.createGoal = handled('create', async (req, res, caller) => {
     await requireActiveMembers(caller.companyId, goal.sharedWith);
     await requireCurrencies(caller.companyId, newTargets, (index) => `targets.${index}.currencyCode`);
     if (Number(await crud(caller.companyId, [{ ownerUserId: caller.uid, deletedStatusKey: LIVE }], 'countDocuments')) >= rules.MAX_GOALS_PER_OWNER) {
-        return refuse(res, 400, 'Request refused', `A person can own at most ${rules.MAX_GOALS_PER_OWNER} goals.`, { field: 'name' });
+        throw Object.assign(new GoalRefused('name', ''), { message: `A person can own at most ${rules.MAX_GOALS_PER_OWNER} goals.` });
     }
     const now = new Date();
     for (const [index, target] of newTargets.entries()) {
@@ -350,6 +350,7 @@ exports.createGoal = handled('create', async (req, res, caller) => {
     const saved = plain(await crud(caller.companyId, {
         ...goal,
         ...crossing.set,
+        ...stamp,
         revision: 0,
         createdBy: caller.uid,
         updatedBy: caller.uid,
@@ -357,6 +358,14 @@ exports.createGoal = handled('create', async (req, res, caller) => {
     }, 'save'));
     reached.tell(caller.companyId, saved, crossing.due, caller.uid);
     announce('insert', caller.companyId);
+    return saved;
+};
+
+exports.saveGoal = saveGoal;
+
+exports.createGoal = handled('create', async (req, res, caller) => {
+    if (!access.canCreate(caller)) return refuse(res, 403, FORBIDDEN, FORBIDDEN);
+    const saved = await saveGoal(caller, req.body);
     audit(req, 'goal.create', saved);
     return sent(res, 'Goal saved.', saved, caller);
 });

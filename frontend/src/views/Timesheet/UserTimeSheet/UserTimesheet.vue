@@ -70,6 +70,7 @@
                     :title="$t('Time.empty_week_title')"
                     :message="$t('Time.empty_week')"
                     :action-label="$t('Time.log_time')"
+                    :sentence="$t('EmptyState.say_time')"
                     @action="openLog()"
                 />
             </div>
