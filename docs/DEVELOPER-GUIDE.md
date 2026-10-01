@@ -27,6 +27,7 @@ The backend serves the built SPA from `frontend/dist`; `cd frontend && npm run b
 | `cd frontend && npm test` | Vitest + `@vue/test-utils` in jsdom (`frontend/tests/*.spec.js`) |
 | `cd frontend && npm run lint -- --no-fix` | Vue CLI ESLint |
 | `node scripts/unused-components.js` | `.vue` files nothing imports (must print nothing) |
+| `npm run env:doc:check` | `docs/ENV.md`, `.env.example` and `frontend/.env.example` match what the code reads, and every description is still read. Not run in CI: run `node scripts/env-doc.js` and commit the three files in the docs pull request that follows merges to `beta` |
 | `node scripts/env-doc.js --check` | env variables described and docs regenerated |
 | `npm run api:doc:check` | `docs/API.md` and `docs/api/openapi.json` match the routes and `scripts/api-doc.meta.json`. Not run in CI: run `npm run api:doc` and commit both files in the docs pull request that follows merges to `beta` |
 | `npm run visual` | the screenshot check of the core screens; CI only, see [Screenshot check](#screenshot-check) |
