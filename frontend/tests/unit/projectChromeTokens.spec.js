@@ -95,13 +95,35 @@ function resolve(value, env) {
     }
     return out.replace(/<(--font-(?:ui|mono))>/g, 'var($1)');
 }
-function px(value, env) {
-    const sum = resolve(value, env).replace(/calc/g, '').replace(/max\(/g, 'Math.max(').replace(/min\(/g, 'Math.min(').replace(/px/g, '');
-    if (!sum.trim() || !/^[\d\s.+\-*/(),Mathmxin]+$/.test(sum)) throw new Error(`cannot compute "${value}" (got "${sum}")`);
-    return Function(`return (${sum});`)();
+/* Works out every min(), max() and calc() once the tokens are in, so a value reads as the browser computes it. */
+function computed(value, env) {
+    let out = resolve(value, env);
+    const number = (expression) => {
+        const sum = expression.replace(/px/g, '');
+        if (!sum.trim() || !/^[\d\s.+\-*/]+$/.test(sum)) throw new Error(`cannot compute "${expression}" in "${value}"`);
+        return Function(`return (${sum});`)();
+    };
+    for (let pass = 0; pass < 24 && /(min|max|calc)\(/.test(out); pass += 1) {
+        out = out.replace(/(min|max|calc)\(([^()]*)\)/, (whole, fn, inside) => {
+            const parts = inside.split(',').map(number);
+            return `${fn === 'calc' ? parts[0] : Math[fn](...parts)}px`;
+        });
+    }
+    return out;
 }
+const px = (value, env) => {
+    const out = computed(value, env);
+    if (!/^-?[\d.]+(px)?$/.test(out)) throw new Error(`"${value}" is not one length (got "${out}")`);
+    return parseFloat(out);
+};
 const size = (rel, selector, property, look) => px(declared(rel, selector, property), ENV[look]);
-const text = (rel, selector, property, look) => resolve(declared(rel, selector, property), ENV[look]);
+const text = (rel, selector, property, look) => computed(declared(rel, selector, property), ENV[look]);
+
+/* The toolbar sets tokens of its own on its root; a rule inside it reads them. */
+const toolbarTokens = () => Object.fromEntries(Object.entries(declarations(withoutMedia(styleOf(TOOLBAR_CSS)), '.pft')).filter(([name]) => name.startsWith('--')));
+const inToolbar = (look) => ({ ...ENV[look], ...toolbarTokens() });
+const barSize = (selector, property, look, rel = TOOLBAR_CSS) => px(declared(rel, selector, property), inToolbar(look));
+const barText = (selector, property, look, rel = TOOLBAR_CSS) => computed(declared(rel, selector, property), inToolbar(look));
 
 describe('the converted stylesheets', () => {
     const HEX = /#[0-9a-fA-F]{3,8}\b(?![-\w])/g;
@@ -165,32 +187,36 @@ describe('the filter toolbar markup', () => {
 
 describe('the filter toolbar reads the tokens', () => {
     it.each([
-        ['.pft', 'padding', 'var(--sp-2) var(--page-pad-x, 20px)'],
-        ['.pft', 'font', '400 var(--fs-md, 12.5px)/var(--lh-body, 1.5) var(--font-ui)'],
-        ['.pft .pft__ctl', 'height', 'var(--control-h-lg, 32px)'],
+        ['.pft', '--pft-h', 'min(var(--control-h-lg, 32px), var(--row-h))'],
+        ['.pft', '--pft-h-boxed', 'min(var(--control-h-lg, 34px), var(--row-h))'],
+        ['.pft', '--pft-fs', 'min(var(--fs-md, 12.5px), var(--row-font))'],
+        ['.pft', 'padding', 'min(var(--sp-2), var(--cell-pad-y)) var(--page-pad-x, 20px)'],
+        ['.pft', 'font', '400 var(--pft-fs)/var(--lh-body, 1.5) var(--font-ui)'],
+        ['.pft .pft__ctl', 'height', 'var(--pft-h)'],
         ['.pft .pft__ctl', 'border-radius', 'var(--r-input)'],
-        ['.pft .pft__input', 'height', 'var(--control-h-lg, 34px)'],
+        ['.pft .pft__input', 'height', 'var(--pft-h-boxed)'],
         ['.pft .pft__input', 'border-radius', 'var(--r-input)'],
-        ['.pft .pft__icon-btn', 'width', 'var(--control-h-lg, 32px)'],
-        ['.pft .pft__icon-btn', 'height', 'var(--control-h-lg, 32px)'],
-        ['.pft .pft__seg', 'height', 'var(--control-h-lg, 34px)'],
+        ['.pft .pft__icon-btn', 'width', 'var(--pft-h)'],
+        ['.pft .pft__icon-btn', 'height', 'var(--pft-h)'],
+        ['.pft .pft__seg', 'height', 'var(--pft-h-boxed)'],
         ['.pft .pft__pill', 'padding', '0 var(--sp-4)'],
         ['.pft__search-scope', 'width', 'var(--hit-min)'],
         ['.pft__search-scope', 'height', 'var(--hit-min)'],
-        ['.pft__mode-chip', 'height', 'var(--control-h-lg, 32px)'],
-        ['.pft .calendar-button', 'height', 'var(--control-h-lg, 32px)'],
+        ['.pft__mode-chip', 'height', 'var(--pft-h)'],
+        ['.pft .calendar-button', 'height', 'var(--pft-h)'],
     ])('%s { %s } is %s', (selector, property, expected) => {
         expect(declared(TOOLBAR_CSS, selector, property)).toBe(expected);
     });
 
-    it.each(['.pft .pft__pill', '.pft .pft__seg-btn', '.pft .pft__input', '.pft .calendar-button', '.pft__mode-chip'])('%s sets its type from the type tokens', (selector) => {
-        expect(declared(TOOLBAR_CSS, selector, 'font')).toMatch(/var\(--fs-md, 12\.5px\)/);
+    it.each(['.pft .pft__pill', '.pft .pft__seg-btn', '.pft .pft__input', '.pft .calendar-button', '.pft__mode-chip', '.pft__filters-btn'])('%s sets its type from the toolbar\'s type token', (selector) => {
+        expect(declared(TOOLBAR_CSS, selector, 'font')).toMatch(/var\(--pft-fs\)/);
     });
 
-    it('the Done by select is a toolbar control like the others', () => {
-        expect(declared(DONE_BY_CSS, '.pv-filter__select', 'height')).toBe('var(--control-h-lg, 32px)');
+    it('the Done by select is a toolbar control like the others, and a control on its own elsewhere', () => {
+        expect(declared(DONE_BY_CSS, '.pv-filter__select', 'height')).toBe('var(--pft-h, var(--control-h-lg, 32px))');
         expect(declared(DONE_BY_CSS, '.pv-filter__select', 'border-radius')).toBe('var(--r-input)');
-        expect(declared(DONE_BY_CSS, '.pv-filter__select', 'font')).toMatch(/var\(--fs-md, 12\.5px\)/);
+        expect(declared(DONE_BY_CSS, '.pv-filter__select', 'font')).toBe('var(--fw-strong, 500) var(--pft-fs, var(--fs-md, 12.5px))/1 var(--font-ui)');
+        expect(px(declared(DONE_BY_CSS, '.pv-filter__select', 'height'), ENV.dense)).toBe(32);
     });
 
     it('paints from the colour tokens only', () => {
@@ -200,38 +226,61 @@ describe('the filter toolbar reads the tokens', () => {
     });
 });
 
-describe('the filter toolbar in the dense default at 1440px', () => {
-    const controls = [
-        ['.pft .pft__ctl', 'height'], ['.pft .pft__input', 'height'], ['.pft .pft__icon-btn', 'height'], ['.pft .pft__icon-btn', 'width'],
-        ['.pft .pft__seg', 'height'], ['.pft__mode-chip', 'height'], ['.pft .calendar-button', 'height'],
-    ];
+const BAR_CONTROLS = [
+    ['.pft .pft__ctl', 'height'], ['.pft .pft__input', 'height'], ['.pft .pft__icon-btn', 'height'], ['.pft .pft__icon-btn', 'width'],
+    ['.pft .pft__seg', 'height'], ['.pft__mode-chip', 'height'], ['.pft .calendar-button', 'height'],
+];
+const barRow = (look) => 2 * px(declared(TOOLBAR_CSS, '.pft', 'padding').split(/\s+(?=var\(--page-pad-x)/)[0], inToolbar(look)) + barSize('.pft .pft__ctl', 'height', look) + 1;
 
-    it.each(controls)('%s { %s } is the 32px control height', (selector, property) => {
-        expect(size(TOOLBAR_CSS, selector, property, 'dense')).toBe(32);
+describe('the filter toolbar in the dense default at 1440px', () => {
+    it.each(BAR_CONTROLS)('%s { %s } is the 32px control height', (selector, property) => {
+        expect(barSize(selector, property, 'dense')).toBe(32);
         expect(px('var(--control-h-lg)', ENV.dense)).toBe(32);
     });
 
     it('the filter pill and the Done by select are 32px too', () => {
-        expect(size(TOOLBAR_CSS, '.pft .top-filter-section', 'height', 'dense') + 2).toBe(32);
-        expect(px(declared(DONE_BY_CSS, '.pv-filter__select', 'height'), ENV.dense)).toBe(32);
+        expect(barSize('.pft .top-filter-section', 'height', 'dense') + 2).toBe(32);
+        expect(barSize('.pv-filter__select', 'height', 'dense', DONE_BY_CSS)).toBe(32);
     });
 
     it('the row is no taller than the project header bar', () => {
-        const [padY] = declared(TOOLBAR_CSS, '.pft', 'padding').split(' ');
-        const row = 2 * px(padY, ENV.dense) + 32 + 1;
-        expect(row).toBeLessThanOrEqual(px('var(--toolbar-h)', ENV.dense));
-        expect(row).toBe(41);
+        expect(barRow('dense')).toBeLessThanOrEqual(px('var(--toolbar-h)', ENV.dense));
+        expect(barRow('dense')).toBe(41);
         expect(declared(TOOLBAR_CSS, '.pft .task-filtersearchassignee-wrapper', 'padding')).toBe('0 !important');
     });
 
     it('lines up with the header bar on the page padding', () => {
-        expect(text(TOOLBAR_CSS, '.pft', 'padding', 'dense')).toBe('4px 16px');
-        expect(resolve(declared(HEADER_CSS, '.ph2__bar', 'padding'), ENV.dense)).toBe('0 16px');
+        expect(barText('.pft', 'padding', 'dense')).toBe('4px 16px');
+        expect(computed(declared(HEADER_CSS, '.ph2__bar', 'padding'), ENV.dense)).toBe('0 16px');
     });
 
     it('sets its controls in the 13px row type', () => {
-        expect(text(TOOLBAR_CSS, '.pft .pft__pill', 'font', 'dense')).toBe('500 13px/1 var(--font-ui)');
-        expect(text(TOOLBAR_CSS, '.pft .pft__input', 'font', 'dense')).toBe('400 13px/1.4 var(--font-ui)');
+        expect(barText('.pft .pft__pill', 'font', 'dense')).toBe('500 13px/1 var(--font-ui)');
+        expect(barText('.pft .pft__input', 'font', 'dense')).toBe('400 13px/1.4 var(--font-ui)');
+        expect(barText('.pv-filter__select', 'font', 'dense', DONE_BY_CSS)).toBe('500 13px/1 var(--font-ui)');
+    });
+});
+
+describe('the filter toolbar under a compact view', () => {
+    it.each(BAR_CONTROLS)('%s { %s } comes down to the compact row', (selector, property) => {
+        expect(barSize(selector, property, 'compact')).toBe(28);
+        expect(barSize(selector, property, 'compact')).toBeLessThan(barSize(selector, property, 'dense'));
+    });
+
+    it('the row is tighter than the default and as tall as the view row above it', () => {
+        expect(barText('.pft', 'padding', 'compact')).toBe('2px 16px');
+        expect(barRow('compact')).toBeLessThan(barRow('dense'));
+        expect(barRow('compact')).toBe(33);
+    });
+
+    it('the type and the Done by select follow', () => {
+        expect(barText('.pft .pft__pill', 'font', 'compact')).toBe('500 12px/1 var(--font-ui)');
+        expect(barSize('.pv-filter__select', 'height', 'compact', DONE_BY_CSS)).toBe(28);
+        expect(barSize('.pft .top-filter-section', 'height', 'compact') + 2).toBe(28);
+    });
+
+    it('a segment is still a 24px target', () => {
+        expect(barSize('.pft .pft__seg-btn', 'height', 'compact')).toBe(24);
     });
 });
 
@@ -245,43 +294,43 @@ describe('the filter toolbar in the classic look', () => {
         ['.pft .pft__ctl', 'height', '32px'],
         ['.pft .pft__ctl', 'border-radius', '8px'],
         ['.pft .pft__input', 'height', '34px'],
+        ['.pft .pft__input', 'padding', '0 30px'],
         ['.pft .pft__input', 'font', '400 12.5px/1.5 var(--font-ui)'],
         ['.pft .pft__icon-btn', 'width', '32px'],
         ['.pft .pft__seg', 'height', '34px'],
+        ['.pft .pft__seg-btn', 'height', '30px'],
+        ['.pft .top-filter-section', 'height', '32px'],
         ['.pft .pft__pill', 'padding', '0 10px'],
         ['.pft .pft__pill', 'gap', '6px'],
         ['.pft .pft__pill', 'font', '400 12.5px/1 var(--font-ui)'],
         ['.pft .pft__seg-btn', 'font', '500 12.5px/1 var(--font-ui)'],
+        ['.pft .pft__members', 'margin-left', '15px'],
         ['.pft__search-scope', 'width', '24px'],
         ['.pft__search-scope', 'border-radius', '6px'],
         ['.pft__mode-chip', 'height', '32px'],
         ['.pft .calendar-button', 'height', '32px'],
+        ['.pft .monthly-calendar-view', 'font', '600 12.5px/32px var(--font-ui)'],
     ])('%s { %s } is still %s', (selector, property, former) => {
-        expect(text(TOOLBAR_CSS, selector, property, 'classic')).toBe(former);
-    });
-
-    it('the search field keeps its 30px side padding and the segments their 30px height', () => {
-        expect(px(declared(TOOLBAR_CSS, '.pft .pft__input', 'padding').split(/\s+(?=calc)/)[1], ENV.classic)).toBe(30);
-        expect(size(TOOLBAR_CSS, '.pft .pft__seg-btn', 'height', 'classic')).toBe(30);
-        expect(size(TOOLBAR_CSS, '.pft .top-filter-section', 'height', 'classic') + 2).toBe(34);
+        expect(barText(selector, property, 'classic')).toBe(former);
     });
 
     it('keeps the inset the legacy wrapper added inside the bar, so the row is as tall as it was', () => {
         const css = styleOf(TOOLBAR_CSS);
         expect(css).toMatch(/:root\[data-variant="classic"\] \.pft:not\(\.pft--phone\) \.task-filtersearchassignee-wrapper\s*\{\s*padding:\s*14px 20px !important;?\s*\}/);
-        expect(2 * (6 + 14) + 34 + 1).toBe(75);
+        expect(2 * (6 + 14) + barSize('.pft .pft__input', 'height', 'classic') + 1).toBe(75);
     });
 
     it('the Done by select is as it was', () => {
-        const env = ENV.classic;
-        expect(resolve(declared(DONE_BY_CSS, '.pv-filter__select', 'height'), env)).toBe('32px');
-        expect(resolve(declared(DONE_BY_CSS, '.pv-filter__select', 'border-radius'), env)).toBe('8px');
-        expect(resolve(declared(DONE_BY_CSS, '.pv-filter__select', 'font'), env)).toBe('500 12.5px/1 var(--font-ui)');
+        expect(barText('.pv-filter__select', 'height', 'classic', DONE_BY_CSS)).toBe('32px');
+        expect(barText('.pv-filter__select', 'padding', 'classic', DONE_BY_CSS)).toBe('0 28px 0 10px');
+        expect(barText('.pv-filter__select', 'border-radius', 'classic', DONE_BY_CSS)).toBe('8px');
+        expect(barText('.pv-filter__select', 'font', 'classic', DONE_BY_CSS)).toBe('500 12.5px/1 var(--font-ui)');
     });
 });
 
 describe('the filter toolbar on a phone', () => {
     const FLOOR = px('var(--hit-min)', ENV.phone);
+    const phoneSize = (selector, property, rel = TOOLBAR_CSS) => px(onPhone(rel, selector, property), inToolbar('phone'));
 
     it('the floor is 40px and above the phone control height', () => {
         expect(FLOOR).toBe(40);
@@ -289,18 +338,18 @@ describe('the filter toolbar on a phone', () => {
     });
 
     it.each(['.pft .pft__ctl', '.pft .pft__ai', '.pft .pft__mode-chip', '.pft .calendar-button', '.pft__search-toggle', '.pft .pft__input'])('%s is as tall as the floor', (selector) => {
-        expect(px(onPhone(TOOLBAR_CSS, selector, 'height'), ENV.phone)).toBe(FLOOR);
+        expect(phoneSize(selector, 'height')).toBe(FLOOR);
     });
 
     it('icon buttons are square at the floor and the filter pill no narrower', () => {
-        expect(px(onPhone(TOOLBAR_CSS, '.pft .pft__icon-btn', 'width'), ENV.phone)).toBe(FLOOR);
-        expect(px(onPhone(TOOLBAR_CSS, '.pft .top-filter-section', 'min-width'), ENV.phone)).toBe(FLOOR);
-        expect(px(onPhone(TOOLBAR_CSS, '.pft .top-filter-section', 'height'), ENV.phone)).toBe(FLOOR);
+        expect(phoneSize('.pft .pft__icon-btn', 'width')).toBe(FLOOR);
+        expect(phoneSize('.pft .top-filter-section', 'min-width')).toBe(FLOOR);
+        expect(phoneSize('.pft .top-filter-section', 'height')).toBe(FLOOR);
     });
 
     it('the Filters button and the Done by select hold the floor', () => {
-        expect(px(declared(TOOLBAR_CSS, '.pft__filters-btn', 'height'), ENV.phone)).toBe(FLOOR);
-        expect(px(onPhone(DONE_BY_CSS, '.pv-filter__select', 'height'), ENV.phone)).toBe(FLOOR);
+        expect(barSize('.pft__filters-btn', 'height', 'phone')).toBe(FLOOR);
+        expect(phoneSize('.pv-filter__select', 'height', DONE_BY_CSS)).toBe(FLOOR);
     });
 });
 
@@ -389,7 +438,7 @@ describe('the project tree in the classic look', () => {
     });
 
     it('the rename field and the close button keep their sizes', () => {
-        expect(size(TREE_RENAME, '.pt-row__rename', 'height', 'classic')).toBe(26);
+        expect(size(TREE_RENAME, '.pt-row__rename', 'height', 'classic')).toBe(26 + 2);
         expect(size(TREE_PANEL, '.ptp__close', 'min-width', 'classic')).toBe(28);
         expect(size(TREE_PANEL, '.ptp__close', 'min-height', 'classic')).toBe(28);
     });
@@ -427,11 +476,12 @@ describe('the tree and toolbar controls keep a 24px target', () => {
     });
 
     it.each(DESKTOP)('toolbar icon buttons, the search scope and the segments are full targets in %s', (look) => {
-        expect(size(TOOLBAR_CSS, '.pft .pft__icon-btn', 'width', look)).toBeGreaterThanOrEqual(FLOOR);
-        expect(size(TOOLBAR_CSS, '.pft .pft__icon-btn', 'height', look)).toBeGreaterThanOrEqual(FLOOR);
-        expect(size(TOOLBAR_CSS, '.pft__search-scope', 'width', look)).toBeGreaterThanOrEqual(FLOOR);
-        expect(size(TOOLBAR_CSS, '.pft__search-scope', 'height', look)).toBeGreaterThanOrEqual(FLOOR);
-        expect(size(TOOLBAR_CSS, '.pft .pft__seg-btn', 'height', look)).toBeGreaterThanOrEqual(FLOOR);
+        expect(barSize('.pft .pft__icon-btn', 'width', look)).toBeGreaterThanOrEqual(FLOOR);
+        expect(barSize('.pft .pft__icon-btn', 'height', look)).toBeGreaterThanOrEqual(FLOOR);
+        expect(barSize('.pft__search-scope', 'width', look)).toBeGreaterThanOrEqual(FLOOR);
+        expect(barSize('.pft__search-scope', 'height', look)).toBeGreaterThanOrEqual(FLOOR);
+        expect(barSize('.pft .pft__seg-btn', 'height', look)).toBeGreaterThanOrEqual(FLOOR);
+        expect(barSize('.pft__search-scope', 'height', look)).toBeLessThanOrEqual(barSize('.pft .pft__input', 'height', look));
     });
 
     it.each(DESKTOP)('the panel close button is a full target in %s', (look) => {
@@ -492,9 +542,9 @@ describe('the saved-view bar and the header leftovers', () => {
     it('the watchers button is a small control like the buttons beside it', () => {
         ['width', 'height'].forEach((side) => {
             expect(declared(HEADER_CSS, '.ph2 .open__watcher', side)).toBe('var(--control-h, 30px)');
-            expect(resolve(declared(HEADER_CSS, '.ph2 .open__watcher', side), ENV.dense)).toBe('26px');
+            expect(computed(declared(HEADER_CSS, '.ph2 .open__watcher', side), ENV.dense)).toBe('26px');
         });
-        expect(resolve(declared('assets/css/tokens.css', '.ah-btn--sm', 'height'), ENV.dense)).toBe('26px');
+        expect(computed(declared('assets/css/tokens.css', '.ah-btn--sm', 'height'), ENV.dense)).toBe('26px');
     });
 });
 

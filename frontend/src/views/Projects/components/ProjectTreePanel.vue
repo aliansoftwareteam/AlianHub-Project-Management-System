@@ -1,6 +1,6 @@
 <template>
     <template v-if="shown">
-        <aside id="project-tree-panel" class="ptp" :class="{ 'ptp--drawer': !wide }" :aria-label="$t('ProjectTree.label')" @keydown.esc="closeDrawer">
+        <aside id="project-tree-panel" class="ptp" :class="{ 'ptp--drawer': !wide }" :aria-label="$t('ProjectTree.label')" :data-density="density" @keydown.esc="closeDrawer">
             <div class="ptp__head">
                 <span class="ptp__title">{{ $t('ProjectTree.label') }}</span>
                 <button v-if="!wide" ref="closeButton" type="button" class="ptp__close" :aria-label="$t('ProjectTree.close')" :title="$t('ProjectTree.close')" @click="closeDrawer">
@@ -24,7 +24,8 @@ import { isWide, projectTreePanelState, projectTreeShown } from "./projectTreePa
 defineOptions({ name: "ProjectTreePanel" });
 
 const props = defineProps({
-    projects: { type: Array, default: null }
+    projects: { type: Array, default: null },
+    density: { type: String, default: undefined }
 });
 
 const route = useRoute();
@@ -54,18 +55,22 @@ watch(() => projectTreePanelState.open, (open) => {
     overflow-y: auto;
     overflow-x: hidden;
     box-sizing: border-box;
-    padding: 12px 8px;
+    padding: var(--sp-5) var(--sp-3);
     background: var(--surface);
     border-right: 1px solid var(--hairline);
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--sp-3);
     scrollbar-width: thin;
 }
 .ptp ~ .section-right { min-width: 0; }
-.ptp__head { display: flex; align-items: center; justify-content: space-between; padding: 0 9px; min-height: 24px; }
-.ptp__title { font: 600 10px/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
-.ptp__close { border: 0; background: transparent; color: var(--ink-2); cursor: pointer; padding: 4px; border-radius: 5px; line-height: 0; min-width: 28px; min-height: 28px; display: inline-flex; align-items: center; justify-content: center; }
+.ptp__head { display: flex; align-items: center; justify-content: space-between; padding: 0 var(--cell-pad-x, 9px); min-height: var(--hit-min); }
+.ptp__title { font: 600 var(--fs-2xs, 10px)/var(--lh-tight, 1.2) var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
+.ptp__close {
+    border: 0; background: transparent; color: var(--ink-2); cursor: pointer; padding: 0; border-radius: var(--r-sm, 5px); line-height: 0;
+    min-width: max(var(--hit-min), var(--control-h-sm, 28px)); min-height: max(var(--hit-min), var(--control-h-sm, 28px));
+    display: inline-flex; align-items: center; justify-content: center;
+}
 .ptp__close:hover { color: var(--ink); background: var(--surface-hover); }
 .ptp__close:focus-visible { outline: none; box-shadow: var(--focus); }
 .ptp--drawer {

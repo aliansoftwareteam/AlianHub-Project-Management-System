@@ -3,7 +3,7 @@
         <template v-if="!loadingProjects && !isRuleData">
             <template v-if="projects?.length && projectData && !isFilterHasData">
                 <template v-if="isRuleData === false ? checkPermission('task.task_list',projectData.isGlobalPermission) !== null && !projectData.isRestrict : !projectData.isRestrict">
-                    <ProjectTreePanel />
+                    <ProjectTreePanel :density="chromeDensity" />
                     <div class="section-right bg-white position-re">
                         <ProjectHeader
                             ref="projectHeader"
@@ -257,6 +257,7 @@
                             ]"
                         >
                             <ProjectFiltersToolbar
+                                :data-density="chromeDensity"
                                 :activeTab="activeTab"
                                 :projectData="projectData"
                                 :clientWidth="clientWidth"
@@ -744,6 +745,8 @@ const savedViews = useSavedViews({
     onSelect: selectView,
 });
 provideViewSettings(savedViews);
+const DENSITY_TABS = ['ProjectListView', 'TableView'];
+const chromeDensity = computed(() => (DENSITY_TABS.includes(activeTab.value) ? savedViews.density.value : undefined));
 const { activeView, dirty: viewDirty, saving: viewSaving, save: saveView, saveForMe: saveViewForMe, saveAsNew: saveViewAsNew, reset: resetView } = savedViews;
 
 const isActiveView = (view) => (activeView.value ? viewKeyOf(view) === viewKeyOf(activeView.value) : activeTab.value === view.keyName);
@@ -1339,14 +1342,6 @@ function closeModal() {
 </script>
 <style scoped>
 @import "./style.css";
-
-.show-archived-active {
-    width: 100%;
-    background-color: var(--warn-bg) !important;
-    height: 44px;
-    padding: 0px 20px;
-}
-
 </style>
 <style>
 .viewlist-mobile-dropdown-new .dropdown_option{
@@ -1438,9 +1433,6 @@ function closeModal() {
     height: 30px;
     width: 30px;
 }
-.task-filtersearchassignee-wrapper{
-    padding: 14px 20px 14px 20px;
-}
 .board-veiw-main-parent.list-view-body,
 .board-veiw-main-parent .task-filtersearchassignee-wrapper {
     background-color: var(--surface);
@@ -1454,12 +1446,6 @@ function closeModal() {
 }
 .search__in{
     line-height: 19px;
-}
-.current__dropdown{
-   padding: 5px 10px 5px 2.58px;
-}
-.manage__filter-users{
-    height: 30px;
 }
 .saving__avtar-div{
     top: 0px;
@@ -1490,22 +1476,6 @@ function closeModal() {
     font-size: 16px;
     width: 100px;
 }
-.ai_button{
-    height: 30px;
-    background: linear-gradient(270deg, #F241CD 0%, #4B5DEE 100%);
-    border: 0px solid transparent;
-    border-radius: 8px;
-    color: #FFFFFF;
-    box-shadow: 0px 5px 10px 0px #9941F24D;
-    padding: 0px 15px 0px 15px;
-    font-size: 13px;
-}
-.main_ai_image{
-    top: 2px;
-    right: 8px;
-    position: relative;
-}
-
 .progress-container {
   width: 75px;
   height: 75px;
@@ -1530,10 +1500,5 @@ function closeModal() {
 .progress-text {
   position: absolute;
   font-size: 1.3em;
-}
-@media(max-width: 1024px){
-.task-filter-assignee .ai_button.btn{
-    margin-left: 0px;
-  }
 }
 </style>

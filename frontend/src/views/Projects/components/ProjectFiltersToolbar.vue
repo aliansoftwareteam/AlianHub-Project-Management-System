@@ -1,7 +1,7 @@
 <template>
     <div class="task-assigneesearch-groupbywrapper pft" :class="{ 'pft--search-open': searchOpen, 'pft--phone': sheetMode }">
-        <div class="d-flex align-items-center justify-content-between flex-wrap task-filtersearchassignee-wrapper" :class="{'w-545' : clientWidth <=767 }" v-if="['ProjectListView', 'Calendar', 'ProjectKanban','TableView'].includes(activeTab)">
-            <div class="d-flex align-items-center justify-content-start task-filtersearch" :class="[{ 'mb-10px': clientWidth <= 767 }]">
+        <div class="d-flex align-items-center justify-content-between flex-wrap task-filtersearchassignee-wrapper" v-if="['ProjectListView', 'Calendar', 'ProjectKanban','TableView'].includes(activeTab)">
+            <div class="d-flex align-items-center justify-content-start task-filtersearch">
                 <TaskFilter :projectData="projectData" @apply="onApplyFilter" @clear="onClearFilter" v-if="!sheetMode && Object.keys(projectData).length > 0"/>
                 <button type="button" class="pft__search-toggle" :aria-label="$t('PlaceHolder.search')" :aria-expanded="searchOpen" @click="searchOpen = !searchOpen">
                     <ShellIcon name="search" :size="15" />
@@ -12,13 +12,13 @@
                         type="text"
                         :placeHolder="$t('PlaceHolder.search')"
                         :aria-label="$t('PlaceHolder.search')"
-                        class="form-control pft__input"
+                        class="pft__input"
                         :value="taskSearch"
                         @input="$emit('update:taskSearch', $event.target.value)"
                     >
-                    <DropDown mode="listbox" :title="$t('Projects.search_in')" id="searchfilterdropdownoptions_driver" class="position-ab dropdown-image-horizontal" :bodyClass="{'search__in-dropdown' : true}">
+                    <DropDown mode="listbox" :title="$t('Projects.search_in')" id="searchfilterdropdownoptions_driver" themed class="position-ab dropdown-image-horizontal" :bodyClass="{'search__in-dropdown' : true}">
                         <template #head>
-                            <h4 class="black font-size-13 font-weight-500 p-10px m-0 search__in" :class="{'border-bottom': clientWidth > 767}">
+                            <h4 class="pft__scope-head" :class="{ 'pft__scope-head--ruled': clientWidth > 767 }">
                                 {{ $t('Projects.search_in') }}
                             </h4>
                         </template>
@@ -28,16 +28,16 @@
                             </button>
                         </template>
                         <template #options>
-                            <DropDownOption :selected="taskNameSearch" @click="taskDescriptionSearch || taskKeySearch ? $emit('update:taskNameSearch', !taskNameSearch) : ''" class="task-serachstatus-dropdown border-radius-4-px">
-                                <span class="project-mobile-desc mr-10px">{{ $t('Projects.task_name') }}</span>
+                            <DropDownOption :selected="taskNameSearch" @click="taskDescriptionSearch || taskKeySearch ? $emit('update:taskNameSearch', !taskNameSearch) : ''" class="task-serachstatus-dropdown">
+                                <span class="project-mobile-desc pft__scope-name">{{ $t('Projects.task_name') }}</span>
                                 <Toggle width="20" :modelValue="taskNameSearch" @update:modelValue="(v) => $emit('update:taskNameSearch', v)" :disabled="taskNameSearch && !taskDescriptionSearch && !taskKeySearch" @change="$emit('search')"/>
                             </DropDownOption>
-                            <DropDownOption :selected="taskKeySearch" @click="$emit('update:taskKeySearch', !taskKeySearch)" class="task-serachstatus-dropdown border-radius-4-px">
-                                <span class="project-mobile-desc mr-10px">{{ $t('Projects.task_key') }}</span>
+                            <DropDownOption :selected="taskKeySearch" @click="$emit('update:taskKeySearch', !taskKeySearch)" class="task-serachstatus-dropdown">
+                                <span class="project-mobile-desc pft__scope-name">{{ $t('Projects.task_key') }}</span>
                                 <Toggle width="20" :modelValue="taskKeySearch" @update:modelValue="(v) => $emit('update:taskKeySearch', v)" @change="$emit('toggleSearch'),$emit('search')"/>
                             </DropDownOption>
-                            <DropDownOption :selected="taskDescriptionSearch" @click="$emit('update:taskDescriptionSearch', !taskDescriptionSearch)" class="task-serachstatus-dropdown border-radius-4-px">
-                                <span class="project-mobile-desc mr-10px">{{ $t('ProjectDetails.description') }}</span>
+                            <DropDownOption :selected="taskDescriptionSearch" @click="$emit('update:taskDescriptionSearch', !taskDescriptionSearch)" class="task-serachstatus-dropdown">
+                                <span class="project-mobile-desc pft__scope-name">{{ $t('ProjectDetails.description') }}</span>
                                 <Toggle width="20" :modelValue="taskDescriptionSearch" @update:modelValue="(v) => $emit('update:taskDescriptionSearch', v)" @change="$emit('toggleSearch'),$emit('search')"/>
                             </DropDownOption>
                         </template>
@@ -59,7 +59,7 @@
                 <Assignee
                     :tourId="'projectviewassignee_driver'"
                     v-if="clientWidth > 767 && projectData?.isPrivateSpace"
-                    class="assignee-data ml-15px"
+                    class="assignee-data pft__members"
                     :users="projectData.AssigneeUserId"
                     :options="[...users.map((x) => x._id), ...teams.map((x) => 'tId_'+x._id)]"
                     :imageWidth="clientWidth>1024 ? '30px' : '25px'"
@@ -77,7 +77,7 @@
                 <template v-if="!showArchived">
                     <button
                         type="button"
-                        class="ai_button pft__icon-btn cursor-pointer"
+                        class="pft__icon-btn pft__ai"
                         :title="$t('AI.write_with_ai')"
                         :aria-label="$t('AI.write_with_ai')"
                         @click="$emit('openAi')"
@@ -87,7 +87,7 @@
                     </button>
                     <DropDown mode="listbox" id="group_by" themed class="group_by" :title="$t('Projects.group_by')" :zIndex="sheetMode ? SHEET_MENU_Z : 7">
                         <template #button="{ triggerAttrs }">
-                            <button type="button" class="text-nowrap btn-white border-groupBy pft__pill cursor-pointer" ref="group_by_status" :title="$t('Projects.group_by')" :aria-label="$t('Projects.group_by')" v-bind="triggerAttrs">
+                            <button type="button" class="pft__ctl pft__pill" ref="group_by_status" :title="$t('Projects.group_by')" :aria-label="$t('Projects.group_by')" v-bind="triggerAttrs">
                                 <ShellIcon name="layout" :size="14" />
                                 <span class="pft__group-label">{{ groupLabel(groupByOptions.find(x => x.id === groupBy)) }}</span>
                             </button>
@@ -104,20 +104,20 @@
                     <button
                         type="button"
                         v-if="activeTab === 'ProjectListView'"
-                        class="border-groupBy pft__icon-btn current__dropdown cursor-pointer"
+                        class="pft__ctl pft__icon-btn current__dropdown"
                         :title="collapsed ? $t('Projects.expand_subtasks') : $t('Projects.collapse_subtasks')"
                         :aria-label="collapsed ? $t('Projects.expand_subtasks') : $t('Projects.collapse_subtasks')"
                         @click="$emit('update:collapsed', !collapsed)"
                     >
                         <ShellIcon :name="collapsed ? 'expand' : 'minimize'" :size="14" />
                     </button>
-                    <div class="border-groupBy d-flex align-items-center assignee-filter manage__filter-users">
+                    <div class="pft__ctl pft__seg manage__filter-users">
                         <button
                             type="button"
                             @click="$emit('manageFilterUsers', userId)"
                             :class="{'is-active' : filterUsers.includes(userId)}"
                             :aria-pressed="filterUsers.includes(userId)"
-                            class="cursor-pointer assignee-user"
+                            class="pft__seg-btn pft__seg-btn--me"
                         >
                             <ShellIcon name="user" :size="14" />
                             <span>{{ $t('Projects.me') }}</span>
@@ -126,7 +126,7 @@
                             type="button"
                             v-if="projectData?.isGlobalPermission === false ? checkPermission('task.show_tasks',projectData.isGlobalPermission) === 2 || checkPermission('task.show_tasks',projectData.isGlobalPermission) === true : true"
                             @click="filtersOpen = false; $emit('update:userSidebar', !userSidebar)"
-                            class="cursor-pointer assignee-status"
+                            class="pft__seg-btn pft__seg-btn--people"
                             :class="{'is-active' : assigneeFilterCount}"
                             :title="assigneeFilterCount ? $t('Projects.assignee_count', { n: assigneeFilterCount }) : $t('ProjectDetails.assignee')"
                             :aria-label="assigneeFilterCount ? $t('Projects.assignee_count', { n: assigneeFilterCount }) : $t('ProjectDetails.assignee')"
@@ -138,9 +138,9 @@
                     <ProvenanceFilter :modelValue="doneBy" @update:modelValue="(v) => $emit('update:doneBy', v)" />
                 </template>
                 <span v-else class="pft__mode-chip">{{ $t('ProjectSlider.archived_list') }}</span>
-                <DropDown mode="menu" id="more_features" :title="$t('Projects.more_features')" :zIndex="sheetMode ? SHEET_MENU_Z : 10">
+                <DropDown mode="menu" id="more_features" themed :title="$t('Projects.more_features')" :zIndex="sheetMode ? SHEET_MENU_Z : 10">
                     <template #button="{ triggerAttrs }">
-                        <button type="button" class="border-groupBy pft__icon-btn cursor-pointer" :title="$t('Projects.more_features')" :aria-label="$t('Projects.more_features')" v-bind="triggerAttrs">
+                        <button type="button" class="pft__ctl pft__icon-btn" :title="$t('Projects.more_features')" :aria-label="$t('Projects.more_features')" v-bind="triggerAttrs">
                             <ShellIcon name="dots" :size="15" />
                         </button>
                     </template>
@@ -157,13 +157,13 @@
             </div>
             </component>
             <div v-if="['Calendar'].includes(activeTab)" class="d-flex align-items-center justify-content-end task-filter-assignee" :class="clientWidth <= 767 ? 'justify-content-start' : ''">
-                <div class="border-groupBy d-flex align-items-center assignee-filter manage__filter-users">
+                <div class="pft__ctl pft__seg manage__filter-users">
                     <button
                         type="button"
                         @click="$emit('manageFilterUsers', userId)"
                         :class="{'is-active' : filterUsers.includes(userId)}"
                         :aria-pressed="filterUsers.includes(userId)"
-                        class="cursor-pointer assignee-user"
+                        class="pft__seg-btn pft__seg-btn--me"
                     >
                         <ShellIcon name="user" :size="14" />
                         <span>{{ $t('Projects.me') }}</span>
@@ -172,7 +172,7 @@
                         type="button"
                         v-if="projectData?.isGlobalPermission === false ? checkPermission('task.show_tasks',projectData.isGlobalPermission) === 2 || checkPermission('task.show_tasks',projectData.isGlobalPermission) === true : true"
                         @click="$emit('update:userSidebar', !userSidebar)"
-                        class="cursor-pointer assignee-status"
+                        class="pft__seg-btn pft__seg-btn--people"
                         :class="{'is-active' : assigneeFilterCount}"
                         :title="assigneeFilterCount ? $t('Projects.assignee_count', { n: assigneeFilterCount }) : $t('ProjectDetails.assignee')"
                         :aria-label="assigneeFilterCount ? $t('Projects.assignee_count', { n: assigneeFilterCount }) : $t('ProjectDetails.assignee')"
