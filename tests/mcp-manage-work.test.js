@@ -71,6 +71,8 @@ let fx;
 beforeEach(() => {
     jest.clearAllMocks();
     fx = seed();
+    // What the manage grant reaches is the subject here, so these projects let an agent close; the default is held in agent-project-policy.test.js.
+    rows(SCHEMA_TYPE.PROJECTS).forEach((project) => { project.agentPolicy = { done: 'yes' }; });
     fx.pageOpen = mockDb.seed(SCHEMA_TYPE.PAGES, {
         title: 'Runbook', ProjectID: P_OPEN, visibility: 'project', createdBy: OTHER, updatedBy: OTHER, editedBy: OTHER, editedAt: new Date('2026-09-01T00:00:00Z'),
         content: { html: '<p>Old body</p>', blocks: { blocks: [{ id: 'b1', type: 'paragraph', data: { text: 'Old body' } }] } }, rawText: 'Old body', deletedStatusKey: 0,
@@ -260,7 +262,7 @@ describe('task.status.set for a token created to manage tasks', () => {
     it('leaves the close to a person where the workspace has a person check an agent\'s work first', async () => {
         mockDb.store.companies[0].agentPolicy = { requireCheckBeforeDone: true };
         const out = await rpc(ctx(OWNER), 'task.status.set', { taskId: fx.top._id, status: 'Done' });
-        expect(out).toMatchObject({ isError: true, error: expect.stringMatching(/a person closes this task/) });
+        expect(out).toMatchObject({ isError: true, refused: true, reason: expect.stringMatching(/a person closes this task/) });
         expect(stored(fx.top._id).statusKey).toBe(2);
         expect((await rpc(ctx(OWNER), 'task.status.set', { taskId: fx.top._id, status: 'To Do' })).ok).toBe(true);
     });

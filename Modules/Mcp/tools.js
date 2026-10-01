@@ -9,6 +9,7 @@ const { hasScope } = require('../ApiTokens/helpers/apiTokenRules');
 const performanceRead = require('../Agents/performanceRead');
 const scopes = require('./scopes');
 const { heldForApproval } = require('./taintHold');
+const projectPolicy = require('../Agents/projectPolicy');
 const visibility = require('./visibility');
 const v2 = require('./v2Flag');
 const cursor = require('./cursor');
@@ -355,12 +356,15 @@ const call = async (ctx, name, args = {}) => {
             throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params, reason: error.message, ip: ctx.ip, taint: ctx.taint });
         }
     }
-    const held = heldForApproval(ctx, tool.action);
+    const tainted = heldForApproval(ctx, tool.action);
     // An outside client that holds the tool's manage grant files what is held for a person; without the grant the call is refused, as before.
-    if (held && !outsideMayFile(ctx, tool)) {
-        throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params, reason: held, ip: ctx.ip, taint: ctx.taint });
+    if (tainted && !outsideMayFile(ctx, tool)) {
+        throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params, reason: tainted, ip: ctx.ip, taint: ctx.taint });
     }
-    if (held || (v2.enabled() && isDestructive(actions.rating(tool.action)))) {
+    // A refusal by the project is left to perform(), which gives the registry's and the holder's refusals first.
+    const rule = await projectPolicy.ask({ companyId: ctx.companyId, actor: ctx.actor, action: tool.action, params });
+    const held = tainted || (rule.decision === projectPolicy.DECISION.PROPOSE ? rule.reason : '');
+    if (rule.decision !== projectPolicy.DECISION.REFUSE && (held || (v2.enabled() && isDestructive(actions.rating(tool.action))))) {
         return propose(ctx, tool, params, str(args.reason, 500) || `${tool.name} via MCP`, held);
     }
     const out = await actions.perform({

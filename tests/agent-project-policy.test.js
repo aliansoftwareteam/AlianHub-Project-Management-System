@@ -187,6 +187,19 @@ describe('where every agent write asks', () => {
         expect(stored(fx.top._id).statusType).toBe('active');
     });
 
+    it('a task created already done counts as a close', async () => {
+        const create = () => rpc(ctx(OWNER), 'task.create', { projectId: P_OPEN, title: 'Born done', status: 'Done' });
+        expect(outcomeOf(await create())).toBe('proposed');
+        setProject(P_OPEN, { done: NEVER });
+        expect(outcomeOf(await create())).toBe('refused');
+        setProject(P_OPEN, { done: YES });
+        setCompany(true);
+        expect(outcomeOf(await create())).toBe('refused');
+        expect(rows(SCHEMA_TYPE.TASKS).filter((task) => task.TaskName === 'Born done')).toHaveLength(0);
+        setCompany(false);
+        expect(outcomeOf(await create())).toBe('applied');
+    });
+
     describe('with the project set to propose everything', () => {
         beforeEach(() => setProject(P_OPEN, { done: YES, connected: CONNECTED.PROPOSE_ALL }));
 

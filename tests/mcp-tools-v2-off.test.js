@@ -6,7 +6,7 @@ jest.mock('../Modules/Agents/actions', () => ({
     perform: jest.fn(async ({ action }) => ({ auditId: 'audit-1', result: { action }, undo: { kind: 'x' } })),
     RefusedError: class RefusedError extends Error {},
 }));
-jest.mock('../Modules/Automations/engine/tools', () => ({ oid: (id) => (/^[0-9a-fA-F]{24}$/.test(String(id)) ? String(id) : null) }));
+jest.mock('../Modules/Automations/engine/tools', () => ({ ...jest.requireActual('../Modules/Automations/engine/tools'), oid: (id) => (/^[0-9a-fA-F]{24}$/.test(String(id)) ? String(id) : null) }));
 jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn(async () => ['6f00000000000000000000a1']) }));
 jest.mock('../Config/permissionGuard', () => ({ ...jest.requireActual('../Config/permissionGuard'), getRoleType: jest.fn(async () => 3) }));
