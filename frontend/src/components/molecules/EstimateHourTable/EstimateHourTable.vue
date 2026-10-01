@@ -35,7 +35,7 @@
                     </th>
                 </tr>
                 <tr v-if="weekRange.length" class="estimate__daysdate-tr">
-                    <th v-for="(data,ind) in weekRange" :key="ind" :class="{'disbleDate': (data.day === 0 || data.day === 6), 'is-today': data.today}" class="text-center">
+                    <th v-for="(data,ind) in weekRange" :key="ind" :class="{'disbleDate': isDayOff(data.day), 'is-today': data.today}" class="text-center">
                         <div class="d-grid">
                             <b>{{ addZero(data.date.getDate()) }}</b>
                             <span>{{ days[data.day] }}</span>
@@ -61,9 +61,9 @@
                         </div>
                     </td>
                     <template v-if="Object.keys(selectedWeekDays).length">
-                        <td v-for="element in selectedWeekDays[user.id]" :key="element.id" class="est_esditing_block p-0" :class="{'disbleDate': (element.day === 0 || element.day === 6), 'is-today': element.today}">
+                        <td v-for="element in selectedWeekDays[user.id]" :key="element.id" class="est_esditing_block p-0" :class="{'disbleDate': isDayOff(element.day), 'is-today': element.today}">
                             <span @click="element.disabled ? '' : showTimeInput(element)" v-if="!element?.edit">
-                                <span class="font-size-14" :class="{'ah-muted': element.disabled || element.day === 0 || element.day === 6}"> {{element.time.HH}}:{{element.time.mm}}</span>
+                                <span class="font-size-14" :class="{'ah-muted': element.disabled || isDayOff(element.day)}"> {{element.time.HH}}:{{element.time.mm}}</span>
                             </span>
                             <span v-else class="vs-con-loading__container" id="div-with-loading-Estimated-TimeInput" @focusout="() => handleClickOutside(element)">
                                 <vue-timepicker
@@ -107,6 +107,7 @@ const { getters } = useStore();
 
 import { useI18n } from "vue-i18n";
 import { isOwnerOrAdmin } from "@/utils/roles";
+import { weekendDaysFor } from "@workingDays";
 const { t } = useI18n();
 
 const emits = defineEmits(['update:updatedETA', 'rangeUpdated'])
@@ -171,6 +172,8 @@ const attributes = ref([
         dates: { start: new Date(), end: new Date() },
     }
 ]);
+
+const isDayOff = (day) => weekendDaysFor(getters['settings/selectedCompany']).includes(day);
 
 const totalUsers = ref([]);
 const updatedItems = ref([]);
