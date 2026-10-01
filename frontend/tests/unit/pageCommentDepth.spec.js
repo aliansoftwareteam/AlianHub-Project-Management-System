@@ -71,6 +71,8 @@ const provide = { $socket: ref(socket), $userId: ref(ME), $companyId: ref('compa
 const mountPanel = async () => {
     const wrapper = mount(PageComments, { props: { pageId: 'p1', blocks: [] }, global: { provide } });
     await flushPromises();
+    await wrapper.trigger('pointerenter');
+    await flushPromises();
     return wrapper;
 };
 const pickerSettles = () => new Promise((resolve) => setTimeout(resolve, 260));
@@ -98,6 +100,20 @@ beforeEach(() => {
         { _id: 'r1', userId: ME, parentId: 'c1', message: 'On it', createdAt: '2026-09-30T10:05:00Z', mediaURL: KEY, mediaOriginalName: 'brief.pdf', mediaSize: 2048 },
     ];
     vi.clearAllMocks();
+});
+
+describe('the people a doc comment can name', () => {
+    it('are asked for when the reader reaches for the panel, once', async () => {
+        const wrapper = mount(PageComments, { props: { pageId: 'p1', blocks: [] }, global: { provide } });
+        await flushPromises();
+        const asked = () => api.calls.filter((c) => c.url.endsWith('/people')).length;
+        expect(asked()).toBe(0);
+        await wrapper.find('.pcm__compose textarea').trigger('focusin');
+        await wrapper.trigger('pointerenter');
+        await flushPromises();
+        expect(asked()).toBe(1);
+        wrapper.unmount();
+    });
 });
 
 describe('mentions in a doc comment', () => {
