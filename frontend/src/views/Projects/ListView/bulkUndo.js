@@ -1,20 +1,16 @@
+import { eachRow } from "@/store/ProjectData/taskTree";
+
 const FIELDS = ["statusKey", "AssigneeUserId", "tagsArray", "sprintId", "deletedStatusKey", "Task_Priority", "DueDate", "isParentTask", "ParentTaskId"];
 
 export function* storedTasks(projectData = {}) {
     for (const bucket of [projectData.tasks, projectData.tableTasks]) {
         for (const project of Object.values(bucket || {})) {
             for (const sprint of Object.values(project || {})) {
-                for (const task of (Array.isArray(sprint?.tasks) ? sprint.tasks : [])) {
-                    yield task;
-                    for (const sub of (Array.isArray(task?.subtaskArray) ? task.subtaskArray : [])) yield sub;
-                }
+                yield* eachRow(Array.isArray(sprint?.tasks) ? sprint.tasks : []);
             }
         }
     }
-    for (const task of (Array.isArray(projectData.searchedTasks) ? projectData.searchedTasks : [])) {
-        yield task;
-        for (const sub of (Array.isArray(task?.subtaskArray) ? task.subtaskArray : [])) yield sub;
-    }
+    yield* eachRow(Array.isArray(projectData.searchedTasks) ? projectData.searchedTasks : []);
 }
 
 const copy = (value) => (Array.isArray(value) ? value.map(String) : value);
@@ -115,9 +111,21 @@ export function undoRequests({ action, payload = {}, before = {}, updatedIds = [
         return taskIds.length ? [{ action, tagId: payload.tagId, operation: adding ? "remove" : "add", taskIds }] : [];
     }
 
-    if (action === "bulkConvertToTask") {
-        const groups = groupBy(known.filter((id) => before[id].isParentTask === false), (id) => String(before[id].ParentTaskId || ""));
-        return [...groups].map(([parentTaskId, taskIds]) => ({ action: "bulkConvertToSubTask", taskIds, parentTaskId }));
+    const backUnderParent = (ids) => [...groupBy(ids.filter((id) => before[id].isParentTask === false), (id) => String(before[id].ParentTaskId || ""))]
+        .map(([parentTaskId, taskIds]) => ({ action: "bulkConvertToSubTask", taskIds, parentTaskId }));
+
+    if (action === "bulkConvertToTask") return backUnderParent(known);
+
+    /* A row that was a subtask goes back under the parent it had; one that was a task goes back to its sprint. */
+    if (action === "bulkConvertToSubTask") {
+        const sprints = projectSprints(project);
+        const projectData = { id: project?._id, ProjectCode: project?.ProjectCode, ProjectName: project?.ProjectName };
+        const wereTasks = groupBy(known.filter((id) => before[id].isParentTask !== false), (id) => String(before[id].sprintId || ""));
+        const backToSprint = [...wereTasks].flatMap(([sprintId, taskIds]) => {
+            const sprintObj = sprints.find((sprint) => String(sprint.id) === sprintId);
+            return sprintObj ? [{ action: "bulkConvertToTask", taskIds, sprintObj, projectData }] : [];
+        });
+        return [...backUnderParent(known), ...backToSprint];
     }
 
     if (action === "bulkUpdatePriority") {
