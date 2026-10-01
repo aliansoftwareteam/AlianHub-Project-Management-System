@@ -12,6 +12,7 @@ import { isOwnerOrAdmin } from "@/utils/roles";
 import { isFavourite } from "@/composable/favourites";
 import { assigneeCondition, assigneeGroups, dueDateBuckets, dueDateCondition, restoreGroupState, sprintToLoad } from "./taskGroups";
 import { customFieldGroups, customFieldIdOf, customGroupUpdate } from "./composables/customFieldQuery";
+import { activeMemberIds } from "@/plugins/customFieldView/fieldTypes/people";
 
 const projectsList = ref([]);
 const filterdProjects = ref([]);
@@ -892,8 +893,7 @@ export function taskListHelper() {
                 indexKey.value = "assigneeIndex";
 
                 // Groups used to come from a typesense group_by; with search gone they come from the company seats instead.
-                const memberIds = (getters["settings/companyUsers"] || []).filter((member) => member && member.userId && member.isDelete !== true && Number(member.status) !== 3).map((member) => member.userId);
-                arr = assigneeGroups(memberIds, getUser, t("Projects.unassigned"), getters["settings/teams"]);
+                arr = assigneeGroups(activeMemberIds(getters["settings/companyUsers"]), getUser, t("Projects.unassigned"), getters["settings/teams"]);
 
                     sprints.forEach((sprint, index) => {
                         sprint.isExpanded = false;
@@ -941,7 +941,10 @@ export function taskListHelper() {
                 indexKey.value = "groupByStatusIndex";
                 const fieldId = customFieldIdOf(type);
                 const def = (getters["settings/finalCustomFields"] || []).find((field) => String(field?._id) === fieldId);
-                arr = customFieldGroups(def, { t });
+                const people = def?.fieldType === "people"
+                    ? activeMemberIds(getters["settings/companyUsers"]).map((id) => ({ id, name: getUser(id).Employee_Name }))
+                    : [];
+                arr = customFieldGroups(def, { t, people });
 
                 sprints.forEach((sprint, index) => {
                     sprint.isExpanded = false;

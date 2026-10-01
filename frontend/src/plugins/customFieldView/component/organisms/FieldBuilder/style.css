@@ -173,3 +173,4 @@
     .fb__row > :nth-child(4), .fb__row > :nth-child(5) { display: none; }
     .fb__types { grid-template-columns: minmax(0, 1fr); }
 }
+.fb__type-icon { vertical-align: -2px; margin-inline-end: 6px; color: var(--ink-2); }
