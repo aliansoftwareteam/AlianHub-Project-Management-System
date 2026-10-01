@@ -194,19 +194,26 @@ exports.getCustomField = async (req, res) => {
 const socketEmitter = require("../../event/socketEventEmitter");
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { evaluateFormula, extractReferences, FUNCTIONS, ROLLUP_FUNCTIONS } = require("./helpers/formula");
-const { computeTaskFields, descendantsOf, validateFormulaDefinition, slug, builtinScope } = require("./helpers/computeFields");
+const { COMPUTED_TYPES, computeTaskFields, descendantsOf, validateFormulaDefinition, slug, builtinScope } = require("./helpers/computeFields");
 const { MAX_DEPTH } = require("../Tasks/helpers/taskTreeRules");
+const { readableTaskIds } = require("../Tasks/helpers/taskWritePlacement");
 
 const isObjectIdString = (value) => typeof value === "string" && /^[a-f\d]{24}$/i.test(value);
 
+const definitionsOf = (rows, projectId) => rows.filter((row) => {
+    if (row.global) return true;
+    const ids = Array.isArray(row.projectId) ? row.projectId : [row.projectId];
+    return ids.map(String).includes(String(projectId));
+});
+
 const loadDefinitions = async (companyId, projectId) => {
     const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.CUSTOM_FIELDS, data: [] }, "find") || [];
-    if (!projectId) return rows;
-    return rows.filter((row) => {
-        if (row.global) return true;
-        const ids = Array.isArray(row.projectId) ? row.projectId : [row.projectId];
-        return ids.map(String).includes(String(projectId));
-    });
+    return projectId ? definitionsOf(rows, projectId) : rows;
+};
+
+const readable = async (companyId, uid, tasks) => {
+    const ids = await readableTaskIds(companyId, uid, tasks.map((task) => String(task._id)));
+    return tasks.filter((task) => ids.includes(String(task._id)));
 };
 
 /* POST /api/v2/custom-fields/formula/validate
@@ -262,7 +269,7 @@ exports.formulaScope = async (req, res) => {
 
         const definitions = await loadDefinitions(companyId, projectId);
         let task = null;
-        if (isObjectIdString(taskId)) {
+        if (isObjectIdString(taskId) && (await readableTaskIds(companyId, req.uid, [taskId])).length) {
             task = await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TASKS,
                 data: [{ _id: new mongoose.Types.ObjectId(taskId), deletedStatusKey: { $ne: 1 } }]
@@ -296,15 +303,16 @@ const liveTasks = async (companyId, filter) => await MongoDbCrudOpration(company
     data: [{ ...filter, deletedStatusKey: { $ne: 1 } }]
 }, "find") || [];
 
-/* A rollup counts every level under its task, so a change on one row moves the rollups of each task above it. */
-const withTasksAbove = async (companyId, tasks) => {
+/* A rollup counts every level under its task, so a change on one row moves the rollups of each task above it.
+ * The climb stops at a task the caller cannot open: nothing above it is computed or written for them. */
+const withTasksAbove = async (companyId, uid, tasks) => {
     const all = [...tasks];
     const known = new Set(all.map((task) => String(task._id)));
     let level = tasks;
     for (let step = 0; step < MAX_DEPTH && level.length; step += 1) {
         const wanted = [...new Set(level.map((task) => String(task.ParentTaskId || "")))].filter((id) => isObjectIdString(id) && !known.has(id));
         // eslint-disable-next-line no-await-in-loop
-        level = wanted.length ? await liveTasks(companyId, { _id: { $in: wanted.map((id) => new mongoose.Types.ObjectId(id)) } }) : [];
+        level = wanted.length ? await readable(companyId, uid, await liveTasks(companyId, { _id: { $in: wanted.map((id) => new mongoose.Types.ObjectId(id)) } })) : [];
         level.forEach((task) => { known.add(String(task._id)); all.push(task); });
     }
     return all;
@@ -324,27 +332,31 @@ const rowsBelow = async (companyId, tasks) => {
 };
 
 /* POST /api/v2/custom-fields/compute
- * body: { projectId, taskIds: [], scope?: 'subtask' | 'sprint' }
- * Evaluates every formula/rollup field for the given tasks, and for the tasks above them,
- * and STORES the result on each task, so the value a client renders was computed on the server.
- * A rollup counts every subtask under its task, on every level, each once. */
+ * body: { taskIds: [], scope?: 'subtask' | 'sprint' }
+ * Evaluates every formula/rollup field of each task's own project for the given tasks, and for the tasks above
+ * them, and STORES the result on each task, so the value a client renders was computed on the server.
+ * A rollup counts every subtask under its task, on every level, each once: the stored number is the whole one,
+ * which is what a list shows while part of the tree is not loaded. Only tasks the caller can open are loaded,
+ * computed, written and answered. */
 exports.computeFields = async (req, res) => {
     try {
         const companyId = req.headers["companyid"];
-        const { projectId, taskIds, scope } = req.body || {};
+        const { taskIds, scope } = req.body || {};
         if (!companyId) return res.send({ status: false, message: "Company ID is required in headers." });
 
         const ids = (Array.isArray(taskIds) ? taskIds : []).filter(isObjectIdString);
         if (!ids.length) return res.send({ status: false, message: "At least one task id is required." });
         if (ids.length > 200) return res.send({ status: false, message: "At most 200 tasks per request." });
 
-        const definitions = await loadDefinitions(companyId, projectId);
-        const computed = definitions.filter((definition) => ["formula", "rollup"].includes(definition.fieldType));
-        if (!computed.length) return res.send({ status: true, statusText: "Nothing to compute.", data: { updated: 0, values: {} } });
+        const everyDefinition = await loadDefinitions(companyId, null);
+        if (!everyDefinition.some((definition) => COMPUTED_TYPES.includes(definition.fieldType))) {
+            return res.send({ status: true, statusText: "Nothing to compute.", data: { updated: 0, values: {} } });
+        }
 
-        const asked = await liveTasks(companyId, { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } });
+        const openable = await readableTaskIds(companyId, req.uid, ids);
+        const asked = openable.length ? await liveTasks(companyId, { _id: { $in: openable.map((id) => new mongoose.Types.ObjectId(id)) } }) : [];
         const bySprint = scope === "sprint";
-        const tasks = bySprint ? asked : await withTasksAbove(companyId, asked);
+        const tasks = bySprint ? asked : await withTasksAbove(companyId, req.uid, asked);
         const rows = bySprint
             ? await liveTasks(companyId, { sprintId: { $in: [...new Set(tasks.map((task) => task.sprintId).filter(Boolean))] } })
             : await rowsBelow(companyId, tasks);
@@ -352,6 +364,9 @@ exports.computeFields = async (req, res) => {
         const out = {};
         const errors = {};
         for (const task of tasks) {
+            const definitions = definitionsOf(everyDefinition, task.ProjectID);
+            const computed = definitions.filter((definition) => COMPUTED_TYPES.includes(definition.fieldType));
+            if (!computed.length) continue;
             const kids = bySprint
                 ? rows.filter((row) => String(row.sprintId) === String(task.sprintId) && String(row._id) !== String(task._id))
                 : descendantsOf(task, rows);
@@ -381,7 +396,7 @@ exports.computeFields = async (req, res) => {
             if (Object.keys(result.errors).length) errors[String(task._id)] = result.errors;
         }
 
-        return res.send({ status: true, statusText: "Computed fields updated.", data: { updated: tasks.length, values: out, errors } });
+        return res.send({ status: true, statusText: "Computed fields updated.", data: { updated: Object.keys(out).length, values: out, errors } });
     } catch (error) {
         console.error("Error in computeFields:", error);
         return res.send({ status: false, message: error.message || "Could not compute these fields." });

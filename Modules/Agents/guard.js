@@ -1,11 +1,16 @@
+const mongoose = require('mongoose');
 const registry = require('./registry');
 const audit = require('./agentAudit');
 const { resolveActor, isAgent } = require('./actor');
+const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 
 // Middleware that applies the registry to the ordinary REST routes when the
 // caller is an agent token. Humans pass straight through — the guard never
 // changes what the web app can do.
+
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
 const refuse = async (req, res, actor, { action, reason, params, entityId }) => {
     const companyId = req.headers['companyid'] || '';
@@ -21,58 +26,93 @@ const withActor = (fn) => async (req, res, next) => {
         const actor = req.agentActor || await resolveActor(req);
         req.agentActor = actor;
         if (!isAgent(actor)) return next();
-        return fn(req, res, next, actor);
+        return await fn(req, res, next, actor);
     } catch (e) {
         logger.error(`agent guard: ${e.message}`);
         return res.status(500).json({ status: false, message: 'Agent guard failed.' });
     }
 };
 
-/* Any route that must be a person: reject agents outright. */
-const requireHumanActor = withActor((req, res, next, actor) =>
-    refuse(req, res, actor, { action: req.body && req.body.action ? String(req.body.action) : 'human-only route', reason: 'Agents cannot perform this action — a person has to.', params: {} }));
+const idText = (value) => {
+    const named = value && typeof value === 'object' ? (value.id || value._id) : value;
+    return typeof named === 'string' && OBJECT_ID.test(named.trim()) ? named.trim().toLowerCase() : '';
+};
 
-/* A route that is one named registry action. */
-const agentActionGuard = (action, paramsOf = () => ({})) => withActor(async (req, res, next, actor) => {
-    const params = paramsOf(req) || {};
-    const check = registry.evaluate(action, params);
-    if (!check.allowed) return refuse(req, res, actor, { action, reason: check.reason, params, entityId: params.taskId });
-    req.agentAction = { action, params };
-    return next();
-});
+const storedRow = (companyId, type, id, fields) => (idText(id)
+    ? MongoDbCrudOpration(companyId, { type, data: [{ _id: new mongoose.Types.ObjectId(idText(id)) }, fields] }, 'findOne')
+    : null);
 
-/* PATCH /api/v2/tasks carries many actions in body.action. Map each to a
- * registry key so setting Done, deleting, or anything unmapped is refused. */
+const projectOfTask = async (companyId, taskId) => {
+    const task = await storedRow(companyId, SCHEMA_TYPE.TASKS, taskId, { ProjectID: 1 });
+    return task && task.ProjectID ? String(task.ProjectID).toLowerCase() : '';
+};
+
+const flatStatus = (row) => (row && row.convertStatus ? row.convertStatus : row);
+
+/* A status is judged as its project defines it, whatever type and name the body gives it. */
+const storedStatus = async (companyId, projectId, statusKey) => {
+    const project = await storedRow(companyId, SCHEMA_TYPE.PROJECTS, projectId, { taskStatusData: 1 });
+    const rows = ((project && project.taskStatusData) || []).map(flatStatus).filter(Boolean);
+    const row = statusKey === undefined || statusKey === null ? null : rows.find((status) => String(status.key) === String(statusKey));
+    return row ? { statusType: row.type, name: row.name } : {};
+};
+
+const fields = (...names) => (body, { taskId }) => ({ action: 'task.update', params: { taskId, fields: Object.fromEntries(names.map((name) => [name, 1])) } });
+
+const ARCHIVE_ACTIONS = { 0: 'task.restore', 2: 'task.archive' };
+
+/* The registry key, or keys, each task action is; every one must be allowed. An action absent here is refused. */
 const TASK_PATCH_ACTIONS = {
-    updateStatus: (b) => ({ action: 'task.status.set', params: { taskId: taskIdOf(b), status: { statusType: b.newStatus && b.newStatus.statusType, name: b.newStatus && b.newStatus.status && b.newStatus.status.text } } }),
-    updateAssignee: (b) => ({ action: 'task.assign', params: { taskId: taskIdOf(b) } }),
-    updatePriority: (b) => ({ action: 'task.update', params: { taskId: taskIdOf(b), fields: { Task_Priority: 1 } } }),
-    updateDueDate: (b) => ({ action: 'task.update', params: { taskId: taskIdOf(b), fields: { DueDate: 1 } } }),
-    updateStartDate: (b) => ({ action: 'task.update', params: { taskId: taskIdOf(b), fields: { startDate: 1 } } }),
-    updateDescription: (b) => ({ action: 'task.update', params: { taskId: taskIdOf(b), fields: { description: 1 } } }),
-    updateTaskName: (b) => ({ action: 'task.update', params: { taskId: taskIdOf(b), fields: { TaskName: 1 } } }),
-    updatePoints: (b) => ({ action: 'task.update', params: { taskId: taskIdOf(b), fields: { points: 1 } } }),
-    updateTaskTotalEstimate: (b) => ({ action: 'task.update', params: { taskId: taskIdOf(b), fields: { totalEstimatedTime: 1 } } }),
-    updateChecklist: (b) => ({ action: 'task.update', params: { taskId: taskIdOf(b), fields: { checklistArray: 1 } } }),
-    updateTags: (b) => ({ action: 'task.update', params: { taskId: taskIdOf(b), fields: { tagsArray: 1 } } }),
-    moveTask: (b) => ({ action: 'task.sprint.move', params: { taskId: taskIdOf(b) } }),
+    updateStatus: async (body, { companyId, taskId }) => {
+        const sent = body.newStatus && typeof body.newStatus === 'object' ? body.newStatus : {};
+        const stored = await storedStatus(companyId, await projectOfTask(companyId, taskId), sent.statusKey);
+        return [stored, { statusType: sent.statusType, name: sent.status && sent.status.text }]
+            .map((status) => ({ action: 'task.status.set', params: { taskId, status } }));
+    },
+    updateAssignee: (body, { taskId }) => ({ action: 'task.assign', params: { taskId } }),
+    updatePriority: fields('Task_Priority'),
+    updateDueDate: fields('DueDate'),
+    updateStartDate: fields('startDate'),
+    updateStartDateAndDueDate: fields('startDate', 'DueDate'),
+    updateDates: fields('startDate', 'DueDate'),
+    updateDescription: fields('description'),
+    updateTaskName: fields('TaskName'),
+    updatePoints: fields('points'),
+    updateTaskTotalEstimate: fields('totalEstimatedTime'),
+    updateChecklists: fields('checklistArray'),
+    updateTags: fields('tagsArray'),
+    moveTask: async (body, { companyId, taskId }) => {
+        const home = await projectOfTask(companyId, taskId);
+        const stays = Boolean(home) && idText(body.projectData && body.projectData.id) === home;
+        return { action: stays ? 'task.sprint.move' : 'task.move', params: { taskId } };
+    },
+    updateArchiveDelete: (body, { taskId }) => ({ action: ARCHIVE_ACTIONS[body.deletedStatusKey === undefined ? 0 : body.deletedStatusKey] || 'task.delete', params: { taskId } }),
 };
 
-const taskIdOf = (b) => (b && ((b.task && b.task._id) || (b.taskData && b.taskData._id) || b.taskId || (b.prevStatus && b.prevStatus.taskId))) || null;
-
-const taskPatchActionOf = (body) => {
-    const name = body && body.action;
-    const map = name && TASK_PATCH_ACTIONS[name];
-    if (!map) return { action: `tasks.${name || 'unknown'}`, params: { taskId: taskIdOf(body) } };
-    return map(body);
+const taskPatchChecks = async (body, at) => {
+    const name = typeof body.action === 'string' ? body.action : '';
+    if (!Object.hasOwn(TASK_PATCH_ACTIONS, name)) return [{ action: `tasks.${name || 'unknown'}`, params: { taskId: at.taskId } }];
+    return [].concat(await TASK_PATCH_ACTIONS[name](body, at));
 };
 
-const taskPatchGuard = withActor(async (req, res, next, actor) => {
-    const { action, params } = taskPatchActionOf(req.body || {});
+/* An action behind a flag reaches a task through its MCP tool alone, where the token's grant, the
+ * workspace's proposal policy and the undo record apply; a task route has none of the three. */
+const evaluateOnRoute = (action, params) => {
     const check = registry.evaluate(action, params);
-    if (!check.allowed) return refuse(req, res, actor, { action, reason: check.reason, params, entityId: params.taskId });
-    req.agentAction = { action, params };
+    if (check.allowed && !registry.ACTIONS.includes(check.action)) return { allowed: false, reason: `Agents cannot perform ${action} on this route` };
+    return check;
+};
+
+/* `taskIdOf(body)` is the task the route's own preparation will write. */
+const taskPatchGuard = (taskIdOf) => withActor(async (req, res, next, actor) => {
     const companyId = req.headers['companyid'] || '';
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const checks = await taskPatchChecks(body, { companyId, taskId: taskIdOf(body) });
+    for (const { action, params } of checks) {
+        const check = evaluateOnRoute(action, params);
+        if (!check.allowed) return refuse(req, res, actor, { action, reason: check.reason, params, entityId: params.taskId });
+    }
+    const [{ action, params }] = checks;
     let auditId;
     try {
         auditId = await audit.openAction(companyId, actor, { action, reason: 'via REST', params, entityId: params.taskId, ip: req.ip || '' });
@@ -112,4 +152,4 @@ const agentPerimeter = withActor(async (req, res, next, actor) => {
     return refuse(req, res, actor, { action: hit.action, reason: `Agents cannot perform ${hit.action}`, params: {} });
 });
 
-module.exports = { requireHumanActor, agentActionGuard, taskPatchGuard, taskPatchActionOf, agentPerimeter, TASK_PATCH_ACTIONS };
+module.exports = { taskPatchGuard, agentPerimeter, TASK_PATCH_ACTIONS };

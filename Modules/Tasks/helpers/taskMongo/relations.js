@@ -7,6 +7,7 @@ const socketEmitter = require('../../../../event/socketEventEmitter');
 const { HandleHistory } = require("../mongo_helper");
 const { HandleBothNotification } = require("../handleNotification");
 const { INVERSE_RELATION, RELATION_LABELS, validateTaskRef, validateRelationPair, validateRelationInput, selectOpenBlockers } = require('./relationRules');
+const { readableTaskIds } = require('../taskWritePlacement');
 
 // Task-to-task relations (blocks / blocked_by / duplicates / duplicated_by /
 // relates_to). A link is stored on BOTH task documents as an entry in the
@@ -131,8 +132,9 @@ module.exports = {
     },
 
     /* -------------- LIST RELATIONS OF A TASK (WITH TASK SUMMARIES) -----------------*/
-    // payload: { companyId, taskId }
-    getTaskRelations({ companyId, taskId }) {
+    // payload: { companyId, taskId, userData }. `userData` is the reader: a link to a task they cannot
+    // open is left out whole, so neither the answer nor its length says the link exists.
+    getTaskRelations({ companyId, taskId, userData }) {
         return new Promise(async (resolve, reject) => {
             try {
                 const check = validateTaskRef({ companyId, taskId });
@@ -144,7 +146,9 @@ module.exports = {
                 if (!task) {
                     return reject(new Error('Task not found.'));
                 }
-                const relations = task.relations || [];
+                const linked = task.relations || [];
+                const openable = new Set(await readableTaskIds(companyId, userData && userData.id, linked.map((rel) => String(rel.taskId))));
+                const relations = linked.filter((rel) => openable.has(String(rel.taskId)));
                 if (!relations.length) {
                     return resolve({ status: true, statusText: 'No linked tasks.', data: [] });
                 }
@@ -178,13 +182,13 @@ module.exports = {
     },
 
     /* -------------- LIST OPEN BLOCKERS OF A TASK -----------------*/
-    // payload: { companyId, taskId }. Returns the `blocked_by` links whose
+    // payload: { companyId, taskId, userData }. Returns the `blocked_by` links whose
     // blocking task is still open — i.e. why this task isn't unblocked yet.
     // Drives the "blocked by N open task(s)" warning shown on the task.
-    getOpenBlockers({ companyId, taskId }) {
+    getOpenBlockers({ companyId, taskId, userData }) {
         return new Promise(async (resolve, reject) => {
             try {
-                const relationsResult = await this.getTaskRelations({ companyId, taskId });
+                const relationsResult = await this.getTaskRelations({ companyId, taskId, userData });
                 const openBlockers = selectOpenBlockers(relationsResult.data || []);
                 resolve({
                     status: true,

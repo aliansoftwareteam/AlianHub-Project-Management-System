@@ -21,6 +21,7 @@ const { parseAgentMentionIds } = require("./helpers/parseMentions");
 const { withoutAiFields } = require("./helpers/aiActor");
 const { bumpUnreadCounts } = require("./helpers/unreadBumps");
 const { isChatMessage, holdsThreads, replyLookup, withThreadSummary, readable, keptRootIds, announceThread } = require("./helpers/chatThreads");
+const { withoutServerOwnedFields } = require("./helpers/serverOwnedFields");
 
 /* A comment an agent run writes never starts agents, so agents cannot start each other.
  * Required on use: the agent modules are only needed by a comment that names an agent. */
@@ -57,7 +58,7 @@ exports.save = async (req, res) => {
         const query = {
             type: SCHEMA_TYPE.COMMENTS,
             data: {
-                ...convertData,
+                ...withoutServerOwnedFields(convertData),
                 mentionIds,
                 ...(convertData.taskId !== 'default' ? { taskId: convertData.taskId } : {})
             }
@@ -162,7 +163,7 @@ exports.update = async (req, res) => {
             }
         }
 
-        const changes = { ...data };
+        const changes = withoutServerOwnedFields(data);
         delete changes.mentionIds;
         const mentionIds = changes.message !== undefined
             ? await resolveMentionIds(req.headers['companyid'], existingComment.userId, threadOf(existingComment), changes.message)

@@ -58,10 +58,11 @@ function initializeControllers() {
     startInterval();
     const { currentDirectory } = require(`./common-storage/common-${process.env.STORAGE_TYPE}.js`);
     //IMPORT CUSTOM FILES
+    // First, so its perimeter (Modules/Agents/guard.js) stands in front of every module's routes.
+    require('./Modules/Agents/init').init(app);
     require('./Modules/Auth/init').init(app);
     require('./Modules/SSO/init').init(app);
     require('./Modules/Audit/init').init(app);
-    require('./Modules/Agents/init').init(app);
     require('./Modules/Mcp/init').init(app);
     require('./Modules/OAuthServer/init').init(app);
     require('./Modules/AgentSessions/init').init(app);

@@ -9,11 +9,14 @@ const { handleEvents } = require('../Company/eventController');
 const logger = require('../../Config/loggerConfig');
 const { requireTaskActionPermission, requireTaskWritePermission } = require('../../Config/permissionGuard');
 const { TASK_ACTIONS, PRE_V2_TASK_ACTIONS, RELATION_ACTIONS, TASK_WRITE_ROUTES, actionEntry } = require('../../Config/taskWritePermissions');
-const { TASK_ACTION_FIELDS, PRE_V2_ACTION_FIELDS, specFor, prepareOrRefuse, sendFailure } = require('./helpers/taskWriteFields');
+const { TASK_ACTION_FIELDS, PRE_V2_ACTION_FIELDS, specFor, writtenTaskId, prepareOrRefuse, sendFailure } = require('./helpers/taskWriteFields');
 const { importTargetAccess, refuseImport } = require('../Importers/helpers/importAccess');
+const { taskPatchGuard } = require('../Agents/guard');
+
+const agentRule = (fields) => taskPatchGuard((body) => writtenTaskId(fields, body));
 
 exports.init = (app) => {
-    app.patch('/api/tasks/', requireTaskActionPermission(PRE_V2_TASK_ACTIONS), async (req, res) => {
+    app.patch('/api/tasks/', requireTaskActionPermission(PRE_V2_TASK_ACTIONS), agentRule(PRE_V2_ACTION_FIELDS), async (req, res) => {
         const action = req.body && req.body.action;
         const payload = await prepareOrRefuse(req, res, specFor(PRE_V2_ACTION_FIELDS, action), `PATCH /api/tasks/ ${action}`);
         if (!payload) return;
@@ -49,7 +52,7 @@ exports.init = (app) => {
         }
     });
 
-    app.patch('/api/v2/tasks', requireTaskActionPermission(), async (req, res) => {
+    app.patch('/api/v2/tasks', requireTaskActionPermission(), agentRule(TASK_ACTION_FIELDS), async (req, res) => {
         const action = req.body && req.body.action;
         const payload = await prepareOrRefuse(req, res, specFor(TASK_ACTION_FIELDS, action), action);
         if (!payload) return;

@@ -28,11 +28,12 @@ const { fieldAppliesToTask } = require('../../../CustomField/helpers/fieldTaskTy
 const { checkedFieldDetail, FieldValueRefused } = require('../../../CustomField/helpers/fieldValueWrite');
 
 const FIELD_NOT_FOR_TASK_TYPE = 'This custom field is not used for this task type.';
+const FIELD_NOT_FOUND = 'This custom field does not exist.';
 
 /* The value as it is stored, or a refusal: the field is not for this task's type, or the value does not fit the field's type. */
 const fieldDetailToStore = async ({ companyId, taskId, customFieldId, storedTask, updateDetail, actorId }) => {
     const definition = await customFieldDefinitionOf(companyId, customFieldId);
-    if (!definition) return updateDetail;
+    if (!definition) throw new TaskWriteRefusal(400, FIELD_NOT_FOUND);
     const task = storedTask || await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: new mongoose.Types.ObjectId(taskId) }] }, 'findOne');
     if (!fieldAppliesToTask(definition, task)) throw new TaskWriteRefusal(400, FIELD_NOT_FOR_TASK_TYPE);
     try {
