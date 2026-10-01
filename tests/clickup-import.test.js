@@ -92,8 +92,38 @@ describe('a ClickUp export imported into an existing project', () => {
     it('keeps subtasks under their parent', async () => {
         await importIntoProject();
         expect(sent('Write the billing tests').ParentTaskId).toBe('86a1aaa01');
-        expect(sent('Check the rounding').ParentTaskId).toBe('86a1aaa01');
+        expect(sent('Check the rounding').ParentTaskId).toBe('86a1aaa02');
         expect(sent('Set up the billing page')._id).toBe('86a1aaa01');
+    });
+
+    it('tells the person which rows the create path had to re-hang', async () => {
+        taskMongo.createMultipleTasks.mockImplementation(async ({ tasks }) => ({
+            status: true,
+            createdTasks: tasks,
+            adjusted: [
+                { _id: 'a', TaskName: 'Too deep', reason: 'TOO_DEEP' },
+                { _id: 'b', TaskName: 'Deeper still', reason: 'TOO_DEEP' },
+                { _id: 'c', TaskName: 'Follow up with legal', reason: 'PARENT_MISSING' },
+            ],
+        }));
+        const res = await importIntoProject();
+        expect(res.body.data.adjusted).toEqual({
+            tooDeep: 2,
+            parentMissing: 1,
+            cycle: 0,
+            rows: [
+                { name: 'Too deep', reason: 'TOO_DEEP' },
+                { name: 'Deeper still', reason: 'TOO_DEEP' },
+                { name: 'Follow up with legal', reason: 'PARENT_MISSING' },
+            ],
+        });
+        expect(res.body.statusText).toMatch(/2 subtasks were deeper than three levels and were placed under their nearest parent/);
+        expect(res.body.statusText).toMatch(/1 row named a parent that is not in the file/);
+    });
+
+    it('says nothing about re-hung rows when the tree fitted', async () => {
+        const res = await importIntoProject();
+        expect(res.body.data.adjusted).toBeUndefined();
     });
 
     it('maps statuses onto the project and adds the missing one', async () => {

@@ -22,6 +22,7 @@
         />
         <div class="formkit__form-wrapper">
             <label class="formkit-label">{{ $t('CustomField.rollup_function') }}</label>
+            <p class="ah-field__hint">{{ $t('Fields.rollup_help') }}</p>
         </div>
         <DropDown mode="listbox" :zIndex="10" :id="rollupFunctionUniqueId" :keepSameWidth="true">
             <template #button>
