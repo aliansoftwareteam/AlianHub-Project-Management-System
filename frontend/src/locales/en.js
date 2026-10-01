@@ -5484,6 +5484,7 @@ export default {
         no_activity_log_found: "No activity log found",
     },
     Projects: {
+        not_available: "N/A",
         filters: "Filters",
         filters_active: "Filters, {n} active",
         filters_close: "Close filters",
@@ -6698,6 +6699,10 @@ export default {
         confirm_delete_title: "Are you sure you want to delete this clip?",
     },
     Milestone: {
+        home_link: "Home",
+        toggle_rows: "Show or hide the rows under {name}",
+        public_project: "Public project",
+        no_filter: "No filter",
         milestone: "Milestone",
         milestone_name: "Milestone Name",
         status_date: "Status Date",
@@ -7967,6 +7972,8 @@ export default {
         generate: "Generate token",
         rotate: "Regenerate token",
         working: "Working…",
+        saved: "Saved",
+        failed: "Failed",
     },
     Audit: {
         subtitle: "An immutable record of sensitive actions in this workspace — role changes, SSO updates, and more.",

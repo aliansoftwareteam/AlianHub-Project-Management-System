@@ -1,6 +1,6 @@
 <template>
     <SpinnerComp :is-spinner="loading" />
-    <div class="milestone-report-wrapper" v-if="!loading" :class="[{'error_404':!error404}]">
+    <div class="ah-page milestone-report-wrapper" v-if="!loading" :class="[{'error_404':!error404}]">
         <div v-if="error404">
             <div v-if="!currentCompany?.planFeature?.milstoneReport">
                 <UpgradePlan
@@ -15,17 +15,16 @@
                 <div class="product_top_bar d-flex justify-content-between align-items-center">
                     <div class="product_top_bar_left milestone-report-backarrow d-flex align-items-center">
                         <div class="prev_mile_report padding_right_report">
-                            <router-link :to="{name: 'Home', params: {cid: companyId}}">
-                                <img src="../../assets/images/svg/Home.svg" alt="backarrow" />
+                            <router-link class="mr-home" :to="{name: 'Home', params: {cid: companyId}}" :aria-label="$t('Milestone.home_link')">
+                                <span class="ah-mask-icon" :style="maskOf(homeIcon)" aria-hidden="true"></span>
                             </router-link>
                         </div>
                         <div class="breadcrumb d-flex align-items-center">
                             <div class="pipeline padding_right_report" v-if="clientWidth > 767">
-                                <router-link class="milestone_reports_family blue text-decoration-underline" :to="`/${companyId}/project`" >{{$t('UserTimesheet.back_projects')}}</router-link>
-                                <!-- <a href="#" >Back to Projects</a> -->
+                                <router-link class="milestone_reports_family" :to="`/${companyId}/project`" >{{$t('UserTimesheet.back_projects')}}</router-link>
                             </div>
                             <div class="pipeline padding_right_report">
-                                <span class="milestone_reports_family black">{{$t('UserTimesheet.milestone_reports')}}</span>
+                                <span class="milestone_reports_family">{{$t('UserTimesheet.milestone_reports')}}</span>
                             </div>
                         </div>
                     </div>
@@ -35,9 +34,9 @@
                         <div class="filterSection">
                             <div class="wf_filter" @click.stop="$refs.filter_ut_click_empty.click()">
                                 <span class="timesheet_user_filter">
-                                    <DropDown mode="listbox" id="FilterDropDownSheet" :title="`status`" :dropDownClass="true" class="status_change_dropdown">
+                                    <DropDown mode="listbox" id="FilterDropDownSheet" themed :title="$t('ProjectDetails.status')" :dropDownClass="true" class="status_change_dropdown">
                                         <template #button="{ triggerAttrs }">
-                                            <button type="button" class="btn-white border cursor-pointer dot-btn" v-bind="triggerAttrs" ref="filter_ut_click_empty">
+                                            <button type="button" class="dot-btn" v-bind="triggerAttrs" ref="filter_ut_click_empty">
                                                 <span class="link_disable_css">{{$t('Filters.filter_by')}} {{$t('ProjectDetails.status')}}</span>
                                             </button>
                                         </template>
@@ -60,9 +59,7 @@
                                         <span @click.stop.prevent class="user_name" :title="chip.name">
                                             {{chip.name}}
                                         </span>
-                                        <button @click.stop.prevent="handleFilter(chip,chipKey,'remove')" type="button" class="btn-close vs-chip--close cursor-pointer">
-                                            <img src="@/assets/images/cancel.png" alt="cancel"/>
-                                        </button>
+                                        <button @click.stop.prevent="handleFilter(chip,chipKey,'remove')" type="button" :aria-label="$t('Reports.remove_filter')">×</button>
                                     </span>
                                 </span>
                             </div>
@@ -124,6 +121,10 @@
     import MilestoneReportThead from '@/components/atom/MilestoneReportThead/MilestoneReportThead.vue'
     import MilestoneReportTbody from '@/components/atom/MilestoneReportTbody/MilestoneReportTbody.vue'
     import { isOwnerOrAdmin } from "@/utils/roles";
+    import { maskOf } from '@/utils/iconMask';
+    import { useI18n } from 'vue-i18n';
+    const { t } = useI18n();
+    const homeIcon = require('@/assets/images/svg/Home.svg');
     // getter and permission
     const { getters,dispatch} = useStore();
     const { checkPermission } = useCustomComposable();
@@ -145,7 +146,7 @@
     const loading = ref(false);
     const objectProjectCurrency = ref({});
     const daysOrMonth = ref([]);
-    const settingNotFound =ref([{'name':'no Filter'}]);
+    const settingNotFound = ref([{ name: t('Milestone.no_filter'), isPlaceholder: true }]);
     const selectedFilters = ref([]);
     const statusNameArray = ref([]);
     const endDateFilter = ref('');
@@ -396,7 +397,7 @@
         daysOrMonth.value = value;
     };
     const handleFilter = (ele,ind,action) => {
-        if(ele.name == "no Filter"){
+        if(ele.isPlaceholder){
             return;
         }
         if(action === 'add'){

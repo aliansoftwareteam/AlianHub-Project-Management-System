@@ -5424,6 +5424,7 @@ export default {
         "no_activity_log_found": "未找到活动日志"
     },
     "Projects": {
+        "not_available": "N/A",
         "filters": "Filters",
         "filters_active": "Filters, {n} active",
         "filters_close": "Close filters",
@@ -6598,6 +6599,10 @@ export default {
         "confirm_delete_title": "Are you sure you want to delete this clip?"
     },
     "Milestone": {
+        "home_link": "Home",
+        "toggle_rows": "Show or hide the rows under {name}",
+        "public_project": "Public project",
+        "no_filter": "No filter",
         "milestone": "里程碑",
         "milestone_name": "里程碑名称",
         "status_date": "状态日期",
@@ -7798,7 +7803,9 @@ export default {
         "copied": "Copied!",
         "generate": "Generate token",
         "rotate": "Regenerate token",
-        "working": "Working…"
+        "working": "Working…",
+        "saved": "Saved",
+        "failed": "Failed"
     },
     "Audit": {
         "subtitle": "An immutable record of sensitive actions in this workspace — role changes, SSO updates, and more.",
