@@ -114,7 +114,7 @@ describe('the project menu can be found and read in either theme', () => {
             .slice(1)
             .join('\n');
         expect(phone).toMatch(/\.assigneelist-audiofile-dropdown\s*\{[^}]*background(?:-color)?:\s*var\(--surface\)/);
-        expect(phone).toMatch(/\.assigneelist-audiofile-dropdown \.drop-down-item,[^{]*\.assigneelist-audiofile-dropdown \.drop-down-item span\s*\{[^}]*color:\s*var\(--ink\)/);
+        expect(phone).toMatch(/\.assigneelist-audiofile-dropdown \.drop-down-item \.gray4b\s*\{[^}]*color:\s*var\(--ink\)/);
     });
 
     it('colours the trigger from a token', () => {
