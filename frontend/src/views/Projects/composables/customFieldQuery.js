@@ -4,6 +4,8 @@ import { fieldAppliesToTask, fieldTaskTypes } from '@fieldTaskTypes';
 import { typeModuleOf } from '@fieldTypes';
 import { maxOf as ratingMaxOf, text as ratingText } from '@fieldTypes/rating';
 import { RANGE as PROGRESS_RANGE } from '@fieldTypes/progress';
+import { linksOf } from '@fieldTypes/relationship';
+import { linkedValue } from '@/plugins/customFieldView/fieldTypes/fieldLinks';
 import { inBand, numberBands, numberOf } from './numberBands';
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -13,13 +15,16 @@ const TEXT_TYPES = ['text', 'textarea', 'email', 'phone', 'url'];
 const NUMBER_TYPES = ['number', 'money'];
 const NUMERIC_TYPES = [...NUMBER_TYPES, 'rating', 'progress'];
 const LIST_TYPES = ['dropdown', 'people'];
-const BANDED_TYPES = [...NUMBER_TYPES, 'progress'];
+const RELATIONSHIP = 'relationship';
+const VOTING = 'voting';
+const BANDED_TYPES = [...NUMBER_TYPES, 'progress', VOTING];
+const PROJECT_RANGED_TYPES = [...NUMBER_TYPES, VOTING];
 const SET_OR_EMPTY_TYPES = ['files'];
 const EMPTY_VALUES = [null, '', []];
 const CHECKED = [true, 'true'];
 
-export const GROUPABLE_TYPES = Object.freeze(['dropdown', 'checkbox', 'date', 'people', 'rating', ...BANDED_TYPES]);
-export const FILTERABLE_TYPES = Object.freeze(['dropdown', 'checkbox', 'date', 'people', ...NUMERIC_TYPES, ...TEXT_TYPES, ...SET_OR_EMPTY_TYPES]);
+export const GROUPABLE_TYPES = Object.freeze(['dropdown', 'checkbox', 'date', 'people', 'rating', ...BANDED_TYPES, RELATIONSHIP]);
+export const FILTERABLE_TYPES = Object.freeze(['dropdown', 'checkbox', 'date', 'people', ...NUMERIC_TYPES, ...TEXT_TYPES, ...SET_OR_EMPTY_TYPES, RELATIONSHIP, VOTING]);
 
 export const isSortableField = (def) => typeModuleOf(def?.fieldType)?.sortable !== false;
 
@@ -38,6 +43,10 @@ const valueInTypes = (condition, types) => (types.length ? { ...condition, ...in
 const blankOrOtherType = (blank, valued, types) => (types.length ? { $nor: [{ ...valued, ...inTypes(types) }] } : blank);
 
 const hasId = (def) => Boolean(def && OBJECT_ID.test(String(def._id || '')));
+
+/* A task carries no linked task and no voter, so a query cannot read them off it. It names what it asks for and the
+   server answers it for the person asking, as the ids of the tasks that qualify. */
+const linkCondition = (fieldId, is, extra = {}) => ({ _id: { fieldLinks: { field: String(fieldId), is, ...extra } } });
 
 export const customGroupOptions = (defs) => (defs || [])
     .filter((def) => hasId(def) && GROUPABLE_TYPES.includes(def.fieldType))
@@ -99,7 +108,7 @@ function ownRange(def) {
     return isRange(ends) && ends[1] > ends[0] ? ends : null;
 }
 
-export const needsProjectRange = (def) => NUMBER_TYPES.includes(def?.fieldType) && !ownRange(def);
+export const needsProjectRange = (def) => PROJECT_RANGED_TYPES.includes(def?.fieldType) && !ownRange(def);
 
 /* The lowest and highest value in the project, read as numbers the way the bands' own conditions read them. It goes through
    the task query, so it counts only tasks the viewer can see. */
@@ -196,6 +205,13 @@ export function customFieldGroups(def, { t = (key) => key, now = new Date(), peo
         ];
     }
     if (BANDED_TYPES.includes(def.fieldType)) return numberGroups(def, { t, range, tasks, base, none, path, types });
+    if (def.fieldType === RELATIONSHIP) {
+        const linked = linkCondition(def._id, 'set');
+        return [
+            { ...base, name: t('ViewGroups.has_value'), value: 'set', searchValue: 'set', dropDisabled: true, conditions: [valueInTypes(linked, types)] },
+            { ...none, dropDisabled: true, conditions: [blankOrOtherType(linkCondition(def._id, 'empty'), linked, types)] }
+        ];
+    }
     if (def.fieldType === 'checkbox') {
         return [
             { ...base, name: t('ViewGroups.checked'), value: true, searchValue: true, conditions: [valueInTypes({ [path]: { $in: CHECKED } }, types)] },
@@ -234,7 +250,12 @@ function dateMatches(time, item) {
 }
 
 export function customGroupMatches(task, item) {
-    const value = fieldAppliesToTask({ fieldTaskTypes: item.customFieldTaskTypes }, task) ? storedValue(task, item.customFieldId) : undefined;
+    const applies = fieldAppliesToTask({ fieldTaskTypes: item.customFieldTaskTypes }, task);
+    if (item.customFieldType === RELATIONSHIP) {
+        const linked = applies && linksOf(linkedValue(task, item.customFieldId)).length > 0;
+        return item.searchValue === 'set' ? linked : !linked;
+    }
+    const value = applies ? storedValue(task, item.customFieldId) : undefined;
     if (LIST_TYPES.includes(item.customFieldType)) {
         const chosen = [].concat(isBlank(value) ? [] : value).filter((id) => !isBlank(id)).map(String);
         return item.searchValue === '' ? chosen.length === 0 : chosen.includes(String(item.searchValue));
@@ -268,8 +289,13 @@ export const customFilterOptions = (defs) => (defs || [])
 
 const IS_SET = { value: ':set', name: 'cf_is_set' };
 const IS_EMPTY = { value: ':empty', name: 'cf_is_empty' };
+const HAS_TASK = { value: ':has', name: 'cf_has_task' };
+const I_VOTED = { value: ':mine', name: 'cf_i_voted' };
+const VALUELESS = [IS_SET.value, IS_EMPTY.value, I_VOTED.value];
 
 export function comparisonsFor(fieldType) {
+    if (fieldType === RELATIONSHIP) return [HAS_TASK, IS_SET, IS_EMPTY];
+    if (fieldType === VOTING) return [I_VOTED, { value: ':=', name: 'Equal_To' }, { value: ':>', name: 'Greater_Than' }, { value: ':<', name: 'Less_Than' }];
     if (LIST_TYPES.includes(fieldType)) return [{ value: ':', name: 'Is' }, { value: ':!=', name: 'Not_Equals_To' }, IS_SET, IS_EMPTY];
     if (fieldType === 'checkbox') return [{ value: ':=', name: 'Is' }];
     if (NUMERIC_TYPES.includes(fieldType)) {
@@ -281,7 +307,7 @@ export function comparisonsFor(fieldType) {
     return [];
 }
 
-export const needsValue = (comparison) => comparison !== IS_SET.value && comparison !== IS_EMPTY.value;
+export const needsValue = (comparison) => !VALUELESS.includes(comparison);
 
 const escapeRegExp = (text) => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -294,6 +320,21 @@ function numberCondition(path, comparison, raw) {
     if (comparison === ':>') return present(value, { $gt: [value, number] });
     if (comparison === ':<') return present(value, { $lt: [value, number] });
     return null;
+}
+
+/* A task nobody voted on carries no count, and is read as zero. */
+function voteCountCondition(path, comparison, raw) {
+    const number = Number(raw);
+    if (raw === '' || raw === null || raw === undefined || !Number.isFinite(number)) return null;
+    const operator = { ':=': '$eq', ':>': '$gt', ':<': '$lt' }[comparison];
+    return operator ? { $expr: { [operator]: [{ $ifNull: [converted(path, 'double'), 0] }, number] } } : null;
+}
+
+function relationshipCondition(fieldId, comparison, values) {
+    if (comparison === IS_SET.value) return linkCondition(fieldId, 'set');
+    if (comparison === IS_EMPTY.value) return linkCondition(fieldId, 'empty');
+    const task = String(values[0] ?? '');
+    return comparison === HAS_TASK.value && OBJECT_ID.test(task) ? linkCondition(fieldId, 'has', { task }) : null;
 }
 
 function dateCondition(path, comparison, raw) {
@@ -333,6 +374,11 @@ function unscopedFilterCondition(row) {
     const values = Array.isArray(row.values) ? row.values : [];
     const type = row.name.fieldType;
 
+    if (type === RELATIONSHIP) return relationshipCondition(fieldIdOfPath(path), comparison, values);
+    if (type === VOTING) {
+        if (comparison === I_VOTED.value) return linkCondition(fieldIdOfPath(path), 'mine');
+        return values.length ? voteCountCondition(path, comparison, values[0]) : null;
+    }
     if (comparison === IS_SET.value) return { [path]: { $nin: EMPTY_VALUES } };
     if (comparison === IS_EMPTY.value) return { [path]: { $in: EMPTY_VALUES } };
     if (!values.length) return null;

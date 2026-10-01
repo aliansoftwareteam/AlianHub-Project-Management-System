@@ -7,23 +7,23 @@
             </div>
             <div class="d-flex flex-column text-ellipsis">
                 <div v-if="findParticularProject && Object.keys(findParticularProject).length" class="d-flex white align-items-center pb-3px">
-                    <span class="text-ellipsis text-capitalize font-weight-400 gray81 font-size-12 d-inline-block" v-if="taskValue.folderObjId && taskValue.folderArray?.name">
+                    <span class="text-ellipsis font-weight-400 gray81 font-size-12 d-inline-block" v-if="taskValue.folderObjId && taskValue.folderArray?.name">
                         {{findParticularProject.ProjectName}} /
                         {{taskValue.folderArray?.name}} 
                         / {{taskValue.sprintArray?.name}} {{ taskValue.isParentTask == false ? taskValue.parentTaskName : '' }}
                     </span>
-                    <span class="text-ellipsis text-capitalize black font-weight-400 gray81 font-size-12 d-inline-block" v-else-if="taskValue.sprintId && taskValue.sprintArray?.name">
+                    <span class="text-ellipsis black font-weight-400 gray81 font-size-12 d-inline-block" v-else-if="taskValue.sprintId && taskValue.sprintArray?.name">
                         {{findParticularProject.ProjectName}} / 
                         {{taskValue.sprintArray?.name}}
                         {{ taskValue.isParentTask == false ? taskValue.parentTaskName : '' }}
                     </span>
-                    <span class="text-ellipsis text-capitalize black font-weight-400 gray81 font-size-12 d-inline-block" v-else>
+                    <span class="text-ellipsis black font-weight-400 gray81 font-size-12 d-inline-block" v-else>
                         {{findParticularProject.ProjectName}}
                     </span>
                 </div>
                 <div class="d-flex align-items-center text-ellipsis">
                     <img :src="subtask" v-if="!taskValue.isParentTask" class="mr-10px">
-                    <span class="text-ellipsis text-capitalize black font-size-16 font-weight-400 d-inline-block pr-10px" :title="taskValue.TaskName">{{ taskValue.TaskName }}</span>
+                    <span class="text-ellipsis black font-size-16 font-weight-400 d-inline-block pr-10px" :title="taskValue.TaskName">{{ taskValue.TaskName }}</span>
                 </div>
             </div>
         </div>

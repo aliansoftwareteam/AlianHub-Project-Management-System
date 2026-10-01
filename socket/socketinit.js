@@ -9,6 +9,7 @@ const {callSocketHandler} = require('./controller/callSocket');
 require('./controller/agentSessionSocket').registerWhenOn();
 require('./controller/viewTemplateSocket');
 require('./controller/whiteboardSocket');
+require('./controller/projectTemplateSocket');
 require('./controller/agentSocket');
 require('./controller/folderSocket');
 const { instrument } = require('@socket.io/admin-ui');

@@ -19,7 +19,7 @@
                 <div class="d-flex startEndMaidiv justify-content-between align-items-center">
                     <span class="starttoEndTime font-ui black font-weight-500">{{(screenShotdetail.screenShotTime.seconds || screenShotdetail.screenShotTime._seconds) ? getDateType(screenShotdetail.screenShotTime.seconds ? screenShotdetail.screenShotTime.seconds : screenShotdetail.screenShotTime._seconds * 1000) : getDateType(parseInt(screenShotdetail.screenShotTime))}}</span>
                     <span class="d-flex align-items-center">
-                        <UserProfile
+                        <UserProfile decorative
                             :showDot="false"
                             :data="{
                                 image: screenShotdetail.userProfile,

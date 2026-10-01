@@ -71,7 +71,7 @@
                         <div :style="{width : clientWidth <=767 ? '100%' : ' 225px'}" class="saved-filters">
                             <div class="saved-filterdropdownlist-wrapper">
                                 <DropDownOption v-for="(item, index) in filteredOptions" :key="index" class="dropdown-item justify-content-between saved-filters-dropdown" :class="{'edit-input-mobile' : clientWidth <=767 && item.isEdit }" @click="!item.isEdit && $emit('apply', {item: item, type: 'saved'})">
-                                    <span class="saved-serach-title text-capitalize w-100 font-size-14 tf-muted" v-if="!item.isEdit">{{ $t(`${ item.name }`)}}</span>
+                                    <span class="saved-serach-title w-100 font-size-14 tf-muted" v-if="!item.isEdit">{{ $t(`${ item.name }`)}}</span>
                                     <InputText v-if="item.isEdit" type="text" @enter="updateFilter(item)" v-model.trim="filterName" :isDirectFocus="true" autocomplete="off" :class="[{'border-red': isInvalid}]" :style="{maxWidth: clientWidth >767 ? '80%':'100%'}"/>
                                     <div v-if="item.isEdit" class="edit-delete-erapper">
                                         <img src="@/assets/images/svg/greencheck2.svg" alt="Edit" class="m0px-10px greencheck__img"  @click.stop="updateFilter(item)">

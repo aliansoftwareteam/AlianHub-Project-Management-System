@@ -355,9 +355,9 @@ describe('Inbox kind "assigned"', () => {
         expect(R.KINDS).toContain('assigned');
         expect(R.kindOf({ sourceType: 'notification', key: 'comment_assigned' })).toBe('assigned');
         const assigned = R.notificationMatch('u1', { tab: 'primary', kind: 'assigned' }).$and;
-        expect(assigned).toContainEqual({ key: 'comment_assigned' });
+        expect(assigned).toContainEqual({ key: { $in: ['comment_assigned', 'doc_comment_assigned'] } });
         const updates = R.notificationMatch('u1', { tab: 'primary', kind: 'update' }).$and;
-        expect(updates).toContainEqual({ key: { $nin: ['general_reminder', 'comment_assigned'] } });
+        expect(updates).toContainEqual({ key: { $nin: ['general_reminder', 'comment_assigned', 'doc_comment_assigned'] } });
         expect(R.planFor('primary', 'all', 'assigned')).toMatchObject({ notifications: true, mentions: false });
     });
 });

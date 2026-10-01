@@ -73,8 +73,8 @@ function submitNew() {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px 12px;
-    padding: 6px 20px;
+    gap: var(--sp-3) var(--sp-5);
+    padding: var(--sp-2) var(--page-pad-x, 20px);
     background: var(--warn-bg);
     border-bottom: 1px solid var(--hairline);
     color: var(--warn-ink);
@@ -83,8 +83,8 @@ function submitNew() {
 .svb__status {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-weight: 600;
+    gap: var(--sp-2);
+    font-weight: var(--fw-title, 600);
 }
 .svb__dot {
     width: 8px;
@@ -98,17 +98,17 @@ function submitNew() {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: var(--sp-2);
     min-width: 0;
 }
 .svb__btn {
-    height: 28px;
-    padding: 0 10px;
+    height: var(--control-h, 28px);
+    padding: 0 var(--sp-4);
     border: 1px solid var(--hairline);
-    border-radius: 8px;
+    border-radius: var(--r-input);
     background: var(--surface);
     color: var(--ink);
-    font: 500 12.5px/1 var(--font-ui);
+    font: var(--fw-strong, 500) var(--fs-sm, 12.5px)/1 var(--font-ui);
     cursor: pointer;
     white-space: nowrap;
 }
@@ -139,12 +139,12 @@ function submitNew() {
     outline-offset: 2px;
 }
 .svb__input {
-    height: 28px;
+    height: var(--control-h, 28px);
     width: 200px;
     max-width: 100%;
-    padding: 0 8px;
+    padding: 0 var(--sp-3);
     border: 1px solid var(--hairline);
-    border-radius: 8px;
+    border-radius: var(--r-input);
     background: var(--surface);
     color: var(--ink);
     font: var(--text-small);
@@ -152,13 +152,13 @@ function submitNew() {
 .svb__check {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
     margin: 0;
     color: var(--ink);
 }
 @media (max-width: 767px) {
     .svb {
-        padding: 6px 12px;
+        padding: var(--sp-2) var(--sp-5);
     }
     .svb__form,
     .svb__actions {

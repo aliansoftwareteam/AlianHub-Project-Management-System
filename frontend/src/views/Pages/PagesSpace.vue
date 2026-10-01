@@ -400,7 +400,7 @@ const DocCard = defineComponent({
             return h('button', { type: 'button', class: ['ah-card', 'hub__card', { 'hub__card--agent': agent }], onClick: () => emit('open', page) }, [
                 h('span', { class: 'hub__card-title' }, [
                     page.title || t('Docs.untitled'),
-                    agent ? h('span', { class: 'ah-chip ah-chip--agent ah-chip--mono hub__tag' }, t('Docs.agent_draft')) : null,
+                    agent ? h('span', { class: 'ah-chip ah-chip--agent hub__tag' }, t('Docs.agent_draft')) : null,
                 ]),
                 h('span', { class: 'hub__card-excerpt' }, page.excerpt || t('Docs.empty_page_excerpt')),
                 h('span', { class: 'hub__card-foot' }, [
@@ -408,7 +408,7 @@ const DocCard = defineComponent({
                     h('span', { class: 'ah-chip hub__card-project' }, projectNameOf(page.ProjectID)),
                     h('span', { class: 'hub__card-meta' }, [
                         avatarNode(page.updatedBy, page.createdByAgent),
-                        h('span', { class: 'hub__mono' }, relativeTime(page.updatedAt, t)),
+                        h('span', { class: 'hub__when' }, relativeTime(page.updatedAt, t)),
                     ]),
                 ]),
             ]);
@@ -425,12 +425,12 @@ const DocList = defineComponent({
             type: 'button',
             key: page._id,
             class: 'hub__row',
-            style: props.tree ? { paddingLeft: `${14 + (page.depth || 0) * 18}px` } : null,
+            style: props.tree ? { paddingLeft: `calc(var(--cell-pad-x, 14px) + ${(page.depth || 0)} * var(--row-indent))` } : null,
             onClick: () => emit('open', page),
         }, [
             h(ShellIcon, { name: page.isWiki ? 'book' : 'file', size: 14, class: 'hub__row-icon' }),
             h('span', { class: 'hub__row-title' }, page.title || t('Docs.untitled')),
-            page.createdByAgent && page.agentStatus !== 'approved' ? h('span', { class: 'ah-chip ah-chip--agent ah-chip--mono hub__tag' }, t('Docs.agent')) : null,
+            page.createdByAgent && page.agentStatus !== 'approved' ? h('span', { class: 'ah-chip ah-chip--agent hub__tag' }, t('Docs.agent')) : null,
             reviewChip(page),
             props.tree ? null : h('span', { class: 'hub__row-project' }, projectNameOf(page.ProjectID)),
             h('span', { class: 'hub__row-time' }, shortDate(page.updatedAt)),
@@ -448,7 +448,7 @@ const AgentList = defineComponent({
             h('span', { class: 'hub__row-main' }, [
                 h('span', { class: 'hub__row-title' }, [
                     page.title || t('Docs.untitled'),
-                    h('span', { class: 'ah-chip ah-chip--agent ah-chip--mono hub__tag' }, t('Docs.agent')),
+                    h('span', { class: 'ah-chip ah-chip--agent hub__tag' }, t('Docs.agent')),
                 ]),
                 h('span', { class: 'ah-small hub__row-sub' }, page.excerpt || t('Docs.empty_page_excerpt')),
             ]),
@@ -488,7 +488,7 @@ const WikiTable = defineComponent({
                     h('span', { class: 'hub__wiki-owner' }, owner
                         ? [avatarNode(page.ownerId), owner.name]
                         : [h('span', { class: 'ah-avatar ah-avatar--sm hub__avatar-none' }, '?'), t('Docs.no_owner')]),
-                    h('span', { class: ['hub__mono', { 'hub__mono--danger': page.reviewState === 'stale' }] }, page.reviewedAt ? shortDate(page.reviewedAt) : '—'),
+                    h('span', { class: ['hub__when', { 'hub__when--danger': page.reviewState === 'stale' }] }, page.reviewedAt ? shortDate(page.reviewedAt) : '—'),
                     h('span', { class: ['hub__wiki-state', `hub__wiki-state--${page.reviewState}`] }, [dot(page.reviewState), t(reviewLabelKey(page.reviewState))]),
                     h('button', { type: 'button', class: 'ah-btn ah-btn--sm ah-btn--ghost', onClick: () => emit('review', page) }, t('Docs.mark_reviewed')),
                 ]);
@@ -503,115 +503,125 @@ const WikiTable = defineComponent({
    components defined in this file, and scoped rules never reach their elements. Every
    selector here is hub__-prefixed, so nothing leaks. */
 .hub {
+    /* .ah-label and the wiki table head read --text-label: in the hub a label is set in the UI font. */
+    --text-label: 600 var(--fs-xs, 10.5px)/var(--lh-tight, 1.2) var(--font-ui);
     display: flex; height: 100%; min-height: 0;
     background: var(--canvas); color: var(--ink); font-family: var(--font-ui);
 }
 .hub__side {
     width: var(--sidebar-w); flex: none;
     background: var(--surface); border-right: 1px solid var(--hairline);
-    padding: 14px 10px; display: flex; flex-direction: column; gap: 14px;
-    font-size: 13px; overflow-y: auto;
+    padding: var(--sp-6, 14px) var(--sp-4, 10px); display: flex; flex-direction: column; gap: var(--sp-6, 14px);
+    font-size: var(--fs-md, 13px); overflow-y: auto;
 }
 .hub__search { position: relative; }
 .hub__search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--ink-2); pointer-events: none; }
 /* Two classes: .ah-input loads later and would reset the padding under the icon. */
-.hub__search .hub__search-input { height: 32px; padding-left: 30px; font-size: 12.5px; }
+.hub__search .hub__search-input { height: var(--control-h-lg, 32px); padding-left: 30px; font-size: var(--fs-md, 12.5px); }
 .hub__nav { display: flex; flex-direction: column; gap: 1px; }
 .hub__label { padding: 0 9px 4px; display: flex; align-items: center; }
 .hub__item {
-    display: flex; align-items: center; gap: 8px;
-    padding: 6px 9px; border-radius: 7px; border: 0; background: transparent;
-    font: 400 13px var(--font-ui); color: var(--ink); text-align: left; cursor: pointer; width: 100%;
+    display: flex; align-items: center; gap: 8px; min-height: var(--control-h, 0px);
+    padding: 6px 9px; border-radius: var(--r-md, 7px); border: 0; background: transparent;
+    font: 400 var(--fs-md, 13px)/var(--lh-snug, 1.3) var(--font-ui); color: var(--ink); text-align: left; cursor: pointer; width: 100%;
     transition: background var(--t-state) var(--ease);
 }
 .hub__item:hover { background: var(--surface-hover); }
+.hub__item:focus-visible { outline: none; box-shadow: var(--focus); }
 .hub__item.is-active { background: var(--brand-tint); color: var(--brand); font-weight: 600; }
 .hub__item-icon { color: var(--ink-2); flex: none; }
 .hub__item.is-active .hub__item-icon { color: var(--brand); }
 .hub__item-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hub__item-count { margin-left: auto; font: 500 11px var(--font-mono); color: var(--ink-2); }
-.hub__item-badge { margin-left: auto; background: var(--brand); color: var(--on-brand); font: 700 10px/1 var(--font-mono); padding: 3px 6px; border-radius: 9px; }
+.hub__item-count { margin-left: auto; font: 500 var(--fs-xs, 11px)/1 var(--font-mono); color: var(--ink-2); }
+.hub__item-badge { margin-left: auto; background: var(--brand); color: var(--on-brand); font: 700 var(--fs-2xs, 10px)/1 var(--font-mono); padding: 3px 6px; border-radius: 9px; }
 .hub__item-badge--warn { background: var(--warn); }
 .hub__swatch { width: 7px; height: 7px; border-radius: 2px; flex: none; }
 .hub__swatch--none { background: var(--ink-3); }
 .hub__new { margin-top: auto; }
 
 .hub__main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.ah-page.hub .ah-toolbar { padding: 0 var(--page-pad-x, 24px); }
+.ah-page.hub .ah-toolbar__title { font: var(--fw-title, 600) var(--fs-lg, 14px)/1.2 var(--font-ui); }
 .hub__stats { margin-left: 4px; }
-.hub__view-select { display: none; height: 30px; border: 1px solid var(--border); border-radius: var(--r-input); background: var(--surface); color: var(--ink); font: 500 12.5px var(--font-ui); padding: 0 8px; }
-.hub__content { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px 40px; display: flex; flex-direction: column; gap: 16px; }
-.hub__section { display: flex; flex-direction: column; gap: 8px; }
-.hub__section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 30px; }
+.hub__view-select { display: none; height: var(--control-h, 30px); border: 1px solid var(--border); border-radius: var(--r-input); background: var(--surface); color: var(--ink); font: 500 var(--fs-md, 12.5px)/1 var(--font-ui); padding: 0 8px; }
+.hub__content { flex: 1; min-height: 0; overflow-y: auto; padding: var(--page-pad-y, 20px) var(--page-pad-x, 24px) calc(2 * var(--page-pad-y, 20px)); display: flex; flex-direction: column; gap: var(--gap-stack, 16px); }
+.hub__section { display: flex; flex-direction: column; gap: var(--sp-3, 8px); }
+.hub__section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: var(--control-h, 30px); }
 .hub__hint { margin: 0; }
-.hub__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.hub__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap-stack, 10px); }
 
 .hub__card {
     display: flex; flex-direction: column; gap: 6px; text-align: left;
-    padding: 12px 14px; min-height: 130px; cursor: pointer;
+    padding: var(--card-pad-y, 12px) var(--card-pad-x, 14px); min-height: 130px; cursor: pointer;
     font-family: var(--font-ui); color: var(--ink);
     transition: border-color var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease);
 }
 .hub__card:hover { border-color: var(--border); box-shadow: var(--shadow-pop); }
 .hub__card:focus-visible { outline: none; box-shadow: var(--focus); }
 .hub__card--agent { border-color: var(--agent); }
-.hub__card-title { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font: 600 13px/1.3 var(--font-ui); }
-.hub__tag { height: 16px; padding: 0 4px; font-size: 8.5px; }
-.hub__card-excerpt { flex: 1; font: 400 11.5px/1.45 var(--font-ui); color: var(--ink-2); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.hub__card-title { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font: var(--fw-title, 600) var(--fs-md, 13px)/var(--lh-snug, 1.3) var(--font-ui); }
+.hub__tag { height: 16px; padding: 0 4px; font-size: var(--fs-2xs, 8.5px); letter-spacing: .04em; text-transform: uppercase; }
+.hub__card-excerpt { flex: 1; font: 400 var(--fs-sm, 11.5px)/1.45 var(--font-ui); color: var(--ink-2); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 .hub__card-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.hub__card-project { max-width: 50%; overflow: hidden; text-overflow: ellipsis; display: inline-block; line-height: 22px; }
+.hub__card-project { max-width: 50%; overflow: hidden; text-overflow: ellipsis; display: inline-block; line-height: var(--chip-h); }
 .hub__card-meta { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
-.hub__mono { font: 500 10.5px var(--font-mono); color: var(--ink-2); }
-.hub__mono--danger { color: var(--danger-ink); }
+.hub__when { font: 400 var(--fs-sm, 10.5px)/1.2 var(--font-ui); color: var(--ink-2); }
+.hub__when--danger { color: var(--danger-ink); }
 
 .hub__list { display: flex; flex-direction: column; overflow: hidden; }
 .hub__row {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 14px; border: 0; border-bottom: 1px solid var(--hairline); background: transparent;
-    font: 400 12.5px var(--font-ui); color: var(--ink); text-align: left; width: 100%; cursor: pointer;
+    display: flex; align-items: center; gap: 10px; box-sizing: border-box; min-height: var(--row-h);
+    padding: var(--cell-pad-y) var(--cell-pad-x, 14px); border: 0; border-bottom: 1px solid var(--hairline); background: transparent;
+    font: 400 var(--row-font)/var(--lh-snug, 1.3) var(--font-ui); color: var(--ink); text-align: left; width: 100%; cursor: pointer;
     transition: background var(--t-state) var(--ease);
 }
 .hub__row:last-child { border-bottom: 0; }
 .hub__row:hover { background: var(--surface-hover); }
-.hub__row--agent { cursor: default; padding: 10px 14px; }
+.hub__row:focus-visible { outline: none; box-shadow: inset var(--focus); }
+.hub__row--agent { cursor: default; }
 .hub__row--agent:hover { background: transparent; }
 .hub__row-icon { color: var(--ink-2); flex: none; }
 .hub__row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
 .hub__row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .hub__row-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hub__row-project { color: var(--ink-2); flex: none; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hub__row-time { font: 500 10.5px var(--font-mono); color: var(--ink-2); flex: none; }
+.hub__row-time { font: 400 var(--fs-sm, 10.5px)/1.2 var(--font-ui); color: var(--ink-2); flex: none; }
 
-.hub__wiki { overflow: hidden; }
-.hub__wiki-head, .hub__wiki-row {
-    display: grid; grid-template-columns: minmax(0, 1fr) 120px 90px 110px 120px; gap: 10px; align-items: center;
-    padding: 9px 14px; border-bottom: 1px solid var(--hairline);
+.hub__wiki { --hub-wiki-cols: minmax(0, 1fr) 120px 90px 110px 120px; overflow: hidden; }
+.hub__wiki-head {
+    display: grid; grid-template-columns: var(--hub-wiki-cols); gap: 10px; align-items: center;
+    padding: 9px var(--cell-pad-x, 14px); border-bottom: 1px solid var(--hairline);
+    font: var(--text-label); letter-spacing: .06em; color: var(--ink-label);
 }
-.hub__wiki-head { font: var(--text-label); letter-spacing: .06em; color: var(--ink-2); }
-.hub__wiki-row { padding: 11px 14px; font-size: 12.5px; }
+.hub__wiki-row {
+    display: grid; grid-template-columns: var(--hub-wiki-cols); gap: 10px; align-items: center;
+    padding: calc(var(--cell-pad-y, 9px) + 2px) var(--cell-pad-x, 14px); border-bottom: 1px solid var(--hairline);
+    font-size: var(--row-font);
+}
 .hub__wiki-row:last-child { border-bottom: 0; }
 .hub__wiki-row--stale { background: var(--danger-bg); }
-.hub__wiki-page { border: 0; background: transparent; padding: 0; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 2px; min-width: 0; font-family: var(--font-ui); color: var(--ink); }
+.hub__wiki-page { min-height: var(--hit-min); border: 0; background: transparent; padding: 0; text-align: left; cursor: pointer; display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; font-family: var(--font-ui); font-size: inherit; color: var(--ink); }
 .hub__wiki-page:hover .hub__wiki-title { color: var(--brand); }
 .hub__wiki-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hub__wiki-owner { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hub__avatar-none { background: var(--surface-hover); color: var(--ink-2); }
-.hub__wiki-state { display: flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; }
+.hub__wiki-state { display: flex; align-items: center; gap: 5px; font: 600 var(--fs-sm, 11.5px)/1.2 var(--font-ui); }
 .hub__wiki-state--verified { color: var(--ok-ink); }
 .hub__wiki-state--due { color: var(--warn-ink); }
 .hub__wiki-state--stale { color: var(--danger-ink); }
 
-.hub__tpl { align-items: flex-start; gap: 6px; padding: 12px 14px; min-height: 130px; text-align: left; cursor: pointer; display: flex; flex-direction: column; font-family: var(--font-ui); color: var(--ink); }
+.hub__tpl { align-items: flex-start; gap: 6px; padding: var(--card-pad-y, 12px) var(--card-pad-x, 14px); min-height: 130px; text-align: left; cursor: pointer; display: flex; flex-direction: column; font-family: var(--font-ui); color: var(--ink); }
 .hub__tpl:hover { border-color: var(--border); box-shadow: var(--shadow-pop); }
-.hub__tpl-icon { width: 26px; height: 26px; border-radius: 7px; background: var(--brand-tint); color: var(--brand); display: inline-grid; place-items: center; }
-.hub__tpl-cta { margin-top: auto; font: 600 12px var(--font-ui); color: var(--brand); }
+.hub__tpl-icon { width: 26px; height: 26px; border-radius: var(--r-md, 7px); background: var(--brand-tint); color: var(--brand); display: inline-grid; place-items: center; }
+.hub__tpl-cta { margin-top: auto; font: 600 var(--fs-sm, 12px)/1.2 var(--font-ui); color: var(--brand); }
 .hub__blank {
-    border: 1.5px dashed rgba(47, 57, 144, .35); border-radius: var(--r-card); background: transparent;
+    border: 1.5px dashed var(--brand-border); border-radius: var(--r-card); background: transparent;
     min-height: 130px; display: grid; place-items: center; cursor: pointer;
-    font: 600 12.5px var(--font-ui); color: var(--brand);
+    font: 600 var(--fs-md, 12.5px)/1.2 var(--font-ui); color: var(--brand);
 }
 .hub__blank:hover { background: var(--brand-tint); }
 
-.hub__empty { border: 1px dashed var(--border); border-radius: 10px; padding: 22px; background: var(--surface-2); display: flex; flex-direction: column; gap: 6px; }
+.hub__empty { border: 1px dashed var(--border); border-radius: var(--r-lg, 10px); padding: calc(var(--card-pad-x, 16px) + 6px); background: var(--surface-2); display: flex; flex-direction: column; gap: 6px; }
 .hub__empty p { margin: 0; }
 .hub__empty-actions { display: flex; gap: 8px; margin-top: 6px; }
 
@@ -621,13 +631,18 @@ const WikiTable = defineComponent({
     .hub__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 767px) {
+    /* The dense toolbar is as tall as a phone button: the row grows so the buttons do not touch its edges. */
+    .ah-page.hub .ah-toolbar { height: auto; min-height: calc(var(--hit-min) + 2 * var(--sp-3, 6px)); }
     .hub__content { padding: 14px 16px 32px; }
     .hub__grid { grid-template-columns: 1fr; }
     .hub__wiki-head { display: none; }
     .hub__wiki-row { grid-template-columns: 1fr 1fr; }
+    .hub__row { min-height: max(var(--row-h), var(--hit-min)); }
     .hub__row-project { display: none; }
     .hub__stats { display: none; }
     .hub__btn-label { display: none; }
-    .hub__wiki-btn { width: 32px; height: 32px; padding: 0; }
+    .hub .ah-btn--sm { min-height: var(--hit-min); }
+    .hub__view-select { height: var(--hit-min); }
+    .hub__wiki-btn { width: var(--hit-min); height: var(--hit-min); padding: 0; }
 }
 </style>

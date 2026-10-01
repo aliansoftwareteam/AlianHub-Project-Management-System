@@ -67,6 +67,7 @@ const {
     exportJobsSchema,
     importJobsSchema,
     aiFieldJobsSchema,
+    customFieldLinksSchema,
     epicsSchema,
     pagesSchema,
     pageVersionsSchema,
@@ -77,6 +78,7 @@ const {
     recurringTasksSchema,
     taskTemplatesSchema,
     viewTemplatesSchema,
+    projectSnapshotsSchema,
     everythingViewsSchema,
     whiteboardsSchema,
     remindersSchema,
@@ -277,6 +279,8 @@ exports.checkType = (type) => {
             return importJobsSchema
         case SCHEMA_TYPE.AI_FIELD_JOBS:
             return aiFieldJobsSchema
+        case SCHEMA_TYPE.CUSTOM_FIELD_LINKS:
+            return customFieldLinksSchema
         case SCHEMA_TYPE.EPICS:
             return epicsSchema
         case SCHEMA_TYPE.PAGES:
@@ -297,6 +301,8 @@ exports.checkType = (type) => {
             return taskTemplatesSchema
         case SCHEMA_TYPE.VIEW_TEMPLATES:
             return viewTemplatesSchema
+        case SCHEMA_TYPE.PROJECT_SNAPSHOTS:
+            return projectSnapshotsSchema
         case SCHEMA_TYPE.EVERYTHING_VIEWS:
             return everythingViewsSchema
         case SCHEMA_TYPE.WHITEBOARDS:
@@ -569,6 +575,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.IMPORT_JOBS}`
         case SCHEMA_TYPE.AI_FIELD_JOBS:
                 return `${dbCollections.AI_FIELD_JOBS}`
+        case SCHEMA_TYPE.CUSTOM_FIELD_LINKS:
+                return `${dbCollections.CUSTOM_FIELD_LINKS}`
         case SCHEMA_TYPE.EPICS:
                 return `${dbCollections.EPICS}`
         case SCHEMA_TYPE.PAGES:
@@ -589,6 +597,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.TASK_TEMPLATES}`
         case SCHEMA_TYPE.VIEW_TEMPLATES:
                 return `${dbCollections.VIEW_TEMPLATES}`
+        case SCHEMA_TYPE.PROJECT_SNAPSHOTS:
+                return `${dbCollections.PROJECT_SNAPSHOTS}`
         case SCHEMA_TYPE.EVERYTHING_VIEWS:
                 return `${dbCollections.EVERYTHING_VIEWS}`
         case SCHEMA_TYPE.WHITEBOARDS:
