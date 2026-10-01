@@ -161,6 +161,11 @@ describe(ID, () => {
         expect(task(C1, 'child').subTasks).toBe(1);
         expect(opFor(C1, 'child', 'subTasks').filter).toEqual({ _id: oid(T.child), subTasks: null });
         expect(task(C1, 'grandchild')).not.toHaveProperty('subTasks');
+
+        const { writes } = await driverWrites('bulkWrite', bulkWrites(C1)[0].data);
+        const counted = writes[0].args[0].map(({ updateOne }) => updateOne).find(({ update }) => 'subTasks' in update.$set);
+        expect(counted.filter.subTasks).toBeNull();
+        expect(counted.update.$set).toEqual({ subTasks: 1 });
     });
 
     test('every write names what it read and keeps updatedAt', async () => {

@@ -51,6 +51,12 @@ const schema = {
             type: String,
             required: false,
         },
+        // The chain of parents above the task, root first; empty or missing on a top-level task.
+        // Derived from ParentTaskId by Modules/Tasks/helpers/taskTree.js, never taken from a client.
+        'ancestors': {
+            type: [String],
+            required: false,
+        },
         'ProjectID': {
             type: mongoose.Schema.Types.ObjectId,
             required: true,

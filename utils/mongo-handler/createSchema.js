@@ -416,6 +416,7 @@ taskSchema.index({ ProjectID: 1, sprintId: 1, deletedStatusKey: 1 });
 taskSchema.index({ sprintId: 1, deletedStatusKey: 1 });
 taskSchema.index({ AssigneeUserId: 1 });
 taskSchema.index({ ParentTaskId: 1 });
+taskSchema.index({ ancestors: 1 });
 taskSchema.index({ TaskKey: 1 });
 
 // comments: every comment is fetched by task/sprint/project triplet.

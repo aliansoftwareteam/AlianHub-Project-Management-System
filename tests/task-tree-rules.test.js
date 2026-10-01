@@ -106,7 +106,8 @@ describe('placement', () => {
     });
 
     test('a root outside a folder gives no folder', () => {
-        const { folderObjId, ...atRoot } = placed;
+        const atRoot = { ...placed };
+        delete atRoot.folderObjId;
         expect(tree.placementFrom(atRoot)).toEqual({ ProjectID: placed.ProjectID, sprintId: placed.sprintId, sprintArray });
         expect(tree.placementFrom({ ...atRoot, folderObjId: null })).not.toHaveProperty('folderObjId');
     });
