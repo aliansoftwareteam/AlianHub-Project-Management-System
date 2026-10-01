@@ -164,6 +164,7 @@ import { toggleTheme, shellState } from '@/components/organisms/Shell/shellState
 import { isMacPlatform } from './paletteKeys';
 import { CHIPS, RECORD_CHIPS, chipAllows, commandArgument, commandLeads, foldRecentProjects, projectPath, recentType, relativeAge, taskLocation, taskPath } from './paletteRows';
 import { openQuickCreate } from '@/components/organisms/QuickCreateTask/quickCreateTask';
+import { routeProjectId, useNewDoc } from '@/components/molecules/Pages/useNewDoc';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { messageKey } from '@/views/Ai/askWhy';
 import { leaveAskHandoff } from './askHandoff';
@@ -252,8 +253,17 @@ const NAV = computed(() => [
     { key: 'changelog', label: t('Changelog.whats_new'), icon: 'changelog', route: 'Changelog' },
 ].filter((n) => n.route && router.hasRoute(n.route) && n.show !== false));
 
+const { canCreateIn, createIn } = useNewDoc();
+const docProjectId = computed(() => routeProjectId(route));
+const canNewDoc = computed(() => {
+    if (!docProjectId.value) return true;
+    const project = (getters['projectData/allProjects']?.data || []).find((p) => String(p._id) === docProjectId.value);
+    return Boolean(project) && canCreateIn(project);
+});
+
 const COMMANDS = computed(() => [
     { key: 'new-task', label: t('Inbox.cmd_new_task'), icon: 'plus' },
+    { key: 'new-doc', label: t('Docs.new_doc'), icon: 'docs', show: canNewDoc.value },
     { key: 'new-project', label: t('Inbox.cmd_new_project'), icon: 'projects', show: allowed('project.project_list'), takesName: true },
     { key: 'start-timer', label: t('Inbox.cmd_start_timer'), icon: 'play', show: !!timesheetRoute() },
     { key: 'toggle-theme', label: shellState.theme === 'dark' ? t('Shell.theme_light') : t('Shell.theme_dark'), icon: shellState.theme === 'dark' ? 'sun' : 'moon' },
@@ -493,6 +503,7 @@ const command = (key, name = '') => {
     if (key === 'logout') { close(); logOut({ islogOut: true }); return; }
     window.dispatchEvent(new CustomEvent('ah:command', { detail: { command: key, query: query.value.trim() } }));
     if (key === 'new-task') { close(); openQuickCreate(); return; }
+    if (key === 'new-doc') { close(); createIn(docProjectId.value); return; }
     if (key === 'new-project') return go({ name: 'Projects', params: { cid: cid.value }, query: { create: 'project', name: name || undefined } });
     if (key === 'start-timer') { const r = timesheetRoute(); return r ? go(to(r)) : close(); }
     return close();
