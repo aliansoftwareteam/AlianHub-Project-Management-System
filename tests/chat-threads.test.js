@@ -161,8 +161,9 @@ describe('a reply in a channel thread', () => {
     });
 
     it('stays out of the channel, whose message carries the count, the last repliers and the last reply time', async () => {
-        await reply(BOB, root._id, 'Yes');
+        const first = await reply(BOB, root._id, 'Yes');
         const last = await reply(CAROL, root._id, 'Agreed');
+        stored(first.body.data._id).createdAt = new Date('2026-10-01T11:00:00Z');
         stored(last.body.data._id).createdAt = new Date('2026-10-01T12:00:00Z');
 
         const r = await listOf(DAVE);
