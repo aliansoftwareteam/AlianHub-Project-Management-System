@@ -1,7 +1,13 @@
 const logger = require('../../Config/loggerConfig');
 const { tenantOf, TenantError } = require('../../Config/tenant');
 const { QueryRefused } = require('../Tasks/helpers/taskQueryGuard');
-const { resolveFor, castVote, RESOLVE_MAX, NOT_FOUND } = require('./helpers/fieldLinks');
+const { resolveFor, castVote, RESOLVE_MAX, NOT_FOUND, FIELDS_HIDDEN } = require('./helpers/fieldLinks');
+
+const VOTE_REFUSALS = Object.freeze({
+    [NOT_FOUND]: { statusCode: 404, refused: 'Task not found.' },
+    [FIELDS_HIDDEN]: { statusCode: 403, refused: 'You do not have access to the custom fields of this task.' },
+});
+const NOT_VOTABLE = Object.freeze({ statusCode: 400, refused: 'That is not a voting field of this task.' });
 
 const VOTE_KEYS = Object.freeze(['taskId', 'vote']);
 
@@ -31,6 +37,6 @@ exports.vote = handle('vote', async ({ companyId, uid, body, params }) => {
     const extra = Object.keys(body).filter((key) => !VOTE_KEYS.includes(key));
     if (extra.length || typeof body.vote !== 'boolean') return { statusCode: 400, refused: 'A vote names the task and whether it is cast or withdrawn, and is cast as yourself.' };
     const cast = await castVote({ companyId, uid, taskId: body.taskId, fieldId: params.fieldId, vote: body.vote });
-    if (cast.refused) return cast.refused === NOT_FOUND ? { statusCode: 404, refused: 'Task not found.' } : { statusCode: 400, refused: 'That is not a voting field of this task.' };
+    if (cast.refused) return VOTE_REFUSALS[cast.refused] || NOT_VOTABLE;
     return { data: cast };
 });

@@ -4605,6 +4605,8 @@ const schema = {
         // relationship | voting
         kind: { type: String, required: true },
         ids: { type: [String], default: [], required: false },
+        // steps on every vote, so the count a task shows is the one from the latest
+        version: { type: Number, required: false },
     },
     sprints: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.

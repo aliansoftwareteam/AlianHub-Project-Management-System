@@ -11,6 +11,7 @@ const askThreads = require('../AI/askThreads');
 const askCard = require('../AI/askCardStore');
 const aiFeedback = require('../AI/feedback');
 const aiProfile = require('../AI/aiProfile');
+const { eraseVoter } = require('../CustomField/helpers/fieldLinkStore');
 
 // The instance console's writes on a workspace's index. Each answers counts, never text, so the
 // caller can audit what it did without holding anything it removed.
@@ -175,6 +176,8 @@ const erasePerson = async (companyId, userId, progress = { removed: {} }, { by =
     if (feedback) progress.removed.ai_feedback = feedback;
     const profiles = await aiProfile.eraseOwner(company, userId);
     if (profiles) progress.removed.ai_profile = profiles;
+    const votes = await eraseVoter(company, userId);
+    if (votes) progress.removed.field_vote = votes;
     return { removed: progress.removed, total: totalOf(progress.removed) };
 };
 

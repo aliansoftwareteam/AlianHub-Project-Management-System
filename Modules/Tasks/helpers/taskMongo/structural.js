@@ -23,6 +23,7 @@ const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
 const { taskNotFound, plainIdOf, TaskWriteRefusal } = require('../taskWriteFields');
 const { cascadeStatus, sprintCountChange, loadSubtree, storedTask, slotUnder } = require('../taskTree');
+const { removeLinksOfTasks } = require('../../../CustomField/helpers/fieldLinkStore');
 module.exports = {
 
     /* The counts, the parent and the current state come from the stored task; the body only says which task and which state it goes to. */
@@ -353,7 +354,9 @@ module.exports = {
                                 }
                             ]
                         }
-                        MongoDbCrudOpration(companyId, delObj, "deleteOne");
+                        MongoDbCrudOpration(companyId, delObj, "deleteOne")
+                            .then(() => removeLinksOfTasks(companyId, [task._id]))
+                            .catch((error) => logger.error(`convert to list, removing the task: ${error && error.message}`));
 
                         /* Its subtasks become tasks of the new list whatever the request says, or they
                          * would be left under a task that no longer exists; theirs stay under them. */
