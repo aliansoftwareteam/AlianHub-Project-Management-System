@@ -87,7 +87,7 @@ const press = async (wrapper, selector) => {
     await flushPromises();
 };
 const confirm = async (wrapper) => {
-    await wrapper.findAll('button.btn-primary')[0].trigger('click');
+    await wrapper.findAll('button.ah-btn--primary')[0].trigger('click');
     await flushPromises();
 };
 
