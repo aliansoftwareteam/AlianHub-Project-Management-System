@@ -200,3 +200,22 @@ exports.handleTaskAttachmentsDuplicateFunctionality = async (bucketId, previousP
 
         return true;
 };
+
+const bucketFile = (bucketId, key) => {
+    const bucketRoot = newPath.resolve(__dirname, '../storage', String(bucketId || ''));
+    const target = newPath.resolve(bucketRoot, String(key || ''));
+    return target.startsWith(bucketRoot + newPath.sep) ? target : '';
+};
+
+exports.handleStoredFileCopy = async (bucketId, previousPath, destinationPath) => {
+    const from = bucketFile(bucketId, previousPath);
+    const to = bucketFile(bucketId, destinationPath);
+    if (!from || !to) throw new Error('The key leaves the company bucket.');
+    await fs.promises.mkdir(newPath.dirname(to), { recursive: true });
+    await fs.promises.copyFile(from, to);
+};
+
+exports.storedFileExists = async (bucketId, key) => {
+    const target = bucketFile(bucketId, key);
+    return Boolean(target) && fs.existsSync(target);
+};

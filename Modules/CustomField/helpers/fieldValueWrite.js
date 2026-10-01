@@ -3,6 +3,7 @@ const { idsOf } = require('../fieldTypes/people');
 const { nonMembersOf, NOT_A_MEMBER } = require('../../../Config/companyMembers');
 const { canReadProject } = require('../../../Config/projectAccess');
 const { customFieldDefinitionsOf } = require('./customFieldText');
+const { NOT_THIS_FIELD, ownFiles, stampedFiles } = require('./fieldFiles');
 
 const CANNOT_OPEN_PROJECT = 'A person named here cannot open this project.';
 
@@ -27,20 +28,27 @@ const onlyPeopleOfTheProject = async ({ companyId, task, fieldId, ids }) => {
     }
 };
 
+const onlyFilesOfTheField = ({ task, fieldId, value, actorId }) => {
+    if (ownFiles({ task, fieldId, value }).length !== value.length) throw new FieldValueRefused(NOT_THIS_FIELD);
+    return stampedFiles({ task, fieldId, value, actorId });
+};
+
+/* What only the server can check about a parsed value. A check that answers a value replaces the parsed one. */
 const SERVER_CHECKS = Object.freeze({
     people: ({ companyId, task, fieldId, value }) => onlyPeopleOfTheProject({ companyId, task, fieldId, ids: value }),
+    files: onlyFilesOfTheField,
 });
 
 /* What is stored for a field one of the type modules handles: its checked value and nothing else. Other types are stored as sent. */
-const checkedFieldDetail = async ({ companyId, definition, task, updateDetail }) => {
+const checkedFieldDetail = async ({ companyId, definition, task, updateDetail, actorId }) => {
     const type = typeModuleOf(definition && definition.fieldType);
     if (!type) return updateDetail;
     if (!isPlainObject(updateDetail)) throw new FieldValueRefused('updateDetail must be an object with a fieldValue.');
     const { value, error } = type.parse(updateDetail.fieldValue, definition);
     if (error) throw new FieldValueRefused(error);
     const fieldId = String(definition._id);
-    if (SERVER_CHECKS[type.type]) await SERVER_CHECKS[type.type]({ companyId, task, fieldId, value });
-    return { fieldValue: value, _id: fieldId };
+    const checked = SERVER_CHECKS[type.type] ? await SERVER_CHECKS[type.type]({ companyId, task, fieldId, value, actorId }) : undefined;
+    return { fieldValue: checked === undefined ? value : checked, _id: fieldId };
 };
 
 const peopleWhoMayBeNamed = async ({ companyId, task, value }) => {
@@ -52,14 +60,18 @@ const peopleWhoMayBeNamed = async ({ companyId, task, value }) => {
     return allowed;
 };
 
-/* Where a single edit is refused, a write that carries many values keeps the part of one that may be stored. */
-const SERVER_NARROWING = Object.freeze({ people: peopleWhoMayBeNamed });
+/* Where a single edit is refused, a write that carries many values keeps the part of one that may be stored. A file
+   belongs to one task, so a value copied from another task keeps none of its files. */
+const SERVER_NARROWING = Object.freeze({
+    people: peopleWhoMayBeNamed,
+    files: ({ task, fieldId, value }) => ownFiles({ task, fieldId, value }),
+});
 
 const storableDetail = async ({ companyId, definition, type, task, detail }) => {
     const { value, error } = isPlainObject(detail) ? type.parse(detail.fieldValue, definition) : { error: true };
     if (error) return { asSent: false };
     const narrow = SERVER_NARROWING[type.type];
-    const kept = narrow && value.length ? await narrow({ companyId, task, value }) : value;
+    const kept = narrow && value.length ? await narrow({ companyId, task, value, fieldId: String(definition._id) }) : value;
     const emptied = narrow && value.length > 0 && !kept.length;
     return { detail: emptied ? null : { fieldValue: kept, _id: String(definition._id) }, asSent: !narrow || kept.length === value.length };
 };

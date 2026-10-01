@@ -56,7 +56,7 @@ const progress = typeModuleOf('progress');
 
 describe('the field type modules', () => {
     it('are one module per type, each with the same shape', () => {
-        expect(MODULE_FIELD_TYPES).toEqual(['people', 'url', 'rating', 'progress']);
+        expect(MODULE_FIELD_TYPES).toEqual(['people', 'url', 'rating', 'progress', 'files']);
         MODULE_FIELD_TYPES.forEach((type) => {
             const module = typeModuleOf(type);
             expect(module.type).toBe(type);

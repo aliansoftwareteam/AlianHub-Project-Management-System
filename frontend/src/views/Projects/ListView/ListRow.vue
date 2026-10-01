@@ -19,16 +19,17 @@
             />
         </span>
 
-        <div class="lv2__title lv2__c-title" role="cell" :class="{ 'lv2__title--sub': isSub }">
+        <div class="lv2__title lv2__c-title" role="cell" :class="{ 'lv2__title--sub': isSub }" :style="isSub ? { '--lv2-depth': level } : null">
             <span v-if="!isSub" class="lv2__grip draggable_icon" aria-hidden="true"><ShellIcon name="grip" :size="12" /></span>
             <button
-                v-if="!isSub && data.isParentTask && subtaskCount"
+                v-if="canNest && subtaskCount"
                 type="button"
                 class="lv2__disclose"
                 :aria-expanded="expanded"
                 :aria-label="$t('List.toggle_subtasks')"
                 @click.stop="$emit('toggle-subtasks')"
             >{{ expanded ? '▾' : '▸' }}</button>
+            <span v-else-if="isSub" class="lv2__disclose lv2__disclose--none" aria-hidden="true"></span>
             <ListStatusCircle
                 :task="data"
                 :statuses="statuses"
@@ -140,12 +141,14 @@ import EstimateCell from "@/views/Projects/components/columns/EstimateCell.vue";
 import TaskColumnCell from "@/views/Projects/components/columns/TaskColumnCell.vue";
 import { defaultColumns, listColumnClass } from "@/views/Projects/composables/viewColumns";
 import { taskMenuItems } from "@/views/Projects/composables/taskMenu";
+import { MAX_DEPTH } from "@taskTreeRules";
 
 defineOptions({ name: "ListRow" });
 
 const props = defineProps({
     data: { type: Object, required: true },
     isSub: { type: Boolean, default: false },
+    depth: { type: Number, default: 0 },
     parent: { type: Object, default: null },
     selected: { type: Boolean, default: false },
     expanded: { type: Boolean, default: false },
@@ -163,7 +166,10 @@ const edit = inject("listRowEdit", null);
 const rights = computed(() => edit?.rights.value || NO_RIGHTS);
 const menu = inject("listRowMenu", null);
 const menuRights = computed(() => ({ rename: rights.value.rename, subtask: rights.value.subtask, template: rights.value.template, ...menu?.rights.value }));
-const menuItems = computed(() => taskMenuItems(props.data, menuRights.value, { isSub: props.isSub }));
+/* How many levels down the row sits. A row on the last level takes no subtasks. */
+const level = computed(() => props.depth || (props.isSub ? 1 : 0));
+const canNest = computed(() => level.value < MAX_DEPTH);
+const menuItems = computed(() => taskMenuItems(props.data, menuRights.value, { isSub: props.isSub, canNest: canNest.value }));
 const statuses = computed(() => edit?.statuses.value || []);
 const showPriority = computed(() => (edit ? edit.showPriority.value : true));
 const rowEl = ref(null);

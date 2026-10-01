@@ -86,7 +86,7 @@
                     <div v-for="entry in cardFieldValues" :key="entry.id" class="card-field">
                         <dt class="card-field__name" :title="entry.label">{{ entry.label }}</dt>
                         <dd class="card-field__value" :title="entry.text">
-                            <component :is="fieldTypeUi(entry.field.fieldType).value" v-if="fieldTypeUi(entry.field.fieldType)" compact :def="entry.field" :value="entry.value" :label="entry.label" />
+                            <component :is="fieldTypeUi(entry.field.fieldType).value" v-if="fieldTypeUi(entry.field.fieldType)" compact :def="entry.field" :value="entry.value" :label="entry.label" v-bind="taskPropFor(entry.field.fieldType, element)" />
                             <template v-else-if="entry.choices.length">
                                 <span v-for="option in entry.choices" :key="option.id" class="card-field__chip ah-status-ink" :style="choiceStyle(option)">{{ option.label || option.value }}</span>
                             </template>
@@ -209,7 +209,7 @@
     import ProvenanceBadge from '@/components/molecules/Provenance/ProvenanceBadge.vue';
     import { taskPoints } from '@/views/Projects/composables/taskPoints';
     import { shownFieldValues } from '@/views/Projects/composables/projectCustomFields';
-    import { fieldTypeUi } from '@/plugins/customFieldView/fieldTypes';
+    import { fieldTypeUi, taskPropFor } from '@/plugins/customFieldView/fieldTypes';
     import { statusChipStyle } from '@/utils/statusChipColors';
     import { isAgentWork } from '@/components/molecules/Provenance/provenance';
     import { useUpdateTasks } from "@/views/Projects/helper"

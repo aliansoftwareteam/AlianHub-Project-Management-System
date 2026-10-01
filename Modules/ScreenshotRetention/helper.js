@@ -39,6 +39,7 @@ const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const logger = require('../../Config/loggerConfig');
+const { isRowTrackshotKey } = require('../../common-storage/taskFileKeys');
 
 const LOG_PREFIX = '[ScreenshotRetention]';
 
@@ -246,9 +247,13 @@ async function countOldTrackshots(companyId, cutoff) {
  * so any non-throwing call counts as success. Transient errors surface
  * as thrown exceptions and we treat the main delete as failed.
  */
-async function deleteTrackshotObjects(companyId, trackshot) {
+async function deleteTrackshotObjects(companyId, rowId, trackshot) {
     const s3 = getS3Client();
     const mainKey = extractKey(trackshot && trackshot.image);
+    // The key on a row is whatever the capture named, so only one in the row's own tracker folder is removed.
+    if (mainKey && !isRowTrackshotKey(rowId, mainKey)) {
+        return { mainDeleted: false, skipped: true, notOwn: true, thumbsDeleted: 0, thumbsFailed: 0, errors: ['not-own-key'] };
+    }
     if (!mainKey) {
         // Record had no usable image key. Caller pre-filters these out of
         // the loop so this is defensive; flag with `skipped` so the caller
@@ -373,6 +378,7 @@ async function runRetentionForCompany(company) {
     let deletedCount = 0;
     let failedCount = 0;
     let skippedCount = 0;       // empty-key trackshots — not counted as deleted
+    let notOwnCount = 0;
     let scannedDocs = 0;
     let runError = null;
     let hitCap = false;
@@ -444,9 +450,10 @@ async function runRetentionForCompany(company) {
                         break;
                     }
                     // eslint-disable-next-line no-await-in-loop
-                    const res = await deleteTrackshotObjects(companyId, shot);
+                    const res = await deleteTrackshotObjects(companyId, doc._id, shot);
                     if (res.skipped) {
                         skippedCount += 1;
+                        if (res.notOwn) notOwnCount += 1;
                         continue;
                     }
                     if (res.mainDeleted) {
@@ -512,6 +519,7 @@ async function runRetentionForCompany(company) {
         logger.error(`${LOG_PREFIX} could not persist run stats companyId=${companyId} ${err && err.message}`);
     }
 
+    if (notOwnCount) logger.warn(`${LOG_PREFIX} companyId=${companyId} kept ${notOwnCount} screenshots whose key is outside their own timer's folder`);
     logger.info(`${LOG_PREFIX} companyId=${companyId} deleted=${deletedCount} failed=${failedCount} skipped=${skippedCount} scannedDocs=${scannedDocs} durationMs=${durationMs}${runError ? ` error=${runError}` : ''}`);
     return stats;
 }

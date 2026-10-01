@@ -55,10 +55,12 @@ const WASABI_TEMP = path.resolve('wasabiUploads');
 const SCREENSHOT = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 const createdTemp = !fs.existsSync(WASABI_TEMP);
 
-const trackerPath = () => `Project/${hex()}/Sprint/${hex()}/TimeLog/${hex()}/${Date.now()}.png`;
-const addSession = (owner, companyId = COMPANY) => {
+const projectOf = (timeSheetId) => (mockDb.sessions[timeSheetId] ? mockDb.sessions[timeSheetId].ProjectId : hex());
+const trackerPath = (timeSheetId = hex(), projectId = projectOf(timeSheetId)) => `Project/${projectId}/Sprint/${hex()}/TimeLog/${timeSheetId}/${Date.now()}.png`;
+const addSession = (owner, companyId = COMPANY, { running = true } = {}) => {
     const id = hex();
-    mockDb.sessions[id] = { companyId, Loggeduser: owner, LogStartTime: Math.floor(Date.now() / 1000) - 600, ProjectId: hex(), TicketID: hex() };
+    const startedAt = Math.floor(Date.now() / 1000) - 600;
+    mockDb.sessions[id] = { companyId, Loggeduser: owner, LogStartTime: startedAt, ProjectId: hex(), TicketID: hex(), ...(running ? { startTimeTracker: startedAt } : {}) };
     return id;
 };
 
@@ -144,7 +146,7 @@ const storedFile = (filePath) => fs.existsSync(path.join(STORAGE_ROOT, COMPANY, 
 describe.each(['v2', 'v3', 'v4'])('a %s tracker capture', (version) => {
     it('adds to the caller\'s own session', async () => {
         const timeSheetId = addSession(ME);
-        const res = await capture(version, timeSheetId, trackerPath());
+        const res = await capture(version, timeSheetId, trackerPath(timeSheetId));
 
         expect(res.status).toBe(200);
         expect(await res.json()).toMatchObject({ status: true });
@@ -155,7 +157,7 @@ describe.each(['v2', 'v3', 'v4'])('a %s tracker capture', (version) => {
 
     it('is refused for a colleague\'s session in the same company, and writes nothing', async () => {
         const timeSheetId = addSession(COLLEAGUE);
-        const filePath = trackerPath();
+        const filePath = trackerPath(timeSheetId);
         const res = await capture(version, timeSheetId, filePath);
 
         expect(res.status).toBe(403);
@@ -167,7 +169,7 @@ describe.each(['v2', 'v3', 'v4'])('a %s tracker capture', (version) => {
 
     it('is refused for the caller\'s own session held in another company', async () => {
         const timeSheetId = addSession(ME, OTHER_COMPANY);
-        const filePath = trackerPath();
+        const filePath = trackerPath(timeSheetId);
         const res = await capture(version, timeSheetId, filePath);
 
         expect(res.status).toBe(403);
@@ -178,7 +180,7 @@ describe.each(['v2', 'v3', 'v4'])('a %s tracker capture', (version) => {
 
     it('is refused when the request names a collection other than the timesheets, and writes nothing', async () => {
         const timeSheetId = addSession(ME);
-        const filePath = trackerPath();
+        const filePath = trackerPath(timeSheetId);
         const res = await capture(version, timeSheetId, filePath, 'projects');
 
         expect(res.status).toBe(403);
@@ -194,5 +196,76 @@ describe.each(['v2', 'v3', 'v4'])('a %s tracker capture', (version) => {
         expect(res.status).toBe(403);
         expect(mockDb.updates).toHaveLength(0);
         expect(storedFile(filePath)).toBe(false);
+    });
+});
+
+const seed = (filePath, content = 'original bytes') => {
+    const file = path.join(STORAGE_ROOT, COMPANY, filePath);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, content);
+    return file;
+};
+
+describe.each(['v2', 'v3', 'v4'])('where a %s tracker capture is stored', (version) => {
+    const refused = async (timeSheetId, filePath) => {
+        const res = await capture(version, timeSheetId, filePath);
+        expect(res.status).toBe(403);
+        const body = await res.json();
+        expect(body).toMatchObject({ status: false });
+        expect(mockDb.updates).toHaveLength(0);
+        expect(mockUploads).toHaveLength(0);
+        return body;
+    };
+
+    it.each([
+        ['the folder of another timer', () => trackerPath(hex())],
+        ['the folder of a colleague\'s timer', () => trackerPath(addSession(COLLEAGUE))],
+        ['a task attachment folder', () => `Project/${hex()}/Sprint/${hex()}/Attachment/${Date.now()}.png`],
+        ['a comment folder', () => `Project/${hex()}/${hex()}/${hex()}/Comments/${Date.now()}.png`],
+        ['a folder outside every layout', () => `captures/${Date.now()}.png`],
+    ])('is refused for %s, and writes nothing', async (_label, pathOf) => {
+        const timeSheetId = addSession(ME);
+        const filePath = pathOf();
+        expect((await refused(timeSheetId, filePath)).code).toBeUndefined();
+        expect(storedFile(filePath)).toBe(false);
+    });
+
+    it('is refused when the path names another project than the timer\'s', async () => {
+        const timeSheetId = addSession(ME);
+        const filePath = trackerPath(timeSheetId, hex());
+        await refused(timeSheetId, filePath);
+        expect(storedFile(filePath)).toBe(false);
+    });
+
+    it('is refused with its own code for a timer that is no longer running', async () => {
+        const timeSheetId = addSession(ME, COMPANY, { running: false });
+        const filePath = trackerPath(timeSheetId);
+        expect(await refused(timeSheetId, filePath)).toMatchObject({ code: 'timer_not_running', statusText: 'This timer is no longer running.' });
+        expect(storedFile(filePath)).toBe(false);
+    });
+
+    it('does not use that code for a stopped timer of someone else', async () => {
+        const timeSheetId = addSession(COLLEAGUE, COMPANY, { running: false });
+        expect((await refused(timeSheetId, trackerPath(timeSheetId))).code).toBeUndefined();
+    });
+
+    it('leaves a stored file of a task as it was', async () => {
+        const timeSheetId = addSession(ME);
+        const filePath = `Project/${projectOf(timeSheetId)}/Sprint/${hex()}/Attachment/spec.png`;
+        const file = seed(filePath);
+        await refused(timeSheetId, filePath);
+        expect(fs.readFileSync(file, 'utf8')).toBe('original bytes');
+    });
+
+    it('does not replace a capture already stored for the timer', async () => {
+        const timeSheetId = addSession(ME);
+        const filePath = trackerPath(timeSheetId);
+        const file = seed(filePath);
+        const res = await capture(version, timeSheetId, filePath);
+
+        expect(res.status).toBe(409);
+        expect(await res.json()).toMatchObject({ status: false, code: 'capture_already_stored' });
+        expect(mockDb.updates).toHaveLength(0);
+        expect(fs.readFileSync(file, 'utf8')).toBe('original bytes');
     });
 });

@@ -13,7 +13,11 @@ const isClosedTask = (task) => (task?.status?.type || task?.statusType) === CLOS
 
 const liveSubtasks = (task) => (Array.isArray(task?.subtaskArray) ? task.subtaskArray : []).filter((sub) => sub && !sub.deletedStatusKey);
 
-const hasSubtasks = (task) => Boolean(task?.isParentTask && ((task.subtaskArray || []).length || Number(task.subTasks)));
+/* True on any level: a subtask can have subtasks of its own. */
+const hasSubtasks = (task) => Boolean(task && ((task.subtaskArray || []).length || Number(task.subTasks) > 0));
+
+/* A group's rows with every loaded level under them, each parent before its children. */
+const treeRows = (rows) => (Array.isArray(rows) ? rows : []).flatMap((task) => (task ? [task, ...treeRows(task.subtaskArray)] : []));
 
 /* subTasks is a denormalized counter maintained by a chain of $inc calls, so it is the
  * last resort: an aggregate of the real children outranks it whenever we have one. */
@@ -65,6 +69,7 @@ module.exports = {
     CLOSED,
     isClosedTask,
     hasSubtasks,
+    treeRows,
     subtaskTotal,
     subtaskProgress,
     progressQuery,
