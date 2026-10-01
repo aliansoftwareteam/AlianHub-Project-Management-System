@@ -2,7 +2,7 @@
 // language for the agent modules (equality including null as missing, array-element equality, a word-match $text, $nor, $in/$nin (any element of a stored array)/$ne/$gt(e)/$lt(e)/$exists/$type/$size/$elemMatch, $set/$inc/$push/$addToSet/$pull,
 // conditional findOneAndUpdate answering the old document unless asked for the new one (null after an upsert insert, as
 // the driver does), updateOne and findOneAndUpdate with upsert and $setOnInsert and a unique _id, findOneAndDelete, deleteOne, deleteMany,
-// bulkWrite of insertOne/updateOne/updateMany, sort/skip/limit on find, sort on findOneAndUpdate, $type 'date'/'string'/'objectId' on the stored value, $match/$unwind (a top-level array)/$project (inclusion or exclusion)/$addFields ($toString, $ifNull, $size, $strLenBytes)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
+// insertMany with a unique _id, bulkWrite of insertOne/updateOne/updateMany, sort/skip/limit on find, sort on findOneAndUpdate, $type 'date'/'string'/'objectId' on the stored value, $match/$unwind (a top-level array)/$project (inclusion or exclusion)/$addFields ($toString, $ifNull, $size, $strLenBytes)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
 // reject a duplicate save or upsert with E11000, declared text indexes that bound $text to their fields) so a test can assert on what was written.
 
 let seq = 1;
@@ -245,6 +245,13 @@ const create = ({ mongooseCasting = false } = {}) => {
             if (hit) throw duplicateKey(hit.fields);
             list.push(doc);
             return clone(doc);
+        }
+        if (method === 'insertMany') {
+            const docs = (data[0] || []).map((doc) => ({ ...doc, _id: doc._id ? String(doc._id) : nextId() }));
+            const taken = new Set(list.map((d) => String(d._id)));
+            docs.forEach((doc) => { if (taken.has(doc._id)) throw duplicateKey(['_id']); taken.add(doc._id); });
+            list.push(...docs);
+            return docs.map(clone);
         }
         if (method === 'find') return ordered(list.filter((d) => matches(d, data[0], textFields)), data[2]).map(clone);
         if (method === 'findOne') return clone(list.find((d) => matches(d, data[0], textFields)) || null);

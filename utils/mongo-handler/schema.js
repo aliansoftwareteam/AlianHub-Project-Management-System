@@ -2211,6 +2211,8 @@ const schema = {
     users: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.
         demo: { type: Boolean, required: false },
+        // Set only by scripts/seed-scale.js; its --drop deletes no user without it.
+        scaleSeed: { type: String, required: false },
         "legacyId": {
             type: String,
             required: false
@@ -2502,6 +2504,8 @@ const schema = {
         }
     },
     companies: {
+        // { by, anchor } — set only by scripts/seed-scale.js, which writes to and drops no company without it.
+        scaleSeed: { type: Object, required: false },
         // { allowedModes: ['workspace','personal','local'], requireCheckBeforeDone }
         agentPolicy: {
             type: Object,
