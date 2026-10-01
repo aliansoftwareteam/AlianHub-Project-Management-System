@@ -53,6 +53,12 @@
                                 <span class="dropdown-label">{{$t('ProjectDetails.remind_me')}}</span>
                             </div>
                         </DropDownOption>
+                        <DropDownOption v-if="canCountTowardGoal()" data-test="task-count-toward-goal" @click="linkingGoal = true">
+                            <div>
+                                <img :src="linkIcon" alt="" />
+                                <span class="dropdown-label">{{$t('Goals.count_toward')}}</span>
+                            </div>
+                        </DropDownOption>
                         <DropDownOption v-if="canOpenTracker" @click="$emit('open', 'tracker')">
                             <div>
                                 <img :src="trackerIcon" alt="" />
@@ -209,6 +215,7 @@
             @confirm="updateTask()"
             :showSpinner="showSpinner"
         />
+        <GoalLinkPicker v-if="linkingGoal" :source="{ kind: 'taskIds', id: props.task._id, name: props.task.TaskName }" @close="linkingGoal = false" />
         <!-- Personal reminder (COLLAB-03) — pick a date/time to be reminded about this task. -->
         <div v-if="showReminderModal" class="reminder-modal__overlay" @click.self="showReminderModal = false">
             <div class="reminder-modal">
@@ -237,7 +244,9 @@
     import SubtaskProgressBadge from '@/components/atom/SubtaskProgressBadge/SubtaskProgressBadge.vue';
     import { openTemplateDialog } from '@/components/molecules/TaskTemplates/taskTemplates';
 
-    import { computed, defineProps,defineEmits, ref, inject, watch } from 'vue';
+    import { canCountTowardGoal, loadLinkableGoals } from '@/views/Goals/goalLinking';
+
+    import { computed, defineAsyncComponent, defineProps,defineEmits, ref, inject, watch } from 'vue';
     import taskClass from "@/utils/TaskOperations"
     import { apiRequest } from '@/services';
     import { useGetterFunctions, useCustomComposable } from '@/composable';
@@ -292,6 +301,9 @@
     const userId = inject('$userId')
     const canOpenTracker = computed(() => (props.task?.AssigneeUserId || []).includes(userId.value) && (props.task?.status?.type || props.task?.statusType) !== 'close');
     const companyId = inject('$companyId')
+    const GoalLinkPicker = defineAsyncComponent(() => import('@/views/Goals/GoalLinkPicker.vue'));
+    const linkingGoal = ref(false);
+    loadLinkableGoals(companyId?.value);
     const clientWidth = inject('$clientWidth');
     // Provided by TaskDetail.vue — { total, completed } for the subtask % badge.
     const subtaskCompletion = inject('subtaskCompletion', null);

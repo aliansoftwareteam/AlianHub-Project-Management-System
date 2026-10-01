@@ -321,6 +321,30 @@
 .ah-detail__prop--tags .ah-detail__prop-label { padding-top: 3px; }
 .ah-detail__tags { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; min-width: 0; }
 .ah-detail__tags .tagList { margin: 0; }
+.ah-detail__prop--lists { align-items: flex-start; }
+.ah-detail__prop--lists .ah-detail__prop-label { padding-top: 4px; }
+.ah-detail__lists { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; min-width: 0; }
+.ah-detail__list-chip {
+    display: inline-flex; align-items: center; gap: 5px; max-width: 100%; min-height: 24px; box-sizing: border-box; padding: 0 8px;
+    border: 1px solid var(--border); border-radius: var(--r-sm, 6px); background: var(--surface); color: var(--ink);
+    font: 400 var(--fs-sm, 12px) var(--font-ui);
+}
+.ah-detail__list-chip--home { background: var(--fill); }
+.ah-detail__list-chip--closed { border-style: dashed; color: var(--ink-2); }
+.ah-detail__list-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ah-detail__list-mark { flex: none; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); }
+.ah-detail__list-remove {
+    flex: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-right: -4px; padding: 0;
+    border: 0; border-radius: var(--r-sm, 6px); background: transparent; color: var(--ink-2); cursor: pointer;
+}
+.ah-detail__list-remove:hover { background: var(--hairline); color: var(--ink); }
+.ah-detail__list-add {
+    display: inline-flex; align-items: center; gap: 4px; min-height: 24px; padding: 0 6px; border: 0; border-radius: var(--r-sm, 6px);
+    background: transparent; color: var(--ink-2); font: 400 var(--fs-sm, 12px) var(--font-ui); cursor: pointer;
+}
+.ah-detail__list-add:hover { background: var(--hairline); color: var(--ink); }
+.ah-detail__list-remove:focus-visible, .ah-detail__list-add:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.ah-detail__list-remove:disabled, .ah-detail__list-add:disabled { opacity: .5; cursor: default; }
 .ah-detail__prop-group { border-top: 1px solid var(--hairline); padding-top: var(--gap-row, 12px); display: flex; flex-direction: column; gap: var(--gap-row, 9px); }
 .ah-detail__relation {
     display: flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 0;
@@ -478,6 +502,8 @@
     .ah-detail__sheet-grip { position: absolute; top: -2px; left: 50%; transform: translateX(-50%); width: 36px; height: 4px; border-radius: 99px; background: var(--border); }
     .ah-detail__sheet-scrim { position: fixed; inset: 0; z-index: 45; background: rgba(0, 0, 0, .35); }
     .ah-detail__props .task-detail-right-side-label, .ah-detail__prop { min-height: 44px; }
+    .ah-detail__list-chip, .ah-detail__list-add { min-height: 32px; }
+    .ah-detail__list-remove { width: 28px; height: 28px; }
     .ah-tray { right: 10px; bottom: calc(var(--tabbar-h) + 10px); }
     .ah-tray__name { max-width: 140px; }
 }

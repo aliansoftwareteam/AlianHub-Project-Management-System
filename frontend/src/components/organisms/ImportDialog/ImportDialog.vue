@@ -21,6 +21,7 @@
                         <ShellIcon name="chevronRight" :size="14" class="imd__chev" />
                     </button>
                 </div>
+                <RecentImports v-if="projectData && projectData._id" :project-id="String(projectData._id)" class="imd__recent" />
             </div>
         </div>
     </teleport>
@@ -34,6 +35,7 @@ import { defineAsyncComponent, ref, defineProps, defineEmits } from 'vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import ImportSourceModals from './ImportSourceModals.vue';
 import { IMPORT_SOURCES } from '@/components/organisms/WorkspaceImport/workspaceImportState';
+import RecentImports from '@/components/organisms/WorkspaceImport/RecentImports.vue';
 
 const WorkspaceImportDialog = defineAsyncComponent(() => import('@/components/organisms/WorkspaceImport/WorkspaceImportDialog.vue'));
 
@@ -63,6 +65,7 @@ const pick = (key) => {
 .imd__title { margin: 0 0 4px; }
 .imd__lead { margin: 0; }
 .imd__grid { display: grid; gap: 8px; }
+.imd__recent { margin-top: 16px; }
 .imd__source { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; text-align: left; cursor: pointer; color: var(--ink); }
 .imd__source:hover { border-color: var(--brand); }
 .imd__mark { flex: none; width: 34px; height: 34px; border-radius: 8px; color: #fff; display: flex; align-items: center; justify-content: center; font: 700 11px/1 var(--font-ui); }

@@ -274,6 +274,7 @@ import * as env from "@/config/env";
 import timeZoneOption from "./timezoneArray.js";
 import languageOptions from "@/utils/languagesName.json";
 import { useGetterFunctions, languageTranslateHelper } from "@/composable";
+import { switchLocale } from "@/locales/main";
 import { apiRequest, apiRequestWithoutCompnay } from "@/services";
 import { unitCapacity as cleanUnitCapacity } from "@/views/Projects/WorkloadView/workloadUnits";
 import { storageQueryBuilder, generateFileName } from "@/utils/storageQueryBuild.js";
@@ -294,13 +295,13 @@ import { DECLINE_REASONS } from "@/views/Ai/episodeText";
 
 defineOptions({ name: "MySettingsView" });
 
-const { t, locale, setLocaleMessage } = useI18n();
+const { t } = useI18n();
 const $toast = useToast();
 const openAtSection = useRoute()?.query?.section;
 const lookSection = ref(null);
 const { getters, commit } = useStore();
 const { getUser } = useGetterFunctions();
-const { selectedLanguageCode, changeLanguage } = languageTranslateHelper();
+const { selectedLanguageCode } = languageTranslateHelper();
 const userId = inject("$userId");
 
 const DEFAULT_HOURS = { days: [1, 2, 3, 4, 5], start: "09:30", end: "18:00", capacity: 8 };
@@ -443,14 +444,13 @@ async function uploadPhotoIfChanged() {
 async function applyLanguage() {
     const previous = localStorage.getItem("language");
     if (selectedLanguageCode.value === previous) return;
-    const messages = await changeLanguage(selectedLanguageCode.value);
-    if (!messages) {
+    try {
+        await switchLocale(selectedLanguageCode.value);
+    } catch (error) {
         selectedLanguageCode.value = previous;
         throw new Error(t("Toast.Language_not_updated!"));
     }
     localStorage.setItem("language", selectedLanguageCode.value);
-    locale.value = selectedLanguageCode.value;
-    setLocaleMessage(selectedLanguageCode.value, messages);
 }
 
 async function saveChanges() {

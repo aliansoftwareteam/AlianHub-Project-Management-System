@@ -1,6 +1,6 @@
 // Must list every id in HOME_CARDS and HOME_CATALOG_KEYS of frontend/src/components/molecules/Home/homeCards.js; tests/user-home-cards.test.js checks it.
 const HOME_CARD_IDS = Object.freeze([
-    'waiting', 'standup', 'assigned_comments', 'recents',
+    'waiting', 'standup', 'assigned_comments', 'recents', 'goals',
     'DueSoonCard', 'MyTimeCard', 'AtRiskTodayCard', 'TasksByStatusCard', 'ProjectPulseCard',
 ]);
 const MAX_LAYOUT = 40;

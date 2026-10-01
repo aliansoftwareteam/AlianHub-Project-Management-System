@@ -119,7 +119,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import * as env from "@/config/env";
 import { apiRequestWithoutCompnay } from "@/services";
-import { languageTranslateHelper } from "@/composable";
+import { loadLocale, switchLocale } from "@/locales/main";
 import {
     LOCALES,
     NUMERAL_SYSTEMS,
@@ -134,9 +134,8 @@ import {
 
 defineOptions({ name: "LanguageRegion" });
 
-const { t, locale, setLocaleMessage, messages } = useI18n({ useScope: "global" });
+const { t, messages } = useI18n({ useScope: "global" });
 const { commit } = useStore();
-const { changeLanguage } = languageTranslateHelper();
 const userId = inject("$userId");
 
 const currencies = ["USD", "EUR", "GBP", "INR", "JPY", "AUD", "CAD", "AED"];
@@ -159,6 +158,9 @@ const sampleMoneyLatin = computed(() => `$${formatNumber(SAMPLE_MONEY, { ...form
 const sampleDateArab = computed(() => formatDate(SAMPLE_DATE, { ...form, numerals: "arab" }));
 const sampleMoneyArab = computed(() => `${formatNumber(SAMPLE_MONEY, { ...form, numerals: "arab" })} $`);
 
+// The right-to-left preview is worded in Arabic whatever language is in use; until its file
+// arrives, or if it cannot be fetched, the English samples below stand in.
+loadLocale("ar").catch(() => {});
 const arabic = computed(() => messages.value?.ar?.LanguageV2 || {});
 const rtlSampleTask = computed(() => arabic.value.sample_task || t("Language.sample_task_en"));
 const rtlSampleStatus = computed(() => arabic.value.sample_status || t("Language.sample_status_en"));
@@ -169,11 +171,8 @@ async function save() {
     error.value = "";
     try {
         if (form.language !== localStorage.getItem("language")) {
-            const bundle = await changeLanguage(form.language);
-            if (!bundle) throw new Error(t("Language.error_language"));
-            setLocaleMessage(form.language, bundle);
+            await switchLocale(form.language).catch(() => { throw new Error(t("Language.error_language")); });
             localStorage.setItem("language", form.language);
-            locale.value = form.language;
         }
         savePrefs({ ...form });
 

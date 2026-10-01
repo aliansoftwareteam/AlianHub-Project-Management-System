@@ -9,6 +9,10 @@ const schema = {
     tasks: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.
         demo: { type: Boolean, required: false },
+        // Written by the importers alone (Modules/Importers): the import job that created the task, and the id its
+        // source gave it. No client body sets either, and a copy of the task carries neither.
+        importJobId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        importSourceId: { type: String, required: false },
         "legacyId": {
             type: String,
             required: false
@@ -482,6 +486,9 @@ const schema = {
         errorList: { type: Array, default: [], required: false },
         mapping: { type: Object, required: false },
         fileName: { type: String, required: false },
+        updated: { type: Number, required: false },
+        undoneAt: { type: Date, required: false },
+        undoneBy: { type: String, required: false },
     },
     aiFieldJobs: {
         userId: { type: String, required: true },
@@ -618,6 +625,8 @@ const schema = {
         sharedWith: { type: [String], default: [], required: false },
         color: { type: String, default: '', required: false },
         progressPct: { type: Number, default: 0, required: false },
+        reachedAt: { type: Date, default: null, required: false },
+        notifiedAt: { type: Date, required: false },
         targets: {
             type: [{
                 _id: false,
@@ -627,6 +636,7 @@ const schema = {
                 weight: { type: Number, default: 1, required: false },
                 progressPct: { type: Number, default: 0, required: false },
                 reachedAt: { type: Date, default: null, required: false },
+                notifiedAt: { type: Date, required: false },
                 start: { type: Number, required: false },
                 target: { type: Number, required: false },
                 current: { type: Number, required: false },
@@ -643,6 +653,8 @@ const schema = {
                     done: { type: Number, required: false },
                     total: { type: Number, required: false },
                     at: { type: Date, required: false },
+                    failedAt: { type: Date, required: false },
+                    failedCode: { type: String, required: false },
                     skipped: {
                         sprintIds: { type: [String], default: undefined, required: false },
                         taskIds: { type: [String], default: undefined, required: false },
@@ -776,8 +788,10 @@ const schema = {
         reviewedAt: { type: Date, required: false },
         reviewedBy: { type: String, required: false },
         reviewerName: { type: String, required: false },
+        // The standing approval was given by the person whose week it is
+        selfApproved: { type: Boolean, default: false, required: false },
         rejectionReason: { type: String, required: false },
-        // One entry per reopening: who reopened the week and when, and the review that undid.
+        // One entry per approval (who, when, and whether it was their own week) and per reopening (who, when, and the review that undid).
         history: {
             type: [{
                 _id: false,
@@ -787,6 +801,7 @@ const schema = {
                 by: { type: String, required: true },
                 byName: { type: String, required: false },
                 at: { type: Date, required: true },
+                selfApproved: { type: Boolean, required: false },
                 reviewedBy: { type: String, required: false },
                 reviewerName: { type: String, required: false },
                 reviewedAt: { type: Date, required: false },
@@ -1270,6 +1285,11 @@ const schema = {
         costUsd: { type: Number, required: false },
         priced: { type: Boolean, default: false, required: false },
         billedToWorkspace: { type: Boolean, default: true, required: false },
+        // Set on a call priced by something other than tokens: unit 'audio_minute', quantity in that unit,
+        // estimated when the quantity came from the upload's size rather than its length
+        unit: { type: String, required: false },
+        quantity: { type: Number, required: false },
+        estimated: { type: Boolean, required: false },
         runId: { type: String, required: false },
         userId: { type: String, required: false },
         at: { type: Date, required: true },
@@ -4102,6 +4122,10 @@ const schema = {
             type: Object,
             required: false
         },
+        goals: {
+            type: Object,
+            required: false
+        },
         userId: {
             type: String,
             required: true,
@@ -4387,7 +4411,11 @@ const schema = {
         agentCitations: { type: Array, required: false },
         agentChanges: { type: Array, required: false },
         // The tool an importer brought the comment from (Modules/Importers); the author and the time are the file's word.
-        importedFrom: { type: String, required: false }
+        importedFrom: { type: String, required: false },
+        // The import job that saved the comment, and its time and author in the file, by which the same file imported
+        // again knows the comment is already here.
+        importJobId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        importKey: { type: String, required: false }
     },
     mainChat: {
         ProjectCode: {
