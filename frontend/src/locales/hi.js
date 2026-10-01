@@ -3264,6 +3264,10 @@ export default {
     },
     "ViewGroups": {
         "no_value": "No value",
+        "number_below": "Below {to}",
+        "number_between": "{from} to {to}",
+        "number_from": "{from} and above",
+        "number_any": "Has a value",
         "checked": "Checked",
         "unchecked": "Not checked",
         "date_past": "Past",
@@ -3977,6 +3981,7 @@ export default {
     },
     "FieldTypes": {
         "builder_note": "This field is edited on the task: in the task panel and in List and Table cells.",
+        "edit_field": "Edit the field {field}",
         "people_multiple_label": "Allow several people",
         "people_multiple_hint": "Untick to hold one person at a time.",
         "rating_max_label": "Highest rating",
