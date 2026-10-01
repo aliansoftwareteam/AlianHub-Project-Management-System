@@ -5118,6 +5118,7 @@ export default {
         "doc_shared": "Shared",
         "doc_private_hint": "Only you can see this doc",
         "doc_shared_hint": "Everyone on this project can see this doc",
+        "doc_private_author_only": "Only the author can make this doc private",
         "doc_share_title": "Share this doc",
         "doc_public_link": "Share link with anyone",
         "doc_public_link_hint": "Anyone with the link can read this doc — no login needed",

@@ -43,6 +43,9 @@ const pageVisibleTo = (page, uid) => Boolean(page)
 
 const pageVisibilityFilter = (uid) => ({ $or: [{ visibility: { $ne: 'private' } }, { createdBy: String(uid || '') }] });
 
+/* Once private, a page is readable by its author alone, so nobody else may make it private. */
+const canMakePrivate = (page, uid) => Boolean(page) && Boolean(uid) && String(page.createdBy || '') === String(uid);
+
 const REVIEW_INTERVAL_MONTHS = 3;
 const STALE_AFTER_MONTHS = 6;
 const REVIEW_STATES = ['none', 'verified', 'due', 'stale'];
@@ -84,6 +87,7 @@ module.exports = {
     htmlToRawText,
     pageVisibleTo,
     pageVisibilityFilter,
+    canMakePrivate,
     parseDate,
     nextReviewDate,
     reviewState,
