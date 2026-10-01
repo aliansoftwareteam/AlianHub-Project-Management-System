@@ -3,7 +3,6 @@ import { onMounted, onUnmounted, ref } from "vue";
 export const BLOCKING_SELECTORS = [
     ".ah-detail",
     ".lv2-bulk",
-    ".bulk-action-bar",
     '[role="dialog"][aria-modal="true"]'
 ];
 

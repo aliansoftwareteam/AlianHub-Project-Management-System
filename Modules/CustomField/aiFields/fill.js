@@ -1,7 +1,10 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
+const { DateTime, IANAZone } = require('luxon');
 const logger = require('../../../Config/loggerConfig');
+const socketEmitter = require('../../../event/socketEventEmitter');
 const { myCache } = require('../../../Config/config');
+const { dbCollections } = require('../../../Config/collections');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { evaluatePermission, isWritable } = require('../../../Config/permissionGuard');
@@ -11,6 +14,7 @@ const { customFieldDefinitionOf } = require('../helpers/customFieldText');
 const { aiConfigOf } = require('./config');
 const { readParts, hasContent, hashOf, TASK_PROJECTION } = require('./source');
 const { buildRequest, parseAnswer } = require('./prompt');
+const { specOf, blank } = require('./outputs');
 const limits = require('./limits');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -65,16 +69,29 @@ async function editableTask({ companyId, uid, definition, taskId }) {
     return { task };
 }
 
-async function askModel({ companyId, uid, definition, config, parts }) {
+/* A date is read in the zone of the person the fill runs as; the workspace keeps no zone of its own. */
+async function outputContext({ uid, config, task }) {
+    if (!specOf(config.output).needsDates) return {};
+    const user = OBJECT_ID.test(String(uid)) ? await MongoDbCrudOpration(dbCollections.GLOBAL, {
+        type: SCHEMA_TYPE.USERS,
+        data: [{ _id: new mongoose.Types.ObjectId(String(uid)) }, { Time_Zone: 1 }],
+    }, 'findOne').catch(() => null) : null;
+    const zone = user && user.Time_Zone && IANAZone.isValidZone(user.Time_Zone) ? user.Time_Zone : 'UTC';
+    const start = task && task.startDate ? DateTime.fromJSDate(new Date(task.startDate), { zone }) : null;
+    return { zone, today: DateTime.now().setZone(zone).toISODate(), startDate: start && start.isValid ? start.toISODate() : '' };
+}
+
+async function askModel({ companyId, uid, definition, config, parts, task }) {
     const provider = require('../../AICore/llmProvider').getProvider();
+    const context = await outputContext({ uid, config, task });
     let timer;
     const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('AI field request timed out')), REQUEST_TIMEOUT_MS); });
     try {
         const result = await Promise.race([
-            provider.chat({ ...buildRequest(definition, config, parts), spend: { feature: FEATURES.AI_FIELD, companyId, userId: String(uid) } }),
+            provider.chat({ ...buildRequest(definition, config, parts, context), spend: { feature: FEATURES.AI_FIELD, companyId, userId: String(uid) } }),
             timeout,
         ]);
-        return parseAnswer(definition, result && result.content);
+        return parseAnswer(definition, config, result && result.content, context);
     } finally {
         clearTimeout(timer);
     }
@@ -84,10 +101,10 @@ async function askModel({ companyId, uid, definition, config, parts }) {
 async function propose({ companyId, uid, definition, config, task, parts: given = null }) {
     const parts = given || await readParts({ companyId, task, reads: config.reads });
     const hash = hashOf(parts);
-    if (!hasContent(parts)) return { fieldValue: definition.fieldType === 'dropdown' ? [] : '', text: '', empty: true, reason: 'no_source', hash };
+    if (!hasContent(parts)) return { ...blank(config.output, 'no_source'), hash };
     const verdict = await limits.gate(companyId);
     if (!verdict.ok) throw gateError(verdict);
-    return { ...(await askModel({ companyId, uid, definition, config, parts })), hash };
+    return { ...(await askModel({ companyId, uid, definition, config, parts, task })), hash };
 }
 
 const proposalKey = (id) => `aiFieldProposal:${id}`;
@@ -128,6 +145,17 @@ async function writeFill({ companyId, uid, definition, config, taskId, fieldValu
     await taskMongo.updateTaskCustomField({ ...payload, filledByAi: true });
 }
 
+/* The value is left as it was; the marker lets the task say the fill did not fit until a later fill replaces it. */
+async function markFailed({ companyId, definition, taskId, reason, trigger }) {
+    const path = `aiFieldFills.${String(definition._id)}.failed`;
+    const failed = { at: new Date(), reason, trigger };
+    const task = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS,
+        data: [{ _id: new mongoose.Types.ObjectId(String(taskId)) }, { $set: { [path]: failed } }, { returnDocument: 'after' }],
+    }, 'findOneAndUpdate');
+    if (task) socketEmitter.emit('update', { type: 'update', data: task, updatedFields: { [path]: failed }, module: 'task' });
+}
+
 const refusedProposal = (taskId, reason) => ({ taskId: String(taskId), proposalId: null, text: '', fieldValue: null, empty: true, reason });
 
 const idList = (ids, max) => {
@@ -149,7 +177,11 @@ async function proposeFills({ companyId, uid, fieldId, taskIds }) {
         const proposalId = answer.empty ? null : remember({
             companyId: String(companyId), uid: String(uid), fieldId: definition._id, taskId: String(taskId), fieldValue: answer.fieldValue, hash: answer.hash,
         });
-        proposals.push({ taskId: String(taskId), taskName: String(task.TaskName || ''), proposalId, text: answer.text, fieldValue: answer.fieldValue, empty: answer.empty, ...(answer.reason ? { reason: answer.reason } : {}) });
+        proposals.push({
+            taskId: String(taskId), taskName: String(task.TaskName || ''), proposalId, text: answer.text, fieldValue: answer.fieldValue, empty: answer.empty,
+            ...(answer.reason ? { reason: answer.reason } : {}),
+            ...(answer.invalid ? { invalid: true } : {}),
+        });
     }
     return { proposals };
 }
@@ -185,6 +217,10 @@ async function fillTask({ companyId, uid, definition, config, taskId, trigger, u
     const parts = await readParts({ companyId, task, reads: config.reads });
     if (unlessHash && hashOf(parts) === unlessHash) return { outcome: 'unchanged' };
     const answer = await propose({ companyId, uid, definition, config, task, parts });
+    if (answer.invalid) {
+        await markFailed({ companyId, definition, taskId, reason: answer.reason, trigger });
+        return { outcome: 'failed', reason: answer.reason };
+    }
     if (answer.empty) return { outcome: 'empty', reason: answer.reason };
     await writeFill({ companyId, uid, definition, config, taskId, fieldValue: answer.fieldValue, hash: answer.hash, trigger });
     return { outcome: 'filled' };

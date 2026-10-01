@@ -26,6 +26,7 @@ exports.init = (app) => {
     app.put('/api/v1/timesheet/entries/billable', weekctrl.setEntriesBillable);
     app.post('/api/v1/timesheet/workload-grid', gridctrl.getWorkloadGrid);
     app.post('/api/v1/timesheet/workload-move', gridctrl.moveWorkloadChip);
+    app.put('/api/v1/timesheet/workload-capacity', gridctrl.saveWorkloadCapacity);
     app.post('/api/v1/timesheet/billable-summary', billablectrl.getBillableSummary);
     app.post('/api/v1/timesheet/export-csv', csvctrl.exportTimesheetCsv);
     app.post('/api/v1/timesheet/send-reminders', reminderctrl.triggerReminders);

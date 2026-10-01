@@ -16,9 +16,9 @@
 
         <div class="ah-field">
             <span :id="`${uid}-output`" class="ah-field__label">{{ $t('AiFields.output') }}</span>
-            <div class="fb__seg" role="group" :aria-labelledby="`${uid}-output`">
+            <div class="fb__seg afp__outputs" role="group" :aria-labelledby="`${uid}-output`">
                 <button
-                    v-for="output in AI_FIELD_TYPES"
+                    v-for="output in AI_OUTPUTS"
                     :key="output"
                     type="button"
                     :data-ai-output="output"
@@ -79,9 +79,79 @@
             <span v-if="errors.prompt" class="ah-field__error">{{ errors.prompt }}</span>
         </div>
 
-        <fieldset v-if="modelValue.output === 'dropdown'" class="afp__group">
+        <fieldset v-if="modelValue.output === 'number'" class="afp__group">
+            <legend class="ah-field__label">{{ $t('AiFields.number_settings') }}</legend>
+            <div class="afp__numbers">
+                <div class="ah-field">
+                    <label class="ah-field__label" for="ai-field-min">{{ $t('AiFields.min') }}</label>
+                    <input
+                        id="ai-field-min"
+                        :value="modelValue.min"
+                        type="text"
+                        inputmode="decimal"
+                        class="ah-input"
+                        :class="{ 'ah-input--error': errors.range }"
+                        :placeholder="$t('AiFields.no_limit')"
+                        @input="set({ min: $event.target.value })"
+                    />
+                </div>
+                <div class="ah-field">
+                    <label class="ah-field__label" for="ai-field-max">{{ $t('AiFields.max') }}</label>
+                    <input
+                        id="ai-field-max"
+                        :value="modelValue.max"
+                        type="text"
+                        inputmode="decimal"
+                        class="ah-input"
+                        :class="{ 'ah-input--error': errors.range }"
+                        :placeholder="$t('AiFields.no_limit')"
+                        @input="set({ max: $event.target.value })"
+                    />
+                </div>
+                <div class="ah-field">
+                    <label class="ah-field__label" for="ai-field-decimals">{{ $t('AiFields.decimals') }}</label>
+                    <input
+                        id="ai-field-decimals"
+                        :value="modelValue.decimals"
+                        type="text"
+                        inputmode="numeric"
+                        class="ah-input"
+                        :class="{ 'ah-input--error': errors.decimals }"
+                        :placeholder="$t('AiFields.decimals_any')"
+                        @input="set({ decimals: $event.target.value })"
+                    />
+                </div>
+            </div>
+            <span v-if="errors.range" class="ah-field__error">{{ errors.range }}</span>
+            <span v-if="errors.decimals" class="ah-field__error">{{ errors.decimals }}</span>
+            <span :id="`${uid}-range`" class="ah-field__label">{{ $t('AiFields.out_of_range') }}</span>
+            <div class="fb__seg" role="group" :aria-labelledby="`${uid}-range`">
+                <button
+                    v-for="choice in OUT_OF_RANGE"
+                    :key="choice"
+                    type="button"
+                    :data-ai-out-of-range="choice"
+                    :class="{ 'is-active': modelValue.outOfRange === choice }"
+                    :aria-pressed="modelValue.outOfRange === choice ? 'true' : 'false'"
+                    @click="set({ outOfRange: choice })"
+                >{{ $t(`AiFields.out_of_range_${choice}`) }}</button>
+            </div>
+            <p class="afp__hint">{{ $t(`AiFields.out_of_range_${modelValue.outOfRange === 'reject' ? 'reject' : 'clamp'}_hint`) }}</p>
+        </fieldset>
+
+        <p v-if="modelValue.output === 'rating'" class="afp__hint">{{ $t('AiFields.rating_hint', { max: RATING_MAX }) }}</p>
+
+        <div v-if="modelValue.output === 'date'" class="ah-field">
+            <label class="ah-field__label" for="ai-field-date-rule">{{ $t('AiFields.date_rule') }}</label>
+            <select id="ai-field-date-rule" :value="modelValue.dateRule" class="ah-input" @change="set({ dateRule: $event.target.value })">
+                <option v-for="rule in DATE_RULES" :key="rule || 'none'" :value="rule">{{ $t(`AiFields.date_rule_${rule || 'none'}`) }}</option>
+            </select>
+            <p class="afp__hint">{{ $t('AiFields.date_hint') }}</p>
+        </div>
+
+        <fieldset v-if="OPTION_OUTPUTS.includes(modelValue.output)" class="afp__group">
             <legend class="ah-field__label">{{ $t('AiFields.options') }}</legend>
-            <p class="afp__hint">{{ $t('AiFields.options_hint') }}</p>
+            <p class="afp__hint">{{ modelValue.output === 'labels' ? $t('AiFields.labels_hint') : $t('AiFields.options_hint') }}</p>
             <div v-for="(option, index) in modelValue.options" :key="option.id || index" class="afp__option">
                 <input
                     :value="option.label"
@@ -120,7 +190,7 @@
 <script setup>
 import { computed } from "vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
-import { AI_FIELD_TYPES, AI_READ_PARTS, templatesFor } from "@/views/Projects/composables/aiFields";
+import { AI_OUTPUTS, AI_READ_PARTS, DATE_RULES, OPTION_OUTPUTS, RATING_MAX, templatesFor } from "@/views/Projects/composables/aiFields";
 
 defineOptions({ name: "AiFieldPanel" });
 
@@ -131,6 +201,7 @@ const props = defineProps({
 const emit = defineEmits(["update:modelValue"]);
 
 const uid = "ai-field-panel";
+const OUT_OF_RANGE = ["clamp", "reject"];
 const templates = computed(() => templatesFor(props.modelValue.output));
 
 const set = (patch) => emit("update:modelValue", { ...props.modelValue, ...patch });
@@ -138,7 +209,8 @@ const set = (patch) => emit("update:modelValue", { ...props.modelValue, ...patch
 function setOutput(output) {
     const allowed = templatesFor(output);
     const template = allowed.includes(props.modelValue.template) && props.modelValue.template !== "custom" ? props.modelValue.template : allowed[0];
-    set({ output, template, options: output === "dropdown" && !props.modelValue.options.length ? [{ id: "", label: "" }] : props.modelValue.options });
+    const needsOptions = OPTION_OUTPUTS.includes(output) && !props.modelValue.options.length;
+    set({ output, template, options: needsOptions ? [{ id: "", label: "" }] : props.modelValue.options });
 }
 
 function setOption(index, label) {
@@ -159,6 +231,11 @@ function toggleRead(part, on) {
 @import "./style.css";
 
 .afp { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.afp__outputs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.afp__outputs button { padding: 7px 4px; overflow-wrap: anywhere; }
+.afp__numbers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.afp__numbers .ah-field { min-width: 0; }
+.afp__numbers .ah-input { width: 100%; min-width: 0; box-sizing: border-box; }
 .afp__templates { display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; }
 .afp__template {
     display: flex; flex-direction: column; gap: 2px;

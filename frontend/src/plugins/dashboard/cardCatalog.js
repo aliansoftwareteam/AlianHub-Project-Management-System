@@ -101,8 +101,27 @@ export const CARD_CATALOG = [
     }),
     card('TaskStatusSummaryCard', 'charts', false),
     card('WorkedTasksTableCard', 'charts', false),
-    card('BurndownCard', 'charts', false),
-    card('VelocityCard', 'charts', false),
+    card('BurndownCard', 'charts', true, {
+        scopeKey: 'Dash.scope_project',
+        size: { w: 6, h: 10, minW: 4, maxW: 12, minH: 8, maxH: 22 },
+        link: { name: 'SprintReport', labelKey: 'Dash.link_sprint_report' },
+        emptyKey: 'Dash.burndown_pick_sprint',
+        settings: [
+            { name: 'projectId', type: 'project', required: true, labelKey: 'Dash.project' },
+            { name: 'sprintId', type: 'sprint', required: true, labelKey: 'Dash.settings_sprint' },
+            { name: 'metric', type: 'choice', labelKey: 'Dash.settings_metric', options: [{ id: 'points', labelKey: 'Dash.metric_points' }, { id: 'count', labelKey: 'Dash.metric_tasks' }] },
+        ],
+    }),
+    card('VelocityCard', 'charts', true, {
+        scopeKey: 'Dash.scope_project',
+        size: { w: 6, h: 9, minW: 4, maxW: 12, minH: 7, maxH: 22 },
+        link: { name: 'VelocityFlow', labelKey: 'Dash.link_velocity' },
+        emptyKey: 'Dash.velocity_pick_project',
+        settings: [
+            { name: 'projectId', type: 'project', required: true, labelKey: 'Dash.project' },
+            { name: 'sprintCount', type: 'count', min: 2, max: 12, default: 6, labelKey: 'Dash.settings_sprint_count' },
+        ],
+    }),
     card('MilestoneReportCard', 'charts', false),
     card('TasksByAssigneeCard', 'charts', false),
 
@@ -112,7 +131,16 @@ export const CARD_CATALOG = [
         emptyKey: 'Dash.empty_agent_spend',
         emptyActionKey: 'Dash.action_open_agents',
     }),
-    card('AskAQuestionCard', 'ai', false),
+    card('AskAQuestionCard', 'ai', true, {
+        scopeKey: 'Dash.scope_mine',
+        size: { w: 6, h: 10, minW: 4, maxW: 12, minH: 7, maxH: 22 },
+        link: { name: 'AiAsk', labelKey: 'Dash.link_ask' },
+        emptyKey: 'Dash.ask_pick_question',
+        settings: [
+            { name: 'question', type: 'text', required: true, maxLength: 500, labelKey: 'Dash.settings_question', placeholderKey: 'Dash.settings_question_placeholder', hintKey: 'Dash.settings_question_hint' },
+            { name: 'projectId', type: 'project', labelKey: 'Dash.settings_ask_project' },
+        ],
+    }),
 ];
 
 export const BUILT_CARDS = CARD_CATALOG.filter((c) => c.built);

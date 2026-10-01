@@ -44,8 +44,10 @@
                     :class="{ 'is-active': isActive(chat.id), 'has-unread': chat.unread > 0 }"
                     @click="$emit('select', { kind: 'direct', item: chat })"
                 >
-                    <span class="ah-dot" :class="chat.isDnd ? 'ah-dot--danger' : 'ah-dot--ok'"></span>
+                    <span v-if="chat.isAgent" class="ah-avatar ah-avatar--sm ah-avatar--agent cs-agent" aria-hidden="true">{{ chat.name.slice(0, 1).toUpperCase() }}</span>
+                    <span v-else class="ah-dot" :class="chat.isDnd ? 'ah-dot--danger' : 'ah-dot--ok'"></span>
                     <span class="cs-row-name">{{ chat.name }}<span v-if="chat.isDnd" class="cs-row-dnd"> · {{ $t('Chat.dnd_short') }}</span></span>
+                    <span v-if="chat.isAgent" class="cs-agent-tag">{{ $t('Chat.agent') }}</span>
                     <span v-if="chat.unread" class="cs-count">{{ chat.unread > 99 ? '99+' : chat.unread }}</span>
                 </button>
 
@@ -58,8 +60,10 @@
                         :class="{ 'is-active': isActive(person.id) }"
                         @click="$emit('select', { kind: 'person', item: person })"
                     >
-                        <span class="ah-dot" :class="person.isDnd ? 'ah-dot--danger' : 'ah-dot--ok'"></span>
+                        <span v-if="person.isAgent" class="ah-avatar ah-avatar--sm ah-avatar--agent cs-agent" aria-hidden="true">{{ person.name.slice(0, 1).toUpperCase() }}</span>
+                        <span v-else class="ah-dot" :class="person.isDnd ? 'ah-dot--danger' : 'ah-dot--ok'"></span>
                         <span class="cs-row-name">{{ person.name }}</span>
+                        <span v-if="person.isAgent" class="cs-agent-tag">{{ $t('Chat.agent') }}</span>
                     </button>
                 </template>
 

@@ -33,10 +33,6 @@ describe('the dashboard catalogue', () => {
         expect(catalogEntry('AtRiskTodayCard').family).toBe('team');
         expect(catalogEntry('AgentSpendCard').family).toBe('ai');
     });
-
-    it('still lists Ask a question as not built', () => {
-        expect(isBuiltCard('AskAQuestionCard')).toBe(false);
-    });
 });
 
 describe('At-risk card', () => {

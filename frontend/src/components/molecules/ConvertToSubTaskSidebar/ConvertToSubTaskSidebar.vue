@@ -228,10 +228,8 @@
             type: Boolean,
             default: false
         },
-        // Bulk convert to subtask. Same task picker, but the sidebar performs
-        // nothing: it hands the chosen parent task back and the caller
-        // (BulkActionBar) fires one bulkConvertToSubTask request for the whole
-        // selection. Mirrors isBulkMove.
+        // Bulk convert to subtask: the sidebar only hands the chosen parent back;
+        // the caller sends one bulkConvertToSubTask for the whole selection.
         isBulkConvert: {
             type: Boolean,
             default: false
@@ -247,6 +245,11 @@
         isBulkMove: {
             type: Boolean,
             default: false
+        },
+        // The projects a bulk caller may place tasks in; null keeps every active project.
+        projectOptions: {
+            type: Array,
+            default: null
         }
     });
     const isDisable = computed(() => props.isDisableButton)
@@ -288,8 +291,9 @@
             if(projectSearch.value) {return props.allProjectsArrayFilter.filter((x) => x.ProjectName.toLowerCase().includes(projectSearch.value.toLowerCase()));} 
             else { return props.allProjectsArrayFilter }
         } else {
-            if(projectSearch.value) {return projectsGetter.value.data.filter((x) => x.ProjectName.toLowerCase().includes(projectSearch.value.toLowerCase()));} 
-            else { return projectsGetter.value.data; }
+            const list = props.projectOptions || projectsGetter.value.data;
+            if(projectSearch.value) {return list.filter((x) => x.ProjectName.toLowerCase().includes(projectSearch.value.toLowerCase()));}
+            else { return list; }
         }
     });
     const emit = defineEmits(["isConvertSubtaskOPen","dataToMainComp","createTask","bulkMoveConfirm","bulkConvertConfirm"])
@@ -924,8 +928,6 @@
     }
 
     const moveTaskButton = () => {
-        // Bulk move: no per-task conversion here — hand the destination to the
-        // caller (BulkActionBar) which fires the bulkMove request.
         if(props.isBulkMove === true){
             if(Object.keys(selectedSprintData.value).length === 0){
                 return;

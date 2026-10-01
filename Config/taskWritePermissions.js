@@ -29,7 +29,7 @@ const TASK_ID = [['taskId']];
 const BULK_TASK_IDS = [['taskIds', '*']];
 const DESTINATION = [['projectData', 'id']];
 
-// ListBulkBar.vue offers the sprint move and tags behind either key, BulkActionBar.vue behind their own keys.
+// ListBulkBar.vue offers the sprint move and tags behind either key.
 const BULK_MOVE = anyOf(write('task.task_move'), write('task.task_status'));
 const BULK_TAGS = anyOf(write('task.task_tag'), write('task.task_status'));
 

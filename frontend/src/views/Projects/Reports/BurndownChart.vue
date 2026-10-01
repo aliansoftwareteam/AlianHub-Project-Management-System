@@ -34,6 +34,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import { downloadReportPdf, chartImage } from './reportsPdf';
+import { sprintChoices } from './composables/agileReports';
 
 const props = defineProps({
     projectData: { type: Object, default: () => ({}) },
@@ -48,18 +49,7 @@ const emptyMsg = ref('');
 const data = ref(null); // { sprintName, totalCount, totalPoints, days:[...] }
 const chartRef = ref(null);
 
-/* The picker is fed the project's whole sprint list, which also carries folders,
-   the backlog and anything else living in that collection. A burndown of the
-   backlog is not wrong so much as meaningless — it has no time box and no end,
-   so the chart would run from its oldest task to today forever. A folder is not
-   a task container at all. Plain lists DO stay: they chart, just without a box. */
-const sprintOptions = computed(() =>
-    (props.sprints || [])
-        .filter((s) => s && s._id)
-        .filter((s) => !s.isFolder && !s.isBacklog && s.mainChat !== true)
-        .filter((s) => s.deletedStatusKey !== 1)
-        .map((s) => ({ _id: s._id, name: s.name || s.sprintName || t('Reports.sprint') }))
-);
+const sprintOptions = computed(() => sprintChoices(props.sprints).map((s) => ({ ...s, name: s.name || t('Reports.sprint') })));
 
 const hasData = computed(() => !!(data.value && data.value.days && data.value.days.length));
 
