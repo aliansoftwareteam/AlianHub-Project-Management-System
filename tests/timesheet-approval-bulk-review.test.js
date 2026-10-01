@@ -198,7 +198,7 @@ describe('POST /api/v2/timesheet-approval/bulk-review', () => {
     });
 
     it.each([
-        ['no ids', { action: 'approve' }],
+        ['no ids', { ids: undefined, action: 'approve' }],
         ['an empty list', { ids: [], action: 'approve' }],
         ['ids that are not a list', { ids: 'abc', action: 'approve' }],
         ['an action that is not approve or reject', { action: 'reopen' }],
