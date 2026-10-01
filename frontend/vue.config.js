@@ -58,11 +58,12 @@ module.exports = defineConfig({
         '@formLogic': path.resolve(__dirname, '../Modules/Forms/helpers/formLogic.js'),
       },
     },
-    // A production build fails once the files a first paint downloads outgrow the budget.
+    // A production build fails once the files a first paint downloads outgrow the budget. Only that
+    // set is budgeted: a chunk fetched later may be any size (the city list alone is 8 MB).
     performance: {
       hints: process.env.NODE_ENV === 'production' ? 'error' : false,
       maxEntrypointSize: FIRST_PAINT_BUDGET_BYTES,
-      maxAssetSize: FIRST_PAINT_BUDGET_BYTES,
+      maxAssetSize: Number.MAX_SAFE_INTEGER,
     },
     plugins: [
       // moment pulls in every locale it ships; the app never switches moment's locale.

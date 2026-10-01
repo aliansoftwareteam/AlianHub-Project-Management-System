@@ -197,4 +197,6 @@ ul.task-detail-action-ul li a {
     justify-content: space-between;
     margin-top: 4px;
 }
-.task-action__btn { display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; }
+/* On the button that also carries d-flex, the utility decides; :where() adds no weight. */
+.task-action__btn:where(:not(.d-flex)) { display: inline-flex; }
+.task-action__btn { align-items: center; justify-content: center; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; }
