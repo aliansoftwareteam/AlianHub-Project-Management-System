@@ -5,8 +5,11 @@ const versions = require('./versions');
 exports.init = (app) => {
     app.get('/api/v2/pages/ai-status', ctrl.aiStatus);
     app.post('/api/v2/pages/ai', ctrl.composeWithAi);
+    app.get('/api/v2/pages/:id/comments/people', comments.listPeople);
     app.get('/api/v2/pages/:id/comments', comments.listComments);
     app.post('/api/v2/pages/:id/comments', comments.createComment);
+    app.put('/api/v2/pages/:id/comments/:commentId/assign', comments.assignComment);
+    app.put('/api/v2/pages/:id/comments/:commentId/reaction', comments.reactToComment);
     app.put('/api/v2/pages/:id/comments/:commentId/resolve', comments.resolveComment);
     app.put('/api/v2/pages/:id/comments/:commentId', comments.updateComment);
     app.delete('/api/v2/pages/:id/comments/:commentId', comments.deleteComment);
