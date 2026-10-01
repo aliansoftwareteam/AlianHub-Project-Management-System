@@ -17,18 +17,18 @@ async function visibleTask({ companyId, uid, taskId, projection }) {
     return listable.map(String).includes(String(task.ProjectID)) ? task : null;
 }
 
-/* The same rule for many tasks at once: those of `taskIds` that sit, outside the trash, in a project `uid` can open. */
+/* The same rule for many tasks at once: those of `taskIds` that sit, outside the trash, in a project whose tasks `uid` may list. */
 async function visibleTasks({ companyId, uid, taskIds, projection }) {
     const ids = [...new Set((taskIds || []).map(String).filter((id) => mongoose.Types.ObjectId.isValid(id) && id.length === 24))];
     if (!uid || !ids.length) return [];
-    const [tasks, visible] = await Promise.all([
+    const [tasks, listable] = await Promise.all([
         MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
             data: [{ _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) }, deletedStatusKey: { $ne: 1 } }, { ...projection, ProjectID: 1 }],
         }, 'find'),
-        scope.visibleProjectIds(companyId, String(uid)),
+        taskListProjectIds(companyId, String(uid)),
     ]);
-    const open = new Set((visible || []).map(String));
+    const open = new Set((listable || []).map(String));
     return (tasks || []).filter((task) => task.ProjectID && open.has(String(task.ProjectID)));
 }
 

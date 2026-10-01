@@ -9,6 +9,7 @@ jest.mock('../Modules/AICore/llmProvider', () => ({
     getProvider: () => ({ name: 'fake', chat: (...a) => mockChat(...a) }),
 }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
