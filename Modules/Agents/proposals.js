@@ -309,9 +309,32 @@ const decline = async (companyId, id, { decider, ip, reason }) => {
     if (DECLINE_REASONS.includes(declineReason)) {
         await quietly(`preference candidate for ${decider.userId}`, () => memory.preferenceCandidate({ companyId, userId: decider.userId, reasonKey: declineReason }));
     }
+    if (declineReason && !DECLINE_REASONS.includes(declineReason)) {
+        await quietly(`keep the typed reason of ${id}`, () => memory.rememberDeclined({ companyId, proposal: p, text: declineReason, userId: decider.userId }));
+    }
     await settleRun(companyId, p, { decision: STATUS.DECLINED, applied: [], reason: declineReason || null, outcome: 'declined by a person' });
     await quietly(`decline feedback for ${id}`, () => aiFeedback.fromDecline(companyId, decider.userId, { proposalId: id, runId: p.runId, reason: declineReason }));
     return { proposal: updated };
+};
+
+/* A change a standing approval applied (./standingApprovals) is kept as a proposal its maker already approved,
+ * so it is listed as done and undone the way an approval made by hand is. */
+const fileApplied = async (companyId, { rule, action, params, auditId, why }) => {
+    const asAsked = { ...params };
+    delete asAsked.__proposal;
+    const label = String((registry.get(action) && registry.get(action).label) || action).slice(0, 300);
+    const saved = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AGENT_PROPOSALS,
+        data: {
+            agentId: String(rule.agentId || ''), agentName: rule.agentName, runId: null, taskId: asAsked.taskId ? String(asAsked.taskId) : null, projectId: rule.projectId,
+            what: label, why: String(why || '').slice(0, 2000), changes: [{ action, params: asAsked, label, reversible: true, rating: actions.rating(action) }],
+            status: STATUS.APPROVED, gate: null, priority: 'normal', decidedBy: String(rule.madeBy), decidedAt: new Date(), undoUntil: new Date(Date.now() + UNDO_WINDOW_MS),
+            auditIds: [String(auditId)], source: SOURCE_MCP, requestedBy: String(rule.requestedBy), standingApprovalId: String(rule._id),
+            ...(rule.oauthGrantId ? { oauthClientId: rule.oauthClientId, oauthGrantId: rule.oauthGrantId } : { tokenId: rule.tokenId }),
+        },
+    }, 'save');
+    emit(companyId, saved);
+    return saved;
 };
 
 /* Takes back a proposal nobody has decided, when what it answered is gone. It is not a person's refusal, so nothing learns from it. */
@@ -377,4 +400,4 @@ const reapStuck = async (companyId, { olderThanMs = stuckThresholdMs(), now = ne
     return { reaped };
 };
 
-module.exports = { STATUS, REASON, SOURCE_MCP, SOURCE_SYSTEM, SYSTEM_DECIDER, REAPED_PREFIX, UNDO_WINDOW_MS, GATE_OWNER_ADMIN, DECLINE_REASONS, validateChanges, create, list, get, approve, decline, withdraw, undoApproval, bucketOf, reapStuck, stuckThresholdMs };
+module.exports = { STATUS, REASON, SOURCE_MCP, SOURCE_SYSTEM, SYSTEM_DECIDER, REAPED_PREFIX, UNDO_WINDOW_MS, GATE_OWNER_ADMIN, DECLINE_REASONS, validateChanges, create, list, get, approve, decline, withdraw, undoApproval, fileApplied, bucketOf, reapStuck, stuckThresholdMs };

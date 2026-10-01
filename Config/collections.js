@@ -113,6 +113,7 @@ const dbCollections = {
     AI_RESERVATIONS: "ai_reservations",
     AI_ALERTS: "ai_alerts",
     AGENT_PROPOSALS: "agent_proposals",
+    AGENT_STANDING_APPROVALS: "agent_standing_approvals",
     AGENT_SKILLS: "agent_skills",
     CALLS: "calls",
     INTEGRATION_CONNECTIONS: "integration_connections",

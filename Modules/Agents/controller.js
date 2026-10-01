@@ -6,6 +6,7 @@ const registry = require('./registry');
 const runs = require('./runs');
 const { TYPE_LIST: PROVIDER_ERROR_TYPES } = require('../AICore/providerError');
 const proposals = require('./proposals');
+const standingApprovals = require('./standingApprovals');
 const accounts = require('./accounts');
 const { isAgent } = require('./actor');
 const access = require('./access');
@@ -621,13 +622,15 @@ const decide = (fn) => async (req, res) => {
         // One answer for a proposal that is not there and one the caller may not see.
         const proposal = await proposals.get(companyId, req.params.id);
         if (!proposal || !(await canSeeProposal(companyId, caller, proposal))) return fail(res, 'Proposal not found.', 404);
-        const out = await fn(companyId, req.params.id, { decider: caller.actor, isPrivileged: caller.privileged, changes: req.body && req.body.changes, reason: req.body && req.body.reason, ip: req.ip || '' });
+        const out = await fn(companyId, req.params.id, { decider: caller.actor, isPrivileged: caller.privileged, changes: req.body && req.body.changes, reason: req.body && req.body.reason, ip: req.ip || '', always: Boolean(req.body) && req.body.always === true, viaToken: Boolean(req.apiToken) });
         if (out.error) return fail(res, out.error, out.status || 400, refusalOf(out));
         return res.send({ status: true, statusText: 'Done.', data: out });
     } catch (e) { logger.error(`proposal decision: ${e.message}`); return fail(res, e.message, 500); }
 };
 
-exports.approveProposal = decide(proposals.approve);
+const approveOnceOrAlways = (companyId, id, { always, ...decision }) => (always ? standingApprovals.approveAlways(companyId, id, decision) : proposals.approve(companyId, id, decision));
+
+exports.approveProposal = decide(approveOnceOrAlways);
 exports.declineProposal = decide(proposals.decline);
 exports.undoProposal = decide(proposals.undoApproval);
 

@@ -7,6 +7,7 @@ const builderCtrl = require('./builderController');
 const chatCtrl = require('./chatController');
 const projectPolicyCtrl = require('./projectPolicyController');
 const projectManagerCtrl = require('./manager/controller');
+const standingApprovalsCtrl = require('./standingApprovalsController');
 const { agentPerimeter } = require('./guard');
 
 exports.init = (app) => {
@@ -78,6 +79,8 @@ exports.init = (app) => {
     app.put('/api/v2/agents/policy', ctrl.setPolicy);
     app.get('/api/v2/agents/project-policy/:projectId', projectPolicyCtrl.getProjectPolicy);
     app.put('/api/v2/agents/project-policy/:projectId', projectPolicyCtrl.putProjectPolicy);
+    app.get('/api/v2/agents/standing-approvals/:projectId', standingApprovalsCtrl.listStanding);
+    app.delete('/api/v2/agents/standing-approvals/:projectId/:id', standingApprovalsCtrl.endStanding);
     app.get('/api/v2/agents/project-manager/:projectId', projectManagerCtrl.getProjectManager);
     app.put('/api/v2/agents/project-manager/:projectId', projectManagerCtrl.putProjectManager);
 

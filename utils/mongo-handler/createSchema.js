@@ -344,6 +344,8 @@ agentProposalsSchema.index({ status: 1, createdAt: -1 });
 agentProposalsSchema.index({ createdAt: -1 });
 agentProposalsSchema.index({ agentId: 1, createdAt: -1 });
 agentProposalsSchema.index({ taskId: 1 });
+const agentStandingApprovalsSchema = new Schema(schema.agentStandingApprovals, {strict: true, timestamps: true});
+agentStandingApprovalsSchema.index({ projectId: 1, action: 1, status: 1 });
 const callsSchema = new Schema(schema.calls, {strict: true, timestamps: true});
 callsSchema.index({ callId: 1 }, { unique: true });
 callsSchema.index({ chatId: 1, createdAt: -1 });
@@ -587,6 +589,7 @@ module.exports = {
     aiReplaysSchema,
     aiAlertsSchema,
     agentProposalsSchema,
+    agentStandingApprovalsSchema,
     agentSkillsSchema,
     callsSchema,
     integrationConnectionsSchema,

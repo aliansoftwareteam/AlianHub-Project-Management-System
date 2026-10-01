@@ -175,6 +175,15 @@ const readProposals = async (companyId, userId) => {
     }
 };
 
+const readApplied = async (companyId, userId) => {
+    try {
+        return await queue.readApplied(companyId, userId);
+    } catch (e) {
+        logger.error(`${LOG_PREFIX} readApplied: ${e.message}`);
+        return [];
+    }
+};
+
 /**
  * Time-off requests waiting on this user. Only an owner or admin can decide
  * them (Modules/Pto), so nobody else sees them; a person's own request is
@@ -266,11 +275,12 @@ exports.list = async (req, res) => {
         const probe = window + 1;
         const waiting = tab === R.APPROVAL_TAB;
         const wantRows = !waiting && kind !== 'approval';
-        const [notifications, mentions, approvals, proposals] = await Promise.all([
+        const [notifications, mentions, approvals, proposals, applied] = await Promise.all([
             wantRows && plan.notifications ? readNotifications(companyId, userId, { sort, limit: probe, match: R.notificationMatch(userId, scope) }) : [],
             wantRows && plan.mentions ? readMentions(companyId, userId, { sort, limit: probe, match: R.mentionMatch(userId, scope) }) : [],
             waiting ? readApprovals(companyId, userId) : [],
             waiting ? readProposals(companyId, userId) : [],
+            waiting ? readApplied(companyId, userId) : [],
         ]);
 
         // The two sources arrive already sorted; this only re-orders the merge of them,
@@ -304,6 +314,7 @@ exports.list = async (req, res) => {
                 items: page,
                 approvals,
                 proposals,
+                applied,
                 // Two ways there is more: the merge itself has rows past this page, or a
                 // source handed back the probe row and so still has rows behind it.
                 hasMore: merged.length > window
