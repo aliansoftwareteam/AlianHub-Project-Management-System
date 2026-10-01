@@ -31,7 +31,7 @@ class TaskWriteRefusal extends Error {
     }
 }
 
-const refuse = (statusCode, message) => { throw new TaskWriteRefusal(statusCode, message); };
+const refuse = (statusCode, message, code) => { throw new TaskWriteRefusal(statusCode, message, code); };
 const ATTACHMENT_KEY_REFUSED = 'ATTACHMENT_KEY_NOT_OWN';
 const taskNotFound = () => new TaskWriteRefusal(404, 'Task not found');
 
@@ -131,10 +131,11 @@ const holdsTaskType = (payload, stored) => {
  * the stored row as `storedTask`. `held` tells whether the stored task already has the value the body names; an action that takes
  * isUpdateTask records history without writing only when it does. `destination` names the project a move or copy writes
  * into, which must exist. `people` returns the user ids the write newly names, each of whom must hold a live seat in
- * the company. `actor` are the params that receive the signed-in user.
+ * the company. `actor` are the params that receive the signed-in user. `strict` refuses a body key the action does not
+ * take, for an action no existing client sends extra fields to.
  */
-const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, project = [], taskIds = [], taskNames = [], projectNames = [], stored = false, held = null, destination = null, attachments = null, people = null, actor }) => Object.freeze({
-    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, project, taskIds, taskNames, projectNames, stored, held, destination, attachments, people,
+const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, project = [], taskIds = [], taskNames = [], projectNames = [], stored = false, held = null, destination = null, attachments = null, people = null, strict = false, actor }) => Object.freeze({
+    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, project, taskIds, taskNames, projectNames, stored, held, destination, attachments, people, strict,
     actor: actor || (params.includes('userData') ? ['userData'] : []),
 });
 
@@ -149,12 +150,15 @@ const TASK_NAME = [['taskData', 'TaskName']];
 const PROJECT_NAME = [['project', 'ProjectName']];
 const PROJECT_DATA_NAME = [['projectData', 'ProjectName']];
 const TASK_IDS = [['taskIds', '*']];
+const LIST_ID = [['sprintId']];
+/* Both spellings of the company a client may send; each is replaced by the validated one. */
+const TENANT = ['companyId', 'CompanyId'];
 const PROJECT_DATA = [['projectData', '_id']];
 const PROJECT = [['project', '_id']];
 const PROJECT_ID = [['projectId']];
 const DESTINATION = ['projectData', 'id'];
 
-const CREATE_DATA_FIELDS = Object.freeze(Object.keys(schema.tasks).filter((field) => !['_id', 'createdBy', 'createdAt', 'ancestors', 'cascadedBy'].includes(field)));
+const CREATE_DATA_FIELDS = Object.freeze(Object.keys(schema.tasks).filter((field) => !['_id', 'createdBy', 'createdAt', 'ancestors', 'cascadedBy', 'extraLists'].includes(field)));
 
 const CREATE = spec({
     params: ['data', 'user', 'projectData', 'indexObj', 'setNotif'],
@@ -211,6 +215,10 @@ const TASK_ACTION_FIELDS = Object.freeze({
     getTaskRelations: spec({ params: ['companyId', 'taskId'], company: companyId, ids: TASK_ID, task: TASK_ID[0] }),
     getOpenBlockers: spec({ params: ['companyId', 'taskId'], company: companyId, ids: TASK_ID, task: TASK_ID[0] }),
 
+    /* The handlers read the task and the list from the database and judge both, so neither is resolved here. */
+    addToList: spec({ params: [...TENANT, 'taskId', 'sprintId', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ...LIST_ID], strict: true }),
+    removeFromList: spec({ params: [...TENANT, 'taskId', 'sprintId', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ...LIST_ID], strict: true }),
+
     bulkUpdateStatus: spec({ params: ['companyId', 'taskIds', 'newStatus', ...HISTORY_USER], writes: { newStatus: STATUS_FIELDS }, company: companyId, ids: TASK_IDS }),
     bulkUpdatePriority: spec({ params: ['companyId', 'taskIds', 'firebaseObj', 'priorityObj', ...HISTORY_USER], writes: { firebaseObj: ['Task_Priority', 'Updated_At'] }, company: companyId, ids: TASK_IDS }),
     bulkUpdateDueDate: spec({ params: ['companyId', 'taskIds', 'DueDate', 'commonDateFormatString', ...HISTORY_USER], company: companyId, ids: TASK_IDS }),
@@ -225,6 +233,7 @@ const TASK_ACTION_FIELDS = Object.freeze({
     bulkMove: spec({ params: ['companyId', 'taskIds', 'sprintObj', 'projectData', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, DESTINATION], destination: DESTINATION }),
     bulkConvertToSubTask: spec({ params: ['companyId', 'taskIds', 'parentTaskId', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, ['parentTaskId']] }),
     bulkConvertToTask: spec({ params: ['companyId', 'taskIds', 'sprintObj', 'projectData', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, DESTINATION], destination: DESTINATION }),
+    bulkAddToList: spec({ params: [...TENANT, 'taskIds', 'sprintId', ...HISTORY_USER], company: companyId, ids: [...TASK_IDS, ...LIST_ID], strict: true }),
     bulkDuplicate: spec({ params: ['companyId', 'taskIds', 'sprintObj', 'oldProject', 'projectData', 'isSubTask', 'duplicateData', 'assignee', 'watcher', 'taskName', 'oldSprintObj', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, DESTINATION], destination: DESTINATION, people: PEOPLE.bulkDuplicate }),
 });
 
@@ -386,6 +395,7 @@ const prepareTaskWrite = (req, taskSpec, label) => {
         if (key === 'action') {
             payload.action = body.action;
         } else if (!taskSpec.params.includes(key)) {
+            if (taskSpec.strict) refuse(400, `${printable(key)} is not accepted by this action.`, 'UNKNOWN_FIELD');
             dropped.push(key);
         } else {
             payload[key] = Object.hasOwn(taskSpec.writes, key) ? cleanWrite(key, body[key], taskSpec, dropped) : body[key];

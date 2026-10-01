@@ -11,6 +11,19 @@ const { CLEARED_RETENTION_SECONDS } = require('../../Modules/Inbox/helpers/inbox
 // privilege-escalation surface flagged in the security audit. If a
 // new legitimate field needs to land, declare it in `./schema.js`.
 const taskSchema = new Schema(schema.tasks, { strict: true, timestamps: true });
+/* A task gains extra lists only on a stored row, through Modules/Tasks/helpers/taskExtraLists.js.
+ * Every writer of a new task document passes one of these two, so a created, imported, copied or
+ * templated row cannot carry the lists of the row it was built from. */
+taskSchema.pre('save', function dropExtraListsFromNewTask() {
+    if (this.isNew) this.set('extraLists', undefined);
+});
+taskSchema.pre('insertMany', function dropExtraListsFromNewTasks(next, docs) {
+    [].concat(docs || []).forEach((doc) => {
+        if (doc && typeof doc.set === 'function') doc.set('extraLists', undefined);
+        else if (doc) delete doc.extraLists;
+    });
+    next();
+});
 const commentSchema = new Schema(schema.comments, { strict: true, timestamps: true });
 const timeSheetSchema = new Schema(schema.timesheet, { strict: true, timestamps: true });
 // BUG-046 / #100 — every other schema in this file already uses
@@ -427,6 +440,8 @@ taskSchema.index({ DueDate: 1 });
 // The Everything view pages across projects on these; Modules/Tasks/helpers/everythingQuery.js sorts in their order.
 taskSchema.index({ ProjectID: 1, deletedStatusKey: 1, updatedAt: -1, _id: 1 });
 taskSchema.index({ ProjectID: 1, deletedStatusKey: 1, DueDate: 1, _id: 1 });
+// The tasks a list also shows that live elsewhere (Modules/Tasks/helpers/taskExtraLists.js).
+taskSchema.index({ 'extraLists.sprintId': 1, deletedStatusKey: 1 });
 
 // comments: every comment is fetched by task/sprint/project triplet.
 commentSchema.index({ 'objId.taskId': 1, deletedStatusKey: 1 });
