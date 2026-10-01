@@ -5,9 +5,9 @@
                 <CalenderCompo
                     :format="props.detail?.fieldDateFormate"
                     :modelValue="props.detail?.fieldValue ? props.detail?.fieldValue : ''"
-                    :minDate="props.detail.fieldPastFuture.includes('Future') ? props.detail.fieldPastFuture.includes('Future') && props.detail.fieldPastFuture.includes('Past') ? '' : new Date(new Date().setHours(0,0,0,0)) : !props.detail.fieldPastFuture.includes('Future') && !props.detail.fieldPastFuture.includes('Past') ? new Date(new Date().setHours(0,0,0,0)) : ''"
-                    :maxDate="props.detail.fieldPastFuture.includes('Past') ? props.detail.fieldPastFuture.includes('Future') && props.detail.fieldPastFuture.includes('Past') ? '' : new Date(new Date().setHours(23,23,59)) : !props.detail.fieldPastFuture.includes('Past') && !props.detail.fieldPastFuture.includes('Future') ? new Date(new Date().setHours(23,23,59)) : ''"
-                    :daysWeekDisable="props.detail.fieldDaysDisable"
+                    :minDate="limits.minDate"
+                    :maxDate="limits.maxDate"
+                    :daysWeekDisable="props.detail?.fieldDaysDisable || []"
                     @update:modelValue="($event) => emit('blurUpdate',$event,props.detail)"
                     :isShowDateAndicon="true"
                     :hideExtraLayouts="props.detail.fieldTimeFormate ? [] : ['time' ,'minutes' , 'hours' , 'seconds']"
@@ -25,13 +25,15 @@
 
 <script setup>
     import CalenderCompo from '@/components/atom/CalenderCompo/CalenderCompo.vue';
-    import { ref } from 'vue';
+    import { dateFieldLimits } from '@/plugins/customFieldView/dateFieldLimits';
+    import { computed, ref } from 'vue';
     const props = defineProps({
         detail:{
             type:Object,
             default:() => {}
         }
     });
+    const limits = computed(() => dateFieldLimits(props.detail));
     const emit = defineEmits(['blurUpdate']);
     const validationError = ref(false);
     const handleOutside = () => {

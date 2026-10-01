@@ -4,7 +4,7 @@ import { createI18n } from 'vue-i18n';
 import en from '@/locales/en';
 import { richHtml } from '@/utils/richHtml';
 import { renderNotice } from '@/views/Inbox/renderNotice';
-import { mentionQueryAt, mentionElement, decorateMentions, mentionOf } from '@/components/molecules/Pages/docMentions';
+import { mentionQueryAt, mentionElement, decorateMentions, mentionOf, taskMentionItem } from '@/components/molecules/Pages/docMentions';
 import { createBlockTools } from '@/components/molecules/Pages/blockTools';
 
 const BOB = '64b7f0c2a1b2c3d4e5f60a01';
@@ -51,6 +51,16 @@ describe('a mention element', () => {
         expect(mentionOf(task)).toEqual({ type: 'task', id: TASK });
         expect(mentionOf(project)).toBeNull();
         expect(mentionOf(bad)).toBeNull();
+    });
+});
+
+describe('a task offered in the picker', () => {
+    it('carries its key apart from its name, and both in the text the mention keeps', () => {
+        expect(taskMentionItem({ _id: TASK, TaskKey: 'QAS-15', TaskName: 'Parent' })).toEqual({ type: 'task', id: TASK, label: 'QAS-15 Parent', meta: 'QAS-15', name: 'Parent' });
+    });
+
+    it('does not repeat the key as the name of a task that has none', () => {
+        expect(taskMentionItem({ _id: TASK, TaskKey: 'QAS-15' })).toMatchObject({ label: 'QAS-15', meta: 'QAS-15', name: '' });
     });
 });
 

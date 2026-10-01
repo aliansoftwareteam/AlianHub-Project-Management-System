@@ -29,4 +29,7 @@
     --dp-range-between-dates-text-color: var(--ink);
     --dp-range-between-border-color: transparent;
     --dp-loader: 5px solid var(--brand);
+    --dp-border-radius: var(--r-md, 4px);
+    --dp-cell-border-radius: var(--r-sm, 4px);
 }
+:root .dp__menu { box-shadow: var(--shadow-surface, none); }
