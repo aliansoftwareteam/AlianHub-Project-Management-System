@@ -165,6 +165,7 @@ import { isMacPlatform } from './paletteKeys';
 import { CHIPS, RECORD_CHIPS, chipAllows, commandArgument, commandLeads, foldRecentProjects, projectPath, recentType, relativeAge, taskLocation, taskPath } from './paletteRows';
 import { openQuickCreate } from '@/components/organisms/QuickCreateTask/quickCreateTask';
 import { routeProjectId, useNewDoc } from '@/components/molecules/Pages/useNewDoc';
+import { docRoute } from '@/components/molecules/Pages/docRoute';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { messageKey } from '@/views/Ai/askWhy';
 import { leaveAskHandoff } from './askHandoff';
@@ -283,7 +284,7 @@ const projectRow = (p) => ({ id: `project:${p._id}`, kind: 'project', icon: 'pro
 const pageRow = (p, place = '') => ({
     id: `page:${p._id}`, kind: 'page', icon: 'docs', title: p.title || t('Docs.untitled'),
     sub: place || projectName(p.ProjectID) || t('Palette.docs_company'), age: relativeAge(p.updatedAt, t),
-    to: { name: 'Pages', params: { cid: cid.value }, query: { page: String(p._id) } },
+    to: docRoute(cid.value, p._id),
 });
 const commentRow = (c) => ({
     id: `comment:${c._id}`, kind: 'comment', icon: 'chat', title: c.message,
@@ -322,7 +323,7 @@ const sourceRow = (s) => {
     const isTask = s.kind === 'task';
     return {
         id: `source:${s.ref}`, kind: 'source', icon: isTask ? 'check' : 'docs', code: isTask ? s.ref : '', title: s.title || s.ref, sub: s.project || '',
-        to: isTask ? `/${cid.value}/project/${s.projectId}/p?task=${encodeURIComponent(s.id)}` : { name: 'PageEditor', params: { cid: cid.value, pageId: String(s.id) } },
+        to: isTask ? `/${cid.value}/project/${s.projectId}/p?task=${encodeURIComponent(s.id)}` : docRoute(cid.value, s.id),
         overlay: isTask ? { query: { task: String(s.id) } } : null,
     };
 };

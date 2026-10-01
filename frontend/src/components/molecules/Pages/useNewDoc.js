@@ -7,6 +7,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { isOwnerOrAdmin } from '@/utils/roles';
 import { identitiesOf } from '@/components/molecules/ProjectTree/projectTreeModel';
+import { docRoute } from './docRoute';
 
 /* Mirrors projectAccess().canEdit in Config/contentAccess.js, the rule POST /api/v2/pages
  * applies: a project that is not private belongs to everyone who sees it, a private one to
@@ -56,7 +57,7 @@ export function useNewDoc() {
                 refuse(response.data?.statusText);
                 return null;
             }
-            router.push({ name: 'PageEditor', params: { cid: route?.params?.cid || companyId?.value, pageId: String(page._id) } });
+            router.push(docRoute(route?.params?.cid || companyId?.value, page._id));
             return page;
         } catch (error) {
             console.error('ERROR in create doc: ', error);
