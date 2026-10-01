@@ -54,6 +54,7 @@ module.exports = defineConfig({
         '@taskTreeRules': path.resolve(__dirname, '../Modules/Tasks/helpers/taskTreeRules.js'),
         '@taskExtraListsRules': path.resolve(__dirname, '../Modules/Tasks/helpers/taskExtraListsRules.js'),
         '@descriptionBlock': path.resolve(__dirname, '../Modules/Tasks/helpers/descriptionBlock.js'),
+        '@richTextAllowlist': path.resolve(__dirname, '../Modules/Tasks/helpers/richTextAllowlist.js'),
         '@formLogic': path.resolve(__dirname, '../Modules/Forms/helpers/formLogic.js'),
       },
     },

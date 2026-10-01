@@ -1,17 +1,14 @@
 import DOMPurify from "dompurify";
 import markdownit from "markdown-it";
+import { LINK_URL, LINK_TARGET, LINK_REL, isKnownFrame, profiles } from "@richTextAllowlist";
 
 /* What a stored editor document may put on the page. Editor.js tools write a block's text with innerHTML, and Editor.js
    sets the HTML it is handed on an element before its own cleaning runs, so a document, and the text form of a
    description, pass through here first. A description is words and structure: no image, frame, script, style or
-   handler, and a link goes to an http, https or mailto address only. A doc page keeps what its preview keeps. */
+   handler, and a link goes to an http, https or mailto address only. A doc page keeps what its preview keeps. The
+   lists are the ones the API holds the same text to when it is saved. */
 
-const INLINE_TAGS = ["b", "strong", "i", "em", "u", "s", "del", "mark", "code", "a", "br", "sub", "sup"];
-const BLOCK_TAGS = ["p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "blockquote", "pre", "hr", "table", "thead", "tbody", "tr", "th", "td"];
-const ALLOWED_ATTR = ["href", "target", "rel", "class", "colspan", "rowspan"];
-// The classes the editor's inline code and marker tools put on their tags.
-const CLASSES = ["inline-code", "cdx-marker"];
-const LINK_URL = /^(https?:|mailto:)/i;
+const { inlineTags: INLINE_TAGS, blockTags: BLOCK_TAGS, attributes: ALLOWED_ATTR, classes: CLASSES, ariaAttributes } = profiles.strict;
 
 const purifier = DOMPurify(window);
 
@@ -24,16 +21,16 @@ purifier.addHook("afterSanitizeAttributes", (node) => {
     if (node.tagName !== "A") return;
     const href = (node.getAttribute("href") || "").trim();
     if (LINK_URL.test(href)) {
-        node.setAttribute("target", "_blank");
-        node.setAttribute("rel", "noopener noreferrer");
+        node.setAttribute("target", LINK_TARGET);
+        node.setAttribute("rel", LINK_REL);
     } else {
         ["href", "target", "rel"].forEach((name) => node.removeAttribute(name));
     }
 });
 
-const BASE = { ALLOWED_ATTR, ALLOW_DATA_ATTR: false, ALLOW_ARIA_ATTR: false, ALLOW_UNKNOWN_PROTOCOLS: false };
+const BASE = { ALLOWED_ATTR: [...ALLOWED_ATTR], ALLOW_DATA_ATTR: false, ALLOW_ARIA_ATTR: ariaAttributes, ALLOW_UNKNOWN_PROTOCOLS: false };
 const TEXT_CONFIG = { ...BASE, ALLOWED_TAGS: [...BLOCK_TAGS, ...INLINE_TAGS] };
-const INLINE_CONFIG = { ...BASE, ALLOWED_TAGS: INLINE_TAGS };
+const INLINE_CONFIG = { ...BASE, ALLOWED_TAGS: [...INLINE_TAGS] };
 
 // Older descriptions hold markdown, or HTML the app wrote itself (the AI sidebar's rendered answer, two merged
 // descriptions joined by a line break), so raw HTML is read and then held to the list above rather than escaped.
@@ -50,24 +47,6 @@ export const descriptionTextHtml = (value) => EDITOR_TAGS.reduce(
 );
 
 const strictInline = (value) => purifier.sanitize(value, INLINE_CONFIG);
-
-// The frames the embed tool builds for the services it knows; a gist is a script from gist.github.com in a data: frame.
-const EMBED_HOSTS = [
-    "player.vimeo.com", "www.youtube.com", "coub.com", "vine.co", "imgur.com", "gfycat.com", "player.twitch.tv", "music.yandex.ru",
-    "codepen.io", "www.instagram.com", "platform.twitter.com", "assets.pinterest.com", "www.facebook.com", "www.aparat.com", "miro.com"
-];
-const GIST_FRAME = /^data:text\/html;charset=utf-8,<head><base target="_blank" \/><\/head><body><script src="https:\/\/gist\.github\.com\/[\w.-]+\/[0-9a-f]+\.js" ><\/script><\/body>$/;
-
-const isKnownFrame = (address) => {
-    if (typeof address !== "string") return false;
-    if (GIST_FRAME.test(address)) return true;
-    try {
-        const url = new URL(address);
-        return url.protocol === "https:" && EMBED_HOSTS.includes(url.hostname);
-    } catch (error) {
-        return false;
-    }
-};
 
 /* A frame to anywhere else is not drawn; the address it was made from stays as a link. */
 const sourceLink = (address) => {

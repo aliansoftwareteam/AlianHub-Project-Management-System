@@ -34,6 +34,7 @@ const { projectAccess, isCompanyAdmin, isCompanyMember, visibleProjectIds } = re
 const versionRules = require('./helpers/pageVersionRules');
 const pageVersions = require('./helpers/pageVersions');
 const pageSettle = require('./helpers/pageSettle');
+const { cleanBlocks, cleanHtml } = require('../Tasks/helpers/cleanRichText');
 
 const LIST_FIELDS = 'title parentPageId ProjectID visibility createdBy linkedTasks updatedBy updatedAt createdAt order '
     + 'isWiki ownerId reviewDate reviewedAt reviewedBy createdByAgent agentName agentStatus rawText sharedWith';
@@ -171,11 +172,11 @@ exports.createPage = async (req, res) => {
         if (parentPageId && !(await findPage(companyId, parentPageId, userId))) {
             return fail(res, 'Page not found.', 404);
         }
-        const blocks = contentBlocks !== undefined ? normalizeBlockMentions(contentToEditorData({ blocks: contentBlocks })) : emptyEditorData();
+        const blocks = contentBlocks !== undefined ? cleanBlocks(normalizeBlockMentions(contentToEditorData({ blocks: contentBlocks })), 'doc') : emptyEditorData();
         if (contentBlocks !== undefined && contentTooLarge({ blocks })) {
             return res.send({ status: false, statusText: 'Page content is too large.' });
         }
-        const html = blocksToHtml(blocks);
+        const html = cleanHtml(blocksToHtml(blocks), 'doc');
         const doc = {
             title: String(title).trim(),
             content: { html, blocks },
@@ -322,12 +323,14 @@ exports.updatePage = async (req, res) => {
                 return res.send({ status: false, statusText: check.reason });
             }
         }
+        // Cleaned here, before anything compares or keeps this body: a version and the "nothing changed" check see
+        // the body as it is stored.
         const nextContent = {};
         if (contentBlocks !== undefined) {
-            nextContent.blocks = normalizeBlockMentions(contentToEditorData({ blocks: contentBlocks }));
+            nextContent.blocks = cleanBlocks(normalizeBlockMentions(contentToEditorData({ blocks: contentBlocks })), 'doc');
         }
         if (contentHtml !== undefined) {
-            nextContent.html = normalizeMentionHtml(String(contentHtml));
+            nextContent.html = cleanHtml(normalizeMentionHtml(String(contentHtml)), 'doc');
         }
         if ((nextContent.html || nextContent.blocks) && contentTooLarge({
             html: nextContent.html,
@@ -366,8 +369,8 @@ exports.updatePage = async (req, res) => {
         if (title !== undefined) update.title = String(title).trim();
         if (contentHtml !== undefined || contentBlocks !== undefined) {
             const merged = { ...(existing.content || {}), ...nextContent };
-            if (!merged.html && merged.blocks) merged.html = blocksToHtml(merged.blocks);
-            if (!merged.blocks && merged.html) merged.blocks = contentToEditorData({ html: merged.html });
+            if (!merged.html && merged.blocks) merged.html = cleanHtml(blocksToHtml(merged.blocks), 'doc');
+            if (!merged.blocks && merged.html) merged.blocks = cleanBlocks(contentToEditorData({ html: merged.html }), 'doc');
             update.content = merged;
             update.rawText = merged.html ? htmlToRawText(merged.html) : blocksToRawText(merged.blocks);
         }

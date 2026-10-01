@@ -22,6 +22,7 @@ const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
 const { taskNotFound, escapeText, TaskWriteRefusal } = require('../taskWriteFields');
+const { cleanDescription } = require('../cleanRichText');
 const { recordCustomFieldValue, recordTaskTag, projectHoldsTag } = require('../taskItemHistory');
 const { customFieldDefinitionOf } = require('../../../CustomField/helpers/customFieldText');
 const { fieldAppliesToTask } = require('../../../CustomField/helpers/fieldTaskTypes');
@@ -272,12 +273,11 @@ module.exports = {
     updateDescription({companyId, task, text}) {
         return new Promise((resolve, reject) => {
             try {
-                let description = text.blocks;
                 const schema = SCHEMA_TYPE.TASKS
-                let updateObj = { 
-                    descriptionBlock: description,
+                let updateObj = cleanDescription({
+                    descriptionBlock: text.blocks,
                     rawDescription: text.text
-                }
+                })
                 let obj = {
                     type: schema,
                     data: [

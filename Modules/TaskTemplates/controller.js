@@ -7,6 +7,7 @@ const logger = require('../../Config/loggerConfig');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { taskMongo } = require('../Tasks/helpers/task_class_Mongo');
 const { HandleHistory } = require('../Tasks/helpers/mongo_helper');
+const { cleanDescription } = require('../Tasks/helpers/cleanRichText');
 const { sessionActor, escapeText } = require('../Tasks/helpers/taskWriteFields');
 const { updateRemainingTime } = require('../LogTime/controllerV2/helpers');
 const { visibleProjectIds } = require('../Agents/scope');
@@ -216,7 +217,7 @@ const withStorableFieldValues = async ({ companyId, task, changes }) => {
 };
 
 const writeFields = async ({ companyId, task, projectId, changes, actor, template }) => {
-    const set = Object.assign({}, ...changes.map((change) => change.patch));
+    const set = cleanDescription(Object.assign({}, ...changes.map((change) => change.patch)));
     const taskId = String(task._id);
     const updated = await crud(companyId, SCHEMA_TYPE.TASKS, [{ _id: oid(taskId) }, { $set: set }, { returnDocument: 'after' }], 'findOneAndUpdate');
     socketEmitter.emit('update', { type: 'update', data: updated, updatedFields: set, module: 'task' });
