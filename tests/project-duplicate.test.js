@@ -15,7 +15,7 @@ jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), 
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
 jest.mock('../Modules/Project/helpers/projectHistory', () => ({ recordProjectCreated: jest.fn(async () => undefined) }));
-jest.mock('../Modules/Automations/matcher', () => ({ invalidate: jest.fn() }));
+jest.mock('../Modules/Automations/engine/matcher', () => ({ invalidate: jest.fn() }));
 jest.mock('../Modules/Project/helpers/projectQuota', () => ({
     stepProjectCount: jest.fn(async (companyId, isPrivateSpace, step) => {
         const bucket = isPrivateSpace === true ? 'privateCount' : 'publicCount';
@@ -31,7 +31,7 @@ const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { removeCache } = require('../utils/commonFunctions');
 const { stepProjectCount } = require('../Modules/Project/helpers/projectQuota');
 const { recordProjectCreated } = require('../Modules/Project/helpers/projectHistory');
-const matcher = require('../Modules/Automations/matcher');
+const matcher = require('../Modules/Automations/engine/matcher');
 const { INLINE_TASK_LIMIT } = require('../Modules/ProjectDuplicate/rules');
 
 const C = 'c00000000000000000000001';
@@ -234,6 +234,17 @@ describe('the structure', () => {
         const copy = copyOf(await duplicate(launch.id));
         expect(byName(copy.lists, 'Glyphs')).toMatchObject({ private: true, AssigneeUserId: [OWNER] });
         expect(byName(copy.lists, 'Backlog').private).toBe(false);
+    });
+
+    it('leaves behind a private list the caller is not on, with its tasks, and says so', async () => {
+        seedTree(launch);
+        const res = await duplicate(launch.id, { include: { tasks: true, assignees: false, dates: false } }, { uid: MEMBER });
+        const copy = copyOf(res);
+        expect(copy.lists.map((list) => list.name).sort()).toEqual(['Backlog', 'Wireframes']);
+        expect(copy.folders.map((folder) => folder.name).sort()).toEqual(['Design', 'Icons']);
+        expect(copy.tasks.map((task) => task.TaskName)).toEqual(['Kickoff']);
+        expect(res.body.data.notes).toContainEqual({ code: 'private_lists_left', count: 1 });
+        expect(res.body.data.counts).toMatchObject({ lists: 2, tasks: 1 });
     });
 
     it('leaves out a deleted folder and what was in it, and an archived list', async () => {
@@ -471,7 +482,17 @@ describe('tasks', () => {
         rowsOf(SCHEMA_TYPE.TASKS).find((row) => row._id === top._id).deletedStatusKey = 1;
         const res = await duplicate(launch.id, { include: { tasks: true, assignees: false, dates: false } });
         expect(copyOf(res).tasks.map((task) => task.TaskName)).toEqual(['Kickoff']);
-        expect(res.body.data.notes).toContainEqual({ code: 'subtasks_without_parent', count: 2 });
+        expect(res.body.data.notes).toContainEqual({ code: 'tasks_left_out', count: 2 });
+    });
+
+    it('stop at the third level when old rows go deeper', async () => {
+        const { top, middle, leaf } = seedTree(launch);
+        seedTask(launch, launch.glyphs, { TaskName: 'Too deep', isParentTask: false, ParentTaskId: String(leaf._id), ancestors: [top, middle, leaf].map((task) => String(task._id)) });
+        const res = await duplicate(launch.id, { include: { tasks: true, assignees: false, dates: false } });
+        const copy = copyOf(res);
+        expect(copy.tasks.map((task) => task.TaskName).sort()).toEqual(['Arrow left', 'Arrows', 'Draw the set', 'Kickoff']);
+        expect(byName(copy.tasks, 'Arrow left', 'TaskName').subTasks).toBe(0);
+        expect(res.body.data.notes).toContainEqual({ code: 'tasks_left_out', count: 1 });
     });
 
     it('never fire the task-created event, a notification or a history line for a copied task', async () => {

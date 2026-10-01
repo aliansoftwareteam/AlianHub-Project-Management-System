@@ -66,7 +66,7 @@ exports.listImports = async (req, res) => {
         }
         const jobs = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.IMPORT_JOBS,
-            data: [{ userId }, 'source status total processed created errorList createdAt', { sort: { createdAt: -1 }, limit: 20 }],
+            data: [{ userId, source: { $ne: 'duplicate' } }, 'source status total processed created errorList createdAt', { sort: { createdAt: -1 }, limit: 20 }],
         }, 'find');
         return res.send({ status: true, statusText: 'Imports fetched.', data: jobs || [] });
     } catch (error) {
