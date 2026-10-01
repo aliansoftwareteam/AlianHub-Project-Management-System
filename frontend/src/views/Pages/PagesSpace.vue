@@ -541,7 +541,7 @@ const WikiTable = defineComponent({
 
 .hub__main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
 .ah-page.hub .ah-toolbar { padding: 0 var(--page-pad-x, 24px); }
-.ah-page.hub .ah-toolbar__title { font: var(--fw-title, 600) var(--fs-lg, 15px)/1.2 var(--font-ui); }
+.ah-page.hub .ah-toolbar__title { font: var(--fw-title, 600) var(--fs-lg, 14px)/1.2 var(--font-ui); }
 .hub__stats { margin-left: 4px; }
 .hub__view-select { display: none; height: var(--control-h, 30px); border: 1px solid var(--border); border-radius: var(--r-input); background: var(--surface); color: var(--ink); font: 500 var(--fs-md, 12.5px)/1 var(--font-ui); padding: 0 8px; }
 .hub__content { flex: 1; min-height: 0; overflow-y: auto; padding: var(--page-pad-y, 20px) var(--page-pad-x, 24px) calc(2 * var(--page-pad-y, 20px)); display: flex; flex-direction: column; gap: var(--gap-stack, 16px); }

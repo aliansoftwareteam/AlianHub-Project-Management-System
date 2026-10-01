@@ -933,7 +933,8 @@ onUnmounted(() => {
 
 .ibx__main { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
 .ibx .ibx__toolbar { gap: 4px; padding: 0 var(--page-pad-x, 22px); }
-.ibx__toolbar .ah-toolbar__title { font: var(--fw-title, 600) var(--fs-lg, 15px)/1.2 var(--font-ui); }
+/* The fallback is Home's, so the three page titles are one size in every look. */
+.ibx__toolbar .ah-toolbar__title { font: var(--fw-title, 600) var(--fs-lg, 14px)/1.2 var(--font-ui); }
 .ibx__tabs { display: flex; gap: 2px; margin-left: 10px; }
 .ibx__tab {
     min-height: var(--hit-min);
@@ -1020,7 +1021,7 @@ onUnmounted(() => {
     .ibx__foot { display: block; }
 }
 @media (max-width: 767px) {
-    .ibx__toolbar { flex-wrap: wrap; height: auto; padding: 8px 12px 0; row-gap: 2px; }
+    .ibx .ibx__toolbar { flex-wrap: wrap; height: auto; padding: 8px 12px 0; row-gap: 2px; }
     .ibx__toolbar .ibx__tabs { order: 5; flex-basis: 100%; margin-left: -4px; overflow-x: auto; scrollbar-width: none; }
     .ibx__tab { height: 40px; padding: 0 10px; }
     .ibx__keys { display: none; }

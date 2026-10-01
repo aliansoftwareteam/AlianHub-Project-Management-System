@@ -18,7 +18,7 @@
             <button
                 v-if="timer && !done"
                 type="button"
-                class="hc-row__act"
+                class="hc-row__act hc-row__timer"
                 :class="{ 'is-on': tracking }"
                 :title="$t('Home.start_timer')"
                 :aria-label="$t('Home.start_timer')"
@@ -31,7 +31,7 @@
             <template v-if="!done">
                 <span v-if="task.DueDate" class="hc-row__meta" :class="{ 'hc-row__meta--danger': overdue }">{{ due }}</span>
                 <button v-else-if="setDate" type="button" class="hc-row__act hc-row__date" :title="setDateLabel" :aria-label="setDateLabel" @click="$emit('set-date', task)">
-                    <ShellIcon name="calendar" :size="14" />
+                    <ShellIcon name="calendar" :size="14" class="hc-row__date-icon" />
                 </button>
             </template>
         </span>

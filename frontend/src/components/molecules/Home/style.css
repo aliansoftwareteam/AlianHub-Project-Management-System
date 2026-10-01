@@ -134,7 +134,7 @@
 .hc-row__title { flex: 1 1 0%; min-width: 40%; align-self: stretch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 0; background: transparent; text-align: left; font: inherit; color: inherit; padding: 0; cursor: pointer; }
 .hc-row__title:hover { color: var(--brand); }
 .hc-row--done .hc-row__title { text-decoration: line-through; }
-.hc-row__tail { display: flex; align-items: center; gap: var(--sp-4, 10px); flex: 0 1 auto; min-width: 0; }
+.hc-row__tail { position: relative; display: flex; align-items: center; gap: var(--sp-4, 10px); flex: 0 1 auto; min-width: 0; }
 .hc-row__prio { flex: none; font: 600 var(--fs-xs, 10.5px)/1 var(--font-ui); padding: 4px 7px; border-radius: var(--r-sm, 5px); background: var(--home-soft); color: var(--ink-label); white-space: nowrap; }
 .hc-row__prio.ah-chip--warn { background: var(--warn-bg); color: var(--warn-ink); }
 .hc-row__prio.ah-chip--danger { background: var(--danger-bg); color: var(--danger-ink); }
@@ -142,22 +142,32 @@
 .hc-row--dim .hc-row__project, .hc-row--done .hc-row__project { color: var(--ink-2); }
 .hc-row__meta { flex: none; font: 400 var(--fs-sm, 10.5px)/1 var(--font-ui); color: var(--ink-2); white-space: nowrap; text-transform: capitalize; }
 .hc-row__meta--danger { color: var(--danger); }
-/* Hidden, a row action keeps its place: showing it under the pointer must not move the title. */
-.hc-row__act { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--control-h-sm, 24px); height: var(--control-h-sm, 24px); border: 0; background: transparent; color: var(--ink-2); padding: 0; border-radius: var(--r-sm, 4px); cursor: pointer; opacity: 0; transition: opacity var(--t-state) var(--ease); }
-.hc-row:hover .hc-row__act, .hc-row:focus-within .hc-row__act, .hc-row__act.is-on { opacity: 1; }
+.hc-row__act { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--control-h-sm, 24px); height: var(--control-h-sm, 24px); border: 0; background: transparent; color: var(--ink-2); padding: 0; border-radius: var(--r-sm, 4px); cursor: pointer; }
 .hc-row__act:hover { color: var(--brand); background: var(--brand-tint); }
 .hc-row__act:focus-visible { outline: none; box-shadow: var(--focus); }
-.hc-row__act.is-on { color: var(--ok); }
+/* Nothing in a row moves under the pointer. The timer sits over the end of the title on the row's
+   own colour and takes no clicks until it shows, as the List's row actions do; the empty due date
+   keeps its place and only its icon appears. */
+.hc-row__timer { position: absolute; right: calc(100% + var(--sp-4, 10px)); top: 50%; transform: translateY(-50%); background: var(--surface); visibility: hidden; pointer-events: none; }
+.hc-row:hover .hc-row__timer, .hc-row:focus-within .hc-row__timer { visibility: visible; pointer-events: auto; background: linear-gradient(var(--surface-hover), var(--surface-hover)), var(--surface); }
+.hc-row__timer.is-on { position: static; transform: none; visibility: visible; pointer-events: auto; background: transparent; color: var(--ok); }
+.hc-row__date-icon { opacity: 0; transition: opacity var(--t-state) var(--ease); }
+.hc-row:hover .hc-row__date-icon, .hc-row:focus-within .hc-row__date-icon { opacity: 1; }
 .hc-row__grip { position: absolute; left: -5px; top: 50%; transform: translateY(-50%); color: var(--ink-2); cursor: grab; line-height: 0; opacity: 0; transition: opacity var(--t-state) var(--ease); }
 .hc-row:hover .hc-row__grip { opacity: 1; }
 @media (hover: none) {
-    .hc-row__act { opacity: 1; }
+    .hc-row__timer { position: static; transform: none; visibility: visible; pointer-events: auto; background: transparent; }
+    .hc-row__date-icon { opacity: 1; }
 }
 .hc-mywork { container: hc-mywork / inline-size; }
+/* A narrow card folds a row onto two lines, as the List does on a phone: the title gets the first
+   line to itself. The title line is one target tall; what the phone floor adds to it, the second
+   line takes back, so the two lines stay as close as they are with a pointer. */
 @container hc-mywork (max-width: 360px) {
     .hc-row { flex-wrap: wrap; row-gap: 0; }
-    .hc-row__title { flex-basis: calc(100% - 15px - var(--sp-4, 10px)); min-width: 0; min-height: 24px; }
-    .hc-row__tail { flex-basis: 100%; box-sizing: border-box; padding-left: calc(15px + var(--sp-4, 10px)); }
+    .hc-row__title { flex-basis: calc(100% - 15px - var(--sp-4, 10px)); min-width: 0; min-height: var(--hit-min); }
+    .hc-row__tail { flex-basis: 100%; box-sizing: border-box; padding-left: calc(15px + var(--sp-4, 10px)); margin-top: calc((24px - var(--hit-min)) / 2); }
+    .hc-row__timer { position: static; transform: none; order: 1; margin-left: auto; }
     .hc-row__project { max-width: 60%; }
 }
 .hc-empty { padding: var(--card-pad-y, 14px); border: 1px dashed var(--border); border-radius: var(--r-md, 9px); font: 400 var(--fs-md, 13px)/var(--lh-body, 1.5) var(--font-ui); color: var(--ink-label); }
@@ -262,19 +272,21 @@
 
 .ah-denied { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--ink-2); font: var(--text-body); }
 
-/* 375px: ring, steps and buttons in one row left a 150px column of wrapped text.
-   Stack them; the ring keeps the title company. */
+/* 375px: the ring and the next step fill the first line (the body's basis is the line less the ring
+   and the gap), so the two buttons share the second. */
 @media (max-width: 767px) {
-    .hc-setup { align-items: flex-start; gap: 10px 12px; }
-    .hc-setup__body { flex: 1 1 100%; order: 3; min-width: 0; }
+    .hc-setup { gap: 10px 12px; }
     .hc-setup__ring { order: 1; }
-    .hc-setup__cta { order: 2; margin-left: auto; min-height: 44px; }
+    .hc-setup__body { flex: 1 1 calc(100% - 50px); order: 2; min-width: 0; }
+    .hc-setup__cta { order: 3; flex: 1 1 auto; min-height: 44px; }
     .hc-setup__dismiss { order: 4; min-height: 44px; }
     .hc-setup__steps { order: 5; }
     .home .ah-tbtn--icon { width: 40px; }
+    .hc-add, .hc-connect, .hc-personal__open { min-height: var(--hit-min); }
     .hp-panel__close { padding: 13px; margin: -13px -13px -13px auto; }
     /* A row action keeps its drawn size beside the chips; the tappable box reaches the phone floor. */
     .hc-row__act { position: relative; }
+    .hc-row__timer { right: auto; top: auto; transform: none; }
     .hc-row__act::before { content: ""; position: absolute; left: 50%; top: 50%; width: var(--hit-min); height: var(--hit-min); transform: translate(-50%, -50%); }
     .hs-label__btn { min-width: 32px; min-height: 32px; margin: -8px 0; justify-content: center; align-items: center; }
     .hs-item__chev { min-width: 32px; min-height: 32px; margin: -8px -8px -8px auto; justify-content: center; align-items: center; }

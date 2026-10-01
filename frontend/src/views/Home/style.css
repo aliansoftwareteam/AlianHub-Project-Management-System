@@ -12,12 +12,12 @@
 }
 @media (min-width: 768px) and (max-width: 1023px) {
     /* The open planner takes 300px, which leaves the content phone-narrow here. */
-    .home:has(.home__planner) .hc-setup { flex-wrap: wrap; align-items: flex-start; gap: 10px 12px; }
-    .home:has(.home__planner) .hc-setup__steps { order: 5; }
-    .home:has(.home__planner) .hc-setup__body { flex: 1 1 100%; order: 3; }
+    .home:has(.home__planner) .hc-setup { flex-wrap: wrap; gap: 10px 12px; }
     .home:has(.home__planner) .hc-setup__ring { order: 1; }
-    .home:has(.home__planner) .hc-setup__cta { order: 2; margin-left: auto; }
+    .home:has(.home__planner) .hc-setup__body { flex: 1 1 calc(100% - 50px); order: 2; }
+    .home:has(.home__planner) .hc-setup__cta { order: 3; }
     .home:has(.home__planner) .hc-setup__dismiss { order: 4; }
+    .home:has(.home__planner) .hc-setup__steps { order: 5; }
 }
 @media (max-width: 991px) {
     .home__grid { grid-template-columns: 1fr; }

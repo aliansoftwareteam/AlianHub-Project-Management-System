@@ -137,8 +137,8 @@ const compute = (text, map) => {
                 if (set !== undefined && set !== 'initial') return set;
                 return fallback === undefined ? whole : fallback.trim();
             })
-            .replace(/calc\(([^()]+)\)/g, (whole, sum) => {
-                if (!/^[\d\s.+\-*/px]+$/.test(sum)) return whole;
+            .replace(/calc\(((?:[^()]|\([^()]*\))+)\)/g, (whole, sum) => {
+                if (!/^[\d\s.+\-*/()px]+$/.test(sum)) return whole;
                 return `${Math.round(Function(`return (${sum.replace(/px/g, '')});`)() * 100) / 100}px`;
             })
             .replace(/max\(([^()]+)\)/g, (whole, list) => {
@@ -296,14 +296,33 @@ describe('My Work rows', () => {
         expect(row(selector, 'flex')).toBe('none');
     });
 
-    it('a row does not move under the pointer: the timer keeps its place and the grip sits in the gutter', () => {
+    it('a row does not move under the pointer: the timer sits over the end of the title and the grip in the gutter', () => {
         const css = styleOf(HOME);
-        expect(ruleBody(base(HOME), '.hc-row__act')).not.toMatch(/display:\s*none/);
-        expect(row('.hc-row__act', 'opacity')).toBe('0');
+        expect(row('.hc-row__timer', 'position')).toBe('absolute');
+        expect(row('.hc-row__tail', 'position')).toBe('relative');
         expect(row('.hc-row__grip', 'position')).toBe('absolute');
         expect(row('.hc-row', 'position')).toBe('relative');
-        expect(css).not.toMatch(/\.hc-row:hover \.hc-row__(act|grip)[^{]*\{[^}]*display/);
-        expect(css).toMatch(/\.hc-row:hover \.hc-row__act,[^{]*\.hc-row:focus-within \.hc-row__act[^{]*\{[^}]*opacity:\s*1/);
+        expect(css).not.toMatch(/\.hc-row:hover \.hc-row__(act|timer|grip|date)[^{]*\{[^}]*(display|position|width|margin)\s*:/);
+        expect(templateOf('components/molecules/Home/TaskRow.vue')).toMatch(/class="hc-row__act hc-row__timer"/);
+    });
+
+    it('a timer that is not shown is not a target lying over the title', () => {
+        const css = styleOf(HOME);
+        expect(row('.hc-row__timer', 'visibility')).toBe('hidden');
+        expect(row('.hc-row__timer', 'pointer-events')).toBe('none');
+        expect(css).toMatch(/\.hc-row:hover \.hc-row__timer,[^{]*\.hc-row:focus-within \.hc-row__timer[^{]*\{[^}]*visibility:\s*visible;[^}]*pointer-events:\s*auto/);
+    });
+
+    it('a running timer stays in the row, where it takes its own width', () => {
+        expect(declaration(ruleBody(base(HOME), '.hc-row__timer.is-on'), 'position')).toBe('static');
+        expect(declaration(ruleBody(base(HOME), '.hc-row__timer.is-on'), 'visibility')).toBe('visible');
+    });
+
+    it('the empty due date keeps its place; only its icon waits for the pointer or the keyboard', () => {
+        const css = styleOf(HOME);
+        expect(row('.hc-row__date-icon', 'opacity')).toBe('0');
+        expect(css).toMatch(/\.hc-row:hover \.hc-row__date-icon,[^{]*\.hc-row:focus-within \.hc-row__date-icon[^{]*\{[^}]*opacity:\s*1/);
+        expect(blocksOf(css, '@media (hover: none)')).toMatch(/\.hc-row__date-icon\s*\{[^}]*opacity:\s*1/);
     });
 
     it('a narrow card folds the row instead of cutting the title', () => {
@@ -313,6 +332,14 @@ describe('My Work rows', () => {
         expect(declaration(ruleBody(narrow, '.hc-row'), 'flex-wrap')).toBe('wrap');
         expect(declaration(ruleBody(narrow, '.hc-row__title'), 'flex-basis')).toMatch(/^calc\(100% - /);
         expect(declaration(ruleBody(narrow, '.hc-row__tail'), 'flex-basis')).toBe('100%');
+    });
+
+    it('folded, the title line is a full target on a phone without pushing the second line away', () => {
+        const narrow = blocksOf(styleOf(HOME), '@container hc-mywork (max-width: 360px)');
+        expect(declaration(ruleBody(narrow, '.hc-row__title'), 'min-height')).toBe('var(--hit-min)');
+        const lift = declaration(ruleBody(narrow, '.hc-row__tail'), 'margin-top');
+        expect(compute(lift, ROOT)).toBe('0px');
+        expect(compute(lift, PHONE)).toBe('-8px');
     });
 
     const task = (extra = {}) => ({ _id: 't1', TaskName: 'Launch-day runbook, rollback plan and owner sign-off', Task_Priority: 'HIGH', ...extra });
@@ -554,7 +581,8 @@ describe('the classic look still computes the sizes these rules had', () => {
         [INBOX, '.ibx__navitem', 'font', '500 13px/1.3 var(--font-ui)'],
         [INBOX, '.ibx__navitem', 'border-radius', '7px'],
         [INBOX, '.ibx__side-foot', 'font-size', '11.5px'],
-        [INBOX, '.ibx__toolbar .ah-toolbar__title', 'font', '600 15px/1.2 var(--font-ui)'],
+        [HOME, '.ah-page .ah-toolbar__title', 'font-size', '14px'],
+        [INBOX, '.ibx__toolbar .ah-toolbar__title', 'font', '600 14px/1.2 var(--font-ui)'],
         [INBOX, '.ibx__tab', 'font', '500 12.5px/1 var(--font-ui)'],
         [INBOX, '.ibx__markall', 'font', '600 12px/1 var(--font-ui)'],
         [INBOX, '.ibx__keys', 'font-size', '10.5px'],
@@ -584,7 +612,7 @@ describe('the classic look still computes the sizes these rules had', () => {
         [HUB, '.hub__item', 'font', '400 13px/1.3 var(--font-ui)'],
         [HUB, '.hub__item', 'border-radius', '7px'],
         [HUB, '.hub__item-count', 'font', '500 11px/1 var(--font-mono)'],
-        [HUB, '.ah-page.hub .ah-toolbar__title', 'font', '600 15px/1.2 var(--font-ui)'],
+        [HUB, '.ah-page.hub .ah-toolbar__title', 'font', '600 14px/1.2 var(--font-ui)'],
         [HUB, '.hub__view-select', 'height', '30px'],
         [HUB, '.hub__view-select', 'font', '500 12.5px/1 var(--font-ui)'],
         [HUB, '.hub__content', 'padding', '20px 24px 40px'],
@@ -677,6 +705,7 @@ describe('the controls keep a 24px target', () => {
         [HOME, '.hp-days button', 'min-height'],
         [HOME, '.hc-setup__toggle', 'min-height'],
         [HOME, '.hc-setup__step button', 'min-height'],
+        [HOME, '.hc-add, .hc-connect, .hc-personal__open', 'min-height'],
         [INBOX, '.ibx__tab', 'min-height'],
         [INBOX, '.ibx__markall', 'min-height'],
         [INBOX, '.ibx__undo-btn', 'min-height'],
