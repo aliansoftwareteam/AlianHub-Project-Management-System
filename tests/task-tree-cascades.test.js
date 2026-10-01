@@ -302,6 +302,7 @@ describe('move', () => {
 
         expect(res.code).toBe(400);
         expect(res.body).toMatchObject({ status: false, code: 'SUBTASK_MOVES_WITH_PARENT' });
+        expect((await call(PATCH, moveBody(GRANDCHILD, { rowOnly: true }))).code).toBe(400);
         expect(placements()).toEqual(FAMILY.map(() => [SPRINT, SPRINT, FOLDER]));
         expect([sprint(SPRINT).tasks, sprint(OTHER_SPRINT).tasks]).toEqual([5, 0]);
     });

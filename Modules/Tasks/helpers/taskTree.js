@@ -91,6 +91,50 @@ const loadSubtree = async (companyId, taskId, { filter = {}, projection = null }
     type: SCHEMA_TYPE.TASKS, data: [{ ...filter, ancestors: String(taskId) }, projection, { lean: true }],
 }, 'find')) || [];
 
+const LIVE = 0;
+const DELETED = 1;
+const ARCHIVED = 2;
+/* What a row carried by its top holds while the top is live, deleted or archived. */
+const CARRIED_KEY = Object.freeze({ [LIVE]: LIVE, [DELETED]: DELETED, [ARCHIVED]: 3 });
+
+/* What one row adds to its sprint's `tasks` and `archiveTaskCount` when its state changes. */
+const sprintCountChange = (from, to, rows = 1) => {
+    const live = (key) => (!key ? 1 : 0);
+    const archived = (key) => (key === ARCHIVED || key === CARRIED_KEY[ARCHIVED] ? 1 : 0);
+    const change = { tasks: rows * (live(to) - live(from)), archiveTaskCount: rows * (archived(to) - archived(from)) };
+    return Object.fromEntries(Object.entries(change).filter(([, by]) => by !== 0));
+};
+
+/* The rows that go with `top` when its deletedStatusKey changes: its live descendants on the way
+ * down, and on the way back only the rows this top carried, so one archived or deleted on its
+ * own stays as it is. Subtasks archived with their parent before the stamp existed hold key 3
+ * and no stamp. Returns the rows it changed, as they are afterwards. */
+const cascadeStatus = async (companyId, top, to) => {
+    const id = String(top._id);
+    const from = top.deletedStatusKey || LIVE;
+    if (from === to) return [];
+    const carriedBefore = [{ ancestors: id, cascadedBy: id }];
+    if (from === ARCHIVED) carriedBefore.push({ ParentTaskId: id, deletedStatusKey: CARRIED_KEY[ARCHIVED], cascadedBy: { $exists: false } });
+    const filter = from === LIVE ? { ancestors: id, deletedStatusKey: LIVE } : { $or: carriedBefore };
+    const rows = (await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [filter, null, { lean: true }] }, 'find')) || [];
+    if (!rows.length) return [];
+    const update = to === LIVE
+        ? { $set: { deletedStatusKey: LIVE }, $unset: { cascadedBy: '' } }
+        : { $set: { deletedStatusKey: CARRIED_KEY[to], cascadedBy: id } };
+    await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [filter, update] }, 'updateMany');
+    return rows.map(({ cascadedBy, ...row }) => ({ ...row, ...update.$set }));
+};
+
+/* Descendants take the placement their top was given; their chains do not change. A deleted
+ * row stays where it is, as in the app's own move. Returns the rows as they were. */
+const placeDescendants = async (companyId, topId, { set, unset }) => {
+    const filter = { ancestors: String(topId), deletedStatusKey: { $ne: DELETED } };
+    const rows = (await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [filter, null, { lean: true }] }, 'find')) || [];
+    if (!rows.length) return [];
+    await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [filter, unset ? { $set: set, $unset: unset } : { $set: set }] }, 'updateMany');
+    return rows;
+};
+
 /* The top's own row belongs to its writer, which sets `ancestors` in the update that changes
  * ParentTaskId. updatedAt is kept: nothing a person sees on a descendant changed. */
 const rewriteDescendantAncestors = async (companyId, topId, topAncestors) => {
@@ -110,4 +154,5 @@ module.exports = {
     MAX_DEPTH, PLACEMENT_FIELDS, REFUSALS,
     ancestorsOf, depthOf, ancestorsFor, rootIdOf, subtreeHeight, canNest, wouldCycle, placementFrom,
     rootOf, slotUnder, levelRows, loadSubtree, rewriteDescendantAncestors,
+    sprintCountChange, cascadeStatus, placeDescendants,
 };

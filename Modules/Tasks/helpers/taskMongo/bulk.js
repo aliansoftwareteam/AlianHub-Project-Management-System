@@ -27,6 +27,7 @@ const { HandleHistory } = require('../mongo_helper');
 const { HandleBothNotification } = require('../handleNotification');
 const { recordCompletion } = require('./recordCompletion.js');
 const { escapeText } = require('../taskWriteFields');
+const { ancestorsOf, loadSubtree } = require('../taskTree');
 const {
     taskAssigneeAdd, taskAssigneeRemove, taskAssigneeReplace,
     taskStatusChange, taskPriorityChange, shownStatus, shownPriority,
@@ -915,7 +916,7 @@ module.exports = {
                 // the single-task sidebar (a person picked them for this move) and
                 // wrong here, where every task has to keep its own. So each task,
                 // parent or subtask, moves on its own values.
-                const selectedIds = new Set(tasks.map((t) => String(t._id)));
+                const selectedRoots = new Set(tasks.filter((t) => t.isParentTask === true).map((t) => String(t._id)));
                 const queue = [];
                 const queued = new Set();
                 const enqueue = (task, carried) => {
@@ -927,9 +928,10 @@ module.exports = {
 
                 for (const task of tasks) {
                     if (task.isParentTask !== true) {
-                        // Its parent is selected too, so the parent's pass below picks
-                        // it up. Moving it here as well would move it twice.
-                        if (selectedIds.has(String(task.ParentTaskId || ''))) continue;
+                        // The task it sits under, at any level, is selected too, so that
+                        // task's pass below picks it up. Moving it here as well would
+                        // move it twice.
+                        if ([String(task.ParentTaskId || ''), ...ancestorsOf(task)].some((id) => selectedRoots.has(id))) continue;
 
                         // On its own, though, it does not move at all. A subtask has no
                         // existence outside its parent: the list renders subtasks nested
@@ -956,16 +958,7 @@ module.exports = {
                     // been bulk-moved before this fix has some. Matching on parentage
                     // alone means selecting the parent gathers them all back, which is
                     // the one way an already-stranded subtask can be reached at all.
-                    //
-                    // ParentTaskId is a String on the task schema, not an ObjectId.
-                    const children = await MongoDbCrudOpration(companyId, {
-                        type: dbCollections.TASKS,
-                        data: [{
-                            ParentTaskId: String(task._id),
-                            isParentTask: false,
-                            deletedStatusKey: { $nin: [1] },
-                        }],
-                    }, 'find').catch((error) => {
+                    const children = await loadSubtree(companyId, task._id, { filter: { deletedStatusKey: { $nin: [1] } } }).catch((error) => {
                         logger.error(`bulkMove subtasks of ${task._id}: ${error.message}`);
                         return null;
                     });
@@ -1007,6 +1000,7 @@ module.exports = {
                             oldProject,
                             // Each task moves as itself; the family was expanded above.
                             isSubTask: false,
+                            rowOnly: true,
                             assignee: Array.isArray(task.AssigneeUserId) ? task.AssigneeUserId : [],
                             watcher: Array.isArray(task.watchers) ? task.watchers : [],
                             userData,
