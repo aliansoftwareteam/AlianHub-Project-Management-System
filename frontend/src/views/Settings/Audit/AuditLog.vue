@@ -283,8 +283,17 @@ onMounted(load);
 .al__note { margin: 10px 0 0; color: var(--ink-2); }
 @media (max-width: 900px) {
     .al__table thead { display: none; }
-    .al__table, .al__table tbody, .al__row, .al__table td { display: block; width: 100%; }
+    .al__table, .al__table tbody, .al__row, .al__table td { display: block; width: 100%; box-sizing: border-box; }
     .al__row { border-bottom: 1px solid var(--hairline); padding: 6px 0; }
     .al__table td { border-bottom: 0; padding: 4px 12px; }
+    .al__actor { white-space: normal; flex-wrap: wrap; }
+    .al__event, .al__reason, .al__id { overflow-wrap: anywhere; }
+}
+@media (max-width: 767px) {
+    .al.ah-page .ah-toolbar { padding: 0 16px; gap: 8px; }
+    .al .ah-toolbar__title { white-space: nowrap; }
+    .al__bar { padding: 10px 16px; }
+    .al__body { padding: 12px 16px 20px; }
+    .al__search { flex-basis: 100%; max-width: none; }
 }
 </style>

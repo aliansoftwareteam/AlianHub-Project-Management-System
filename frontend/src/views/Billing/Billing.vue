@@ -1,7 +1,7 @@
 <template>
     <div class="ah-page billing">
         <header class="ah-toolbar billing__bar">
-            <h1 class="billing__title">{{ $t('Billing.title') }} · {{ projectName }}</h1>
+            <h1 class="billing__title" :title="heading">{{ heading }}</h1>
             <span v-if="clientLine" class="billing__client ah-mono">{{ clientLine }}</span>
             <nav class="billing__tabs" :aria-label="$t('Billing.views_nav')">
                 <button type="button" class="billing__tab" :class="{ 'is-active': tab === 'contract' }" @click="setTab('contract')">
@@ -79,6 +79,7 @@ const tab = ref("contract");
 const settingsOpen = ref(false);
 
 const projectName = computed(() => (contract.data && contract.data.project.name) || "");
+const heading = computed(() => `${t("Billing.title")} · ${projectName.value}`);
 const clientLine = computed(() => {
     if (!contract.data) return "";
     const c = contract.data.contract;
