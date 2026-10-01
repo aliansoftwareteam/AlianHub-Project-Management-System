@@ -37,6 +37,7 @@ const asCaller = ({ human = true, privileged = true, userId = OWNER } = {}) => {
     access.callerOf.mockResolvedValue({ actor: { userId, kind: human ? 'human' : 'agent' }, human, privileged });
     access.canManageAgents.mockImplementation((caller) => Boolean(caller && caller.human && caller.privileged));
     access.visibleProjectIdsFor.mockResolvedValue([]);
+    access.readableRuns.mockImplementation(async (companyId, caller, runs) => runs);
 };
 
 const savedFlag = process.env.WORKFLOW_ENGINE;
@@ -143,6 +144,23 @@ describe('who may manage a workflow run', () => {
         const res = resSpy();
         await controller.getRun(reqFor({ params: { id: RUN_ID } }), res);
         expect(res.statusCode).toBe(404);
+    });
+
+    it('hides from an owner or admin a run that is private work of someone else', async () => {
+        store.getRun.mockResolvedValue({ _id: RUN_ID, startedBy: MEMBER, projectId: 'ffffffffffffffffffffffff' });
+        store.listRuns.mockResolvedValue([{ _id: RUN_ID, startedBy: MEMBER, projectId: 'ffffffffffffffffffffffff' }]);
+        access.readableRuns.mockResolvedValue([]);
+
+        const read = resSpy();
+        await controller.getRun(reqFor({ params: { id: RUN_ID } }), read);
+        expect(read.statusCode).toBe(404);
+        const retried = resSpy();
+        await controller.retryStep(reqFor({ params: { id: RUN_ID, stepId: 'sAgent' } }), retried);
+        expect(retried.statusCode).toBe(404);
+        const listed = resSpy();
+        await controller.listRuns(reqFor(), listed);
+        expect(listed.body.data).toEqual([]);
+        expect(access.readableRuns).toHaveBeenCalledWith(COMPANY, expect.objectContaining({ privileged: true }), expect.any(Array));
     });
 
     it('refuses a request whose body names a different company than its header', async () => {

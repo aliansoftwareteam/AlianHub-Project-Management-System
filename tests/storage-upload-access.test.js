@@ -203,7 +203,7 @@ describe('POST /api/v1/storage/uploadFile on server storage', () => {
     });
 
     it('stores an upload from an active member of the company', async () => {
-        const filePath = `qa/${hex()}.txt`;
+        const filePath = `Reminders/${COMPANY_A}/${USER}/${hex()}.txt`;
         const res = await send({ companyId: COMPANY_A, filePath });
         expect(res.status).toBe(200);
         expect(fs.readFileSync(path.join(STORAGE_ROOT, COMPANY_A, filePath), 'utf8')).toBe('f35d upload body');

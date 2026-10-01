@@ -98,7 +98,7 @@ describe('POST /api/v1/wasabi/uploadFile', () => {
     });
 
     it('uploads for an active member of the company', async () => {
-        const res = await multipart({ companyId: COMPANY_A, path: 'qa/note.txt' });
+        const res = await multipart({ companyId: COMPANY_A, path: `Reminders/${COMPANY_A}/${USER}/note.txt` });
         expect(res.status).toBe(200);
         expect((await res.json()).status).toBe(true);
         expect(s3Send).toHaveBeenCalledTimes(1);

@@ -3,8 +3,8 @@
     Created By: Parth Detroja
 -->
 <template>
-    <div class="bg-white d-flex align-items-center position-re border-radius-6-px" :class="{'mr-15' : clientWidth > 767 , 'mr-010' : clientWidth <= 767}">
-        <div class="bottom-filter-section bg-white home_card" >
+    <div class="tf-panel d-flex align-items-center position-re border-radius-6-px" :class="{'mr-15' : clientWidth > 767 , 'mr-010' : clientWidth <= 767}">
+        <div class="bottom-filter-section home_card">
             <div v-if="!isValidate || !isValidateFilter" role="alert" aria-live="polite" aria-atomic="true" class="alert alert-danger font-size-13">{{$t('Filters.pleaseselectvalid')}}</div>
             <div class="table-data">
                 <FieldsTable
@@ -23,7 +23,7 @@
             <div class="d-flex w-100 add-filter-wrapper">
                 <div class="add-section mb-13px" :class="{'d-flex justify-content-between w-100' : clientWidth <= 767}" v-if="keysArray?.length">
                     <span><a href="#" class="mr-10px font-weight-400 font-size-12"  @click.stop.prevent="clearFilter($event)" v-if="clientWidth <= 767" >{{$t('Filters.clearall')}}</a></span>
-                    <a href="#" class="blue font-weight-400 font-size-12" @click.stop.prevent="addRow">+ {{$t('Filters.addfilter')}}</a>
+                    <a href="#" class="tf-link font-weight-400 font-size-12" @click.stop.prevent="addRow">+ {{$t('Filters.addfilter')}}</a>
                 </div>
             </div>
             <FieldsActions

@@ -59,6 +59,9 @@
 }
 .pft .pft__pill svg { color: var(--ink-2); flex: none; }
 .pft__group-label { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+/* The options are teleported out of .pft, so these take no .pft prefix. */
+.pft__group-option { display: flex; align-items: center; gap: 10px; }
+.ah-mask-icon.pft__group-icon { width: 12px; height: 12px; }
 .pft .pft__icon-btn {
     display: inline-flex; align-items: center; justify-content: center; flex: none;
     width: 32px; height: 32px; padding: 0; border-radius: 8px;
