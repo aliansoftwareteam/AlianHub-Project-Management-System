@@ -26,7 +26,7 @@
                             <span class="ah-chip ah-chip--agent ah-chip--mono cm-thread__ai-for" data-test="ai-for">{{ $t('AiMention.answered_for', { name: askerName(reply) }) }}</span>
                         </template>
                         <template v-else>
-                            <UserProfile
+                            <UserProfile decorative
                                 :showDot="false"
                                 class="cm-thread__avatar"
                                 :data="{ id: reply.userId, title: authorName(reply), image: getUser(reply.userId)?.Employee_profileImageURL }"

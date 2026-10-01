@@ -9,7 +9,7 @@
         @keydown.enter.self.prevent="$emit('select', item)"
         @keydown.space.self.prevent="$emit('select', item)"
     >
-        <div class="d-flex align-items-center assignee-userlist text-capitalize">
+        <div class="d-flex align-items-center assignee-userlist">
             <template v-if="item?.teamColor?.color">
                 <span class="team_icon_span cursor-pointer text-center" :style="[{'color': item?.teamColor?.color,'background-color': item?.teamColor?.bgColor, 'padding':'5px'}]">{{item.label.charAt(0)}}</span>
             </template>

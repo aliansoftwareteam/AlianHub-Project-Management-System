@@ -46,7 +46,7 @@
                         >
                             <div class="d-flex align-items-center" :title="user.label">
                                 <input type="checkbox" :id="'checkbox'+user.id" v-model="user.isChecked" :class="[{'checkboxBlue' : user.isChecked}]"/>
-                                <UserProfile
+                                <UserProfile decorative
                                     :showDot="false"
                                     :data="{
                                         image: user.image,

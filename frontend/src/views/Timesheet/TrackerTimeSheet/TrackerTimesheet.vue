@@ -82,7 +82,7 @@
                                             v-show="filterType.toLowerCase()=='users' && isEveryOne">
                                                 <a class="vs-dropdown-users d-flex align-items-center">
                                                     <input type="checkbox" class="ah-check" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent',true)" :value="item.id" v-model="checkedFilter">&nbsp;
-                                                    <UserProfile
+                                                    <UserProfile decorative
                                                         v-if="filterType.toLowerCase() == 'users'"
                                                         :showDot="false"
                                                         class="timesheet_user_profile mr-10px"

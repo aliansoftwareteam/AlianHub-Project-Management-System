@@ -39,7 +39,7 @@
                 <tr v-for="(user, index) in userArrayData" :key="index">
                     <td class="py-8px">
                         <div class="d-flex align-items-center">
-                            <UserProfile :data="{ title: user?.name, image: user?.image }" width="30px" :showDot="false"
+                            <UserProfile decorative :data="{ title: user?.name, image: user?.image }" width="30px" :showDot="false"
                                 :thumbnail="'30x30'" />
                             <span class="ml-8px font-size-14 font-weight-500 text-ellipsis w-85" :title="user.name">
                                 {{ user.name }}
