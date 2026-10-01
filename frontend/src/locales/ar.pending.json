@@ -3175,6 +3175,7 @@
     "CustomField.date_created": "Date Created",
     "CustomField.date_format": "Date Format",
     "CustomField.days_of_week": "Days of the week",
+    "CustomField.edit_custom_field": "Edit Custom Field",
     "CustomField.enter_maximum_limit": "Enter Maximum Limit",
     "CustomField.enter_maximum_limit_type": "Enter Maximum Limit Type",
     "CustomField.enter_minimum_limit": "Enter Minimum Limit",

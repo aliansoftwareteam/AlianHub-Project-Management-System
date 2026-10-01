@@ -6472,6 +6472,7 @@ export default {
     "CustomField": {
         "custom_field": "自定义字段",
         "create_custom_field": "创建自定义字段",
+        "edit_custom_field": "Edit Custom Field",
         "formula_expression": "Formula",
         "formula_expression_placeholder": "e.g. {Estimate} * 2 + {Buffer}",
         "referenceable_fields": "Available fields",
