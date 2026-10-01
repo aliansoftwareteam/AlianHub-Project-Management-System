@@ -1,5 +1,5 @@
 <template>
-    <div v-show="tabIndexCheck === 1">
+    <div v-show="tabIndexCheck === 1" data-field-tab="1">
         <CustomFieldInputComponent
             :label="$t('PlaceHolder.field_label')"
             :type="'text'"
@@ -60,7 +60,7 @@
             </template>
         </DropDown>
     </div>
-    <div v-show="tabIndexCheck === 2">
+    <div v-show="tabIndexCheck === 2" data-field-tab="2">
         <CustomFieldInputComponent
             :label="$t('CustomField.date_format')"
             :type="'radio'"
@@ -73,7 +73,7 @@
             :help="$t('CustomField.select_date_format')"
         />
     </div>
-    <div v-show="tabIndexCheck === 3">
+    <div v-show="tabIndexCheck === 3" data-field-tab="3">
         <CustomFieldInputComponent
             :type="'checkbox'"
             :options="liteMode"
@@ -97,7 +97,7 @@
             />
         </div>
     </div>
-    <div v-show="tabIndexCheck === 4">
+    <div v-show="tabIndexCheck === 4" data-field-tab="4">
         <CustomFieldInputComponent
             :label="$t('CustomField.past_and_future')"
             :type="'checkbox'"
