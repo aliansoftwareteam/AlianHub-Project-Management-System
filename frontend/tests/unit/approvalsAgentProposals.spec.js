@@ -10,6 +10,7 @@ const { apiRequest, echo } = vi.hoisted(() => ({
 vi.mock('@/services', () => ({ apiRequest }));
 vi.mock('@/store/index', () => ({ default: { getters: {} } }));
 vi.mock('@/composable', () => ({ useGetterFunctions: () => ({ getUser: () => ({}) }) }));
+vi.mock('@/views/Timesheet/TimesheetTabs.vue', () => ({ default: { name: 'TimesheetTabs', render: () => null } }));
 vi.mock('vue-i18n', async (importOriginal) => ({ ...(await importOriginal()), useI18n: () => ({ t: echo }) }));
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 

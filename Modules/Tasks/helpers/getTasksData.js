@@ -9,6 +9,7 @@ const logger = require("../../../Config/loggerConfig");
 const { QueryRefused, validatePipeline, visibilityStage } = require("./taskQueryGuard");
 const { WriteRefused, parseCascade, assertCanCascade, cascadeFilter } = require("./taskWriteGuard");
 const { canReadTask } = require("./taskReadAccess");
+const { extraListsOf, listsForViewer } = require("./taskExtraLists");
 const { withLinkConditions } = require("../../CustomField/helpers/fieldLinks");
 
 const refuse = (res, statusCode, statusText, message, extra = {}) => res.status(statusCode).json({ status: false, statusText, message, ...extra });
@@ -46,6 +47,11 @@ const OBJECT_ID = /^[a-f0-9]{24}$/i;
 // response never confirms that a task id is real.
 const taskNotFound = (res) => refuse(res, 404, "Task not found.", "Task not found.");
 
+const readableTask = async (companyId, uid, id) => {
+    const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: new mongoose.Types.ObjectId(id) }] }, "findOne");
+    return task && await canReadTask(companyId, uid, task) ? task : null;
+};
+
 exports.getTask = async (req, res) => {
     try {
         const companyId = String(req.headers["companyid"] || "");
@@ -54,13 +60,32 @@ exports.getTask = async (req, res) => {
             return refuse(res, 400, "A valid task id is required.", "An error occurred while getting the task.");
         }
 
-        const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: new mongoose.Types.ObjectId(id) }] }, "findOne");
+        const task = await readableTask(companyId, req.uid, id);
         if (!task) return taskNotFound(res);
-
-        if (!(await canReadTask(companyId, req.uid, task))) return taskNotFound(res);
-        return res.status(200).json(task);
+        if (!extraListsOf(task).length) return res.status(200).json(task);
+        const stored = typeof task.toJSON === "function" ? task.toJSON() : task;
+        return res.status(200).json({ ...stored, extraLists: await listsForViewer(companyId, req.uid, task) });
     } catch (error) {
         logger.error(`getTask error: ${error.message || error}`);
+        return refuse(res, 500, "An error occurred while getting the task.", "An error occurred while getting the task.");
+    }
+};
+
+exports.getTaskLists = async (req, res) => {
+    try {
+        const companyId = tenantOf(req);
+        const id = String(req.params.id || "");
+        if (!OBJECT_ID.test(id)) {
+            return refuse(res, 400, "A valid task id is required.", "An error occurred while getting the task.");
+        }
+        const task = await readableTask(companyId, req.uid, id);
+        if (!task) return taskNotFound(res);
+        return res.status(200).json({ status: true, statusText: "Task lists.", data: { taskId: id.toLowerCase(), extraLists: await listsForViewer(companyId, req.uid, task) } });
+    } catch (error) {
+        if (error instanceof TenantError) {
+            return refuse(res, error.statusCode, "Forbidden", error.message);
+        }
+        logger.error(`getTaskLists error: ${error.message || error}`);
         return refuse(res, 500, "An error occurred while getting the task.", "An error occurred while getting the task.");
     }
 };

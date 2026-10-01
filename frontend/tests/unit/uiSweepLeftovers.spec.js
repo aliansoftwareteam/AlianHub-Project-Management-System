@@ -57,7 +57,7 @@ describe('the project calendar grid', () => {
     test('draws each day card on the frame, so no rounded cell corners meet across the collapsed table', () => {
         expect(ruleBody(css, '.cv__grid :deep(.fc-daygrid-day)')).not.toMatch(/border-radius|border:/);
         const frame = ruleBody(css, '.cv__grid :deep(.fc-daygrid-day-frame)');
-        expect(frame).toMatch(/border-radius:\s*10px/);
+        expect(frame).toMatch(/border-radius:\s*var\(--r-lg, 10px\)/);
         expect(frame).toMatch(/min-height:\s*100%/);
         expect(ruleBody(css, '.cv__grid :deep(.fc-scrollgrid-sync-table td)')).toMatch(/padding:\s*3px/);
         expect(phone).not.toMatch(/:deep\(\.fc-daygrid-day\)\s*\{/);

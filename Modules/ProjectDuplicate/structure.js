@@ -7,6 +7,8 @@ const { hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
 const { sprintPlacementOf } = require('../Tasks/helpers/sprintPlacement');
 const { canManageRules } = require('../Automations/helpers/ruleAccess');
 const matcher = require('../Automations/engine/matcher');
+const { asList, announceFields } = require('../CustomField/helpers/fieldProjects');
+const { removeLinksOfTasks } = require('../CustomField/helpers/fieldLinkStore');
 const rules = require('./rules');
 
 const asId = (id) => new mongoose.Types.ObjectId(String(id));
@@ -64,11 +66,13 @@ const copyAutomations = async ({ companyId, caller, sourceRules, projectId, ids,
    the view settings and the automations that name a field keep meaning the same field. */
 const linkCustomFields = async (companyId, fieldIds, projectId) => {
     if (!fieldIds.length) return [];
+    const shared = await find(companyId, SCHEMA_TYPE.CUSTOM_FIELDS, { _id: { $in: fieldIds.map(asId) } }, { _id: 1, projectId: 1 });
+    for (const field of shared) await asList(companyId, field);
     await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.CUSTOM_FIELDS,
         data: [{ _id: { $in: fieldIds.map(asId) } }, { $addToSet: { projectId } }],
     }, 'updateMany');
-    removeCache(`customField:${companyId}`);
+    announceFields(companyId);
     return fieldIds;
 };
 
@@ -113,7 +117,9 @@ const discard = async (companyId, made) => {
     const projectRef = made.projectId;
     const projectId = String(projectRef);
     const drop = (type, filter) => MongoDbCrudOpration(companyId, { type, data: [filter] }, 'deleteMany');
+    const copied = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ ProjectID: projectRef }, { _id: 1 }, { lean: true }] }, 'find').catch(() => []);
     await Promise.allSettled([
+        removeLinksOfTasks(companyId, (copied || []).map((row) => row._id)),
         drop(SCHEMA_TYPE.TASKS, { ProjectID: projectRef }),
         drop(SCHEMA_TYPE.SPRINTS, { projectId: projectRef }),
         drop(SCHEMA_TYPE.FOLDERS, { projectId: projectRef }),
@@ -121,7 +127,7 @@ const discard = async (companyId, made) => {
         drop(SCHEMA_TYPE.PROJECTS, { _id: projectRef }),
         made.rules.length ? drop(SCHEMA_TYPE.AUTOMATION_RULES, { _id: { $in: made.rules } }).then(() => automationsChanged(companyId)) : null,
         MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.CUSTOM_FIELDS, data: [{ projectId }, { $pull: { projectId } }] }, 'updateMany')
-            .then(() => removeCache(`customField:${companyId}`)),
+            .then(() => announceFields(companyId)),
     ]);
 };
 

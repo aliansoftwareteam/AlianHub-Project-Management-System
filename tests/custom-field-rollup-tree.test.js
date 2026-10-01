@@ -16,6 +16,7 @@ const { computeFields } = require('../Modules/CustomField/controller');
 
 const CID = '6f00000000000000000000c1';
 const PROJECT = '6f0000000000000000000b01';
+const OWNER = '6f00000000000000000000a1';
 const COST = '6f0000000000000000000f01';
 const TOTAL = '6f0000000000000000000f02';
 const ROWS = '6f0000000000000000000f03';
@@ -94,13 +95,15 @@ describe('POST /api/v2/custom-fields/compute', () => {
     const stored = (taskId, fieldId) => (mockDb.store[SCHEMA_TYPE.TASKS].find((task) => String(task._id) === taskId).customField[fieldId] || {}).fieldValue;
     const compute = async (taskIds) => {
         const res = { send: (body) => { res.body = body; return res; } };
-        await computeFields({ headers: { companyid: CID }, body: { projectId: PROJECT, taskIds } }, res);
+        await computeFields({ headers: { companyid: CID }, uid: OWNER, body: { projectId: PROJECT, taskIds } }, res);
         return res.body;
     };
 
     beforeEach(() => {
         Object.keys(mockDb.store).forEach((type) => { mockDb.store[type].length = 0; });
         jest.clearAllMocks();
+        mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
+        mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: new ObjectId(PROJECT), isPrivateSpace: false });
         definitions.forEach((definition) => mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { ...definition, _id: new ObjectId(definition._id) }));
         [...tree(), row(id(9), ROOT, [ROOT], 1000, { deletedStatusKey: 1 })]
             .forEach((task) => mockDb.seed(SCHEMA_TYPE.TASKS, { ...task, _id: new ObjectId(task._id) }));

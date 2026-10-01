@@ -39,8 +39,8 @@
                 @keydown="onGridKey"
             >
                 <div class="tv2__head" role="row">
-                    <span role="columnheader"></span>
-                    <span role="columnheader" class="tv2__head-name" :aria-sort="ariaSort('TaskName')">
+                    <span role="columnheader" class="tv2__c-select"></span>
+                    <span role="columnheader" class="tv2__head-name tv2__c-name" :aria-sort="ariaSort('TaskName')">
                         <button
                             type="button"
                             class="tv2__sort"
@@ -68,6 +68,9 @@
                             >
                                 {{ $t('Projects.status') }}<span class="tv2__sort-caret" :class="{ 'is-on': sortOf('statusKey') }" aria-hidden="true">{{ sortGlyph('statusKey') }}</span>
                             </button>
+                        </span>
+                        <span v-else-if="column.ai && column.id !== 'risk'" role="columnheader" class="tv2__head-col">
+                            <AiColumnHead :column="column" :tasks="aiColumnTasks" />
                         </span>
                         <span v-else-if="column.ai" role="columnheader" :class="{ 'tv2__head-ai': column.id !== 'risk' }" :title="$t(column.id === 'risk' ? 'List.risk_formula' : 'List.ai_source_hint')">{{ column.id === 'risk' ? '' : '✦ ' }}{{ $t(column.labelKey) }}</span>
                         <span v-else-if="column.field && isAiField(column.field)" role="columnheader" class="tv2__head-col" :aria-sort="ariaSort(sortFieldOf(column))">
@@ -103,9 +106,11 @@
                                 :aria-expanded="isSprintOpen(sprint)"
                                 @click="toggleSprint(sprint)"
                             >
-                                <span class="tv2__caret" :class="{ 'tv2__caret--open': isSprintOpen(sprint) }" aria-hidden="true">▸</span>
-                                <span class="tv2__sprint-name">{{ sprint.name }}</span>
-                                <span class="tv2__sprint-meta" :title="$t('List.sprint_total_hint')">{{ sprint.tasks || 0 }}</span>
+                                <span class="tv2__sprint-label">
+                                    <span class="tv2__caret" :class="{ 'tv2__caret--open': isSprintOpen(sprint) }" aria-hidden="true">▸</span>
+                                    <span class="tv2__sprint-name">{{ sprint.name }}</span>
+                                    <span class="tv2__sprint-meta" :title="$t('List.sprint_total_hint')">{{ sprint.tasks || 0 }}</span>
+                                </span>
                             </button>
                         </span>
                     </div>
@@ -126,7 +131,7 @@
                 </template>
             </div>
 
-            <div v-else class="d-flex align-items-center justify-content-center flex-column">
+            <div v-else class="tv2__empty">
                 <EmptyState
                     v-if="project?.deletedStatusKey !== 2"
                     :title="$t(emptyTitleKey)"
@@ -150,6 +155,7 @@ import ListBulkBar from '@/views/Projects/ListView/ListBulkBar.vue';
 import ViewColumnChooser from '@/views/Projects/components/columns/ViewColumnChooser.vue';
 import ViewDensityControl from '@/views/Projects/components/columns/ViewDensityControl.vue';
 import AiFieldColumnHead from '@/views/Projects/components/columns/AiFieldColumnHead.vue';
+import AiColumnHead from './AiColumnHead.vue';
 import { isAiField, loadedViewTasks } from '@/views/Projects/composables/aiFields';
 
 // UTILS

@@ -7,6 +7,7 @@ const { MODULE_FIELD_TYPES, typeModuleOf } = require('../fieldTypes');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const SETTINGS_PERMISSION = 'settings.settings_custom_field';
+const MAX_LINKED_PROJECTS = 500;
 
 // The field forms differ per field type, and every property they name is a fieldXxx one.
 const DEFINITION_PROPERTY = /^field[A-Z][A-Za-z]*$/;
@@ -34,6 +35,16 @@ const checkedTaskTypes = (value) => {
     if (!keys) throw new FieldWriteError(`fieldTaskTypes must be a list of at most ${MAX_TASK_TYPES} task type keys.`);
     return keys;
 };
+
+const checkedTitle = (value) => {
+    if (typeof value !== 'string' || !value.trim()) throw new FieldWriteError('A custom field needs a name.');
+    return value.trim();
+};
+
+const OPTIONAL_TEXT = ['fieldPlaceholder', 'fieldDescription'];
+
+const hasLabelledOption = (options) => Array.isArray(options)
+    && options.some((option) => option && typeof option.label === 'string' && option.label.trim());
 
 const checkedPastFuture = (value) => {
     const allowed = cleanPastFuture(value);
@@ -63,6 +74,13 @@ const checkProperties = (updateObject, { insert }) => {
         if (name in updateObject && typeof updateObject[name] !== 'boolean') throw new FieldWriteError(`${name} must be true or false.`);
     });
     if ('projectId' in updateObject && !isIdList(updateObject.projectId)) throw new FieldWriteError('projectId must be a list of project ids.');
+    if (insert || 'fieldTitle' in updateObject) updateObject.fieldTitle = checkedTitle(updateObject.fieldTitle);
+    OPTIONAL_TEXT.forEach((name) => {
+        if (name in updateObject && typeof updateObject[name] !== 'string') throw new FieldWriteError(`${name} must be text.`);
+    });
+    if (updateObject.fieldType === 'dropdown' && (insert || 'fieldOptions' in updateObject) && !hasLabelledOption(updateObject.fieldOptions)) {
+        throw new FieldWriteError('A dropdown field needs at least one option.');
+    }
     if ('fieldAi' in updateObject) updateObject.fieldAi = checkedAiConfig(updateObject);
     if ('fieldTaskTypes' in updateObject) updateObject.fieldTaskTypes = checkedTaskTypes(updateObject.fieldTaskTypes);
     if ('fieldPastFuture' in updateObject) updateObject.fieldPastFuture = checkedPastFuture(updateObject.fieldPastFuture);
@@ -71,10 +89,34 @@ const checkProperties = (updateObject, { insert }) => {
 
 const fieldInsertFrom = (updateObject) => checkProperties(updateObject, { insert: true });
 
-const fieldUpdateFrom = ({ key, id, updateObject }) => {
+const checkedProjects = (body, name) => {
+    const value = body[name];
+    if (value === undefined) return [];
+    if (!Array.isArray(value) || value.length > MAX_LINKED_PROJECTS || !isIdList(value)) throw new FieldWriteError(`${name} must be a list of at most ${MAX_LINKED_PROJECTS} project ids.`);
+    return value;
+};
+
+/* The projects a field is linked to are changed by name, beside the properties `updateObject` sets. */
+const checkProjectLinks = (body) => {
+    const add = checkedProjects(body, 'addProjects');
+    const remove = checkedProjects(body, 'removeProjects');
+    const update = isPlainObject(body.updateObject) ? body.updateObject : {};
+    const kept = [...add, ...(Array.isArray(update.projectId) ? update.projectId : [])];
+    if (remove.some((id) => kept.includes(id))) throw new FieldWriteError('A project cannot be both added and taken off.');
+    if (update.global === true && add.length) throw new FieldWriteError('A company-wide field is not linked to projects.');
+    return add.length + remove.length > 0;
+};
+
+const fieldUpdateFrom = (body) => {
+    const { key, id } = body;
     if (key !== '$set') throw new FieldWriteError('A custom field is updated with $set only.');
     if (typeof id !== 'string' || !OBJECT_ID.test(id)) throw new FieldWriteError('Id is Required');
-    return checkProperties(updateObject, { insert: false });
+    const links = checkProjectLinks(body);
+    if (links && (body.updateObject === undefined || (isPlainObject(body.updateObject) && !Object.keys(body.updateObject).length))) {
+        body.updateObject = {};
+        return body.updateObject;
+    }
+    return checkProperties(body.updateObject, { insert: false });
 };
 
 const hasNoProjects = (field) => !(Array.isArray(field.projectId) ? field.projectId : [field.projectId]).some(Boolean);

@@ -2,8 +2,8 @@
     <div class="kanban-card-wrapper">
         <div @click.stop.prevent="!showArchiveVar ? toggleTaskDetail(element) : ''">
             <div>
-                <div class="d-flex justify-content-between">
-                    <div class="d-flex align-items-start card-title-row">
+                <div class="card-head">
+                    <div class="card-title-row">
                         <label
                             v-if="canCardMultiSelect"
                             class="kanban-card-multi-select"
@@ -25,7 +25,7 @@
                             ref="renameInput"
                             v-model="renameDraft"
                             type="text"
-                            class="card-rename ml-5px"
+                            class="card-rename"
                             maxlength="250"
                             :aria-label="$t('List.rename_label')"
                             @click.stop
@@ -38,7 +38,7 @@
                         <div
                             v-else
                             ref="titleEl"
-                            class="card-title font-weight-500 ml-5px"
+                            class="card-title"
                             :title="element.TaskName"
                             role="button"
                             tabindex="0"
@@ -46,8 +46,8 @@
                             @keydown.space.self.prevent="!showArchiveVar ? toggleTaskDetail(element) : ''"
                         >
                             <span v-if="taskKey" class="card-key">{{ taskKey }}</span>
-                            <img v-if="element.deletedStatusKey === 2" :src="inventoryIcon" alt="inventory" class="ml-5px" />
-                            <img v-if="element.deletedStatusKey === 1" :src="deleteIcon" alt="delete" class="ml-5px" />
+                            <img v-if="element.deletedStatusKey === 2" :src="inventoryIcon" alt="inventory" class="card-title__state" />
+                            <img v-if="element.deletedStatusKey === 1" :src="deleteIcon" alt="delete" class="card-title__state" />
                             {{ element.TaskName }}
                         </div>
                     </div>
@@ -59,13 +59,13 @@
                             trigger-class="option-list__trigger"
                             @choose="runMenu"
                         >
-                            <img :src="horizontalDots" alt="" aria-hidden="true">
+                            <span class="ah-mask-icon option-list__dots" :style="maskOf(horizontalDots)" aria-hidden="true"></span>
                         </TaskMenuPopup>
                     </div>
                 </div>
                 <div
                     v-if="!showArchiveVar && taskTags.length && checkApps('tags') && checkPermission('task.task_tag',projectData?.isGlobalPermission) !== null"
-                    class="card-tags d-flex align-items-center mt-10px ml--5px"
+                    class="card-tags"
                 >
                     <div v-for="item in taskTags.slice(0, TAG_CHIP_LIMIT)" :key="item.uid" class="tagList" @click.stop>
                         <TagChip :data="item" :isBorder="false" :prjectGlobalPermission="projectData?.isGlobalPermission" :ids="tagIds" :tagsArray="projectData.tagsArray"/>
@@ -99,14 +99,14 @@
                     <span v-if="isTiming" class="card-timer">● {{ timerClock }}</span>
                     <ProvenanceBadge v-if="showSplitBadge" :task="element" />
                 </div>
-                <div class="d-flex justify-content-between mt-10px" :class="{'ml-5px': element.AssigneeUserId.length > 0}">
+                <div class="card-foot">
                     <div class="card-assignee" :class="{ 'card-assignee--agent': !!agentRun }" v-if="checkPermission('task.task_assignee',projectData?.isGlobalPermission) !== null && (groupValue !== 1 || isSubTask)">
                         <span v-if="agentRun" class="card-assignee__agent" :title="agentRun.agentName" aria-hidden="true">◉</span>
                         <Assignee
                             :users="element.AssigneeUserId"
                             :options="canAssignOthers ? permittedOptions : nonPermittedOptions"
                             :num-of-users="1"
-                            imageWidth="25px"
+                            imageWidth="var(--avatar-size)"
                             :addUser="!showArchiveVar"
                             :buttonLabel="assigneeNames ? $t('List.cell_change', { field: $t('List.assignee'), value: assigneeNames }) : $t('List.cell_set', { field: $t('List.assignee') })"
                             @selected="changeAssignee(checkApps('MultipleAssignees',projectData) ? 'add' : 'replace', $event)"
@@ -115,16 +115,10 @@
                             :multiSelect="checkApps('MultipleAssignees')"
                         />
                     </div>
-                    <div class="d-flex align-items-center board-view-action-wrapper">
-                        <span class="mr-5px date-picker d-flex align-items-center"
-                            v-if="showDueDateChip"
-                            :class="(myCounts || myParentCounts) > 0 ? 'mr-5px' : ''"
-                            :style="`border-radius: ${element?.DueDate ? '5px' : '50%'}; padding: ${element?.DueDate ? '3px 6px' : '6px'};`"
-                        >
-                            <img class="mr-5px" v-if="element?.DueDate" :src="calendarIcon" alt="" />
+                    <div class="card-foot__actions board-view-action-wrapper">
+                        <span v-if="showDueDateChip" class="date-picker">
                             <CalenderCompo
                                 v-if="canEditDueDate"
-                                class="d-flex align-items-center"
                                 :modelValue="duePickerValue"
                                 :hideExtraLayouts="['time', 'minutes', 'hours', 'seconds']"
                                 menuClass="calender-menu-class-duedate"
@@ -134,21 +128,25 @@
                                 <template #trigger>
                                     <button
                                         type="button"
-                                        class="d-flex calendar-trigger calendar-trigger--button"
+                                        class="calendar-trigger calendar-trigger--button card-chip"
+                                        :class="{ 'card-chip--icon': !dueDateText }"
                                         aria-haspopup="dialog"
                                         :aria-label="dueDateText ? $t('List.cell_change', { field: $t('List.due_date'), value: dueDateText }) : $t('List.cell_set', { field: $t('List.due_date') })"
                                         :title="dueDateFull || null"
                                     >
+                                        <span class="ah-mask-icon card-icon card-icon--calendar" :style="maskOf(calendarIcon)" aria-hidden="true"></span>
                                         <template v-if="dueDateText">{{ dueDateText }}</template>
-                                        <img v-else :src="calendarIcon" alt="">
                                     </button>
                                 </template>
                             </CalenderCompo>
-                            <span v-else :title="dueDateFull">{{ dueDateText }}</span>
+                            <span v-else class="card-chip" :title="dueDateFull">
+                                <span class="ah-mask-icon card-icon card-icon--calendar" :style="maskOf(calendarIcon)" aria-hidden="true"></span>
+                                {{ dueDateText }}
+                            </span>
                         </span>
-                        <span class="priority__compo"
+                        <span
                             v-if="(groupValue !== 2 || isSubTask) && checkPermission('task.task_priority',projectData?.isGlobalPermission) !== null && checkApps('Priority')"
-                            :class="((element?.subTasks) || (myCounts || myParentCounts) > 0) ? 'mr-5px' : ''"
+                            class="priority__compo"
                         >
                             <Priority
                                 :priorityVal="element.Task_Priority"
@@ -161,25 +159,24 @@
                         <button
                             v-if="subtaskCount"
                             type="button"
-                            class="task-count-section card-subtasks-toggle"
-                            :class="{ 'card-subtasks-toggle--spaced': myCounts > 0 }"
+                            class="card-chip card-subtasks-toggle"
                             :aria-expanded="subtasksOpen"
                             :aria-label="subtaskLabel"
                             :title="subtaskLabel"
                             @click.stop="subtaskTree?.toggle(element, itemData)"
                         >
-                            <img src="@/assets/images/png/subTaskShape.png" alt="" />
+                            <span class="ah-mask-icon card-icon card-icon--subtasks" :style="maskOf(subtaskIcon)" aria-hidden="true"></span>
                             <span>{{ subtaskText }}</span>
                             <span v-if="myParentCounts > 0" class="sub-task-count">{{ myParentCounts > 99 ? "+99" : myParentCounts }}</span>
                         </button>
                         <button
                             type="button"
-                            class="d-flex align-items-center board-task-comment-count position-re cursor-pointer"
+                            class="board-task-comment-count"
                             v-if="projectData.viewColumn?.find((x)=> x.key === 'commentCounts')?.show && myCounts > 0"
                             :aria-label="$t('Projects.unread_comments_open', { n: myCounts })"
                             @click.stop="!showArchiveVar ? changeRoute() : ''"
                         >
-                            <img class="mr-5px" src="@/assets/images/svg/ChatIcon.svg" alt="" />
+                            <span class="ah-mask-icon card-icon card-icon--comments" :style="maskOf(commentIcon)" aria-hidden="true"></span>
                             <span class="parent-task-count" aria-hidden="true">{{myCounts > 99 ? "+99" : myCounts}}</span>
                         </button>
                     </div>
@@ -243,6 +240,7 @@
     import { useI18n } from "vue-i18n";
     import { proposalTitle, skillLabel } from "@/views/Ai/plainLabels";
     import { useTimer } from "@/components/molecules/Home/useTimer";
+    import { maskOf } from "@/utils/iconMask";
     import { permittedAssignees, selfAssignable } from "@/utils/assigneeOptions";
     const { t } = useI18n();
     const props = defineProps({
@@ -289,6 +287,8 @@
     const archive = ref(false);
     const horizontalDots = require("@/assets/images/svg/horizontalDots.svg");
     const calendarIcon = require("@/assets/images/svg/component-inactive-icons/comp_calender_inactive.svg");
+    const subtaskIcon = require("@/assets/images/png/subTaskShape.png");
+    const commentIcon = require("@/assets/images/svg/ChatIcon.svg");
     const inventoryIcon = require("@/assets/images/inventory_2.png");
     const deleteIcon = require("@/assets/images/DeleteIcon.png");
     const route = useRoute()

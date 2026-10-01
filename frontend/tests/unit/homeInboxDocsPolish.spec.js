@@ -27,6 +27,7 @@ const HOME = 'components/molecules/Home/style.css';
 const HOME_VIEW = 'views/Home/style.css';
 const INBOX = 'views/Inbox/Inbox.vue';
 const HUB = 'views/Pages/PagesSpace.vue';
+const EMPTY_STATE = 'components/atom/EmptyState/EmptyState.vue';
 const HOME_PARTS = [
     'components/molecules/Home/AgendaCard.vue',
     'components/molecules/Home/AssignedCommentsCard.vue',
@@ -228,7 +229,6 @@ describe('one type scale', () => {
         [HOME, '.hc-card__title', 'font', '--fs-lg'],
         [HOME, '.hc-setup__title', 'font', '--fs-lg'],
         [HOME, '.hp-panel__head', 'font', '--fs-lg'],
-        [INBOX, '.ibx__zero-title', 'font', '--fs-lg'],
         [HUB, '.hub__card-title', 'font', '--fs-md'],
         [HOME, '.hc-row', 'font', '--fs-md'],
         [INBOX, '.ibx', 'font-size', '--row-font'],
@@ -520,10 +520,11 @@ describe('Inbox rows', () => {
         expect(value(INBOX, '.ibx__undo-btn', 'color')).toBe('var(--rail-brand)');
     });
 
-    it('the empty state is on the scale', () => {
-        expect(value(INBOX, '.ibx__zero-title', 'font')).toBe('var(--fw-title, 600) var(--fs-lg, 15px)/var(--lh-snug, 1.3) var(--font-ui)');
-        expect(value(INBOX, '.ibx__zero-sub', 'font-size')).toBe('var(--fs-md, 12.5px)');
-        expect(value(INBOX, '.ibx__zero-mark', 'border-radius')).toBe('50%');
+    it('the empty state is the shared one, which is on the scale', () => {
+        expect(read(INBOX)).toMatch(/<EmptyState[^>]*illustration="inbox"/);
+        expect(read(INBOX)).not.toContain('ibx__zero-title');
+        expect(value(EMPTY_STATE, '.empty-state__title', 'font')).toBe('var(--text-h3)');
+        expect(value(EMPTY_STATE, '.empty-state__msg', 'font')).toBe('var(--text-small)');
     });
 });
 
@@ -604,7 +605,6 @@ describe('the classic look still computes the sizes these rules had', () => {
         [INBOX, '.ibx__actions .ah-btn--sm', 'padding', '0 10px'],
         [INBOX, '.ibx__actions .ah-btn--sm', 'font-size', '11.5px'],
         [INBOX, '.ibx__reply-input', 'font-size', '12.5px'],
-        [INBOX, '.ibx__zero-title', 'font', '600 15px/1.3 var(--font-ui)'],
         [INBOX, '.ibx__foot', 'font-size', '11.5px'],
         [INBOX, '.ibx__snooze-hint', 'font', '400 11px/1.2 var(--font-ui)'],
         [INBOX, '.ibx__undo', 'font-size', '12.5px'],
@@ -638,7 +638,6 @@ describe('the classic look still computes the sizes these rules had', () => {
         [HUB, '.hub__wiki-state', 'font', '600 11.5px/1.2 var(--font-ui)'],
         [HUB, '.hub__tpl-cta', 'font', '600 12px/1.2 var(--font-ui)'],
         [HUB, '.hub__blank', 'font', '600 12.5px/1.2 var(--font-ui)'],
-        [HUB, '.hub__empty', 'padding', '22px'],
     ])('%s %s { %s } is %s', (rel, selector, property, former) => {
         expect(compute(value(rel, selector, property), CLASSIC)).toBe(former);
     });

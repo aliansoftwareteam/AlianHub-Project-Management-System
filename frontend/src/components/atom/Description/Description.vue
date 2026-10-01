@@ -48,21 +48,10 @@ import { computed, defineComponent, inject, onMounted, provide, ref, watch } fro
 import { useStore } from 'vuex';
 import Swal from 'sweetalert2';
 import { useRoute, useRouter } from "vue-router";
-import markdownit from 'markdown-it'
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from "vue-i18n";
 import { canUseAi } from "@/composable/aiAvailability";
 const { t } = useI18n();
-const mardownInit = markdownit({
-    html: true
-})
-// Emit inline code as <code class="inline-code"> (the class @editorjs/inline-code
-// uses) so Editor.js preserves + styles it when markdown is converted into
-// description blocks — a bare <code> loses the inline-code styling on sanitize.
-mardownInit.renderer.rules.code_inline = (tokens, idx) =>
-    `<code class="inline-code">${mardownInit.utils.escapeHtml(tokens[idx].content)}</code>`;
-// mardownInit.renderer.rules.strong_open = () => "<b>";
-// mardownInit.renderer.rules.strong_close = () => "</b>";
 
 import PromptSidebar from "@/components/molecules/PromptSidebar/PromptSidebar.vue"
 import AiWriteDescription from "@/components/molecules/AiWriteDescription/AiWriteDescription.vue"
@@ -86,6 +75,7 @@ import * as env from '@/config/env';
 import { useCustomComposable } from '@/composable';
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 import taskClass from '@/utils/TaskOperations';
+import { descriptionTextHtml, safeEditorDocument } from '@/utils/editorHtml';
 const aiIcon = require('@/assets/images/svg/ai_image.svg');
 
 
@@ -221,6 +211,10 @@ const editorTools = {
     }
 }
 
+// The converter turns text into blocks. An address in that text stays an address: only a person pasting one into the
+// editor makes an embedded frame of it.
+const converterTools = () => Object.fromEntries(Object.entries(editorTools).filter(([name]) => name !== 'embed'));
+
 const editor = ref();
 
 const $toast = useToast();
@@ -305,7 +299,7 @@ function initEditor() {
     });
     converter.value = new EditorJS({
         holder: 'editor-converter',
-        tools: {...editorTools},
+        tools: converterTools(),
         onChange() {
             converter.value.save().then((newBlocks) => {
                 injectBlocks(newBlocks.blocks?.reverse() || [])
@@ -478,7 +472,7 @@ function renderDescription(replace = false) {
                 blockIndex.value = 1;
                 injectDescription(props.description,replace);
             }else{
-                editor.value?.render(props.description)
+                editor.value?.render(safeEditorDocument(props.description))
                 .then(() => {
                     checkContentSize()
                 });
@@ -506,7 +500,6 @@ function openDescriptionWithAi () {
             title: t('AI.please_upgrade_plan_to_use_ai'),
             text: t('AI.ai_available_on_paid_plans_upgrade_now'),
             icon: 'info',
-            confirmButtonColor: '#28C76F',
             confirmButtonText: t('Header.upgrade_now'),
             showCloseButton:true    
         }).then((result) => {
@@ -536,7 +529,6 @@ function openAiWriteDescription() {
             title: t('AI.please_upgrade_plan_to_use_ai'),
             text: t('AI.ai_available_on_paid_plans_upgrade_now'),
             icon: 'info',
-            confirmButtonColor: '#28C76F',
             confirmButtonText: t('Header.upgrade_now'),
             showCloseButton:true
         }).then((result) => {
@@ -581,8 +573,7 @@ async function applyAiDescription(payload = '') {
 async function injectDescription(description = '') {
     try {
         description = description.replaceAll(/\\n/g, '\n');
-        const htmlStr = mardownInit.render(description)
-        await converter.value.blocks.renderFromHTML(htmlStr);
+        await converter.value.blocks.renderFromHTML(descriptionTextHtml(description));
     } catch (error) {
         console.error(error,"error");
     }
@@ -594,7 +585,7 @@ async function injectBlocks (newBlocks) {
     newBlocks.forEach((block, index) => {
         blocks.splice(blockIndex.value-1, index === 0 ? 1 : 0, block);
     })
-    await editor.value.render({...tempBlock.value, blocks})
+    await editor.value.render(safeEditorDocument({...tempBlock.value, blocks}))
     checkContentSize()
     // The AI "Use this" path renders programmatically (no editor onChange fires),
     // so persist explicitly once the generated content is in the editor —
@@ -604,31 +595,6 @@ async function injectBlocks (newBlocks) {
         saveData();
     }
 }
-
-// async function cancelData () {
-//     if(Object.keys(tempBlock.value).length > 0){
-//         if(props.description){
-//             if(typeof props.description === 'string'){
-//                 const blockCount = editor.blocks.getBlocksCount();
-//                 for (let i = blockCount - 1; i >= 0; i--) {
-//                     editor.blocks.delete(i);
-//                 }
-//                 blockIndex.value = 1;
-//                 converter.blocks.renderFromHTML(props.description);
-//             }else{
-//                 editor?.render(props.description);
-//                 if(!Object.keys(tempBlock.value).length){
-//                     tempBlock.value = props.description;
-//                 }
-//             }
-//         }else{
-//             let obj = {
-//                 blocks: []
-//             }
-//             editor?.render(obj);
-//         }
-//     }
-// }
 
 function resetAiBlocks() {
     // const currIndex = blockIndex.value;

@@ -1,8 +1,8 @@
 // A tiny in-memory stand-in for MongoDbCrudOpration: enough of the query
-// language for the agent modules (equality including null as missing, array-element equality, a word-match $text, $nor, $expr with $eq/$ne of two operands, $in/$nin (any element of a stored array)/$ne/$gt(e)/$lt(e)/$exists/$type/$size/$elemMatch, $set/$inc/$push/$addToSet/$pull,
+// language for the agent modules (equality including null as missing, array-element equality, a word-match $text, $nor, $expr with $eq/$ne of two operands, $in/$nin (any element of a stored array)/$ne/$gt(e)/$lt(e)/$exists/$type/$size/$elemMatch, $set/$inc/$push (with $each and $slice)/$addToSet/$pull,
 // conditional findOneAndUpdate answering the old document unless asked for the new one (null after an upsert insert, as
 // the driver does), updateOne and findOneAndUpdate with upsert and $setOnInsert and a unique _id, findOneAndDelete, deleteOne, deleteMany,
-// insertMany with a unique _id, bulkWrite of insertOne/updateOne/updateMany, sort/skip/limit on find, sort on findOneAndUpdate, $type 'date'/'string'/'objectId' on the stored value, $match/$unwind (a top-level array)/$project (inclusion or exclusion)/$addFields ($toString, $ifNull, $size, $strLenBytes)/$group (a field, a compound or a $dateToString '%Y-%m-%d' day _id)/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
+// insertMany with a unique _id, bulkWrite of insertOne/updateOne/updateMany, sort/skip/limit on find, sort on findOneAndUpdate, $type 'date'/'string'/'objectId' on the stored value, $match/$unwind (a top-level array)/$project (inclusion or exclusion)/$addFields ($toString, $ifNull, $size, $strLenBytes, $convert to a number, $cond with $in)/$group (a field, a compound or a $dateToString '%Y-%m-%d' day _id)/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
 // reject a duplicate save or upsert with E11000, declared text indexes that bound $text to their fields) so a test can assert on what was written.
 
 let seq = 1;
@@ -119,7 +119,11 @@ const write = (doc, key, fn, arrayFilters) => {
 const apply = (doc, update = {}, arrayFilters) => {
     Object.entries(update.$set || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = v; }, arrayFilters));
     Object.entries(update.$inc || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = Number(t[l] || 0) + v; }, arrayFilters));
-    Object.entries(update.$push || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = [...(t[l] || []), ...(v && Array.isArray(v.$each) ? v.$each : [v])]; }, arrayFilters));
+    Object.entries(update.$push || {}).forEach(([k, v]) => write(doc, k, (t, l) => {
+        const pushed = [...(t[l] || []), ...(v && Array.isArray(v.$each) ? v.$each : [v])];
+        const keep = v && Array.isArray(v.$each) ? v.$slice : undefined;
+        t[l] = Number.isInteger(keep) ? (keep < 0 ? pushed.slice(keep) : pushed.slice(0, keep)) : pushed;
+    }, arrayFilters));
     Object.entries(update.$unset || {}).forEach(([k]) => write(doc, k, (t, l) => { delete t[l]; }));
     Object.entries(update.$addToSet || {}).forEach(([k, v]) => write(doc, k, (t, l) => {
         const list = Array.isArray(t[l]) ? t[l] : [];
@@ -201,12 +205,28 @@ const group = (docs, spec) => {
     return [...out.values()];
 };
 
+const DECIMAL = /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i;
+
 const computed = (doc, value, search, textFields) => {
     if (value && typeof value === 'object' && value.$meta === 'textScore') return textScoreOf(doc, search, textFields);
     if (value && typeof value === 'object' && value.$toString !== undefined) return String(hex(fieldOf(doc, value.$toString)));
     if (value && typeof value === 'object' && Array.isArray(value.$ifNull)) {
         const found = computed(doc, value.$ifNull[0], search, textFields);
         return found == null ? computed(doc, value.$ifNull[1], search, textFields) : found;
+    }
+    if (value && typeof value === 'object' && value.$convert !== undefined) {
+        const { input, onError = null, onNull = null } = value.$convert;
+        const found = computed(doc, input, search, textFields);
+        if (found == null) return onNull;
+        if (typeof found === 'number') return found;
+        return typeof found === 'string' && DECIMAL.test(found) ? Number(found) : onError;
+    }
+    if (value && typeof value === 'object' && Array.isArray(value.$cond)) {
+        const [test, then, otherwise] = value.$cond;
+        return computed(doc, computed(doc, test, search, textFields) ? then : otherwise, search, textFields);
+    }
+    if (value && typeof value === 'object' && Array.isArray(value.$in)) {
+        return value.$in[1].includes(computed(doc, value.$in[0], search, textFields));
     }
     if (value && typeof value === 'object' && value.$size !== undefined) { const list = computed(doc, value.$size, search, textFields); return Array.isArray(list) ? list.length : 0; }
     if (value && typeof value === 'object' && value.$strLenBytes !== undefined) return Buffer.byteLength(String(computed(doc, value.$strLenBytes, search, textFields)));

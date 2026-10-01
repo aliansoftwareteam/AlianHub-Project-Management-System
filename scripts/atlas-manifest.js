@@ -1,6 +1,7 @@
 /* One entry per screen. `route` is the address after the #, with :parameters the atlas
  * resolves from the API at run time (scripts/atlas/params.js). `steps` run after the page
- * has settled and may only look: press a shortcut, open a menu, scroll, wait.
+ * has settled and may only look: press a shortcut, open a menu, scroll, wait. `phoneSteps`
+ * replace them under the phone breakpoint, where the rail is the tab bar's More sheet.
  * `core` puts a screen in the screenshot check (npm run visual, and npm run atlas -- --core),
  * which takes it at 1440x900; `phone` adds 390x844. */
 
@@ -8,6 +9,8 @@ const STEP_ACTIONS = ['press', 'click', 'hover', 'scrollTo', 'waitFor'];
 
 const project = (name, tab, extra = {}) => ({ name, route: `/:cid/project/:projectId/p?tab=${tab}`, ...extra });
 const settings = (name, path, extra = {}) => ({ name: `settings-${name}`, route: `/:cid/settings/${path}`, ...extra });
+
+const MORE_SHEET = [{ action: 'click', selector: '[data-test="tab-more"]' }, { action: 'waitFor', selector: '.ah-sheet' }];
 
 const SCREENS = [
     { name: 'sign-in', route: '/login', auth: false },
@@ -17,12 +20,13 @@ const SCREENS = [
     { name: 'home', route: '/:cid', core: true, phone: true },
     { name: 'my-work', route: '/:cid/personal' },
     { name: 'everything', route: '/:cid/everything', core: true },
+    { name: 'goals', route: '/:cid/goals' },
     { name: 'inbox', route: '/:cid/inbox' },
     { name: 'planner', route: '/:cid/planner' },
     { name: 'chat', route: '/:cid/chat' },
     { name: 'command-palette', route: '/:cid', core: true, steps: [{ action: 'press', key: 'Control+k' }, { action: 'waitFor', selector: '.pal' }] },
-    { name: 'more-menu', route: '/:cid', steps: [{ action: 'click', selector: '.ah-rail__foot .ah-rail__item--btn[aria-haspopup="menu"]' }, { action: 'waitFor', selector: '.ah-rail__pop' }] },
-    { name: 'profile-menu', route: '/:cid', steps: [{ action: 'click', selector: '.ah-rail__foot button:has(.ah-rail__avatar)' }, { action: 'waitFor', selector: '.ah-rail__pop--profile' }] },
+    { name: 'more-menu', route: '/:cid', steps: [{ action: 'click', selector: '.ah-rail__foot .ah-rail__item--btn[aria-haspopup="menu"]' }, { action: 'waitFor', selector: '.ah-rail__pop' }], phoneSteps: MORE_SHEET },
+    { name: 'profile-menu', route: '/:cid', steps: [{ action: 'click', selector: '.ah-rail__foot button:has(.ah-rail__avatar)' }, { action: 'waitFor', selector: '.ah-rail__pop--profile' }], phoneSteps: [...MORE_SHEET, { action: 'scrollTo', selector: '.ah-sheet > .ah-pop__item:last-child' }] },
 
     { name: 'ai-ask', route: '/:cid/ai/ask' },
     { name: 'ai-agents', route: '/:cid/ai/agents' },

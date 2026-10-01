@@ -93,16 +93,16 @@ onMounted(load);
     min-width: 54px;
     text-align: center;
     font: var(--text-data);
-    font-size: 10px;
-    padding: 2px 6px;
+    font-size: var(--fs-2xs, 10px);
+    padding: 2px var(--sp-2);
     border-radius: var(--r-chip);
 }
 .risk__reason--overdue { background: var(--danger-bg); color: var(--danger-ink); }
 .risk__reason--blocked { background: var(--warn-bg); color: var(--warn-ink); }
 .risk__reason--stalled { background: var(--surface-2); color: var(--ink-label); }
-.risk__key { font: var(--text-data); color: var(--brand); margin-right: 5px; }
+.risk__key { font: var(--text-data); color: var(--brand); margin-right: calc(var(--sp-1) + 1px); }
 .risk__proj { max-width: 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 767px) {
-    .risk__row { min-height: 44px; }
+    .risk__row { min-height: max(var(--hit-min), 44px); }
 }
 </style>

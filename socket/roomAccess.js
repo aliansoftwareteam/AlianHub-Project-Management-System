@@ -5,6 +5,7 @@ const { canReadProject } = require('../Config/projectAccess');
 const { getRoleType, isPrivileged } = require('../Config/permissionGuard');
 const { canSeeSprintById } = require('../Modules/Sprints/helpers/sprintVisibility');
 const { canUsePage } = require('../Modules/Pages/helpers/pageAccess');
+const { mayListTasksIn } = require('../Modules/Tasks/helpers/taskListProjects');
 const logger = require('../Config/loggerConfig');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -42,6 +43,13 @@ const projectReadable = async ({ companyId, uid }, projectId) => {
     return access.allowed || access.missing === true;
 };
 
+/* A task room streams task rows, so its project must be one whose tasks the caller may list. */
+const tasksReadable = async ({ companyId, uid }, projectId) => {
+    const access = await canReadProject(companyId, uid, projectId);
+    if (!access.allowed) return access.missing === true;
+    return mayListTasksIn(companyId, uid, projectId);
+};
+
 const sprintVisible = async ({ companyId, uid }, sprintId) => (
     isPrivileged(await getRoleType(companyId, uid)) || canSeeSprintById(companyId, uid, sprintId)
 );
@@ -57,13 +65,13 @@ const canOpenTask = async (identity, taskId) => {
     const task = await findTask(identity.companyId, taskId);
     if (!task) return false;
     if (task.mainChat === true && !(task.AssigneeUserId || []).map(String).includes(identity.uid)) return false;
-    if (!(await projectReadable(identity, task.ProjectID))) return false;
+    if (!(await tasksReadable(identity, task.ProjectID))) return false;
     return sprintVisible(identity, task.sprintId);
 };
 
 const canOpenSprintBoard = async (identity, projectId, sprintId) => {
     if (!OBJECT_ID.test(String(projectId || ''))) return false;
-    if (!(await projectReadable(identity, projectId))) return false;
+    if (!(await tasksReadable(identity, projectId))) return false;
     return sprintVisible(identity, sprintId);
 };
 

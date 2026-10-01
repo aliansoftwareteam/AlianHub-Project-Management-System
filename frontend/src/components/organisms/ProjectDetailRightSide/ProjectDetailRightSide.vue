@@ -234,7 +234,7 @@
             @closeSidebar="handleCloseSidebar"
             :componentDetail="componentDetail && Object.keys(componentDetail).length ? componentDetail : {}"
             :customFieldObject="componentDetail && Object.keys(componentDetail).length ? customFieldObject : {}"
-            :isCustomField="isCustomField"
+            v-model:isCustomField="isCustomField"
             @handleClose="handleClose()"
         />
     </div>

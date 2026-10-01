@@ -8,6 +8,7 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({
 }));
 jest.mock('../Config/config', () => ({ myCache: { get: () => undefined, set: () => {}, del: () => {}, keys: () => [], getTtl: () => 0 } }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
@@ -235,22 +236,22 @@ describe('what the schemas keep of both fields', () => {
     it('keeps the linked ids, the voters and their kind on the collection', async () => {
         mockDb.calls.length = 0;
         await copyFieldLinks({ companyId: CID, actorId: OWNER, pairs: new Map([[CHILD, CHILD_COPY]]) });
-        await castVote({ companyId: CID, uid: MEMBER, taskId: OUTSIDE, fieldId: VOTES, vote: true });
+        await castVote({ companyId: CID, uid: OWNER, taskId: OUTSIDE, fieldId: VOTES, vote: true });
         const updates = await stored(SCHEMA_TYPE.CUSTOM_FIELD_LINKS);
         expect(updates).toEqual(expect.arrayContaining([
             { filter: { taskId: CHILD_COPY, fieldId: CLIENT }, update: expect.objectContaining({ $set: expect.objectContaining({ kind: 'relationship', ids: [SOURCE] }) }) },
-            { filter: { taskId: OUTSIDE, fieldId: VOTES }, update: expect.objectContaining({ $addToSet: { ids: MEMBER }, $set: expect.objectContaining({ kind: 'voting' }) }) },
+            { filter: { taskId: OUTSIDE, fieldId: VOTES, kind: 'voting' }, update: expect.objectContaining({ $addToSet: { ids: OWNER }, $inc: { version: 1 } }) },
         ]));
     });
 
     it('keeps the marker and the vote count on the task', async () => {
         mockDb.calls.length = 0;
         await copyFieldLinks({ companyId: CID, actorId: OWNER, pairs: new Map([[CHILD, CHILD_COPY]]) });
-        await castVote({ companyId: CID, uid: MEMBER, taskId: OUTSIDE, fieldId: VOTES, vote: true });
+        await castVote({ companyId: CID, uid: OWNER, taskId: OUTSIDE, fieldId: VOTES, vote: true });
         const sets = (await stored(SCHEMA_TYPE.TASKS)).map(({ update }) => update.$set);
         expect(sets).toEqual(expect.arrayContaining([
             expect.objectContaining({ [`customField.${CLIENT}`]: { _id: CLIENT, fieldValue: '', revision: expect.any(Number) } }),
-            expect.objectContaining({ [`customField.${VOTES}`]: { _id: VOTES, fieldValue: 1, revision: expect.any(Number) } }),
+            expect.objectContaining({ [`customField.${VOTES}`]: { _id: VOTES, fieldValue: 1, revision: expect.any(Number), version: 1 } }),
         ]));
     });
 

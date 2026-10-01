@@ -100,7 +100,7 @@
                 </div>
             </span>
 
-            <DropDown mode="menu" :id="`mc_menu_${domId}`" :zIndex="1300">
+            <DropDown mode="menu" themed :id="`mc_menu_${domId}`" :zIndex="1300">
                 <template #button="{ triggerAttrs }">
                     <button type="button" :title="$t('MainChat.more')" v-bind="triggerAttrs"><MainChatIcon name="more" :size="15" /></button>
                 </template>

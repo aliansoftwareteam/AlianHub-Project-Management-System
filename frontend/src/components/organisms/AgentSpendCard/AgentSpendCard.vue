@@ -95,7 +95,7 @@ onMounted(load);
 
 <style scoped src="@/components/organisms/DashboardCard/cardBody.css"></style>
 <style scoped>
-.spend__rows { display: flex; flex-direction: column; gap: 9px; margin-top: 4px; }
+.spend__rows { display: flex; flex-direction: column; gap: calc(var(--sp-3) + 1px); margin-top: var(--sp-1); }
 .spend__row { flex-wrap: wrap; }
 .spend__chip { flex: none; }
 </style>

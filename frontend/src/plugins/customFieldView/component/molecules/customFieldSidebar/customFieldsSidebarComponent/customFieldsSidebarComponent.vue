@@ -27,6 +27,7 @@
                 :pageInd="componentDetails && Object.keys(componentDetails).length ? 1 : 0"
                 :customFieldObject="componentDetails && Object.keys(componentDetails).length ? customFieldObjects : {}"
                 :isType="isType"
+                :round="round"
             />
         </template>
     </Sidebar>
@@ -38,7 +39,7 @@
     import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 
     const { t } = useI18n();
-    const emit = defineEmits(['customFieldStore','closeSidebar','handleClose']);
+    const emit = defineEmits(['customFieldStore','closeSidebar','handleClose','update:isCustomField']);
 
     const props = defineProps({
         componentDetail:{
@@ -64,7 +65,18 @@
     const customFieldObjects = ref(props.customFieldObject);
     const title = computed(() => (customFieldObjects.value?._id ? t('CustomField.edit_custom_field') : t('CustomField.create_custom_field')));
 
+    const addingAnother = ref(false);
+    const round = ref(0);
+
+    /* Every host closes the drawer once its save went through. After "Save and add another" that close starts the next field
+       instead, and the host, which binds isCustomField with v-model, is told the drawer is still open. */
     watch(() => props.isCustomField, (newVal) => {
+        if (!newVal && addingAnother.value) {
+            addingAnother.value = false;
+            round.value += 1;
+            emit('update:isCustomField', true);
+            return;
+        }
         isCustomFields.value = newVal;
     });
     watch(() => props.componentDetail, (newVal) => {
@@ -73,13 +85,15 @@
     watch(() => props.customFieldObject, (newVal) => {
         customFieldObjects.value = newVal;
     });
-    const customFieldStores = (val,isEdit) => {
+    const customFieldStores = (val,isEdit,another = false) => {
+        addingAnother.value = another === true && !isEdit;
         emit('customFieldStore',val,isEdit);
     };
     const handleCloseSidebar = (val,pageIndex) => {
         emit('closeSidebar',val,pageIndex);
     };
     const handleClose = () => {
+        addingAnother.value = false;
         emit('handleClose');
     };
 </script>

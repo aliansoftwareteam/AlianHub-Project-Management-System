@@ -1,6 +1,7 @@
 .screenShotTime__header--time {
-    font-weight: 500;
-    font-size: 18px;
+    font-weight: var(--fw-strong, 500);
+    font-size: var(--fs-xl, 18px);
+    color: var(--ink);
     display: flex;
     justify-content: space-between;
     padding: 14px 12px 15px 20px;
@@ -8,16 +9,25 @@
     align-items: center;
 }
 .screenShotTime__header--time.screenShotTime__header--activeTime {
-    background-color: #DFE1E6;
+    background-color: var(--fill);
     border-radius: 12px 12px 0 0;
 }
-img.taable_arrow.screenShotTime__header-open {
+.taable_arrow {
+    width: 9px;
+    height: 9px;
+    color: var(--ink-2);
+}
+.taable_arrow.screenShotTime__header-open {
     transform: rotate(90deg);
     cursor: pointer;
 }
+.screenShotTime__none {
+    color: var(--danger-ink);
+}
 
 .screenShotTime__header {
-    border: 1px solid #e8e8e8;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: 12px;
     margin-bottom: 20px;
 }
@@ -36,10 +46,10 @@ img.taable_arrow.screenShotTime__header-open {
     height: 356px;
     max-height: 356px;
     min-height: 356px;
-    border: 1px solid #E8E8E8;
+    border: 1px solid var(--hairline);
     z-index: 2;
     border-radius: 10px;
-    box-shadow: 0px 0px 15px 3px rgba(0,0,0,0.25);
+    box-shadow: 0px 0px 15px 3px var(--shadow-ink);
 }
 .screen__table-arrow{
     top: 3px;

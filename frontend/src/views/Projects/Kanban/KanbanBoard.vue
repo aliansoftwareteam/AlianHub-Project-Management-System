@@ -9,7 +9,6 @@
             @dragleave="onColumnDragLeave"
             @drop="hoveredColumnIndex = null"
         >
-            <!-- Card Area -->
             <div class="kanban-card-wrapper">
                 <div class="column-head column-head-wrap">
                     <span class="status-color-dot" :style="`background-color: ${column.textColor || 'var(--ink-3)'}`"></span>
@@ -35,14 +34,13 @@
                         :aria-label="$t('Projects.add_task_to_column', { name: column.name })"
                         @click="showAddInput(column.key)"
                     >
-                        <img class="add-task-icon" src="@/assets/images/svg/pluss.svg" alt="" aria-hidden="true">
+                        <span class="ah-mask-icon add-task-icon" :style="maskOf(plusIcon)" aria-hidden="true"></span>
                     </button>
                 </div>
                 <div class="add-task-section" v-if="activeColumnId === column.key" :id="column.key">
                     <BoardViewTaskCreateVue :data="column" :groupValue="groupValue" @toggle="(val) => showAddInput(val)" :sprintData="{}" :sprintId="sprintId" />
                 </div>
 
-                <!-- Tasks List -->
                 <div class="kanban-cards-area">
                     <Draggable
                         class="kanban-cards"
@@ -76,7 +74,6 @@
                 <button v-if="moreCount(column) > 0" type="button" class="more-count" @click="loadMore(column)">{{ $t('Projects.more_count', { n: moreCount(column) }) }}</button>
             </div>
 
-            <!-- Drop Area -->
             <div class="column-drop-area" :class="{ 'highlight-drop': hoveredColumnIndex === columnIndex }"></div>
         </div>
     </div>
@@ -105,6 +102,9 @@ import { tabUpdateMarker } from "@/utils/taskUpdateMarker";
 import { taskNavAttrs } from "@/components/organisms/TaskDetailOverlay/taskNavigation";
 import { useTaskSequenceSource } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 import { useSubtaskTree } from "@/views/Projects/composables/subtaskTree";
+import { maskOf } from "@/utils/iconMask";
+
+const plusIcon = require("@/assets/images/svg/pluss.svg");
 
 //Props
 const props = defineProps({

@@ -1,9 +1,8 @@
-export const PALETTE_OPEN_EVENT = 'ah:palette-open';
+import { isMacPlatform, shortcutKey } from '@/composable/shortcuts';
 
-export function isMacPlatform(nav = typeof navigator === 'undefined' ? undefined : navigator) {
-    const platform = (nav && ((nav.userAgentData && nav.userAgentData.platform) || nav.platform)) || '';
-    return /mac|iphone|ipad|ipod/i.test(platform);
-}
+export { isMacPlatform };
+
+export const PALETTE_OPEN_EVENT = 'ah:palette-open';
 
 const TEXT_INPUT_TYPES = new Set(['', 'text', 'search', 'url', 'email', 'tel', 'password', 'number']);
 
@@ -21,7 +20,7 @@ function editableKind(target) {
  * keep both, since there the combination inserts a link. */
 export function isPaletteShortcut(event, { mac = isMacPlatform() } = {}) {
     if (!event || event.defaultPrevented || event.isComposing) return false;
-    if (String(event.key || '').toLowerCase() !== 'k' || event.shiftKey || event.altKey) return false;
+    if (String(event.key || '').toLowerCase() !== shortcutKey('palette') || event.shiftKey || event.altKey) return false;
     if (event.metaKey === event.ctrlKey) return false;
     const primary = mac ? event.metaKey : event.ctrlKey;
     const kind = editableKind(event.target);

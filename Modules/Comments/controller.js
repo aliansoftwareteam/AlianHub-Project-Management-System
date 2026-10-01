@@ -19,8 +19,10 @@ const { withoutAssignment, withoutThreadState, placeReply } = require("./helpers
 const { notifyReply } = require("./helpers/threadNotices");
 const { parseAgentMentionIds } = require("./helpers/parseMentions");
 const { withoutAiFields } = require("./helpers/aiActor");
+const { withoutImportFields } = require("./helpers/importFields");
 const { bumpUnreadCounts } = require("./helpers/unreadBumps");
 const { isChatMessage, holdsThreads, replyLookup, withThreadSummary, readable, keptRootIds, announceThread } = require("./helpers/chatThreads");
+const { withoutServerOwnedFields } = require("./helpers/serverOwnedFields");
 
 /* A comment an agent run writes never starts agents, so agents cannot start each other.
  * Required on use: the agent modules are only needed by a comment that names an agent. */
@@ -29,6 +31,17 @@ const startMentionedAgents = async (req, companyId, comment) => {
     const actor = await require("../Agents/actor").resolveActor(req);
     if (actor.runId) return;
     await require("../Agents/triggers").fromComment(companyId, { authorId: comment.userId, taskId: comment.taskId, message: comment.message });
+};
+
+/* A summary kept for a task was made from its comments: it goes when one of them is deleted, and is marked as
+ * behind when one is edited. A failure here leaves a summary that says less than it should, never a failed write.
+ * Required on use: only a delete or an edit needs the store. */
+const keptSummaryFollows = async (companyId, comment, { deleted, edited }) => {
+    if (!comment.taskId || comment.taskId === 'default' || (!deleted && !edited)) return;
+    const kept = require("../AI/taskAiValues");
+    await Promise.resolve()
+        .then(() => (deleted ? kept.forgetSummary(companyId, comment.taskId) : kept.markSummaryBehind(companyId, comment.taskId)))
+        .catch((error) => logger.error(`[comments] kept summary of task ${comment.taskId}: ${error.message}`));
 };
 
 const writeOptionsFrom = (options) => {
@@ -42,7 +55,7 @@ exports.save = async (req, res) => {
     try {
         const { data } = req.body
         const companyId = req.headers['companyid'];
-        const placement = await placeReply(companyId, withoutAiFields(withoutAssignment(escapeCommentFields(replaceObjectKey(data, ["objId"])))));
+        const placement = await placeReply(companyId, withoutImportFields(withoutAiFields(withoutAssignment(escapeCommentFields(replaceObjectKey(data, ["objId"]))))));
         if (!placement.allowed) return refuseThread(res, placement);
         const convertData = placement.data;
         // SEC (AHE-3834) — the author is the authenticated caller, never a client-supplied
@@ -57,7 +70,7 @@ exports.save = async (req, res) => {
         const query = {
             type: SCHEMA_TYPE.COMMENTS,
             data: {
-                ...convertData,
+                ...withoutServerOwnedFields(convertData),
                 mentionIds,
                 ...(convertData.taskId !== 'default' ? { taskId: convertData.taskId } : {})
             }
@@ -119,7 +132,7 @@ exports.save = async (req, res) => {
 exports.update = async (req, res) => {
     try {
         const { id, isProjectComment } = req.body;
-        const data = withoutAiFields(withoutThreadState(escapeCommentFields(req.body.data)));
+        const data = withoutImportFields(withoutAiFields(withoutThreadState(escapeCommentFields(req.body.data))));
 
         if (!id) {
             return res.status(400).json({
@@ -162,7 +175,7 @@ exports.update = async (req, res) => {
             }
         }
 
-        const changes = { ...data };
+        const changes = withoutServerOwnedFields(data);
         delete changes.mentionIds;
         const mentionIds = changes.message !== undefined
             ? await resolveMentionIds(req.headers['companyid'], existingComment.userId, threadOf(existingComment), changes.message)
@@ -192,6 +205,7 @@ exports.update = async (req, res) => {
             socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'comments_project', companyId });
         }
         const deletionChanged = changedKeys.includes('isDeleted') && Boolean(data.isDeleted) !== Boolean(existingComment.isDeleted);
+        if (response) await keptSummaryFollows(companyId, existingComment, { deleted: deletionChanged && Boolean(data.isDeleted), edited: changes.message !== undefined });
         if (response && existingComment.parentId && deletionChanged && await isChatMessage(companyId, existingComment)) {
             await announceThread(companyId, existingComment.parentId)
                 .catch((err) => logger.error(`[comments] thread count not sent: ${err.message}`));

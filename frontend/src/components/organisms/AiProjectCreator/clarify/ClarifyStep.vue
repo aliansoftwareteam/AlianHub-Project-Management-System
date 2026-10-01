@@ -521,10 +521,10 @@ function onKeydown(evt) {
 
 /* ── Card surface ──────────────────────────────────────────────── */
 .cw__card {
-    background: #fff;
-    border: 1px solid #e5e7eb;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: 14px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    box-shadow: 0 1px 2px var(--shadow-ink);
     padding: 18px 18px 14px;
     display: flex;
     flex-direction: column;
@@ -541,8 +541,8 @@ function onKeydown(evt) {
     flex-shrink: 0;
     font-size: 11px;
     font-weight: 600;
-    color: #2F3990;
-    background: #eef0ff;
+    color: var(--brand);
+    background: var(--brand-tint);
     padding: 3px 8px;
     border-radius: 999px;
     letter-spacing: 0.2px;
@@ -552,12 +552,12 @@ function onKeydown(evt) {
     flex: 1;
     font-size: 15px;
     font-weight: 600;
-    color: #2b2b35;
+    color: var(--ink);
     line-height: 1.4;
     min-width: 0;
 }
 .cw__req {
-    color: #b07000;
+    color: var(--warn-ink);
     font-weight: 700;
     margin-left: 2px;
 }
@@ -565,7 +565,7 @@ function onKeydown(evt) {
     appearance: none;
     background: transparent;
     border: none;
-    color: #9aa0a6;
+    color: var(--ink-2);
     font-size: 20px;
     line-height: 1;
     width: 28px;
@@ -576,8 +576,8 @@ function onKeydown(evt) {
     transition: background-color 0.15s ease, color 0.15s ease;
 }
 .cw__close:hover:not(:disabled) {
-    background: #f4f5f7;
-    color: #2b2b35;
+    background: var(--canvas);
+    color: var(--ink);
 }
 .cw__close:disabled {
     opacity: 0.4;
@@ -588,7 +588,7 @@ function onKeydown(evt) {
 .cw__hint {
     margin: 0;
     font-size: 12px;
-    color: #6b7280;
+    color: var(--ink-2);
     line-height: 1.5;
 }
 
@@ -600,7 +600,7 @@ function onKeydown(evt) {
 }
 .cw__option {
     appearance: none;
-    background: #f8f9fb;
+    background: var(--surface-2);
     border: 1px solid transparent;
     border-radius: 10px;
     padding: 12px 14px;
@@ -614,11 +614,11 @@ function onKeydown(evt) {
     color: inherit;
 }
 .cw__option:hover:not(.cw__option--selected) {
-    background: #f1f3f7;
+    background: var(--fill);
 }
 .cw__option--selected {
-    background: #eef0ff;
-    border-color: #c7cdfa;
+    background: var(--brand-tint);
+    border-color: var(--brand-border);
 }
 .cw__option--other {
     cursor: default;
@@ -638,7 +638,7 @@ function onKeydown(evt) {
     flex-wrap: wrap;
     font-size: 14px;
     font-weight: 500;
-    color: #2b2b35;
+    color: var(--ink);
 }
 .cw__option-text {
     overflow: hidden;
@@ -647,8 +647,8 @@ function onKeydown(evt) {
 .cw__rec {
     font-size: 10px;
     font-weight: 600;
-    color: #2F3990;
-    background: #e6e8ff;
+    color: var(--brand);
+    background: var(--brand-tint);
     padding: 2px 6px;
     border-radius: 4px;
     letter-spacing: 0.3px;
@@ -656,7 +656,7 @@ function onKeydown(evt) {
 }
 .cw__option-desc {
     font-size: 12px;
-    color: #6b7280;
+    color: var(--ink-2);
     line-height: 1.45;
 }
 .cw__kbd {
@@ -670,9 +670,9 @@ function onKeydown(evt) {
     padding: 0 6px;
     font-size: 11px;
     font-family: inherit;
-    color: #6b7280;
-    background: #fff;
-    border: 1px solid #e5e7eb;
+    color: var(--ink-2);
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: 4px;
 }
 
@@ -680,35 +680,35 @@ function onKeydown(evt) {
 .cw__inline-input,
 .cw__other-input {
     appearance: none;
-    border: 1px solid #e5e7eb;
-    background: #fff;
+    border: 1px solid var(--hairline);
+    background: var(--surface);
     border-radius: 6px;
     padding: 6px 10px;
     font-size: 13px;
-    color: #2b2b35;
+    color: var(--ink);
     outline: none;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
     width: 100%;
 }
 .cw__inline-input:focus,
 .cw__other-input:focus {
-    border-color: #2F3990;
-    box-shadow: 0 0 0 3px rgba(47, 57, 144, 0.18);
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-ring);
 }
 .cw__inline-input::placeholder,
 .cw__other-input::placeholder {
-    color: #9aa0a6;
+    color: var(--ink-2);
 }
 
 /* Free-text textarea */
 .cw__textarea {
     width: 100%;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--hairline);
     border-radius: 10px;
     padding: 10px 12px;
     font-size: 13px;
-    color: #2b2b35;
-    background: #fff;
+    color: var(--ink);
+    background: var(--surface);
     outline: none;
     resize: vertical;
     min-height: 90px;
@@ -718,11 +718,11 @@ function onKeydown(evt) {
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .cw__textarea:focus {
-    border-color: #2F3990;
-    box-shadow: 0 0 0 3px rgba(47, 57, 144, 0.18);
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-ring);
 }
 .cw__textarea::placeholder {
-    color: #9aa0a6;
+    color: var(--ink-2);
 }
 
 /* ── Footer ────────────────────────────────────────────────────── */
@@ -731,7 +731,7 @@ function onKeydown(evt) {
     align-items: center;
     gap: 8px;
     padding-top: 4px;
-    border-top: 1px solid #f0f1f3;
+    border-top: 1px solid var(--hairline);
     margin-top: 4px;
     padding-top: 12px;
 }
@@ -754,36 +754,36 @@ function onKeydown(evt) {
 }
 .cw__btn--ghost {
     background: transparent;
-    border-color: #e5e7eb;
-    color: #4b5563;
+    border-color: var(--hairline);
+    color: var(--ink-2);
 }
 .cw__btn--ghost:hover:not(:disabled) {
-    background: #f4f5f7;
-    border-color: #d1d5db;
+    background: var(--canvas);
+    border-color: var(--border);
 }
 .cw__btn--unknown-active {
-    background: #fff7ed;
-    border-color: #fdba74;
-    color: #9a3412;
+    background: var(--warn-bg);
+    border-color: var(--warn);
+    color: var(--warn-ink);
 }
 .cw__btn--link {
     background: transparent;
     border-color: transparent;
-    color: #6b7280;
+    color: var(--ink-2);
     padding: 6px 8px;
 }
 .cw__btn--link:hover:not(:disabled) {
-    color: #2F3990;
+    color: var(--brand);
     background: transparent;
 }
 .cw__btn--primary {
-    background: #2F3990;
-    color: #fff;
-    border-color: #2F3990;
+    background: var(--brand);
+    color: var(--on-brand);
+    border-color: var(--brand);
 }
 .cw__btn--primary:hover:not(:disabled) {
-    background: #252D75;
-    border-color: #252D75;
+    background: var(--brand-deep);
+    border-color: var(--brand-deep);
 }
 .cw__btn:disabled {
     opacity: 0.5;
@@ -794,21 +794,21 @@ function onKeydown(evt) {
     line-height: 1;
 }
 .cw__kbd--inline {
-    color: rgba(255, 255, 255, 0.9);
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.25);
+    color: var(--on-brand);
+    background: color-mix(in srgb, var(--on-brand) 15%, transparent);
+    border-color: color-mix(in srgb, var(--on-brand) 25%, transparent);
 }
 .cw__btn--ghost .cw__kbd--inline,
 .cw__btn--link .cw__kbd--inline {
-    color: #6b7280;
-    background: #fff;
-    border-color: #e5e7eb;
+    color: var(--ink-2);
+    background: var(--surface);
+    border-color: var(--hairline);
 }
 
 /* ── Skeleton (loading questions) ─────────────────────────────── */
 .cw__skeleton {
-    background: #fff;
-    border: 1px solid #e5e7eb;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: 14px;
     padding: 18px;
     display: flex;
@@ -818,7 +818,7 @@ function onKeydown(evt) {
 .cw__skeleton-line {
     height: 12px;
     border-radius: 4px;
-    background: linear-gradient(90deg, #f0f1f3 0%, #e5e7eb 50%, #f0f1f3 100%);
+    background: linear-gradient(90deg, var(--fill) 0%, var(--track) 50%, var(--fill) 100%);
     background-size: 200% 100%;
     animation: cw-shimmer 1.4s infinite;
 }
@@ -835,7 +835,7 @@ function onKeydown(evt) {
 .cw__skeleton-row {
     height: 44px;
     border-radius: 10px;
-    background: linear-gradient(90deg, #f4f5f7 0%, #eaecf0 50%, #f4f5f7 100%);
+    background: linear-gradient(90deg, var(--canvas) 0%, var(--track) 50%, var(--canvas) 100%);
     background-size: 200% 100%;
     animation: cw-shimmer 1.4s infinite;
 }
@@ -846,8 +846,8 @@ function onKeydown(evt) {
 
 /* ── Error state ──────────────────────────────────────────────── */
 .cw__error {
-    background: #fff5f5;
-    border: 1px solid #fecaca;
+    background: var(--danger-bg);
+    border: 1px solid var(--danger);
     border-radius: 10px;
     padding: 14px 16px;
     display: flex;
@@ -858,12 +858,12 @@ function onKeydown(evt) {
     margin: 0;
     font-size: 13px;
     font-weight: 600;
-    color: #c5343a;
+    color: var(--danger-ink);
 }
 .cw__error-msg {
     margin: 0;
     font-size: 12px;
-    color: #4b5563;
+    color: var(--ink-2);
     line-height: 1.5;
 }
 .cw__error-actions {

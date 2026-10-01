@@ -1,6 +1,7 @@
 const { canReadProject } = require('../../../Config/projectAccess');
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { canSeeSprintById } = require('../../Sprints/helpers/sprintVisibility');
+const { mayListTasksIn } = require('./taskListProjects');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { visibilityStage, toObjectIds } = require('./taskQueryGuard');
@@ -20,6 +21,7 @@ const canReadTask = async (companyId, uid, task) => {
     if (project.missing) return isChatParticipant(task, uid);
     if (!project.allowed) return false;
     if (isPrivileged(await getRoleType(companyId, uid))) return true;
+    if (!(await mayListTasksIn(companyId, uid, task.ProjectID))) return false;
     return canSeeSprintById(companyId, uid, task.sprintId);
 };
 

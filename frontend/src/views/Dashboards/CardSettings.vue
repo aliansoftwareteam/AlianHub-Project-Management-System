@@ -128,7 +128,7 @@ const save = () => {
 </script>
 
 <style scoped>
-.csf { display: flex; flex-direction: column; gap: 14px; }
+.csf { display: flex; flex-direction: column; gap: var(--sp-6); }
 .csf__text { resize: vertical; min-height: 72px; font-family: inherit; }
-.csf__actions { display: flex; justify-content: flex-end; gap: 8px; }
+.csf__actions { display: flex; justify-content: flex-end; gap: var(--sp-3); }
 </style>

@@ -34,7 +34,7 @@ const ADMIN = '6f0000000000000000000a72';
 const REDIRECT = 'http://127.0.0.1:41417/callback';
 const ALL = ['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write'];
 
-const ENV_KEYS = ['MCP_OAUTH', 'APIURL', 'JWT_SECRET', 'MCP_OAUTH_ISSUER'];
+const ENV_KEYS = ['MCP_OAUTH', 'APIURL', 'JWT_SECRET', 'MCP_OAUTH_ISSUER', 'MCP_TOOLS_MANAGE'];
 const saved = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
 afterAll(() => { ENV_KEYS.forEach((k) => { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }); });
 
@@ -218,5 +218,79 @@ describe('narrowing an approval', () => {
         await approvalsModule.approve({ companyId: C, client: elsewhere.client, scopes: ['tasks:read'], actor });
         expect(rows(SCHEMA_TYPE.OAUTH_GRANTS).find((g) => g.clientId === inside.client.clientId).scopes).toEqual(['tasks:read']);
         expect(rows(SCHEMA_TYPE.OAUTH_GRANTS).find((g) => g.clientId === elsewhere.client.clientId).scopes).toEqual(['tasks:read', 'tasks:write']);
+    });
+});
+
+describe('a manage scope and the workspace approval', () => {
+    const actor = { id: ADMIN };
+    const MANAGING = ['tasks:read', 'tasks:write', 'tasks:manage'];
+    const approvalOf = (clientId) => rows(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS).find((r) => r.clientId === clientId);
+    const mintManaging = async () => {
+        const client = await register();
+        approvalRow(client.clientId, { scopes: [...ALL, 'tasks:manage'] });
+        const issued = await exchange(client, await codeFor(client, MANAGING));
+        return { client, raw: issued.access_token, refresh: issued.refresh_token };
+    };
+
+    it('is not exchanged for under an approval that does not name it, and the grant is revoked', async () => {
+        const client = await register();
+        approvalRow(client.clientId);
+        await expect(exchange(client, await codeFor(client, MANAGING))).rejects.toMatchObject({ error: 'invalid_grant' });
+        expect(rows(SCHEMA_TYPE.OAUTH_GRANTS)[0]).toMatchObject({ revokedReason: 'not_approved' });
+    });
+
+    it('reaches /mcp only while the approval names it: taken out, the next request no longer holds it', async () => {
+        const { client, raw } = await mintManaging();
+        expect((await oauthAuth.authenticate({ headers: {} }, raw)).token.scopes).toEqual(MANAGING);
+        approvalOf(client.clientId).scopes = [...ALL];
+        const after = await oauthAuth.authenticate({ headers: {} }, raw);
+        expect(after.token.scopes).toEqual(['tasks:read', 'tasks:write']);
+        expect(after.oauth.scopes).toEqual(['tasks:read', 'tasks:write']);
+    });
+
+    it('is never given by an approval that names no scopes, whatever the client asked for or registered', async () => {
+        const client = await register();
+        mockDb.seed(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS, { companyId: C, clientId: client.clientId, status: 'pending', scopes: [], requestedScopes: ['tasks:write', 'tasks:manage', 'docs:manage'] });
+        expect((await approvalsModule.approve({ companyId: C, client, actor })).scopes).toEqual(['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read']);
+        const open = { clientId: 'ahc_0000000000000000000000a1', kind: 'preregistered', scopes: [], redirectUris: [REDIRECT] };
+        expect((await approvalsModule.approve({ companyId: C, client: open, actor })).scopes).toEqual(ALL);
+        await expect(approvalsModule.approve({ companyId: C, client: open, scopes: ['tasks:read', 'docs:manage'], actor })).rejects.toMatchObject({ statusCode: 400 });
+        const named = { clientId: 'ahc_0000000000000000000000a2', kind: 'preregistered', scopes: ['tasks:read', 'tasks:manage'], redirectUris: [REDIRECT] };
+        expect((await approvalsModule.approve({ companyId: C, client: named, actor })).scopes).toEqual(['tasks:read']);
+        expect((await approvalsModule.approve({ companyId: C, client: named, scopes: ['tasks:read', 'tasks:manage'], actor })).scopes).toEqual(['tasks:read', 'tasks:manage']);
+    });
+
+    it('is taken from every grant and live token when an owner or admin takes it out of the approval', async () => {
+        const { client, raw, refresh } = await mintManaging();
+        await approvalsModule.approve({ companyId: C, client, scopes: ['tasks:read', 'tasks:write'], actor });
+        expect(rows(SCHEMA_TYPE.OAUTH_GRANTS)[0]).toMatchObject({ scopes: ['tasks:read', 'tasks:write'] });
+        expect((await grants.introspect(raw)).scopes).toEqual(['tasks:read', 'tasks:write']);
+        expect((await grants.refresh({ client, refreshToken: refresh, resource: RESOURCE })).scope).toBe('tasks:read tasks:write');
+    });
+
+    it('is not held while the approval module is absent, when every other scope is', async () => {
+        const { raw } = await mintManaging();
+        const absent = jest.spyOn(approvalsHook, 'load').mockReturnValue(null);
+        try {
+            expect((await oauthAuth.authenticate({ headers: {} }, raw)).token.scopes).toEqual(['tasks:read', 'tasks:write']);
+        } finally {
+            absent.mockRestore();
+        }
+    });
+
+    it('answers a grant\'s standing for an approval the way a call under it is answered', async () => {
+        const { client } = await mintManaging();
+        const grant = rows(SCHEMA_TYPE.OAUTH_GRANTS)[0];
+        const asked = { companyId: C, grantId: grant.grantId, clientId: client.clientId, userId: USER };
+        expect(await oauthAuth.standingOfGrant(asked)).toEqual(MANAGING);
+        expect(await oauthAuth.standingOfGrant({ ...asked, userId: ADMIN })).toBeNull();
+        expect(await oauthAuth.standingOfGrant({ ...asked, companyId: OTHER_C })).toBeNull();
+        approvalOf(client.clientId).scopes = [...ALL];
+        expect(await oauthAuth.standingOfGrant(asked)).toEqual(['tasks:read', 'tasks:write']);
+        setStatus(client.clientId, 'revoked');
+        expect(await oauthAuth.standingOfGrant(asked)).toBeNull();
+        setStatus(client.clientId, 'approved');
+        await grants.revokeGrant(grant.grantId, 'revoked_by_user');
+        expect(await oauthAuth.standingOfGrant(asked)).toBeNull();
     });
 });

@@ -1,9 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createMemoryHistory, createRouter } from 'vue-router';
+import { createStore } from 'vuex';
 
 const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn((method) => Promise.resolve({ data: method === 'get' ? { status: true, data: [] } : { status: true } })) }));
 vi.mock('@/services', () => ({ apiRequest, apiRequestWithoutCompnay: vi.fn() }));
+vi.mock('@/store/index', () => ({ default: { getters: { 'settings/companyUserDetail': {}, 'settings/rules': {}, 'settings/projectRules': {} } } }));
+vi.mock('@/locales/main', () => ({ i18n: { global: { t: (key) => key } } }));
+vi.mock('@/utils/storageQueryBuild', () => ({ storageQueryBuilder: vi.fn() }));
+vi.mock('@/composable/commonFunction', () => ({ isBundledPriorityImage: vi.fn() }));
 
 import * as env from '@/config/env';
 import ProjectHeader from '@/views/Projects/components/ProjectHeader.vue';
@@ -25,7 +30,7 @@ const open = async (sprint, folders) => {
     });
     await router.push({ name: 'Project', params: { cid: 'company-1', id: 'p1' } });
     await router.isReady();
-    const wrapper = mount(ProjectHeader, { props: { project, projects: [project], sprint, ...(folders ? { folders } : {}) }, global: { plugins: [router] } });
+    const wrapper = mount(ProjectHeader, { props: { project, projects: [project], sprint, ...(folders ? { folders } : {}) }, global: { plugins: [router, createStore({ getters: { 'projectData/sprints': () => ({}), 'projectData/folders': () => ({}) } })] } });
     await flushPromises();
     return { wrapper, router };
 };

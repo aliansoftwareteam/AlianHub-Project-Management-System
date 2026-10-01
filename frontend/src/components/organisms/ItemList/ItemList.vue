@@ -307,7 +307,7 @@
         @closeSidebar="handleCloseSidebar"
         :componentDetail="{}"
         :customFieldObject="{}"
-        :isCustomField="isCustomField"
+        v-model:isCustomField="isCustomField"
         @handleClose="handleClose()"
     />
 </template>

@@ -148,9 +148,27 @@
                     </div>
                 </div>
 
-                <div v-if="!visibleList.length" class="ah-empty mbv__empty">
-                    {{ search ? $t('Members.empty_search') : $t('Members.empty_all') }}
-                </div>
+                <EmptyState
+                    v-if="!visibleList.length && search"
+                    compact
+                    class="ah-empty mbv__empty"
+                    illustration="search"
+                    data-test="members-no-match"
+                    :title="$t('Members.empty_search')"
+                    :action-label="$t('Members.clear_search')"
+                    @action="search = ''"
+                />
+                <EmptyState
+                    v-else-if="!visibleList.length"
+                    compact
+                    class="ah-empty mbv__empty"
+                    illustration="people"
+                    data-test="members-empty"
+                    :title="$t('Members.empty_all')"
+                    :action-label="$t('Members.invite')"
+                    :action-allowed="canInvite && !inviteOpen"
+                    @action="inviteOpen = true"
+                />
             </section>
         </template>
         <AppState v-else kind="denied" />
@@ -166,6 +184,7 @@ import { useToast } from "vue-toast-notification";
 import Swal from "sweetalert2";
 import AppState from "@/components/molecules/AppState/AppState.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { useCustomComposable } from "@/composable";
 import { apiRequest, apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
@@ -431,8 +450,7 @@ async function removeMember(item) {
         text: `${t("conformationmsg.Are_you_sure_you_want_to_delete")} ${item.Employee_Name || item.userEmail}?`,
         showCancelButton: true,
         icon: "warning",
-        confirmButtonColor: "#2F3990",
-        cancelButtonColor: "#c1121f",
+        customClass: { confirm: 'swal2-deny' },
         cancelButtonText: t("Home.no"),
         confirmButtonText: t("Home.yes")
     });

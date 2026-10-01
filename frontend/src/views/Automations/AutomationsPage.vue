@@ -209,12 +209,19 @@
                     @close="showGallery = false"
                 />
                 <p v-if="loading" class="ah-empty">{{ $t('Parity.loading') }}</p>
-                <div v-else-if="!rules.length && !showGallery" class="ah-empty au__empty">
-                    <h2 class="ah-h2">{{ $t('Automations.empty_title') }}</h2>
-                    <p>{{ $t('Automations.empty_sub') }}</p>
-                    <button v-if="canManage" type="button" class="ah-btn ah-btn--primary" @click="startNew">{{ $t('Automations.new') }}</button>
-                    <button v-if="canManage" type="button" class="ah-btn ah-btn--secondary" @click="showGallery = true">{{ $t('AutomationTemplates.open') }}</button>
-                </div>
+                <EmptyState
+                    v-else-if="!rules.length && !showGallery"
+                    class="ah-empty"
+                    data-test="automations-empty"
+                    :heading-level="2"
+                    :title="$t('Automations.empty_title')"
+                    :message="$t('Automations.empty_sub')"
+                    :action-label="$t('Automations.new')"
+                    :action-allowed="canManage"
+                    :secondary-label="canManage ? $t('AutomationTemplates.open') : ''"
+                    @action="startNew"
+                    @secondary="showGallery = true"
+                />
 
                 <div v-for="r in rules" :key="r._id" class="au__rule" :class="{ 'au__rule--off': !r.enabled }">
                     <button
@@ -248,6 +255,7 @@ import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import RunHistoryDrawer from './RunHistoryDrawer.vue';
 import AutomationAiDraft from './AutomationAiDraft.vue';
 import AutomationTemplateGallery from './AutomationTemplateGallery.vue';

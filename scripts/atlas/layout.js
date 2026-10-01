@@ -1,4 +1,4 @@
-/* global window, document, getComputedStyle, NodeFilter -- collectLayout runs in the page */
+/* global window, document, getComputedStyle, NodeFilter, requestAnimationFrame -- collectLayout and the box readers run in the page */
 
 const TARGET_MIN = 24;
 const TARGET_CLEARANCE = 12;
@@ -281,6 +281,49 @@ function collectLayout({ interactive, edge, limit }) {
     return { viewport, scopes, controls, texts, layers };
 }
 
+const BIGGEST = 5;
+
+function cssImpact({ total, changed }) {
+    const delta = (pair) => ({ width: Math.round(pair.after.width - pair.before.width), height: Math.round(pair.after.height - pair.before.height) });
+    const resized = changed.map((pair) => ({ pair, ...delta(pair) })).filter((change) => change.width || change.height);
+    return {
+        total,
+        resized: resized.length,
+        shifted: changed.length - resized.length,
+        biggest: resized
+            .sort((a, b) => (Math.abs(b.width) + Math.abs(b.height)) - (Math.abs(a.width) + Math.abs(a.height)))
+            .slice(0, BIGGEST)
+            .map((change) => ({ selector: shortSelector(change.pair.el), width: change.width, height: change.height })),
+    };
+}
+
+/* Both run in the page. The boxes are kept on the elements themselves, so an element the app
+ * adds or drops between the two readings is left out instead of shifting every index. */
+function rememberBoxes() {
+    window.__atlasBoxes = new Map([...document.body.querySelectorAll('*')].map((element) => [element, element.getBoundingClientRect()]));
+}
+
+function changedBoxes({ limit }) {
+    const plain = (element) => ({ tag: element.tagName.toLowerCase(), id: element.id || '', classes: (element.getAttribute('class') || '').split(/\s+/).filter(Boolean), role: element.getAttribute('role') || '' });
+    const changed = [];
+    for (const [element, before] of window.__atlasBoxes) {
+        if (!element.isConnected || (!before.width && !before.height)) continue;
+        const after = element.getBoundingClientRect();
+        if (['left', 'top', 'width', 'height'].every((side) => Math.abs(after[side] - before[side]) < 0.5)) continue;
+        if (changed.length < limit) changed.push({ el: { ...plain(element), parent: element.parentElement ? plain(element.parentElement) : null }, before: before.toJSON(), after: after.toJSON() });
+    }
+    const total = window.__atlasBoxes.size;
+    delete window.__atlasBoxes;
+    return { total, changed };
+}
+
+async function patchCss(page, css) {
+    await page.evaluate(rememberBoxes);
+    await page.addStyleTag({ content: css });
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    return cssImpact(await page.evaluate(changedBoxes, { limit: 2000 }));
+}
+
 const measureLayout = async (page) => layoutFindings(await page.evaluate(collectLayout, { interactive: INTERACTIVE, edge: EDGE_TOLERANCE, limit: 400 }));
 
-module.exports = { shortSelector, widestOffenders, overflowOf, smallTargets, cutControls, clippedText, coveringLayers, layoutFindings, summaryOf, collectLayout, measureLayout };
+module.exports = { cssImpact, patchCss, shortSelector, widestOffenders, overflowOf, smallTargets, cutControls, clippedText, coveringLayers, layoutFindings, summaryOf, collectLayout, measureLayout };

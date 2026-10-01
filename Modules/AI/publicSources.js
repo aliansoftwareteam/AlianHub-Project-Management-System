@@ -25,19 +25,24 @@ const textMatch = (terms, fields) => (terms.length
     ? { $or: fields.map((f) => ({ [f]: { $regex: terms.map(escapeRegex).join('|'), $options: 'i' } })) }
     : {});
 
+/* Who may read a channel is looked for among the workspace's live seats, one more than the cap at most. */
+const channelCandidates = async (companyId) => {
+    const seats = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.COMPANY_USERS, data: [{ ...ACTIVE_SEAT }, { userId: 1 }, { limit: READER_CAP + 1 }],
+    }, 'find');
+    return [...new Set((seats || []).map((seat) => String(seat.userId)).filter(isId))];
+};
+
+/* Whether a channel here has more possible readers than their shared sources are worked out for: nothing counts as
+ * shared in one, so an answer with sources cannot be posted to it. A direct message never does. */
+const tooManyChannelReaders = async (companyId) => (await channelCandidates(companyId)).length > READER_CAP;
+
 /* A direct message is read by its participants; a channel by whoever the thread rule lets in, looked for among the
  * workspace's live seats. null when there are too many to check. */
 const threadReaders = async (companyId, thread, conversation) => {
-    let candidates;
-    if (conversation && Array.isArray(conversation.AssigneeUserId)) {
-        candidates = conversation.AssigneeUserId.map(String);
-    } else {
-        const seats = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.COMPANY_USERS, data: [{ ...ACTIVE_SEAT }, { userId: 1 }, { limit: READER_CAP + 1 }],
-        }, 'find');
-        candidates = (seats || []).map((seat) => String(seat.userId));
-    }
-    candidates = [...new Set(candidates.filter(isId))];
+    const candidates = conversation && Array.isArray(conversation.AssigneeUserId)
+        ? [...new Set(conversation.AssigneeUserId.map(String).filter(isId))]
+        : await channelCandidates(companyId);
     if (candidates.length > READER_CAP) return null;
     const decisions = await Promise.all(candidates.map((uid) => commentThreadAccess(companyId, uid, thread).catch(() => ({ allowed: false }))));
     return candidates.filter((uid, index) => decisions[index].allowed);
@@ -105,14 +110,14 @@ const publicSources = async (companyId, { question, projects }) => {
     ];
 };
 
-/* Whether every source an answer was built from sits where every reader of the thread can open it. */
-const allShared = async (companyId, { thread, conversation, used }) => {
-    const keys = Array.isArray(used) ? used : [];
-    if (!keys.length) return true;
-    if (keys.some(([kind, id]) => !['task', 'page'].includes(kind) || !isId(id))) return false;
+/* The sources of `used` that sit where every reader of the thread can open them, as `kind:id`. Only a task outside a
+ * private sprint and a page that is not private can be: every other kind is narrower than a project. */
+const sharedAmong = async (companyId, { thread, conversation, used }) => {
+    const keys = (Array.isArray(used) ? used : []).filter(([kind, id]) => ['task', 'page'].includes(kind) && isId(id));
+    if (!keys.length) return new Set();
     const projects = await sharedProjects(companyId, await threadReaders(companyId, thread, conversation));
     const shared = new Set(projects.map((p) => String(p._id)));
-    if (!shared.size) return false;
+    if (!shared.size) return new Set();
     const hidden = new Set(await privateSprintIds(companyId, [...shared]));
     const byKind = (kind) => keys.filter(([k]) => k === kind).map(([, id]) => new mongoose.Types.ObjectId(id));
     const [tasks, pages] = await Promise.all([
@@ -121,8 +126,18 @@ const allShared = async (companyId, { thread, conversation, used }) => {
     ]);
     const okTask = (t) => t.deletedStatusKey !== 1 && t.mainChat !== true && shared.has(String(t.ProjectID)) && !(t.sprintId && hidden.has(String(t.sprintId)));
     const okPage = (p) => p.deletedStatusKey !== 1 && p.visibility !== 'private' && shared.has(String(p.ProjectID));
-    const found = [...(tasks || []).filter(okTask), ...(pages || []).filter(okPage)].map((row) => String(row._id));
-    return keys.every(([, id]) => found.includes(String(id)));
+    return new Set([
+        ...(tasks || []).filter(okTask).map((row) => `task:${String(row._id)}`),
+        ...(pages || []).filter(okPage).map((row) => `page:${String(row._id)}`),
+    ]);
 };
 
-module.exports = { READER_CAP, threadReaders, sharedProjects, publicSources, allShared };
+/* Whether every source an answer was built from sits where every reader of the thread can open it. */
+const allShared = async (companyId, { thread, conversation, used }) => {
+    const keys = Array.isArray(used) ? used : [];
+    if (!keys.length) return true;
+    const shared = await sharedAmong(companyId, { thread, conversation, used: keys });
+    return keys.every(([kind, id]) => shared.has(`${kind}:${id}`));
+};
+
+module.exports = { READER_CAP, threadReaders, tooManyChannelReaders, sharedProjects, publicSources, sharedAmong, allShared };

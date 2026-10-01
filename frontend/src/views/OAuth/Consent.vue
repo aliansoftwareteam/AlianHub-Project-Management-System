@@ -34,8 +34,8 @@
                 </dl>
                 <p v-if="info.client.loopback" class="oc__warn" role="note" data-test="loopback-warning">{{ $t('OAuthConsent.loopback_warning') }}</p>
 
-                <p class="auth__p">{{ $t('OAuthConsent.scopes_lead') }}</p>
-                <ul class="oc__scopes">
+                <p v-if="info.scopes.length" class="auth__p">{{ $t('OAuthConsent.scopes_lead') }}</p>
+                <ul v-if="info.scopes.length" class="oc__scopes">
                     <li v-for="scope in info.scopes" :key="scope" :data-test="`scope-${scope}`">{{ $t(scopeSentenceKey(scope)) }}</li>
                 </ul>
 
@@ -60,6 +60,17 @@
                         </div>
                     </fieldset>
 
+                    <fieldset v-if="manageScopes.length" class="oc__workspaces" data-test="manage-scopes">
+                        <legend class="auth__p">{{ $t('OAuthConsent.manage_lead') }}</legend>
+                        <label v-for="scope in manageScopes" :key="scope" class="oc__workspace oc__manage">
+                            <input v-model="ticked" type="checkbox" name="grant" :value="scope" :disabled="!approvedHere(scope)" :data-test="`grant-${scope}`" />
+                            <span class="oc__manage-text">
+                                <span>{{ $t(scopeSentenceKey(scope)) }}</span>
+                                <span v-if="chosen && !approvedHere(scope)" class="ah-small" :data-test="`grant-unapproved-${scope}`">{{ $t('OAuthConsent.manage_not_approved') }}</span>
+                            </span>
+                        </label>
+                    </fieldset>
+
                     <p v-if="askError" class="oc__error" role="alert">{{ askError }}</p>
 
                     <div class="oc__actions">
@@ -74,7 +85,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
@@ -109,6 +120,12 @@ const personLabel = computed(() => {
 const switchAccount = () => useAuth().logOut({ islogOut: true });
 
 const eligible = computed(() => (info.value?.workspaces || []).filter((w) => w.eligible));
+
+// Nothing here starts ticked, and one the chosen workspace has not approved cannot be ticked at all.
+const ticked = ref([]);
+const manageScopes = computed(() => info.value?.manageScopes || []);
+const approvedHere = (scope) => ((info.value?.workspaces || []).find((w) => w.id === chosen.value)?.manageScopes || []).includes(scope);
+watch(chosen, () => { ticked.value = ticked.value.filter(approvedHere); });
 const blocked = computed(() => (info.value?.workspaces || []).filter((w) => !w.eligible));
 const waiting = (w) => w.approval === "pending" || requested[w.id];
 
@@ -160,5 +177,7 @@ onMounted(load);
 .oc__workspaces { border: 0; padding: 0; margin: 0 0 12px; display: grid; gap: 6px; }
 .oc__workspace { display: flex; gap: 8px; align-items: center; }
 .oc__workspace--blocked { justify-content: space-between; opacity: .85; }
+.oc__manage { align-items: flex-start; }
+.oc__manage-text { display: grid; gap: 2px; }
 .oc__actions { display: flex; gap: 8px; justify-content: flex-end; margin: 12px 0 6px; }
 </style>

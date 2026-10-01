@@ -66,6 +66,7 @@ jest.mock('../Modules/Sprints/helpers/sprintVisibility', () => ({
 jest.mock('../utils/companyMembers', () => ({
     memberProfiles: jest.fn(async (companyId, ids) => [...new Set(ids.map(String))].map((id) => ({ _id: id, Employee_Name: { '6f0000000000000000000d01': 'Alice', '6f0000000000000000000d02': 'Bob', '6f0000000000000000000d03': 'Carol' }[id] }))),
 }));
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 jest.mock('../Modules/Agents/scope', () => ({
     visibleProjects: jest.fn(async (companyId, uid) => [
         { _id: '6a9954186dd786246031e490', ProjectName: 'Web' },

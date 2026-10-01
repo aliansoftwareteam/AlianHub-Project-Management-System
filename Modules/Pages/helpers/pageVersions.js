@@ -11,6 +11,7 @@ const OBJECT_ID = /^[a-f\d]{24}$/i;
 const NEWEST_FIRST = { createdAt: -1, _id: -1 };
 const ROW_FIELDS = 'pageId title name reason savedBy savedAt visibility hash size createdAt';
 const LIST_LIMIT = 300;
+const RECENT_LIMIT = 20;
 
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
 const store = (companyId, data, method) => MongoDbCrudOpration(String(companyId), { type: SCHEMA_TYPE.PAGE_VERSIONS, data }, method);
@@ -57,14 +58,14 @@ const keep = async (companyId, page, { reason, savedBy, savedAt, name = '', stat
     return saved;
 };
 
-/* Before the doc's state is replaced: keeps it under its own writer and time. A save keeps it when the rule says so;
- * a restore passes its own reason and keeps it whenever it is worth keeping. */
-const keepOutgoing = async (companyId, page, editorId, { now = new Date(), reason = '' } = {}) => {
+/* Before the doc's state is replaced: keeps it under its own writer and time. A save keeps it when the rule says so,
+ * judged against the state coming in; a restore passes its own reason and keeps it whenever it is worth keeping. */
+const keepOutgoing = async (companyId, page, editorId, { now = new Date(), reason = '', incoming = null } = {}) => {
     const state = rules.snapshotOf(page);
-    const latest = await latestOf(companyId, page._id);
+    const recent = await rowsOf(companyId, page._id, RECENT_LIMIT);
     const why = reason
-        ? (rules.worthKeeping(state, latest, rules.markOf(page)) ? reason : '')
-        : rules.reasonToKeep({ page, editorId, latest, now, state });
+        ? (rules.worthKeeping(state, recent[0] || null, rules.markOf(page)) ? reason : '')
+        : rules.reasonToKeep({ page, editorId, recent, now, state, incoming });
     if (!why) return null;
     return keep(companyId, page, { reason: why, savedBy: rules.writerOf(page), savedAt: rules.writtenAt(page) || now, state, now });
 };

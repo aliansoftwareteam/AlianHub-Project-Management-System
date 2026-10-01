@@ -82,6 +82,8 @@ const verifyJWTTokenWithCRoute = [
     "/api/v2/forms",
     "/api/v2/task-templates",
     "/api/v2/view-templates",
+    "/api/v2/goals",
+    "/api/v2/whiteboards",
     "/api/v2/assignment-rules",
     "/api/v1/removeCache",
     // Found by walking the Express stack for routes no guard list reached (task 034).
@@ -244,6 +246,7 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/ai/meeting-notes',
     '/api/v1/ai/chat-summary',
     '/api/v1/ai/task-summary',
+    '/api/v1/ai/task-values',
     '/api/v1/ai/task-category',
     '/api/v1/ai/task-assist',
     '/api/v1/ai/task-next-steps',

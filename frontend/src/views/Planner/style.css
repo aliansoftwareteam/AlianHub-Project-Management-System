@@ -2,7 +2,8 @@
 .planner .ah-toolbar__date { font: var(--text-data); color: var(--ink-2); }
 .planner__sidebar-toggle { display: none; }
 .planner__range { display: inline-flex; align-items: center; gap: 2px; }
-.planner__range button { border: 0; border-radius: 6px; padding: 4px 6px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+/* Sizes read the look's tokens; a fallback is the size the rule had before the dense look, which the classic look draws. */
+.planner__range button { min-width: var(--hit-min); min-height: var(--hit-min); border: 0; border-radius: var(--r-chip); padding: var(--sp-1) var(--sp-2); background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .planner__range button:hover { background: var(--surface-hover); color: var(--ink); }
 .planner__range button:focus-visible { outline: none; box-shadow: var(--focus); }
 
@@ -30,14 +31,14 @@
     background: var(--surface);
     border-bottom: 1px solid var(--hairline);
     border-right: 1px solid var(--hairline);
-    height: 46px;
+    height: calc(var(--row-h) + 10px);
 }
 
 .planner__day-head {
     position: sticky;
     top: 0;
     z-index: 2;
-    height: 46px;
+    height: calc(var(--row-h) + 10px);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -46,7 +47,7 @@
     background: var(--surface);
     border-bottom: 1px solid var(--hairline);
     border-right: 1px solid var(--hairline);
-    font: 600 12px/1 var(--font-ui);
+    font: 600 var(--fs-sm, 12px)/1 var(--font-ui);
     color: var(--ink);
 }
 .planner__day-head span { font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
@@ -64,7 +65,7 @@
 
 .planner__hour {
     position: absolute;
-    right: 8px;
+    right: var(--sp-3);
     text-align: right;
     font: var(--text-data);
     color: var(--ink-2);
@@ -87,13 +88,13 @@
 
 .planner__block {
     position: absolute;
-    left: 4px;
-    right: 4px;
-    border-radius: 8px;
-    padding: 5px 8px;
+    left: var(--sp-1);
+    right: var(--sp-1);
+    border-radius: var(--r-input);
+    padding: calc(var(--sp-1) + 1px) var(--sp-3);
     background: var(--brand-tint);
     border-left: 3px solid var(--brand);
-    font: 600 11.5px/1.25 var(--font-ui);
+    font: 600 var(--fs-sm, 11.5px)/var(--lh-snug, 1.25) var(--font-ui);
     color: var(--ink);
     overflow: hidden;
     cursor: grab;
@@ -134,20 +135,20 @@
 /* The top padding keeps the first card's border and shadow inside the scroll box. */
 .planner__tray-list { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; overflow: auto; padding-top: 4px; }
 .planner__tray-count { color: var(--ink-2); }
-.planner__tray-empty { margin: 0 14px; }
+.planner__tray-empty { margin: 0 var(--sp-6); }
 .planner__card--picked { border-color: var(--brand); box-shadow: 0 0 0 1.5px var(--brand-ring), var(--shadow-card); }
 .planner__tray-title {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    padding: 12px 14px 8px;
+    gap: var(--sp-3);
+    padding: var(--sp-5) var(--sp-6) var(--sp-3);
     font: var(--text-h3);
 }
-.planner__tray-tabs { padding: 0 14px 10px; }
+.planner__tray-tabs { padding: 0 var(--sp-6) var(--sp-4); }
 .planner__tray-foot {
     margin-top: auto;
-    padding: 10px 14px;
+    padding: var(--sp-4) var(--sp-6);
     border-top: 1px solid var(--hairline);
     font: var(--text-small);
     color: var(--ink-2);
@@ -155,19 +156,19 @@
 
 .planner__card {
     flex: none;
-    margin: 0 14px 8px;
-    padding: 9px 11px;
+    margin: 0 var(--sp-6) var(--sp-3);
+    padding: calc(var(--sp-3) + 1px) calc(var(--sp-4) + 1px);
     border: 1px solid var(--hairline);
-    border-radius: 9px;
+    border-radius: var(--r-lg, 9px);
     background: var(--surface);
     box-shadow: var(--shadow-card);
-    font: 500 12.5px/1.35 var(--font-ui);
+    font: var(--fw-strong, 500) var(--fs-md, 12.5px)/var(--lh-snug, 1.35) var(--font-ui);
     color: var(--ink);
     cursor: grab;
 }
 .planner__card:active { cursor: grabbing; }
 .planner__card--overdue { border-color: var(--danger-bg); }
-.planner__card-meta { display: flex; gap: 8px; margin-top: 4px; font: var(--text-data); color: var(--ink-2); }
+.planner__card-meta { display: flex; gap: var(--sp-3); margin-top: var(--sp-1); font: var(--text-data); color: var(--ink-2); }
 .planner__card-meta--danger { color: var(--danger-ink); }
 
 @media (max-width: 1280px) {
@@ -180,19 +181,19 @@
 @media (max-width: 768px) {
     .planner { height: 100%; }
     .planner .ah-page__main { display: flex; flex-direction: column; min-height: 0; }
-    .planner .ah-toolbar { padding: 0 12px; gap: 8px; }
+    .planner .ah-toolbar { padding: 0 var(--sp-5); gap: var(--sp-3); }
     .planner__sidebar-toggle,
     .planner .ah-toolbar__actions .ah-tabs,
     .planner__cal,
     .planner__hours { display: none; }
     .planner .ah-toolbar__actions { margin-left: auto; }
-    .planner__range button { min-width: 32px; min-height: 44px; }
+    .planner__range button { min-width: max(var(--hit-min), 32px); min-height: 44px; }
 
     .planner__days {
         display: flex;
         justify-content: space-between;
         gap: 2px;
-        padding: 6px 10px 8px;
+        padding: var(--sp-2) var(--sp-4) var(--sp-3);
         background: var(--surface);
         border-bottom: 1px solid var(--hairline);
     }
@@ -204,9 +205,9 @@
         flex: 1;
         min-width: 44px;
         min-height: 44px;
-        padding: 4px 0;
+        padding: var(--sp-1) 0;
         border: 0;
-        border-radius: 9px;
+        border-radius: var(--r-lg, 9px);
         background: transparent;
         font: var(--text-data);
         color: var(--ink-2);
@@ -220,8 +221,8 @@
     /* The column template is set inline from the day count; only the desktop
        minimum has to go so one day fits a 375px screen. */
     .planner__grid { min-width: 0; }
-    .planner__day-head { font-size: 12.5px; }
-    .planner__block { min-height: 44px; padding: 8px 10px; font-size: 13px; }
+    .planner__day-head { font-size: var(--fs-md, 12.5px); }
+    .planner__block { min-height: 44px; padding: var(--sp-3) var(--sp-4); font-size: var(--fs-md, 13px); }
     .planner__col { cursor: pointer; }
 
     .planner__sheet {
@@ -241,9 +242,9 @@
     .planner__pick {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: var(--sp-4);
         min-height: 44px;
-        padding: 8px 14px;
+        padding: var(--sp-3) var(--sp-6);
         background: var(--brand-tint);
         font: var(--text-small);
         color: var(--brand);
@@ -251,10 +252,10 @@
     .planner__pick-cancel {
         margin-left: auto;
         min-height: 44px;
-        padding: 0 6px;
+        padding: 0 var(--sp-2);
         border: 0;
         background: transparent;
-        font: 600 12.5px/1 var(--font-ui);
+        font: 600 var(--fs-md, 12.5px)/1 var(--font-ui);
         color: var(--brand);
         cursor: pointer;
     }

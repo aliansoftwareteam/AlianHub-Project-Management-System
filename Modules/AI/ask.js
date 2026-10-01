@@ -7,7 +7,7 @@ const logger = require('../../Config/loggerConfig');
 const { getProvider, isAnyProviderConfigured } = require('../AICore/llmProvider');
 const { FEATURES } = require('../AICore/features');
 const { visibleProjects } = require('../Agents/scope');
-const { pageVisibilityFilter } = require('../Pages/helpers/pageRules');
+const { pageReachFilter } = require('../Pages/helpers/pageRules');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const knowledgeFlag = require('../Knowledge/flag');
 const { askSources } = require('../Knowledge/askSources');
@@ -15,6 +15,7 @@ const { structuredTasks } = require('./askStructured');
 const { gatherForTask } = require('./taskContext');
 const { isNarrowed } = require('../../Config/tokenNarrowing');
 const { aboutAsker } = require('./aiProfile');
+const { askAnswerToken } = require('./shareToken');
 
 // Ask (handoff 13i) — a question box over the workspace.
 //
@@ -101,7 +102,7 @@ const gather = async (companyId, uid, { question, projectId, limit = MAX_PER_TYP
     const textMatch = orRegex(terms, ['TaskName', 'TaskKey', 'rawDescription']);
     if (textMatch) Object.assign(taskMatch, textMatch);
 
-    const pageMatch = { deletedStatusKey: { $ne: 1 }, ProjectID: { $in: searchIds }, $and: [pageVisibilityFilter(uid)] };
+    const pageMatch = { deletedStatusKey: { $ne: 1 }, ...pageReachFilter({ uid, projectIds: searchIds, companyWide: !named && !projectId && !tokenProjectIds.length }) };
     const pageText = orRegex(terms, ['title']);
     if (pageText) pageMatch.$and.push(pageText);
 
@@ -262,6 +263,7 @@ const answerQuestion = async (req, { question, mode, projectId, taskId } = {}) =
 
     const answer = String(result.content || '').trim();
     const cited = gathered.sources.filter((s) => answer.includes(`[${s.ref}]`));
+    const shareToken = askAnswerToken({ companyId, uid, question, answer, cited, sources: gathered.sources });
     return {
         status: true,
         statusText: 'OK',
@@ -273,6 +275,7 @@ const answerQuestion = async (req, { question, mode, projectId, taskId } = {}) =
             sources: gathered.sources,
             scope: { projects: gathered.projects.length, privileged: isPrivileged(roleType) },
             usage: { tokens: result.totalTokens, model: result.model },
+            ...(shareToken ? { shareToken } : {}),
             ...found,
         },
     };

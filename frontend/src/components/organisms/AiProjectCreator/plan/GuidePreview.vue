@@ -72,8 +72,8 @@ const escalations = computed(() => list(props.guide && props.guide.escalations))
 
 <style scoped>
 .gp {
-    background: #fff;
-    border: 1px solid #e5e7eb;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: 14px;
     padding: 14px 16px;
     display: flex;
@@ -81,8 +81,8 @@ const escalations = computed(() => list(props.guide && props.guide.escalations))
     gap: 10px;
 }
 .gp__head { display: flex; flex-direction: column; gap: 2px; }
-.gp__title { margin: 0; font-size: 14px; font-weight: 600; color: #0f172a; }
-.gp__lead { margin: 0; font-size: 12px; color: #64748b; line-height: 1.5; }
+.gp__title { margin: 0; font-size: 14px; font-weight: 600; color: var(--ink); }
+.gp__lead { margin: 0; font-size: 12px; color: var(--ink-2); line-height: 1.5; }
 .gp__grid { display: flex; flex-direction: column; gap: 10px; }
 .gp__block-title {
     margin: 0 0 4px;
@@ -90,11 +90,11 @@ const escalations = computed(() => list(props.guide && props.guide.escalations))
     font-weight: 600;
     letter-spacing: 0.4px;
     text-transform: uppercase;
-    color: #94a3b8;
+    color: var(--ink-2);
 }
-.gp__stages, .gp__list { margin: 0; padding-left: 18px; font-size: 13px; color: #1e293b; line-height: 1.5; }
+.gp__stages, .gp__list { margin: 0; padding-left: 18px; font-size: 13px; color: var(--ink); line-height: 1.5; }
 .gp__stages li + li, .gp__list li + li { margin-top: 3px; }
-.gp__goal { color: #64748b; }
+.gp__goal { color: var(--ink-2); }
 .gp__status, .gp__error {
     display: flex;
     align-items: center;
@@ -103,22 +103,22 @@ const escalations = computed(() => list(props.guide && props.guide.escalations))
     border-radius: 8px;
     padding: 8px 12px;
 }
-.gp__status { background: #eef2ff; color: #2F3990; }
-.gp__error { background: #fff5f5; color: #b91c1c; border: 1px solid #fecaca; justify-content: space-between; }
+.gp__status { background: var(--brand-tint); color: var(--brand); }
+.gp__error { background: var(--danger-bg); color: var(--danger-ink); border: 1px solid var(--danger); justify-content: space-between; }
 .gp__spinner {
     width: 14px;
     height: 14px;
     border-radius: 999px;
-    border: 2px solid #c7d2fe;
-    border-top-color: #2F3990;
+    border: 2px solid var(--brand-border);
+    border-top-color: var(--brand);
     animation: gp-spin 0.8s linear infinite;
 }
 @keyframes gp-spin { to { transform: rotate(360deg); } }
 .gp__btn {
     appearance: none;
-    border: 1px solid #fecaca;
-    background: #fff;
-    color: #b91c1c;
+    border: 1px solid var(--danger);
+    background: var(--surface);
+    color: var(--danger-ink);
     border-radius: 6px;
     padding: 4px 10px;
     font-size: 12px;
@@ -127,7 +127,7 @@ const escalations = computed(() => list(props.guide && props.guide.escalations))
 .gp__edit-trigger {
     cursor: pointer;
     font-size: 12px;
-    color: #2F3990;
+    color: var(--brand);
     font-weight: 500;
     list-style: none;
 }
@@ -135,15 +135,15 @@ const escalations = computed(() => list(props.guide && props.guide.escalations))
 .gp__textarea {
     width: 100%;
     margin-top: 8px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--hairline);
     border-radius: 10px;
     padding: 10px 12px;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 12.5px;
     line-height: 1.55;
-    color: #0f172a;
+    color: var(--ink);
     resize: vertical;
     outline: none;
 }
-.gp__textarea:focus { border-color: #2F3990; box-shadow: 0 0 0 3px rgba(47, 57, 144, 0.18); }
+.gp__textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring); }
 </style>

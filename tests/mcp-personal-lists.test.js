@@ -26,6 +26,7 @@ jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), 
 
 const { myCache } = require('../Config/config');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
+const { seedTaskListRules } = require('./fixtures/taskListRules');
 const actions = require('../Modules/Agents/actions');
 const performanceRead = require('../Modules/Agents/performanceRead');
 const tools = require('../Modules/Mcp/tools');
@@ -69,6 +70,7 @@ beforeEach(() => {
     delete process.env.MCP_TOOLS_V2;
 
     [[OWNER, 1], [ADMIN, 2], [MEMBER, 3], [SOMEONE, 3]].forEach(([userId, roleType]) => mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, roleType, status: 2, isDelete: false }));
+    seedTaskListRules(mockDb);
     const project = (_id, ProjectName, extra = {}) => mockDb.seed(SCHEMA_TYPE.PROJECTS, {
         _id, ProjectName, ProjectCode: ProjectName.toUpperCase(), isPrivateSpace: false, AssigneeUserId: [], taskStatusData: [], deletedStatusKey: 0, ...extra,
     });

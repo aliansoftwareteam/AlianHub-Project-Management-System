@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
-const { pageVisibilityFilter } = require('../../Pages/helpers/pageRules');
+const { pageReachFilter } = require('../../Pages/helpers/pageRules');
 
 const VISIT_TYPES = ['task', 'project', 'sprint', 'doc'];
 const LIST_LIMIT = 15;
@@ -64,7 +64,7 @@ const resolveVisits = async (companyId, uid, visits, { visible, sprintClause = {
             ? read(companyId, SCHEMA_TYPE.PAGES, {
                 _id: { $in: idsOf('doc') },
                 ...NOT_DELETED,
-                $and: [pageVisibilityFilter(uid), { $or: [{ ProjectID: { $in: inProjects } }, { ProjectID: { $in: [null, undefined] } }] }],
+                ...pageReachFilter({ uid, projectIds: inProjects }),
             }, 'title ProjectID')
             : [],
         landingSprints(companyId, visitedProjects, hidden),

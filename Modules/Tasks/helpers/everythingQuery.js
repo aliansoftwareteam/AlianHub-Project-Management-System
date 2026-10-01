@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { ownOrNotPersonal } = require('../../PersonalList/ownership');
-const { arrangeRules, rolePermission } = require('../../../Config/rulePermissions');
+const { TASK_LIST, projectPermissions, taskListProjectIds } = require('../../../Config/rulePermissions');
 
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 50;
@@ -16,7 +16,6 @@ const UNASSIGNED = 'unassigned';
 
 const GROUPS = Object.freeze(['none', 'status', 'assignee', 'project', 'priority', 'dueDate']);
 const STATUS_TYPES = Object.freeze(['default_active', 'active', 'done', 'close', 'default_close']);
-const TASK_LIST = 'task.task_list';
 const DEFAULT_DIRECTION = Object.freeze({ updatedAt: 'desc', DueDate: 'asc' });
 /* The direction _id takes next to an ascending sort key, as the two indexes of migration 067 store
  * it: { updatedAt: -1, _id: 1 } and { DueDate: 1, _id: 1 }. Following it, in either direction,
@@ -205,33 +204,6 @@ const projectMatch = (projectIds, uid, includeClosedProjects) => ({
     ...(includeClosedProjects ? {} : { statusType: { $ne: 'close' } }),
     ...ownOrNotPersonal(uid),
 });
-
-/* What the caller's role holds for a key in a project: by the project's own rules when it has
- * them, by the company's otherwise (usesProjectRules in Config/permissionGuard.js). */
-const projectPermissions = (roleType, companyRules, projectRules) => {
-    const rulesOf = new Map();
-    (projectRules || []).forEach((rule) => {
-        const id = String(rule.projectId);
-        rulesOf.set(id, [...(rulesOf.get(id) || []), rule]);
-    });
-    const company = arrangeRules(companyRules);
-    const arranged = new Map();
-    const own = (id) => {
-        if (!arranged.has(id)) arranged.set(id, arrangeRules(rulesOf.get(id) || []));
-        return arranged.get(id);
-    };
-    return (project, path) => rolePermission(project.isGlobalPermission === false ? own(String(project._id)) : company, roleType, path);
-};
-
-/* The project page shows no task to a role whose task list permission is unset. Read-only still
- * reads. The caller's own personal list is theirs whatever their role allows elsewhere. */
-const taskListProjectIds = (projects, roleType, companyRules, projectRules) => {
-    const permissionOf = projectPermissions(roleType, companyRules, projectRules);
-    const readable = (permission) => permission !== null && permission !== undefined && permission !== 0;
-    return projects
-        .filter((project) => project.isPersonal === true || readable(permissionOf(project, TASK_LIST)))
-        .map((project) => String(project._id));
-};
 
 /* The rule the List row applies (rowEditRights in the web app): a picker opens only when the task
  * list and the field are both set to edit, and never in a closed project. `permissionOf` is null

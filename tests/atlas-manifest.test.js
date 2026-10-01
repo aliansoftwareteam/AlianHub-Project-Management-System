@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { SCREENS, LEFT_OUT, STEP_ACTIONS } = require('../scripts/atlas-manifest');
+const { stepsFor } = require('../scripts/atlas/core');
 const { isScreenName } = require('../scripts/atlas/naming');
 const { paramsOf, resolveRoute } = require('../scripts/atlas/routes');
 
@@ -68,12 +69,31 @@ describe('atlas manifest', () => {
     test('setup steps only look: no typing, no submitting', () => {
         expect(STEP_ACTIONS).toEqual(['press', 'click', 'hover', 'scrollTo', 'waitFor']);
         for (const screen of SCREENS) {
-            for (const step of screen.steps || []) {
+            for (const step of [...(screen.steps || []), ...(screen.phoneSteps || [])]) {
                 expect(STEP_ACTIONS).toContain(step.action);
                 if (step.action === 'press') expect(step.key).not.toMatch(/^(Enter|Return|Space)$/i);
                 else expect(typeof step.selector).toBe('string');
             }
         }
+    });
+
+    test('a screen reached through the rail has a phone path, where the rail is the More sheet', () => {
+        const railOnly = SCREENS.filter((screen) => (screen.steps || []).some((step) => /ah-rail/.test(step.selector || '')));
+        expect(railOnly.map((screen) => screen.name)).toEqual(['more-menu', 'profile-menu']);
+        for (const screen of railOnly) {
+            expect(screen.phoneSteps.length).toBeGreaterThan(0);
+            expect(screen.phoneSteps.some((step) => /ah-rail/.test(step.selector || ''))).toBe(false);
+            expect(screen.phoneSteps.filter((step) => step.action === 'click').map((step) => step.selector)).toEqual(['[data-test="tab-more"]']);
+        }
+    });
+
+    test('the phone path is taken under the phone breakpoint only', () => {
+        const screen = { steps: [{ action: 'press', key: 'a' }], phoneSteps: [{ action: 'press', key: 'b' }] };
+        expect(stepsFor(screen, { width: 390 })).toBe(screen.phoneSteps);
+        expect(stepsFor(screen, { width: 767 })).toBe(screen.phoneSteps);
+        expect(stepsFor(screen, { width: 768 })).toBe(screen.steps);
+        expect(stepsFor({ steps: screen.steps }, { width: 390 })).toBe(screen.steps);
+        expect(stepsFor({}, { width: 390 })).toEqual([]);
     });
 
     test('every left-out route says why and is not also captured', () => {

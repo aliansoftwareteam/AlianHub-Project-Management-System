@@ -1,3 +1,6 @@
+/* One page behind both: /:cid/goals/:goalId is the list with that goal's panel open. */
+const goalsPage = () => import(/* webpackChunkName: "goals" */ '@/views/Goals/Goals.vue');
+
 export default [
     {
         path: '/:cid/planner',
@@ -16,6 +19,24 @@ export default [
             requiresAuth: true
         },
         component: () => import(/* webpackChunkName: "everything" */ '@/views/Everything/Everything.vue')
+    },
+    {
+        path: '/:cid/goals',
+        name: 'Goals',
+        meta: {
+            title: 'Goals',
+            requiresAuth: true
+        },
+        component: goalsPage
+    },
+    {
+        path: '/:cid/goals/:goalId',
+        name: 'Goal',
+        meta: {
+            title: 'Goals',
+            requiresAuth: true
+        },
+        component: goalsPage
     },
     {
         path: '/:cid/personal',

@@ -107,30 +107,30 @@ const onSidebarSelected = (option) => {
 /* Same chrome as SkillsSelect's bordered trigger, so Source and Skills are
    indistinguishable as form fields. */
 .source-select__field {
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
     border-radius: 6px;
     height: 30px;
     padding: 0 10px;
     box-sizing: border-box;
-    background: #ffffff;
+    background: var(--surface);
     cursor: pointer;
     width: 100%;
 }
 .source-select__value {
     font-size: 13px;
-    color: #535358;
+    color: var(--ink-2);
 }
 .source-select__placeholder {
     font-size: 13px;
-    color: #818181;
+    color: var(--ink-2);
 }
 .source-select__option {
     padding: 6px 4px;
     font-size: 13px;
-    color: #535358;
+    color: var(--ink-2);
 }
 .source-select__option--active {
-    color: #2F3990;
+    color: var(--brand);
     font-weight: 500;
 }
 </style>

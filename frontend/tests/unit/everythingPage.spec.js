@@ -60,7 +60,7 @@ const reads = () => apiRequest.mock.calls.filter(([, url]) => url === TASKS);
 const sent = () => reads().map(([, , body]) => body);
 const sentNames = () => sent().map(recordedAs);
 
-const projectList = Object.values({ ...fixture.projectCounts.response.data.projects }).map((card) => ({ ...card, deletedStatusKey: 0 }));
+const projectList = Object.values({ ...fixture.withSubtasks.response.data.projects }).map((card) => ({ ...card, deletedStatusKey: 0 }));
 
 const newStore = () => createStore({
     modules: {
@@ -169,6 +169,8 @@ describe('the list', () => {
         expect(sentNames().at(-1)).toBe('nothing');
         expect(sent().at(-1).filter.search).toBe('nothing is called this');
         expect(test('evr-empty').exists()).toBe(true);
+        expect(test('evr-empty').find('svg').attributes('data-illustration')).toBe('search');
+        expect(test('evr-empty').find('.empty-state__btn').text()).toBe('Everything.clear_filters');
         expect(rows()).toHaveLength(0);
 
         await test('evr-empty').find('button').trigger('click');

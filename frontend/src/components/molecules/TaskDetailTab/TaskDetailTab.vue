@@ -21,7 +21,7 @@
             <Description
                 v-if="show.description && checkPermission('task.task_description',projectData?.isGlobalPermission) !== null && checkPermission('task.task_description',projectData?.isGlobalPermission) !== undefined && Object.keys(projectData).length > 0"
                 :isShowAi="canUseAi({ project: projectData, permitted: checkPermission('task.task_description',projectData?.isGlobalPermission) == true })"
-                :description="task?.descriptionBlock ? task.descriptionBlock : task.description"
+                :description="taskDescription"
                 :editPermission="checkPermission('task.task_description',projectData?.isGlobalPermission)"
                 :minlength="10"
                 :projectData="projectData"
@@ -51,6 +51,7 @@
                 class="mt-1"
                 @open="$emit('openDoc', $event)"
             />
+            <TaskLinks v-if="show.linkedDocs" :links="task.links" />
             <EpicPicker
                 v-if="show.epic"
                 :task="task"
@@ -121,7 +122,7 @@
         @closeSidebar="handleCloseSidebar"
         :componentDetail="componentDetail && Object.keys(componentDetail).length ? componentDetail : {}"
         :customFieldObject="componentDetail && Object.keys(componentDetail).length ? customFieldObject : {}"
-        :isCustomField="isCustomField"
+        v-model:isCustomField="isCustomField"
         @handleClose="handleClose()"
     />
     <PromptSidebar v-if="isOpenPromptDeatil" @closePrompt="isOpenPromptDeatil = false" :selectedPrompt="selectedPrompt" @closeMainSidebar="isOpenPromptDeatil = false" :project="projectData" :task="task" />
@@ -141,6 +142,8 @@ import CheckListComponent from '@/components/molecules/CheckList/CheckList.vue'
 import SubTasks from '@/components/organisms/SubTasks/SubTasks.vue'
 import LinkedTasks from '@/components/organisms/LinkedTasks/LinkedTasks.vue'
 import LinkedDocs from '@/components/molecules/Pages/LinkedDocs.vue'
+import TaskLinks from '@/components/molecules/TaskLinks/TaskLinks.vue'
+import { shownDescription } from '@/utils/taskDescription'
 import EpicPicker from '@/components/molecules/Epics/EpicPicker.vue'
 import CreateTagPopup from "@/components/molecules/TagList/CreateTagPopup.vue";
 import TagChip from '@/components/atom/TagChip/TagChip.vue'
@@ -217,6 +220,7 @@ const companyOwner = computed(() => {
     return getters["settings/companyOwnerDetail"];
 });
 const checkList = computed(() => props.task.checklistArray);
+const taskDescription = computed(() => shownDescription(props.task));
 const currentCompany = computed(() => getters["settings/selectedCompany"]);
 const projectsGetter = computed(() => getters["projectData/onlyActiveProjects"]);
 const showCustomField = computed(() => checkPermission("task.task_custom_field", projectData.value?.isGlobalPermission, {gettersVal: getters}));
@@ -520,8 +524,7 @@ const deleteAttachments = (attachment) => {
         text: `${t('Toast.Are_you_sure_to_delete_this_file')} ?`,
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#d33',
+        customClass: { confirm: 'swal2-deny' },
         cancelButtonText: t('Projects.cancel'),
         confirmButtonText: t('conformationmsg.yes_delete')
     }).then((result)=>{

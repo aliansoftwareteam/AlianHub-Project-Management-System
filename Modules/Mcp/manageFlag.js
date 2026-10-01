@@ -15,14 +15,23 @@ const GRANTS = Object.freeze([GRANT, DOCS_GRANT]);
 
 const enabled = () => ['on', 'true', '1'].includes(String(process.env.MCP_TOOLS_MANAGE || 'off').trim().toLowerCase());
 
-const holdsGrant = (token, grant = GRANT) => Boolean(token) && !token.oauth && Array.isArray(token.grants) && token.grants.includes(grant);
+/* A personal token holds the grants it was created with; an OAuth token holds a grant as the scope of that name,
+ * which its client asked for, its person ticked and its workspace approved. */
+const holdsGrant = (token, grant = GRANT) => {
+    if (!token) return false;
+    const held = token.oauth ? token.scopes : token.grants;
+    return Array.isArray(held) && held.includes(grant);
+};
+
+/* A personal token also needs its write scope; an OAuth token's manage scope is itself the leave to write. */
+const mayUse = (ctx, grant) => Boolean(ctx) && holdsGrant(ctx.token, grant) && Boolean(ctx.canWrite || (ctx.token && ctx.token.oauth));
 
 /* Whether this caller's token was created to manage tasks, while the tools are on. */
-const managesTasks = (ctx) => enabled() && Boolean(ctx) && Boolean(ctx.canWrite) && holdsGrant(ctx.token);
+const managesTasks = (ctx) => enabled() && mayUse(ctx, GRANT);
 
 const CLOSING = 'status.set("Done")';
 
 /* The never-list as this caller meets it: closing a task stays on it for everyone whose token was not created to manage tasks. */
 const neverFor = (ctx, never) => (managesTasks(ctx) ? never.filter((entry) => entry !== CLOSING) : never);
 
-module.exports = { ACTIONS, GRANT, DOCS_GRANT, GRANTS, enabled, holdsGrant, managesTasks, neverFor };
+module.exports = { ACTIONS, GRANT, DOCS_GRANT, GRANTS, enabled, holdsGrant, mayUse, managesTasks, neverFor };

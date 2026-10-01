@@ -141,10 +141,13 @@ const scopesOf = (value) => {
 };
 
 /* Without scopes named, the ceiling is what was asked for plus reading, or for a pre-registered client, what it
- * was registered with. */
+ * was registered with. A manage scope is never part of it: an approval holds one only when the owner or admin
+ * deciding named it. */
 const defaultScopes = (client, existing) => {
-    if (client.kind === 'preregistered') return client.scopes && client.scopes.length ? inScopeOrder(client.scopes) : [...config.SCOPES];
-    return inScopeOrder([...config.READ_SCOPES, ...((existing && existing.requestedScopes) || [])]);
+    const implied = client.kind === 'preregistered'
+        ? config.namedScopes(client)
+        : [...config.READ_SCOPES, ...((existing && existing.requestedScopes) || [])];
+    return inScopeOrder(implied).filter((scope) => !config.isManageScope(scope));
 };
 
 async function approve({ companyId, client, scopes, privateSprints, actor, now = new Date() }) {
@@ -152,7 +155,8 @@ async function approve({ companyId, client, scopes, privateSprints, actor, now =
     if (privateSprints !== undefined && typeof privateSprints !== 'boolean') throw new ApprovalError(400, 'privateSprints must be true or false.');
     const existing = await store.approvals.find(companyId, client.clientId);
     const ceiling = scopes === undefined || scopes === null ? defaultScopes(client, existing) : scopesOf(scopes);
-    if (client.scopes && client.scopes.length && !ceiling.every((scope) => client.scopes.includes(scope))) {
+    const named = config.namedScopes(client);
+    if (named && !ceiling.every((scope) => named.includes(scope))) {
         throw new ApprovalError(400, 'A client can only be approved for scopes it registered.');
     }
     const keepOptIn = existing && existing.status === STATUS.APPROVED ? Boolean(existing.privateSprints) : false;

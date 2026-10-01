@@ -57,7 +57,7 @@ beforeEach(() => {
 /* The app's confirm dialog renders into #my-modal, outside the panel. */
 const confirmDialog = () => document.querySelector('#my-modal .modal');
 const answer = async (accept) => {
-    confirmDialog().querySelector(accept ? '.btn-primary' : '.outline-secondary').click();
+    confirmDialog().querySelector(accept ? '.ah-btn--primary' : '.ah-btn--secondary').click();
     await flushPromises();
 };
 

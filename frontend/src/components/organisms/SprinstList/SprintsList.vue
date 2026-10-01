@@ -167,57 +167,28 @@
                                 <img :src="horizontalDots" :alt="$t('Projects.list_actions')" class="vertical-middle">
                             </template>
                             <template #options>
-                                <DropDownOption @click="updateItem(0)" v-if="showArchiveVar && sprint?.deletedStatusKey === 2">
-                                    <div class="d-flex align-items-center project-mobile-desc">
-                                        <img :src="restore_icon" alt="restore_icon" class="mr-10px">
-                                        {{$t('Projects.restore')}}
-                                    </div>
-                                </DropDownOption>
-                                <DropDownOption
-                                    v-if="canRunScrum && scrumState === 'planned'"
-                                    @click="startSprint()"
-                                >
-                                    <div class="d-flex align-items-center project-mobile-desc">
-                                        <img :src="sprintStartIcon" alt="start sprint" class="mr-10px">
-                                        {{ $t('Scrum.start_sprint') }}
-                                    </div>
-                                </DropDownOption>
-                                <DropDownOption
-                                    v-if="canRunScrum && (scrumState === 'active' || scrumState === 'overdue')"
-                                    @click="showCompleteSprint = true"
-                                >
-                                    <div class="d-flex align-items-center project-mobile-desc">
-                                        <img :src="sprintCompleteIcon" alt="complete sprint" class="mr-10px">
-                                        {{ $t('Scrum.complete_sprint') }}
-                                    </div>
-                                </DropDownOption>
-                                <DropDownOption
-                                    v-if="canRunScrum"
-                                    @click="showSprintSetup = true"
-                                >
-                                    <div class="d-flex align-items-center project-mobile-desc">
-                                        <img :src="sprintSetupIcon" alt="sprint settings" class="mr-10px">
-                                        {{ scrumState === 'none' ? $t('Scrum.make_it_a_sprint') : $t('Scrum.sprint_settings') }}
-                                    </div>
-                                </DropDownOption>
-                                <DropDownOption @click="showSidebar = true, archive = true" v-if="!showArchiveVar">
-                                    <div class="d-flex align-items-center project-mobile-desc">
-                                        <img :src="inventoryIcon" alt="inventoryIcon" class="mr-10px">
-                                        {{$t('Projects.archive')}}
-                                    </div>
-                                </DropDownOption>
-                                <DropDownOption @click="showMoveToFolder = true" v-if="!showArchiveVar && !sprint.isFolder && folderList.length">
-                                    <div class="d-flex align-items-center project-mobile-desc">
-                                        <img :src="folder" alt="folder" class="mr-10px" style="width: 16px;">
-                                        {{$t('Projects.move_to_folder')}}
-                                    </div>
-                                </DropDownOption>
-                                <DropDownOption @click="showSidebar = true, archive = false">
-                                    <div class="d-flex align-items-center project-mobile-desc mobile-deleteIcon red">
-                                        <img :src="deleteIcon" alt="deleteIcon" class="mr-10px">
-                                        {{$t('Projects.delete')}}
-                                    </div>
-                                </DropDownOption>
+                                <template v-if="sprint.isFolder">
+                                    <DropDownOption @click="showSidebar = true, archive = true" v-if="!showArchiveVar">
+                                        <div class="d-flex align-items-center project-mobile-desc">
+                                            <img :src="inventoryIcon" alt="inventoryIcon" class="mr-10px">
+                                            {{$t('Projects.archive')}}
+                                        </div>
+                                    </DropDownOption>
+                                    <DropDownOption @click="showSidebar = true, archive = false">
+                                        <div class="d-flex align-items-center project-mobile-desc mobile-deleteIcon red">
+                                            <img :src="deleteIcon" alt="deleteIcon" class="mr-10px">
+                                            {{$t('Projects.delete')}}
+                                        </div>
+                                    </DropDownOption>
+                                </template>
+                                <template v-else>
+                                    <DropDownOption v-for="entry in listEntries" :key="entry.id" :data-item="entry.id" @click="runListEntry(entry.id)">
+                                        <div class="d-flex align-items-center project-mobile-desc" :class="{ 'mobile-deleteIcon red': entry.danger }">
+                                            <ShellIcon :name="entry.icon" :size="16" class="mr-10px" />
+                                            {{ $t(entry.labelKey) }}
+                                        </div>
+                                    </DropDownOption>
+                                </template>
                             </template>
                         </DropDown>
                     </div>
@@ -307,6 +278,7 @@
             @selected="changeAssignee('add', $event.id)"
             @removed="changeAssignee('remove', $event.id)"
         />
+        <ListMenu v-if="!sprint.isFolder" ref="sharedListMenu" headless :project="project" :sprint="sprint" :archived-view="Boolean(showArchiveVar)" />
         <MoveToFolderModal
             v-model="showMoveToFolder"
             :folders="folderList"
@@ -347,6 +319,9 @@ import Toggle from "@/components/atom/Toggle/Toggle.vue"
 import Assignee from "@/components/molecules/Assignee/Assignee.vue"
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
 import MoveToFolderModal from "@/components/molecules/MoveToFolder/MoveToFolderModal.vue"
+import ListMenu from "@/components/molecules/ListMenu/ListMenu.vue"
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue"
+import { listMenuEntries } from "@/views/Projects/composables/listMenu"
 import SprintStateChip from "@/components/molecules/SprintScrum/SprintStateChip.vue"
 import SprintSetupModal from "@/components/molecules/SprintScrum/SprintSetupModal.vue"
 import CloseSprintStep from "./CloseSprintStep.vue"
@@ -392,10 +367,6 @@ const inventory_2 = require('@/assets/images/inventory_2.png');
 const horizontalDots = require("@/assets/images/svg/horizontalDots.svg");
 const aiIcon = require("@/assets/images/svg/ai_image.svg");
 const inventoryIcon = require("@/assets/images/svg/inventoryIcon.svg");
-const restore_icon = require("@/assets/images/svg/restore_icon.svg");
-const sprintSetupIcon = require("@/assets/images/svg/sprintSetup.svg");
-const sprintStartIcon = require("@/assets/images/svg/sprintStart.svg");
-const sprintCompleteIcon = require("@/assets/images/svg/sprintComplete.svg");
 const deleteIcon = require("@/assets/images/svg/deleteIcon.svg");
 
 defineComponent({
@@ -618,6 +589,27 @@ const startSprint = async () => {
         $toast.error(error?.message || t('Toast.something_went_wrong'), { position: 'top-right' });
     }
 };
+
+/* The entries are the ones every place shows a list with; this header keeps its own handlers for the
+   ones it had, and the shared menu runs the rest. */
+const sharedListMenu = ref(null);
+const listEntries = computed(() => listMenuEntries({
+    project: project.value,
+    list: props.sprint,
+    folders: project.value?.sprintsfolders,
+    check: (key) => checkPermission(key, project.value?.isGlobalPermission),
+    archivedView: Boolean(showArchiveVar.value)
+}));
+const OWN_LIST_ENTRIES = {
+    restore: () => updateItem(0),
+    'start-sprint': () => startSprint(),
+    'complete-sprint': () => { showCompleteSprint.value = true; },
+    'sprint-settings': () => { showSprintSetup.value = true; },
+    move: () => { showMoveToFolder.value = true; },
+    archive: () => { archive.value = true; showSidebar.value = true; },
+    delete: () => { archive.value = false; showSidebar.value = true; }
+};
+const runListEntry = (id) => (OWN_LIST_ENTRIES[id] ? OWN_LIST_ENTRIES[id]() : sharedListMenu.value?.run(id));
 
 const folderLegend = computed(() => folderPathLabel(project.value?.sprintsfolders, props.sprint?.folderId) || props.sprint?.folderName || '');
 

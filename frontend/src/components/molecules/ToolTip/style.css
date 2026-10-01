@@ -68,7 +68,7 @@
     margin-top: 4px;
     text-decoration: underline;
     display: block;
-    transition: color 0.2s;
+    transition: color var(--motion-fast) var(--ease-out);
     user-select: none;
     width: 100%;
     text-align: right;
@@ -82,10 +82,9 @@
     color: #42a5f5;
 }
 
-/* Fade transition */
 .tooltip-fade-enter-active,
 .tooltip-fade-leave-active {
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    transition: opacity var(--motion-fast) var(--ease-out), transform var(--motion-fast) var(--ease-out);
 }
 
 .tooltip-fade-enter-from {

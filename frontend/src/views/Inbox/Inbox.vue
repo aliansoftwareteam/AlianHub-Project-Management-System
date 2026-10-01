@@ -86,12 +86,18 @@
                     <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="reload">{{ $t('Inbox.retry') }}</button>
                 </div>
 
-                <div v-else-if="!rows.length" class="ibx__zero">
-                    <span class="ibx__zero-mark"><ShellIcon name="check" :size="22" /></span>
-                    <div class="ibx__zero-title">{{ $t('Inbox.zero_' + tab) }}</div>
-                    <div class="ibx__zero-sub">{{ $t(ZERO_SUB[tab]) }}</div>
-                    <button v-if="tab !== 'primary'" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="switchTab('primary')">{{ $t('Inbox.back_to_primary') }}</button>
-                </div>
+                <EmptyState
+                    v-else-if="!rows.length"
+                    class="ibx__zero"
+                    illustration="inbox"
+                    data-test="inbox-zero"
+                    :heading-level="2"
+                    :title="$t('Inbox.zero_' + tab)"
+                    :message="$t(ZERO_SUB[tab])"
+                    :action-label="$t('Inbox.back_to_primary')"
+                    :action-allowed="tab !== 'primary'"
+                    @action="switchTab('primary')"
+                />
 
                 <template v-else>
                     <article
@@ -114,14 +120,14 @@
                             <span class="ibx__what">
                                 <template v-if="it.kind === 'approval'">
                                     <strong>{{ actorName(it) || $t('Inbox.someone') }}</strong> {{ $t('Inbox.requested_off', { range: dateRange(it) }) }}
-                                    <span class="ibx__dim">· {{ $t('Inbox.needs_your_approval') }}</span>
+                                    <span class="ibx__dim"><span class="ibx__dot">· </span>{{ $t('Inbox.needs_your_approval') }}</span>
                                 </template>
                                 <template v-else-if="it.kind === 'proposal'">
                                     <strong>{{ it.agentName }}</strong> {{ $t('Inbox.wants_to') }} {{ proposalTitle(t, it) }}
-                                    <span class="ibx__dim">· {{ $t('Inbox.needs_your_approval') }}</span>
+                                    <span class="ibx__dim"><span class="ibx__dot">· </span>{{ $t('Inbox.needs_your_approval') }}</span>
                                 </template>
                                 <template v-else-if="it.kind === 'reminder'">
-                                    <strong>{{ $t('Inbox.reminder') }}</strong> <span class="ibx__dim">· {{ it.unread ? $t('Inbox.due_now') : $t('Inbox.done') }}</span>
+                                    <strong>{{ $t('Inbox.reminder') }}</strong> <span class="ibx__dim"><span class="ibx__dot">· </span>{{ it.unread ? $t('Inbox.due_now') : $t('Inbox.done') }}</span>
                                 </template>
                                 <template v-else-if="it.kind === 'mention'">
                                     <strong>{{ actorName(it) || $t('Inbox.someone') }}</strong> {{ it.mainChat ? $t('Inbox.mentioned_you_chat') : $t('Inbox.mentioned_you') }}
@@ -296,6 +302,7 @@ import { sendProposalDecision } from '@/composable/agentProposals';
 import { proposalTitle } from '@/views/Ai/plainLabels';
 import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { useHelper } from '@/components/organisms/Header/helper';
 import { openPanel } from '@/components/organisms/Shell/shellState';
 import { shortcutPrefs } from '@/composable/shortcuts';
@@ -951,10 +958,7 @@ onUnmounted(() => {
 .ibx__list { flex: 1; min-height: 0; overflow: auto; padding: var(--page-pad-y, 12px) var(--page-pad-x, 14px) var(--sp-8, 20px); display: flex; flex-direction: column; gap: var(--sp-3, 8px); }
 .ibx__state { padding: 40px 0; text-align: center; color: var(--ink-2); display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .ibx__state--error { color: var(--danger-ink); }
-.ibx__zero { padding: 60px 0; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.ibx__zero-mark { width: 44px; height: 44px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--ok-bg); color: var(--ok-ink); margin-bottom: 8px; }
-.ibx__zero-title { font: var(--fw-title, 600) var(--fs-lg, 15px)/var(--lh-snug, 1.3) var(--font-ui); color: var(--ink); }
-.ibx__zero-sub { font-size: var(--fs-md, 12.5px); color: var(--ink-2); margin-bottom: 8px; max-width: 420px; }
+.ibx__zero.empty-state { padding-block: 48px; }
 
 /* A row of the List, opened up: the same height, padding, type and avatar tokens, so compact tightens it too. */
 .ibx__card {
@@ -1026,6 +1030,8 @@ onUnmounted(() => {
     .ibx__tab { height: 40px; padding: 0 10px; }
     .ibx__keys { display: none; }
     .ibx__list { padding: 10px; }
+    .ibx__what .ibx__dim { display: block; overflow: hidden; text-overflow: ellipsis; }
+    .ibx__dot { display: none; }
     .ibx .ah-btn--sm { min-height: var(--hit-min); }
     .ibx__actions .ah-btn--sm { height: 44px; padding: 0 14px; font-size: var(--fs-md, 13px); }
     .ibx__snooze { left: 8px; right: 8px; width: auto; }

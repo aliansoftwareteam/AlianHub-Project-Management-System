@@ -5,6 +5,7 @@ import { useCustomComposable } from "@/composable";
 import { isAiSectionRoute } from "@/router/ai/section";
 import { aiReachable, canUseAi } from "@/composable/aiAvailability";
 import { isOwnerOrAdmin as isOwnerOrAdminRole } from "@/utils/roles";
+import { canApprove } from "@/views/Approvals/approvalAccess";
 
 const PROJECT_ROUTE_PREFIX = "Project";
 
@@ -34,6 +35,7 @@ export function useNavItems(companyId) {
     const rail = computed(() => [
         { key: "home", label: "Shell.home", icon: "home", to: to("Home"), match: (r) => r.name === "Home" || r.name === "PersonalList", show: true },
         { key: "everything", label: "Shell.everything", icon: "layers", to: to("Everything"), match: (r) => r.name === "Everything", show: ready.value && exists("Everything") },
+        { key: "goals", label: "Shell.goals", icon: "target", to: to("Goals"), match: (r) => r.name === "Goals" || r.name === "Goal", show: ready.value && exists("Goals") },
         { key: "projects", label: "Header.Projects", icon: "projects", to: to("Projects"), match: (r) => String(r.name || "").startsWith(PROJECT_ROUTE_PREFIX), show: allowed("project.project_list") },
         { key: "inbox", label: "Inbox.title", icon: "inbox", to: to("inbox"), match: (r) => r.name === "inbox", show: ready.value },
         { key: "planner", label: "Shell.planner", icon: "planner", to: to("Planner"), match: (r) => r.name === "Planner", show: exists("Planner") },
@@ -51,6 +53,7 @@ export function useNavItems(companyId) {
                 items: [
                     { key: "portfolio", label: "Header.Portfolio", icon: "portfolio", to: to("Portfolio"), match: (r) => r.name === "Portfolio", show: ready.value },
                     { key: "automations", label: "Automations.title", icon: "automations", to: to("Automations"), match: (r) => r.name === "Automations", show: ready.value && exists("Automations") },
+                    { key: "approvals", label: "Time.approvals", icon: "checkSquare", to: to("Approvals"), match: (r) => r.name === "Approvals", show: ready.value && exists("Approvals") && canApprove(companyUser.value) },
                     { key: "integrations", label: "Header.Integrations", icon: "integrations", to: to("IntegrationsHub"), match: (r) => r.name === "IntegrationsHub", show: ready.value && exists("IntegrationsHub") },
                     { key: "connections", label: "Parity.nav_connections", icon: "key", to: to("Connections"), match: (r) => r.name === "Connections", show: ready.value && exists("Connections") },
                     { key: "externalData", label: "Provenance.nav_external_data", icon: "globe", to: to("ExternalData"), match: (r) => r.name === "ExternalData", show: ready.value && exists("ExternalData") }

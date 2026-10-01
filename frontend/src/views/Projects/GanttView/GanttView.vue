@@ -138,6 +138,7 @@ import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import taskClass from '@/utils/TaskOperations';
+import { readLookLength } from '@/utils/lookTokens';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { criticalPath } from '@/views/Projects/composables/criticalPath';
 import { fsCollisionLinks } from '@/views/Projects/composables/ganttCollisions';
@@ -515,9 +516,12 @@ function schedule(task) {
 }
 
 /* ------------------------------------- zoom ------------------------------------- */
+// dhtmlx lays its rows out in pixels: the List's row height for the look, 36px where a look names none.
+const lookRowHeight = () => readLookLength('--row-h', 36);
+
 function applyScales(level) {
     if (!gantt) return;
-    gantt.config.scale_height = 34;
+    gantt.config.scale_height = lookRowHeight() - 2;
     if (level === 'Day') {
         gantt.config.scales = [
             { unit: 'day', step: 1, format: '%d %M' },
@@ -623,7 +627,7 @@ onMounted(async () => {
         gantt.config.drag_links = !readOnly.value;
         gantt.config.drag_progress = false;
         gantt.config.fit_tasks = true;
-        gantt.config.row_height = 36;
+        gantt.config.row_height = lookRowHeight();
         gantt.config.bar_height = 16;
         gantt.config.show_markers = true;
         gantt.config.columns = [

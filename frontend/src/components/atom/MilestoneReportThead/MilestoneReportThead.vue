@@ -10,6 +10,7 @@
         <th colspan="100%">
             <div class="days-selected-dropdown">
                 <SelectComp
+                    themed
                     :name="SelectionuiqId"
                     title=""
                     displayKey="name"
@@ -24,6 +25,7 @@
             </div>
             <div class="days-selected-dropdown days-selected-dropdown-value" v-if="days && days.length">
                 <SelectComp
+                    themed
                     :name="SelectionuiqIds"
                     title=""
                     displayKey="name"

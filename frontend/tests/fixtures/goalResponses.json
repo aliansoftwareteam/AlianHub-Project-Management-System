@@ -1,0 +1,2619 @@
+{
+  "list": {
+    "as": "me",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goals fetched successfully.",
+      "data": [
+        {
+          "_id": "6f0000000000000000000e02",
+          "name": "Cut churn",
+          "description": "",
+          "ownerUserId": "6f0000000000000000000001",
+          "periodStart": "2027-01-01",
+          "periodEnd": "2027-03-31",
+          "visibility": "private",
+          "sharedWith": [],
+          "sharedWithMe": false,
+          "isOwner": true,
+          "color": "",
+          "progressPct": 50,
+          "targets": [
+            {
+              "id": "6f0000000000000000000f04",
+              "name": "Monthly churn",
+              "kind": "number",
+              "weight": 1,
+              "progressPct": 50,
+              "reachedAt": null,
+              "start": 40,
+              "target": 10,
+              "current": 25,
+              "unit": "%",
+              "updatedBy": "6f0000000000000000000001",
+              "updatedAt": "2026-09-20T09:00:00.000Z"
+            }
+          ],
+          "archived": false,
+          "canEdit": true,
+          "canSetValue": true,
+          "createdBy": "6f0000000000000000000001",
+          "createdAt": "2026-09-20T09:00:00.000Z",
+          "updatedAt": null
+        },
+        {
+          "_id": "6f0000000000000000000e01",
+          "name": "Grow revenue",
+          "description": "Net new revenue only",
+          "ownerUserId": "6f0000000000000000000001",
+          "periodStart": "2026-10-01",
+          "periodEnd": "2026-12-31",
+          "visibility": "workspace",
+          "sharedWith": [],
+          "sharedWithMe": false,
+          "isOwner": true,
+          "color": "#2F3990",
+          "progressPct": 33,
+          "targets": [
+            {
+              "id": "6f0000000000000000000f01",
+              "name": "New customers",
+              "kind": "number",
+              "weight": 1,
+              "progressPct": 30,
+              "reachedAt": null,
+              "start": 0,
+              "target": 10,
+              "current": 3,
+              "unit": "customers",
+              "updatedBy": "6f0000000000000000000001",
+              "updatedAt": "2026-09-20T09:00:00.000Z"
+            },
+            {
+              "id": "6f0000000000000000000f02",
+              "name": "Revenue",
+              "kind": "currency",
+              "weight": 2,
+              "progressPct": 0,
+              "reachedAt": null,
+              "start": 1000,
+              "target": 5000,
+              "current": 1000,
+              "unit": "",
+              "currencyCode": "USD",
+              "updatedBy": "6f0000000000000000000001",
+              "updatedAt": "2026-09-20T09:00:00.000Z"
+            },
+            {
+              "id": "6f0000000000000000000f03",
+              "name": "Pricing page live",
+              "kind": "boolean",
+              "weight": 1,
+              "progressPct": 100,
+              "reachedAt": "2026-09-20T09:00:00.000Z",
+              "done": true,
+              "updatedBy": "6f0000000000000000000001",
+              "updatedAt": "2026-09-20T09:00:00.000Z"
+            }
+          ],
+          "archived": false,
+          "canEdit": true,
+          "canSetValue": true,
+          "createdBy": "6f0000000000000000000001",
+          "createdAt": "2026-09-20T09:00:00.000Z",
+          "updatedAt": null
+        },
+        {
+          "_id": "6f0000000000000000000e03",
+          "name": "Hire the team",
+          "description": "",
+          "ownerUserId": "6f0000000000000000000002",
+          "periodStart": "2026-07-01",
+          "periodEnd": "2026-09-30",
+          "visibility": "people",
+          "sharedWith": [],
+          "sharedWithMe": true,
+          "isOwner": false,
+          "color": "",
+          "progressPct": 50,
+          "targets": [
+            {
+              "id": "6f0000000000000000000f05",
+              "name": "Offer accepted",
+              "kind": "boolean",
+              "weight": 1,
+              "progressPct": 0,
+              "reachedAt": null,
+              "done": false,
+              "updatedBy": "6f0000000000000000000002",
+              "updatedAt": "2026-09-20T09:00:00.000Z"
+            },
+            {
+              "id": "6f0000000000000000000f06",
+              "name": "Engineers",
+              "kind": "number",
+              "weight": 1,
+              "progressPct": 100,
+              "reachedAt": "2026-09-20T09:00:00.000Z",
+              "start": 0,
+              "target": 4,
+              "current": 4,
+              "unit": "",
+              "updatedBy": "6f0000000000000000000002",
+              "updatedAt": "2026-09-20T09:00:00.000Z"
+            }
+          ],
+          "archived": false,
+          "canEdit": false,
+          "canSetValue": false,
+          "createdBy": "6f0000000000000000000002",
+          "createdAt": "2026-09-20T09:00:00.000Z",
+          "updatedAt": null
+        },
+        {
+          "_id": "6f0000000000000000000e04",
+          "name": "Refresh the brand",
+          "description": "",
+          "ownerUserId": "6f0000000000000000000002",
+          "periodStart": "",
+          "periodEnd": "",
+          "visibility": "workspace",
+          "sharedWith": [],
+          "sharedWithMe": false,
+          "isOwner": false,
+          "color": "",
+          "progressPct": 0,
+          "targets": [],
+          "archived": false,
+          "canEdit": false,
+          "canSetValue": false,
+          "createdBy": "6f0000000000000000000002",
+          "createdAt": "2026-09-20T09:00:00.000Z",
+          "updatedAt": null
+        }
+      ]
+    }
+  },
+  "listMine": {
+    "as": "me",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals?mine=true"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goals fetched successfully.",
+      "data": [
+        {
+          "_id": "6f0000000000000000000e02",
+          "name": "Cut churn",
+          "description": "",
+          "ownerUserId": "6f0000000000000000000001",
+          "periodStart": "2027-01-01",
+          "periodEnd": "2027-03-31",
+          "visibility": "private",
+          "sharedWith": [],
+          "sharedWithMe": false,
+          "isOwner": true,
+          "color": "",
+          "progressPct": 50,
+          "targets": [
+            {
+              "id": "6f0000000000000000000f04",
+              "name": "Monthly churn",
+              "kind": "number",
+              "weight": 1,
+              "progressPct": 50,
+              "reachedAt": null,
+              "start": 40,
+              "target": 10,
+              "current": 25,
+              "unit": "%",
+              "updatedBy": "6f0000000000000000000001",
+              "updatedAt": "2026-09-20T09:00:00.000Z"
+            }
+          ],
+          "archived": false,
+          "canEdit": true,
+          "canSetValue": true,
+          "createdBy": "6f0000000000000000000001",
+          "createdAt": "2026-09-20T09:00:00.000Z",
+          "updatedAt": null
+        },
+        {
+          "_id": "6f0000000000000000000e01",
+          "name": "Grow revenue",
+          "description": "Net new revenue only",
+          "ownerUserId": "6f0000000000000000000001",
+          "periodStart": "2026-10-01",
+          "periodEnd": "2026-12-31",
+          "visibility": "workspace",
+          "sharedWith": [],
+          "sharedWithMe": false,
+          "isOwner": true,
+          "color": "#2F3990",
+          "progressPct": 33,
+          "targets": [
+            {
+              "id": "6f0000000000000000000f01",
+              "name": "New customers",
+              "kind": "number",
+              "weight": 1,
+              "progressPct": 30,
+              "reachedAt": null,
+              "start": 0,
+              "target": 10,
+              "current": 3,
+              "unit": "customers",
+              "updatedBy": "6f0000000000000000000001",
+              "updatedAt": "2026-09-20T09:00:00.000Z"
+            },
+            {
+              "id": "6f0000000000000000000f02",
+              "name": "Revenue",
+              "kind": "currency",
+              "weight": 2,
+              "progressPct": 0,
+              "reachedAt": null,
+              "start": 1000,
+              "target": 5000,
+              "current": 1000,
+              "unit": "",
+              "currencyCode": "USD",
+              "updatedBy": "6f0000000000000000000001",
+              "updatedAt": "2026-09-20T09:00:00.000Z"
+            },
+            {
+              "id": "6f0000000000000000000f03",
+              "name": "Pricing page live",
+              "kind": "boolean",
+              "weight": 1,
+              "progressPct": 100,
+              "reachedAt": "2026-09-20T09:00:00.000Z",
+              "done": true,
+              "updatedBy": "6f0000000000000000000001",
+              "updatedAt": "2026-09-20T09:00:00.000Z"
+            }
+          ],
+          "archived": false,
+          "canEdit": true,
+          "canSetValue": true,
+          "createdBy": "6f0000000000000000000001",
+          "createdAt": "2026-09-20T09:00:00.000Z",
+          "updatedAt": null
+        },
+        {
+          "_id": "6f0000000000000000000e03",
+          "name": "Hire the team",
+          "description": "",
+          "ownerUserId": "6f0000000000000000000002",
+          "periodStart": "2026-07-01",
+          "periodEnd": "2026-09-30",
+          "visibility": "people",
+          "sharedWith": [],
+          "sharedWithMe": true,
+          "isOwner": false,
+          "color": "",
+          "progressPct": 50,
+          "targets": [
+            {
+              "id": "6f0000000000000000000f05",
+              "name": "Offer accepted",
+              "kind": "boolean",
+              "weight": 1,
+              "progressPct": 0,
+              "reachedAt": null,
+              "done": false,
+              "updatedBy": "6f0000000000000000000002",
+              "updatedAt": "2026-09-20T09:00:00.000Z"
+            },
+            {
+              "id": "6f0000000000000000000f06",
+              "name": "Engineers",
+              "kind": "number",
+              "weight": 1,
+              "progressPct": 100,
+              "reachedAt": "2026-09-20T09:00:00.000Z",
+              "start": 0,
+              "target": 4,
+              "current": 4,
+              "unit": "",
+              "updatedBy": "6f0000000000000000000002",
+              "updatedAt": "2026-09-20T09:00:00.000Z"
+            }
+          ],
+          "archived": false,
+          "canEdit": false,
+          "canSetValue": false,
+          "createdBy": "6f0000000000000000000002",
+          "createdAt": "2026-09-20T09:00:00.000Z",
+          "updatedAt": null
+        }
+      ]
+    }
+  },
+  "listArchived": {
+    "as": "me",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals?archived=true"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goals fetched successfully.",
+      "data": [
+        {
+          "_id": "6f0000000000000000000e05",
+          "name": "Launch v1",
+          "description": "",
+          "ownerUserId": "6f0000000000000000000001",
+          "periodStart": "2026-01-01",
+          "periodEnd": "2026-03-31",
+          "visibility": "workspace",
+          "sharedWith": [],
+          "sharedWithMe": false,
+          "isOwner": true,
+          "color": "",
+          "progressPct": 100,
+          "targets": [
+            {
+              "id": "6f0000000000000000000f07",
+              "name": "Shipped",
+              "kind": "boolean",
+              "weight": 1,
+              "progressPct": 100,
+              "reachedAt": "2026-09-20T09:00:00.000Z",
+              "done": true,
+              "updatedBy": "6f0000000000000000000001",
+              "updatedAt": "2026-09-20T09:00:00.000Z"
+            }
+          ],
+          "archived": true,
+          "canEdit": true,
+          "canSetValue": true,
+          "createdBy": "6f0000000000000000000001",
+          "createdAt": "2026-09-20T09:00:00.000Z",
+          "updatedAt": null
+        }
+      ]
+    }
+  },
+  "listGuest": {
+    "as": "gil",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goals fetched successfully.",
+      "data": [
+        {
+          "_id": "6f0000000000000000000e07",
+          "name": "Client rollout",
+          "description": "",
+          "ownerUserId": "6f0000000000000000000002",
+          "periodStart": "",
+          "periodEnd": "",
+          "visibility": "people",
+          "sharedWith": [],
+          "sharedWithMe": true,
+          "isOwner": false,
+          "color": "",
+          "progressPct": 40,
+          "targets": [
+            {
+              "id": "6f0000000000000000000f08",
+              "name": "Sites live",
+              "kind": "number",
+              "weight": 1,
+              "progressPct": 40,
+              "reachedAt": null,
+              "start": 0,
+              "target": 5,
+              "current": 2,
+              "unit": "sites",
+              "updatedBy": "6f0000000000000000000002",
+              "updatedAt": "2026-09-20T09:00:00.000Z"
+            }
+          ],
+          "archived": false,
+          "canEdit": false,
+          "canSetValue": false,
+          "createdBy": "6f0000000000000000000002",
+          "createdAt": "2026-09-20T09:00:00.000Z",
+          "updatedAt": null
+        }
+      ]
+    }
+  },
+  "listAdmin": {
+    "as": "ada",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goals fetched successfully.",
+      "data": [
+        {
+          "_id": "6f0000000000000000000e01",
+          "name": "Grow revenue",
+          "description": "Net new revenue only",
+          "ownerUserId": "6f0000000000000000000001",
+          "periodStart": "2026-10-01",
+          "periodEnd": "2026-12-31",
+          "visibility": "workspace",
+          "sharedWith": [],
+          "sharedWithMe": false,
+          "isOwner": false,
+          "color": "#2F3990",
+          "progressPct": 33,
+          "targets": [
+            {
+              "id": "6f0000000000000000000f01",
+              "name": "New customers",
+              "kind": "number",
+              "weight": 1,
+              "progressPct": 30,
+              "reachedAt": null,
+              "start": 0,
+              "target": 10,
+              "current": 3,
+              "unit": "customers",
+              "updatedBy": "6f0000000000000000000001",
+              "updatedAt": "2026-09-20T09:00:00.000Z"
+            },
+            {
+              "id": "6f0000000000000000000f02",
+              "name": "Revenue",
+              "kind": "currency",
+              "weight": 2,
+              "progressPct": 0,
+              "reachedAt": null,
+              "start": 1000,
+              "target": 5000,
+              "current": 1000,
+              "unit": "",
+              "currencyCode": "USD",
+              "updatedBy": "6f0000000000000000000001",
+              "updatedAt": "2026-09-20T09:00:00.000Z"
+            },
+            {
+              "id": "6f0000000000000000000f03",
+              "name": "Pricing page live",
+              "kind": "boolean",
+              "weight": 1,
+              "progressPct": 100,
+              "reachedAt": "2026-09-20T09:00:00.000Z",
+              "done": true,
+              "updatedBy": "6f0000000000000000000001",
+              "updatedAt": "2026-09-20T09:00:00.000Z"
+            }
+          ],
+          "archived": false,
+          "canEdit": true,
+          "canSetValue": true,
+          "createdBy": "6f0000000000000000000001",
+          "createdAt": "2026-09-20T09:00:00.000Z",
+          "updatedAt": null
+        },
+        {
+          "_id": "6f0000000000000000000e04",
+          "name": "Refresh the brand",
+          "description": "",
+          "ownerUserId": "6f0000000000000000000002",
+          "periodStart": "",
+          "periodEnd": "",
+          "visibility": "workspace",
+          "sharedWith": [],
+          "sharedWithMe": false,
+          "isOwner": false,
+          "color": "",
+          "progressPct": 0,
+          "targets": [],
+          "archived": false,
+          "canEdit": true,
+          "canSetValue": true,
+          "createdBy": "6f0000000000000000000002",
+          "createdAt": "2026-09-20T09:00:00.000Z",
+          "updatedAt": null
+        }
+      ]
+    }
+  },
+  "read": {
+    "as": "me",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals/6f0000000000000000000e01"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal fetched successfully.",
+      "data": {
+        "_id": "6f0000000000000000000e01",
+        "name": "Grow revenue",
+        "description": "Net new revenue only",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "2026-10-01",
+        "periodEnd": "2026-12-31",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "#2F3990",
+        "progressPct": 33,
+        "targets": [
+          {
+            "id": "6f0000000000000000000f01",
+            "name": "New customers",
+            "kind": "number",
+            "weight": 1,
+            "progressPct": 30,
+            "reachedAt": null,
+            "start": 0,
+            "target": 10,
+            "current": 3,
+            "unit": "customers",
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-09-20T09:00:00.000Z"
+          },
+          {
+            "id": "6f0000000000000000000f02",
+            "name": "Revenue",
+            "kind": "currency",
+            "weight": 2,
+            "progressPct": 0,
+            "reachedAt": null,
+            "start": 1000,
+            "target": 5000,
+            "current": 1000,
+            "unit": "",
+            "currencyCode": "USD",
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-09-20T09:00:00.000Z"
+          },
+          {
+            "id": "6f0000000000000000000f03",
+            "name": "Pricing page live",
+            "kind": "boolean",
+            "weight": 1,
+            "progressPct": 100,
+            "reachedAt": "2026-09-20T09:00:00.000Z",
+            "done": true,
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-09-20T09:00:00.000Z"
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-09-20T09:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "readShared": {
+    "as": "me",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals/6f0000000000000000000e03"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal fetched successfully.",
+      "data": {
+        "_id": "6f0000000000000000000e03",
+        "name": "Hire the team",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000002",
+        "periodStart": "2026-07-01",
+        "periodEnd": "2026-09-30",
+        "visibility": "people",
+        "sharedWith": [],
+        "sharedWithMe": true,
+        "isOwner": false,
+        "color": "",
+        "progressPct": 50,
+        "targets": [
+          {
+            "id": "6f0000000000000000000f05",
+            "name": "Offer accepted",
+            "kind": "boolean",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "done": false,
+            "updatedBy": "6f0000000000000000000002",
+            "updatedAt": "2026-09-20T09:00:00.000Z"
+          },
+          {
+            "id": "6f0000000000000000000f06",
+            "name": "Engineers",
+            "kind": "number",
+            "weight": 1,
+            "progressPct": 100,
+            "reachedAt": "2026-09-20T09:00:00.000Z",
+            "start": 0,
+            "target": 4,
+            "current": 4,
+            "unit": "",
+            "updatedBy": "6f0000000000000000000002",
+            "updatedAt": "2026-09-20T09:00:00.000Z"
+          }
+        ],
+        "archived": false,
+        "canEdit": false,
+        "canSetValue": false,
+        "createdBy": "6f0000000000000000000002",
+        "createdAt": "2026-09-20T09:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "readMissing": {
+    "as": "me",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals/6f0000000000000000000e06"
+    },
+    "statusCode": 404,
+    "response": {
+      "status": false,
+      "statusText": "Goal not found.",
+      "message": "Goal not found."
+    }
+  },
+  "created": {
+    "as": "me",
+    "request": {
+      "method": "post",
+      "path": "/api/v2/goals",
+      "body": {
+        "name": "Ship the mobile app",
+        "periodStart": "2026-10-01",
+        "periodEnd": "2026-12-31"
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal saved.",
+      "data": {
+        "_id": "000000000000000000000015",
+        "name": "Ship the mobile app",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "2026-10-01",
+        "periodEnd": "2026-12-31",
+        "visibility": "private",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 0,
+        "targets": [],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T06:38:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "createRefused": {
+    "as": "me",
+    "request": {
+      "method": "post",
+      "path": "/api/v2/goals",
+      "body": {
+        "name": "Backwards",
+        "periodStart": "2026-12-31",
+        "periodEnd": "2026-10-01"
+      }
+    },
+    "statusCode": 400,
+    "response": {
+      "status": false,
+      "statusText": "Request refused",
+      "message": "periodEnd must not be before periodStart",
+      "field": "periodEnd"
+    }
+  },
+  "createRefusedGuest": {
+    "as": "gil",
+    "request": {
+      "method": "post",
+      "path": "/api/v2/goals",
+      "body": {
+        "name": "A guest's goal"
+      }
+    },
+    "statusCode": 403,
+    "response": {
+      "status": false,
+      "statusText": "You do not have permission to perform this action.",
+      "message": "You do not have permission to perform this action."
+    }
+  },
+  "described": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/6f0000000000000000000e01",
+      "body": {
+        "description": "Net new revenue, all regions"
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal saved.",
+      "data": {
+        "_id": "6f0000000000000000000e01",
+        "name": "Grow revenue",
+        "description": "Net new revenue, all regions",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "2026-10-01",
+        "periodEnd": "2026-12-31",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "#2F3990",
+        "progressPct": 33,
+        "targets": [
+          {
+            "id": "6f0000000000000000000f01",
+            "name": "New customers",
+            "kind": "number",
+            "weight": 1,
+            "progressPct": 30,
+            "reachedAt": null,
+            "start": 0,
+            "target": 10,
+            "current": 3,
+            "unit": "customers",
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-09-20T09:00:00.000Z"
+          },
+          {
+            "id": "6f0000000000000000000f02",
+            "name": "Revenue",
+            "kind": "currency",
+            "weight": 2,
+            "progressPct": 0,
+            "reachedAt": null,
+            "start": 1000,
+            "target": 5000,
+            "current": 1000,
+            "unit": "",
+            "currencyCode": "USD",
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-09-20T09:00:00.000Z"
+          },
+          {
+            "id": "6f0000000000000000000f03",
+            "name": "Pricing page live",
+            "kind": "boolean",
+            "weight": 1,
+            "progressPct": 100,
+            "reachedAt": "2026-09-20T09:00:00.000Z",
+            "done": true,
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-09-20T09:00:00.000Z"
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-09-20T09:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "shared": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/6f0000000000000000000e02",
+      "body": {
+        "visibility": "people",
+        "sharedWith": [
+          "6f0000000000000000000002",
+          "6f0000000000000000000004"
+        ]
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal saved.",
+      "data": {
+        "_id": "6f0000000000000000000e02",
+        "name": "Cut churn",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "2027-01-01",
+        "periodEnd": "2027-03-31",
+        "visibility": "people",
+        "sharedWith": [
+          "6f0000000000000000000002",
+          "6f0000000000000000000004"
+        ],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 50,
+        "targets": [
+          {
+            "id": "6f0000000000000000000f04",
+            "name": "Monthly churn",
+            "kind": "number",
+            "weight": 1,
+            "progressPct": 50,
+            "reachedAt": null,
+            "start": 40,
+            "target": 10,
+            "current": 25,
+            "unit": "%",
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-09-20T09:00:00.000Z"
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-09-20T09:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "sharedRefused": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/6f0000000000000000000e02",
+      "body": {
+        "sharedWith": [
+          "6f0000000000000000000005"
+        ]
+      }
+    },
+    "statusCode": 400,
+    "response": {
+      "status": false,
+      "statusText": "Request refused",
+      "message": "sharedWith names someone who is not an active member",
+      "field": "sharedWith"
+    }
+  },
+  "editRefused": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/6f0000000000000000000e03",
+      "body": {
+        "name": "Taken"
+      }
+    },
+    "statusCode": 403,
+    "response": {
+      "status": false,
+      "statusText": "You do not have permission to perform this action.",
+      "message": "You do not have permission to perform this action."
+    }
+  },
+  "valueSet": {
+    "as": "me",
+    "request": {
+      "method": "put",
+      "path": "/api/v2/goals/6f0000000000000000000e01/targets/6f0000000000000000000f01/value",
+      "body": {
+        "current": 5
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Target updated.",
+      "data": {
+        "_id": "6f0000000000000000000e01",
+        "name": "Grow revenue",
+        "description": "Net new revenue, all regions",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "2026-10-01",
+        "periodEnd": "2026-12-31",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "#2F3990",
+        "progressPct": 38,
+        "targets": [
+          {
+            "id": "6f0000000000000000000f01",
+            "name": "New customers",
+            "kind": "number",
+            "weight": 1,
+            "progressPct": 50,
+            "reachedAt": null,
+            "start": 0,
+            "target": 10,
+            "current": 5,
+            "unit": "customers",
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-10-01T06:45:00.000Z"
+          },
+          {
+            "id": "6f0000000000000000000f02",
+            "name": "Revenue",
+            "kind": "currency",
+            "weight": 2,
+            "progressPct": 0,
+            "reachedAt": null,
+            "start": 1000,
+            "target": 5000,
+            "current": 1000,
+            "unit": "",
+            "currencyCode": "USD",
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-09-20T09:00:00.000Z"
+          },
+          {
+            "id": "6f0000000000000000000f03",
+            "name": "Pricing page live",
+            "kind": "boolean",
+            "weight": 1,
+            "progressPct": 100,
+            "reachedAt": "2026-09-20T09:00:00.000Z",
+            "done": true,
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-09-20T09:00:00.000Z"
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-09-20T09:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "valueUnticked": {
+    "as": "me",
+    "request": {
+      "method": "put",
+      "path": "/api/v2/goals/6f0000000000000000000e01/targets/6f0000000000000000000f03/value",
+      "body": {
+        "done": false
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Target updated.",
+      "data": {
+        "_id": "6f0000000000000000000e01",
+        "name": "Grow revenue",
+        "description": "Net new revenue, all regions",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "2026-10-01",
+        "periodEnd": "2026-12-31",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "#2F3990",
+        "progressPct": 13,
+        "targets": [
+          {
+            "id": "6f0000000000000000000f01",
+            "name": "New customers",
+            "kind": "number",
+            "weight": 1,
+            "progressPct": 50,
+            "reachedAt": null,
+            "start": 0,
+            "target": 10,
+            "current": 5,
+            "unit": "customers",
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-10-01T06:45:00.000Z"
+          },
+          {
+            "id": "6f0000000000000000000f02",
+            "name": "Revenue",
+            "kind": "currency",
+            "weight": 2,
+            "progressPct": 0,
+            "reachedAt": null,
+            "start": 1000,
+            "target": 5000,
+            "current": 1000,
+            "unit": "",
+            "currencyCode": "USD",
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-09-20T09:00:00.000Z"
+          },
+          {
+            "id": "6f0000000000000000000f03",
+            "name": "Pricing page live",
+            "kind": "boolean",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "done": false,
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-10-01T06:46:00.000Z"
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-09-20T09:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "valueRefused": {
+    "as": "me",
+    "request": {
+      "method": "put",
+      "path": "/api/v2/goals/6f0000000000000000000e03/targets/6f0000000000000000000f05/value",
+      "body": {
+        "done": true
+      }
+    },
+    "statusCode": 403,
+    "response": {
+      "status": false,
+      "statusText": "You do not have permission to perform this action.",
+      "message": "You do not have permission to perform this action."
+    }
+  },
+  "valueTooLarge": {
+    "as": "me",
+    "request": {
+      "method": "put",
+      "path": "/api/v2/goals/6f0000000000000000000e01/targets/6f0000000000000000000f01/value",
+      "body": {
+        "current": 10000000000000000
+      }
+    },
+    "statusCode": 400,
+    "response": {
+      "status": false,
+      "statusText": "Request refused",
+      "message": "current must be a number",
+      "field": "current"
+    }
+  },
+  "targetAdded": {
+    "as": "me",
+    "request": {
+      "method": "post",
+      "path": "/api/v2/goals/6f0000000000000000000e02/targets",
+      "body": {
+        "kind": "currency",
+        "name": "Revenue kept",
+        "weight": 2,
+        "start": 0,
+        "target": 20000,
+        "currencyCode": "EUR"
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Target added.",
+      "data": {
+        "_id": "6f0000000000000000000e02",
+        "name": "Cut churn",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "2027-01-01",
+        "periodEnd": "2027-03-31",
+        "visibility": "people",
+        "sharedWith": [
+          "6f0000000000000000000002",
+          "6f0000000000000000000004"
+        ],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 17,
+        "targets": [
+          {
+            "id": "6f0000000000000000000f04",
+            "name": "Monthly churn",
+            "kind": "number",
+            "weight": 1,
+            "progressPct": 50,
+            "reachedAt": null,
+            "start": 40,
+            "target": 10,
+            "current": 25,
+            "unit": "%",
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-09-20T09:00:00.000Z"
+          },
+          {
+            "id": "6f0000000000000000009001",
+            "name": "Revenue kept",
+            "kind": "currency",
+            "weight": 2,
+            "progressPct": 0,
+            "reachedAt": null,
+            "start": 0,
+            "target": 20000,
+            "current": 0,
+            "unit": "",
+            "currencyCode": "EUR",
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-10-01T06:49:00.000Z"
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-09-20T09:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "targetAddRefused": {
+    "as": "me",
+    "request": {
+      "method": "post",
+      "path": "/api/v2/goals/6f0000000000000000000e02/targets",
+      "body": {
+        "kind": "currency",
+        "name": "In pounds",
+        "weight": 1,
+        "target": 100,
+        "currencyCode": "GBP"
+      }
+    },
+    "statusCode": 400,
+    "response": {
+      "status": false,
+      "statusText": "Request refused",
+      "message": "currencyCode is not a currency of this workspace",
+      "field": "currencyCode"
+    }
+  },
+  "targetTicked": {
+    "as": "me",
+    "request": {
+      "method": "post",
+      "path": "/api/v2/goals/6f0000000000000000000e02/targets",
+      "body": {
+        "kind": "boolean",
+        "name": "Exit survey sent",
+        "weight": 1
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Target added.",
+      "data": {
+        "_id": "6f0000000000000000000e02",
+        "name": "Cut churn",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "2027-01-01",
+        "periodEnd": "2027-03-31",
+        "visibility": "people",
+        "sharedWith": [
+          "6f0000000000000000000002",
+          "6f0000000000000000000004"
+        ],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 13,
+        "targets": [
+          {
+            "id": "6f0000000000000000000f04",
+            "name": "Monthly churn",
+            "kind": "number",
+            "weight": 1,
+            "progressPct": 50,
+            "reachedAt": null,
+            "start": 40,
+            "target": 10,
+            "current": 25,
+            "unit": "%",
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-09-20T09:00:00.000Z"
+          },
+          {
+            "id": "6f0000000000000000009001",
+            "name": "Revenue kept",
+            "kind": "currency",
+            "weight": 2,
+            "progressPct": 0,
+            "reachedAt": null,
+            "start": 0,
+            "target": 20000,
+            "current": 0,
+            "unit": "",
+            "currencyCode": "EUR",
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-10-01T06:49:00.000Z"
+          },
+          {
+            "id": "6f0000000000000000009002",
+            "name": "Exit survey sent",
+            "kind": "boolean",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "done": false,
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-10-01T06:51:00.000Z"
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-09-20T09:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "targetEdited": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/6f0000000000000000000e02/targets/6f0000000000000000000f04",
+      "body": {
+        "name": "Monthly churn rate",
+        "target": 5
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Target saved.",
+      "data": {
+        "_id": "6f0000000000000000000e02",
+        "name": "Cut churn",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "2027-01-01",
+        "periodEnd": "2027-03-31",
+        "visibility": "people",
+        "sharedWith": [
+          "6f0000000000000000000002",
+          "6f0000000000000000000004"
+        ],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 11,
+        "targets": [
+          {
+            "id": "6f0000000000000000000f04",
+            "name": "Monthly churn rate",
+            "kind": "number",
+            "weight": 1,
+            "progressPct": 43,
+            "reachedAt": null,
+            "start": 40,
+            "target": 5,
+            "current": 25,
+            "unit": "%",
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-09-20T09:00:00.000Z"
+          },
+          {
+            "id": "6f0000000000000000009001",
+            "name": "Revenue kept",
+            "kind": "currency",
+            "weight": 2,
+            "progressPct": 0,
+            "reachedAt": null,
+            "start": 0,
+            "target": 20000,
+            "current": 0,
+            "unit": "",
+            "currencyCode": "EUR",
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-10-01T06:49:00.000Z"
+          },
+          {
+            "id": "6f0000000000000000009002",
+            "name": "Exit survey sent",
+            "kind": "boolean",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "done": false,
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-10-01T06:51:00.000Z"
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-09-20T09:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "targetRemoved": {
+    "as": "me",
+    "request": {
+      "method": "delete",
+      "path": "/api/v2/goals/6f0000000000000000000e02/targets/6f0000000000000000009001"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Target removed.",
+      "data": {
+        "_id": "6f0000000000000000000e02",
+        "name": "Cut churn",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "2027-01-01",
+        "periodEnd": "2027-03-31",
+        "visibility": "people",
+        "sharedWith": [
+          "6f0000000000000000000002",
+          "6f0000000000000000000004"
+        ],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 21,
+        "targets": [
+          {
+            "id": "6f0000000000000000000f04",
+            "name": "Monthly churn rate",
+            "kind": "number",
+            "weight": 1,
+            "progressPct": 43,
+            "reachedAt": null,
+            "start": 40,
+            "target": 5,
+            "current": 25,
+            "unit": "%",
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-09-20T09:00:00.000Z"
+          },
+          {
+            "id": "6f0000000000000000009002",
+            "name": "Exit survey sent",
+            "kind": "boolean",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "done": false,
+            "updatedBy": "6f0000000000000000000001",
+            "updatedAt": "2026-10-01T06:51:00.000Z"
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-09-20T09:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "archived": {
+    "as": "me",
+    "request": {
+      "method": "post",
+      "path": "/api/v2/goals/000000000000000000000015/archive"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal archived.",
+      "data": {
+        "_id": "000000000000000000000015",
+        "name": "Ship the mobile app",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "2026-10-01",
+        "periodEnd": "2026-12-31",
+        "visibility": "private",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 0,
+        "targets": [],
+        "archived": true,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T06:38:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "archivedRefused": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/000000000000000000000015",
+      "body": {
+        "name": "Too late"
+      }
+    },
+    "statusCode": 409,
+    "response": {
+      "status": false,
+      "statusText": "This goal is archived. Restore it to change it.",
+      "message": "This goal is archived. Restore it to change it."
+    }
+  },
+  "readArchived": {
+    "as": "me",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals/000000000000000000000015"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal fetched successfully.",
+      "data": {
+        "_id": "000000000000000000000015",
+        "name": "Ship the mobile app",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "2026-10-01",
+        "periodEnd": "2026-12-31",
+        "visibility": "private",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 0,
+        "targets": [],
+        "archived": true,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T06:38:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "restored": {
+    "as": "me",
+    "request": {
+      "method": "post",
+      "path": "/api/v2/goals/000000000000000000000015/restore"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal restored.",
+      "data": {
+        "_id": "000000000000000000000015",
+        "name": "Ship the mobile app",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "2026-10-01",
+        "periodEnd": "2026-12-31",
+        "visibility": "private",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 0,
+        "targets": [],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T06:38:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "handedOver": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/000000000000000000000015",
+      "body": {
+        "ownerUserId": "6f0000000000000000000002"
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal saved.",
+      "data": null
+    }
+  },
+  "readHandedOver": {
+    "as": "me",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals/000000000000000000000015"
+    },
+    "statusCode": 404,
+    "response": {
+      "status": false,
+      "statusText": "Goal not found.",
+      "message": "Goal not found."
+    }
+  },
+  "tasksGoal": {
+    "as": "me",
+    "request": {
+      "method": "post",
+      "path": "/api/v2/goals",
+      "body": {
+        "name": "Deliver the release"
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal saved.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "private",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 0,
+        "targets": [],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksAdded": {
+    "as": "me",
+    "request": {
+      "method": "post",
+      "path": "/api/v2/goals/000000000000000000000028/targets",
+      "body": {
+        "kind": "tasks",
+        "name": "Release tasks",
+        "weight": 1,
+        "sources": {
+          "sprintIds": [
+            "6f0000000000000000000b01",
+            "6f0000000000000000000b03"
+          ],
+          "taskIds": [
+            "6f0000000000000000000d05"
+          ]
+        }
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Target added.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "private",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 33,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 33,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01",
+                "6f0000000000000000000b03"
+              ],
+              "taskIds": [
+                "6f0000000000000000000d05"
+              ]
+            },
+            "counted": {
+              "done": 2,
+              "total": 6,
+              "at": "2026-10-01T07:01:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksAddedEmpty": {
+    "as": "me",
+    "request": {
+      "method": "post",
+      "path": "/api/v2/goals/000000000000000000000028/targets",
+      "body": {
+        "kind": "tasks",
+        "name": "Stretch tasks",
+        "weight": 1,
+        "sources": {
+          "sprintIds": [],
+          "taskIds": []
+        }
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Target added.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "private",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 17,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 33,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01",
+                "6f0000000000000000000b03"
+              ],
+              "taskIds": [
+                "6f0000000000000000000d05"
+              ]
+            },
+            "counted": {
+              "done": 2,
+              "total": 6,
+              "at": "2026-10-01T07:01:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:02:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksNotFound": {
+    "as": "me",
+    "request": {
+      "method": "post",
+      "path": "/api/v2/goals/000000000000000000000028/targets",
+      "body": {
+        "kind": "tasks",
+        "name": "Old tasks",
+        "weight": 1,
+        "sources": {
+          "sprintIds": [
+            "6f0000000000000000000b01",
+            "6f0000000000000000000b09"
+          ],
+          "taskIds": []
+        }
+      }
+    },
+    "statusCode": 400,
+    "response": {
+      "status": false,
+      "statusText": "Request refused",
+      "message": "sources.sprintIds.1 is not a list you can open",
+      "field": "sources.sprintIds.1",
+      "code": "source_not_found"
+    }
+  },
+  "tasksValueRefused": {
+    "as": "me",
+    "request": {
+      "method": "put",
+      "path": "/api/v2/goals/000000000000000000000028/targets/6f0000000000000000009003/value",
+      "body": {
+        "current": 3
+      }
+    },
+    "statusCode": 400,
+    "response": {
+      "status": false,
+      "statusText": "Request refused",
+      "message": "current is counted from tasks and cannot be set by hand",
+      "field": "current",
+      "code": "counted_from_tasks"
+    }
+  },
+  "tasksWouldDrop": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/000000000000000000000028",
+      "body": {
+        "visibility": "workspace"
+      }
+    },
+    "statusCode": 400,
+    "response": {
+      "status": false,
+      "statusText": "Request refused",
+      "message": "visibility cannot change while the goal counts tasks that not everyone who would read it can open. Remove those sources first",
+      "field": "visibility",
+      "code": "sources_would_drop",
+      "sources": {
+        "sprintIds": [
+          "6f0000000000000000000b03"
+        ],
+        "taskIds": []
+      }
+    }
+  },
+  "tasksDropped": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/000000000000000000000028/targets/6f0000000000000000009003",
+      "body": {
+        "sources": {
+          "sprintIds": [
+            "6f0000000000000000000b01"
+          ],
+          "taskIds": [
+            "6f0000000000000000000d05"
+          ]
+        }
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Target saved.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "private",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 13,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 25,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01"
+              ],
+              "taskIds": [
+                "6f0000000000000000000d05"
+              ]
+            },
+            "counted": {
+              "done": 1,
+              "total": 4,
+              "at": "2026-10-01T07:06:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:02:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksOpened": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/000000000000000000000028",
+      "body": {
+        "visibility": "workspace"
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal saved.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 13,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 25,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01"
+              ],
+              "taskIds": [
+                "6f0000000000000000000d05"
+              ]
+            },
+            "counted": {
+              "done": 1,
+              "total": 4,
+              "at": "2026-10-01T07:07:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:07:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksNotShared": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/000000000000000000000028/targets/6f0000000000000000009003",
+      "body": {
+        "sources": {
+          "sprintIds": [
+            "6f0000000000000000000b01",
+            "6f0000000000000000000b03"
+          ],
+          "taskIds": [
+            "6f0000000000000000000d05"
+          ]
+        }
+      }
+    },
+    "statusCode": 400,
+    "response": {
+      "status": false,
+      "statusText": "Request refused",
+      "message": "sources.sprintIds.1 cannot be counted on this goal: not everyone who reads the goal can open it. Share the goal with fewer people, or use a number target instead",
+      "field": "sources.sprintIds.1",
+      "code": "source_not_shared",
+      "sources": {
+        "sprintIds": [
+          "6f0000000000000000000b03"
+        ],
+        "taskIds": []
+      }
+    }
+  },
+  "tasksRelinked": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/000000000000000000000028/targets/6f0000000000000000009003",
+      "body": {
+        "sources": {
+          "sprintIds": [
+            "6f0000000000000000000b01",
+            "6f0000000000000000000b02"
+          ],
+          "taskIds": []
+        }
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Target saved.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 20,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 40,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01",
+                "6f0000000000000000000b02"
+              ],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 2,
+              "total": 5,
+              "at": "2026-10-01T07:09:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:07:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksReadReader": {
+    "as": "sam",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals/000000000000000000000028"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal fetched successfully.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": false,
+        "color": "",
+        "progressPct": 20,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 40,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01",
+                "6f0000000000000000000b02"
+              ],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 2,
+              "total": 5,
+              "at": "2026-10-01T07:09:00.000Z"
+            },
+            "notCounted": 0,
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:07:00.000Z"
+            },
+            "notCounted": 0,
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": false,
+        "canSetValue": false,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksReadStale": {
+    "as": "me",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals/000000000000000000000028"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal fetched successfully.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 20,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 40,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01",
+                "6f0000000000000000000b02"
+              ],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 2,
+              "total": 5,
+              "at": "2026-10-01T07:09:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": true,
+            "updatedBy": "",
+            "updatedAt": null
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:07:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": true,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksReadLeftOut": {
+    "as": "me",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals/000000000000000000000028"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal fetched successfully.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 17,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 33,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01",
+                "6f0000000000000000000b02"
+              ],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 1,
+              "total": 3,
+              "at": "2026-10-01T07:22:00.000Z"
+            },
+            "notCounted": 1,
+            "notCountedSources": {
+              "sprintIds": [
+                "6f0000000000000000000b02"
+              ],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:22:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksReadLeftOutReader": {
+    "as": "sam",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals/000000000000000000000028"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal fetched successfully.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": false,
+        "color": "",
+        "progressPct": 17,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 33,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01"
+              ],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 1,
+              "total": 3,
+              "at": "2026-10-01T07:22:00.000Z"
+            },
+            "notCounted": 1,
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:22:00.000Z"
+            },
+            "notCounted": 0,
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": false,
+        "canSetValue": false,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksUncounted": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/000000000000000000000028/targets/6f0000000000000000009003",
+      "body": {
+        "sources": {
+          "sprintIds": [
+            "6f0000000000000000000b01"
+          ],
+          "taskIds": []
+        }
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Target saved.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 17,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 33,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01"
+              ],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 1,
+              "total": 3,
+              "at": "2026-10-01T07:25:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:22:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  }
+}

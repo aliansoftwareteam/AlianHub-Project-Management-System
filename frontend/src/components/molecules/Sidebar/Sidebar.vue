@@ -249,10 +249,7 @@ const props = defineProps({
         type: Boolean,
         default:false
     },
-    themed: {
-        type: Boolean,
-        default: false
-    }
+    themed: { type: Boolean, default: true }
 })
 const showSide = ref(false);
 const search = ref("");

@@ -1,7 +1,7 @@
 import * as env from '@/config/env';
 import { apiRequest } from '../../services/index'
 import { tableSortStages } from '@/views/Projects/composables/customFieldQuery';
-import { groupCondition, groupCountsQuery, readGroupCounts, sprintTaskMatch } from './taskQueries';
+import { groupCondition, groupCountsQuery, readGroupCounts, readGroupTotals, sprintTaskMatch } from './taskQueries';
 import { ancestorsOf } from '@taskTreeRules';
 
 /* A second caller for a page that is already on its way gets the first one's answer. */
@@ -246,16 +246,20 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
     })
 }
 
-/* The server's count for every group of a sprint, in one request. Socket events can only adjust
-   a count for a task the store holds; for any other change the List asks again. */
+/* The server's count for every group of a sprint, and the totals of the columns named, in one request.
+   Socket events can only adjust a count for a task the store holds; for any other change the List asks again. */
 export const refreshGroupCounts = ({state, commit}, payload) => {
-    const {pid, sprintId, items = [], showAllTasks, userId} = payload;
+    const {pid, sprintId, items = [], showAllTasks, userId, totals = []} = payload;
     if(!state.tasks?.[pid]?.sprints?.includes(sprintId) || !items.length) return Promise.resolve();
 
-    return apiRequest('post',`${env.TASK}/find`,{findQuery: groupCountsQuery({ pid, sprintId, items, showAllTasks, userId })})
+    return apiRequest('post',`${env.TASK}/find`,{findQuery: groupCountsQuery({ pid, sprintId, items, showAllTasks, userId, totals })})
     .then((resp) => {
         if(resp.status !== 200) return;
-        commit('mutateGroupCounts', { pid, sprintId, found: readGroupCounts(items, resp.data?.[0]) });
+        commit('mutateGroupCounts', {
+            pid, sprintId,
+            found: readGroupCounts(items, resp.data?.[0]),
+            totals: totals.length ? readGroupTotals(items, resp.data?.[0], totals) : null
+        });
     });
 }
 

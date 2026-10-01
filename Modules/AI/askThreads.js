@@ -3,9 +3,10 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { isNarrowed } = require('../../Config/tokenNarrowing');
 const logger = require('../../Config/loggerConfig');
-const { pageVisibilityFilter } = require('../Pages/helpers/pageRules');
+const { pageReachFilter } = require('../Pages/helpers/pageRules');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const { openProjects } = require('./ask');
+const visibleSet = require('../Knowledge/visibleSet');
 
 /* Threads are private to the person who asked, admins included. A turn stores only the ids of what it
  * cited; reading a thread back resolves each one under the reader's access of the day. */
@@ -84,12 +85,30 @@ const objectIds = (ids) => ids.map((id) => new mongoose.Types.ObjectId(id));
 
 const idsOfKind = (cites, kind) => [...new Set(cites.filter((c) => c.kind === kind).map((c) => String(c.sourceId)).filter((id) => OBJECT_ID.test(id)))];
 
-/* Tasks, pages and projects the reader can open today, by `kind:id`. Other kinds have no page of their own to open. */
+const PASSAGE_KINDS = ['comment', 'transcript', 'guide', 'file'];
+
+/* A cited passage of the knowledge store is named by its source row, so it is read again the way retrieval reads
+ * it: from the live row, under what the reader may retrieve today. A reader with no role here retrieves nothing. */
+const openPassages = async (companyId, uid, cites) => {
+    const wanted = new Map(cites.filter((c) => PASSAGE_KINDS.includes(c.kind) && c.sourceId).map((c) => [`${c.kind}:${String(c.sourceId)}`, c]));
+    if (!wanted.size) return [];
+    try {
+        const set = await visibleSet.resolveVisibleSet({ companyId, caller: { kind: 'user', userId: uid }, scope: { sourceTypes: PASSAGE_KINDS } });
+        return await visibleSet.recheck({ set, passages: [...wanted.values()].map((c) => ({ sourceType: c.kind, sourceId: String(c.sourceId), title: '', updatedAt: null })) });
+    } catch (error) {
+        if (error instanceof visibleSet.RetrievalRefused) return [];
+        throw error;
+    }
+};
+
+/* What the reader can open today of what was cited, by `kind:id`: tasks, pages and projects from their rows,
+ * passages through retrieval's own re-read. Only a task and a page have a page of their own to link to. */
 const openSources = async (companyId, uid, cites) => {
     const taskIds = idsOfKind(cites, 'task');
     const pageIds = idsOfKind(cites, 'page');
     const citedProjects = idsOfKind(cites, 'project');
     const found = new Map();
+    (await openPassages(companyId, uid, cites)).forEach((p) => found.set(`${p.sourceType}:${p.sourceId}`, { title: String(p.title || ''), projectId: '', project: '' }));
     if (!taskIds.length && !pageIds.length && !citedProjects.length) return found;
     const projects = await openProjects(companyId, uid);
     const projectIds = projects.map((p) => String(p._id));
@@ -102,7 +121,7 @@ const openSources = async (companyId, uid, cites) => {
         }, 'find') : [],
         pageIds.length ? MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
-            data: [{ _id: { $in: objectIds(pageIds) }, deletedStatusKey: { $ne: 1 }, ProjectID: { $in: projectIds }, $and: [pageVisibilityFilter(uid)] }, 'title ProjectID', { lean: true }],
+            data: [{ _id: { $in: objectIds(pageIds) }, deletedStatusKey: { $ne: 1 }, ...pageReachFilter({ uid, projectIds }) }, 'title ProjectID', { lean: true }],
         }, 'find') : [],
     ]);
     const add = (kind, row, title) => found.set(`${kind}:${String(row._id)}`, { title: String(title || ''), projectId: String(row.ProjectID || ''), project: nameById[String(row.ProjectID)] || '' });

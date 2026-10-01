@@ -36,17 +36,36 @@ run(async () => {
     if (!session.project) throw new Error('The scale seed company has no project. Run the seed first.');
 
     const room = require('./scale/lib/pace').pacer({ base, log });
-    const { measureApi } = require('./scale/lib/apiProbes');
-    const api = await measureApi({ base, session, runs, room, log });
+    const { client, measureApi } = require('./scale/lib/apiProbes');
+    const only = typeof args.only === 'string' ? args.only : '';
+    if (only && only !== 'everything') throw new Error('--only takes "everything".');
+    const api = only ? { metrics: [], size: {} } : await measureApi({ base, session, runs, room, log });
     const metrics = [...api.metrics];
+
+    const { measureEverything, everythingExplainer } = require('./scale/lib/everythingProbes');
+    /* A server older than the Everything view still gets its List and Board measured. */
+    let everything = { metrics: [], size: {} };
+    try {
+        everything = await measureEverything({
+            base, session, runs, room, log,
+            call: client({ base, token: session.accessToken, companyId: session.companyId }),
+            explain: args['no-explain'] ? null : await everythingExplainer({ session }),
+            viewer: { now: new Date(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' },
+        });
+    } catch (error) {
+        if (only) throw error;
+        log(`Everything: not measured: ${error.message}`);
+    }
+    metrics.push(...everything.metrics);
 
     let browserNote = 'skipped with --no-browser';
     if (!args['no-browser']) {
-        const { launchBrowser, measureBrowser } = require('./scale/lib/browserProbes');
+        const { launchBrowser, measureBrowser, measureEverythingPage } = require('./scale/lib/browserProbes');
         const browser = await launchBrowser();
         if (browser) {
             try {
-                metrics.push(...await measureBrowser({ browser, base, session, list: api.size.list, loads, room, log }));
+                if (!only) metrics.push(...await measureBrowser({ browser, base, session, list: api.size.list, loads, room, log }));
+                if (everything.metrics.length) metrics.push(...await measureEverythingPage({ browser, base, session, loads, room, log }));
                 browserNote = `Chromium ${browser.version()}, headless`;
             } finally {
                 await browser.close();
@@ -63,9 +82,10 @@ run(async () => {
         machine: machine(),
         loadAverage: os.loadavg().map((load) => Math.round(load * 100) / 100),
         base,
-        tasks: api.size.tasks,
+        tasks: only ? everything.size.tasks : api.size.tasks,
         subtasks: api.size.subtasks,
         list: api.size.list,
+        everything: everything.size,
         runs,
         loads,
         browser: browserNote,

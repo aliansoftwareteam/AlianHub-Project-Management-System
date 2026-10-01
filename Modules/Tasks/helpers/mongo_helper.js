@@ -24,6 +24,7 @@ const { updateCommentCollection, addCommentCollection } = require('../../Comment
 const { reconcileSprintTaskCount, scheduleReconciliation } = require('./reconcileTaskCount');
 const { loadSubtree, rewriteDescendantAncestors, sprintCountChange, DELETED } = require('./taskTree');
 const { storableFieldValues } = require('../../CustomField/helpers/fieldValueWrite');
+const { withDescriptionBlock } = require('./descriptionBlock');
 const { copyFieldFiles } = require('../../CustomField/helpers/fieldFiles');
 
 /* ------------- TASK ------------- */
@@ -82,7 +83,7 @@ exports.HandleTask = async (companyId, object, isUpdate, id = null, userData) =>
                         _id: id
                     }, {...object}]
                 } else {
-                    data = {...object};
+                    data = withDescriptionBlock({...object});
 
                     if(data._id) {
                         data._id = new mongoose.Types.ObjectId(data._id);

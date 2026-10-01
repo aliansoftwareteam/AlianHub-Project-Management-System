@@ -181,7 +181,7 @@ Every key is optional. An unknown key at any level is a 400.
 | `rows` | Up to `limit` tasks. Each carries `_id`, `TaskName`, `TaskKey`, `status`, `statusKey`, `statusType`, `Task_Priority`, `AssigneeUserId`, `DueDate`, `startDate`, `ProjectID`, `sprintId`, `folderObjId`, `TaskType`, `TaskTypeKey`, `tagsArray`, `subTasks`, `ancestors`, `ParentTaskId`, `isParentTask`, `createdAt`, `updatedAt`. No custom field values |
 | `groups` | On the first page: a list of `{ key, count }` for the chosen `group`, counted over the same match. `key` is `null` for "no value". With `group: none` it holds one entry with the total. On a later page (a `cursor` was sent) it is `null` |
 | `nextCursor` | A string when more rows exist, otherwise `null` |
-| `projects` | A map by project id, for the projects the rows name (and the group keys, when grouping by project). Each card carries `_id`, `ProjectName`, `ProjectCode`, `projectIcon`, `taskStatusData`, `taskTypeCounts`, `apps`, `statusType`, `isPersonal` and `edit: { status, priority }` |
+| `projects` | A map by project id, for the projects the rows name (and the group keys, when grouping by project). A project a row names carries the whole card: `_id`, `ProjectName`, `ProjectCode`, `projectIcon`, `taskStatusData`, `taskTypeCounts`, `apps`, `statusType`, `isPersonal` and `edit: { status, priority }`. A project that is only counted carries what a heading shows: `_id`, `ProjectName`, `ProjectCode`, `projectIcon`, `statusType` and `isPersonal` (E4: the whole cards were 538 kB with 301 projects) |
 
 The page shows priority only where the project's `apps` include the Priority app, and opens a status or priority picker only where `edit` allows it.
 
