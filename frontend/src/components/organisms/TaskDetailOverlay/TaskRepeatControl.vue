@@ -273,7 +273,6 @@ watch(() => props.task?._id, () => { close(); load(); }, { immediate: true });
 .ah-repeat__actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .ah-repeat__danger { color: var(--danger); }
 @media (max-width: 767px) {
-    .ah-repeat { flex-direction: column; }
     .ah-repeat__input, .ah-repeat__summary, .ah-repeat__day { min-height: 40px; }
 }
 </style>
