@@ -19,7 +19,7 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, toRef } from "vue";
 import { fieldTaskTypes } from "@fieldTaskTypes";
 import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
 import { useTaskTypeOptions } from "@/plugins/customFieldView/taskTypeOptions";
@@ -27,12 +27,14 @@ import { useTaskTypeOptions } from "@/plugins/customFieldView/taskTypeOptions";
 defineOptions({ name: "FieldTaskTypesPicker" });
 
 const props = defineProps({
-    modelValue: { type: Array, default: () => [] }
+    modelValue: { type: Array, default: () => [] },
+    /* The projects the field belongs to; none means a company-wide field. */
+    projectIds: { type: Array, default: () => [] }
 });
 const emit = defineEmits(["update:modelValue"]);
 
 const chosen = computed(() => fieldTaskTypes({ fieldTaskTypes: props.modelValue }));
-const options = useTaskTypeOptions(chosen);
+const options = useTaskTypeOptions({ chosen, projectIds: toRef(props, 'projectIds') });
 
 function toggle(key, on) {
     const rest = chosen.value.filter((entry) => entry !== key);

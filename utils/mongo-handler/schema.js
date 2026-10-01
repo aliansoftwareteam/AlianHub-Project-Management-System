@@ -51,6 +51,12 @@ const schema = {
             type: String,
             required: false,
         },
+        // The chain of parents above the task, root first; empty or missing on a top-level task.
+        // Derived from ParentTaskId by Modules/Tasks/helpers/taskTree.js, never taken from a client.
+        'ancestors': {
+            type: [String],
+            required: false,
+        },
         'ProjectID': {
             type: mongoose.Schema.Types.ObjectId,
             required: true,
@@ -148,6 +154,10 @@ const schema = {
             type: Number,
             required: false,
         },
+        // The due date task.due_date_passed last fired for (Modules/Automations/engine/dueDateTrigger).
+        dueDatePassedFor: { type: Date, required: false },
+        // True while task.subtasks_all_done has fired and no subtask has been open since (Modules/Automations/engine/subtaskTrigger).
+        subtasksAllDone: { type: Boolean, required: false },
         'rawDescription': {
             type: String,
             required: false,
@@ -916,6 +926,8 @@ const schema = {
         reactToAutomation: { type: Boolean, default: false, required: false },
         // Round-robin turn per assign step id, advanced atomically by Modules/Automations/engine/assignees.
         assignCursors: { type: Object, default: {}, required: false },
+        // { [userId]: { hour, count } } — notices the rule's notify steps sent each person in the current hour (Modules/Automations/engine/noticeRecipients).
+        notifyWindows: { type: Object, default: {}, required: false },
         // [{ reason: 'unknown_status', status, step? }] — a condition naming a status no project in scope has,
         // flagged by migrations 061 (conditions) and 062 (condition steps) instead of being dropped; cleared when the rule is saved again.
         needsReview: { type: Array, default: undefined, required: false },
@@ -1539,14 +1551,28 @@ const schema = {
         approvedBy: { type: String, required: false },
         // Same contract as tasks.origin, for a page an inbound path creates; a member's or an agent's page has none
         origin: { type: Object, required: false },
+        // Who last changed the title or the body, and when. updatedBy moves on a property change too, so it cannot
+        // say who wrote the state a version keeps.
+        editedBy: { type: String, required: false },
+        editedAt: { type: Date, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Doc history (Modules/Pages/versions.js). savedBy and savedAt are the writer and the time of the state held, not of
+    // the row. A row with no reason is from the removed history: no savedAt (createdAt stands in) and no visibility.
     pageVersions: {
         pageId: { type: mongoose.Schema.Types.ObjectId, required: true },
         title: { type: String, required: false },
         content: { type: Object, required: false },
         rawText: { type: String, required: false },
         savedBy: { type: String, required: false },
+        savedAt: { type: Date, required: false },
+        name: { type: String, required: false },
+        // 'author' | 'interval' | 'restore' | 'manual'
+        reason: { type: String, required: false },
+        // The doc's visibility while this state was live; a 'private' version is its author's alone for good.
+        visibility: { type: String, required: false },
+        hash: { type: String, required: false },
+        size: { type: Number, required: false },
     },
     // Comments on a doc (Modules/Pages/comments.js). A reply carries its thread's first comment as parentId and that
     // comment's blockId; a blockId the doc no longer has is read as a doc-level comment.
@@ -2615,6 +2641,13 @@ const schema = {
             required: false,
             default: true
         },
+        // Weekday numbers (0 = Sunday) the company works; absent reads as Monday to Friday
+        // (Modules/Company/helpers/workingDays.js). No default, so only a chosen week is stored.
+        workingDays: {
+            type: [Number],
+            required: false,
+            default: undefined
+        },
         Cst_Phone: {
             type: String,
             required: false
@@ -3362,6 +3395,12 @@ const schema = {
             type: Boolean,
             required: true,
             default : true
+        },
+        // The project's own working week, overriding the company's; absent, null or empty uses the company's.
+        workingDays: {
+            type: [Number],
+            required: false,
+            default: undefined
         },
         lastProjectActivity: {
             type: Number,

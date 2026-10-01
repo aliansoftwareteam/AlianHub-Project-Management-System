@@ -70,8 +70,8 @@
                         <input type="text" class="customfield__form-control" :placeHolder="$t('PlaceHolder.search')" v-model="search" @input="handleInput">
                     </template>
                     <template #options>
-                        <div v-if="allCountriesArray && allCountriesArray.length && (allCountriesArray).filter((x)=>x.code === props.detail.fieldFlag || x.code === props.detail.fieldCountryObject.code).length">
-                            <DropDownOption v-for="(Country,index) in (allCountriesArray).filter((x)=>x.code === props.detail.fieldFlag || x.code === props.detail.fieldCountryObject.code)" :key="index" :selected="Country.code.toLowerCase() === flag?.toLowerCase()" @click="handleUpdate(Country)">
+                        <div v-if="allCountriesArray && allCountriesArray.length && (allCountriesArray).filter((x)=>x.code === props.detail.fieldFlag || x.code === props.detail.fieldCountryObject?.code).length">
+                            <DropDownOption v-for="(Country,index) in (allCountriesArray).filter((x)=>x.code === props.detail.fieldFlag || x.code === props.detail.fieldCountryObject?.code)" :key="index" :selected="Country.code.toLowerCase() === flag?.toLowerCase()" @click="handleUpdate(Country)">
                                 <div class="d-flex align-items-center">
                                     <div :class="`vti__flag ${Country.code.toLowerCase()}`" ></div>
                                     <span class="ownEveryone">{{Country.en}}</span>

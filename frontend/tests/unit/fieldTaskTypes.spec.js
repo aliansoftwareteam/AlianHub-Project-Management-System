@@ -13,7 +13,7 @@ import { fieldAppliesToTask, shownFieldValues } from '@/views/Projects/composabl
 import {
     customFieldGroups, customFilterCondition, customFilterOptions, customGroupMatches, customSortValue, groupTakesTask, putFrom, tableSortStages, valuePath
 } from '@/views/Projects/composables/customFieldQuery';
-import { taskTypeOptions } from '@/plugins/customFieldView/taskTypeOptions';
+import { fieldProjectIds, taskTypeOptions } from '@/plugins/customFieldView/taskTypeOptions';
 import CustomFieldCell from '@/views/Projects/components/columns/CustomFieldCell.vue';
 import CustomFieldRender from '@/plugins/customFieldView/component/molecules/customFieldTaskView/customFieldRender.vue';
 import TextComponentListing from '@/plugins/customFieldView/component/atom/customFieldTaskView/textComponentListing.vue';
@@ -156,27 +156,63 @@ describe('group, filter and sort by a scoped field', () => {
 });
 
 describe('the "Show for task types" choice', () => {
+    const type = (key, name, more = {}) => ({ key, name, value: name.toLowerCase().replace(' ', '_'), taskCount: 0, ...more });
+    const SANDBOX = { _id: 'p-sandbox', ProjectName: 'QA Sandbox', taskTypeCounts: [type(1, 'Task'), type(3, 'Sub Task'), type(BUG, 'Bug')] };
+    const DESIGN = { _id: 'p-design', ProjectName: 'Design', taskTypeCounts: [type(1, 'Task'), type(4, 'Story'), type(5, 'Spike', { isDeleted: true })] };
+    const keys = (options) => options.map((option) => option.key);
+
     it('offers the company\'s live task types, and keeps a chosen type that has since gone', () => {
-        const options = taskTypeOptions(COMPANY_TYPES, [], [9]);
-        expect(options.map((option) => option.key)).toEqual([1, BUG, 9]);
+        const options = taskTypeOptions({ companyTypes: COMPANY_TYPES, chosen: [9] });
+        expect(keys(options)).toEqual([1, BUG, 9]);
         expect(options[2].missing).toBe(true);
     });
 
-    it('falls back to the task type templates when the company list is not loaded', () => {
+    it('falls back to the task type templates when nothing else is loaded', () => {
         const templates = [{ taskTypes: [{ key: 1, name: 'Task' }, { key: BUG, name: 'Bug' }] }, { taskTypes: [{ key: BUG, name: 'Bug' }] }];
-        expect(taskTypeOptions({}, templates, []).map((option) => option.key)).toEqual([1, BUG]);
+        expect(keys(taskTypeOptions({ companyTypes: {}, templates }))).toEqual([1, BUG]);
     });
 
-    const picker = (modelValue) => mount(FieldTaskTypesPicker, {
-        props: { modelValue },
-        global: {
-            plugins: [i18n, createStore({ getters: { 'settings/AllTaskType': () => COMPANY_TYPES, 'settings/taskType': () => [] } })],
-            stubs: { TaskTypeIcon: true }
-        }
+    it('offers a project\'s own types when the company catalogue is empty', () => {
+        const options = taskTypeOptions({ companyTypes: [], templates: [], projects: [SANDBOX], projectIds: ['p-sandbox'] });
+        expect(options.map((option) => [option.key, option.name])).toEqual([[1, 'Task'], [3, 'Sub Task'], [BUG, 'Bug']]);
+        expect(options[2].taskType).toBe(SANDBOX.taskTypeCounts[2]);
+    });
+
+    it('offers a company-wide field every type of the projects that are open to the person, each once', () => {
+        expect(keys(taskTypeOptions({ companyTypes: [], templates: [], projects: [SANDBOX, DESIGN, null, {}] }))).toEqual([1, 3, BUG, 4]);
+    });
+
+    it('offers only keys the server accepts for a field', () => {
+        const odd = { _id: 'p-odd', taskTypeCounts: [type(0, 'Zero'), type('7', 'Seven'), type('x', 'Named'), { name: 'Keyless' }, type(1.5, 'Half')] };
+        expect(keys(taskTypeOptions({ projects: [odd], projectIds: ['p-odd'] }))).toEqual([7]);
+    });
+
+    it('offers a company-wide field the company catalogue when it has entries', () => {
+        expect(keys(taskTypeOptions({ companyTypes: COMPANY_TYPES, projects: [SANDBOX, DESIGN] }))).toEqual([1, BUG]);
+    });
+
+    it('does not offer a project field another project\'s types', () => {
+        const scope = { templates: [], projects: [SANDBOX, DESIGN], projectIds: ['p-design'] };
+        expect(keys(taskTypeOptions({ ...scope, companyTypes: [] }))).toEqual([1, 4]);
+        expect(keys(taskTypeOptions({ ...scope, companyTypes: COMPANY_TYPES }))).toEqual([1, 4]);
+        expect(keys(taskTypeOptions({ ...scope, companyTypes: [], projectIds: 'p-sandbox' }))).toEqual([1, 3, BUG]);
+    });
+
+    it('reads a field\'s projects the way the server does', () => {
+        expect(fieldProjectIds({ global: true, projectId: ['p-design'] })).toEqual([]);
+        expect(fieldProjectIds({ global: false, projectId: ['p-design'] })).toEqual(['p-design']);
+        expect(fieldProjectIds({ projectId: 'p-design' })).toEqual(['p-design']);
+        expect(fieldProjectIds({ global: false, projectId: '' })).toEqual([]);
+        expect(fieldProjectIds(undefined)).toEqual([]);
+    });
+
+    const picker = (props, storeGetters = { 'settings/AllTaskType': () => COMPANY_TYPES, 'settings/taskType': () => [] }) => mount(FieldTaskTypesPicker, {
+        props,
+        global: { plugins: [i18n, createStore({ getters: storeGetters })], stubs: { TaskTypeIcon: true } }
     });
 
     it('ticks the chosen types and says that none ticked means every type', async () => {
-        const wrapper = picker([BUG]);
+        const wrapper = picker({ modelValue: [BUG] });
         const boxes = wrapper.findAll('input[type="checkbox"]');
         expect(boxes.map((box) => box.element.checked)).toEqual([false, true]);
         expect(wrapper.text()).toContain(en.Fields.task_types_hint);
@@ -185,5 +221,16 @@ describe('the "Show for task types" choice', () => {
         expect(wrapper.emitted('update:modelValue').at(-1)).toEqual([[BUG, 1]]);
         await boxes[1].setValue(false);
         expect(wrapper.emitted('update:modelValue').at(-1)).toEqual([[]]);
+    });
+
+    it('lists the types of the projects it is told the field belongs to', () => {
+        const wrapper = picker({ modelValue: [], projectIds: ['p-design'] }, {
+            'settings/AllTaskType': () => [],
+            'settings/taskType': () => [],
+            'projectData/allProjects': () => ({ data: [SANDBOX, DESIGN] }),
+            'projectData/currentProjectDetails': () => SANDBOX
+        });
+        expect(wrapper.findAll('.ftt__name').map((name) => name.text())).toEqual(['Task', 'Story']);
+        expect(wrapper.text()).not.toContain(en.Fields.task_types_empty);
     });
 });
