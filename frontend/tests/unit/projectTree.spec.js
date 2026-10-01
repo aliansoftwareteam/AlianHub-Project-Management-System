@@ -193,6 +193,13 @@ describe('the tree panel on project pages', () => {
         expect(wrapper.find('[role="tree"]').exists()).toBe(false);
     });
 
+    it('takes no density from the open view: it lists every project, so its rows keep one height', async () => {
+        const { wrapper } = await mountWith(ProjectTreePanel, { projects: PROJECTS }, { width: 1280 });
+        expect(Object.keys(ProjectTreePanel.props)).toEqual(['projects']);
+        expect(wrapper.find('#project-tree-panel').attributes('data-density')).toBeUndefined();
+        expect(wrapper.find('[data-density]').exists()).toBe(false);
+    });
+
     it('is mounted by the project page', () => {
         const source = fs.readFileSync(path.resolve(__dirname, '../../src/views/Projects/Projects.vue'), 'utf8');
         expect(source).toMatch(/<ProjectTreePanel\b/);

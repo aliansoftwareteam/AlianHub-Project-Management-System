@@ -31,7 +31,7 @@
                 :className="'custom__field-required'"
                 :name="'fieldDescription'"
             />
-            <DropDown mode="listbox" :zIndex="10" v-if="isType">
+            <DropDown themed mode="listbox" :zIndex="10" v-if="isType">
                 <template #button>
                     <div class="formkit__form-wrapper" :ref="customFieldTypeUniqueId">
                         <div class="custom__field-required">
@@ -63,7 +63,7 @@
             <div class="formkit__form-wrapper">
                 <label class="formkit-label">{{$t('ProjectDetails.currency')}}</label>
             </div>
-            <DropDown mode="listbox" @isVisible="search='',allCountriesArray = allCountries" :zIndex="10" :id="customFieldUniqueId" :classIndex="1" :keepSameWidth="true">
+            <DropDown themed mode="listbox" @isVisible="search='',allCountriesArray = allCountries" :zIndex="10" :id="customFieldUniqueId" :classIndex="1" :keepSameWidth="true">
                 <template #button>
                     <div class="formkit__form-wrapper" :ref="customFieldUniqueId">
                         <span class="ah-sr-only">{{$t('ProjectDetails.currency')}}</span>

@@ -12,7 +12,7 @@
             <div class="screnshotpreviewHover__Discription d-flex align-items-center justify-content-between py-8px">
                 <span class="screnshotpreviewHover__Discription--memoname font-ui GunPowder text-ellipsis font-size-12 gray pr-10px mw-50">{{dataObj.memoName}}</span>
                 <span class="d-flex align-items-center">
-                    <UserProfile
+                    <UserProfile decorative
                         :showDot="false"
                         :data="{
                             image: dataObj.userProfile,

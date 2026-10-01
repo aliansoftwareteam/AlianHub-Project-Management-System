@@ -101,7 +101,7 @@
                 <transition name="ah-fade">
                     <div v-if="shellState.profileOpen" class="ah-pop ah-rail__pop ah-rail__pop--profile" role="menu" @click.stop>
                         <div class="ah-rail__me">
-                            <UserProfile :showDot="false" :data="{ image: me.Employee_profileImageURL, title: me.Employee_Name }" width="34px" :thumbnail="'35x35'" />
+                            <UserProfile decorative :showDot="false" :data="{ image: me.Employee_profileImageURL, title: me.Employee_Name }" width="34px" :thumbnail="'35x35'" />
                             <div class="ah-rail__me-text">
                                 <strong>{{ me.Employee_Name }}</strong>
                                 <span class="ah-small">{{ me.Employee_Email }}</span>
