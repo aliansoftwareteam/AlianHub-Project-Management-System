@@ -17,6 +17,15 @@
             </div>
 
             <template v-else>
+                <ViewTemplateList
+                    v-if="visibleTemplates.length"
+                    :templates="visibleTemplates"
+                    :adding="addingFromTemplate"
+                    :showAll="Boolean(query.trim())"
+                    @pick="addFromTemplate"
+                    @changed="loadTemplates"
+                />
+
                 <section v-for="group in visibleGroups" :key="group.key" class="view__group">
                     <h3 class="view__group-title">{{$t(group.labelKey)}}</h3>
                     <div class="view__grid">
@@ -30,20 +39,12 @@
                             :title="item.description ? $t(`ViewListdescription.${item.description}`) : null"
                             @click="selectView(item)"
                         >
-                            <img class="view__cell-icon" :src="projectComponentsIcons(item.keyName)?.icon" alt="" aria-hidden="true">
+                            <span v-if="projectComponentsIcons(item.keyName)?.icon" class="ah-mask-icon view__cell-icon" :style="maskOf(projectComponentsIcons(item.keyName).icon)" aria-hidden="true"></span>
                             <span class="view__cell-name">{{$t(`ViewList.${item.name}`)}}</span>
                             <span class="view__cell-tag">{{$t(viewTagKey(item.keyName))}}</span>
                         </button>
                     </div>
                 </section>
-
-                <ViewTemplateList
-                    v-if="visibleTemplates.length"
-                    :templates="visibleTemplates"
-                    :adding="addingFromTemplate"
-                    @pick="addFromTemplate"
-                    @changed="loadTemplates"
-                />
 
                 <p v-if="!visibleGroups.length && !visibleTemplates.length" class="view__empty">{{$t('Projects.no_views_match')}}</p>
             </template>
@@ -62,20 +63,18 @@
     </div>
 </template>
 <script setup>
-// UTILS
 import { addView } from '@/components/molecules/EmbedView/helper.js'
 import { addPrivateView, groupViews, viewTagKey } from './helper.js'
+import { maskOf } from '@/utils/iconMask'
 import { addViewFromTemplate, errorText, fittingTemplates, leftOutText, useViewTemplates } from './viewTemplates'
 import { createPrivateView } from '@/views/Projects/composables/savedViewApi'
 import { useCustomComposable } from "@/composable";
 import * as env from '@/config/env';
 import { projectComponentsIcons } from '@/composable/commonFunction';
 
-// COMPONENTS
 import EmbedView from '@/components/molecules/EmbedView/EmbedView.vue'
 import ViewTemplateList from './ViewTemplateList.vue'
 
-// PACKAGES
 import { ref, onMounted, inject, computed, watch } from 'vue'
 import { useToast } from 'vue-toast-notification'
 import { useStore } from 'vuex';
@@ -98,7 +97,7 @@ const props = defineProps({
 
 const companyUserData = computed(()=> { return getters['settings/companyUsers']})
 const toast = useToast()
-const emits = defineEmits(['closeDropdown','handleCloseDropdown'])
+const emits = defineEmits(['closeDropdown','handleCloseDropdown','added'])
 const isPin = ref(false)
 const isPrivate = ref(false)
 const navOptions = ref('')
@@ -189,8 +188,11 @@ const visibleTemplates = computed(() => {
 });
 
 /* The server fits the template to this project and hands the view back; a private one is stored on the member row, as every private view is. */
+const myRow = () => companyUserData.value.find((item) => userId.value === item.userId);
+const showMine = (row, view) => commit('settings/mutateCompanyUsers', { data: { ...row, ProjectRequiredComponent: [...(row.ProjectRequiredComponent || []), view] }, op: 'modified' });
+
 const keepPrivately = async (draft) => {
-    const row = companyUserData.value.find((item) => userId.value === item.userId);
+    const row = myRow();
     const view = {
         ...Object.fromEntries(PRIVATE_COPIED_FIELDS.filter((field) => draft[field] !== undefined).map((field) => [field, draft[field]])),
         id: makeUniqueId(10),
@@ -203,7 +205,19 @@ const keepPrivately = async (draft) => {
         createdAt: new Date(),
     };
     await createPrivateView(row._id, view);
-    commit('settings/mutateCompanyUsers', { data: { ...row, ProjectRequiredComponent: [...(row.ProjectRequiredComponent || []), view] }, op: 'modified' });
+    showMine(row, view);
+    return view;
+};
+
+const close = () => {
+    emits('closeDropdown');
+    emits('handleCloseDropdown');
+};
+
+/* An unmounted component emits nothing, so the page hears about the new view before the menu closes. */
+const announce = (view) => {
+    emits('added', view);
+    close();
 };
 
 const addFromTemplate = async (template) => {
@@ -211,12 +225,12 @@ const addFromTemplate = async (template) => {
     addingFromTemplate.value = true;
     try {
         const response = await addViewFromTemplate(Data.value._id, { templateId: template._id, isPin: isPin.value, isPrivate: isPrivate.value });
-        if (isPrivate.value) await keepPrivately(response.data);
-        else commit('projectData/projectLocalUpdate', { itemData: response.data, projectId: Data.value._id, key: 'ProjectView', subKey: 'add', userId: '' });
+        const view = isPrivate.value ? await keepPrivately(response.data) : response.data;
+        if (!isPrivate.value) commit('projectData/projectLocalUpdate', { itemData: view, projectId: Data.value._id, key: 'ProjectView', subKey: 'add', userId: '' });
         const leftOut = leftOutText(response.leftOut, t);
         if (leftOut) toast.warning(leftOut, { position: 'top-right' });
         else toast.success(t('Toast.View_added_successfully'), { position: 'top-right' });
-        emits('closeDropdown');
+        announce(view);
     } catch (error) {
         toast.error(errorText(error, t('ViewTemplates.add_failed')), { position: 'top-right' });
     } finally {
@@ -230,7 +244,6 @@ const selectView = (item) => {
         return;
     }
     handleSubmit(item);
-    emits('handleCloseDropdown');
 };
 
 watch(() => getters['projectData/projects']?.data?.find((x) => x._id === Data.value?._id) , () => {
@@ -249,17 +262,23 @@ const handleSubmit = (item) =>{
         addView({cid: companyId.value, pid: Data.value._id}, payload).then((res) => {
             commit('projectData/projectLocalUpdate', {itemData: res.data,projectId: Data.value._id,key:"ProjectView",subKey:"add",userId: ''});
             toast.success(res.statusText , {position:'top-right'})
+            announce(res.data)
         }).catch((err) =>{
             console.error(err.statusText)
+            close()
         })
     } else {
-        addPrivateView({cid:companyId.value, uid:companyUser.value._id, uniqueId:makeUniqueId(10)}, {...payload, isPrivate: true, projectId: Data.value._id}).then((res) => {
+        const row = myRow();
+        const view = {...payload, isPrivate: true, projectId: Data.value._id, id: makeUniqueId(10), createdAt: new Date()};
+        addPrivateView({cid:companyId.value, uid: row._id, uniqueId: view.id}, view).then((res) => {
+            showMine(row, view)
             toast.success(t(`Toast.${res.statusText}`), {position:'top-right'})
+            announce(view)
         }).catch((err) => {
             console.error(err.statusText)
+            close()
         })
     }
-    emits('closeDropdown')
 }
 
 </script>

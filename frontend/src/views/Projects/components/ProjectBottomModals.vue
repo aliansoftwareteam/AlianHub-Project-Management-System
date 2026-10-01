@@ -1,12 +1,12 @@
 <template>
     <div>
-        <DropDown mode="dialog" :aria-label="$t('Projects.all_views')" :title="$t('Projects.all_views')" :ref="projectAddView" :bodyClass="{'viewlist-mobile-dropdown-new' : true}" maxHeight="unset" v-if="clientWidth <= 768">
+        <DropDown mode="dialog" themed :aria-label="$t('Projects.all_views')" :title="$t('Projects.all_views')" :ref="projectAddView" :bodyClass="{'viewlist-mobile-dropdown-new' : true}" maxHeight="unset" v-if="clientWidth <= 768">
             <template #button="{ triggerAttrs }">
                 <span ref="allViewsTrigger" v-bind="triggerAttrs"></span>
             </template>
             <template #options>
                 <div>
-                    <ViewsDropdown @handleCloseDropdown="allViewsTrigger?.click()" :projectData="projectData"/>
+                    <ViewsDropdown @handleCloseDropdown="allViewsTrigger?.click()" @added="$emit('viewAdded', $event)" :projectData="projectData"/>
                 </div>
             </template>
         </DropDown>
@@ -117,6 +117,7 @@ defineEmits([
     'tourModalAccept',
     'tourModalClose',
     'closeAiSidebar',
+    'viewAdded',
 ]);
 
 const allViewsTrigger = ref(null);
