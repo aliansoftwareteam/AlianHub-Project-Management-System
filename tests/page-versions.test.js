@@ -269,6 +269,13 @@ describe('saving a version by hand', () => {
         expect(kept()[0].savedAt).toEqual(new Date(T0 + MINUTE));
     });
 
+    it('announces nothing: a version is not a doc, and the knowledge index reads what docs announce', async () => {
+        const saved = await saveVersion(EDITOR, 'Before review');
+        await rename(EDITOR, saved.data._id, 'Renamed');
+
+        expect(socketEmitter.emit).not.toHaveBeenCalled();
+    });
+
     it('does not keep the same state twice, and names the one it already has', async () => {
         await saveVersion(AUTHOR);
         await saveVersion(AUTHOR);

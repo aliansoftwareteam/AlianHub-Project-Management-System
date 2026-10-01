@@ -69,27 +69,4 @@ const keepOutgoing = async (companyId, page, editorId, { now = new Date(), reaso
     return keep(companyId, page, { reason: why, savedBy: rules.writerOf(page), savedAt: rules.writtenAt(page) || now, state, now });
 };
 
-/* The docs a person wrote, whatever state they are in: a trashed or since-shared doc still has its private copies. */
-const privateOf = async (companyId, userId) => {
-    const pages = await MongoDbCrudOpration(String(companyId), {
-        type: SCHEMA_TYPE.PAGES,
-        data: [{ createdBy: String(userId) }, '_id', { lean: true }],
-    }, 'find');
-    return { pageId: { $in: (pages || []).map((page) => oid(page._id)) }, visibility: 'private' };
-};
-
-/* Erasure by person (Knowledge/controls): the copies kept while a doc of theirs was private. Their shared docs stay,
- * and so do the versions of them. */
-const erasePrivateOf = async (companyId, userId) => {
-    const where = await privateOf(companyId, userId);
-    if (!where.pageId.$in.length) return 0;
-    const result = await store(companyId, [where], 'deleteMany');
-    return (result && result.deletedCount) || 0;
-};
-
-const hasPrivateOf = async (companyId, userId) => {
-    const where = await privateOf(companyId, userId);
-    return Boolean(where.pageId.$in.length) && Boolean(await store(companyId, [where, '_id', { lean: true }], 'findOne'));
-};
-
-module.exports = { rowsOf, latestOf, versionOf, namedCount, setName, thin, keep, keepOutgoing, erasePrivateOf, hasPrivateOf };
+module.exports = { rowsOf, latestOf, versionOf, namedCount, setName, thin, keep, keepOutgoing };
