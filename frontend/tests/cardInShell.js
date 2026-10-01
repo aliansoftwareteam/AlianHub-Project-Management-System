@@ -5,6 +5,7 @@ import DashboardCard from '@/components/organisms/DashboardCard/DashboardCard.vu
 
 export const CATALOG_EMPTY_TEXT = 'catalogue empty text';
 
+const RouterLink = { name: 'RouterLink', props: ['to'], render() { return h('a', this.$slots.default && this.$slots.default()); } };
 export const ApexChart = { name: 'ApexChart', props: ['series', 'options', 'type', 'height'], render: () => h('div', { 'data-test': 'apex' }) };
 
 export const settle = async () => {
@@ -32,7 +33,7 @@ export function mountInShell(body, { props = {}, shell = {}, global = {} } = {})
             default: () => h(body, { cardUID: 'c1', ...attrs, refreshTrigger: Number(attrs.refreshTrigger || 0) + refreshes.value }),
         }),
     };
-    const wrapper = mount(Host, { attrs: props, global: { ...global, stubs: { ApexChart, ...(global.stubs || {}) } } });
+    const wrapper = mount(Host, { attrs: props, global: { ...global, stubs: { ApexChart, RouterLink, ...(global.stubs || {}) } } });
     return { wrapper, shown: shown(wrapper), refresh, setShell: (next) => { shellProps.value = next; } };
 }
 

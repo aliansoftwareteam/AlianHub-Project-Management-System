@@ -37,6 +37,8 @@ const deferred = () => {
     return { promise, resolve };
 };
 
+const instanceOf = (wrapper, component) => wrapper.findComponent(component).vm.$.uid;
+
 const inShell = (body, cardData = {}) => mountInShell(body, { props: { cardData }, global: { plugins: [store()] } });
 
 const sprints = (n) => Array.from({ length: n }, (_, i) => ({ sprintId: `s${i}`, name: `Sprint ${i}`, committed: 10, completed: 8 + i }));
@@ -133,7 +135,7 @@ describe('a card body inside the real card shell', () => {
         apiRequest.mockResolvedValue(ok({ sprints: sprints(2) }));
         const { wrapper, shown, setShell } = inShell(VelocityCard, { projectId: 'p1' });
         await flushPromises();
-        const body = wrapper.findComponent(VelocityCard).vm;
+        const mounted = instanceOf(wrapper, VelocityCard);
 
         setShell({ state: 'loading' });
         await flushPromises();
@@ -142,7 +144,7 @@ describe('a card body inside the real card shell', () => {
         await flushPromises();
 
         expect(shown.state).toBe('ready');
-        expect(wrapper.findComponent(VelocityCard).vm).toBe(body);
+        expect(instanceOf(wrapper, VelocityCard)).toBe(mounted);
         expect(apiRequest).toHaveBeenCalledTimes(1);
     });
 });
@@ -193,7 +195,7 @@ describe('Burndown inside the real card shell', () => {
         const { wrapper, shown, setShell } = inShell(BurndownCard, { projectId: 'p1', sprintId: 's1' });
         await flushPromises();
 
-        const body = wrapper.findComponent(BurndownCard).vm;
+        const mounted = instanceOf(wrapper, BurndownCard);
         expect(apiRequest).toHaveBeenCalledTimes(1);
         expect(apiRequest).toHaveBeenCalledWith('get', '/api/v1/agile/burndown?sprintId=s1');
         expect(shown.state).toBe('loading');
@@ -202,7 +204,7 @@ describe('Burndown inside the real card shell', () => {
         await flushPromises();
         await flushPromises();
 
-        expect(wrapper.findComponent(BurndownCard).vm).toBe(body);
+        expect(instanceOf(wrapper, BurndownCard)).toBe(mounted);
         expect(shown.state).toBe('ready');
         expect(wrapper.find('[data-test="burndown-remaining"]').text()).toBe('7');
         expect(wrapper.findComponent(ApexChart).props('series')[0].data).toEqual([12, 7]);
@@ -212,7 +214,7 @@ describe('Burndown inside the real card shell', () => {
             setShell({ state });
             await flushPromises();
         }
-        expect(wrapper.findComponent(BurndownCard).vm).toBe(body);
+        expect(instanceOf(wrapper, BurndownCard)).toBe(mounted);
         expect(apiRequest).toHaveBeenCalledTimes(1);
     });
 
