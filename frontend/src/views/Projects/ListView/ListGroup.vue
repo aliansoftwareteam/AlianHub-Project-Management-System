@@ -128,7 +128,7 @@ import { apiRequest } from "@/services";
 import { subtaskCreateAssignees } from "@/utils/assigneeOptions";
 import * as env from "@/config/env";
 import { applyContext, applyTemplate, defaultTemplateOf, listTemplates } from "@/components/molecules/TaskTemplates/taskTemplates";
-import { loadedTotals, totalColumnsOf, totalText } from "@/views/Projects/composables/groupTotals";
+import { groupTotalsOf, totalCellText, totalColumnsOf } from "@/views/Projects/composables/groupTotals";
 import { listColumnClass } from "@/views/Projects/composables/viewColumns";
 import { MANUAL, sortTasks } from "@/views/Projects/composables/viewSort";
 import { groupTakesTask, putFrom } from "@/views/Projects/composables/customFieldQuery";
@@ -215,14 +215,16 @@ const left = computed(() => Math.max(0, total.value - rows.value.length));
 /* With every task of the group loaded the rows are added up here, so a total follows an edit at once. A group
  * that holds only part of its tasks shows the server's totals for all of them, and nothing until they arrive. */
 const serverTotals = computed(() => getters["projectData/tasks"]?.[props.project._id]?.[sprintId.value]?.totals?.[`${props.item.searchKey}_${props.item.searchValue}`] || null);
-const groupTotals = computed(() => (left.value > 0
-    ? serverTotals.value
-    : loadedTotals(rows.value, totalColumns.value, { allTasks: rowEdit?.fields?.allTasks.value || [], defs: rowEdit?.fields?.defs.value || [] })));
+const groupTotals = computed(() => groupTotalsOf({
+    rows: rows.value,
+    count: found.value,
+    server: serverTotals.value,
+    totals: totalColumns.value,
+    allTasks: rowEdit?.fields?.allTasks.value || [],
+    defs: rowEdit?.fields?.defs.value || []
+}));
 const groupPoints = computed(() => groupTotals.value?.points || 0);
-const totalOf = (column) => {
-    const summed = totalColumns.value.find((entry) => entry.id === column.id);
-    return summed ? totalText(summed, groupTotals.value?.[column.id]) : "";
-};
+const totalOf = (column) => totalCellText(totalColumns.value, groupTotals.value, column.id);
 watch(() => [left.value > 0, totalColumns.value.map((column) => column.id).join()], ([partial, ids]) => {
     if (partial && ids) listTotals?.refresh();
 }, { immediate: true });

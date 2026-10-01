@@ -220,6 +220,18 @@ export const mutateGroupCounts = (state, payload) => {
     if(totals) state.tasks[pid][sprintId].totals = {...state.tasks[pid][sprintId].totals, ...totals};
 }
 
+export const mutateTableGroupCounts = (state, payload) => {
+    const {pid, sprintId, found, totals} = payload;
+    const held = state.tableGroupCounts[pid]?.[sprintId];
+    state.tableGroupCounts = {
+        ...state.tableGroupCounts,
+        [pid]: {
+            ...state.tableGroupCounts[pid],
+            [sprintId]: {found: {...held?.found, ...found}, totals: totals ? {...held?.totals, ...totals} : held?.totals}
+        }
+    };
+}
+
 // HANDLE TASK
 /* A reorder this tab made comes back from the server with its own marker. The row already
    holds the new place, so an echo that is not newer only confirms the index it carries. */
