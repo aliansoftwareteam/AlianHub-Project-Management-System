@@ -10,8 +10,9 @@
  *   fromInput(typed)                        optional: what a person typed, as the value to parse
  */
 const people = require('./people');
+const url = require('./url');
 
-const MODULES = Object.freeze({ people });
+const MODULES = Object.freeze({ people, url });
 const MODULE_FIELD_TYPES = Object.freeze(Object.keys(MODULES));
 
 const typeModuleOf = (fieldType) => (MODULE_FIELD_TYPES.includes(fieldType) ? MODULES[fieldType] : null);

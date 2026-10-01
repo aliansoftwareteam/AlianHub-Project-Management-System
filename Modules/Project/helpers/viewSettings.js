@@ -8,7 +8,7 @@ const DONE_BY = ['all', 'human', 'agent', 'mixed', 'unchecked'];
 const SUBTASKS = ['collapsed', 'expanded'];
 const WORKLOAD_UNITS = ['hours', 'points', 'count'];
 const FILTER_TYPES = ['array', 'string', 'date', 'object', 'arrayOfObject', 'custom'];
-const CUSTOM_FIELD_TYPES = ['dropdown', 'checkbox', 'date', 'number', 'money', 'text', 'textarea', 'email', 'phone', 'people'];
+const CUSTOM_FIELD_TYPES = ['dropdown', 'checkbox', 'date', 'number', 'money', 'text', 'textarea', 'email', 'phone', 'people', 'url'];
 const CUSTOM_VALUE = /^customField\.([a-f0-9]{24})\.fieldValue$/i;
 const COMPARISONS = [':', ':!=', ':>', ':<', ':=', ':~', ':set', ':empty'];
 const CONDITIONS = ['&&', '||'];

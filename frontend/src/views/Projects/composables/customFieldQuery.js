@@ -6,7 +6,7 @@ import { typeModuleOf } from '@fieldTypes';
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const VALUE_PATH = /^customField\.([a-f0-9]{24})\.fieldValue$/i;
 const GROUP_PREFIX = 'cf:';
-const TEXT_TYPES = ['text', 'textarea', 'email', 'phone'];
+const TEXT_TYPES = ['text', 'textarea', 'email', 'phone', 'url'];
 const NUMBER_TYPES = ['number', 'money'];
 const NUMERIC_TYPES = [...NUMBER_TYPES];
 const LIST_TYPES = ['dropdown', 'people'];

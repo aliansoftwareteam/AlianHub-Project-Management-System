@@ -3854,6 +3854,8 @@ export default {
         "hint_phone": "validated, clickable",
         "type_people": "People",
         "hint_people": "one or several members",
+        "type_url": "Link",
+        "hint_url": "a web address that opens in a new tab",
         "type_formula": "Formula",
         "hint_formula": "computed from other fields",
         "type_rollup": "Rollup",
@@ -3869,7 +3871,10 @@ export default {
     "FieldTypes": {
         "builder_note": "This field is edited on the task: in the task panel and in List and Table cells.",
         "people_multiple_label": "Allow several people",
-        "people_multiple_hint": "Untick to hold one person at a time."
+        "people_multiple_hint": "Untick to hold one person at a time.",
+        "url_placeholder": "example.com/page",
+        "url_edit": "Change the link",
+        "url_not_a_link": "This is not an http or https link, so it is not shown as one."
     },
     "Import": {
         "title": "Import tasks",

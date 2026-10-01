@@ -3,11 +3,13 @@
    own the builder component for them (v-model on the draft) and the message shown when they do not fit. */
 import PeopleFieldValue from './PeopleFieldValue.vue';
 import PeopleFieldSettings from './PeopleFieldSettings.vue';
+import UrlFieldValue from './UrlFieldValue.vue';
 
 export { activeMemberIds, peopleOptions } from './people';
 
 const UI = Object.freeze({
-    people: { icon: 'users', value: PeopleFieldValue, settings: PeopleFieldSettings }
+    people: { icon: 'users', value: PeopleFieldValue, settings: PeopleFieldSettings },
+    url: { icon: 'link', value: UrlFieldValue, settings: null }
 });
 
 export const fieldTypeUi = (fieldType) => (Object.keys(UI).includes(fieldType) ? UI[fieldType] : null);

@@ -244,7 +244,7 @@ const typeOptions = [
     { key: "checkbox", label: t("Fields.type_checkbox"), hint: t("Fields.hint_checkbox") },
     { key: "email", label: t("Fields.type_email"), hint: t("Fields.hint_email") },
     { key: "phone", label: t("Fields.type_phone"), hint: t("Fields.hint_phone") },
-    ...["people"].map((key) => ({ key, label: t(`Fields.type_${key}`), hint: t(`Fields.hint_${key}`), icon: fieldTypeUi(key).icon })),
+    ...["people", "url"].map((key) => ({ key, label: t(`Fields.type_${key}`), hint: t(`Fields.hint_${key}`), icon: fieldTypeUi(key).icon })),
     { key: "formula", label: t("Fields.type_formula"), hint: t("Fields.hint_formula"), computed: true },
     { key: "rollup", label: t("Fields.type_rollup"), hint: t("Fields.hint_rollup"), computed: true },
     { key: "ai", label: t("Fields.type_ai"), hint: t("Fields.hint_ai"), ai: true }
