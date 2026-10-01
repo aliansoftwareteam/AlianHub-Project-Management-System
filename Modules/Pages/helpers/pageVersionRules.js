@@ -8,10 +8,18 @@ const MINUTE = 60 * 1000;
 const DAY = 24 * 60 * MINUTE;
 
 /* A version is the state a save is about to replace, kept under the time it was written and the person who wrote
- * it. It is kept when someone else wrote that state, or when the last version was kept longer ago than the interval;
- * saves in between change the doc only. The removed history kept the outgoing body under the incoming save's time and
- * author, which put every entry one save behind its label. */
+ * it. It is kept when someone else wrote that state and none of their work was kept inside the interval, when the
+ * last version was kept longer ago than the interval, or when the save loses more of its text than a small edit
+ * does; small edits in between change the doc only. Two people saving in turn would otherwise keep a version on
+ * every save and push the older history out through the cap. The removed history kept the outgoing body under the
+ * incoming save's time and author, which put every entry one save behind its label. */
 const VERSION_INTERVAL_MS = 10 * MINUTE;
+
+/* A small edit loses fewer characters than this and less than a quarter of the doc's text. Text that is only added
+ * loses nothing, so typing on never keeps a version by itself. */
+const SMALL_EDIT_CHARS = 20;
+const SMALL_EDIT_SHARE = 4;
+const NO_TEXT_BLOCKS = ['image', 'embed'];
 
 /* Unnamed versions thin with age: every one from the last day, then the newest of each day for thirty days, then
  * the newest of each week. Named versions are never thinned, so they are capped by count instead. */
@@ -22,7 +30,7 @@ const MAX_NAMED_VERSIONS = 30;
 const MAX_VERSION_BYTES = 32 * 1024 * 1024;
 const MAX_NAME_LENGTH = 80;
 
-const REASONS = Object.freeze(['author', 'interval', 'restore', 'manual']);
+const REASONS = Object.freeze(['author', 'interval', 'rewrite', 'restore', 'manual']);
 const LEGACY = 'legacy';
 
 const plain = (row) => (row && typeof row.toObject === 'function' ? row.toObject() : { ...(row || {}) });
@@ -74,12 +82,47 @@ const heldBy = (latest, state, mark) => Boolean(latest) && latest.hash === state
 /* A blank doc is not worth a version, and neither is a state the last version already holds. */
 const worthKeeping = (state, latest, mark) => state.blocks.length > 0 && !heldBy(latest, state, mark);
 
-/* Why the doc's current state is kept before `editorId` replaces it, or '' when it is not. */
-const reasonToKeep = ({ page, editorId, latest, now = new Date(), state = snapshotOf(page) }) => {
-    if (!worthKeeping(state, latest, markOf(page))) return '';
-    if (writerOf(page) !== String(editorId || '')) return 'author';
-    const since = latest ? keptAt(latest) : asDate(page.createdAt);
-    return !since || now.getTime() - since.getTime() > VERSION_INTERVAL_MS ? 'interval' : '';
+const lostChars = (before, after) => {
+    const shorter = Math.min(before.length, after.length);
+    let head = 0;
+    while (head < shorter && before[head] === after[head]) head += 1;
+    let tail = 0;
+    while (tail < shorter - head && before[before.length - 1 - tail] === after[after.length - 1 - tail]) tail += 1;
+    return before.length - head - tail;
+};
+
+const textOfBlock = (block) => blocksToRawText([block], Number.MAX_SAFE_INTEGER);
+const weightOf = (block, text) => text.length || (NO_TEXT_BLOCKS.includes(block && block.type) ? SMALL_EDIT_CHARS : 0);
+
+/* How much of `before` is no longer in `after`: block by block where every block carries an id, so a block that is
+ * gone counts whole; as one text otherwise. */
+const lossOf = (before, after) => {
+    const texts = before.map(textOfBlock);
+    const total = before.reduce((sum, block, index) => sum + weightOf(block, texts[index]), 0);
+    if (![...before, ...after].every((block) => block && block.id)) {
+        return { lost: lostChars(texts.join('\n'), after.map(textOfBlock).join('\n')), total };
+    }
+    const kept = new Map(after.map((block) => [block.id, textOfBlock(block)]));
+    const lost = before.reduce((sum, block, index) => sum + (kept.has(block.id)
+        ? lostChars(texts[index], kept.get(block.id))
+        : weightOf(block, texts[index])), 0);
+    return { lost, total };
+};
+
+const isSmallEdit = ({ lost, total }) => lost === 0 || (lost < SMALL_EDIT_CHARS && lost * SMALL_EDIT_SHARE < total);
+
+const insideInterval = (at, now) => Boolean(at) && now.getTime() - at.getTime() <= VERSION_INTERVAL_MS;
+
+/* Why the doc's current state is kept before `editorId` replaces it with `incoming`, or '' when it is not.
+ * `recent` is the newest versions first; `latest` alone stands in for it. */
+const reasonToKeep = ({ page, editorId, latest, recent = latest ? [latest] : [], now = new Date(), state = snapshotOf(page), incoming = null }) => {
+    const newest = recent[0] || null;
+    if (!worthKeeping(state, newest, markOf(page))) return '';
+    const writer = writerOf(page);
+    const keptForWriter = recent.some((row) => String(row.savedBy || '') === writer && insideInterval(keptAt(row), now));
+    if (writer !== String(editorId || '') && !keptForWriter) return 'author';
+    if (!insideInterval(newest ? keptAt(newest) : asDate(page.createdAt), now)) return 'interval';
+    return incoming && !isSmallEdit(lossOf(state.blocks, incoming.blocks)) ? 'rewrite' : '';
 };
 
 const dayOf = (date) => Math.floor(date.getTime() / DAY);
@@ -163,6 +206,7 @@ module.exports = {
     MAX_NAMED_VERSIONS,
     MAX_VERSION_BYTES,
     MAX_NAME_LENGTH,
+    SMALL_EDIT_CHARS,
     REASONS,
     isLegacy,
     timeOf,
@@ -173,6 +217,8 @@ module.exports = {
     markOf,
     heldBy,
     worthKeeping,
+    lossOf,
+    isSmallEdit,
     reasonToKeep,
     versionsToDrop,
     versionVisibleTo,

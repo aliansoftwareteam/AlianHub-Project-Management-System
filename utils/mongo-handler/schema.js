@@ -1585,7 +1585,7 @@ const schema = {
         savedBy: { type: String, required: false },
         savedAt: { type: Date, required: false },
         name: { type: String, required: false },
-        // 'author' | 'interval' | 'restore' | 'manual'
+        // 'author' | 'interval' | 'rewrite' | 'restore' | 'manual'
         reason: { type: String, required: false },
         // The doc's visibility while this state was live; a 'private' version is its author's alone for good.
         visibility: { type: String, required: false },

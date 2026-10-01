@@ -96,15 +96,19 @@ const announceMentions = (companyId, page, actorId, before, after) => {
 
 const htmlOf = (content) => String((content && content.html) || '');
 
-/* Whether a save changes what a version holds: the title or the body. */
-const changesState = (existing, update) => {
-    const next = { title: update.title !== undefined ? update.title : existing.title, content: update.content || existing.content };
-    return versionRules.snapshotOf(next).hash !== versionRules.snapshotOf(existing).hash
+/* The state a save leaves behind, when it changes what a version holds: the title or the body. */
+const incomingState = (existing, update) => {
+    const next = versionRules.snapshotOf({
+        title: update.title !== undefined ? update.title : existing.title,
+        content: update.content || existing.content,
+    });
+    const changed = next.hash !== versionRules.snapshotOf(existing).hash
         || (Boolean(update.content) && htmlOf(update.content) !== htmlOf(existing.content));
+    return changed ? next : null;
 };
 
 /* History never holds up or fails the save that feeds it. */
-const keepOutgoingVersion = (companyId, page, editorId, now) => pageVersions.keepOutgoing(companyId, page, editorId, { now })
+const keepOutgoingVersion = (companyId, page, editorId, now, incoming) => pageVersions.keepOutgoing(companyId, page, editorId, { now, incoming })
     .catch((error) => logger.error(`ERROR keeping a page version: ${error.message}`));
 
 /* A non-deleted (or trashed) page the caller may act on, or null. */
@@ -335,9 +339,10 @@ exports.updatePage = async (req, res) => {
             }
             update.linkedTasks = [...new Set(linkedTasks.map(String))].map((x) => new mongoose.Types.ObjectId(x));
         }
-        if ((update.title !== undefined || update.content) && changesState(existing, update)) {
+        const incoming = update.title !== undefined || update.content ? incomingState(existing, update) : null;
+        if (incoming) {
             const now = new Date();
-            await keepOutgoingVersion(companyId, existing, userId, now);
+            await keepOutgoingVersion(companyId, existing, userId, now, incoming);
             update.editedBy = userId;
             update.editedAt = now;
         }

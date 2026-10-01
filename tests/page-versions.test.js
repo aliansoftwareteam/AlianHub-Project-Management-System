@@ -223,6 +223,24 @@ describe('when a version is kept', () => {
         ]);
     });
 
+    it('keeps one version per writer in ten minutes when two people save in turn', async () => {
+        const turns = [[EDITOR, 'One, two'], [AUTHOR, 'One, two, three'], [EDITOR, 'One, two, three, four'], [AUTHOR, 'One, two, three, four, five'], [EDITOR, 'One, two, three, four, five, six']];
+        for (const [index, [uid, text]] of turns.entries()) {
+            at(1 + index);
+            await save(uid, [para('a', text)]);
+        }
+
+        expect(kept().map((row) => [row.rawText, row.savedBy, row.reason])).toEqual([
+            ['One', AUTHOR, 'author'],
+            ['One, two', EDITOR, 'author'],
+        ]);
+
+        at(13);
+        await save(AUTHOR, [para('a', 'One, two, three, four, five, six, seven')]);
+        expect(kept()).toHaveLength(3);
+        expect(kept()[2]).toMatchObject({ rawText: 'One, two, three, four, five, six', savedBy: EDITOR, reason: 'author' });
+    });
+
     it('does not count a save that changes nothing, or a change to the doc’s properties', async () => {
         at(30);
         await save(AUTHOR, [para('a', 'One')]);

@@ -47,7 +47,24 @@ describe('when the outgoing state is kept', () => {
     const latest = (over = {}) => ({ savedBy: ALICE, savedAt: ago(HOUR), createdAt: ago(8 * MINUTE), hash: 'other', ...over });
 
     it('is kept when someone else wrote it', () => {
-        expect(rules.reasonToKeep({ page: page(), editorId: BOB, latest: latest(), now: NOW })).toBe('author');
+        expect(rules.reasonToKeep({ page: page(), editorId: BOB, latest: latest({ savedBy: BOB }), now: NOW })).toBe('author');
+        expect(rules.reasonToKeep({ page: page(), editorId: BOB, latest: null, now: NOW })).toBe('author');
+    });
+
+    it('is kept once per writer in ten minutes when two people save in turn', () => {
+        const aliceKept = latest({ savedBy: ALICE, createdAt: ago(2 * MINUTE) });
+        const bobKept = latest({ savedBy: BOB, createdAt: ago(MINUTE) });
+        expect(rules.reasonToKeep({ page: page(), editorId: BOB, recent: [bobKept, aliceKept], now: NOW })).toBe('');
+        expect(rules.reasonToKeep({ page: page(), editorId: BOB, recent: [bobKept], now: NOW })).toBe('author');
+
+        const aliceLongAgo = latest({ savedBy: ALICE, createdAt: ago(11 * MINUTE) });
+        expect(rules.reasonToKeep({ page: page(), editorId: BOB, recent: [bobKept, aliceLongAgo], now: NOW })).toBe('author');
+    });
+
+    it('still keeps the other writer’s text inside the ten minutes when the save would lose it', () => {
+        const aliceKept = latest({ savedBy: ALICE, createdAt: ago(2 * MINUTE) });
+        const incoming = rules.snapshotOf(page({ content: { blocks: [para('a', 'Two')] } }));
+        expect(rules.reasonToKeep({ page: page(), editorId: BOB, recent: [aliceKept], now: NOW, incoming })).toBe('rewrite');
     });
 
     it('is not kept when its own writer saves again within ten minutes of the last version', () => {
@@ -133,7 +150,8 @@ describe('when a save loses text', () => {
     it('keeps what a save removes most of, whoever wrote it', () => {
         const incoming = state('Kept line');
         expect(rules.reasonToKeep({ page: doc(['Kept line', LONG]), editorId: ALICE, latest: justKept, now: NOW, incoming })).toBe('rewrite');
-        expect(rules.reasonToKeep({ page: doc(['Kept line', LONG]), editorId: BOB, latest: justKept, now: NOW, incoming })).toBe('author');
+        expect(rules.reasonToKeep({ page: doc(['Kept line', LONG]), editorId: BOB, latest: justKept, now: NOW, incoming })).toBe('rewrite');
+        expect(rules.reasonToKeep({ page: doc(['Kept line', LONG]), editorId: BOB, latest: null, now: NOW, incoming })).toBe('author');
     });
 
     it('still coalesces a run of small edits inside ten minutes', () => {
