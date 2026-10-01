@@ -134,6 +134,35 @@ describe('posting an Ask answer to chat', () => {
         expect(wrapper.emitted('close')).toBeUndefined();
     });
 
+    it('says plainly that a channel with too many readers cannot take the answer, before the person tries', async () => {
+        const BIG = { projectId: 'space-1', sprintId: 'ch-2', taskId: 'default', name: 'everyone', space: 'Team', tooManyReaders: true };
+        apiRequest.mockImplementation(async (method, url, body) => {
+            if (method === 'get' && url === TARGETS) return ok({ channels: [BIG, CHANNEL], directs: [DIRECT], readerCap: 50 });
+            posts.push(body);
+            return reply(body);
+        });
+        const wrapper = await openDialog();
+
+        expect(wrapper.find('[data-test="post-target"]').element.value).toBe('space-1:ch-2:default');
+        expect(wrapper.find('[data-test="post-too-many"]').text()).toBe('Ask.post_too_many_readers {"n":50}');
+        expect(wrapper.find('[data-test="post-send"]').attributes('disabled')).toBeDefined();
+        await press(wrapper, 'post-send');
+        expect(posts).toEqual([]);
+
+        await wrapper.find('[data-test="post-target"]').setValue('space-1:ch-1:default');
+        expect(wrapper.find('[data-test="post-too-many"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="post-send"]').attributes('disabled')).toBeUndefined();
+    });
+
+    it('says the same when the server refuses a channel for its number of readers', async () => {
+        reply = async () => ({ data: { status: false, code: 'too_many_readers', data: { readerCap: 50 } } });
+        const wrapper = await openDialog();
+        await press(wrapper, 'post-send');
+        expect(wrapper.find('[data-test="post-too-many"]').text()).toBe('Ask.post_too_many_readers {"n":50}');
+        expect(wrapper.find('[data-test="post-held"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="post-send"]').attributes('disabled')).toBeDefined();
+    });
+
     it('says so when there is nowhere to post, or the list could not be read', async () => {
         serve({ channels: [], directs: [] });
         const none = await openDialog();

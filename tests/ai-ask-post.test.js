@@ -260,6 +260,39 @@ describe('the conversations an answer can be posted to', () => {
     });
 });
 
+describe('a channel read by more people than their shared sources are worked out for', () => {
+    const crowd = () => Array.from({ length: 50 }, (_, i) => mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: (0x6f0000000000 + i).toString(16).padStart(24, '0'), status: 2, roleType: 3 }));
+
+    it('is marked in the list, so the dialog can say so before the person tries, and a direct message is not', async () => {
+        const few = (await call(askPost.targets, ALICE)).body.data;
+        expect(few.readerCap).toBe(50);
+        expect(few.channels[0].tooManyReaders).toBeUndefined();
+
+        crowd();
+        const many = (await call(askPost.targets, ALICE)).body.data;
+        expect(many.channels).toEqual([expect.objectContaining({ name: 'general', tooManyReaders: true })]);
+        expect(many.directs).toEqual([{ projectId: DM_SPACE, sprintId: DM_SPRINT, taskId: DM_TASK, name: 'Bob' }]);
+    });
+
+    it('is refused by name when someone posts there anyway, and nothing is posted even on "only shared"', async () => {
+        crowd();
+        const given = answered({ answer: 'Pricing launches on Friday [WEB-7].', cited: [SHARED] });
+        const first = await postTo(channel, given);
+        const second = await postTo(channel, given, ALICE, { onlyShared: true });
+        [first, second].forEach((r) => {
+            expect(r.code).toBe(200);
+            expect(r.body).toMatchObject({ status: false, code: 'too_many_readers', data: { readerCap: 50 } });
+        });
+        expect(comments()).toHaveLength(0);
+    });
+
+    it('still takes a post to a direct message in the same workspace', async () => {
+        crowd();
+        const r = await postTo(dm, answered({ answer: 'Pricing launches on Friday [WEB-7].', cited: [SHARED] }));
+        expect(r.body.status).toBe(true);
+    });
+});
+
 describe('what is left of an answer for everyone', () => {
     const cites = [{ kind: 'task', id: 'a', ref: 'WEB-7' }, { kind: 'task', id: 'b', ref: 'ALP-1' }];
     const shared = new Set(['task:a']);
