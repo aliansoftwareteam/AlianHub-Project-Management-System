@@ -2124,6 +2124,8 @@ export default {
         "summary_loading": "Reading the thread…",
         "summary_failed": "Could not summarise this thread.",
         "refresh_summary": "Refresh summary",
+        "summarise_thread": "Summarise this thread",
+        "summary_behind": "The thread has changed since this summary. Refresh it to bring it up to date.",
         "description": "Description",
         "subtasks": "Subtasks",
         "files": "Files",
@@ -3849,6 +3851,7 @@ export default {
         "live_data": "live",
         "updated_just_now": "updated just now",
         "updated_min": "updated {n}m ago",
+        "updated_hours": "updated {n}h ago",
         "link_my_tasks": "My tasks",
         "link_timesheet": "Timesheet",
         "link_projects": "Projects",
@@ -3888,6 +3891,13 @@ export default {
         "settings_question_placeholder": "Which tasks in the current sprint are blocked?",
         "settings_question_hint": "Everyone who opens this dashboard gets their own answer, built only from what they can open. Each answer uses AI and counts toward the workspace AI spend.",
         "settings_ask_project": "Search in",
+        "settings_refresh_after": "Ask again when the answer is older than",
+        "settings_refresh_after_hint": "The answer is kept and shown each time the dashboard opens. Past this age, opening the dashboard asks once for a new one. The refresh button on the card always asks again.",
+        "refresh_after_hour": "1 hour",
+        "refresh_after_6_hours": "6 hours",
+        "refresh_after_day": "1 day",
+        "refresh_after_week": "7 days",
+        "refresh_after_never": "Never ask again automatically",
         "settings_all_projects": "Every project the viewer can open",
         "metric_points": "Points",
         "metric_tasks": "Tasks",
@@ -3907,6 +3917,8 @@ export default {
         "ask_budget_exhausted": "The workspace has reached its AI spending cap, so this question was not asked. It is asked again once the cap resets or is raised.",
         "ask_note": "from what you can open",
         "ask_note_asked": "asked {n}m ago, from what you can open",
+        "ask_note_from": "This answer is from {when}",
+        "ask_availability_unknown": "Could not check whether AI is available here, so this question was not asked.",
         "card_DueSoonCard_title": "My work",
         "card_DueSoonCard_answer": "What is late, due today, and due this week.",
         "card_MyTimeCard_title": "My time",
@@ -5412,6 +5424,7 @@ export default {
         "no_activity_log_found": "Δεν βρέθηκε αρχείο δραστηριότητας"
     },
     "Projects": {
+        "not_available": "N/A",
         "filters": "Filters",
         "filters_active": "Filters, {n} active",
         "filters_close": "Close filters",
@@ -6586,6 +6599,10 @@ export default {
         "confirm_delete_title": "Are you sure you want to delete this clip?"
     },
     "Milestone": {
+        "home_link": "Home",
+        "toggle_rows": "Show or hide the rows under {name}",
+        "public_project": "Public project",
+        "no_filter": "No filter",
         "milestone": "Ορόσημο",
         "milestone_name": "Όνομα Ορόσημου",
         "status_date": "Ημερομηνία Κατάστασης",
@@ -7786,7 +7803,9 @@ export default {
         "copied": "Copied!",
         "generate": "Generate token",
         "rotate": "Regenerate token",
-        "working": "Working…"
+        "working": "Working…",
+        "saved": "Saved",
+        "failed": "Failed"
     },
     "Audit": {
         "subtitle": "An immutable record of sensitive actions in this workspace — role changes, SSO updates, and more.",
