@@ -14,7 +14,7 @@
         <p v-if="!people.length" class="ah-small psp__none" data-test="doc-share-none">{{ $t('Docs.share_none') }}</p>
         <ul v-else class="psp__list">
             <li v-for="person in people" :key="person.userId" class="psp__row" data-test="doc-share-person" :data-user="person.userId">
-                <span class="ah-avatar ah-avatar--sm" aria-hidden="true">
+                <span class="ah-avatar" aria-hidden="true">
                     <img v-if="person.image" :src="person.image" alt="" />
                     <template v-else>{{ person.initial }}</template>
                 </span>
@@ -122,8 +122,8 @@ onMounted(() => send('get'));
 .psp__copy { flex: 1 1 160px; min-width: 0; }
 .psp__label { font-size: 13.5px; font-weight: 500; color: var(--ink); }
 .psp__none { margin: 0; color: var(--ink-2); }
-.psp__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.psp__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.psp__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.psp__row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-width: 0; min-height: max(var(--row-h, 40px), 40px); }
 .psp__name { flex: 1 1 120px; min-width: 0; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ah-input.psp__role { flex: none; width: auto; appearance: auto; }
 .psp__remove {
