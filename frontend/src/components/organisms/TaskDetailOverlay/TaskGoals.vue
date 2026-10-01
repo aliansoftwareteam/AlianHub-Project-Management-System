@@ -29,6 +29,7 @@ import { useRouter } from "vue-router";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequest } from "@/services";
 import { forTaskRequest } from "@/views/Goals/goalRequest";
+import { linkableGoals } from "@/views/Goals/goalLinking";
 
 defineOptions({ name: "TaskGoals" });
 
@@ -59,6 +60,7 @@ async function load(taskId) {
 }
 
 watch(() => props.taskId, load, { immediate: true });
+watch(() => linkableGoals.linked, () => load(props.taskId));
 </script>
 
 <style scoped>
