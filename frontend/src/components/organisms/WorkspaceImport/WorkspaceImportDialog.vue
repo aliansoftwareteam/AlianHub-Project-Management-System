@@ -65,7 +65,7 @@
                         <template v-if="source === 'clickup'">
                             <label class="wim__label" for="wim-sprint">{{ $t('WorkspaceImport.sprint_label') }}</label>
                             <select id="wim-sprint" v-model="sprintId" class="wim__select" :disabled="!sprintOptions.length" data-test="wim-sprint">
-                                <option v-for="option in sprintOptions" :key="option.id" :value="option.id">{{ option.folderName ? `${option.folderName} / ${option.name}` : option.name }}</option>
+                                <option v-for="option in sprintOptions" :key="option.id" :value="option.id">{{ listLabel(option) }}</option>
                             </select>
                             <label class="wim__check">
                                 <input v-model="addMissing" type="checkbox" />
@@ -160,6 +160,7 @@ import { useCustomComposable } from "@/composable";
 import { IMPORT_SOURCES, sprintOptionsOf } from "./workspaceImportState";
 import { useClickUpImport } from "./useClickUpImport";
 import { readSheet } from "./readSheet";
+import { listLabel } from "@/utils/folderTree";
 
 defineOptions({ name: "WorkspaceImportDialog" });
 

@@ -5781,6 +5781,11 @@ export default {
         "new": "New",
         "new_list": "New list",
         "new_folder": "New folder",
+        "new_subfolder": "New subfolder",
+        "new_subfolder_in": "New subfolder in {folder}",
+        "move_folder": "Move folder",
+        "move_folder_hint": "Choose where {folder} goes",
+        "top_level": "Top level of the project",
         "new_menu_task": "Task",
         "menu_view": "View",
         "menu_find": "Find",
@@ -6212,7 +6217,16 @@ export default {
         "search_not_loaded": "That message is further back in this conversation — load earlier messages to jump to it.",
         "unread_one": "1 unread message",
         "unread_many": "{count} unread messages",
-        "marked_unread": "Marked as unread from here"
+        "marked_unread": "Marked as unread from here",
+        "reply_in_thread": "Reply in thread",
+        "thread_title": "Thread",
+        "thread_close": "Close thread",
+        "thread_replies_one": "1 reply",
+        "thread_replies_many": "{count} replies",
+        "thread_open_one": "Open the thread, 1 reply",
+        "thread_open_many": "Open the thread, {count} replies",
+        "thread_last_reply": "Last reply {when}",
+        "thread_failed": "This thread could not be opened. It may have been deleted, or you may not have access to it."
     },
     "Filters": {
         "filter": "筛选器",
@@ -8872,6 +8886,7 @@ export default {
         "Upgrade_your_plan_you_have_reached_the_limit_for_creating_sprints": "升级您的计划。您已达到冲刺创建的限制。",
         "Folder created successfully": "文件夹创建成功",
         "Folder updated successfully": "文件夹更新成功",
+        "Folder_moved_successfully": "Folder moved successfully",
         "Folde restored successfully": "文件夹恢复成功",
         "Folder closed successfully": "文件夹关闭成功",
         "Folder archived successfully": "文件夹归档成功",
@@ -11319,7 +11334,8 @@ export default {
         "show": "Show the project tree",
         "hide": "Hide the project tree",
         "close": "Close the project tree",
-        "tasks": "{n} tasks"
+        "tasks": "{n} tasks",
+        "folder_actions": "Actions for {folder}"
     },
     "TaskTemplates": {
         "save_as": "Save as template",
