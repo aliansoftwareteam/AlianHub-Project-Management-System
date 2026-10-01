@@ -5,6 +5,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { recordFieldCreated, recordFieldRenamed } = require("./helpers/customFieldHistory");
+const { withFieldDefaults } = require("./helpers/fieldDefaults");
 
 exports.insertCustomField = async (req, res) => {
     try {
@@ -51,7 +52,7 @@ exports.insertCustomFieldPromise = (updateObject, type, companyId) => {
 
             const currentDate = new Date();
             const updateObjectDate = {
-                ...updateObject,
+                ...withFieldDefaults(updateObject),
                 updatedAt: currentDate,
                 createdAt: currentDate
             };

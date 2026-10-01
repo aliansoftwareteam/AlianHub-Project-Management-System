@@ -151,3 +151,6 @@ package-lock.json
 
 # Demo team passwords and manifest written by npm run demo:seed
 /.demo-accounts.local.json
+
+# Screenshot atlases written by npm run atlas and npm run atlas:compare
+/artifacts/atlas/

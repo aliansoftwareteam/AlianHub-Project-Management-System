@@ -1,33 +1,13 @@
 <!--
-  DashboardCard — the one wrapper every dashboard card renders inside (handoff 20a).
+  The one wrapper every dashboard card renders inside (handoff 20a).
 
-  Anatomy, top to bottom: title + mono scope tag + chrome (period, refresh, settings,
-  remove) · body · footer with the freshness line and the link that opens the real view.
+  The body in the default slot is mounted for the card's whole life and reports through
+  useCardMeta(); the shell draws the skeleton, the empty state and the error state over it.
+  Never put the slot behind a v-if on the state: a body that is unmounted while it loads
+  cannot report, and one that is remounted when it reports loads again, in a loop.
 
-  Props
-    title           string   card name
-    scope           string   mono tag saying whose data it is — MINE, MY TEAM, WORKSPACE, a project
-    periodOptions   array    [{ id, label }] — renders the period <select> when non-empty
-    periodValue     number   selected period id
-    showRefresh     bool     render the refresh control
-    showSettings    bool     render the settings control
-    showRemove      bool     render the remove control
-    live            bool     the body is live rather than computed — shows the LIVE tag
-    footerNote      string   default freshness / caption line (a body can override via meta.note)
-    linkLabel/linkTo         the footer door: a router location for the same data, unfiltered
-    emptyText/emptyAction    default empty-state copy; emptyAction names the next action
-    state           string   'loading' | 'ready' | 'empty' | 'error' — overrides the body's own
-
-  Emits: period-change, refresh, settings, remove, retry, empty-action
-
-  Slots
-    default   the body (list, bars, chart or table)
-    metric    optional headline row above the body — one number and one comparison
-    actions   extra chrome, left of the built-in controls
-    empty     replaces the default empty state
-
-  A card body drives the state through useCardMeta() rather than props, so the grid
-  does not have to know which cards can be empty.
+  `state` ('loading' | 'ready' | 'empty' | 'error') overrides what the body reports.
+  `emptyText` and `emptyAction` are the catalogue's copy, used when the body names none.
 -->
 <template>
     <section class="dcard" :class="{ 'dcard--live': live }">
@@ -65,28 +45,36 @@
             <slot name="metric"></slot>
         </div>
 
-        <div class="dcard__body ah-scroll" :class="{ 'dcard__body--center': resolvedState !== 'ready' }">
-            <div v-if="resolvedState === 'loading'" class="dcard__skeleton" aria-hidden="true">
-                <span class="dcard__sk dcard__sk--wide"></span>
-                <span class="dcard__sk"></span>
-                <span class="dcard__sk dcard__sk--short"></span>
+        <div class="dcard__body ah-scroll" :class="{ 'dcard__body--covered': !isReady }">
+            <div class="dcard__content" data-test="dcard-content" :aria-hidden="isReady ? null : 'true'">
+                <slot></slot>
             </div>
-            <div v-else-if="resolvedState === 'error'" class="dcard__state">
-                <p class="dcard__state-text">{{ meta.error || $t('Dash.card_error') }}</p>
-                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="$emit('retry')">{{ $t('Dash.try_again') }}</button>
+            <div v-if="resolvedState === 'loading'" class="dcard__cover" data-test="dcard-skeleton" aria-hidden="true">
+                <div class="dcard__skeleton">
+                    <span class="dcard__sk dcard__sk--wide"></span>
+                    <span class="dcard__sk"></span>
+                    <span class="dcard__sk dcard__sk--short"></span>
+                </div>
             </div>
-            <div v-else-if="resolvedState === 'empty'" class="dcard__state">
-                <slot name="empty">
-                    <p class="dcard__state-text">{{ meta.emptyText || emptyText }}</p>
-                    <button
-                        v-if="meta.emptyAction || emptyAction"
-                        type="button"
-                        class="ah-btn ah-btn--outline ah-btn--sm"
-                        @click="$emit('empty-action')"
-                    >{{ meta.emptyAction || emptyAction }}</button>
-                </slot>
+            <div v-else-if="resolvedState === 'error'" class="dcard__cover" data-test="dcard-error">
+                <div class="dcard__state">
+                    <p class="dcard__state-text">{{ meta.error || $t('Dash.card_error') }}</p>
+                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="dcard-retry" @click="retry">{{ $t('Dash.try_again') }}</button>
+                </div>
             </div>
-            <slot v-else></slot>
+            <div v-else-if="resolvedState === 'empty'" class="dcard__cover" data-test="dcard-empty">
+                <div class="dcard__state">
+                    <slot name="empty">
+                        <p class="dcard__state-text">{{ meta.emptyText || emptyText }}</p>
+                        <button
+                            v-if="meta.emptyAction || emptyAction"
+                            type="button"
+                            class="ah-btn ah-btn--outline ah-btn--sm"
+                            @click="$emit('empty-action')"
+                        >{{ meta.emptyAction || emptyAction }}</button>
+                    </slot>
+                </div>
+            </div>
         </div>
 
         <footer class="dcard__foot">
@@ -121,13 +109,32 @@ const props = defineProps({
     state: { type: String, default: '' },
 });
 
-defineEmits(['period-change', 'refresh', 'settings', 'remove', 'retry', 'empty-action']);
+const emit = defineEmits(['period-change', 'refresh', 'settings', 'remove', 'retry', 'empty-action']);
+
+const REPORT_TIMEOUT_MS = 15000;
 
 const { t } = useI18n();
-const meta = reactive({ state: 'loading', note: '', updatedAt: null, emptyText: '', emptyAction: '', error: '' });
+const meta = reactive({ state: '', note: '', updatedAt: null, emptyText: '', emptyAction: '', error: '' });
 provide(CARD_META_KEY, meta);
 
-const resolvedState = computed(() => props.state || meta.state || 'ready');
+// A body that has reported 'loading' owns its request and will report again. One that has said
+// nothing by the deadline (its chunk failed, it threw, it does not use useCardMeta) never will,
+// and showing it as ready would put an unexplained blank where its numbers should be.
+const unanswered = ref(false);
+let reportDeadline = null;
+const awaitReport = () => {
+    clearTimeout(reportDeadline);
+    unanswered.value = false;
+    reportDeadline = setTimeout(() => { unanswered.value = !meta.state; }, REPORT_TIMEOUT_MS);
+};
+
+const resolvedState = computed(() => props.state || meta.state || (unanswered.value ? 'error' : 'loading'));
+const isReady = computed(() => resolvedState.value === 'ready');
+
+const retry = () => {
+    if (unanswered.value) awaitReport();
+    emit('retry');
+};
 
 // Rule 4 of the card anatomy: a live card says so, a computed one says when it
 // last ran. A stale number that looks live is worse than no number.
@@ -135,8 +142,14 @@ const loadedAt = ref(0);
 const now = ref(Date.now());
 let tick = null;
 watch(resolvedState, (state) => { if (state !== 'loading') loadedAt.value = Date.now(); }, { immediate: true });
-onMounted(() => { tick = setInterval(() => { now.value = Date.now(); }, 60000); });
-onBeforeUnmount(() => clearInterval(tick));
+onMounted(() => {
+    tick = setInterval(() => { now.value = Date.now(); }, 60000);
+    awaitReport();
+});
+onBeforeUnmount(() => {
+    clearInterval(tick);
+    clearTimeout(reportDeadline);
+});
 
 const freshness = computed(() => {
     if (props.live) return t('Dash.live_data');
@@ -225,15 +238,26 @@ const footerLeft = computed(() => [freshness.value, meta.note || props.footerNot
 .dcard__tool:focus-visible { outline: none; box-shadow: var(--focus); }
 .dcard__metric { padding: 8px 15px 0; }
 .dcard__body {
+    position: relative;
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
     padding: 9px 15px 12px;
 }
-.dcard__body--center { display: flex; align-items: center; justify-content: center; }
-.dcard__state { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 6px 0; }
+.dcard__body--covered { overflow: hidden; }
+/* The body keeps its box while it is covered, so a chart inside it measures a real size. */
+.dcard__content { display: contents; }
+.dcard__body--covered > .dcard__content { visibility: hidden; }
+.dcard__cover {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    overflow: auto;
+    padding: 9px 15px 12px;
+}
+.dcard__state { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: auto; text-align: center; padding: 6px 0; }
 .dcard__state-text { margin: 0; font: var(--text-small); color: var(--ink-2); max-width: 34ch; line-height: 1.5; }
-.dcard__skeleton { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.dcard__skeleton { width: 100%; display: flex; flex-direction: column; gap: 8px; margin: auto; }
 .dcard__sk { height: 10px; border-radius: 5px; background: var(--surface-hover); width: 70%; }
 .dcard__sk--wide { width: 100%; height: 18px; }
 .dcard__sk--short { width: 45%; }

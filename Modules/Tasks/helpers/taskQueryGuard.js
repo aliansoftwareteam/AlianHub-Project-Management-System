@@ -115,19 +115,21 @@ const toObjectIds = (ids) => (ids || [])
     .map((id) => new mongoose.Types.ObjectId(String(id)));
 
 /* Company-wide, short of what belongs to the people in it: someone else's personal list, and a chat
- * the caller is not in. Kept under $nor so a caller that spreads the match into its own filter and
- * then names a ProjectID keeps both exclusions. */
-const companyWideStage = async (companyId, uid) => {
-    const personalLists = idForms(await othersPersonalListIds(companyId, uid));
-    return {
-        $match: {
-            $nor: [
-                ...(personalLists.length ? [{ ProjectID: { $in: personalLists } }] : []),
-                { mainChat: true, AssigneeUserId: { $ne: String(uid) } },
-            ],
-        },
-    };
-};
+ * the caller is not in. `personalLists` are the ids othersPersonalListIds gives for the caller. Kept
+ * under $nor so a caller that spreads the match into its own filter and then names a ProjectID keeps
+ * both exclusions. */
+const companyWideMatch = (uid, personalLists) => ({
+    $nor: [
+        ...(personalLists.length ? [{ ProjectID: { $in: idForms(personalLists) } }] : []),
+        { mainChat: true, AssigneeUserId: { $ne: String(uid) } },
+    ],
+});
+
+/* The same rule for a task already read, which must carry ProjectID, mainChat and AssigneeUserId. */
+const readsCompanyWide = (task, uid, personalLists) => !personalLists.map(String).includes(String(task.ProjectID))
+    && (task.mainChat !== true || [].concat(task.AssigneeUserId || []).map(String).includes(String(uid)));
+
+const companyWideStage = async (companyId, uid) => ({ $match: companyWideMatch(uid, await othersPersonalListIds(companyId, uid)) });
 
 /* Owners and admins keep company-wide task visibility unless a token narrows them to some projects;
  * everyone else sees the projects the sidebar lists for them, minus the private sprints they are not
@@ -151,5 +153,7 @@ module.exports = {
     QueryRefused,
     validatePipeline,
     visibilityStage,
+    companyWideMatch,
+    readsCompanyWide,
     toObjectIds,
 };
