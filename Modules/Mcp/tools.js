@@ -17,6 +17,10 @@ const { annotationsFor, isDestructive } = require('./annotations');
 const { propose } = require('./propose');
 const sessionTools = require('./sessionTools');
 const dataTools = require('./dataTools');
+const manageFlag = require('./manageFlag');
+const manageTools = require('./manageTools');
+const argsSchema = require('./argsSchema');
+const { taskRow, planRow } = require('./taskRows');
 
 const str = (v, max = 500) => String(v === undefined || v === null ? '' : v).slice(0, max);
 const clampLimit = (v, def = 10, max = 50) => Math.min(Math.max(parseInt(v, 10) || def, 1), max);
@@ -27,25 +31,11 @@ const taskFilter = (ctx, vis, narrowTo, extra = {}) => ({
 
 const taskTarget = (args) => ({ taskId: str(args.taskId, 40) });
 
-const taskRow = (t) => ({
-    taskId: String(t._id),
-    key: t.TaskKey || '',
-    title: t.TaskName || '',
-    // Stored as { text, key, type }; agents get the readable name, not the object.
-    status: (t.status && typeof t.status === 'object') ? (t.status.text || '') : (t.status || ''),
-    statusType: t.statusType || (t.status && t.status.type) || '',
-    priority: t.Task_Priority || '',
-    projectId: String(t.ProjectID || ''),
-    sprintId: String(t.sprintId || ''),
-    dueDate: t.DueDate || null,
-    estimateHours: Number(t.totalEstimatedTime || 0) / 3600 || 0,
-});
-
-const taskPage = async (ctx, tool, args, filter, sort) => {
+const taskPage = async (ctx, tool, args, filter, sort, row = taskRow) => {
     const { rows, nextCursor } = await cursor.page(ctx, tool, args, ({ skip, limit }) => MongoDbCrudOpration(ctx.companyId, {
         type: SCHEMA_TYPE.TASKS, data: [filter, null, { sort, skip, limit }],
     }, 'find'));
-    const tasks = await names.forTasks(ctx, rows, taskRow);
+    const tasks = await names.forTasks(ctx, rows, row);
     return nextCursor ? { tasks, nextCursor } : { tasks };
 };
 
@@ -97,12 +87,20 @@ const TOOLS = [
             const filter = taskFilter(ctx, vis, args.projectId);
             if (args.query) filter.TaskName = { $regex: str(args.query, 120).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
             if (args.status) filter.status = { $regex: `^${str(args.status, 60)}$`, $options: 'i' };
-            if (v2.enabled()) return taskPage(ctx, 'tasks.search', args, filter, { updatedAt: -1, _id: -1 });
+            const planning = manageFlag.enabled();
+            if (planning) {
+                const more = manageTools.searchFilter(args);
+                if (more.error) return { error: more.error };
+                // Added beside the caller's own clause: a filter on the same field must narrow it, never replace it.
+                filter.$and = [...(filter.$and || []), more.filter];
+            }
+            const row = planning ? planRow : taskRow;
+            if (v2.enabled()) return taskPage(ctx, 'tasks.search', args, filter, { updatedAt: -1, _id: -1 }, row);
             const rows = await MongoDbCrudOpration(ctx.companyId, {
                 type: SCHEMA_TYPE.TASKS,
                 data: [filter, null, { sort: { updatedAt: -1 }, limit: clampLimit(args.limit) }],
             }, 'find');
-            return { tasks: (rows || []).map(taskRow) };
+            return { tasks: (rows || []).map(row) };
         },
     },
     {
@@ -246,9 +244,18 @@ const FLAGGED_TOOLS = [
     },
 ];
 
-const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...dataTools.offered(), ...sessionTools.offered()];
+const SEARCH_FOR_PLANNING = 'Search tasks you can see by text, status, project, list, assignee or due date. Each task carries its assignees, dates, estimate, subtask count and the tasks above it.';
 
-const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...dataTools.TOOLS, ...sessionTools.TOOLS];
+const withPlanning = (t) => (t.name === 'tasks.search' && manageFlag.enabled()
+    ? { ...t, description: SEARCH_FOR_PLANNING, input: { ...t.input, properties: { ...t.input.properties, ...manageTools.SEARCH_INPUT } } }
+    : t);
+
+const offered = () => [...TOOLS.map(withPlanning), ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...dataTools.offered(), ...manageTools.offered(), ...sessionTools.offered()];
+
+const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...dataTools.TOOLS, ...manageTools.TOOLS, ...sessionTools.TOOLS];
+
+/* A tool that needs a grant is one only a write token created with that grant lists or runs. */
+const holdsGrantFor = (ctx, tool) => !tool.grant || (Boolean(ctx) && Boolean(ctx.canWrite) && manageFlag.holdsGrant(ctx.token));
 
 const toolNames = () => offered().map((t) => t.name);
 
@@ -257,9 +264,11 @@ const PAGE_INPUT = Object.freeze({
     limit: { type: 'integer', description: `Page size, default ${cursor.PAGE_DEFAULT}, at most ${cursor.PAGE_MAX}` },
 });
 
-const manifest = () => {
-    if (!v2.enabled()) return offered().map((t) => ({ name: t.name, description: t.description, inputSchema: t.input }));
-    return offered().map((t) => ({
+/* With a caller, the tools that caller may use; without one (the public manifest), every tool this server offers. */
+const manifest = (ctx = null) => {
+    const listed = ctx ? offered().filter((t) => holdsGrantFor(ctx, t)) : offered();
+    if (!v2.enabled()) return listed.map((t) => ({ name: t.name, description: t.description, inputSchema: t.input }));
+    return listed.map((t) => ({
         name: t.name,
         description: t.description,
         inputSchema: t.paginated ? { ...t.input, properties: { ...t.input.properties, ...PAGE_INPUT } } : t.input,
@@ -271,7 +280,16 @@ const actionOf = (name) => { const tool = offered().find((t) => t.name === Strin
 const actionsOffered = () => offered().map((t) => t.action);
 
 /* An OAuth token is held to the one scope the tool needs; a personal token keeps its read/write rule. */
+const PAGE_ARGS = Object.freeze({ cursor: { type: 'string', maxLength: 2000 }, limit: { type: 'integer', minimum: 1, maximum: cursor.PAGE_MAX } });
+
+const refuseBadArguments = (tool, args) => {
+    if (!tool.strict) return;
+    const problem = argsSchema.problemIn(tool.input, args, tool.paginated ? PAGE_ARGS : {}) || (tool.check ? tool.check(args) : '');
+    if (problem) throw Object.assign(new Error(`${tool.name}: ${problem}`), { code: -32602 });
+};
+
 const scopeRefusal = (ctx, tool, write) => {
+    if (!holdsGrantFor(ctx, tool)) return `This token was not created with the ${tool.grant} grant, which ${tool.name} needs.`;
     if (ctx.token && ctx.token.oauth) {
         const needed = scopes.scopeForTool(tool.name);
         return needed && scopes.grantedScopes(ctx.token).includes(needed) ? '' : `This token lacks the ${needed || 'required'} scope.`;
@@ -293,6 +311,7 @@ const call = async (ctx, name, args = {}) => {
     if (tool.run) {
         const refused = scopeRefusal(ctx, tool, false);
         if (refused) throw Object.assign(new Error(refused), { code: -32004 });
+        refuseBadArguments(tool, args);
         if (!tool.authorizesPerProject) await actions.authorizeRead({
             companyId: ctx.companyId, actor: ctx.actor, action: tool.action,
             params: tool.readParams ? tool.readParams(args) : { taskId: args.taskId }, ip: ctx.ip, allowedActions: ctx.allowedActions,
@@ -302,6 +321,7 @@ const call = async (ctx, name, args = {}) => {
 
     const refused = scopeRefusal(ctx, tool, true);
     if (refused) throw Object.assign(new Error(refused), { code: -32004 });
+    refuseBadArguments(tool, args);
     const params = tool.params(args);
     if (filtered) {
         try {
