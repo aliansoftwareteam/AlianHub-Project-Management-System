@@ -1,15 +1,4 @@
-
-.cancelButtonList{
-    border: 1px solid #2F3990;
-    border-radius: 4px;
-    height: 30px;
-    padding: 3px 14px;
-    font-size: 16px;
-    line-height: 24px;
-}
-.converted__sidebar .sidebar-body {
-    background-color: #F4F5F7 !important;
-}
+.cts-card { background: var(--surface); }
 .inital-box{
     margin-left: 0 !important;
     width: 20px !important;
@@ -21,20 +10,18 @@
     font-style: normal;
     font-weight: 400;
     line-height: 19.24px;
-    color: #FFF;
+    color: var(--rail-ink-strong);
 }
 .projectDivInList{
-    background: #DFE1E6;
+    background: var(--fill);
     width: 100%;
     max-width: 100%;
-    border: 1px solid #DFE1E6;
+    box-sizing: border-box;
+    border: 1px solid var(--hairline);
     border-radius: 5px;
     height: 36px;
     padding: 5px 10px;
     margin-bottom: 10px;
-}
-.convertlist__cancel-btn{
-    padding: 3px 13.2px !important;
 }
 .close_image-icon{
     right: 15px !important; 
@@ -48,5 +35,4 @@
 }
 @media(max-width: 767px){
     .projectDivInList{height: 50px;}
-    .converted__sidebar .sidebar-body {background-color: #fff !important;}
 }

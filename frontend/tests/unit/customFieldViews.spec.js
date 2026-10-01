@@ -40,8 +40,8 @@ const withField = (id, fieldValue, extra = {}) => ({ customField: { [id]: { fiel
 const ids = (rows) => rows.map((row) => row._id);
 
 describe('group by custom field', () => {
-    test('offers dropdown, checkbox and date fields, never free text or numbers', () => {
-        expect(customGroupOptions(defs).map((option) => option.id)).toEqual([`cf:${STAGE}`, `cf:${DONE}`, `cf:${DUE}`]);
+    test('offers dropdown, checkbox, date and number fields, never free text', () => {
+        expect(customGroupOptions(defs).map((option) => option.id)).toEqual([`cf:${STAGE}`, `cf:${DONE}`, `cf:${DUE}`, `cf:${SIZE}`]);
         expect(customGroupOptions(defs)[0]).toMatchObject({ title: 'Stage', fieldType: 'dropdown' });
     });
 

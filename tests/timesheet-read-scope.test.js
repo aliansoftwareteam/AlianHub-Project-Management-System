@@ -11,6 +11,7 @@ jest.mock('../Config/permissionGuard', () => ({
     isPrivileged: (r) => r === 1 || r === 2,
 }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn() }));
+jest.mock('../Modules/PersonalList/ownership', () => ({ ...jest.requireActual('../Modules/PersonalList/ownership'), othersPersonalListIds: jest.fn(async () => []) }));
 
 const { getRoleType, evaluatePermission } = require('../Config/permissionGuard');
 const { visibleProjectIds } = require('../Modules/Agents/scope');

@@ -1,39 +1,38 @@
 <template>
     <div class="mainConverToSubTask">
-    <Sidebar width="607px"  :top="clientWidth <= 767 ? '0px' : '46px'" className="converted__sidebar">
+    <Sidebar width="607px"  :top="clientWidth <= 767 ? '0px' : '46px'" className="converted__sidebar" :title="sidebarTitle">
             <template #head-left >
-                <div class="blue font-ui screenShotPreview text-ellipsis text-nowrap pr-15px" :class="clientWidth>767 ? 'font-size-18' : 'font-size-16'"  v-if="(props.fromWhich == undefined || props.fromWhich !== 'dashboard')">{{props.isMoveTask === true || props.openMoveSubTask === true ? $t('DuplicateTask.move_task') : isMergeTask === true ? $t('DuplicateTask.mearge_task_into') : isDuplicate === true ? $t('Projects.duplicate_task') : isConvertTask ? $t('ProjectDetails.convert_task') : isCreteTask ? $t('Comments.create_task') : $t('ProjectDetails.convert_subtask')}}</div>
-                <div class="blue font-ui screenShotPreview text-ellipsis text-nowrap pr-15px" :class="clientWidth>767 ? 'font-size-18' : 'font-size-16'" v-else>{{$t('Home.AddtoQueue')}}</div>
+                <div class="blue font-ui screenShotPreview text-ellipsis text-nowrap pr-15px" :class="clientWidth>767 ? 'font-size-18' : 'font-size-16'">{{ sidebarTitle }}</div>
             </template>
             <template #head-right>
-                <button class="outline-primary d-flex align-items-center font-ui" @click="closeSidebar()" :class="clientWidth>767 ? 'font-size-16' : 'font-size-14'" :style="[{padding : clientWidth ? '3px 13.2px' : '3px 5px' , marginRight : clientWidth ? '0px' : '5px'}]">{{$t('Projects.cancel')}}</button>
+                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="closeSidebar()">{{$t('Projects.cancel')}}</button>
                 <template v-if="isDuplicate === true || isCreteTask === true">
-                    <button v-if="Object.keys(selectedSprintData).length > 0 && isDisable === false" class="btn-primary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-14'"  :style="[{padding : clientWidth ? '3px 14.4px' : '3px 5px'}]"  @click="duplicateTaskButton()">{{isDuplicate ? $t('Projects.duplicate_task') : $t('Comments.create_task')}}</button>
-                    <button v-else class="btn-secondary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-11'"  :style="[{padding : clientWidth>767 ? '3px 14.4px' : '3px 3px'}]">{{isDuplicate ? $t('Projects.duplicate_task') : $t('Comments.create_task')}}</button>
+                    <button v-if="Object.keys(selectedSprintData).length > 0 && isDisable === false" type="button" class="ah-btn ah-btn--primary ah-btn--sm ml-10px" @click="duplicateTaskButton()">{{isDuplicate ? $t('Projects.duplicate_task') : $t('Comments.create_task')}}</button>
+                    <button v-else type="button" class="ah-btn ah-btn--secondary ah-btn--sm ml-10px" disabled>{{isDuplicate ? $t('Projects.duplicate_task') : $t('Comments.create_task')}}</button>
                     <template v-if="isDuplicate">
-                        <button v-if="Object.keys(selectedSprintData).length > 0 && isDisable === false" class="btn-primary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-14'"  :style="[{padding : clientWidth ? '3px 14.4px' : '3px 5px'}]"  @click="duplicateTaskButton(),isRedirect = true">{{$t('ProjectDetails.DUPLICATE_AND_OPEN')}}</button>
-                        <button v-else class="btn-secondary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-11'"  :style="[{padding : clientWidth>767 ? '3px 14.4px' : '3px 3px'}]">{{$t('ProjectDetails.DUPLICATE_AND_OPEN')}}</button>
+                        <button v-if="Object.keys(selectedSprintData).length > 0 && isDisable === false" type="button" class="ah-btn ah-btn--primary ah-btn--sm ml-10px" @click="duplicateTaskButton(),isRedirect = true">{{$t('ProjectDetails.DUPLICATE_AND_OPEN')}}</button>
+                        <button v-else type="button" class="ah-btn ah-btn--secondary ah-btn--sm ml-10px" disabled>{{$t('ProjectDetails.DUPLICATE_AND_OPEN')}}</button>
                     </template>
                 </template>
                 <template v-if="isMoveTask || isConvertTask">
-                    <button v-if="Object.keys(selectedSprintData).length > 0" class="btn-primary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-14'"  :style="[{padding : clientWidth ? '3px 14.4px' : '3px 5px'}]"  @click="moveTaskButton()">{{isMoveTask ? $t("ProjectDetails.move") : $t('ProjectDetails.convert')}}</button>
-                    <button v-else class="btn-secondary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-11'"  :style="[{padding : clientWidth>767 ? '3px 14.4px' : '3px 3px'}]">{{isMoveTask ? $t("ProjectDetails.move") : $t('ProjectDetails.convert')}}</button>
+                    <button v-if="Object.keys(selectedSprintData).length > 0" type="button" class="ah-btn ah-btn--primary ah-btn--sm ml-10px" @click="moveTaskButton()">{{isMoveTask ? $t("ProjectDetails.move") : $t('ProjectDetails.convert')}}</button>
+                    <button v-else type="button" class="ah-btn ah-btn--secondary ah-btn--sm ml-10px" disabled>{{isMoveTask ? $t("ProjectDetails.move") : $t('ProjectDetails.convert')}}</button>
                     <template v-if="props.isBulkMove === false">
-                        <button v-if="Object.keys(selectedSprintData).length > 0" class="btn-primary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-14'"  :style="[{padding : clientWidth ? '3px 14.4px' : '3px 5px'}]"  @click="moveTaskButton(),isRedirect = true">{{isMoveTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
-                        <button v-else class="btn-secondary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-11'"  :style="[{padding : clientWidth>767 ? '3px 14.4px' : '3px 3px'}]">{{isMoveTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
+                        <button v-if="Object.keys(selectedSprintData).length > 0" type="button" class="ah-btn ah-btn--primary ah-btn--sm ml-10px" @click="moveTaskButton(),isRedirect = true">{{isMoveTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
+                        <button v-else type="button" class="ah-btn ah-btn--secondary ah-btn--sm ml-10px" disabled>{{isMoveTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
                     </template>
                 </template>
                 <div v-if="isMergeTask || isOpenSubTask || openMoveSubTask">
-                    <button v-if="isTaskSelected" class="btn-primary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-14'"  :style="[{padding : clientWidth ? '3px 14.4px' : '3px 5px'}]"  @click="callMergeTaskForItem(false)">{{isMergeTask ? $t("ProjectDetails.merge") : openMoveSubTask ? $t("ProjectDetails.move") : $t('ProjectDetails.convert')}}</button>
-                    <button v-else class="btn-secondary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-11'"  :style="[{padding : clientWidth>767 ? '3px 14.4px' : '3px 3px'}]">{{isMergeTask ? $t("ProjectDetails.merge") : openMoveSubTask ? $t("ProjectDetails.move") : $t('ProjectDetails.convert')}}</button>
-                    <button v-if="isTaskSelected" class="btn-primary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-14'"  :style="[{padding : clientWidth ? '3px 14.4px' : '3px 5px'}]"  @click="callMergeTaskForItem(true),isRedirect = true">{{isMergeTask ? $t('ProjectDetails.MERGE_AND_OPEN') : openMoveSubTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
-                    <button v-else class="btn-secondary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-11'"  :style="[{padding : clientWidth>767 ? '3px 14.4px' : '3px 3px'}]">{{isMergeTask ? $t('ProjectDetails.MERGE_AND_OPEN') : openMoveSubTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
+                    <button v-if="isTaskSelected" type="button" class="ah-btn ah-btn--primary ah-btn--sm ml-10px" @click="callMergeTaskForItem(false)">{{isMergeTask ? $t("ProjectDetails.merge") : openMoveSubTask ? $t("ProjectDetails.move") : $t('ProjectDetails.convert')}}</button>
+                    <button v-else type="button" class="ah-btn ah-btn--secondary ah-btn--sm ml-10px" disabled>{{isMergeTask ? $t("ProjectDetails.merge") : openMoveSubTask ? $t("ProjectDetails.move") : $t('ProjectDetails.convert')}}</button>
+                    <button v-if="isTaskSelected" type="button" class="ah-btn ah-btn--primary ah-btn--sm ml-10px" @click="callMergeTaskForItem(true),isRedirect = true">{{isMergeTask ? $t('ProjectDetails.MERGE_AND_OPEN') : openMoveSubTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
+                    <button v-else type="button" class="ah-btn ah-btn--secondary ah-btn--sm ml-10px" disabled>{{isMergeTask ? $t('ProjectDetails.MERGE_AND_OPEN') : openMoveSubTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
                 </div>
             </template>
             <template #body>
                 <div :class="[{'duplicatetask__converttask--wrapper': (props.isDuplicate === true || isCreteTask === true)}]">
                     <DuplicateCompo v-if="props.isDuplicate === true" @selctedItems="selectedItems" :task="task" :selectedProjectData="selectedProjectData" :selectedSprint="selectedSprintData" @assignee="assigneFun" @watcher="watcherFun" @taskName="taskFun" :from="props.isMoveTask ? 'move' : 'duplicate'"/>
-                    <div class="bg-white create__component--wrapper">
+                    <div class="create__component--wrapper">
                         <div v-if="isCreteTask" class="create__task-title form-group d-flex align-items-center border-bottom-mobiledrop">
                             <InputText
                                 v-model="taskData.value"
@@ -52,7 +51,7 @@
                             <div class="red font-size-12">{{taskData.error}}</div>
                         </div>
                     </div>
-                    <div class="bg-white overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar p15x-20px" :class="{'border-radius-12-px' : clientWidth > 767, 'border-radius-0 ' : clientWidth <= 767 , 'convert__projecttask-wrapper':props.isDuplicate === true || isCreteTask === true }"  :style="[{margin : clientWidth > 767 ? '15px' : '0px' , height : clientWidth <= 767 ?  '100%' : '' , maxHeight :  clientWidth > 767 ? 'calc(100vh - 46px)' : '100%' }]">
+                    <div class="cts-card overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar p15x-20px" :class="{'border-radius-12-px' : clientWidth > 767, 'border-radius-0 ' : clientWidth <= 767 , 'convert__projecttask-wrapper':props.isDuplicate === true || isCreteTask === true }"  :style="[{margin : clientWidth > 767 ? '15px' : '0px' , height : clientWidth <= 767 ?  '100%' : '' , maxHeight :  clientWidth > 767 ? 'calc(100vh - 46px)' : '100%' }]">
                         <span v-if="props.isDuplicate === true || isCreteTask === true" class="font-size-16 font-weight-500 dark-gray mb-20px">{{$t('Projects.location')}}</span>
                         <div :class="[{'duplicate__component-with--convertlist':props.isDuplicate === true || isCreteTask === true,'duplicate_component_only' : props.isDuplicate === true}]">
                             <div class="gray" :class="{'font-size-12' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}">{{$t('Notification.project')}}</div>
@@ -65,10 +64,10 @@
                                     </template>
                                     <span class="text-ellipsis Project-name-sidebar font-weight-500" :class="{'font-size-13' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}">{{selectedProjectData.ProjectName}}</span>
                                 </div>
-                                <span class="blue text-decoration-underline font-weight-500 cursor-pointer" @click="isShowProjectList = true" :class="{'font-size-14' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}">{{$t('Projects.browse_projects')}}</span>
+                                <button type="button" class="cts-browse" @click="isShowProjectList = true" :class="{'font-size-14' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}">{{$t('Projects.browse_projects')}}</button>
                             </div>
                             <template v-if="isShowProjectList === true">
-                                <InputText :placeHolder="$t('PlaceHolder.search')" v-model="projectSearch" class="input__Search"/>
+                                <InputText :placeHolder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" v-model="projectSearch" class="input__Search"/>
                                 <template v-if="projectDatas.length > 0">
                                     <div class="overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar duplicate__convertTask" :style="[{ maxHeight : clientWidth > 767 ? 'calc(100vh - 214px)' : 'calc(100vh - 240px)'}]">
                                         <div v-for="project in projectDatas" :key="project" class="browse__Categotyproject-wrapper">
@@ -86,7 +85,7 @@
                                 <div v-else>{{$t('ProjectSlider.no_result_found')}}</div>
                             </template>
                             <div v-if="isShowProjectList === false">
-                                <InputText :placeHolder="$t('PlaceHolder.search')" v-model="taskSearch" class="input__Search"/>
+                                <InputText :placeHolder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" v-model="taskSearch" class="input__Search"/>
                                 <div class="overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar"  :class="[{'duplicatetask__project--sprintList':props.isDuplicate === true}]" :style="[{maxHeight : clientWidth > 767 ? 'calc(100vh - 241px)' : 'calc(100vh - 275px)'}]">
                                     <template v-if="filterFoldersSprints && Object.keys(filterFoldersSprints).length">
                                         <SideBarSprintFolderData
@@ -255,6 +254,15 @@
         }
     });
     const isDisable = computed(() => props.isDisableButton)
+    const sidebarTitle = computed(() => {
+        if (props.fromWhich === 'dashboard') return t('Home.AddtoQueue');
+        if (props.isMoveTask || props.openMoveSubTask) return t('DuplicateTask.move_task');
+        if (props.isMergeTask) return t('DuplicateTask.mearge_task_into');
+        if (props.isDuplicate) return t('Projects.duplicate_task');
+        if (props.isConvertTask) return t('ProjectDetails.convert_task');
+        if (props.isCreteTask) return t('Comments.create_task');
+        return t('ProjectDetails.convert_subtask');
+    });
     const {changeTaskType, changeStatus, filterSprintData, filterFolderSprintData, oldStatusData, oldTaskTypeData} = useHelperFun();
     const {getUser} = useGetterFunctions()
     const  { checkErrors  } = useValidation();
@@ -1144,3 +1152,4 @@
     }
 </script>
 <style scoped src="./style.css"></style>
+<style src="./theme.css"></style>
