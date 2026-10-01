@@ -14,11 +14,11 @@ afterEach(() => {
 });
 
 describe('the design variant attribute', () => {
-    it('offers the three variants', () => {
-        expect(VARIANT_CHOICES).toEqual(['a', 'b', 'c']);
+    it('offers the three variants and the classic look', () => {
+        expect(VARIANT_CHOICES).toEqual(['a', 'b', 'c', 'classic']);
     });
 
-    it('is absent when nothing is stored, so the app looks as it does today', () => {
+    it('is absent when nothing is stored, so the app wears the default with no attribute', () => {
         initTheme();
         expect(html.hasAttribute('data-variant')).toBe(false);
         expect(shellState.variant).toBe('');
