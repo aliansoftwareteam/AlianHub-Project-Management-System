@@ -45,7 +45,7 @@
                     />
                     <ViewDensityControl :model-value="density" @update:model-value="setDensity" />
                 </div>
-                <KanbanBoard :data="processedBoardData" :group="grouped" :sprintId="sprintId" />
+                <KanbanBoard :data="processedBoardData" :group="grouped" :sprintId="sprintId" :otherRows="otherOnBoard" :otherProjects="otherRows.projects.value" :otherTruncated="otherRowsShown && otherRows.truncated.value" />
             </template>
             <template v-else>
                 <div class="board-view__empty">
@@ -72,6 +72,8 @@ import isEqual from 'lodash/isEqual';
 import KanbanBoard from '@/views/Projects/Kanban/KanbanBoard.vue';
 import ListBulkBar from '@/views/Projects/ListView/ListBulkBar.vue';
 import { taskInGroup } from '@/views/Projects/ListView/listFilter';
+import { inList } from '@/store/ProjectData/listMembership';
+import { placeOnBoard, useOtherProjectRows } from '@/views/Projects/composables/otherProjectRows';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 import ViewColumnChooser from '@/views/Projects/components/columns/ViewColumnChooser.vue';
@@ -154,7 +156,7 @@ const taskSourceArray = computed(() => {
     if (searchedTask.value && searchedTasksData.value.length > 0) {
         const currentSprintId = props.sprints[0]?.id;
         if (!currentSprintId) return [];
-        return searchedTasksData.value.filter(task => task.sprintId === currentSprintId);
+        return searchedTasksData.value.filter(task => inList(task, currentSprintId));
     } else if (!searchedTask.value && project.value?._id && props.sprints[0]?.id) {
         return allProjectTasks.value[project.value._id]?.[props.sprints[0].id]?.tasks || [];
     }
@@ -223,6 +225,11 @@ const processedBoardData = computed(() => {
         };
     });
 });
+
+/* A search or a filter is matched against this project's own data, which says nothing of a task that lives elsewhere. */
+const otherRows = useOtherProjectRows(project, computed(() => props.sprints[0]?.id || ''));
+const otherRowsShown = computed(() => !searchedTask.value && !showArchiveVar.value);
+const otherOnBoard = computed(() => placeOnBoard(otherRowsShown.value ? otherRows.rows.value : [], processedBoardData.value));
 
 // Watch for changes in grouping type or sprints to regenerate the group structure
 watch([() => props.grouped, () => props.sprints,() => route?.params], ([newGroup, newSprints, newRouteParams], [oldGroup, oldSprints, oldRouteParams]) => {

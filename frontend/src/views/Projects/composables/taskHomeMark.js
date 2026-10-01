@@ -15,6 +15,13 @@ export function homeOf(task, list, projects = []) {
     return { list: task.sprintArray?.name || "", elsewhere, project: project?.ProjectName || "" };
 }
 
+/* A drag the view refuses has already moved the card in the list the view draws from. */
+export function putBack(rows, { element, oldIndex, newIndex } = {}) {
+    if (!Array.isArray(rows) || rows[newIndex] !== element) return;
+    rows.splice(newIndex, 1);
+    rows.splice(oldIndex, 0, element);
+}
+
 export function homeMarkText(home, t) {
     if (!home) return null;
     if (home.elsewhere && !home.project) return { name: t("TaskLists.another_project"), title: t("TaskLists.lives_in_another_project") };

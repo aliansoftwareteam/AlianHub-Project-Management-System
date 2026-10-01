@@ -2,7 +2,7 @@ import { isOwnTabUpdate } from '@/utils/taskUpdateMarker';
 import { useCustomComposable } from '@/composable/index.js';
 import { isOwnerOrAdmin } from "@/utils/roles";
 import { locate, placeRow, removeRow, treeOf } from "./taskTree";
-import { isStranger, leftList, otherHolders, shownInList } from "./listMembership";
+import { isStranger, leftList, otherHolders, shownInList, touchesOtherProjects } from "./listMembership";
 const { checkPermission } = useCustomComposable();
 
 export const mutateMongoUpdatedTask = (state, payload) => {
@@ -310,6 +310,8 @@ function applyTaskChange(state, payload, sprintId) {
 
 export const mutateUpdateFirebaseTasks = (state, payload) => {
     const {pid, sprintId, op, data} = payload;
+    /* Rows of another project's tasks are not kept here: a list reads them on its own, and reads them again when this rises. */
+    if(touchesOtherProjects(data, pid, op === "modified" ? payload.updatedFields : null)) state.otherProjectChanges = (state.otherProjectChanges || 0) + 1;
     applyTaskChange(state, payload, sprintId);
     if(!data?._id || !["modified", "removed"].includes(op)) return;
     otherHolders(state.tasks[pid], data, pid, sprintId).forEach((holder) => {

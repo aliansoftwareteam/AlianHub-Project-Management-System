@@ -8,10 +8,7 @@ import { defineComponent, nextTick, toRef } from 'vue';
 import { config, flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 
-const { sent, overlay } = vi.hoisted(() => ({
-    sent: { calls: [], answer: null },
-    overlay: { opened: [], closed: new Set() }
-}));
+const { sent, opened } = vi.hoisted(() => ({ sent: { calls: [], answer: null }, opened: [] }));
 
 vi.mock('@/services', () => ({
     apiRequest: vi.fn((method, url, body) => {
@@ -21,10 +18,7 @@ vi.mock('@/services', () => ({
     apiRequestWithoutCompnay: vi.fn(),
     apiRequestWithoutSecure: vi.fn()
 }));
-vi.mock('@/components/organisms/TaskDetailOverlay/useTaskOverlay', () => ({
-    openTask: (payload) => overlay.opened.push(payload),
-    onTaskClosed: (listener) => { overlay.closed.add(listener); return () => overlay.closed.delete(listener); }
-}));
+vi.mock('@/components/organisms/TaskDetailOverlay/useTaskOverlay', () => ({ openTask: (payload) => opened.push(payload) }));
 
 // The store and the composable import each other; the app loads the store first, and so must this.
 import '@/store';
@@ -62,7 +56,7 @@ const rowThere = (id, over = {}) => ({
 const answer = (rows, projects = { [THERE_PROJECT]: cardThere }, nextCursor = null) => Promise.resolve({ data: { status: true, data: { rows, projects, nextCursor } } });
 
 const storeWith = (projects = [{ _id: HERE_PROJECT }, { _id: THERE_PROJECT }]) => createStore({
-    state: { changes: {} },
+    state: { changes: 0 },
     getters: {
         'projectData/onlyActiveProjects': () => ({ data: projects }),
         'projectData/otherProjectChanges': (state) => state.changes,
@@ -72,7 +66,7 @@ const storeWith = (projects = [{ _id: HERE_PROJECT }, { _id: THERE_PROJECT }]) =
         'settings/teams': () => [],
         'users/users': () => []
     },
-    mutations: { changed(state, listId) { state.changes = { ...state.changes, [listId]: (state.changes[listId] || 0) + 1 }; } }
+    mutations: { changed(state) { state.changes += 1; } }
 });
 
 const Host = defineComponent({
@@ -86,7 +80,7 @@ const section = (props = {}, store = storeWith()) => mount(OtherProjectRows, {
     props: { rows: [rowThere('t1')], projects: { [THERE_PROJECT]: cardThere }, list: { sprintId: HERE, projectId: HERE_PROJECT }, heading: true, ...props },
     global: {
         plugins: [store],
-        provide: { $companyId: { value: 'c1' } },
+        provide: { $companyId: { value: 'c1' }, $defaultUserAvatar: '', $defaultGhostCustomUserImg: '' },
         stubs: { Sidebar: true, PriorityComp: { render() { return this.$slots.trigger?.({ open: () => {} }); } } }
     }
 });
@@ -94,8 +88,7 @@ const section = (props = {}, store = storeWith()) => mount(OtherProjectRows, {
 beforeEach(() => {
     sent.calls.length = 0;
     sent.answer = null;
-    overlay.opened.length = 0;
-    overlay.closed.clear();
+    opened.length = 0;
 });
 afterEach(() => { vi.useRealTimers(); });
 
@@ -162,46 +155,69 @@ describe('which rows are kept', () => {
 
 describe('when the rows are read again', () => {
     it('after a change to a task of another project reaches the list', async () => {
-        vi.useFakeTimers();
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
         const store = storeWith();
         host(store);
         await flushPromises();
         sent.calls.length = 0;
 
-        store.commit('changed', HERE);
+        store.commit('changed');
+        store.commit('changed');
         await nextTick();
         expect(sent.calls).toHaveLength(0);
-        vi.advanceTimersByTime(500);
+        vi.advanceTimersByTime(1000);
         await flushPromises();
 
         expect(sent.calls).toHaveLength(1);
     });
 
-    it('after the task panel closes, and no longer once the list is gone', async () => {
-        vi.useFakeTimers();
-        const wrapper = host();
+    it('and not once the list is gone', async () => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+        const store = storeWith();
+        const wrapper = host(store);
         await flushPromises();
         sent.calls.length = 0;
 
-        overlay.closed.forEach((listener) => listener());
-        vi.advanceTimersByTime(500);
-        await flushPromises();
-        expect(sent.calls).toHaveLength(1);
-
+        store.commit('changed');
+        await nextTick();
         wrapper.unmount();
-        expect(overlay.closed.size).toBe(0);
+        vi.advanceTimersByTime(1000);
+        await flushPromises();
+
+        expect(sent.calls).toHaveLength(0);
     });
 
-    it('the store raises the marker for a task of another project, and takes nothing of it', () => {
-        const state = { tasks: { [HERE_PROJECT]: { projectId: HERE_PROJECT, sprints: [HERE], [HERE]: { index: {}, found: {}, tasks: [] } } }, tableTasks: {} };
-        const change = (data) => mutateUpdateFirebaseTasks(state, { snap: {}, op: 'modified', pid: HERE_PROJECT, sprintId: HERE, data, updatedFields: { statusKey: 2 } });
+    describe('the store raises the marker', () => {
+        let state;
+        const change = (pid, sprintId, data, updatedFields = { statusKey: 2 }) => mutateUpdateFirebaseTasks(state, { snap: {}, op: 'modified', pid, sprintId, data, updatedFields });
+        beforeEach(() => {
+            state = { tasks: { [HERE_PROJECT]: { projectId: HERE_PROJECT, sprints: [HERE], [HERE]: { index: {}, found: {}, tasks: [] } } }, tableTasks: {} };
+        });
 
-        change(rowThere('t1'));
-        change(rowThere('t1'));
-        change({ _id: 'own', ProjectID: HERE_PROJECT, sprintId: HERE, isParentTask: true, ParentTaskId: '' });
+        it('when a change to a task of another project reaches the list, and takes nothing of it', () => {
+            change(HERE_PROJECT, HERE, rowThere('t1'));
+            change(HERE_PROJECT, HERE, rowThere('t1'));
 
-        expect(state.otherProjectChanges).toEqual({ [HERE]: 2 });
-        expect(state.tasks[HERE_PROJECT][HERE].tasks.map((row) => row._id)).not.toContain('t1');
+            expect(state.otherProjectChanges).toBe(2);
+            expect(state.tasks[HERE_PROJECT][HERE].tasks).toEqual([]);
+        });
+
+        it('when the person changes such a task in its own project, or takes it out of a list', () => {
+            change(THERE_PROJECT, THERE, rowThere('t1'));
+            expect(state.otherProjectChanges).toBe(1);
+
+            change(THERE_PROJECT, THERE, rowThere('t1', { extraLists: [] }), { extraLists: [] });
+            expect(state.otherProjectChanges).toBe(2);
+        });
+
+        it('and not for a task that is in no list of another project', () => {
+            const own = { _id: 'own', ProjectID: HERE_PROJECT, sprintId: HERE, isParentTask: true, ParentTaskId: '' };
+
+            change(HERE_PROJECT, HERE, own);
+            change(HERE_PROJECT, HERE, { ...own, extraLists: [{ projectId: HERE_PROJECT, sprintId: THERE }] });
+
+            expect(state.otherProjectChanges).toBeUndefined();
+        });
     });
 });
 
@@ -235,13 +251,13 @@ describe('a row from another project', () => {
 
         await wrapper.find('.evr__name').trigger('click');
 
-        expect(overlay.opened).toEqual([{ companyId: 'c1', projectId: THERE_PROJECT, sprintId: THERE, folderId: '', taskId: 't1' }]);
+        expect(opened).toEqual([{ companyId: 'c1', projectId: THERE_PROJECT, sprintId: THERE, folderId: '', taskId: 't1' }]);
     });
 
     it('sits under a heading, with a note when there are more than were read', () => {
         expect(section().find('.opr__head').text()).toContain('From other projects');
         expect(section().find('.opr__note').exists()).toBe(false);
-        expect(section({ truncated: true }).find('.opr__note').text()).toBe('Showing the first 1. Open Everything to see them all.');
+        expect(section({ truncated: true }).find('.opr__note').text()).toBe('This list holds more tasks from other projects than are shown here.');
         expect(section({ rows: [] }).find('[data-other-project-rows]').exists()).toBe(false);
     });
 

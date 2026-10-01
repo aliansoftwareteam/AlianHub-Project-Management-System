@@ -1,4 +1,5 @@
 import { customGroupMatches } from "@/views/Projects/composables/customFieldQuery";
+import { inList } from "@/store/ProjectData/listMembership";
 
 const assigneeIds = (task) => {
     const ids = task?.AssigneeUserId;
@@ -46,7 +47,7 @@ export function groupLabel(item) {
 
 export function listSourceTasks({ searched, searchedTasks, storeTasks, sprintId }) {
     if (!searched) return storeTasks || [];
-    return (searchedTasks || []).filter((task) => task.sprintId === sprintId);
+    return (searchedTasks || []).filter((task) => inList(task, sprintId));
 }
 
 const isVisible = (task, showArchived) => (showArchived ? task.deletedStatusKey === 2 : !task.deletedStatusKey);

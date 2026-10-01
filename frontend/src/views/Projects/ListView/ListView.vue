@@ -38,7 +38,7 @@
                     :calendarDateChange="calendarDateChange"
                 />
             </div>
-            <template v-else-if="groupedTasks.length && (totalTasks || !countsSettled)">
+            <template v-else-if="groupedTasks.length && (totalTasks || !countsSettled || otherRowsShown)">
                 <ListBulkBar v-if="project" :project="project" />
                 <ConvertToSubTaskSidebar
                     v-if="rowMenu.moving.value"
@@ -113,6 +113,15 @@
                                 </button>
                                 </div></div>
                             </template>
+                            <div v-if="otherRowsShown && sprint.id === openSprint?.id" role="row" class="lv2__aria-row"><div role="cell" class="lv2__aria-row">
+                                <OtherProjectRows
+                                    heading
+                                    :rows="otherRows.rows.value"
+                                    :projects="otherRows.projects.value"
+                                    :truncated="otherRows.truncated.value"
+                                    :list="{ sprintId: sprint.id, projectId: project?._id }"
+                                />
+                            </div></div>
                         </template>
                     </section>
                 </div>
@@ -187,6 +196,8 @@ import TaskMenuSidebars from '@/views/Projects/components/taskMenu/TaskMenuSideb
 import { sortChoices, useListSort } from '@/views/Projects/composables/viewSort';
 import { columnCatalogue, listColumnClass, listColumnsAt, listGridVars, useViewColumns } from '@/views/Projects/composables/viewColumns';
 import { totalColumnsOf } from '@/views/Projects/composables/groupTotals';
+import OtherProjectRows from '@/views/Projects/components/OtherProjectRows.vue';
+import { useOtherProjectRows } from '@/views/Projects/composables/otherProjectRows';
 
 // UTILS
 const {getters} = useStore();
@@ -419,6 +430,10 @@ function init (group,refetch,projects,sprints,groupedTasksData,isBoard,isInitial
 const COUNT_SETTLE_MS = 400;
 let countTimer = null;
 const openSprint = computed(() => groupedTasks.value.find((sprint) => sprint?.isExpanded));
+
+/* A search or a filter is matched against this project's own data, which says nothing of a task that lives elsewhere. */
+const otherRows = useOtherProjectRows(project, computed(() => (openSprint.value && !openSprint.value.isFolder ? openSprint.value.id : '')));
+const otherRowsShown = computed(() => !searchedTask.value && !showArchived.value && otherRows.rows.value.length > 0);
 
 function refreshGroupCounts() {
     const sprint = openSprint.value;

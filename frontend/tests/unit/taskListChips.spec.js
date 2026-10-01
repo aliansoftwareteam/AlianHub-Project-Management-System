@@ -40,7 +40,7 @@ const store = () => createStore({
         'users/users': () => []
     }
 });
-const mounted = (component, props) => mount(component, { props, global: { plugins: [store()], stubs: { Sidebar: true } } });
+const mounted = (component, props) => mount(component, { props, global: { plugins: [store()], provide: { $defaultUserAvatar: '', $defaultGhostCustomUserImg: '' }, stubs: { Sidebar: true } } });
 
 describe('the lists a task is shown with', () => {
     it('are the ones the server named, in the order it gave them', () => {
