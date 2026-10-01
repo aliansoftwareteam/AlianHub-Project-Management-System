@@ -56,12 +56,13 @@ const progress = typeModuleOf('progress');
 
 describe('the field type modules', () => {
     it('are one module per type, each with the same shape', () => {
-        expect(MODULE_FIELD_TYPES).toEqual(['people', 'url', 'rating', 'progress', 'files']);
+        expect(MODULE_FIELD_TYPES).toEqual(['people', 'url', 'rating', 'progress', 'files', 'relationship', 'voting']);
         MODULE_FIELD_TYPES.forEach((type) => {
             const module = typeModuleOf(type);
             expect(module.type).toBe(type);
             ['settings', 'parse', 'text', 'sortValue'].forEach((name) => expect(typeof module[name]).toBe('function'));
-            expect(module.parse(module.empty, {})).toEqual({ value: module.empty });
+            if (module.castOnly) expect(module.parse(module.empty, {}).error).toEqual(expect.any(String));
+            else expect(module.parse(module.empty, {})).toEqual({ value: module.empty });
         });
         expect(typeModuleOf('text')).toBeNull();
         expect(typeModuleOf('constructor')).toBeNull();
