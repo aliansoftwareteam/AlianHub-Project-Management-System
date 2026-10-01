@@ -7,28 +7,27 @@ function parseDays(value) {
     return days;
 }
 
+const SHIFTED = Symbol.for('alianhub.clockShifted');
+
 function shiftClock(target, days) {
     const RealDate = target.Date;
     const offsetMs = days * MS_PER_DAY;
-    if (!offsetMs || RealDate.isClockShifted) return RealDate;
+    if (!offsetMs || RealDate[SHIFTED]) return RealDate;
 
-    const shiftedNow = () => RealDate.now() + offsetMs;
-    const ShiftedDate = new Proxy(RealDate, {
+    const realNow = RealDate.now.bind(RealDate);
+    const shiftedNow = () => realNow() + offsetMs;
+    // jest.spyOn(Date, 'now') must keep working, so `now` is patched in place rather than trapped.
+    RealDate.now = shiftedNow;
+    RealDate[SHIFTED] = true;
+    target.Date = new Proxy(RealDate, {
         construct(Real, args, newTarget) {
-            if (args.length === 0) return Reflect.construct(Real, [shiftedNow()], newTarget);
-            return Reflect.construct(Real, args, newTarget);
+            return Reflect.construct(Real, args.length === 0 ? [shiftedNow()] : args, newTarget);
         },
         apply() {
             return new RealDate(shiftedNow()).toString();
-        },
-        get(Real, prop, receiver) {
-            if (prop === 'now') return shiftedNow;
-            if (prop === 'isClockShifted') return true;
-            return Reflect.get(Real, prop, receiver);
         }
     });
-    target.Date = ShiftedDate;
-    return ShiftedDate;
+    return target.Date;
 }
 
 if (typeof process !== 'undefined' && process.env.CLOCK_SHIFT_DAYS !== undefined) {

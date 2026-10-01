@@ -1,17 +1,18 @@
+const vm = require('vm');
 const { shiftClock, parseDays } = require('./support/shift-clock');
 const { summarize } = require('./support/clock-summary');
 
 const DAY = 86400000;
 
 describe('shiftClock', () => {
-    const makeTarget = () => ({ Date });
+    const freshDate = () => vm.runInNewContext('Date');
+    const makeTarget = () => ({ Date: freshDate() });
+    const realNow = freshDate().now();
 
     test('moves the no-argument constructor and Date.now forward', () => {
-        const target = makeTarget();
-        const before = Date.now();
-        const Shifted = shiftClock(target, 40);
-        const nowDelta = Shifted.now() - before;
-        const ctorDelta = new Shifted().getTime() - before;
+        const Shifted = shiftClock(makeTarget(), 40);
+        const nowDelta = Shifted.now() - realNow;
+        const ctorDelta = new Shifted().getTime() - realNow;
         expect(nowDelta).toBeGreaterThanOrEqual(40 * DAY);
         expect(nowDelta).toBeLessThan(40 * DAY + 5000);
         expect(ctorDelta).toBeGreaterThanOrEqual(40 * DAY);
@@ -29,23 +30,36 @@ describe('shiftClock', () => {
     });
 
     test('keeps instanceof and the string form working', () => {
-        const Shifted = shiftClock(makeTarget(), 3);
-        expect(new Shifted() instanceof Date).toBe(true);
-        expect(new Date() instanceof Shifted).toBe(true);
+        const target = makeTarget();
+        const Real = target.Date;
+        const Shifted = shiftClock(target, 3);
+        expect(new Shifted() instanceof Real).toBe(true);
+        expect(new Real() instanceof Shifted).toBe(true);
         expect(typeof Shifted()).toBe('string');
+    });
+
+    test('lets jest.spyOn(Date, "now") pin the clock', () => {
+        const target = makeTarget();
+        const Shifted = shiftClock(target, 40);
+        const spy = jest.spyOn(Shifted, 'now').mockReturnValue(1000);
+        expect(Shifted.now()).toBe(1000);
+        spy.mockRestore();
+        expect(Shifted.now() - realNow).toBeGreaterThanOrEqual(40 * DAY);
     });
 
     test('replaces the Date on the target it is given and applies once', () => {
         const target = makeTarget();
         const first = shiftClock(target, 3);
         expect(target.Date).toBe(first);
-        expect(shiftClock(target, 3).now()).toBeLessThan(Date.now() + 3 * DAY + 5000);
+        expect(shiftClock(target, 3)).toBe(first);
+        expect(first.now() - realNow).toBeLessThan(3 * DAY + 5000);
     });
 
     test('does nothing for a zero shift', () => {
         const target = makeTarget();
-        expect(shiftClock(target, 0)).toBe(Date);
-        expect(target.Date).toBe(Date);
+        const Real = target.Date;
+        expect(shiftClock(target, 0)).toBe(Real);
+        expect(target.Date).toBe(Real);
     });
 
     test('leaves timers alone', async () => {
