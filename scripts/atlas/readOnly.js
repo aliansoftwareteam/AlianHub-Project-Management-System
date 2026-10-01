@@ -17,6 +17,7 @@ const ALLOWED_READS = [
     { method: 'POST', path: '/api/v1/timesheet/workload-grid', why: 'Workload grid: finds over estimates, time logs and time off.' },
     { method: 'POST', path: '/api/v1/estimatedTime', why: 'Estimates in the list, workload and timesheets: an aggregate over estimates, with $out and $merge refused by timesheetQueryScope.' },
     { method: 'POST', path: '/api/v2/sprints/hours', why: 'Sprint hour totals in the project sidebar: a find and two aggregates.' },
+    { method: 'POST', path: '/api/v1/getGlobalTemplate', why: 'Project templates in Settings: returns the cached global templates, sorted by the focus in the body.' },
     { method: 'POST', path: '/api/v1/milestoneReport', why: 'Milestone report: an aggregate over milestones built on the server.' },
     { method: 'POST', path: '/api/v1/reports/custom/run', why: 'Custom report preview: runs a validated report config and saves nothing.' },
     { method: 'POST', path: '/socket.io/', why: 'Socket.io long-polling sends its connect and room-join packets as POST; a page that only loads joins rooms and nothing else.' },

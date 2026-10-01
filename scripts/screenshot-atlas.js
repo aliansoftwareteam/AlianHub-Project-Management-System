@@ -230,8 +230,11 @@ function mergeWithEarlierRun(outDir, shots, failures) {
     } catch {}
     const attempted = new Set([...shots, ...failures].map(keyOf));
     const kept = (list) => (list || []).filter((entry) => !attempted.has(keyOf(entry)));
-    return { shots: [...kept(earlier.shots), ...shots], failures: [...kept(earlier.failures), ...failures] };
+    return { shots: [...kept(earlier.shots), ...shots], failures: [...kept(earlier.failures), ...failures], earlierVersion: earlier.version || null };
 }
+
+// A server rebuilt mid-run, or a retake into the same folder, leaves shots from more than one build.
+const versionsSeen = (earlier, ...current) => [...new Set([...(earlier ? earlier.split(', ') : []), ...current].filter(Boolean))].join(', ') || null;
 
 /* The folder is the record: every shot on disk is listed, so a run that was cut short
  * still gets a gallery from the next one. atlas.json only adds the notes. */
@@ -271,6 +274,7 @@ async function main() {
     }
 
     fs.mkdirSync(outDir, { recursive: true });
+    const versionAtStart = await appVersion(args.baseUrl);
     const shots = [];
     const failures = [];
     const blocked = new Set();
@@ -307,10 +311,10 @@ async function main() {
         await browser.close();
     }
 
-    const merged = mergeWithEarlierRun(outDir, shots, failures);
+    const { earlierVersion, ...merged } = mergeWithEarlierRun(outDir, shots, failures);
     const meta = {
         baseUrl: args.baseUrl,
-        version: await appVersion(args.baseUrl),
+        version: versionsSeen(earlierVersion, versionAtStart, await appVersion(args.baseUrl)),
         createdAt: new Date().toISOString(),
         variant: args.variant,
         blocked: [...blocked].sort(),
