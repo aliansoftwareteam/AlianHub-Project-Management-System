@@ -14,6 +14,24 @@ const PATCH = 'PATCH /api/v2/tasks';
 const BULK = 'POST /api/v2/tasks/bulk';
 const RELATIONS = 'POST /api/v2/tasks/relations';
 
+const ONLOAD = 'POST /api/v1/updateTaskIndexOnload';
+
+/*
+ * The groups views/Projects/helper.js groupBy hands every task view. Beside the three values the on-load index route
+ * reads, each carries the query its rows are fetched with and the rows already loaded.
+ */
+const DUE_TODAY = Date.parse('2026-10-01T00:00:00.000Z') / 1000;
+const loadedRow = { _id: '6f0000000000000000000b02', TaskKey: 'PAR-2', TaskName: 'Task 02', statusKey: 2, groupByStatusIndex: 5 };
+const VIEW_GROUPS = {
+    status: { key: '0_1_Doing', name: 'Doing', type: 'active', textColor: '#111', bgColor: '#eee', isExpanded: true, tasksArray: [], conditions: [{ statusKey: { $eq: 2 } }], searchKey: 'statusKey', indexName: 'groupByStatusIndex', searchCondition: ':=', searchValue: 2 },
+    priority: { key: '0_0_High', name: 'High', value: 'HIGH', isExpanded: true, image: '', tasksArray: [], conditions: [{ Task_Priority: { $eq: 'HIGH' } }], searchKey: 'Task_Priority', indexName: 'groupByPriorityIndex', searchCondition: ':=', searchValue: 'HIGH' },
+    assignee: { key: '0_0_Assignee', name: 'Assignee', isExpanded: true, users: [{ id: USER.id, Employee_Name: USER.Employee_Name }], value: USER.id, teamIds: ['tId_6f00000000000000000000d1'], sprintId: 's1', tasksArray: [loadedRow], conditions: [{ AssigneeUserId: { $in: [USER.id, 'tId_6f00000000000000000000d1'] } }], searchKey: 'AssigneeUserId', indexName: 'groupByAssigneeIndex', searchCondition: ':', searchValue: [USER.id] },
+    unassigned: { key: '0_1_Unassigned', name: 'Unassigned', isExpanded: true, users: [], value: '', teamIds: [], sprintId: 's1', tasksArray: [loadedRow], conditions: [{ AssigneeUserId: { $in: [null, []] } }], searchKey: 'AssigneeUserId', indexName: 'groupByAssigneeIndex', searchCondition: ':', searchValue: '[]' },
+    dueDate: { key: '0_1_TODAY', matchName: 'Today', name: 'Today', value: 'TODAY', operation: 'range', searchCondition: ':=', seconds: DUE_TODAY, endSeconds: DUE_TODAY + 86400, isExpanded: true, tasksArray: [], searchKey: 'DueDate', indexName: 'groupByDueDateIndex', searchValue: DUE_TODAY, mongoConditions: [{ DueDate: { dbDate: { $gte: new Date(DUE_TODAY * 1000), $lt: new Date((DUE_TODAY + 86400) * 1000) } } }] },
+    customField: { customFieldId: '6f00000000000000000000f1', customFieldType: 'dropdown', name: 'Blue', value: 'opt-1', isExpanded: true, tasksArray: [], conditions: [{ 'customField.6f00000000000000000000f1.fieldValue': 'opt-1' }], searchKey: 'customField.6f00000000000000000000f1.fieldValue', indexName: 'groupByStatusIndex', searchValue: 'opt-1' },
+};
+const onLoadIndex = (group) => ({ taskId }) => ({ taskUpdate: { data: taskId, item: group, taskKey: 'PAR-1' }, companyId: CID });
+
 const bulk = (action, payload) => ({ taskId, otherTaskId }) => ({ action, taskIds: [taskId, otherTaskId], userData: USER, ...payload });
 
 const WEB_APP_BODIES = [
@@ -74,7 +92,11 @@ const WEB_APP_BODIES = [
     { route: RELATIONS, action: 'list', source: 'LinkedTasks.vue, TaskDetailPanel.vue, TaskOperations', keys: ['task.task_list'], body: ({ taskId }) => ({ action: 'list', taskId }) },
 
     { route: 'POST /api/v1/taskIndex', source: 'views/Projects/ListView/useListDragDrop.js', keys: ['task.task_list'], body: ({ taskId, projectId }) => ({ relevantIndex: 2, projectId, companyId: CID, taskId, isFirst: false, isFirstWithRecord: false, indexName: 'groupByStatusIndex', sprintId: 's1', relevantKey: 2, searchKey: 'statusKey', taskKey: 'PAR-1', updateData: {} }) },
-    { route: 'POST /api/v1/updateTaskIndexOnload', source: 'views/Projects/TableView/TableViewTable.vue', keys: ['task.task_list'], body: ({ taskId }) => ({ taskUpdate: { data: taskId, item: { indexName: 'groupByStatusIndex', searchKey: 'statusKey', searchValue: 2 }, taskKey: 'PAR-1' }, companyId: CID }) },
+    { route: ONLOAD, source: 'views/Projects/TableView/TableViewTable.vue, grouped by status', keys: ['task.task_list'], body: onLoadIndex(VIEW_GROUPS.status) },
+    { route: ONLOAD, source: 'components/organisms/ItemList/ItemList.vue, grouped by priority', keys: ['task.task_list'], body: onLoadIndex(VIEW_GROUPS.priority) },
+    { route: ONLOAD, source: 'views/Projects/Kanban/KanbanBoard.vue, grouped by assignee', keys: ['task.task_list'], body: onLoadIndex(VIEW_GROUPS.assignee) },
+    { route: ONLOAD, source: 'views/Projects/Kanban/KanbanBoard.vue, the unassigned column', keys: ['task.task_list'], body: onLoadIndex(VIEW_GROUPS.unassigned) },
+    { route: ONLOAD, source: 'plugins/tasklistDashboard TaskItemList.vue, grouped by due date', keys: ['task.task_list'], body: onLoadIndex(VIEW_GROUPS.dueDate) },
 
     { route: 'PATCH /api/v1/importTasks', source: 'utils/TaskOperations createMultipleTasks', keys: ['task.task_create'], body: ({ projectId }) => ({ action: 'createMultipleTasks', tasks: [], userData: USER, projectData: projectSlice(projectId), indexObj: {}, statusArray: [], sprint: { id: 's1' }, eventId: 'e1' }) },
 ];
@@ -139,3 +161,5 @@ const CALENDAR_DRAG = {
 module.exports = WEB_APP_BODIES;
 module.exports.GROUP_DRAGS = GROUP_DRAGS;
 module.exports.CALENDAR_DRAG = CALENDAR_DRAG;
+module.exports.VIEW_GROUPS = VIEW_GROUPS;
+module.exports.onLoadIndex = onLoadIndex;
