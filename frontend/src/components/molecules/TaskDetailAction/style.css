@@ -27,11 +27,8 @@ ul.task-detail-action-ul li a {
     padding: 0px;
     margin: 0px;
     margin-right: 10px;
-    background-color: #fff;
+    background-color: var(--surface);
     border: 6px;
-}
-ul.task_detail_navbar_ul li:last-child span {
-    color: #4B4B4B;
 }
 .task-detail-action .watcher-action {
     margin-right: 16px;
@@ -40,12 +37,13 @@ ul.task_detail_navbar_ul li:last-child span {
     justify-content: center;
     align-items: center!important;
     border-radius: 6px!important;
-    border: 1px solid #E0E0E0!important;
+    border: 1px solid var(--border)!important;
 }
 .task-detail-action .watcher-action .watcher-count {
     position: absolute;
     top: 13px;
-    background-color: #DFE1E6;
+    background-color: var(--surface-2);
+    box-shadow: 0 0 0 1px var(--border);
     border-radius: 20px;
     display: block;
     font-family: var(--font-ui);
@@ -53,7 +51,7 @@ ul.task_detail_navbar_ul li:last-child span {
     font-weight: 500;
     font-size: 9px;
     line-height: 16px;
-    color: #818181;
+    color: var(--ink);
     height: 15px;
     width: 15px;
     text-align: center;
@@ -65,7 +63,7 @@ ul.task_detail_navbar_ul li:last-child span {
     line-height: 28px;
 }
 .task-detail-action .close-icon {
-    background: #DFE1E6;
+    background: var(--fill);
     border-radius: 4px !important;
     margin-right: 0 !important;
 }
@@ -162,12 +160,14 @@ ul.task_detail_navbar_ul li:last-child span {
     z-index: 1000;
 }
 .reminder-modal{
-    background: #fff;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--hairline);
     border-radius: 12px;
     padding: 20px;
     width: 320px;
     max-width: 90vw;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    box-shadow: var(--shadow-modal);
 }
 .reminder-modal__title{
     font-size: 16px;
@@ -177,13 +177,15 @@ ul.task_detail_navbar_ul li:last-child span {
 .reminder-modal__label{
     display: block;
     font-size: 12px;
-    color: #818181;
+    color: var(--ink-2);
     margin-bottom: 5px;
 }
 .reminder-modal__field{
     width: 100%;
     box-sizing: border-box;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink);
     border-radius: 6px;
     padding: 8px;
     font-size: 13px;

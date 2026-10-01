@@ -1,6 +1,7 @@
 import { computed } from 'vue';
 import { useStore } from 'vuex';
 import { NAV_ATTR, readSequence } from '@/components/organisms/TaskDetailOverlay/taskNavigation';
+import { locate } from '@/store/ProjectData/taskTree';
 
 // Rows carry data-task-nav in screen order, so the ids read here already follow the
 // view's filter, sort, grouping and collapsed groups.
@@ -54,20 +55,13 @@ export function useTaskSelection() {
 
     const findTaskWithParent = (taskId) => {
         const tasksState = store.state.projectData?.tasks || {};
-        const targetId = String(taskId);
         for (const pid of Object.keys(tasksState)) {
             const project = tasksState[pid];
             const sprintIds = Array.isArray(project?.sprints) ? project.sprints : [];
             for (const sid of sprintIds) {
-                const sprintData = project[sid];
-                if (!sprintData?.tasks) continue;
-                for (const t of sprintData.tasks) {
-                    if (String(t?._id) === targetId) return { task: t, parent: null };
-                    if (Array.isArray(t?.subtaskArray)) {
-                        const sub = t.subtaskArray.find((s) => String(s?._id) === targetId);
-                        if (sub) return { task: sub, parent: t };
-                    }
-                }
+                if (!project[sid]?.tasks) continue;
+                const found = locate({ tasks: project[sid].tasks }, taskId);
+                if (found) return { task: found.row, parent: found.parent };
             }
         }
         return null;
@@ -77,9 +71,9 @@ export function useTaskSelection() {
         ? task.subtaskArray.map((s) => String(s?._id || '')).filter(Boolean)
         : []);
 
-    const selectRange = (range, id) => {
+    const selectRange = (range, id, { rowsAlone = false } = {}) => {
         store.commit('taskSelection/selectMany', range);
-        const subIds = range.flatMap((rid) => subtaskIdsOf(findTaskWithParent(rid)?.task));
+        const subIds = rowsAlone ? [] : range.flatMap((rid) => subtaskIdsOf(findTaskWithParent(rid)?.task));
         if (subIds.length) store.commit('taskSelection/selectMany', subIds);
         store.commit('taskSelection/setAnchor', id);
     };
@@ -91,19 +85,21 @@ export function useTaskSelection() {
         if (box && box.type === 'checkbox') box.checked = isSelected(id);
     };
 
-    // Parent toggled: mirror onto its loaded subtasks. Subtask toggled: unless the view
-    // selects subtasks on their own, the parent is selected exactly when every sibling is.
-    const toggleAndCascade = (task, evt, visibleTaskIds, { subtasksAlone = false } = {}) => {
+    // Parent toggled: mirror onto its loaded subtasks. Subtask toggled: the parent is selected
+    // exactly when every sibling is. A view that passes rowsAlone does neither: each row, on
+    // any level, is selected by itself.
+    const toggleAndCascade = (task, evt, visibleTaskIds, { rowsAlone = false } = {}) => {
         if (!task?._id) return;
         const id = String(task._id);
         const range = evt?.shiftKey ? rangeTo(id, visibleTaskIds) : null;
         if (range) {
-            selectRange(range, id);
+            selectRange(range, id, { rowsAlone });
             syncCheckbox(evt, id);
             return;
         }
         toggle(id);
         syncCheckbox(evt, id);
+        if (rowsAlone) return;
         const isNowSelected = selectedTaskIds.value.includes(id);
 
         const subIds = subtaskIdsOf(task);
@@ -112,7 +108,7 @@ export function useTaskSelection() {
             return;
         }
 
-        if (task.isParentTask === false && !subtasksAlone) {
+        if (task.isParentTask === false) {
             const parent = findTaskWithParent(id)?.parent;
             if (!parent?._id || !Array.isArray(parent.subtaskArray)) return;
             const siblingIds = parent.subtaskArray.map((s) => String(s?._id)).filter(Boolean);
@@ -138,7 +134,7 @@ export function useTaskSelection() {
         if (evt.key === ' ' || evt.key === 'Spacebar') {
             evt.preventDefault();
             const range = rangeTo(id, ids);
-            if (range) selectRange(range, id);
+            if (range) selectRange(range, id, options);
             else toggleAndCascade(task, undefined, undefined, options);
             return id;
         }
@@ -148,7 +144,7 @@ export function useTaskSelection() {
         const nextId = at === -1 ? undefined : ids[at + (evt.key === 'ArrowDown' ? 1 : -1)];
         if (!nextId) return null;
         if (!rangeTo(id, ids)) store.commit('taskSelection/setAnchor', id);
-        selectRange(rangeTo(nextId, ids) || [id, nextId], nextId);
+        selectRange(rangeTo(nextId, ids) || [id, nextId], nextId, options);
         return nextId;
     };
 

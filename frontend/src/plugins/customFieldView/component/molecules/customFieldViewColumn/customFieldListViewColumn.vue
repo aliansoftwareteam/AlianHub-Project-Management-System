@@ -44,6 +44,7 @@
                 :def="moduleDefs[obj.key]"
                 :value="props.task.customField?.[obj.key]?.fieldValue"
                 :label="moduleDefs[obj.key].fieldTitle || ''"
+                v-bind="taskPropFor(moduleDefs[obj.key].fieldType, props.task)"
             />
         </div>
     </span>
@@ -68,7 +69,7 @@
     import { useStore } from 'vuex';
     import { useI18n } from "vue-i18n";
     import { fieldAppliesToTask } from '@fieldTaskTypes';
-    import { fieldTypeUi } from '@/plugins/customFieldView/fieldTypes';
+    import { fieldTypeUi, taskPropFor } from '@/plugins/customFieldView/fieldTypes';
     const { t } = useI18n();
 
     const {checkPermission, checkApps} = useCustomComposable();

@@ -992,7 +992,6 @@ onUnmounted(() => {
 .ibx__snooze-item:focus-visible { outline: none; box-shadow: var(--focus); }
 .ibx__snooze-hint { font: 500 11px/1.2 var(--font-mono); color: var(--ink-2); }
 .ibx__snooze-custom { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 6px; border-top: 1px solid var(--hairline); }
-.ibx__snooze-custom .ah-input { color-scheme: light dark; }
 .ibx__snooze-custom .ah-btn { align-self: flex-end; }
 
 .ibx__undo {

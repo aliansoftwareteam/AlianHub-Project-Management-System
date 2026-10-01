@@ -165,17 +165,81 @@ describe('a subtask row edits in place like a task row', () => {
         const rowMenu = menu();
         const wrapper = renderSub({ rowMenu });
         const actions = wrapper.findAll('.lv2__actions [data-action]').map((b) => b.attributes('data-action'));
-        expect(actions).toEqual(['rename', 'copy-link', 'new-tab', 'menu']);
+        expect(actions).toEqual(['rename', 'subtask', 'copy-link', 'new-tab', 'menu']);
         await wrapper.find('[data-action="menu"]').trigger('click');
         const items = wrapper.findAll('[role="menu"] [role="menuitem"]').map((i) => i.attributes('data-item'));
-        expect(items).toEqual(expect.arrayContaining(['rename', 'copy-link', 'copy-key', 'open', 'move', 'duplicate', 'archive', 'delete']));
-        for (const item of ['subtask', 'save-template', 'convert-subtask', 'duplicate-subtasks']) expect(items).not.toContain(item);
+        expect(items).toEqual(expect.arrayContaining(['rename', 'subtask', 'copy-link', 'copy-key', 'open', 'move', 'duplicate', 'archive', 'delete']));
+        for (const item of ['save-template', 'convert-subtask', 'duplicate-subtasks']) expect(items).not.toContain(item);
         await wrapper.find('[data-item="archive"]').trigger('click');
         expect(rowMenu.archive).toHaveBeenCalledWith(expect.objectContaining({ _id: 's-a' }));
         await wrapper.find('[data-action="menu"]').trigger('click');
         await wrapper.find('[data-item="move"]').trigger('click');
         expect(rowMenu.openSidebar).toHaveBeenCalledWith('move', expect.objectContaining({ _id: 's-a' }));
         expect(rowMenu.startMove).not.toHaveBeenCalled();
+    });
+});
+
+describe('a subtask row at each level', () => {
+    const levelTwo = (over = {}) => sub('s-a', { subTasks: 2, ancestors: ['t1'], ...over });
+    const levelThree = (over = {}) => sub('g-1', { ParentTaskId: 's-a', ancestors: ['t1', 's-a'], ...over });
+
+    it('a subtask with subtasks of its own has a disclosure, and opening it is left to the group', async () => {
+        const wrapper = renderSub({ data: levelTwo(), props: { depth: 1 } });
+        const disclose = wrapper.find('button.lv2__disclose');
+        expect(disclose.exists()).toBe(true);
+        expect(disclose.attributes('aria-expanded')).toBe('false');
+        await disclose.trigger('click');
+        expect(wrapper.emitted('toggle-subtasks')).toHaveLength(1);
+        expect(wrapper.emitted('open')).toBeUndefined();
+    });
+
+    it('a subtask without subtasks keeps the place of the disclosure, so siblings line up', () => {
+        const wrapper = renderSub({ data: sub('s-b'), props: { depth: 1 } });
+        expect(wrapper.find('button.lv2__disclose').exists()).toBe(false);
+        expect(wrapper.find('.lv2__disclose').exists()).toBe(true);
+    });
+
+    it('shows its direct children as done over total', () => {
+        const wrapper = renderSub({ data: levelTwo(), props: { depth: 1, progress: { total: 2, completed: 1 } } });
+        expect(wrapper.find('.lv2__key').text()).toContain('1/2');
+    });
+
+    it('a level-three row never has a disclosure, whatever its count says', () => {
+        const wrapper = renderSub({ data: levelThree({ subTasks: 1 }), props: { depth: 2 } });
+        expect(wrapper.find('button.lv2__disclose').exists()).toBe(false);
+    });
+
+    it('steps in one indent per level', () => {
+        const depthOf = (wrapper) => wrapper.find('.lv2__title').element.style.getPropertyValue('--lv2-depth');
+        expect(depthOf(renderSub({ data: levelTwo(), props: { depth: 1 } }))).toBe('1');
+        expect(depthOf(renderSub({ data: levelThree(), props: { depth: 2 } }))).toBe('2');
+        expect(depthOf(renderSub({ data: parent(), props: { isSub: false } }))).toBe('');
+    });
+
+    it('offers Add subtask on levels one and two, and not on level three', async () => {
+        const actionsOf = (wrapper) => wrapper.findAll('.lv2__actions [data-action]').map((b) => b.attributes('data-action'));
+        expect(actionsOf(renderSub({ data: parent(), props: { isSub: false } }))).toContain('subtask');
+        expect(actionsOf(renderSub({ data: levelTwo(), props: { depth: 1 } }))).toContain('subtask');
+
+        const third = renderSub({ data: levelThree(), props: { depth: 2 } });
+        expect(actionsOf(third)).not.toContain('subtask');
+        await third.find('[data-action="menu"]').trigger('click');
+        expect(third.findAll('[role="menu"] [role="menuitem"]').map((i) => i.attributes('data-item'))).not.toContain('subtask');
+    });
+
+    it('asks the group for a subtask of its own from the row', async () => {
+        const wrapper = renderSub({ data: levelTwo(), props: { depth: 1 } });
+        await wrapper.find('[data-action="subtask"]').trigger('click');
+        expect(wrapper.emitted('add-subtask')[0][0]).toMatchObject({ _id: 's-a' });
+    });
+
+    it('a level-three row is offered the people its level-two parent allows', () => {
+        const ctx = edit();
+        ctx.assigneeOptions = vi.fn(() => ['u2']);
+        const above = levelTwo({ AssigneeUserId: ['u2'] });
+        const wrapper = renderSub({ ctx, data: levelThree(), props: { depth: 2, parent: above } });
+        expect(ctx.assigneeOptions).toHaveBeenCalledWith(expect.objectContaining({ _id: 'g-1' }), expect.objectContaining({ _id: 's-a' }));
+        expect(wrapper.findComponent({ name: 'ListAssigneeCell' }).props('options')).toEqual(['u2']);
     });
 });
 
@@ -196,27 +260,34 @@ const selectionStore = (selected = [], tasks = [parent(), loner()]) => createSto
 describe('the List selects subtask rows on their own', () => {
     const RowStub = defineComponent({
         name: 'ListRow',
-        props: { data: Object, isSub: Boolean, canSelect: Boolean, selected: Boolean },
-        emits: ['select'],
+        props: { data: Object, isSub: Boolean, depth: Number, parent: Object, expanded: Boolean, canSelect: Boolean, selected: Boolean },
+        emits: ['select', 'toggle-subtasks', 'add-subtask'],
         setup: (props, { emit }) => () => h('div', {
             class: props.isSub ? 'row-sub' : 'row',
             'data-id': props.data._id,
+            'data-depth': String(props.depth || 0),
+            'data-parent': props.parent?._id || '',
+            'data-expanded': String(props.expanded),
             'data-can-select': String(props.canSelect),
             'data-selected': String(props.selected),
             onClick: (event) => emit('select', props.data, event)
-        }, props.data.TaskName)
+        }, [
+            props.data.TaskName,
+            h('button', { class: 'stub-toggle', onClick: (event) => { event.stopPropagation(); emit('toggle-subtasks'); } }),
+            h('button', { class: 'stub-add', onClick: (event) => { event.stopPropagation(); emit('add-subtask', props.data); } })
+        ])
     });
     const DraggableStub = defineComponent({
         name: 'DraggableStub',
-        props: ['list'],
-        setup: (props, { slots }) => () => h('div', props.list.map((element) => slots.item({ element })))
+        props: ['list', 'group'],
+        setup: (props, { slots }) => () => h('div', { class: 'drag-list' }, props.list.map((element) => slots.item({ element })))
     });
     const statusItem = { key: '0_0_Open', name: 'Open', isExpanded: true, searchKey: 'statusKey', searchValue: 1, indexName: 'groupByStatusIndex' };
-    const mountGroup = (store, item = statusItem, groupType = 0) => mount(ListGroup, {
+    const mountGroup = (store, item = statusItem, groupType = 0, collapsed = false) => mount(ListGroup, {
         props: { item, sprint: { id: SPRINT }, project: { _id: PID, taskStatusData: [OPEN, DONE] }, groupType },
         global: {
             plugins: [store],
-            provide: { searchedTask: ref(false), showArchived: ref(false), taskCollapsed: ref(false) },
+            provide: { searchedTask: ref(false), showArchived: ref(false), taskCollapsed: ref(collapsed) },
             stubs: { ListRow: RowStub, draggable: DraggableStub, CreateTask: true }
         }
     });
@@ -242,12 +313,76 @@ describe('the List selects subtask rows on their own', () => {
         expect(selected(store)).toEqual(['s-b']);
     });
 
-    it('selecting a task still takes its loaded subtasks along', async () => {
+    it('selecting a task selects that row only: its subtasks travel with it on the server', async () => {
         const store = selectionStore();
         const wrapper = mountGroup(store);
         await flushPromises();
         await wrapper.find('.row[data-id="t1"]').trigger('click');
-        expect(selected(store)).toEqual(['s-a', 's-b', 't1']);
+        expect(selected(store)).toEqual(['t1']);
+    });
+
+    const deep = () => parent({
+        subtaskArray: [
+            sub('s-a', { subTasks: 1, ancestors: ['t1'], subtaskArray: [sub('g-1', { ParentTaskId: 's-a', ancestors: ['t1', 's-a'] })] }),
+            sub('s-b', { ancestors: ['t1'] })
+        ]
+    });
+    const subRows = (wrapper) => wrapper.findAll('.row-sub').map((row) => [row.attributes('data-id'), row.attributes('data-depth'), row.attributes('data-parent')]);
+
+    it('renders every level when the toolbar expands all, each row under its own parent', async () => {
+        const wrapper = mountGroup(selectionStore([], [deep(), loner()]));
+        await flushPromises();
+        expect(subRows(wrapper)).toEqual([['s-a', '1', 't1'], ['g-1', '2', 's-a'], ['s-b', '1', 't1']]);
+    });
+
+    it('opens one level at a time by hand, and reopening a parent shows the levels that were open under it', async () => {
+        const wrapper = mountGroup(selectionStore([], [deep(), loner()]), statusItem, 0, true);
+        await flushPromises();
+        expect(subRows(wrapper)).toEqual([]);
+
+        await wrapper.find('.row[data-id="t1"] .stub-toggle').trigger('click');
+        expect(subRows(wrapper).map(([id]) => id)).toEqual(['s-a', 's-b']);
+
+        await wrapper.find('.row-sub[data-id="s-a"] .stub-toggle').trigger('click');
+        expect(subRows(wrapper).map(([id]) => id)).toEqual(['s-a', 'g-1', 's-b']);
+        expect(wrapper.find('.row-sub[data-id="s-a"]').attributes('data-expanded')).toBe('true');
+
+        await wrapper.find('.row[data-id="t1"] .stub-toggle').trigger('click');
+        expect(subRows(wrapper)).toEqual([]);
+        await wrapper.find('.row[data-id="t1"] .stub-toggle').trigger('click');
+        expect(subRows(wrapper).map(([id]) => id)).toEqual(['s-a', 'g-1', 's-b']);
+    });
+
+    it('selecting a row at any level selects that row and nothing under or above it', async () => {
+        const store = selectionStore([], [deep(), loner()]);
+        const wrapper = mountGroup(store);
+        await flushPromises();
+        await wrapper.find('.row-sub[data-id="s-a"]').trigger('click');
+        expect(selected(store)).toEqual(['s-a']);
+        await wrapper.find('.row-sub[data-id="g-1"]').trigger('click');
+        expect(selected(store)).toEqual(['g-1', 's-a']);
+        await wrapper.find('.row-sub[data-id="s-a"]').trigger('click');
+        expect(selected(store)).toEqual(['g-1']);
+    });
+
+    it('offers the inline create row under a level-two row, for a subtask of that row', async () => {
+        const wrapper = mountGroup(selectionStore([], [deep(), loner()]));
+        await flushPromises();
+        await wrapper.find('.row-sub[data-id="s-a"] .stub-add').trigger('click');
+        const create = wrapper.findComponent({ name: 'CreateTask' });
+        expect(create.exists()).toBe(true);
+        expect(create.attributes('taskid')).toBe('s-a');
+    });
+
+    it('takes drops from its own drag group only, and keeps nested rows out of the sortable list', async () => {
+        const wrapper = mountGroup(selectionStore([], [deep(), loner()]));
+        await flushPromises();
+        const lists = wrapper.findAllComponents(DraggableStub);
+        expect(lists).toHaveLength(1);
+        expect(lists[0].props('list').map((row) => row._id)).toEqual(['t1', 't2']);
+        const group = lists[0].props('group');
+        expect(group.name).toBe('lv2-task');
+        expect(group.put({}, {}, { dataset: {} })).toEqual(['lv2-task']);
     });
 
     it('a subtask under a task in a custom-field group is selectable, whatever its own field value', async () => {

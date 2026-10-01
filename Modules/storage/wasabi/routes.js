@@ -125,7 +125,7 @@ exports.init = (app) => {
     *         replaceFile:
     *           type: boolean
     *           required: false
-    *           description: Set true if you want to replace same name file in wasabi Other wise this parameter is not required.
+    *           description: Ignored. A stored file is never replaced; every upload is stored under a new timestamped name.
     *         file:
     *           type: string
     *           required: true

@@ -230,4 +230,5 @@
         color: #505050;
         padding-right: 2px;
     }
+    .formkit__content-wrapper .formkit__content-currency { color: var(--ink); }
 </style>

@@ -2,7 +2,7 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose")
 const logger = require("../../Config/loggerConfig");
-const { handleTaskAttachmentsDuplicateFunctionality } = require(`../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
+const { handleStoredFileCopy } = require(`../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
 const { replaceObjectKey } = require("../Auth/helper");
 const socketEmitter = require('../../event/socketEventEmitter');
 const { escapeRegex } = require("../../utils/escapeRegex");
@@ -13,6 +13,8 @@ const { commentThreadAccess, refuseThread } = require("./helpers/threadAccess");
 const { threadOf, canPostToThread, canChangeComment, changesThreadOrAuthor } = require("./helpers/threadWriteAccess");
 const { resolveMentionIds, deliverMentions } = require("./helpers/commentNotifications");
 const { taskIdMatch } = require("./helpers/taskIdMatch");
+const { isThreadFile, mayCarryMedia, refuseMedia } = require("./helpers/commentFileKeys");
+const { judge: judgeDownload } = require("../storage/downloadScope");
 const { withoutAssignment, withoutThreadState, placeReply } = require("./helpers/commentThreads");
 const { notifyReply } = require("./helpers/threadNotices");
 const { parseAgentMentionIds } = require("./helpers/parseMentions");
@@ -49,6 +51,7 @@ exports.save = async (req, res) => {
         const thread = threadOf(convertData);
         const access = await canPostToThread(companyId, req.uid, thread);
         if (!access.allowed) return refuseThread(res, access);
+        if (!(await mayCarryMedia(companyId, req.uid, convertData, convertData.mediaURL))) return refuseMedia(res);
         const chatThread = Boolean(placement.parent) && await isChatMessage(companyId, placement.parent);
         const mentionIds = await resolveMentionIds(companyId, convertData.userId, thread, convertData.message);
         const query = {
@@ -146,6 +149,9 @@ exports.update = async (req, res) => {
         if (changesThreadOrAuthor(existingComment, data)) {
             return res.status(400).json({ status: false, message: 'A comment cannot move to another thread or author.' });
         }
+        const namesNewMedia = Object.prototype.hasOwnProperty.call(data || {}, 'mediaURL')
+            && String(data.mediaURL || '') !== String(existingComment.mediaURL || '');
+        if (namesNewMedia && !(await mayCarryMedia(req.headers['companyid'], req.uid, existingComment, data.mediaURL))) return refuseMedia(res);
         const isOwner = String(existingComment.userId) === String(req.uid);
         const changedKeys = Object.keys(data || {});
         const pinOnly = changedKeys.length > 0 && changedKeys.every((k) => k === 'pinnedMessage');
@@ -588,7 +594,23 @@ exports.updateCommentCollection = (companyId, task, sprintObj, newProjectData,ta
  * @param {*} sprintObj 
  * @returns 
  */
-exports.addCommentCollection = (companyId, projectData, task, newTask, sprintObj) => {
+/* Only a file in the comment's own thread folder that the person duplicating may read is copied,
+ * and it alone: the storage copy used to take every file beside it. Any other key is kept as it is. */
+const copiedMediaKey = async (companyId, actorId, comment, folder) => {
+    const key = comment.mediaURL;
+    if (!key) return '';
+    if (!isThreadFile(comment, key) || !(await judgeDownload({ companyId, uid: actorId, key })).allowed) return key;
+    const copy = `${folder}/${key.substring(key.lastIndexOf('/') + 1)}`;
+    try {
+        await handleStoredFileCopy(companyId, key, copy);
+        return copy;
+    } catch (error) {
+        logger.error(`comment file not copied to the duplicate: ${error.message || error}`);
+        return key;
+    }
+};
+
+exports.addCommentCollection = (companyId, projectData, task, newTask, sprintObj, userData) => {
     return new Promise(async (resolve, reject) => {
         try {
             const comment = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: [{ taskId: taskIdMatch(task._id) }] }, "find").then((querySnapshot) => {
@@ -600,17 +622,10 @@ exports.addCommentCollection = (companyId, projectData, task, newTask, sprintObj
             })
             const commentsToInsert = [];
 
-            comment.forEach((cmt) => {
+            const folder = `Project/${projectData.id}/${sprintObj.id}/${newTask.id}/Comments`;
+            for (const cmt of comment) {
                 let parsedMap = JSON.parse(JSON.stringify(cmt));
-                let newMediaURL = '';
-
-                if (parsedMap.mediaURL) {
-                    const previousUrl = parsedMap.mediaURL;
-                    let lastSlashIndex = previousUrl.lastIndexOf('/');
-                    let fileName = previousUrl.substring(lastSlashIndex + 1);
-                    newMediaURL = `Project/${projectData.id}/${sprintObj.id}/${newTask.id}/Comments/${fileName}`;
-                    handleTaskAttachmentsDuplicateFunctionality(companyId, previousUrl, newMediaURL);
-                }
+                const newMediaURL = await copiedMediaKey(companyId, userData && userData.id, parsedMap, folder);
 
                 const obj = {
                     ...parsedMap,
@@ -622,7 +637,7 @@ exports.addCommentCollection = (companyId, projectData, task, newTask, sprintObj
                 delete obj._id;
 
                 commentsToInsert.push(obj);
-            });
+            }
             let obj = {
                 type: SCHEMA_TYPE.COMMENTS,
                 data: [commentsToInsert]

@@ -373,7 +373,7 @@ async function run(action, payload) {
         selection.clear();
         if (RELOCATING.has(action)) refreshSprintCounts();
     } catch (error) {
-        $toast.error(error?.message || t("List.bulk_failed"));
+        $toast.error(error?.response?.data?.statusText || error?.message || t("List.bulk_failed"));
     } finally {
         working.value = false;
     }

@@ -56,6 +56,42 @@ describe('snapshotTasks', () => {
         expect(before.sub.statusKey).toBe(2);
         expect(before.tt.statusKey).toBe(3);
     });
+
+    it('finds a row on the third level, in the sprint list and in a search result', () => {
+        const leaf = { _id: 'leaf', statusKey: 2, isParentTask: false, ParentTaskId: 'sub' };
+        const tree = [{ _id: 'p', isParentTask: true, subtaskArray: [{ _id: 'sub', isParentTask: false, ParentTaskId: 'p', subtaskArray: [leaf] }] }];
+        expect(snapshotTasks({ tasks: { p1: { sprints: ['s1'], s1: { tasks: tree } } } }, ['leaf']).leaf).toMatchObject({ statusKey: 2, ParentTaskId: 'sub' });
+        expect(snapshotTasks({ tasks: {}, searchedTasks: tree }, ['leaf']).leaf).toMatchObject({ statusKey: 2, ParentTaskId: 'sub' });
+    });
+});
+
+describe('undo puts a row back under the parent it had', () => {
+    const leaf = { _id: 'leaf', statusKey: 1, sprintId: 's1', isParentTask: false, ParentTaskId: 'sub' };
+    const sub = { _id: 'sub', statusKey: 1, sprintId: 's1', isParentTask: false, ParentTaskId: 't1', subtaskArray: [leaf] };
+    const state = {
+        tasks: { p1: { sprints: ['s1'], s1: { tasks: [{ _id: 't1', isParentTask: true, sprintId: 's1', subtaskArray: [sub] }, { _id: 't2', isParentTask: true, sprintId: 's1' }, { _id: 't3', isParentTask: true, sprintId: 's2' }] } } },
+        searchedTasks: []
+    };
+    const before = snapshotTasks(state, ['leaf', 'sub', 't2', 't3']);
+
+    it('a sub-subtask promoted to a task goes back under its subtask, not under the top task', () => {
+        expect(undoRequests({ action: 'bulkConvertToTask', payload: {}, before, updatedIds: ['leaf'], project }))
+            .toEqual([{ action: 'bulkConvertToSubTask', taskIds: ['leaf'], parentTaskId: 'sub' }]);
+    });
+
+    it('rows made subtasks of another task go back: subtasks to their parent, tasks to their own sprint', () => {
+        const requests = undoRequests({ action: 'bulkConvertToSubTask', payload: { parentTaskId: 't9' }, before, updatedIds: ['leaf', 't2', 't3'], project });
+        expect(requests).toEqual([
+            { action: 'bulkConvertToSubTask', taskIds: ['leaf'], parentTaskId: 'sub' },
+            { action: 'bulkConvertToTask', taskIds: ['t2'], sprintObj: project.sprintsObj.s1, projectData: { id: 'p1', ProjectCode: 'P1', ProjectName: 'Project' } },
+            { action: 'bulkConvertToTask', taskIds: ['t3'], sprintObj: project.sprintsObj.s2, projectData: { id: 'p1', ProjectCode: 'P1', ProjectName: 'Project' } }
+        ]);
+    });
+
+    it('offers no way back for a task whose sprint is gone', () => {
+        const gone = snapshotTasks({ tasks: { p1: { sprints: ['sx'], sx: { tasks: [{ _id: 'tx', isParentTask: true, sprintId: 'sx' }] } } } }, ['tx']);
+        expect(undoRequests({ action: 'bulkConvertToSubTask', payload: { parentTaskId: 't9' }, before: gone, updatedIds: ['tx'], project })).toEqual([]);
+    });
 });
 
 describe('undoRequests', () => {

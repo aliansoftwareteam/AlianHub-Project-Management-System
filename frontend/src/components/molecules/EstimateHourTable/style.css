@@ -1,5 +1,5 @@
 .disbleDate {
-    background-color: lightgray;
+    background-color: var(--fill);
     opacity: 0.5;
 }
 
@@ -12,8 +12,8 @@ table.table.table-astimated-hour tr td{
     padding: 8px;
     min-width: 54px;
     text-align: center;
-    border-bottom: 1px solid #DFE1E6;
-  
+    border-bottom: 1px solid var(--hairline);
+    color: var(--ink);
 }
 input.form-control.focusinput.date_input_value {
     text-align: center;
@@ -22,7 +22,10 @@ table.table.table-astimated-hour tr td.est_esditing_block{
     padding: 8px;
     min-width: 54px;
     text-align: center;
-    border-left: 1px solid #cfd0d3; 
+    border-left: 1px solid var(--border);
+}
+table.table.table-astimated-hour tr td.est_esditing_block.is-today {
+    background-color: var(--brand-tint);
 }
 table.table.table-astimated-hour tr th {
     padding: 8px;
@@ -31,15 +34,15 @@ table.table.table-astimated-hour tr th {
 }
 table.table.table-astimated-hour tr th span {
     display: block;
-    color: #474747;
+    color: var(--ink-2);
     font-weight: 400
 }
 
 table.table.table-astimated-hour tr th b {
-    color: #000
+    color: var(--ink)
 }
 tr.estimate__daysdate-tr th {
-    border: 1px solid #cfd0d3;
+    border: 1px solid var(--border);
 }
 table.table.table-astimated-hour tr th {
     font-family: var(--font-ui);
@@ -78,12 +81,11 @@ table.table.table-astimated-hour thead tr:first-child th {
     font-weight: 500;
     font-size: 16px;
     line-height: 24px;
-    /* border-top: 0 solid #cfd0d3 */
 }
 
 table.table.table-astimated-hour td.full-width span.font-weight-bold {
     font-weight: 700;
-    color: #000
+    color: var(--ink)
 }
 
 .table-Estimataed-hour-Wrapper {
@@ -109,12 +111,21 @@ table.table.table-astimated-hour thead {
     position: relative
 }
 
+/* Opaque, because the head is sticky over the scrolling rows. */
 .table-Estimataed-hour-Wrapper th {
-    background-color: #DFE1E6;
+    background-color: color-mix(in srgb, var(--ink) 9%, var(--surface));
+    color: var(--ink);
+}
+.table-Estimataed-hour-Wrapper tr.estimate__daysdate-tr th.is-today {
+    background-color: var(--brand);
+}
+table.table.table-astimated-hour tr.estimate__daysdate-tr th.is-today b,
+table.table.table-astimated-hour tr.estimate__daysdate-tr th.is-today span {
+    color: var(--on-brand);
 }
 .table-Estimataed-hour-Wrapper th.border-bottom:after {
     height: 1px;
-    background: #cfd0d3;
+    background: var(--border);
     content: "";
     position: absolute;
     z-index: 9999;
@@ -123,17 +134,18 @@ table.table.table-astimated-hour thead {
     bottom: -1px
 }
 .table-Estimataed-hour-Wrapper .table-astimated-hour tr:first-child th:first-child{
-    padding: 10px 14px; 
+    padding: 10px 14px;
     text-align: left !important;
     border-radius: 6px 0px 0px 0px;
 }
 .table-Estimataed-hour-Wrapper .table-astimated-hour tr:first-child th:last-child{
     padding: 5px;
-    border-left: 1px solid #cfd0d3;
+    border-left: 1px solid var(--border);
     border-radius: 0px 6px 0px 0px;
 }
 .toggle__popover {
     width: 202px;
+    background: transparent;
 }
 .total__users {
     padding: 5px 5px 5px 10px !important;

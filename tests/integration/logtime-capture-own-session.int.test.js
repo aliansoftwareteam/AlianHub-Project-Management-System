@@ -26,7 +26,7 @@ const randomId = () => crypto.randomBytes(12).toString('hex');
 const db = () => client.db(COMPANY);
 const entryById = (id) => db().collection('timesheets').findOne({ _id: new ObjectId(String(id)) });
 const memberCompanyUser = () => ({ userId: { $in: [member.uid, new ObjectId(member.uid)] } });
-const trackerPath = () => `Project/${project._id}/Sprint/${randomId()}/TimeLog/${randomId()}/${Date.now()}.png`;
+const trackerPath = (timeSheetId) => `Project/${project._id}/Sprint/${randomId()}/TimeLog/${timeSheetId}/${Date.now()}.png`;
 const storedUnder = (filePath) => fs.existsSync(path.join(STORAGE_ROOT, COMPANY, path.dirname(filePath)));
 
 const startTimer = async (session) => {
@@ -104,7 +104,7 @@ afterAll(async () => {
 describe('tracker captures apply only to the caller\'s own session', () => {
     it.each(['v3', 'v4'])('accepts a %s capture on the member\'s own session', async (version) => {
         const timeSheetId = await startTimer(member);
-        const filePath = trackerPath();
+        const filePath = trackerPath(timeSheetId);
         const res = await capture(member, version, timeSheetId, filePath);
 
         expect(res.status).toBe(200);
@@ -116,7 +116,7 @@ describe('tracker captures apply only to the caller\'s own session', () => {
     it.each(['v2', 'v3', 'v4'])('refuses a %s capture on the owner\'s session and writes nothing', async (version) => {
         const timeSheetId = await startTimer(owner);
         const before = await entryById(timeSheetId);
-        const filePath = trackerPath();
+        const filePath = trackerPath(timeSheetId);
         const res = await capture(member, version, timeSheetId, filePath);
 
         expect(res.status).toBe(403);

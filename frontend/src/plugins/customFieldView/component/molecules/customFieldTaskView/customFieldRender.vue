@@ -4,7 +4,7 @@
             <h3 class="custom-field__title" :class="headerClasses">
                 {{ $t('CustomField.custom_field') }}
             </h3>
-            <span v-if="props.editPermission" class="font-ui font-size-14 font-weight-500 font-normal text-decoration-underline blue cursor-pointer custom-field__add" @click="emit('isCustomField', true)">+ {{ $t('CustomField.custom_field') }}</span>
+            <button v-if="props.editPermission" type="button" class="ah-btn ah-btn--ghost ah-btn--sm custom-field__add" @click="emit('isCustomField', true)">+ {{ $t('CustomField.custom_field') }}</button>
         </div>
         
         <!-- Loading skeleton -->
@@ -19,7 +19,7 @@
             <template v-if="filteredCustomFields.length">
                 <template v-for="item in filteredCustomFields" :key="item._id">
                     <div v-if="fieldTypeUi(item?.fieldType)" class="position-re">
-                        <ModuleFieldListing :detail="item" :editable="props.editPermission === true" @change="handleFieldValue(item, $event)" @edit="handleEdit(item)" />
+                        <ModuleFieldListing :detail="item" :task="props.task" :editable="props.editPermission === true" @change="handleFieldValue(item, $event)" @edit="handleEdit(item)" />
                         <AiFieldMark v-if="isAiField(item)" class="custom-field__ai" :def="item" :task="props.task" :canFill="props.editPermission === true" show-text />
                     </div>
                     <div v-else class="position-re" :class="itemClasses">
