@@ -144,6 +144,9 @@ projectSnapshotsSchema.index({ kind: 1, deletedStatusKey: 1 });
 projectSnapshotsSchema.index({ templateId: 1, part: 1 });
 const everythingViewsSchema = new Schema(schema.everything_views, {strict: true, timestamps: true});
 everythingViewsSchema.index({ userId: 1, deletedStatusKey: 1 });
+const goalsSchema = new Schema(schema.goals, {strict: true, timestamps: true});
+goalsSchema.index({ deletedStatusKey: 1, ownerUserId: 1 });
+goalsSchema.index({ deletedStatusKey: 1, visibility: 1 });
 const remindersSchema = new Schema(schema.reminders, {strict: true, timestamps: true});
 remindersSchema.index({ userId: 1, fired: 1, reminderAt: 1 });
 const notesSchema = new Schema(schema.notes, {strict: true, timestamps: true});
@@ -512,6 +515,7 @@ module.exports = {
     viewTemplatesSchema,
     projectSnapshotsSchema,
     everythingViewsSchema,
+    goalsSchema,
     remindersSchema,
     notesSchema,
     generalRemindersSchema,

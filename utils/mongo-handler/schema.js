@@ -593,6 +593,58 @@ const schema = {
         isDefault: { type: Boolean, default: false, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Goals (Modules/Goals). Who may read a row is decided by visibility, ownerUserId and sharedWith
+    // (helpers/goalAccess.js); revision is the guard every write names so two writers cannot overwrite each other.
+    goals: {
+        name: { type: String, required: true },
+        description: { type: String, default: '', required: false },
+        ownerUserId: { type: String, required: true },
+        periodStart: { type: String, default: '', required: false },
+        periodEnd: { type: String, default: '', required: false },
+        visibility: { type: String, required: true },
+        sharedWith: { type: [String], default: [], required: false },
+        color: { type: String, default: '', required: false },
+        progressPct: { type: Number, default: 0, required: false },
+        targets: {
+            type: [{
+                _id: false,
+                id: { type: String, required: true },
+                name: { type: String, required: true },
+                kind: { type: String, required: true },
+                weight: { type: Number, default: 1, required: false },
+                progressPct: { type: Number, default: 0, required: false },
+                reachedAt: { type: Date, default: null, required: false },
+                start: { type: Number, required: false },
+                target: { type: Number, required: false },
+                current: { type: Number, required: false },
+                unit: { type: String, required: false },
+                currencyCode: { type: String, required: false },
+                done: { type: Boolean, required: false },
+                updatedBy: { type: String, required: false },
+                updatedAt: { type: Date, required: false },
+                sources: {
+                    sprintIds: { type: [String], default: undefined, required: false },
+                    taskIds: { type: [String], default: undefined, required: false },
+                },
+                counted: {
+                    done: { type: Number, required: false },
+                    total: { type: Number, required: false },
+                    at: { type: Date, required: false },
+                    skipped: {
+                        sprintIds: { type: [String], default: undefined, required: false },
+                        taskIds: { type: [String], default: undefined, required: false },
+                    },
+                },
+                dirty: { type: Boolean, required: false },
+            }],
+            default: [],
+            required: false,
+        },
+        revision: { type: Number, default: 0, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Personal reminders (COLLAB-03) — one-shot, per-user. A node-schedule cron
     // (every minute) fires any reminder whose reminderAt has passed and that
     // hasn't fired yet, delivering an in-app notification to userId. Managed by
