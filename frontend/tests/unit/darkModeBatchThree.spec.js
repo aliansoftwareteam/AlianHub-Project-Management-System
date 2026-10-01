@@ -158,6 +158,24 @@ describe('the project tabs that show the details column', () => {
         expect(/const TOKEN_BODY_TABS = \[([^\]]+)\]/.exec(vue)[1].replace(/['\s]/g, '').split(',')).toEqual(['ProjectDetail', 'Comments', 'ActivityLog']);
     });
 
+    test('the activity list paints its names, its text and Load more from tokens', () => {
+        const css = read('components/templates/ActivityLog/style.css');
+        expect(hardCodedColours(withoutComments(css))).toEqual([]);
+        expect(ruleBody(css, '.main-activity .wrapperNameImage span b')).toMatch(/color:\s*var\(--ink\)/);
+        expect(ruleBody(css, '.main-activity .wrapperNameImage span')).toMatch(/color:\s*var\(--ink-2\)/);
+        expect(ruleBody(css, '.btn-class')).toMatch(/color:\s*var\(--brand\)/);
+    });
+
+    test('the comment feed on the tab paints its bubbles, footer and field from tokens', () => {
+        const css = read('views/Projects/Comments/style.css');
+        expect(ruleBody(css, '.list-view-body--detail .message_id-sent.bg-white')).toMatch(/background-color:\s*var\(--surface\)/);
+        expect(ruleBody(css, '.list-view-body--detail .message_id-sent')).toMatch(/color:\s*var\(--ink\)/);
+        const footer = ruleBody(css, '.list-view-body--detail #comment_footer');
+        expect(footer).toMatch(/background-color:\s*var\(--surface\)/);
+        expect(footer).toMatch(/color-scheme:\s*var\(--scheme\)/);
+        expect(ruleBody(css, '.list-view-body--detail .write-message')).toMatch(/color:\s*var\(--ink\)/);
+    });
+
     test('the feed and the activity list take theme ink for their legacy colour classes', () => {
         const css = read('views/Projects/style.css');
         expect(css).toMatch(/\.list-view-body--detail :is\([^)]*\.black[^)]*\)[^{]*\{[^}]*color:\s*var\(--ink\)/);

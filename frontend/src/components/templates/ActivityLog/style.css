@@ -1,0 +1,52 @@
+.btn-class{
+    color: var(--brand);
+    font-size: 14px;
+    font-weight: 500;
+    font-family: var(--font-ui);
+    text-decoration: underline;
+    border: 0;
+}
+.main-activity{
+    margin-bottom: 24px;
+}
+.showProjectDetailRight .activity-log{
+    padding: 20px;
+}
+.activity-scroll{
+    max-height: calc(100dvh - 160px);
+    margin-bottom: 0;
+    overflow-y: auto;
+    padding: 10px;
+}
+.activity-scroll::-webkit-scrollbar{
+    width: 6px;
+    background-color: var(--fill);
+}
+.activity-scroll::-webkit-scrollbar-thumb{
+    background-color: var(--border);
+    border: 2px solid var(--border);
+    border-radius: 5px;
+}
+.activity-scroll::-webkit-scrollbar-track{
+    -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);
+    border-radius: 10px;
+    background-color: var(--fill);
+}
+.main-activity .wrapperNameImage span{
+    color: var(--ink-2);
+    font-size: 14px;
+    line-height: 22px;
+}
+.main-activity .wrapperNameImage span b{
+    color: var(--ink);
+}
+.activity-scroll button {
+    background: transparent;
+}
+@media(max-width: 1024px){
+    .main-activity {margin-bottom: 15px;}
+
+}
+@media(max-width: 767px){
+.activity-scroll {max-height: fit-content; }
+}
