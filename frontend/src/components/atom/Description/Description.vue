@@ -14,7 +14,7 @@
                     <span class="font-size-14 font-weight-500 ai-color ai-border-bottom">{{ $t('AI.ai_write_description') }}</span>
                 </div>
             </div>
-            <div v-show="contentLoaded" id="editorjs" :class="{'ml-10px mr-10-px': clientWidth < 767, 'show_hide_class': !isShow}" @click="isShow = true"></div>
+            <div v-show="contentLoaded" id="editorjs" role="group" :aria-label="$t('Description.description')" :class="{'ml-10px mr-10-px': clientWidth < 767, 'show_hide_class': !isShow}" @click="isShow = true"></div>
             <Transition>
                 <span v-if="showMessage" class="saved_message">{{$t('Description.saved')}}</span>
             </Transition>

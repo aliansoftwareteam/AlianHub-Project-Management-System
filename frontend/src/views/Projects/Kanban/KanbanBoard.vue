@@ -4,6 +4,8 @@
             v-for="(column, columnIndex) in columns"
             :key="column.key"
             class="kanban-column"
+            role="group"
+            :aria-label="column.name"
             :class="{ 'kanban-column--danger': isBlockedColumn(column), 'is-drop-target': hoveredColumnIndex === columnIndex }"
             @dragover.prevent="hoveredColumnIndex = columnIndex"
             @dragleave="onColumnDragLeave"
