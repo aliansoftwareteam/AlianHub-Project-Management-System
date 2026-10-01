@@ -140,7 +140,7 @@ describe('the column chooser', () => {
 
     it('lays out one grid track per shown column, and the List keeps its narrower tracks', () => {
         const list = defaultColumns('list');
-        expect(gridTracks('list', list)).toBe('28px minmax(0, 1fr) minmax(0, .45fr) 56px 64px 72px 48px 80px 88px');
+        expect(gridTracks('list', list)).toBe('28px var(--lv2-title-track) minmax(56px, .45fr) 56px 64px 72px 48px 80px 88px');
         expect(listColumnsAt(list, 1050).map((c) => c.id)).not.toContain('doneBy');
         const withPoints = resolveColumns('list', columnCatalogue('list'), withVisibility(null, 'points', true)).filter((c) => c.visible);
         expect(listColumnsAt(withPoints, 900).map((c) => c.id)).toEqual(['tags', 'assignee', 'due', 'priority']);

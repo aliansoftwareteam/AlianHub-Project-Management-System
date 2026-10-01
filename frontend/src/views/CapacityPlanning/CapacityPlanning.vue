@@ -52,9 +52,9 @@
             </template>
             <div v-if="!visibleTeams.length" class="tv-empty"><span>{{ loading ? $t('Time.loading') : $t('Time.capacity_empty') }}</span></div>
             <div class="tv-legend">
-                <span><i style="background: var(--brand)"></i>{{ $t('Time.legend_committed') }}</span>
-                <span><i style="background: var(--brand); opacity: .5"></i>{{ $t('Time.legend_pipeline') }}</span>
-                <span><i style="background: var(--danger)"></i>{{ $t('Time.legend_over_avail') }}</span>
+                <span><i class="cp__key"></i>{{ $t('Time.legend_committed') }}</span>
+                <span><i class="cp__key cp__key--pipeline"></i>{{ $t('Time.legend_pipeline') }}</span>
+                <span><i class="cp__key cp__key--over"></i>{{ $t('Time.legend_over_avail') }}</span>
                 <span>{{ $t('Time.legend_line') }}</span>
             </div>
         </div>
@@ -200,17 +200,19 @@ onMounted(() => { if (!isMobile.value) load(); });
 .cp__team { align-self: center; font-weight: 600; display: flex; flex-direction: column; min-width: 0; }
 .cp__team small { font: 500 10.5px/1.2 var(--font-mono); color: var(--ink-2); }
 .cp__team--whatif { color: var(--brand); font-size: 11.5px; }
-.cp__track { position: relative; height: 100%; background: rgba(0, 0, 0, .06); border-radius: 5px; overflow: hidden; }
-:root[data-theme="dark"] .cp__track { background: rgba(255, 255, 255, .08); }
+.cp__track { position: relative; height: 100%; background: var(--track); border-radius: 5px; overflow: hidden; }
 .cp__bar { position: absolute; bottom: 0; left: 0; right: 0; background: var(--brand); border-radius: 5px; transition: height var(--t-state) var(--ease); }
 .cp__bar.is-over { background: var(--danger); }
 .cp__bar.is-tight { background: var(--warn); }
 .cp__bar--pipeline { background: var(--brand); opacity: .5; border-radius: 5px 5px 0 0; }
+.cp__key { background: var(--brand); }
+.cp__key--pipeline { opacity: .5; }
+.cp__key--over { background: var(--danger); }
 .cp__line { position: absolute; left: 0; right: 0; border-top: 2px solid var(--ink); }
 .cp__line.is-dashed { border-top-style: dashed; border-top-color: var(--ink-3); }
 .cp__whatif { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .cp__whatif-input { width: 84px; height: 30px; font-family: var(--font-mono); }
-.cp__gap { padding: 11px 13px; border-color: rgba(193, 18, 31, .25); line-height: 1.5; }
+.cp__gap { padding: 11px 13px; border-color: color-mix(in srgb, var(--danger) 25%, transparent); line-height: 1.5; }
 .cp__gap strong { font-weight: 600; color: var(--danger-ink); }
 .cp__gap--ok { border-color: var(--hairline); color: var(--ink-2); }
 .cp__gap-more { color: var(--ink-2); margin-left: 6px; }
