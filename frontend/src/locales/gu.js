@@ -6270,7 +6270,7 @@ export default {
         "yes_delete": "હા, તેને કાઢી નાખો!",
         "task_will_become_subtasks_of": "કાર્ય ઉપકાર્ય બની જશે",
         "Are_you_sure_you_want_to_delete": "શું તમે ખરેખર કાઢી નાખવા માંગો છો",
-        "subtasks_will_become_subtasks_of": "ઉપકાર્યો ઉપકાર્યો બની જશે",
+        "subtasks_will_become_subtasks_of": "subtasks stay under it and move with it under",
         "unlock_board_view": "બોર્ડ દૃશ્ય અનલૉક કરવા માટે",
         "unlock_project_detail_view": "પ્રોજેક્ટ વિગતવાર દૃશ્ય અનલૉક કરવા માટે",
         "unlock_table_view": "ટેબલ દૃશ્ય અનલૉક કરવા માટે",

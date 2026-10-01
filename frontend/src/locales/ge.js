@@ -6270,7 +6270,7 @@ export default {
         "yes_delete": "Ja, löschen!",
         "task_will_become_subtasks_of": "Die Aufgabe wird zu Unteraufgaben von",
         "Are_you_sure_you_want_to_delete": "Sind Sie sicher, dass Sie löschen möchten?",
-        "subtasks_will_become_subtasks_of": "Unteraufgaben werden zu Unteraufgaben von",
+        "subtasks_will_become_subtasks_of": "subtasks stay under it and move with it under",
         "unlock_board_view": "Um die Board-Ansicht freizuschalten",
         "unlock_project_detail_view": "Um die Projekt-Detail-Ansicht freizuschalten",
         "unlock_table_view": "Um die Tabellen-Ansicht freizuschalten",
