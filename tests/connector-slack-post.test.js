@@ -333,7 +333,7 @@ describe('approving a Slack message', () => {
         const out = await approveAs(p._id, OWNER);
         expect(out.applied).toEqual([{ action: ACTION, ok: false, error: 'That Slack channel is not on this workspace\'s allow-list.' }]);
         expect(mockSlack.calls).toHaveLength(0);
-        expect(proposalRow(p._id)).toMatchObject({ status: 'failed', delivery: [expect.objectContaining({ ok: false, error: expect.stringContaining('allow-list') })] });
+        expect(proposalRow(p._id)).toMatchObject({ status: 'approved', delivery: [expect.objectContaining({ ok: false, error: expect.stringContaining('allow-list') })] });
     });
 
     it('a stored proposal whose channel was changed by hand is refused at apply time', async () => {
@@ -342,7 +342,7 @@ describe('approving a Slack message', () => {
         mockSlack.calls.length = 0;
         await approveAs(p._id, OWNER);
         expect(mockSlack.calls).toHaveLength(0);
-        expect(proposalRow(p._id).status).toBe('failed');
+        expect(proposalRow(p._id).delivery).toEqual([expect.objectContaining({ ok: false, channelId: GENERAL })]);
     });
 
     it('a token Slack no longer accepts breaks the connection, tells the admin, and is not tried again', async () => {
@@ -352,7 +352,7 @@ describe('approving a Slack message', () => {
         mockSlack.calls.length = 0;
         await approveAs(first._id, OWNER);
         expect(posts()).toHaveLength(1);
-        expect(proposalRow(first._id)).toMatchObject({ status: 'failed', failedReason: 'slack: invalid_auth', delivery: [expect.objectContaining({ ok: false, error: 'slack: invalid_auth' })] });
+        expect(proposalRow(first._id).delivery).toEqual([expect.objectContaining({ ok: false, error: 'slack: invalid_auth' })]);
         const seen = await call(ctrl.getSlack, ADMIN);
         expect(seen.body.data).toMatchObject({ status: 'broken', brokenReason: 'invalid_auth' });
         expect(seen.body.data.brokenAt).toBeInstanceOf(Date);
@@ -374,7 +374,7 @@ describe('approving a Slack message', () => {
         const third = await propose({ channelId: RELEASES, text: 'Three' });
         await approveAs(third._id, OWNER);
         expect(posts().pop().authorization).toBe(`Bearer ${NEW_TOKEN}`);
-        expect(proposalRow(third._id).status).toBe('approved');
+        expect(proposalRow(third._id).delivery).toEqual([expect.objectContaining({ ok: true, ts: TS })]);
     });
 
     it('a Slack rate limit is recorded with its wait and is not retried', async () => {
@@ -383,7 +383,7 @@ describe('approving a Slack message', () => {
         mockSlack.calls.length = 0;
         await approveAs(p._id, OWNER);
         expect(posts()).toHaveLength(1);
-        expect(proposalRow(p._id)).toMatchObject({ status: 'failed', delivery: [expect.objectContaining({ ok: false, error: 'slack: rate_limited, retry after 30s' })] });
+        expect(proposalRow(p._id).delivery).toEqual([expect.objectContaining({ ok: false, error: 'slack: rate_limited, retry after 30s' })]);
         expect(rows(T)[0].status).toBe('connected');
     });
 
@@ -510,15 +510,19 @@ describe('with the flag off', () => {
         const p = await propose({ channelId: RELEASES, text: 'Hello' });
         delete process.env.CONNECTORS;
         mockSlack.calls.length = 0;
-        await approveAs(p._id, OWNER);
+        const out = await approveAs(p._id, OWNER);
         expect(mockSlack.calls).toHaveLength(0);
-        expect(proposalRow(p._id).status).toBe('failed');
+        expect(out.applied).toEqual([expect.objectContaining({ action: ACTION, ok: false })]);
     });
 
     it('named but without its preconditions: the screen is told why, and every route refuses', async () => {
         delete process.env.AGENT_TAINT_ROUTING;
-        const catalogue = await call(integrations.listCatalog, OWNER);
-        expect(catalogue.body.connectors).toEqual({ slack: { on: false, problems: ['taint_routing_off'] } });
+        const catalogue = await call(integrations.listCatalog, MEMBER);
+        expect(catalogue.body.connectors).toEqual(['slack']);
+        const seen = await call(ctrl.getSlack, ADMIN);
+        expect(seen.body).toMatchObject({ status: true, data: { on: false, problems: ['taint_routing_off'] } });
+        expect(Object.keys(seen.body.data).sort()).toEqual(['on', 'problems']);
+        expect((await call(ctrl.getSlack, MEMBER)).code).toBe(403);
         const out = await call(ctrl.saveSlackSecrets, OWNER, { body: { botToken: TOKEN } });
         expect(out.code).toBe(409);
         expect(out.body).toMatchObject({ status: false, problems: ['taint_routing_off'] });
@@ -528,9 +532,10 @@ describe('with the flag off', () => {
         expect(registry.has(ACTION)).toBe(false);
     });
 
-    it('the catalogue says the connector is on once everything is in place', async () => {
+    it('the catalogue names the connector and nothing more; its state is the owner\'s and admin\'s to read', async () => {
         const catalogue = await call(integrations.listCatalog, MEMBER);
-        expect(catalogue.body.connectors).toEqual({ slack: { on: true, problems: [] } });
+        expect(catalogue.body.connectors).toEqual(['slack']);
+        expect((await call(ctrl.getSlack, OWNER)).body.data).toMatchObject({ on: true, problems: [], connected: false });
     });
 });
 

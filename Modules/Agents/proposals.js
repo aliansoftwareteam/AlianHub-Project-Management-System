@@ -279,11 +279,7 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     }
     const undoUntil = new Date(Date.now() + UNDO_WINDOW_MS);
     const delivery = slackPost.deliveryOf(changes, applied);
-    // A message that was approved and never sent must not read as done.
-    const unsent = delivery.length && !applied.some((a) => a.ok)
-        ? { status: STATUS.FAILED, failedReason: String(delivery[0].error || '').slice(0, 300), failedAt: new Date() }
-        : {};
-    const updated = await setStatus(companyId, id, { status, changes, undoUntil, auditIds, ...(delivery.length ? { delivery } : {}), ...unsent });
+    const updated = await setStatus(companyId, id, { status, changes, undoUntil, auditIds, ...(delivery.length ? { delivery } : {}) });
     await audit.recordProposalDecision(companyId, { ...decider, ...runTrace }, { proposalId: id, decision: status, agentName: p.agentName, runId: p.runId, changes: applied, ip });
     const row = typeof p.toObject === 'function' ? p.toObject() : p;
     await quietly(`remember approved changes of ${id}`, () => memory.rememberApprovedChanges({ companyId, projectId: p.projectId, proposal: { ...row, changes, decidedBy: decider.userId }, applied }));

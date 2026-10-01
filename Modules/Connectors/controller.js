@@ -10,7 +10,7 @@ const refuse = (res, code, statusText, extra = {}) => res.status(code).send({ st
 
 /* The tenant is the verified header, the role the live seat, and a token never manages a connector; only then
  * does the flag's own state matter, so a member learns nothing about whether the connector is set up. */
-const managerOrRefuse = async (req, res) => {
+const managerOrRefuse = async (req, res, { whenOff } = {}) => {
     let companyId;
     try {
         companyId = tenantOf(req);
@@ -23,6 +23,7 @@ const managerOrRefuse = async (req, res) => {
     if (!isPrivileged(await getRoleType(companyId, req.uid))) { refuse(res, 403, 'Only an owner or admin can manage connectors.'); return ''; }
     const state = flag.status('slack');
     if (!state.requested) { refuse(res, 404, 'The Slack connector is off.'); return ''; }
+    if (!state.on && whenOff) { whenOff(state); return ''; }
     if (!state.on) {
         refuse(res, 409, `The Slack connector stays off: ${state.problems.map((p) => p.text).join('; ')}.`, { problems: state.problems.map((p) => p.code) });
         return '';
@@ -41,9 +42,10 @@ const failed = (res, error, what) => {
     return refuse(res, 500, 'Something went wrong.');
 };
 
-const handle = (what, statusText, run) => async (req, res) => {
+const handle = (what, statusText, run, { answersWhenOff = false } = {}) => async (req, res) => {
     try {
-        const companyId = await managerOrRefuse(req, res);
+        const whenOff = answersWhenOff ? (state) => res.send({ status: true, statusText, data: { on: false, problems: state.problems.map((p) => p.code) } }) : undefined;
+        const companyId = await managerOrRefuse(req, res, { whenOff });
         if (!companyId) return undefined;
         return res.send({ status: true, statusText, data: await run(companyId, req) });
     } catch (error) {
@@ -51,7 +53,8 @@ const handle = (what, statusText, run) => async (req, res) => {
     }
 };
 
-exports.getSlack = handle('get the Slack connector', 'Slack connector fetched.', (companyId) => slack.describe(companyId));
+/* The one route that answers while the connector is named but off, so the screen can say why to an owner or admin. */
+exports.getSlack = handle('get the Slack connector', 'Slack connector fetched.', async (companyId) => ({ on: true, problems: [], ...(await slack.describe(companyId)) }), { answersWhenOff: true });
 
 exports.saveSlackSecrets = handle('save the Slack connector secrets', 'Slack connector saved.', (companyId, req) => {
     const body = req.body || {};

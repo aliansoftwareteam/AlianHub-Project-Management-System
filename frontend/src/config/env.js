@@ -264,6 +264,7 @@ module.exports.AGENT_BUDGET = '/api/v2/agents/budget';
 module.exports.AGENT_MODELS = '/api/v2/agents/models';
 module.exports.AGENT_ROUTING_POLICY = '/api/v2/agents/routing-policy';
 module.exports.PROVIDER_KEYS = '/api/v2/provider-keys';
+module.exports.CONNECTORS = '/api/v2/connectors';
 module.exports.AI_SWITCH = '/api/v2/ai-switch';
 module.exports.AGENT_MEMORY_PROJECT = '/api/v2/agents/memory/project';
 module.exports.AGENT_MEMORY = '/api/v2/agents/memory';
