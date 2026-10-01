@@ -147,7 +147,7 @@ import AppState from '@/components/molecules/AppState/AppState.vue';
 import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
 import LogTimeSheet from '@/views/TimeLog/LogTimeSheet.vue';
 import ReopenWeek from './ReopenWeek.vue';
-import { lastReopenOf } from '@/views/Approvals/approvalAccess';
+import { isOwnApproval, lastReopenOf } from '@/views/Approvals/approvalAccess';
 import { isOwnerOrAdmin } from "@/utils/roles";
 
 defineOptions({ name: 'UserTimesheet' });
@@ -231,7 +231,7 @@ const statusChip = computed(() => {
     const doc = approval.value.current;
     const status = statusOf(doc);
     const cls = { submitted: 'ah-chip--warn', approved: 'ah-chip--ok', rejected: 'ah-chip--danger' }[status] || '';
-    const label = t(`Time.status_${status}`);
+    const label = isOwnApproval(doc) ? t('Time.approved_own_week', { name: doc.reviewerName || t('Time.someone') }) : t(`Time.status_${status}`);
     const title = status === 'rejected' && doc.rejectionReason ? t('Time.reason', { reason: doc.rejectionReason }) : '';
     return { cls, label: title ? `${label} · ${doc.rejectionReason}` : label, title };
 });
@@ -248,7 +248,7 @@ const previous = computed(() => {
     const hours = doc ? formatHm(doc.totalMinutes) : '';
     const who = doc && doc.reviewerName;
     if (status === 'submitted') return { dot: 'ah-dot--warn', label: t('Time.status_submitted').toLowerCase(), detail: who ? t('Time.awaiting_named', { name: who }) : t('Time.awaiting_approval'), hours };
-    if (status === 'approved') return { dot: 'ah-dot--ok', label: t('Time.status_approved').toLowerCase(), detail: who ? t('Time.approved_by', { name: who }) : '', hours };
+    if (status === 'approved') return { dot: 'ah-dot--ok', label: t('Time.status_approved').toLowerCase(), detail: who ? t(isOwnApproval(doc) ? 'Time.approved_by_own_week' : 'Time.approved_by', { name: who }) : '', hours };
     if (status === 'rejected') return { dot: 'ah-dot--danger', label: t('Time.status_rejected').toLowerCase(), detail: doc.rejectionReason ? t('Time.reason', { reason: doc.rejectionReason }) : (who ? t('Time.rejected_by', { name: who }) : ''), hours };
     return { dot: 'ut2-dot--none', label: t('Time.not_submitted'), detail: '', hours: '' };
 });

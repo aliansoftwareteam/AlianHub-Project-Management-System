@@ -11,6 +11,7 @@ const { attribution, isAgent } = require('./actor');
 const stepCredential = require('../Workflows/stepCredential');
 const completionStore = require('../Tasks/helpers/completionStore');
 const { sprintPlacementOf, followSprintMove, moveDescendants } = require('../Tasks/helpers/sprintPlacement');
+const { pullOfLists } = require('../Tasks/helpers/taskExtraLists');
 const { emitPageChange } = require('../Pages/helpers/pageEvents');
 const { markdownToEditorData, blocksToHtml } = require('../Pages/helpers/pageContent');
 const { escapeCommentText } = require('../Comments/helpers/plainText');
@@ -96,6 +97,21 @@ const FLAGGED_RATINGS = Object.freeze({
     'page.update': write(SCOPE.PROJECT),
     'slack.message.post': write(SCOPE.WORKSPACE, false),
     'slack.channel.read': read(SCOPE.WORKSPACE),
+    'tags.list': read(SCOPE.PROJECT),
+    'task.tags.add': write(SCOPE.TASK),
+    'task.tags.remove': write(SCOPE.TASK),
+    'task.relations.list': read(SCOPE.TASK),
+    // A link is written on both tasks, which may sit in two projects.
+    'task.relation.add': write(SCOPE.PROJECT),
+    'task.relation.remove': write(SCOPE.PROJECT),
+    'lists.list': read(SCOPE.PROJECT),
+    'list.create': write(SCOPE.PROJECT),
+    'list.rename': write(SCOPE.PROJECT),
+    'list.move': write(SCOPE.PROJECT),
+    'page.comments.list': read(SCOPE.PROJECT),
+    'page.comment.create': write(SCOPE.PROJECT),
+    'page.comment.reply': write(SCOPE.PROJECT),
+    'page.comment.assign': write(SCOPE.PROJECT),
 });
 
 const ratingTable = () => ({ ...RATINGS, ...Object.fromEntries(Object.entries(FLAGGED_RATINGS).filter(([k]) => registry.has(k))) });
@@ -316,7 +332,7 @@ const executors = {
         if (!sprint) throw new tools.DeterministicError('sprint not found in this project');
         const previous = { sprintId: task.sprintId, sprintArray: task.sprintArray, folderObjId: task.folderObjId || null };
         const placement = await sprintPlacementOf(companyId, sprint);
-        const r = await tools.updateTask(companyId, task._id, placement.set, context(actor, 'task.sprint.move', depth), placement.unset);
+        const r = await tools.updateTask(companyId, task._id, placement.set, context(actor, 'task.sprint.move', depth), placement.unset, pullOfLists([target]));
         await followSprintMove(companyId, { taskId: task._id, projectId: task.ProjectID, fromSprintId: task.sprintId, toSprintId: target });
         await moveDescendants(companyId, task._id, placement, target);
         return { result: { sprintId: String(target), name: sprint.name }, undo: { kind: 'sprint', taskId: String(task._id), previous }, entityId: task._id, entityName: task.TaskName, task: r.task };
@@ -427,6 +443,7 @@ const executors = {
 
     ...require('./taskRequests').executors,
     ...require('./pageRequests').executors,
+    ...require('./workRequests').executors,
 };
 
 const COMMENT_ACTIONS = new Set(['task.comment', 'comment.create', 'chat.post', 'comment.update']);

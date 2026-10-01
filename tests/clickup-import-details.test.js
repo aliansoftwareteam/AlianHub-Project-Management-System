@@ -256,6 +256,7 @@ describe('what an import of one list will bring in', () => {
             tags: { added: ['urgent', 'archive'], skipped: [] },
             links: 3,
             people: { unmatched: ['ghost@nowhere.test', 'Pat Example'], cannotOpen: ['lee@private.test'] },
+            existing: { skipped: 0, updated: 0 },
         });
     });
 
@@ -302,6 +303,7 @@ describe('the summaries of several lists as one', () => {
             fields: { created: ['Stage', 'Budget'], reused: ['Client'], asText: ['Site'], skipped: ['Notes'], reason: 'no_permission', valuesSet: 6, valuesDropped: 1 },
             tags: { added: ['urgent'], skipped: ['later'] },
             people: { unmatched: ['ghost@nowhere.test'], cannotOpen: ['lee@private.test'] },
+            existing: { skipped: 0, updated: 0 },
         });
         expect(mergeSummaries([])).toMatchObject({ tasks: 0, links: 0, fields: { created: [], valuesSet: 0 } });
     });

@@ -9,7 +9,8 @@ const emptySummary = () => ({
     checklistItems: 0,
     tags: { added: [], skipped: [] },
     links: 0,
-    people: { unmatched: [], cannotOpen: [] }
+    people: { unmatched: [], cannotOpen: [] },
+    existing: { skipped: 0, updated: 0 }
 });
 
 /* An import runs as one request per ClickUp list, each answering its own summary. Mirrors mergeSummaries in
@@ -36,7 +37,8 @@ export function mergeSummaries(summaries) {
         checklistItems: sum.checklistItems + one.checklistItems,
         tags: { added: unique([...sum.tags.added, ...one.tags.added]), skipped: unique([...sum.tags.skipped, ...one.tags.skipped]) },
         links: sum.links + one.links,
-        people: { unmatched: unique([...sum.people.unmatched, ...one.people.unmatched]), cannotOpen: unique([...sum.people.cannotOpen, ...one.people.cannotOpen]) }
+        people: { unmatched: unique([...sum.people.unmatched, ...one.people.unmatched]), cannotOpen: unique([...sum.people.cannotOpen, ...one.people.cannotOpen]) },
+        existing: { skipped: sum.existing.skipped + (one.existing?.skipped || 0), updated: sum.existing.updated + (one.existing?.updated || 0) }
     }), emptySummary());
     const created = new Set(merged.fields.created.map(lower));
     merged.fields.reused = merged.fields.reused.filter((name) => !created.has(lower(name)));
@@ -49,6 +51,7 @@ const reasonKey = (prefix, reason) => `${prefix}_${REASONS.includes(reason) ? re
 /* One row per kind the file holds: what comes in and what is left out, with the reason. A kind the file does not hold has no row. */
 export function countRows(summary, t, prefix) {
     const { comments, fields, tags, people } = summary;
+    const existing = summary.existing || { skipped: 0, updated: 0 };
     const fieldCount = fields.created.length + fields.reused.length;
     const peopleOut = [
         people.unmatched.length ? t(`${prefix}.out_people_unmatched`, { count: people.unmatched.length }) : "",
@@ -56,6 +59,7 @@ export function countRows(summary, t, prefix) {
     ].filter(Boolean).join("; ");
     return [
         { key: "tasks", show: true, into: summary.tasks, out: "" },
+        { key: "existing", show: existing.skipped + existing.updated > 0, into: existing.updated ? t(`${prefix}.counts_existing_updated`, { count: existing.updated }) : "", out: existing.skipped ? t(`${prefix}.out_existing`, { count: existing.skipped }) : "" },
         { key: "subtasks_2", show: summary.subtasks.level2 > 0, into: summary.subtasks.level2, out: "" },
         { key: "subtasks_3", show: summary.subtasks.level3 > 0, into: summary.subtasks.level3, out: "" },
         { key: "comments", show: comments.imported + comments.skipped > 0, into: comments.imported, out: comments.skipped ? t(reasonKey(`${prefix}.out_comments`, comments.reason), { count: comments.skipped }) : "" },

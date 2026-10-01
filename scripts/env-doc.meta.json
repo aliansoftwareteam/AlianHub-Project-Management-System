@@ -762,6 +762,11 @@
     "description": "MCP management tools: \"on\" registers and offers, to a personal access token created with the tasks:manage grant or an OAuth token holding the tasks:manage scope, fields.list, subtasks.list, members.list, task.history and task.links.list (reads), task.update, task.assign, task.field.set, task.move, task.archive, task.restore, comment.update and tasks.batch (up to 25 writes in one call), and fuller forms of tasks.search, task.get, task.create, subtask.create, task.comment and task.status.set (any status of the task's project, Done included, recorded as closed through the agent and unchecked); and, to a token created with the docs:manage grant or an OAuth token holding the docs:manage scope, page.create and page.update. Each write runs through the web app's own route preparation and handlers as the person behind the token. A grant is chosen when the token is created and never added afterwards, so a token made earlier lists and runs exactly what it did before; an OAuth client is given a manage scope only as MCP_OAUTH describes. Default \"off\" leaves the registry and the MCP tool list as they were.",
     "default": "off"
   },
+  "MCP_TOOLS_WORK": {
+    "group": "ai",
+    "description": "MCP everyday work tools: \"on\" registers and offers tags.list, task.relations.list, lists.list and page.comments.list (reads), and task.tags.add, task.tags.remove, task.relation.add, task.relation.remove, list.create, list.rename, list.move, page.comment.create, page.comment.reply and page.comment.assign (writes). A read needs the read scope and a write the write scope; none needs a manage grant, so every token that reads or writes gains them. Each answers only what the person behind the token can open in the web app, stays inside the projects a token was narrowed to, and each write runs through the web app's own route handlers as that person, under the permission the route asks for. Nothing here deletes or archives. For an OAuth client under AGENT_TAINT_ROUTING, a write that reaches past one task (a link, a list change, a doc comment) is refused, or filed as a proposal when the token holds tasks:manage (links and lists) or docs:manage (doc comments). Default \"off\" leaves the registry and the MCP tool list as they were.",
+    "default": "off"
+  },
   "MCP_TOOLS_V2": {
     "group": "ai",
     "description": "MCP tools v2: \"on\" puts human names and a ref next to the ids in tool results (only names the caller may see), pages every list tool with an opaque cursor (default 25, at most 100 per page), annotates every tool with readOnlyHint, destructiveHint, idempotentHint and openWorldHint from its action rating, and turns a destructive call (an irreversible or workspace-scope write) into a proposal a person approves in the Inbox instead of acting. Default \"off\" keeps the tool list and result shapes as they were.",
@@ -1398,6 +1403,11 @@
     "group": "ai",
     "description": "Speech-to-text model for Talk to text. Audio goes to the OpenAI-compatible server when it answers chat (its /audio/transcriptions), otherwise to OpenAI at OPENAI_BASE_URL.",
     "default": "whisper-1"
+  },
+  "WHISPER_USD_PER_MINUTE": {
+    "group": "ai",
+    "description": "What a minute of Talk to text audio costs, in USD, booked to the workspace AI budget as feature transcription. Unset, audio sent to OpenAI is booked at whisper-1's list price (0.006) and audio sent to the OpenAI-compatible server at 0. Set it when WHISPER_MODEL names a model with another price.",
+    "default": "0.006"
   },
   "AI_FIELD_BULK_MAX": {
     "group": "ai",

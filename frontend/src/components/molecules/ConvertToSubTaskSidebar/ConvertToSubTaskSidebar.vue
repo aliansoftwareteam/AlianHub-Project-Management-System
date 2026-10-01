@@ -15,8 +15,8 @@
                     </template>
                 </template>
                 <template v-if="isMoveTask || isConvertTask">
-                    <button v-if="Object.keys(selectedSprintData).length > 0" type="button" class="ah-btn ah-btn--primary ah-btn--sm ml-10px" @click="moveTaskButton()">{{isMoveTask ? $t("ProjectDetails.move") : $t('ProjectDetails.convert')}}</button>
-                    <button v-else type="button" class="ah-btn ah-btn--secondary ah-btn--sm ml-10px" disabled>{{isMoveTask ? $t("ProjectDetails.move") : $t('ProjectDetails.convert')}}</button>
+                    <button v-if="Object.keys(selectedSprintData).length > 0" type="button" class="ah-btn ah-btn--primary ah-btn--sm ml-10px" @click="moveTaskButton()">{{ placeLabel }}</button>
+                    <button v-else type="button" class="ah-btn ah-btn--secondary ah-btn--sm ml-10px" disabled>{{ placeLabel }}</button>
                     <template v-if="props.isBulkMove === false">
                         <button v-if="Object.keys(selectedSprintData).length > 0" type="button" class="ah-btn ah-btn--primary ah-btn--sm ml-10px" @click="moveTaskButton(),isRedirect = true">{{isMoveTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
                         <button v-else type="button" class="ah-btn ah-btn--secondary ah-btn--sm ml-10px" disabled>{{isMoveTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
@@ -53,6 +53,8 @@
                     </div>
                     <div class="cts-card overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar p15x-20px" :class="{'border-radius-12-px' : clientWidth > 767, 'border-radius-0 ' : clientWidth <= 767 , 'convert__projecttask-wrapper':props.isDuplicate === true || isCreteTask === true }"  :style="[{margin : clientWidth > 767 ? '15px' : '0px' , height : clientWidth <= 767 ?  '100%' : '' , maxHeight :  clientWidth > 767 ? 'calc(100vh - 46px)' : '100%' }]">
                         <span v-if="props.isDuplicate === true || isCreteTask === true" class="font-size-16 font-weight-500 dark-gray mb-20px">{{$t('Projects.location')}}</span>
+                        <p v-if="listPicker && listPicker.note" class="convert__picker-note">{{ listPicker.note }}</p>
+                        <p v-if="losesExtraLists" class="convert__depth-note">{{ $t('TaskLists.convert_note') }}</p>
                         <div :class="[{'duplicate__component-with--convertlist':props.isDuplicate === true || isCreteTask === true,'duplicate_component_only' : props.isDuplicate === true}]">
                             <div class="gray" :class="{'font-size-12' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}">{{$t('Notification.project')}}</div>
                             <div class="d-flex align-items-center justify-content-between project__title-browsewrapper" v-if="isShowProjectList === false" :style="[{paddingTop : clientWidth > 767 ? '7px' : '15px'}]">
@@ -256,10 +258,22 @@
         projectOptions: {
             type: Array,
             default: null
+        },
+        // A plain list picker over the bulk move's project and list browser: its own title, confirm label and
+        // note, and `offers(list)` says which lists may be picked.
+        listPicker: {
+            type: Object,
+            default: null
         }
     });
     const isDisable = computed(() => props.isDisableButton)
+    const placeLabel = computed(() => {
+        if (props.listPicker) return props.listPicker.confirm;
+        return props.isMoveTask ? t('ProjectDetails.move') : t('ProjectDetails.convert');
+    });
+    const losesExtraLists = computed(() => props.isOpenSubTask && !props.isBulkConvert && (props.task?.extraLists || []).length > 0);
     const sidebarTitle = computed(() => {
+        if (props.listPicker) return props.listPicker.title;
         if (props.fromWhich === 'dashboard') return t('Home.AddtoQueue');
         if (props.isMoveTask || props.openMoveSubTask) return t('DuplicateTask.move_task');
         if (props.isMergeTask) return t('DuplicateTask.mearge_task_into');
@@ -1043,7 +1057,8 @@
                 .then((results) => {
                     const resolvedPromises = results.filter((result) => result.status === 'fulfilled');
                     if (resolvedPromises.length === 2) {
-                        const [sprintsResult, foldersResult] = resolvedPromises.map((result) => result.value);
+                        const [fetchedSprints, foldersResult] = resolvedPromises.map((result) => result.value);
+                        const sprintsResult = props.listPicker ? (fetchedSprints || []).filter(props.listPicker.offers) : fetchedSprints;
                         const sprintsArray = sprintsResult?.filter(sprint => sprint.projectId === id && !sprint.folderId).map((x) => ({ ...x, id:x._id }));
         
                         const foldersObject = foldersResult?.reduce((acc, folder) => {

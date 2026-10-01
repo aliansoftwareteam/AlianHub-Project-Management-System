@@ -82,6 +82,7 @@
                             <div class="ap__sub">{{ card.sub }}</div>
                         </div>
                         <span v-if="card.kind === 'agent'" class="ah-chip ah-chip--agent">{{ $t('Time.agent_tag') }}</span>
+                        <span v-if="card.own" class="ah-chip ah-chip--warn" data-test="own-week" :title="$t('Time.own_week_hint')">{{ $t('Time.own_week') }}</span>
                     </div>
 
                     <div v-if="card.kind === 'timesheet'" class="ap__facts">
@@ -216,7 +217,7 @@ const overlapText = (row) => {
 
 const cards = computed(() => {
     const ts = timesheets.value.map((row) => ({
-        kind: 'timesheet', key: `ts-${row._id}`, row, at: row.submittedAt,
+        kind: 'timesheet', key: `ts-${row._id}`, row, at: row.submittedAt, own: String(row.userId) === String(uid.value),
         name: row.userName || nameOf(row.userId), avatar: row.userAvatar, color: colorFor(row.userId),
         title: t('Time.ts_card_title', { name: row.userName || nameOf(row.userId) }),
         sub: t('Time.week_of', { date: moment(row.periodStart).format('MMM D'), h: formatHm(row.totalMinutes) }),

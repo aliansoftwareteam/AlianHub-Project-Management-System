@@ -13,7 +13,7 @@ const { settingsCollectionDocs } = require('../Config/collections');
 const logger = require("../Config/loggerConfig");
 const { MongoDbCrudOpration } = require("./mongo-handler/mongoQueries");
 const { SCHEMA_TYPE } = require("../Config/schemaType");
-const { COMMENT_NOTICE_ITEMS, DOC_NOTICE_SECTION, docNoticeSection } = require("../Config/notificationKey");
+const { COMMENT_NOTICE_ITEMS, DOC_NOTICE_SECTION, docNoticeSection, GOAL_NOTICE_SECTION, goalNoticeSection } = require("../Config/notificationKey");
 const {defaultCustomFields} = require("../utils/Tempates/customFields");
 const {defaultProjectTours} = require("../utils/Tempates/projectTours");
 const { addSprintFun } = require('../Modules/Sprints/controller');
@@ -1758,6 +1758,7 @@ exports.importUserNotifications = async (companyName, uid) => {
                     [tasks.key]: tasks,
                     [chat.key]:chat,
                     [DOC_NOTICE_SECTION.key]: docNoticeSection(),
+                    [GOAL_NOTICE_SECTION.key]: goalNoticeSection(),
                     userId: uid }
             },
             { upsert: true }
