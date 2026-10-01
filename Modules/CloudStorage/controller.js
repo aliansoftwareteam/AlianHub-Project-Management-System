@@ -29,6 +29,7 @@ const P = require('./helpers/cloudProviders');
 const R = require('./helpers/cloudStorageRules');
 const { encryptToken, decryptToken } = require('./helpers/cloudCrypto');
 const { pinSessionTenant } = require('../../Config/tenant');
+const { UPLOAD, changeVerdict } = require('../storage/changeScope');
 
 const LOG_PREFIX = '[cloud-storage]';
 
@@ -583,6 +584,9 @@ exports.importFile = async (req, res) => {
         // The path becomes a filesystem/bucket key — refuse traversal outright.
         if (storagePath.includes('..') || storagePath.startsWith('/') || storagePath.includes('\\')) {
             return res.send({ status: false, statusText: 'path is not valid.' });
+        }
+        if (!(await changeVerdict({ companyId, uid: userId, key: storagePath, action: UPLOAD })).allowed) {
+            return res.send({ status: false, statusText: 'You cannot add a file there.' });
         }
 
         // Dropbox's Chooser issues no OAuth token, so importing uses the temporary

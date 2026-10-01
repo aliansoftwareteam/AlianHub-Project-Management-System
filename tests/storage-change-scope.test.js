@@ -32,6 +32,7 @@ jest.mock('../Modules/Instance/guard', () => ({ requireInstanceAdmin: (req, res,
 jest.mock('../Modules/Company/controller/updateCompany', () => ({ updateCompanyFun: jest.fn(), getCompanyDataFun: jest.fn() }));
 jest.mock('../common-storage/common-server.js', () => ({ handleProfileGetForUser: jest.fn(), handleTaskTypeImageGet: jest.fn() }));
 jest.mock('../common-storage/common-wasabi.js', () => ({ handleProfileGetForUser: jest.fn(), handleTaskTypeImageGet: jest.fn() }));
+jest.mock('axios', () => Object.assign(jest.fn(async () => ({ data: Buffer.from('cloud bytes') })), { create: jest.fn(() => ({})), get: jest.fn(), post: jest.fn() }));
 jest.mock('@aws-sdk/s3-request-presigner', () => ({ getSignedUrl: jest.fn(async () => 'https://signed.example/object') }));
 jest.mock('@aws-sdk/client-s3', () => {
     const send = jest.fn(async () => ({}));
@@ -54,9 +55,13 @@ const crypto = require('node:crypto');
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
+const axios = require('axios');
 const { __send: s3Send } = require('@aws-sdk/client-s3');
 const logger = require('../Config/loggerConfig');
 const { ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER, isPrivileged } = require('../Config/roleTypes');
+
+const { RULES } = require('../Modules/storage/changeScope');
+const cloud = require('../Modules/CloudStorage/controller');
 
 const CID = crypto.randomBytes(12).toString('hex');
 const OTHER_COMPANY = crypto.randomBytes(12).toString('hex');
@@ -153,6 +158,7 @@ const MEMBER_RULES = {
     'project.project_sprint_create': true,
     'project.private_projects': 1,
     'chat.chat_channel': true,
+    'chat.one_to_one_chat': true,
 };
 
 const flat = (value, parts) => parts.reduce((values, part) => values.flatMap((v) => {
@@ -231,6 +237,7 @@ const seedRows = () => ({
         { _id: PRIVATE_PROJECT_SPRINT, projectId: PRIVATE_PROJECT },
         { _id: PERSONAL_SPRINT, projectId: PERSONAL_LIST },
         { _id: PRIVATE_CHANNEL, projectId: CHAT_SPACE, private: true, AssigneeUserId: [MEMBER, OTHER_MEMBER] },
+        { _id: DM_SPRINT, projectId: DM_SPACE },
     ],
     tasks: [
         { _id: OPEN_TASK, ProjectID: OPEN_PROJECT, sprintId: SPRINT, attachments: [{ url: key.attachment }, { url: key.privateVoiceNote }] },
@@ -291,6 +298,7 @@ afterAll(async () => {
 beforeEach(() => {
     mockWorld.rows = seedRows();
     s3Send.mockClear();
+    axios.mockClear();
     logger.warn.mockClear();
     fs.rmSync(path.join(STORAGE_ROOT, CID), { recursive: true, force: true });
 });
@@ -532,6 +540,7 @@ const UPLOADED_ROWS = [
     ['a file for the project chat', MEMBER, `Project/${OPEN_PROJECT}/Comments/new.png`],
     ['a file for a direct message, for a participant', MEMBER, `Project/${DM_SPACE}/${DM_SPRINT}/${DM_TASK}/Comments/new.png`],
     ['a file for a private channel, for a channel member', MEMBER, `Project/${CHAT_SPACE}/${PRIVATE_CHANNEL}/default/Comments/new.png`],
+    ['the first file of a new direct conversation', MEMBER, `Project/${DM_SPACE}/Comments/new.png`],
     ['a project attachment, with the project attachments permission', MEMBER, `Project/${OPEN_PROJECT}/ProjectAttachment/new.pdf`],
     ['a project icon, with a project permission', MEMBER, `Project/${OPEN_PROJECT}/Settings/ProjectIcon/new.png`],
     ['the icon of a project being created, with the create permission', MEMBER, key.newProjectIcon],
@@ -555,6 +564,7 @@ const UPLOAD_NOT_FOUND = [
     ['a file into a direct message the caller is not in, for an owner', OWNER, key.dmFile],
     ['a file into a private channel the caller is not in, for an owner', OWNER, key.channelFile],
     ['a comment file into a private project', MEMBER, key.privateComment],
+    ['a file into the chat space as if it were a project chat', MEMBER, `Project/${CHAT_SPACE}/Comments/new.png`],
     ['a project attachment into a private project', MEMBER, key.privateProjectAttachment],
     ['a project icon into a private project', MEMBER, key.privateProjectIcon],
     ["a file into a colleague's clip folder", MEMBER, key.othersClip],
@@ -569,6 +579,7 @@ const UPLOAD_READ_ONLY = [
     ['a project attachment, for a role that may only read the project', VIEWER, key.projectAttachment],
     ['a project icon, for a role that may only read the project', VIEWER, key.projectIcon],
     ['the icon of a project that does not exist, without the create permission', VIEWER, key.newProjectIcon],
+    ['the first file of a new direct conversation, for a role that may not start one', VIEWER, `Project/${DM_SPACE}/Comments/new.png`],
     ['the company logo, for a member', MEMBER, key.companyLogo],
     ['a template image, for a member', MEMBER, key.templateLogo],
     ['a priority image, for a member', MEMBER, key.priorityImage],
@@ -608,5 +619,59 @@ describe('uploading over a stored file on server storage', () => {
         const out = await UPLOAD[routeName](MEMBER, key.privateAttachment);
         expect(out.status).toBe(404);
         expect(stored(key.privateAttachment)).toBe(ORIGINAL);
+    });
+});
+
+describe('importing a cloud file', () => {
+    const importInto = async (uid, filePath) => {
+        process.env.STORAGE_TYPE = SERVER;
+        const answers = [];
+        const res = { status: () => res, send: (body) => { answers.push(body); return res; } };
+        await cloud.importFile({
+            uid,
+            aud: CID,
+            headers: { companyid: CID },
+            params: { provider: 'dropbox' },
+            body: { fileId: 'file-1', filename: 'handover.pdf', path: filePath, downloadUrl: 'https://dl.dropboxusercontent.com/s/abc/handover.pdf' },
+        }, res);
+        return answers[0];
+    };
+
+    it('stores the copy in the folder of a task the caller may attach to', async () => {
+        const filePath = `Project/${OPEN_PROJECT}/Sprint/${OPEN_TASK}/Attachment/handover.pdf`;
+        expect(await importInto(MEMBER, filePath)).toMatchObject({ status: true });
+        expect(stored(filePath)).toBe('cloud bytes');
+    });
+
+    it.each([
+        ['a private project the caller is not on', MEMBER, key.privateAttachment],
+        ["another person's personal list, for an owner", OWNER, key.personalAttachment],
+        ['a task where the role may only read attachments', VIEWER, key.attachment],
+        ['a folder outside every layout', OWNER, key.outsideLayouts],
+    ])('refuses %s before it downloads anything', async (_label, uid, filePath) => {
+        seed(filePath);
+        expect(await importInto(uid, filePath)).toMatchObject({ status: false });
+        expect(axios).not.toHaveBeenCalled();
+        expect(stored(filePath)).toBe(ORIGINAL);
+    });
+});
+
+describe('a file stored in a custom field', () => {
+    const FIELD = '6f0000000000000000000f11';
+    const fieldFile = (projectId, taskId) => {
+        const filePath = `Project/${projectId}/Sprint/${taskId}/Field/${FIELD}/contract.pdf`;
+        return [[filePath, projectId, taskId, FIELD], filePath];
+    };
+    const ask = (action, uid, projectId, taskId) => {
+        const [match, filePath] = fieldFile(projectId, taskId);
+        return RULES.task_field_file[action]({ companyId: CID, uid, storage: WASABI }, match, filePath);
+    };
+
+    it.each(['remove', 'upload'])('%s is for whoever may open the task and change its custom fields', async (action) => {
+        expect(await ask(action, MEMBER, OPEN_PROJECT, OPEN_TASK)).toBe(true);
+        expect(await ask(action, VIEWER, OPEN_PROJECT, OPEN_TASK)).toBe('read_only');
+        expect(await ask(action, MEMBER, PRIVATE_PROJECT, PRIVATE_TASK)).toBe('not_found');
+        expect(await ask(action, OWNER, PERSONAL_LIST, PERSONAL_TASK)).toBe('not_found');
+        expect(await ask(action, MEMBER, OPEN_PROJECT, MISSING_TASK)).toBe('not_found');
     });
 });
