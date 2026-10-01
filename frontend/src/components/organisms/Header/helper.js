@@ -5,6 +5,9 @@ import { useToast } from "vue-toast-notification";
 import { openTask, isSameProjectPage } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 import { i18n } from "@/locales/main";
 const t = i18n.global.t;
+
+/* A reply in a chat thread: the notice's taskId names the conversation and changeData.threadId the thread. */
+const CHAT_THREAD_REPLY = "chat_thread_reply";
 export function useHelper() {
     const companyId = inject("$companyId");
     const router = useRouter();
@@ -30,6 +33,14 @@ export function useHelper() {
                 query: {tab: "Comments"}
             }
             const projects = computed(() => tmpGetter["projectData/projects"])
+            if(data.changeType === CHAT_THREAD_REPLY && data.changeData?.threadId) {
+                router.push({
+                    name: "chat_project_channel",
+                    params: { cid: companyId.value, pid: data.projectId, sid: data.taskId },
+                    query: { thread: data.changeData.threadId }
+                });
+                return;
+            }
             if(key === "notifications") {
                 route.query = {tab: "ProjectListView"};
                 if(data.type.toLowerCase() !== "project") {
@@ -110,7 +121,8 @@ export function useHelper() {
                         pid: data.projectId,
                         sid: data.sprintId
                     }
-                    route.query = {};
+                    const threadId = data.threadId || data.comment_parentId;
+                    route.query = threadId ? { thread: threadId } : {};
                 } else {
                     route.query = {tab: "Comments"};
     

@@ -211,7 +211,7 @@ describe('a chat message', () => {
         const wrapper = mountMessage({ ...ROOT, replyCount: 2, replierIds: ['user-3', 'ai'], lastReplyAt: '2026-10-01T09:06:00.000Z' });
 
         const footer = wrapper.find('[data-test="thread-footer"]');
-        expect(footer.text()).toContain('MainChat.thread_replies {"count":2}');
+        expect(footer.text()).toContain('MainChat.thread_replies_many {"count":2}');
         expect(footer.text()).toContain('MainChat.thread_last_reply');
         expect(footer.findAll('.mc-av')).toHaveLength(2);
         expect(footer.find('.mc-av').attributes('title')).toBe('Cara Diaz');
