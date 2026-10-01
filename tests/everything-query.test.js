@@ -17,7 +17,7 @@ const refusal = (body) => {
     }
     return null;
 };
-const NO_FILTER = { status: null, assignee: null, priority: null, dueDate: null, taskType: null, tags: null, search: null, projectIds: null };
+const NO_FILTER = { status: null, statusType: null, assignee: null, priority: null, dueDate: null, taskType: null, tags: null, search: null, projectIds: null };
 const hexOf = (value) => JSON.parse(JSON.stringify(value));
 
 describe('the request is data, checked at the boundary', () => {
@@ -80,6 +80,9 @@ describe('the request is data, checked at the boundary', () => {
         ['filter.status', { filter: { status: ['x'.repeat(101)] } }],
         ['filter.status', { filter: { status: Array.from({ length: 101 }, (_, n) => n) } }],
         ['filter.status', { filter: { status: [1.5] } }],
+        ['filter.statusType', { filter: { statusType: ['finished'] } }],
+        ['filter.statusType', { filter: { statusType: 'active' } }],
+        ['filter.statusType', { filter: { statusType: [{ $ne: 'close' }] } }],
         ['filter.assignee', { filter: { assignee: U1 } }],
         ['filter.assignee', { filter: { assignee: ['$where'] } }],
         ['filter.assignee', { filter: { assignee: [7] } }],
@@ -105,6 +108,7 @@ describe('the request is data, checked at the boundary', () => {
         const { filter } = q.parseRequest({
             filter: {
                 status: ['To Do', 2, 'To Do'],
+                statusType: ['default_active', 'active', 'active'],
                 assignee: ['unassigned', U1],
                 priority: ['HIGH'],
                 dueDate: { from: '2026-10-01T00:00:00.000Z', to: 1790812800000 },
@@ -116,6 +120,7 @@ describe('the request is data, checked at the boundary', () => {
         });
         expect(filter).toEqual({
             status: { names: ['To Do'], keys: [2] },
+            statusType: ['default_active', 'active'],
             assignee: { ids: [U1], unassigned: true },
             priority: ['HIGH'],
             dueDate: { from: new Date('2026-10-01T00:00:00.000Z'), to: new Date(1790812800000), none: false },
@@ -127,7 +132,7 @@ describe('the request is data, checked at the boundary', () => {
     });
 
     it('reads an empty list or an empty search as no filter', () => {
-        expect(q.parseRequest({ filter: { status: [], assignee: [], priority: [], taskType: [], tags: [], search: '   ', projectIds: [], dueDate: {} } }).filter).toEqual(NO_FILTER);
+        expect(q.parseRequest({ filter: { status: [], statusType: [], assignee: [], priority: [], taskType: [], tags: [], search: '   ', projectIds: [], dueDate: {} } }).filter).toEqual(NO_FILTER);
     });
 
     it('reads "no due date" and a timezone', () => {
@@ -144,11 +149,12 @@ describe('the projects a request reads', () => {
         expect(q.scopedProjectIds([P1], [P2, P1])).toEqual([P1]);
     });
 
-    it('leave out trashed, archived and closed projects and other people\'s personal lists', () => {
+    it('leave out trashed, archived, restricted and closed projects and other people\'s personal lists', () => {
         const filter = q.projectMatch([P1, P2], U1, false);
         expect(hexOf(filter)).toEqual({
             _id: { $in: [P1, P2] },
             deletedStatusKey: { $nin: [1, 2] },
+            isRestrict: { $ne: true },
             statusType: { $ne: 'close' },
             $or: [{ isPersonal: { $ne: true } }, { personalOwner: U1 }],
         });
@@ -159,6 +165,7 @@ describe('the projects a request reads', () => {
         const filter = q.projectMatch([P1], U1, true);
         expect(filter.statusType).toBeUndefined();
         expect(filter.deletedStatusKey).toEqual({ $nin: [1, 2] });
+        expect(filter.isRestrict).toEqual({ $ne: true });
         expect(filter.$or).toEqual([{ isPersonal: { $ne: true } }, { personalOwner: U1 }]);
     });
 });
@@ -188,6 +195,7 @@ describe('the task match', () => {
         const match = matchOf({
             filter: {
                 status: ['To Do', 2],
+                statusType: ['default_active', 'active'],
                 assignee: ['unassigned', U1],
                 priority: ['HIGH', 'LOW'],
                 dueDate: { from: '2026-10-01T00:00:00.000Z', to: '2026-10-31T00:00:00.000Z' },
@@ -200,6 +208,7 @@ describe('the task match', () => {
         expect(match.ProjectID).toEqual({ $in: [P1, P2] });
         expect(match.$and).toEqual([
             { $or: [{ 'status.text': { $in: ['To Do'] } }, { statusKey: { $in: [2] } }] },
+            { statusType: { $in: ['default_active', 'active'] } },
             { $or: [{ AssigneeUserId: { $in: [U1] } }, { AssigneeUserId: { $size: 0 } }, { AssigneeUserId: null }] },
             { Task_Priority: { $in: ['HIGH', 'LOW'] } },
             { DueDate: { $gte: new Date('2026-10-01T00:00:00.000Z'), $lte: new Date('2026-10-31T00:00:00.000Z') } },
@@ -367,6 +376,7 @@ describe('the cursor', () => {
         expect(refused(cursor, other({ companyId: 'c1', uid: P1 }, same))).toBe('cursor');
         expect(refused(cursor, other({ companyId: 'c1', uid: U1 }, { ...same, filter: { priority: ['LOW'] } }))).toBe('cursor');
         expect(refused(cursor, other({ companyId: 'c1', uid: U1 }, { ...same, sort: { by: 'DueDate', dir: 'desc' } }))).toBe('cursor');
+        expect(refused(cursor, other({ companyId: 'c1', uid: U1 }, { ...same, filter: { priority: ['HIGH'], statusType: ['active'] } }))).toBe('cursor');
         expect(refused(cursor, other({ companyId: 'c1', uid: U1 }, { ...same, includeSubtasks: true }))).toBe('cursor');
         expect(refused(cursor, other({ companyId: 'c1', uid: U1 }, { ...same, includeClosedProjects: true }))).toBe('cursor');
     });
@@ -380,5 +390,43 @@ describe('the cursor', () => {
         expect(refused(signed({ v: 'now', i: TASK }))).toBe('cursor');
         expect(refused(signed({ v: 1, i: { $gt: '' } }))).toBe('cursor');
         expect(refused(signed({ v: 1 }))).toBe('cursor');
+    });
+});
+
+describe('status types', () => {
+    it('are the four a project status can have, and the legacy closed one', () => {
+        expect(q.STATUS_TYPES).toEqual(['default_active', 'active', 'done', 'close', 'default_close']);
+        expect(q.parseRequest({ filter: { statusType: q.STATUS_TYPES } }).filter.statusType).toEqual(q.STATUS_TYPES);
+    });
+});
+
+describe('a role that is denied the task list', () => {
+    const MEMBER_ROLE = 3;
+    const rules = (permission, projectId) => {
+        const parent = { _id: `task-${projectId || 'company'}`, key: 'task', isParent: true, roles: [{ key: MEMBER_ROLE, permission: true }], ...(projectId ? { projectId } : {}) };
+        return [parent, { _id: `list-${projectId || 'company'}`, key: 'task_list', isParent: false, parentId: parent._id, roles: [{ key: MEMBER_ROLE, permission }], ...(projectId ? { projectId } : {}) }];
+    };
+    const projects = [
+        { _id: P1 },
+        { _id: P2, isGlobalPermission: false },
+        { _id: U1, isGlobalPermission: true },
+        { _id: TASK, isPersonal: true, isGlobalPermission: false },
+    ];
+    const idsFor = (companyPermission, projectPermission) => q.taskListProjectIds(projects, MEMBER_ROLE, rules(companyPermission), rules(projectPermission, P2));
+
+    it('reads a project by its own rules when it has them, and by the company rules otherwise', () => {
+        expect(idsFor(true, true)).toEqual([P1, P2, U1, TASK]);
+        expect(idsFor(true, null)).toEqual([P1, U1, TASK]);
+        expect(idsFor(null, true)).toEqual([P2, TASK]);
+        expect(idsFor(null, null)).toEqual([TASK]);
+    });
+
+    it('keeps a role that may only look', () => {
+        expect(idsFor(false, false)).toEqual([P1, P2, U1, TASK]);
+    });
+
+    it('drops every project whose rules cannot be read, and keeps the caller\'s own personal list', () => {
+        expect(q.taskListProjectIds(projects, MEMBER_ROLE, [], [])).toEqual([TASK]);
+        expect(q.taskListProjectIds(projects, 7, rules(true), rules(true, P2))).toEqual([TASK]);
     });
 });

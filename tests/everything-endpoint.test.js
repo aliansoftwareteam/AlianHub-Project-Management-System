@@ -11,7 +11,14 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({
     validateObjectId: (id) => /^[a-f0-9]{24}$/i.test(String(id)),
 }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
-jest.mock('../Modules/settings/securityPermissions/controller', () => ({ fetchRules: jest.fn(async () => []) }));
+const mockRules = { taskList: true };
+/* The company rules as the matrix stores them: a section row and the keys under it, each with a value per role. */
+const mockRulesFor = (taskList, projectId) => {
+    const scope = projectId ? { projectId } : {};
+    const section = { _id: `task-${projectId || 'company'}`, key: 'task', isParent: true, roles: [{ key: 3, permission: true }], ...scope };
+    return [section, { _id: `task-list-${projectId || 'company'}`, key: 'task_list', isParent: false, parentId: section._id, roles: [{ key: 3, permission: taskList }], ...scope }];
+};
+jest.mock('../Modules/settings/securityPermissions/controller', () => ({ fetchRules: jest.fn(async () => mockRulesFor(mockRules.taskList)) }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
 
 const { myCache } = require('../Config/config');
@@ -88,6 +95,7 @@ beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     mockDb.calls.length = 0;
     myCache.flushAll();
+    mockRules.taskList = true;
     Object.entries(ROLES).forEach(([userId, roleType]) => mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, roleType, status: 2, isDelete: false }));
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: DEACTIVATED, roleType: 3, status: 2, isDelete: true });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: CANCELLED, roleType: 3, status: 3, isDelete: false });
@@ -198,6 +206,59 @@ describe('what a person sees', () => {
     });
 });
 
+describe('a role that is denied the task list', () => {
+    const ownRules = (proj, taskList) => {
+        proj.isGlobalPermission = false;
+        mockRulesFor(taskList, String(proj._id)).forEach((rule) => mockDb.seed(SCHEMA_TYPE.PROJECT_RULES, rule));
+    };
+
+    it('sees no project\'s tasks, as on the project page, and keeps their own personal list', async () => {
+        mockRules.taskList = null;
+        expect(await names(MEMBER)).toEqual(['member\'s personal list']);
+        expect(await names(MEMBER, { filter: { projectIds: [String(seeded.open._id)] } })).toEqual([]);
+        expect((await everything(MEMBER, { group: 'project' })).groups.map((g) => g.key)).toEqual([String(seeded.lists[MEMBER]._id)]);
+    });
+
+    it('does not change what an owner or an admin sees', async () => {
+        mockRules.taskList = null;
+        expect(await names(OWNER)).toEqual([...COMPANY_WIDE, 'owner\'s personal list'].sort());
+        expect(await names(ADMIN)).toEqual([...COMPANY_WIDE, 'admin\'s personal list'].sort());
+    });
+
+    it('still shows the tasks to a role that may look but not edit', async () => {
+        mockRules.taskList = false;
+        expect(await names(MEMBER)).toEqual(MEMBER_SEES);
+    });
+
+    it('judges a project with its own rules by those rules, in both directions', async () => {
+        ownRules(seeded.mine, null);
+        expect(await names(MEMBER)).toEqual(MEMBER_SEES.filter((name) => name !== 'private, member on it'));
+
+        mockRules.taskList = null;
+        ownRules(seeded.open, true);
+        expect(await names(MEMBER)).toEqual(['open', 'in a private sprint shared with the member', 'member\'s personal list'].sort());
+    });
+
+    it('reads the rules of every project in one query, not one per project', async () => {
+        ownRules(seeded.mine, true);
+        ownRules(seeded.open, true);
+        mockDb.calls.length = 0;
+        await everything(MEMBER);
+        expect(mockDb.calls.filter((c) => c.type === SCHEMA_TYPE.PROJECT_RULES)).toHaveLength(1);
+    });
+});
+
+describe('a restricted project', () => {
+    it('is left out, as the project page leaves its tasks out', async () => {
+        seeded.open.isRestrict = true;
+        for (const uid of [MEMBER, OWNER]) {
+            const seen = await names(uid);
+            expect(seen).not.toContain('open');
+            expect(seen).toContain('private, member on it');
+        }
+    });
+});
+
 describe('who may ask', () => {
     it.each([['deactivated', DEACTIVATED], ['cancelled', CANCELLED], ['unknown', '6f0000000000000000000009']])('refuses a %s seat before any task is read', async (_what, uid) => {
         const res = await call(uid);
@@ -293,8 +354,8 @@ describe('the request is data, never a pipeline', () => {
 
 describe('filters', () => {
     beforeEach(() => {
-        task(seeded.open, 'urgent bug', { Task_Priority: 'HIGH', TaskType: 'Bug', TaskTypeKey: 2, tagsArray: ['tag-1'], DueDate: day(10), status: { key: 2, text: 'Doing', type: 'active' }, statusKey: 2, AssigneeUserId: [COLLEAGUE] });
-        task(seeded.mine, 'nobody on it (a.b)', { AssigneeUserId: [], DueDate: day(20), status: { key: 7, text: 'Doing', type: 'active' }, statusKey: 7 });
+        task(seeded.open, 'urgent bug', { Task_Priority: 'HIGH', TaskType: 'Bug', TaskTypeKey: 2, tagsArray: ['tag-1'], DueDate: day(10), status: { key: 2, text: 'Doing', type: 'active' }, statusKey: 2, statusType: 'active', AssigneeUserId: [COLLEAGUE] });
+        task(seeded.mine, 'nobody on it (a.b)', { AssigneeUserId: [], DueDate: day(20), status: { key: 7, text: 'Doing', type: 'active' }, statusKey: 7, statusType: 'active' });
     });
 
     it.each([
@@ -303,6 +364,7 @@ describe('filters', () => {
         ['assignee', { assignee: [COLLEAGUE] }, ['urgent bug']],
         ['nobody assigned', { assignee: ['unassigned'] }, ['nobody on it (a.b)']],
         ['priority', { priority: ['HIGH'] }, ['urgent bug']],
+        ['status type', { statusType: ['active'] }, ['nobody on it (a.b)', 'urgent bug']],
         ['task type by name', { taskType: ['Bug'] }, ['urgent bug']],
         ['task type by key', { taskType: [2] }, ['urgent bug']],
         ['tags', { tags: ['tag-1'] }, ['urgent bug']],
@@ -311,6 +373,18 @@ describe('filters', () => {
         ['two filters at once', { status: ['Doing'], priority: ['HIGH'] }, ['urgent bug']],
     ])('filters by %s', async (_what, filter, expected) => {
         expect(await names(MEMBER, { filter })).toEqual(expected);
+    });
+
+    it('hides done work when asked for the open status types only', async () => {
+        task(seeded.open, 'finished', { status: { key: 9, text: 'Done', type: 'close' }, statusKey: 9, statusType: 'close' });
+        task(seeded.open, 'ready for review', { status: { key: 8, text: 'Review', type: 'done' }, statusKey: 8, statusType: 'done' });
+        expect(await names(MEMBER)).toEqual(expect.arrayContaining(['finished', 'ready for review']));
+        const open = await names(MEMBER, { filter: { statusType: ['default_active', 'active'] } });
+        expect(open).toEqual([...MEMBER_SEES, 'nobody on it (a.b)', 'urgent bug'].sort());
+        expect(await names(MEMBER, { filter: { statusType: ['done', 'close'] } })).toEqual(['finished', 'ready for review']);
+        const res = await call(MEMBER, { filter: { statusType: ['finished'] } });
+        expect(res.statusCode).toBe(400);
+        expect(res.body.field).toBe('filter.statusType');
     });
 
     it('reads a regular expression in the search as plain text', async () => {
