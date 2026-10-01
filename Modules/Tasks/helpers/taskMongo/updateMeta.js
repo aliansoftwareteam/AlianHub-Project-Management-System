@@ -22,7 +22,7 @@ const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
 const { taskNotFound, escapeText, TaskWriteRefusal } = require('../taskWriteFields');
-const { recordCustomFieldValue, recordTaskTag } = require('../taskItemHistory');
+const { recordCustomFieldValue, recordTaskTag, projectHoldsTag } = require('../taskItemHistory');
 const { customFieldDefinitionOf } = require('../../../CustomField/helpers/customFieldText');
 const { fieldAppliesToTask } = require('../../../CustomField/helpers/fieldTaskTypes');
 const { checkedFieldDetail, FieldValueRefused } = require('../../../CustomField/helpers/fieldValueWrite');
@@ -58,6 +58,16 @@ const checklistItemIds = (operation, data, history) => {
     if (operation === 'checklistremove') return Array.isArray(data) ? data : [data];
     return [];
 };
+const TAG_NOT_IN_PROJECT = 'The tag is not one of this project\'s tags.';
+
+/* A tag the project no longer has can still be taken off a task. */
+const tagMayBeWritten = async (companyId, taskId, tagId, operation, storedTask) => {
+    if (operation !== 'add') return true;
+    const task = storedTask || await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: new mongoose.Types.ObjectId(taskId) }, { ProjectID: 1 }] }, 'findOne');
+    if (!task) throw taskNotFound();
+    return ['string', 'number'].includes(typeof tagId) && String(tagId) !== '' && projectHoldsTag(companyId, task.ProjectID, tagId);
+};
+
 module.exports = {
 
     updateTags({companyId, taskId, tagId, operation, userData, storedTask}) {
@@ -93,7 +103,10 @@ module.exports = {
                     ]
                 }
 
-                MongoDbCrudOpration(companyId, obj, "findOneAndUpdate").then((response) => {
+                tagMayBeWritten(companyId, taskId, tagId, operation, storedTask).then((allowed) => {
+                    if (!allowed) throw new TaskWriteRefusal(400, TAG_NOT_IN_PROJECT);
+                    return MongoDbCrudOpration(companyId, obj, "findOneAndUpdate");
+                }).then((response) => {
                     if (!response) {
                         reject(taskNotFound());
                         return;

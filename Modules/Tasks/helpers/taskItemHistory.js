@@ -56,6 +56,9 @@ const projectTagsOf = async (companyId, projectId) => {
     return (project && plain(project).tagsArray) || [];
 };
 
+const projectHoldsTag = async (companyId, projectId, tagId) => (await projectTagsOf(companyId, projectId))
+    .some((tag) => tag && tag.uid !== undefined && tag.uid !== null && String(tag.uid) === String(tagId));
+
 const logFailure = (what) => (error) => logger.error(`${what}: ${(error && error.message) || JSON.stringify(error)}`);
 
 const recordCustomFieldValue = async ({ companyId, task, customFieldId, updateDetail, actor, viaAi = false }) => {
@@ -88,4 +91,5 @@ module.exports = {
     describeTaskTag,
     recordCustomFieldValue,
     recordTaskTag,
+    projectHoldsTag,
 };

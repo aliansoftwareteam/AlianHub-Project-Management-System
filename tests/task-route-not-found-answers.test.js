@@ -101,6 +101,7 @@ beforeEach(() => {
     const companyTaskRules = rows(SCHEMA_TYPE.RULES).find((rule) => rule.key === 'task');
     mockDb.seed(SCHEMA_TYPE.RULES, { key: 'task_create', name: 'task_create', isParent: false, parentId: String(companyTaskRules._id), roles: [{ key: 3, permission: true }, { key: 0, permission: true }] });
     ownRules(P_PRIVATE, (key) => (key === 'task_list' ? true : null));
+    rows(SCHEMA_TYPE.PROJECTS).forEach((row) => { row.tagsArray = [{ uid: 'tag-1', tagName: 'Urgent' }]; });
     project(P_RULED, 'Ruled');
     list(L_RULED, 'List of the project with its own rules', P_RULED);
     seedTask(T_RULED, 'Task nobody but an owner lists', P_RULED, L_RULED);
