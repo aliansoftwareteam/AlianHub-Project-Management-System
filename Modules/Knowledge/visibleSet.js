@@ -6,7 +6,7 @@ const permissionGuard = require('../../Config/permissionGuard');
 const { isPrivileged } = require('../../Config/roleTypes');
 const { visibleProjectIds } = require('../Agents/scope');
 const { hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
-const { pageVisibilityFilter } = require('../Pages/helpers/pageRules');
+const { pageReachFilter } = require('../Pages/helpers/pageRules');
 const { COMMENT_TYPES, CHUNK_ONLY_SOURCES } = require('./sources');
 const { chunkGuide, guideMarkdown, guideTitle } = require('./ingest/chunker');
 
@@ -100,12 +100,12 @@ const resolveVisibleSet = async ({ companyId, caller, scope } = {}) => {
 const projectlessClosed = (set) => Boolean(set.projectBound) && !set.reachesProjectless;
 
 /* A page with no project is the company's, unless the caller scoped to one project. */
-const inProjectOrCompanyWide = (set, field) => {
-    const projects = objectIds(set.projectIds);
-    return set.projectId || projectlessClosed(set)
-        ? { [field]: { $in: projects } }
-        : { $or: [{ [field]: { $in: projects } }, { [field]: { $in: [null, undefined] } }] };
-};
+const pageReach = (set, projectField) => pageReachFilter({
+    uid: set.caller.userId,
+    projectIds: objectIds(set.projectIds),
+    companyWide: !(set.projectId || projectlessClosed(set)),
+    projectField,
+});
 
 /* A call belongs to the people on it; its project narrows only a search scoped to one project, or
  * a project-bound set. */
@@ -125,7 +125,7 @@ const clausesFor = (set) => {
         task,
         guide: { deletedStatusKey: { $ne: 1 } },
         file: { ...task, ProjectID: { $in: objectIds(set.fileProjectIds || []) } },
-        page: { deletedStatusKey: { $ne: 1 }, $and: [inProjectOrCompanyWide(set, 'ProjectID'), pageVisibilityFilter(set.caller.userId)] },
+        page: { deletedStatusKey: { $ne: 1 }, ...pageReach(set, 'ProjectID') },
         comment: { projectId: { $in: projects }, isDeleted: { $ne: true }, type: { $in: COMMENT_TYPES }, ...sprintClause },
         transcript: {
             participants: set.caller.userId,
@@ -142,7 +142,7 @@ const liveChunk = (set, sourceType) => ({ companyId: set.companyId, sourceType, 
 const chunkClausesFor = (set) => {
     const hidden = set.hiddenSprintIds.length ? { sprintId: { $nin: objectIds(set.hiddenSprintIds) } } : {};
     return {
-        page: { ...liveChunk(set, 'page'), $and: [inProjectOrCompanyWide(set, 'projectId'), pageVisibilityFilter(set.caller.userId)] },
+        page: { ...liveChunk(set, 'page'), ...pageReach(set, 'projectId') },
         comment: { ...liveChunk(set, 'comment'), projectId: { $in: objectIds(set.projectIds) }, ...hidden },
         guide: { ...liveChunk(set, 'guide'), projectId: { $in: objectIds(set.projectIds) } },
         file: { ...liveChunk(set, 'file'), projectId: { $in: objectIds(set.fileProjectIds || []) }, ...hidden },
