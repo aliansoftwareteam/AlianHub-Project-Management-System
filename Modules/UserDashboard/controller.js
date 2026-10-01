@@ -19,6 +19,7 @@ const {
     projectScopeClause,
 } = require("./helpers/resourceHelpers");
 const { ROLE_GUEST, isPrivileged } = require('../../Config/roleTypes');
+const { ACTIVE_SEAT } = require('../../Config/seatStatus');
 
 // Parse a client-built advanced-filter match from the request body.
 function bodyTaskMatch(body) {
@@ -45,21 +46,26 @@ function resolveVisibleUserIds(payload = {}) {
     return self ? [self] : [];
 }
 
+async function activeSeatRoleType(companyId, uid) {
+    const row = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.COMPANY_USERS,
+        data: [{ userId: String(uid), ...ACTIVE_SEAT }, { roleType: 1 }],
+    }, "findOne");
+    if (!row) return null;
+    const rt = Number(row.roleType);
+    return Number.isInteger(rt) && rt >= ROLE_GUEST ? rt : ROLE_GUEST;
+}
+
 // SECURITY: resolve the caller's real role for this company from the DB, never
 // from the request body. These routes are JWT-protected (req.uid is the
 // verified user; the companyid header is checked against the token audience),
 // but roleType isn't in the token — so look it up in company_users. Fails
-// closed to the guest role, the most restricted, when absent, so a forged
-// callerRoleType in the body can never widen the visibility scope.
+// closed to the guest role, the most restricted, without an active seat, so a
+// forged callerRoleType in the body can never widen the visibility scope.
 async function resolveCallerRoleType(companyId, uid) {
     if (!uid) return ROLE_GUEST;
     try {
-        const row = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.COMPANY_USERS,
-            data: [{ userId: String(uid), isDelete: { $ne: true } }, { roleType: 1 }],
-        }, "findOne");
-        const rt = row ? Number(row.roleType) : NaN;
-        return Number.isInteger(rt) && rt >= ROLE_GUEST ? rt : ROLE_GUEST;
+        return (await activeSeatRoleType(companyId, uid)) ?? ROLE_GUEST;
     } catch (e) {
         logger.error(`resolveCallerRoleType error (company=${companyId}, uid=${uid}): ${e.message || e}`);
         return ROLE_GUEST;
@@ -73,8 +79,8 @@ exports.resolveCallerRoleType = resolveCallerRoleType;
 // sees private projects they belong to (AssigneeUserId includes their id or a
 // team id) plus public projects — public are also membership-gated unless the
 // caller holds the `public_projects` permission. Returns a Mongo sub-filter to
-// merge into a PROJECTS query, or null for no restriction. Fails closed (member
-// scope) on any lookup error.
+// merge into a PROJECTS query, or null for no restriction. Without an active
+// seat, or on any lookup error, it matches no project.
 async function resolveVisibleProjectFilter(companyId, uid) {
     if (!uid) return { _id: { $in: [] } }; // no identity → see nothing
     try {
@@ -84,8 +90,9 @@ async function resolveVisibleProjectFilter(companyId, uid) {
                 data: [{ assigneeUsersArray: { $in: [String(uid)] } }, { _id: 1 }],
             }, "find").catch(() => []),
             fetchRules(companyId).catch(() => []),
-            resolveCallerRoleType(companyId, uid),
+            activeSeatRoleType(companyId, uid),
         ]);
+        if (roleType === null) return { _id: { $in: [] } };
         if (isPrivileged(roleType)) return null; // admin/owner → all projects
         const teamIds = (teams || []).map((t) => "tId_" + t._id);
         const member = { $in: [String(uid), ...teamIds] };
@@ -103,6 +110,7 @@ async function resolveVisibleProjectFilter(companyId, uid) {
         return { _id: { $in: [] } };
     }
 }
+exports.resolveVisibleProjectFilter = resolveVisibleProjectFilter;
 
 /**
  * This endpoint is used to get user user dashboard template
