@@ -652,6 +652,9 @@ export default {
         "summary_skipped_row": "Row {row}: {reason}",
         "skip_no_name": "the task has no name",
         "summary_unmatched": "Left unassigned: {names}",
+        "summary_too_deep": "{count} subtask(s) were deeper than three levels and were placed under their nearest parent:",
+        "summary_parent_missing": "{count} row(s) named a parent that is not in the file and were imported as tasks:",
+        "summary_cycle": "{count} row(s) named parents that loop and were imported as tasks:",
         "back": "Back",
         "next": "Next",
         "run": "Import {count} task(s)",
@@ -4009,6 +4012,7 @@ export default {
         "rollup_scope": "Across",
         "rollup_scope_subtasks": "Subtasks",
         "rollup_scope_sprint": "Sprint",
+        "rollup_help": "A rollup counts every subtask under the task, on every level, once each. On a subtask it counts the subtasks under that one. A source field counts only on the task types it is for.",
         "show_as": "Show as",
         "format_money": "Money",
         "format_number": "Number",
@@ -4168,7 +4172,12 @@ export default {
         "target_start_date": "Start date",
         "target_estimate": "Estimate (hours)",
         "target_logged_time": "Logged time (hours)",
-        "target_tags": "Tags"
+        "target_tags": "Tags",
+        "target_task_key": "Task key or ID",
+        "target_parent": "Parent task (key or title)",
+        "adjusted_too_deep": "{count} subtask(s) were deeper than three levels and were placed under their nearest parent:",
+        "adjusted_parent_missing": "{count} row(s) named a parent that is not in the file and were imported as tasks:",
+        "adjusted_cycle": "{count} row(s) named parents that loop and were imported as tasks:"
     },
     "Language": {
         "title": "Language & region",
