@@ -572,6 +572,7 @@ exports.updateSprintFun = (req) => {
 
 /* Other tabs learn only that the company's folders changed, and read them again: see socket/controller/folderSocket.js. */
 const announceFolders = (type, companyId) => socketEmitter.emit(type, { type, companyId, module: 'folders' });
+exports.announceFolders = announceFolders;
 
 const recordFolderHistory = (companyId, projectId, message, userData) => HandleHistoryref
     .HandleHistory('project', companyId, projectId, null, { message, key: 'Create_Folder' }, userData)

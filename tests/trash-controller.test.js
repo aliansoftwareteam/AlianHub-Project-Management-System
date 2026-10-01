@@ -8,8 +8,11 @@ jest.mock('../Modules/Project/controller/updateProject', () => ({ updateProjectI
 jest.mock('../Modules/Sprints/controller', () => ({
     updateSprintFun: jest.fn(async () => ({ status: true })),
     updateFolderFun: jest.fn(async () => ({ answer: { status: true }, cascade: Promise.resolve() })),
+    announceFolders: jest.fn(),
 }));
-jest.mock('../Modules/Tasks/helpers/task_class_Mongo', () => ({ taskMongo: { bulkRestore: jest.fn(async () => ({ totals: { updated: 1 } })) } }));
+jest.mock('../Modules/Tasks/helpers/task_class_Mongo', () => ({
+    taskMongo: { bulkRestore: jest.fn(async () => ({ totals: { updated: 1 } })), leaveLists: jest.fn(async () => 0) },
+}));
 jest.mock('../Modules/Pages/controller', () => ({ restorePage: jest.fn((req, res) => res.send({ status: true, statusText: 'page' })) }));
 jest.mock('../Modules/Trash/listAccess', () => ({ visibleTrash: jest.fn(async (companyId, uid, kind, docs) => docs) }));
 jest.mock('../Modules/Tasks/helpers/taskWriteFields', () => ({ sessionActor: jest.fn(async (req) => ({ id: String(req.uid), Employee_Name: 'Me' })) }));
@@ -209,7 +212,7 @@ describe('DELETE /api/v2/sample-data', () => {
         db.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: oid(), fieldTitle: 'Estimate (hours)', projectId: [String(SAMPLE)], global: false, isDelete: true });
         db.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: oid(), fieldTitle: 'Shared', projectId: [String(SAMPLE), String(OWN_PROJECT)], global: false, isDelete: true });
         db.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: oid(), fieldTitle: 'Company wide', projectId: '', global: true, isDelete: true });
-        db.seed(SCHEMA_TYPE.GOALS, { _id: oid(), name: 'Finish the getting-started tasks', ownerUserId: USER, sample: true, deletedStatusKey: 0 });
+        db.seed(SCHEMA_TYPE.GOALS, { _id: oid(), name: 'Finish the getting-started tasks', ownerUserId: USER, sample: true, sampleProjectId: String(SAMPLE), deletedStatusKey: 0 });
         db.seed(SCHEMA_TYPE.GOALS, { _id: oid(), name: 'My goal counting the sample list', ownerUserId: USER, deletedStatusKey: 0 });
     };
     const rowsOf = (type, where = () => true) => db.store[type].filter(where);

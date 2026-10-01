@@ -98,4 +98,26 @@ module.exports = {
         }
         return { projectId: String(destination.project._id), sprintId: String(destination.list._id), added, skipped };
     },
+
+    /* For lists that go to the trash with their project. A task that lives in `exceptProjectId` keeps its entry, so restoring that project brings it back whole. */
+    async leaveLists({ companyId, sprintIds, exceptProjectId }) {
+        if (!sprintIds.length) return 0;
+        const gone = new Set(sprintIds.map(String));
+        const pull = extraLists.pullOfLists([...gone]);
+        const held = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS, data: [{ extraLists: { $elemMatch: pull.extraLists } }, '_id ProjectID extraLists'],
+        }, 'find');
+        let left = 0;
+        for (const task of held || []) {
+            if (String(task.ProjectID) === String(exceptProjectId)) continue;
+            const entries = task.extraLists
+                .filter((entry) => gone.has(String(entry.sprintId)))
+                .map((entry) => ({ projectId: String(entry.projectId), sprintId: String(entry.sprintId) }));
+            const updated = await writeTask(companyId, { filter: { _id: task._id }, update: { $pull: pull } });
+            if (!updated) continue;
+            announce(companyId, updated, entries);
+            left += 1;
+        }
+        return left;
+    },
 };

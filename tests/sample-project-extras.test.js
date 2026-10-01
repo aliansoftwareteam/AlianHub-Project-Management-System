@@ -25,7 +25,7 @@ jest.mock('../Modules/Sprints/controller', () => {
     actual.getPerProjectCount = async () => true;
     return actual;
 });
-jest.mock('../Modules/Tasks/helpers/task_class_Mongo', () => ({ taskMongo: {} }));
+jest.mock('../Modules/Tasks/helpers/task_class_Mongo', () => ({ taskMongo: jest.requireActual('../Modules/Tasks/helpers/taskMongo/extraLists') }));
 jest.mock('../Modules/Pages/controller', () => jest.requireActual('../Modules/Pages/controller'));
 jest.mock('../Modules/Trash/listAccess', () => ({ visibleTrash: jest.fn() }));
 jest.mock('../Modules/Tasks/helpers/taskWriteFields', () => ({
@@ -321,6 +321,67 @@ describe("a person's own task that was added to a sample list", () => {
         const kept = rows(SCHEMA_TYPE.TASKS).filter((t) => inSample(t, 'ProjectID') && (t.extraLists || []).length);
         expect(kept).toHaveLength(1);
         expect(String(kept[0].extraLists[0].sprintId)).toBe(sampleList);
+    });
+});
+
+describe('what counts as sample', () => {
+    beforeEach(seedSample);
+
+    const goals = require('../Modules/Goals/controller');
+    const ask = async (handler, { body, id } = {}) => {
+        const res = response();
+        res.json = res.send;
+        await handler({ headers: { companyid: COMPANY }, aud: COMPANY, uid: OWNER, body, query: {}, params: { id } }, res);
+        return res;
+    };
+    const marked = () => rows(SCHEMA_TYPE.GOALS).filter((g) => g.sample !== undefined || g.sampleProjectId !== undefined);
+
+    test('the seeded goal names the welcome project it came with', () => {
+        expect(marked()).toHaveLength(1);
+        expect(marked()[0]).toMatchObject({ sample: true, sampleProjectId: MARK, name: 'Finish the getting-started tasks' });
+    });
+
+    test('the goal schema stores both marks, and no doc, folder or list has one', () => {
+        const { checkType } = jest.requireActual('../utils/mongo-handler/mongoQueries');
+        expect(checkType(SCHEMA_TYPE.GOALS).path('sample')).toBeDefined();
+        expect(checkType(SCHEMA_TYPE.GOALS).path('sampleProjectId')).toBeDefined();
+        [SCHEMA_TYPE.PAGES, SCHEMA_TYPE.FOLDERS, SCHEMA_TYPE.SPRINTS].forEach((type) => {
+            expect(Object.keys(checkType(type).paths).filter((path) => /sample/i.test(path))).toEqual([]);
+        });
+    });
+
+    test('a goal request that names either mark is refused, and stores nothing', async () => {
+        const mine = rows(SCHEMA_TYPE.GOALS).find((g) => g.name === 'My goal');
+        const asked = [
+            await ask(goals.createGoal, { body: { name: 'Mine too', sample: true } }),
+            await ask(goals.createGoal, { body: { name: 'Mine too', sampleProjectId: MARK } }),
+            await ask(goals.updateGoal, { id: String(mine._id), body: { sample: true } }),
+            await ask(goals.updateGoal, { id: String(mine._id), body: { name: 'My goal', sampleProjectId: MARK } }),
+        ];
+        expect(asked.map((res) => res.statusCode)).toEqual([400, 400, 400, 400]);
+        expect(rows(SCHEMA_TYPE.GOALS).filter((g) => g.name === 'Mine too')).toHaveLength(0);
+        expect(marked()).toHaveLength(1);
+    });
+
+    test('a goal, doc, folder or list outside the welcome project stays, whatever it carries', async () => {
+        mockDb.seed(SCHEMA_TYPE.GOALS, { name: 'Flag alone', ownerUserId: OWNER, sample: true, deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.GOALS, { name: 'Another project', ownerUserId: OWNER, sample: true, sampleProjectId: String(OWN_PROJECT_ID), deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.GOALS, { name: 'Id alone', ownerUserId: OWNER, sampleProjectId: MARK, deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Marked doc', ProjectID: OWN_PROJECT_ID, sample: true, deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.FOLDERS, { name: 'Marked folder', projectId: OWN_PROJECT_ID, sample: true, deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.SPRINTS, { name: 'Marked list', projectId: OWN_PROJECT_ID, sample: true, deletedStatusKey: 0 });
+        const res = await removeSample();
+        expect(res.body.data).toMatchObject({ goals: 1, docs: 1, folders: 2, lists: 4 });
+        ['Flag alone', 'Another project', 'Id alone'].forEach((name) => expect(rows(SCHEMA_TYPE.GOALS).find((g) => g.name === name).deletedStatusKey).toBe(0));
+        expect(rows(SCHEMA_TYPE.PAGES).find((p) => p.title === 'Marked doc').deletedStatusKey).toBe(0);
+        expect(rows(SCHEMA_TYPE.FOLDERS).find((f) => f.name === 'Marked folder').deletedStatusKey).toBe(0);
+        expect(rows(SCHEMA_TYPE.SPRINTS).find((l) => l.name === 'Marked list').deletedStatusKey).toBe(0);
+    });
+
+    test('the goal of a welcome project that is already in the trash still goes', async () => {
+        rows(SCHEMA_TYPE.PROJECTS).find((p) => inSample(p, '_id')).deletedStatusKey = 1;
+        const res = await removeSample();
+        expect(res.body.data).toMatchObject({ projects: 0, goals: 1 });
     });
 });
 

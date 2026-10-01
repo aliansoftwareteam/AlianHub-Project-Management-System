@@ -125,14 +125,14 @@ async function createSampleDoc({ companyId, projectId, ownerId }) {
 }
 
 /* Visibility is left at the Goals module's default, private to the owner. */
-async function createSampleGoal({ companyId, ownerId, sprintId }) {
+async function createSampleGoal({ companyId, projectId, ownerId, sprintId }) {
     const { saveGoal } = require('../Modules/Goals/controller');
     const caller = { companyId, uid: String(ownerId), isGuest: false, isPrivileged: true };
     return saveGoal(caller, {
         name: GOAL_NAME,
         color: GOAL_COLOR,
         targets: [{ name: GOAL_TARGET_NAME, kind: 'tasks', sources: { sprintIds: [String(sprintId)] } }],
-    }, { sample: true });
+    }, { sample: true, sampleProjectId: String(projectId) });
 }
 
 /* The owner adds it as anyone would, so the rules, the history and the event are the ones every extra list gets. */
@@ -147,7 +147,7 @@ async function seedSampleExtras({ project, sprints, tasks, ownerId, userData }) 
     const projectId = String(project._id);
     const placed = await safely('folders', () => createSampleFolders({ project, userData }));
     await safely('doc', () => createSampleDoc({ companyId, projectId, ownerId }));
-    if (sprints && sprints[0]) await safely('goal', () => createSampleGoal({ companyId, ownerId, sprintId: sprints[0]._id }));
+    if (sprints && sprints[0]) await safely('goal', () => createSampleGoal({ companyId, projectId, ownerId, sprintId: sprints[0]._id }));
     const secondHome = sprints && sprints[1] && tasks.find((t) => t.isParentTask !== false && String(t.sprintId) === String(sprints[1]._id));
     if (placed && secondHome) {
         await safely('second list', () => addTaskToSecondList({ project, taskId: String(secondHome._id), list: placed.list, userData }));
