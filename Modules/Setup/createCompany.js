@@ -46,11 +46,12 @@ const COMPANY_DEFAULTS = {
     Cst_LogTimeDays: '8',
 };
 
-async function createFirstCompany({ userId, email, companyName, teamFocus = '', sampleData = true, onStep = () => {} }) {
+async function createFirstCompany({ userId, email, companyName, teamFocus = '', sampleData = true, companyFields = {}, onStep = () => {} }) {
     const companyMongoId = new mongoose.Types.ObjectId();
     const companyId = String(companyMongoId);
     const company = {
         ...COMPANY_DEFAULTS,
+        ...companyFields,
         _id: companyMongoId,
         userId,
         teamFocus,
