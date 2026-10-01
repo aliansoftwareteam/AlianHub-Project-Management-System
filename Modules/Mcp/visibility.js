@@ -5,7 +5,7 @@ const { getRoleType } = require('../../Config/permissionGuard');
 const { isPrivileged } = require('../../Config/roleTypes');
 const { visibleProjectIds } = require('../Agents/scope');
 const { hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
-const { pageVisibleTo } = require('../Pages/helpers/pageRules');
+const { pageReachFilter, pageReachedBy } = require('../Pages/helpers/pageRules');
 const { othersPersonalListIds } = require('../PersonalList/ownership');
 const { companyWideMatch, readsCompanyWide } = require('../Tasks/helpers/taskQueryGuard');
 const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
@@ -36,8 +36,7 @@ const build = ({ uid, projectIds, hidden, tokenNarrowed, personalLists = null })
     const allowsTask = (task) => Boolean(task) && allowsProject(task.ProjectID) && allowsSprint(task.sprintId)
         && readsCompanyWide(task, uid, [...excluded]);
     // A page outside every project is company-wide; a project-restricted token was never granted those.
-    const allowsPage = (page) => pageVisibleTo(page, uid)
-        && (page.ProjectID ? allowsProject(page.ProjectID) : !tokenNarrowed);
+    const allowsPage = (page) => pageReachedBy(page, { uid, inProject: allowsProject, companyWide: !tokenNarrowed });
 
     /* A find clause for tasks. `narrowTo` is a caller's projectId argument: it can only
      * shrink the set, so a project outside the filter matches nothing. */
@@ -51,14 +50,12 @@ const build = ({ uid, projectIds, hidden, tokenNarrowed, personalLists = null })
         };
     };
 
-    const pageClause = () => ({
-        $and: [
-            { $or: [{ visibility: { $ne: 'private' } }, { createdBy: String(uid) }] },
-            projectIds === null
-                ? (tokenNarrowed ? { ProjectID: { $nin: [null, undefined] } } : {})
-                : { $or: [{ ProjectID: { $in: projectIds.map(toOid) } }, ...(tokenNarrowed ? [] : [{ ProjectID: { $in: [null, undefined] } }])] },
-            ...(excluded.size ? [{ ProjectID: { $nin: idForms([...excluded]) } }] : []),
-        ],
+    const pageClause = () => pageReachFilter({
+        uid,
+        projectIds: (projectIds || []).map(toOid),
+        everyProject: projectIds === null,
+        companyWide: !tokenNarrowed,
+        exceptProjectIds: idForms([...excluded]),
     });
 
     return { projectIds, hiddenSprintIds: [...hiddenSet], excludedProjectIds: [...excluded], allowsProject, allowsSprint, allowsTask, allowsPage, taskClause, pageClause };
