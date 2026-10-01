@@ -34,6 +34,7 @@ jest.mock('../Config/projectAccess', () => ({
         ? { allowed: true }
         : { allowed: false, missing: true })),
 }));
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 jest.mock('../Modules/Sprints/helpers/sprintVisibility', () => ({
     ...jest.requireActual('../Modules/Sprints/helpers/sprintVisibility'),
     canSeeSprintById: jest.fn(async (companyId, uid, sprintId) => !(String(sprintId) === '6a9954186dd786246031e482' && String(uid) === '6f0000000000000000000d03')),
@@ -345,13 +346,14 @@ describe('a mention in a thread reply', () => {
 });
 
 describe('the thread count event', () => {
-    it('reaches the sockets in the channel\'s room as a comment update', () => {
+    it('reaches the sockets in the channel\'s room as a comment update', async () => {
         const relay = relays['comments_thread:update'];
         expect(relay).toEqual(expect.any(Function));
 
         const sent = [];
-        const inChannel = { id: 's1', rooms: new Set() };
-        const elsewhere = { id: 's2', rooms: new Set() };
+        const identity = { companyId: COMPANY, uid: ALICE };
+        const inChannel = { id: 's1', rooms: new Set(), identity };
+        const elsewhere = { id: 's2', rooms: new Set(), identity };
         const join = (socket, prefix) => {
             const roomName = `${prefix}**${socket.id}`;
             socket.rooms.add(roomName);
@@ -363,7 +365,7 @@ describe('the thread count event', () => {
             join(elsewhere, `comments_${CHANNEL_PROJECT}_${PRIVATE_CHANNEL}_default`),
         ];
 
-        relay({ type: 'update', module: 'comments_thread', companyId: COMPANY, data: { _id: 'm1', projectId: CHANNEL_PROJECT, sprintId: CHANNEL, taskId: 'default', replyCount: 3 } });
+        await relay({ type: 'update', module: 'comments_thread', companyId: COMPANY, data: { _id: 'm1', projectId: CHANNEL_PROJECT, sprintId: CHANNEL, taskId: 'default', replyCount: 3 } });
 
         expect(sent).toEqual([{ room: rooms[0], event: 'commentUpdate', payload: expect.objectContaining({ fullDocument: expect.objectContaining({ _id: 'm1', replyCount: 3 }) }) }]);
         rooms.forEach(removeRoom);

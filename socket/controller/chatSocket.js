@@ -6,9 +6,7 @@ const {
     findRoomsByPrefixes,
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
-const { onJoin, roomFor, prefixOfOwnRoom, isSelf, projectReadable } = require('../roomAccess');
-
-const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const { onJoin, roomFor, prefixOfOwnRoom, isSelf, canOpenChats, mayReceiveTask, inOrder } = require('../roomAccess');
 
 function setEventName(type) {
     switch (type) {
@@ -19,32 +17,34 @@ function setEventName(type) {
     }
 }
 
-const handleTaskChange = (changeData, includeUpdatedFields = false) => {
-    if (changeData.module !== 'task' || changeData.data.mainChat !== true) return;
+/* A conversation goes to the chat list of each of its two participants, `chat_<spaceId>_<userId>`. */
+const roomsOf = ({ data }) => {
+    const participants = [].concat(data.AssigneeUserId || []);
+    return findRoomsByPrefixes(`chat_${data.ProjectID}_${participants[0]}`, `chat_${data.ProjectID}_${participants[1]}`);
+};
 
-    // SOCKET-PERFORMANCE-PLAN #1 (Phase 2): chat events broadcast to both
-    // participants in a 1:1 task chat. The room prefix is
-    // `chat_<projectId>_<userId>` per participant; look up both in one pass.
-    const chatIdentifier = `chat_${changeData.data.ProjectID}_${changeData.data.AssigneeUserId[0]}`;
-    const chatIdentifier1 = `chat_${changeData.data.ProjectID}_${changeData.data.AssigneeUserId[1]}`;
-    const relatedRooms = findRoomsByPrefixes(chatIdentifier, chatIdentifier1);
-    if (!relatedRooms.length) return;
-
+const relayChatChange = async (changeData, includeUpdatedFields) => {
     const eventName = setEventName(changeData.type);
     const emitData = {
         fullDocument: changeData.data,
         ...(includeUpdatedFields && { updatedFields: changeData.updatedFields }),
     };
+    for (const room of roomsOf(changeData)) {
+        // eslint-disable-next-line no-await-in-loop
+        if (!(await mayReceiveTask(room.socket.identity, changeData))) continue;
+        if (room.socket.rooms.has(room.roomName)) room.namespace.to(room.roomName).emit(eventName, emitData);
+    }
+};
 
-    relatedRooms.forEach(data => {
-        if (!data.socket.rooms.has(data.roomName)) return;
-        data.namespace.to(data.roomName).emit(eventName, emitData);
-    });
+const handleTaskChange = (changeData, includeUpdatedFields = false) => {
+    if (changeData.module !== 'task' || !changeData.data || changeData.data.mainChat !== true) return undefined;
+    if (!roomsOf(changeData).length) return undefined;
+    return inOrder(() => relayChatChange(changeData, includeUpdatedFields));
 };
 
 exports.chatSocketHandler = ({ socket, namespace }) => {
     onJoin(socket, 'joinChats',
-        (data, identity) => isSelf(identity, data.userId) && OBJECT_ID.test(String(data.projectId || '')) && projectReadable(identity, data.projectId),
+        (data, identity) => isSelf(identity, data.userId) && canOpenChats(identity, data.projectId),
         (data) => {
             const roomName = roomFor(socket, `chat_${data.projectId}_${data.userId}`);
             joinRoom(socket, roomName);
@@ -57,8 +57,5 @@ exports.chatSocketHandler = ({ socket, namespace }) => {
     });
 };
 
-// SOCKET-PERFORMANCE-PLAN #2: chat events live on the `task` module too —
-// the chat handler only forwards events where `mainChat === true`, so it
-// shares the same namespace as the task handler.
 socketEmitter.on('task:update', changeData => handleTaskChange(changeData, true));
 socketEmitter.on('task:insert', changeData => handleTaskChange(changeData, false));
