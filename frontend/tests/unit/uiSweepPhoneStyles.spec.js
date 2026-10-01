@@ -79,12 +79,14 @@ describe('the project calendar on a phone', () => {
 });
 
 describe('phone touch targets', () => {
-    test('Home controls reach at least 32px', () => {
-        const phone = phoneBlocks(read('components/molecules/Home/style.css'));
+    test('Home controls reach the phone floor, which --hit-min carries', () => {
+        const css = read('components/molecules/Home/style.css');
+        const phone = phoneBlocks(css);
         expect(ruleBody(phone, '.home .ah-tbtn--icon')).toMatch(/width:\s*40px/);
-        expect(ruleBody(phone, '.hc-tab')).toMatch(/min-height:\s*36px/);
-        expect(ruleBody(phone, '.hc-agenda__nav button')).toMatch(/min-height:\s*32px/);
-        expect(ruleBody(phone, '.hp-days button')).toMatch(/min-height:\s*36px/);
+        for (const selector of ['.hc-tab', '.hc-agenda__nav button', '.hp-days button']) {
+            expect(ruleBody(css, selector), selector).toMatch(/min-height:\s*var\(--hit-min, 24px\)/);
+            expect(ruleBody(phone, selector), selector).not.toMatch(/min-height/);
+        }
         expect(ruleBody(phone, '.hp-panel__close')).toMatch(/padding:\s*13px/);
     });
 
