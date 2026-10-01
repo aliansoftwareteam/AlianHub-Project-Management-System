@@ -3888,6 +3888,7 @@ export default {
     },
     "FieldTypes": {
         "builder_note": "This field is edited on the task: in the task panel and in List and Table cells.",
+        "edit_field": "Edit the field {field}",
         "people_multiple_label": "Allow several people",
         "people_multiple_hint": "Untick to hold one person at a time.",
         "rating_max_label": "Highest rating",

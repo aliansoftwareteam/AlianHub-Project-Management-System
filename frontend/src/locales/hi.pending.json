@@ -3510,6 +3510,7 @@
     "Favourites.reorder_named": "Move {name}",
     "Favourites.toggle": "Favourite {name}",
     "FieldTypes.builder_note": "This field is edited on the task: in the task panel and in List and Table cells.",
+    "FieldTypes.edit_field": "Edit the field {field}",
     "FieldTypes.people_multiple_hint": "Untick to hold one person at a time.",
     "FieldTypes.people_multiple_label": "Allow several people",
     "FieldTypes.progress_none": "Not set",
