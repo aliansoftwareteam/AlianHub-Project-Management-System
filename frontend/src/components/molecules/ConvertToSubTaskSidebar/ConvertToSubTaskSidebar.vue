@@ -31,7 +31,7 @@
             </template>
             <template #body>
                 <div :class="[{'duplicatetask__converttask--wrapper': (props.isDuplicate === true || isCreteTask === true)}]">
-                    <DuplicateCompo v-if="props.isDuplicate === true" @selctedItems="selectedItems" :task="task" :selectedProjectData="selectedProjectData" :selectedSprint="selectedSprintData" @assignee="assigneFun" @watcher="watcherFun" @taskName="taskFun" :from="props.isMoveTask ? 'move' : 'duplicate'"/>
+                    <DuplicateCompo v-if="props.isDuplicate === true" @selctedItems="selectedItems" :task="task" :selectedProjectData="selectedProjectData" :selectedSprint="selectedSprintData" @assignee="carryAssignees" @watcher="carryWatchers" @taskName="taskFun" :from="props.isMoveTask ? 'move' : 'duplicate'"/>
                     <div class="create__component--wrapper">
                         <div v-if="isCreteTask" class="create__task-title form-group d-flex align-items-center border-bottom-mobiledrop">
                             <InputText
@@ -769,6 +769,14 @@
 
     function taskFun (data) {
         duplicateTaskName.value = data;
+    }
+
+    function carryAssignees (ids) {
+        selectedAssigneeId.value = ids;
+    }
+
+    function carryWatchers (ids) {
+        selectedWatcherId.value = ids;
     }
 
     const getDataFromChild = (ele) => {
