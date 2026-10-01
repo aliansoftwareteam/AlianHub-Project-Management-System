@@ -470,6 +470,18 @@ describe('group counts come from the same match as the rows', () => {
         expect(groups.length).toBeGreaterThan(1);
     });
 
+    it('sends what a heading shows for a project it only counts, and the whole card for a project on the page', async () => {
+        const { groups, projects, rows } = await everything(MEMBER, { group: 'project', limit: 1 });
+        const onPage = String(rows[0].ProjectID);
+        expect(Object.keys(projects[onPage]).sort()).toEqual(['ProjectCode', 'ProjectName', '_id', 'apps', 'edit', 'isPersonal', 'projectIcon', 'statusType', 'taskStatusData', 'taskTypeCounts']);
+        const onlyCounted = groups.map((g) => g.key).filter((key) => key !== onPage);
+        expect(onlyCounted.length).toBeGreaterThan(0);
+        onlyCounted.forEach((key) => {
+            expect(Object.keys(projects[key]).sort()).toEqual(['ProjectCode', 'ProjectName', '_id', 'isPersonal', 'projectIcon', 'statusType']);
+            expect(projects[key]).toMatchObject({ _id: key, ProjectName: expect.any(String), isPersonal: expect.any(Boolean) });
+        });
+    });
+
     it('counts once per query: a page reached by cursor carries no counts', async () => {
         const first = await everything(MEMBER, { group: 'status', limit: 2 });
         const second = await everything(MEMBER, { group: 'status', limit: 2, cursor: first.nextCursor });
