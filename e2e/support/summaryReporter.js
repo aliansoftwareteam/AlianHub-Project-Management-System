@@ -13,7 +13,9 @@ class SummaryReporter {
         if (result.status === 'passed') return;
         if (result.status === 'skipped') return;
         const lines = plain(result.error && result.error.message).split('\n').filter(Boolean).slice(0, 8).join('\n');
-        this.failed.set(test.id, `${test.titlePath().slice(2).join(' > ')}\n${lines}`);
+        const tree = result.attachments.find((attachment) => attachment.name === 'page-tree');
+        const seen = tree && tree.body ? `\n[page tree]\n${tree.body.toString().slice(0, 3000)}` : '';
+        this.failed.set(test.id, `${test.titlePath().slice(2).join(' > ')}\n${lines}${seen}`);
     }
 
     onEnd() {
