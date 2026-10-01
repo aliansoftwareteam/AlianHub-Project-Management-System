@@ -1,6 +1,7 @@
 import { computed, reactive, ref } from "vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
+import { adjustedTotals } from "@/plugins/importTasks/importTree";
 
 const failure = (error) => error?.response?.data?.statusText || error?.message || "";
 
@@ -70,6 +71,7 @@ export function useClickUpImport() {
 
     const skippedRows = computed(() => (preview.value?.skippedRows || []));
     const unmatchedAssignees = computed(() => Array.from(new Set(results.value.flatMap((result) => result.unmatchedAssignees || []))));
+    const adjusted = computed(() => adjustedTotals(results.value));
 
-    return { rows, preview, previewError, running, progress, results, totals, skippedRows, unmatchedAssignees, reset, loadPreview, run };
+    return { rows, preview, previewError, running, progress, results, totals, skippedRows, unmatchedAssignees, adjusted, reset, loadPreview, run };
 }
