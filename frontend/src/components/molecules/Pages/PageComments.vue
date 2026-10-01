@@ -1,5 +1,5 @@
 <template>
-    <aside class="pcm" :aria-label="$t('Docs.comments_title')">
+    <aside class="pcm" :aria-label="$t('Docs.comments_title')" @pointerenter="loadReaders" @focusin="loadReaders">
         <header class="pcm__head">
             <h3 class="pcm__title">{{ $t('Docs.comments_title') }}</h3>
             <div class="ah-tabs pcm__tabs" role="tablist">
@@ -14,6 +14,7 @@
                 <ShellIcon name="x" :size="14" />
             </button>
         </header>
+        <p v-if="atLimit" class="pcm__limit" role="status" data-test="comment-limit">{{ $t('Docs.comments_limit', { n: limit }) }}</p>
 
         <div ref="listEl" class="pcm__list ah-scroll">
             <p v-if="loading" class="pcm__empty">{{ $t('Docs.comments_loading') }}</p>
@@ -45,27 +46,39 @@
                         </span>
                     </div>
                     <div v-if="editingId === String(item._id)" class="pcm__edit">
-                        <PageCommentInput v-model="editDraft" :people="people" :label="$t('Docs.comment_edit')" autofocus @submit="saveEdit(item)" @cancel="editingId = ''" />
+                        <PageCommentInput v-model="editDraft" :sources="sources" :label="$t('Docs.comment_edit')" autofocus @submit="saveEdit(item)" @cancel="editingId = ''" />
                         <div class="pcm__row">
                             <button type="button" class="ah-btn ah-btn--sm ah-btn--ghost" @click="editingId = ''">{{ $t('Docs.comment_cancel') }}</button>
-                            <button type="button" class="ah-btn ah-btn--sm ah-btn--primary" :disabled="!editDraft.trim() || busy" @click="saveEdit(item)">{{ $t('Docs.comment_save') }}</button>
+                            <button type="button" class="ah-btn ah-btn--sm ah-btn--primary" :disabled="(!editDraft.trim() && !item.mediaURL) || busy" @click="saveEdit(item)">{{ $t('Docs.comment_save') }}</button>
                         </div>
                     </div>
                     <!-- commentHtml escapes the whole text before it marks up mentions and links. -->
-                    <p v-else class="pcm__text" v-html="commentHtml(item.message, { links: true })"></p>
+                    <p v-else-if="item.message" class="pcm__text" v-html="commentHtml(item.message, { links: true, refs: true })" @click="onMentionClick" @keydown="onMentionKeydown"></p>
+                    <button v-if="item.mediaURL" type="button" class="pcm__file" data-test="comment-file" :title="$t('Docs.comment_file_open')" @click="openFile(item)">
+                        <ShellIcon name="file" :size="12" />
+                        <span class="pcm__file-name">{{ item.mediaOriginalName || $t('Docs.comment_file') }}</span>
+                    </button>
+                    <ReactionBar themed compact :reactions="item.reactions || []" @toggle="(emoji) => toggleReaction(item, emoji)" />
                 </div>
 
                 <div class="pcm__row pcm__row--thread">
-                    <button type="button" class="ah-btn ah-btn--sm ah-btn--ghost" @click="toggleReply(thread.root)">{{ $t('Docs.comment_reply') }}</button>
-                    <button type="button" class="ah-btn ah-btn--sm ah-btn--ghost" @click="setResolved(thread.root, !thread.root.resolved)">
+                    <button v-if="!atLimit" type="button" class="ah-btn ah-btn--sm ah-btn--ghost" @click="toggleReply(thread.root)">{{ $t('Docs.comment_reply') }}</button>
+                    <button v-if="!thread.root.assigneeId" type="button" class="ah-btn ah-btn--sm ah-btn--ghost" @click="setResolved(thread.root, !thread.root.resolved)">
                         <ShellIcon :name="thread.root.resolved ? 'refresh' : 'check'" :size="12" />
                         {{ thread.root.resolved ? $t('Docs.comment_reopen') : $t('Docs.comment_resolve') }}
                     </button>
+                    <CommentAssignment :comment="thread.root" :people="readers" :actions="assignActions" />
                 </div>
-                <div v-if="replyingTo === String(thread.root._id)" class="pcm__reply">
-                    <PageCommentInput v-model="replyDraft" :people="people" :placeholder="$t('Docs.comment_reply_placeholder')" autofocus @submit="send(thread.root)" @cancel="replyingTo = ''" />
+                <div v-if="replyingTo === String(thread.root._id) && !atLimit" class="pcm__reply">
+                    <PageCommentInput v-model="replyDraft" :sources="sources" :placeholder="$t('Docs.comment_reply_placeholder')" autofocus @submit="send(thread.root)" @cancel="replyingTo = ''" />
+                    <span v-if="replyFile" class="ah-chip pcm__chip" data-test="comment-reply-file">
+                        <ShellIcon name="file" :size="12" />
+                        <span class="pcm__anchor-text">{{ replyFile.name }}</span>
+                        <button type="button" class="pcm__unanchor" :title="$t('Docs.comment_file_remove')" :aria-label="$t('Docs.comment_file_remove')" @click="replyFile = null">✕</button>
+                    </span>
                     <div class="pcm__row">
-                        <button type="button" class="ah-btn ah-btn--sm ah-btn--primary" :disabled="!replyDraft.trim() || busy" @click="send(thread.root)">{{ $t('Docs.comment_send') }}</button>
+                        <button type="button" class="ah-btn ah-btn--sm ah-btn--ghost" :disabled="busy" @click="pickFile('reply')"><ShellIcon name="file" :size="12" />{{ $t('Docs.comment_attach') }}</button>
+                        <button type="button" class="ah-btn ah-btn--sm ah-btn--primary" :disabled="(!replyDraft.trim() && !replyFile) || busy" @click="send(thread.root)">{{ $t('Docs.comment_send') }}</button>
                     </div>
                 </div>
             </article>
@@ -81,9 +94,16 @@
                 <button v-if="canAnchor" type="button" class="ah-btn ah-btn--sm ah-btn--ghost" @click="useCurrentBlock">{{ $t('Docs.comment_on_block') }}</button>
             </div>
             <p v-if="anchorHint" class="pcm__hint" role="status">{{ anchorHint }}</p>
-            <PageCommentInput ref="composer" v-model="draft" :people="people" :placeholder="$t('Docs.comment_placeholder')" @submit="send(null)" />
+            <PageCommentInput ref="composer" v-model="draft" :sources="sources" :placeholder="$t('Docs.comment_placeholder')" @submit="send(null)" />
+            <span v-if="draftFile" class="ah-chip pcm__chip" data-test="comment-draft-file">
+                <ShellIcon name="file" :size="12" />
+                <span class="pcm__anchor-text">{{ draftFile.name }}</span>
+                <button type="button" class="pcm__unanchor" :title="$t('Docs.comment_file_remove')" :aria-label="$t('Docs.comment_file_remove')" @click="draftFile = null">✕</button>
+            </span>
             <div class="pcm__row">
-                <button type="button" class="ah-btn ah-btn--sm ah-btn--primary" :disabled="!draft.trim() || busy" @click="send(null)">{{ $t('Docs.comment_send') }}</button>
+                <input ref="fileInput" type="file" class="pcm__file-input" tabindex="-1" aria-hidden="true" data-test="comment-attach-input" @change="onFilePicked" />
+                <button type="button" class="ah-btn ah-btn--sm ah-btn--ghost" :disabled="busy || atLimit" @click="pickFile('draft')"><ShellIcon name="file" :size="12" />{{ $t('Docs.comment_attach') }}</button>
+                <button type="button" class="ah-btn ah-btn--sm ah-btn--primary" :disabled="(!draft.trim() && !draftFile) || busy || atLimit" @click="send(null)">{{ $t('Docs.comment_send') }}</button>
             </div>
         </footer>
     </aside>
@@ -95,13 +115,18 @@ import { useI18n } from 'vue-i18n';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import ReactionBar from '@/components/atom/ReactionBar/ReactionBar.vue';
+import CommentAssignment from '@/components/molecules/CommentThread/CommentAssignment.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
-import { useGetterFunctions } from '@/composable';
+import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { commentHtml, decodeCommentText } from '@/utils/commentHtml';
 import PageCommentInput from './PageCommentInput.vue';
 import { initials, relativeTime } from './docsFormat';
 import { applyCommentEvent, threadsOf } from './pageComments';
+import { docCommentSources } from './docCommentSources';
+import { removeDocCommentFile, uploadDocCommentFile } from './docCommentFiles';
+import { useMentionLinks } from './useMentionLinks';
 
 defineOptions({ name: 'PageComments' });
 
@@ -110,6 +135,7 @@ const props = defineProps({
     blocks: { type: Array, default: null },
     focusId: { type: String, default: '' },
     pickBlock: { type: Function, default: null },
+    beforeLeave: { type: Function, default: () => true },
 });
 
 const emit = defineEmits(['close', 'jump', 'count', 'threads']);
@@ -118,15 +144,23 @@ const { t } = useI18n();
 const $toast = useToast();
 const store = useStore();
 const { getUser } = useGetterFunctions();
+const { checkBucketStorage, getWasabiImageLink } = useCustomComposable();
+const { onMentionClick, onMentionKeydown } = useMentionLinks({ beforeLeave: () => props.beforeLeave() });
 const socket = inject('$socket', ref(null));
 const userId = inject('$userId', ref(''));
+const companyId = inject('$companyId', ref(''));
 
 const PRIVILEGED_ROLES = [1, 2];
-const ACTIVE_SEAT = 2;
 const EVENTS = ['pageCommentInsert', 'pageCommentUpdate'];
 const EXCERPT = 60;
+const DEFAULT_LIMIT = 500;
 
 const comments = ref([]);
+const limit = ref(DEFAULT_LIMIT);
+const readerIds = ref([]);
+const draftFile = ref(null);
+const replyFile = ref(null);
+const fileInput = ref(null);
 const loading = ref(false);
 const busy = ref(false);
 const filter = ref('open');
@@ -143,13 +177,17 @@ const composer = ref(null);
 
 const me = computed(() => String((userId && userId.value) || ''));
 const isAdmin = computed(() => PRIVILEGED_ROLES.includes(Number((store.getters['settings/companyUserDetail'] || {}).roleType)));
-/* The same people the doc editor's mention picker offers: live seats that are not agents or bots. */
-const people = computed(() => (store.getters['settings/companyUsers'] || [])
-    .filter((seat) => seat && seat.userId && seat.isDelete !== true && (seat.status === undefined || Number(seat.status) === ACTIVE_SEAT)
-        && !seat.isAgent && !seat.isBot && String(seat.userId) !== me.value)
-    .map((seat) => ({ id: String(seat.userId), user: getUser(String(seat.userId)) }))
+/* The server names who can read this doc; nobody else is offered for a mention or an assignment. */
+const readers = computed(() => readerIds.value
+    .map((id) => ({ id, user: getUser(id) }))
     .filter(({ user }) => user && user.Employee_Name && !user.ghostUser)
-    .map(({ id, user }) => ({ id, name: user.Employee_Name })));
+    .map(({ id, user }) => ({ id, name: user.Employee_Name, image: user.Employee_profileImageURL })));
+const sources = docCommentSources({
+    pageId: () => props.pageId,
+    people: () => readers.value.filter((person) => person.id !== me.value),
+    untitled: () => t('Docs.untitled'),
+});
+const atLimit = computed(() => comments.value.length >= limit.value);
 const blockIds = computed(() => (Array.isArray(props.blocks) ? props.blocks.map((block) => block && block.id).filter(Boolean) : null));
 const threads = computed(() => threadsOf(comments.value, blockIds.value));
 const openThreads = computed(() => threads.value.filter((thread) => !thread.root.resolved));
@@ -173,13 +211,27 @@ function blockExcerpt(id) {
 const base = () => `${env.PAGES}/${props.pageId}/comments`;
 const failed = (response) => $toast.error(response?.data?.statusText || t('Toast.something_went_wrong'), { position: 'top-right' });
 
+/* Asked for once the reader reaches for the panel, not on every doc open: the server checks each member against the doc. */
+let readersAsked = false;
+function loadReaders() {
+    if (readersAsked || !props.pageId) return;
+    readersAsked = true;
+    apiRequest('get', `${base()}/people`)
+        .then((response) => { readerIds.value = response.data?.status && Array.isArray(response.data.data) ? response.data.data.map(String) : []; })
+        .catch(() => { readersAsked = false; });
+}
+
 function load() {
     if (!props.pageId) return;
     loading.value = true;
     apiRequest('get', base())
         .then((response) => {
-            if (response.data?.status) comments.value = response.data.data || [];
-            else failed(response);
+            if (!response.data?.status) {
+                failed(response);
+                return;
+            }
+            comments.value = response.data.data || [];
+            limit.value = Number(response.data.limit) > 0 ? Number(response.data.limit) : DEFAULT_LIMIT;
         })
         .catch((error) => console.error('ERROR in load doc comments: ', error))
         .finally(() => {
@@ -206,15 +258,16 @@ function merge(row) {
     if (row) comments.value = applyCommentEvent(comments.value, row);
 }
 
+async function request(method, url, body) {
+    const response = await apiRequest(method, url, body);
+    if (!response.data?.status) throw Object.assign(new Error(response.data?.statusText || t('Toast.something_went_wrong')), { response });
+    return response.data.data || {};
+}
+
 async function write(method, url, body) {
     busy.value = true;
     try {
-        const response = await apiRequest(method, url, body);
-        if (!response.data?.status) {
-            failed(response);
-            return null;
-        }
-        return response.data.data || {};
+        return await request(method, url, body);
     } catch (error) {
         console.error('ERROR in doc comment write: ', error);
         failed(error?.response);
@@ -224,18 +277,37 @@ async function write(method, url, body) {
     }
 }
 
+async function upload(file) {
+    if (checkBucketStorage([file.size], { gettersVal: store.getters }) !== true) return null;
+    busy.value = true;
+    try {
+        return await uploadDocCommentFile({ companyId: companyId.value, pageId: props.pageId, file });
+    } catch (error) {
+        console.error('ERROR in doc comment upload: ', error);
+        $toast.error(t('Docs.comment_file_failed'), { position: 'top-right' });
+        return null;
+    } finally {
+        busy.value = false;
+    }
+}
+
 async function send(threadRoot) {
     const message = threadRoot ? replyDraft.value : draft.value;
-    if (!message.trim() || busy.value) return;
-    const body = threadRoot ? { message, parentId: String(threadRoot._id) } : { message, ...(anchor.value ? { blockId: anchor.value.id } : {}) };
-    const saved = await write('post', base(), body);
+    const file = threadRoot ? replyFile.value : draftFile.value;
+    if ((!message.trim() && !file) || busy.value || atLimit.value) return;
+    const attached = file ? await upload(file) : {};
+    if (!attached) return;
+    const place = threadRoot ? { parentId: String(threadRoot._id) } : (anchor.value ? { blockId: anchor.value.id } : {});
+    const saved = await write('post', base(), { message, ...place, ...attached });
     if (!saved) return;
     merge(saved);
     if (threadRoot) {
         replyDraft.value = '';
+        replyFile.value = null;
         replyingTo.value = '';
     } else {
         draft.value = '';
+        draftFile.value = null;
         anchor.value = null;
         filter.value = 'open';
     }
@@ -245,7 +317,41 @@ function toggleReply(root) {
     const id = String(root._id);
     replyingTo.value = replyingTo.value === id ? '' : id;
     replyDraft.value = '';
+    replyFile.value = null;
 }
+
+let pickingFor = 'draft';
+function pickFile(target) {
+    pickingFor = target;
+    if (fileInput.value) fileInput.value.click();
+}
+
+function onFilePicked(event) {
+    const [file] = event.target.files || [];
+    event.target.value = '';
+    if (!file) return;
+    if (pickingFor === 'reply') replyFile.value = file;
+    else draftFile.value = file;
+}
+
+async function openFile(item) {
+    const url = await getWasabiImageLink(companyId.value, item.mediaURL).catch(() => '');
+    if (url) window.open(url, '_blank', 'noopener');
+    else $toast.error(t('Docs.comment_file_unavailable'), { position: 'top-right' });
+}
+
+async function toggleReaction(item, emoji) {
+    const saved = await write('put', `${base()}/${item._id}/reaction`, { emoji });
+    if (saved) merge(saved);
+}
+
+/* The shared assign control shows a refusal beside itself, so these throw instead of raising a toast. */
+const changeThread = (action) => async (comment, value) => {
+    const saved = await request('put', `${base()}/${comment._id}/${action}`, action === 'assign' ? { assigneeId: value } : { resolved: value });
+    merge(saved);
+    return saved;
+};
+const assignActions = { assign: changeThread('assign'), resolve: changeThread('resolve') };
 
 /* The server stores text escaped; editing starts from what the reader saw. */
 function startEdit(item) {
@@ -254,7 +360,7 @@ function startEdit(item) {
 }
 
 async function saveEdit(item) {
-    if (!editDraft.value.trim()) return;
+    if (!editDraft.value.trim() && !item.mediaURL) return;
     const saved = await write('put', `${base()}/${item._id}`, { message: editDraft.value });
     if (!saved) return;
     merge(saved);
@@ -269,8 +375,18 @@ async function setResolved(root, resolved) {
 async function remove(item) {
     const question = item.parentId ? t('Docs.comment_delete_confirm') : t('Docs.comment_delete_thread_confirm');
     if (!window.confirm(question)) return;
+    const gone = [item, ...comments.value.filter((row) => String(row.parentId || '') === String(item._id))];
     const done = await write('delete', `${base()}/${item._id}`);
-    if (done) merge({ ...item, isDeleted: true });
+    if (!done) return;
+    merge({ ...item, isDeleted: true });
+    removeFilesOf(gone);
+}
+
+/* The server lets a file go only when its comment's author or an admin asks and no other comment still shows it. */
+function removeFilesOf(rows) {
+    const kept = new Set(comments.value.map((row) => row.mediaURL).filter(Boolean));
+    rows.filter((row) => row.mediaURL && !kept.has(row.mediaURL) && (isMine(row) || isAdmin.value))
+        .forEach((row) => removeDocCommentFile(companyId.value, row.mediaURL).catch(() => {}));
 }
 
 function useCurrentBlock() {
@@ -314,7 +430,11 @@ function join() {
 
 watch(() => props.pageId, () => {
     comments.value = [];
+    readerIds.value = [];
+    readersAsked = false;
     anchor.value = null;
+    draftFile.value = null;
+    replyFile.value = null;
     replyingTo.value = '';
     editingId.value = '';
     load();
@@ -369,9 +489,22 @@ defineExpose({ startOnBlock });
 .pcm__text { margin: 0; font: 400 13px/1.5 var(--font-ui); white-space: pre-wrap; overflow-wrap: anywhere; }
 .pcm__text :deep(.mentioned) { color: var(--brand); font-weight: 600; }
 .pcm__text :deep(a) { color: var(--brand); }
+.pcm__text :deep(.mention) { color: var(--brand); font-weight: 600; cursor: pointer; border-radius: 4px; }
+.pcm__text :deep(.mention:focus-visible) { outline: none; box-shadow: var(--focus); }
+.pcm__file {
+    align-self: flex-start; max-width: 100%; min-height: 28px;
+    display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); color: var(--ink);
+    font: 500 12px/1.3 var(--font-ui); cursor: pointer;
+}
+.pcm__file:hover { background: var(--surface-hover); }
+.pcm__file:focus-visible { outline: none; box-shadow: var(--focus); }
+.pcm__file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pcm__file-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.pcm__limit { margin: 0; padding: 8px 12px; border-bottom: 1px solid var(--hairline); background: var(--warn-bg); color: var(--warn-ink); font: var(--text-small); }
 
 .pcm__row { display: flex; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
-.pcm__row--thread { justify-content: flex-start; }
+.pcm__row--thread { justify-content: flex-start; align-items: center; }
 .pcm__edit, .pcm__reply { display: flex; flex-direction: column; gap: 6px; }
 
 .pcm__compose { flex: none; border-top: 1px solid var(--hairline); padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; background: var(--surface-2); }
