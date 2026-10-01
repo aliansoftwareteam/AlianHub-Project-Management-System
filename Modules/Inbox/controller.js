@@ -9,6 +9,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const { updateUnReadCommentsCountFun } = require('../notification-count/controller');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
+const { privateWorkOf, proposalClause } = require('../Agents/privateWork');
 const R = require('./helpers/inboxRules');
 const S = require('./helpers/inboxState');
 const { CHAT_THREAD_REPLY } = require('../Comments/helpers/chatThreads');
@@ -176,9 +177,10 @@ const readProposals = async (companyId, userId) => {
     try {
         const roleType = await getRoleType(companyId, userId);
         if (!isPrivileged(roleType)) return [];
+        const notPrivate = proposalClause(await privateWorkOf(companyId, userId));
         const rows = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AGENT_PROPOSALS,
-            data: [{ status: 'pending' }, {}, { sort: { createdAt: -1 }, limit: 20 }],
+            data: [{ status: 'pending', ...notPrivate }, {}, { sort: { createdAt: -1 }, limit: 20 }],
         }, 'find');
         return (rows || []).map((r) => ({
             sourceType: 'proposal',

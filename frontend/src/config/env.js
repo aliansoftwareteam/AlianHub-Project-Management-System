@@ -75,6 +75,7 @@ module.exports.SPRINT_HOURS = '/api/v2/sprints/hours';
 module.exports.CALL_ICE_CONFIG = '/api/v2/calls/ice-config';
 module.exports.CALL_NOTES = '/api/v2/calls/notes';
 module.exports.FOLDER = '/api/v1/folder';
+module.exports.PROJECTS_V2 = '/api/v2/projects';
 module.exports.REMOVE_USER_NOTIFICATION = '/api/v1/removeUserNotification';
 module.exports.GENERATETOKEN_V2 = '/api/v2/generateToken';
 module.exports.TRACKER_CODE = '/api/v2/auth/tracker-code';

@@ -2,7 +2,15 @@
     <ul ref="treeEl" class="pt" role="tree" :aria-label="label" @keydown="onKeydown" @focusin="onFocusin">
         <li v-for="row in rows" :key="row.key" role="none">
             <div role="none" class="pt-row" :class="[`pt-row--l${row.level}`, { 'is-current': row.key === currentKey }]">
+                <FolderRenameInput
+                    v-if="row.key === renamingKey"
+                    :project="openProject"
+                    :folder="{ id: row.id, name: row.name, parentFolderId: row.parentFolderId }"
+                    :folders="openFolders"
+                    @done="endRename(row.key)"
+                />
                 <router-link
+                    v-else
                     role="treeitem"
                     class="pt-row__link"
                     :to="row.to"
@@ -23,6 +31,7 @@
                     </template>
                 </router-link>
                 <FavouriteStar
+                    v-if="row.key !== renamingKey"
                     class="pt-row__star"
                     :type="row.kind"
                     :id="row.id"
@@ -34,12 +43,14 @@
                     aria-hidden="true"
                 />
                 <FolderRowMenu
-                    v-if="row.kind === 'folder' && row.projectId === openProjectId"
+                    v-if="row.kind === 'folder' && row.projectId === openProjectId && row.key !== renamingKey"
                     :ref="(el) => setMenuRef(row.key, el)"
                     :project="openProject"
                     :folder="{ id: row.id, name: row.name, parentFolderId: row.parentFolderId }"
                     :folders="openFolders"
+                    :sprints="openSprints"
                     @reveal="expanded[`folder:${$event}`] = true"
+                    @rename="renamingKey = row.key"
                 />
                 <button
                     v-if="row.expandable"
@@ -61,15 +72,17 @@
 
 <script setup>
 import { computed, inject, nextTick, reactive, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import FavouriteStar from "@/components/atom/FavouriteStar/FavouriteStar.vue";
 import { isOwnerOrAdmin } from "@/utils/roles";
 import { projectColor } from "@/components/molecules/Home/homeFormat";
+import { folderIdOf, isLiveFolder } from "@/utils/folderTree";
+import FolderRenameInput from "./FolderRenameInput.vue";
 import FolderRowMenu from "./FolderRowMenu.vue";
 import { treeCache, loadProjectTree } from "./projectTreeData";
-import { folderRowKeys, identitiesOf, projectBranch, visibleRows } from "./projectTreeModel";
+import { folderRowKeys, identitiesOf, projectBranch, treeRoute, visibleRows } from "./projectTreeModel";
 
 defineOptions({ name: "ProjectTree" });
 
@@ -79,6 +92,7 @@ const props = defineProps({
 });
 
 const route = useRoute();
+const router = useRouter();
 const { getters } = useStore();
 const companyId = inject("$companyId");
 const userId = inject("$userId");
@@ -121,12 +135,31 @@ const colorOf = (id) => projectColor(props.projects.find((project) => String(pro
 const openProjectId = computed(() => String(route.params?.id || ""));
 const openProject = computed(() => props.projects.find((project) => String(project._id) === openProjectId.value) || { _id: openProjectId.value });
 const openFolders = computed(() => sourceOf(openProjectId.value)?.folders || []);
+const openSprints = computed(() => sourceOf(openProjectId.value)?.sprints || []);
 
 const menuRefs = {};
 const setMenuRef = (key, el) => {
     if (el) menuRefs[key] = el;
     else delete menuRefs[key];
 };
+
+const renamingKey = ref("");
+function endRename(key) {
+    renamingKey.value = "";
+    focusRow(key);
+}
+
+/* A folder that is archived or deleted while someone looks at it, or at a subfolder of it, has no
+   live page left, so they go to the project. Watched rather than told by the row's menu: the row,
+   and the menu with it, is gone by the time the write has answered. */
+const viewedFolderLive = computed(() => {
+    const viewed = String(route.params?.folderId || "");
+    const folder = viewed && openFolders.value.find((item) => folderIdOf(item) === viewed);
+    return folder ? isLiveFolder(openFolders.value, folder) : null;
+});
+watch(viewedFolderLive, (live, was) => {
+    if (was === true && live === false) router.push(treeRoute("project", { cid: companyId?.value, projectId: openProjectId.value }));
+});
 
 function setExpanded(key, open) {
     expanded[key] = open;

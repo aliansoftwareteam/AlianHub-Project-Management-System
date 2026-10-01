@@ -310,8 +310,7 @@ async function planCompletion(companyId, sprint) {
             type: SCHEMA_TYPE.TASKS,
             data: [{
                 sprintId: sprint._id,
-                isParentTask: false,
-                ParentTaskId: { $in: doneParentIds },
+                ancestors: { $in: doneParentIds.map(String) },
                 statusType: { $ne: rules.DONE_STATUS_TYPE },
                 deletedStatusKey: { $in: [0, 2, undefined] },
             }, `${SCOPE_FIELDS} ParentTaskId`],

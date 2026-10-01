@@ -6,8 +6,8 @@ const { replaceObjectKey } = require("../Auth/helper");
 const { estimateAndPersist: estimateTaskTimeWithAI, proposeEstimate, _internal: aiEstimatorInternal } = require("./aiTaskEstimator");
 const { updateRemainingTime } = require("../LogTime/controllerV2/helpers");
 const { resolveSheetScope, SHEET_PERMISSION, scopedEstimateMatch, opensProject } = require("../TimeSheet/helpers/timeScope");
-const { scopeEstimatePipeline, TimesheetQueryRefused } = require("../TimeSheet/helpers/timesheetQueryScope");
-const { buildEstimateWrite, EstimateWriteRefused } = require("./helpers/estimateWriteScope");
+const { scopeEstimatePipeline, withJoinScope, TimesheetQueryRefused } = require("../TimeSheet/helpers/timesheetQueryScope");
+const { buildEstimateWrite, authorizeTaskProject, EstimateWriteRefused } = require("./helpers/estimateWriteScope");
 const { previousPlanOf, recordPlanChange } = require("./helpers/planHistory");
 const { idForms } = require("../../utils/mongo-handler/objectIdKeys");
 const { evaluatePermission, isWritable } = require("../../Config/permissionGuard");
@@ -57,6 +57,9 @@ exports.updateEstimatedTime = async(req,res) => {
         let write;
         try {
             write = buildEstimateWrite(req.body, scope);
+            if (scope.hidden && scope.hidden.length) {
+                authorizeTaskProject(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: new mongoose.Types.ObjectId(write.plan.taskId) }, { ProjectID: 1 }] }, 'findOne'), scope);
+            }
         } catch (error) {
             if (!(error instanceof EstimateWriteRefused)) throw error;
             return res.status(error.statusCode).json({ status: false, statusText: error.statusCode === 403 ? "Forbidden" : "Bad Request", message: error.message });
@@ -202,11 +205,12 @@ exports.proposeAiEstimate = async (req, res) => {
 exports.getEstimateByAggregate = async (req,res) => {
     try {
         const companyId = req.headers['companyid'];
+        const queryeta = req.body && req.body.queryeta;
         const scope = await resolveSheetScope(companyId, req.uid, ESTIMATE_SCOPE_PERMISSIONS);
         let pipeline;
         try {
             /* replaceObjectKey rebuilds every object, so it runs before the guard adds ObjectIds. */
-            pipeline = scopeEstimatePipeline(replaceObjectKey(req.body && req.body.queryeta, ["dbDate"]), scope);
+            pipeline = await withJoinScope(companyId, scope, queryeta, (joinScope) => scopeEstimatePipeline(replaceObjectKey(queryeta, ["dbDate"]), joinScope));
         } catch (error) {
             if (!(error instanceof TimesheetQueryRefused)) throw error;
             return res.status(400).json({ status: false, statusText: "Bad Request", message: error.message });

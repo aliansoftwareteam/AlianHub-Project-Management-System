@@ -10,7 +10,7 @@ const audit = require('./agentAudit');
 const { attribution, isAgent } = require('./actor');
 const stepCredential = require('../Workflows/stepCredential');
 const completionStore = require('../Tasks/helpers/completionStore');
-const { sprintPlacementOf, followSprintMove } = require('../Tasks/helpers/sprintPlacement');
+const { sprintPlacementOf, followSprintMove, moveDescendants } = require('../Tasks/helpers/sprintPlacement');
 const { emitPageChange } = require('../Pages/helpers/pageEvents');
 const { markdownToEditorData, blocksToHtml } = require('../Pages/helpers/pageContent');
 const { escapeCommentText } = require('../Comments/helpers/plainText');
@@ -265,6 +265,7 @@ const executors = {
 
     async 'task.sprint.move'({ companyId, actor, params, depth }) {
         const task = await tools.getTask(companyId, params.taskId);
+        if (task.ParentTaskId) throw new tools.DeterministicError('a subtask moves with its parent');
         const target = oid(params.sprintId);
         if (!target) throw new tools.DeterministicError('a valid sprintId is required');
         const sprint = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: target, projectId: task.ProjectID }] }, 'findOne');
@@ -273,6 +274,7 @@ const executors = {
         const placement = await sprintPlacementOf(companyId, sprint);
         const r = await tools.updateTask(companyId, task._id, placement.set, context(actor, 'task.sprint.move', depth), placement.unset);
         await followSprintMove(companyId, { taskId: task._id, projectId: task.ProjectID, fromSprintId: task.sprintId, toSprintId: target });
+        await moveDescendants(companyId, task._id, placement, target);
         return { result: { sprintId: String(target), name: sprint.name }, undo: { kind: 'sprint', taskId: String(task._id), previous }, entityId: task._id, entityName: task.TaskName, task: r.task };
     },
 

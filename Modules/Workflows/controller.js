@@ -77,7 +77,7 @@ const readableRun = async (companyId, caller, runId) => {
     if (!OBJECT_ID.test(String(runId || ''))) return null;
     const run = await store.getRun(companyId, runId);
     if (!run) return null;
-    if (caller.privileged) return run;
+    if (caller.privileged) return (await access.readableRuns(companyId, caller, [run])).length ? run : null;
     if (String(run.startedBy || '') === String(caller.actor.userId)) return run;
     const visible = await access.visibleProjectIdsFor(companyId, caller);
     if (run.projectId && visible && visible.includes(String(run.projectId))) return run;
@@ -260,7 +260,7 @@ exports.listRuns = async (req, res) => {
         const ctx = await context(req, res);
         if (!ctx) return undefined;
         const rows = (await store.listRuns(ctx.companyId, req.query || {})) || [];
-        if (ctx.caller.privileged) return ok(res, 'Runs fetched.', rows);
+        if (ctx.caller.privileged) return ok(res, 'Runs fetched.', await access.readableRuns(ctx.companyId, ctx.caller, rows));
         const visible = await access.visibleProjectIdsFor(ctx.companyId, ctx.caller);
         const mine = rows.filter((run) => String(run.startedBy || '') === String(ctx.caller.actor.userId)
             || (run.projectId && visible && visible.includes(String(run.projectId))));

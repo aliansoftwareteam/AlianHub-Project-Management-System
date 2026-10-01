@@ -140,6 +140,7 @@ function initializeControllers() {
     require('./Modules/ApiTokens/init').init(app);
     require('./Modules/Pages/init').init(app);
     require('./Modules/Trash/init').init(app);
+    require('./Modules/ProjectDuplicate/init').init(app);
     require('./Modules/Forms/init').init(app);
     require('./Modules/PublicShares/init').init(app);
     require('./Modules/WhoCanSee/init').init(app);

@@ -73,6 +73,7 @@ const verifyJWTTokenWithCRoute = [
     "/api/v2/search",
     "/api/v2/pages",
     "/api/v2/trash",
+    "/api/v2/projects",
     "/api/v2/sample-data",
     // Forms (Modules/Forms). Managing a form is company data: the prefix has to be
     // listed here or every handler below is reachable with no token, and the author

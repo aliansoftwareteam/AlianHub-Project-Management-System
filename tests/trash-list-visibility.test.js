@@ -94,6 +94,16 @@ describe('the trash lists only what the caller can open', () => {
         expect(await titles(OWNER, 'lists')).toEqual(['Channel', 'List in a private project', 'Open list', 'Private list', 'Shared private list']);
     });
 
+    it('folders: in the projects the caller may read, and never a chat category', async () => {
+        const folder = (name, inProject, doc = {}) => mockDb.seed(SCHEMA_TYPE.FOLDERS, { _id: oid(), name, projectId: inProject._id, deletedStatusKey: 1, ...doc });
+        folder('Open folder', open);
+        folder('Live folder', open, { deletedStatusKey: 0 });
+        folder('Folder in a private project', closed);
+        folder('Category', { _id: oid() });
+        expect(await titles(MEMBER, 'folders')).toEqual(['Open folder']);
+        expect(await titles(OWNER, 'folders')).toEqual(['Folder in a private project', 'Open folder']);
+    });
+
     it('tasks: in readable projects and not in private lists the caller is not on', async () => {
         task('Open task', sprint('Open list', open));
         task('Task in a private list', sprint('Private list', open, { private: true, AssigneeUserId: [OWNER] }));

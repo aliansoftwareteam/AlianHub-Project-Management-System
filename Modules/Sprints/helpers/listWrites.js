@@ -4,7 +4,7 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { canSeeSprint, sprintIdentities } = require('./sprintVisibility');
 const { ListWriteError } = require('./listWriteError');
-const { refuseRestoreUnderHiddenParent, subfoldersFollowing } = require('./folderTree');
+const { folderCascade, refuseRestoreUnderHiddenParent, subfoldersFollowing } = require('./folderTree');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const SPRINT_STATUSES = [0, 1, 2, 5];
@@ -105,19 +105,20 @@ const prepareSprintUpdate = async (companyId, uid, sprintId, updateObject) => {
 };
 
 /* An archive, delete or restore cascades onto the folder's own sprints and those of the subfolders that follow it, not the ones the client lists. */
-const prepareFolderUpdate = async (companyId, folderId, updateObject) => {
+const prepareFolderUpdate = async (companyId, folderId, updateObject, { fromTrash = false } = {}) => {
     const update = folderUpdateFrom(updateObject);
     if (!OBJECT_ID.test(String(folderId || ''))) throw new ListWriteError('A valid folder id is required.');
     const folder = await findOne(companyId, SCHEMA_TYPE.FOLDERS, { _id: oid(folderId) }, { projectId: 1, parentFolderId: 1 });
     if (!folder) return null;
     const status = update.$set.deletedStatusKey;
     if (status === 0) await refuseRestoreUnderHiddenParent(companyId, folder);
-    const subfolders = await subfoldersFollowing(companyId, folder, status);
+    const cascade = folderCascade(status, fromTrash);
+    const subfolders = await subfoldersFollowing(companyId, folder, cascade);
     const sprints = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.SPRINTS,
-        data: [{ folderId: { $in: [folderId, ...subfolders.ids].map(oid) }, projectId: folder.projectId, deletedStatusKey: { $nin: FOLDER_CASCADE_SKIPS } }, { _id: 1 }],
+        data: [{ folderId: { $in: [folderId, ...subfolders].map(oid) }, projectId: folder.projectId, deletedStatusKey: { $nin: FOLDER_CASCADE_SKIPS } }, { _id: 1 }],
     }, 'find');
-    return { update, status, projectId: String(folder.projectId), sprints: (sprints || []).map((sprint) => String(sprint._id)), subfolders };
+    return { update, status, cascade, projectId: String(folder.projectId), sprints: (sprints || []).map((sprint) => String(sprint._id)), subfolders };
 };
 
 module.exports = { ListWriteError, sprintUpdateFrom, sprintWriteKinds, folderUpdateFrom, writtenStatus, prepareSprintUpdate, prepareFolderUpdate };

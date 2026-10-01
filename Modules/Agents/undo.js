@@ -11,7 +11,7 @@ const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
 const { canChangeComment } = require('../Comments/helpers/threadWriteAccess');
 const { canSeeSprintById } = require('../Sprints/helpers/sprintVisibility');
-const { followSprintMove } = require('../Tasks/helpers/sprintPlacement');
+const { followSprintMove, moveDescendants } = require('../Tasks/helpers/sprintPlacement');
 const { pageVisibleTo } = require('../Pages/helpers/pageRules');
 
 // Undo replays the inverse action and logs it as the person who pressed Undo.
@@ -78,6 +78,7 @@ const inverses = {
         else if ('folderObjId' in u.previous) unset = { folderObjId: '' };
         await setTask(companyId, u.taskId, set, unset);
         if (before) await followSprintMove(companyId, { taskId: before._id, projectId: before.ProjectID, fromSprintId: before.sprintId, toSprintId: u.previous.sprintId });
+        await moveDescendants(companyId, u.taskId, { set, unset }, u.previous.sprintId);
         return { taskId: u.taskId, restored: String(u.previous.sprintId) };
     },
     async link(companyId, u) {
