@@ -1,7 +1,10 @@
 const mockDb = require('./fixtures/fakeMongo').create();
+const mockCache = { rows: undefined };
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...args) => mockDb.crud(...args) }));
-jest.mock('../Config/config', () => ({ myCache: { get: () => undefined, set: () => {}, del: () => {}, keys: () => [], getTtl: () => 0 } }));
+jest.mock('../Config/config', () => ({
+    myCache: { get: (key) => (String(key).startsWith('company_users:') ? mockCache.rows : undefined), set: () => {}, del: () => {}, keys: () => [], getTtl: () => 0 },
+}));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Modules/Audit/recorder', () => ({ recordAuditFromReq: jest.fn(), recordAudit: jest.fn() }));
@@ -25,8 +28,8 @@ const LINK = 'b'.repeat(64);
 const INVITED_EMAIL = 'invited@e2e.test';
 
 const SHARED = ['_id', 'companyId', 'designation', 'isDelete', 'managerId', 'roleType', 'status', 'userEmail', 'userId'];
-const OWN_ONLY = ['ProjectRequiredComponent', 'embedViews', 'dashboardLocked', 'aiRequestedCount'];
-const MANAGED = ['workloadCapacity', 'isTrackerUser', 'isRestrict', 'sendInvitationTime', 'scimExternalId', 'createdAt'];
+const OWN_ONLY = ['ProjectRequiredComponent', 'embedViews', 'aiRequestedCount'];
+const MANAGED = ['workloadCapacity', 'isTrackerUser', 'isRestrict', 'dashboardLocked', 'sendInvitationTime', 'scimExternalId', 'createdAt'];
 
 const rows = () => mockDb.store[SCHEMA_TYPE.COMPANY_USERS];
 const stored = (userId) => rows().find((row) => row.userId === userId);
@@ -163,7 +166,11 @@ describe('GET /api/v1/members', () => {
     });
 });
 
-describe('GET /api/v1/members/:id', () => {
+/* The list is kept in a cache for a week, so the read answers from it or from the database. */
+describe.each([['read from the database', false], ['kept in the cache', true]])('GET /api/v1/members/:id with the list %s', (label, cached) => {
+    beforeEach(() => { mockCache.rows = cached ? JSON.stringify(rows()) : undefined; });
+    afterEach(() => { mockCache.rows = undefined; });
+
     it('gives a member the same colleague fields as the list', async () => {
         expect(Object.keys(await byId(MEMBER, COLLEAGUE)).sort()).toEqual(SHARED);
     });
@@ -182,8 +189,25 @@ describe('GET /api/v1/members/:id', () => {
         OWN_ONLY.forEach((field) => expect(row).not.toHaveProperty(field));
     });
 
-    it('answers nothing for an account that has not accepted its invitation', async () => {
-        expect(await byId(MEMBER, INVITED_ACCOUNT)).toBeNull();
+    it.each([['owner', OWNER], ['admin', ADMIN], ['role that may open the member list', LISTER]])('gives an %s an open invitation without its link', async (who, uid) => {
+        const row = await byId(uid, INVITED_ACCOUNT);
+
+        expect(row).toMatchObject({ userId: INVITED_ACCOUNT, userEmail: INVITED_EMAIL, roleType: 3, status: 1, isDelete: false });
+        expect(row).not.toHaveProperty('linkId');
+        expect(JSON.stringify(row)).not.toContain(LINK);
+    });
+
+    it('gives an owner a removed seat', async () => {
+        expect(await byId(OWNER, REMOVED)).toMatchObject({ userId: REMOVED, status: 2, isDelete: true });
+    });
+
+    it.each([['member', MEMBER], ['guest', GUEST]])('answers a %s as it does for no member when the seat is not live', async (who, uid) => {
+        const nobody = await call(ctrl.getMembersById, { uid, params: { id: '6f00000000000000000000ee' } });
+
+        for (const id of [INVITED_ACCOUNT, REMOVED]) {
+            expect(await call(ctrl.getMembersById, { uid, params: { id } })).toEqual(nobody);
+        }
+        expect(nobody.body).toBeNull();
     });
 });
 

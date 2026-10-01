@@ -7,8 +7,8 @@ const socketEmitter = require('../../../event/socketEventEmitter');
 const reportingLine = require('../../Users/helpers/reportingLine');
 const { getRoleType, isPrivileged, invalidateRoleCache, ROLE_OWNER } = require('../../../Config/permissionGuard');
 const { judgeMemberUpdate, judgeInvitationAcceptance } = require('./membershipGuard');
-const { COLLEAGUE, viewerOf, memberRowFor, colleagueFieldsOf, countFilterOf, inUseFilterOf } = require('./memberRowRules');
-const { SEAT_CANCELLED, SEAT_PENDING, SEAT_ACTIVE } = require('../../../Config/seatStatus');
+const { COLLEAGUE, viewerOf, memberRowFor, memberById, colleagueFieldsOf, countFilterOf, inUseFilterOf } = require('./memberRowRules');
+const { SEAT_CANCELLED, SEAT_PENDING } = require('../../../Config/seatStatus');
 const knowledgeEvents = require('../../Knowledge/ingest/events');
 const { recordPrivateViewChange } = require('./privateViewHistory');
 const { cleanViewSettings, cleanViewTitle } = require('../../Project/helpers/viewSettings');
@@ -110,23 +110,22 @@ exports.getMembers = async (req, res) => {
 exports.getMembersById = async (req, res) => {
     try {
         const companyId = req.headers['companyid'];
-        const id = String(req.params.id || '');
-        const rowView = memberRowFor(await viewerOf(companyId, req.uid));
+        const wanted = memberById(await viewerOf(companyId, req.uid), String(req.params.id || ''));
         const cacheKey = `company_users:${companyId}`;
 
-        const member = (cachedMemberRows(companyId) || []).find((row) => row.userId === id && Number(row.status) === SEAT_ACTIVE);
+        const member = (cachedMemberRows(companyId) || []).find(wanted.matches);
         if (member) {
             res.set({
                 'FromCache': 'true',
                 'cacheExpireTime': myCache.getTtl(cacheKey)
             });
-            return res.status(200).json(rowView(member));
+            return res.status(200).json(wanted.view(member));
         }
         const response = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMPANY_USERS,
-            data: [{ userId: id, status: SEAT_ACTIVE }]
+            data: [wanted.filter]
         }, 'findOne');
-        return res.status(200).json(rowView(response));
+        return res.status(200).json(wanted.view(response));
     } catch (error) {
         return res.status(500).json({
             message: "An error occurred while get the company user",

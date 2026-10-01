@@ -1,19 +1,19 @@
 const { getRoleType, evaluatePermission, isPrivileged, ROLE_GUEST } = require('../../../Config/permissionGuard');
-const { SEAT_ACTIVE } = require('../../../Config/seatStatus');
+const { SEAT_ACTIVE, ACTIVE_SEAT } = require('../../../Config/seatStatus');
 
 const MEMBER_LIST_PERMISSION = 'settings.settings_member_list';
 
 const ROW_FIELDS = ['_id', 'companyId', 'status', 'isDelete'];
 const SEAT_FIELDS = ['roleType', 'designation'];
 const COLLEAGUE_FIELDS = ['userEmail', 'managerId'];
-const SEAT_STATE_FIELDS = ['sendInvitationTime', 'isTrackerUser', 'isRestrict', 'workloadCapacity', 'createdAt', 'updatedAt'];
+const SEAT_STATE_FIELDS = ['sendInvitationTime', 'isTrackerUser', 'isRestrict', 'workloadCapacity', 'dashboardLocked', 'createdAt', 'updatedAt'];
 const MANAGED_FIELDS = [
     ...SEAT_FIELDS, ...COLLEAGUE_FIELDS, ...SEAT_STATE_FIELDS,
     'scimExternalId', 'scimGivenName', 'scimFamilyName', 'scimDeactivatedSeatAt', 'legacyId', 'demo',
 ];
 const OWN_FIELDS = [
     ...COLLEAGUE_FIELDS, ...SEAT_STATE_FIELDS,
-    'dashboardLocked', 'aiRequestedCount', 'ProjectRequiredComponent', 'embedViews',
+    'aiRequestedCount', 'ProjectRequiredComponent', 'embedViews',
 ];
 const COUNT_FIELDS = ['roleType', 'designation', 'status', 'isDelete'];
 const IN_USE_FIELDS = ['roleType', 'designation'];
@@ -56,6 +56,22 @@ const memberRowFor = (viewer) => (row) => {
     return pick(source, fieldsFor(viewer, source));
 };
 
+const isLiveSeat = (row) => Number(row.status) === SEAT_ACTIVE && row.isDelete !== true;
+
+/* A read by account id. Whoever manages members finds any row of that account, an invitation or a
+ * removed seat included; everyone else finds a live seat, so an invitation answers as no member does.
+ * `filter` is the same rule as a query. The link of an invitation is never part of the answer. A
+ * manager gets back the id they asked with, which tells them nothing; the list still withholds it
+ * on a seat that is not accepted. */
+const memberById = (viewer, userId) => ({
+    filter: { userId, ...(viewer.manages ? {} : ACTIVE_SEAT) },
+    matches: (row) => Boolean(row) && row.userId === userId && (viewer.manages || isLiveSeat(row)),
+    view: (row) => {
+        const shown = memberRowFor({ ...viewer, invites: false })(row);
+        return shown && viewer.manages ? { ...shown, userId } : shown;
+    },
+});
+
 const colleagueFieldsOf = (changes) => pick(changes || {}, [...ROW_FIELDS, ...SEAT_FIELDS, ...COLLEAGUE_FIELDS]);
 
 const countFilterOf = (query) => {
@@ -70,4 +86,4 @@ const inUseFilterOf = (key, value) => {
     return IN_USE_FIELDS.includes(key) && String(value).trim() !== '' && Number.isInteger(wanted) ? { [key]: wanted } : null;
 };
 
-module.exports = { COLLEAGUE, viewerOf, memberRowFor, colleagueFieldsOf, countFilterOf, inUseFilterOf };
+module.exports = { COLLEAGUE, viewerOf, memberRowFor, memberById, colleagueFieldsOf, countFilterOf, inUseFilterOf };
