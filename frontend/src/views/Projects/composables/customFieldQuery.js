@@ -151,6 +151,10 @@ export function customGroupMatches(task, item) {
     return false;
 }
 
+/* A drop writes the group's value, which the server refuses on a task of another type; the view declines the drop instead of
+   showing the row in a group it is not in. `taskTypeKey` may be the text of a data attribute. */
+export const groupTakesTask = (item, taskTypeKey) => fieldAppliesToTask({ fieldTaskTypes: item?.customFieldTaskTypes }, { TaskTypeKey: taskTypeKey });
+
 /* A date group is a range, not a value, so nothing can be dropped into one. */
 export function customGroupUpdate(item) {
     if (!item?.customFieldId || item.dropDisabled) return null;
