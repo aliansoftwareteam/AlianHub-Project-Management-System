@@ -230,7 +230,12 @@ function mergeWithEarlierRun(outDir, shots, failures) {
     } catch {}
     const attempted = new Set([...shots, ...failures].map(keyOf));
     const kept = (list) => (list || []).filter((entry) => !attempted.has(keyOf(entry)));
-    return { shots: [...kept(earlier.shots), ...shots], failures: [...kept(earlier.failures), ...failures], earlierVersion: earlier.version || null };
+    return {
+        shots: [...kept(earlier.shots), ...shots],
+        failures: [...kept(earlier.failures), ...failures],
+        earlierVersion: earlier.version || null,
+        earlierBlocked: earlier.blocked || [],
+    };
 }
 
 // A server rebuilt mid-run, or a retake into the same folder, leaves shots from more than one build.
@@ -311,13 +316,13 @@ async function main() {
         await browser.close();
     }
 
-    const { earlierVersion, ...merged } = mergeWithEarlierRun(outDir, shots, failures);
+    const { earlierVersion, earlierBlocked, ...merged } = mergeWithEarlierRun(outDir, shots, failures);
     const meta = {
         baseUrl: args.baseUrl,
         version: versionsSeen(earlierVersion, versionAtStart, await appVersion(args.baseUrl)),
         createdAt: new Date().toISOString(),
         variant: args.variant,
-        blocked: [...blocked].sort(),
+        blocked: [...new Set([...earlierBlocked, ...blocked])].sort(),
     };
     const count = writeIndex(outDir, { meta, ...merged });
 
