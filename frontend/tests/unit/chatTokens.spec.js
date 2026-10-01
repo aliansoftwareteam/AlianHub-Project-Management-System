@@ -401,3 +401,62 @@ describe('chat controls keep a 24px target on a desktop', () => {
         expect(parseFloat(text(CHAT, '.mc-srch-input', 'padding', look).split(' ')[1])).toBeGreaterThanOrEqual(clear);
     });
 });
+
+/* The project's Comments tab and the task panel share an older feed. What #1284 left in it on
+   fixed colours: the jump button, media borders, the recording bar, the attach sheet and the menu. */
+describe('the comment feed inside a project follows the theme', () => {
+    const FEED = 'views/Projects/Comments/Comments.vue';
+    const FEED_CSS = 'views/Projects/Comments/style.css';
+    const MESSAGE = 'components/organisms/Comment/Comment.vue';
+    const MESSAGE_CSS = 'components/organisms/Comment/style.css';
+    const SHEET = 'components/molecules/MediaConfirmation/MediaConfirmation.vue';
+    const feed = templateOf(FEED);
+    const tagWith = (template, hook) => (template.match(new RegExp(`<[a-zA-Z]+\\b[^>]*\\b${hook}\\b[^>]*>`, 'g')) || []);
+
+    it.each([FEED_CSS, MESSAGE_CSS, SHEET])('%s names no hex colour', (rel) => {
+        expect(hexColours(rel)).toEqual([]);
+    });
+
+    it('the jump button is a theme surface with a masked arrow and a name', () => {
+        expect(declared(FEED_CSS, '.scroll-bottom-btn', 'background')).toBe('var(--surface)');
+        expect(declared(FEED_CSS, '.scroll-bottom-btn', 'border')).toBe('1px solid var(--border)');
+        expect(declared(FEED_CSS, '.scroll-bottom-btn', 'color')).toBe('var(--ink-2)');
+        const [button] = tagWith(feed, 'scroll-bottom-btn');
+        expect(button).not.toMatch(/bg-light-blue/);
+        expect(button).toMatch(/:aria-label="\$t\('MainChat\.jump_latest'\)"/);
+        expect(feed).toMatch(/<span class="ah-mask-icon" :style="maskOf\(downArrow\)"><\/span>/);
+        expect(feed).not.toMatch(/<img :src="downArrow"/);
+        expect(read('locales/en.js')).toMatch(/jump_latest: "/);
+    });
+
+    it('the recording bar fills in the ok colour over the track', () => {
+        const segments = tagWith(feed, 'record__progress');
+        expect(segments).toHaveLength(2);
+        segments.forEach((segment) => expect(segment).not.toMatch(/\bbg-(green|light-gray)\b/));
+        expect(declared(FEED_CSS, '.record__progress--done', 'background')).toBe('var(--ok)');
+        expect(declared(FEED_CSS, '.record__progress--left', 'background')).toBe('var(--track)');
+    });
+
+    it('a send button that cannot send takes the fill, on either footer', () => {
+        expect(declared(FEED_CSS, '.disable__send-button', 'background-color')).toBe('var(--fill) !important');
+    });
+
+    it('an image or a clip in a message is outlined in the border token', () => {
+        expect(declared(MESSAGE_CSS, '.comment__image', 'border')).toBe('1px solid var(--border)');
+        expect(declared(MESSAGE_CSS, '.video_controls', 'border')).toBe('1px solid var(--border)');
+    });
+
+    it('the message menu opens as a themed panel', () => {
+        expect(read(MESSAGE)).toMatch(/<DropDown mode="menu" themed /);
+    });
+
+    it('the attach sheet draws its tiles from tokens', () => {
+        const sheet = templateOf(SHEET);
+        expect(classesIn(sheet).filter((name) => ['border', 'bg-gray'].includes(name) || LEGACY_CLASS.test(name))).toEqual([]);
+        expect(declared(SHEET, '.media__file-value', 'border')).toBe('1px solid var(--border)');
+        expect(declared(SHEET, '.media__file-value', 'background')).toBe('var(--surface-2)');
+        expect(declared(SHEET, '.media__component-right', 'background')).toBe('var(--fill)');
+        expect(declared(SHEET, '.media__component-right', 'color')).toBe('var(--ink-2)');
+        expect(sheet).toMatch(/class="ah-mask-icon add__new-image" :style="maskOf\(addNew\)"/);
+    });
+});
