@@ -11,7 +11,7 @@ vi.mock('@/store/index', () => ({ default: { commit: () => {}, dispatch: () => P
 
 import { fieldAppliesToTask, shownFieldValues } from '@/views/Projects/composables/projectCustomFields';
 import {
-    customFieldGroups, customFilterCondition, customFilterOptions, customGroupMatches, customSortValue, groupTakesTask, tableSortStages, valuePath
+    customFieldGroups, customFilterCondition, customFilterOptions, customGroupMatches, customSortValue, groupTakesTask, putFrom, tableSortStages, valuePath
 } from '@/views/Projects/composables/customFieldQuery';
 import { taskTypeOptions } from '@/plugins/customFieldView/taskTypeOptions';
 import CustomFieldCell from '@/views/Projects/components/columns/CustomFieldCell.vue';
@@ -136,6 +136,14 @@ describe('group, filter and sort by a scoped field', () => {
         expect(groupTakesTask(gold, undefined)).toBe(false);
         expect(groupTakesTask(customFieldGroups({ ...tier, fieldTaskTypes: [] })[0], '1')).toBe(true);
         expect(groupTakesTask({ searchKey: 'statusKey', searchValue: 1 }, undefined)).toBe(true);
+    });
+
+    it('an allowed List drop names its own drag group, because Sortable reads true as "from any list"', () => {
+        const [gold] = customFieldGroups(tier);
+        const row = (taskType) => ({ dataset: { taskType } });
+        expect(putFrom('lv2-task', gold)(null, null, row(String(BUG)))).toEqual(['lv2-task']);
+        expect(putFrom('lv2-task', gold)(null, null, row('1'))).toBe(false);
+        expect(putFrom('lv2-task', { searchKey: 'statusKey' })(null, null, row('1'))).toEqual(['lv2-task']);
     });
 
     it('sorts a task of another type as having no value', () => {
