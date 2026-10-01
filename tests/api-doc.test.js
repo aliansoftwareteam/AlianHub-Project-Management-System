@@ -1,4 +1,4 @@
-const { AUTH, classifyAuth, groupRoutes, metaProblems, renderRoute, renderAppendix, openApiOf, staleFiles } = require('../scripts/api-doc');
+const { AUTH, classifyAuth, groupRoutes, metaShapeProblems, metaDrift, driftReport, renderRoute, renderAppendix, openApiOf, staleFiles } = require('../scripts/api-doc');
 
 const context = {
     held: [
@@ -104,24 +104,20 @@ describe('route grouping', () => {
     });
 });
 
-describe('meta file problems', () => {
-    it('finds none when every v2 route is described and every entry names a route', () => {
-        expect(metaProblems(routes, meta)).toEqual([]);
+describe('the meta file by itself', () => {
+    it('is accepted when every entry has a valid shape', () => {
+        expect(metaShapeProblems(meta)).toEqual([]);
     });
 
-    it('names a v2 route with no entry', () => {
-        expect(metaProblems([...routes, route('DELETE /api/v2/pages/:id')], meta)).toEqual([
-            'not described in scripts/api-doc.meta.json: DELETE /api/v2/pages/:id',
-        ]);
+    it('refuses a file without its two parts', () => {
+        expect(metaShapeProblems({ routes: {} })).toEqual(['scripts/api-doc.meta.json must hold a "resources" list and a "routes" object']);
+        expect(metaShapeProblems(null)).toHaveLength(1);
     });
 
-    it('does not ask for an entry outside v2', () => {
-        expect(metaProblems([...routes, route('GET /api/v1/project/:id')], meta)).toEqual([]);
-    });
-
-    it('names an entry whose route no longer exists', () => {
-        expect(metaProblems(routes.filter((r) => r.key !== 'GET /api/v2/forms'), meta)).toEqual([
-            'described but no longer registered: GET /api/v2/forms',
+    it('refuses a resource with no title and one listed twice', () => {
+        expect(metaShapeProblems({ resources: [{ id: 'pages', intro: 'Wiki pages.' }, ...meta.resources], routes: {} })).toEqual([
+            'a resource needs an id, a title and an intro: {"id":"pages","intro":"Wiki pages."}',
+            'resource listed twice: pages',
         ]);
     });
 
@@ -136,12 +132,99 @@ describe('meta file problems', () => {
                 'POST /api/v2/tasks': { resource: 'tasks', stability: 'stable' },
             },
         };
-        expect(metaProblems(routes, broken)).toEqual([
+        expect(metaShapeProblems(broken)).toEqual([
             'unknown stability "done": GET /api/v2/forms',
             'unknown resource "wiki": GET /api/v2/pages',
             'documented in full but marked internal: POST /api/v2/pages',
             'documented in full but has no title, summary or response: POST /api/v2/tasks',
         ]);
+    });
+
+    it('refuses a key that is not a route, a body that is not a list and an action filter that is not a pattern', () => {
+        const documented = { resource: 'pages', stability: 'beta', title: 'List pages', summary: 'Lists pages.', response: {} };
+        expect(metaShapeProblems({
+            resources: meta.resources,
+            routes: {
+                '/api/v2/pages': { stability: 'beta' },
+                'GET /api/v2/pages': { ...documented, body: 'title' },
+                'POST /api/v2/pages': { ...documented, actionsMatching: '(' },
+                'PUT /api/v2/pages/:id': 'beta',
+            },
+        })).toEqual([
+            'not a route key (METHOD /path): /api/v2/pages',
+            '"body" must be a list: GET /api/v2/pages',
+            '"actionsMatching" is not a pattern: POST /api/v2/pages',
+            'entry is not an object: PUT /api/v2/pages/:id',
+        ]);
+    });
+
+    it('does not depend on which routes exist', () => {
+        const withOrphan = { ...meta, routes: { ...meta.routes, 'GET /api/v2/gone': { stability: 'beta', summary: 'Removed by another change.' } } };
+        expect(metaShapeProblems(withOrphan)).toEqual([]);
+    });
+});
+
+describe('routes and meta file moving apart', () => {
+    const added = route('DELETE /api/v2/pages/:id');
+    const withoutForms = routes.filter((r) => r.key !== 'GET /api/v2/forms');
+
+    it('finds nothing when every v2 route is described and every entry names a route', () => {
+        expect(metaDrift(routes, meta)).toEqual({ orphans: [], undescribed: [] });
+    });
+
+    it('names a v2 route with no entry, and asks for none outside v2', () => {
+        expect(metaDrift([...routes, added, route('GET /api/v1/project/:id')], meta)).toEqual({ orphans: [], undescribed: ['DELETE /api/v2/pages/:id'] });
+    });
+
+    it('names an entry whose route no longer exists', () => {
+        expect(metaDrift(withoutForms, meta)).toEqual({ orphans: ['GET /api/v2/forms'], undescribed: [] });
+    });
+
+    it('lists a route with no entry by rule: v2 undocumented, v1 internal', () => {
+        const grouped = groupRoutes([...routes, added, route('GET /api/v1/project/:id')], meta);
+        const status = Object.fromEntries(grouped.appendix.map((item) => [item.route.key, item.status]));
+        expect(status['DELETE /api/v2/pages/:id']).toBe('undocumented');
+        expect(status['GET /api/v1/project/:id']).toBe('internal');
+    });
+
+    it('leaves an entry with no route out of the reference and the OpenAPI document', () => {
+        const orphaned = { ...meta, routes: { ...meta.routes, 'GET /api/v2/gone': { resource: 'pages', stability: 'beta', title: 'Gone', summary: 'Removed.', response: {} } } };
+        const grouped = groupRoutes(routes, orphaned);
+        expect(grouped.resources[0].routes.map((r) => r.route.key)).toEqual(['GET /api/v2/pages', 'POST /api/v2/pages']);
+        expect(Object.keys(openApiOf(grouped, context).paths)).not.toContain('/api/v2/gone');
+    });
+});
+
+describe('what drift costs', () => {
+    const drift = {
+        stale: ['out of date: docs/API.md (run npm run api:doc)'],
+        orphans: ['GET /api/v2/forms'],
+        undescribed: ['DELETE /api/v2/pages/:id'],
+    };
+
+    it('is only warnings by default, so a pull request cannot fail on what another one merged', () => {
+        expect(driftReport(drift)).toEqual({
+            problems: [],
+            warnings: [
+                'out of date: docs/API.md (run npm run api:doc)',
+                'described but no longer registered, left out: GET /api/v2/forms',
+                'not described in scripts/api-doc.meta.json, listed as undocumented: DELETE /api/v2/pages/:id',
+            ],
+        });
+    });
+
+    it('fails on stale files and orphan entries when strict, and still only warns about a route with no entry', () => {
+        expect(driftReport(drift, true)).toEqual({
+            problems: [
+                'out of date: docs/API.md (run npm run api:doc)',
+                'described but no longer registered, left out: GET /api/v2/forms',
+            ],
+            warnings: ['not described in scripts/api-doc.meta.json, listed as undocumented: DELETE /api/v2/pages/:id'],
+        });
+    });
+
+    it('passes a strict check with nothing to report', () => {
+        expect(driftReport({ stale: [], orphans: [], undescribed: [] }, true)).toEqual({ problems: [], warnings: [] });
     });
 });
 
@@ -221,6 +304,11 @@ describe('the OpenAPI document', () => {
         expect(doc.paths['/api/v2/tasks'].post['x-token-scope']).toBe('write');
         expect(doc.paths['/api/v2/forms'].get).toMatchObject({ tags: ['Not documented in full'], 'x-documented': false });
         expect(doc.paths['/api/v2/pages/{id}'].get.parameters).toEqual([{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }]);
+    });
+
+    it('says what it was built from when told', () => {
+        expect(doc.info['x-built-from']).toBeUndefined();
+        expect(openApiOf(groupRoutes(routes, meta), context, 'abc123def456').info['x-built-from']).toBe('abc123def456');
     });
 
     it('leaves out internal routes and routes the meta file does not describe', () => {

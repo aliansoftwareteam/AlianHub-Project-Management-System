@@ -6,8 +6,10 @@ jest.mock('../../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(
 jest.mock('../../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn(async () => null) }));
 jest.mock('../../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
 
-const { build, check, loadMeta } = require('../../scripts/api-doc');
+const { build, check, loadMeta, metaShapeProblems } = require('../../scripts/api-doc');
 
+/* Only what another pull request merging first cannot break is checked here. Whether docs/API.md is current, and whether
+ * every route has an entry, is `npm run api:doc:check`, run in the docs pull request that follows merges. */
 const intervals = [];
 const built = build({ stub: false, intervals });
 
@@ -17,23 +19,24 @@ afterAll(async () => {
 });
 
 describe('the public API reference', () => {
-    it('describes every /api/v2 route in scripts/api-doc.meta.json, and only routes that exist', () => {
+    it('has a meta file that parses, with valid entries and every documented route complete', () => {
+        expect(metaShapeProblems(loadMeta())).toEqual([]);
+    });
+
+    it('is generated from the current tree without failing', () => {
         expect(built.problems).toEqual([]);
-    });
-
-    it('is current with the routes and the meta file (npm run api:doc)', () => {
-        expect(check(built)).toEqual([]);
-    });
-
-    it('walks the routes (the enumeration still works)', () => {
         expect(built.routes.length).toBeGreaterThan(700);
-        expect(built.routes.filter((r) => r.path.startsWith('/api/v2/')).length).toBeGreaterThan(300);
+        expect(built.grouped.resources.length).toBeGreaterThan(0);
+        expect(Object.values(built.files).every((content) => typeof content === 'string' && content.length > 1000)).toBe(true);
+        expect(() => JSON.parse(Object.values(built.files).find((content) => content.startsWith('{')))).not.toThrow();
     });
 
-    it('documents routes in full and lists the rest', () => {
-        const documented = Object.values(loadMeta().routes).filter((entry) => entry.resource);
-        expect(documented.length).toBeGreaterThan(20);
-        expect(built.files).toBeDefined();
+    it('is the same on a second run', () => {
+        expect(build({ stub: false, intervals }).files).toEqual(built.files);
+    });
+
+    it('never fails a pull request on a stale file, a new route or a removed one', () => {
+        expect(check(built).problems).toEqual([]);
     });
 
     it('carries no token, id or address that could be real', () => {

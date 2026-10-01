@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
@@ -12,6 +13,7 @@ const OUTPUTS = {
     openapi: path.join(ROOT, 'docs', 'api', 'openapi.json'),
 };
 const REGENERATE = 'npm run api:doc';
+const STRICT_CHECK = 'npm run api:doc:check';
 const DESCRIBED_PREFIX = '/api/v2/';
 const WEB_APP_PREFIX = '/api/v1/';
 const STABILITIES = ['stable', 'beta', 'internal'];
@@ -88,25 +90,60 @@ function groupRoutes(routes, meta) {
     return { resources, appendix };
 }
 
+const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+const ROUTE_KEY = /^(GET|POST|PUT|PATCH|DELETE|USE) \/\S*$/;
+const LIST_FIELDS = ['description', 'pathParams', 'query', 'body', 'bodyNotes', 'responseNotes', 'responseFields', 'examples'];
+
+const isPattern = (text) => {
+    try {
+        return Boolean(new RegExp(text));
+    } catch (error) {
+        return false;
+    }
+};
+
 function entryProblems(key, entry, resourceIds) {
+    if (!ROUTE_KEY.test(key)) return [`not a route key (METHOD /path): ${key}`];
+    if (!isPlainObject(entry)) return [`entry is not an object: ${key}`];
     if (!STABILITIES.includes(entry.stability)) return [`unknown stability "${entry.stability}": ${key}`];
     if (!isDocumented(entry)) return [];
     if (!resourceIds.includes(entry.resource)) return [`unknown resource "${entry.resource}": ${key}`];
     if (entry.stability === INTERNAL) return [`documented in full but marked internal: ${key}`];
     if (!entry.title || !entry.summary || entry.response === undefined) return [`documented in full but has no title, summary or response: ${key}`];
+    const notList = LIST_FIELDS.find((field) => entry[field] !== undefined && !Array.isArray(entry[field]));
+    if (notList) return [`"${notList}" must be a list: ${key}`];
+    if (entry.actionsMatching !== undefined && !isPattern(entry.actionsMatching)) return [`"actionsMatching" is not a pattern: ${key}`];
     return [];
 }
 
-function metaProblems(routes, meta) {
-    const registered = new Set(routes.map((route) => route.key));
-    const resourceIds = (meta.resources || []).map((resource) => resource.id);
-    const described = Object.keys(meta.routes).sort();
+/* What is wrong with the meta file by itself. Nothing here depends on which routes exist, so another change merging first cannot make it fail. */
+function metaShapeProblems(meta) {
+    if (!isPlainObject(meta) || !Array.isArray(meta.resources) || !isPlainObject(meta.routes)) {
+        return [`${META_NAME} must hold a "resources" list and a "routes" object`];
+    }
+    const resourceIds = meta.resources.map((resource) => resource && resource.id);
     return [
-        ...routes.map((route) => route.key).filter((key) => key.split(' ')[1].startsWith(DESCRIBED_PREFIX) && !meta.routes[key]).sort()
-            .map((key) => `not described in ${META_NAME}: ${key}`),
-        ...described.filter((key) => !registered.has(key)).map((key) => `described but no longer registered: ${key}`),
-        ...described.filter((key) => registered.has(key)).flatMap((key) => entryProblems(key, meta.routes[key], resourceIds)),
+        ...meta.resources.filter((resource) => !isPlainObject(resource) || !resource.id || !resource.title || !resource.intro)
+            .map((resource) => `a resource needs an id, a title and an intro: ${JSON.stringify(resource)}`),
+        ...resourceIds.filter((id, at) => id && resourceIds.indexOf(id) !== at).map((id) => `resource listed twice: ${id}`),
+        ...Object.keys(meta.routes).sort().flatMap((key) => entryProblems(key, meta.routes[key], resourceIds)),
     ];
+}
+
+/* Where the routes and the meta file have moved apart. Neither is an error: a route with no entry is listed by rule and an entry with no route is left out. */
+function metaDrift(routes, meta) {
+    const registered = new Set(routes.map((route) => route.key));
+    return {
+        orphans: Object.keys(meta.routes).filter((key) => !registered.has(key)).sort(),
+        undescribed: routes.filter((route) => route.path.startsWith(DESCRIBED_PREFIX) && !meta.routes[route.key]).map((route) => route.key).sort(),
+    };
+}
+
+/* A pull request must not fail because another one merged first, so drift only fails when asked to (the docs pull request, a release). */
+function driftReport({ stale, orphans, undescribed }, strict = false) {
+    const drift = [...stale, ...orphans.map((key) => `described but no longer registered, left out: ${key}`)];
+    const notes = undescribed.map((key) => `not described in ${META_NAME}, listed as ${UNDOCUMENTED}: ${key}`);
+    return strict ? { problems: drift, warnings: notes } : { problems: [], warnings: [...drift, ...notes] };
 }
 
 const cell = (text) => String(text === undefined || text === null ? '' : text).replace(/\|/g, '\\|').replace(/\n/g, ' ');
@@ -279,7 +316,7 @@ function operationOf(route, entry, tag, context) {
 
 const OTHER_TAG = 'Not documented in full';
 
-function openApiOf(grouped, context) {
+function openApiOf(grouped, context, builtFrom = '') {
     const paths = {};
     const add = (route, entry, tag) => {
         if (route.method === 'USE') return;
@@ -293,7 +330,8 @@ function openApiOf(grouped, context) {
         info: {
             title: 'AlianHub API',
             version: 'v2',
-            description: `Paths, methods, auth and tags only. The full reference is docs/API.md. Generated by ${REGENERATE}.`,
+            description: `Paths, methods, auth and tags only. The full reference is docs/API.md. Generated by ${REGENERATE}; do not edit by hand.`,
+            ...(builtFrom ? { 'x-built-from': builtFrom } : {}),
         },
         tags: [...grouped.resources.map((resource) => ({ name: resource.title, description: resource.intro })), { name: OTHER_TAG }],
         paths: Object.fromEntries(Object.keys(paths).sort().map((at) => [at, paths[at]])),
@@ -314,7 +352,9 @@ function renderFront(facts, grouped, counts) {
     return [
         '# AlianHub API reference',
         '',
-        `Generated by \`${REGENERATE}\` from the routes the server registers, the guards they sit behind and \`${META_NAME}\`. Do not edit this file by hand: \`tests/conventions/api-doc.test.js\` fails when it differs from what the generator writes, and when a \`/api/v2\` route has no entry in the meta file.`,
+        `Generated by \`${REGENERATE}\` from the routes the server registers, the guards they sit behind and \`${META_NAME}\`. Do not edit this file by hand. It is regenerated in the docs pull request that follows merges to \`beta\`, so in between it can be a few routes behind the code: \`${STRICT_CHECK}\` says whether it is current, and a route added since is not here yet.`,
+        '',
+        `Built from ${counts.total} routes and the meta file, fingerprint \`${facts.builtFrom}\`.`,
         '',
         `The server registers ${counts.total} routes. ${counts.documented} are documented in full below. The other ${counts.appendix} are listed in the [appendix](#appendix-every-other-route) with their method, path and auth, marked \`${INTERNAL}\` or \`${UNDOCUMENTED}\`, so this page is honest about what it does not cover. A machine-readable list of paths, methods, auth and tags is in \`docs/api/openapi.json\`.`,
         '',
@@ -508,6 +548,11 @@ function staleFiles(files, read, root = ROOT) {
 
 const loadMeta = () => JSON.parse(fs.readFileSync(META_FILE, 'utf8'));
 
+/* Names the routes and the meta file an output was built from without a date, so two runs on one tree print the same file. */
+const fingerprintOf = (routes, meta) => crypto.createHash('sha256')
+    .update(JSON.stringify([routes.map((route) => [route.key, route.guard, route.ownAuth, route.permissions]), meta]))
+    .digest('hex').slice(0, 12);
+
 const isActionTable = (taskWrites) => Boolean(taskWrites) && !Object.hasOwn(taskWrites, 'needs');
 
 /* The task write table says which key an action needs; the field specs say which body keys it keeps. An action with no
@@ -568,47 +613,52 @@ function collect({ stub = true, intervals = [] } = {}) {
 
 function build(options) {
     const meta = loadMeta();
-    const { routes, context, facts } = collect(options);
-    const problems = metaProblems(routes, meta);
-    if (problems.length) return { problems, routes };
+    const problems = metaShapeProblems(meta);
+    if (problems.length) return { problems };
 
+    const { routes, context, facts } = collect(options);
     const grouped = groupRoutes(routes, meta);
+    facts.builtFrom = fingerprintOf(routes, meta);
     facts.held = grouped.resources.flatMap((resource) => resource.routes)
         .filter(({ route, entry }) => classifyAuth(route, entry, context).narrowedToken).map(({ route }) => route.key);
     return {
         problems,
         routes,
         grouped,
+        drift: metaDrift(routes, meta),
         files: {
             [OUTPUTS.docs]: renderDocs(grouped, context, facts),
-            [OUTPUTS.openapi]: `${JSON.stringify(openApiOf(grouped, context), null, 2)}\n`,
+            [OUTPUTS.openapi]: `${JSON.stringify(openApiOf(grouped, context, facts.builtFrom), null, 2)}\n`,
         },
     };
 }
 
 const readOrNull = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null);
 
-function check(built = build()) {
-    return built.problems.length ? built.problems : staleFiles(built.files, readOrNull);
+function check(built = build(), { strict = false } = {}) {
+    if (built.problems.length) return { problems: built.problems, warnings: [] };
+    return driftReport({ stale: staleFiles(built.files, readOrNull), ...built.drift }, strict);
 }
 
 function main(argv) {
+    const strict = argv.includes('--strict');
     const built = build();
-    if (built.problems.length || argv.includes('--check')) {
-        const problems = check(built);
-        problems.forEach((problem) => process.stderr.write(`${problem}\n`));
-        process.stderr.write(problems.length ? `${problems.length} problem(s)\n` : 'the api reference is in sync\n');
-        return problems.length ? 1 : 0;
+    if (!built.problems.length && !argv.includes('--check')) {
+        for (const [file, content] of Object.entries(built.files)) {
+            fs.mkdirSync(path.dirname(file), { recursive: true });
+            fs.writeFileSync(file, content);
+            process.stdout.write(`wrote ${path.relative(ROOT, file)}\n`);
+        }
     }
-    for (const [file, content] of Object.entries(built.files)) {
-        fs.mkdirSync(path.dirname(file), { recursive: true });
-        fs.writeFileSync(file, content);
-        process.stdout.write(`wrote ${path.relative(ROOT, file)}\n`);
-    }
-    return 0;
+    const { problems, warnings } = check(built, { strict });
+    warnings.forEach((warning) => process.stderr.write(`warning: ${warning}\n`));
+    problems.forEach((problem) => process.stderr.write(`${problem}\n`));
+    if (problems.length) process.stderr.write(`${problems.length} problem(s)\n`);
+    else process.stderr.write(warnings.length ? `${warnings.length} warning(s); ${strict ? 'none of them fails a strict check' : `${STRICT_CHECK} fails on stale files and orphan entries`}\n` : 'the api reference is in sync\n');
+    return problems.length ? 1 : 0;
 }
 
 // Loading every module leaves timers and scheduled jobs behind, so the process is ended rather than left to drain.
 if (require.main === module) process.exit(main(process.argv.slice(2)));
 
-module.exports = { AUTH, classifyAuth, groupRoutes, metaProblems, actionRows, renderRoute, renderAppendix, renderDocs, openApiOf, staleFiles, loadMeta, collect, build, check };
+module.exports = { AUTH, classifyAuth, groupRoutes, metaShapeProblems, metaDrift, driftReport, actionRows, renderRoute, renderAppendix, renderDocs, openApiOf, staleFiles, loadMeta, collect, build, check };
