@@ -30,4 +30,21 @@ async function saveStorageState(browser, state, role) {
 
 const settingsNav = (page) => page.getByRole('navigation', { name: 'Settings navigation' });
 
-module.exports = { signInThroughForm, saveStorageState, settingsNav };
+/* The first-run tours and the getting-started checklist sit over the screen a flow is about. */
+const skipFirstRun = (page) => page.addInitScript(() => {
+    for (const screen of ['shell', 'project', 'board', 'list']) localStorage.setItem(`ah.tour.skipped.${screen}`, '1');
+    sessionStorage.setItem('ah.gs.dismissed', '1');
+});
+
+const taskPanel = (page) => page.getByRole('dialog', { name: 'Task detail' });
+
+const listRow = (page, taskName) => page.getByRole('row').filter({ has: page.getByRole('button', { name: taskName, exact: true }) });
+
+/* A row's actions are hidden until the row is hovered or holds focus. */
+async function chooseFromRowMenu(page, row, taskName, item) {
+    await row.getByRole('button', { name: taskName, exact: true }).focus();
+    await row.getByRole('button', { name: `More actions for ${taskName}`, exact: true }).click();
+    await page.getByRole('menu', { name: `More actions for ${taskName}`, exact: true }).getByRole('menuitem', { name: item, exact: true }).click();
+}
+
+module.exports = { chooseFromRowMenu, listRow, saveStorageState, settingsNav, signInThroughForm, skipFirstRun, taskPanel };

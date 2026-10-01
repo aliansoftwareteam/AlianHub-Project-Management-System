@@ -14,6 +14,8 @@ module.exports = defineConfig({
     use: {
         trace: 'on-first-retry',
         screenshot: 'only-on-failure',
+        consoleGuard: true,
+        pageTreeOnFailure: true,
     },
     projects: [
         { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
