@@ -465,48 +465,39 @@ module.exports = {
         });
     },
 
-    bulkUpdateDates({ companyId, userData, dates }) {
-        return new Promise(async (resolve, reject) => {
-            try {
-                if (!companyId) return reject(new Error('companyId required'));
-                const wanted = readDateRows(dates);
-                if (wanted.error) return reject(new Error(wanted.error));
+    async bulkUpdateDates({ companyId, userData, dates }) {
+        if (!companyId) throw new Error('companyId required');
+        const wanted = readDateRows(dates);
+        if (wanted.error) throw new Error(wanted.error);
 
-                const { tasks, skipped } = await loadScopedTasks(companyId, [...wanted.rows.keys()], { includeArchived: false });
-                if (!tasks.length) {
-                    return resolve(summarize({ updated: [], skipped, errors: [] }));
-                }
-                const fieldsOf = (task) => wanted.rows.get(String(task._id));
+        const { tasks, skipped } = await loadScopedTasks(companyId, [...wanted.rows.keys()], { includeArchived: false });
+        if (!tasks.length) return summarize({ updated: [], skipped, errors: [] });
+        const fieldsOf = (task) => wanted.rows.get(String(task._id));
 
-                try {
-                    await MongoDbCrudOpration(companyId, {
-                        type: dbCollections.TASKS,
-                        data: [tasks.map((task) => ({ updateOne: { filter: { _id: task._id }, update: { $set: fieldsOf(task) } } }))],
-                    }, 'bulkWrite');
-                } catch (error) {
-                    logger.error(`bulkUpdateDates bulkWrite error: ${error.message}`);
-                    return reject(error);
-                }
+        try {
+            await MongoDbCrudOpration(companyId, {
+                type: dbCollections.TASKS,
+                data: [tasks.map((task) => ({ updateOne: { filter: { _id: task._id }, update: { $set: fieldsOf(task) } } }))],
+            }, 'bulkWrite');
+        } catch (error) {
+            logger.error(`bulkUpdateDates bulkWrite error: ${error.message}`);
+            throw error;
+        }
 
-                const updated = tasks.map((task) => String(task._id));
-                tasks.forEach((task) => {
-                    emitTaskUpdate(task, fieldsOf(task));
-                    const historyObj = {
-                        key: 'Project_DueDate',
-                        sprintId: task.sprintId,
-                        message: `<b>${userData?.Employee_Name || ''}</b> rescheduled the task on the Gantt.`,
-                    };
-                    HandleHistory('task', companyId, task.ProjectID, task._id, historyObj, userData)
-                        .catch((err) => logger.error(`bulkUpdateDates history ${task._id}: ${err.message}`));
-                });
-
-                emitBulkSummary('bulkUpdateDates', { taskIds: updated });
-                resolve(summarize({ updated, skipped, errors: [] }));
-            } catch (error) {
-                logger.error(`bulkUpdateDates error: ${error.message}`);
-                reject(error);
-            }
+        tasks.forEach((task) => {
+            emitTaskUpdate(task, fieldsOf(task));
+            const historyObj = {
+                key: 'Project_DueDate',
+                sprintId: task.sprintId,
+                message: `<b>${userData?.Employee_Name || ''}</b> rescheduled the task on the Gantt.`,
+            };
+            HandleHistory('task', companyId, task.ProjectID, task._id, historyObj, userData)
+                .catch((err) => logger.error(`bulkUpdateDates history ${task._id}: ${err.message}`));
         });
+
+        const updated = tasks.map((task) => String(task._id));
+        emitBulkSummary('bulkUpdateDates', { taskIds: updated });
+        return summarize({ updated, skipped, errors: [] });
     },
 
     // ---------------------- START DATE ----------------------
