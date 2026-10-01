@@ -383,9 +383,6 @@ function adjustListViewHeight() {
     }
 }
 
-/* Projects.vue mounts the legacy bottom bulk bar for every view; the redesigned
-   views carry their own, so the old one is hidden while they are on screen. */
-
 onMounted(() => {
     if(!currentCompany.value?.planFeature?.listView){
         return;

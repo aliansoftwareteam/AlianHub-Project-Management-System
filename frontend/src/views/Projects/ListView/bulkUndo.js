@@ -1,6 +1,6 @@
-const FIELDS = ["statusKey", "AssigneeUserId", "tagsArray", "sprintId", "deletedStatusKey", "Task_Priority", "DueDate"];
+const FIELDS = ["statusKey", "AssigneeUserId", "tagsArray", "sprintId", "deletedStatusKey", "Task_Priority", "DueDate", "isParentTask", "ParentTaskId"];
 
-function* storedTasks(projectData = {}) {
+export function* storedTasks(projectData = {}) {
     for (const bucket of [projectData.tasks, projectData.tableTasks]) {
         for (const project of Object.values(bucket || {})) {
             for (const sprint of Object.values(project || {})) {
@@ -60,7 +60,7 @@ function projectSprints(project) {
 
 /* Each request is one existing bulk call. The API takes one new value per call, so tasks
  * that shared a previous value go back together and the rest get a call each. */
-export function undoRequests({ action, payload = {}, before = {}, updatedIds = [], project, priorities = [] }) {
+export function undoRequests({ action, payload = {}, before = {}, updatedIds = [], project, priorities = [], nameOf = () => "" }) {
     const known = updatedIds.map(String).filter((id) => before[id]);
     if (!known.length) return [];
 
@@ -86,10 +86,35 @@ export function undoRequests({ action, payload = {}, before = {}, updatedIds = [
             : [];
     }
 
-    if (action === "bulkUpdateTags" && payload.operation === "add") {
+    if (action === "bulkUpdateAssignee" && payload.type === "assigneRemove") {
+        const removed = (payload.employeeId || []).map(String);
+        const taskIds = known.filter((id) => removed.some((uid) => (before[id].AssigneeUserId || []).includes(uid)));
+        return taskIds.length
+            ? [{ action, type: "assigneeAdd", employeeId: removed, employeeName: payload.employeeName, taskIds }]
+            : [];
+    }
+
+    if (action === "bulkUpdateAssignee" && payload.type === "replace") {
+        const placed = (payload.employeeId || []).map(String);
+        const people = (id) => [...(before[id].AssigneeUserId || [])].sort();
+        const changed = known.filter((id) => people(id).join() !== [...placed].sort().join());
+        const groups = groupBy(changed, (id) => people(id).join(), { keepEmpty: true });
+        return [...groups].map(([key, taskIds]) => (key
+            ? { action, type: "replace", employeeId: key.split(","), employeeName: key.split(",").map(nameOf).join(", "), taskIds }
+            : { action, type: "assigneRemove", employeeId: placed, employeeName: payload.employeeName, taskIds }));
+    }
+
+    if (action === "bulkUpdateTags") {
         const tagId = String(payload.tagId);
-        const taskIds = known.filter((id) => !(before[id].tagsArray || []).includes(tagId));
-        return taskIds.length ? [{ action, tagId: payload.tagId, operation: "remove", taskIds }] : [];
+        const had = (id) => (before[id].tagsArray || []).includes(tagId);
+        const adding = payload.operation === "add";
+        const taskIds = known.filter((id) => had(id) !== adding);
+        return taskIds.length ? [{ action, tagId: payload.tagId, operation: adding ? "remove" : "add", taskIds }] : [];
+    }
+
+    if (action === "bulkConvertToTask") {
+        const groups = groupBy(known.filter((id) => before[id].isParentTask === false), (id) => String(before[id].ParentTaskId || ""));
+        return [...groups].map(([parentTaskId, taskIds]) => ({ action: "bulkConvertToSubTask", taskIds, parentTaskId }));
     }
 
     if (action === "bulkUpdatePriority") {
