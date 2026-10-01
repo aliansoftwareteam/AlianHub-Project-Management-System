@@ -15,8 +15,6 @@
 .sb-item:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .sidebar_item_main.sb-item:hover .emp_label { color: var(--ink) !important; }
 .sb-item .designationAssignee { color: var(--ink-2); }
-/* On a dark surface the agent chip keeps its light-theme ink, which is too dim there. */
-:root[data-theme="dark"] .sb-item .ah-chip--agent { color: var(--brand); }
 .sidebar__task-image{
     height: 15px !important;
     width: 15px !important;

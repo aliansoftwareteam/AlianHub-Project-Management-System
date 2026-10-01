@@ -110,7 +110,7 @@
 
 .land__sell { display: flex; flex-direction: column; align-items: center; gap: var(--sp-4); text-align: center; padding: var(--sp-9) var(--sp-6); border: 1px dashed var(--border); border-radius: var(--r-card); background: var(--surface); }
 .land__sell h3 { font: var(--text-h2); color: var(--ink); margin: 0; }
-.land__sell p { font: var(--text-small); color: var(--ink-2); margin: 0; max-width: 520px; line-height: 1.55; }
+.land__sell p { font: var(--text-body); color: var(--ink-2); margin: 0; max-width: 520px; line-height: 1.55; }
 .land__sell-promise { font: var(--text-data); color: var(--ink-label); }
 
 @media (max-width: 1100px) {

@@ -1,16 +1,17 @@
 <template>
-    <tr class="background_color_total_status">
-        <td class="fixed background_color_total_status" :class="[{'td_class_border':props.daysOrMonth && props.daysOrMonth.length ? new Date().getMonth() === 0 && new Date().getDate() === 1 : new Date().getMonth() === 0}]">
+    <tr class="mr-row--total">
+        <td class="fixed" :class="[{'td_class_border':props.daysOrMonth && props.daysOrMonth.length ? new Date().getMonth() === 0 && new Date().getDate() === 1 : new Date().getMonth() === 0}]">
             <div class="d-flex justify-content-between">
                 <div class="thtitle padding_wrapper_arrow">
-                    <img v-if='toogleTotalDropDown' :src="arrowToogle" alt="arrowToogle" @click="handleToogleTotal()" class="rotate_arrow cursor-pointer">
-                    <img v-else :src="arrowToogle" alt="arrowToogle" @click="handleToogleTotal()" class="cursor-pointer">
-                    <span class="thtitle_currency_family black padding_wrapper_left_arrow">{{$t("TimeTracker.total")}}</span>
+                    <button type="button" class="mr-toggle" :class="{ 'is-open': toogleTotalDropDown }" :aria-expanded="toogleTotalDropDown" :aria-label="$t('Milestone.toggle_rows', { name: $t('TimeTracker.total') })" @click="handleToogleTotal()">
+                        <span class="ah-mask-icon" :style="maskOf(arrowToogle)" aria-hidden="true"></span>
+                    </button>
+                    <span class="thtitle_currency_family padding_wrapper_left_arrow">{{$t("TimeTracker.total")}}</span>
                 </div>
                 <div class="thtitle"></div>
                 <div class="thtitle"></div>
                 <div class="thtitle">
-                    <span class="thtitle_currency_family black text-ellipsis d-block" :title="`${props.currencySymbol} ${props.daysOrMonth && props.daysOrMonth.length === 0 ? getCommaSeperatedNumber(calculateTotalAmount()) : getCommaSeperatedNumber(calculateTotalAmountDate())}`">
+                    <span class="thtitle_currency_family text-ellipsis d-block" :title="`${props.currencySymbol} ${props.daysOrMonth && props.daysOrMonth.length === 0 ? getCommaSeperatedNumber(calculateTotalAmount()) : getCommaSeperatedNumber(calculateTotalAmountDate())}`">
                         {{props.currencySymbol}} {{props.daysOrMonth && props.daysOrMonth.length === 0 ? getCommaSeperatedNumber(calculateTotalAmount()) : getCommaSeperatedNumber(calculateTotalAmountDate())}}
                     </span>
                 </div>
@@ -21,33 +22,23 @@
                     'border-color-highlight-left':props.daysOrMonth.length === 0 ? new Date().getMonth() === monthIndex : new Date().getMonth() === new Date(monthDate.date).getMonth() && new Date().getDate() === monthIndex + 1,
                     'border-color-highlight-left-next':props.daysOrMonth.length === 0 ? new Date().getMonth() + 1 === monthIndex : new Date().getMonth() === new Date(monthDate.date).getMonth() && new Date().getDate() === monthIndex
                 }]"
-                class="border_currency totalAmountCurrencyFamily black text-center font-weight-700 text-ellipsis" :title="`${totalProjectCurrency(monthDate,monthIndex) === 0 ? '' : `${props.currencySymbol} ${getCommaSeperatedNumber(totalProjectCurrency(monthDate,monthIndex))}`}`">
+                class="border_currency totalAmountCurrencyFamily text-center text-ellipsis" :title="`${totalProjectCurrency(monthDate,monthIndex) === 0 ? '' : `${props.currencySymbol} ${getCommaSeperatedNumber(totalProjectCurrency(monthDate,monthIndex))}`}`">
                 {{totalProjectCurrency(monthDate,monthIndex) === 0 ? '' : `${props.currencySymbol} ${getCommaSeperatedNumber(totalProjectCurrency(monthDate,monthIndex))}`}}
             </td>
         </template>
     </tr>
     <template v-if="toogleTotalDropDown">
-        <tr class="background_color_total_status">
-            <td class="fixed background_color_total_status" :class="[{'td_class_border':props.daysOrMonth && props.daysOrMonth.length ? new Date().getMonth() === 0 && new Date().getDate() === 1 : new Date().getMonth() === 0}]">
+        <tr class="mr-row--total">
+            <td class="fixed" :class="[{'td_class_border':props.daysOrMonth && props.daysOrMonth.length ? new Date().getMonth() === 0 && new Date().getDate() === 1 : new Date().getMonth() === 0}]">
                 <div class="d-flex justify-content-between align-items-center">
                     <div class="thtitle">
                     </div>
                     <div class="thtitle_wrapper">
-                        <span
-                            class="thtitle_currency_family_status short_mil_status_wrapper"
-                            :style="[{
-                                'color':'#3B3B3B',
-                                'border-radius':'4px',
-                                'margin-left':'10px',
-                                'font-weight': '500',
-                                'font-size':'14px'
-                            }]"
-                            :title="$t('Milestone.refunded_amount')"
-                        >
+                        <span class="thtitle_currency_family_status short_mil_status_wrapper mr-label" :title="$t('Milestone.refunded_amount')">
                             {{$t('Milestone.refunded_amount')}}
                         </span>
                     </div>
-                    <div class="thtitle thtitle_currency_family lightGrey pl-5px text-ellipsis d-block" :title="`${props.currencySymbol} ${totalAmountRefund(released) === 0 ? '' : `-`} ${props.daysOrMonth && props.daysOrMonth.length === 0 ? getCommaSeperatedNumber(totalAmountRefund(released)) : getCommaSeperatedNumber(totalAmountRefund(released))}`">
+                    <div class="thtitle thtitle_currency_family mr-amount--muted pl-5px text-ellipsis d-block" :title="`${props.currencySymbol} ${totalAmountRefund(released) === 0 ? '' : `-`} ${props.daysOrMonth && props.daysOrMonth.length === 0 ? getCommaSeperatedNumber(totalAmountRefund(released)) : getCommaSeperatedNumber(totalAmountRefund(released))}`">
                         {{props.currencySymbol}} {{totalAmountRefund(released) === 0 ? '' : `-`}} {{props.daysOrMonth && props.daysOrMonth.length === 0 ? getCommaSeperatedNumber(totalAmountRefund(released)) : getCommaSeperatedNumber(totalAmountRefund(released))}}
                     </div>
                 </div>
@@ -57,34 +48,28 @@
                         'border-color-highlight-left':props.daysOrMonth.length === 0 ? new Date().getMonth() === monthIndex : new Date().getMonth() === new Date(monthDate.date).getMonth() && new Date().getDate() === monthIndex + 1,
                         'border-color-highlight-left-next':props.daysOrMonth.length === 0 ? new Date().getMonth() + 1 === monthIndex : new Date().getMonth() === new Date(monthDate.date).getMonth() && new Date().getDate() === monthIndex
                     }]"
-                    class="border_currency totalAmountCurrencyFamily black text-center font-weight-700 text-ellipsis"
+                    class="border_currency totalAmountCurrencyFamily text-center text-ellipsis"
                     :title="`${totalProjectMonthYearRefund(monthDate,monthIndex,released) === 0 ? '' : `${props.currencySymbol} - ${getCommaSeperatedNumber(totalProjectMonthYearRefund(monthDate,monthIndex,released))}`}`"
                 >
                     {{totalProjectMonthYearRefund(monthDate,monthIndex,released) === 0 ? '' : `${props.currencySymbol} - ${getCommaSeperatedNumber(totalProjectMonthYearRefund(monthDate,monthIndex,released))}`}}
                 </td>
             </template>
         </tr>
-        <tr class="background_color_total_status" v-for="(statusName,indexStatus) in statusObj" :key="indexStatus">
-            <td class="fixed background_color_total_status" :class="[{'td_class_border':props.daysOrMonth && props.daysOrMonth.length ? new Date().getMonth() === 0 && new Date().getDate() === 1 : new Date().getMonth() === 0}]">
+        <tr class="mr-row--total" v-for="(statusName,indexStatus) in statusObj" :key="indexStatus">
+            <td class="fixed" :class="[{'td_class_border':props.daysOrMonth && props.daysOrMonth.length ? new Date().getMonth() === 0 && new Date().getDate() === 1 : new Date().getMonth() === 0}]">
                 <div class="d-flex justify-content-between align-items-center">
                     <div class="thtitle">
                     </div>
                     <div class="thtitle_wrapper">
                         <span
-                            class="thtitle_currency_family_status short_mil_status_wrapper"
-                            :style="[{
-                                'background-color':settingStatus.filter((ele) => {return ele.value === indexStatus})[0].backgroundColor,
-                                'color':'#fff',
-                                'padding':'2px 10px',
-                                'border-radius':'4px',
-                                'margin-left':'10px'
-                            }]"
+                            class="thtitle_currency_family_status short_mil_status_wrapper mr-status-chip ah-status-ink"
+                            :style="chipStyle(settingStatus.filter((ele) => {return ele.value === indexStatus})[0])"
                             :title="settingStatus.filter((ele) => {return ele.value === indexStatus})[0].name"
                         >
                             {{settingStatus.filter((ele) => {return ele.value === indexStatus})[0].name}}
                         </span>
                     </div>
-                    <div class="thtitle thtitle_currency_family lightGrey pl-5px text-ellipsis d-block" :title="`${props.currencySymbol} ${props.daysOrMonth && props.daysOrMonth.length === 0 ? getCommaSeperatedNumber(totalAmount(statusName.multipleStatus)) : getCommaSeperatedNumber(totalAmountFilterMonth(statusName.multipleStatus))}`">
+                    <div class="thtitle thtitle_currency_family mr-amount--muted pl-5px text-ellipsis d-block" :title="`${props.currencySymbol} ${props.daysOrMonth && props.daysOrMonth.length === 0 ? getCommaSeperatedNumber(totalAmount(statusName.multipleStatus)) : getCommaSeperatedNumber(totalAmountFilterMonth(statusName.multipleStatus))}`">
                         {{props.currencySymbol}} {{props.daysOrMonth && props.daysOrMonth.length === 0 ? getCommaSeperatedNumber(totalAmount(statusName.multipleStatus)) : getCommaSeperatedNumber(totalAmountFilterMonth(statusName.multipleStatus))}} 
                     </div>
                 </div>
@@ -95,7 +80,7 @@
                     'border-color-highlight-left':props.daysOrMonth.length === 0 ? new Date().getMonth() === monthIndex : new Date().getMonth() === new Date(monthDate.date).getMonth() && new Date().getDate() === monthIndex + 1,
                     'border-color-highlight-left-next':props.daysOrMonth.length === 0 ? new Date().getMonth() + 1 === monthIndex : new Date().getMonth() === new Date(monthDate.date).getMonth() && new Date().getDate() === monthIndex
                 }]"
-                class="border_currency totalAmountCurrencyFamily black text-center font-weight-700 text-ellipsis"
+                class="border_currency totalAmountCurrencyFamily text-center text-ellipsis"
                 :title="`${totalProjectMonthYear(monthDate,monthIndex,statusName.multipleStatus) === 0 ? '' : `${props.currencySymbol} ${getCommaSeperatedNumber(totalProjectMonthYear(monthDate,monthIndex,statusName.multipleStatus))}`}`"
                 >{{totalProjectMonthYear(monthDate,monthIndex,statusName.multipleStatus) === 0 ? '' : `${props.currencySymbol} ${getCommaSeperatedNumber(totalProjectMonthYear(monthDate,monthIndex,statusName.multipleStatus))}`}}</td>
             </template>
@@ -109,6 +94,9 @@
     import { useStore } from "vuex";
     import { defineProps,computed, ref,watch } from 'vue';
     import {milestoneData} from '@/components/organisms/FixMilestone/helper.js';
+    import { statusChipStyle } from '@/utils/statusChipColors';
+    import { maskOf } from '@/utils/iconMask';
+    const chipStyle = (status) => statusChipStyle({ textColor: status?.textColor, bgColor: status?.backgroundColor });
     const { getCommaSeperatedNumber } = milestoneData();
     // store
     const { getters } = useStore();

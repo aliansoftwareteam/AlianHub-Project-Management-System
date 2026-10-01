@@ -40,7 +40,7 @@
                 <ShellIcon :name="ICONS[kind]" :size="14" class="tr__row-icon" />
                 <span class="tr__row-title" :title="row.title">
                     <span v-if="row.code" class="ah-chip ah-chip--mono">{{ row.code }}</span>
-                    {{ row.title }}
+                    <span class="tr__row-name">{{ row.title }}</span>
                 </span>
                 <span class="tr__row-project tr__c-project">{{ projectNameOf(row.projectId) }}</span>
                 <span class="tr__row-time tr__c-when">{{ shortDate(row.updatedAt) }}</span>
@@ -143,7 +143,9 @@ onMounted(load);
 .tr__row:last-child { border-bottom: 0; }
 .tr__row:hover { background: var(--surface-hover); }
 .tr__row-icon { color: var(--ink-2); }
-.tr__row-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+.tr__row-title { min-width: 0; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+.tr__row-title .ah-chip { flex: none; }
+.tr__row-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .tr__row-project { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tr__row-time { font: 500 10.5px var(--font-mono); color: var(--ink-2); }
 @media (max-width: 767px) {

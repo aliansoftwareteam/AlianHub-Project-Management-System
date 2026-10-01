@@ -186,7 +186,7 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
 
 .ph2 .ah-btn--ghost { padding: 0 6px; line-height: 0; }
 .ph2 .ah-btn--ghost img { vertical-align: middle; }
-.ph2 .open__watcher { padding: 0; background: var(--surface); color: var(--ink-2); border-color: var(--border); }
+.ph2 .open__watcher { width: var(--control-h, 30px); height: var(--control-h, 30px); padding: 0; background: var(--surface); color: var(--ink-2); border-color: var(--border); }
 .ph2 .open__watcher:hover { background: var(--surface-hover); }
 .ph2 .dot-btn { display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2); }
 .ph2 .dot-btn:hover { color: var(--ink); }

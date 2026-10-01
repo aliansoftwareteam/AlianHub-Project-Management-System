@@ -242,8 +242,8 @@ defineExpose({ open });
 <style>
 .pt-menu { position: relative; display: inline-flex; }
 .pt-row__more {
-    min-width: 24px; min-height: 24px; display: inline-flex; align-items: center; justify-content: center;
-    border: 0; background: transparent; color: var(--ink-2); padding: 2px; cursor: pointer; border-radius: 4px;
+    min-width: var(--hit-min); min-height: var(--hit-min); display: inline-flex; align-items: center; justify-content: center;
+    border: 0; background: transparent; color: var(--ink-2); padding: 0; cursor: pointer; border-radius: var(--r-sm, 4px);
     visibility: hidden;
 }
 .pt-row__more:hover { color: var(--ink); background: var(--fill); }
@@ -252,9 +252,9 @@ defineExpose({ open });
 .pt-menu__pop { position: absolute; top: calc(100% + var(--sp-1)); right: 0; z-index: 40; min-width: 180px; }
 .pt-menu__danger, .pt-menu__danger:hover { color: var(--danger); }
 .pt-menu__overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, .35); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: var(--sp-7); }
-.pt-menu__card { background: var(--surface); color: var(--ink); border-radius: 12px; width: min(420px, 100%); padding: 18px var(--sp-8) 26px; box-shadow: var(--shadow-pop); font-family: var(--font-ui); }
+.pt-menu__card { background: var(--surface); color: var(--ink); border-radius: var(--r-card); width: min(420px, 100%); padding: 18px var(--sp-8) 26px; box-shadow: var(--shadow-pop); font-family: var(--font-ui); }
 .pt-menu__title { margin: 0 0 var(--sp-5); overflow-wrap: anywhere; }
-.pt-menu__text { margin: 0 0 var(--sp-8); font-size: 13px; line-height: 1.5; color: var(--ink-2); overflow-wrap: anywhere; }
+.pt-menu__text { margin: 0 0 var(--sp-8); font-size: var(--fs-md, 13px); line-height: var(--lh-body, 1.5); color: var(--ink-2); overflow-wrap: anywhere; }
 .pt-menu__actions { display: flex; justify-content: flex-end; gap: var(--sp-4); }
 @media (hover: none) {
     .pt-row__more { visibility: visible; }

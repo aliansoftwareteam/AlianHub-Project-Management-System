@@ -4,7 +4,7 @@
         <div class="parity-page__main">
             <div class="ah-toolbar">
                 <div class="ah-toolbar__title">{{ $t('Parity.connections') }}</div>
-                <div class="ah-tabs" style="margin-left:8px">
+                <div class="ah-tabs conn__tabs">
                     <button v-for="tab in tabs" :key="tab" type="button" class="ah-tab" :class="{ 'is-active': view === tab }" @click="view = tab">
                         {{ $t(`Parity.conn_tab_${tab}`) }}
                     </button>

@@ -104,7 +104,7 @@ onMounted(() => { load().catch(() => {}); });
 
 <style scoped>
 .hwait__hide {
-    width: 26px; height: 26px; display: grid; place-items: center; flex: none;
+    width: var(--control-h, 26px); height: var(--control-h, 26px); display: grid; place-items: center; flex: none;
     border: 0; border-radius: var(--r-chip); background: transparent; color: var(--ink-2); cursor: pointer;
 }
 .hwait__hide:hover { background: var(--surface-hover); color: var(--ink); }
@@ -116,7 +116,7 @@ onMounted(() => { load().catch(() => {}); });
 .hwait__what { font: 500 var(--fs-md, 13px)/1.35 var(--font-ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hwait__who { font: 400 var(--fs-sm, 11.5px)/1.3 var(--font-ui); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hwait__actions { display: flex; gap: 6px; flex: none; }
-.hwait__inbox { align-self: flex-start; font: 600 var(--fs-md, 12.5px)/1.2 var(--font-ui); color: var(--brand); text-decoration: none; }
+.hwait__inbox { align-self: flex-start; display: inline-flex; align-items: center; min-height: var(--hit-min); font: 600 var(--fs-md, 12.5px)/1.2 var(--font-ui); color: var(--brand); text-decoration: none; }
 .hwait__inbox:hover { text-decoration: underline; }
 @media (max-width: 767px) {
     .hwait__row { flex-wrap: wrap; }

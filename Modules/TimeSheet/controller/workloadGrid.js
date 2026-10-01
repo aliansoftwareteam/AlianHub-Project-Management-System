@@ -14,6 +14,10 @@ const { workingDaysOf, weekendOf } = require('../../Company/helpers/companyWeek'
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const { acceptedMemberIds } = require('../../../utils/companyMembers');
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
+const { resolveSheetScope, scopedEstimateMatch, scopedTimeMatch, openProjects, SHEET_PERMISSION } = require('../helpers/timeScope');
+const { withoutHiddenSprintPlans, namesTimeOff, asUnavailableDays } = require('../helpers/planVisibility');
+const { canReadTask } = require('../../Tasks/helpers/taskReadAccess');
+const { visibilityStage } = require('../../Tasks/helpers/taskQueryGuard');
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 const safeZone = (z) => (z && DateTime.local().setZone(z).isValid ? z : 'UTC');
 const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
@@ -65,7 +69,7 @@ const capacityByUser = async (companyId, userIds) => {
 
 /* Points and count read open tasks rather than the hour plan, so a task with points and no
  * hours planned still lands on its due day. */
-const unitGrid = async ({ companyId, unit, userIds, projectIds, days, rangeStart, rangeEnd, estimates, ptoByUser, names, workingDays }) => {
+const unitGrid = async ({ companyId, unit, userIds, inProjects, openToCaller, days, rangeStart, rangeEnd, estimates, ptoByUser, names, workingDays }) => {
     const plannedDays = {};
     (estimates || []).forEach((e) => {
         const taskId = String(e.TaskId || '');
@@ -81,8 +85,9 @@ const unitGrid = async ({ companyId, unit, userIds, projectIds, days, rangeStart
             { AssigneeUserId: { $in: userIds }, DueDate: { $gte: rangeStart, $lte: rangeEnd } },
             { _id: { $in: Object.keys(plannedDays).map(oid).filter(Boolean) } },
         ],
+        $and: [openToCaller],
     };
-    if (projectIds.length) taskMatch.ProjectID = { $in: idForms(projectIds) };
+    if (inProjects) taskMatch.ProjectID = inProjects;
     const [tasks, capacities] = await Promise.all([
         MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
@@ -135,12 +140,12 @@ exports.getWorkloadGrid = async (req, res) => {
         const zone = safeZone(b.timeZone);
         const unit = U.unitOf(b.unit);
         const hoursPerDay = Number(b.hoursPerDay) > 0 ? Number(b.hoursPerDay) : 8;
-        const roleType = await getRoleType(companyId, req.uid);
-        const privileged = isPrivileged(roleType);
+        const scope = await resolveSheetScope(companyId, req.uid, SHEET_PERMISSION.workload);
 
-        let userIds = Array.isArray(b.userIds) ? b.userIds.map(String).filter(Boolean) : [];
+        /* Other people's rows are for a caller the workload grant lets see everyone; anyone else gets their own. */
+        let userIds = scope.everyone && Array.isArray(b.userIds) ? b.userIds.map(String).filter(Boolean) : [];
         if (!userIds.length) {
-            if (privileged) {
+            if (scope.companyWide) {
                 const members = await MongoDbCrudOpration(companyId, {
                     type: SCHEMA_TYPE.COMPANY_USERS, data: [{ isDelete: { $ne: true } }, { userId: 1 }],
                 }, 'find').catch(() => []);
@@ -150,18 +155,23 @@ exports.getWorkloadGrid = async (req, res) => {
             }
         }
         userIds = await acceptedMemberIds(companyId, userIds);
-        const projectIds = Array.isArray(b.projectIds) ? b.projectIds.map(String).filter(Boolean) : [];
+        const askedProjects = Array.isArray(b.projectIds) ? b.projectIds.map(String).filter(Boolean) : [];
+        /* Projects asked for and not open to the caller match nothing, rather than lifting the filter. */
+        const projectIds = openProjects(scope, askedProjects);
+        const inProjects = askedProjects.length ? { $in: idForms(projectIds) } : null;
         const rangeStart = new Date(`${b.start}T00:00:00.000Z`);
         const rangeEnd = new Date(`${b.end}T23:59:59.999Z`);
         const startSec = Math.floor(DateTime.fromISO(b.start, { zone }).startOf('day').toSeconds());
         const endSec = Math.floor(DateTime.fromISO(b.end, { zone }).endOf('day').toSeconds());
 
-        const estMatch = { UserId: { $in: userIds }, Date: { $gte: rangeStart, $lte: rangeEnd } };
-        const logMatch = { Loggeduser: { $in: userIds }, LogStartTime: { $gte: startSec, $lte: endSec } };
-        if (projectIds.length) { estMatch.ProjectId = { $in: idForms(projectIds) }; logMatch.ProjectId = { $in: idForms(projectIds) }; }
+        const estMatch = { ...scopedEstimateMatch(scope), UserId: { $in: userIds }, Date: { $gte: rangeStart, $lte: rangeEnd } };
+        const logMatch = { ...scopedTimeMatch(scope, { userIds, projectIds: askedProjects.length ? askedProjects : null }), LogStartTime: { $gte: startSec, $lte: endSec } };
+        if (inProjects) estMatch.ProjectId = inProjects;
 
         const [estimates, logs, ptoRows, names] = await Promise.all([
-            MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.ESTIMATES_TIME, data: [estMatch, { UserId: 1, TaskId: 1, ProjectId: 1, Date: 1, EstimatedTime: 1 }] }, 'find').catch(() => []),
+            MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.ESTIMATES_TIME, data: [estMatch, { UserId: 1, TaskId: 1, ProjectId: 1, Date: 1, EstimatedTime: 1 }] }, 'find')
+                .catch(() => [])
+                .then((rows) => withoutHiddenSprintPlans(companyId, req.uid, rows)),
             unit === 'hours'
                 ? MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TIMESHEET, data: [logMatch, { Loggeduser: 1, LogStartTime: 1, LogTimeDuration: 1 }] }, 'find').catch(() => [])
                 : [],
@@ -171,10 +181,12 @@ exports.getWorkloadGrid = async (req, res) => {
         const ptoByUser = {};
         (ptoRows || []).forEach((p) => { (ptoByUser[String(p.userId)] = ptoByUser[String(p.userId)] || []).push(p); });
         const workingDays = await workingDaysOf(companyId, projectIds.length === 1 ? projectIds[0] : null);
+        const asShownToCaller = (rows) => rows.map((row) => (namesTimeOff(scope, row.userId) ? row : { ...row, days: asUnavailableDays(row.days) }));
 
         if (unit !== 'hours') {
-            const { users, unpointed } = await unitGrid({ companyId, unit, userIds, projectIds, days, rangeStart, rangeEnd, estimates, ptoByUser, names, workingDays });
-            return res.json({ status: true, statusText: 'OK', data: { start: b.start, end: b.end, days, unit, workingDays, unpointed, users } });
+            const openToCaller = (await visibilityStage(companyId, req.uid)).$match;
+            const { users, unpointed } = await unitGrid({ companyId, unit, userIds, inProjects, openToCaller, days, rangeStart, rangeEnd, estimates, ptoByUser, names, workingDays });
+            return res.json({ status: true, statusText: 'OK', data: { start: b.start, end: b.end, days, unit, workingDays, unpointed, users: asShownToCaller(users) } });
         }
 
         const taskIds = [...new Set((estimates || []).map((e) => String(e.TaskId || '')).filter(Boolean))];
@@ -227,7 +239,7 @@ exports.getWorkloadGrid = async (req, res) => {
             return { userId: uid, name: (names[uid] && names[uid].name) || '', avatar: (names[uid] && names[uid].avatar) || '', hoursPerDay, ...grid };
         }).sort((a, b) => b.utilizationPct - a.utilizationPct);
 
-        return res.json({ status: true, statusText: 'OK', data: { start: b.start, end: b.end, days, unit, workingDays, hoursPerDay, users } });
+        return res.json({ status: true, statusText: 'OK', data: { start: b.start, end: b.end, days, unit, workingDays, hoursPerDay, users: asShownToCaller(users) } });
     } catch (e) {
         if (e instanceof TenantError) return res.status(e.statusCode).json({ status: false, statusText: e.message });
         logger.error(`getWorkloadGrid: ${e.message}`);
@@ -288,17 +300,23 @@ exports.moveWorkloadChip = async (req, res) => {
         const sameDate = b.fromDate === b.toDate;
         if (sameUser && sameDate) return res.json({ status: true, statusText: 'Nothing to move.', data: null });
 
+        const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: taskId }] }, 'findOne');
+        if (!task || !(await canReadTask(companyId, req.uid, task))) {
+            return res.status(404).json({ status: false, statusText: 'Task not found.' });
+        }
+
         const from = dayBounds(b.fromDate);
-        const estimateFilter = b.estimateId && oid(b.estimateId)
-            ? { _id: oid(b.estimateId) }
-            : { TaskId: String(b.taskId), UserId: fromUserId, Date: { $gte: from.start, $lte: from.end } };
+        /* A plan id only picks among the plans of the task and person just checked. */
+        const estimateFilter = {
+            TaskId: String(b.taskId),
+            UserId: fromUserId,
+            ...(b.estimateId && oid(b.estimateId) ? { _id: oid(b.estimateId) } : { Date: { $gte: from.start, $lte: from.end } }),
+        };
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.ESTIMATES_TIME,
             data: [estimateFilter, { $set: { UserId: toUserId, Date: dayBounds(b.toDate).start } }],
         }, 'updateMany');
 
-        const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: taskId }] }, 'findOne');
-        if (!task) return res.status(404).json({ status: false, statusText: 'Task not found.' });
         const set = {};
         if (!sameDate) set.DueDate = dayBounds(b.toDate).end;
         if (!sameUser) {

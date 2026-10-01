@@ -32,7 +32,8 @@ export default defineConfig({
             '@fieldTypes': path.resolve(__dirname, '../Modules/CustomField/fieldTypes'),
             '@automationTemplates': path.resolve(__dirname, '../Modules/Automations/templates.js'),
             '@workingDays': path.resolve(__dirname, '../Modules/Company/helpers/workingDays.js'),
-            '@taskTreeRules': path.resolve(__dirname, '../Modules/Tasks/helpers/taskTreeRules.js')
+            '@taskTreeRules': path.resolve(__dirname, '../Modules/Tasks/helpers/taskTreeRules.js'),
+            '@formLogic': path.resolve(__dirname, '../Modules/Forms/helpers/formLogic.js')
         }
     },
     test: {
