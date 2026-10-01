@@ -56,7 +56,7 @@
 }
 .gv__replan-line { margin: 0 0 4px; }
 .gv__replan-line:last-child { margin-bottom: 0; }
-.gv__replan-tag { color: var(--agent); font-weight: 600; }
+.gv__replan-tag { color: var(--agent-ink); font-weight: 600; }
 :root[data-theme="dark"] .gv__replan-tag { color: var(--brand); }
 .gv__replan-link { color: var(--rail-ink-strong); text-decoration: underline; margin-left: 4px; }
 .gv__replan-close {

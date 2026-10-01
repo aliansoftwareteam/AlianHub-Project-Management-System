@@ -154,7 +154,7 @@
                                             v-for="(user, index) in detailedUsers.filter((x, index) => index >= 1).map((x) => ({...x,label: x.Employee_Name, image: x.profileImage}))"
                                             :key="'user'+index"
                                         >
-                                        <UserProfile
+                                        <UserProfile decorative
                                             :showDot="true"
                                             :data="{
                                                 image: user.image,
@@ -217,7 +217,7 @@
                                             v-for="(user, index) in watcherUsers.filter((x, index) => index >= 1).map((x) => ({...x,label: x.Employee_Name, image: x.profileImage}))"
                                             :key="'user'+index"
                                         >
-                                        <UserProfile
+                                        <UserProfile decorative
                                             :showDot="true"
                                             :data="{
                                                 image: user.image,
@@ -256,7 +256,7 @@
                                             v-for="(user, index) in getWatchers.filter((x, index) => index >= 1).map((x) => ({...x,label: x.Employee_Name, image: x.profileImage}))"
                                             :key="'user'+index"
                                         >
-                                        <UserProfile
+                                        <UserProfile decorative
                                             :showDot="true"
                                             :data="{
                                                 image: user.image,

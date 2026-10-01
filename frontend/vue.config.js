@@ -52,6 +52,7 @@ module.exports = defineConfig({
         '@automationTemplates': path.resolve(__dirname, '../Modules/Automations/templates.js'),
         '@workingDays': path.resolve(__dirname, '../Modules/Company/helpers/workingDays.js'),
         '@taskTreeRules': path.resolve(__dirname, '../Modules/Tasks/helpers/taskTreeRules.js'),
+        '@formLogic': path.resolve(__dirname, '../Modules/Forms/helpers/formLogic.js'),
       },
     },
     plugins: [

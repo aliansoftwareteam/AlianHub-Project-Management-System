@@ -74,7 +74,7 @@
                     <tbody>
                         <tr v-for="row in sortedRows" :key="row.userId">
                             <td class="ubc-td-user">
-                                <UserProfile
+                                <UserProfile decorative
                                     :data="{ image: getUserProfile(row.userId).Employee_profileImageURL, title: row.userName }"
                                     :showDot="getUserProfile(row.userId).isOnline"
                                     width="26px"
