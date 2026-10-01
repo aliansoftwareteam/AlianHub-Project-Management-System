@@ -7901,6 +7901,7 @@ export default {
         "unlock_custom_field": "कस्टम फ़ील्ड अनलॉक करने के लिए",
         "to_unlock_milestone": "माइलस्टोन अनलॉक करने के लिए",
         "to_unlock_milestone_report": "माइलस्टोन रिपोर्ट अनलॉक करने के लिए",
+        "to_unlock_project_timesheet": "To Unlock Project Timesheet",
         "to_unlock_security": "सुरक्षा और अनुमतियाँ अनलॉक करने के लिए",
         "to_unlock_team": "टीम को अनलॉक करें",
         "to_unlcok_project": "प्रोजेक्ट अनलॉक करने के लिए",

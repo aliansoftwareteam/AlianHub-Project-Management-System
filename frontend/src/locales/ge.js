@@ -7901,6 +7901,7 @@ export default {
         "unlock_custom_field": "Zum Freischalten des benutzerdefinierten Feldes",
         "to_unlock_milestone": "Zum Freischalten von Meilensteinen",
         "to_unlock_milestone_report": "Zum Freischalten von Meilensteinberichten",
+        "to_unlock_project_timesheet": "To Unlock Project Timesheet",
         "to_unlock_security": "Zum Freischalten von Sicherheit & Berechtigungen",
         "to_unlock_team": "Team entsperren",
         "to_unlcok_project": "Zum Freischalten des Projekts",

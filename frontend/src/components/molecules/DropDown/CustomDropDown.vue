@@ -122,10 +122,7 @@ const props = defineProps({
         type:String,
         default:''
     },
-    themed: {
-        type: Boolean,
-        default: false
-    }
+    themed: { type: Boolean, default: true }
 });
 
 const dropdownVisible = ref(false);

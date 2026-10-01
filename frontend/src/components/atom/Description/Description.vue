@@ -500,7 +500,6 @@ function openDescriptionWithAi () {
             title: t('AI.please_upgrade_plan_to_use_ai'),
             text: t('AI.ai_available_on_paid_plans_upgrade_now'),
             icon: 'info',
-            confirmButtonColor: '#28C76F',
             confirmButtonText: t('Header.upgrade_now'),
             showCloseButton:true    
         }).then((result) => {
@@ -530,7 +529,6 @@ function openAiWriteDescription() {
             title: t('AI.please_upgrade_plan_to_use_ai'),
             text: t('AI.ai_available_on_paid_plans_upgrade_now'),
             icon: 'info',
-            confirmButtonColor: '#28C76F',
             confirmButtonText: t('Header.upgrade_now'),
             showCloseButton:true
         }).then((result) => {

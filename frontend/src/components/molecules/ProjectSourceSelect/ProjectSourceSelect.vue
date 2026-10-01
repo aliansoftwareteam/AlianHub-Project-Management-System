@@ -127,10 +127,10 @@ const onSidebarSelected = (option) => {
 .source-select__option {
     padding: 6px 4px;
     font-size: 13px;
-    color: #535358;
+    color: var(--ink-2);
 }
 .source-select__option--active {
-    color: #2F3990;
+    color: var(--brand);
     font-weight: 500;
 }
 </style>

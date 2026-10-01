@@ -7901,6 +7901,7 @@ export default {
         "unlock_custom_field": "Чтобы разблокировать пользовательское поле",
         "to_unlock_milestone": "Чтобы разблокировать этап",
         "to_unlock_milestone_report": "Чтобы разблокировать отчет по этапу",
+        "to_unlock_project_timesheet": "To Unlock Project Timesheet",
         "to_unlock_security": "Чтобы разблокировать безопасность и разрешения",
         "to_unlock_team": "Разблокировать команду",
         "to_unlcok_project": "Чтобы разблокировать проект",

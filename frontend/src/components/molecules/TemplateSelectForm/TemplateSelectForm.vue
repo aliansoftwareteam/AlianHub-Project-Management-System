@@ -12,8 +12,7 @@
         <ul class="templated_name_ul position-re">
             <li v-for="(tempVal, index) in templates" :key="tempVal._id || index" class="cursor-pointer" :class="[{ 'temp_save_value': tempVal.isShowSave }]">
                 <span v-if="editingIndex !== index"
-                    :class="[{ 'temp_save_dot': tempVal.isShowSave }, isMobile ? 'templated-name-mobile' : 'templated-name-desktop']"
-                    :style="isSelected(tempVal) ? 'color: #3845B3 !important; font-weight: 500' : ''"
+                    :class="[{ 'temp_save_dot': tempVal.isShowSave, 'is-selected': isSelected(tempVal) }, isMobile ? 'templated-name-mobile' : 'templated-name-desktop']"
                     :title="tempVal.TemplateName" @click="selectTemplate(tempVal)"
                     class="templated_name text-ellipsis"> {{ tempVal.TemplateName }} </span>
                 <input v-else type="text" class="statusInputText form-control edit-input statuseditInput" :maxlength="50" v-model.trim="editName" @keypress.enter="confirmRename(tempVal, index)" @input="errTempMsg = ''"/>
@@ -186,6 +185,11 @@ defineExpose({ closeInputs });
 @import '@/components/templates/CreateProject/style.css';
 </style>
 <style scoped>
+/* A themed host sets --tsf-selected; every other host keeps the light-page blue. */
+.templated_name.is-selected {
+    color: var(--tsf-selected, #3845B3) !important;
+    font-weight: 500;
+}
 /* Sticky so Back / template name / Save Template stay visible while the list scrolls under
    them; the solid background keeps scrolled rows from showing through. */
 .tsf-substep-header {

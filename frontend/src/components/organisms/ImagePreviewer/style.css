@@ -9,7 +9,10 @@
     top: 0;
     left: 0;
     z-index: 99;
-    background-color: #1a1a1a;
+    /* A lightbox is dark in both themes, like the rail. */
+    background-color: var(--rail);
+    color: var(--rail-ink-strong);
+    color-scheme: dark;
 
     font-family: sans-serif;
 }
@@ -44,7 +47,7 @@
     z-index: 3;
     padding: 0px 15px 15px;
     padding-bottom: 15px;
-    background: linear-gradient(0deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.56) 60%, rgba(0,0,0,0) 100%);
+    background: linear-gradient(0deg, var(--rail) 0%, color-mix(in srgb, var(--rail) 56%, transparent) 60%, transparent 100%);
     bottom: -130px;
     transition: all 0.2s ease;
     
@@ -57,13 +60,12 @@
     bottom: 0;
     padding-bottom: 25px;
     height: 200px;
-    background: linear-gradient(0deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0) 100%);
+    background: linear-gradient(0deg, var(--rail) 0%, color-mix(in srgb, var(--rail) 50%, transparent) 50%, transparent 100%);
 }
 
 .images_container .filler-div {
     min-width: calc(50% - 60px);
     content: '';
-    background-color: red;
     height: fit-content;
 }
 
@@ -86,7 +88,7 @@
 }
 
 .button-style {
-    background: radial-gradient(circle, rgba(0,0,0,1) 0%, rgba(0,0,0,0.8) 80%, rgba(0,0,0,0) 100%);
+    background: radial-gradient(circle, var(--rail) 0%, color-mix(in srgb, var(--rail) 80%, transparent) 80%, transparent 100%);
     border-radius: 50%;
     cursor: pointer;
     display: flex;

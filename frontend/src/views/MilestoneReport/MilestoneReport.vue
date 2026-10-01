@@ -62,6 +62,7 @@
                                         <button @click.stop.prevent="handleFilter(chip,chipKey,'remove')" type="button" :aria-label="$t('Reports.remove_filter')">×</button>
                                     </span>
                                 </span>
+                                <span class="ah-mask-icon wf_filter__icon" :style="maskOf(filterIcon)" aria-hidden="true"></span>
                             </div>
                         </div>
                     </div>
@@ -125,6 +126,7 @@
     import { useI18n } from 'vue-i18n';
     const { t } = useI18n();
     const homeIcon = require('@/assets/images/svg/Home.svg');
+    const filterIcon = require('@/assets/images/svg/filter_icon.svg');
     // getter and permission
     const { getters,dispatch} = useStore();
     const { checkPermission } = useCustomComposable();

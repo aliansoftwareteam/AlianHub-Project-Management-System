@@ -8053,6 +8053,7 @@ export default {
         unlock_custom_field: "To Unlock Custom Field",
         to_unlock_milestone: "To Unlock Milestone",
         to_unlock_milestone_report: "To Unlock Milestone Report",
+        to_unlock_project_timesheet: "To Unlock Project Timesheet",
         to_unlock_security: "To Unlock Security & Permissions",
         to_unlock_team: "To Unlock Team",
         to_unlcok_project: "To Unlock Project",
