@@ -77,9 +77,9 @@ const readDeclared = async ({ companyId, actor, url, declaredHosts, credential, 
 };
 
 /* A connector's call to its provider: the host is fixed in code, never taken from a task or a model, and the call
- * always names a workspace, so that workspace's egress list applies to it like any other agent fetch. The token
+ * always names a workspace, so that workspace's egress list applies to it like any other agent fetch. A token
  * lives only in the Authorization header, which safeFetch drops at the first hop to another origin, and no
- * redirect is followed. Nothing read here enters a run's context, so no host is noted as a taint source. */
+ * redirect is followed. A token endpoint takes its credentials in the form instead and is sent no such header. Nothing read here enters a run's context, so no host is noted as a taint source. */
 const callProvider = async (url, { form = {}, token, timeoutMs, maxBytes } = {}) => {
     if (!(egressContext.get() || {}).companyId) {
         throw Object.assign(new Error('a connector call names no workspace, so it was refused'), { code: 'no_workspace' });
@@ -90,7 +90,7 @@ const callProvider = async (url, { form = {}, token, timeoutMs, maxBytes } = {})
         timeoutMs,
         maxBytes,
         maxRedirects: 0,
-        headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Bearer ${token}` },
+        headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     });
     return { status: res.status, headers: res.headers || {}, body: res.body };
 };

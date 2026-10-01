@@ -1997,10 +1997,13 @@ const schema = {
         // Moves on with every save; a save names the version it read, so two console tabs cannot drop each other's hosts.
         version: { type: Number, required: false },
     },
-    // One row per workspace and connector (Modules/Agents/connectors). Tokens live in `secrets` by handle, never here.
+    // One row per workspace and connector, or per person and connector when the connection is a person's own
+    // (Modules/Agents/connectors). Tokens live in `secrets` by handle, never here.
     connectorConnections: {
         connector: { type: String, required: true },
-        // { bot_token: 'sec_…', signing_secret: 'sec_…' }
+        // The person a personal connection belongs to; absent on a workspace connection.
+        userId: { type: String, required: false },
+        // { bot_token: 'sec_…', signing_secret: 'sec_…' } or { refresh_token: 'sec_…', access_token: 'sec_…' }
         secretHandles: { type: Object, default: {}, required: false },
         secretSetAt: { type: Object, default: {}, required: false },
         team: { type: Object, required: false },
@@ -2010,10 +2013,22 @@ const schema = {
         // [{ id, name, read, post }] the channels an owner or admin chose and what agents may do in each; a row
         // without the two ticks is from before reading existed and means post only
         allowedChannels: { type: Array, default: [], required: false },
-        // connected | broken
+        // connected | broken, and for a person's connection also pending | revoked
         status: { type: String, default: 'connected', required: false },
         brokenReason: { type: String, required: false },
         brokenAt: { type: Date, required: false },
+        // What the provider granted, and { email, sub } of the account the person connected
+        scopes: { type: [String], default: undefined, required: false },
+        account: { type: Object, required: false },
+        accessExpiresAt: { type: Date, required: false },
+        connectedAt: { type: Date, required: false },
+        lastUsedAt: { type: Date, required: false },
+        lastRefreshedAt: { type: Date, required: false },
+        // { stateHash, verifier, sessionId, origin } of a connect attempt in progress; cleared when it is used
+        oauth: { type: Object, required: false },
+        disconnectedAt: { type: Date, required: false },
+        // self | admin | member_removed
+        disconnectedBy: { type: String, required: false },
         lastPostAt: { type: Date, required: false },
         lastReadAt: { type: Date, required: false },
         createdBy: { type: String, required: false },

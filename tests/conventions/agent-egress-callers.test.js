@@ -51,6 +51,10 @@ const FETCHERS = {
         uses: ['helper:agentFetch.*'],
         reach: () => require('../../Modules/Agents/connectors/slackApi').call({ companyId: CID, actor: ACTOR, token: 'xoxb-not-a-real-token', method: 'auth.test' }),
     },
+    'Modules/Agents/connectors/googleApi.js': {
+        uses: ['helper:agentFetch.*'],
+        reach: () => require('../../Modules/Agents/connectors/googleApi').revoke({ companyId: CID, actor: ACTOR, token: 'not-a-real-token' }),
+    },
     'Modules/AgentSessions/announce.js': {
         uses: ['helper:agentFetch.*'],
         reach: () => require('../../Modules/AgentSessions/announce').deliver({ companyId: CID, actor: ACTOR, url: 'https://agent.example.com/hooks/alianhub', body: '{}', headers: {} }),
