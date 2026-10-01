@@ -622,6 +622,20 @@ const schema = {
                 done: { type: Boolean, required: false },
                 updatedBy: { type: String, required: false },
                 updatedAt: { type: Date, required: false },
+                sources: {
+                    sprintIds: { type: [String], default: undefined, required: false },
+                    taskIds: { type: [String], default: undefined, required: false },
+                },
+                counted: {
+                    done: { type: Number, required: false },
+                    total: { type: Number, required: false },
+                    at: { type: Date, required: false },
+                    skipped: {
+                        sprintIds: { type: [String], default: undefined, required: false },
+                        taskIds: { type: [String], default: undefined, required: false },
+                    },
+                },
+                dirty: { type: Boolean, required: false },
             }],
             default: [],
             required: false,

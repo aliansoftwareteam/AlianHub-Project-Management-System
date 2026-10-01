@@ -311,7 +311,7 @@ describe('what a request may hold', () => {
         ['color', { name: 'N', color: '#12345' }],
         ['targets', { name: 'N', targets: {} }],
         ['targets.0', { name: 'N', targets: ['Launched'] }],
-        ['targets.1.kind', { name: 'N', targets: [LAUNCH, { name: 'T', kind: 'tasks' }] }],
+        ['targets.1.kind', { name: 'N', targets: [LAUNCH, { name: 'T', kind: 'epic' }] }],
         ['ownerUserId', { name: 'N', ownerUserId: ADMIN }],
         ['progressPct', { name: 'N', progressPct: 100 }],
         ['deletedStatusKey', { name: 'N', deletedStatusKey: 0 }],
@@ -337,7 +337,7 @@ describe('what a request may hold', () => {
     it.each([
         ['body', 'Launched'],
         ['kind', { name: 'T' }],
-        ['kind', { name: 'T', kind: 'tasks' }],
+        ['kind', { name: 'T', kind: 'epic' }],
         ['kind', { name: 'T', kind: ['number'] }],
         ['name', { kind: 'boolean' }],
         ['name', { kind: 'number', name: '', target: 1 }],
@@ -478,10 +478,10 @@ describe('the stored row', () => {
     });
 
     it('drops what a target was not declared to hold', () => {
-        const cast = new Goal({ name: 'N', ownerUserId: AUTHOR, visibility: 'private', targets: [{ id: 't', name: 'T', kind: 'boolean', done: true, sources: { taskIds: ['x'] } }], stray: 1 });
+        const cast = new Goal({ name: 'N', ownerUserId: AUTHOR, visibility: 'private', targets: [{ id: 't', name: 'T', kind: 'boolean', done: true, secret: { taskIds: ['x'] } }], stray: 1 });
         const kept = cast.toObject({ minimize: false });
         expect('stray' in kept).toBe(false);
-        expect('sources' in kept.targets[0]).toBe(false);
+        expect('secret' in kept.targets[0]).toBe(false);
     });
 
     it('is only ever changed in fields its schema declares', async () => {

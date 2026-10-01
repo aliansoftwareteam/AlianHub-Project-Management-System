@@ -6,19 +6,19 @@ const { ACTIVE_SEAT } = require('../../Config/seatStatus');
 const { ROLE_GUEST, isPrivileged } = require('../../Config/roleTypes');
 const { isNarrowed } = require('../../Config/tokenNarrowing');
 const logger = require('../../Config/loggerConfig');
-const socketEmitter = require('../../event/socketEventEmitter');
 const { recordAuditFromReq } = require('../Audit/recorder');
 const access = require('./helpers/goalAccess');
 const rules = require('./helpers/goalRules');
 const { withProgress } = require('./helpers/goalProgress');
+const { LIVE, ARCHIVED, crud, announce, writeAtRevision } = require('./goalStore');
+const sources = require('./goalSources');
+const counts = require('./goalCounts');
 
 const { GoalRefused } = rules;
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
-const LIVE = 0;
-const ARCHIVED = 2;
 const WRITE_ATTEMPTS = 3;
-const SOCKET_MODULE = 'goals';
+const AUDIENCE_FIELDS = Object.freeze(['visibility', 'sharedWith', 'ownerUserId']);
 
 const NOT_FOUND = 'Goal not found.';
 const TARGET_NOT_FOUND = 'Target not found.';
@@ -31,29 +31,55 @@ const FAILED = 'Something went wrong with the goal.';
 const refuse = (res, statusCode, statusText, message, extra = {}) => res.status(statusCode).json({ status: false, statusText, message, ...extra });
 const stop = (statusCode, statusText) => Object.assign(new Error(statusText), { statusCode, stopped: true });
 
-const crud = (companyId, data, method) => MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.GOALS, data }, method);
 const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
 const newId = () => new mongoose.Types.ObjectId().toString();
 const sameId = (a, b) => String(a) === String(b);
 
-const presentTarget = (target) => ({
+/* A reader is given the sources the number is built from, which every reader can open. The ones left out
+ * are named for those who can change them; a reader learns only how many there are. */
+const presentCount = (target, { canEdit, live, now }) => {
+    const all = sources.sourcesOf(target);
+    const counted = target.counted || {};
+    const skipped = { ...sources.none(), ...(counted.skipped || {}) };
+    const kept = (kind) => all[kind].filter((id) => !skipped[kind].map(String).includes(id));
+    return {
+        sources: canEdit ? all : { sprintIds: kept('sprintIds'), taskIds: kept('taskIds') },
+        counted: { done: counted.done || 0, total: counted.total || 0, at: counted.at || null },
+        notCounted: skipped.sprintIds.length + skipped.taskIds.length,
+        ...(canEdit ? { notCountedSources: { sprintIds: skipped.sprintIds.map(String), taskIds: skipped.taskIds.map(String) } } : {}),
+        dirty: target.dirty === true,
+        updating: live && counts.isDue(target, now),
+    };
+};
+
+const VALUE_OF = Object.freeze({
+    [rules.BOOLEAN]: (target) => ({ done: target.done === true }),
+    [rules.TASKS]: presentCount,
+});
+const measuredValue = (target) => ({
+    start: target.start,
+    target: target.target,
+    current: target.current,
+    unit: target.unit || '',
+    ...(target.kind === rules.CURRENCY ? { currencyCode: target.currencyCode } : {}),
+});
+
+const presentTarget = (target, view) => ({
     id: String(target.id),
     name: target.name,
     kind: target.kind,
     weight: target.weight || 1,
     progressPct: target.progressPct || 0,
     reachedAt: target.reachedAt || null,
-    ...(target.kind === rules.BOOLEAN
-        ? { done: target.done === true }
-        : { start: target.start, target: target.target, current: target.current, unit: target.unit || '' }),
-    ...(target.kind === rules.CURRENCY ? { currencyCode: target.currencyCode } : {}),
+    ...(VALUE_OF[target.kind] || measuredValue)(target, view),
     updatedBy: target.updatedBy || '',
     updatedAt: target.updatedAt || null,
 });
 
 /* The people a goal is shared with are listed for those who manage the list; a reader learns only whether they are on it. */
-const present = (goal, caller) => {
+const present = (goal, caller, now = new Date()) => {
     const canEdit = access.canEdit(goal, caller);
+    const view = { canEdit, live: goal.deletedStatusKey === LIVE, now };
     return {
         _id: String(goal._id),
         name: goal.name,
@@ -67,7 +93,7 @@ const present = (goal, caller) => {
         isOwner: access.isOwner(goal, caller),
         color: goal.color || '',
         progressPct: goal.progressPct || 0,
-        targets: (goal.targets || []).map(presentTarget),
+        targets: (goal.targets || []).map((target) => presentTarget(target, view)),
         archived: goal.deletedStatusKey === ARCHIVED,
         canEdit,
         canSetValue: access.canSetValue(goal, caller),
@@ -82,9 +108,6 @@ const sent = (res, statusText, goal, caller) => res.status(200).json({
     statusText,
     data: goal && access.canSee(goal, caller) ? present(goal, caller) : null,
 });
-
-/* Only the fact of a change leaves the request: which goal it was would tell a member about goals they cannot read. */
-const announce = (type, companyId) => socketEmitter.emit(type, { type, companyId, module: SOCKET_MODULE });
 
 /* The audit log is read by owners and admins, so it records a goal only while the whole workspace can read that goal. */
 const audit = (req, action, goal, { was, fields } = {}) => {
@@ -121,7 +144,7 @@ const handled = (where, handler) => async (req, res) => {
         if (!caller) return undefined;
         return await handler(req, res, caller);
     } catch (error) {
-        if (error instanceof GoalRefused) return refuse(res, 400, 'Request refused', error.message, { field: error.field });
+        if (error instanceof GoalRefused) return refuse(res, 400, 'Request refused', error.message, { field: error.field, ...error.extra });
         if (error && error.stopped) return refuse(res, error.statusCode, error.message, error.message);
         if (error instanceof TenantError) return refuse(res, error.statusCode, 'Forbidden', error.message);
         logger.error(`goals ${where}: ${error.message || error}`);
@@ -149,11 +172,7 @@ const mutate = async (caller, id, allowed, change, { archivedToo = false } = {})
         if (!allowed(goal, caller)) throw stop(403, FORBIDDEN);
         if (!archivedToo && goal.deletedStatusKey !== LIVE) throw stop(409, IS_ARCHIVED);
         const set = await change(goal);
-        const saved = await crud(caller.companyId, [
-            { _id: goal._id, revision: Number(goal.revision) || 0 },
-            { $set: { ...set, updatedBy: caller.uid }, $inc: { revision: 1 } },
-            { returnDocument: 'after', lean: true },
-        ], 'findOneAndUpdate');
+        const saved = await writeAtRevision(caller.companyId, goal, { ...set, updatedBy: caller.uid });
         if (saved) return { was: goal, saved };
     }
     throw stop(409, BUSY);
@@ -206,6 +225,13 @@ const targetOf = (goal, targetId) => {
 
 const withTarget = (goal, target) => (goal.targets || []).map((entry) => (sameId(entry.id, target.id) ? target : entry));
 
+const newTarget = (target, caller, now) => ({ id: newId(), ...target, ...(target.kind === rules.TASKS ? {} : valueStamp(caller, now)) });
+
+/* A read answers with the stored numbers at once; a count that is due is made again behind it. */
+const recountBehind = (companyId, goals, now) => goals
+    .filter((goal) => counts.hasDue(goal, now))
+    .forEach((goal) => counts.recountSoon(companyId, goal._id));
+
 exports.listGoals = handled('list', async (req, res, caller) => {
     const archived = rules.flagQuery(req.query, 'archived');
     const mine = rules.flagQuery(req.query, 'mine');
@@ -214,14 +240,18 @@ exports.listGoals = handled('list', async (req, res, caller) => {
         null,
         { lean: true },
     ], 'find') || [];
-    const data = goals
-        .filter((goal) => !mine || access.isOwner(goal, caller) || access.isNamed(goal, caller))
-        .map((goal) => present(goal, caller))
-        .sort((a, b) => a.name.localeCompare(b.name));
+    const now = new Date();
+    const listed = goals.filter((goal) => !mine || access.isOwner(goal, caller) || access.isNamed(goal, caller));
+    recountBehind(caller.companyId, listed, now);
+    const data = listed.map((goal) => present(goal, caller, now)).sort((a, b) => a.name.localeCompare(b.name));
     return res.status(200).json({ status: true, statusText: 'Goals fetched successfully.', data });
 });
 
-exports.getGoal = handled('get', async (req, res, caller) => sent(res, 'Goal fetched successfully.', await visibleGoal(caller, req.params.id), caller));
+exports.getGoal = handled('get', async (req, res, caller) => {
+    const goal = await visibleGoal(caller, req.params.id);
+    recountBehind(caller.companyId, [goal], new Date());
+    return sent(res, 'Goal fetched successfully.', goal, caller);
+});
 
 exports.createGoal = handled('create', async (req, res, caller) => {
     if (!access.canCreate(caller)) return refuse(res, 403, FORBIDDEN, FORBIDDEN);
@@ -235,7 +265,10 @@ exports.createGoal = handled('create', async (req, res, caller) => {
         return refuse(res, 400, 'Request refused', `A person can own at most ${rules.MAX_GOALS_PER_OWNER} goals.`, { field: 'name' });
     }
     const now = new Date();
-    const targets = newTargets.map((target) => ({ id: newId(), ...target, ...valueStamp(caller, now) }));
+    for (const [index, target] of newTargets.entries()) {
+        if (target.kind === rules.TASKS) await sources.requireCountable(caller.companyId, caller.uid, goal, target.sources, `targets.${index}.sources`);
+    }
+    const targets = await counts.recounted(caller.companyId, { ...goal, targets: newTargets.map((target) => newTarget(target, caller, now)) }, { now });
     const saved = plain(await crud(caller.companyId, {
         ...goal,
         ...withProgress(targets, now),
@@ -257,7 +290,16 @@ exports.updateGoal = handled('update', async (req, res, caller) => {
         requireUnsharedWhenPrivate(next, fields.sharedWith);
         if (fields.sharedWith) await requireActiveMembers(caller.companyId, fields.sharedWith);
         if (fields.ownerUserId && !sameId(fields.ownerUserId, goal.ownerUserId)) await requireOwnerSeat(caller.companyId, fields.ownerUserId);
-        return next.visibility === access.PRIVATE ? { ...fields, sharedWith: [] } : fields;
+        const set = next.visibility === access.PRIVATE ? { ...fields, sharedWith: [] } : fields;
+        const reshaped = AUDIENCE_FIELDS.find((key) => fields[key] !== undefined);
+        if (!reshaped || !(goal.targets || []).some(sources.holdsSources)) return set;
+        const reshapedGoal = { ...goal, ...set };
+        const dropped = await sources.wouldDrop(caller.companyId, goal, reshapedGoal);
+        if (dropped.sprintIds.length || dropped.taskIds.length) {
+            throw new GoalRefused(reshaped, 'cannot change while the goal counts tasks that not everyone who would read it can open. Remove those sources first', { code: 'sources_would_drop', sources: dropped });
+        }
+        const now = new Date();
+        return { ...set, ...withProgress(await counts.recounted(caller.companyId, reshapedGoal, { now }), now) };
     });
     announce('update', caller.companyId);
     audit(req, 'goal.update', saved, { was, fields: Object.keys(fields) });
@@ -280,8 +322,11 @@ exports.addTarget = handled('add target', async (req, res, caller) => {
     const { saved } = await mutate(caller, req.params.id, access.canEdit, async (goal) => {
         if ((goal.targets || []).length >= rules.MAX_TARGETS) throw new GoalRefused('targets', `holds at most ${rules.MAX_TARGETS} targets`);
         await requireCurrencies(caller.companyId, [target]);
+        if (target.kind === rules.TASKS) await sources.requireCountable(caller.companyId, caller.uid, goal, target.sources);
         const now = new Date();
-        return withProgress([...(goal.targets || []), { id: newId(), ...target, ...valueStamp(caller, now) }], now);
+        const added = newTarget(target, caller, now);
+        const targets = await counts.recounted(caller.companyId, { ...goal, targets: [...(goal.targets || []), added] }, { now, only: (entry) => entry.id === added.id });
+        return withProgress(targets, now);
     });
     announce('update', caller.companyId);
     return sent(res, 'Target added.', saved, caller);
@@ -292,7 +337,11 @@ exports.editTarget = handled('edit target', async (req, res, caller) => {
         const stored = targetOf(goal, req.params.targetId);
         const edited = rules.parseTargetEdit(req.body, stored);
         if (edited.currencyCode !== stored.currencyCode) await requireCurrencies(caller.companyId, [edited]);
-        return withProgress(withTarget(goal, edited));
+        const relinked = stored.kind === rules.TASKS && edited.sources !== stored.sources;
+        if (relinked) await sources.requireCountable(caller.companyId, caller.uid, goal, edited.sources);
+        const now = new Date();
+        const targets = await counts.recounted(caller.companyId, { ...goal, targets: withTarget(goal, edited) }, { now, only: (entry) => relinked && sameId(entry.id, edited.id) });
+        return withProgress(targets, now);
     });
     announce('update', caller.companyId);
     return sent(res, 'Target saved.', saved, caller);

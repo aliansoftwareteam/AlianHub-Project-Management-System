@@ -8,6 +8,8 @@ const MAX_SHARED = 100;
 const MAX_WEIGHT = 100;
 const MAX_AMOUNT = 1e15;
 const MAX_GOALS_PER_OWNER = 200;
+const MAX_SOURCE_LISTS = 20;
+const MAX_SOURCE_TASKS = 100;
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -17,7 +19,8 @@ const CURRENCY_CODE = /^[A-Z]{3}$/;
 const NUMBER = 'number';
 const CURRENCY = 'currency';
 const BOOLEAN = 'boolean';
-const TARGET_KINDS = Object.freeze([NUMBER, CURRENCY, BOOLEAN]);
+const TASKS = 'tasks';
+const TARGET_KINDS = Object.freeze([NUMBER, CURRENCY, BOOLEAN, TASKS]);
 
 const CREATE_KEYS = Object.freeze(['name', 'description', 'periodStart', 'periodEnd', 'visibility', 'sharedWith', 'color', 'targets']);
 const UPDATE_KEYS = Object.freeze(['name', 'description', 'periodStart', 'periodEnd', 'visibility', 'sharedWith', 'color', 'ownerUserId']);
@@ -27,15 +30,19 @@ const TARGET_KEYS = Object.freeze({
     [NUMBER]: MEASURED_KEYS,
     [CURRENCY]: [...MEASURED_KEYS, 'currencyCode'],
     [BOOLEAN]: ['name', 'kind', 'weight', 'done'],
+    [TASKS]: ['name', 'kind', 'weight', 'sources'],
 });
+const MEASURED_KINDS = Object.freeze([NUMBER, CURRENCY]);
 const VALUE_KEY = Object.freeze({ [NUMBER]: 'current', [CURRENCY]: 'current', [BOOLEAN]: 'done' });
 const definitionKeys = (kind) => TARGET_KEYS[kind].filter((key) => key !== 'kind' && key !== VALUE_KEY[kind]);
 
+/* `extra` travels to the response beside the field: a `code` the page can word itself, and the sources a refusal names. */
 class GoalRefused extends Error {
-    constructor(field, reason) {
+    constructor(field, reason, extra = {}) {
         super(`${field} ${reason}`);
         this.name = 'GoalRefused';
         this.field = field;
+        this.extra = extra;
     }
 }
 
@@ -89,6 +96,21 @@ const peopleOf = (value, field) => {
     return [...new Set(value)];
 };
 
+const idsOf = (value, field, max) => {
+    if (!Array.isArray(value) || value.length > max || !value.every((id) => typeof id === 'string' && OBJECT_ID.test(id))) {
+        throw new GoalRefused(field, `must be a list of at most ${max} ids`);
+    }
+    return [...new Set(value)];
+};
+
+const SOURCE_LIMITS = Object.freeze({ sprintIds: MAX_SOURCE_LISTS, taskIds: MAX_SOURCE_TASKS });
+
+const sourcesOf = (value, field) => {
+    onlyKnownKeys(value, Object.keys(SOURCE_LIMITS), `${field}.`);
+    return Object.fromEntries(Object.entries(SOURCE_LIMITS)
+        .map(([key, max]) => [key, value[key] === undefined ? [] : idsOf(value[key], `${field}.${key}`, max)]));
+};
+
 const FIELD_RULES = Object.freeze({
     name: nameOf,
     description: (value, field) => textOf(value, field, MAX_DESCRIPTION),
@@ -121,6 +143,7 @@ const TARGET_RULES = Object.freeze({
         return value;
     },
     done: flagOf,
+    sources: sourcesOf,
 });
 
 const checked = (body, rules, at = '') => Object.fromEntries(Object.keys(body)
@@ -141,6 +164,7 @@ const parseNewTarget = (body, at = '') => {
     if (fields.name === undefined) throw new GoalRefused(`${at}name`, 'is required');
     const base = { name: fields.name, kind, weight: fields.weight === undefined ? 1 : fields.weight };
     if (kind === BOOLEAN) return { ...base, done: fields.done === true };
+    if (kind === TASKS) return { ...base, sources: fields.sources || sourcesOf({}, `${at}sources`) };
     if (fields.target === undefined) throw new GoalRefused(`${at}target`, 'is required');
     if (kind === CURRENCY && fields.currencyCode === undefined) throw new GoalRefused(`${at}currencyCode`, 'is required');
     const start = fields.start === undefined ? 0 : fields.start;
@@ -162,11 +186,12 @@ const parseTargetEdit = (body, stored) => {
     const fields = checked(body, TARGET_RULES);
     if (!Object.keys(fields).length) throw new GoalRefused('body', 'names nothing to change');
     const edited = { ...stored, ...fields };
-    if (stored.kind !== BOOLEAN) requireRange(edited);
+    if (MEASURED_KINDS.includes(stored.kind)) requireRange(edited);
     return edited;
 };
 
 const parseTargetValue = (body, stored) => {
+    if (stored.kind === TASKS) throw new GoalRefused('current', 'is counted from tasks and cannot be set by hand', { code: 'counted_from_tasks' });
     const key = VALUE_KEY[stored.kind];
     onlyKnownKeys(body, [key]);
     if (body[key] === undefined) throw new GoalRefused(key, 'is required');
@@ -200,6 +225,7 @@ const flagQuery = (query, key) => {
 };
 
 module.exports = {
-    MAX_TARGETS, MAX_NAME, MAX_DESCRIPTION, MAX_UNIT, MAX_SHARED, MAX_WEIGHT, MAX_GOALS_PER_OWNER, TARGET_KINDS, BOOLEAN, CURRENCY,
+    MAX_TARGETS, MAX_NAME, MAX_DESCRIPTION, MAX_UNIT, MAX_SHARED, MAX_WEIGHT, MAX_GOALS_PER_OWNER, MAX_SOURCE_LISTS, MAX_SOURCE_TASKS,
+    TARGET_KINDS, BOOLEAN, CURRENCY, TASKS,
     GoalRefused, parseGoalBody, parseNewTarget, parseTargetEdit, parseTargetValue, requirePeriodInOrder, flagQuery,
 };
