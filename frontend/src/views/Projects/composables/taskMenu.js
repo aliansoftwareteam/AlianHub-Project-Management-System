@@ -8,7 +8,7 @@ const hasSubtasks = (task) => Number(task.subTasks || 0) > 0;
  * what happens when an item is picked. */
 export const TASK_MENU = Object.freeze([
     { id: "rename", labelKey: "List.menu_rename", group: "task", shown: ({ rights }) => rights.rename },
-    { id: "subtask", labelKey: "List.menu_subtask", group: "task", shown: ({ rights, isSub }) => rights.subtask && !isSub },
+    { id: "subtask", labelKey: "List.menu_subtask", group: "task", shown: ({ rights, canNest }) => rights.subtask && canNest },
     { id: "copy-link", labelKey: "List.menu_copy_link", group: "task" },
     { id: "copy-key", labelKey: "List.menu_copy_key", group: "task", shown: ({ task }) => hasKey(task) },
     { id: "new-tab", labelKey: "List.menu_new_tab", group: "task" },
@@ -47,8 +47,10 @@ export function taskMenuRights(check, { archived = false } = {}) {
     };
 }
 
-export function taskMenuItems(task, rights, { isSub = task?.isParentTask === false } = {}) {
-    const context = { task: task || {}, rights: rights || {}, isSub };
+/* `canNest` says whether the task may take a subtask. A view that shows one level leaves it
+ * out, and only a top-level task is offered one there. */
+export function taskMenuItems(task, rights, { isSub = task?.isParentTask === false, canNest = !isSub } = {}) {
+    const context = { task: task || {}, rights: rights || {}, isSub, canNest };
     let group = null;
     return TASK_MENU
         .filter((item) => !item.shown || item.shown(context))

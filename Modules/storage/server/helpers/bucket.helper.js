@@ -387,6 +387,7 @@ const { updateCompanyFun, getCompanyDataFun } = require('../../../Company/contro
 const { DEFAULT_LIMITS, safeRelativePath } = require('../../../../utils/uploadConfig');
 const { USER_PROFILES_BUCKET, refuseBeforeWrite, refuseUpload, uploadRefusal } = require('../../bucketAccess');
 const { uploadScopeRefusal } = require('../../changeScope');
+const { isRowTrackshotKey } = require('../../../../common-storage/taskFileKeys');
 
 const storage = multer.diskStorage({
     destination: function (req, _, cb) {
@@ -545,6 +546,10 @@ exports.cleanUpTrackShotCompanyWise = async(companyId) => {
                 let updatedShots = [];
                 
                 for (const shot of ts.trackShots) {
+                    if (!isRowTrackshotKey(ts._id, shot.image)) {
+                        updatedShots.push({ ...shot, deleted: false });
+                        continue;
+                    }
                     try {
                         const filePath = path.join(__dirname, '../../../storage', companyId, shot.image);
                         fs.unlinkSync(filePath);

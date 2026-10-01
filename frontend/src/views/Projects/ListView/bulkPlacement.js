@@ -1,5 +1,6 @@
 import { creatableProjects } from "@/components/organisms/QuickCreateTask/quickCreateTask";
 import { storedTasks } from "./bulkUndo.js";
+import { REFUSALS, ancestorsOf } from "@taskTreeRules";
 
 const granted = (check, project, key) => check(key, project) === true;
 
@@ -21,7 +22,7 @@ export function parentTargets(projects, check) {
         .filter((project) => granted(check, project, "task.task_convert_to_subtask"));
 }
 
-/* A subtask whose parent is also selected travels with it, so only the others are loose. */
+/* A subtask travels with any selected task above it, on whatever level, so only the others are loose. */
 export function selectionShape(projectData, taskIds) {
     const wanted = new Set((taskIds || []).map(String));
     const found = new Map();
@@ -30,7 +31,8 @@ export function selectionShape(projectData, taskIds) {
         if (wanted.has(id) && !found.has(id)) found.set(id, task);
     }
     const subtasks = [...found.values()].filter((task) => task.isParentTask === false);
-    const looseSubtasks = subtasks.filter((task) => !wanted.has(String(task.ParentTaskId || "")));
+    const above = (task) => [String(task.ParentTaskId || ""), ...ancestorsOf(task)];
+    const looseSubtasks = subtasks.filter((task) => !above(task).some((id) => wanted.has(id)));
     return { count: wanted.size, subtasks: subtasks.length, looseSubtasks: looseSubtasks.length };
 }
 
@@ -62,6 +64,13 @@ const REASONS = {
     "subtask-moves-with-its-parent": "reason_subtask_moves_with_its_parent"
 };
 
+/* The server reports a failed conversion with the sentence of the rule it broke. */
+const TREE_REFUSALS = {
+    [REFUSALS.SUBTREE_TOO_DEEP]: "reason_subtree_too_deep",
+    [REFUSALS.PARENT_AT_MAX_DEPTH]: "reason_parent_at_max_depth",
+    [REFUSALS.PARENT_IS_DESCENDANT]: "reason_parent_is_descendant"
+};
+
 function commonest(list) {
     const counts = new Map();
     list.forEach((entry) => counts.set(entry?.reason, (counts.get(entry?.reason) || 0) + 1));
@@ -78,6 +87,11 @@ export function bulkReport(result, t) {
         const key = REASONS[commonest(skipped)] || "reason_skipped";
         parts.push(t("BulkActions.result_skipped", { n: skipped.length, reason: t(`BulkActions.${key}`) }));
     }
-    if (errors.length) parts.push(t("BulkActions.result_failed", { n: errors.length }));
+    if (errors.length) {
+        const key = TREE_REFUSALS[commonest(errors)];
+        parts.push(key
+            ? t("BulkActions.result_failed_reason", { n: errors.length, reason: t(`BulkActions.${key}`) })
+            : t("BulkActions.result_failed", { n: errors.length }));
+    }
     return parts.join(" — ");
 }

@@ -14,11 +14,14 @@ const NUMBER_TYPES = ['number', 'money'];
 const NUMERIC_TYPES = [...NUMBER_TYPES, 'rating', 'progress'];
 const LIST_TYPES = ['dropdown', 'people'];
 const BANDED_TYPES = [...NUMBER_TYPES, 'progress'];
+const SET_OR_EMPTY_TYPES = ['files'];
 const EMPTY_VALUES = [null, '', []];
 const CHECKED = [true, 'true'];
 
 export const GROUPABLE_TYPES = Object.freeze(['dropdown', 'checkbox', 'date', 'people', 'rating', ...BANDED_TYPES]);
-export const FILTERABLE_TYPES = Object.freeze(['dropdown', 'checkbox', 'date', 'people', ...NUMERIC_TYPES, ...TEXT_TYPES]);
+export const FILTERABLE_TYPES = Object.freeze(['dropdown', 'checkbox', 'date', 'people', ...NUMERIC_TYPES, ...TEXT_TYPES, ...SET_OR_EMPTY_TYPES]);
+
+export const isSortableField = (def) => typeModuleOf(def?.fieldType)?.sortable !== false;
 
 export const valuePath = (fieldId) => `customField.${fieldId}.fieldValue`;
 export const fieldIdOfPath = (path) => VALUE_PATH.exec(String(path || ''))?.[1] || null;
@@ -274,6 +277,7 @@ export function comparisonsFor(fieldType) {
     }
     if (fieldType === 'date') return [{ value: ':=', name: 'cf_on' }, { value: ':>', name: 'cf_after' }, { value: ':<', name: 'cf_before' }, IS_SET, IS_EMPTY];
     if (TEXT_TYPES.includes(fieldType)) return [{ value: ':~', name: 'cf_contains' }, { value: ':=', name: 'Is' }, IS_SET, IS_EMPTY];
+    if (SET_OR_EMPTY_TYPES.includes(fieldType)) return [IS_SET, IS_EMPTY];
     return [];
 }
 

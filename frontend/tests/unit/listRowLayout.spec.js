@@ -58,7 +58,9 @@ function px(value, local = {}) {
 
 const width = (selector) => px(declared(rule(base, selector), 'width'));
 const titleGap = () => px(declared(rule(base, '.lv2__title'), 'gap'));
-const subtaskInset = () => px(declared(rule(base, '.lv2__title--sub'), 'padding-left'));
+const subtaskInset = (depth = 1) => px(declared(rule(base, '.lv2__title--sub'), 'padding-left'), { '--lv2-depth': String(depth) });
+const parentCircle = () => width('.lv2__grip') + titleGap() + width('.lv2__disclose') + titleGap();
+const subtaskCircle = (depth) => subtaskInset(depth) + width('.lv2__disclose') + titleGap();
 
 describe('a subtask row is indented under its parent', () => {
     it('there is an indent token next to the density tokens', () => {
@@ -66,20 +68,26 @@ describe('a subtask row is indented under its parent', () => {
         expect(px('var(--row-indent)')).toBeGreaterThanOrEqual(12);
     });
 
-    it('the subtask title cell is indented by that token, not by a literal', () => {
+    it('the subtask title cell is indented by that token for each level it is down, not by a literal', () => {
         const indent = declared(rule(base, '.lv2__title--sub'), 'padding-left');
-        expect(indent).toContain('var(--row-indent)');
+        expect(indent).toContain('var(--row-indent) * var(--lv2-depth');
         expect(indent).not.toMatch(/\d+px/);
     });
 
-    it('its name starts one indent step to the right of the parent name', () => {
-        const parentName = width('.lv2__grip') + titleGap() + width('.lv2__disclose') + titleGap() + width('.lv2__status') + titleGap();
-        const subtaskName = subtaskInset() + width('.lv2__status') + titleGap();
-        expect(subtaskName - parentName).toBe(px('var(--row-indent)'));
+    it('a subtask keeps a place for its own disclosure, so its circle and name start one step right of the parent', () => {
+        expect(subtaskCircle(1) - parentCircle()).toBe(px('var(--row-indent)'));
+        expect(declared(rule(base, '.lv2__disclose--none'), 'visibility')).toBe('hidden');
     });
 
-    it('its status circle starts to the right of the parent status circle', () => {
-        expect(subtaskInset()).toBeGreaterThan(width('.lv2__grip') + titleGap() + width('.lv2__disclose') + titleGap());
+    it('a sub-subtask starts one more step to the right', () => {
+        expect(subtaskCircle(2) - subtaskCircle(1)).toBe(px('var(--row-indent)'));
+        expect(subtaskCircle(2) - parentCircle()).toBe(2 * px('var(--row-indent)'));
+    });
+});
+
+describe('the column headers sit on one line', () => {
+    it('every header is centred on the Task header, Done by included', () => {
+        expect(declared(rule(base, '.lv2__cols'), 'align-items')).toBe('center');
     });
 });
 
