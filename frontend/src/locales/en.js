@@ -3005,7 +3005,6 @@ export default {
         esc: "Esc",
         bulk_region: "Bulk task actions",
         bulk_no_options: "Nothing to choose from here.",
-        bulk_sprint_subtasks: "Subtasks move with their parent task.",
         bulk_failed: "That bulk change did not go through.",
         bulk_done: "Updated {n} tasks.",
         bulk_undo: "Undo",

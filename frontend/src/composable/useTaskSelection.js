@@ -1,7 +1,6 @@
 import { computed } from 'vue';
 import { useStore } from 'vuex';
 import { NAV_ATTR, readSequence } from '@/components/organisms/TaskDetailOverlay/taskNavigation';
-import { selectionMix, subtaskIdsIn } from './selectionKinds';
 
 // Rows carry data-task-nav in screen order, so the ids read here already follow the
 // view's filter, sort, grouping and collapsed groups.
@@ -25,8 +24,6 @@ export function useTaskSelection() {
     const count = computed(() => selectedTaskIds.value.length);
     const hasSelection = computed(() => selectedTaskIds.value.length > 0);
     const activeView = computed(() => store.state.taskSelection.activeView);
-    const selectedSubtaskIds = computed(() => subtaskIdsIn(store.state.projectData, selectedTaskIds.value));
-    const mix = computed(() => selectionMix(selectedTaskIds.value.length, selectedSubtaskIds.value.length));
 
     const isSelected = (taskId) => {
         if (!taskId) return false;
@@ -198,8 +195,6 @@ export function useTaskSelection() {
         count,
         hasSelection,
         activeView,
-        selectedSubtaskIds,
-        mix,
         isSelected,
         toggle,
         toggleAndCascade,

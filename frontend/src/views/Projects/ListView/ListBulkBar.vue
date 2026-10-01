@@ -7,11 +7,9 @@
                 type="button"
                 class="lv2-bulk__btn"
                 :disabled="working || !menu.enabled"
-                :title="menu.hint || null"
                 @click.stop="toggle(menu.key)"
             >{{ menu.label }} ▾</button>
             <div v-if="open === menu.key" class="lv2-bulk__menu" @click.stop>
-                <p v-if="menu.hint" class="lv2-bulk__note">{{ menu.hint }}</p>
                 <CalenderCompo
                     v-if="menu.calendar"
                     modelValue=""
@@ -175,10 +173,7 @@ const menus = computed(() => [
         key: "due", label: t("List.due_date"), enabled: canDue.value, calendar: true,
         options: [{ id: "clear", label: t("List.bulk_due_clear") }], pick: () => run("bulkUpdateDueDate", { DueDate: null })
     },
-    {
-        key: "sprint", label: t("List.sprint"), enabled: canMove.value && selection.mix.value !== "subtasks", options: sprints.value, pick: pickSprint,
-        hint: selection.selectedSubtaskIds.value.length ? t("List.bulk_sprint_subtasks") : ""
-    },
+    { key: "sprint", label: t("List.sprint"), enabled: canMove.value, options: sprints.value, pick: pickSprint },
     { key: "tags", label: t("List.tags"), enabled: canTag.value, options: tags.value, pick: pickTag }
 ].filter(Boolean));
 

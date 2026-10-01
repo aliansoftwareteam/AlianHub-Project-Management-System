@@ -1,5 +1,5 @@
 /* Task 045.4 — a subtask row in the List edits in place and joins bulk selection like a task row. */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { config, flushPromises, mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import { createStore } from 'vuex';
@@ -7,18 +7,9 @@ import { defineComponent, h, ref } from 'vue';
 import en from '@/locales/en';
 import taskSelection from '@/store/TaskSelection';
 
-const { apiRequest, toast } = vi.hoisted(() => ({
-    apiRequest: vi.fn(() => Promise.resolve({ data: [] })),
-    toast: { success: vi.fn(), error: vi.fn() }
-}));
-
-vi.mock('@/services', () => ({ apiRequest }));
-vi.mock('vue-toast-notification', () => ({ useToast: () => toast }));
-vi.mock('@/composable/aiAvailability', () => ({ aiUsable: ref(false), canUseAi: () => false }));
-vi.mock('@/views/Projects/TableView/useTaskSummaries.js', () => ({ useTaskSummaries: () => ({ generateMany: vi.fn() }) }));
+vi.mock('@/services', () => ({ apiRequest: vi.fn(() => Promise.resolve({ data: [] })) }));
 vi.mock('@/composable', () => ({
-    useCustomComposable: () => ({ checkPermission: () => true, debounce: (fn) => fn }),
-    useGetterFunctions: () => ({ getUser: (id) => ({ id, Employee_Name: `User ${id}` }) })
+    useCustomComposable: () => ({ checkPermission: () => true, debounce: (fn) => fn })
 }));
 vi.mock('@/views/Projects/helper.js', () => ({
     taskListHelper: () => ({ getSprintTasks: vi.fn(() => Promise.resolve()) }),
@@ -28,15 +19,10 @@ vi.mock('@/views/Projects/ListView/useProjectAgentActivity.js', () => ({
     useProjectAgentActivity: () => ({ runFor: () => null, proposalFor: () => null, load: () => {} })
 }));
 vi.mock('@/views/Projects/ListView/useListDragDrop.js', () => ({ useListDragDrop: () => ({ applyDrag: vi.fn() }) }));
-vi.mock('@/components/atom/CalenderCompo/CalenderCompo.vue', () => ({
-    default: { name: 'CalenderCompo', template: '<div class="cal-stub"><slot name="trigger" /></div>' }
-}));
 
 import ListRow from '@/views/Projects/ListView/ListRow.vue';
 import ListGroup from '@/views/Projects/ListView/ListGroup.vue';
-import ListBulkBar from '@/views/Projects/ListView/ListBulkBar.vue';
-import { useTaskSelection } from '@/composable/useTaskSelection.js';
-import { selectionMix, subtaskIdsIn } from '@/composable/selectionKinds.js';
+import { snapshotTasks } from '@/views/Projects/ListView/bulkUndo.js';
 
 const i18n = createI18n({ legacy: false, locale: 'en', messages: { en }, missingWarn: false, fallbackWarn: false });
 config.global.plugins = [i18n];
@@ -188,24 +174,6 @@ describe('a subtask row edits in place like a task row', () => {
     });
 });
 
-describe('the selection tells subtasks apart', () => {
-    const state = () => ({
-        tasks: { [PID]: { sprints: [SPRINT], [SPRINT]: { tasks: [parent(), loner()] } } },
-        searchedTasks: [parent({ _id: 't9', subtaskArray: [sub('s-z', { ParentTaskId: 't9' })] })]
-    });
-
-    it('finds the selected ids that are subtasks, in the sprint lists and in a search', () => {
-        expect(subtaskIdsIn(state(), ['t1', 's-a', 't2', 's-z', 'unknown'])).toEqual(['s-a', 's-z']);
-    });
-
-    it('names the mix of a selection', () => {
-        expect(selectionMix(0, 0)).toBe('none');
-        expect(selectionMix(3, 0)).toBe('tasks');
-        expect(selectionMix(2, 2)).toBe('subtasks');
-        expect(selectionMix(3, 1)).toBe('mixed');
-    });
-});
-
 const selectionStore = (selected = []) => createStore({
     modules: {
         taskSelection: { ...taskSelection, state: () => ({ selectedTaskIds: [...selected], lastAnchorId: null, activeView: 'list', activeProjectId: PID }) },
@@ -215,16 +183,6 @@ const selectionStore = (selected = []) => createStore({
             getters: {
                 tasks: (s) => s.tasks,
                 searchedTasks: (s) => s.searchedTasks
-            }
-        },
-        settings: {
-            namespaced: true,
-            getters: {
-                companyUsers: () => [],
-                companyOwnerDetail: () => ({ userId: 'owner' }),
-                companyPriority: () => [],
-                selectedCompany: () => ({ planFeature: {} }),
-                finalCustomFields: () => []
             }
         }
     }
@@ -286,58 +244,19 @@ describe('the List selects subtask rows on their own', () => {
         await wrapper.find('.row[data-id="t1"]').trigger('click');
         expect(selected(store)).toEqual(['s-a', 's-b', 't1']);
     });
-
-    it('useTaskSelection reports which selected ids are subtasks', () => {
-        const store = selectionStore(['t2', 's-a']);
-        let selection;
-        mount(defineComponent({ setup() { selection = useTaskSelection(); return () => null; } }), { global: { plugins: [store] } });
-        expect(selection.selectedSubtaskIds.value).toEqual(['s-a']);
-        expect(selection.mix.value).toBe('mixed');
-    });
 });
 
-describe('the bulk bar with subtasks in the selection', () => {
-    const project = {
-        _id: PID, ProjectCode: 'AH', ProjectName: 'Project', isGlobalPermission: true, apps: [],
-        taskStatusData: [OPEN, DONE], sprintsObj: { s1: { id: 's1', name: 'Sprint 1' }, s2: { id: 's2', name: 'Sprint 2' } }, tagsArray: [], AssigneeUserId: []
-    };
-    const mountBar = (selected) => mount(ListBulkBar, {
-        props: { project },
-        global: { plugins: [selectionStore(selected)], provide: { $userId: ref('u1') }, stubs: { ConfirmationSidebar: true } }
-    });
-    const button = (wrapper, label) => wrapper.findAll('.lv2-bulk__btn').find((b) => b.text().startsWith(label));
-
-    beforeEach(() => {
-        apiRequest.mockReset();
-        apiRequest.mockImplementation(() => Promise.resolve({ data: { status: true, data: { updated: ['s-a', 't2'], totals: { updated: 2 } } } }));
+describe('a selected subtask is told apart by its loaded task', () => {
+    const state = () => ({
+        tasks: { [PID]: { sprints: [SPRINT], [SPRINT]: { tasks: [parent(), loner()] } } },
+        searchedTasks: [parent({ _id: 't9', subtaskArray: [sub('s-z', { ParentTaskId: 't9', statusKey: 2 })] })]
     });
 
-    it('sets the status of a mixed selection in one bulk call over every id', async () => {
-        const wrapper = mountBar(['s-a', 't2']);
-        await button(wrapper, en.List.status).trigger('click');
-        await wrapper.findAll('.lv2-bulk__item').find((item) => item.text() === 'Complete').trigger('click');
-        await flushPromises();
-        expect(apiRequest.mock.calls[0][2]).toMatchObject({ action: 'bulkUpdateStatus', taskIds: ['s-a', 't2'] });
+    it('the bulk snapshot finds a subtask under its task in the sprint list', () => {
+        expect(snapshotTasks(state(), ['s-a', 't2'])).toMatchObject({ 's-a': { statusKey: 1 }, t2: { statusKey: 1 } });
     });
 
-    it('turns Sprint off when only subtasks are selected, and says why', () => {
-        const wrapper = mountBar(['s-a', 's-b']);
-        const sprint = button(wrapper, en.List.sprint);
-        expect(sprint.attributes('disabled')).toBeDefined();
-        expect(sprint.attributes('title')).toBe(en.List.bulk_sprint_subtasks);
-        expect(button(wrapper, en.List.status).attributes('disabled')).toBeUndefined();
-    });
-
-    it('keeps Sprint for a mixed selection, noting that subtasks go with their task', async () => {
-        const wrapper = mountBar(['s-a', 't2']);
-        const sprint = button(wrapper, en.List.sprint);
-        expect(sprint.attributes('disabled')).toBeUndefined();
-        await sprint.trigger('click');
-        expect(wrapper.find('.lv2-bulk__menu .lv2-bulk__note').text()).toBe(en.List.bulk_sprint_subtasks);
-    });
-
-    it('leaves Sprint alone for a selection of tasks', () => {
-        const wrapper = mountBar(['t1', 't2']);
-        expect(button(wrapper, en.List.sprint).attributes('title')).toBeUndefined();
+    it('and under a searched task, where a filtered List takes its subtask rows from', () => {
+        expect(snapshotTasks(state(), ['s-z'])).toMatchObject({ 's-z': { statusKey: 2, sprintId: SPRINT } });
     });
 });

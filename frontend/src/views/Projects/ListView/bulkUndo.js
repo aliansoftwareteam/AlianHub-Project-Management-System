@@ -11,7 +11,10 @@ function* storedTasks(projectData = {}) {
             }
         }
     }
-    for (const task of (Array.isArray(projectData.searchedTasks) ? projectData.searchedTasks : [])) yield task;
+    for (const task of (Array.isArray(projectData.searchedTasks) ? projectData.searchedTasks : [])) {
+        yield task;
+        for (const sub of (Array.isArray(task?.subtaskArray) ? task.subtaskArray : [])) yield sub;
+    }
 }
 
 const copy = (value) => (Array.isArray(value) ? value.map(String) : value);
