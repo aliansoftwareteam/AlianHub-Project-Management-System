@@ -1720,6 +1720,21 @@ const schema = {
         // Everyone already told that the doc names them. No default: a doc without the list predates it, and a
         // mongoose array would otherwise read as an empty list and tell everyone it names again.
         mentionsTold: { type: [String], required: false, default: undefined },
+        // People this one doc is shared with by name, whatever its project or privacy; role is 'viewer' or 'editor'.
+        // Modules/Pages/helpers/pageRules.js holds the limit and what a share gives.
+        sharedWith: {
+            type: [{
+                _id: false,
+                userId: { type: String, required: true },
+                role: { type: String, required: true },
+                by: { type: String, required: false },
+                at: { type: Date, required: false },
+            }],
+            required: false,
+            default: undefined,
+        },
+        // Everyone already told the doc was shared with them, so naming a person again tells them nothing twice.
+        sharesTold: { type: [String], required: false, default: undefined },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     // Doc history (Modules/Pages/versions.js). savedBy and savedAt are the writer and the time of the state held, not of
@@ -2284,6 +2299,8 @@ const schema = {
         participants: { type: [String], required: false, default: [] },
         visibility: { type: String, required: false, default: 'project' },
         createdBy: { type: String, required: false, default: '' },
+        // Pages only: the user ids the page is shared with by name.
+        sharedWith: { type: [String], required: false, default: [] },
         // 'human' | 'agent'
         authorKind: { type: String, required: false, default: 'human' },
         // 'member' | 'agent' | 'external', the taint contract of Modules/Agents/taint.js; absent on chunks older than the field reads as not external.
@@ -2589,6 +2606,8 @@ const schema = {
             viewedBoard: { type: Boolean, required: false },
             viewedNotifications: { type: Boolean, required: false },
             importedWork: { type: Boolean, required: false },
+            openedMyWork: { type: Boolean, required: false },
+            viewedShortcuts: { type: Boolean, required: false },
             toursOffered: { type: [String], required: false, default: undefined }
         },
         navPreferences: {

@@ -190,8 +190,12 @@ const readIdsAt = (body, paths) => {
     return { ids: [...ids], unreadable };
 };
 
-const idAt = (body, fields) => readIdsAt(body, [fields]).ids[0] || null;
 const idsAt = (body, paths) => readIdsAt(body, paths).ids;
+
+/* Per request, the task and project ids it names that its caller cannot open. A refusal resting on the
+ * rules of one would say it exists, so once found they are judged as ids that name nothing are. */
+const unopenable = new WeakMap();
+const NONE_UNOPENABLE = new Set();
 
 /*
  * The projects whose rules judge a request, from every body shape the web app sends to a guarded route
@@ -204,6 +208,8 @@ const idsAt = (body, paths) => readIdsAt(body, paths).ids;
  */
 const projectsForRequest = async (companyId, req, lookup = null) => {
     const body = (req && req.body) || {};
+    const hidden = (req && unopenable.get(req)) || NONE_UNOPENABLE;
+    const openIdsAt = (paths) => idsAt(body, paths).filter((id) => !hidden.has(id));
     const taskIds = idsAt(body, lookup ? (lookup.tasks || []) : TASK_ID_FIELDS);
     const projectOfTask = new Map();
     if (taskIds.length) {
@@ -211,16 +217,19 @@ const projectsForRequest = async (companyId, req, lookup = null) => {
             type: SCHEMA_TYPE.TASKS,
             data: [{ _id: { $in: taskIds.map(toObjectId) } }, { ProjectID: 1 }],
         }, 'find');
-        (tasks || []).forEach((task) => { if (task.ProjectID) projectOfTask.set(String(task._id).toLowerCase(), String(task.ProjectID).toLowerCase()); });
+        (tasks || []).forEach((task) => {
+            const id = String(task._id).toLowerCase();
+            if (task.ProjectID && !hidden.has(id)) projectOfTask.set(id, String(task.ProjectID).toLowerCase());
+        });
     }
     const taskProjectIds = [...new Set(taskIds.map((id) => projectOfTask.get(id)).filter(Boolean))];
     const projectIds = lookup
-        ? [...new Set([...taskProjectIds, ...idsAt(body, lookup.projects || [])])]
-        : (taskIds.length ? taskProjectIds : idsAt(body, PROJECT_ID_FIELDS));
-    const legacyTaskId = idAt(body, ['taskData', '_id']);
+        ? [...new Set([...taskProjectIds, ...openIdsAt(lookup.projects || [])])]
+        : (taskIds.length ? taskProjectIds : openIdsAt(PROJECT_ID_FIELDS));
+    const legacyTaskId = idsAt(body, [['taskData', '_id']])[0] || null;
     const legacyProjectId = legacyTaskId
         ? (projectOfTask.get(legacyTaskId) || null)
-        : (idAt(body, ['data', 'ProjectID']) || idAt(body, ['projectId']));
+        : (openIdsAt([['data', 'ProjectID']])[0] || openIdsAt([['projectId']])[0] || null);
     return { projectIds, unresolved: taskIds.length > 0 && taskProjectIds.length === 0, legacyProjectId };
 };
 
@@ -270,6 +279,32 @@ const requireCompanyAdmin = ({ permission = null } = {}) => async (req, res, nex
 };
 
 const passes = (permission, write) => (write ? isWritable(permission) : isReadable(permission));
+
+const unopenableIds = async (companyId, req, lookups) => {
+    // Required here: both modules read roles through this one.
+    const { readableTaskIds } = require("../Modules/Tasks/helpers/taskWritePlacement");
+    const { canReadProject } = require("./projectAccess");
+    const body = (req && req.body) || {};
+    const taskIds = idsAt(body, lookups.flatMap((lookup) => lookup.tasks || []));
+    const projectIds = idsAt(body, lookups.flatMap((lookup) => lookup.projects || []));
+    const readable = new Set((await readableTaskIds(companyId, req.uid, taskIds)).map((id) => String(id).toLowerCase()));
+    const closed = [];
+    for (const projectId of projectIds) {
+        if (!(await canReadProject(companyId, req.uid, projectId)).allowed) closed.push(projectId);
+    }
+    return [...taskIds.filter((id) => !readable.has(id)), ...closed];
+};
+
+/* A refusal is judged again with what the caller cannot open taken as missing, so a route that answers
+ * "not found" for both never tells them apart here. `lookups` is null on routes that do not ask for it. */
+const judgedOnWhatOpens = async (req, lookups, judge) => {
+    const verdict = await judge();
+    if (verdict.allowed || !lookups) return verdict;
+    const hidden = await unopenableIds(String(req.headers["companyid"] || ""), req, lookups);
+    if (!hidden.length) return verdict;
+    unopenable.set(req, new Set(hidden));
+    return judge();
+};
 
 /* The first project whose rules refuse, GLOBAL_SCOPE when the company rules refuse, or null when all allow. */
 const refusingScope = async (companyId, uid, path, write, projectIds, strict) => {
@@ -357,7 +392,7 @@ const judgeSession = async (req, res, next, { permission, check, refuse }) => {
  * `sessionAllows(req)` names the browser-session requests the route's handler allows without the key,
  * such as a member changing their own preferences; API tokens are judged on the key alone.
  */
-const requirePermission = (path, { write = true, sessionAllows = null } = {}) => Object.assign(async (req, res, next) => {
+const requirePermission = (path, { write = true, sessionAllows = null, unopenableIn = null } = {}) => Object.assign(async (req, res, next) => {
     const forbid = (statusText) => res.status(403).json({ status: false, statusText, error: "Forbidden", permission: path });
     if (!isApiTokenRequest(req)) {
         return judgeSession(req, res, next, { permission: path, refuse: forbid, check: () => sessionPermissionVerdict(req, path, write, sessionAllows) });
@@ -365,7 +400,8 @@ const requirePermission = (path, { write = true, sessionAllows = null } = {}) =>
     if (!fineGrainedEnforced()) return next();
     try {
         const companyId = req.headers["companyid"] || "";
-        if ((await requestVerdict(companyId, req.uid, req, path, write)).allowed) return next();
+        const verdict = await judgedOnWhatOpens(req, unopenableIn, () => requestVerdict(companyId, req.uid, req, path, write));
+        if (verdict.allowed) return next();
         return forbid("You do not have permission to perform this action.");
     } catch (error) {
         logger.error(`requirePermission error (${path}): ${error.message || error}`);
@@ -416,11 +452,12 @@ const namesOtherCompany = (req, body) => {
     });
 };
 
+const lookupsOf = (taskEntry, needs) => [taskEntry.tokenEnforced ? DEFAULT_LOOKUP : taskEntry, ...needs.filter((need) => need.lookup).map((need) => need.lookup)];
+
 const taskWriteProblem = (req, taskEntry, needs) => {
     const body = (req && req.body) || {};
     if (namesOtherCompany(req, body)) return REASONS.COMPANY_MISMATCH;
-    const lookups = [taskEntry.tokenEnforced ? DEFAULT_LOOKUP : taskEntry, ...needs.filter((need) => need.lookup).map((need) => need.lookup)];
-    const paths = lookups.flatMap((lookup) => [...(lookup.tasks || []), ...(lookup.projects || [])]);
+    const paths = lookupsOf(taskEntry, needs).flatMap((lookup) => [...(lookup.tasks || []), ...(lookup.projects || [])]);
     return readIdsAt(body, paths).unreadable ? REASONS.UNRESOLVABLE_ID : null;
 };
 
@@ -436,9 +473,11 @@ const problemVerdict = async (req, reason) => ({
  * API tokens are refused a body naming another company or an unreadable id in every mode. Otherwise the nine
  * token-enforced actions keep the token path they had, and every other task write goes through the workspace's
  * mode for tokens and sessions alike, so a new mapping refuses nothing until a workspace enforces.
+ * `unopenableAsMissing` is for a route whose handler answers "not found" for what its caller cannot open.
  */
-const requireTaskWritePermission = (taskEntry) => Object.assign(async (req, res, next) => {
+const requireTaskWritePermission = (taskEntry, { unopenableAsMissing = false } = {}) => Object.assign(async (req, res, next) => {
     const needs = requirementsOf(taskEntry, req.body);
+    const unopenableIn = unopenableAsMissing ? lookupsOf(taskEntry, needs) : null;
     const label = needs.map(needLabel).join('+');
     const problem = taskWriteProblem(req, taskEntry, needs);
     const refuse = (statusText, verdict = {}) => res.status(403).json({ status: false, statusText: verdict.statusText || statusText, error: "Forbidden", permission: verdict.permission || label });
@@ -447,18 +486,16 @@ const requireTaskWritePermission = (taskEntry) => Object.assign(async (req, res,
             logger.warn(`permission guard ${label}: API token refused, ${problem}`);
             return refuse(PROBLEM_TEXT[problem]);
         }
-        if (taskEntry.tokenEnforced) return requirePermission(needs[0].key)(req, res, next);
+        if (taskEntry.tokenEnforced) return requirePermission(needs[0].key, { unopenableIn })(req, res, next);
     }
-    const check = () => {
-        if (problem) return problemVerdict(req, problem);
-        return taskEntry.tokenEnforced ? sessionPermissionVerdict(req, needs[0].key, needs[0].write, null) : taskWriteVerdict(req, taskEntry, needs);
-    };
+    const judge = () => (taskEntry.tokenEnforced ? sessionPermissionVerdict(req, needs[0].key, needs[0].write, null) : taskWriteVerdict(req, taskEntry, needs));
+    const check = () => (problem ? problemVerdict(req, problem) : judgedOnWhatOpens(req, unopenableIn, judge));
     return judgeSession(req, res, next, { permission: label, refuse, check });
 }, { taskWrites: taskEntry });
 
-const requireTaskActionPermission = (actions = TASK_ACTIONS) => Object.assign(async (req, res, next) => {
+const requireTaskActionPermission = (actions = TASK_ACTIONS, options = {}) => Object.assign(async (req, res, next) => {
     const taskEntry = actionEntry(actions, req.body && req.body.action);
-    return taskEntry ? requireTaskWritePermission(taskEntry)(req, res, next) : next();
+    return taskEntry ? requireTaskWritePermission(taskEntry, options)(req, res, next) : next();
 }, { taskWrites: actions });
 
 /** The permission keys the MCP server enforces (one per tool/field). */

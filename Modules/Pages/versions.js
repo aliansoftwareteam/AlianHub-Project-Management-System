@@ -6,11 +6,12 @@ const { fail } = require('../../Config/respond');
 const logger = require('../../Config/loggerConfig');
 const { emitPageChange } = require('./helpers/pageEvents');
 const { canUsePage } = require('./helpers/pageAccess');
-const { isObjectIdString, reviewState } = require('./helpers/pageRules');
+const { isObjectIdString, reviewState, hideShares } = require('./helpers/pageRules');
 const { EDITOR_VERSION, blocksToHtml, blocksToRawText } = require('./helpers/pageContent');
 const rules = require('./helpers/pageVersionRules');
 const versions = require('./helpers/pageVersions');
 const pageSettle = require('./helpers/pageSettle');
+const { cleanBlocks, cleanHtml } = require('../Tasks/helpers/cleanRichText');
 
 const PAGE_NOT_FOUND = 'Page not found.';
 const VERSION_NOT_FOUND = 'Version not found.';
@@ -148,10 +149,11 @@ exports.restoreVersion = async (req, res) => {
         const now = new Date();
         await versions.keepOutgoing(companyId, page, uid, { now, reason: 'restore' });
 
-        const blocks = rules.blocksOf(version.content);
+        // A version kept before bodies were cleaned on save holds the body as it was sent.
+        const blocks = cleanBlocks(rules.blocksOf(version.content), 'doc');
         const update = {
             title: String(version.title || page.title),
-            content: { html: blocksToHtml(blocks), blocks: { time: now.getTime(), blocks, version: EDITOR_VERSION } },
+            content: { html: cleanHtml(blocksToHtml(blocks), 'doc'), blocks: { time: now.getTime(), blocks, version: EDITOR_VERSION } },
             rawText: blocksToRawText(blocks),
             updatedBy: uid,
             editedBy: uid,
@@ -166,7 +168,7 @@ exports.restoreVersion = async (req, res) => {
 
         pageSettle.cancel(companyId, page._id);
         emitPageChange(companyId, 'update', updated);
-        const data = typeof updated.toObject === 'function' ? updated.toObject() : updated;
+        const data = hideShares(typeof updated.toObject === 'function' ? updated.toObject() : { ...updated }, uid);
         data.reviewState = reviewState(data);
         return res.send({ status: true, statusText: 'Version restored.', data });
     } catch (error) {

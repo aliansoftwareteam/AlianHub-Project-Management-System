@@ -38,7 +38,7 @@
             :isMoveTask="true"
             :isBulkMove="true"
             :task="task"
-            :selectedProjectObject="pickerStart"
+            :selectedProjectObject="project"
             :projectOptions="pickerProjects"
             :listPicker="listPicker"
             @isConvertSubtaskOPen="picking = false"
@@ -87,9 +87,7 @@ const activeProjects = computed(() => getters["projectData/onlyActiveProjects"]?
 const canAdd = computed(() => canAddLists(props.task, props.project, entries.value, otherRules.check));
 const shown = computed(() => !props.task?.ParentTaskId && (entries.value.length > 0 || canAdd.value));
 
-/* Copies: the picker writes the lists it offers onto the project it is browsing, and here those are not all of the project's lists. */
-const pickerProjects = computed(() => addTargets(activeProjects.value, otherRules.check).map((project) => ({ ...project })));
-const pickerStart = computed(() => ({ ...props.project, sprintsObj: {}, sprintsfolders: {} }));
+const pickerProjects = computed(() => addTargets(activeProjects.value, otherRules.check));
 const listPicker = computed(() => ({
     title: t("TaskLists.add"),
     confirm: t("TaskLists.add_confirm"),

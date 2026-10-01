@@ -161,6 +161,8 @@ describe('the web app task flows still work', () => {
         const task = await createTask(owner.api, { project: flow.project, user: state.users.owner, companyOwnerId: owner.uid });
         const status = flow.project.taskStatusData.find((s) => s.type === 'close') || flow.project.taskStatusData[0];
         const due = new Date(Date.now() + 86400000).toISOString();
+        const tag = { uid: 'twf-tag', tagName: 'TWF', tagColor: '#ff0000', tagBgColor: '#ff000035' };
+        expect((await owner.api.post('/api/v1/project/tags', { id: String(flow.project._id), items: tag, operation: 'push' })).status).toBe(200);
         const calls = [
             { action: 'updateTaskName', firebaseObj: { TaskName: 'TWF renamed' }, projectData: projectSlice(flow.project), taskData: { _id: task._id, sprintId: task.sprintId, TaskName: 'before' }, obj: { previousTaskName: 'before', userName: 'Max' }, userData: userData(member) },
             { action: 'updateStatus', newStatus: { status: { text: status.name, key: status.key, value: status.value, type: status.type }, statusKey: status.key, statusType: status.type }, prevStatus: { taskId: task._id, taskName: 'TWF renamed', statusName: 'To Do', updatedTaskName: status.name }, projectData: projectSlice(flow.project), task: { _id: task._id, sprintId: task.sprintId }, isUpdateTask: true, userData: userData(member) },

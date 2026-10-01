@@ -14,6 +14,7 @@ const { sprintPlacementOf, followSprintMove, moveDescendants } = require('../Tas
 const { pullOfLists } = require('../Tasks/helpers/taskExtraLists');
 const { emitPageChange } = require('../Pages/helpers/pageEvents');
 const { markdownToEditorData, blocksToHtml } = require('../Pages/helpers/pageContent');
+const { cleanPageContent } = require('../Tasks/helpers/cleanRichText');
 const { escapeCommentText } = require('../Comments/helpers/plainText');
 const { isPeriodLocked } = require('../TimesheetApproval/helpers/lockGuard');
 const { canPostToThread } = require('../Comments/helpers/threadWriteAccess');
@@ -95,8 +96,6 @@ const FLAGGED_RATINGS = Object.freeze({
     'tasks.batch': write(SCOPE.TASK),
     'page.create': write(SCOPE.PROJECT),
     'page.update': write(SCOPE.PROJECT),
-    'slack.message.post': write(SCOPE.WORKSPACE, false),
-    'slack.channel.read': read(SCOPE.WORKSPACE),
     'tags.list': read(SCOPE.PROJECT),
     'task.tags.add': write(SCOPE.TASK),
     'task.tags.remove': write(SCOPE.TASK),
@@ -112,6 +111,14 @@ const FLAGGED_RATINGS = Object.freeze({
     'page.comment.create': write(SCOPE.PROJECT),
     'page.comment.reply': write(SCOPE.PROJECT),
     'page.comment.assign': write(SCOPE.PROJECT),
+    'goals.list': read(SCOPE.WORKSPACE),
+    'goal.get': read(SCOPE.WORKSPACE),
+    // A goal belongs to no project and is read by everyone it is shared with.
+    'goal.target.set': write(SCOPE.WORKSPACE),
+    'goal.target.sources.add': write(SCOPE.WORKSPACE),
+    'goal.target.sources.remove': write(SCOPE.WORKSPACE),
+    'slack.message.post': write(SCOPE.WORKSPACE, false),
+    'slack.channel.read': read(SCOPE.WORKSPACE),
 });
 
 const ratingTable = () => ({ ...RATINGS, ...Object.fromEntries(Object.entries(FLAGGED_RATINGS).filter(([k]) => registry.has(k))) });
@@ -402,7 +409,7 @@ const executors = {
         const linked = (params.taskId && oid(params.taskId)) ? [oid(params.taskId)] : [];
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
-            data: { title, rawText: String(params.text || '').slice(0, 20000), content: params.content || contentOfText(params.text),
+            data: { title, rawText: String(params.text || '').slice(0, 20000), content: cleanPageContent(params.content || contentOfText(params.text)),
                     ProjectID: params.projectId && oid(params.projectId) ? oid(params.projectId) : undefined,
                     createdBy: String(actor.userId || a.actorId), linkedTasks: linked, visibility: 'project',
                     createdByAgent: true, agentName: a.label, agentStatus: 'draft', deletedStatusKey: 0 },
@@ -444,6 +451,7 @@ const executors = {
     ...require('./taskRequests').executors,
     ...require('./pageRequests').executors,
     ...require('./workRequests').executors,
+    ...require('./goalRequests').executors,
 };
 
 const COMMENT_ACTIONS = new Set(['task.comment', 'comment.create', 'chat.post', 'comment.update']);

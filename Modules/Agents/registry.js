@@ -15,8 +15,8 @@
 const performanceFlag = require('./performanceFlag');
 const dataFlag = require('../Mcp/dataFlag');
 const manageFlag = require('../Mcp/manageFlag');
-const connectorsFlag = require('./connectors/flag');
 const workFlag = require('../Mcp/workFlag');
+const connectorsFlag = require('./connectors/flag');
 
 // `permission` names the Security & Permissions catalogue entry
 // (Config/permissionGuard) that governs the same operation for a person.
@@ -120,18 +120,6 @@ const FLAGGED = Object.freeze([
         { key: 'page.create', label: 'Create a doc (a draft until a person approves it)', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
         { key: 'page.update', label: 'Change a doc\'s title or body', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
     ].map((action) => ({ enabled: manageFlag.enabled, action: Object.freeze(action) })),
-    {
-        enabled: connectorsFlag.slackOn,
-        action: Object.freeze({ key: 'slack.message.post', label: 'Propose a Slack message', risk: RISK.HIGH, undoable: false, write: true, cost: 'write',
-            gate: 'owner_admin', proposeOnly: true, constraint: 'only to a channel on the workspace\'s Slack allow-list; plain text, no files; never sent without a person\'s approval',
-            permission: 'settings.settings_edit_company' }),
-    },
-    {
-        enabled: connectorsFlag.slackOn,
-        action: Object.freeze({ key: 'slack.channel.read', label: 'Read recent messages of a Slack channel', risk: RISK.LOW, undoable: false, write: false, cost: 'read',
-            constraint: 'only a public channel on the workspace\'s Slack allow-list for reading; text only, capped per read and per run; the run is marked and makes no web fetch after it',
-            permission: { key: 'project.project_details', write: false } }),
-    },
     // These run the web app's own tag, relation, list and doc comment handlers (Agents/workRequests.js).
     ...[
         { key: 'tags.list', label: 'List a project\'s tags', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
@@ -151,7 +139,29 @@ const FLAGGED = Object.freeze([
         { key: 'page.comment.create', label: 'Comment on a doc', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
         { key: 'page.comment.reply', label: 'Reply to a comment on a doc', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
         { key: 'page.comment.assign', label: 'Assign a doc comment thread', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
+        // Goals have no catalogue entry of their own: who reads or edits one is the goal routes' rule (Agents/goalRequests.js).
+        // What a goal shows is counted from tasks, so an agent reaches goals only for a person whose role may list tasks.
+        { key: 'goals.list', label: 'List the goals the person can read', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
+        { key: 'goal.get', label: 'Read a goal', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
+        { key: 'goal.target.set', label: 'Report the value of a goal\'s target', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
+          constraint: 'only on a goal the person behind the agent can edit; never a target counted from tasks', permission: { key: 'task.task_list', write: false } },
+        { key: 'goal.target.sources.add', label: 'Count a list or task toward a goal\'s target', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
+          constraint: 'only on a goal the person behind the agent can edit, and a list or task every reader of the goal can open', permission: { key: 'task.task_list', write: false } },
+        { key: 'goal.target.sources.remove', label: 'Stop counting a list or task toward a goal\'s target', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
+          constraint: 'only on a goal the person behind the agent can edit', permission: { key: 'task.task_list', write: false } },
     ].map((action) => ({ enabled: workFlag.enabled, action: Object.freeze(action) })),
+    {
+        enabled: connectorsFlag.slackOn,
+        action: Object.freeze({ key: 'slack.message.post', label: 'Propose a Slack message', risk: RISK.HIGH, undoable: false, write: true, cost: 'write',
+            gate: 'owner_admin', proposeOnly: true, constraint: 'only to a channel on the workspace\'s Slack allow-list; plain text, no files; never sent without a person\'s approval',
+            permission: 'settings.settings_edit_company' }),
+    },
+    {
+        enabled: connectorsFlag.slackOn,
+        action: Object.freeze({ key: 'slack.channel.read', label: 'Read recent messages of a Slack channel', risk: RISK.LOW, undoable: false, write: false, cost: 'read',
+            constraint: 'only a public channel on the workspace\'s Slack allow-list for reading; text only, capped per read and per run; the run is marked and makes no web fetch after it',
+            permission: { key: 'project.project_details', write: false } }),
+    },
 ]);
 
 /* A string maps the whole action at its own level (write for writes, read for

@@ -7,12 +7,13 @@ const rules = require('./recurrenceRules');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
+const { cleanDescription, RichTextLimitError } = require('../Tasks/helpers/cleanRichText');
 
 // Build a valid task `data` template from the request (mirrors the defaults in
 // taskMongo.createSubTaskWithAi so taskMongo.create accepts it).
 function buildTemplateFromBody(body) {
     const project = body.projectData || {};
-    return {
+    return cleanDescription({
         TaskName: body.taskName,
         TaskKey: '-',
         AssigneeUserId: Array.isArray(body.assignees) ? body.assignees : [],
@@ -34,7 +35,7 @@ function buildTemplateFromBody(body) {
         points: (body.points === undefined || body.points === null || body.points === '') ? null : Number(body.points),
         rawDescription: body.rawDescription || '',
         descriptionBlock: body.descriptionBlock || {},
-    };
+    });
 }
 
 exports.createDefinition = async (req, res) => {
@@ -81,7 +82,7 @@ exports.createDefinition = async (req, res) => {
         res.send({ status: true, statusText: 'Recurring task created', data: saved });
     } catch (error) {
         logger.error(`[recurringTasks] create failed: ${error.message}`);
-        res.send({ status: false, statusText: error.message });
+        res.status(error instanceof RichTextLimitError ? error.statusCode : 200).send({ status: false, statusText: error.message });
     }
 };
 

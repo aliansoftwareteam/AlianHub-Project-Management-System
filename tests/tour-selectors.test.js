@@ -1,8 +1,9 @@
-/* Every tour anchor must exist somewhere in the app source, or the step silently
-   falls back to a centred card and nobody notices the tour pointing at nothing. */
+/* Every tour anchor must exist somewhere in the app source, or the stop silently
+   docks in a corner and nobody notices the tour pointing at nothing. */
 const fs = require('fs');
 const path = require('path');
-const { STEPS, SCREENS, screenFor, doneKey } = require('../frontend/src/components/organisms/Tour/tourSteps');
+const { TOUR, STOPS } = require('../frontend/src/components/organisms/Tour/tourSteps');
+const { TOURS } = require('../Modules/Users/helpers/onboardingRules');
 
 const SRC = path.join(__dirname, '..', 'frontend', 'src');
 const TOUR_DIR = path.join(SRC, 'components', 'organisms', 'Tour');
@@ -38,13 +39,11 @@ function needles(selector) {
 const present = (selector) => needles(selector).some((needle) => source.includes(needle));
 
 describe('tour anchors exist in source', () => {
-    SCREENS.forEach((screen) => {
-        STEPS[screen].forEach((step) => {
-            test(`${screen}/${step.key}: ${step.els.join(' , ')}`, () => {
-                expect(step.els.length).toBeGreaterThan(0);
-                step.els.forEach((selector) => {
-                    if (!present(selector)) throw new Error(`no element matches ${selector} in frontend/src`);
-                });
+    STOPS.forEach((stop) => {
+        test(`${stop.key}: ${stop.els.join(' , ')}`, () => {
+            expect(stop.els.length).toBeGreaterThan(0);
+            stop.els.forEach((selector) => {
+                if (!present(selector)) throw new Error(`no element matches ${selector} in frontend/src`);
             });
         });
     });
@@ -52,30 +51,15 @@ describe('tour anchors exist in source', () => {
 
 describe('tour copy keys', () => {
     const en = fs.readFileSync(path.join(SRC, 'locales', 'en.js'), 'utf8');
-    SCREENS.forEach((screen) => {
-        STEPS[screen].forEach((step, i) => {
-            test(`AuthV2.tour_${screen}_${step.key}_* exist`, () => {
-                expect(en).toContain(`tour_${screen}_${step.key}_title:`);
-                expect(en).toContain(`tour_${screen}_${step.key}_body:`);
-                if (i < STEPS[screen].length - 1) expect(en).toContain(`tour_${screen}_${step.key}_next:`);
-            });
+    STOPS.forEach((stop) => {
+        test(`Auth.tour_${TOUR}_${stop.key}_* exist`, () => {
+            for (const part of ['title', 'body', 'key']) expect(en).toContain(`tour_${TOUR}_${stop.key}_${part}:`);
         });
     });
 });
 
-describe('screenFor', () => {
-    test('route meta wins, then the route name and tab', () => {
-        expect(screenFor({ meta: { tour: 'list' }, name: 'Home' })).toBe('list');
-        expect(screenFor({ name: 'Home' })).toBe('shell');
-        expect(screenFor({ name: 'ProjectSprint', query: { tab: 'ProjectKanban' } })).toBe('board');
-        expect(screenFor({ name: 'Project', query: { tab: 'ProjectListView' } })).toBe('list');
-        expect(screenFor({ name: 'ProjectFolder', query: {} })).toBe('project');
-        expect(screenFor({ name: 'Projects' })).toBe('');
-        expect(screenFor({ name: 'Members' })).toBe('');
-    });
-
-    test('done flags keep the shell key the user documents already carry', () => {
-        expect(doneKey('shell')).toBe('isShellTour');
-        expect(doneKey('board')).toBe('isTour_board');
+describe('the tour name', () => {
+    test('is one the server stores as offered', () => {
+        expect(TOURS).toContain(TOUR);
     });
 });

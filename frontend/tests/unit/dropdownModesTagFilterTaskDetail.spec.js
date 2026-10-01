@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { ref } from 'vue';
 
 const ids = vi.hoisted(() => ({ next: 0 }));
+const viewer = vi.hoisted(() => ({ roleType: undefined }));
 vi.mock('@/composable', () => ({
     useCustomComposable: () => ({
         debounce: (fn) => fn,
@@ -20,6 +21,7 @@ vi.mock('vuex', async (importOriginal) => ({
         getters: {
             'settings/projectSkills': [{ slug: 'vue', name: 'Vue' }, { slug: 'node', name: 'Node' }],
             'settings/companyUsers': [{ userId: 'user-2' }],
+            'settings/companyUserDetail': viewer.roleType === undefined ? undefined : { roleType: viewer.roleType },
         },
         commit: vi.fn(),
     }),
@@ -29,6 +31,9 @@ import CreateTagPopup from '@/components/molecules/TagList/CreateTagPopup.vue';
 import SkillsSelect from '@/components/molecules/SkillsSelect/SkillsSelect.vue';
 import TaskDetailAction from '@/components/molecules/TaskDetailAction/TaskDetailAction.vue';
 import FieldsActions from '@/components/molecules/TaskFilter/FieldsActions.vue';
+import { routerKey } from 'vue-router';
+import { apiRequest } from '@/services';
+import { resetLinkableGoals } from '@/views/Goals/goalLinking';
 
 const stubs = { ConfirmationSidebar: true, InputText: true, SpinnerComp: true, TagChip: true, ConvertToSubTaskSidebar: true, ConvertToList: true, WasabiIamgeCompp: true, SubtaskProgressBadge: true, Skelaton: true };
 
@@ -52,6 +57,9 @@ const open = async (trigger) => {
 beforeEach(() => {
     vi.useFakeTimers();
     document.body.innerHTML = '<div id="my-dropdown"></div><div id="app"></div>';
+    viewer.roleType = undefined;
+    resetLinkableGoals();
+    apiRequest.mockClear();
 });
 
 afterEach(() => {
@@ -121,6 +129,45 @@ describe('the task detail header', () => {
         expect(trigger.getAttribute('aria-expanded')).toBe('true');
         expect(popupOf(trigger).getAttribute('role')).toBe('menu');
         expect(popupOf(trigger).querySelectorAll('[role="menuitem"]').length).toBeGreaterThan(0);
+    });
+
+    describe('"Count toward a goal…" in that menu', () => {
+        const withGoalsPage = { ...provide, [routerKey]: { hasRoute: (name) => name === 'Goals' } };
+        const goalReads = () => apiRequest.mock.calls.filter(([, url]) => url === '/api/v2/goals');
+        const entryIn = (trigger) => [...popupOf(trigger).querySelectorAll('[role="menuitem"]')].find((item) => item.textContent.includes('Goals.count_toward'));
+
+        it('is offered to a member, and the goals are asked for when the menu opens, not when it is drawn', async () => {
+            viewer.roleType = 3;
+            await mountOn(TaskDetailAction, props, withGoalsPage);
+            expect(goalReads()).toEqual([]);
+
+            const trigger = triggerNamed('TaskPanel.more_actions');
+            await open(trigger);
+            expect(entryIn(trigger)).toBeTruthy();
+            expect(goalReads()).toEqual([['get', '/api/v2/goals']]);
+
+            await open(trigger);
+            await open(trigger);
+            expect(goalReads()).toHaveLength(1);
+        });
+
+        it('is not offered to a guest, for whom nothing is asked', async () => {
+            viewer.roleType = 0;
+            await mountOn(TaskDetailAction, props, withGoalsPage);
+            const trigger = triggerNamed('TaskPanel.more_actions');
+            await open(trigger);
+            expect(entryIn(trigger)).toBeUndefined();
+            expect(goalReads()).toEqual([]);
+        });
+
+        it('is not offered in a build without the Goals page', async () => {
+            viewer.roleType = 3;
+            await mountOn(TaskDetailAction, props, provide);
+            const trigger = triggerNamed('TaskPanel.more_actions');
+            await open(trigger);
+            expect(entryIn(trigger)).toBeUndefined();
+            expect(goalReads()).toEqual([]);
+        });
     });
 
     it('opens a listbox of watchers that marks who is watching', async () => {

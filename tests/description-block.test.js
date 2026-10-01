@@ -37,16 +37,16 @@ describe('a description written as text, as the task editor stores it', () => {
 
     it('turns a web address into a link that shows the address itself', () => {
         expect(blocksOf('See https://example.test/spec?a=1&b=2.')).toEqual([
-            paragraph('See <a href="https://example.test/spec?a=1&amp;b=2">https://example.test/spec?a=1&amp;b=2</a>.'),
+            paragraph('See <a href="https://example.test/spec?a=1&amp;b=2" target="_blank" rel="noopener noreferrer">https://example.test/spec?a=1&amp;b=2</a>.'),
         ]);
         expect(blocksOf('- the brief: http://example.test/brief')).toEqual([
-            { type: 'list', data: { style: 'unordered', items: [item('the brief: <a href="http://example.test/brief">http://example.test/brief</a>')] } },
+            { type: 'list', data: { style: 'unordered', items: [item('the brief: <a href="http://example.test/brief" target="_blank" rel="noopener noreferrer">http://example.test/brief</a>')] } },
         ]);
     });
 
     it('shows where a named link really goes', () => {
         expect(blocksOf('Read [the spec](https://example.test/spec) first')).toEqual([
-            paragraph('Read the spec (<a href="https://example.test/spec">https://example.test/spec</a>) first'),
+            paragraph('Read the spec (<a href="https://example.test/spec" target="_blank" rel="noopener noreferrer">https://example.test/spec</a>) first'),
         ]);
     });
 
@@ -66,11 +66,11 @@ describe('a description written as text, as the task editor stores it', () => {
             '# <iframe src="https://example.test">',
         ].join('\n');
         const html = blocksOf(hostile).flatMap((block) => (block.type === 'list' ? block.data.items.map((entry) => entry.content) : [block.data.text])).join('\n');
-        expect(html).not.toMatch(/<(?!a href="https?:\/\/[^"<>]*">|\/a>)/);
+        expect(html).not.toMatch(/<(?!a href="https?:\/\/[^"<>]*" target="_blank" rel="noopener noreferrer">|\/a>)/);
         expect(html).not.toMatch(/javascript:[^"]*"\s*>/);
-        expect(blocksOf('<b>bold</b> & "quoted"')).toEqual([paragraph('&lt;b&gt;bold&lt;/b&gt; &amp; &quot;quoted&quot;')]);
+        expect(blocksOf('<b>bold</b> & "quoted"')).toEqual([paragraph('&lt;b&gt;bold&lt;/b&gt; &amp; "quoted"')]);
         expect(blocksOf('https://example.test/"onmouseover="alert(1)')).toEqual([
-            paragraph('<a href="https://example.test/">https://example.test/</a>&quot;onmouseover=&quot;alert(1)'),
+            paragraph('<a href="https://example.test/" target="_blank" rel="noopener noreferrer">https://example.test/</a>"onmouseover="alert(1)'),
         ]);
     });
 

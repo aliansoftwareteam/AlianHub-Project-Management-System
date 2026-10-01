@@ -26,6 +26,7 @@ const { loadSubtree, rewriteDescendantAncestors, sprintCountChange, DELETED } = 
 const { storableFieldValues } = require('../../CustomField/helpers/fieldValueWrite');
 const { withDescriptionBlock } = require('./descriptionBlock');
 const { withoutImportMark } = require('./importMark');
+const { cleanDescription } = require('./cleanRichText');
 const { copyFieldFiles } = require('../../CustomField/helpers/fieldFiles');
 const extraLists = require('./taskExtraLists');
 
@@ -69,6 +70,8 @@ exports.HandleTask = async (companyId, object, isUpdate, id = null, userData, { 
                     object.dueDateDeadLine = object.dueDateDeadLine.map((x) => new Date(x.date));
                     object.DueDate = new Date(object.DueDate);
                 }
+
+                cleanDescription(object);
 
                 /* Every new task document is saved here: a create, an import row, a form, a template, a copy. */
                 let droppedFieldValues = 0;
@@ -276,6 +279,7 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                         ...obj,
                     }
                 }
+                const hadLists = extraLists.extraListsOf(convertTask).map((entry) => ({ projectId: String(entry.projectId), sprintId: String(entry.sprintId) }));
                 let queryObj = {
                     type: SCHEMA_TYPE.TASKS,
                     data: [
@@ -292,7 +296,7 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                     ]
                 }
                 MongoDbCrudOpration(companyId, queryObj, "findOneAndUpdate").then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: extraLists.extraListsOf(convertTask).length ? { ...obj, extraLists: [] } : obj, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: hadLists.length ? { ...obj, extraLists: [] } : obj, module: 'task', ...(hadLists.length ? { leftLists: hadLists } : {}) });
                     /*When a subtask is converted to another subtask within a parent task, and a subtask is removed, the count of the parent task is reduced.*/
                     if (isMainSubTask === true) {
                         let object = {
@@ -512,7 +516,7 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                 }
                 }
                 MongoDbCrudOpration(companyId, queryObj, "findOneAndUpdate").then((ele) => {
-                    socketEmitter.emit('update', { type: "update", data: ele , updatedFields: extraLists.extraListsOf(moveTask).length ? { ...obj, extraLists: extraLists.extraListsOf(ele) } : obj, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: ele , updatedFields: extraLists.extraListsOf(moveTask).length ? { ...obj, extraLists: extraLists.extraListsOf(ele) } : obj, module: 'task', ...(extras.dropped.length ? { leftLists: extras.dropped.map(({ entry }) => entry) } : {}) });
                     resolve({ status: true, statusText: "MOVE" });
 
                     updateCommentCollection(companyId, moveTask,sprintObj,projectData,moveTask._id).catch((err) => { logger.error(`${err},ERROR IN ADD COMMENTS IN SUBTASK`); })

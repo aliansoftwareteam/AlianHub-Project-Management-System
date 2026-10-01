@@ -11,17 +11,25 @@ const { myCache } = require('../Config/config');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { resolveVisibleSet, clausesFor, chunkClausesFor, recheck } = require('../Modules/Knowledge/visibleSet');
 
-const { C, PROJECTS } = world;
+const { C, PEOPLE, PAGES, PROJECTS } = world;
 
 const WHOLE_COMPANY = {
-    owner: ['shared', 'company', 'closed'],
-    admin: ['shared', 'company', 'closed'],
-    inside: ['insidePrivate', 'shared', 'company', 'closed'],
+    owner: ['shared', 'company', 'closed', 'namedEdit'],
+    admin: ['shared', 'company', 'closed', 'namedEdit'],
+    inside: ['insidePrivate', 'shared', 'company', 'closed', 'namedView', 'namedEdit'],
     outside: ['outsidePrivate', 'shared', 'company'],
     guest: ['shared', 'company'],
+    viewer: ['shared', 'company', 'namedView'],
+    editor: ['shared', 'company', 'namedEdit'],
 };
 
-const ONE_PROJECT = { owner: ['shared'], admin: ['shared'], inside: ['insidePrivate', 'shared'], outside: ['outsidePrivate', 'shared'], guest: ['shared'] };
+const ONE_PROJECT = {
+    owner: ['shared'], admin: ['shared'], inside: ['insidePrivate', 'shared'], outside: ['outsidePrivate', 'shared'], guest: ['shared'], viewer: ['shared'], editor: ['shared'],
+};
+
+const THE_CLOSED_PROJECT = {
+    owner: ['closed', 'namedEdit'], admin: ['closed', 'namedEdit'], inside: ['closed', 'namedView', 'namedEdit'], outside: [], guest: [], viewer: ['namedView'], editor: ['namedEdit'],
+};
 
 const setFor = (uid, { scope, tokenProjectIds } = {}) => resolveVisibleSet({ companyId: C, caller: { kind: 'user', userId: uid, tokenProjectIds }, scope });
 
@@ -43,6 +51,7 @@ beforeEach(() => {
         projectId: page.ProjectID || null,
         visibility: page.visibility,
         createdBy: page.createdBy,
+        sharedWith: (page.sharedWith || []).map((share) => share.userId),
         deleted: page.deletedStatusKey === 1,
     }));
 });
@@ -65,9 +74,28 @@ describe('the page readers agree on who reaches a page: knowledge retrieval', ()
         expect(await chunksFor({ tokenProjectIds })).toEqual(ONE_PROJECT);
     });
 
+    it('reads a doc shared with the person by name inside the scope or the token, and nowhere else', async () => {
+        const scope = { projectId: PROJECTS.closed };
+        const tokenProjectIds = [PROJECTS.closed];
+        expect(await rowsFor({ scope })).toEqual(THE_CLOSED_PROJECT);
+        expect(await chunksFor({ scope })).toEqual(THE_CLOSED_PROJECT);
+        expect(await rowsFor({ tokenProjectIds })).toEqual(THE_CLOSED_PROJECT);
+        expect(await chunksFor({ tokenProjectIds })).toEqual(THE_CLOSED_PROJECT);
+        expect((await rowsFor({ scope, tokenProjectIds: [PROJECTS.open] })).viewer).toEqual([]);
+    });
+
     it('rechecks ranked passages against the live docs', async () => {
         const passages = world.pageRows().map((page) => ({ sourceType: 'page', sourceId: page._id, updatedAt: page.updatedAt }));
         const kept = await world.askEveryone(async (uid) => recheck({ set: await setFor(uid), passages }));
         expect(kept).toEqual(WHOLE_COMPANY);
+    });
+
+    it('says how a passage is read: by name, as its author, or through its project', async () => {
+        const passages = [PAGES.namedView, PAGES.namedEdit].map((sourceId) => ({ sourceType: 'page', sourceId, updatedAt: new Date(Date.UTC(2026, 5, 1)) }));
+        const how = async (who) => (await recheck({ set: await setFor(PEOPLE[who]), passages })).map((passage) => passage.permission);
+
+        expect(await how('viewer')).toEqual([{ visibility: 'named', via: 'share' }]);
+        expect(await how('editor')).toEqual([{ visibility: 'named', via: 'share' }]);
+        expect(await how('inside')).toEqual([{ visibility: 'private', via: 'owner' }, { visibility: 'project', via: 'project' }]);
     });
 });

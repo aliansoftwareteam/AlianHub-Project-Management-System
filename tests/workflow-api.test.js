@@ -13,6 +13,7 @@ const store = require('../Modules/Workflows/store');
 const queue = require('../Modules/Workflows/queue');
 const access = require('../Modules/Agents/access');
 const revert = require('../Modules/Agents/revert');
+const approvals = require('../Modules/Workflows/approvals');
 const controller = require('../Modules/Workflows/controller');
 const scheduler = require('../Modules/Workflows/scheduler');
 const stepTypes = require('../Modules/Workflows/stepTypes');
@@ -67,6 +68,27 @@ describe('the flag gates the whole surface', () => {
         }
         expect(store.createRun).not.toHaveBeenCalled();
         expect(store.getRun).not.toHaveBeenCalled();
+    });
+
+    it('answers the approvals list with nothing waiting and an off marker, because Home reads it on every visit', async () => {
+        process.env.WORKFLOW_ENGINE = 'off';
+        const res = resSpy();
+        await controller.listApprovals(reqFor({ query: { status: 'pending' } }), res);
+
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toMatchObject({ status: true, data: [], engineOff: true });
+        expect(approvals.listByStatus).not.toHaveBeenCalled();
+        expect(access.callerOf).not.toHaveBeenCalled();
+    });
+
+    it('leaves the off marker out of the approvals list while the engine is on', async () => {
+        approvals.listByStatus.mockResolvedValue([]);
+        const res = resSpy();
+        await controller.listApprovals(reqFor({ query: { status: 'pending' } }), res);
+
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toMatchObject({ status: true, data: [] });
+        expect(res.body.engineOff).toBeUndefined();
     });
 });
 

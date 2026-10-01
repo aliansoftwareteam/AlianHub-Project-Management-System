@@ -39,5 +39,8 @@ export const renderNotice = (it, { t, changeText }) => {
         const key = `Inbox.${data.targetId ? "goal_target_reached" : "goal_reached"}${data.byCount ? "" : "_by"}`;
         return escapeHtml(t(key, { goal: clip(data.goalName), target: clip(data.targetName) }));
     }
+    if (it.changeType === "doc_shared") {
+        return escapeHtml(t("Inbox.doc_shared", { doc: clip(data.pageTitle) || t("Docs.untitled") }));
+    }
     return changeText(notificationHtml(it.message || ""));
 };

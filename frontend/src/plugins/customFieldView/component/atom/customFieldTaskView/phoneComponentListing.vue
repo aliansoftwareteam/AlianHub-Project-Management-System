@@ -110,7 +110,7 @@
     </div>
 </template>
 <script setup>
-    import { FormKit } from '@formkit/vue';
+    import { FormKit } from '@/plugins/customFieldView/lazyFormKit';
     import { computed, inject, onMounted, ref, watch } from "vue";
     import { useStore } from "vuex";
     import { useCustomComposable } from "@/composable";

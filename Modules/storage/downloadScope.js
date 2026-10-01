@@ -165,7 +165,7 @@ const clip = async (ctx, [, companyId, userId], key) => {
 
 const reminderAttachment = async (ctx, [, companyId, userId]) => ownFolder(ctx, companyId, userId) || NO_ACCESS;
 
-const liveDoc = (ctx, pageId) => find(ctx, SCHEMA_TYPE.PAGES, { _id: oid(pageId), deletedStatusKey: 0 }, 'ProjectID visibility createdBy deletedStatusKey');
+const liveDoc = (ctx, pageId) => find(ctx, SCHEMA_TYPE.PAGES, { _id: oid(pageId), deletedStatusKey: 0 }, 'ProjectID visibility createdBy sharedWith deletedStatusKey');
 
 /* An image uploaded into a doc, and a file on one of its comments, is for whoever may read that doc. */
 const inReadableDoc = async (ctx, [, pageId]) => {

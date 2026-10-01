@@ -65,6 +65,7 @@ const narrowToAgent = async (set) => {
     PER_PROJECT_LISTS.forEach((list) => {
         narrowed[list] = (Array.isArray(set[list]) ? set[list] : []).filter((id) => allowed.includes(String(id)));
     });
+    narrowed.namedProjectIds = (Array.isArray(set.namedProjectIds) ? set.namedProjectIds : allowed).filter((id) => allowed.includes(String(id)));
     return narrowed;
 };
 

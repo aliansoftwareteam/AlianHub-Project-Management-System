@@ -7,7 +7,7 @@ const {
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
 const logger = require('../../Config/loggerConfig');
-const { onJoin, roomFor, prefixOfOwnRoom, canOpenComments, pageCommentRoomOf, readablePage } = require('../roomAccess');
+const { onJoin, roomFor, prefixOfOwnRoom, canOpenComments, pageCommentRoomOf, readablePage, mayReceiveComments, inOrder } = require('../roomAccess');
 const { THREAD_MODULE } = require('../../Modules/Comments/helpers/chatThreads');
 
 exports.commentSocketHandler = ({ socket, namespace }) => {
@@ -47,10 +47,12 @@ exports.commentSocketHandler = ({ socket, namespace }) => {
             typing: !!data.typing,
         };
 
+        const companyId = socket.identity && socket.identity.companyId;
         findRoomsByPrefix(data.roomPrefix).forEach((entry) => {
             // Never echo to the author — including their own other tabs, which the
             // client also guards against by user id.
             if (!entry.socket || entry.socket === socket || entry.socket.disconnected) return;
+            if (!companyId || !entry.socket.identity || entry.socket.identity.companyId !== companyId) return;
             entry.socket.emit('commentTyping', payload);
         });
     });
@@ -65,44 +67,31 @@ function setEventName(type) {
     }
 }
 
-const handleCommentChange = (changeData, includeUpdatedFields = false) => {
-    // Both modules share the same emit shape; the only difference is the
-    // prefix used to find subscribed rooms.
-    let prefix;
-    if (changeData.module === 'comments' || changeData.module === THREAD_MODULE) {
-        const { projectId, sprintId, taskId } = changeData.data;
-        prefix = `comments_${projectId}_${sprintId}_${taskId}`;
-    } else if (changeData.module === 'comments_project') {
-        prefix = `comments_project_${changeData.data.projectId}`;
-    } else {
-        return;
-    }
+const prefixOf = ({ module, data }) => {
+    if (module === 'comments' || module === THREAD_MODULE) return `comments_${data.projectId}_${data.sprintId}_${data.taskId}`;
+    if (module === 'comments_project') return `comments_project_${data.projectId}`;
+    return null;
+};
 
-    // SOCKET-PERFORMANCE-PLAN #1 (Phase 2): O(1) prefix lookup replaces the
-    // full-array filter + `uniqueRooms` dedup helper. The Map-based index
-    // is already deduped by construction (key = roomName), so a second-pass
-    // dedup is no longer needed.
-    const relatedRooms = findRoomsByPrefix(prefix);
-    if (!relatedRooms.length) return;
-
+const relayCommentChange = async (changeData, prefix, includeUpdatedFields) => {
     const eventName = setEventName(changeData.type);
     const emitData = {
         fullDocument: changeData.data,
         ...(includeUpdatedFields && { updatedFields: changeData.updatedFields }),
     };
-
-    relatedRooms.forEach(data => {
-        // SOCKET-PERFORMANCE-PLAN #5 (Phase 2): see taskSocket.js — small-Set
-        // membership check beats scanning the namespace's full adapter.rooms.
-        if (!data.socket.rooms.has(data.roomName)) return;
-        data.namespace.to(data.roomName).emit(eventName, emitData);
-    });
+    for (const room of findRoomsByPrefix(prefix)) {
+        // eslint-disable-next-line no-await-in-loop
+        if (!(await mayReceiveComments(room.socket.identity, changeData, prefix))) continue;
+        if (room.socket.rooms.has(room.roomName)) room.namespace.to(room.roomName).emit(eventName, emitData);
+    }
 };
 
-// SOCKET-PERFORMANCE-PLAN #2: comments are published under two modules —
-// `comments` (task-level comments) and `comments_project` (project-level
-// comments). Subscribe to both namespaces so the handler still receives
-// every relevant event while ignoring task/companies/notification fan-out.
+const handleCommentChange = (changeData, includeUpdatedFields = false) => {
+    const prefix = changeData && changeData.data ? prefixOf(changeData) : null;
+    if (!prefix || !findRoomsByPrefix(prefix).length) return undefined;
+    return inOrder(() => relayCommentChange(changeData, prefix, includeUpdatedFields));
+};
+
 const PAGE_COMMENT_EVENTS = { insert: 'pageCommentInsert', update: 'pageCommentUpdate' };
 
 /* Sent to each room member only while they can still read the doc: a doc made private keeps its old viewers

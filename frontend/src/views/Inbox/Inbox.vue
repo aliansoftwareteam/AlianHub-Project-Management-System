@@ -788,7 +788,7 @@ const open = (it) => {
         router.push({ name: 'PageEditor', params: { cid: companyId?.value, pageId: String(it.changeData.pageId) }, query: { comment: String(it.changeData.commentId || '') } }).catch(() => {});
         return;
     }
-    if (it.changeType === 'doc_mention' && it.changeData?.pageId) {
+    if (['doc_mention', 'doc_shared'].includes(it.changeType) && it.changeData?.pageId) {
         router.push({ name: 'PageEditor', params: { cid: companyId?.value, pageId: String(it.changeData.pageId) } }).catch(() => {});
         return;
     }

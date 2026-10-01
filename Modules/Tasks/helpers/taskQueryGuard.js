@@ -115,6 +115,42 @@ const toObjectIds = (ids) => (ids || [])
     .filter((id) => /^[a-f0-9]{24}$/i.test(String(id)))
     .map((id) => new mongoose.Types.ObjectId(String(id)));
 
+const isId = (value) => typeof value === 'string' || Boolean(value && value._bsontype === 'ObjectId');
+
+const namesList = (value, listId) => {
+    const named = isPlainObject(value) && Object.keys(value).length === 1 && '$eq' in value ? value.$eq : value;
+    return isId(named) && String(named).toLowerCase() === String(listId);
+};
+
+const widened = (clause, listId) => {
+    if (!isPlainObject(clause)) return clause;
+    const inner = Array.isArray(clause.$and) ? clause.$and.map((part) => widened(part, listId)) : null;
+    const changedInside = Boolean(inner) && inner.some((part, at) => part !== clause.$and[at]);
+    if (!namesList(clause.sprintId, listId)) return changedInside ? { ...clause, $and: inner } : clause;
+    const { sprintId: home, ...rest } = clause;
+    const inList = { $or: [{ sprintId: home }, { extraLists: { $elemMatch: { sprintId: listId } } }] };
+    return { ...rest, $and: [...(inner || []), inList] };
+};
+
+/* The rows of one list are the tasks that live in it and the tasks it holds as an extra list. The
+ * caller names the list by its plain `sprintId` in a top-level $match, directly or under $and, and
+ * only that is widened: a condition under $or or inside a $facet keeps the meaning it was written
+ * with. The scope stage still runs first, on each task's home. */
+const withExtraListRows = (stages, sprintId) => {
+    const [listId] = toObjectIds([sprintId]);
+    if (!listId) return stages;
+    return stages.map((stage) => {
+        const match = widened(stage.$match, listId);
+        return match === stage.$match ? stage : { $match: match };
+    });
+};
+
+/* The same for one match a server reader built itself, wherever in its pipeline it sits. */
+const matchWithExtraListRows = (match, sprintId) => {
+    const [listId] = toObjectIds([sprintId]);
+    return listId ? widened(match, listId) : match;
+};
+
 /* Company-wide, short of what belongs to the people in it: someone else's personal list, and a chat
  * the caller is not in. `personalLists` are the ids othersPersonalListIds gives for the caller. Kept
  * under $nor so a caller that spreads the match into its own filter and then names a ProjectID keeps
@@ -153,6 +189,8 @@ module.exports = {
     LOOKUP_TARGETS,
     QueryRefused,
     validatePipeline,
+    withExtraListRows,
+    matchWithExtraListRows,
     visibilityStage,
     companyWideMatch,
     readsCompanyWide,

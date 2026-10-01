@@ -15,6 +15,7 @@ const { handleTaskAttachmentsDuplicateFunctionality } = require(`../../../../com
 const { isTaskStoredFile, taskAttachmentKey } = require('../../../../common-storage/taskFileKeys');
 const { copyFieldFiles } = require('../../../CustomField/helpers/fieldFiles');
 const { copyFieldLinks } = require('../../../CustomField/helpers/fieldLinks');
+const { cleanDescription, DESCRIPTION_FIELDS } = require('../cleanRichText');
 const { buildQueryObject, buildHistoryObject, convertToDisplayFormat } = require("../helper");
 const socketEmitter = require('../../../../event/socketEventEmitter');
 const { addCommentCollection, updateCommentCollection } = require('../../../Comments/controller')
@@ -108,6 +109,13 @@ module.exports = {
                         }
                         if(des1.blocks.length > 0 || des2.blocks.length > 0){
                             mergeObj.descriptionBlock = mergedObject;
+                        }
+                        try {
+                            cleanDescription(mergeObj);
+                        } catch (error) {
+                            // The other task is already in the trash by now: the kept task keeps its own description.
+                            DESCRIPTION_FIELDS.forEach((field) => { delete mergeObj[field]; });
+                            logger.error(`merge left the description as it was: ${error.message}`);
                         }
                         let updateObj = {
                             type: SCHEMA_TYPE.TASKS,

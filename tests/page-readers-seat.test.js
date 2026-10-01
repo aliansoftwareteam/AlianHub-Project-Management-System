@@ -78,4 +78,22 @@ describe('the page readers give the same answer: a caller without a live seat', 
         await expect(visibility.assertWritable(C, vis, { companyWide: true })).rejects.toMatchObject({ notVisible: true });
         await expect(visibility.assertWritable(C, vis, { pageId: PAGES.company })).rejects.toMatchObject({ notVisible: true });
     });
+
+    it('reaches no doc that is shared with them by name', async () => {
+        mockDb.store[SCHEMA_TYPE.PAGES].forEach((page) => { page.sharedWith = [{ userId: SEATLESS, role: 'editor', by: PEOPLE.owner, at: new Date() }]; });
+
+        for (const query of [{}, { scope: 'all' }, { scope: 'shared' }, { taskId: world.TASK }]) {
+            const res = reply();
+            await pages.listPages(verified({ uid: SEATLESS, params: {}, body: {}, query, headers: { companyid: C } }), res);
+            expect(res.body).toMatchObject({ status: true, data: [] });
+        }
+        const opened = reply();
+        await pages.getPage(verified({ uid: SEATLESS, params: { id: PAGES.namedView }, body: {}, query: {}, headers: { companyid: C } }), opened);
+        expect(opened.body.status).toBe(false);
+
+        const vis = await visibility.forCaller({ companyId: C, userId: SEATLESS, projectIds: [] });
+        expect(await mockDb.crud(C, { type: SCHEMA_TYPE.PAGES, data: [vis.pageClause()] }, 'find')).toEqual([]);
+        expect(mockDb.store[SCHEMA_TYPE.PAGES].filter((page) => vis.allowsPage(page))).toEqual([]);
+        await expect(visibility.assertWritable(C, vis, { pageId: PAGES.namedView })).rejects.toMatchObject({ notVisible: true });
+    });
 });
