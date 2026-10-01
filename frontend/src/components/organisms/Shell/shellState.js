@@ -7,7 +7,9 @@ const CONTRAST_KEY = "ah.contrast";
 const CONTRAST_CHOICES = ["auto", "standard", "high"];
 const VARIANT_KEY = "ah.variant";
 const VARIANT_OFF = "off";
-export const VARIANT_CHOICES = ["a", "b", "c"];
+export const VARIANT_CHOICES = ["a", "b", "c", "classic"];
+/* The look tokens.css puts on :root, so it needs no attribute. */
+export const DEFAULT_VARIANT = "b";
 const NAV_KEY = "ah.nav";
 const NAV_SAVE_DELAY_MS = 800;
 
@@ -77,6 +79,8 @@ export function applyContrast(choice) {
 }
 
 const knownVariant = (value) => (VARIANT_CHOICES.includes(value) ? value : "");
+
+export const activeVariant = () => shellState.variant || DEFAULT_VARIANT;
 
 /* The router is in hash mode, so a shared link carries ?variant= inside the hash; one typed
    by hand usually has it before the hash. */

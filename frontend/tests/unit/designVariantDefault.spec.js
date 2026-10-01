@@ -150,9 +150,8 @@ describe('on a phone', () => {
 });
 
 describe('the shared primitives follow the look', () => {
-    const css = tokens.slice(0, tokens.indexOf('@media (max-width: 767px) {\n    body {'));
     const reads = (selector, property, expected) => {
-        const body = ruleBody(css, selector);
+        const body = ruleBody(tokens, selector);
         const match = new RegExp(`(^|[;\\s])${property}\\s*:\\s*([^;]+)`).exec(body);
         expect(match ? match[2].trim() : '', `${selector} { ${property} }`).toContain(expected);
     };

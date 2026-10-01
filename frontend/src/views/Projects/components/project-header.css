@@ -10,9 +10,9 @@
     min-height: var(--toolbar-h);
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 0 20px;
-    font: var(--text-small);
+    gap: var(--sp-5);
+    padding: 0 var(--page-pad-x, 20px);
+    font: 400 var(--fs-md, 12.5px)/var(--lh-body, 1.5) var(--font-ui);
     color: var(--ink);
 }
 
@@ -33,7 +33,7 @@
 .ph2__folder { max-width: 18ch; overflow: hidden; text-overflow: ellipsis; color: var(--ink-2); }
 
 .ph2__project {
-    font: 600 14px/1.2 var(--font-ui);
+    font: var(--fw-title, 600) var(--fs-lg, 14px)/var(--lh-tight, 1.2) var(--font-ui);
     letter-spacing: -.2px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -49,7 +49,7 @@
     border: 0;
     background: none;
     color: var(--ink);
-    font: 600 14px/1.2 var(--font-ui);
+    font: var(--fw-title, 600) var(--fs-lg, 14px)/var(--lh-tight, 1.2) var(--font-ui);
     letter-spacing: -.2px;
     cursor: pointer;
 }
@@ -67,12 +67,12 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
     color: var(--ink-2);
     padding: 4px;
     margin-left: -6px;
-    min-width: 28px;
-    min-height: 28px;
+    min-width: var(--control-h-sm, 28px);
+    min-height: var(--control-h-sm, 28px);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 6px;
+    border-radius: var(--r-sm, 6px);
     cursor: pointer;
     flex: none;
 }
@@ -80,7 +80,7 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
 .ph2__tree:focus-visible { outline: none; box-shadow: var(--focus); }
 
 .ph2__range {
-    font: var(--text-label);
+    font: 600 var(--fs-xs, 10.5px)/1.2 var(--font-mono);
     letter-spacing: .06em;
     color: var(--ink-2);
     white-space: nowrap;
@@ -101,7 +101,7 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
 .ph2__star.is-on svg { fill: var(--warn); }
 
 .ph2__code {
-    font: var(--text-data);
+    font: 500 var(--fs-sm, 11.5px)/1.2 var(--font-mono);
     color: var(--ink-2);
     text-transform: uppercase;
     padding-left: 10px;
@@ -116,9 +116,9 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
     display: flex;
     align-items: stretch;
     min-width: 0;
-    min-height: 38px;
+    min-height: var(--control-h-lg, 38px);
     overflow-x: auto;
-    padding: 0 20px;
+    padding: 0 var(--page-pad-x, 20px);
     border-top: 1px solid var(--hairline);
     color: var(--ink);
 }
@@ -132,8 +132,8 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
 .ph2__tab {
     border: 0;
     background: none;
-    padding: 6px 10px;
-    font: var(--text-small);
+    padding: var(--sp-2) var(--sp-4);
+    font: 400 var(--fs-md, 12.5px)/var(--lh-body, 1.5) var(--font-ui);
     color: var(--ink-2);
     cursor: pointer;
     white-space: nowrap;
@@ -141,7 +141,7 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
     transition: color var(--t-state) var(--ease), border-color var(--t-state) var(--ease);
 }
 .ph2__tab:hover { color: var(--ink); }
-.ph2__tab.is-active { color: var(--ink); font-weight: 600; border-bottom-color: var(--brand); }
+.ph2__tab.is-active { color: var(--ink); font-weight: var(--fw-strong, 600); border-bottom-color: var(--brand); }
 .ph2__tab--add { color: var(--brand); }
 
 /* The existing ViewsList row, when Projects.vue passes it through the `views`
@@ -150,14 +150,14 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
 .ph2__viewrow .wrapper.bg-light-gray { background: none; }
 .ph2__viewrow .view-list {
     border: 0 !important;
-    padding: 6px 10px;
+    padding: var(--sp-2) var(--sp-4);
     height: auto !important;
     align-items: center;
     border-bottom: 2px solid transparent;
 }
 .ph2__viewrow .wrapper.bg-light-gray .view-list { border-bottom: 2px solid var(--brand) !important; }
-.ph2__viewrow .wrapper.bg-light-gray .view-list .gray81 { color: var(--ink); font-weight: 600; }
-.ph2__viewrow .view-list .gray81 { color: var(--ink-2); font-size: 12.5px; }
+.ph2__viewrow .wrapper.bg-light-gray .view-list .gray81 { color: var(--ink); font-weight: var(--fw-strong, 600); }
+.ph2__viewrow .view-list .gray81 { color: var(--ink-2); font-size: var(--fs-md, 12.5px); }
 
 .ph2__viewrow .view-list:focus-visible,
 .ph2__viewrow .ph2__tab:focus-visible {
@@ -170,7 +170,7 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
     margin-left: auto;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--sp-2);
     flex: none;
 }
 
@@ -184,7 +184,7 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
 .ph2 .sprint-watcher-count {
     background-color: var(--fill);
     color: var(--ink-2);
-    font: var(--text-label);
+    font: 600 var(--fs-xs, 10.5px)/1 var(--font-mono);
     line-height: 16px;
 }
 
@@ -203,13 +203,13 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
     padding: 5px 10px;
     background: var(--rail);
     color: var(--rail-ink-strong);
-    border-radius: 8px;
-    font-size: 11.5px;
+    border-radius: var(--r-md, 8px);
+    font-size: var(--fs-sm, 11.5px);
     white-space: nowrap;
 }
 .ph2__agents-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--rail-ok); }
 .ph2__agents-label { font-weight: 600; }
-.ph2__agents-meta { font: var(--text-data); color: var(--rail-ink-2); }
+.ph2__agents-meta { font: 500 var(--fs-sm, 11.5px)/1.2 var(--font-mono); color: var(--rail-ink-2); }
 
 @media (max-width: 1279px) {
     .ph2__code { display: none; }
@@ -241,12 +241,12 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
     gap: 2px;
 }
 .ph2__title-slot .list-view-header-title {
-    font: 600 14px/1.2 var(--font-ui);
+    font: var(--fw-title, 600) var(--fs-lg, 14px)/var(--lh-tight, 1.2) var(--font-ui);
     letter-spacing: -.2px;
     color: var(--ink);
 }
 .ph2__title-slot .key-wapper .key-text {
-    font: var(--text-data);
+    font: 500 var(--fs-sm, 11.5px)/1.2 var(--font-mono);
     color: var(--ink-2);
     border-left: 1px solid var(--hairline);
 }
@@ -255,7 +255,7 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
     height: 20px;
     border-radius: 5px;
     color: #fff;
-    font: 600 11px/1 var(--font-ui);
+    font: 600 var(--fs-xs, 11px)/1 var(--font-ui);
     flex: none;
 }
 .ph2__title-slot .mark__project-favourite { width: 14px; height: 14px; }
