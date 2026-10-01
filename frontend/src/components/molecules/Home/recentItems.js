@@ -1,34 +1,42 @@
 export const RECENT_TYPES = Object.freeze(["task", "project", "doc", "sprint"]);
 
-const idOf = (entity) => String(entity?._id || entity?.id || "");
 const textOf = (...values) => values.find((v) => typeof v === "string" && v.trim()) || "";
+const idOf = (...values) => {
+    const found = values.find((v) => v !== undefined && v !== null && v !== "");
+    return found === undefined ? "" : String(found);
+};
 
-// The endpoint answered { visitedAt, task } before it learned other types, so an untyped visit is a task.
+// Before the endpoint learned other types it answered { visitedAt, task }, so a row without a type is a task and its fields come from the task.
 export function toRecentItem(visit) {
     if (!visit || typeof visit !== "object") return null;
     const type = visit.type || visit.entityType || "task";
     if (!RECENT_TYPES.includes(type)) return null;
-    const entity = visit[type] || visit.item || visit.entity || null;
-    const id = idOf(entity);
+    const route = visit.route && typeof visit.route === "object" ? visit.route : {};
+    const task = type === "task" && visit.task && typeof visit.task === "object" ? visit.task : null;
+    const id = idOf(visit.id, task?._id);
     if (!id) return null;
 
-    const base = { type, id, visitedAt: visit.visitedAt || null };
-    if (type === "task") {
-        return { ...base, title: textOf(entity.TaskName, entity.name, entity.title), code: textOf(entity.TaskKey), task: entity };
-    }
-    if (type === "project") {
-        return { ...base, title: textOf(entity.ProjectName, entity.name, entity.title), code: textOf(entity.ProjectCode) };
-    }
-    if (type === "doc") {
-        return { ...base, title: textOf(entity.title, entity.name, entity.pageTitle), code: "" };
-    }
-    return {
-        ...base,
-        title: textOf(entity.name, entity.sprintName, entity.title),
-        code: "",
-        projectId: String(entity.projectId || entity.ProjectID || ""),
-        folderId: String(entity.folderId || ""),
+    const item = {
+        type,
+        id,
+        visitedAt: visit.visitedAt || null,
+        title: textOf(visit.title, task?.TaskName),
+        code: textOf(task?.TaskKey),
+        projectId: idOf(route.projectId, visit.projectId, task?.ProjectID, type === "project" ? id : ""),
+        projectName: textOf(visit.projectName),
+        folderId: idOf(route.folderId, task?.folderObjId),
     };
+    if (type === "task") {
+        item.task = task || { _id: idOf(route.taskId, id), ProjectID: item.projectId, sprintId: idOf(route.sprintId), folderObjId: item.folderId };
+    }
+    return item;
+}
+
+// Opening a project records the project and the sprint it lands on; the sprint row already says where that was.
+export function toRecentItems(rows) {
+    const items = (Array.isArray(rows) ? rows : []).map(toRecentItem).filter(Boolean);
+    const sprintProjects = new Set(items.filter((item) => item.type === "sprint").map((item) => item.projectId));
+    return items.filter((item) => item.type !== "project" || !sprintProjects.has(item.id));
 }
 
 export function recentRoute(item, cid) {

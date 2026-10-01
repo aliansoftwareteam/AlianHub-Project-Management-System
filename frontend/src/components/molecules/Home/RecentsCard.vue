@@ -18,7 +18,7 @@
                     <ShellIcon :name="ICONS[item.type]" :size="14" class="hrec__icon" />
                     <span class="hrec__text">
                         <span class="hrec__title">{{ item.title || $t('Home.recents_untitled') }}</span>
-                        <span class="hrec__meta">{{ item.code ? `${item.code} · ` : '' }}{{ $t(`Home.recents_type_${item.type}`) }}</span>
+                        <span class="hrec__meta">{{ metaOf(item) }}</span>
                     </span>
                 </button>
             </li>
@@ -29,10 +29,11 @@
 <script setup>
 import { inject, onMounted, ref, unref } from "vue";
 import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
-import { recentRoute, toRecentItem } from "./recentItems";
+import { recentRoute, toRecentItems } from "./recentItems";
 
 defineOptions({ name: "RecentsCard" });
 const emit = defineEmits(["open", "hide"]);
@@ -41,16 +42,19 @@ const SHOWN = 8;
 const ICONS = Object.freeze({ task: "check", project: "projects", doc: "docs", sprint: "flag" });
 
 const router = useRouter();
+const { t } = useI18n();
 const companyId = inject("$companyId", "");
 const items = ref([]);
 const state = ref("loading");
 
+const metaOf = (item) => [item.code, t(`Home.recents_type_${item.type}`), item.type === "project" ? "" : item.projectName].filter(Boolean).join(" · ");
+
 async function load() {
     state.value = "loading";
     try {
-        const res = await apiRequest("get", env.RECENT_VISITS);
+        const res = await apiRequest("get", `${env.RECENT_VISITS}?types=all`);
         if (!res?.data?.status) throw new Error(res?.data?.statusText || "Recent visits not read");
-        items.value = (res.data.data || []).map(toRecentItem).filter(Boolean).slice(0, SHOWN);
+        items.value = toRecentItems(res.data.data).slice(0, SHOWN);
         state.value = "ready";
     } catch (error) {
         state.value = "failed";
