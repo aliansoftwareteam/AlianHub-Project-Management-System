@@ -155,6 +155,7 @@
                             <button type="button" :class="{ 'is-active': draft.rollupScope !== 'sprint' }" @click="draft.rollupScope = 'subtask'">{{ $t('Fields.rollup_scope_subtasks') }}</button>
                             <button type="button" :class="{ 'is-active': draft.rollupScope === 'sprint' }" @click="draft.rollupScope = 'sprint'">{{ $t('Fields.rollup_scope_sprint') }}</button>
                         </div>
+                        <p class="ah-field__hint" data-test="fb-rollup-help">{{ $t('Fields.rollup_help') }}</p>
                     </div>
                 </template>
 

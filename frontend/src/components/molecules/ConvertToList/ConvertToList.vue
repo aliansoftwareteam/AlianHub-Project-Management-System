@@ -79,6 +79,7 @@
     import { apiRequest } from "../../../services";
     import * as env from '@/config/env';
     import { nestedFolders } from '@/utils/folderTree';
+    import { convertToListRequest } from '@/views/Projects/composables/taskPlacement';
 
     const { t } = useI18n();
 
@@ -191,21 +192,14 @@
                                 companyOwnerId: companyOwner.value.userId,
                             }
 
-                            taskClass.convertToList({
+                            taskClass.convertToList(convertToListRequest({
                                 companyId: companyId.value,
-                                projectData: {
-                                    id : selectedProjectData.value._id,
-                                    ProjectName : selectedProjectData.value.ProjectName
-                                },
-                                taskId : props.task._id,
+                                project: selectedProjectData.value,
+                                task: props.task,
                                 userData : userData,
-                                folderData : selectedFolderData.value ? selectedFolderData.value : null,
-                                sprintObj : { 
-                                    id: props.task.sprintId,
-                                    folderId : props.task.folderObjId || null
-                                },
+                                folder: selectedFolderData.value,
                                 isSubTask : subtaskArr.value.length > 0 ? true : false
-                            }).then((response)=>{
+                            })).then((response)=>{
                                 if(response.data.status === true){
                                     let sprintObj = response.data.data;
                                     let parmasObj = {

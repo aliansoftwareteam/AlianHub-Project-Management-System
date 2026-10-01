@@ -337,6 +337,8 @@ import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption
 const {isCustomFields} = customField();
 import * as env from '@/config/env';
 import { indexRepairBody, indexRepairRows, plainGroupValue } from "@/views/Projects/composables/taskGroupIndex";
+import { childrenWereRead } from "@/store/ProjectData/taskTree";
+import { convertToTaskRequest } from "@/views/Projects/composables/taskPlacement";
 import { useI18n } from "vue-i18n";
 import { apiRequest } from "../../../services";
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue"
@@ -700,9 +702,8 @@ function toggleTask(task,e) {
         subObserver[task._id] = null;
     }
 
-    if(task.isExpanded === true && (!task.subtaskArray || task.subtaskArray.length < 25)) {
-        let fetchNew = currentProjectTasks.value?.[props.projectId]?.[props.sprintId].index[`${task._id}_${props.item.searchKey}_${props.item.searchValue}`] === undefined;
-        fetchSubTask(task, fetchNew);
+    if(task.isExpanded === true) {
+        fetchSubTask(task, !childrenWereRead(currentProjectTasks.value?.[props.projectId]?.[props.sprintId], task._id, props.item));
     }
 }
 
@@ -833,24 +834,14 @@ function updateItem(type,e, item) {
             });
         }else if(type === "task" && checkPermission('task.convert_to_task', props.project?.isGlobalPermission) === true) {
             if(e?.added?.element.isParentTask === false){
-                taskClass.convertToTask({
+                taskClass.convertToTask(convertToTaskRequest({
                     companyId: companyId.value,
-                    projectData: {
-                        id:pid
-                    },
-                    taskId : e?.added?.element._id,
-                    parentTaskId:e?.added?.element.ParentTaskId,
-                    sprintObj: props.sprintObject,
-                    oldSprintObj :{
-                        id:props.sprintObject.id,
-                        folderId:null
-                    },
-                    oldProject: {
-                        id : pid,
-                        taskTypeCounts : props.project.taskTypeCounts,
-                        taskStatusData : props.project.taskStatusData
-                    }
-                }).then(() => {
+                    destination: props.project,
+                    sprint: props.sprintObject,
+                    task: e.added.element,
+                    oldSprint: { id: props.sprintObject.id, folderId: null },
+                    source: props.project
+                })).then(() => {
                     commit("projectData/mutateUpdateFirebaseTasks",{
                         snap, 
                         op: "removed",
@@ -1052,7 +1043,7 @@ function fetchSubTask(task, fetchNew = false) {
         userId: userId.value,
         fetchNew: fetchNew,
         projectData: projectData.value,
-        parentId: task.isParentTask ? task._id : ""
+        parentId: String(task._id)
     })
 }
 
@@ -1201,7 +1192,7 @@ function prepareIndexData () {
     const rows = indexRepairRows(items.value, props.item, checkPermission('task.task_list', projectData.value?.isGlobalPermission));
     if (!rows.length) return;
 
-    commit("projectData/mutateTaskIndex", {pid: projectData.value._id, sprintId: items.value[0].sprintId, tasksArray: rows.map((row) => ({ _id: row.data })), indexName: items.value[0].indexName});
+    commit("projectData/mutateTaskIndex", {pid: projectData.value._id, sprintId: items.value[0].sprintId, tasksArray: rows.map((row) => ({ _id: row.data })), indexName: props.item.indexName});
     if (rows.length !== 1) {
         isLoading.value = true;
     }

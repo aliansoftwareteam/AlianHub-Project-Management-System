@@ -224,5 +224,5 @@ const eraseOwner = async (companyId, userId) => {
 const hasThreads = async (companyId, userId) => Boolean(await store(companyId, [{ ownerId: validOwner(userId) }, '_id', { lean: true }], 'findOne'));
 
 module.exports = {
-    LIMITS, callerOf, findThread, historyOf, lastQuestionOf, appendTurn, listThreads, getThread, renameThread, deleteThread, eraseOwner, hasThreads,
+    LIMITS, callerOf, findThread, historyOf, lastQuestionOf, appendTurn, listThreads, getThread, renameThread, deleteThread, eraseOwner, hasThreads, openSources, citedView,
 };

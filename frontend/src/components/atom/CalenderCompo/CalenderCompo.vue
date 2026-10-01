@@ -81,9 +81,10 @@
                             v-if="dateValue != ''"
                             readonly 
                             class="date_format_cal font-ui"
-                            :class="[{'calendar-comp':!calenderImage,'calendar-comp-white':calenderImage}]"
+                            :class="[{'calendar-comp':!calenderImage,'calendar-comp-white':calenderImage,'date_format_cal--value':valueAsText}]"
                             type="text"
-                            :placeholder="convertDateFormat(dateValue,props.format ? props.format : '',{showDayName: false})"
+                            :value="valueAsText ? convertDateFormat(dateValue,props.format ? props.format : '',{showDayName: false}) : null"
+                            :placeholder="valueAsText ? null : convertDateFormat(dateValue,props.format ? props.format : '',{showDayName: false})"
                             :id="inputId"
                             :aria-label="ariaLabel || null"
                             @keydown.enter.prevent="openCalendar"
@@ -107,9 +108,10 @@
                             v-if="dateValue != ''"
                             readonly 
                             class="date_format_cal font-ui"
-                            :class="[{'bg-transparent border-0 cursor-pointer':!calenderImage,'calendar-comp-white':calenderImage,'text-ellipse':isEllipsis,'d-block':isEllipsis,'mw-150px':isEllipsis,'date_mw':isTask}]"
+                            :class="[{'bg-transparent border-0 cursor-pointer':!calenderImage,'calendar-comp-white':calenderImage,'text-ellipse':isEllipsis,'d-block':isEllipsis,'mw-150px':isEllipsis,'date_mw':isTask,'date_format_cal--value':valueAsText}]"
                             type="text"
-                            :placeholder="convertDateAndTime(timeFormate,dateValue,props.format)"
+                            :value="valueAsText ? convertDateAndTime(timeFormate,dateValue,props.format) : null"
+                            :placeholder="valueAsText ? null : convertDateAndTime(timeFormate,dateValue,props.format)"
                             :id="inputId"
                             :aria-label="ariaLabel || null"
                             @keydown.enter.prevent="openCalendar"
@@ -190,6 +192,11 @@ const props = defineProps({
     maxDate: {
         type: [Date, String],
         default: ''
+    },
+    /* The chosen date is the input's value, which a screen reader and a copy can reach, rather than its placeholder. */
+    valueAsText: {
+        type: Boolean,
+        default: false
     },
     isShowDateAndicon: {
         type: Boolean,

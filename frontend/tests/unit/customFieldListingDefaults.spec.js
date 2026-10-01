@@ -101,6 +101,30 @@ describe('the allowed dates of a date field', () => {
     });
 });
 
+describe('a date field that holds a date', () => {
+    const input = (wrapper) => wrapper.find('input.date_format_cal');
+
+    it('carries it as the input\'s value in the task panel, where a screen reader and a copy can reach it', () => {
+        const { wrapper } = show(DateComponentListing, { ...DUE, fieldValue: '2026-10-15', fieldDateFormate: 'DD/MM/YYYY' });
+        expect(input(wrapper).element.value).toBe('2026-10-15');
+        expect(input(wrapper).attributes('placeholder')).toBeUndefined();
+        expect(input(wrapper).attributes('readonly')).toBeDefined();
+        expect(input(wrapper).classes()).toContain('date_format_cal--value');
+    });
+
+    it('carries the time with it when the field keeps one', () => {
+        const { wrapper } = show(DateComponentListing, { ...DUE, fieldValue: new Date(2026, 9, 15, 14, 30), fieldDateFormate: 'DD/MM/YYYY', fieldTimeFormate: '24 Hour' });
+        expect(input(wrapper).element.value).toContain('14:30');
+        expect(input(wrapper).attributes('placeholder')).toBeUndefined();
+    });
+
+    it('shows its format as a placeholder only while it is empty', () => {
+        const { wrapper } = show(DateComponentListing, { ...DUE, fieldDateFormate: 'DD/MM/YYYY' });
+        expect(input(wrapper).element.value).toBe('');
+        expect(input(wrapper).attributes('placeholder')).toBe('DD/MM/YYYY');
+    });
+});
+
 describe('a date field with no past/future setting', () => {
     it('renders in the task panel and takes a picked date', async () => {
         const { wrapper, failed } = show(DateComponentListing, DUE);

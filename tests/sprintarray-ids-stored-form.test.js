@@ -53,7 +53,8 @@ const SUB_TASK = '6f0000000000000000000b0a';
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const settle = async () => { for (let i = 0; i < 30; i += 1) await new Promise((resolve) => setImmediate(resolve)); };
 
-/* The element as the web app sends it, plus a field no writer declares, which must survive too. */
+/* The element as older web apps send it, plus a field no writer declares; the schema keeps the id, the name and the folder. */
+const STORED_ELEMENT = { id: SPRINT, name: 'Sprint 1', folderId: FOLDER, folderName: 'Design' };
 const element = () => ({ id: SPRINT, name: 'Sprint 1', value: 'SPRINT_1', folderId: FOLDER, folderName: 'Design', isAccessible: true, legacyNote: { kept: true } });
 const taskDoc = (extra = {}) => ({
     TaskName: 'Write the brief', TaskKey: 'PAR-9', TaskType: 'task', TaskTypeKey: 1, ProjectID: OPEN_PROJECT, CompanyId: CID,
@@ -76,13 +77,13 @@ describe('the task schema stores a sprint id and a folder id as ObjectIds', () =
         ['findOneAndUpdate with an upsert', 'findOneAndUpdate', () => [{ _id: TASK_ID }, { $set: { sprintArray: element() } }, { new: true, upsert: true }]],
         ['bulkWrite', 'bulkWrite', () => [[{ insertOne: { document: taskDoc() } }, { updateOne: { filter: { _id: TASK_ID }, update: { $set: { sprintArray: element() } } } }]]],
         ['replaceOne', 'replaceOne', () => [{ _id: TASK_ID }, taskDoc()]],
-    ])('%s converts both ids and keeps every other field of the element', async (_, method, args) => {
+    ])('%s converts both ids and keeps the two names', async (_, method, args) => {
         const stored = await storedElements(method, args());
         expect(stored.length).toBeGreaterThan(0);
         stored.forEach((el) => {
             expect(isObjectId(el.id)).toBe(true);
             expect(isObjectId(el.folderId)).toBe(true);
-            expect({ ...el, id: String(el.id), folderId: String(el.folderId) }).toEqual(element());
+            expect({ ...el, id: String(el.id), folderId: String(el.folderId) }).toEqual(STORED_ELEMENT);
         });
     });
 

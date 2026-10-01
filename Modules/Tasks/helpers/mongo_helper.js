@@ -7,6 +7,7 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { default: mongoose } = require('mongoose');
 const { updateSprintCount } = require('../../notification-count/controller');
+const { parentCountFields } = require('../../notification-count/unreadParents');
 const { updateSprintFun } = require('../../Sprints/controller');
 const { dbCollections } = require('../../../Config/collections');
 const { handleTaskAttachmentsDuplicateFunctionality } = require(`../../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
@@ -997,15 +998,15 @@ exports.addHistoryCollection = (companyId, projectData, task, newTaskData, sprin
     })
 }
 
-exports.removeCommentCount = (companyId,projectId,sprintId,taskId,parentTaskId = '') => {
+/* A row's unread count comes off every task above it: the parent named by the caller (the one
+ * the row is leaving) and the tasks above that, or the row's own stored chain. */
+exports.removeCommentCount = async (companyId,projectId,sprintId,taskId,parentTaskId = '') => {
+    const parentTaskField = await parentCountFields(companyId, { projectId, sprintId, taskId, parentTaskId })
+        .catch(() => (parentTaskId ? [`parentTask_${projectId}_${sprintId}_${parentTaskId}_comments`] : []));
     return new Promise((resolve,reject) => {
         try {
             const sprintFieldName = `sprint_${projectId}_${sprintId}_comments`;
             const taskFieldName = `task_${projectId}_${sprintId}_${taskId}_comments`;
-            let parentTaskField = ``;
-            if(parentTaskId !== '') {
-                parentTaskField = `parentTask_${projectId}_${sprintId}_${parentTaskId}_comments`
-            }
             let obj = {
                 type: dbCollections.USERID,
                 data: [{

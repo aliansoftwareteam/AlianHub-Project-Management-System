@@ -13,13 +13,14 @@ vi.mock('@/views/Ai/AccountAttribution.vue', () => ({ default: { name: 'AccountA
 
 import AiAccounts from '@/views/Ai/AiAccounts.vue';
 import en from '@/locales/en.js';
-import { canGrantTasks, grantsOf } from '@/views/Ai/tokenPolicy';
+import { canGrantDocs, canGrantTasks, grantsOf } from '@/views/Ai/tokenPolicy';
 
 const i18n = config.global.plugins[0];
 i18n.global.setLocaleMessage('en', en);
 const t = i18n.global.t;
 
 const GRANT = 'tasks:manage';
+const DOCS = 'docs:manage';
 const policyOf = ({ strict = false, grants } = {}) => ({ strict, graceDays: 30, strictSince: null, minExpiryDays: 1, maxExpiryDays: 365, ...(grants ? { grants } : {}) });
 const token = (over) => ({ _id: over.name, prefix: 'ahp_1234abcd', scopes: ['read', 'write'], active: true, createdAt: new Date().toISOString(), lastUsedAt: null, expiresAt: null, projectIds: [], grants: [], ...over });
 
@@ -82,6 +83,27 @@ describe('letting a new agent token manage tasks', () => {
         expect(mintBodies()[0].grants).toEqual([GRANT]);
     });
 
+    it('offers writing docs as a choice of its own, and sends each grant that is ticked', async () => {
+        const wrapper = await openForm({ policy: policyOf({ grants: [GRANT, DOCS] }) });
+        expect(wrapper.text()).toContain(t('Accounts.token_grant_docs'));
+        await wrapper.find('[data-test="token-grant-docs"]').setValue(true);
+        await create(wrapper);
+        expect(mintBodies()[0].grants).toEqual([DOCS]);
+
+        const second = await openForm({ policy: policyOf({ grants: [GRANT, DOCS] }) });
+        await second.find('[data-test="token-grant-tasks"]').setValue(true);
+        await second.find('[data-test="token-grant-docs"]').setValue(true);
+        await create(second);
+        expect(mintBodies()[1].grants).toEqual([GRANT, DOCS]);
+    });
+
+    it('does not offer a grant the server does not name', async () => {
+        const wrapper = await openForm({ policy: policyOf({ grants: [GRANT] }) });
+        expect(wrapper.find('[data-test="token-grant-docs"]').exists()).toBe(false);
+        expect(canGrantDocs({ scopes: ['write'] }, policyOf({ grants: [GRANT] }))).toBe(false);
+        expect(grantsOf({ manageDocs: true, manageTasks: true }, policyOf({ grants: [GRANT] }))).toEqual([GRANT]);
+    });
+
     it('leaves the grant out when the box stays unticked', async () => {
         const wrapper = await openForm({ policy: policyOf({ grants: [GRANT] }) });
         await create(wrapper);
@@ -89,10 +111,11 @@ describe('letting a new agent token manage tasks', () => {
     });
 
     it('says which listed tokens manage tasks', async () => {
-        const wrapper = await openForm({ policy: policyOf({ grants: [GRANT] }), tokens: [token({ name: 'With', grants: [GRANT] }), token({ name: 'Without' })] });
+        const wrapper = await openForm({ policy: policyOf({ grants: [GRANT] }), tokens: [token({ name: 'With', grants: [GRANT] }), token({ name: 'Without' }), token({ name: 'Docs', grants: [DOCS] })] });
         const meta = wrapper.findAll('.acct-token').map((row) => row.text());
         expect(meta.find((text) => text.startsWith('With')).includes(t('Accounts.token_grant_tasks_short'))).toBe(true);
         expect(meta.find((text) => text.startsWith('Without')).includes(t('Accounts.token_grant_tasks_short'))).toBe(false);
+        expect(meta.find((text) => text.startsWith('Docs')).includes(t('Accounts.token_grant_docs_short'))).toBe(true);
     });
 
     it('needs the write scope where scopes are chosen', () => {
