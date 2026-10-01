@@ -770,6 +770,8 @@ const CUSTOM_GROUP_ICONS = {
     dropdown: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldDropdownGrey.svg'),
     checkbox: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldCheckboxGrey.svg'),
     date: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldDateGrey.svg'),
+    people: require('@/assets/images/svg/person.svg'),
+    rating: require('@/assets/images/svg/blankStar.svg'),
 };
 const { defs: projectFieldDefs } = useProjectCustomFields(projectData);
 const groupByOptions = computed(() => [

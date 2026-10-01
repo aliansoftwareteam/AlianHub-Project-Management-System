@@ -20,6 +20,8 @@ const {
 } = require("./helpers/resourceHelpers");
 const { ROLE_GUEST, isPrivileged } = require('../../Config/roleTypes');
 const { ACTIVE_SEAT } = require('../../Config/seatStatus');
+const { arrangeRules, rolePermission, PRIVATE_PROJECTS, seesEveryPrivateProject } = require('../../Config/rulePermissions');
+const { ownOrNotPersonal } = require('../PersonalList/ownership');
 
 // Parse a client-built advanced-filter match from the request body.
 function bodyTaskMatch(body) {
@@ -73,16 +75,16 @@ async function resolveCallerRoleType(companyId, uid) {
 }
 exports.resolveCallerRoleType = resolveCallerRoleType;
 
-// SECURITY: project-level visibility for the company-wide project cards. Mirrors
-// the project-list scoping (Modules/Project/controller/getProjectFilterData.js):
-// owner/admin (roleType 1|2) see everything (returns null → no filter); a member
-// sees private projects they belong to (AssigneeUserId includes their id or a
-// team id) plus public projects — public are also membership-gated unless the
-// caller holds the `public_projects` permission. Returns a Mongo sub-filter to
-// merge into a PROJECTS query, or null for no restriction. Without an active
+const noProject = () => ({ filter: { _id: { $in: [] } }, companyWide: false });
+
+// Project-level visibility for the company-wide project cards, by the same rule as
+// decideProjectAccess in Config/projectAccess.js: a personal list is its owner's alone;
+// owners and admins see every other project (companyWide); everyone else sees public
+// projects, and a private one when they or a team of theirs is assigned or their role
+// lists every private project. `filter` merges into a PROJECTS query. Without an active
 // seat, or on any lookup error, it matches no project.
-async function resolveVisibleProjectFilter(companyId, uid) {
-    if (!uid) return { _id: { $in: [] } }; // no identity → see nothing
+async function resolveProjectVisibility(companyId, uid) {
+    if (!uid) return noProject();
     try {
         const [teams, rules, roleType] = await Promise.all([
             MongoDbCrudOpration(companyId, {
@@ -92,24 +94,26 @@ async function resolveVisibleProjectFilter(companyId, uid) {
             fetchRules(companyId).catch(() => []),
             activeSeatRoleType(companyId, uid),
         ]);
-        if (roleType === null) return { _id: { $in: [] } };
-        if (isPrivileged(roleType)) return null; // admin/owner → all projects
-        const teamIds = (teams || []).map((t) => "tId_" + t._id);
-        const member = { $in: [String(uid), ...teamIds] };
-        const rule = Array.isArray(rules) ? rules.find((x) => x && x.key === "public_projects") : null;
-        const showAllProjects = !!(rule && rule.roles && rule.roles.find((r) => r.key === roleType && r.permission === true));
+        if (roleType === null) return noProject();
+        if (isPrivileged(roleType)) return { filter: ownOrNotPersonal(uid), companyWide: true };
+        const assigned = { AssigneeUserId: { $in: [String(uid), ...(teams || []).map((t) => "tId_" + t._id)] } };
+        const everyPrivateProject = seesEveryPrivateProject(rolePermission(arrangeRules(rules), roleType, PRIVATE_PROJECTS));
         return {
-            $or: [
-                { isPrivateSpace: true, AssigneeUserId: member },
-                { isPrivateSpace: false, ...(showAllProjects ? {} : { AssigneeUserId: member }) },
-            ],
+            filter: {
+                $and: [
+                    ownOrNotPersonal(uid),
+                    { $or: [{ isPrivateSpace: false }, { isPrivateSpace: true, ...(everyPrivateProject ? {} : assigned) }] },
+                ],
+            },
+            companyWide: false,
         };
     } catch (e) {
-        logger.error(`resolveVisibleProjectFilter error (company=${companyId}, uid=${uid}): ${e.message || e}`);
-        // Fail closed to member-only-nothing rather than leaking company-wide.
-        return { _id: { $in: [] } };
+        logger.error(`resolveProjectVisibility error (company=${companyId}, uid=${uid}): ${e.message || e}`);
+        return noProject();
     }
 }
+
+const resolveVisibleProjectFilter = async (companyId, uid) => (await resolveProjectVisibility(companyId, uid)).filter;
 exports.resolveVisibleProjectFilter = resolveVisibleProjectFilter;
 
 /**
@@ -830,9 +834,7 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         // needs the per-project rows behind each number, not just totals.
         const includeProjects = req.body && req.body.includeProjects === true;
 
-        // SECURITY: scope to the caller's visible projects. Owner/admin → null
-        // (all projects); a member → only projects they belong to / public ones.
-        const projFilter = await resolveVisibleProjectFilter(companyId, req.uid);
+        const { filter: projFilter, companyWide } = await resolveProjectVisibility(companyId, req.uid);
 
         // Project scoping from the card selector: all / include ($in) / exclude ($nin).
         const projectMode = req.body?.projectMode || 'all';
@@ -845,7 +847,7 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         const activeProjects = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PROJECTS,
             data: [
-                { statusType: { $nin: ["close"] }, deletedStatusKey: 0, ...(projFilter || {}), ...(projClause ? { _id: projClause } : {}) },
+                { statusType: { $nin: ["close"] }, deletedStatusKey: 0, ...(projClause ? { _id: projClause } : {}), $and: [projFilter] },
                 includeProjects
                     ? { ProjectType: 1, ProjectName: 1, status: 1, statusType: 1, projectStatusData: 1 }
                     : { ProjectType: 1, ProjectName: 1 },
@@ -881,10 +883,9 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         (timelogs || []).forEach((ts) => {
             if (ts.ProjectId) workingProjectIds.add(String(ts.ProjectId));
         });
-        // For a scoped (member) caller, count only projects they can see; admins
-        // (projFilter === null) keep the company-wide count unchanged.
+        // A scoped caller counts only projects they can see; owners and admins keep the company-wide count.
         let workingProjects = workingProjectIds.size;
-        if (projFilter) {
+        if (!companyWide) {
             const accessibleIds = new Set((activeProjects || []).map((p) => String(p._id)));
             workingProjects = [...workingProjectIds].filter((id) => accessibleIds.has(id)).length;
         }
@@ -1504,9 +1505,7 @@ exports.getProjectProgressMetric = async (req, res) => {
         };
 
         // Active project criteria — matches the app's "active" definition:
-        // not closed, not deleted. SECURITY: scoped to the caller's visible
-        // projects (owner/admin → all; member → own/public), so the active-project
-        // count and by-type breakdown no longer leak company-wide project data.
+        // not closed, not deleted, and scoped to the projects the caller can open.
         const needsProjectScope = metric === "active_projects" || metric === "projects_by_type";
         const projFilter = needsProjectScope ? await resolveVisibleProjectFilter(companyId, req.uid) : null;
         const activeProjectFilter = {
@@ -3022,13 +3021,12 @@ function sanitizeDashboardCards(cards) {
     }).filter((c) => c.componentId && c.uid);
 }
 
-// Project ids the caller may see, for the 'project' visibility. Owner/admin get
-// every project; everyone else gets the same set the project list would give them.
+// Project ids the caller may see, for the 'project' visibility: the set the project list gives them.
 async function visibleProjectIds(companyId, uid) {
     const filter = await resolveVisibleProjectFilter(companyId, uid);
     const rows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.PROJECTS,
-        data: [{ isDelete: { $ne: true }, ...(filter || {}) }, { _id: 1 }],
+        data: [{ isDelete: { $ne: true }, ...filter }, { _id: 1 }],
     }, "find").catch(() => []);
     return (rows || []).map((p) => String(p._id));
 }

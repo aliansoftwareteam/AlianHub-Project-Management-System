@@ -97,6 +97,19 @@ describe('GET /api/public-v1/tasks/:key answers for the token owner', () => {
         const res = await call('GET /api/public-v1/tasks/:key', OWNER, { params: { key: 'AH-1' } });
         expect(res.body).toMatchObject({ status: true, data: { TaskName: 'Secret task' } });
     });
+
+    it('leaves a personal list to its owner, for a task read by key and for a task listing', async () => {
+        const list = mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: oid(), ProjectName: 'Personal', isPrivateSpace: true, isPersonal: true, personalOwner: MEMBER, AssigneeUserId: [MEMBER] });
+        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: oid(), TaskKey: 'ME-1', TaskName: 'Personal task', ProjectID: String(list._id), deletedStatusKey: 0 });
+
+        expect((await call('GET /api/public-v1/tasks/:key', OWNER, { params: { key: 'ME-1' } })).statusCode).toBe(404);
+        const listing = await call('GET /api/public-v1/tasks', OWNER, { query: { projectId: String(list._id) } });
+        expect(JSON.stringify(listing.body)).not.toContain('Personal task');
+
+        expect((await call('GET /api/public-v1/tasks/:key', MEMBER, { params: { key: 'ME-1' } })).body).toMatchObject({ status: true, data: { TaskName: 'Personal task' } });
+        const own = await call('GET /api/public-v1/tasks', MEMBER, { query: { projectId: String(list._id) } });
+        expect(own.body.data.map((task) => task.TaskName)).toEqual(['Personal task']);
+    });
 });
 
 describe('the rest of the namespace answers for the token owner too', () => {
