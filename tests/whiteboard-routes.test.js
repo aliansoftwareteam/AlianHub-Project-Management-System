@@ -309,3 +309,159 @@ describe('saving through the route', () => {
         expect((await call(RESTORE, MEMBER, [OPEN, LIST], undefined)).statusCode).toBe(400);
     });
 });
+
+describe('a board follows its list', () => {
+    const FOLDER = 'f00000000000000000000001';
+    const SUBFOLDER = 'f00000000000000000000002';
+    const FOLDER_LIST = 'd00000000000000000000011';
+    const SUBFOLDER_LIST = 'd00000000000000000000012';
+    const F1 = 'e00000000000000000000011';
+    const F2 = 'e00000000000000000000012';
+    const row = (type, id) => mockDb.store[type].find((doc) => String(doc._id) === id);
+    const setStatus = (type, id, deletedStatusKey) => { row(type, id).deletedStatusKey = deletedStatusKey; myCache.flushAll(); };
+    const boardOf = (where) => boards().find((board) => String(board.sprintId) === where[1]);
+    const move = (uid, where, taskId) => save(uid, where, { baseRevision: boardOf(where).revision, upsert: [card('c', taskId, 77, 88)] });
+
+    beforeEach(async () => {
+        mockDb.seed(SCHEMA_TYPE.FOLDERS, { _id: FOLDER, projectId: OPEN, name: 'Folder', deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.FOLDERS, { _id: SUBFOLDER, projectId: OPEN, name: 'Subfolder', parentFolderId: FOLDER, deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: FOLDER_LIST, projectId: OPEN, folderId: FOLDER, name: 'In folder', private: false, AssigneeUserId: [], deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: SUBFOLDER_LIST, projectId: OPEN, folderId: SUBFOLDER, name: 'In subfolder', private: false, AssigneeUserId: [], deletedStatusKey: 0 });
+        seedTask(F1, OPEN, FOLDER_LIST);
+        seedTask(F2, OPEN, SUBFOLDER_LIST);
+        await save(MEMBER, [OPEN, LIST], { baseRevision: 0, upsert: [card('c', T1), { id: 'n', type: 'note', text: 'Keep me', tone: 'green', x: 1, y: 2, w: 180, h: 120 }] });
+        await save(MEMBER, [OPEN, FOLDER_LIST], { baseRevision: 0, upsert: [card('c', F1)] });
+        await save(MEMBER, [OPEN, SUBFOLDER_LIST], { baseRevision: 0, upsert: [card('c', F2)] });
+    });
+
+    const gone = async (where, taskId) => {
+        for (const uid of [MEMBER, OWNER]) {
+            expect((await read(uid, where)).statusCode).toBe(404);
+            expect((await move(uid, where, taskId)).statusCode).toBe(404);
+            expect((await call(HISTORY, uid, where)).statusCode).toBe(404);
+            expect((await call(RESTORE, uid, where, { revision: 1 })).statusCode).toBe(404);
+        }
+    };
+    const frozen = async (where, taskId) => {
+        for (const uid of [MEMBER, OWNER]) {
+            const seen = await read(uid, where);
+            expect({ statusCode: seen.statusCode, canEdit: seen.body.data.canEdit, cards: seen.body.data.elements.length > 0 }).toEqual({ statusCode: 200, canEdit: false, cards: true });
+            expect((await move(uid, where, taskId)).statusCode).toBe(403);
+            expect((await call(RESTORE, uid, where, { revision: 1 })).statusCode).toBe(403);
+        }
+    };
+    const live = async (where, taskId) => {
+        expect((await read(MEMBER, where)).body.data.canEdit).toBe(true);
+        expect((await move(MEMBER, where, taskId)).statusCode).toBe(200);
+    };
+
+    it.each([
+        ['the list', SCHEMA_TYPE.SPRINTS, LIST, [OPEN, LIST], T1],
+        ['the folder it is in', SCHEMA_TYPE.FOLDERS, FOLDER, [OPEN, FOLDER_LIST], F1],
+        ['the folder above its folder', SCHEMA_TYPE.FOLDERS, FOLDER, [OPEN, SUBFOLDER_LIST], F2],
+        ['the project', SCHEMA_TYPE.PROJECTS, OPEN, [OPEN, LIST], T1],
+    ])('is gone while %s is in the trash and back as it was once that is restored', async (_what, type, id, where, taskId) => {
+        const before = JSON.stringify(boards());
+        setStatus(type, id, 1);
+        await gone(where, taskId);
+        expect(JSON.stringify(boards())).toBe(before);
+
+        setStatus(type, id, 0);
+        expect((await read(MEMBER, where)).body.data.revision).toBe(1);
+        await live(where, taskId);
+    });
+
+    it.each([
+        ['the list is archived', SCHEMA_TYPE.SPRINTS, LIST, 2, [OPEN, LIST], T1],
+        ['the list is closed', SCHEMA_TYPE.SPRINTS, LIST, 5, [OPEN, LIST], T1],
+        ['its folder is archived', SCHEMA_TYPE.FOLDERS, FOLDER, 2, [OPEN, FOLDER_LIST], F1],
+        ['its folder is archived with the folder above', SCHEMA_TYPE.FOLDERS, SUBFOLDER, 6, [OPEN, SUBFOLDER_LIST], F2],
+        ['the folder above its folder is archived', SCHEMA_TYPE.FOLDERS, FOLDER, 2, [OPEN, SUBFOLDER_LIST], F2],
+        ['the project is archived', SCHEMA_TYPE.PROJECTS, OPEN, 2, [OPEN, LIST], T1],
+    ])('can be read and not changed while %s, whoever asks', async (_what, type, id, status, where, taskId) => {
+        const before = JSON.stringify(boards());
+        setStatus(type, id, status);
+        await frozen(where, taskId);
+        expect(JSON.stringify(boards())).toBe(before);
+
+        setStatus(type, id, 0);
+        await live(where, taskId);
+    });
+
+    it('leaves the boards of the other lists as they are', async () => {
+        setStatus(SCHEMA_TYPE.FOLDERS, FOLDER, 1);
+        setStatus(SCHEMA_TYPE.SPRINTS, PRIVATE_LIST, 1);
+        await live([OPEN, LIST], T1);
+        expect((await read(MEMBER, [OPEN, LIST])).body.data.elements.map((element) => element.id)).toEqual(['c', 'n']);
+    });
+
+    it('drops the card of a task that went to the trash or to another list, on the next read, and keeps the notes', async () => {
+        await save(MEMBER, [OPEN, LIST], { baseRevision: 1, upsert: [card('d', T2)] });
+        row(SCHEMA_TYPE.TASKS, T1).deletedStatusKey = 1;
+        expect((await read(MEMBER, [OPEN, LIST])).body.data.elements.map((element) => element.id)).toEqual(['n', 'd']);
+        row(SCHEMA_TYPE.TASKS, T2).sprintId = FOLDER_LIST;
+        expect((await read(MEMBER, [OPEN, LIST])).body.data.elements.map((element) => element.id)).toEqual(['n']);
+
+        row(SCHEMA_TYPE.TASKS, T1).deletedStatusKey = 0;
+        expect((await read(MEMBER, [OPEN, LIST])).body.data.elements.map((element) => element.id)).toEqual(['c', 'n']);
+    });
+});
+
+describe('notes and text through the routes', () => {
+    const note = (id, text, extra = {}) => ({ id, type: 'note', text, tone: 'amber', x: 30, y: 40, w: 180, h: 120, ...extra });
+
+    it('come back as stored, text as typed, to everyone who can read the board', async () => {
+        const saved = await save(MEMBER, [OPEN, LIST], { baseRevision: 0, upsert: [note('n1', MARKUP), { id: 'x1', type: 'text', text: 'Q4', x: 1, y: 2, w: 220, h: 40 }] });
+        expect(saved.statusCode).toBe(200);
+        for (const uid of [MEMBER, TEAMMATE, OWNER, ADMIN]) {
+            expect((await read(uid, [OPEN, LIST])).body.data.elements).toEqual([
+                { id: 'n1', type: 'note', text: MARKUP, tone: 'amber', x: 30, y: 40, w: 180, h: 120, z: 0 },
+                { id: 'x1', type: 'text', text: 'Q4', x: 1, y: 2, w: 220, h: 40, z: 0 },
+            ]);
+        }
+    });
+
+    it('are read by exactly the people who can read the board', async () => {
+        await save(MEMBER, [OPEN, PRIVATE_LIST], { baseRevision: 0, upsert: [note('n1', 'Only for this list')] });
+        await save(MEMBER, [CLOSED, CLOSED_LIST], { baseRevision: 0, upsert: [note('n1', 'Only for this project')] });
+        await save(MEMBER, [PERSONAL, PERSONAL_LIST], { baseRevision: 0, upsert: [note('n1', 'Only for me')] });
+
+        const seenBy = async (uid, where) => { const res = await read(uid, where); return res.statusCode === 200 ? res.body.data.elements.map((element) => element.text) : res.statusCode; };
+        expect(await seenBy(MEMBER, [OPEN, PRIVATE_LIST])).toEqual(['Only for this list']);
+        expect(await seenBy(OWNER, [OPEN, PRIVATE_LIST])).toEqual(['Only for this list']);
+        expect(await seenBy(TEAMMATE, [OPEN, PRIVATE_LIST])).toBe(404);
+        expect(await seenBy(WATCHER, [CLOSED, CLOSED_LIST])).toEqual(['Only for this project']);
+        expect(await seenBy(TEAMMATE, [CLOSED, CLOSED_LIST])).toBe(404);
+        expect(await seenBy(MEMBER, [PERSONAL, PERSONAL_LIST])).toEqual(['Only for me']);
+        for (const uid of [OWNER, ADMIN, TEAMMATE]) expect(await seenBy(uid, [PERSONAL, PERSONAL_LIST])).toBe(404);
+
+        for (const [uid, where] of [[TEAMMATE, [OPEN, PRIVATE_LIST]], [TEAMMATE, [CLOSED, CLOSED_LIST]], [OWNER, [PERSONAL, PERSONAL_LIST]]]) {
+            for (const res of [await read(uid, where), await call(HISTORY, uid, where), await save(uid, where, { baseRevision: 1, upsert: [note('n2', 'x')] })]) {
+                expect(JSON.stringify(res.body)).not.toContain('Only for');
+            }
+        }
+    });
+
+    it('are not changed by someone who can only read the board', async () => {
+        await save(MEMBER, [CLOSED, CLOSED_LIST], { baseRevision: 0, upsert: [note('n1', 'Plan')] });
+        const edited = await save(WATCHER, [CLOSED, CLOSED_LIST], { baseRevision: 1, upsert: [note('n1', 'Changed')], remove: ['n1'] });
+        expect(edited.statusCode).toBe(403);
+        expect(boards()[0].elements[0].text).toBe('Plan');
+    });
+
+    it('answers 400 for an unknown field, an unknown tone and text that is too long, and stores nothing', async () => {
+        const answers = [];
+        for (const element of [note('n1', 'a', { color: '#ff0000' }), note('n1', 'a', { tone: 'teal' }), note('n1', 'x'.repeat(MAX_TEXT_LENGTH + 1)), note('n1', 'a', { html: '<b>a</b>' })]) {
+            const res = await save(MEMBER, [OPEN, LIST], { baseRevision: 0, upsert: [element] });
+            answers.push([res.statusCode, res.body.field]);
+        }
+        expect(answers).toEqual([[400, 'upsert.color'], [400, 'upsert.tone'], [400, 'upsert.text'], [400, 'upsert.html']]);
+        expect(boards()).toEqual([]);
+    });
+
+    it('holds notes to their own cap', async () => {
+        const many = Array.from({ length: MAX_NOTES + 1 }, (_, n) => note(`n${n}`, ''));
+        const res = await save(MEMBER, [OPEN, LIST], { baseRevision: 0, upsert: many });
+        expect({ statusCode: res.statusCode, field: res.body.field }).toEqual({ statusCode: 400, field: 'upsert' });
+    });
+});
