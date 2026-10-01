@@ -30,23 +30,62 @@ describe('the hidden Home cards survive the strict user schema', () => {
     it('leaves a user who never hid a card without a value', () => {
         expect(new Users({}).toObject().homeCards?.hidden).toBeUndefined();
     });
+
+    it('keeps homeCards.layout as an ordered list of names', () => {
+        expect(new Users({ homeCards: { layout: ['recents', 'waiting'] } }).toObject().homeCards.layout).toEqual(['recents', 'waiting']);
+    });
+
+    it('leaves a user who never arranged Home without a layout', () => {
+        expect(new Users({}).toObject().homeCards?.layout).toBeUndefined();
+    });
 });
 
-describe('every Home card the page offers can be hidden', () => {
+describe('every Home card the page offers can be saved', () => {
     const source = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'Home', 'homeCards.js'), 'utf8');
-    const ids = [...source.matchAll(/id:\s*"([^"]+)"/g)].map((m) => m[1]);
+    const ownIds = [...source.matchAll(/id:\s*"([^"]+)"/g)].map((m) => m[1]);
+    const catalogList = (source.match(/HOME_CATALOG_KEYS = Object\.freeze\(\[([^\]]*)\]/) || [])[1] || '';
+    const catalogIds = [...catalogList.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
 
-    it('finds the cards (the scan works)', () => { expect(ids.length).toBeGreaterThan(1); });
-    it.each(ids)('%s is a known id', (id) => { expect(HOME_CARD_IDS).toContain(id); });
+    it('finds the Home cards and the dashboard cards (the scan works)', () => {
+        expect(ownIds).toContain('recents');
+        expect(catalogIds.length).toBeGreaterThan(1);
+    });
+    it.each([...ownIds, ...catalogIds])('%s is a known id', (id) => { expect(HOME_CARD_IDS).toContain(id); });
 });
 
 describe('sanitizeHomeCards', () => {
     it('turns a list of known ids into a $set on the caller\'s record', () => {
-        expect(sanitizeHomeCards({ hidden: ['standup'] })).toEqual({ ok: true, update: { $set: { 'homeCards.hidden': ['standup'] } } });
+        expect(sanitizeHomeCards({ hidden: ['standup'] })).toEqual({ ok: true, field: 'hidden', update: { $set: { 'homeCards.hidden': ['standup'] } } });
     });
 
     it('accepts showing every card again', () => {
-        expect(sanitizeHomeCards({ hidden: [] })).toEqual({ ok: true, update: { $set: { 'homeCards.hidden': [] } } });
+        expect(sanitizeHomeCards({ hidden: [] })).toEqual({ ok: true, field: 'hidden', update: { $set: { 'homeCards.hidden': [] } } });
+    });
+
+    it('stores a layout in order and drops the old hidden list', () => {
+        expect(sanitizeHomeCards({ layout: ['recents', 'DueSoonCard', 'waiting'] })).toEqual({
+            ok: true,
+            field: 'layout',
+            update: { $set: { 'homeCards.layout': ['recents', 'DueSoonCard', 'waiting'] }, $unset: { 'homeCards.hidden': '' } },
+        });
+    });
+
+    it('accepts an empty Home', () => {
+        expect(sanitizeHomeCards({ layout: [] }).update.$set).toEqual({ 'homeCards.layout': [] });
+    });
+
+    it('skips an unknown or retired card and a repeat instead of refusing the layout', () => {
+        expect(sanitizeHomeCards({ layout: ['standup', 'RetiredCard', 'standup', 'recents'] }).update.$set)
+            .toEqual({ 'homeCards.layout': ['standup', 'recents'] });
+    });
+
+    it.each([
+        ['a layout that is not a list', { layout: 'recents' }],
+        ['a layout entry that is not a name', { layout: ['recents', { id: 'waiting' }] }],
+        ['an overlong layout', { layout: Array.from({ length: 41 }, (_, i) => `card${i}`) }],
+        ['a layout and a hidden list together', { layout: [], hidden: [] }],
+    ])('refuses %s', (_name, body) => {
+        expect(sanitizeHomeCards(body).ok).toBe(false);
     });
 
     it.each([
@@ -98,6 +137,16 @@ describe(`PUT ${ROUTE}`, () => {
         expect(res.json.mock.calls[0][0]).toEqual({ status: true, statusText: 'Home cards saved', data: { hidden: ['waiting'] } });
     });
 
+    it('saves the layout and returns it as stored', async () => {
+        MongoDbCrudOpration.mockResolvedValue({ _id: UID, homeCards: { layout: ['recents', 'MyTimeCard'] } });
+        const res = resOf();
+        await updateOwnHomeCards({ uid: UID, body: { layout: ['recents', 'MyTimeCard'] } }, res);
+        const [, query] = MongoDbCrudOpration.mock.calls[0];
+        expect(String(query.data[0]._id)).toBe(UID);
+        expect(query.data[1]).toEqual({ $set: { 'homeCards.layout': ['recents', 'MyTimeCard'] }, $unset: { 'homeCards.hidden': '' } });
+        expect(res.json.mock.calls[0][0]).toEqual({ status: true, statusText: 'Home cards saved', data: { layout: ['recents', 'MyTimeCard'] } });
+    });
+
     it('answers 400 and writes nothing for an invalid shape', async () => {
         const res = resOf();
         await updateOwnHomeCards({ uid: UID, body: { hidden: ['nope'] } }, res);
@@ -116,5 +165,9 @@ describe(`PUT ${ROUTE}`, () => {
 describe('the caller reads the hidden cards back on their own record', () => {
     it('includes homeCards in the self view', () => {
         expect(toSelfView({ _id: UID, homeCards: { hidden: ['standup'] } }).homeCards).toEqual({ hidden: ['standup'] });
+    });
+
+    it('includes the saved layout in the self view', () => {
+        expect(toSelfView({ _id: UID, homeCards: { layout: ['recents'] } }).homeCards).toEqual({ layout: ['recents'] });
     });
 });
