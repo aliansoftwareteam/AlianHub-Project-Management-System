@@ -6,6 +6,11 @@
 // status.set("Done") are ABSENT — not disabled, absent — so a compromised token
 // has nothing to switch on. The guard, the MCP server and the proposal approver
 // all resolve actions through this one file.
+//
+// One exception is deliberate and off by default: with MCP_TOOLS_MANAGE on, a
+// person may create a token whose agent closes tasks for them (task.status.change).
+// Nothing else reaches it, and the close is recorded as theirs, made through the
+// agent, and unchecked.
 
 const performanceFlag = require('./performanceFlag');
 const dataFlag = require('../Mcp/dataFlag');
