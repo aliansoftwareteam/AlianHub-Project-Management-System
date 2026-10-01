@@ -12210,6 +12210,7 @@ export default {
         "convert_note": "This task is also in other lists. As a subtask it will be removed from them.",
         "menu_remove_here": "Remove from this list",
         "removed_here": "Removed from this list.",
+        "added_back": "Added back to the list.",
         "lives_in": "Lives in {list}",
         "lives_in_project": "Lives in {list}, in {project}",
         "lives_in_another_list": "Lives in another list",

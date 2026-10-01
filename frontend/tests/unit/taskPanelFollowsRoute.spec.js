@@ -85,8 +85,7 @@ describe('the task panel follows the route', () => {
 
         it('closes when the task query is removed from the URL', async () => {
             expect(overlayState.open).toBe(true);
-            const { task, ...rest } = here().query;
-            await router.push({ query: rest });
+            await router.push({ query: { tab: here().query.tab } });
             await flushPromises();
 
             expect(overlayState.open).toBe(false);
