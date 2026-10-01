@@ -19,6 +19,7 @@ const HELD_ROUTES = [
     { methods: ['GET'], path: /^\/api\/v2\/api-tokens\/me\/?$/i },
     { methods: ['GET'], path: /^\/api\/v1\/task\/[a-f0-9]{24}\/?$/i },
     { methods: ['POST'], path: /^\/api\/v1\/task\/find\/?$/i },
+    { methods: ['POST'], path: /^\/api\/v2\/tasks\/everything\/?$/i },
     { methods: ['GET'], path: /^\/api\/v1\/project\/[a-f0-9]{24}\/?$/i },
     { methods: ['POST'], path: /^\/api\/v1\/ai\/ask\/?$/i },
     { methods: ['GET'], path: /^\/api\/v1\/ai\/ask\/sources\/?$/i },

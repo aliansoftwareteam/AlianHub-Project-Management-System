@@ -87,3 +87,5 @@ const asStatusColors = (tag) => ({ textColor: tag?.tagColor, bgColor: tag?.tagBg
 export const tagChipColors = (tag, options) => statusChipColors(asStatusColors(tag), options);
 
 export const tagChipStyle = (tag) => statusChipStyle(asStatusColors(tag));
+
+export const optionChipStyle = (option) => (option?.color ? statusChipStyle({ textColor: option.color }) : {});

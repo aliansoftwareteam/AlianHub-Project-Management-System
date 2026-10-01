@@ -64,9 +64,10 @@ exports.listImports = async (req, res) => {
         if (req.query && req.query.uid && String(req.query.uid) !== userId) {
             return res.status(403).send({ status: false, statusText: 'You can only list your own imports.' });
         }
+        // The task copy of a duplicated project keeps its progress in this collection too (Modules/ProjectDuplicate).
         const jobs = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.IMPORT_JOBS,
-            data: [{ userId }, 'source status total processed created errorList createdAt', { sort: { createdAt: -1 }, limit: 20 }],
+            data: [{ userId, source: { $ne: 'duplicate' } }, 'source status total processed created errorList createdAt', { sort: { createdAt: -1 }, limit: 20 }],
         }, 'find');
         return res.send({ status: true, statusText: 'Imports fetched.', data: jobs || [] });
     } catch (error) {

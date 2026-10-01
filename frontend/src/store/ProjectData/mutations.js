@@ -1,6 +1,7 @@
 import { isOwnTabUpdate } from '@/utils/taskUpdateMarker';
 import { useCustomComposable } from '@/composable/index.js';
 import { isOwnerOrAdmin } from "@/utils/roles";
+import { locate, placeRow, removeRow, treeOf } from "./taskTree";
 const { checkPermission } = useCustomComposable();
 
 export const mutateMongoUpdatedTask = (state, payload) => {
@@ -213,27 +214,17 @@ export const mutateGroupCounts = (state, payload) => {
 }
 
 // HANDLE TASK
-/* A task has just been attached to `taskIndex` as a subtask. Raise that parent's
-   subtask count by one.
-
-   Counted UP rather than recomputed from subtaskArray.length, which is what the
-   line here used to try. That array is paginated at 35 and only filled when a row
-   is expanded, so a parent with 40 subtasks — or one never opened — would have had
-   its count rewritten downwards. That is why the recompute was commented out, and
-   why it stays out.
-
-   Guarded on dragDropcheck so only a genuine re-parent counts. The same branch
-   also runs for every ordinary field change on a subtask, and a partially loaded
-   subtaskArray means "not in the array" cannot be read as "newly added" on its own.
-
-   The parent's own document update follows from the server carrying the
-   authoritative count, and merges straight over this. This exists so the arrow
-   appears immediately rather than after that round trip. */
-function bumpParentSubtaskCount(state, pid, sprintId, taskIndex, dragDropcheck) {
-    if (dragDropcheck !== true) return;
-    const parent = state.tasks?.[pid]?.[sprintId]?.tasks?.[taskIndex];
-    if (!parent) return;
-    parent.subTasks = (Number(parent.subTasks) || 0) + 1;
+/* A reorder this tab made comes back from the server with its own marker. The row already
+   holds the new place, so an echo that is not newer only confirms the index it carries. */
+function keepsOwnReorder(bucket, data, updatedFields) {
+    if(data.isParentTask === false || data.islocalSnapStop !== true || !isOwnTabUpdate(data.updateToken)) return false;
+    const row = bucket.tasks.find((x) => x._id === data._id);
+    if(!(row?.updateTimeStamp <= updatedFields?.updateToken?.timeStamp)) return false;
+    const updatedIndex = Object.keys(updatedFields).find((x) => ['groupByDueDateIndex','groupByPriorityIndex','groupByAssigneeIndex','groupByStatusIndex'].includes(x));
+    if(updatedIndex) {
+        row[updatedIndex] = data[updatedIndex];
+    }
+    return true;
 }
 
 export const mutateUpdateFirebaseTasks = (state, payload) => {
@@ -277,127 +268,29 @@ export const mutateUpdateFirebaseTasks = (state, payload) => {
                     }
                 }
             }
+            const bucket = state.tasks[pid][sprintId];
             if(op === "inital") {
-                if(!state.tasks[pid][sprintId].snapshot) {
-                    state.tasks[pid][sprintId].snapshot = snap
+                if(!bucket.snapshot) {
+                    bucket.snapshot = snap
                 }
                 state.tasks[pid].groupBy = payloadGroupBy;
             } else if(op === "added") {
-                if(data.isParentTask === false) {
-                    const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data.ParentTaskId);
-                    if(taskIndex !== -1) {
-                        if(state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray && state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.length) {
-                            const subTaskIndex = state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.findIndex((x) => x._id === data._id);
-                            if(subTaskIndex === -1) {
-                                state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.push(data);
-                            } else {
-                                state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray[subTaskIndex] = {...state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray[subTaskIndex], ...data};
-                            }
-                        } else {
-                            state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray= [data];
-                        }
-                    }
-                } else {
-                    const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data._id);
-
-                    if(taskIndex === -1) {
-                        // state.tasks[pid][sprintId].found[``] += 1;
-                        state.tasks[pid][sprintId].tasks = [...state.tasks[pid][sprintId].tasks, data];
-                    } else {
-                        state.tasks[pid][sprintId].tasks[taskIndex] = {...state.tasks[pid][sprintId].tasks[taskIndex], ...data};
-                    }
-                }
+                placeRow(bucket, data);
             } else if(op === "modified") {
-                if(data.isParentTask === false) {
-                    const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data.ParentTaskId);
-                    if(taskIndex !== -1 && state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray) {
-                        const subTaskIndex = state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.findIndex((x) => x._id === data._id);
-                        if(subTaskIndex !== -1){
-                            state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray[subTaskIndex] = {...state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray[subTaskIndex], ...data};
-                        }else{
-                            if(state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray && state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.length){
-                                state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.push(data);
-                            }else{
-                                state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray = [data];
-                            }
-                            bumpParentSubtaskCount(state, pid, sprintId, taskIndex, dragDropcheck);
-                        }
-                    }
-                    // taskIndex is -1 when the parent is not in this view — filtered
-                    // out, in another group, or past the 35-row page. Reading
-                    // tasks[-1].subtaskArray threw from inside the mutation, which
-                    // aborts the commit and leaves the drop half applied.
-                    else if(dragDropcheck === true && taskIndex !== -1 && state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray === undefined && data.ParentTaskId){
-                        state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray = [data];
-                        bumpParentSubtaskCount(state, pid, sprintId, taskIndex, dragDropcheck);
-                    }
-                } else {
-                    const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data._id);
-                    
-                    if (data.islocalSnapStop && data.islocalSnapStop === true) {     
-                        if (!isOwnTabUpdate(data.updateToken)) {
-                            if(taskIndex !== -1) {
-                                state.tasks[pid][sprintId].tasks[taskIndex] = {...state.tasks[pid][sprintId].tasks[taskIndex], ...data};
-                            }else{
-                                state.tasks[pid][sprintId].tasks.push(data);
-                            }
-                        } else {
-                            const temp = state.tasks[pid][sprintId].tasks?.[taskIndex]
-                            if (temp?.updateTimeStamp <= updatedFields.updateToken?.timeStamp) {
-                                let indexes = ['groupByDueDateIndex','groupByPriorityIndex','groupByAssigneeIndex','groupByStatusIndex']
-                                let updatedIndex = Object.keys(updatedFields).find((x) => indexes.includes(x))
-                                if (updatedIndex) {
-                                    state.tasks[pid][sprintId].tasks[taskIndex][updatedIndex] = data[updatedIndex]
-                                }
-                            } else {
-                                if(taskIndex !== -1) {
-                                    state.tasks[pid][sprintId].tasks[taskIndex] = {...state.tasks[pid][sprintId].tasks[taskIndex], ...data};
-                                }else{
-                                    state.tasks[pid][sprintId].tasks.push(data);
-                                }
-                            }
-                        }
-                    } else {
-                        if(taskIndex !== -1) {
-                            state.tasks[pid][sprintId].tasks[taskIndex] = {...state.tasks[pid][sprintId].tasks[taskIndex], ...data};
-                        }else{
-                            state.tasks[pid][sprintId].tasks.push(data);
-                        }
+                if(!keepsOwnReorder(bucket, data, updatedFields)) {
+                    const parent = placeRow(bucket, data);
+                    if(parent && dragDropcheck === true) {
+                        parent.subTasks = (Number(parent.subTasks) || 0) + 1;
                     }
                 }
             } else if(op === "removed") {
-                if(data.isParentTask === false) {
-                    const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data.ParentTaskId);
-                    if(taskIndex !== -1 && state?.tasks?.[pid]?.[sprintId]?.tasks?.[taskIndex]?.subtaskArray) {                        
-                        const subTaskIndex = state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.findIndex((x) => x._id === data._id);
-                        state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.splice(subTaskIndex, 1);
-                        state.tasks[pid][sprintId].tasks[taskIndex].subTasks = state?.tasks?.[pid]?.[sprintId]?.tasks[taskIndex]?.subtaskArray?.length || 0;
-                    }
-                } else {
-                    const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data._id);
-                    if(taskIndex !== -1) {
-                        state.tasks[pid][sprintId].tasks.splice(taskIndex, 1);
-                    }
+                const parent = removeRow(bucket, data._id);
+                if(parent) {
+                    parent.subTasks = Math.max(0, (Number(parent.subTasks) || 0) - 1);
                 }
             }
             if(data !== null && data.sprintId !== sprintId && updatedFields?.sprintId){
-                const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data._id);
-                if(taskIndex !== -1) {
-                    state.tasks[pid][sprintId].tasks.splice(taskIndex, 1);
-                }
-            }
-            if(data !== null && data.sprintId === sprintId && (updatedFields?.isParentTask === true || updatedFields?.isParentTask === false || updatedFields?.subTasks)){
-                if(data.isParentTask === false) {
-                    const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data._id);
-                    if(taskIndex !== -1) {
-                        state.tasks[pid][sprintId].tasks.splice(taskIndex,1);
-                    }
-                }else{
-                    const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data._id);
-                    if(taskIndex === -1){
-                        state.tasks[pid][sprintId].tasks.push(data)
-                    }
-                }
+                removeRow(bucket, data._id);
             }
         }
     }
@@ -489,32 +382,7 @@ export const mutateTypesenseTasks = (state, payload) => {
             };
             if(!data) return;
 
-            if(data.isParentTask === false) {
-
-                const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data.ParentTaskId);
-
-                if(taskIndex !== -1) {
-                    if(state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray) {
-                        const subTaskIndex = state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.findIndex((x) => x._id === data._id);
-
-                        if(subTaskIndex !== -1) {
-                            state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray[subTaskIndex] = {...data};
-                        } else {
-                            state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.push(data);
-                        }
-                    } else {
-                        state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray = [data];
-                    }
-                }
-            } else {
-                const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data._id);
-
-                if(taskIndex !== -1) {
-                    state.tasks[pid][sprintId].tasks[taskIndex] = {...state.tasks[pid][sprintId].tasks[taskIndex], ...data};
-                } else {
-                    state.tasks[pid][sprintId].tasks.push(data);
-                }
-            }
+            placeRow(state.tasks[pid][sprintId], data);
         } else {
 
             state.tasks[pid].sprints.push(sprintId);
@@ -529,7 +397,7 @@ export const mutateTypesenseTasks = (state, payload) => {
                 snapshot: null
             };
             if(data) {
-                state.tasks[pid][sprintId].tasks = [data];
+                placeRow(state.tasks[pid][sprintId], data);
             }
         }
     } else {
@@ -549,7 +417,7 @@ export const mutateTypesenseTasks = (state, payload) => {
             sprints: [sprintId]
         };
         if(data) {
-            state.tasks[pid][sprintId].tasks = [data];
+            placeRow(state.tasks[pid][sprintId], data);
         }
     }
 }
@@ -735,33 +603,13 @@ export const mutateTypesenseTableTasks = (state, payload) => {
 }
 
 export const mutateSearchTask = (state, payload) => {
-    let mapTasks = [];
-    payload.data.sort((a, b) => a.isParentTask > b.isParentTask ? -1 : 1);
-
     if(payload.op === "added"){
-        payload.data.forEach((task) => {
-            if(task.isParentTask) {
-                const index = mapTasks.findIndex((x) => x._id === task._id)
-    
-                if(index !== -1) {
-                    mapTasks[index] = {...mapTasks[index], ...task};
-                } else {
-                    mapTasks.push({...task, subtaskArray: []})
-                }
-            } else {
-                const index = mapTasks.findIndex((x) => x._id === task.ParentTaskId)
-    
-                if(index !== -1) {
-                    mapTasks[index].subtaskArray.push(task);
-                }
-            }
-        })
-        state.searchedTasks = mapTasks;
-    }else{
-        let index = state.searchedTasks.findIndex((x) => x._id === payload.data[0]._id);
-        if(index !== -1){
-            state.searchedTasks[index] = payload.data[0];
-        }
+        state.searchedTasks = treeOf(payload.data);
+        return;
+    }
+    const found = locate({ tasks: state.searchedTasks }, payload.data[0]._id);
+    if(found){
+        found.siblings[found.index] = payload.data[0];
     }
 }
 
@@ -975,6 +823,11 @@ export const mutateFolders = (state,payload) => {
         }
     }
 }
+
+export const replaceFolders = (state, { projectId, folders }) => {
+    state.folders = { ...state.folders, [projectId]: folders };
+}
+
 export const mutateSearchedProjects = (state,payload) => {
     let searchedProjects = [];
     let searchData = payload.data;

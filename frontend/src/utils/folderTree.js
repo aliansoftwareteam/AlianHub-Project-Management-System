@@ -56,3 +56,17 @@ export function folderMoveTargets(folders, folder) {
     if (!folder || holdsSubfolders(folders, folder)) return [];
     return listOf(folders).filter((target) => canHoldSubfolders(folders, target) && folderIdOf(target) !== folderIdOf(folder));
 }
+
+/* What an archive or delete of the folder takes with it: the live subfolders, the live lists in
+   it and in them, and the tasks those lists count. `tasksKnown` is false when a list carries no count. */
+export function folderContents({ folders, sprints }, folderId) {
+    const following = subfoldersOf(folders, folderId).filter(isLive).map(folderIdOf);
+    const inside = new Set([String(folderId), ...following]);
+    const lists = (sprints || []).filter((sprint) => isLive(sprint) && sprint.folderId && inside.has(String(sprint.folderId)));
+    return {
+        subfolders: following.length,
+        lists: lists.length,
+        tasks: lists.reduce((sum, sprint) => sum + (Number(sprint.tasks) || 0), 0),
+        tasksKnown: lists.every((sprint) => Number.isFinite(Number(sprint.tasks ?? NaN)))
+    };
+}

@@ -57,6 +57,12 @@ const schema = {
             type: [String],
             required: false,
         },
+        // The task whose archive or delete carried this row with it; a restore of that task brings
+        // back the rows that name it. Written only by the cascade in Modules/Tasks/helpers/taskTree.js.
+        'cascadedBy': {
+            type: String,
+            required: false,
+        },
         'ProjectID': {
             type: mongoose.Schema.Types.ObjectId,
             required: true,
@@ -4547,7 +4553,10 @@ const schema = {
         // people fields: false holds one person
         fieldMultiple: { type: Boolean, required: false },
         // rating fields: 3 to 10
-        fieldRatingMax: { type: Number, required: false }
+        fieldRatingMax: { type: Number, required: false },
+        // files fields: 1 to 20 files, and any | images | documents
+        fieldFilesMax: { type: Number, required: false },
+        fieldFilesKind: { type: String, required: false }
     },
     sprints: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.

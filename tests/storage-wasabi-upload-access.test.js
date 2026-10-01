@@ -125,3 +125,23 @@ describe('POST /api/v1/wasabi/uploadFile_64', () => {
         expect(s3Send).toHaveBeenCalled();
     });
 });
+
+describe('an upload never replaces a stored object', () => {
+    const folder = `Reminders/${COMPANY_A}/${USER}`;
+    const storedKeys = () => s3Send.mock.calls.map(([command]) => command).filter((command) => command.name === 'PutObject').map((command) => command.input.Key);
+    const isNewName = (key, name) => new RegExp(`^${folder}/\\d{8}T\\d{9}Z_${name.replace('.', '\\.')}$`).test(key);
+
+    it.each(['0', 'false', 'true'])('POST /api/v1/wasabi/uploadFile stores under a new name when replaceFile is %p', async (replaceFile) => {
+        const res = await multipart({ companyId: COMPANY_A, path: `${folder}/note.txt`, replaceFile });
+        expect(res.status).toBe(200);
+        expect(storedKeys()).toHaveLength(1);
+        expect(isNewName(storedKeys()[0], 'note.txt')).toBe(true);
+    });
+
+    it.each([['"0"', '0'], ['an empty list', []], [false, false], [true, true]])('POST /api/v1/wasabi/uploadFile_64 stores under a new name when replaceFile is %s', async (_label, replaceFile) => {
+        const res = await base64({ companyId: COMPANY_A, path: `${folder}/a.png`, base64String: PNG, replaceFile });
+        expect(res.status).toBe(200);
+        expect(storedKeys()).toHaveLength(1);
+        expect(isNewName(storedKeys()[0], 'a.png')).toBe(true);
+    });
+});

@@ -21,6 +21,7 @@ const NAME = '[^/]+';
 const THUMBNAIL = '(?:-\\d+x\\d+)?';
 const THUMBNAIL_SUFFIX = /-\d+x\d+(\.[^./]+)$/i;
 const ATTACHMENTS_PERMISSION = 'task.task_attachments';
+const CUSTOM_FIELD_PERMISSION = 'task.task_custom_field';
 const LISTING_LIMIT = 20;
 const REFUSAL_CODE = 'STORED_FILE_NOT_AVAILABLE';
 const REFUSAL_TEXT = 'File not found';
@@ -100,6 +101,16 @@ const taskAttachment = async (ctx, [, , folderId], key) => {
     return listedByOpenTask(ctx, listing(key));
 };
 
+/* A file in a custom field is read where the field is shown: by whoever may open the task and see its custom fields. */
+const taskFieldFile = async (ctx, [, , taskId]) => {
+    const task = await taskById(ctx, taskId);
+    if (!task) return NOT_FOUND;
+    if (!(await mayOpenTask(ctx, task))) return NO_ACCESS;
+    if (await privileged(ctx)) return true;
+    const permission = await evaluatePermission(ctx.companyId, ctx.uid, CUSTOM_FIELD_PERMISSION, { projectId: String(task.ProjectID) }).catch(() => null);
+    return isReadable(permission) || NO_ACCESS;
+};
+
 /* Chat spaces are main_chats rows, not projects: the one-to-one space holds direct messages,
  * the others hold channels every company member may list. */
 const chatSpace = (ctx, projectId) => (OBJECT_ID.test(String(projectId || ''))
@@ -166,6 +177,7 @@ const companyAsset = async () => true;
 
 const LAYOUTS = Object.freeze([
     { type: 'task_attachment', pattern: layout(`Project/${ID}/Sprint/${ID}/Attachment/${NAME}`), allows: taskAttachment },
+    { type: 'task_field_file', pattern: layout(`Project/${ID}/Sprint/${ID}/Field/${ID}/${NAME}`), allows: taskFieldFile },
     { type: 'tracker_screenshot', pattern: layout(`Project/${ID}/Sprint/${ID}/TimeLog/${NAME}/${NAME}`), allows: trackerScreenshot },
     { type: 'channel_comment', pattern: layout(`Project/${ID}/${ID}/default/Comments/${NAME}`), allows: channelComment },
     { type: 'task_comment', pattern: layout(`Project/${ID}/${ID}/${ID}/Comments/${NAME}`), allows: taskComment },

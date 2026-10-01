@@ -2,7 +2,7 @@ import { computed } from 'vue';
 import { useViewSettings } from './viewSettingsContext';
 import { PRIORITY_RANK, priorityKey } from '@/components/molecules/Home/homeFormat';
 import { taskPoints } from './taskPoints';
-import { customFieldIdOf, customGroupId, customSortValue, fieldIdOfPath, valuePath } from './customFieldQuery';
+import { customFieldIdOf, customGroupId, customSortValue, fieldIdOfPath, isSortableField, valuePath } from './customFieldQuery';
 
 export const SORT_KEYS = ['manual', 'due', 'priority', 'created', 'updated', 'name', 'status', 'assignee', 'points', 'estimate'];
 export const MANUAL = Object.freeze({ key: 'manual', dir: 'asc' });
@@ -45,7 +45,7 @@ export function settingsFromSort(sort) {
 
 export const sortChoices = (fields = []) => [
     ...SORT_KEYS.map((key) => ({ key, labelKey: `List.sort_${key}` })),
-    ...(fields || []).filter((field) => field?._id).map((field) => ({ key: customGroupId(field._id), label: field.fieldTitle || '' }))
+    ...(fields || []).filter((field) => field?._id && isSortableField(field)).map((field) => ({ key: customGroupId(field._id), label: field.fieldTitle || '' }))
 ];
 
 const timeOf = (value) => {

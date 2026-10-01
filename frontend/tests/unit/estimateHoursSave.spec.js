@@ -64,7 +64,7 @@ const openPlanner = async () => {
 };
 
 const save = async (wrapper) => {
-    await wrapper.find('button.btn-primary').trigger('click');
+    await wrapper.find('button.ah-btn--primary').trigger('click');
     await flushPromises();
 };
 

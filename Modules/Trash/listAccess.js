@@ -26,6 +26,8 @@ const inReadableProject = (caller, projectId) => caller.readProject(projectId)
 
 const KEEP = {
     projects: (caller, docs) => keepWhere(docs, (doc) => caller.readProject(doc._id).then((decision) => decision.allowed)),
+    /* Chat categories share the folders collection; the trash restores project folders only. */
+    folders: (caller, docs) => keepWhere(docs, (doc) => caller.readProject(doc.projectId).then((decision) => Boolean(decision.allowed))),
     lists: async (caller, docs) => {
         const identities = caller.privileged ? null : await sprintIdentities(caller.companyId, caller.uid);
         return keepWhere(docs, async (doc) => (await inReadableProject(caller, doc.projectId)) && (caller.privileged || canSeeSprint(doc, identities)));
