@@ -643,6 +643,8 @@ const schema = {
                     done: { type: Number, required: false },
                     total: { type: Number, required: false },
                     at: { type: Date, required: false },
+                    failedAt: { type: Date, required: false },
+                    failedCode: { type: String, required: false },
                     skipped: {
                         sprintIds: { type: [String], default: undefined, required: false },
                         taskIds: { type: [String], default: undefined, required: false },

@@ -13,7 +13,9 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({
     validateObjectId: (id) => /^[a-f0-9]{24}$/i.test(String(id)),
 }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
-jest.mock('../Modules/settings/securityPermissions/controller', () => ({ fetchRules: jest.fn(async () => []) }));
+jest.mock('../Modules/settings/securityPermissions/controller', () => ({
+    fetchRules: jest.fn(async () => require('./fixtures/taskListRules').taskListRules({ 0: false, 3: true })),
+}));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
 jest.mock('../Modules/Audit/recorder', () => ({ recordAuditFromReq: jest.fn() }));
 
@@ -205,7 +207,22 @@ const record = async () => {
     await step('tasksReadStale', request.readRequest(delivery));
     const leftOut = await step('tasksReadLeftOut', request.readRequest(delivery));
     await step('tasksReadLeftOutReader', request.readRequest(delivery), 'sam');
-    await step('tasksUncounted', request.sourcesRequest(delivery, leftOut.targets[0], request.withoutSources(leftOut.targets[0].sources, leftOut.targets[0].notCountedSources)));
+    const uncounted = await step('tasksUncounted', request.sourcesRequest(delivery, leftOut.targets[0], request.withoutSources(leftOut.targets[0].sources, leftOut.targets[0].notCountedSources)));
+
+    minute += 11;
+    const answering = mockDb.crud.getMockImplementation();
+    mockDb.crud.mockImplementation(async (companyId, query, method) => {
+        if (method === 'aggregate') throw new Error('the database went away');
+        return answering(companyId, query, method);
+    });
+    await step('tasksReadBeforeFailing', request.readRequest(delivery));
+    mockDb.crud.mockImplementation(answering);
+    /* A failed count is tried again thirty seconds on: these two reads come 12 and 24 seconds after it. */
+    minute -= 0.8;
+    await step('tasksReadFailed', request.readRequest(delivery));
+    minute -= 0.8;
+    await step('tasksReadFailedReader', request.readRequest(delivery), 'sam');
+    await step('tasksCountedAgain', request.sourcesRequest(delivery, uncounted.targets[0], uncounted.targets[0].sources));
     return out;
 };
 
@@ -297,6 +314,15 @@ test('the fixture the web app is tested against is what the handlers answer to t
     expect(JSON.stringify(recorded.tasksReadLeftOutReader.response)).not.toContain(BACKLOG);
     expect(recorded.tasksUncounted.request.body).toEqual({ sources: { sprintIds: [SPRINT], taskIds: [] } });
     expect(counted(recorded.tasksUncounted)).toMatchObject({ notCounted: 0, counted: { done: 1, total: 3 } });
+    expect(counted(recorded.tasksAdded).sourceNames).toMatchObject({
+        sprintIds: { [SPRINT]: { name: 'Sprint 1', projectName: 'Website' }, [TEAM_LIST]: { name: 'Interviews', projectName: 'Hiring plan' } },
+        taskIds: { [LOOSE_TASK]: { name: 'Fix the footer', projectId: WEBSITE } },
+    });
+    expect(Object.keys(counted(recorded.tasksReadLeftOutReader).sourceNames.sprintIds)).toEqual([SPRINT]);
+    expect(counted(recorded.tasksReadBeforeFailing)).toMatchObject({ updating: true });
+    expect(counted(recorded.tasksReadFailed)).toMatchObject({ updating: false, counted: { done: 1, total: 3, failedCode: 'error' } });
+    expect(counted(recorded.tasksReadFailedReader)).toMatchObject({ updating: false, counted: { failedCode: 'error' } });
+    expect(counted(recorded.tasksCountedAgain).counted.failedAt).toBeUndefined();
 
     if (process.env.UPDATE_GOALS_FIXTURE === '1') {
         fs.mkdirSync(path.dirname(FIXTURE), { recursive: true });

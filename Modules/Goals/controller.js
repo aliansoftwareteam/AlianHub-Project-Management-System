@@ -7,6 +7,7 @@ const { ROLE_GUEST, isPrivileged } = require('../../Config/roleTypes');
 const { isNarrowed } = require('../../Config/tokenNarrowing');
 const logger = require('../../Config/loggerConfig');
 const { recordAuditFromReq } = require('../Audit/recorder');
+const { openableTasks } = require('../Tasks/helpers/taskReadAccess');
 const access = require('./helpers/goalAccess');
 const rules = require('./helpers/goalRules');
 const { withProgress } = require('./helpers/goalProgress');
@@ -22,6 +23,7 @@ const AUDIENCE_FIELDS = Object.freeze(['visibility', 'sharedWith', 'ownerUserId'
 
 const NOT_FOUND = 'Goal not found.';
 const TARGET_NOT_FOUND = 'Target not found.';
+const TASK_NOT_FOUND = 'Task not found.';
 const FORBIDDEN = 'You do not have permission to perform this action.';
 const NARROWED = 'A token limited to some projects cannot read or change goals.';
 const IS_ARCHIVED = 'This goal is archived. Restore it to change it.';
@@ -44,7 +46,12 @@ const presentCount = (target, { canEdit, live, now }) => {
     const kept = (kind) => all[kind].filter((id) => !skipped[kind].map(String).includes(id));
     return {
         sources: canEdit ? all : { sprintIds: kept('sprintIds'), taskIds: kept('taskIds') },
-        counted: { done: counted.done || 0, total: counted.total || 0, at: counted.at || null },
+        counted: {
+            done: counted.done || 0,
+            total: counted.total || 0,
+            at: counted.at || null,
+            ...(counted.failedAt ? { failedAt: counted.failedAt, failedCode: counted.failedCode || counts.COUNT_ERROR } : {}),
+        },
         notCounted: skipped.sprintIds.length + skipped.taskIds.length,
         ...(canEdit ? { notCountedSources: { sprintIds: skipped.sprintIds.map(String), taskIds: skipped.taskIds.map(String) } } : {}),
         dirty: target.dirty === true,
@@ -103,10 +110,26 @@ const present = (goal, caller, now = new Date()) => {
     };
 };
 
-const sent = (res, statusText, goal, caller) => res.status(200).json({
+/* Each counted target is sent with the names of the sources this reader can open themselves. The names
+ * are read once for everything in the answer, and an answer whose names could not be read goes out without them. */
+const presentAll = async (goals, caller, now = new Date()) => {
+    const shown = goals.map((goal) => present(goal, caller, now));
+    const counted = (target) => target.kind === rules.TASKS;
+    const linked = sources.merged(shown.flatMap((goal) => goal.targets).filter(counted).map((target) => target.sources));
+    const names = await sources.namesFor(caller.companyId, caller.uid, linked).catch((error) => {
+        logger.error(`goals source names: ${error.message || error}`);
+        return sources.noNames();
+    });
+    return shown.map((goal) => ({
+        ...goal,
+        targets: goal.targets.map((target) => (counted(target) ? { ...target, sourceNames: sources.namesOf(names, target.sources) } : target)),
+    }));
+};
+
+const sent = async (res, statusText, goal, caller) => res.status(200).json({
     status: true,
     statusText,
-    data: goal && access.canSee(goal, caller) ? present(goal, caller) : null,
+    data: goal && access.canSee(goal, caller) ? (await presentAll([goal], caller))[0] : null,
 });
 
 /* The audit log is read by owners and admins, so it records a goal only while the whole workspace can read that goal. */
@@ -243,7 +266,7 @@ exports.listGoals = handled('list', async (req, res, caller) => {
     const now = new Date();
     const listed = goals.filter((goal) => !mine || access.isOwner(goal, caller) || access.isNamed(goal, caller));
     recountBehind(caller.companyId, listed, now);
-    const data = listed.map((goal) => present(goal, caller, now)).sort((a, b) => a.name.localeCompare(b.name));
+    const data = (await presentAll(listed, caller, now)).sort((a, b) => a.name.localeCompare(b.name));
     return res.status(200).json({ status: true, statusText: 'Goals fetched successfully.', data });
 });
 
@@ -251,6 +274,36 @@ exports.getGoal = handled('get', async (req, res, caller) => {
     const goal = await visibleGoal(caller, req.params.id);
     recountBehind(caller.companyId, [goal], new Date());
     return sent(res, 'Goal fetched successfully.', goal, caller);
+});
+
+/* A task the caller cannot open answers exactly as one that does not exist, and a goal they cannot read is never among the answers. */
+exports.goalsForTask = handled('for task', async (req, res, caller) => {
+    const taskId = String(req.params.taskId || '');
+    const [task] = OBJECT_ID.test(taskId)
+        ? await openableTasks(caller.companyId, caller.uid, [taskId], { projection: { sprintId: 1, isParentTask: 1 } })
+        : [];
+    if (!task) throw stop(404, TASK_NOT_FOUND);
+    const goals = await crud(caller.companyId, [
+        { deletedStatusKey: LIVE, $and: [access.visibleTo(caller), sources.namingTask(task)] },
+        null,
+        { lean: true },
+    ], 'find') || [];
+    const data = goals
+        .filter((goal) => access.canSee(goal, caller))
+        .flatMap((goal) => (goal.targets || []).map((target) => ({ goal, target, through: sources.countedThrough(target, task) })))
+        .filter((entry) => entry.through)
+        .map(({ goal, target, through }) => ({
+            goalId: String(goal._id),
+            goalName: goal.name,
+            color: goal.color || '',
+            progressPct: goal.progressPct || 0,
+            targetId: String(target.id),
+            targetName: target.name,
+            targetProgressPct: target.progressPct || 0,
+            through,
+        }))
+        .sort((a, b) => a.goalName.localeCompare(b.goalName) || a.targetName.localeCompare(b.targetName));
+    return res.status(200).json({ status: true, statusText: 'Goals fetched successfully.', data });
 });
 
 exports.createGoal = handled('create', async (req, res, caller) => {

@@ -334,6 +334,8 @@
                     <button v-else type="button" class="ah-detail__prop-link ah-small" @click="activeTab = 'relations'">{{ $t('TaskPanel.no_relations') }}</button>
                 </div>
 
+                <TaskGoals v-if="task._id" :task-id="task._id" />
+
                 <div class="ah-detail__foot ah-small">
                     <span v-if="task.createdAt">{{ $t('TaskPanel.created_by', { date: formatDay(task.createdAt), name: leaderName }) }}</span>
                     <span v-if="task.watchers?.length"> · {{ $t('TaskPanel.watched_by', { n: task.watchers.length }) }}</span>
@@ -385,6 +387,7 @@ import TaskTimerChip from "./TaskTimerChip.vue";
 import TaskTimeSection from "./TaskTimeSection.vue";
 import TaskAgentStrip from "./TaskAgentStrip.vue";
 import TaskListsRow from "./TaskListsRow.vue";
+import TaskGoals from "./TaskGoals.vue";
 import AiResultPreview from "@/components/molecules/AiPreview/AiResultPreview.vue";
 import { canControlRun } from "@/views/Ai/agentAccess";
 
