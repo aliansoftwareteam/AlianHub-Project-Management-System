@@ -8,6 +8,7 @@ import brandSettingTab from './brandSettings'
 import ToursData from './Tours';
 import taskSelection from './TaskSelection';
 import everything from './Everything';
+import goals from './Goals';
 
 const socketInstanceWatcher = (store) => {
     let previousSocketInstance = store.state.settings.socketInstance;
@@ -40,7 +41,8 @@ export default createStore({
         brandSettingTab,
         ToursData,
         taskSelection,
-        everything
+        everything,
+        goals
     },
     plugins: [socketInstanceWatcher]
 })
