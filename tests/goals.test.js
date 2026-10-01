@@ -510,6 +510,52 @@ describe('the stored row', () => {
     });
 });
 
+describe('the routes', () => {
+    let server;
+    let base;
+    beforeAll(async () => {
+        const express = require('express');
+        const app = express();
+        app.use(express.json());
+        app.use((req, res, next) => { req.uid = req.headers['x-test-uid']; req.aud = C; next(); });
+        require('../Modules/Goals/routes').init(app);
+        server = await new Promise((resolve) => { const listening = app.listen(0, '127.0.0.1', () => resolve(listening)); });
+        base = `http://127.0.0.1:${server.address().port}`;
+    });
+    afterAll(() => new Promise((resolve) => { server.close(resolve); }));
+
+    const http = async (method, path, body, uid = AUTHOR) => {
+        const res = await fetch(`${base}${path}`, {
+            method,
+            headers: { companyid: C, 'x-test-uid': uid, ...(body ? { 'content-type': 'application/json' } : {}) },
+            body: body ? JSON.stringify(body) : undefined,
+        });
+        return { statusCode: res.status, body: await res.json() };
+    };
+
+    it('carry a goal from made to archived, naming the goal and the target in the path', async () => {
+        const goal = (await http('POST', '/api/v2/goals', { name: 'Q4', visibility: 'workspace', targets: [CUSTOMERS] })).body.data;
+        const at = `/api/v2/goals/${goal._id}`;
+        const target = `${at}/targets/${goal.targets[0].id}`;
+        expect(goal.targets[0].updatedAt).toEqual(expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/));
+
+        expect((await http('GET', '/api/v2/goals?mine=true')).body.data.map((row) => row._id)).toEqual([goal._id]);
+        expect((await http('GET', '/api/v2/goals?archived=yes')).statusCode).toBe(400);
+        expect((await http('GET', at, undefined, NAMED)).body.data).toMatchObject({ name: 'Q4', canEdit: false });
+        expect((await http('PATCH', at, { name: 'Q4 plan' })).body.data.name).toBe('Q4 plan');
+        expect((await http('PUT', `${target}/value`, { current: 5 }, NAMED)).statusCode).toBe(403);
+        expect((await http('PUT', `${target}/value`, { current: 5 }, ADMIN)).body.data.progressPct).toBe(50);
+        expect((await http('PATCH', target, { target: 5 })).body.data.progressPct).toBe(100);
+        const added = (await http('POST', `${at}/targets`, LAUNCH)).body.data;
+        expect(added.targets.map((row) => row.name)).toEqual(['New customers', 'Launched']);
+        expect((await http('DELETE', `${at}/targets/${added.targets[1].id}`)).body.data.targets).toHaveLength(1);
+        expect((await http('POST', `${at}/archive`)).body.data.archived).toBe(true);
+        expect((await http('PATCH', at, { name: 'Late' })).statusCode).toBe(409);
+        expect((await http('POST', `${at}/restore`)).body.data.archived).toBe(false);
+        expect((await http('GET', '/api/v2/goals')).body.data).toHaveLength(1);
+    });
+});
+
 describe('the live update', () => {
     const helper = require('../socket/helper');
     const { relay, EVENT } = require('../socket/controller/goalSocket');

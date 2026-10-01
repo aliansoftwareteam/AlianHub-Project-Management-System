@@ -178,10 +178,14 @@ const requireOwnerSeat = async (companyId, id) => {
     if (typeof roleType !== 'number' || roleType === ROLE_GUEST) throw new GoalRefused('ownerUserId', 'must be an active member who is not a guest');
 };
 
-const requireCurrency = async (companyId, target, at = '') => {
-    if (target.kind !== rules.CURRENCY) return;
-    const known = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.CURRENCY_LIST, data: [{ code: target.currencyCode }, { _id: 1 }] }, 'findOne');
-    if (!known) throw new GoalRefused(`${at}currencyCode`, 'is not a currency of this workspace');
+const requireCurrencies = async (companyId, targets, fieldAt = () => 'currencyCode') => {
+    const priced = (target) => target.kind === rules.CURRENCY;
+    const codes = [...new Set(targets.filter(priced).map((target) => target.currencyCode))];
+    if (!codes.length) return;
+    const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.CURRENCY_LIST, data: [{ code: { $in: codes } }, { code: 1 }] }, 'find');
+    const known = new Set((rows || []).map((row) => row.code));
+    const unknownAt = targets.findIndex((target) => priced(target) && !known.has(target.currencyCode));
+    if (unknownAt !== -1) throw new GoalRefused(fieldAt(unknownAt), 'is not a currency of this workspace');
 };
 
 const requireNoBody = (body) => {
@@ -226,7 +230,7 @@ exports.createGoal = handled('create', async (req, res, caller) => {
     rules.requirePeriodInOrder(goal);
     requireUnsharedWhenPrivate(goal, goal.sharedWith);
     await requireActiveMembers(caller.companyId, goal.sharedWith);
-    for (const [index, target] of newTargets.entries()) await requireCurrency(caller.companyId, target, `targets.${index}.`);
+    await requireCurrencies(caller.companyId, newTargets, (index) => `targets.${index}.currencyCode`);
     if (Number(await crud(caller.companyId, [{ ownerUserId: caller.uid, deletedStatusKey: LIVE }], 'countDocuments')) >= rules.MAX_GOALS_PER_OWNER) {
         return refuse(res, 400, 'Request refused', `A person can own at most ${rules.MAX_GOALS_PER_OWNER} goals.`, { field: 'name' });
     }
@@ -275,7 +279,7 @@ exports.addTarget = handled('add target', async (req, res, caller) => {
     const target = rules.parseNewTarget(req.body);
     const { saved } = await mutate(caller, req.params.id, access.canEdit, async (goal) => {
         if ((goal.targets || []).length >= rules.MAX_TARGETS) throw new GoalRefused('targets', `holds at most ${rules.MAX_TARGETS} targets`);
-        await requireCurrency(caller.companyId, target);
+        await requireCurrencies(caller.companyId, [target]);
         const now = new Date();
         return withProgress([...(goal.targets || []), { id: newId(), ...target, ...valueStamp(caller, now) }], now);
     });
@@ -287,7 +291,7 @@ exports.editTarget = handled('edit target', async (req, res, caller) => {
     const { saved } = await mutate(caller, req.params.id, access.canEdit, async (goal) => {
         const stored = targetOf(goal, req.params.targetId);
         const edited = rules.parseTargetEdit(req.body, stored);
-        if (edited.currencyCode !== stored.currencyCode) await requireCurrency(caller.companyId, edited);
+        if (edited.currencyCode !== stored.currencyCode) await requireCurrencies(caller.companyId, [edited]);
         return withProgress(withTarget(goal, edited));
     });
     announce('update', caller.companyId);
