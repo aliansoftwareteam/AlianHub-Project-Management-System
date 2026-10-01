@@ -22,6 +22,7 @@ jest.mock('../Config/permissionGuard', () => ({
 }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn() }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn() }));
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 jest.mock('../utils/commonFunctions.js', () => ({ removeCache: jest.fn() }));
 jest.mock('../Modules/service.js', () => ({}));
 jest.mock('../Modules/serviceFunction.js', () => ({}));
