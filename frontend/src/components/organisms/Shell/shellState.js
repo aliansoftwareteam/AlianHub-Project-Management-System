@@ -5,6 +5,9 @@ import * as env from "@/config/env";
 const THEME_KEY = "ah.theme";
 const CONTRAST_KEY = "ah.contrast";
 const CONTRAST_CHOICES = ["auto", "standard", "high"];
+const VARIANT_KEY = "ah.variant";
+const VARIANT_OFF = "off";
+export const VARIANT_CHOICES = ["a", "b", "c"];
 const NAV_KEY = "ah.nav";
 const NAV_SAVE_DELAY_MS = 800;
 
@@ -33,6 +36,7 @@ export const shellState = reactive({
     sidebarCollapsed: false,
     theme: localStorage.getItem(THEME_KEY) || "light",
     contrast: CONTRAST_CHOICES.includes(localStorage.getItem(CONTRAST_KEY)) ? localStorage.getItem(CONTRAST_KEY) : "auto",
+    variant: "",
     nav: { pinned: localPinsOf(signedInUserId()) },
     agentsRunning: 0
 });
@@ -72,9 +76,37 @@ export function applyContrast(choice) {
     paintContrast();
 }
 
+const knownVariant = (value) => (VARIANT_CHOICES.includes(value) ? value : "");
+
+/* The router is in hash mode, so a shared link carries ?variant= inside the hash; one typed
+   by hand usually has it before the hash. */
+function variantInUrl() {
+    const { search, hash } = window.location;
+    const hashQuery = hash.includes("?") ? hash.slice(hash.indexOf("?")) : "";
+    return new URLSearchParams(search).get("variant") || new URLSearchParams(hashQuery).get("variant");
+}
+
+export function applyVariant(choice) {
+    shellState.variant = knownVariant(choice);
+    if (shellState.variant) {
+        localStorage.setItem(VARIANT_KEY, shellState.variant);
+        document.documentElement.setAttribute("data-variant", shellState.variant);
+    } else {
+        localStorage.removeItem(VARIANT_KEY);
+        document.documentElement.removeAttribute("data-variant");
+    }
+}
+
+function initVariant() {
+    const asked = variantInUrl();
+    if (asked === VARIANT_OFF || knownVariant(asked)) applyVariant(asked);
+    else applyVariant(localStorage.getItem(VARIANT_KEY));
+}
+
 export function initTheme() {
     document.documentElement.setAttribute("data-theme", resolveTheme(shellState.theme));
     paintContrast();
+    initVariant();
     if (systemDark && systemDark.addEventListener) {
         systemDark.addEventListener("change", () => {
             if (shellState.theme === "system") document.documentElement.setAttribute("data-theme", resolveTheme("system"));
