@@ -332,9 +332,10 @@ const usable = (ctx) => toolsFor(ctx)
     .map((tool) => ({ name: tool.name, write: !tool.run }));
 
 /* A write built from something the tool reads first: its arguments, or its answer when there is nothing to build from.
- * A connection kept away from the action is refused before that read, so the answer tells it nothing. */
+ * A connection kept away from the action is refused before that read, so the answer tells it nothing. Whether the
+ * write then runs or waits for a person is decided after it is prepared. */
 const prepare = async (ctx, tool, args, vis) => {
-    const may = registry.evaluate(tool.action, {}, { allowedActions: ctx.allowedActions });
+    const may = registry.evaluate(tool.action, { __proposal: true }, { allowedActions: ctx.allowedActions });
     if (!may.allowed) throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params: {}, reason: may.reason, ip: ctx.ip, taint: ctx.taint });
     return tool.prepare(ctx, args, vis);
 };

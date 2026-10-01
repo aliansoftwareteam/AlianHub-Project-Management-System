@@ -231,4 +231,4 @@ const fieldDefinitionFrom = (draft, { projectId, userId }) => {
     };
 };
 
-module.exports = { FIELD_TYPES, NO_PERMISSION, fieldTypeOf, planFields, namedPeople, fieldDefinitionFrom };
+module.exports = { FIELD_TYPES, NO_PERMISSION, fieldTypeOf, planFields, namedPeople, fieldDefinitionFrom, newOption };

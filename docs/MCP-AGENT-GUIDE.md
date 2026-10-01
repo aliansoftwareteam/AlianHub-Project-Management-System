@@ -14,7 +14,7 @@ Three things, in this order.
    |---|---|
    | `MCP_TOOLS_DATA=on` | `projects.list`, `project.get`, `sprints.list`, `statuses.list`, `comments.list`, `pages.search`, `page.get`, `timesheet.read`, `comment.create`, `timelog.create`, `screen.link`, `person.place` |
    | `MCP_TOOLS_MANAGE=on` | The task management tools and the doc writing tools below, for tokens created with the matching grant |
-   | `MCP_TOOLS_WORK=on` | `tags.list`, `task.tags.add`, `task.tags.remove`, `task.relations.list`, `task.relation.add`, `task.relation.remove`, `lists.list`, `list.create`, `list.rename`, `list.move`, `page.comments.list`, `page.comment.create`, `page.comment.reply`, `page.comment.assign`, `goals.list`, `goal.get`, `goal.target.set`, `goal.target.sources.add`, `goal.target.sources.remove`, `task.lists.list`, `task.lists.add`, `task.lists.remove`, and `sprintId` on `tasks.search`, for every token that reads or writes; none of them needs a grant |
+   | `MCP_TOOLS_WORK=on` | `tags.list`, `task.tags.add`, `task.tags.remove`, `task.relations.list`, `task.relation.add`, `task.relation.remove`, `lists.list`, `list.create`, `list.rename`, `list.move`, `page.comments.list`, `page.comment.create`, `page.comment.reply`, `page.comment.assign`, `goals.list`, `goal.get`, `goal.target.set`, `goal.target.sources.add`, `goal.target.sources.remove`, `task.lists.list`, `task.lists.add`, `task.lists.remove`, `fields.create`, `view.create`, and `sprintId` on `tasks.search`, for every token that reads or writes; none of them needs a grant |
    | `MCP_TOOLS_V2=on` | Names next to ids, paged lists, and a person's approval for any call that cannot be undone |
 
 2. **What the token was created with.** A token has scopes (read, write) and may have grants:
@@ -310,6 +310,24 @@ These need `MCP_TOOLS_WORK` and the write scope, and no grant. Each asks the per
 
 Undo, from the agent audit log: a tag and a link are put back as they were, a task added to a list is taken out and one taken out is added again, a rename and a move are reversed, and a list an agent created is moved to the trash while it is still empty. There is no tool that archives or deletes a list or a folder.
 
+### Fields and saved views
+
+These need `MCP_TOOLS_WORK` and the write scope, and no grant. A field or a view shows to everyone on the project, so a call never makes one: it is always filed for a person, whatever the project's policy says, and answers `pending` with the proposal it filed. The Inbox shows the person exactly what will be made: each field with its type and options, or the view with its layout and what it shows. An outside client's call is filed only when its connection holds `tasks:manage`, and approval asks that scope again. Once approved, each runs the web app's own route as the person behind the token, so it asks the permission the web app asks: custom fields (on the project or on tasks) for a field, views or project details for a view.
+
+`fields.create`: add up to 10 custom fields to one project in one call. Arguments: `projectId`, `fields` (each with `name`, `type` and, for a dropdown, `options` as plain text; `description` is optional), and `reason`. The types are `text`, `textarea`, `number`, `money`, `date`, `dropdown`, `checkbox`, `email`, `phone`, `url`, `people`, `rating` and `progress`. Options are cleaned to plain text, at most 30 of 60 characters each. A field is made for that project alone, never company-wide. A field the project already has by that name is kept, not made twice. Several fields are one proposal and one approval; the result names each field as made, kept, or not saved and why.
+
+```json
+{ "name": "fields.create", "arguments": { "projectId": "<project id>", "fields": [{ "name": "Budget", "type": "money" }, { "name": "Region", "type": "dropdown", "options": ["North", "South"] }] } }
+```
+
+`view.create`: add a saved view to one project. Arguments: `projectId`, `name`, `kind` (`list`, `board`, `table`, `calendar` or `workload`; a list when left out), and what the view shows: `groupBy` and `sortBy` (a built-in choice or the id of a custom field), `sortDirection`, `mine`, `assigneeIds`, `statuses` (by name), `priorities`, `search`, `subtasks` and `showFieldIds`. The view starts as a copy of the project's view of that kind, as "duplicate view" does; a project with no view of that kind answers so at once. A status or a field the project does not have is left out, and the result's `leftOut` names the part. The result holds the view's web address when the server has one set.
+
+```json
+{ "name": "view.create", "arguments": { "projectId": "<project id>", "name": "My open work", "kind": "board", "groupBy": "priority", "mine": true } }
+```
+
+Undo, from the Inbox or the agent audit log: a view an agent added is removed, and nothing else. Each field it made is switched off, as the field form's own switch does, only while it is still that project's alone and no task holds a value in it. A field that holds a value, or that someone has since put on another project, stays, and the undo names it and says why.
+
 ### Comments, links and time
 
 `task.comment`, `comment.create`: comment on a task. With `tasks:manage`, a member named as `@[Their Name](their member id)` is notified, and `@[All](everyone)` reaches everyone who can open the task.
@@ -470,4 +488,4 @@ The task's description is the message's text, stored as text, followed by a line
 
 ## What an agent cannot do yet
 
-Create, share, archive or delete a goal, or add and remove its targets; change a project or its members; create, rename or move a folder; archive or restore a list; start or complete a sprint; create or edit a project's tags; saved views and dashboards; automations; time edits and time approval; checklists, attachments and watchers; converting a task to a subtask and back, merging and duplicating; reactions, files and resolving on a doc comment, and editing one; reactions on a task comment. Deleting is not planned.
+Create, share, archive or delete a goal, or add and remove its targets; change a project or its members; create, rename or move a folder; archive or restore a list; start or complete a sprint; create or edit a project's tags; change or remove a field or a view, formula and rollup fields, company-wide fields; dashboards; automations; time edits and time approval; checklists, attachments and watchers; converting a task to a subtask and back, merging and duplicating; reactions, files and resolving on a doc comment, and editing one; reactions on a task comment. Deleting is not planned.

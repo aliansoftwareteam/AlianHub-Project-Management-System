@@ -348,6 +348,8 @@ const executors = {
             entityType: 'page', entityId: pageId, entityName: (page && page.title) || '',
         };
     },
+
+    ...require('./setupRequests').executors,
 };
 
 module.exports = {
