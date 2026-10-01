@@ -328,6 +328,7 @@
     "AgentCatalogue.why_adjusted_skills": "Left out skills this workspace does not have.",
     "AgentCatalogue.why_adjusted_spendCap": "Capped at the limit for a new agent. You can change it.",
     "AgentChat.change_done": "DONE",
+    "AgentChat.change_failed": "FAILED",
     "AgentChat.change_proposed": "WAITING FOR APPROVAL",
     "AgentChat.change_refused": "NOT ALLOWED",
     "AgentChat.could_not_reply": "The agent could not reply to this.",

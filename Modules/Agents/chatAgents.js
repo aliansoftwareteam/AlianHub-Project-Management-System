@@ -214,7 +214,7 @@ const settleChanges = async (companyId, { agent, run, askerId, changes }) => {
         } catch (e) {
             // eslint-disable-next-line no-await-in-loop
             await lazy.runs.patch(companyId, run._id, {}, { $inc: { refusals: e.name === 'RefusedError' ? 1 : 0 }, $push: { actions: { action: rated.action, auditId: e.auditId || null, ok: false, error: e.message, at: new Date() } } });
-            outcomes.push({ action: rated.action, label: rated.label, outcome: 'refused' });
+            outcomes.push({ action: rated.action, label: rated.label, outcome: e.name === 'RefusedError' ? 'refused' : 'failed' });
         }
     }
     if (decisions.length) await lazy.runs.patch(companyId, run._id, {}, { $push: { decisions: { $each: decisions } } });

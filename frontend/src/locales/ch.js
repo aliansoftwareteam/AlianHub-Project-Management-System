@@ -10302,7 +10302,8 @@ export default {
         "could_not_reply": "The agent could not reply to this.",
         "change_done": "DONE",
         "change_proposed": "WAITING FOR APPROVAL",
-        "change_refused": "NOT ALLOWED"
+        "change_refused": "NOT ALLOWED",
+        "change_failed": "FAILED"
     },
     "AiAvailability": {
         "off_title": "AI is turned off",

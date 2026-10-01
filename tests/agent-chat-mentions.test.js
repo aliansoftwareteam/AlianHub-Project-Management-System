@@ -53,7 +53,7 @@ jest.mock('../Config/permissionGuard', () => ({
     isWritable: (permission) => permission === true,
 }));
 jest.mock('../Config/projectAccess', () => ({
-    canReadProject: jest.fn(async (companyId, uid, projectId) => (String(projectId) === '6a9954186dd786246031e481'
+    canReadProject: jest.fn(async (companyId, uid, projectId) => (['6a9954186dd786246031e481', '6a9954186dd786246031e490'].includes(String(projectId))
         ? { allowed: true }
         : { allowed: false, missing: true })),
 }));
@@ -92,6 +92,7 @@ jest.mock('../Modules/Agents/budget', () => ({
     alertIfCrossed: jest.fn(async () => null),
 }));
 jest.mock('../Modules/Knowledge/ingest/events', () => ({ publishCommentChanged: jest.fn(), publishGuideSaved: jest.fn() }));
+jest.mock('../Modules/Audit/recorder', () => ({ recordAudit: jest.fn(async () => null) }));
 
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
@@ -167,7 +168,7 @@ beforeEach(() => {
     d.seed(SCHEMA_TYPE.SPRINTS, { _id: CHANNEL, projectId: oid(CHANNEL_PROJECT) });
     d.seed(SCHEMA_TYPE.SPRINTS, { _id: PRIVATE_CHANNEL, projectId: oid(CHANNEL_PROJECT) });
     d.seed(SCHEMA_TYPE.TASKS, { _id: PEOPLE_DM, ProjectID: CHAT_SPACE, sprintId: DM_SPRINT, mainChat: true, AssigneeUserId: [ALICE, BOB] });
-    d.seed(SCHEMA_TYPE.TASKS, { _id: WEB_TASK, ProjectID: WORK_PROJECT, TaskName: 'Launch pricing page', TaskKey: 'WEB-7', deletedStatusKey: 0, updatedAt: new Date() });
+    d.seed(SCHEMA_TYPE.TASKS, { _id: WEB_TASK, CompanyId: COMPANY, ProjectID: WORK_PROJECT, TaskName: 'Launch pricing page', TaskKey: 'WEB-7', deletedStatusKey: 0, updatedAt: new Date() });
     d.seed(SCHEMA_TYPE.TASKS, { ProjectID: HIDDEN_PROJECT, TaskName: 'Launch merger secretly', TaskKey: 'SEC-1', deletedStatusKey: 0, updatedAt: new Date() });
     d.seed(SCHEMA_TYPE.TASKS, { _id: ALPHA_TASK, ProjectID: ALICE_PROJECT, TaskName: 'Alpha acquisition plan', TaskKey: 'ALP-1', deletedStatusKey: 0, updatedAt: new Date() });
     [ALICE, BOB, CAROL].forEach((userId) => d.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, status: 2, roleType: 3 }));
@@ -290,6 +291,38 @@ describe('@agent in a chat channel', () => {
         expect(run.status).toBe('waiting_approval');
         expect(run.proposals).toEqual([String(proposals[0]._id)]);
         expect(agentReplies()[0].agentChanges).toEqual([{ action: 'subtask.create', label: 'Check the pricing copy', outcome: 'proposed', proposalId: String(proposals[0]._id) }]);
+    });
+});
+
+describe('an L2 agent asked for a change in chat', () => {
+    const askForNote = async (agentChange) => {
+        Object.assign(db().store[SCHEMA_TYPE.AGENTS].find((a) => String(a._id) === HELPER), { autonomy: 2, ...agentChange });
+        mockChat.mockResolvedValue(reply({
+            reply: 'Noted on the task [WEB-7].',
+            changes: [{ action: 'task.comment', label: 'Note the launch date', params: { taskId: WEB_TASK, body: 'Launch is on Friday.' } }],
+        }));
+        await post(ALICE, `${mention(HELPER)} note the launch date on the pricing task`, channel);
+        return rows(SCHEMA_TYPE.COMMENTS).filter((c) => String(c.taskId) === WEB_TASK);
+    };
+
+    it('makes a reversible task change itself, as the asker, inside its projects', async () => {
+        const notes = await askForNote({ projectIds: [WORK_PROJECT] });
+
+        expect(notes).toEqual([expect.objectContaining({ message: 'Launch is on Friday.', actorType: 'agent', agentId: HELPER, userId: ALICE })]);
+        expect(rows(SCHEMA_TYPE.AGENT_PROPOSALS)).toHaveLength(0);
+        const [run] = chatRuns();
+        expect(run.status).toBe('done');
+        expect(run.decisions).toEqual([expect.objectContaining({ action: 'task.comment', decision: 'act' })]);
+        expect(agentReplies().find((c) => c.taskId === 'default').agentChanges).toEqual([{ action: 'task.comment', label: 'Note the launch date', outcome: 'done' }]);
+    });
+
+    it('is refused a write when it has no project scope, as on a task', async () => {
+        const notes = await askForNote({ projectIds: [] });
+
+        expect(notes).toHaveLength(0);
+        expect(rows(SCHEMA_TYPE.AGENT_PROPOSALS)).toHaveLength(0);
+        expect(chatRuns()[0].decisions).toEqual([expect.objectContaining({ action: 'task.comment', decision: 'refuse' })]);
+        expect(agentReplies()[0].agentChanges).toEqual([{ action: 'task.comment', label: 'Note the launch date', outcome: 'refused' }]);
     });
 });
 

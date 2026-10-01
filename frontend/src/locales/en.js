@@ -10677,6 +10677,7 @@ export default {
         change_done: "DONE",
         change_proposed: "WAITING FOR APPROVAL",
         change_refused: "NOT ALLOWED",
+        change_failed: "FAILED",
     },
     AiAvailability: {
         off_title: "AI is turned off",

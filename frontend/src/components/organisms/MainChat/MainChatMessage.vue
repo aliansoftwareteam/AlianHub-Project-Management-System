@@ -192,7 +192,7 @@ onBeforeUnmount(() => {
 const { t } = useI18n();
 const injectedCompanyId = inject('$companyId', '');
 const companyId = computed(() => unref(injectedCompanyId) || '');
-const CHANGE_OUTCOMES = ['done', 'proposed', 'refused'];
+const CHANGE_OUTCOMES = ['done', 'proposed', 'refused', 'failed'];
 const agentChanges = computed(() => (Array.isArray(props.message.agentChanges) ? props.message.agentChanges : [])
     .filter((change) => change && CHANGE_OUTCOMES.includes(change.outcome)));
 const agentAskState = computed(() => (props.message.agentAsk && props.message.agentAsk.state) || '');
