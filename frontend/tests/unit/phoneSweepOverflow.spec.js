@@ -44,6 +44,26 @@ describe('Connections on a phone', () => {
     });
 });
 
+describe('External data on a phone', () => {
+    const css = mediaBlocks(read('views/Integrations/externalData.css'), '@media (max-width: 768px)');
+
+    test('the title keeps one line and the counts drop to a row of their own', () => {
+        expect(ruleBody(css, '.ah-page.xd .ah-toolbar')).toMatch(/flex-wrap:\s*wrap/);
+        expect(ruleBody(css, '.ah-page.xd .ah-toolbar')).toMatch(/height:\s*auto/);
+        expect(ruleBody(css, '.xd .ah-toolbar__title')).toMatch(/white-space:\s*nowrap/);
+        expect(ruleBody(css, '.xd__meta')).toMatch(/flex-basis:\s*100%/);
+    });
+});
+
+describe('Route tasks to agents on a phone', () => {
+    test('the title and the count keep one line each', () => {
+        const css = phone(read('views/Ai/parity.css'));
+        expect(read('views/Ai/AgentRouting.vue')).toMatch(/<div class="ah-page parity-page route-page">/);
+        expect(ruleBody(css, '.ah-page.route-page .ah-toolbar')).toMatch(/padding:\s*0 16px/);
+        expect(ruleBody(css, '.route-page .ah-toolbar__title')).toMatch(/white-space:\s*nowrap/);
+    });
+});
+
 describe('Project and Tracker timesheets on a phone', () => {
     test('the filter box counts its padding inside its width', () => {
         const css = read('views/Timesheet/style.css');
