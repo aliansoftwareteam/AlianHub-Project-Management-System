@@ -6,8 +6,10 @@
  * re-hung on its level-two ancestor and both parents' subTasks follow.
  * Every row is read before the first write, so a dry run plans from the data as it is; each update
  * names the ParentTaskId or the count it read, so a row changed meanwhile is skipped. updatedAt is
- * kept: nothing a person sees on the task changed. verify() reads the index back, not up(): a read
- * after the write would stop the dry run from planning. */
+ * kept: nothing a person sees on the task changed. The index is not read back: a read after the
+ * write would stop the dry run from planning.
+ * No verify(): the plan would count every subtask a writer saves after this ran, and the index of
+ * a workspace made afterwards is built by the schema, so a healthy database would fail the check. */
 
 const mongoose = require('mongoose');
 const { HEX_ID } = require('../utils/mongo-handler/objectIdKeys');
@@ -18,7 +20,6 @@ const BATCH_SIZE = 500;
 
 const hasParent = { ParentTaskId: { $type: 'string', $ne: '' } };
 const sameChain = (stored, chain) => Array.isArray(stored) && stored.length === chain.length && stored.every((id, index) => String(id) === chain[index]);
-const plural = (n, one) => `${n} ${n === 1 ? one : `${one}s`}`;
 
 async function readTasks(ctx, companyId, filter, projection) {
     return await ctx.company(companyId, { type: ctx.SCHEMA_TYPE.TASKS, data: [filter, projection, { lean: true }] }, 'find') || [];
@@ -108,11 +109,6 @@ async function convertCompany(ctx, companyId) {
     return counts;
 }
 
-async function hasAncestorsIndex(ctx, companyId) {
-    const indexes = await ctx.company(companyId, { type: ctx.SCHEMA_TYPE.TASKS, data: [] }, 'listIndexes').catch(() => []) || [];
-    return indexes.some((index) => index && index.key && index.key.ancestors === 1);
-}
-
 module.exports = {
     id: ID,
     scope: 'company',
@@ -125,17 +121,5 @@ module.exports = {
             ctx.logger.info(`[migrations] 064 ${companyId}: ${JSON.stringify(counts)}`);
             return counts;
         });
-    },
-    /* Orphans, cycles and subtasks in another sprint cannot be repaired here, so only the rows
-     * this migration would still write are a problem. */
-    async verify(ctx) {
-        const problems = [];
-        await ctx.forEachCompany(async (companyId) => {
-            const { written, rehung } = (await planCompany(ctx, companyId)).counts;
-            if (written) problems.push(`${companyId} ${plural(written, 'subtask')} without the right ancestors`);
-            if (rehung) problems.push(`${companyId} ${plural(rehung, 'subtask')} below level three`);
-            if (!await hasAncestorsIndex(ctx, companyId)) problems.push(`${companyId} tasks have no ancestors index`);
-        });
-        return problems;
     },
 };
