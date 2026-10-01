@@ -5593,6 +5593,7 @@ export default {
         "expires_optional": "Expires (optional)",
         "password_optional": "Password (optional)",
         "delete_link": "Delete link",
+        "public_link_deleted": "Public link deleted",
         "password_protected": "Password protected",
         "share_expires_on": "Expires",
         "intake_inbox": "Requests",

@@ -7208,6 +7208,7 @@
     "Projects.proposal_id_format_warning": "That doesn't look like an Upwork proposal ID. It will still be saved.",
     "Projects.proposal_id_required_upwork": "A proposal ID is required for Upwork projects.",
     "Projects.public_link": "Public link",
+    "Projects.public_link_deleted": "Public link deleted",
     "Projects.recent_tasks": "Recent",
     "Projects.reject": "Reject",
     "Projects.relation_blocked_by": "Blocked by",

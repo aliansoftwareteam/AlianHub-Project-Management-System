@@ -3,6 +3,7 @@ import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { useUpdateTasks } from "@/views/Projects/helper.js";
 import { tabUpdateMarker } from "@/utils/taskUpdateMarker";
+import { plainGroupValue } from "@/views/Projects/composables/taskGroupIndex";
 
 const GAP = 65536;
 
@@ -78,7 +79,7 @@ export function useListDragDrop() {
             isFirstWithRecord: index === 0 && rows.length > 1,
             indexName: item.indexName,
             sprintId: task.sprintId,
-            relevantKey: item.searchValue,
+            relevantKey: plainGroupValue(item.searchValue),
             searchKey: item.searchKey,
             taskKey: task.TaskKey,
             updateData
