@@ -1,5 +1,5 @@
 <template>
-    <div class="task-assigneesearch-groupbywrapper pft" :class="{ 'pft--search-open': searchOpen, 'pft--phone': sheetMode }">
+    <div class="task-assigneesearch-groupbywrapper pft" role="toolbar" :aria-label="$t('Projects.view_toolbar')" :class="{ 'pft--search-open': searchOpen, 'pft--phone': sheetMode }">
         <div class="d-flex align-items-center justify-content-between flex-wrap task-filtersearchassignee-wrapper" v-if="['ProjectListView', 'Calendar', 'ProjectKanban','TableView'].includes(activeTab)">
             <div class="d-flex align-items-center justify-content-start task-filtersearch">
                 <TaskFilter :projectData="projectData" @apply="onApplyFilter" @clear="onClearFilter" v-if="!sheetMode && Object.keys(projectData).length > 0"/>

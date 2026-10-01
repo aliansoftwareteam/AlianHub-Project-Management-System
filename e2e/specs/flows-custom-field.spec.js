@@ -11,7 +11,7 @@ test.describe('custom fields', () => {
 
         await page.goto(`/#/${state.companyId}/settings/custom-field`);
         await page.getByRole('button', { name: 'Field', exact: true }).click();
-        const label = page.getByRole('textbox', { name: 'Field label', exact: true });
+        const label = page.getByRole('dialog', { name: 'Create Custom Field' }).getByRole('textbox', { name: 'Field Label' });
         await label.fill(title);
         await label.press('Enter');
 

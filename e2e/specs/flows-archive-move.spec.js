@@ -25,7 +25,7 @@ test.describe('archiving and moving tasks in the List', () => {
         await expect(row).toHaveCount(0);
         await expect.poll(async () => (await readTask(owner.api, task._id)).deletedStatusKey).toBe(2);
 
-        await page.getByRole('button', { name: 'More', exact: true }).click();
+        await page.getByRole('toolbar', { name: 'Task view options' }).getByRole('button', { name: 'More', exact: true }).click();
         await page.getByRole('menuitem', { name: 'Show Archive', exact: true }).click();
         await expect(row).toBeVisible();
 
@@ -33,7 +33,7 @@ test.describe('archiving and moving tasks in the List', () => {
         await expect(row).toHaveCount(0);
         await expect.poll(async () => (await readTask(owner.api, task._id)).deletedStatusKey).toBe(0);
 
-        await page.getByRole('button', { name: 'More', exact: true }).click();
+        await page.getByRole('toolbar', { name: 'Task view options' }).getByRole('button', { name: 'More', exact: true }).click();
         await page.getByRole('menuitem', { name: 'Hide Archive', exact: true }).click();
         await expect(row).toBeVisible();
     });

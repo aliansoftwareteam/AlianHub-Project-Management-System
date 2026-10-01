@@ -1,0 +1,32 @@
+const { test, expect, asRole } = require('../support/test');
+const { uniqueSuffix } = require('../support/fixtures');
+const { skipFirstRun } = require('../support/pages');
+
+test.describe('chat', () => {
+    test.use(asRole('owner'));
+    test.beforeEach(async ({ page }) => skipFirstRun(page));
+
+    test('a reply in a thread is posted under its message', async ({ page, state }) => {
+        const suffix = uniqueSuffix();
+        const message = `Question ${suffix}`;
+        const reply = `Answer ${suffix}`;
+
+        await page.goto(`/#/${state.companyId}/chat`);
+        await page.getByRole('button', { name: 'New message', exact: true }).click();
+        await page.getByRole('button', { name: /Max Member/ }).click();
+        const composer = page.getByPlaceholder('Type here');
+        await composer.fill(message);
+        await composer.press('Enter');
+        await expect(page.getByText(message, { exact: true })).toBeVisible();
+
+        await page.getByText(message, { exact: true }).hover();
+        await page.getByRole('button', { name: 'Reply in thread', exact: true }).first().click();
+        const thread = page.getByRole('complementary', { name: 'Thread' });
+        const threadComposer = thread.getByPlaceholder('Type here');
+        await threadComposer.fill(reply);
+        await threadComposer.press('Enter');
+
+        await expect(thread.getByText(reply, { exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: /1 reply/ })).toBeVisible();
+    });
+});
