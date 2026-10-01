@@ -517,6 +517,7 @@ const resetFields = (item) => {
         if (item.name.type === 'custom') {
             item.comparisonsData = comparisonsFor(item.name.fieldType);
             item.comparison = item.comparisonsData[0] || {};
+            if (!needsValue(item.comparison.value)) item.values = [true];
             comparison.value = item.comparison;
         } else if (arraykeys.includes(item.name.value)) {
             item.comparisonsData = [

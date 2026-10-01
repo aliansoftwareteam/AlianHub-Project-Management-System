@@ -165,9 +165,11 @@ const clip = async (ctx, [, companyId, userId], key) => {
 
 const reminderAttachment = async (ctx, [, companyId, userId]) => ownFolder(ctx, companyId, userId) || NO_ACCESS;
 
-/* An image uploaded into a doc is for whoever may read that doc. */
-const docImage = async (ctx, [, pageId]) => {
-    const page = await find(ctx, SCHEMA_TYPE.PAGES, { _id: oid(pageId), deletedStatusKey: 0 }, 'ProjectID visibility createdBy');
+const liveDoc = (ctx, pageId) => find(ctx, SCHEMA_TYPE.PAGES, { _id: oid(pageId), deletedStatusKey: 0 }, 'ProjectID visibility createdBy deletedStatusKey');
+
+/* An image uploaded into a doc, and a file on one of its comments, is for whoever may read that doc. */
+const inReadableDoc = async (ctx, [, pageId]) => {
+    const page = await liveDoc(ctx, pageId);
     if (!page) return NOT_FOUND;
     return (await canUsePage(ctx.companyId, page, ctx.uid)) || NO_ACCESS;
 };
@@ -188,7 +190,8 @@ const LAYOUTS = Object.freeze([
     { type: 'form_upload', pattern: layout(`formAttachment/${ID}/[a-f0-9]{24}${THUMBNAIL}\\.[a-z0-9]{1,8}`), allows: formUpload },
     { type: 'clip', pattern: layout(`Clips/${ID}/${ID}/${NAME}`), allows: clip },
     { type: 'reminder_attachment', pattern: layout(`Reminders/${ID}/${ID}/${NAME}`), allows: reminderAttachment },
-    { type: 'doc_image', pattern: layout(`Pages/${ID}/${NAME}`), allows: docImage },
+    { type: 'doc_image', pattern: layout(`Pages/${ID}/${NAME}`), allows: inReadableDoc },
+    { type: 'doc_comment_file', pattern: layout(`Pages/${ID}/Comments/${NAME}`), allows: inReadableDoc, enforced: true },
     { type: 'company_asset', pattern: layout(`(?:setting/task_type|taskPriorities|companyIcon|ProjectTemplate)/${NAME}`), allows: companyAsset },
 ]);
 
@@ -218,7 +221,7 @@ const judge = async ({ companyId, uid, key, storage = process.env.STORAGE_TYPE }
     const outcome = await found.entry.allows(ctx, found.match, path);
     return outcome === true
         ? { allowed: true, type: found.entry.type }
-        : { allowed: false, type: found.entry.type, reason: typeof outcome === 'string' ? outcome : NO_ACCESS };
+        : { allowed: false, type: found.entry.type, reason: typeof outcome === 'string' ? outcome : NO_ACCESS, enforced: found.entry.enforced === true };
 };
 
 const countReported = (type, reason) => countCategory(`download:${type}:${reason}`);
@@ -239,8 +242,9 @@ function requireStoredFileRead(pickBucketId, pickPath, { storage, skipBucket = (
             verdict = { allowed: false, type: 'error', reason: 'error' };
         }
         if (verdict.allowed) return next();
-        // Report mode exists to learn what enforcing would break for the web app; a token narrowed to some projects was never given the rest.
-        if (mode() === REPORT && !narrowingFor(req.uid)) {
+        // Report mode exists to learn what enforcing would break for the web app; a token narrowed to some projects was never given the rest,
+        // and a layout added with its rule has no earlier files to break.
+        if (mode() === REPORT && !verdict.enforced && !narrowingFor(req.uid)) {
             const count = countReported(verdict.type, verdict.reason);
             logger.warn(`stored-file download would be refused (layout: ${verdict.type}, reason: ${verdict.reason}, reported so far for this layout and reason: ${count})`);
             return next();
@@ -259,6 +263,7 @@ module.exports = {
     keysFor,
     find,
     taskById,
+    liveDoc,
     chatSpace,
     privileged,
     mayReadProject,

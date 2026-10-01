@@ -14,6 +14,7 @@ const { updateUnReadCommentsCountFun } = require("../../../notification-count/co
 const { handleTaskAttachmentsDuplicateFunctionality } = require(`../../../../common-storage/common-${process.env.STORAGE_TYPE}.js`)
 const { isTaskStoredFile, taskAttachmentKey } = require('../../../../common-storage/taskFileKeys');
 const { copyFieldFiles } = require('../../../CustomField/helpers/fieldFiles');
+const { copyFieldLinks } = require('../../../CustomField/helpers/fieldLinks');
 const { buildQueryObject, buildHistoryObject, convertToDisplayFormat } = require("../helper");
 const socketEmitter = require('../../../../event/socketEventEmitter');
 const { addCommentCollection, updateCommentCollection } = require('../../../Comments/controller')
@@ -311,6 +312,10 @@ module.exports = {
                         .then((taskResult) => {
                             if(taskResult.status){
                                 resolve({status: true, statusText: "Duplicate Task Added",taskId :taskResult.id });
+                                /* Filled as each subtask is copied, so a link between two copied tasks is carried to their copies. */
+                                const copied = new Map([[String(selectedTask._id), String(taskResult.id)]]);
+                                const copyLinks = () => copyFieldLinks({ companyId, actorId: userData && userData.id, pairs: copied })
+                                    .catch((error) => logger.error(`field links copy on duplicate: ${error && error.message}`));
                                 if(duplicateData.includes('Attachments')){
                                     copyFieldFiles({ companyId, source: selectedTask, target: { _id: taskResult.id, ProjectID: projectData.id } })
                                         .catch((error) => logger.error(`field files copy on duplicate: ${error && error.message}`));
@@ -421,12 +426,13 @@ module.exports = {
                                         let countFunction = async(row) => {
                                             try {
                                                 if(count >= Object.keys(arrayOfObjects).length) {
+                                                    copyLinks();
                                                     resolve({status: true, statusText: "subtask merged successfully"});
                                                     return;
                                                 }else{
                                                     let promise = [];
                                                     row.forEach((stask)=>{
-                                                        promise.push(duplicateSubTaskFunction(companyId, projectData, sprintObj, stask, taskResult.id,userData, oldProject,duplicateData));
+                                                        promise.push(duplicateSubTaskFunction(companyId, projectData, sprintObj, stask, taskResult.id,userData, oldProject,duplicateData, undefined, copied));
                                                     })
                                                     Promise.allSettled(promise).then((res)=>{
                                                         count++;
@@ -443,6 +449,8 @@ module.exports = {
                                         }
                                         countFunction(arrayOfObjects[Object.keys(arrayOfObjects)[count]]);
                                     })
+                                } else {
+                                    copyLinks();
                                 }
                             }else{
                                 resolve(taskResult);

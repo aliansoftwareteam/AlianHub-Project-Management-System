@@ -64,10 +64,12 @@ import DropDownOption from "@/components/molecules/DropDownOption/DropDownOption
 
 defineOptions({ name: "CommentAssignment" });
 
+/* `actions` is how the change is saved: a task comment's by default, a doc comment's when its panel passes its own. */
 const props = defineProps({
     comment: { type: Object, required: true },
     people: { type: Array, default: () => [] },
-    allowAssign: { type: Boolean, default: true }
+    allowAssign: { type: Boolean, default: true },
+    actions: { type: Object, default: () => ({ assign: assignComment, resolve: resolveComment }) }
 });
 
 const { t } = useI18n();
@@ -119,11 +121,11 @@ function pick(id) {
     triggerLabel.value?.click();
     query.value = "";
     if (String(id) === String(current.value.assigneeId || "")) return;
-    run(() => assignComment(props.comment, id));
+    run(() => props.actions.assign(props.comment, id));
 }
 
 function toggleResolved() {
-    run(() => resolveComment(props.comment, !current.value.resolved));
+    run(() => props.actions.resolve(props.comment, !current.value.resolved));
 }
 </script>
 
