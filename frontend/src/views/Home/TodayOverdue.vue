@@ -67,15 +67,19 @@
                             @open-project="goProject"
                         />
                         <div class="home__side">
-                            <WaitingOnYouCard v-if="isHomeCardShown('waiting')" @hide="hideCard('waiting')" />
                             <AgendaCard :day="agendaDay" :items="agendaItems" :connected="agenda.connected.value" :first-run="firstRun" @shift="shiftAgenda" />
-                            <AssignedCommentsCard v-if="isHomeCardShown('assigned_comments')" @open="openTask" @hide="hideCard('assigned_comments')" />
+                            <template v-for="id in homeCards.layout" :key="id">
+                                <WaitingOnYouCard v-if="id === 'waiting'" @hide="hideCard(id)" />
+                                <AssignedCommentsCard v-else-if="id === 'assigned_comments'" @open="openTask" @hide="hideCard(id)" />
+                                <StandupCard v-else-if="id === 'standup'" @hide="hideCard(id)" />
+                                <RecentsCard v-else-if="id === 'recents'" @open="openTask" @hide="hideCard(id)" />
+                                <HomeCatalogCard v-else :card-key="id" @remove="hideCard(id)" />
+                            </template>
                             <section v-if="firstRun && !timer.active" class="hc-card">
                                 <div class="hc-personal__title">{{ $t('Home.personal_list') }}</div>
                                 <p class="hc-hint" style="margin: 0">{{ $t('Home.personal_hint') }}</p>
                                 <router-link class="hc-personal__open" :to="{ name: 'PersonalList', params: { cid: companyId } }">{{ $t('Home.open') }}</router-link>
                             </section>
-                            <StandupCard v-if="isHomeCardShown('standup')" @hide="hideCard('standup')" />
                             <TimerChip />
                         </div>
                     </div>
@@ -126,7 +130,9 @@ import SetupChecklist from "@/components/molecules/Home/SetupChecklist.vue";
 import HomeCardsMenu from "@/components/molecules/Home/HomeCardsMenu.vue";
 import WaitingOnYouCard from "@/components/molecules/Home/WaitingOnYouCard.vue";
 import StandupCard from "@/components/molecules/Home/StandupCard.vue";
-import { isHomeCardShown, setHomeCardShown, syncHomeCards } from "@/components/molecules/Home/homeCards";
+import RecentsCard from "@/components/molecules/Home/RecentsCard.vue";
+import HomeCatalogCard from "@/components/molecules/Home/HomeCatalogCard.vue";
+import { homeCards, setHomeCardShown, syncHomeCards } from "@/components/molecules/Home/homeCards";
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue";
 import { useOnboardingChecklist } from "@/composable/useOnboardingChecklist";
 import { useBlockingSurface } from "@/composable/blockingSurface";

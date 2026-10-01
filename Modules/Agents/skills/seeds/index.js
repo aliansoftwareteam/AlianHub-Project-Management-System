@@ -9,6 +9,9 @@ const briefParse = require('./briefParse');
 const digest = require('./digest');
 const projectGuide = require('./projectGuide');
 const prReview = require('./prReview');
+const fieldsFill = require('./fieldsFill');
+const prdDraft = require('./prdDraft');
+const wikiUpkeep = require('./wikiUpkeep');
 
 const documentOf = (seed) => {
     const checked = validateSkill(seed);
@@ -22,7 +25,7 @@ const documentOf = (seed) => {
  * A company's own copy shadows this one and reads as data. */
 const builtInOf = (seed, aliases = []) => ({ ...compile(documentOf(seed)), source: 'code', aliases });
 
-const BUILT_IN = [builtInOf(digest, ['risk.today']), builtInOf(projectGuide)];
+const BUILT_IN = [builtInOf(digest, ['risk.today']), builtInOf(projectGuide), builtInOf(fieldsFill), builtInOf(prdDraft), builtInOf(wikiUpkeep)];
 
 /* pr.summary reads its pull request through the url reader, which validates only while
  * SKILL_EXTERNAL_READS is on. With the flag off it is compiled from the seed as written, so it
@@ -36,4 +39,4 @@ const prReviewSkill = () => {
     return prReviewBuilt;
 };
 
-module.exports = { documentOf, BUILT_IN, PR_REVIEW, prReviewSkill, SEEDS: { briefParse, digest, projectGuide, prReview } };
+module.exports = { documentOf, BUILT_IN, PR_REVIEW, prReviewSkill, SEEDS: { briefParse, digest, projectGuide, prReview, fieldsFill, prdDraft, wikiUpkeep } };

@@ -123,7 +123,7 @@ const props = defineProps({
         default: ""
     },
     groupBy: {
-        type: Number,
+        type: [Number, String],
         default: 1
     },
     assigneeOptions: {
@@ -148,7 +148,7 @@ const props = defineProps({
         type: Date
     },
     groupType:{
-        type: Number,
+        type: [Number, String],
         default: null
     },
     considerWidth:{

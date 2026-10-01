@@ -79,6 +79,49 @@
                         <router-link class="gv__replan-link" :to="{ name: 'AiInbox', params: { cid: companyId } }">{{ $t('Views.review') }}</router-link>
                     </p>
                 </div>
+
+                <div
+                    v-if="shiftPreview"
+                    ref="shiftEl"
+                    class="gv__shift"
+                    role="dialog"
+                    aria-labelledby="gv-shift-title"
+                    @keydown.esc="cancelShift"
+                >
+                    <p id="gv-shift-title" class="gv__shift-title">{{ $t('Views.shift_title', { task: taskLabel(shiftPreview.task) }) }}</p>
+                    <template v-if="shiftRows.length">
+                        <p class="gv__shift-text">{{ $t('Views.shift_intro', { n: shiftRows.length }, shiftRows.length) }}</p>
+                        <ul class="gv__shift-list ah-scroll">
+                            <li v-for="row in shiftRows" :key="row.id" class="gv__shift-row">
+                                <span class="gv__shift-name" :title="row.name">{{ row.name }}</span>
+                                <span class="ah-mono gv__shift-days">{{ $t('Views.shift_days', { n: row.days }, row.days) }}</span>
+                                <span class="ah-mono gv__shift-range">{{ row.range }}</span>
+                            </li>
+                        </ul>
+                    </template>
+                    <template v-if="conflictRows.length">
+                        <p class="gv__shift-text">{{ $t('Views.shift_locked') }}</p>
+                        <ul class="gv__shift-list ah-scroll">
+                            <li v-for="row in conflictRows" :key="row.id" class="gv__shift-row">
+                                <span class="gv__shift-name" :title="row.name">{{ row.name }}</span>
+                                <span class="ah-mono gv__shift-days">{{ $t('Views.shift_needs', { days: $t('Views.shift_days', { n: row.days }, row.days) }) }}</span>
+                            </li>
+                        </ul>
+                    </template>
+                    <p v-if="cycleChain" class="gv__shift-warn">{{ $t('Views.shift_cycle', { chain: cycleChain }) }}</p>
+                    <p class="gv__shift-note">{{ $t('Views.shift_earlier') }}</p>
+                    <div class="gv__shift-actions">
+                        <button
+                            v-if="shiftRows.length"
+                            type="button"
+                            class="ah-btn ah-btn--primary ah-btn--sm"
+                            :disabled="shiftBusy"
+                            @click="applyShift"
+                        >{{ $t('Views.shift_apply') }}</button>
+                        <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" :disabled="shiftBusy" @click="moveOnly">{{ $t('Views.shift_only') }}</button>
+                        <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="shiftBusy" @click="cancelShift">{{ $t('Views.shift_cancel') }}</button>
+                    </div>
+                </div>
             </div>
         </template>
     </div>
@@ -97,7 +140,10 @@ import taskClass from '@/utils/TaskOperations';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { criticalPath } from '@/views/Projects/composables/criticalPath';
 import { fsCollisionLinks } from '@/views/Projects/composables/ganttCollisions';
+import { shiftDependants } from '@/views/Projects/composables/ganttShift';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
+import { showUndoToast } from '@/composable/useUndoToast';
+import { useToast } from 'vue-toast-notification';
 
 defineOptions({ name: 'GanttView' });
 
@@ -111,6 +157,7 @@ const { t } = useI18n();
 const { checkPermission } = useCustomComposable();
 const { getUser } = useGetterFunctions();
 const { groupBy } = taskListHelper();
+const toast = useToast();
 const selectedProject = inject('selectedProject', ref({}));
 const companyId = inject('$companyId', ref(''));
 const clientWidth = inject('$clientWidth', ref(1440));
@@ -129,6 +176,9 @@ const zoom = ref('Week');
 const showCritical = ref(true);
 const showBaseline = ref(true);
 const replanOpen = ref(false);
+const shiftPreview = ref(null);
+const shiftBusy = ref(false);
+const shiftEl = ref(null);
 
 let gantt = null;     // dhtmlx instance (lazy-loaded)
 let ready = false;    // init complete
@@ -187,6 +237,18 @@ const criticalIds = computed(() => (showCritical.value ? new Set(critical.value.
 const collisionLinks = computed(() => fsCollisionLinks(scheduled.value.map((task) => ({
     id: String(task._id), startDate: task.startDate, DueDate: task.DueDate, blocks: blocksOf(task),
 }))));
+
+const shortDate = (value) => new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+const taskLabel = (task) => (task && (task.TaskName || task.TaskKey)) || t('Views.untitled');
+const labelOf = (id) => taskLabel(findTask(id));
+const shiftRows = computed(() => (shiftPreview.value?.shifts || []).map((shift) => ({
+    id: shift.id,
+    name: labelOf(shift.id),
+    days: shift.days,
+    range: `${shortDate(shift.to.startDate)} – ${shortDate(shift.to.DueDate)}`,
+})));
+const conflictRows = computed(() => (shiftPreview.value?.conflicts || []).map((conflict) => ({ id: conflict.id, name: labelOf(conflict.id), days: conflict.days })));
+const cycleChain = computed(() => (shiftPreview.value?.cycle || []).map(labelOf).join(' → '));
 
 /* The last dated plan the task carried before this one. Only a real earlier date
  * counts — an invented baseline would read as a slip that never happened. */
@@ -328,19 +390,86 @@ function placeToday() {
     } catch (e) { /* markers are decoration */ }
 }
 
-/* ------------------------------------ writes ------------------------------------ */
-function persistDates(id) {
-    if (suppress) return;
-    const g = gantt.getTask(id);
-    const task = findTask(id);
-    if (!g || !task) return;
+function saveDates(task, dates) {
     taskClass.updateDates({
-        firebaseObj: { startDate: g.start_date, DueDate: g.end_date },
+        firebaseObj: dates,
         projectData: buildProjectData(),
         taskData: task,
         userData: buildUserData(),
     }).catch((e) => console.error('Gantt: updateDates failed', e));
 }
+
+/* The batch write leaves archived tasks out, so they are never offered as shiftable. */
+const mayShift = (id) => !readOnly.value && findTask(id)?.deletedStatusKey !== 2;
+
+function onTaskDragged(id) {
+    if (suppress) return;
+    const g = gantt.getTask(id);
+    const task = findTask(id);
+    if (!g || !task) return;
+    const to = { startDate: g.start_date, DueDate: g.end_date };
+    const plan = shiftDependants(
+        scheduled.value.map((row) => ({ id: String(row._id), startDate: row.startDate, DueDate: row.DueDate })),
+        scheduled.value.flatMap((row) => blocksOf(row).map((target) => ({ source: String(row._id), target }))),
+        String(id),
+        to,
+        { canEdit: mayShift },
+    );
+    if (!plan.shifts.length && !plan.conflicts.length && !plan.cycle.length) {
+        saveDates(task, to);
+        return;
+    }
+    shiftPreview.value = { id: String(id), task, to, ...plan };
+    nextTick(() => shiftEl.value?.querySelector('button')?.focus());
+}
+
+function writeDates(rows) {
+    return taskClass.updateDatesBatch({ rows, userData: buildUserData() });
+}
+
+function restoreDates(before) {
+    const rows = before.map(({ id, startDate, DueDate }) => ({ task: findTask(id), startDate, DueDate })).filter((row) => row.task);
+    return writeDates(rows).catch((e) => {
+        console.error('Gantt: undo shift failed', e);
+        toast.error(t('Views.shift_undo_failed'));
+    });
+}
+
+async function applyShift() {
+    const plan = shiftPreview.value;
+    if (!plan || shiftBusy.value) return;
+    shiftBusy.value = true;
+    const rows = [{ task: plan.task, ...plan.to }, ...plan.shifts.map((shift) => ({ task: findTask(shift.id), ...shift.to }))].filter((row) => row.task);
+    const before = rows.map(({ task }) => ({ id: String(task._id), startDate: task.startDate, DueDate: task.DueDate }));
+    try {
+        await writeDates(rows);
+        showUndoToast({
+            message: t('Views.shift_done', { task: taskLabel(plan.task), n: plan.shifts.length }, plan.shifts.length),
+            undo: () => restoreDates(before),
+        });
+    } catch (e) {
+        console.error('Gantt: shift failed', e);
+        toast.error(t('Views.shift_failed'));
+        renderData();
+    } finally {
+        shiftBusy.value = false;
+        shiftPreview.value = null;
+    }
+}
+
+function moveOnly() {
+    const plan = shiftPreview.value;
+    if (!plan || shiftBusy.value) return;
+    shiftPreview.value = null;
+    saveDates(plan.task, plan.to);
+}
+
+function cancelShift() {
+    if (shiftBusy.value) return;
+    shiftPreview.value = null;
+    renderData();
+}
+
 function persistLinkAdd(id, link) {
     if (suppress) return;
     apiRequest('post', '/api/v2/tasks/relations', {
@@ -522,7 +651,8 @@ onMounted(async () => {
             });
         }
 
-        eventIds.push(gantt.attachEvent('onAfterTaskDrag', (id) => persistDates(id)));
+        eventIds.push(gantt.attachEvent('onBeforeTaskDrag', () => !shiftPreview.value));
+        eventIds.push(gantt.attachEvent('onAfterTaskDrag', (id) => onTaskDragged(id)));
         eventIds.push(gantt.attachEvent('onAfterLinkAdd', (id, link) => persistLinkAdd(id, link)));
         eventIds.push(gantt.attachEvent('onAfterLinkDelete', (id, link) => persistLinkDelete(link)));
         eventIds.push(gantt.attachEvent('onTaskDblClick', (id) => {

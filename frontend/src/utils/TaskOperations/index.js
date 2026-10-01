@@ -382,6 +382,27 @@ class Task {
         })
     }
 
+    /* rows: [{ task, startDate, DueDate }], written in one request; a failed write puts every task's old dates back. */
+    async updateDatesBatch({ rows, userData }) {
+        const commitDates = (task, dates) => Store.commit('projectData/mutateUpdateFirebaseTasks', {
+            snap: null, op: "modified", pid: task.ProjectID, sprintId: task.sprintId, data: { ...task, ...dates }, updatedFields: { ...dates },
+        });
+        const previous = rows.map(({ task }) => ({ startDate: task.startDate, DueDate: task.DueDate }));
+        rows.forEach(({ task, startDate, DueDate }) => commitDates(task, { startDate, DueDate }));
+        try {
+            const response = await apiRequest("post", env.V2_TASKS_BULK, {
+                action: "bulkUpdateDates",
+                dates: rows.map(({ task, startDate, DueDate }) => ({ taskId: task._id, startDate, DueDate })),
+                userData: { Employee_Name: userData.Employee_Name, id: userData.id, companyOwnerId: userData.companyOwnerId },
+            });
+            if (!response?.data?.status) throw new Error(response?.data?.statusText || "bulkUpdateDates failed");
+            return response.data.data;
+        } catch (error) {
+            rows.forEach(({ task }, at) => commitDates(task, previous[at]));
+            throw error;
+        }
+    }
+
     /* -------------- UPDATE ASSIGNEE ADD OR ASSIGNEE REMOVE FUNCTION FOR TASK -----------------*/
 
     updateAssignee({ firebaseObj,projectData ,taskData,employeeName,type,userData,isUpdateTask = true}) {

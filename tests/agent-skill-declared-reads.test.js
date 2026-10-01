@@ -97,7 +97,7 @@ describe('flag off: beta exactly', () => {
         const keys = catalogues().readers.map((r) => r.key);
         expect(keys).not.toContain('url');
         expect(keys).not.toContain('api');
-        expect(keys).toEqual(['task', 'project', 'project.tasks', 'memory', 'linked_doc']);
+        expect(keys).toEqual(['task', 'project', 'project.tasks', 'memory', 'linked_doc', 'task.ai_fields', 'project.pages']);
     });
 
     it.each(['url', 'api'])('refuses a %s reader as unknown, and does not offer it', (reader) => {

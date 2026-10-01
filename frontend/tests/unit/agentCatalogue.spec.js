@@ -37,7 +37,8 @@ const REGISTRY = {
     ],
     never: ['project.delete']
 };
-const SKILLS = ['brief.parse', 'digest.ceo', 'project.guide', 'pr.summary', 'qa-review'].map((key) => ({ key, name: key, source: 'code', requires: null, unavailable: null }));
+const SKILL_KEYS = ['brief.parse', 'digest.ceo', 'project.guide', 'pr.summary', 'qa-review', 'fields.fill', 'prd.draft', 'wiki.upkeep'];
+const SKILLS = SKILL_KEYS.map((key) => ({ key, name: key, source: 'code', requires: null, unavailable: null }));
 
 const DRAFT = {
     name: 'Deadline Watcher',
@@ -87,11 +88,10 @@ const slugsOf = (list) => list.map((tpl) => tpl.slug);
 
 describe('the template catalogue as data', () => {
     it('files every template under known categories and names only real skills', () => {
-        const real = ['brief.parse', 'digest.ceo', 'project.guide', 'pr.summary', 'qa-review'];
         CATALOGUE_TEMPLATES.forEach((tpl) => {
             expect(tpl.categories.length).toBeGreaterThan(0);
             tpl.categories.forEach((c) => expect(CATALOGUE_CATEGORIES).toContain(c));
-            tpl.skills.forEach((key) => expect(real).toContain(key));
+            tpl.skills.forEach((key) => expect(SKILL_KEYS).toContain(key));
             expect(tpl.autonomy).toBeLessThanOrEqual(1);
             expect(t(`AgentCatalogue.tpl_${tpl.slug}_name`)).not.toBe(`AgentCatalogue.tpl_${tpl.slug}_name`);
             expect(t(`AgentCatalogue.tpl_${tpl.slug}_about`)).not.toBe(`AgentCatalogue.tpl_${tpl.slug}_about`);
@@ -189,10 +189,20 @@ describe('the catalogue dialog', () => {
     });
 
     it('keeps a template that needs something missing visible but not selectable', async () => {
+        const off = SKILLS.map((s) => (s.key === 'qa-review' ? { ...s, unavailable: { reason: 'off' } } : s));
+        apiRequest.mockImplementation((type, url) => (url.startsWith('/api/v2/agents/skills') ? ok(off) : ok([])));
         const wrapper = await mountWith(AgentCatalogue);
-        const card = wrapper.find('[data-slug="field_filler"]');
+        const card = wrapper.find('[data-slug="qa_reviewer"]');
         expect(card.find('[data-test="catalogue-use"]').attributes('disabled')).toBeDefined();
-        expect(card.text()).toContain(t('AgentCatalogue.blocked_ai_fields'));
+        expect(card.text()).toContain(t('AgentCatalogue.blocked_unavailable'));
+    });
+
+    it('offers the field filler, the PRD writer and wiki upkeep', async () => {
+        const wrapper = await mountWith(AgentCatalogue);
+        ['field_filler', 'prd_writer', 'wiki_upkeep'].forEach((slug) => {
+            expect(wrapper.find(`[data-slug="${slug}"] [data-test="catalogue-use"]`).attributes('disabled')).toBeUndefined();
+        });
+        expect(wrapper.find('[data-slug="field_filler"]').text()).toContain(t('AgentCatalogue.need_ai_field'));
     });
 
     it('drafts from a sentence and hands the wizard the draft, saving nothing', async () => {

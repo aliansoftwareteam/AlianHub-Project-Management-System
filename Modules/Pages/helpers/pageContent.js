@@ -94,9 +94,12 @@ function blockToHtml(block) {
         case 'delimiter':
             return '<hr>';
         case 'image': {
-            if (!data.url) return '';
             const caption = escapeHtml(data.caption);
-            return `<figure><img src="${escapeHtml(data.url)}" alt="${caption}">${caption ? `<figcaption>${caption}</figcaption>` : ''}</figure>`;
+            const figcaption = caption ? `<figcaption>${caption}</figcaption>` : '';
+            // An uploaded image has no public url: the viewer signs its key on open.
+            if (data.key) return `<figure class="doc-image" data-image-key="${escapeHtml(data.key)}">${figcaption}</figure>`;
+            if (!data.url) return '';
+            return `<figure><img src="${escapeHtml(data.url)}" alt="${caption}">${figcaption}</figure>`;
         }
         case 'embed': {
             const source = escapeHtml(data.source || data.embed);
@@ -171,6 +174,11 @@ function htmlToBlocks(html) {
         }
         if (/^<hr\s*\/?>$/i.test(chunk)) {
             blocks.push({ type: 'delimiter', data: {} });
+            return;
+        }
+        const uploaded = chunk.match(/^<figure[^>]*data-image-key="([^"]*)"[^>]*>(?:<figcaption>([\s\S]*)<\/figcaption>)?<\/figure>$/i);
+        if (uploaded) {
+            blocks.push({ type: 'image', data: { key: stripTags(uploaded[1]), url: '', caption: stripTags(uploaded[2] || '') } });
             return;
         }
         const figure = chunk.match(/^<figure[^>]*><img[^>]*src="([^"]*)"[^>]*>(?:<figcaption>([\s\S]*)<\/figcaption>)?<\/figure>$/i);

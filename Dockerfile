@@ -45,6 +45,7 @@ COPY Modules/Agents/dailyRunLimit.js /app/Modules/Agents/dailyRunLimit.js
 COPY Modules/Auth/helpers/passwordRule.js /app/Modules/Auth/helpers/passwordRule.js
 COPY Modules/Project/helpers/viewSettings.js /app/Modules/Project/helpers/viewSettings.js
 COPY Modules/CustomField/helpers/fieldTaskTypes.js /app/Modules/CustomField/helpers/fieldTaskTypes.js
+COPY Modules/Automations/templates.js /app/Modules/Automations/templates.js
 
 # Build the SPA bundle. webpack needs more than Node's default ~2 GB heap for
 # this bundle (same setting as ci.yml).
