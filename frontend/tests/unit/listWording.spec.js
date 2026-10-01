@@ -61,7 +61,7 @@ describe('the tasks by status card', () => {
     const subOf = async (total, projectCount) => {
         answer.total = total;
         answer.projects = Array.from({ length: projectCount }, (_, n) => ({ projectId: `p${n}`, name: `Project ${n}`, total: 1, counts: {} }));
-        const wrapper = mount(TasksByStatusCard);
+        const wrapper = mount(TasksByStatusCard, { global: { mocks: { $t: i18n.global.t } } });
         await flushPromises();
         return `${wrapper.get('.dc-num').text()} ${wrapper.get('.dc-sub').text()}`;
     };

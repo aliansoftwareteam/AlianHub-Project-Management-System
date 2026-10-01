@@ -166,7 +166,7 @@ describe('+ New → New list', () => {
         answers(created({ folderId: 'design' }));
         let wrapper = await startNewList();
         await submit(wrapper, 'roadmap');
-        expect(toast.error).toHaveBeenCalledWith('Sprint already exists', { position: 'top-right' });
+        expect(toast.error).toHaveBeenCalledWith('List already exists', { position: 'top-right' });
         expect(apiRequest).not.toHaveBeenCalled();
 
         await submit(wrapper, 'Inbox');
@@ -177,7 +177,7 @@ describe('+ New → New list', () => {
         route.params = { cid: 'company-1', id: 'p1' };
         wrapper = await startNewList();
         await submit(wrapper, 'inbox');
-        expect(toast.error).toHaveBeenCalledWith('Sprint already exists', { position: 'top-right' });
+        expect(toast.error).toHaveBeenCalledWith('List already exists', { position: 'top-right' });
         expect(apiRequest).not.toHaveBeenCalled();
         await submit(wrapper, 'Roadmap');
         expect(apiRequest).toHaveBeenCalledTimes(1);
@@ -259,7 +259,7 @@ describe('a folder\'s own menu', () => {
         const wrapper = menu('design');
         await choose(wrapper, 'New list');
         await submit(wrapper, 'Roadmap');
-        expect(toast.error).toHaveBeenCalledWith('Sprint already exists', { position: 'top-right' });
+        expect(toast.error).toHaveBeenCalledWith('List already exists', { position: 'top-right' });
         expect(apiRequest).not.toHaveBeenCalled();
     });
 });
