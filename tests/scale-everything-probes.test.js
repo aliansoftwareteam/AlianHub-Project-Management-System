@@ -15,7 +15,7 @@ describe('the cases measured', () => {
     it('cover the first page, each grouping, the filters, both sorts and subtasks', () => {
         expect(cases.map((probe) => probe.key)).toEqual([
             'api.everythingFirstPage', 'api.everythingGroupStatus', 'api.everythingGroupAssignee', 'api.everythingGroupProject', 'api.everythingGroupDueDate',
-            'api.everythingFilterAssignee', 'api.everythingHideDone', 'api.everythingSearch', 'api.everythingSortDue', 'api.everythingSubtasks',
+            'api.everythingFilterAssignee', 'api.everythingHideDone', 'api.everythingSearch', 'api.everythingSearchMiss', 'api.everythingSortDue', 'api.everythingSubtasks',
         ]);
         expect(new Set(cases.map((probe) => probe.label)).size).toBe(cases.length);
     });
@@ -44,6 +44,7 @@ describe('the cases measured', () => {
     it('filter by one assignee, search by a word, sort by due date and show subtasks, one thing at a time', () => {
         expect(byKey['api.everythingFilterAssignee'].request.filter).toEqual({ assignee: [ASSIGNEE] });
         expect(byKey['api.everythingSearch'].request.filter).toEqual({ search: 'login' });
+        expect(byKey['api.everythingSearchMiss'].request.filter.search).not.toBe('login');
         expect(byKey['api.everythingSortDue'].request.sort).toEqual({ by: 'DueDate', dir: 'asc' });
         expect(byKey['api.everythingSubtasks'].request.includeSubtasks).toBe(true);
     });
@@ -194,7 +195,8 @@ describe('a measuring run', () => {
         const { metrics, room } = await run();
         const first = metrics.find((metric) => metric.key === 'api.everythingFirstPage');
         expect(first).toMatchObject({ runs: 3, unit: 'ms', rows: 50, bytes: 2048, detail: '50 rows, 1 count, 2 kB' });
-        expect(metrics.slice(0, 10).map((metric) => metric.runs)).toEqual(Array(10).fill(3));
+        expect(metrics.slice(0, cases.length).map((metric) => metric.runs)).toEqual(Array(cases.length).fill(3));
+        expect(metrics.find((metric) => metric.key === 'api.everythingSearchMiss')).toMatchObject({ runs: 3, unit: 'ms' });
         expect(room).toHaveBeenCalledWith(5);
     });
 

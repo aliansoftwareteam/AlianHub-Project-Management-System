@@ -9,6 +9,8 @@ const ENDPOINT = '/api/v2/tasks/everything';
 const WARM_UP_RUNS = 2;
 const PAUSE_MS = 50;
 const SEARCH_TEXT = 'login';
+// No seeded task name holds it, so the server has to look at every task the person can see before it can say so.
+const SEARCH_MISS = 'zzqxv';
 const MAX_PAGES = 80;
 const GROUP_KINDS = ['status', 'assignee', 'project', 'dueDate'];
 
@@ -31,6 +33,7 @@ function everythingCases({ assignee, viewer }) {
         { key: 'api.everythingFilterAssignee', label: 'Everything API: first page filtered by one assignee', request: first({ assignee: [assignee] }) },
         { key: 'api.everythingHideDone', label: 'Everything API: first page with done work hidden (the page\'s default)', request: first({ hideDone: true }) },
         { key: 'api.everythingSearch', label: `Everything API: first page searching task names for "${SEARCH_TEXT}"`, request: first({ search: SEARCH_TEXT }) },
+        { key: 'api.everythingSearchMiss', label: 'Everything API: a search that matches nothing (every task is read)', request: first({ search: SEARCH_MISS }) },
         { key: 'api.everythingSortDue', label: 'Everything API: first page sorted by due date, soonest first', request: first({ sortBy: 'DueDate', sortDir: 'asc' }) },
         { key: 'api.everythingSubtasks', label: 'Everything API: first page with subtasks shown', request: first({ showSubtasks: true }) },
     ];

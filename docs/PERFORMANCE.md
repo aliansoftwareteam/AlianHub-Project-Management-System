@@ -15,6 +15,8 @@ The finish line is one project with **10,000 tasks**, on a warm server.
 | Opening the task panel: click to visible response | under 150 ms |
 | Scrolling | 50 frames per second or more |
 | Task-query API, first page | under 300 ms |
+| Everything: first usable paint (first task rows visible) | under 1.5 s |
+| Everything API: every request the page makes (a first page, the counts of a grouping, one page of a group) | under 300 ms |
 
 A budget is judged on the **median** of the runs; the p95 is shown beside it. At **50,000 tasks** the same things are measured and reported as "measured, no budget yet".
 
@@ -36,6 +38,8 @@ A budget is judged on the **median** of the runs; the p95 is shown beside it. At
 | Custom fields | 5 on the project (dropdown, number, date, text, checkbox), with values on about 60% of tasks |
 
 The same task number always produces the same task, so 10,000 tasks are the first 10,000 of 50,000 and a second run with a larger number tops the project up.
+
+**Optional: many small projects.** One project does not exercise a read across projects, which names every project the person can open. `--small-projects N` (1 to 500) adds N projects beside the big one, in the same company: "Scale Small 001" (key `SS001`) onwards, each with one list and ten tasks (plus their subtasks), no comments and no custom fields. Only the owner is put on them; their tasks are assigned to the company's members. It needs the company to exist, creates only what is missing, and is removed by `--drop` with everything else.
 
 ### How it is written
 
@@ -73,6 +77,7 @@ Each company has its own MongoDB database, named by the company id. Everything a
 ```bash
 npm run scale:seed -- --tasks 10000      # create the company, or top it up
 npm run scale:seed -- --tasks 50000      # top the same project up to 50,000
+npm run scale:seed -- --small-projects 300   # add 300 small projects to the same company
 npm run -s scale:seed -- --token         # a one-hour session token for the owner, on stdout
 npm run scale:seed -- --drop             # remove the company and nothing else
 ```
@@ -91,6 +96,8 @@ npm run scale:measure                               # against http://localhost:4
 npm run scale:measure -- --base http://localhost:4000 --runs 20 --loads 5
 npm run scale:measure -- --no-browser               # API timings only
 npm run scale:measure -- --out results.json         # JSON to a file, the table to stdout
+npm run scale:measure -- --only everything          # the Everything endpoint and page, nothing else
+npm run scale:measure -- --no-explain               # without the query plans
 ```
 
 It needs a running server with a built frontend, and the seeded company. It prints a markdown table to paste under [Results](#results), then the same numbers as JSON.
@@ -102,6 +109,16 @@ It needs a running server with a built frontend, and the seeded company. It prin
 - the project load: `GET /api/v1/project` and the project's lists;
 - the global search, `POST /api/v2/search`.
 
+**The Everything view** (`POST /api/v2/tasks/everything`) is measured with the requests the page itself builds (`frontend/src/views/Everything/everythingRequest.js`), one at a time with a 50 ms pause between calls:
+
+- the first page with no filter, 50 rows and the total, newest first;
+- the counts alone for a grouping by status, by assignee, by project and by due date, which is what a grouped view sends first;
+- a first page filtered by one assignee, with done work hidden (the page's default), searching names for "login", and searching for a word no task has, which makes the server read every task;
+- a first page sorted by due date, and one with subtasks shown;
+- every page of the largest status group, following the cursor to the end: the time per page, and whether each row came exactly once.
+
+Beside each time the script prints what MongoDB did for the same request. It builds the pipelines with the server's own query builder (`Modules/Tasks/helpers/everythingQuery.js`) for the projects the owner can open, runs `explain('executionStats')` on them through the driver, and reports the index used, whether the order came from the index or from a sort in memory, and how many index keys and documents were read for the rows returned. Explain runs the query and writes nothing. A server older than the Everything view is reported as "not measured" and the rest of the run goes on.
+
 **Browser timings** use Playwright's Chromium, headless, one page at a time, at 1440 × 900. They run only when that browser is already installed; nothing is downloaded.
 
 - *First rows* and *first cards*: from navigation to the frame after the one that first shows a task row or a card. Each view is loaded 5 times in a fresh page; the first load has an empty browser cache.
@@ -109,6 +126,7 @@ It needs a running server with a built frontend, and the seeded company. It prin
 - *Task panel*: from the click on a task name to the panel being visible, and to the task being shown in it.
 - *Scroll*: frames per second while the list scrolls for 3 seconds, three times.
 - *DOM nodes* and *JS heap*: after the view has loaded, read from the browser after a garbage collection.
+- *Everything, first rows*: the same measurement on `/#/<company>/everything`, to the first task row. The page reads the person's saved views before its tasks; that request is not counted as the task query in the timeline.
 
 A time is read inside the page at the start of the frame after the one that shows the change, so it includes the browser's layout and paint and is at most one frame (17 ms) late.
 
@@ -168,3 +186,31 @@ Three things the numbers do not show on their face:
 1. **Neither view loads the project.** Each asks for the first 35 tasks per status of one list, so first paint depends on the list (here 799 documents), not on the 12,076 in the project. MongoDB reads every task of that list through the `ProjectID, sprintId, deletedStatusKey` index and sorts them in memory to return 35; that is 10 ms here and grows with the list.
 2. **The List cannot show the rest.** The "To Do" group says 165 and shows 35. Scrolling to the end loads nothing and there is no "load more". (The Board's code loads more as a column scrolls; this run did not exercise it.) The List meets its scroll budget on 210 rows, not on 10,000 tasks.
 3. **Filters and search fetch the whole project in one answer.** A filter by priority High returns 2,397 full tasks, 3.1 MB, in 112 ms; MongoDB needs 14 ms of that (it reads all 12,076 tasks of the project), the rest is building and sending the answer. A name search returns 713 tasks, 0.9 MB. The browser then groups them itself, which this run did not time. These are the paths that grow with the project and the ones to watch at 50,000.
+
+## The Everything view
+
+### Expectations before the first run (2026-10-01, not measured)
+
+Written from the query builder and the two indexes of migration 067 alone, so the first measurement has something to confirm or refute. Nothing below is a result.
+
+The indexes are `{ ProjectID, deletedStatusKey, updatedAt: -1, _id }` and `{ ProjectID, deletedStatusKey, DueDate, _id }`. Every request matches `ProjectID` in the projects the person can open and `deletedStatusKey: 0`, then filters, then sorts by the third and fourth key.
+
+| Case | Expected | Why |
+| --- | --- | --- |
+| First page, one project, either sort | well under budget; order from the index, about 60 documents read for 51 | one `ProjectID` makes the index prefix an equality, so the page is a short walk; the only waste is skipping subtasks |
+| First page, **more than 200 projects** | under budget at this size, but **sorted in memory**: every matching task read to return 51 | MongoDB merges one index range per `ProjectID` to keep the order, and gives up above 200 ranges (`internalQueryMaxScansToExplode`). With 301 projects it reads all of them and sorts. The time then grows with the number of tasks, not with the page |
+| Counts for a grouping (status, assignee, project, due date) | 20 to 80 ms, the slowest part of opening a grouped view | a count per group has to read every matching task: the grouped fields are in no index. The due-date grouping also converts each date to a day in the viewer's timezone. Linear in the number of tasks |
+| Counts by project with hundreds of projects | the time is fine, **the answer is large**: maybe 0.5 to 1 MB | the answer carries a full card (statuses, task types, apps) for every project counted, not only for the ones on the page |
+| Filter by one assignee, hide done | under budget | the rows are still walked in index order with the filter applied to each document; a filter that most tasks pass ends the walk early |
+| Search for a common word | under budget | the same walk, a case-insensitive match on each name; about one task in sixteen matches "login" |
+| **Search that matches nothing** | the worst case for a page: every task read twice (rows and count), tens of ms here | an unanchored, case-insensitive pattern cannot use an index, and with no match the walk never ends early. Linear in the number of tasks |
+| Sort by due date | under budget; the 15% of tasks with no due date are read last, by a second query only when the dated ones run out | `DueDate` of type date gives the index a range to walk |
+| Paging to the end of a group | every page as fast as the first | the cursor names the last row's sort key and id, and the query carries that key as a range the index can seek to |
+| Page: first rows | under 1.5 s, near the Board's time | one read of the saved views, then one request of about 30 kB, then 50 rows of far fewer nodes than a List row |
+
+Two things to look at in the browser that the first-rows time will not show:
+
+1. **A grouped view asks for every group that is on screen when it opens**, three at a time. Before any rows are drawn all the group headers fit on screen, so with six statuses it loads six first pages and draws 300 rows, and with hundreds of projects it loads a screenful of them.
+2. **The page waits for the saved-views read before it asks for tasks** when the browser holds no working state, one round trip that is only needed to know the default view.
+
+If the numbers agree, the fixes to weigh, smallest first: slim cards for projects that are only counted; an index that keeps the order without a range per project, `{ deletedStatusKey, updatedAt, _id, ProjectID }`, so a long project list is checked on the index keys instead of forcing a sort; asking for the tasks and the saved views together.
