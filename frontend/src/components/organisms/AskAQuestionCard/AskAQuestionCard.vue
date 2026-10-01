@@ -246,4 +246,7 @@ onBeforeUnmount(() => {
     text-decoration: none;
 }
 a.askc__ref:hover { text-decoration: underline; }
+@media (max-width: 767px) {
+    a.askc__ref { display: inline-flex; align-items: center; min-height: var(--hit-min); }
+}
 </style>

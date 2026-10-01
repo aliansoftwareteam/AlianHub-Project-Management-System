@@ -90,6 +90,7 @@ describe('dashboards read the tokens', () => {
         [BODY, '.dc-stat__num', 'font', '600 var(--fs-xl, 19px)/1.1 var(--font-ui)'],
         [BODY, '.dc-item', 'font-size', 'var(--fs-md, 12.5px)'],
         [BODY, '.dc-item--click', 'min-height', 'var(--hit-min)'],
+        [BODY, '.dc-item--click', 'box-sizing', 'border-box'],
         [PICKER, '.dpick__card', 'padding', 'var(--card-pad-y, 11px) var(--card-pad-x, 13px)'],
         [PICKER, '.dpick__search', 'height', 'max(var(--hit-min), var(--control-h-lg, 34px))'],
         [SETTINGS, '.csf', 'gap', 'var(--sp-6)'],
@@ -258,6 +259,7 @@ describe('dashboards on a phone', () => {
         expect(px(onPhone(card('ProjectPulseCard'), '.ppc__bar-row', 'min-height'), ENV.phone)).toBe(FLOOR);
         expect(px(onPhone(card('TeamLoggedVsEtaCard'), '.tle__row--team', 'min-height'), ENV.phone)).toBe(FLOOR);
         expect(px(onPhone(card('AtRiskTodayCard'), '.risk__row', 'min-height'), ENV.phone)).toBe(44);
+        expect(px(onPhone(card('AskAQuestionCard'), 'a.askc__ref', 'min-height'), ENV.phone)).toBe(FLOOR);
     });
 
     it('a hub tab keeps the 44px it had', () => {

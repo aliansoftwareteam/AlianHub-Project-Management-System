@@ -41,7 +41,7 @@
     color: var(--ink);
 }
 .dc-item:last-child { border-bottom: 0; }
-.dc-item--click { min-height: var(--hit-min); cursor: pointer; border-radius: var(--r-chip); }
+.dc-item--click { box-sizing: border-box; min-height: var(--hit-min); cursor: pointer; border-radius: var(--r-chip); }
 .dc-item--click:hover { background: var(--surface-hover); }
 .dc-item__text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dc-item__meta { font: var(--text-data); color: var(--ink-2); flex: none; }

@@ -88,14 +88,14 @@ describe('chat reads the tokens', () => {
         [CHAT, '.mc-comp-box', 'padding', 'var(--card-pad-y, 10px) var(--card-pad-x, 12px)'],
         [CHAT, '.mc-comp .write-message', 'font', '400 var(--fs-md, 12.5px)/var(--lh-body, 1.5) var(--font-ui)'],
         [CHAT, '.mc-note', 'padding', 'var(--card-pad-y, 10px) var(--card-pad-x, 12px)'],
-        [CHAT, '.mc-srch-input', 'height', 'var(--control-h-lg, 34px)'],
+        [CHAT, '.mc-srch-input', 'height', 'var(--control-h-lg, 36px)'],
         [CHAT, '.mc-thread-foot', 'min-height', 'var(--control-h, 28px)'],
         [CHAT, '.mc-tile--video::after', 'color', 'var(--rail-ink-strong)'],
         [SIDEBAR, '.cs', 'width', 'var(--sidebar-w)'],
         [SIDEBAR, '.cs-top', 'height', 'var(--toolbar-h)'],
         [SIDEBAR, '.cs-row', 'min-height', 'max(var(--hit-min), calc(var(--row-h) - var(--sp-2)))'],
         [SIDEBAR, '.cs-row', 'font', '400 var(--fs-md, 12.5px)/var(--lh-tight, 1.2) var(--font-ui)'],
-        [SIDEBAR, '.cs-search', 'height', 'var(--control-h-lg, 32px)'],
+        [SIDEBAR, '.cs-search', 'height', 'var(--control-h-lg, 34px)'],
         [NOTES, '.cn__body', 'padding', 'var(--page-pad-y, 20px) var(--page-pad-x, 24px)'],
         [NOTES, '.cn__summary', 'padding', 'var(--card-pad-y, 14px) var(--card-pad-x, 16px)'],
     ])('%s: %s { %s } is %s', (rel, selector, property, expected) => {
@@ -247,7 +247,6 @@ describe('chat in the classic look', () => {
         [CHAT, '.mc-info-pin', 'border-radius', '8px'],
         [CHAT, '.mc-info-doc .mc-file-ic', 'width', '26px'],
         [CHAT, '.mc-srch-box', 'padding', '10px 16px 0'],
-        [CHAT, '.mc-srch-input', 'height', '34px'],
         [CHAT, '.mc-srch-input', 'padding', '0 30px 0 10px'],
         [CHAT, '.mc-srch-row', 'padding', '8px'],
         [CHAT, '.mc-srch-file .mc-file-ic', 'width', '24px'],
@@ -268,7 +267,6 @@ describe('chat in the classic look', () => {
         [SIDEBAR, '.cs-top', 'padding', '0 10px 0 16px'],
         [SIDEBAR, '.cs-title', 'font', '600 13.5px/1.2 var(--font-ui)'],
         [SIDEBAR, '.cs-icon', 'width', '28px'],
-        [SIDEBAR, '.cs-search', 'height', '32px'],
         [SIDEBAR, '.cs-search', 'margin', '0 10px 8px'],
         [SIDEBAR, '.cs-search-input', 'font', '400 12.5px/1 var(--font-ui)'],
         [SIDEBAR, '.cs-list', 'padding', '4px 10px 16px'],
@@ -290,6 +288,14 @@ describe('chat in the classic look', () => {
         [NOTES, '.cn__item-title', 'font', '500 13px/1.35 var(--font-ui)'],
     ])('%s: %s { %s } is still %s', (rel, selector, property, former) => {
         expect(text(rel, selector, property, 'classic')).toBe(former);
+    });
+
+    /* Both drew a 1px border outside a content-box height of 34px and 32px. */
+    it('the two bordered fields are sized by their border box and measure what they did', () => {
+        expect(declared(CHAT, '.mc-srch-input', 'box-sizing')).toBe('border-box');
+        expect(declared(SIDEBAR, '.cs-search', 'box-sizing')).toBe('border-box');
+        expect(size(CHAT, '.mc-srch-input', 'height', 'classic')).toBe(34 + 2);
+        expect(size(SIDEBAR, '.cs-search', 'height', 'classic')).toBe(32 + 2);
     });
 
     it('the header and the sidebar head stay as tall as the classic toolbar', () => {
