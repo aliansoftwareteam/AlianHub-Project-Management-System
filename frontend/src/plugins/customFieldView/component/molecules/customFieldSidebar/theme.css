@@ -1,0 +1,29 @@
+/* Unscoped on purpose: the panel is rendered by the shared Sidebar and the fields by FormKit, which
+   a scoped rule of the drawer cannot reach. Every selector starts at .customFieldSidebar, the class
+   this drawer gives its panel. */
+.customFieldSidebar .sidebar-head {
+    height: 62px;
+}
+/* FormKit's theme paints from its own variables, which are fixed light colours. */
+.customFieldSidebar .sidebar-content {
+    --fk-color-input: var(--ink);
+    --fk-color-placeholder: var(--ink-2);
+    --fk-color-help: var(--ink-2);
+    --fk-color-danger: var(--danger);
+    --fk-color-error: var(--danger);
+    --fk-color-border: var(--border);
+    --fk-color-primary: var(--brand);
+    --fk-color-border-focus: var(--brand);
+    --fk-color-checked: var(--brand);
+    --fk-color-icon: var(--ink);
+    --fk-color-icon-minor: var(--ink-2);
+    --fk-color-button: var(--on-brand);
+    --fk-color-submit: var(--on-brand);
+    --fk-bg-button: var(--brand);
+    --fk-bg-submit: var(--brand);
+    --fk-bg-disabled: var(--fill);
+    --fk-color-disabled: var(--ink-2);
+}
+.customFieldSidebar .formkit-input { color: var(--ink); }
+.customFieldSidebar .formkit-input::placeholder { color: var(--ink-2); }
+.customFieldSidebar .formkit-message { color: var(--danger); }

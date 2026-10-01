@@ -6716,6 +6716,8 @@ export default {
         custom_field: "Custom Field",
         create_custom_field: "Create Custom Field",
         edit_custom_field: "Edit Custom Field",
+        back: "Back",
+        back_to_types: "Back to the field types",
         min_value: "{field} must be at least {min}.",
         max_value: "{field} must be less than or equal to {max}.",
         must_be_valid_email: "{field} must be a valid email",

@@ -94,8 +94,7 @@ describe('a token surface inside a host that keeps light controls', () => {
     test.each([
         ['views/Projects/style.css', '.list-view-body--detail'],
         ['components/organisms/ProjectDetailRightSide/style.css', '.projectRightside'],
-        ['components/molecules/Sidebar/style.css', '.sb-tokens'],
-        ['plugins/customFieldView/component/molecules/customFieldSidebar/theme.css', '.customFieldSidebar .sidebar-content']
+        ['components/molecules/Sidebar/style.css', '.sb-tokens']
     ])('%s: %s states the scheme of the theme', (rel, selector) => {
         expect(ruleBody(read(rel), selector)).toMatch(/color-scheme:\s*var\(--scheme\)/);
     });
@@ -171,11 +170,11 @@ describe('the custom field drawer', () => {
         expect(legacyClasses(rel)).toEqual([]);
     });
 
-    test('the panel, its head and its body are theme surfaces', () => {
-        const css = read('plugins/customFieldView/component/molecules/customFieldSidebar/theme.css');
-        expect(ruleBody(css, '.customFieldSidebar .sidebar-content')).toMatch(/background:\s*var\(--surface\)/);
-        expect(css).toMatch(/\.customFieldSidebar \.sidebar-body[^{]*\{[^}]*background(-color)?:\s*var\(--surface\)/);
-        expect(css).toMatch(/\.customFieldSidebar \.sidebar-head[^{]*\{[^}]*background(-color)?:\s*var\(--surface\)/);
+    test('FormKit fields inside it take their ink, placeholder and border from the theme', () => {
+        const fields = ruleBody(read('plugins/customFieldView/component/molecules/customFieldSidebar/theme.css'), '.customFieldSidebar .sidebar-content');
+        expect(fields).toMatch(/--fk-color-input:\s*var\(--ink\)/);
+        expect(fields).toMatch(/--fk-color-placeholder:\s*var\(--ink-2\)/);
+        expect(fields).toMatch(/--fk-color-border:\s*var\(--border\)/);
     });
 
     const type = (key, name) => ({ key, name, value: name.toLowerCase(), taskCount: 0, isDeleted: false, taskImage: '' });
@@ -201,7 +200,8 @@ describe('the custom field drawer', () => {
         }
     });
     const SidebarStub = {
-        props: ['visible', 'title'],
+        name: 'SidebarStub',
+        props: ['visible', 'title', 'themed'],
         template: '<section v-if="visible" role="dialog" :aria-label="title"><header><slot name="head-left" /><slot name="head-right" /></header><slot name="body" /></section>'
     };
     const stubs = { Sidebar: SidebarStub, CustomFieldInputComponent: true, DropDown: true, TaskTypeIcon: true, ShellIcon: true };
@@ -219,6 +219,12 @@ describe('the custom field drawer', () => {
         await wrapper.get(`[data-field-type="${cfType}"]`).trigger('click');
         await flushPromises();
     };
+
+    test('its panel is a themed sidebar, not a fixed white one', async () => {
+        const wrapper = await drawer();
+        expect(wrapper.getComponent(SidebarStub).props('themed')).toBe('');
+        expect(read('plugins/customFieldView/component/molecules/customFieldSidebar/style.css')).not.toMatch(/sidebar-(body|head)/);
+    });
 
     test('the dialog is named after what it does', async () => {
         expect((await drawer()).get('[role="dialog"]').attributes('aria-label')).toBe(en.CustomField.create_custom_field);
@@ -343,7 +349,7 @@ describe('the legacy pickers follow the theme', () => {
         ['views/Projects/components/ProjectSidebars.vue', "$t('Projects.list_of_user')"],
         ['components/organisms/CreateChannelSidebar/CreateChannelSidebar.vue', "$t('Channel.create_channel')"]
     ])('%s opens its picker themed', (rel, title) => {
-        const tags = [...template(rel).matchAll(/<Sidebar\b[^>]*>/g)].map((match) => match[0]);
+        const tags = template(rel).split('<Sidebar').slice(1).map((rest) => rest.split(/\/>|<template/)[0]);
         const tag = tags.find((item) => item.includes(`:title="${title}"`));
         expect(tag).toMatch(/\sthemed(\s|>)/);
     });

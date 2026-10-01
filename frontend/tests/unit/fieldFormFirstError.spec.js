@@ -64,6 +64,18 @@ const submit = async (wrapper, values) => {
     return node;
 };
 
+describe('the fields of the form', () => {
+    it('have ids of their own, so each label names its own field', async () => {
+        const wrapper = await dateForm();
+        const title = wrapper.get('input[name="fieldTitle"]').attributes('id');
+        const description = wrapper.get('textarea[name="fieldDescription"]').attributes('id');
+        expect(title).toBeTruthy();
+        expect(description).toBeTruthy();
+        expect(title).not.toBe(description);
+        expect(wrapper.get(`label[for="${description}"]`).text()).toContain(en.Description.description);
+    });
+});
+
 describe('saving a date field from the Limits tab', () => {
     it('shows the General tab and focuses the description when it is missing', async () => {
         const wrapper = await dateForm();

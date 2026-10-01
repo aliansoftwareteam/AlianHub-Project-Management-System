@@ -66,3 +66,22 @@
 }
 .sidebar-close { display: inline-flex; align-items: center; padding: 0; border: 0; background: none; cursor: pointer; }
 .sidebar-content:focus { outline: none; }
+/* Opt-in through the `themed` prop: the panel, its head, its search field and the rows it lists take
+   the tokens and so follow the theme. Every other sidebar keeps its legacy light colours, because
+   its contents still paint dark ink. */
+.sb-tokens {
+    background: var(--surface);
+    color: var(--ink);
+    color-scheme: var(--scheme);
+}
+.sb-tokens .sidebar-head { color: var(--ink); border-color: var(--hairline); }
+.sb-tokens .sidebar-body { color: var(--ink); }
+.sb-tokens .mobile-list-inputsearch-wrapper { border-color: var(--hairline); }
+.sb-tokens .form-control { background: var(--surface); color: var(--ink); border-color: var(--border); }
+.sb-tokens .form-control::placeholder { color: var(--ink-2); }
+.sb-tokens .form-control:focus-visible { outline: none; border-color: var(--brand); box-shadow: var(--focus); }
+.sb-tokens .group-title { color: var(--ink); }
+.sb-tokens .red { color: var(--danger); }
+.sb-tokens .sidebar-close { padding: 4px; border-radius: var(--r-chip); color: var(--ink-2); }
+.sb-tokens .sidebar-close:hover { background: var(--surface-hover); color: var(--ink); }
+.sb-tokens .sidebar-close:focus-visible { outline: none; box-shadow: var(--focus); }
