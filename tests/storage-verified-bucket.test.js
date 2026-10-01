@@ -98,7 +98,7 @@ describe('POST /api/v1/wasabi/deleteFile', () => {
     });
 
     it('deletes from the bucket of a company the caller is an active member of', async () => {
-        const r = await remove({ companyId: COMPANY_A, path: 'qa/note.txt' });
+        const r = await remove({ companyId: COMPANY_A, path: `Reminders/${COMPANY_A}/${USER}/note.txt` });
 
         expect(r.status).toBe(200);
         expect(s3Send).toHaveBeenCalledTimes(1);

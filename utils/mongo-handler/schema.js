@@ -57,6 +57,12 @@ const schema = {
             type: [String],
             required: false,
         },
+        // The task whose archive or delete carried this row with it; a restore of that task brings
+        // back the rows that name it. Written only by the cascade in Modules/Tasks/helpers/taskTree.js.
+        'cascadedBy': {
+            type: String,
+            required: false,
+        },
         'ProjectID': {
             type: mongoose.Schema.Types.ObjectId,
             required: true,

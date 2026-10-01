@@ -1,6 +1,7 @@
 const {task} = require('./helpers/task_class');
 const {taskMongo} = require('./helpers/task_class_Mongo');
 const tabSyncTaskCtrl = require('./controller/getTabSyncTasks');
+const everythingCtrl = require('./controller/everything');
 const advanceFilter = require('./helpers/manageGlobalFilter');
 const getTaskCtrl = require('./helpers/getTasksData');
 const { handleEvents } = require('../Company/eventController');
@@ -85,13 +86,15 @@ exports.init = (app) => {
             })
             .catch((error) => {
                 logger.error(`ERROR bulk ${action}: ${error.message}`);
-                res.send({ status: false, statusText: error.message });
+                sendFailure(res, error);
             });
         } catch (error) {
             logger.error(`ERROR bulk dispatch: ${error.message}`);
             res.send({ status: false, statusText: error.message });
         }
     });
+
+    app.post('/api/v2/tasks/everything', everythingCtrl.listEverything);
 
     app.post('/api/v2/tasks/relations', requireTaskActionPermission(RELATION_ACTIONS), async (req, res) => {
         try {

@@ -176,7 +176,7 @@ describe('a folder\'s own menu', () => {
 
     it('reads the permission of the project it is handed', async () => {
         expect(menu('ops', projectWith({ isGlobalPermission: false })).find('.pt-row__more').exists()).toBe(false);
-        expect((await open(menu('ops'))).map((item) => item.text())).toEqual(['Projects.new_subfolder', 'Projects.move_folder']);
+        expect((await open(menu('ops'))).map((item) => item.text())).toEqual(['Projects.new_subfolder', 'Projects.rename', 'Projects.move_folder']);
     });
 
     it('offers nothing in a closed project', () => {
