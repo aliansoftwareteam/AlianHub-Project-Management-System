@@ -47,6 +47,7 @@ const { HandleHistory } = require('../Tasks/helpers/helper');
 const { HandleBothNotification } = require('../Tasks/helpers/handleNotification');
 const { checkProjectPlan, removeProjectCount } = require('../createProject/controller');
 const { estimateAndPersist: estimateTaskTimeWithAI } = require('../EstimatedTime/aiTaskEstimator');
+const { storableFieldValues } = require('../CustomField/helpers/fieldValueWrite');
 const planRules = require('./planRules');
 const sseEmitter = require('./sseEmitter');
 const executeAgents = require('./executeAgents');
@@ -815,6 +816,11 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
         }
     }
     const docs = [...parentDocs, ...subtaskDocs];
+
+    const fieldDefinitions = new Map();
+    for (const doc of docs) {
+        doc.customField = (await storableFieldValues({ companyId, task: doc, definitions: fieldDefinitions })).customField;
+    }
 
     const typeIncrements = {};
     for (const d of docs) {

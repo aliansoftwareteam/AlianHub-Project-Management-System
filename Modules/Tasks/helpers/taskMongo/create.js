@@ -221,7 +221,8 @@ module.exports = {
                 }, {});
     
                 let completedTasks = 0;
-    
+                let droppedFieldValues = 0;
+
                 const updateProgress = () => {
                     const progress = Math.round((completedTasks / totalTasks) * 100);
                     emitListener(eventId, { step: progress });
@@ -275,6 +276,7 @@ module.exports = {
                     }).then(taskResult => {
                         idMapping[task._id] = taskResult.id;
                         task.createdTaskId = taskResult.id;
+                        droppedFieldValues += taskResult.droppedFieldValues || 0;
                         completedTasks++;
                         updateProgress();
                     })
@@ -324,7 +326,8 @@ module.exports = {
                             projectData,
                             indexObj,
                             setNotif: true
-                        }).then(() => {
+                        }).then((taskResult) => {
+                            droppedFieldValues += taskResult.droppedFieldValues || 0;
                             completedTasks++;
                             updateProgress();
                         })
@@ -332,7 +335,7 @@ module.exports = {
     
                     return Promise.all(subtaskPromises);
                 }).then(() => {
-                    resolve({ status: true, statusText: "Tasks created successfully", createdTasks: tasks, customFields: createdCustomFields });
+                    resolve({ status: true, statusText: "Tasks created successfully", createdTasks: tasks, customFields: createdCustomFields, droppedFieldValues });
                     emitListener(eventId, { step: "STOP" });
                 }).catch(error => {
                     console.error("Error while creating tasks:", error);
