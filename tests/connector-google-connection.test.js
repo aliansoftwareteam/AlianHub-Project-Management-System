@@ -260,11 +260,15 @@ describe('the state is bound to the session and the workspace that started it, o
 
     it('another person cannot complete it, so a consent given under someone else\'s link connects nobody', async () => {
         const { state, code } = await consentAs(ADMIN, { email: 'victim@example.test' });
-        const out = await completeAs(MEMBER, { state, code });
-        expect(out.code).toBe(400);
-        expect(out.body.code).toBe('state_invalid');
+        for (const sessionId of [SESSION[MEMBER], SESSION[ADMIN]]) {
+            const out = await completeAs(MEMBER, { state, code }, { sessionId });
+            expect(out.code).toBe(400);
+            expect(out.body.code).toBe('state_invalid');
+        }
         await untouched(MEMBER);
         await untouched(ADMIN);
+        expect(rowOf(ADMIN).oauth.sessionId).toBe(SESSION[ADMIN]);
+        expect((await completeAs(ADMIN, { state, code })).code).toBe(200);
     });
 
     it('it cannot be completed in another workspace the person belongs to', async () => {
@@ -461,11 +465,10 @@ describe('the access token is refreshed on use, once', () => {
         expect(rowOf(MEMBER).status).toBe('connected');
     });
 
-    it('a token revoked from the stored-secrets screen reads as not connected', async () => {
+    it('a refresh token revoked from the stored-secrets screen ends the connection at once, while the access token is still fresh', async () => {
         await connectAs(MEMBER);
         await store.revoke({ companyId: C, handle: rowOf(MEMBER).secretHandles.refresh_token, actor: OWNER });
         mockGoogle.calls.length = 0;
-        expire(MEMBER);
         expect(await handleFor(MEMBER)).toEqual({ handle: null, reason: 'token_unavailable' });
         expect(mockGoogle.calls).toHaveLength(0);
         expect((await call(ctrl.mine, MEMBER)).body.data.connections[0]).toMatchObject({ connected: false, account: null });
@@ -691,6 +694,13 @@ describe('the tokens never leave the secrets store', () => {
         expect(unreachable.code).toBe(502);
         expect(unreachable.body.statusText).toContain('[hidden]');
         responses.push(unreachable);
+
+        const echoing = await consentAs(MEMBER);
+        mockGoogle.answers.token = (form) => ({ status: 400, body: { error: `bad ${form.client_secret} ${form.code}`, error_description: form.client_secret } });
+        const echoed = await completeAs(MEMBER, echoing);
+        expect(echoed.code).toBe(502);
+        expect(echoed.body.code).toBe('http_400');
+        responses.push(echoed);
         delete mockGoogle.answers.token;
 
         const crashing = await consentAs(MEMBER);

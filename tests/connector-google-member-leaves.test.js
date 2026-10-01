@@ -12,6 +12,7 @@ jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), 
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
 jest.mock('../Modules/Audit/recorder', () => ({ recordAuditFromReq: jest.fn(), recordAudit: jest.fn() }));
 jest.mock('../utils/data', () => ({ importUserNotifications: jest.fn(async () => undefined) }));
+jest.mock('../Modules/Auth/controller/authHelpers', () => ({ addAndRemoveUserInMongodbNotificationCount: jest.fn(async () => {}) }));
 jest.mock('../Modules/Company/helpers/companyCounters', () => ({
     stepCompanyCounters: jest.fn(async () => ({})),
     releaseMemberSeat: jest.fn(async () => ({})),
@@ -22,6 +23,7 @@ jest.mock('../Modules/Agents/engine/safeFetch', () => ({
 }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
+const { dbCollections } = require('../Config/collections');
 const members = require('../Modules/settings/Members/controller');
 const scim = require('../Modules/Scim/provisioning');
 const google = require('../Modules/Agents/connectors/googleConnection');
@@ -106,6 +108,13 @@ describe('a member with a Google connection leaves the workspace', () => {
 
     it('deactivated through provisioning: the same', async () => {
         await scim.setActive(C, LEAVER, false);
+        await ended();
+    });
+
+    it('provisioned again as inactive: the same', async () => {
+        mockDb.seed(dbCollections.USER_AUTH, { _id: LEAVER, email: `${LEAVER}@e2e.test` });
+        await scim.provision(C, { email: `${LEAVER}@e2e.test`, active: false });
+        expect(seat(LEAVER).isDelete).toBe(true);
         await ended();
     });
 

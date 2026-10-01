@@ -322,7 +322,10 @@ const usableTokenHandle = async ({ companyId, userId, connector }) => {
     if (!holdsToken(row)) return none('not_connected');
     if (row.status === STATUS.BROKEN) return none('broken');
     const handles = row.secretHandles;
-    const fresh = handles.access_token && row.accessExpiresAt && new Date(row.accessExpiresAt).getTime() - EXPIRY_SKEW_MS > Date.now();
+    // Revoking the refresh token from the stored-secrets screen ends the connection now, not when the access token runs out.
+    const held = await store.describe({ companyId, handle: handles.refresh_token }).then(() => true).catch(() => false);
+    if (!held) return none('token_unavailable');
+    const fresh =handles.access_token && row.accessExpiresAt && new Date(row.accessExpiresAt).getTime() - EXPIRY_SKEW_MS > Date.now();
     if (fresh) {
         await update(companyId, row, { $set: { lastUsedAt: new Date() } });
         return { handle: handles.access_token, reason: '' };
