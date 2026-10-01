@@ -5,7 +5,7 @@ const logger = require("../../Config/loggerConfig");
 const { escapeRegex } = require("../../utils/escapeRegex");
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
 const { visibleProjectIds } = require("../Agents/scope");
-const { pageVisibilityFilter } = require("../Pages/helpers/pageRules");
+const { pageReachFilter } = require("../Pages/helpers/pageRules");
 const { validateSearchInput, truncate, RESULT_LIMIT_PER_TYPE } = require('./helpers/searchRules');
 const { hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
 const { keepTaskListProjectIds } = require('../Tasks/helpers/taskListProjects');
@@ -104,10 +104,7 @@ exports.globalSearch = async (req, res) => {
                     {
                         deletedStatusKey: { $ne: 1 },
                         title: rx,
-                        $and: [
-                            { $or: [{ ProjectID: { $in: projectIds } }, { ProjectID: { $in: [null, undefined] } }] },
-                            pageVisibilityFilter(uid),
-                        ],
+                        ...pageReachFilter({ uid, projectIds }),
                     },
                     'title ProjectID updatedBy updatedAt',
                     { limit: RESULT_LIMIT_PER_TYPE, sort: { updatedAt: -1 } },

@@ -13,8 +13,8 @@ const {
     parseDate,
     nextReviewDate,
     reviewState,
-    pageVisibleTo,
-    pageVisibilityFilter,
+    pageReachFilter,
+    pageReachedBy,
     canMakePrivate,
 } = require('./helpers/pageRules');
 const {
@@ -80,13 +80,6 @@ const readPageMeta = ({ visibility, isWiki, ownerId, reviewDate, agentStatus }) 
  * chosen by the caller.
  */
 const callerId = (req) => String((req && req.uid) || '');
-
-const inVisibleProjects = (visibleIds) => ({
-    $or: [
-        { ProjectID: { $in: visibleIds.map((id) => new mongoose.Types.ObjectId(id)) } },
-        { ProjectID: { $in: [null, undefined] } },
-    ],
-});
 
 const htmlOf = (content) => String((content && content.html) || '');
 
@@ -247,7 +240,8 @@ exports.listPages = async (req, res) => {
         // A private doc belongs to its author alone, and a project's docs to those who can
         // see the project — including a task's linked docs, where they would leak by title.
         const userId = callerId(req);
-        filter.$and = [pageVisibilityFilter(userId), inVisibleProjects(await visibleProjectIds(companyId, userId))];
+        const projectIds = (await visibleProjectIds(companyId, userId)).map((id) => new mongoose.Types.ObjectId(id));
+        Object.assign(filter, pageReachFilter({ uid: userId, projectIds }));
 
         const pages = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
@@ -539,7 +533,7 @@ exports.deletePage = async (req, res) => {
         (all || []).forEach((p) => {
             const parent = p.parentPageId ? String(p.parentPageId) : '';
             if (!parent) return;
-            if (!pageVisibleTo(p, userId) || (p.ProjectID && !visibleProjects.has(String(p.ProjectID)))) return;
+            if (!pageReachedBy(p, { uid: userId, inProject: (projectId) => visibleProjects.has(String(projectId)) })) return;
             if (!childrenOf.has(parent)) childrenOf.set(parent, []);
             childrenOf.get(parent).push(String(p._id));
         });
