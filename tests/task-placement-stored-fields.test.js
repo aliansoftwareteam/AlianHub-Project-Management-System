@@ -171,8 +171,7 @@ const bulkDuplicateBody = () => ({ action: 'bulkDuplicate', taskIds: [OPEN_TASK]
 /* The list a task lands in comes from the request. */
 const PLACED_FROM_THE_BODY = [
     [CREATE, 'create', createBody],
-    [IMPORT, 'createMultipleTasks', importBody],
-    [PATCH, 'createSubTaskWithAi', placedInWholeList(PATCH, 'createSubTaskWithAi')],
+    [PATCH, 'createSubTaskWithAi', placedInWholeList(PATCH, 'createSubTaskWithAi', { type: 'task', parentTask: { ProjectID: OPEN_PROJECT } })],
     [PATCH, 'convertToTask', placedInWholeList(PATCH, 'convertToTask')],
     [PATCH, 'moveTask', placedInWholeList(PATCH, 'moveTask')],
     [PATCH, 'duplicateTask', placedInWholeList(PATCH, 'duplicateTask')],
@@ -180,8 +179,10 @@ const PLACED_FROM_THE_BODY = [
     [BULK, 'bulkConvertToTask', placedInWholeList(BULK, 'bulkConvertToTask', { taskIds: [SUB_TASK] })],
     [BULK, 'bulkDuplicate', bulkDuplicateBody],
 ];
-/* The list comes from a stored task or from the list the action creates. */
+/* The list comes from a stored task, from the stored list an import names or from the list the action creates. */
 const PLACED_FROM_STORED_DATA = [
+    [IMPORT, 'createMultipleTasks', importBody],
+    [PATCH, 'createSubTaskWithAi', placedInWholeList(PATCH, 'createSubTaskWithAi')],
     [PATCH, 'convertToSubTask', () => fixture(PATCH, 'convertToSubTask')],
     [PATCH, 'convertToList', () => ({ ...fixture(PATCH, 'convertToList'), isSubTask: true, sprintObj: wholeList({ _id: SPRINT, id: SPRINT }), folderData: { folderId: FOLDER, name: 'Design', sprintsObj: { [SPRINT]: wholeList() } } })],
     [PATCH, 'mergeTask', () => ({ ...fixture(PATCH, 'mergeTask'), isSubTask: true })],
@@ -252,8 +253,9 @@ describe('the list a task write names', () => {
     });
 
     test('carries a folder name only with a folder id', () => {
-        expect(prepared('bulkMove', { taskIds: [OPEN_TASK], sprintObj: { id: OTHER_SPRINT, name: 'Sprint 2', folderId: '', folderName: 'Design' } }).sprintObj).toEqual({ id: OTHER_SPRINT, name: 'Sprint 2' });
-        expect(prepared('bulkMove', { taskIds: [OPEN_TASK], sprintObj: { id: OTHER_SPRINT, name: 'Sprint 2', folderId: FOLDER } }).sprintObj).toEqual({ id: OTHER_SPRINT, name: 'Sprint 2', folderId: FOLDER, folderName: '' });
+        expect(prepared('bulkMove', { taskIds: [OPEN_TASK], sprintObj: { id: OTHER_SPRINT, name: 'Sprint 2', folderId: '', folderName: 'Design' } }).sprintObj).toEqual({ id: OTHER_SPRINT, name: 'Sprint 2', folderId: '' });
+        expect(prepared('bulkMove', { taskIds: [OPEN_TASK], sprintObj: { id: OTHER_SPRINT, name: 'Sprint 2', folderId: null, tasks: 4 } }).sprintObj).toEqual({ id: OTHER_SPRINT, name: 'Sprint 2', folderId: null });
+        expect(prepared('bulkMove', { taskIds: [OPEN_TASK], sprintObj: { id: OTHER_SPRINT, name: 'Sprint 2', folderId: FOLDER } }).sprintObj).toEqual({ id: OTHER_SPRINT, name: 'Sprint 2', folderId: FOLDER });
     });
 
     test('is left for the handler to refuse when none is sent', () => {
