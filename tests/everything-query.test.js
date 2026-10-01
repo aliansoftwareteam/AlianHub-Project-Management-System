@@ -434,7 +434,7 @@ describe('a role that is denied the task list', () => {
 describe('what a role may change in a project\'s rows', () => {
     const MEMBER_ROLE = 3;
     const rules = (permissions, projectId) => {
-        const parent = { _id: `task-${projectId || 'company'}`, key: 'task', isParent: true, roles: [{ key: MEMBER_ROLE, permission: true }] };
+        const parent = { _id: `task-${projectId || 'company'}`, key: 'task', isParent: true, projectId, roles: [{ key: MEMBER_ROLE, permission: true }] };
         return [parent, ...Object.entries(permissions).map(([key, permission]) => ({ _id: `${key}-${projectId || 'company'}`, key, isParent: false, parentId: parent._id, projectId, roles: [{ key: MEMBER_ROLE, permission }] }))];
     };
     const ALL = { task_list: true, task_status: true, task_priority: true };

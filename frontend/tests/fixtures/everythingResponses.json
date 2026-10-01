@@ -1,0 +1,1996 @@
+{
+  "all": {
+    "request": {
+      "limit": 3,
+      "filter": {
+        "statusType": [
+          "default_active",
+          "active"
+        ]
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Tasks fetched successfully.",
+      "data": {
+        "rows": [
+          {
+            "_id": "6f0000000000000000000f05",
+            "TaskName": "Rotate the keys",
+            "TaskKey": "OPS-5",
+            "status": {
+              "key": 2,
+              "text": "Doing",
+              "type": "active"
+            },
+            "statusKey": 2,
+            "statusType": "active",
+            "Task_Priority": "HIGH",
+            "AssigneeUserId": [
+              "6f0000000000000000000001"
+            ],
+            "ProjectID": "6f0000000000000000000a02",
+            "sprintId": "6f0000000000000000000b01",
+            "folderObjId": "6f0000000000000000000d01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-05T09:00:00.000Z"
+          },
+          {
+            "_id": "6f0000000000000000000f04",
+            "TaskName": "Renew the domain",
+            "TaskKey": "OPS-4",
+            "status": {
+              "key": 1,
+              "text": "To Do",
+              "type": "default_active"
+            },
+            "statusKey": 1,
+            "statusType": "default_active",
+            "Task_Priority": "LOW",
+            "AssigneeUserId": [],
+            "DueDate": "2026-10-20T18:29:59.000Z",
+            "ProjectID": "6f0000000000000000000a02",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-04T09:00:00.000Z"
+          },
+          {
+            "_id": "6f0000000000000000000f03",
+            "TaskName": "Fix the footer",
+            "TaskKey": "WEB-3",
+            "status": {
+              "key": 2,
+              "text": "Doing",
+              "type": "active"
+            },
+            "statusKey": 2,
+            "statusType": "active",
+            "Task_Priority": "MEDIUM",
+            "AssigneeUserId": [
+              "6f0000000000000000000002"
+            ],
+            "DueDate": "2026-10-03T18:29:59.000Z",
+            "ProjectID": "6f0000000000000000000a01",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "bug",
+            "TaskTypeKey": 2,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-03T09:00:00.000Z"
+          }
+        ],
+        "groups": [
+          {
+            "key": null,
+            "count": 5
+          }
+        ],
+        "nextCursor": "eyJ2IjoxNzkxMDE4MDAwMDAwLCJpIjoiNmYwMDAwMDAwMDAwMDAwMDAwMDAwZjAzIiwicSI6IlgxM0dYdXFEOVhuMHdHcVlKOEp2RDl2MGxLUUF2WWhMUUFiT1RDVHBBYjQifQ.FIeGjky6GRevWz7_-tpRFM3igZWbxGsHG1ABdZ4yUxI",
+        "projects": {
+          "6f0000000000000000000a01": {
+            "_id": "6f0000000000000000000a01",
+            "ProjectName": "Website",
+            "ProjectCode": "WEB",
+            "projectIcon": {
+              "type": "color",
+              "data": "#2F3990"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [
+              {
+                "key": "Priority"
+              }
+            ],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          },
+          "6f0000000000000000000a02": {
+            "_id": "6f0000000000000000000a02",
+            "ProjectName": "Operations",
+            "ProjectCode": "OPS",
+            "projectIcon": {
+              "type": "color",
+              "data": "#7B68EE"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "allNext": {
+    "request": {
+      "limit": 3,
+      "filter": {
+        "statusType": [
+          "default_active",
+          "active"
+        ]
+      },
+      "cursor": "eyJ2IjoxNzkxMDE4MDAwMDAwLCJpIjoiNmYwMDAwMDAwMDAwMDAwMDAwMDAwZjAzIiwicSI6IlgxM0dYdXFEOVhuMHdHcVlKOEp2RDl2MGxLUUF2WWhMUUFiT1RDVHBBYjQifQ.FIeGjky6GRevWz7_-tpRFM3igZWbxGsHG1ABdZ4yUxI"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Tasks fetched successfully.",
+      "data": {
+        "rows": [
+          {
+            "_id": "6f0000000000000000000f02",
+            "TaskName": "Draw the home page",
+            "TaskKey": "WEB-2",
+            "status": {
+              "key": 2,
+              "text": "Doing",
+              "type": "active"
+            },
+            "statusKey": 2,
+            "statusType": "active",
+            "Task_Priority": "MEDIUM",
+            "AssigneeUserId": [
+              "6f0000000000000000000001",
+              "6f0000000000000000000002"
+            ],
+            "DueDate": "2026-10-01T18:29:59.000Z",
+            "ProjectID": "6f0000000000000000000a01",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 2,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-02T09:00:00.000Z"
+          },
+          {
+            "_id": "6f0000000000000000000f01",
+            "TaskName": "Write the brief",
+            "TaskKey": "WEB-1",
+            "status": {
+              "key": 1,
+              "text": "To Do",
+              "type": "default_active"
+            },
+            "statusKey": 1,
+            "statusType": "default_active",
+            "Task_Priority": "HIGH",
+            "AssigneeUserId": [
+              "6f0000000000000000000001"
+            ],
+            "DueDate": "2026-09-28T18:29:59.000Z",
+            "ProjectID": "6f0000000000000000000a01",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-01T09:00:00.000Z"
+          }
+        ],
+        "groups": null,
+        "nextCursor": null,
+        "projects": {
+          "6f0000000000000000000a01": {
+            "_id": "6f0000000000000000000a01",
+            "ProjectName": "Website",
+            "ProjectCode": "WEB",
+            "projectIcon": {
+              "type": "color",
+              "data": "#2F3990"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [
+              {
+                "key": "Priority"
+              }
+            ],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "withDone": {
+    "request": {
+      "limit": 50
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Tasks fetched successfully.",
+      "data": {
+        "rows": [
+          {
+            "_id": "6f0000000000000000000f06",
+            "TaskName": "Archive last year",
+            "TaskKey": "OPS-6",
+            "status": {
+              "key": 3,
+              "text": "Done",
+              "type": "close"
+            },
+            "statusKey": 3,
+            "statusType": "close",
+            "Task_Priority": "MEDIUM",
+            "AssigneeUserId": [
+              "6f0000000000000000000001"
+            ],
+            "ProjectID": "6f0000000000000000000a02",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-06T09:00:00.000Z"
+          },
+          {
+            "_id": "6f0000000000000000000f05",
+            "TaskName": "Rotate the keys",
+            "TaskKey": "OPS-5",
+            "status": {
+              "key": 2,
+              "text": "Doing",
+              "type": "active"
+            },
+            "statusKey": 2,
+            "statusType": "active",
+            "Task_Priority": "HIGH",
+            "AssigneeUserId": [
+              "6f0000000000000000000001"
+            ],
+            "ProjectID": "6f0000000000000000000a02",
+            "sprintId": "6f0000000000000000000b01",
+            "folderObjId": "6f0000000000000000000d01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-05T09:00:00.000Z"
+          },
+          {
+            "_id": "6f0000000000000000000f04",
+            "TaskName": "Renew the domain",
+            "TaskKey": "OPS-4",
+            "status": {
+              "key": 1,
+              "text": "To Do",
+              "type": "default_active"
+            },
+            "statusKey": 1,
+            "statusType": "default_active",
+            "Task_Priority": "LOW",
+            "AssigneeUserId": [],
+            "DueDate": "2026-10-20T18:29:59.000Z",
+            "ProjectID": "6f0000000000000000000a02",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-04T09:00:00.000Z"
+          },
+          {
+            "_id": "6f0000000000000000000f03",
+            "TaskName": "Fix the footer",
+            "TaskKey": "WEB-3",
+            "status": {
+              "key": 2,
+              "text": "Doing",
+              "type": "active"
+            },
+            "statusKey": 2,
+            "statusType": "active",
+            "Task_Priority": "MEDIUM",
+            "AssigneeUserId": [
+              "6f0000000000000000000002"
+            ],
+            "DueDate": "2026-10-03T18:29:59.000Z",
+            "ProjectID": "6f0000000000000000000a01",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "bug",
+            "TaskTypeKey": 2,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-03T09:00:00.000Z"
+          },
+          {
+            "_id": "6f0000000000000000000f02",
+            "TaskName": "Draw the home page",
+            "TaskKey": "WEB-2",
+            "status": {
+              "key": 2,
+              "text": "Doing",
+              "type": "active"
+            },
+            "statusKey": 2,
+            "statusType": "active",
+            "Task_Priority": "MEDIUM",
+            "AssigneeUserId": [
+              "6f0000000000000000000001",
+              "6f0000000000000000000002"
+            ],
+            "DueDate": "2026-10-01T18:29:59.000Z",
+            "ProjectID": "6f0000000000000000000a01",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 2,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-02T09:00:00.000Z"
+          },
+          {
+            "_id": "6f0000000000000000000f01",
+            "TaskName": "Write the brief",
+            "TaskKey": "WEB-1",
+            "status": {
+              "key": 1,
+              "text": "To Do",
+              "type": "default_active"
+            },
+            "statusKey": 1,
+            "statusType": "default_active",
+            "Task_Priority": "HIGH",
+            "AssigneeUserId": [
+              "6f0000000000000000000001"
+            ],
+            "DueDate": "2026-09-28T18:29:59.000Z",
+            "ProjectID": "6f0000000000000000000a01",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-01T09:00:00.000Z"
+          }
+        ],
+        "groups": [
+          {
+            "key": null,
+            "count": 6
+          }
+        ],
+        "nextCursor": null,
+        "projects": {
+          "6f0000000000000000000a01": {
+            "_id": "6f0000000000000000000a01",
+            "ProjectName": "Website",
+            "ProjectCode": "WEB",
+            "projectIcon": {
+              "type": "color",
+              "data": "#2F3990"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [
+              {
+                "key": "Priority"
+              }
+            ],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          },
+          "6f0000000000000000000a02": {
+            "_id": "6f0000000000000000000a02",
+            "ProjectName": "Operations",
+            "ProjectCode": "OPS",
+            "projectIcon": {
+              "type": "color",
+              "data": "#7B68EE"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "withSubtasks": {
+    "request": {
+      "limit": 50,
+      "includeSubtasks": true
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Tasks fetched successfully.",
+      "data": {
+        "rows": [
+          {
+            "_id": "6f0000000000000000000f07",
+            "TaskName": "Pick the fonts",
+            "TaskKey": "WEB-7",
+            "status": {
+              "key": 1,
+              "text": "To Do",
+              "type": "default_active"
+            },
+            "statusKey": 1,
+            "statusType": "default_active",
+            "Task_Priority": "MEDIUM",
+            "AssigneeUserId": [
+              "6f0000000000000000000001"
+            ],
+            "ProjectID": "6f0000000000000000000a01",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "ancestors": [
+              "6f0000000000000000000f02"
+            ],
+            "ParentTaskId": "6f0000000000000000000f02",
+            "isParentTask": false,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-07T09:00:00.000Z"
+          },
+          {
+            "_id": "6f0000000000000000000f06",
+            "TaskName": "Archive last year",
+            "TaskKey": "OPS-6",
+            "status": {
+              "key": 3,
+              "text": "Done",
+              "type": "close"
+            },
+            "statusKey": 3,
+            "statusType": "close",
+            "Task_Priority": "MEDIUM",
+            "AssigneeUserId": [
+              "6f0000000000000000000001"
+            ],
+            "ProjectID": "6f0000000000000000000a02",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-06T09:00:00.000Z"
+          },
+          {
+            "_id": "6f0000000000000000000f05",
+            "TaskName": "Rotate the keys",
+            "TaskKey": "OPS-5",
+            "status": {
+              "key": 2,
+              "text": "Doing",
+              "type": "active"
+            },
+            "statusKey": 2,
+            "statusType": "active",
+            "Task_Priority": "HIGH",
+            "AssigneeUserId": [
+              "6f0000000000000000000001"
+            ],
+            "ProjectID": "6f0000000000000000000a02",
+            "sprintId": "6f0000000000000000000b01",
+            "folderObjId": "6f0000000000000000000d01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-05T09:00:00.000Z"
+          },
+          {
+            "_id": "6f0000000000000000000f04",
+            "TaskName": "Renew the domain",
+            "TaskKey": "OPS-4",
+            "status": {
+              "key": 1,
+              "text": "To Do",
+              "type": "default_active"
+            },
+            "statusKey": 1,
+            "statusType": "default_active",
+            "Task_Priority": "LOW",
+            "AssigneeUserId": [],
+            "DueDate": "2026-10-20T18:29:59.000Z",
+            "ProjectID": "6f0000000000000000000a02",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-04T09:00:00.000Z"
+          },
+          {
+            "_id": "6f0000000000000000000f03",
+            "TaskName": "Fix the footer",
+            "TaskKey": "WEB-3",
+            "status": {
+              "key": 2,
+              "text": "Doing",
+              "type": "active"
+            },
+            "statusKey": 2,
+            "statusType": "active",
+            "Task_Priority": "MEDIUM",
+            "AssigneeUserId": [
+              "6f0000000000000000000002"
+            ],
+            "DueDate": "2026-10-03T18:29:59.000Z",
+            "ProjectID": "6f0000000000000000000a01",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "bug",
+            "TaskTypeKey": 2,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-03T09:00:00.000Z"
+          },
+          {
+            "_id": "6f0000000000000000000f02",
+            "TaskName": "Draw the home page",
+            "TaskKey": "WEB-2",
+            "status": {
+              "key": 2,
+              "text": "Doing",
+              "type": "active"
+            },
+            "statusKey": 2,
+            "statusType": "active",
+            "Task_Priority": "MEDIUM",
+            "AssigneeUserId": [
+              "6f0000000000000000000001",
+              "6f0000000000000000000002"
+            ],
+            "DueDate": "2026-10-01T18:29:59.000Z",
+            "ProjectID": "6f0000000000000000000a01",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 2,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-02T09:00:00.000Z"
+          },
+          {
+            "_id": "6f0000000000000000000f01",
+            "TaskName": "Write the brief",
+            "TaskKey": "WEB-1",
+            "status": {
+              "key": 1,
+              "text": "To Do",
+              "type": "default_active"
+            },
+            "statusKey": 1,
+            "statusType": "default_active",
+            "Task_Priority": "HIGH",
+            "AssigneeUserId": [
+              "6f0000000000000000000001"
+            ],
+            "DueDate": "2026-09-28T18:29:59.000Z",
+            "ProjectID": "6f0000000000000000000a01",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-01T09:00:00.000Z"
+          }
+        ],
+        "groups": [
+          {
+            "key": null,
+            "count": 7
+          }
+        ],
+        "nextCursor": null,
+        "projects": {
+          "6f0000000000000000000a01": {
+            "_id": "6f0000000000000000000a01",
+            "ProjectName": "Website",
+            "ProjectCode": "WEB",
+            "projectIcon": {
+              "type": "color",
+              "data": "#2F3990"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [
+              {
+                "key": "Priority"
+              }
+            ],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          },
+          "6f0000000000000000000a02": {
+            "_id": "6f0000000000000000000a02",
+            "ProjectName": "Operations",
+            "ProjectCode": "OPS",
+            "projectIcon": {
+              "type": "color",
+              "data": "#7B68EE"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "byStatus": {
+    "request": {
+      "group": "status",
+      "limit": 1,
+      "filter": {
+        "statusType": [
+          "default_active",
+          "active"
+        ]
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Tasks fetched successfully.",
+      "data": {
+        "rows": [
+          {
+            "_id": "6f0000000000000000000f05",
+            "TaskName": "Rotate the keys",
+            "TaskKey": "OPS-5",
+            "status": {
+              "key": 2,
+              "text": "Doing",
+              "type": "active"
+            },
+            "statusKey": 2,
+            "statusType": "active",
+            "Task_Priority": "HIGH",
+            "AssigneeUserId": [
+              "6f0000000000000000000001"
+            ],
+            "ProjectID": "6f0000000000000000000a02",
+            "sprintId": "6f0000000000000000000b01",
+            "folderObjId": "6f0000000000000000000d01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-05T09:00:00.000Z"
+          }
+        ],
+        "groups": [
+          {
+            "key": "Doing",
+            "count": 3
+          },
+          {
+            "key": "To Do",
+            "count": 2
+          }
+        ],
+        "nextCursor": "eyJ2IjoxNzkxMTkwODAwMDAwLCJpIjoiNmYwMDAwMDAwMDAwMDAwMDAwMDAwZjA1IiwicSI6IlgxM0dYdXFEOVhuMHdHcVlKOEp2RDl2MGxLUUF2WWhMUUFiT1RDVHBBYjQifQ.3TcvvTWygIv0IaRctN28gFgG8s6F2Xf_2AEvMhmwRck",
+        "projects": {
+          "6f0000000000000000000a02": {
+            "_id": "6f0000000000000000000a02",
+            "ProjectName": "Operations",
+            "ProjectCode": "OPS",
+            "projectIcon": {
+              "type": "color",
+              "data": "#7B68EE"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "statusDoing": {
+    "request": {
+      "limit": 2,
+      "filter": {
+        "statusType": [
+          "default_active",
+          "active"
+        ],
+        "status": [
+          "Doing"
+        ]
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Tasks fetched successfully.",
+      "data": {
+        "rows": [
+          {
+            "_id": "6f0000000000000000000f05",
+            "TaskName": "Rotate the keys",
+            "TaskKey": "OPS-5",
+            "status": {
+              "key": 2,
+              "text": "Doing",
+              "type": "active"
+            },
+            "statusKey": 2,
+            "statusType": "active",
+            "Task_Priority": "HIGH",
+            "AssigneeUserId": [
+              "6f0000000000000000000001"
+            ],
+            "ProjectID": "6f0000000000000000000a02",
+            "sprintId": "6f0000000000000000000b01",
+            "folderObjId": "6f0000000000000000000d01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-05T09:00:00.000Z"
+          },
+          {
+            "_id": "6f0000000000000000000f03",
+            "TaskName": "Fix the footer",
+            "TaskKey": "WEB-3",
+            "status": {
+              "key": 2,
+              "text": "Doing",
+              "type": "active"
+            },
+            "statusKey": 2,
+            "statusType": "active",
+            "Task_Priority": "MEDIUM",
+            "AssigneeUserId": [
+              "6f0000000000000000000002"
+            ],
+            "DueDate": "2026-10-03T18:29:59.000Z",
+            "ProjectID": "6f0000000000000000000a01",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "bug",
+            "TaskTypeKey": 2,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-03T09:00:00.000Z"
+          }
+        ],
+        "groups": [
+          {
+            "key": null,
+            "count": 3
+          }
+        ],
+        "nextCursor": "eyJ2IjoxNzkxMDE4MDAwMDAwLCJpIjoiNmYwMDAwMDAwMDAwMDAwMDAwMDAwZjAzIiwicSI6IjlOb0FjelVtSEtadDJOWjBCTjVMWmp5QmozRmNiR0NFYUYxNkpvdHhSVW8ifQ.FMZ_LGpKMALoHoHKrgBk8wsrde8i2PS5XoDW6DfHKh4",
+        "projects": {
+          "6f0000000000000000000a01": {
+            "_id": "6f0000000000000000000a01",
+            "ProjectName": "Website",
+            "ProjectCode": "WEB",
+            "projectIcon": {
+              "type": "color",
+              "data": "#2F3990"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [
+              {
+                "key": "Priority"
+              }
+            ],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          },
+          "6f0000000000000000000a02": {
+            "_id": "6f0000000000000000000a02",
+            "ProjectName": "Operations",
+            "ProjectCode": "OPS",
+            "projectIcon": {
+              "type": "color",
+              "data": "#7B68EE"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "statusDoingNext": {
+    "request": {
+      "limit": 2,
+      "filter": {
+        "statusType": [
+          "default_active",
+          "active"
+        ],
+        "status": [
+          "Doing"
+        ]
+      },
+      "cursor": "eyJ2IjoxNzkxMDE4MDAwMDAwLCJpIjoiNmYwMDAwMDAwMDAwMDAwMDAwMDAwZjAzIiwicSI6IjlOb0FjelVtSEtadDJOWjBCTjVMWmp5QmozRmNiR0NFYUYxNkpvdHhSVW8ifQ.FMZ_LGpKMALoHoHKrgBk8wsrde8i2PS5XoDW6DfHKh4"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Tasks fetched successfully.",
+      "data": {
+        "rows": [
+          {
+            "_id": "6f0000000000000000000f02",
+            "TaskName": "Draw the home page",
+            "TaskKey": "WEB-2",
+            "status": {
+              "key": 2,
+              "text": "Doing",
+              "type": "active"
+            },
+            "statusKey": 2,
+            "statusType": "active",
+            "Task_Priority": "MEDIUM",
+            "AssigneeUserId": [
+              "6f0000000000000000000001",
+              "6f0000000000000000000002"
+            ],
+            "DueDate": "2026-10-01T18:29:59.000Z",
+            "ProjectID": "6f0000000000000000000a01",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 2,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-02T09:00:00.000Z"
+          }
+        ],
+        "groups": null,
+        "nextCursor": null,
+        "projects": {
+          "6f0000000000000000000a01": {
+            "_id": "6f0000000000000000000a01",
+            "ProjectName": "Website",
+            "ProjectCode": "WEB",
+            "projectIcon": {
+              "type": "color",
+              "data": "#2F3990"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [
+              {
+                "key": "Priority"
+              }
+            ],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "statusToDo": {
+    "request": {
+      "limit": 2,
+      "filter": {
+        "statusType": [
+          "default_active",
+          "active"
+        ],
+        "status": [
+          "To Do"
+        ]
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Tasks fetched successfully.",
+      "data": {
+        "rows": [
+          {
+            "_id": "6f0000000000000000000f04",
+            "TaskName": "Renew the domain",
+            "TaskKey": "OPS-4",
+            "status": {
+              "key": 1,
+              "text": "To Do",
+              "type": "default_active"
+            },
+            "statusKey": 1,
+            "statusType": "default_active",
+            "Task_Priority": "LOW",
+            "AssigneeUserId": [],
+            "DueDate": "2026-10-20T18:29:59.000Z",
+            "ProjectID": "6f0000000000000000000a02",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-04T09:00:00.000Z"
+          },
+          {
+            "_id": "6f0000000000000000000f01",
+            "TaskName": "Write the brief",
+            "TaskKey": "WEB-1",
+            "status": {
+              "key": 1,
+              "text": "To Do",
+              "type": "default_active"
+            },
+            "statusKey": 1,
+            "statusType": "default_active",
+            "Task_Priority": "HIGH",
+            "AssigneeUserId": [
+              "6f0000000000000000000001"
+            ],
+            "DueDate": "2026-09-28T18:29:59.000Z",
+            "ProjectID": "6f0000000000000000000a01",
+            "sprintId": "6f0000000000000000000b01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-01T09:00:00.000Z"
+          }
+        ],
+        "groups": [
+          {
+            "key": null,
+            "count": 2
+          }
+        ],
+        "nextCursor": null,
+        "projects": {
+          "6f0000000000000000000a01": {
+            "_id": "6f0000000000000000000a01",
+            "ProjectName": "Website",
+            "ProjectCode": "WEB",
+            "projectIcon": {
+              "type": "color",
+              "data": "#2F3990"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [
+              {
+                "key": "Priority"
+              }
+            ],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          },
+          "6f0000000000000000000a02": {
+            "_id": "6f0000000000000000000a02",
+            "ProjectName": "Operations",
+            "ProjectCode": "OPS",
+            "projectIcon": {
+              "type": "color",
+              "data": "#7B68EE"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "byProject": {
+    "request": {
+      "group": "project",
+      "limit": 1,
+      "filter": {
+        "statusType": [
+          "default_active",
+          "active"
+        ]
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Tasks fetched successfully.",
+      "data": {
+        "rows": [
+          {
+            "_id": "6f0000000000000000000f05",
+            "TaskName": "Rotate the keys",
+            "TaskKey": "OPS-5",
+            "status": {
+              "key": 2,
+              "text": "Doing",
+              "type": "active"
+            },
+            "statusKey": 2,
+            "statusType": "active",
+            "Task_Priority": "HIGH",
+            "AssigneeUserId": [
+              "6f0000000000000000000001"
+            ],
+            "ProjectID": "6f0000000000000000000a02",
+            "sprintId": "6f0000000000000000000b01",
+            "folderObjId": "6f0000000000000000000d01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-05T09:00:00.000Z"
+          }
+        ],
+        "groups": [
+          {
+            "key": "6f0000000000000000000a01",
+            "count": 3
+          },
+          {
+            "key": "6f0000000000000000000a02",
+            "count": 2
+          }
+        ],
+        "nextCursor": "eyJ2IjoxNzkxMTkwODAwMDAwLCJpIjoiNmYwMDAwMDAwMDAwMDAwMDAwMDAwZjA1IiwicSI6IlgxM0dYdXFEOVhuMHdHcVlKOEp2RDl2MGxLUUF2WWhMUUFiT1RDVHBBYjQifQ.3TcvvTWygIv0IaRctN28gFgG8s6F2Xf_2AEvMhmwRck",
+        "projects": {
+          "6f0000000000000000000a01": {
+            "_id": "6f0000000000000000000a01",
+            "ProjectName": "Website",
+            "ProjectCode": "WEB",
+            "projectIcon": {
+              "type": "color",
+              "data": "#2F3990"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [
+              {
+                "key": "Priority"
+              }
+            ],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          },
+          "6f0000000000000000000a02": {
+            "_id": "6f0000000000000000000a02",
+            "ProjectName": "Operations",
+            "ProjectCode": "OPS",
+            "projectIcon": {
+              "type": "color",
+              "data": "#7B68EE"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "byPriority": {
+    "request": {
+      "group": "priority",
+      "limit": 1,
+      "filter": {
+        "statusType": [
+          "default_active",
+          "active"
+        ]
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Tasks fetched successfully.",
+      "data": {
+        "rows": [
+          {
+            "_id": "6f0000000000000000000f05",
+            "TaskName": "Rotate the keys",
+            "TaskKey": "OPS-5",
+            "status": {
+              "key": 2,
+              "text": "Doing",
+              "type": "active"
+            },
+            "statusKey": 2,
+            "statusType": "active",
+            "Task_Priority": "HIGH",
+            "AssigneeUserId": [
+              "6f0000000000000000000001"
+            ],
+            "ProjectID": "6f0000000000000000000a02",
+            "sprintId": "6f0000000000000000000b01",
+            "folderObjId": "6f0000000000000000000d01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-05T09:00:00.000Z"
+          }
+        ],
+        "groups": [
+          {
+            "key": "HIGH",
+            "count": 2
+          },
+          {
+            "key": "LOW",
+            "count": 1
+          },
+          {
+            "key": "MEDIUM",
+            "count": 2
+          }
+        ],
+        "nextCursor": "eyJ2IjoxNzkxMTkwODAwMDAwLCJpIjoiNmYwMDAwMDAwMDAwMDAwMDAwMDAwZjA1IiwicSI6IlgxM0dYdXFEOVhuMHdHcVlKOEp2RDl2MGxLUUF2WWhMUUFiT1RDVHBBYjQifQ.3TcvvTWygIv0IaRctN28gFgG8s6F2Xf_2AEvMhmwRck",
+        "projects": {
+          "6f0000000000000000000a02": {
+            "_id": "6f0000000000000000000a02",
+            "ProjectName": "Operations",
+            "ProjectCode": "OPS",
+            "projectIcon": {
+              "type": "color",
+              "data": "#7B68EE"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "byDueDate": {
+    "request": {
+      "group": "dueDate",
+      "limit": 1,
+      "timezone": "Asia/Kolkata",
+      "filter": {
+        "statusType": [
+          "default_active",
+          "active"
+        ]
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Tasks fetched successfully.",
+      "data": {
+        "rows": [
+          {
+            "_id": "6f0000000000000000000f05",
+            "TaskName": "Rotate the keys",
+            "TaskKey": "OPS-5",
+            "status": {
+              "key": 2,
+              "text": "Doing",
+              "type": "active"
+            },
+            "statusKey": 2,
+            "statusType": "active",
+            "Task_Priority": "HIGH",
+            "AssigneeUserId": [
+              "6f0000000000000000000001"
+            ],
+            "ProjectID": "6f0000000000000000000a02",
+            "sprintId": "6f0000000000000000000b01",
+            "folderObjId": "6f0000000000000000000d01",
+            "TaskType": "task",
+            "TaskTypeKey": 1,
+            "tagsArray": [],
+            "subTasks": 0,
+            "isParentTask": true,
+            "createdAt": "2026-09-01T09:00:00.000Z",
+            "updatedAt": "2026-10-05T09:00:00.000Z"
+          }
+        ],
+        "groups": [
+          {
+            "key": null,
+            "count": 1
+          },
+          {
+            "key": "2026-09-28",
+            "count": 1
+          },
+          {
+            "key": "2026-10-01",
+            "count": 1
+          },
+          {
+            "key": "2026-10-03",
+            "count": 1
+          },
+          {
+            "key": "2026-10-20",
+            "count": 1
+          }
+        ],
+        "nextCursor": "eyJ2IjoxNzkxMTkwODAwMDAwLCJpIjoiNmYwMDAwMDAwMDAwMDAwMDAwMDAwZjA1IiwicSI6IlgxM0dYdXFEOVhuMHdHcVlKOEp2RDl2MGxLUUF2WWhMUUFiT1RDVHBBYjQifQ.3TcvvTWygIv0IaRctN28gFgG8s6F2Xf_2AEvMhmwRck",
+        "projects": {
+          "6f0000000000000000000a02": {
+            "_id": "6f0000000000000000000a02",
+            "ProjectName": "Operations",
+            "ProjectCode": "OPS",
+            "projectIcon": {
+              "type": "color",
+              "data": "#7B68EE"
+            },
+            "taskStatusData": [
+              {
+                "key": 1,
+                "name": "To Do",
+                "type": "default_active",
+                "bgColor": "#6b728035",
+                "textColor": "#6b7280"
+              },
+              {
+                "key": 2,
+                "name": "Doing",
+                "type": "active",
+                "bgColor": "#2563eb35",
+                "textColor": "#2563eb"
+              },
+              {
+                "key": 3,
+                "name": "Done",
+                "type": "close",
+                "bgColor": "#16a34a35",
+                "textColor": "#16a34a"
+              }
+            ],
+            "taskTypeCounts": [
+              {
+                "key": 1,
+                "name": "Task",
+                "value": "task"
+              },
+              {
+                "key": 2,
+                "name": "Bug",
+                "value": "bug"
+              }
+            ],
+            "apps": [],
+            "statusType": "active",
+            "isPersonal": false,
+            "edit": {
+              "status": true,
+              "priority": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "nothing": {
+    "request": {
+      "limit": 50,
+      "filter": {
+        "statusType": [
+          "default_active",
+          "active"
+        ],
+        "search": "nothing is called this"
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Tasks fetched successfully.",
+      "data": {
+        "rows": [],
+        "groups": [
+          {
+            "key": null,
+            "count": 0
+          }
+        ],
+        "nextCursor": null,
+        "projects": {}
+      }
+    }
+  },
+  "staleCursor": {
+    "request": {
+      "limit": 2,
+      "filter": {
+        "statusType": [
+          "default_active",
+          "active"
+        ],
+        "status": [
+          "To Do"
+        ]
+      },
+      "cursor": "eyJ2IjoxNzkxMDE4MDAwMDAwLCJpIjoiNmYwMDAwMDAwMDAwMDAwMDAwMDAwZjAzIiwicSI6IjlOb0FjelVtSEtadDJOWjBCTjVMWmp5QmozRmNiR0NFYUYxNkpvdHhSVW8ifQ.FMZ_LGpKMALoHoHKrgBk8wsrde8i2PS5XoDW6DfHKh4"
+    },
+    "statusCode": 400,
+    "response": {
+      "status": false,
+      "statusText": "Request refused",
+      "message": "cursor is not valid for this request",
+      "field": "cursor"
+    }
+  }
+}
