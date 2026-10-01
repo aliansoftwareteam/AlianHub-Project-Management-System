@@ -24,7 +24,6 @@ vi.mock('@/services', () => ({
         return sent.answer ? sent.answer({ method, url, body }) : Promise.resolve({ status: 200, data: [{ result: [], count: [] }] });
     })
 }));
-vi.mock('../../src/services/index', async () => import('@/services'));
 vi.mock('vue-toast-notification', () => ({ useToast: () => toast }));
 vi.mock('@/composable/useUndoToast', () => ({ showUndoToast: vi.fn() }));
 vi.mock('@/views/Projects/helper.js', () => ({
