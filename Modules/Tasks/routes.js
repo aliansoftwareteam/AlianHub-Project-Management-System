@@ -2,6 +2,7 @@ const {task} = require('./helpers/task_class');
 const {taskMongo} = require('./helpers/task_class_Mongo');
 const tabSyncTaskCtrl = require('./controller/getTabSyncTasks');
 const everythingCtrl = require('./controller/everything');
+const everythingViewsCtrl = require('./controller/everythingViews');
 const advanceFilter = require('./helpers/manageGlobalFilter');
 const getTaskCtrl = require('./helpers/getTasksData');
 const { handleEvents } = require('../Company/eventController');
@@ -95,6 +96,11 @@ exports.init = (app) => {
     });
 
     app.post('/api/v2/tasks/everything', everythingCtrl.listEverything);
+
+    app.get('/api/v2/tasks/everything/views', everythingViewsCtrl.listViews);
+    app.post('/api/v2/tasks/everything/views', everythingViewsCtrl.createView);
+    app.patch('/api/v2/tasks/everything/views/:id', everythingViewsCtrl.updateView);
+    app.delete('/api/v2/tasks/everything/views/:id', everythingViewsCtrl.deleteView);
 
     app.post('/api/v2/tasks/relations', requireTaskActionPermission(RELATION_ACTIONS), async (req, res) => {
         try {
