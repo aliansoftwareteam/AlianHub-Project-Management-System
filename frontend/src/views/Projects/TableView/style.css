@@ -287,6 +287,21 @@
 
 .tv2__empty { display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .tv2__sentinel { height: 1px; }
+.tv2__totals {
+    --tv2-row-tint: transparent;
+    display: grid;
+    grid-template-columns: var(--tv2-cols);
+    gap: var(--tv2-gap);
+    padding: var(--cell-pad-y) var(--tv2-pad-x);
+    align-items: center;
+    border-bottom: 1px solid var(--hairline);
+    background: var(--surface);
+    font: 600 var(--fs-sm, 11.5px)/1.2 var(--font-mono);
+    color: var(--ink);
+}
+.tv2__totals > [role="cell"] { min-width: 0; }
+.tv2__totals-label { color: var(--ink-2); }
+.tv2__totals-cell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
 .tv2__skeleton { height: var(--row-h); border-radius: var(--r-md, 8px); margin: var(--sp-2) var(--tv2-pad-x); }
 
 /* When the columns need more than the screen the Table scrolls sideways, and the checkbox and

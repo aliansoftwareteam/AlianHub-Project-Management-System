@@ -836,13 +836,14 @@ export function taskListHelper() {
             }
         })
     }
-    function getGroupCounts({projectId, sprintId, items, projectData, totals = []}) {
+    function getGroupCounts({projectId, sprintId, items, projectData, totals = [], table = false}) {
         if(permit === null && projectData.isGlobalPermission === false) return Promise.resolve();
         return dispatch("projectData/refreshGroupCounts", {
             pid: projectId,
             sprintId,
             items,
             totals,
+            table,
             userId: userId.value,
             showAllTasks: projectData.isGlobalPermission === false ? permit : true
         });

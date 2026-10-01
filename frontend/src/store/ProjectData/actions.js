@@ -251,13 +251,13 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
 /* The server's count for every group of a sprint, and the totals of the columns named, in one request.
    Socket events can only adjust a count for a task the store holds; for any other change the List asks again. */
 export const refreshGroupCounts = ({state, commit}, payload) => {
-    const {pid, sprintId, items = [], showAllTasks, userId, totals = []} = payload;
-    if(!state.tasks?.[pid]?.sprints?.includes(sprintId) || !items.length) return Promise.resolve();
+    const {pid, sprintId, items = [], showAllTasks, userId, totals = [], table = false} = payload;
+    if(!items.length || (!table && !state.tasks?.[pid]?.sprints?.includes(sprintId))) return Promise.resolve();
 
     return apiRequest('post',`${env.TASK}/find`,{findQuery: groupCountsQuery({ pid, sprintId, items, showAllTasks, userId, totals }), inList: sprintId})
     .then((resp) => {
         if(resp.status !== 200) return;
-        commit('mutateGroupCounts', {
+        commit(table ? 'mutateTableGroupCounts' : 'mutateGroupCounts', {
             pid, sprintId,
             found: readGroupCounts(items, resp.data?.[0]),
             totals: totals.length ? readGroupTotals(items, resp.data?.[0], totals) : null
