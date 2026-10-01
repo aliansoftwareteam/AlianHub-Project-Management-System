@@ -1742,7 +1742,7 @@ export default {
         link_done: "{name} now counts toward {target}.",
         link_loading: "Loading your goals…",
         link_failed: "Your goals could not be loaded.",
-        link_none: "There is no goal you can edit.",
+        link_no_goals: "You have no goals you can edit.",
         sources: "Lists and tasks",
         sources_hint: "Progress is the share of these tasks that are done. A list counts its top-level tasks.",
         sources_none: "No lists or tasks linked yet",

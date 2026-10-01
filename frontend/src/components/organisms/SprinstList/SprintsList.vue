@@ -322,6 +322,7 @@ import MoveToFolderModal from "@/components/molecules/MoveToFolder/MoveToFolderM
 import ListMenu from "@/components/molecules/ListMenu/ListMenu.vue"
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue"
 import { listMenuEntries } from "@/views/Projects/composables/listMenu"
+import { useGoalLinking } from "@/views/Goals/goalLinking"
 import SprintStateChip from "@/components/molecules/SprintScrum/SprintStateChip.vue"
 import SprintSetupModal from "@/components/molecules/SprintScrum/SprintSetupModal.vue"
 import CloseSprintStep from "./CloseSprintStep.vue"
@@ -593,12 +594,14 @@ const startSprint = async () => {
 /* The entries are the ones every place shows a list with; this header keeps its own handlers for the
    ones it had, and the shared menu runs the rest. */
 const sharedListMenu = ref(null);
+const { offered: goalsOffered } = useGoalLinking();
 const listEntries = computed(() => listMenuEntries({
     project: project.value,
     list: props.sprint,
     folders: project.value?.sprintsfolders,
     check: (key) => checkPermission(key, project.value?.isGlobalPermission),
-    archivedView: Boolean(showArchiveVar.value)
+    archivedView: Boolean(showArchiveVar.value),
+    goalsOffered: goalsOffered.value
 }));
 const OWN_LIST_ENTRIES = {
     restore: () => updateItem(0),

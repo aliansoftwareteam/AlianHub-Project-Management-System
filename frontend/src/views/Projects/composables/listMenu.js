@@ -1,6 +1,5 @@
 import { nestedFolders } from "@/utils/folderTree";
 import { treeRoute } from "@/components/molecules/ProjectTree/projectTreeModel";
-import { canCountTowardGoal } from "@/views/Goals/goalLinking";
 
 const ARCHIVED = 2;
 
@@ -31,7 +30,7 @@ export const LIST_MENU = Object.freeze([
     { id: "rename", labelKey: "Projects.rename", icon: "edit", group: "list", shown: ({ rights }) => rights.rename },
     { id: "copy-link", labelKey: "Projects.copy_list_link", icon: "link", group: "list" },
     { id: "move", labelKey: "Projects.move_to_folder_menu", icon: "arrowRight", group: "place", shown: ({ rights, list, hasFolders }) => rights.move && (Boolean(list.folderId) || hasFolders) },
-    { id: "count-toward-goal", labelKey: "Goals.count_toward", icon: "target", group: "place", shown: ({ live, list, editsAGoal }) => live && editsAGoal && list.mainChat !== true },
+    { id: "count-toward-goal", labelKey: "Goals.count_toward", icon: "target", group: "place", shown: ({ live, list, goalsOffered }) => live && goalsOffered && list.mainChat !== true },
     { id: "start-sprint", labelKey: "Scrum.start_sprint", icon: "play", group: "sprint", shown: ({ rights, state }) => rights.scrum && state === "planned" },
     { id: "complete-sprint", labelKey: "Scrum.complete_sprint", icon: "checkSquare", group: "sprint", shown: ({ rights, state }) => rights.scrum && running(state) },
     { id: "sprint-settings", labelKey: ({ state }) => (state === "none" ? "Scrum.make_it_a_sprint" : "Scrum.sprint_settings"), icon: "settings", group: "sprint", shown: ({ rights }) => rights.scrum },
@@ -62,14 +61,15 @@ export function listMenuRights({ project, list, check, archivedView = false }) {
     };
 }
 
-/* `folders` is the project's folders, as the list of documents or the map the project carries. */
-export function listMenuEntries({ project, list, folders = [], check, archivedView = false }) {
+/* `folders` is the project's folders, as the list of documents or the map the project carries.
+   `goalsOffered` is useGoalLinking().offered where the menu is drawn. */
+export function listMenuEntries({ project, list, folders = [], check, archivedView = false, goalsOffered = false }) {
     const context = {
         list: list || {},
         state: sprintState(list),
         hasFolders: nestedFolders(folders).length > 0,
         live: isLive({ project, list, archivedView }),
-        editsAGoal: canCountTowardGoal(),
+        goalsOffered: goalsOffered === true,
         rights: listMenuRights({ project, list, check, archivedView })
     };
     let group = null;

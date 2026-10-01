@@ -8,6 +8,7 @@ const visibility = require('./visibility');
 const manageFlag = require('./manageFlag');
 const manageTools = require('./manageTools');
 const workTools = require('./workTools');
+const goalTokens = require('../Goals/goalTokens');
 
 // An approved MCP proposal runs as the token's person, not as the approver, so
 // approval re-asks everything the original call was asked and adds the
@@ -26,6 +27,7 @@ const targetOf = (params = {}) => {
     if (params.projectId) target.projectId = String(params.projectId);
     if (params.projectId && params.sprintId) target.sprintId = String(params.sprintId);
     if (params.pageId) target.pageId = String(params.pageId);
+    if (params.goalId) Object.assign(target, goalTokens.WRITE_TARGET);
     return target;
 };
 

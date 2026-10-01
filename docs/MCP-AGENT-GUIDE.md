@@ -14,7 +14,7 @@ Three things, in this order.
    |---|---|
    | `MCP_TOOLS_DATA=on` | `projects.list`, `project.get`, `sprints.list`, `statuses.list`, `comments.list`, `pages.search`, `page.get`, `timesheet.read`, `comment.create`, `timelog.create` |
    | `MCP_TOOLS_MANAGE=on` | The task management tools and the doc writing tools below, for tokens created with the matching grant |
-   | `MCP_TOOLS_WORK=on` | `tags.list`, `task.tags.add`, `task.tags.remove`, `task.relations.list`, `task.relation.add`, `task.relation.remove`, `lists.list`, `list.create`, `list.rename`, `list.move`, `page.comments.list`, `page.comment.create`, `page.comment.reply`, `page.comment.assign`, for every token that reads or writes; none of them needs a grant |
+   | `MCP_TOOLS_WORK=on` | `tags.list`, `task.tags.add`, `task.tags.remove`, `task.relations.list`, `task.relation.add`, `task.relation.remove`, `lists.list`, `list.create`, `list.rename`, `list.move`, `page.comments.list`, `page.comment.create`, `page.comment.reply`, `page.comment.assign`, `goals.list`, `goal.get`, `goal.target.set`, `goal.target.sources.add`, `goal.target.sources.remove`, for every token that reads or writes; none of them needs a grant |
    | `MCP_TOOLS_V2=on` | Names next to ids, paged lists, and a person's approval for any call that cannot be undone |
 
 2. **What the token was created with.** A token has scopes (read, write) and may have grants:
@@ -34,7 +34,7 @@ An agent connected through OAuth (`MCP_OAUTH`) is held to the scopes its connect
 - **The person ticked it** on the consent screen. Both start unticked, each with a sentence saying what it allows; everything else the app asked for is granted together as before.
 - **An owner or admin approved it for that app by name** under Settings, Agent clients. Approving an app without choosing permissions never includes either one, and an app an admin registered without a list of permissions cannot be given them at all; register it again naming them.
 
-The `MCP_TOOLS_WORK` tools take the plain scopes: `projects:read` for `tags.list` and `lists.list`, `tasks:read` for `task.relations.list`, `docs:read` for `page.comments.list`, and `tasks:write` for each of their writes.
+The `MCP_TOOLS_WORK` tools take the plain scopes: `projects:read` for `tags.list`, `lists.list`, `goals.list` and `goal.get`, `tasks:read` for `task.relations.list`, `docs:read` for `page.comments.list`, and `tasks:write` for each of their writes.
 
 An app connected before these scopes existed, and any connection where one of the three is missing, lists and runs exactly what it did before. The write scope never stands in for a manage scope, and a manage scope never stands in for the write scope: closing a task through `task.status.set` takes both `tasks:write` and `tasks:manage`.
 
@@ -63,7 +63,8 @@ Revoke a token on the same screen. A revoked or expired token stops working on i
 - It is recorded in the agent audit log with what it replaced. Where the result says `undoable: true`, a person can undo it from that log within the workspace's undo window.
 - With `MCP_TOOLS_V2` on, a call that cannot be undone (`task.move`) is not run. It is filed as a proposal in the Inbox, and the result says `pending: true`. A person who can open the same task and holds the same permission approves or declines it.
 - For an app connected through OAuth, with `AGENT_TAINT_ROUTING` on, a write that reaches past one task (`task.create`, `task.move`, `task.archive`, `task.restore`, `page.create`, `page.update`) is filed the same way when the connection holds the manage scope the tool needs, and refused when it does not. Approval asks the connection again: it must still be live and still hold that scope, the app must still be approved for it in the workspace, and the person must still have a seat and be able to open what the change touches. A proposal filed by a connection that has since been revoked or narrowed cannot be approved.
-- The `MCP_TOOLS_WORK` writes follow the same rule without needing a manage scope to run. Under `AGENT_TAINT_ROUTING`, a tag stays on one task and runs. A link between tasks, a list change and a doc comment reach past one task: each is refused for a connection without the manage scope, and filed for a person when the connection holds `tasks:manage` (links and lists) or `docs:manage` (doc comments), with approval asking that scope again.
+- The `MCP_TOOLS_WORK` writes follow the same rule without needing a manage scope to run. Under `AGENT_TAINT_ROUTING`, a tag stays on one task and runs. A link between tasks, a list change and a doc comment reach past one task: each is refused for a connection without the manage scope, and filed for a person when the connection holds `tasks:manage` (links and lists) or `docs:manage` (doc comments), with approval asking that scope again. A change to a goal reaches everyone the goal is shared with: it is refused without `tasks:manage` and filed with it.
+- A goal belongs to no project. A token kept to some projects reads a goal only when the goal counts tasks and every list and task it counts is in those projects, and it changes no goal.
 - A refusal says why, and is recorded too.
 
 There is no tool that deletes a task, a doc or a comment, or moves one to the trash.
@@ -327,6 +328,36 @@ These need `MCP_TOOLS_WORK` and the write scope, and no grant: anyone who can op
 
 Undo takes a comment back with the replies it drew, and puts an assignment back to who held it.
 
+### Goals
+
+These need `MCP_TOOLS_WORK`, the read scope to read and the write scope to change, and no grant. A goal is read and changed by the rule the Goals page keeps: a private goal is its owner's alone, a goal shared with people is theirs to read, a workspace goal is read by every member and changed by its owner, owners and admins. A guest reads a goal only when it is shared with them by name. The person's role must be allowed to list tasks.
+
+`goals.list`: the goals you can read, as the Goals page lists them, each with its progress and its targets. Arguments: `mine` (the goals you own or are named on), `archived`, and `limit`. A target counted from tasks carries `sources` (the lists and tasks it counts) and `sourceNames`, which names only the ones you can open.
+
+```json
+{ "name": "goals.list", "arguments": { "mine": true } }
+```
+
+`goal.get`: one goal. Argument: `goalId`. A goal you cannot read answers as one that does not exist.
+
+```json
+{ "name": "goal.get", "arguments": { "goalId": "<goal id>" } }
+```
+
+`goal.target.set`: report the current value of a target that is set by hand. Arguments: `goalId`, `targetId`, `value` (a number for a number or currency target, `true` or `false` for a true-or-false one), and `reason`. A target counted from tasks is refused with `counted_from_tasks`. When the value reaches the target, the goal's readers are told as they are when a person sets it.
+
+```json
+{ "name": "goal.target.set", "arguments": { "goalId": "<goal id>", "targetId": "<target id>", "value": 42, "reason": "Weekly numbers" } }
+```
+
+`goal.target.sources.add`, `goal.target.sources.remove`: count one more list or task toward a target counted from tasks, or stop counting one. Arguments: `goalId`, `targetId`, `kind` (`list` or `task`), `sourceId`, and `reason`. A list counts its top-level tasks. The target is counted again at once, and the result carries the new count. A refusal starts with its code: `source_not_found` when you cannot open the list or task, `source_not_shared` when not everyone who reads the goal can open it. The result says `changed: false` when the target already counted it, or never did.
+
+```json
+{ "name": "goal.target.sources.add", "arguments": { "goalId": "<goal id>", "targetId": "<target id>", "kind": "list", "sourceId": "<list id>" } }
+```
+
+Undo, by someone who can edit the goal: a value is put back to what it was, and a list or task is taken out or put back. The audit log names a goal only while the whole workspace can read it.
+
 ## What an agent cannot do yet
 
-Change a project or its members; create, rename or move a folder; archive or restore a list; start or complete a sprint; create or edit a project's tags; saved views and dashboards; automations; time edits and time approval; checklists, attachments and watchers; converting a task to a subtask and back, merging and duplicating; reactions, files and resolving on a doc comment, and editing one; reactions on a task comment. Deleting is not planned.
+Create, share, archive or delete a goal, or add and remove its targets; change a project or its members; create, rename or move a folder; archive or restore a list; start or complete a sprint; create or edit a project's tags; saved views and dashboards; automations; time edits and time approval; checklists, attachments and watchers; converting a task to a subtask and back, merging and duplicating; reactions, files and resolving on a doc comment, and editing one; reactions on a task comment. Deleting is not planned.

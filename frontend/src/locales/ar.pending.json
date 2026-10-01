@@ -4384,7 +4384,7 @@
     "Goals.link_goal": "Goal",
     "Goals.link_list_hint": "Pick the target whose progress should count the top-level tasks of the list {name}.",
     "Goals.link_loading": "Loading your goals…",
-    "Goals.link_none": "There is no goal you can edit.",
+    "Goals.link_no_goals": "You have no goals you can edit.",
     "Goals.link_save": "Count it",
     "Goals.link_sources": "Link lists or tasks",
     "Goals.link_target": "Target",
