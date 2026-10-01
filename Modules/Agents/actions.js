@@ -118,6 +118,7 @@ const FLAGGED_RATINGS = Object.freeze({
     'goal.target.sources.add': write(SCOPE.WORKSPACE),
     'goal.target.sources.remove': write(SCOPE.WORKSPACE),
     'slack.message.post': write(SCOPE.WORKSPACE, false),
+    'slack.channel.read': read(SCOPE.WORKSPACE),
 });
 
 const ratingTable = () => ({ ...RATINGS, ...Object.fromEntries(Object.entries(FLAGGED_RATINGS).filter(([k]) => registry.has(k))) });

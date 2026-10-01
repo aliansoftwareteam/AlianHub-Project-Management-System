@@ -1,6 +1,7 @@
 const ACTION_DONE = 'agent.action';
 const ACTION_REFUSED = 'agent.action_refused';
 const PROPOSAL_DECIDED = 'agent.proposal_decided';
+const CONNECTOR_CALL = 'connector.call';
 const APPROVED_PROPOSAL = /^approved proposal /;
 
 const numberOrNull = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
@@ -32,7 +33,7 @@ const decisionOf = (row, meta, nextDecision) => {
 
 const statusOf = (row, meta) => {
     if (row.action === ACTION_REFUSED) return 'refused';
-    return row.action === ACTION_DONE ? meta.state || null : null;
+    return row.action === ACTION_DONE || row.action === CONNECTOR_CALL ? meta.state || null : null;
 };
 
 const toolEntry = (row, nextDecision) => {
@@ -43,6 +44,7 @@ const toolEntry = (row, nextDecision) => {
         kind: 'tool', auditId: String(row._id), event: row.action, action: meta.action || row.action,
         decision: decisionOf(row, meta, nextDecision), status: statusOf(row, meta), at: row.createdAt || null,
         durationMs: settled !== null && settled >= 0 ? settled : null, tokens: numberOrNull(cost.tokens), costUsd: numberOrNull(cost.usd),
+        ...(row.action === CONNECTOR_CALL ? { messages: numberOrNull(meta.messages), chars: numberOrNull(meta.chars) } : {}),
     };
 };
 

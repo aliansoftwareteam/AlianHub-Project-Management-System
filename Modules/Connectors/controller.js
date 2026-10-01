@@ -65,4 +65,7 @@ exports.removeSlackSecret = handle('remove a Slack connector secret', 'Removed.'
 
 exports.refreshSlackChannels = handle('refresh the Slack channel list', 'Channel list refreshed.', (companyId, req) => slack.refreshChannels(companyId, actorOf(req)));
 
-exports.setSlackChannels = handle('set the Slack channel allow-list', 'Allowed channels saved.', (companyId, req) => slack.setAllowedChannels(companyId, (req.body || {}).channelIds, actorOf(req)));
+exports.setSlackChannels = handle('set the Slack channel allow-list', 'Allowed channels saved.', (companyId, req) => {
+    const body = req.body || {};
+    return slack.setAllowedChannels(companyId, body.channels !== undefined ? body.channels : body.channelIds, actorOf(req));
+});

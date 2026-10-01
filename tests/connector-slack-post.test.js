@@ -170,7 +170,7 @@ describe('connecting Slack', () => {
         expect(unknown.code).toBe(400);
         expect(rows(T)[0].allowedChannels).toEqual([]);
         const ok = await call(ctrl.setSlackChannels, ADMIN, { body: { channelIds: [RELEASES] } });
-        expect(ok.body.data.allowedChannels).toEqual([{ id: RELEASES, name: 'releases' }]);
+        expect(ok.body.data.allowedChannels).toEqual([{ id: RELEASES, name: 'releases', read: false, post: true }]);
     });
 
     it('removing the bot token ends the connection and revokes the stored secret', async () => {
@@ -234,7 +234,7 @@ describe('who may manage the connection', () => {
         for (const uid of [OWNER, ADMIN]) {
             // eslint-disable-next-line no-await-in-loop
             const out = await call(ctrl.getSlack, uid);
-            expect(out.body).toMatchObject({ status: true, data: { connected: true, allowedChannels: [{ id: RELEASES, name: 'releases' }] } });
+            expect(out.body).toMatchObject({ status: true, data: { connected: true, allowedChannels: [{ id: RELEASES, name: 'releases', read: false, post: true }] } });
         }
     });
 });
@@ -370,7 +370,7 @@ describe('approving a Slack message', () => {
 
         mockSlack.answers = healthySlack();
         const replaced = await call(ctrl.saveSlackSecrets, OWNER, { body: { botToken: NEW_TOKEN } });
-        expect(replaced.body.data).toMatchObject({ status: 'connected', brokenReason: '', allowedChannels: [{ id: RELEASES, name: 'releases' }] });
+        expect(replaced.body.data).toMatchObject({ status: 'connected', brokenReason: '', allowedChannels: [{ id: RELEASES, name: 'releases', read: false, post: true }] });
         const third = await propose({ channelId: RELEASES, text: 'Three' });
         await approveAs(third._id, OWNER);
         expect(posts().pop().authorization).toBe(`Bearer ${NEW_TOKEN}`);

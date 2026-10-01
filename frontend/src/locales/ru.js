@@ -2947,6 +2947,8 @@ export default {
         "skill_label_fields_fill": "Fill a task's AI fields",
         "skill_label_prd_draft": "Draft a PRD from a brief",
         "skill_label_wiki_upkeep": "Find pages that have gone stale",
+        "skill_label_slack_summary": "Summarise a Slack channel",
+        "skill_about_slack_summary": "Reads the last day of one allowed Slack channel and proposes a one-paragraph summary to post back to it.",
         "skill_about_brief_parse": "Reads a task brief and proposes subtasks with estimates, plus the open questions.",
         "skill_about_project_plan": "Reads a task brief and proposes the plan as subtasks with estimates.",
         "skill_about_pr_summary": "Reads the pull request a task links to, summarises the change and flags risk.",
@@ -8481,7 +8483,8 @@ export default {
         "taint_kind_webhook": "Webhook",
         "taint_kind_file": "Uploaded file",
         "taint_kind_passage": "Knowledge passage",
-        "taint_kind_instruction": "Instruction-shaped text"
+        "taint_kind_instruction": "Instruction-shaped text",
+        "taint_kind_connector": "Connector"
     },
     "QuickCreate": {
         "title": "New task",
@@ -12082,7 +12085,12 @@ export default {
         "err_value": "Paste the value first.",
         "confirm_remove_bot_token": "Remove the bot token? Agents can no longer propose Slack messages, and the channel list is cleared.",
         "confirm_remove_signing_secret": "Remove the signing secret?",
-        "channels_title": "Channels agents may post to",
+        "channels_heading": "What agents may do in each channel",
+        "read_lead": "Tick Read to let an agent run read a channel's recent messages as plain text. A run that has read a channel is marked, makes no web fetch after that, and can still only propose a message. Private channels and direct messages are never read.",
+        "read": "Read",
+        "post": "Post",
+        "read_label": "Agents may read #{name}",
+        "post_label": "Agents may propose messages to #{name}",
         "channels_lead": "Only public channels Slack listed for this app. A message to any other channel is refused, both when it is proposed and when it is approved.",
         "channels_none": "Slack listed no public channels for this app.",
         "not_member": "the app is not in this channel yet: invite it in Slack",
