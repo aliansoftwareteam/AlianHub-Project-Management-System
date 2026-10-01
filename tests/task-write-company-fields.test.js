@@ -459,9 +459,13 @@ describe('an update never creates the task it names', () => {
 
 /* Masks the ids and times a run generates, so two runs of the same body compare equal. */
 const SEEDED = new Set([OPEN_TASK, OPEN_TASK_2, OPEN_PROJECT, OTHER_PROJECT_ID, MEMBER, OWNER, CID, SPRINT, FOLDER]);
+const SEEDED_DAYS = ['2026-01-01', '2026-10-01'];
+const RUN_STARTED = Date.now();
+// A time stamped during the run is generated even when the run falls on a seeded day.
+const stampedThisRun = (v) => Date.parse(v) >= RUN_STARTED && Date.parse(v) <= Date.now();
 const normalise = (value) => JSON.parse(JSON.stringify(value, (key, v) => {
     if (typeof v === 'string' && /^[a-f0-9]{24}$/i.test(v) && !SEEDED.has(v) && !v.startsWith('6f')) return '<generated>';
-    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v) && !v.startsWith('2026-01-01') && !v.startsWith('2026-10-01')) return '<time>';
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v) && (stampedThisRun(v) || !SEEDED_DAYS.some((day) => v.startsWith(day)))) return '<time>';
     if (['lastMessage', 'updatedAt'].includes(key)) return '<time>';
     return v;
 }));
