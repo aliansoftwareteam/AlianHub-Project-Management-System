@@ -51,6 +51,7 @@ const { save, update, getPaginatedMessages, searchMessageFromMainChat } = requir
 const threads = require('../Modules/Comments/threads');
 const { forgetHealed } = require('../Modules/Comments/helpers/noticeItems');
 const { chatThreadPath } = require('../Modules/Comments/helpers/chatThreads');
+const createSchema = require('../utils/mongo-handler/createSchema');
 const { upsertRoom, removeRoom } = require('../socket/helper');
 require('../socket/controller/commentSocket');
 
@@ -314,6 +315,31 @@ describe('a thread reply notice', () => {
     it('opens the conversation with the thread beside it', () => {
         expect(chatThreadPath({ companyId: COMPANY, projectId: CHANNEL_PROJECT, taskId: CHANNEL, changeData: { threadId: 'a b' } }))
             .toBe(`${COMPANY}/chat/${CHANNEL_PROJECT}/${CHANNEL}?thread=a%20b`);
+    });
+
+    it('keeps its thread through the strict notification schema', async () => {
+        await reply(BOB, root._id, 'Yes');
+        const [sent] = notices().filter((n) => n.key === 'comment_reply');
+        const Notice = mongoose.models.ChatThreadNoticeProbe || mongoose.model('ChatThreadNoticeProbe', createSchema.notificationsSchema);
+
+        const row = new Notice({ ...sent, receiverID: ALICE, uniqueId: 'n1' });
+
+        expect(row.validateSync()).toBeUndefined();
+        expect(row.toObject()).toMatchObject({ changeType: 'chat_thread_reply', changeData: { threadId: String(root._id) }, taskId: CHANNEL });
+    });
+});
+
+describe('a mention in a thread reply', () => {
+    it('is recorded with the thread it was made in, which the strict mention schema keeps', async () => {
+        const { deliverMentions } = jest.requireActual('../Modules/Comments/helpers/commentNotifications');
+        const r = await reply(BOB, root._id, `@[Alice](${ALICE}) see this`);
+
+        await deliverMentions(COMPANY, stored(r.body.data._id), [ALICE]);
+
+        const [record] = mockDb.store[SCHEMA_TYPE.MENTIONS];
+        expect(record).toMatchObject({ comment_id: String(r.body.data._id), comment_parentId: String(root._id), mainChat: true, mentionIds: [ALICE] });
+        const Mention = mongoose.models.ChatThreadMentionProbe || mongoose.model('ChatThreadMentionProbe', createSchema.mentionsSchema);
+        expect(new Mention(record).toObject().comment_parentId).toBe(String(root._id));
     });
 });
 

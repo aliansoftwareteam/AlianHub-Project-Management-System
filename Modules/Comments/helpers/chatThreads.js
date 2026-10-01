@@ -91,9 +91,13 @@ const keptRoot = async (companyId, id) => {
 /* The deleted messages of a conversation that still have replies. Two reads sized by how many messages were
  * deleted there, so the page query keeps its own sort, skip and limit. */
 const keptRootIds = async (companyId, { projectId, sprintId, taskId }) => {
+    if (!isId(projectId)) return [];
     const deleted = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.COMMENTS,
-        data: [{ projectId: oid(projectId), sprintId: oid(sprintId), taskId: taskIdMatch(taskId), parentId: null, isDeleted: true }, { _id: 1 }],
+        data: [{
+            projectId: oid(projectId), ...(isId(sprintId) ? { sprintId: oid(sprintId) } : {}), taskId: taskIdMatch(taskId),
+            parentId: null, isDeleted: true,
+        }, { _id: 1 }],
     }, 'find');
     if (!deleted || !deleted.length) return [];
     const replies = await MongoDbCrudOpration(companyId, {

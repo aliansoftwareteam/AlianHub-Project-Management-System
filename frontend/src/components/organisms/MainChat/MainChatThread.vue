@@ -130,7 +130,11 @@ async function open() {
     failed.value = false;
     if (!rootId.value) return;
     failed.value = !(await load());
-    if (!failed.value) nextTick(showFocused);
+    if (failed.value || !props.focusId) return;
+    // Two ticks: the list scrolls to its newest reply one tick after it renders.
+    await nextTick();
+    await nextTick();
+    showFocused();
 }
 
 watch(rootId, open, { immediate: true });
