@@ -187,6 +187,22 @@ describe('PAG-09 docs and forms are limited to visible projects', () => {
         expect((await call(pages.getPage, request({ uid: OWNER, params: { id: hidden._id } }))).body.data.title).toBe('Hidden plan');
     });
 
+    it('gives a person who sees a project without the right to change it a doc to read, and no place to add one', async () => {
+        const plan = seedPage({ title: 'Plan', ProjectID: PRIVATE });
+
+        const opened = await call(pages.getPage, request({ uid: VIEWER, params: { id: plan._id } }));
+        expect(opened.body.data).toMatchObject({ title: 'Plan', canEdit: false });
+        expect((await call(pages.getPage, request({ uid: OWNER, params: { id: plan._id } }))).body.data.canEdit).toBe(true);
+
+        const inProject = await call(pages.createPage, request({ uid: VIEWER, body: { title: 'Mine', projectId: PRIVATE } }));
+        expect(inProject.body).toMatchObject({ status: false, statusCode: 403 });
+        const under = await call(pages.createPage, request({ uid: VIEWER, body: { title: 'Mine', parentPageId: String(plan._id) } }));
+        expect(under.body).toMatchObject({ status: false, statusCode: 403 });
+        const unseen = await call(pages.createPage, request({ uid: MEMBER, body: { title: 'Mine', projectId: PRIVATE } }));
+        expect(unseen.body).toMatchObject({ status: false, statusCode: 404 });
+        expect(rows(SCHEMA_TYPE.PAGES).map((page) => page.title)).toEqual(['Plan']);
+    });
+
     it('does not list or open a form of a hidden project', async () => {
         const form = seedForm(PRIVATE);
         const list = await call(forms.listForms, request({ uid: GUEST, query: { projectId: PRIVATE } }));

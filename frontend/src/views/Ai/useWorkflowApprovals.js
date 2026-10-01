@@ -10,7 +10,7 @@ import { sortApprovals } from "./workflowApprovals";
 // Deciding and reassigning both answer with the approval as it now stands, so
 // the row in the list is refreshed from the answer rather than from a reload.
 
-const request = async (type, endpoint, body, fallbackKey) => {
+const send = async (type, endpoint, body, fallbackKey) => {
     let res;
     try {
         res = await apiRequest(type, endpoint, body);
@@ -22,8 +22,10 @@ const request = async (type, endpoint, body, fallbackKey) => {
     if (res?.data?.status !== true) {
         throw Object.assign(new Error(res?.data?.statusText || res?.data?.message || i18n.global.t(fallbackKey)), { status: 0 });
     }
-    return res.data.data;
+    return res.data;
 };
+
+const request = async (...args) => (await send(...args)).data;
 
 export function useWorkflowApprovals() {
     const rows = ref([]);
@@ -36,8 +38,9 @@ export function useWorkflowApprovals() {
         error.value = "";
         engineOff.value = false;
         try {
-            const data = await request("get", env.WORKFLOW_APPROVALS, null, "Workflows.approvals_load_failed");
-            rows.value = Array.isArray(data) ? data : [];
+            const answer = await send("get", env.WORKFLOW_APPROVALS, null, "Workflows.approvals_load_failed");
+            rows.value = Array.isArray(answer.data) ? answer.data : [];
+            engineOff.value = answer.engineOff === true;
         } catch (e) {
             rows.value = [];
             if (isEngineOff(e)) engineOff.value = true;

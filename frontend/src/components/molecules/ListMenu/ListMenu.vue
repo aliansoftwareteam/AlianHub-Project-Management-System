@@ -1,5 +1,5 @@
 <template>
-    <div v-if="headless || entries.length" ref="root" :class="{ 'pt-menu': inTree, lm: !inTree && !headless }">
+    <div v-if="headless || entries.length" ref="root" :class="{ 'pt-menu': inTree, lm: !inTree && !headless }" @click.capture="prefetchGoals" @keydown.down.capture="prefetchGoals">
         <template v-if="inTree">
             <button
                 type="button"
@@ -97,7 +97,7 @@
  *   reveal(folderId)   the list now sits in that folder, so a tree should open the way to it
  *   rename(listId)     in a tree: the row should let its name be edited in place
  */
-import { computed, defineAsyncComponent, defineEmits, defineExpose, defineProps, inject, nextTick, onMounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent, defineEmits, defineExpose, defineProps, inject, nextTick, ref, watch } from "vue";
 import { routeLocationKey, routerKey } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -110,7 +110,7 @@ import { folderIdOf, nestedFolders } from "@/utils/folderTree";
 import { treeRoute } from "@/components/molecules/ProjectTree/projectTreeModel";
 import { useRowMenu } from "@/components/molecules/ProjectTree/useRowMenu";
 import { listMenuEntries, listMenuRights, listUrl } from "@/views/Projects/composables/listMenu";
-import { loadLinkableGoals } from "@/views/Goals/goalLinking";
+import { useGoalLinking } from "@/views/Goals/goalLinking";
 import { makePlainList, moveSprint, refreshSprints, setSprintStatus, sprintChanged, startSprint } from "@/views/Projects/sprintActions";
 
 const MoveToFolderModal = defineAsyncComponent(() => import("@/components/molecules/MoveToFolder/MoveToFolderModal.vue"));
@@ -166,7 +166,9 @@ const siblings = computed(() => projectSprints.value.map((item) => ({ ...item, i
 const label = computed(() => t("ProjectTree.list_actions", { list: list.value.name }));
 
 const check = (key) => checkPermission(key, props.project?.isGlobalPermission);
-const entries = computed(() => listMenuEntries({ project: props.project, list: list.value, folders: projectFolders.value, check, archivedView: props.archivedView }));
+/* The goals are asked for when the menu is opened, never when it is drawn. */
+const { offered: goalsOffered, prefetch: prefetchGoals } = useGoalLinking();
+const entries = computed(() => listMenuEntries({ project: props.project, list: list.value, folders: projectFolders.value, check, archivedView: props.archivedView, goalsOffered: goalsOffered.value }));
 const targets = computed(() => nestedFolders(projectFolders.value).map((folder) => ({ id: folderIdOf(folder), name: folder.name || folder.folderName || "", depth: folder.depth })));
 
 const asking = computed(() => {
@@ -177,10 +179,6 @@ const asking = computed(() => {
 });
 
 watch(asking, (now) => { if (now) nextTick(() => cancelButton.value?.focus()); });
-
-/* Read once for the workspace, however many menus are drawn: it decides whether "Count toward a goal…" is offered. */
-onMounted(() => loadLinkableGoals(companyId?.value));
-
 const complain = (result) => $toast.error(result.message || t("Toast.something_went_wrong"), TOAST);
 const context = () => ({ companyId: companyId?.value, project: props.project, sprint: { ...list.value } });
 

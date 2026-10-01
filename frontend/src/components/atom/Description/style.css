@@ -249,7 +249,6 @@ max-width: 100% !important;
     .description__Edit-wrapper {max-height: 450px;margin-bottom: 20px;overflow: auto;}
     .description__Edit-wrapper::-webkit-scrollbar{display: none;}
     .description-main{border-bottom: 0 !important;max-height: calc(100dvh - 160px);margin-bottom: 20px;}
-    .description-action{margin-bottom: 20px;}
     .description-main .ql-toolbar.ql-snow+.ql-container.ql-snow{padding: 15px !important;}
     .description-main .ql-editor p{padding: 0 !important;}
     #editorjs .ce-toolbar__plus,

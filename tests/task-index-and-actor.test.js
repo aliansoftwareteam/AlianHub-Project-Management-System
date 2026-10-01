@@ -138,7 +138,7 @@ const reset = () => {
     logger.warn.mockClear();
     HandleBothNotification.mockClear();
     updateSprintFun.mockClear();
-    [OPEN_PROJECT, OTHER_PROJECT].forEach((_id) => mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id, ProjectName: 'Parity', ProjectCode: 'PAR', CompanyId: CID, lastTaskId: 4, taskStatusData: STATUS_LIST, taskTypeCounts: TYPE_LIST }));
+    [OPEN_PROJECT, OTHER_PROJECT].forEach((_id) => mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id, ProjectName: 'Parity', ProjectCode: 'PAR', CompanyId: CID, lastTaskId: 4, taskStatusData: STATUS_LIST, taskTypeCounts: TYPE_LIST, tagsArray: [{ uid: 'tag-1', tagName: 'Urgent' }] }));
     mockDb.seed(SCHEMA_TYPE.USERS, { _id: OWNER, Employee_Name: OWNER_NAME });
     mockDb.seed(SCHEMA_TYPE.USERS, { _id: MEMBER, Employee_Name: 'Max Member' });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });

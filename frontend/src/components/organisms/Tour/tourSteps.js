@@ -1,55 +1,46 @@
 /* CommonJS on purpose: webpack consumes it in the app and root Jest checks every selector against source.
-   Each step lists selectors in preference order; a missing anchor degrades to a centred card.
-   Copy lives at AuthV2.tour_<screen>_<key>_title|body|next. */
-const STEPS = {
-    shell: [
-        { key: 'rail', els: ['.ah-rail'], side: 'right', align: 'start' },
-        { key: 'work', els: ['.hc-mywork', '.ah-app__view'], side: 'left', align: 'start' },
-        { key: 'more', els: ['.ah-rail__item--btn', '.ah-rail__foot'], side: 'right', align: 'end' },
-        { key: 'timer', els: ['.hc-mywork', '.ah-rail__foot'], side: 'left', align: 'end' }
-    ],
-    project: [
-        { key: 'header', els: ['.ph2__bar'], side: 'bottom', align: 'start' },
-        { key: 'views', els: ['.ph2__viewrow'], side: 'bottom', align: 'start' },
-        { key: 'new', els: ['.nip', '.ph2__actions'], side: 'bottom', align: 'end' },
-        { key: 'search', els: ['#projectviewfiltersearch_driver', '.pft'], side: 'bottom', align: 'start' },
-        { key: 'more', els: ['#more_features', '.pft'], side: 'bottom', align: 'end' }
-    ],
-    board: [
-        { key: 'columns', els: ['.kanban-column', '.kanban-board'], side: 'right', align: 'start' },
-        { key: 'add', els: ['.add-task-icon', '.kanban-column'], side: 'bottom', align: 'start' },
-        { key: 'wip', els: ['.task-count', '.kanban-column'], side: 'bottom', align: 'start' },
-        { key: 'cards', els: ['.kanban-card-wrapper', '.kanban-board'], side: 'right', align: 'start' }
-    ],
-    list: [
-        { key: 'columns', els: ['.lv2__cols', '#list_scroll'], side: 'bottom', align: 'start' },
-        { key: 'group', els: ['#group_by', '.pft'], side: 'bottom', align: 'end' },
-        { key: 'subtasks', els: ['.current__dropdown', '.pft'], side: 'bottom', align: 'end' },
-        { key: 'bulk', els: ['.lv2__cols', '#list_scroll'], side: 'bottom', align: 'start' }
-    ]
-};
+   Each stop lists selectors in preference order; with none on screen the card docks in a corner.
+   Copy lives at Auth.tour_first_<key>_title|body|key, and `shortcut` is an id in composable/shortcuts.js. */
+const TOUR = 'first';
 
-const SCREENS = Object.keys(STEPS);
-const doneKey = (screen) => (screen === 'shell' ? 'isShellTour' : `isTour_${screen}`);
+const STOPS = [
+    { key: 'rail', els: ['.ah-rail', '.ah-tabbar'], side: 'right', shortcut: 'palette' },
+    { key: 'tree', els: ['.pt', '.ph2__tree'], side: 'right', shortcut: 'go-projects' },
+    { key: 'views', els: ['.ph2__viewrow', '.lm'], side: 'bottom', shortcut: 'create-task' },
+    { key: 'panel', els: ['.ah-detail__panel-inner'], side: 'left', shortcut: 'task-close' }
+];
 
-function screenFor(route) {
-    if (route && route.meta && route.meta.tour) return route.meta.tour;
-    const name = String((route && route.name) || '');
-    if (name === 'Home') return 'shell';
-    if (name.startsWith('Project') && name !== 'Projects') {
-        const tab = String((route && route.query && route.query.tab) || '');
-        if (tab === 'ProjectKanban') return 'board';
-        if (tab === 'ProjectListView') return 'list';
-        return 'project';
-    }
-    return '';
+/* A person who finished the old shell tour, or closed the setup card, is not on a first visit. */
+function mayAutoStart({ seen, skipped, legacyDone, dismissed, blocked }) {
+    return !seen && !skipped && !legacyDone && !dismissed && !blocked;
 }
 
-/* The shell tour is a step of the Home checklist, so it only starts when asked for; starting it on
-   landing stacked it on top of that checklist. A screen tour offers itself once per user, ever. */
-function mayAutoOffer(which, { done, skipped, savedStep, offeredBefore, wide, shellSettled }) {
-    if (which === 'shell' || !STEPS[which]) return false;
-    return !done && !skipped && !savedStep && !offeredBefore && wide && shellSettled;
+const GAP = 12;
+const EDGE = 12;
+const SIDES = ['right', 'bottom', 'left', 'top'];
+
+/* Where the card goes so it stays on screen and off the thing it describes. An anchor that leaves
+   no room on any side (a full-screen panel on a phone) gets the corner farthest from its centre. */
+function placePopover(anchor, size, viewport, side = 'right') {
+    const maxLeft = Math.max(EDGE, viewport.width - size.width - EDGE);
+    const maxTop = Math.max(EDGE, viewport.height - size.height - EDGE);
+    const clampX = (x) => Math.min(Math.max(EDGE, x), maxLeft);
+    const clampY = (y) => Math.min(Math.max(EDGE, y), maxTop);
+    if (!anchor) return { left: maxLeft, top: maxTop, side: 'none' };
+
+    const spots = {
+        right: { left: anchor.right + GAP, top: clampY(anchor.top) },
+        left: { left: anchor.left - GAP - size.width, top: clampY(anchor.top) },
+        bottom: { left: clampX(anchor.left), top: anchor.bottom + GAP },
+        top: { left: clampX(anchor.left), top: anchor.top - GAP - size.height }
+    };
+    const fits = (spot) => spot.left >= EDGE && spot.top >= EDGE && spot.left <= maxLeft && spot.top <= maxTop;
+    const chosen = [side, ...SIDES.filter((s) => s !== side)].find((s) => fits(spots[s]));
+    if (chosen) return { ...spots[chosen], side: chosen };
+
+    const centreX = (anchor.left + anchor.right) / 2;
+    const centreY = (anchor.top + anchor.bottom) / 2;
+    return { left: centreX > viewport.width / 2 ? EDGE : maxLeft, top: centreY > viewport.height / 2 ? EDGE : maxTop, side: 'none' };
 }
 
-module.exports = { STEPS, SCREENS, screenFor, doneKey, mayAutoOffer };
+module.exports = { TOUR, STOPS, mayAutoStart, placePopover };

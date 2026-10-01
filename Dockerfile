@@ -52,6 +52,7 @@ COPY Modules/Company/helpers/workingDays.js /app/Modules/Company/helpers/working
 COPY Modules/Tasks/helpers/taskTreeRules.js /app/Modules/Tasks/helpers/taskTreeRules.js
 COPY Modules/Tasks/helpers/taskExtraListsRules.js /app/Modules/Tasks/helpers/taskExtraListsRules.js
 COPY Modules/Tasks/helpers/descriptionBlock.js /app/Modules/Tasks/helpers/descriptionBlock.js
+COPY Modules/Tasks/helpers/richTextAllowlist.js /app/Modules/Tasks/helpers/richTextAllowlist.js
 COPY Modules/Forms/helpers/formLogic.js /app/Modules/Forms/helpers/formLogic.js
 
 # Build the SPA bundle. webpack needs more than Node's default ~2 GB heap for

@@ -7,6 +7,7 @@ const {
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { onJoin, roomFor, prefixOfOwnRoom, isSelf, canOpenTask, canOpenSprintBoard, mayReceiveTask, inOrder } = require('../roomAccess');
+const { extraListsOf } = require('../../Modules/Tasks/helpers/taskExtraListsRules');
 
 function setEventName(type) {
     switch (type) {
@@ -17,11 +18,28 @@ function setEventName(type) {
     }
 }
 
-const roomsOf = ({ data }) => findRoomsByPrefixes(
-    `project_sprint_${data.ProjectID}_${data.sprintId}`,
-    `taskDetail_${data._id}`,
-    `taskDetail_${data.ParentTaskId}`,
-);
+const listRoom = (projectId, sprintId) => `project_sprint_${projectId}_${sprintId}`;
+
+/* The rooms of the lists a task was added to, and of the ones this change took it out of
+ * (`leftLists`, set by the writer), so a removal reaches the list it left. A conversation row is in no list but its own. */
+const extraListRooms = (changeData) => {
+    if (changeData.data.mainChat === true) return [];
+    const home = String(changeData.data.sprintId);
+    const entries = [...extraListsOf(changeData.data), ...(Array.isArray(changeData.leftLists) ? changeData.leftLists : [])];
+    return [...new Set(entries.filter((entry) => entry && String(entry.sprintId) !== home).map((entry) => listRoom(entry.projectId, entry.sprintId)))];
+};
+
+/* A task event goes to the list it lives in, to its own detail pane, to its parent's, and to the lists it was added to. */
+const roomsOf = (changeData) => {
+    const { data } = changeData;
+    const rooms = findRoomsByPrefixes(
+        listRoom(data.ProjectID, data.sprintId),
+        `taskDetail_${data._id}`,
+        `taskDetail_${data.ParentTaskId}`,
+        ...extraListRooms(changeData),
+    );
+    return [...new Map(rooms.map((room) => [room.roomName, room])).values()];
+};
 
 const deliver = (room, changeData, eventName, emitData) => {
     if (room.isUserIdCheck) {
@@ -46,6 +64,7 @@ const relayTaskChange = async (changeData, includeUpdatedFields) => {
         fullDocument: changeData.data,
         ...(includeUpdatedFields && { updatedFields: changeData.updatedFields }),
     };
+    // A room of an added list was joined on that list alone, so every socket is judged on the task's home.
     for (const room of roomsOf(changeData)) {
         // eslint-disable-next-line no-await-in-loop
         if (!(await mayReceiveTask(room.socket.identity, changeData))) continue;

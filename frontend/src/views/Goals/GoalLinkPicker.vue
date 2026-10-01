@@ -10,7 +10,10 @@
                     {{ $t('Goals.link_failed') }}
                     <button type="button" class="glk__retry" @click="load">{{ $t('Goals.count_retry') }}</button>
                 </p>
-                <p v-else-if="!goals.length" class="glk__hint" data-test="glk-none">{{ $t('Goals.link_none') }}</p>
+                <p v-else-if="!goals.length" class="glk__hint" data-test="glk-none">
+                    {{ $t('Goals.link_no_goals') }}
+                    <button v-if="canMakeGoal" type="button" class="glk__retry" data-test="glk-new-goal" @click="newGoal">{{ $t('Goals.new_goal') }}</button>
+                </p>
                 <template v-else>
                     <label class="ah-field">
                         <span class="ah-field__label">{{ $t('Goals.link_goal') }}</span>
@@ -45,11 +48,12 @@
 
 <script setup>
 import { computed, inject, nextTick, onMounted, ref, unref } from "vue";
+import { routerKey } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import { apiRequest } from "@/services";
 import { LIMITS, TASKS, addTargetRequest, refusalKey, sourcesOf, sourcesRequest } from "./goalRequest";
-import { linkableGoals, loadLinkableGoals, noteLinked } from "./goalLinking";
+import { linkableGoals, linkableGoalsAreStale, loadLinkableGoals, noteLinked } from "./goalLinking";
 
 defineOptions({ name: "GoalLinkPicker" });
 
@@ -66,6 +70,8 @@ const emit = defineEmits(["close", "linked"]);
 
 const { t, te } = useI18n();
 const toast = useToast();
+/* Injected, not taken with useRouter, which warns where a menu is drawn outside a router. */
+const router = inject(routerKey, null);
 const companyId = inject("$companyId", "");
 const uid = `glk-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -90,8 +96,15 @@ function pickTarget() {
     targetId.value = free ? free.id : (roomForTarget.value ? NEW_TARGET : "");
 }
 
+const canMakeGoal = computed(() => Boolean(router?.hasRoute?.("Goals")));
+
+function newGoal() {
+    router.push({ name: "Goals", params: { cid: unref(companyId) }, query: { new: "1" } }).catch(() => {});
+    emit("close");
+}
+
 async function load() {
-    await loadLinkableGoals(unref(companyId), { again: true });
+    await loadLinkableGoals(unref(companyId), { again: linkableGoalsAreStale() });
     if (!goal.value) goalId.value = goals.value[0]?._id || "";
     pickTarget();
     await nextTick();

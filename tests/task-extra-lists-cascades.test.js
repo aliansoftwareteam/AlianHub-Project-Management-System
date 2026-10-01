@@ -73,9 +73,10 @@ const setState = async (taskId, deletedStatusKey) => {
 };
 
 const extraListLines = () => rows(SCHEMA_TYPE.HISTORY).filter((row) => row.Key === 'Task_Extra_List' || row.key === 'Task_Extra_List');
-const lastUpdateOf = (taskId) => socketEmitter.emit.mock.calls
+const updatesOf = (taskId) => socketEmitter.emit.mock.calls
     .filter(([name, payload]) => name === 'update' && payload.module === 'task' && payload.data && String(payload.data._id) === taskId)
-    .map(([, payload]) => payload).pop();
+    .map(([, payload]) => payload);
+const lastUpdateOf = (taskId) => updatesOf(taskId).pop();
 
 beforeEach(() => {
     mockWorld.reset();
@@ -164,6 +165,24 @@ describe('moving a task\'s home', () => {
         expect(message).toBe('<b>Write &lt;the&gt; brief</b> moved to another project and is no longer in the list <b>Sprint &lt;7&gt;</b>, a private list, a list in another project.');
         expect(String(lines[0].ProjectId || lines[0].projectId)).toBe(P.ELSEWHERE);
     });
+
+    test('tells the relay which lists the task left, so their rows can go', async () => {
+        place(T.TASK, [[P.ELSEWHERE, L.SCRUM], [P.CLOSED, L.CLOSED], [P.HOME, L.HOME_SECOND]]);
+
+        await move(T.TASK, P.ELSEWHERE, L.THERE);
+
+        expect(updatesOf(T.TASK).filter((update) => update.leftLists).map((update) => update.leftLists)).toEqual([
+            [{ projectId: P.ELSEWHERE, sprintId: L.SCRUM }, { projectId: P.CLOSED, sprintId: L.CLOSED }],
+        ]);
+    });
+
+    test('says nothing of lists left when it left none', async () => {
+        place(T.TASK, [[P.ELSEWHERE, L.THERE]]);
+
+        await move(T.TASK, P.HOME, L.HOME_SECOND);
+
+        expect(updatesOf(T.TASK).filter((update) => update.leftLists)).toEqual([]);
+    });
 });
 
 describe('converting', () => {
@@ -176,6 +195,7 @@ describe('converting', () => {
         expect(stored(T.SECOND)).toMatchObject({ ParentTaskId: T.TASK, isParentTask: false });
         expect(stored(T.SECOND)).not.toHaveProperty('extraLists');
         expect(lastUpdateOf(T.SECOND).updatedFields.extraLists).toEqual([]);
+        expect(lastUpdateOf(T.SECOND).leftLists).toEqual([{ projectId: P.HOME, sprintId: L.HOME_SECOND }, { projectId: P.ELSEWHERE, sprintId: L.THERE }]);
     });
 
     test('several tasks to subtasks clears them on each', async () => {
@@ -249,6 +269,25 @@ describe('what leaves the entries alone', () => {
 
         list.deletedStatusKey = 0;
         expect((await read()).body.data.extraLists).toEqual([expect.objectContaining({ sprintId: L.THERE, name: 'Launch plan' })]);
+    });
+});
+
+describe('taking a task out of a list', () => {
+    test('tells the relay which list it left', async () => {
+        place(T.TASK, [[P.HOME, L.HOME_SECOND], [P.ELSEWHERE, L.THERE]]);
+
+        const res = await call('PATCH /api/v2/tasks', uidOf.OWNER, { body: { action: 'removeFromList', taskId: T.TASK, sprintId: L.THERE } });
+
+        expect(res.code).toBe(200);
+        expect(lastUpdateOf(T.TASK).leftLists).toEqual([{ projectId: P.ELSEWHERE, sprintId: L.THERE }]);
+        expect(lastUpdateOf(T.TASK).updatedFields.extraLists.map((entry) => String(entry.sprintId))).toEqual([L.HOME_SECOND]);
+    });
+
+    test('an addition names no list left', async () => {
+        const res = await call('PATCH /api/v2/tasks', uidOf.OWNER, { body: { action: 'addToList', taskId: T.TASK, sprintId: L.THERE } });
+
+        expect(res.code).toBe(200);
+        expect(lastUpdateOf(T.TASK)).not.toHaveProperty('leftLists');
     });
 });
 

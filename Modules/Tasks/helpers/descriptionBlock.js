@@ -1,7 +1,8 @@
 /* A task description as the editor stores it, built from plain text or simple markdown, with nothing required so the
  * web app can share it. The task panel reads `descriptionBlock`; `rawDescription` is the plain text beside it that
  * search reads. The editor puts a block's text on the page as HTML, so every character of the source is escaped and the
- * only markup written here is a link to an http or https address, shown as that address. */
+ * only markup written here is a link to an http or https address, shown as that address. Text and links are written
+ * the way cleanRichText.js writes them, so a document built here is stored as it was built. */
 
 const EDITOR_VERSION = '2.30.7';
 const MAX_BLOCKS = 1000;
@@ -17,8 +18,9 @@ const escapeHtml = (value) => String(value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replace(/\u00a0/g, '&nbsp;');
+
+const escapeAttribute = (value) => escapeHtml(value).replace(/"/g, '&quot;');
 
 const hrefOf = (address) => {
     try {
@@ -31,7 +33,7 @@ const hrefOf = (address) => {
 
 const anchor = (address) => {
     const href = hrefOf(address);
-    return href ? `<a href="${escapeHtml(href)}">${escapeHtml(address)}</a>` : escapeHtml(address);
+    return href ? `<a href="${escapeAttribute(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(address)}</a>` : escapeHtml(address);
 };
 
 /* A link never hides where it goes: "[the spec](https://…)" reads "the spec (https://…)". */

@@ -5,7 +5,7 @@ const ROOT = path.join(__dirname, '..', '..');
 /* Everything an agent run can reach: the agents themselves, the workflow and automation engines that start them
  * and hold their tool steps, the MCP server's tools, knowledge retrieval, and the model layer they all call. */
 const SCANNED = ['Modules/Agents', 'Modules/Workflows', 'Modules/Automations', 'Modules/Mcp', 'Modules/Knowledge', 'Modules/AICore', 'Modules/AgentSessions'];
-const FETCH_HELPERS = { safeFetch: ['safeFetch'], pageAudit: ['fetchPage', 'audit', 'postJson'], agentFetch: ['audit', 'postJson', 'readDeclared'] };
+const FETCH_HELPERS = { safeFetch: ['safeFetch'], pageAudit: ['fetchPage', 'audit', 'postJson'], agentFetch: ['audit', 'postJson', 'readDeclared', 'callProvider'] };
 const CID = '6f00000000000000000000a1';
 const ACTOR = '6f0000000000000000000011';
 
@@ -46,6 +46,10 @@ const FETCHERS = {
                 delete process.env.SKILL_EXTERNAL_READS;
             }
         },
+    },
+    'Modules/Agents/connectors/slackApi.js': {
+        uses: ['helper:agentFetch.*'],
+        reach: () => require('../../Modules/Agents/connectors/slackApi').call({ companyId: CID, actor: ACTOR, token: 'xoxb-not-a-real-token', method: 'auth.test' }),
     },
     'Modules/AgentSessions/announce.js': {
         uses: ['helper:agentFetch.*'],
@@ -345,6 +349,7 @@ describe('agent fetches go through the workspace egress gateway', () => {
             const { audit } = require('../../Modules/Agents/engine/agentFetch');
             await expect(audit('https://example.com/pricing')).rejects.toMatchObject({ code: 'no_workspace' });
             await expect(require('../../Modules/Agents/engine/agentFetch').postJson('https://agent.example.com/hooks/alianhub', { body: '{}' })).rejects.toMatchObject({ code: 'no_workspace' });
+            await expect(require('../../Modules/Agents/engine/agentFetch').callProvider('https://slack.com/api/auth.test', { token: 'xoxb-not-a-real-token' })).rejects.toMatchObject({ code: 'no_workspace' });
             expect(seen).toEqual([]);
         });
     });

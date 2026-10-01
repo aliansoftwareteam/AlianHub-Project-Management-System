@@ -12,6 +12,7 @@ async function rotateProblem({ companyId, secret, value }) {
     if (secret.kind === 'webhook') {
         return WEBHOOK_SECRET.test(text) ? null : { statusCode: 400, message: 'A webhook signing secret must be 32 to 256 characters with no spaces.' };
     }
+    if (secret.kind === 'connector') return { statusCode: 409, message: 'A connector\'s secret is replaced where the connector is set up, under Integrations, so the new value is checked with the provider.' };
     if (secret.kind !== 'integration') return null;
     const field = await fieldOfHandle({ companyId, handle: secret.handle });
     if (!field) return { statusCode: 409, message: 'No connected integration uses this secret, so it cannot be rotated. Revoke it instead.' };

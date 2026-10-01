@@ -51,6 +51,7 @@
             />
             <button v-else type="button" class="lv2__name" :title="data.TaskName" @click.stop="open">{{ data.TaskName }}</button>
             <span v-if="!renaming && metaText" class="lv2__key">{{ metaText }}</span>
+            <TaskHomeMark v-if="!renaming && !isSub" :task="data" :list="viewedList" />
             <span v-if="tracking" class="lv2__timer" :title="$t('List.tracking_now')">● {{ timerText }}</span>
             <button v-if="agentLine" type="button" class="lv2__agent-line" :title="agentLine" @click.stop="$emit('review-agent', proposal)">
                 ✦ {{ agentLine }}
@@ -141,6 +142,7 @@ import EstimateCell from "@/views/Projects/components/columns/EstimateCell.vue";
 import TaskColumnCell from "@/views/Projects/components/columns/TaskColumnCell.vue";
 import { defaultColumns, listColumnClass } from "@/views/Projects/composables/viewColumns";
 import { taskMenuItems } from "@/views/Projects/composables/taskMenu";
+import TaskHomeMark from "@/views/Projects/components/TaskHomeMark.vue";
 import { MAX_DEPTH } from "@taskTreeRules";
 
 defineOptions({ name: "ListRow" });
@@ -169,7 +171,8 @@ const menuRights = computed(() => ({ rename: rights.value.rename, subtask: right
 /* How many levels down the row sits. A row on the last level takes no subtasks. */
 const level = computed(() => props.depth || (props.isSub ? 1 : 0));
 const canNest = computed(() => level.value < MAX_DEPTH);
-const menuItems = computed(() => taskMenuItems(props.data, menuRights.value, { isSub: props.isSub, canNest: canNest.value }));
+const viewedList = inject("viewedList", ref(null));
+const menuItems = computed(() => taskMenuItems(props.data, menuRights.value, { isSub: props.isSub, canNest: canNest.value, listId: viewedList.value?.sprintId }));
 const statuses = computed(() => edit?.statuses.value || []);
 const showPriority = computed(() => (edit ? edit.showPriority.value : true));
 const rowEl = ref(null);
@@ -266,6 +269,7 @@ function runMenu(id) {
         "convert-subtask": viaSidebar,
         "convert-list": viaSidebar,
         move: props.isSub ? viaSidebar : () => menu.startMove(task),
+        "remove-from-list": () => menu.removeFromList(task, viewedList.value?.sprintId),
         duplicate: props.isSub ? viaSidebar : () => menu.duplicate(task),
         "duplicate-subtasks": () => menu.duplicate(task, { withSubtasks: true }),
         merge: viaSidebar,

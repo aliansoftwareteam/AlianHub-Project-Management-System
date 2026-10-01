@@ -33,6 +33,7 @@ import { saveSingleKeyShortcuts } from '@/composable/shortcutPreferences';
 import { PALETTE_OPEN_EVENT, isPaletteShortcut } from '@/components/molecules/AdvanceSearch/paletteKeys';
 import { navKeyDirection } from '@/components/organisms/TaskDetailOverlay/taskNavigation';
 import KeyboardShortcuts from '@/components/organisms/KeyboardShortcuts/KeyboardShortcuts.vue';
+import { resetOnboardingRecord } from '@/composable/onboardingState';
 
 const HOME = { key: 'home', to: { name: 'Home', params: { cid: 'company-1' } } };
 const INBOX = { key: 'inbox', to: { name: 'inbox', params: { cid: 'company-1' } } };
@@ -77,6 +78,8 @@ beforeEach(() => {
     nav.items = [HOME, INBOX, PROJECTS];
     push.mockClear();
     apiRequestWithoutCompnay.mockReset();
+    apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true } });
+    resetOnboardingRecord();
     try { localStorage.clear(); } catch (e) { /* jsdom storage */ }
     setSingleKeyShortcuts(true);
     closeShortcutSheet();
@@ -324,6 +327,23 @@ describe('turning single-key shortcuts off', () => {
         expect(shortcutPrefs.singleKeys).toBe(true);
         await mountShortcuts({ accessibilityPreferences: { singleKeyShortcuts: false } });
         expect(shortcutPrefs.singleKeys).toBe(false);
+    });
+
+    it('records the first opening of the sheet on the user, once', async () => {
+        await mountShortcuts();
+        await press('?');
+        expect(apiRequestWithoutCompnay).toHaveBeenCalledWith('put', env.USER_ONBOARDING, { viewedShortcuts: true });
+        closeShortcutSheet();
+        await nextTick();
+        await press('?');
+        expect(apiRequestWithoutCompnay).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not record it again for someone whose record already has it', async () => {
+        await mountShortcuts({ homeChecklist: { viewedShortcuts: true } });
+        await press('?');
+        expect(sheet()).not.toBeNull();
+        expect(apiRequestWithoutCompnay).not.toHaveBeenCalled();
     });
 
     it('saves the choice on the user', async () => {

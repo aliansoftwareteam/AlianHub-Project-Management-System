@@ -1,6 +1,8 @@
 const { defineConfig } = require('@vue/cli-service');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const path = require('path');
+const webpack = require('webpack');
+const { FIRST_PAINT_BUDGET_BYTES } = require('./firstPaintBudget');
 const brandSettings = require('../brandSettings.json');
 const imageURL = `/api/v1/getlogo?key=logo&type=web`;
 
@@ -54,10 +56,20 @@ module.exports = defineConfig({
         '@taskTreeRules': path.resolve(__dirname, '../Modules/Tasks/helpers/taskTreeRules.js'),
         '@taskExtraListsRules': path.resolve(__dirname, '../Modules/Tasks/helpers/taskExtraListsRules.js'),
         '@descriptionBlock': path.resolve(__dirname, '../Modules/Tasks/helpers/descriptionBlock.js'),
+        '@richTextAllowlist': path.resolve(__dirname, '../Modules/Tasks/helpers/richTextAllowlist.js'),
         '@formLogic': path.resolve(__dirname, '../Modules/Forms/helpers/formLogic.js'),
       },
     },
+    // A production build fails once the files a first paint downloads outgrow the budget. Only that
+    // set is budgeted: a chunk fetched later may be any size (the city list alone is 8 MB).
+    performance: {
+      hints: process.env.NODE_ENV === 'production' ? 'error' : false,
+      maxEntrypointSize: FIRST_PAINT_BUDGET_BYTES,
+      maxAssetSize: Number.MAX_SAFE_INTEGER,
+    },
     plugins: [
+      // moment pulls in every locale it ships; the app never switches moment's locale.
+      new webpack.IgnorePlugin({ resourceRegExp: /^\.\/locale$/, contextRegExp: /moment$/ }),
       new HtmlWebpackPlugin({
         template: 'public/index.html',
         filename: 'index.html',

@@ -26,7 +26,7 @@ vi.mock('@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.
     __esModule: true,
     default: {
         name: 'ConvertToSubTaskSidebar',
-        props: ['closeSideBar', 'isMoveTask', 'isBulkMove', 'isOpenSubTask', 'isBulkConvert', 'task', 'projectOptions'],
+        props: ['closeSideBar', 'isMoveTask', 'isBulkMove', 'isOpenSubTask', 'isBulkConvert', 'task', 'projectOptions', 'listPicker'],
         emits: ['isConvertSubtaskOPen', 'bulkMoveConfirm', 'bulkConvertConfirm'],
         template: '<div class="placement-stub"></div>'
     }
@@ -115,8 +115,8 @@ describe('bulk placement helpers', () => {
         expect(none.moveProject).toEqual({ enabled: false, reason: 'BulkActions.move_denied' });
         expect(none.toSubtask).toEqual({ enabled: false, reason: 'BulkActions.convert_denied' });
         expect(none.toTask).toEqual({ enabled: false, reason: 'BulkActions.convert_denied' });
-        expect(placementActions({ count: 2, subtasks: 1, looseSubtasks: 1 }, all))
-            .toEqual({ moveProject: { enabled: true }, toSubtask: { enabled: true }, toTask: { enabled: true } });
+        expect(placementActions({ count: 2, subtasks: 1, looseSubtasks: 1 }, { ...all, addToList: true }))
+            .toEqual({ moveProject: { enabled: true }, toSubtask: { enabled: true }, toTask: { enabled: true }, addToList: { enabled: true } });
     });
 
     it('reports skipped and failed items with the commonest reason', () => {
@@ -235,6 +235,66 @@ describe('ListBulkBar placement', () => {
             sprintObj: { id: 'x1', name: 'Inbox' }
         });
         expect(store.state.taskSelection.selectedTaskIds).toEqual([]);
+    });
+
+    it('adds the selection to another list through a plain list picker, and says what was left out', async () => {
+        const wrapper = mountBar(['t1', 't2']);
+        apiRequest.mockImplementation((method) => (method === 'post'
+            ? ok({ projectId: 'p2', sprintId: 'x1', added: ['t1'], skipped: [{ taskId: 't2', code: 'ALREADY_IN_LIST', reason: 'server text' }] })
+            : Promise.resolve({ data: [] })));
+        await menu(wrapper, 'List.sprint').trigger('click');
+        await item(wrapper, 'TaskLists.bulk_add').trigger('click');
+        await flushPromises();
+
+        const picker = sidebar(wrapper);
+        expect(picker.props()).toMatchObject({ isMoveTask: true, isBulkMove: true });
+        expect(picker.props('listPicker')).toMatchObject({ title: 'TaskLists.bulk_add', confirm: 'TaskLists.add_confirm', note: 'TaskLists.bulk_add_note' });
+        expect([{ _id: 'a' }, { _id: 'b', isScrum: true }, { _id: 'c', isBacklog: true }].map(picker.props('listPicker').offers)).toEqual([true, false, false]);
+        expect(picker.props('projectOptions').map((p) => p._id)).toEqual(['p1', 'p2', 'p4']);
+
+        picker.vm.$emit('bulkMoveConfirm', { project: other, sprint: { id: 'x1', name: 'Inbox' } });
+        await flushPromises();
+        expect(bodies()).toEqual([{ action: 'bulkAddToList', taskIds: ['t1', 't2'], sprintId: 'x1' }]);
+        expect(toast.success).toHaveBeenCalledWith('TaskLists.bulk_added');
+        expect(toast.warning).toHaveBeenCalledWith('TaskLists.bulk_skipped');
+        expect(store.state.taskSelection.selectedTaskIds).toEqual([]);
+        expect(en.TaskLists.bulk_skipped).toBe('{n} not added: {reason}');
+        expect(en.TaskLists.bulk_added).toBe('{n} added to {list}.');
+    });
+
+    it('a move opens the same sidebar without the list picker', async () => {
+        const wrapper = mountBar(['t2']);
+        await menu(wrapper, 'List.sprint').trigger('click');
+        await item(wrapper, 'List.bulk_move_project').trigger('click');
+        await flushPromises();
+
+        expect(sidebar(wrapper).props('listPicker')).toBeNull();
+    });
+
+    it('does not offer another list for subtasks alone or without the right to move tasks, and says why', async () => {
+        const subtasksOnly = mountBar(['s-b']);
+        await menu(subtasksOnly, 'List.sprint').trigger('click');
+        expect(item(subtasksOnly, 'TaskLists.bulk_add').attributes()).toMatchObject({ disabled: '', title: 'TaskLists.bulk_subtasks_hint' });
+
+        denied.add('task.task_move');
+        const noRight = mountBar(['t2']);
+        await menu(noRight, 'List.sprint').trigger('click');
+        expect(item(noRight, 'TaskLists.bulk_add').attributes()).toMatchObject({ disabled: '', title: 'BulkActions.move_denied' });
+    });
+
+    it('says the server\'s reason in words when it refuses the list', async () => {
+        const wrapper = mountBar(['t2']);
+        apiRequest.mockImplementation((method) => (method === 'post'
+            ? Promise.reject({ response: { status: 400, data: { status: false, code: 'SCRUM_LIST' } } })
+            : Promise.resolve({ data: [] })));
+        await menu(wrapper, 'List.sprint').trigger('click');
+        await item(wrapper, 'TaskLists.bulk_add').trigger('click');
+        await flushPromises();
+        sidebar(wrapper).vm.$emit('bulkMoveConfirm', { project: other, sprint: { id: 'x1', name: 'Inbox' } });
+        await flushPromises();
+
+        expect(toast.error).toHaveBeenCalledWith('TaskLists.refusal_scrum_list');
+        expect(store.state.taskSelection.selectedTaskIds).toEqual(['t2']);
     });
 
     it('will not move subtasks away from their parent, and says why', async () => {
