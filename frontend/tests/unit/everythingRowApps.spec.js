@@ -12,6 +12,8 @@ import fixture from '../fixtures/everythingResponses.json';
 
 vi.mock('@/services', () => ({ apiRequest: vi.fn(), apiRequestWithoutCompnay: vi.fn(), apiRequestWithoutSecure: vi.fn() }));
 
+// The store and the composable import each other; the app loads the store first, and so must this.
+import '@/store';
 import EverythingRow from '@/views/Everything/EverythingRow.vue';
 import { useCustomComposable } from '@/composable';
 
@@ -49,7 +51,7 @@ describe('a row decides from the project it is handed', () => {
 
     it('shows no priority when the plan does not include the app, whatever the project says', () => {
         expect(mountRow(cards[WEB], { planFeature: { projectProjectApp: false } }).find('.evr__prio').text()).toBe('');
-        expect(mountRow(cards[WEB], { planFeature: undefined }).find('.evr__prio').text()).toBe('');
+        expect(mountRow(cards[WEB], { planFeature: null }).find('.evr__prio').text()).toBe('');
     });
 
     it('offers the status of the row\'s project, named by that project', () => {

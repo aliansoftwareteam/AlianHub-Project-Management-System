@@ -12,10 +12,7 @@ vi.mock('vue-router', async (importOriginal) => ({
     useRoute: () => current,
     useRouter: () => ({ hasRoute: () => true })
 }));
-vi.mock('@/composable', async (importOriginal) => {
-    const real = await importOriginal();
-    return { ...real, useCustomComposable: () => ({ ...real.useCustomComposable(), checkPermission: (key) => (permissions.denied.includes(key) ? null : true) }) };
-});
+vi.mock('@/composable', () => ({ useCustomComposable: () => ({ checkPermission: (key) => (permissions.denied.includes(key) ? null : true) }) }));
 
 import homeRoutes from '@/router/home';
 import { useNavItems } from '@/components/organisms/Shell/navItems';

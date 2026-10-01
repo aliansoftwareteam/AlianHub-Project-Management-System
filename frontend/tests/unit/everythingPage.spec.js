@@ -30,11 +30,11 @@ vi.mock('@/views/Projects/ListView/ListDueCell.vue', async () => {
 });
 vi.mock('@/views/Projects/ListView/ListStatusCircle.vue', async () => {
     const { h } = await import('vue');
-    return { default: { name: 'ListStatusCircle', props: ['task', 'statuses', 'editable', 'chip'], emits: ['change'], render() { return h('span', { class: 'stub-status' }, this.task.status?.text); } } };
+    return { default: { name: 'ListStatusCircle', props: { task: Object, statuses: Array, editable: Boolean, chip: Boolean }, emits: ['change'], render() { return h('span', { class: 'stub-status' }, this.task.status?.text); } } };
 });
 vi.mock('@/views/Projects/ListView/ListPriorityCell.vue', async () => {
     const { h } = await import('vue');
-    return { default: { name: 'ListPriorityCell', props: ['task', 'editable'], emits: ['change'], render() { return h('span', { class: 'stub-priority' }, this.task.Task_Priority); } } };
+    return { default: { name: 'ListPriorityCell', props: { task: Object, editable: Boolean }, emits: ['change'], render() { return h('span', { class: 'stub-priority' }, this.task.Task_Priority); } } };
 });
 
 import everything from '@/store/Everything';
