@@ -1,4 +1,4 @@
-import { isOwnTabUpdate } from '@/utils/taskUpdateMarker';
+import { isOwnTabUpdate, ownEditsInFlight } from '@/utils/taskUpdateMarker';
 import { useCustomComposable } from '@/composable/index.js';
 import { isOwnerOrAdmin } from "@/utils/roles";
 import { locate, placeRow, removeRow, treeOf } from "./taskTree";
@@ -187,7 +187,7 @@ const MEMBERSHIP_FIELDS = ["deletedStatusKey", "sprintId", "isParentTask"];
 
 /* Whether an event from the server can have changed how many tasks a group holds. The
    arithmetic below only knows the group a task left when the store holds that task, and it
-   covers neither removals nor grouping by assignee or custom field, so the List asks the
+   covers neither removals nor a team assignee or grouping by custom field, so the List asks the
    server for the counts after any of these. Local, optimistic writes are left out: the
    server may not have stored them yet. */
 function changesGroupCounts(groupBy, op, data, updatedFields) {
@@ -234,8 +234,39 @@ function keepsOwnReorder(bucket, data, updatedFields) {
     return true;
 }
 
+/* An event from the server while this tab's edit of the same task is unanswered: the fields
+   that edit holds stay as the person left them, and are not counted as a move. */
+function keepOwnEdits({data, updatedFields}) {
+    const held = data ? ownEditsInFlight(data._id) : {};
+    const fields = Object.keys(held);
+    if(!fields.length) return {data, updatedFields};
+    return {
+        data: {...data, ...held},
+        updatedFields: Object.fromEntries(Object.entries(updatedFields || {}).filter(([field]) => !fields.includes(field)))
+    };
+}
+
+/* Grouped by assignee a task sits in the group of each person it names, or in Unassigned. A
+   team is left to the server's count: it puts the task in the group of every member. */
+function assigneeCountMoves(tasks, groupBy, updatedFields, taskId) {
+    const next = updatedFields?.AssigneeUserId;
+    const row = tasks?.find((x) => x._id === taskId);
+    if(groupBy.type !== 1 || !row || !Array.isArray(next)) return [];
+    const previous = row.AssigneeUserId || [];
+    if([...previous, ...next].some((id) => String(id).startsWith("tId_"))) return [];
+    const keyOf = (id) => groupBy.items?.find((x) => (id === null ? x.value === "[]" : Array.isArray(x.value) && x.value[0] === id))?.key;
+    const groupsOf = (ids) => (ids.length ? ids : [null]);
+    const before = groupsOf(previous);
+    const after = groupsOf(next);
+    return [
+        ...after.filter((id) => !before.includes(id)).map((id) => [keyOf(id), 1]),
+        ...before.filter((id) => !after.includes(id)).map((id) => [keyOf(id), -1])
+    ].filter(([key]) => key);
+}
+
 export const mutateUpdateFirebaseTasks = (state, payload) => {
-    const {pid, sprintId, op, data, snap, updatedFields,dragDropcheck, groupBy: payloadGroupBy} = payload;
+    const {pid, sprintId, op, snap, dragDropcheck, groupBy: payloadGroupBy} = payload;
+    const {data, updatedFields} = snap && op === "modified" ? keepOwnEdits(payload) : payload;
 
     const projectFound = Object.keys(state.tasks).includes(pid);
 
@@ -244,10 +275,10 @@ export const mutateUpdateFirebaseTasks = (state, payload) => {
         const sprintFound = state.tasks[pid].sprints.includes(sprintId);
         if(sprintFound) {
             if(groupBy) {
-                if(snap && changesGroupCounts(groupBy, op, data, updatedFields)) {
+                if(snap && changesGroupCounts(groupBy, op, data, payload.updatedFields)) {
                     state.tasks[pid][sprintId].countsStale = (state.tasks[pid][sprintId].countsStale || 0) + 1;
                 }
-                if(snap && changesGroupTotals(op, data, updatedFields)) {
+                if(snap && changesGroupTotals(op, data, payload.updatedFields)) {
                     state.tasks[pid][sprintId].totalsStale = (state.tasks[pid][sprintId].totalsStale || 0) + 1;
                 }
                 if(["modified", "added"]?.includes(op) && data.isParentTask) {
@@ -265,6 +296,12 @@ export const mutateUpdateFirebaseTasks = (state, payload) => {
                         } else {
                             state.tasks[pid][sprintId].found[removeKey] = 0
                         }
+                    }
+                    if(op === "modified") {
+                        const found = state.tasks[pid][sprintId].found;
+                        assigneeCountMoves(state.tasks[pid][sprintId].tasks, groupBy, updatedFields, data._id).forEach(([key, step]) => {
+                            found[key] = Math.max(0, (found[key] || 0) + step);
+                        });
                     }
                 } else if(["removed"]?.includes(op)) {
                     const {removeKey} = returnItemCountDetails(state.tasks[pid][sprintId].tasks, groupBy, null, data._id);
