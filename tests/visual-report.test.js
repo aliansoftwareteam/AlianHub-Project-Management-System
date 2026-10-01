@@ -17,6 +17,12 @@ describe('what a run reports', () => {
         expect(result.text).not.toContain('visual:accept');
     });
 
+    test('a run that broke before comparing does not read as a match', () => {
+        const { text } = summarise({ proposed: [], baseline: [], runId: '77', failed: true });
+        expect(text).not.toContain('matches');
+        expect(text).toContain('failed');
+    });
+
     test('a proposed shot with a baseline is a change; one without is a missing baseline', () => {
         const result = summarise({
             proposed: ['home__light__1440x900.png', 'doc__dark__1440x900.png', 'notes.txt'],

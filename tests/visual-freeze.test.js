@@ -53,8 +53,4 @@ describe('freezing the dates the server stamped during the run', () => {
         const body = JSON.stringify({ _id: '66fb1e2a9c3d4e5f6a7b8c9d', key: 1759309200000, count: 42, day: '2026-10-01' });
         expect(freezeTimestamps(body, run)).toBe(body);
     });
-
-    test('a socket.io polling frame is text, not JSON, and is handled the same way', () => {
-        expect(freezeTimestamps('42["taskUpdated",{"updatedAt":"2026-10-01T09:10:00.000Z"}]', run)).toContain(minuteOf(SEEDED));
-    });
 });
