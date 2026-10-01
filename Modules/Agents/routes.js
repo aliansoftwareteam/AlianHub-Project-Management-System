@@ -6,6 +6,7 @@ const schedulesCtrl = require('./schedulesController');
 const builderCtrl = require('./builderController');
 const chatCtrl = require('./chatController');
 const projectPolicyCtrl = require('./projectPolicyController');
+const projectManagerCtrl = require('./manager/controller');
 const { agentPerimeter } = require('./guard');
 
 exports.init = (app) => {
@@ -77,6 +78,8 @@ exports.init = (app) => {
     app.put('/api/v2/agents/policy', ctrl.setPolicy);
     app.get('/api/v2/agents/project-policy/:projectId', projectPolicyCtrl.getProjectPolicy);
     app.put('/api/v2/agents/project-policy/:projectId', projectPolicyCtrl.putProjectPolicy);
+    app.get('/api/v2/agents/project-manager/:projectId', projectManagerCtrl.getProjectManager);
+    app.put('/api/v2/agents/project-manager/:projectId', projectManagerCtrl.putProjectManager);
 
     app.get('/api/v2/agents', ctrl.listAgents);
     app.post('/api/v2/agents', ctrl.createAgent);

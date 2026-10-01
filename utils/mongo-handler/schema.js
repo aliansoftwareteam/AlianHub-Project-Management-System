@@ -1143,6 +1143,24 @@ const schema = {
         firstSeenAt: { type: Date, required: false },
         lastSeenAt: { type: Date, required: false },
     },
+    // What a project's daily look found, by rule and with no model — managed by Modules/Agents/manager.
+    projectFindings: {
+        projectId: { type: mongoose.Schema.Types.Mixed, required: true, set: objectIdIfHex },
+        // rule, subject and cause; one row per project and key, reopened when the cause comes back
+        key: { type: String, required: true },
+        rule: { type: String, required: true },
+        taskId: { type: String, required: false },
+        // every task the finding names or counts: a reader sees it only when they can open them all
+        taskIds: { type: [String], default: [], required: false },
+        userId: { type: String, required: false },
+        facts: { type: Object, default: {}, required: false },
+        // open | handled (its change was approved and the cause lasts) | declined (never offered again) | closed (the cause is gone)
+        status: { type: String, default: 'open', required: true },
+        proposalId: { type: String, required: false },
+        openedAt: { type: Date, required: false },
+        lastSeenAt: { type: Date, required: false },
+        closedAt: { type: Date, required: false },
+    },
     // Agents as teammates — managed by Modules/Agents.
     agents: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.
@@ -1457,8 +1475,11 @@ const schema = {
         declineReason: { type: String, required: false },
         // { sources: [{ kind, ref, at }], reason } — set when the run behind it read external content
         taint: { type: Object, required: false },
-        // 'mcp' when an MCP tool call filed it: requestedBy is the token's person, who the approved change runs as
+        // 'mcp' when an MCP tool call filed it: requestedBy is the token's person, who the approved change runs as.
+        // 'system' when a project's daily look filed it: the approved change runs on the approver's own rights.
         source: { type: String, required: false },
+        // { id, rule, facts, projectName } of the finding a 'system' proposal answers
+        finding: { type: Object, required: false },
         requestedBy: { type: String, required: false },
         tokenId: { type: String, required: false },
         // the token's project list when it filed; approval refuses a target outside it
@@ -3551,6 +3572,16 @@ const schema = {
         // { done: 'never' | 'approval' | 'yes', connected: 'propose_all' | 'single_task', updatedBy, updatedAt }; absent means the defaults (Modules/Agents/projectPolicy.js).
         agentPolicy: {
             type: Object,
+            required: false
+        },
+        // { on, updatedBy, updatedAt }; absent means off (Modules/Agents/manager/settings.js).
+        agentManager: {
+            type: Object,
+            required: false
+        },
+        // The day (YYYY-MM-DD) of the last daily look: the mark a server takes before it looks, so two never look on one day.
+        agentManagerLookedOn: {
+            type: String,
             required: false
         },
         ProjectType: {

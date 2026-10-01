@@ -102,6 +102,7 @@ const SCHEMA_TYPE = {
     WORKFLOW_APPROVALS: "workflow_approvals",
     WORKFLOW_DEFINITIONS: "workflow_definitions",
     AGENT_FINDINGS: "agent_findings",
+    PROJECT_FINDINGS: "project_findings",
     AGENTS: "agents",
     AGENT_RUNS: "agent_runs",
     AGENT_REVISIONS: "agent_revisions",

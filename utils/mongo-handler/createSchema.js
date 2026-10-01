@@ -280,6 +280,11 @@ const agentFindingsSchema = new Schema(schema.agentFindings, {strict: true, time
 agentFindingsSchema.index({ taskId: 1, factId: 1 }, { unique: true });
 agentFindingsSchema.index({ projectId: 1, status: 1 });
 
+const projectFindingsSchema = new Schema(schema.projectFindings, {strict: true, timestamps: true});
+// One row per project and cause. Unique, so two servers looking at once cannot file the same finding twice.
+projectFindingsSchema.index({ projectId: 1, key: 1 }, { unique: true, name: 'project_cause' });
+projectFindingsSchema.index({ projectId: 1, status: 1, openedAt: -1 });
+
 const agentsSchema = new Schema(schema.agents, {strict: true, timestamps: true});
 agentsSchema.index({ paused: 1 });
 agentsSchema.index({ ownerId: 1 });
@@ -572,6 +577,7 @@ module.exports = {
     workflowApprovalsSchema,
     workflowDefinitionsSchema,
     agentFindingsSchema,
+    projectFindingsSchema,
     agentsSchema,
     agentRunsSchema,
     agentRevisionsSchema,
