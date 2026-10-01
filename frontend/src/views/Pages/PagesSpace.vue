@@ -183,7 +183,7 @@
                 <template v-else>
                     <div class="hub__section-head">
                         <span class="ah-label">{{ projectNameOf(viewProjectId) }}</span>
-                        <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="createDoc({ projectId: viewProjectId })">
+                        <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="createDoc({})">
                             <ShellIcon name="plus" :size="13" />{{ $t('Docs.new_doc') }}
                         </button>
                     </div>
@@ -324,7 +324,7 @@ function open(page) {
     router.push({ name: 'PageEditor', params: { cid: route.params.cid, pageId: String(page._id) } });
 }
 
-function createDoc({ projectId = '', isWiki = false, template = null }) {
+function createDoc({ projectId = viewProjectId.value, isWiki = false, template = null }) {
     const body = {
         title: template ? t(template.label) : t('Docs.untitled'),
         ...(projectId ? { projectId } : {}),

@@ -80,6 +80,7 @@ describe('MainChatPanel listens to every event its children raise', () => {
         'MainChatMessageList',
         'MainChatInfo',
         'MainChatSearch',
+        'MainChatThread',
         'MainChatSummary',
         'MakeTaskSheet',
     ])('%s', (child) => {

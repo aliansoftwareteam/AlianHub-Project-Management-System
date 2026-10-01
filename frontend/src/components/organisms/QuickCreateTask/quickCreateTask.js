@@ -1,4 +1,5 @@
 import { reactive } from "vue";
+import { folderPathLabel, isLiveFolder } from "@/utils/folderTree";
 
 const LAST_PROJECT_KEY = "ah.quickCreate.lastProject";
 const DRAFT_KEY = "ah.quickCreate.draft";
@@ -121,19 +122,24 @@ export function hasPriorityApp(project, company) {
     return Boolean(on && company && company.planFeature && company.planFeature.projectProjectApp);
 }
 
-/* A project's lists as the create dialog offers them: live lists only, and none from a
- * deleted folder. Accepts the sprint and folder documents the sprintFolder API returns. */
+/* A project's lists as the create dialog offers them: live lists only, and none from a folder that
+ * is not live or sits under one that is not. `folderName` is what the task stores of its folder;
+ * `folderPath` is the path the dialog shows. Accepts the documents the sprintFolder API returns. */
 export function listsOf(sprintDocs, folderDocs = []) {
     const live = (x) => Number((x && x.deletedStatusKey) || 0) === 0;
-    const liveFolders = new Map(folderDocs.filter(live).map((f) => [String(f._id || f.id), f.name || f.folderName || ""]));
+    const liveFolders = new Map(folderDocs.filter((f) => isLiveFolder(folderDocs, f)).map((f) => [String(f._id || f.id), f]));
     return (sprintDocs || [])
         .filter(live)
         .filter((s) => !s.folderId || !folderDocs.length || liveFolders.has(String(s.folderId)))
-        .map((s) => ({
-            id: String(s._id || s.id),
-            name: s.name || "",
-            value: s.value,
-            folderId: s.folderId ? String(s.folderId) : "",
-            folderName: s.folderId ? (liveFolders.get(String(s.folderId)) || s.folderName || "") : ""
-        }));
+        .map((s) => {
+            const folder = s.folderId ? liveFolders.get(String(s.folderId)) : null;
+            return {
+                id: String(s._id || s.id),
+                name: s.name || "",
+                value: s.value,
+                folderId: s.folderId ? String(s.folderId) : "",
+                folderName: s.folderId ? ((folder && (folder.name || folder.folderName)) || s.folderName || "") : "",
+                ...(folder ? { folderPath: folderPathLabel(folderDocs, folder) } : {})
+            };
+        });
 }
