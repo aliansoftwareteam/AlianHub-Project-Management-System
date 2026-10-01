@@ -27,9 +27,10 @@
     import { useToast } from 'vue-toast-notification';
     import {defineComponent,ref, watch,inject} from 'vue'
     import CustomFieldList from "../../atom/settingCustomField/customFieldList.vue";
+    import { projectLinkRequest } from "../../../fieldProjectLinks";
 
     const $toast = useToast();
-    const {getters,commit} = useStore();
+    const {getters,commit,dispatch} = useStore();
     const { t } = useI18n();
 
     // inject
@@ -136,26 +137,27 @@
             console.error("Error in updating the custom field")
         }
     };
-    const updateCustomFieldProject = async(value) => {
+    const updateCustomFieldProject = async(value, before) => {
         value.updatedAt = new Date();
         const object = {
             type: "updateOne",
             key: "$set",
             id: value._id,
-            updateObject: {
-                projectId: value.global ? [] : value.projectId,
-                global: value.global
-            }
+            ...projectLinkRequest(before, value)
         };
+        // The list shows the change before the server answers, so a refusal reads the stored definitions back.
+        const rereadDefinitions = () => dispatch("settings/setfinalCustomFields");
         await apiRequest("put",env.CUSTOM_FIELD,object).then((res) => {
             if(res.status === 200){
                 commit("settings/mutateFinalCustomFields", {data: {...value} || {},op: "modified"});
                 $toast.success(t('Toast.Field_Updated_Successfully'), {position: 'top-right' })
             }else{
+                rereadDefinitions();
                 $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
             }
         }).catch((err)=>{
             console.error("Error in updating the custom field",err);
+            rereadDefinitions();
             $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
         });
     };

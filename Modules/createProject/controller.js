@@ -60,6 +60,7 @@ const { resolveProjectSkills } = require("../settings/ProjectSkills/helper");
 const { normaliseSource, cleanProposalId, numericProposalId, validateProposalId } = require("../Project/helpers/projectSourceRules");
 const { stepProjectCount } = require("../Project/helpers/projectQuota");
 const { recordProjectCreated } = require("../Project/helpers/projectHistory");
+const { announceFields } = require("../CustomField/helpers/fieldProjects");
 
 exports.checkProjectPlan = (req) => {
     return new Promise(async(resolve,reject) => {
@@ -630,7 +631,7 @@ exports.createProject = async (req) => {
                                 reject({status: false, statusText: 'error in creating project'});
                                 return;
                             }
-                            removeCache(`customField:${companyId}`);
+                            announceFields(companyId, 'insert');
                         }
 
                         // Awaited because clients create their first task straight from this response and a task needs a sprint.

@@ -7,6 +7,7 @@ const { hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
 const { sprintPlacementOf } = require('../Tasks/helpers/sprintPlacement');
 const { canManageRules } = require('../Automations/helpers/ruleAccess');
 const matcher = require('../Automations/engine/matcher');
+const { asList, announceFields } = require('../CustomField/helpers/fieldProjects');
 const rules = require('./rules');
 
 const asId = (id) => new mongoose.Types.ObjectId(String(id));
@@ -43,13 +44,14 @@ const copyAutomations = async ({ companyId, caller, sourceId, projectId, ids, no
 /* The definitions are shared with the copy rather than cloned, so the values on copied tasks,
    the view settings and the automations that name a field keep meaning the same field. */
 const linkCustomFields = async (companyId, sourceId, projectId) => {
-    const shared = await find(companyId, SCHEMA_TYPE.CUSTOM_FIELDS, { projectId: sourceId, global: { $ne: true } }, { _id: 1 });
+    const shared = await find(companyId, SCHEMA_TYPE.CUSTOM_FIELDS, { projectId: sourceId, global: { $ne: true } }, { _id: 1, projectId: 1 });
     if (!shared.length) return [];
+    for (const field of shared) await asList(companyId, field);
     await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.CUSTOM_FIELDS,
         data: [{ _id: { $in: shared.map((field) => field._id) } }, { $addToSet: { projectId } }],
     }, 'updateMany');
-    removeCache(`customField:${companyId}`);
+    announceFields(companyId);
     return shared.map((field) => String(field._id));
 };
 
@@ -117,7 +119,7 @@ const discard = async (companyId, made) => {
         drop(SCHEMA_TYPE.PROJECTS, { _id: projectRef }),
         made.rules.length ? drop(SCHEMA_TYPE.AUTOMATION_RULES, { _id: { $in: made.rules } }).then(() => automationsChanged(companyId)) : null,
         MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.CUSTOM_FIELDS, data: [{ projectId }, { $pull: { projectId } }] }, 'updateMany')
-            .then(() => removeCache(`customField:${companyId}`)),
+            .then(() => announceFields(companyId)),
     ]);
 };
 

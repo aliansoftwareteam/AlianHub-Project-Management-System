@@ -95,6 +95,7 @@ const logo = "/api/v1/getlogo?key=logo&type=desktop";
 import { useRoute, useRouter } from 'vue-router';
 import { languageTranslateHelper } from './composable/index';
 import {socketHelper} from './composable/socketHelper';
+import { useFieldDefinitionsSync } from '@/plugins/customFieldView/fieldDefinitionsSync';
 import { apiRequest,apiRequestWithoutCompnay } from './services';
 import OfflineBanner from '@/components/offline/OfflineBanner.vue';
 import { initOffline } from '@/offline';
@@ -718,6 +719,7 @@ provide("$defaultGhostCustomUserImg", defaultGhostCustomUser);
 provide("$currentLoggedInUserDetails", '');
 provide("$mainTour", mainTour);
 provide("$socket",socket);
+useFieldDefinitionsSync(socket);
 
 </script>
 

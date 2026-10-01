@@ -174,9 +174,34 @@ describe('the projects of a field', () => {
 
         expect((await update(OWNER, field._id, { addProjects: [beta] })).statusCode).toBe(200);
         expect(stored(field._id).projectId).toEqual([alpha, beta]);
+        const writes = mockDb.calls.filter((call) => call.type === SCHEMA_TYPE.CUSTOM_FIELDS && call.method === 'updateOne').map((call) => call.data);
+        expect(writes[1][0]).toEqual({ _id: field._id, projectId: alpha });
+        expect(writes.slice(1).map(([, change]) => Object.keys(change))).toEqual([['$set'], ['$addToSet']]);
 
         expect((await update(OWNER, field._id, { removeProjects: [alpha] })).statusCode).toBe(200);
         expect(stored(field._id).projectId).toEqual([beta]);
+    });
+
+    it('are a list afterwards when an older field held none as empty text', async () => {
+        const field = seedField({ global: true, projectId: '' });
+
+        expect((await update(OWNER, field._id, { updateObject: { global: false }, addProjects: [alpha] })).statusCode).toBe(200);
+
+        const writes = mockDb.calls.filter((call) => call.type === SCHEMA_TYPE.CUSTOM_FIELDS && call.method === 'updateOne').map((call) => call.data);
+        expect(writes[1][0]).toEqual({ _id: field._id, projectId: '' });
+        expect(writes.slice(1).map(([, change]) => Object.keys(change))).toEqual([['$set'], ['$addToSet']]);
+        expect(stored(field._id)).toMatchObject({ global: false, projectId: [alpha] });
+    });
+
+    it('are taken off even when the copy that asks was read before the project was linked', async () => {
+        const field = seedField({ projectId: [alpha] });
+        const { linkPlan } = require('../Modules/CustomField/helpers/fieldProjects');
+
+        expect(linkPlan({ projectId: [alpha] }, { removeProjects: [beta, beta] })).toMatchObject({ remove: [beta], add: [], dropped: [], result: [alpha] });
+        await update(OWNER, field._id, { addProjects: [beta] });
+        expect((await update(OWNER, field._id, { removeProjects: [beta] })).statusCode).toBe(200);
+
+        expect(linked(field._id)).toEqual([alpha]);
     });
 
     it('are cleared when the field is made company-wide', async () => {

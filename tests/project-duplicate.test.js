@@ -33,6 +33,7 @@ const mongoose = require('mongoose');
 const { myCache } = require('../Config/config');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { removeCache } = require('../utils/commonFunctions');
+const socketEmitter = require('../event/socketEventEmitter');
 const { stepProjectCount } = require('../Modules/Project/helpers/projectQuota');
 const { recordProjectCreated } = require('../Modules/Project/helpers/projectHistory');
 const matcher = require('../Modules/Automations/engine/matcher');
@@ -332,6 +333,16 @@ describe('the project itself', () => {
         expect(rowsOf(SCHEMA_TYPE.CUSTOM_FIELDS).find((row) => row._id === own._id).projectId).toEqual([launch.id, id]);
         expect(rowsOf(SCHEMA_TYPE.CUSTOM_FIELDS).find((row) => row._id === other._id).projectId).toHaveLength(1);
         expect(removeCache).toHaveBeenCalledWith(`customField:${C}`);
+        expect(socketEmitter.emit).toHaveBeenCalledWith('update', { type: 'update', companyId: C, module: 'customFields' });
+    });
+
+    it('links a field that holds its one project as text', async () => {
+        const own = seed(SCHEMA_TYPE.CUSTOM_FIELDS, { fieldTitle: 'Shape', global: false, projectId: launch.id });
+        const { id } = copyOf(await duplicate(launch.id));
+        const writes = db().calls.filter((call) => call.type === SCHEMA_TYPE.CUSTOM_FIELDS && ['updateOne', 'updateMany'].includes(call.method));
+        expect(writes.map((call) => [call.method, Object.keys(call.data[1])[0]])).toEqual([['updateOne', '$set'], ['updateMany', '$addToSet']]);
+        expect(writes[0].data[0]).toEqual({ _id: own._id, projectId: launch.id });
+        expect(rowsOf(SCHEMA_TYPE.CUSTOM_FIELDS).find((row) => row._id === own._id).projectId).toEqual([launch.id, id]);
     });
 
     it('copies the permissions of a project that has its own', async () => {
@@ -514,7 +525,6 @@ describe('tasks', () => {
     });
 
     it('never fire the task-created event, a notification or a history line for a copied task', async () => {
-        const socketEmitter = require('../event/socketEventEmitter');
         seedTree(launch);
         await duplicate(launch.id, { include: { tasks: true, assignees: true, dates: true } });
         expect(socketEmitter.emit).not.toHaveBeenCalled();
@@ -713,6 +723,9 @@ describe('a field shared with the copy', () => {
     const updateField = (id, updateObject, uid = OWNER) => run('PUT /api/v1/customField', {
         uid, table: fieldRoutes(), body: { type: 'updateOne', key: '$set', id: String(id), updateObject },
     });
+    const takeOff = (id, projectId, uid = OWNER) => run('PUT /api/v1/customField', {
+        uid, table: fieldRoutes(), body: { type: 'updateOne', key: '$set', id: String(id), removeProjects: [projectId] },
+    });
     const definition = (id) => rowsOf(SCHEMA_TYPE.CUSTOM_FIELDS).find((row) => String(row._id) === String(id));
     const valuesIn = (projectId) => inProject(SCHEMA_TYPE.TASKS, projectId, 'ProjectID').map((task) => task.customField);
 
@@ -729,7 +742,7 @@ describe('a field shared with the copy', () => {
 
     it('stays on the copy, with its values, when it is taken off the source', async () => {
         await shared();
-        const res = await updateField(field, { projectId: [copy.id] });
+        const res = await takeOff(field, launch.id);
         expect(res.statusCode).toBe(200);
         expect(definition(field)).toMatchObject({ fieldTitle: 'Score', fieldType: 'rating', isDelete: true, global: false, projectId: [copy.id] });
         expect(valuesIn(copy.id)).toEqual([{ [field]: { fieldValue: 4, _id: field } }]);
@@ -738,7 +751,7 @@ describe('a field shared with the copy', () => {
 
     it('stays on the source, with its values, when it is taken off the copy', async () => {
         await shared();
-        const res = await updateField(field, { projectId: [launch.id] });
+        const res = await takeOff(field, copy.id);
         expect(res.statusCode).toBe(200);
         expect(definition(field)).toMatchObject({ fieldTitle: 'Score', isDelete: true, global: false, projectId: [launch.id] });
         expect(valuesIn(launch.id)).toEqual([{ [field]: { fieldValue: 4, _id: field } }]);
@@ -754,6 +767,8 @@ describe('a field shared with the copy', () => {
             expect([403, 404]).toContain(res.statusCode);
             expect(JSON.stringify(definition(field))).toBe(before);
         }
+        expect([403, 404]).toContain((await takeOff(field, copy.id, MEMBER)).statusCode);
+        expect(JSON.stringify(definition(field))).toBe(before);
         expect(valuesIn(copy.id)).toEqual([{ [field]: { fieldValue: 4, _id: field } }]);
     });
 

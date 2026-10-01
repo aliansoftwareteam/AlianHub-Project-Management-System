@@ -363,16 +363,18 @@
     };
     const handleOutsideClick = (value) => {
         if(!value && areArraysEqual(finalCustomFieldData.value[customFieldIndex.value].projectId,finalCustomFieldDataTest.value[customFieldIndex.value].projectId) === false){  
+            const loaded = finalCustomFieldData.value[customFieldIndex.value];
+            const before = { global: loaded.global, projectId: [].concat(loaded.projectId || []) };
             if(finalCustomFieldDataTest.value[customFieldIndex.value].global === true && !finalCustomFieldData.value[customFieldIndex.value].global){
                 if(projectList.value.length !== finalCustomFieldDataTest.value[customFieldIndex.value].projectId.length){
                     finalCustomFieldData.value[customFieldIndex.value].projectId = finalCustomFieldDataTest.value[customFieldIndex.value].projectId;
                     finalCustomFieldData.value[customFieldIndex.value].global = finalCustomFieldDataTest.value[customFieldIndex.value].global;            
-                    emit('updateCustomFieldProject',finalCustomFieldData.value[customFieldIndex.value]);
+                    emit('updateCustomFieldProject',finalCustomFieldData.value[customFieldIndex.value],before);
                 }
             }else if(finalCustomFieldDataTest.value[customFieldIndex.value].global === false){
                 finalCustomFieldData.value[customFieldIndex.value].projectId = finalCustomFieldDataTest.value[customFieldIndex.value].projectId;
                 finalCustomFieldData.value[customFieldIndex.value].global = finalCustomFieldDataTest.value[customFieldIndex.value].global;            
-                emit('updateCustomFieldProject',finalCustomFieldData.value[customFieldIndex.value]);
+                emit('updateCustomFieldProject',finalCustomFieldData.value[customFieldIndex.value],before);
             }
         }
         projectListSearch.value = projectList.value ? JSON.parse(JSON.stringify(projectList.value)) : [];
