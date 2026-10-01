@@ -72,6 +72,8 @@ beforeEach(() => {
     const db = mockDbOf(CID);
     db.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
     db.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: 3, status: 2, isDelete: false });
+    const taskRules = db.seed(SCHEMA_TYPE.RULES, { key: 'task', name: 'Task', isParent: true, roles: [] });
+    db.seed(SCHEMA_TYPE.RULES, { key: 'task_list', name: 'Task List', isParent: false, parentId: String(taskRules._id), roles: [{ key: 3, permission: true }] });
     db.seed(SCHEMA_TYPE.PROJECTS, { _id: OPEN_PROJECT, ProjectName: 'Open', CompanyId: CID });
     db.seed(SCHEMA_TYPE.PROJECTS, { _id: PARITY_PROJECT, ProjectName: 'Parity', CompanyId: CID });
     db.seed(SCHEMA_TYPE.PROJECTS, { _id: PRIVATE_PROJECT, ProjectName: 'Private', CompanyId: CID, isPrivateSpace: true, AssigneeUserId: [OWNER] });

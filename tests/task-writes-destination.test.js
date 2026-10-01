@@ -71,6 +71,8 @@ beforeEach(() => {
         mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, roleType, status: 2, isDelete: false });
         mockDb.seed(SCHEMA_TYPE.USERS, { _id: userId, Employee_Name });
     });
+    const taskRules = mockDb.seed(SCHEMA_TYPE.RULES, { key: 'task', name: 'Task', isParent: true, roles: [] });
+    mockDb.seed(SCHEMA_TYPE.RULES, { key: 'task_list', name: 'Task List', isParent: false, parentId: String(taskRules._id), roles: [{ key: 3, permission: true }] });
     const project = (_id, ProjectName, extra = {}) => mockDb.seed(SCHEMA_TYPE.PROJECTS, {
         _id, ProjectName, ProjectCode: ProjectName.slice(0, 3).toUpperCase(), isPrivateSpace: false, AssigneeUserId: [], deletedStatusKey: 0, ...extra,
     });
