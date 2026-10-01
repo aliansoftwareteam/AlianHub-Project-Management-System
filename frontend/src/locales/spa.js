@@ -2379,6 +2379,8 @@ export default {
         "files": "Files",
         "relations_tab": "Relations",
         "relations": "Relations",
+        "counts_toward": "Counts toward",
+        "counts_toward_goal": "{target}, a target of the goal {goal}, which is {pct}% reached",
         "no_relations": "No relations yet — link a task",
         "relations_note": "Gantt draws only blocks and waits on. \"Related\" is a reading aid and never moves a date.",
         "activity": "Activity",

@@ -8288,6 +8288,8 @@
     "TaskPanel.copy_id": "Copy task ID {key}",
     "TaskPanel.copy_link": "Copy task link",
     "TaskPanel.copy_title": "Copy task name",
+    "TaskPanel.counts_toward": "Counts toward",
+    "TaskPanel.counts_toward_goal": "{target}, a target of the goal {goal}, which is {pct}% reached",
     "TaskPanel.created_by": "Created {date} by {name}",
     "TaskPanel.description": "Description",
     "TaskPanel.dialog_label": "Task detail",

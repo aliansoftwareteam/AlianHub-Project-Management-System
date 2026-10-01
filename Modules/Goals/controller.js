@@ -7,6 +7,7 @@ const { ROLE_GUEST, isPrivileged } = require('../../Config/roleTypes');
 const { isNarrowed } = require('../../Config/tokenNarrowing');
 const logger = require('../../Config/loggerConfig');
 const { recordAuditFromReq } = require('../Audit/recorder');
+const { openableTasks } = require('../Tasks/helpers/taskReadAccess');
 const access = require('./helpers/goalAccess');
 const rules = require('./helpers/goalRules');
 const { withProgress } = require('./helpers/goalProgress');
@@ -22,6 +23,7 @@ const AUDIENCE_FIELDS = Object.freeze(['visibility', 'sharedWith', 'ownerUserId'
 
 const NOT_FOUND = 'Goal not found.';
 const TARGET_NOT_FOUND = 'Target not found.';
+const TASK_NOT_FOUND = 'Task not found.';
 const FORBIDDEN = 'You do not have permission to perform this action.';
 const NARROWED = 'A token limited to some projects cannot read or change goals.';
 const IS_ARCHIVED = 'This goal is archived. Restore it to change it.';
@@ -272,6 +274,36 @@ exports.getGoal = handled('get', async (req, res, caller) => {
     const goal = await visibleGoal(caller, req.params.id);
     recountBehind(caller.companyId, [goal], new Date());
     return sent(res, 'Goal fetched successfully.', goal, caller);
+});
+
+/* A task the caller cannot open answers exactly as one that does not exist, and a goal they cannot read is never among the answers. */
+exports.goalsForTask = handled('for task', async (req, res, caller) => {
+    const taskId = String(req.params.taskId || '');
+    const [task] = OBJECT_ID.test(taskId)
+        ? await openableTasks(caller.companyId, caller.uid, [taskId], { projection: { sprintId: 1, isParentTask: 1 } })
+        : [];
+    if (!task) throw stop(404, TASK_NOT_FOUND);
+    const goals = await crud(caller.companyId, [
+        { deletedStatusKey: LIVE, $and: [access.visibleTo(caller), sources.namingTask(task)] },
+        null,
+        { lean: true },
+    ], 'find') || [];
+    const data = goals
+        .filter((goal) => access.canSee(goal, caller))
+        .flatMap((goal) => (goal.targets || []).map((target) => ({ goal, target, through: sources.countedThrough(target, task) })))
+        .filter((entry) => entry.through)
+        .map(({ goal, target, through }) => ({
+            goalId: String(goal._id),
+            goalName: goal.name,
+            color: goal.color || '',
+            progressPct: goal.progressPct || 0,
+            targetId: String(target.id),
+            targetName: target.name,
+            targetProgressPct: target.progressPct || 0,
+            through,
+        }))
+        .sort((a, b) => a.goalName.localeCompare(b.goalName) || a.targetName.localeCompare(b.targetName));
+    return res.status(200).json({ status: true, statusText: 'Goals fetched successfully.', data });
 });
 
 exports.createGoal = handled('create', async (req, res, caller) => {

@@ -80,6 +80,7 @@ const listRequest = ({ archived = false, mine = false } = {}) => {
     return { method: 'get', path: query ? `${V2_GOALS}?${query}` : V2_GOALS };
 };
 const readRequest = (id) => ({ method: 'get', path: goalPath(id) });
+const forTaskRequest = (taskId) => ({ method: 'get', path: `${V2_GOALS}/for-task/${taskId}` });
 const createRequest = (form) => ({ method: 'post', path: V2_GOALS, body: goalFields(form) });
 const updateRequest = (id, changes) => ({ method: 'patch', path: goalPath(id), body: goalFields(changes, { keepEmpty: true }) });
 const archiveRequest = (id) => ({ method: 'post', path: `${goalPath(id)}/archive` });
@@ -180,7 +181,7 @@ const afterHandover = (goal, { myId, privileged }) => {
 
 module.exports = {
     V2_GOALS, KINDS, VISIBILITIES, SORTS, PERIODS, LIMITS, NUMBER, CURRENCY, BOOLEAN, TASKS, SOURCE_KINDS,
-    kindOf, isMeasured, listRequest, readRequest, createRequest, updateRequest, archiveRequest, restoreRequest,
+    kindOf, isMeasured, listRequest, readRequest, forTaskRequest, createRequest, updateRequest, archiveRequest, restoreRequest,
     addTargetRequest, editTargetRequest, sourcesRequest, removeTargetRequest, valueRequest, valueOf,
     sourcesOf, sourceCount, withoutSources, refusalKey, refusedSources,
     todayOf, periodBucket, groupGoals, isReached, reachedCount, rangeOf, checkGoal, checkTarget, fieldOf, errorKey, afterHandover

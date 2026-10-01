@@ -113,6 +113,25 @@ const namesOf = (names, sources) => Object.fromEntries(KINDS.map((kind) => [kind
 
 const merged = (sets) => Object.fromEntries(KINDS.map((kind) => [kind, unique(sets.flatMap((set) => set[kind] || []))]));
 
+/* How a target counts one task: named on its own, or as a top-level task whose home is a counted
+ * list. A source left out of the count counts nothing. */
+const countedThrough = (target, task) => {
+    if (target.kind !== TASKS) return null;
+    const linked = sourcesOf(target);
+    const skipped = { ...none(), ...((target.counted || {}).skipped || {}) };
+    const counts = (kind, id) => linked[kind].includes(id) && !skipped[kind].map(String).includes(id);
+    if (counts('taskIds', String(task._id))) return 'task';
+    return task.isParentTask === true && counts('sprintIds', String(task.sprintId)) ? 'list' : null;
+};
+
+/* One $or at the root, so each branch is planned on its own index over the stored sources. */
+const namingTask = (task) => ({
+    $or: [
+        { targets: { $elemMatch: { kind: TASKS, 'sources.taskIds': String(task._id) } } },
+        ...(task.isParentTask === true && task.sprintId ? [{ targets: { $elemMatch: { kind: TASKS, 'sources.sprintIds': String(task.sprintId) } } }] : []),
+    ],
+});
+
 const firstSkipped = (skipped) => {
     const kind = KINDS.find((key) => skipped[key].length);
     return kind ? [kind, skipped[kind][0]] : null;
@@ -147,4 +166,4 @@ const wouldDrop = async (companyId, goal, next) => {
     return { sprintIds: unique(dropped.sprintIds), taskIds: unique(dropped.taskIds) };
 };
 
-module.exports = { READER_CAP, KINDS, audienceOf, judge, namesFor, namesOf, noNames, merged, requireCountable, wouldDrop, sourcesOf, holdsSources, none };
+module.exports = { READER_CAP, KINDS, audienceOf, judge, namesFor, namesOf, noNames, merged, countedThrough, namingTask, requireCountable, wouldDrop, sourcesOf, holdsSources, none };
