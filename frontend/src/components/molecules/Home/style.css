@@ -121,6 +121,7 @@
 .hc-group { display: flex; align-items: center; justify-content: space-between; min-height: var(--control-h-sm, 0px); font: 600 var(--fs-xs, 10.5px)/var(--lh-tight, 1.2) var(--font-ui); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-label); margin-top: 4px; }
 .hc-group:first-of-type { margin-top: 0; }
 .hc-group--danger { color: var(--danger); }
+.hc-group:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-chip); }
 .hc-group__count { margin-left: var(--sp-3, 6px); font-family: var(--font-mono); font-weight: 500; letter-spacing: 0; color: var(--ink-2); }
 .hc-group--danger .hc-group__count { color: inherit; }
 .hc-group__sort { display: inline-flex; align-items: center; min-height: var(--hit-min); margin: -6px 0; border: 0; background: transparent; padding: 0; font: 500 var(--fs-xs, 10.5px)/1.2 var(--font-ui); letter-spacing: 0; text-transform: none; color: var(--ink-2); cursor: pointer; }

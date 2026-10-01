@@ -19,6 +19,7 @@
             :message="$t(canCreate ? 'Home.goals_empty' : 'Home.goals_empty_guest')"
             :action-label="$t('Goals.new_goal')"
             :action-allowed="canCreate && hasPage"
+            :sentence="canCreate ? $t('EmptyState.say_goal') : ''"
             data-test="goals-card-empty"
             @action="newGoal"
         />

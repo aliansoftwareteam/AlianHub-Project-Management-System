@@ -90,6 +90,7 @@
                 :message="$t(filtered ? 'Everything.empty_hint' : 'Everything.empty_none_hint')"
                 :action-label="$t('Everything.clear_filters')"
                 :action-allowed="filtered"
+                :sentence="filtered ? '' : $t('EmptyState.say_project')"
                 @action="clearFilters"
             />
             <EverythingBoard

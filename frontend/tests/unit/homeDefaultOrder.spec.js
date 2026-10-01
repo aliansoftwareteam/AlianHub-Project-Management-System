@@ -78,7 +78,7 @@ const openHome = async ({ stored, projects = [{ _id: 'p1', ProjectName: 'Launch'
     getters['users/users'] = [{ _id: 'user-1', homeCards: stored }];
     getters['projectData/projects'] = { data: projects };
     getters['settings/selectedCompany'] = { Cst_CompanyName: 'Acme' };
-    wrapper = mount(TodayOverdue, { attachTo: document.body });
+    wrapper = mount(TodayOverdue, { attachTo: document.body, global: { stubs: { RouterLink: true }, provide: { $dateFormat: ref('') } } });
     await flushPromises();
     return wrapper;
 };

@@ -145,6 +145,7 @@
                     :title="showArchived ? $t('ProjectSlider.no_archived') : $t(emptyTitleKey)"
                     :message="showArchived ? '' : $t(emptyMessageKey)"
                     :actionLabel="emptyActionLabel"
+                    :sentence="!showArchived && emptySentenceKey ? $t(emptySentenceKey) : ''"
                     :helpPath="showArchived ? '' : 'tasks'"
                     @action="onEmptyAction"
                 />
@@ -219,7 +220,7 @@ const {
 const { checkApps, checkPermission } = useCustomComposable();
 const tagsOn = computed(() => checkApps("tags") && checkPermission("task.task_tag", project.value?.isGlobalPermission) !== null);
 const agents = useProjectAgentActivity();
-const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
+const { emptyTitleKey, emptyMessageKey, emptySentenceKey } = useTaskEmptyState(project);
 const rowEdit = useListRowEdit(project, showArchived);
 provide('listRowEdit', rowEdit);
 const aiColumnTasks = computed(() => loadedViewTasks(getters, project.value?._id, { searched: Boolean(searchedTask?.value) }));

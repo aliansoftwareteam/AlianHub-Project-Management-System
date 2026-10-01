@@ -98,12 +98,12 @@ describe('the numbers on the line are the linked screens\' own', () => {
     it('overdue and today: the rows My work lists under those headings', async () => {
         serverTasks = [task('late-1', day(-3)), task('late-2', day(-1)), task('now', day(0)), task('later', day(4))];
         const home = await openHome();
-        expect(home.next).toEqual({ kind: NEXT.OVERDUE, count: home.work.groups.overdue.length });
+        expect(home.next).toEqual({ kind: NEXT.OVERDUE, count: home.work.groups.value.overdue.length });
         expect(home.next.count).toBe(2);
 
         serverTasks = [task('now-1', day(0)), task('now-2', day(0)), task('later', day(4))];
         const calm = await openHome();
-        expect(calm.next).toEqual({ kind: NEXT.TODAY, count: calm.work.groups.today.length });
+        expect(calm.next).toEqual({ kind: NEXT.TODAY, count: calm.work.groups.value.today.length });
         expect(calm.next.count).toBe(2);
     });
 
