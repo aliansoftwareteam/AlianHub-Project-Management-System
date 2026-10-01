@@ -6,6 +6,12 @@ export const WHITEBOARD_EVENT = 'whiteboardChanged';
 export const SAVE_DELAY_MS = 800;
 const RETRY_DELAY_MS = 8000;
 const MAX_CONFLICT_TRIES = 4;
+/* The names and sizes Modules/Whiteboards/boardRules.js takes; a spec holds the two lists together. */
+export const NOTE_TONES = ['amber', 'green', 'red', 'violet', 'brand', 'grey'];
+export const NOTE_BOUNDS = { minW: 40, maxW: 1200, minH: 24, maxH: 1200 };
+const TASK = 'task';
+/* A waiting change is kept under the task's id for a card and under this prefix for a note or a text. */
+const ELEMENT_KEY = 'el:';
 
 export const legacyKeyOf = (projectId, sprintId) => `wb:${projectId || 'p'}:${sprintId || 's'}`;
 export const unsavedKeyOf = (projectId, sprintId) => `wb-unsaved:${projectId || 'p'}:${sprintId || 's'}`;
@@ -27,9 +33,13 @@ const writeStored = (key, value) => {
     }
 };
 
-const newCardId = () => `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+export const newElementId = () => `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
 const placeIn = (place) => ({ x: Math.max(0, Math.round(Number(place.x) || 0)), y: Math.max(0, Math.round(Number(place.y) || 0)) });
+const between = (value, min, max) => Math.min(max, Math.max(min, Math.round(Number(value) || 0)));
 const bodyOf = (response) => response?.data?.data;
+const isElementKey = (key) => key.startsWith(ELEMENT_KEY);
+const isWritten = (element) => Boolean(element) && element.type !== TASK && !element.withheld;
+const byLayer = (a, b) => (a.z || 0) - (b.z || 0);
 
 /* One list's board. `source` is 'local' while the only board is the one an earlier build kept in this browser:
    it stays in use, untouched, until someone uploads it, and is never sent or removed without being asked. */
@@ -41,6 +51,8 @@ export function useWhiteboardBoard({ projectId, sprintId, socket }) {
     const boardId = ref(null);
     const elements = ref([]);
     const limit = ref(2000);
+    const noteLimit = ref(500);
+    const textLimit = ref(2000);
     const pending = reactive(new Map());
     const localCopy = ref(null);
     const saveState = ref('saved');
@@ -65,6 +77,19 @@ export function useWhiteboardBoard({ projectId, sprintId, socket }) {
     const usesLocal = computed(() => source.value === 'local');
     const hasUnusedLocal = computed(() => phase.value === 'ready' && source.value === 'server' && Boolean(localCopy.value));
     const canMove = computed(() => phase.value === 'ready' && (usesLocal.value || canEdit.value));
+    /* Notes and text as this person sees them: the saved ones with their own waiting edits and deletions on top. */
+    const written = computed(() => {
+        const shown = new Map(elements.value.filter(isWritten).map((element) => [element.id, element]));
+        pending.forEach((change, key) => {
+            if (!isElementKey(key)) return;
+            if (change.remove) shown.delete(key.slice(ELEMENT_KEY.length));
+            else shown.set(change.element.id, change.element);
+        });
+        return [...shown.values()].sort(byLayer);
+    });
+    const canWrite = computed(() => phase.value === 'ready' && canEdit.value && !usesLocal.value);
+    const notesFull = computed(() => written.value.length >= noteLimit.value);
+    const topLayer = computed(() => Math.max(0, ...elements.value.map((element) => element.z || 0), ...written.value.map((element) => element.z || 0)));
 
     const placeOf = (taskId) => {
         if (usesLocal.value) return localCopy.value?.[taskId] || null;
@@ -80,19 +105,32 @@ export function useWhiteboardBoard({ projectId, sprintId, socket }) {
         elements.value = Array.isArray(board.elements) ? board.elements : [];
         canEdit.value = board.canEdit === true;
         limit.value = Number(board.limits?.elements) || limit.value;
+        noteLimit.value = Number(board.limits?.notes) || noteLimit.value;
+        textLimit.value = Number(board.limits?.text) || textLimit.value;
     };
 
-    const cardsFor = (places) => [...places].map(([taskId, place]) => {
+    const cardFor = (taskId, place) => {
         const held = byTask.value.get(taskId);
-        return { id: held ? held.id : newCardId(), type: 'task', taskId, ...placeIn(place), z: held ? held.z || 0 : 0 };
-    });
+        return { id: held ? held.id : newElementId(), type: TASK, taskId, ...placeIn(place), z: held ? held.z || 0 : 0 };
+    };
+
+    const patchOf = (changes) => {
+        const upsert = [];
+        const remove = [];
+        changes.forEach((change, key) => {
+            if (!isElementKey(key)) upsert.push(cardFor(key, change));
+            else if (change.remove) remove.push(key.slice(ELEMENT_KEY.length));
+            else upsert.push({ ...change.element });
+        });
+        return { baseRevision: revision.value, ...(upsert.length ? { upsert } : {}), ...(remove.length ? { remove } : {}) };
+    };
 
     const settle = (sent) => {
-        sent.forEach((place, taskId) => { if (pending.get(taskId) === place) pending.delete(taskId); });
+        sent.forEach((change, key) => { if (pending.get(key) === change) pending.delete(key); });
         keepUnsaved();
     };
 
-    const send = (places) => apiRequest('patch', url(), { baseRevision: revision.value, upsert: cardsFor(places) });
+    const send = (changes) => apiRequest('patch', url(), patchOf(changes));
 
     const retryLater = () => {
         clearTimeout(retryTimer);
@@ -158,6 +196,40 @@ export function useWhiteboardBoard({ projectId, sprintId, socket }) {
         schedule();
     };
 
+    const wait = (key, change) => {
+        pending.set(key, change);
+        keepUnsaved();
+        saveState.value = 'saving';
+        schedule();
+    };
+
+    /* A note or a text is sent whole, so the fields are settled here the way the server would settle them. */
+    const putElement = (element) => {
+        if (!canWrite.value || !element || element.type === TASK) return;
+        wait(`${ELEMENT_KEY}${element.id}`, {
+            element: {
+                id: element.id,
+                type: element.type,
+                text: String(element.text ?? '').slice(0, textLimit.value),
+                ...(element.type === 'note' ? { tone: NOTE_TONES.includes(element.tone) ? element.tone : NOTE_TONES[0] } : {}),
+                ...placeIn(element),
+                w: between(element.w, NOTE_BOUNDS.minW, NOTE_BOUNDS.maxW),
+                h: between(element.h, NOTE_BOUNDS.minH, NOTE_BOUNDS.maxH),
+                z: Math.max(0, Math.round(Number(element.z) || 0)),
+            },
+        });
+    };
+
+    const removeElement = (id) => {
+        if (canWrite.value) wait(`${ELEMENT_KEY}${id}`, { remove: true });
+    };
+
+    const waitingFrom = (stored) => Object.entries(stored || {}).forEach(([key, change]) => {
+        if (!isElementKey(key)) pending.set(key, placeIn(change));
+        else if (change?.remove === true) pending.set(key, { remove: true });
+        else if (change?.element?.id) pending.set(key, { element: change.element });
+    });
+
     async function load() {
         if (!ready()) return;
         const key = keyNow();
@@ -169,8 +241,7 @@ export function useWhiteboardBoard({ projectId, sprintId, socket }) {
                 loadedKey = key;
                 localCopy.value = readStored(legacyKey());
                 source.value = revision.value === 0 && localCopy.value ? 'local' : 'server';
-                Object.entries(source.value === 'server' && canEdit.value ? readStored(unsavedKey()) || {} : {})
-                    .forEach(([taskId, at]) => pending.set(taskId, placeIn(at)));
+                if (source.value === 'server' && canEdit.value) waitingFrom(readStored(unsavedKey()));
             } else if (revision.value > 0) {
                 source.value = 'server';
             }
@@ -277,7 +348,7 @@ export function useWhiteboardBoard({ projectId, sprintId, socket }) {
         if (!pending.size || !canEdit.value || usesLocal.value || inFlight || !project || !sprint) return;
         const key = unsavedKeyOf(project, sprint);
         const kept = localStorage.getItem(key);
-        apiRequest('patch', `${env.WHITEBOARDS}/${project}/${sprint}`, { baseRevision: revision.value, upsert: cardsFor(pending) })
+        apiRequest('patch', `${env.WHITEBOARDS}/${project}/${sprint}`, patchOf(pending))
             .then(() => { if (localStorage.getItem(key) === kept) writeStored(key, null); })
             .catch(() => {});
     };
@@ -319,7 +390,7 @@ export function useWhiteboardBoard({ projectId, sprintId, socket }) {
     });
 
     return {
-        phase, canEdit, canMove, saveState, usesLocal, hasUnusedLocal, withheld, elements, history, historyFailed,
-        placeOf, place, uploadLocal, discardLocal, loadHistory, restore,
+        phase, canEdit, canMove, canWrite, saveState, usesLocal, hasUnusedLocal, withheld, elements, written, notesFull, textLimit, topLayer,
+        history, historyFailed, placeOf, place, putElement, removeElement, uploadLocal, discardLocal, loadHistory, restore,
     };
 }

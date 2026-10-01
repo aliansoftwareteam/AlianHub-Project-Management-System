@@ -138,6 +138,7 @@ describe('making and changing a note', () => {
     });
 
     it('saves what is typed, as typed, and shows typed markup as text', async () => {
+        patches.push((body) => ok(boardOf(2, [card('a', 't1', 100, 200), body.upsert[0], label('x1')])));
         await open();
         await select('n1');
         await noteOf('n1').find('[data-wb-note-edit]').trigger('click');
