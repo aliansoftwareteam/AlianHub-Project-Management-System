@@ -9,6 +9,8 @@ const SOCKET_PATH = '/socket.io/';
 const SHELL = '.ah-app';
 const SHELL_TIMEOUT_MS = 30000;
 
+const routeOf = (url) => (new URL(url).hash || '#/').slice(1).split('?')[0].replace(/\/$/, '') || '/';
+
 function networkQuiet(page) {
     return new Promise((resolve) => {
         const inFlight = new Set();
@@ -69,4 +71,4 @@ async function runStep(page, step) {
     throw new Error(`Unknown step "${step.action}"`);
 }
 
-module.exports = { SHELL, SHELL_TIMEOUT_MS, settle, runStep };
+module.exports = { SHELL, SHELL_TIMEOUT_MS, routeOf, settle, runStep };

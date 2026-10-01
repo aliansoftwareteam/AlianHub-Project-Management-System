@@ -1,4 +1,4 @@
-const { parseFileName } = require('../atlas/naming');
+const { parseFileName } = require('../../scripts/atlas/naming');
 
 const label = (file) => {
     const { screen, theme, size } = parseFileName(file);

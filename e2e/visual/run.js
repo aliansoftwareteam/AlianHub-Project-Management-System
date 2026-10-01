@@ -1,7 +1,7 @@
 const fs = require('fs');
 const { spawnSync } = require('child_process');
-const { ROOT, PROPOSED_DIR, baselineDir, mayRun } = require('./visual/settings');
-const { summarise } = require('./visual/report');
+const { ROOT, PROPOSED_DIR, baselineDir, mayRun } = require('./settings');
+const { summarise } = require('./report');
 
 const REFUSAL = [
     'The screenshot check runs in CI: a screenshot made on this machine never matches the Linux baseline.',

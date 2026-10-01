@@ -2,8 +2,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { coreShots } = require('./atlas/core');
-const { ROOT, BASELINE_DIR, LOCAL_BASELINE_DIR, PROPOSED_DIR, ARTIFACT } = require('./visual/settings');
+const { coreShots } = require('../../scripts/atlas/core');
+const { ROOT, BASELINE_DIR, LOCAL_BASELINE_DIR, PROPOSED_DIR, ARTIFACT } = require('./settings');
 
 const USAGE = [
     'Usage: npm run visual:accept -- <run id>',

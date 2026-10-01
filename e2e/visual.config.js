@@ -1,7 +1,7 @@
 const path = require('node:path');
 const { defineConfig } = require('@playwright/test');
-const { LOCALE, TIMEZONE } = require('../scripts/visual/freeze');
-const { THRESHOLD, MAX_DIFF_PIXEL_RATIO, baselineDir } = require('../scripts/visual/settings');
+const { LOCALE, TIMEZONE } = require('./visual/freeze');
+const { THRESHOLD, MAX_DIFF_PIXEL_RATIO, baselineDir } = require('./visual/settings');
 
 module.exports = defineConfig({
     testDir: './visual',

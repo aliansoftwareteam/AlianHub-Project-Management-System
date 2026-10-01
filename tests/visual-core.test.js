@@ -3,8 +3,8 @@ const { SCREENS } = require('../scripts/atlas-manifest');
 const { DESKTOP, PHONE, coreScreens, coreShots, inCore } = require('../scripts/atlas/core');
 const { parseArgs, parseFileName } = require('../scripts/atlas/naming');
 const { selectScreens } = require('../scripts/screenshot-atlas');
-const { MASKED, HIDDEN, captureCss } = require('../scripts/visual/masks');
-const { THRESHOLD, MAX_DIFF_PIXEL_RATIO, BASELINE_DIR, LOCAL_BASELINE_DIR, baselineDir, mayRun } = require('../scripts/visual/settings');
+const { MASKED, HIDDEN, captureCss } = require('../e2e/visual/masks');
+const { THRESHOLD, MAX_DIFF_PIXEL_RATIO, BASELINE_DIR, LOCAL_BASELINE_DIR, baselineDir, mayRun } = require('../e2e/visual/settings');
 
 const CORE = ['home', 'everything', 'command-palette', 'docs', 'doc', 'dashboard', 'project-list', 'project-board', 'project-table', 'task-detail', 'settings-my-profile'];
 const ON_PHONE = ['home', 'project-list', 'project-board', 'task-detail'];

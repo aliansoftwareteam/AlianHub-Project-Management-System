@@ -1,9 +1,9 @@
 const fs = require('fs');
 const path = require('path');
-const { summarise } = require('../scripts/visual/report');
-const { ARTIFACT, PROPOSED_DIR } = require('../scripts/visual/settings');
-const { plan } = require('../scripts/visual');
-const { acceptPlan } = require('../scripts/visual-accept');
+const { summarise } = require('../e2e/visual/report');
+const { ARTIFACT, PROPOSED_DIR } = require('../e2e/visual/settings');
+const { plan } = require('../e2e/visual/run');
+const { acceptPlan } = require('../e2e/visual/accept');
 
 const ROOT = path.join(__dirname, '..');
 const WORKFLOW = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'visual.yml'), 'utf8');

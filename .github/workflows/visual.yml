@@ -22,7 +22,7 @@ jobs:
     name: Core screens
     runs-on: ubuntu-24.04
     # Not blocking while the baseline is new. Once it is committed and the tolerance in
-    # scripts/visual/settings.js is tuned, remove this line and add "Core screens" to the
+    # e2e/visual/settings.js is tuned, remove this line and add "Core screens" to the
     # required checks of beta.
     continue-on-error: true
     timeout-minutes: 30

@@ -7,15 +7,17 @@ const { coreShots } = require('../../scripts/atlas/core');
 const { parseSize } = require('../../scripts/atlas/naming');
 const { resolveRoute } = require('../../scripts/atlas/routes');
 const { decide } = require('../../scripts/atlas/readOnly');
-const { SHELL, SHELL_TIMEOUT_MS, settle, runStep } = require('../../scripts/atlas/browser');
-const { NOW, freezeTimestamps } = require('../../scripts/visual/freeze');
-const { MASKED, captureCss } = require('../../scripts/visual/masks');
-const { ARTIFACT, PROPOSED_DIR, baselineDir } = require('../../scripts/visual/settings');
+const { SHELL, SHELL_TIMEOUT_MS, routeOf, settle, runStep } = require('../../scripts/atlas/browser');
+const { NOW, freezeTimestamps } = require('./freeze');
+const { MASKED, captureCss } = require('./masks');
+const { ARTIFACT, PROPOSED_DIR, baselineDir } = require('./settings');
 
 const BLOCKED_BODY = JSON.stringify({ status: false, statusText: 'Blocked', message: 'The screenshot check is read-only.' });
 const SOCKET_PATH = '/socket.io/';
 const TEXT_BODY = /json|text\/plain/;
 const BODY_FONT = 'Inter Tight';
+// AppState draws these in place of a screen: not found, no access, offline, server unreachable.
+const NOT_THE_SCREEN = '.ah-state';
 const AT_REST_ATTEMPTS = 8;
 const AT_REST_GAP_MS = 250;
 const SHOT = { animations: 'disabled', caret: 'hide', scale: 'css', type: 'png' };
@@ -147,6 +149,9 @@ for (const [group, shots] of groups) {
                 await settle(page);
                 for (const step of screen.steps || []) await runStep(page, step);
                 if (screen.steps) await settle(page);
+
+                expect(routeOf(page.url()), 'the app stayed on the screen it was sent to').toBe(route.split('?')[0]);
+                await expect(page.locator(NOT_THE_SCREEN), 'the screen opened, not an error state in its place').toHaveCount(0);
 
                 const fonts = await fontsAndImages(page);
                 expect(fonts, 'the web fonts loaded; a miss here is the network, not the design').toEqual({ bodyFont: true, failed: [] });

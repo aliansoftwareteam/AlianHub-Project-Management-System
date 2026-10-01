@@ -10,7 +10,7 @@ const { decide } = require('./atlas/readOnly');
 const { galleryHtml } = require('./atlas/gallery');
 const { newBudget, noteBudget, roomToLoad } = require('./atlas/pace');
 const { coreScreens, inCore } = require('./atlas/core');
-const { SHELL, SHELL_TIMEOUT_MS, settle, runStep } = require('./atlas/browser');
+const { SHELL, SHELL_TIMEOUT_MS, routeOf, settle, runStep } = require('./atlas/browser');
 
 const ROOT = path.resolve(__dirname, '..');
 const NAVIGATION_TIMEOUT_MS = 45000;
@@ -93,8 +93,6 @@ class SessionRefused extends Error {
         super('The session was refused: the app went to sign-in. A demo token lasts an hour.');
     }
 }
-
-const routeOf = (url) => (new URL(url).hash || '#/').slice(1).split('?')[0].replace(/\/$/, '') || '/';
 
 // The shell draws only once the socket has answered, and that wait makes no request networkQuiet() can see.
 async function shellOrSignIn(page) {

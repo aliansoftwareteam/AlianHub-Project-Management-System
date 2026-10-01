@@ -1,4 +1,4 @@
-const { NOW, SEEDED, TIMEZONE, freezeTimestamps } = require('../scripts/visual/freeze');
+const { NOW, SEEDED, TIMEZONE, freezeTimestamps } = require('../e2e/visual/freeze');
 
 const RUN_START = Date.parse('2026-10-01T09:00:00.000Z');
 const run = { from: RUN_START, to: RUN_START + 20 * 60 * 1000 };
