@@ -21,6 +21,7 @@ const SPRINT_PLAN_CHECK_TTL_SECONDS = 30;
 const { updateCommentCollection, addCommentCollection } = require('../../Comments/controller');
 // BUG-033 / #87 — self-healing reconciliation for sprint task counts.
 const { reconcileSprintTaskCount, scheduleReconciliation } = require('./reconcileTaskCount');
+const { storableFieldValues } = require('../../CustomField/helpers/fieldValueWrite');
 
 /* ------------- TASK ------------- */
 exports.HandleTask = async (companyId, object, isUpdate, id = null, userData) => {
@@ -63,7 +64,15 @@ exports.HandleTask = async (companyId, object, isUpdate, id = null, userData) =>
                     object.dueDateDeadLine = object.dueDateDeadLine.map((x) => new Date(x.date));
                     object.DueDate = new Date(object.DueDate);
                 }
-    
+
+                /* Every new task document is saved here: a create, an import row, a form, a template, a copy. */
+                let droppedFieldValues = 0;
+                if (object.customField !== undefined) {
+                    const kept = await storableFieldValues({ companyId, task: object });
+                    object.customField = kept.customField;
+                    droppedFieldValues = kept.dropped.length;
+                }
+
                 let data;
                 if (isUpdate || id !== null) {
                     data = [{
@@ -112,7 +121,7 @@ exports.HandleTask = async (companyId, object, isUpdate, id = null, userData) =>
                                     logger.error(`HandleTask project-history error: ${error && error.message ? error.message : error}`);
                                 }),
                         ]);
-                        resolve({ status: true, id: isUpdate ? id : response._id, message: "Task created successfully." });
+                        resolve({ status: true, id: isUpdate ? id : response._id, message: "Task created successfully.", ...(droppedFieldValues ? { droppedFieldValues } : {}) });
                     }).catch(error => {
                         reject(error);
                     })

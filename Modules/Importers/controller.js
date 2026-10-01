@@ -282,7 +282,7 @@ const finishImport = async (companyId, { source, project, sprint, actor, statusA
             data: [{ _id: job._id }, { $set: { status: 'done', processed: tasks.length, created: createdCount } }],
         }, 'updateOne');
         const detail = report ? { skippedRows: report.skippedRows, unmatchedAssignees: [...unmatchedEmails, ...report.unnamedAssignees] } : {};
-        return { status: true, statusText: `Imported ${createdCount} tasks from ${source} (${skipped} skipped).`, data: { jobId: job._id, projectId: String(project._id), created: createdCount, skipped, ...detail } };
+        return { status: true, statusText: `Imported ${createdCount} tasks from ${source} (${skipped} skipped).`, data: { jobId: job._id, projectId: String(project._id), created: createdCount, skipped, ...detail, ...(result?.droppedFieldValues ? { droppedFieldValues: result.droppedFieldValues } : {}) } };
     } catch (creationError) {
         logger.error(`[importers] ${source} job ${job._id} failed: ${creationError.message}`);
         await MongoDbCrudOpration(companyId, {
