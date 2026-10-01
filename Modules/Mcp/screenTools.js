@@ -47,13 +47,15 @@ const listPath = async (ctx, args, vis) => {
     return onView(`/project/${project._id}/${inFolder}/${list._id}`, args.view);
 };
 
+const taskAddress = (task) => (isId(task.sprintId)
+    ? `/project/${task.ProjectID}/s/${task.sprintId}/${task._id}?detailTab=task-detail-tab`
+    : `/project/${task.ProjectID}/p`);
+
 const taskPath = async (ctx, args, vis) => {
     if (!isId(args.taskId)) return null;
     const task = await findOne(ctx, SCHEMA_TYPE.TASKS, { _id: oid(String(args.taskId)), deletedStatusKey: { $ne: 1 } }, TASK_ACCESS_FIELDS);
     if (!vis.allowsTask(task) || !(await loadProject(ctx, vis, String(task.ProjectID)))) return null;
-    return isId(task.sprintId)
-        ? `/project/${task.ProjectID}/s/${task.sprintId}/${task._id}?detailTab=task-detail-tab`
-        : `/project/${task.ProjectID}/p`;
+    return taskAddress(task);
 };
 
 const docPath = async (ctx, args, vis) => {
@@ -112,4 +114,4 @@ const SCOPES = Object.freeze({ [ACTION]: 'projects:read' });
 
 const offered = () => TOOLS.filter((tool) => registry.has(tool.action));
 
-module.exports = { TOOLS, SCOPES, ACTION, VIEWS, PLACES, offered };
+module.exports = { TOOLS, SCOPES, ACTION, VIEWS, PLACES, offered, webBase, taskAddress };

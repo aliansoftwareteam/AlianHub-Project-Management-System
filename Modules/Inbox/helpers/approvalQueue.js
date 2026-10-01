@@ -3,6 +3,8 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { ROLE_GUEST } = require('../../../Config/roleTypes');
 const access = require('../../Agents/access');
+const intentPreview = require('../../Agents/intentPreview');
+const logger = require('../../../Config/loggerConfig');
 
 // The queue is a view of the proposals the agent API already lists for this person
 // (access.readScopeOf), never a wider one. Deciding still goes through that API, so a row
@@ -23,7 +25,7 @@ const namedProjects = (proposal) => (Array.isArray(proposal.changes) ? proposal.
 const staysInside = (projectIds) => (proposal) => !Array.isArray(projectIds)
     || namedProjects(proposal).every((id) => projectIds.includes(id));
 
-const toRow = (caller) => (proposal) => ({
+const toRow = (caller, previews) => (proposal) => ({
     sourceType: 'proposal',
     sourceId: String(proposal._id),
     proposalId: String(proposal._id),
@@ -34,9 +36,10 @@ const toRow = (caller) => (proposal) => ({
     requestedBy: proposal.requestedBy ? String(proposal.requestedBy) : '',
     what: proposal.what || '',
     why: proposal.why || '',
-    changes: (Array.isArray(proposal.changes) ? proposal.changes : []).map((change) => ({
-        action: change.action, params: change.params || {}, label: change.label || change.action, reversible: Boolean(change.reversible),
-    })),
+    changes: (Array.isArray(proposal.changes) ? proposal.changes : []).map((change, at) => {
+        const preview = (previews.get(String(proposal._id)) || [])[at];
+        return { action: change.action, params: change.params || {}, label: change.label || change.action, reversible: Boolean(change.reversible), ...(preview ? { preview } : {}) };
+    }),
     cost: proposal.cost || null,
     gate: proposal.gate || null,
     locked: !access.mayDecideProposal(caller, proposal),
@@ -58,7 +61,13 @@ const readQueue = async (companyId, userId) => {
         type: SCHEMA_TYPE.AGENT_PROPOSALS,
         data: [{ status: 'pending', ...access.proposalScopeClause(scope) }, {}, { sort: { createdAt: -1 }, limit: QUEUE_LIMIT }],
     }, 'find');
-    return (rows || []).map(plain).filter(staysInside(scope.projectIds)).map(toRow(caller));
+    const listed = (rows || []).map(plain).filter(staysInside(scope.projectIds));
+    // The queue is still worth showing without its cards.
+    const previews = await intentPreview.forProposals(companyId, userId, listed).catch((error) => {
+        logger.error(`[inbox] proposal previews: ${error.message}`);
+        return new Map();
+    });
+    return listed.map(toRow(caller, previews));
 };
 
 const waitingCount = (rows) => rows.filter((row) => !row.locked).length;

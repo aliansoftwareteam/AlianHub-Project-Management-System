@@ -73,6 +73,7 @@ const taskCount = () => rows(SCHEMA_TYPE.TASKS).length;
 const project = (id) => rows(SCHEMA_TYPE.PROJECTS).find((row) => String(row._id) === String(id));
 const outcomeOf = (reply) => (reply.pending ? 'proposed' : reply.refused ? 'refused' : reply.ok ? 'applied' : 'failed');
 const blocksOf = (task) => JSON.stringify(task.descriptionBlock || {});
+const placeOf = (task) => [String(task.ProjectID), String(task.sprintId)];
 
 beforeEach(() => {
     jest.clearAllMocks();
@@ -104,9 +105,10 @@ describe('the tool exists with the tools that manage tasks', () => {
     it('is not listed for, and refuses, a token that was not created to manage tasks or that only reads', async () => {
         const id = idOf(message());
         expect(await listed(olderToken(OWNER))).not.toContain(TOOL);
-        expect((await make(olderToken(OWNER), { messageId: id })).rpcError).toMatchObject({ code: -32004 });
-        expect((await make(readOnly(OWNER), { messageId: id })).rpcError).toMatchObject({ code: -32004 });
-        expect(taskCount()).toBe(rows(SCHEMA_TYPE.TASKS).length);
+        const before = taskCount();
+        expect(await make(olderToken(OWNER), { messageId: id })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage grant/) });
+        expect(await make(readOnly(OWNER), { messageId: id })).toMatchObject({ isError: true, error: expect.stringMatching(/read-only/) });
+        expect(taskCount()).toBe(before);
     });
 
     it('refuses an argument it does not take, and a list named without its project', async () => {
@@ -124,7 +126,8 @@ describe('a message the person can read becomes a task', () => {
         expect(out).toMatchObject({ ok: true, undoable: true, result: { title: 'The login page is broken on Safari' } });
         expect(taskCount()).toBe(before + 1);
         const task = stored(out.result.taskId);
-        expect(task).toMatchObject({ TaskName: 'The login page is broken on Safari', ProjectID: P_OPEN, sprintId: S_OPEN, AssigneeUserId: [] });
+        expect(task).toMatchObject({ TaskName: 'The login page is broken on Safari', AssigneeUserId: [] });
+        expect(placeOf(task)).toEqual([P_OPEN, S_OPEN]);
         expect(task.rawDescription).toContain('The login page is broken on Safari\nSeen by two customers today');
         expect(task.rawDescription).toContain('Priya Other');
         expect(audits('task.add', 'applied')).toHaveLength(1);
@@ -135,7 +138,8 @@ describe('a message the person can read becomes a task', () => {
             messageId: idOf(message()), title: 'Fix the login page', projectId: P_DEST, sprintId: S_DEST, assigneeIds: [MEMBER], priority: 'HIGH', dueDate: '2026-10-09',
         });
         expect(out).toMatchObject({ ok: true, result: { title: 'Fix the login page' } });
-        expect(stored(out.result.taskId)).toMatchObject({ TaskName: 'Fix the login page', ProjectID: P_DEST, sprintId: S_DEST, AssigneeUserId: [MEMBER], Task_Priority: 'HIGH' });
+        expect(stored(out.result.taskId)).toMatchObject({ TaskName: 'Fix the login page', AssigneeUserId: [MEMBER], Task_Priority: 'HIGH' });
+        expect(placeOf(stored(out.result.taskId))).toEqual([P_DEST, S_DEST]);
         expect(stored(out.result.taskId).rawDescription).toContain('The login page is broken on Safari');
     });
 
@@ -143,7 +147,8 @@ describe('a message the person can read becomes a task', () => {
         const comment = message({ taskId: fx.top._id, sprintId: S_OPEN, message: 'We also need a migration for this' });
         const out = await make(ctx(MEMBER), { messageId: idOf(comment) });
         expect(out).toMatchObject({ ok: true });
-        expect(stored(out.result.taskId)).toMatchObject({ TaskName: 'We also need a migration for this', ProjectID: P_OPEN, sprintId: S_OPEN, isParentTask: true });
+        expect(stored(out.result.taskId)).toMatchObject({ TaskName: 'We also need a migration for this', isParentTask: true });
+        expect(placeOf(stored(out.result.taskId))).toEqual([P_OPEN, S_OPEN]);
     });
 
     it('a direct message the person is in needs a place named, and then becomes a task there', async () => {
@@ -154,7 +159,8 @@ describe('a message the person can read becomes a task', () => {
         expect(unplaced).toMatchObject({ ok: false, error: expect.stringMatching(/which project/i) });
         expect(taskCount()).toBe(before);
         const out = await make(ctx(OWNER), { messageId: idOf(direct), projectId: P_OPEN, sprintId: S_NEXT });
-        expect(stored(out.result.taskId)).toMatchObject({ TaskName: 'Can you look at the invoice export?', ProjectID: P_OPEN, sprintId: S_NEXT });
+        expect(stored(out.result.taskId)).toMatchObject({ TaskName: 'Can you look at the invoice export?' });
+        expect(placeOf(stored(out.result.taskId))).toEqual([P_OPEN, S_NEXT]);
     });
 
     it('links back to the message when this AlianHub has a web address, and holds no link when it has none', async () => {
@@ -246,6 +252,13 @@ describe('a message the person cannot read answers exactly as one that does not 
         expect(await make(ctx(OWNER, { projectIds: [P_OPEN] }), { messageId: id })).toMatchObject({ ok: true });
     });
 
+    it('a connection kept away from creating tasks is refused before any message is read', async () => {
+        const kept = ctx(OWNER, { allowedActions: ['tasks.next', 'task.get'] });
+        const readable = await make(kept, { messageId: idOf(message()) });
+        expect(readable).toMatchObject({ refused: true });
+        expect(await make(kept, { messageId: MISSING })).toMatchObject({ refused: true, reason: readable.reason });
+    });
+
     it('a readable message cannot be placed in a project or list the person cannot open', async () => {
         const id = idOf(message());
         const before = taskCount();
@@ -307,7 +320,7 @@ describe('the project\'s rule for agents holds it exactly as it holds a create',
         const id = idOf(message());
         const plain = await rpc(outside(OWNER, granted), 'task.create', { projectId: P_OPEN, sprintId: S_OPEN, title: 'Plain' });
         expect(outcomeOf(await make(outside(OWNER, granted), { messageId: id }))).toBe(outcomeOf(plain));
-        expect((await make(outside(OWNER, PLAIN_SCOPES), { messageId: id })).rpcError).toMatchObject({ code: -32004 });
+        expect(await make(outside(OWNER, PLAIN_SCOPES), { messageId: id })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage grant/) });
     });
 
     it('runs inside a batch as one of its changes', async () => {

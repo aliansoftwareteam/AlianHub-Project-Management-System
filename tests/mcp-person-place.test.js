@@ -41,7 +41,7 @@ const scopes = require('../Modules/Mcp/scopes');
 const server = require('../Modules/Mcp/server');
 
 const {
-    CID, OWNER, INSIDER, OUTSIDER, GUEST, P_OPEN, P_PRIVATE, P_PERSONAL, L_OPEN, L_SECRET, L_PRIVATE,
+    OWNER, INSIDER, OUTSIDER, GUEST, P_OPEN, P_PRIVATE, P_PERSONAL, L_OPEN, L_SECRET, L_PRIVATE,
     T_OPEN, T_SECRET, T_PRIVATE, T_PERSONAL, MISSING, BEFORE, FLAGS, ctx, narrowed, readOnly, outside, settle,
 } = world;
 const { seed, rows, rpcThrough, listedThrough } = world.create(mockDb);
@@ -93,7 +93,7 @@ describe('the tool exists with the read tools', () => {
     it('answers a connection that only reads, and refuses one that may not read projects', async () => {
         visit(OWNER, 'project', P_OPEN, 2);
         expect((await where(readOnly(OWNER))).place).toMatchObject({ kind: 'project' });
-        expect((await where(outside(OWNER, ['tasks:read']))).rpcError).toMatchObject({ code: -32004 });
+        expect(await where(outside(OWNER, ['tasks:read']))).toMatchObject({ isError: true, error: expect.stringMatching(/projects:read scope/) });
         expect((await where(ctx(OWNER, { allowedActions: ['tasks.next'] }))).refused).toBe(true);
     });
 });

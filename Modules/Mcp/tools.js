@@ -19,6 +19,7 @@ const { propose, outsideMayFile } = require('./propose');
 const sessionTools = require('./sessionTools');
 const dataTools = require('./dataTools');
 const screenTools = require('./screenTools');
+const intentTools = require('./intentTools');
 const manageFlag = require('./manageFlag');
 const manageTools = require('./manageTools');
 const workTools = require('./workTools');
@@ -259,9 +260,9 @@ const FLAGGED_TOOLS = [
 const SEARCH_BY_LIST = 'Search tasks you can see by text, status, project or list. A list answers the tasks that live in it and the tasks added to it.';
 const SEARCH_FOR_PLANNING = 'Search tasks you can see by text, status, project, list, assignee or due date. Each task carries its assignees, dates, estimate, subtask count and the tasks above it.';
 
-const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...dataTools.offered(), ...screenTools.offered(), ...manageTools.offered(), ...workTools.offered(), ...sessionTools.offered()];
+const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...dataTools.offered(), ...screenTools.offered(), ...intentTools.offered(), ...manageTools.offered(), ...workTools.offered(), ...sessionTools.offered()];
 
-const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...dataTools.TOOLS, ...screenTools.TOOLS, ...manageTools.TOOLS, ...Object.values(manageTools.VARIANTS), ...workTools.TOOLS, ...sessionTools.TOOLS];
+const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...dataTools.TOOLS, ...screenTools.TOOLS, ...intentTools.TOOLS, ...manageTools.TOOLS, ...Object.values(manageTools.VARIANTS), ...workTools.TOOLS, ...sessionTools.TOOLS];
 
 /* A tool that needs a grant is one only a caller holding that grant lists or runs. */
 const holdsGrantFor = (ctx, tool) => !tool.grant || manageFlag.mayUse(ctx, tool.grant);
@@ -330,6 +331,14 @@ const usable = (ctx) => toolsFor(ctx)
     .filter((tool) => !(Array.isArray(ctx.allowedActions) && ctx.allowedActions.length) || ctx.allowedActions.includes(tool.action))
     .map((tool) => ({ name: tool.name, write: !tool.run }));
 
+/* A write built from something the tool reads first: its arguments, or its answer when there is nothing to build from.
+ * A connection kept away from the action is refused before that read, so the answer tells it nothing. */
+const prepare = async (ctx, tool, args, vis) => {
+    const may = registry.evaluate(tool.action, {}, { allowedActions: ctx.allowedActions });
+    if (!may.allowed) throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params: {}, reason: may.reason, ip: ctx.ip, taint: ctx.taint });
+    return tool.prepare(ctx, args, vis);
+};
+
 /* Run a tool for an MCP caller. Reads are authorised through the registry;
  * writes go through actions.perform, so they are audited and undoable. */
 const call = async (ctx, name, args = {}) => {
@@ -356,10 +365,13 @@ const call = async (ctx, name, args = {}) => {
     if (refused) throw Object.assign(new Error(refused), { code: -32004 });
     refuseBadArguments(tool, args);
     if (tool.batch) return runBatch(ctx, tool, args);
-    const params = tool.params(args);
+    const vis = filtered ? await visibility.forCaller(ctx) : undefined;
+    const prepared = tool.prepare ? await prepare(ctx, tool, args, vis) : { args };
+    if (prepared.answer) return prepared.answer;
+    const params = tool.params(prepared.args);
     if (filtered) {
         try {
-            await visibility.assertWritable(ctx.companyId, await visibility.forCaller(ctx), tool.target(args));
+            await visibility.assertWritable(ctx.companyId, vis, tool.target(prepared.args));
         } catch (error) {
             if (!error.notVisible) throw error;
             throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params, reason: error.message, ip: ctx.ip, taint: ctx.taint });

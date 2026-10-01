@@ -35,6 +35,8 @@ const mountCard = (preview) => {
     return wrapper;
 };
 const line = (kind) => wrapper.find(`[data-test="intent-line"][data-kind="${kind}"]`);
+const label = (kind) => line(kind).find('dt').text();
+const value = (kind) => line(kind).find('dd').text();
 
 afterEach(() => { wrapper?.unmount(); wrapper = null; });
 
@@ -44,46 +46,49 @@ describe('the preview card for a task an agent wants to create', () => {
         expect(wrapper.find('[data-test="intent-kind"]').text()).toBe('New task');
         expect(wrapper.find('[data-test="intent-title"]').text()).toBe('Fix the login bug');
         expect(wrapper.findAll('[data-test="intent-line"]').map((el) => el.attributes('data-kind'))).toEqual(['place', 'assignees', 'due', 'priority', 'description']);
-        expect(line('place').text()).toContain('Website');
-        expect(line('place').text()).toContain('Sprint 4');
-        expect(line('assignees').text()).toContain('Priya');
-        expect(line('due').text()).toMatch(/Oct 9, 2026/);
-        expect(line('priority').text()).toContain('High');
-        expect(line('description').text()).toContain('Safari users cannot sign in.');
+        expect([label('place'), value('place')]).toEqual(['Where', 'Sprint 4, in Website']);
+        expect([label('assignees'), value('assignees')]).toEqual(['For', 'Priya']);
+        expect([label('due'), value('due')]).toEqual(['Due', 'Oct 9, 2026']);
+        expect([label('priority'), value('priority')]).toEqual(['Priority', 'High']);
+        expect([label('description'), value('description')]).toEqual(['Description', 'Safari users cannot sign in.']);
     });
 
     it('says a subtask is one, and which task it goes under', () => {
         mountCard({ kind: 'subtask', title: 'Write the test', lines: [{ kind: 'parent', task: 'Fix the login bug' }] });
         expect(wrapper.find('[data-test="intent-kind"]').text()).toBe('New subtask');
-        expect(line('parent').text()).toContain('Fix the login bug');
+        expect([label('parent'), value('parent')]).toEqual(['Under', 'Fix the login bug']);
     });
 
     it('names the project alone when the list is not one the person may see', () => {
         mountCard(create({ lines: [{ kind: 'place', project: 'Website', list: '' }] }));
-        expect(line('place').text()).toContain('Website');
-        expect(line('place').text()).not.toMatch(/undefined|null|\/|›/);
+        expect(value('place')).toBe('Website');
     });
 
     it('counts the people it may not name', () => {
         mountCard(create({ lines: [{ kind: 'assignees', names: ['Priya'], others: 2 }] }));
-        expect(line('assignees').text()).toBe('For Priya and 2 others');
+        expect(value('assignees')).toBe('Priya and 2 more');
         wrapper.unmount();
         mountCard(create({ lines: [{ kind: 'assignees', names: [], others: 1 }] }));
-        expect(line('assignees').text()).toBe('For 1 other person');
+        expect(value('assignees')).toBe('1 person not shown');
+        wrapper.unmount();
+        mountCard(create({ lines: [{ kind: 'assignees', names: [], others: 3 }] }));
+        expect(value('assignees')).toBe('3 people not shown');
     });
 
     it('shows an estimate in hours and minutes, a link count, and that a description goes on', () => {
         mountCard(create({ lines: [{ kind: 'estimate', minutes: 90 }, { kind: 'links', count: 2 }, { kind: 'description', text: 'A long story', more: true }] }));
-        expect(line('estimate').text()).toContain('1 h 30 min');
-        expect(line('links').text()).toContain('2 links');
-        expect(line('description').text()).toContain('A long story…');
+        expect(value('estimate')).toBe('1 h 30 min');
+        expect(value('links')).toBe('2 links');
+        expect(value('description')).toBe('A long story…');
     });
 
     it('shows markup in a proposal as the text it is, and builds no element from it', () => {
         const attack = '<img src=x onerror="window.__hit = 1"><script>window.__hit = 2</script>';
         mountCard({ kind: 'task', title: attack, lines: [{ kind: 'place', project: attack, list: attack }, { kind: 'assignees', names: [attack], others: 0 }, { kind: 'description', text: attack, more: false }, { kind: 'status', name: attack }] });
         expect(wrapper.find('[data-test="intent-title"]').text()).toBe(attack);
-        expect(line('description').text()).toContain(attack);
+        expect(value('description')).toBe(attack);
+        expect(value('place')).toBe(`${attack}, in ${attack}`);
+        expect(value('status')).toBe(attack);
         expect(wrapper.find('img').exists()).toBe(false);
         expect(wrapper.find('script').exists()).toBe(false);
         expect(wrapper.html()).not.toContain('<img');
@@ -99,7 +104,7 @@ describe('the preview card for a task an agent wants to create', () => {
 
     it('shows a date it cannot read as the text it was given', () => {
         mountCard(create({ lines: [{ kind: 'due', date: 'next Friday' }] }));
-        expect(line('due').text()).toContain('next Friday');
+        expect(value('due')).toBe('next Friday');
     });
 
     it('has one entry per kind of line, so a later kind is one more entry', () => {
@@ -132,10 +137,8 @@ describe('the card in a row of the Inbox approval queue', () => {
         expect(card.exists()).toBe(true);
         expect(card.find('[data-test="intent-title"]').text()).toBe('Fix the login bug');
         expect(card.text()).toContain('Website');
-        const text = wrapper.find('[data-test="queue-row"]').text();
-        expect(text).toContain('Claude, for Priya');
-        expect(text).toContain('create the task “Fix the login bug”');
-        expect(text).not.toContain('task.create');
+        expect(wrapper.find('[data-test="queue-row"] .aq__what').text()).toBe('Claude, for Priya wants to create the task “Fix the login bug”');
+        expect(wrapper.find('[data-test="queue-row"] .aq__changes').text()).not.toContain('task.create');
         expect(wrapper.find('[data-test="queue-approve"]').exists()).toBe(true);
         expect(wrapper.find('[data-test="queue-decline"]').exists()).toBe(true);
     });
