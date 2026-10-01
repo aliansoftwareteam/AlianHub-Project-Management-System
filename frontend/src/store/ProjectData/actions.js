@@ -364,7 +364,7 @@ export const setTableTasksFromTypesense = ({ state, commit, rootGetters }, paylo
                         ],
                     },
                 },
-                ...(sortKey ? tableSortStages(sortKey, rootGetters?.['settings/finalCustomFields']) : [{ $sort: item?.indexName ? { [item.indexName]: 1 } : { createdAt: 1 } }]),
+                ...(sortKey ? tableSortStages(sortKey, rootGetters?.['settings/finalCustomFields'], { users: rootGetters?.['users/users'] }) : [{ $sort: item?.indexName ? { [item.indexName]: 1 } : { createdAt: 1 } }]),
                 {
                     $skip: skip,
                 },

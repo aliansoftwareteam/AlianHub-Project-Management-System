@@ -67,7 +67,7 @@
                     </CustomDropDown>
                 </div>
                 <div class="mr-010 custom-filters-col d-flex align-items-center" :class= "{'date_range_calendar': clientWidth < 767 && item?.name.value === 'DueDate'  && dateOption === 'Date range' }">
-                    <CustomFieldFilterValue v-if="item.name.type === 'custom'" v-model="item.values" :field="customFieldOf(item.name)" :comparison="item.comparison.value || ''" />
+                    <CustomFieldFilterValue v-if="item.name.type === 'custom'" v-model="item.values" :field="customFieldOf(item.name)" :comparison="item.comparison.value || ''" :people="users" />
                     <CustomDropDown v-if="arrayKeys.includes(item?.name.value)" @isVisible="(isOpen) => resetSearchValue(isOpen)" :zindexCustomDrop="99" :style="{marginBottom : clientWidth <= 767 ? item?.name.value === 'DueDate'  && dateOption === 'Date range' ? '0px' : '20px !important' : '0' }"  :maxWidth="clientWidth > 767 ? '211px' : '100%'"  :bodyClass="{'filter-selectall-options' : true}">
                         <template #head v-if="clientWidth <= 767">
                             <div class="d-flex align-items-center justify-content-between cancel-title-donewrapper">

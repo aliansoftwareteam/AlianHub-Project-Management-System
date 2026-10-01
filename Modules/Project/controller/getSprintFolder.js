@@ -3,6 +3,7 @@ const { MongoDbCrudOpration,validateObjectId } = require("../../../utils/mongo-h
 const { mongoose } = require("mongoose");
 const logger = require("../../../Config/loggerConfig");
 const { isPrivileged } = require("../../../Config/roleTypes");
+const { ACTIVE_SEAT } = require("../../../Config/seatStatus");
 const { sprintIdentities, visibleSprintClause } = require("../../Sprints/helpers/sprintVisibility");
 
 
@@ -36,24 +37,17 @@ exports.getDefaultSprintData = async (uid, query, companyId, projectId, roleType
 };
 
 
+/* Every entry names its parent, null at the top level, so a client can nest the flat list. */
+const withParentFolder = (folder) => ({ ...folder, parentFolderId: folder.parentFolderId || null });
+
 exports.getDefaultFolderData = (uid,query,companyId,projectId) => {
     return new Promise((resolve, reject) => {
         try {
-            const defaultPrivate = {
-                projectId : new mongoose.Types.ObjectId(projectId),
-                deletedStatusKey: { $nin: [1] },
-            };
-            const defaultPublic = {
-                projectId : new mongoose.Types.ObjectId(projectId),
-                deletedStatusKey: { $nin: [1] },
-            };
             const queryArray = [
                 {
                     $match: {
-                        $or: [
-                            defaultPrivate,
-                            defaultPublic
-                        ]
+                        projectId : new mongoose.Types.ObjectId(projectId),
+                        deletedStatusKey: { $nin: [1] },
                     }
                 }
             ];
@@ -76,7 +70,7 @@ exports.getDefaultFolderData = (uid,query,companyId,projectId) => {
                 data: [queryArray]
             }
             MongoDbCrudOpration(companyId, mongoObj, 'aggregate').then((res)=>{
-                resolve(res);
+                resolve((res || []).map(withParentFolder));
             }).catch((error)=>{
                 reject(error);
             })
@@ -99,7 +93,7 @@ exports.getSprintFolder = async (req,res) => {
         const companyObj = {
             type: SCHEMA_TYPE.COMPANY_USERS,
             data: [
-                { userId: uid },
+                { userId: uid, ...ACTIVE_SEAT },
                 { roleType: 1, _id: 0 }
             ]
         };
