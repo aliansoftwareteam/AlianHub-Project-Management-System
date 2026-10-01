@@ -107,6 +107,40 @@ describe('the workspace import dialog', () => {
         expect(wrapper.emitted('close')).toHaveLength(1);
     });
 
+    it('says in the summary which subtasks could not keep the place the file gave them', async () => {
+        apiRequest.mockImplementation(async (method, url, body) => {
+            if (url === IMPORT_CLICKUP_PREVIEW) return { data: { status: true, data: PREVIEW } };
+            const adjusted = body.listName === 'Backlog'
+                ? { tooDeep: 2, parentMissing: 0, cycle: 0, rows: [{ name: 'Too deep', reason: 'TOO_DEEP' }, { name: 'Deeper still', reason: 'TOO_DEEP' }] }
+                : { tooDeep: 1, parentMissing: 1, cycle: 0, rows: [{ name: 'Deepest', reason: 'TOO_DEEP' }, { name: 'Orphan', reason: 'PARENT_MISSING' }] };
+            return { data: { status: true, data: { projectId: `new-${body.listName}`, created: body.rows.length, skipped: 0, adjusted } } };
+        });
+        const wrapper = open({ initialSource: 'clickup' });
+        await uploadFile(wrapper);
+        await wrapper.find('[data-test="wim-next"]').trigger('click');
+        await flushPromises();
+        await wrapper.find('[data-test="wim-run"]').trigger('click');
+        await flushPromises();
+
+        const lines = wrapper.findAll('[data-test="wim-adjusted"] li').map((line) => line.text());
+        expect(lines).toHaveLength(2);
+        expect(lines[0]).toContain('WorkspaceImport.summary_too_deep');
+        expect(lines[0]).toContain('Too deep, Deeper still, Deepest');
+        expect(lines[1]).toContain('WorkspaceImport.summary_parent_missing');
+        expect(lines[1]).toContain('Orphan');
+    });
+
+    it('has no such line when every subtask kept its place', async () => {
+        const wrapper = open({ initialSource: 'clickup' });
+        await uploadFile(wrapper);
+        await wrapper.find('[data-test="wim-next"]').trigger('click');
+        await flushPromises();
+        await wrapper.find('[data-test="wim-run"]').trigger('click');
+        await flushPromises();
+        expect(wrapper.find('[data-test="wim-summary"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="wim-adjusted"]').exists()).toBe(false);
+    });
+
     it('imports into a chosen project and list, previewing against that project', async () => {
         const wrapper = open({ initialSource: 'clickup' });
         await uploadFile(wrapper);

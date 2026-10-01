@@ -5,7 +5,7 @@
             <div class="input-field-group" :style="[{width : clientWidth > 767 ? 'calc(100% - 170px)' : '100%'}]">
                 <InputText
                     v-model="taskName.value"
-                    class="form-control login-input text-capitalize"
+                    class="form-control login-input"
                     :placeHolder="$t('PlaceHolder.Enter_Duplicate_Task_Name')"
                     :maxLength="250"
                     :minLength="3"  
