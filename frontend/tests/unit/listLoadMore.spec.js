@@ -77,7 +77,7 @@ const sprints = () => [{ id: SPRINT, name: 'List', projectId: PID, tasks: 110, d
 const pad = (n) => String(n).padStart(3, '0');
 const task = (n, statusKey) => ({
     _id: `t${pad(n)}`, TaskName: `Task ${pad(n)}`, TaskKey: `SC-${n}`, ProjectID: PID, sprintId: SPRINT, isParentTask: true,
-    statusKey, statusType: statusKey === 2 ? 'close' : 'default_active', groupByStatusIndex: n, createdAt: `2026-09-01T00:00:${pad(n % 60)}.000Z`,
+    statusKey, statusType: statusKey === 2 ? 'close' : 'default_active', groupByStatusIndex: n, createdAt: new Date(Date.UTC(2026, 8, 1, 0, 0, n)).toISOString(),
     AssigneeUserId: [], deletedStatusKey: 0, subTasks: 0
 });
 const seedServer = () => {
@@ -140,6 +140,7 @@ async function openList(props = {}) {
         props: { grouped: 0, sprints: sprints(), sprintLoading: false, ...props },
         global: {
             plugins: [Store],
+            mocks: { $t: (...args) => i18n.global.t(...args) },
             provide: {
                 selectedProject: project, $clientWidth: ref(1280), $companyId: ref('c1'), $userId: ref('u1'), $dateFormat: ref('DD/MM/YYYY'),
                 showArchived: ref(false), searchedTask: searched, taskCollapsed: ref(true), clearTaskFilters: () => {},
@@ -215,6 +216,22 @@ describe('the list opens without a wait', () => {
         await settle(2000);
         expect(server.calls.length).toBeGreaterThan(0);
     });
+
+    it('coming back to a list it already holds keeps the rows and asks for the counts, not for more pages', async () => {
+        await openList();
+        await loadMore('To Do');
+        wrapper.unmount();
+        server.calls = [];
+        server.tasks = server.tasks.filter((row) => row._id !== 't100');
+
+        await openList();
+        await settle(1000);
+
+        expect(rowIds('To Do')).toEqual(expectedIds(1, 70));
+        expect(pageCalls()).toHaveLength(0);
+        expect(server.calls).toHaveLength(1);
+        expect(headerCount('To Do')).toBe('99');
+    });
 });
 
 describe('a group loads all of its tasks', () => {
@@ -270,6 +287,36 @@ describe('a group loads all of its tasks', () => {
         await settle();
         expect(pagesFor(1).map(skipOf)).toEqual([0, 35]);
         expect(rowIds('To Do')).toEqual(expectedIds(1, 70));
+    });
+
+    it('misses no task when a loaded row leaves the group between pages', async () => {
+        const moved = server.tasks.find((row) => row._id === 't010');
+        Object.assign(moved, { statusKey: 2, statusType: 'close' });
+        Store.commit('projectData/mutateUpdateFirebaseTasks', {
+            snap: null, op: 'modified', pid: PID, sprintId: SPRINT, data: { ...moved }, updatedFields: { statusKey: 2, statusType: 'close' }
+        });
+        await settle();
+        expect(headerCount('To Do')).toBe('99');
+
+        await loadMore('To Do');
+        expect(skipOf(pagesFor(1)[1])).toBe(34);
+        expect(rowIds('To Do')).toEqual(expectedIds(1, 70).filter((id) => id !== 't010'));
+    });
+
+    it('misses no task when a new one is added to the end of the group between pages', async () => {
+        const created = { ...task(999, 1), groupByStatusIndex: 999 };
+        server.tasks.push(created);
+        Store.commit('projectData/mutateUpdateFirebaseTasks', {
+            snap: null, op: 'added', pid: PID, sprintId: SPRINT, data: { ...created }, updatedFields: { ...created }
+        });
+        await settle();
+        expect(rowIds('To Do')).toEqual([...expectedIds(1, 35), 't999']);
+        expect(headerCount('To Do')).toBe('101');
+
+        await loadMore('To Do');
+        expect(skipOf(pagesFor(1)[1])).toBe(35);
+        expect(rowIds('To Do')).toEqual([...expectedIds(1, 70), 't999']);
+        expect(moreButton('To Do').text()).toBe('Load more (30 left)');
     });
 
     it('offers no more for a group that is fully loaded', () => {
