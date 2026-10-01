@@ -116,10 +116,21 @@ describe('form responses link to the task they created', () => {
         expect(taskReads[0][0]).toBe(COMPANY);
     });
 
-    it('leaves the link out of an export, which only needs the key', async () => {
-        seedSubmission(seedTask({ TaskKey: 'OPN-8' }));
-        const res = await list(OWNER, form._id, { all: '1' });
-        expect(rowFor(res, 'OPN-8').taskKey).toBe('OPN-8');
-        expect(rowFor(res, 'OPN-8').task).toBeUndefined();
+    it('keeps taskId beside the link for an openable task, on the page and in the export, and drops it otherwise', async () => {
+        const open = seedTask({ TaskKey: 'OPN-8' });
+        const hidden = seedTask({ TaskKey: 'OPN-9', sprintId: closedSprint._id });
+        const deleted = seedTask({ TaskKey: 'OPN-10', deletedStatusKey: 1 });
+        [open, hidden, deleted].forEach((task) => seedSubmission(task));
+        seedSubmission(null);
+
+        for (const query of [{}, { all: '1' }]) {
+            const res = await list(MEMBER, form._id, query);
+            expect(rowFor(res, 'OPN-8').taskId).toBe(String(open._id));
+            expect(rowFor(res, 'OPN-8').task.id).toBe(String(open._id));
+            for (const row of res.body.data.submissions.filter((r) => r.taskKey !== 'OPN-8')) {
+                expect(row.task).toBeNull();
+                expect(row).not.toHaveProperty('taskId');
+            }
+        }
     });
 });

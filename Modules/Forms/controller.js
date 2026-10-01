@@ -328,7 +328,7 @@ exports.listSubmissions = async (req, res) => {
             }
         }
 
-        const links = exportAll ? null : await taskLinks(companyId, callerId(req), rows || []);
+        const links = await taskLinks(companyId, callerId(req), rows || []);
         const data = (rows || []).map((row) => {
             const values = {};
             const files = {};
@@ -348,11 +348,13 @@ exports.listSubmissions = async (req, res) => {
                     };
                 }
             }
+            const task = links.get(String(row.taskId || '')) || null;
             return {
                 _id: row._id,
                 submittedAt: row.createdAt,
                 taskKey: row.taskKey || '',
-                ...(links ? { task: links.get(String(row.taskId || '')) || null } : {}),
+                ...(task ? { taskId: task.id } : {}),
+                task,
                 values,
                 files,
             };
