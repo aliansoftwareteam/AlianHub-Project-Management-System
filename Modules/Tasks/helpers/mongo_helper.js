@@ -22,6 +22,7 @@ const { updateCommentCollection, addCommentCollection } = require('../../Comment
 // BUG-033 / #87 — self-healing reconciliation for sprint task counts.
 const { reconcileSprintTaskCount, scheduleReconciliation } = require('./reconcileTaskCount');
 const { storableFieldValues } = require('../../CustomField/helpers/fieldValueWrite');
+const { copyFieldFiles } = require('../../CustomField/helpers/fieldFiles');
 
 /* ------------- TASK ------------- */
 exports.HandleTask = async (companyId, object, isUpdate, id = null, userData) => {
@@ -829,6 +830,8 @@ exports.duplicateSubTaskFunction = (companyId, projectData, sprintObj, subtask, 
                 obj.TaskKey = projectData.ProjectCode + '-' +  response.lastTaskId;
                 exports.HandleTask(companyId, obj, false, null, userData).then((taskResult) => {
                     if(duplicateData.includes('Attachments')){
+                        copyFieldFiles({ companyId, source: subtask, target: { _id: taskResult.id, ProjectID: projectData.id } })
+                            .catch((error) => logger.error(`field files copy on duplicate: ${error && error.message}`));
                         if(subtask.attachments.length > 0) {
                             /* Only a file stored for the source task is copied; any other key stays as it was, read under its own owner. */
                             const promises = subtask.attachments.map(async (x) => {
