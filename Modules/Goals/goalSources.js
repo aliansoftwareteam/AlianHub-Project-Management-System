@@ -5,6 +5,7 @@ const { ACTIVE_SEAT } = require('../../Config/seatStatus');
 const { isPrivileged } = require('../../Config/roleTypes');
 const { sharedProjects, READER_CAP } = require('../AI/publicSources');
 const { canSeeSprint, sprintIdentities } = require('../Sprints/helpers/sprintVisibility');
+const { openableTasks } = require('../Tasks/helpers/taskReadAccess');
 const { PRIVATE, PEOPLE } = require('./helpers/goalAccess');
 const { GoalRefused, TASKS } = require('./helpers/goalRules');
 
@@ -61,9 +62,9 @@ const openProjects = async (companyId, audience, candidates) => {
 
 /* Splits sources into the ones the audience can open and the ones it cannot. A source that is not there answers as one that cannot be opened. */
 const judge = async (companyId, audience, sources) => {
-    const tasks = sources.taskIds.length ? await find(companyId, SCHEMA_TYPE.TASKS, { _id: { $in: oids(sources.taskIds) } }, 'ProjectID sprintId mainChat') : [];
+    const tasks = sources.taskIds.length ? await find(companyId, SCHEMA_TYPE.TASKS, { _id: { $in: oids(sources.taskIds) } }, 'ProjectID sprintId mainChat TaskName TaskKey') : [];
     const listIds = unique([...sources.sprintIds, ...tasks.map((task) => task.sprintId || '')]).filter(isId);
-    const lists = listIds.length ? await find(companyId, SCHEMA_TYPE.SPRINTS, { _id: { $in: oids(listIds) } }, 'projectId private AssigneeUserId deletedStatusKey') : [];
+    const lists = listIds.length ? await find(companyId, SCHEMA_TYPE.SPRINTS, { _id: { $in: oids(listIds) } }, 'projectId private AssigneeUserId deletedStatusKey name') : [];
     const open = await openProjects(companyId, audience, unique([...lists.map((list) => list.projectId), ...tasks.map((task) => task.ProjectID)]).filter(isId));
     const identities = audience.sole && !audience.privileged ? await sprintIdentities(companyId, audience.sole) : [];
     const listById = byId(lists);
@@ -81,8 +82,36 @@ const judge = async (companyId, audience, sources) => {
     const split = (ids, isOpen) => [ids.filter((id) => isOpen(id)), ids.filter((id) => !isOpen(id))];
     const [openLists, closedLists] = split(sources.sprintIds, listOpen);
     const [openTasks, closedTasks] = split(sources.taskIds, taskOpen);
-    return { counted: { sprintIds: openLists, taskIds: openTasks }, skipped: { sprintIds: closedLists, taskIds: closedTasks } };
+    return { counted: { sprintIds: openLists, taskIds: openTasks }, skipped: { sprintIds: closedLists, taskIds: closedTasks }, rows: { sprintIds: listById, taskIds: taskById } };
 };
+
+const noNames = () => ({ sprintIds: {}, taskIds: {} });
+
+/* What one person is told about the sources they are shown: the name of a list they can open, and of a
+ * task the task read itself would give them. A source they cannot open has no entry, whoever linked it. */
+const namesFor = async (companyId, uid, sources) => {
+    const names = noNames();
+    if (!KINDS.some((kind) => sources[kind].length)) return names;
+    const { counted, rows } = await judge(companyId, await soleReader(companyId, uid), sources);
+    const readable = new Set((await openableTasks(companyId, uid, counted.taskIds)).map((row) => String(row._id)));
+    const taskIds = counted.taskIds.filter((id) => readable.has(String(id)));
+    const projectOf = { sprintIds: (id) => String(rows.sprintIds.get(String(id)).projectId), taskIds: (id) => String(rows.taskIds.get(String(id)).ProjectID) };
+    const projectIds = unique([...counted.sprintIds.map(projectOf.sprintIds), ...taskIds.map(projectOf.taskIds)]);
+    const projectNames = byId(projectIds.length ? await find(companyId, SCHEMA_TYPE.PROJECTS, { _id: { $in: oids(projectIds) } }, 'ProjectName') : []);
+    const placed = (projectId) => ({ projectId, projectName: (projectNames.get(projectId) || {}).ProjectName || '' });
+    counted.sprintIds.forEach((id) => {
+        names.sprintIds[id] = { id, name: rows.sprintIds.get(id).name || '', ...placed(projectOf.sprintIds(id)) };
+    });
+    taskIds.forEach((id) => {
+        const task = rows.taskIds.get(id);
+        names.taskIds[id] = { id, name: task.TaskName || '', key: task.TaskKey || '', ...placed(projectOf.taskIds(id)) };
+    });
+    return names;
+};
+
+const namesOf = (names, sources) => Object.fromEntries(KINDS.map((kind) => [kind, Object.fromEntries(sources[kind].filter((id) => names[kind][id]).map((id) => [id, names[kind][id]]))]));
+
+const merged = (sets) => Object.fromEntries(KINDS.map((kind) => [kind, unique(sets.flatMap((set) => set[kind] || []))]));
 
 const firstSkipped = (skipped) => {
     const kind = KINDS.find((key) => skipped[key].length);
@@ -118,4 +147,4 @@ const wouldDrop = async (companyId, goal, next) => {
     return { sprintIds: unique(dropped.sprintIds), taskIds: unique(dropped.taskIds) };
 };
 
-module.exports = { READER_CAP, KINDS, audienceOf, judge, requireCountable, wouldDrop, sourcesOf, holdsSources, none };
+module.exports = { READER_CAP, KINDS, audienceOf, judge, namesFor, namesOf, noNames, merged, requireCountable, wouldDrop, sourcesOf, holdsSources, none };

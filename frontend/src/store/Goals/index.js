@@ -4,9 +4,8 @@ import {
 } from '@/views/Goals/goalRequest';
 
 export const REFETCH_DELAY_MS = 400;
-/* A count the server has started is asked for again this long after its last answer, this many times at most. */
+/* A count the server has started is asked for again this long after its last answer. */
 export const COUNT_POLL_MS = 2000;
-export const COUNT_POLL_LIMIT = 30;
 
 const READY = 'ready';
 const LOADING = 'loading';

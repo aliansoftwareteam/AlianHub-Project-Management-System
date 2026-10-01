@@ -321,6 +321,98 @@ describe('when a count is made again', () => {
     });
 });
 
+describe('a count that failed', () => {
+    const failing = (error) => {
+        const original = mockDb.crud.getMockImplementation();
+        mockDb.crud.mockImplementation(async (companyId, query, method) => {
+            if (method === 'aggregate') throw error;
+            return original(companyId, query, method);
+        });
+        return () => mockDb.crud.mockImplementation(original);
+    };
+    const stale = async () => {
+        task(open, openList, { statusType: 'close' });
+        const id = await counting({ sprintIds: [openList] });
+        task(open, openList);
+        after(10 * MINUTE);
+        return id;
+    };
+
+    it('is recorded with when and a reason code, keeps the last numbers, and is no longer said to be on its way', async () => {
+        const id = await stale();
+        const emit = jest.spyOn(socketEmitter, 'emit');
+        const restore = failing(new Error('E11000 could not read customer "Acme"'));
+        expect((await read(id)).targets[0]).toMatchObject({ updating: true });
+        await counts.idle();
+        restore();
+
+        const failedAt = new Date(T0.getTime() + 10 * MINUTE);
+        expect(goalRow(id).targets[0].counted).toMatchObject({ done: 1, total: 1, at: T0, failedAt, failedCode: 'error' });
+        expect(emit).toHaveBeenCalledWith('update', { type: 'update', companyId: C, module: 'goals' });
+        const res = await call(goals.getGoal, AUTHOR, { id });
+        expect(res.body.data.targets[0]).toMatchObject({ updating: false, progressPct: 100, counted: { done: 1, total: 1, at: T0, failedAt, failedCode: 'error' } });
+        expect(JSON.stringify(res.body)).not.toContain('Acme');
+        expect(JSON.stringify(goalRow(id))).not.toContain('Acme');
+        expect(logger.error).toHaveBeenCalledTimes(1);
+        emit.mockRestore();
+    });
+
+    it('names a store that could not be reached apart from any other failure', async () => {
+        const id = await stale();
+        const restore = failing(Object.assign(new Error('timed out'), { name: 'MongoNetworkTimeoutError' }));
+        await read(id);
+        await counts.idle();
+        restore();
+        expect(goalRow(id).targets[0].counted.failedCode).toBe('unavailable');
+    });
+
+    it('is tried again by the first read thirty seconds later, and a count that works clears it', async () => {
+        const id = await stale();
+        const restore = failing(new Error('the database went away'));
+        await read(id);
+        await counts.idle();
+        restore();
+
+        after(30 * SECOND - 1);
+        mockDb.calls.length = 0;
+        expect((await read(id)).targets[0]).toMatchObject({ updating: false });
+        await counts.idle();
+        expect(aggregates()).toHaveLength(0);
+
+        after(1);
+        expect((await read(id)).targets[0]).toMatchObject({ updating: true });
+        await counts.idle();
+        const fresh = (await read(id)).targets[0];
+        expect(fresh).toMatchObject({ updating: false, progressPct: 50, counted: { done: 1, total: 2 } });
+        expect('failedAt' in fresh.counted).toBe(false);
+        expect('failedAt' in goalRow(id).targets[0].counted).toBe(false);
+    });
+
+    it('is cleared when the sources are saved again, which counts at once', async () => {
+        const id = await stale();
+        const restore = failing(new Error('the database went away'));
+        await read(id);
+        await counts.idle();
+        restore();
+        const targetId = goalRow(id).targets[0].id;
+        const res = await call(goals.editTarget, AUTHOR, { id, targetId, body: { sources: { sprintIds: [openList], taskIds: [] } } });
+        expect(res.body.data.targets[0]).toMatchObject({ updating: false, counted: { done: 1, total: 2 } });
+        expect('failedAt' in res.body.data.targets[0].counted).toBe(false);
+    });
+
+    it('marks only the targets that were being counted', async () => {
+        const res = await call(goals.createGoal, AUTHOR, { body: { name: 'Two', targets: [{ name: 'A', kind: 'tasks', sources: { sprintIds: [openList] } }, { name: 'B', kind: 'number', target: 5 }] } });
+        const id = res.body.data._id;
+        after(10 * MINUTE);
+        const restore = failing(new Error('the database went away'));
+        await expect(counts.refresh(C, id)).rejects.toThrow('the database went away');
+        restore();
+        const [countedTarget, numberTarget] = goalRow(id).targets;
+        expect(countedTarget.counted.failedCode).toBe('error');
+        expect(numberTarget.counted).toBeUndefined();
+    });
+});
+
 describe('a task change', () => {
     const envelope = (type, { changedFields = [], sprintId = openList, previous = null, id = nextId('f0'), companyId = C, kind = 'task' } = {}) => ({
         ...domainEventBus.buildEnvelope({ companyId, type, doc: { _id: id, ProjectID: String(open._id), sprintId }, changedFields, previous, actor: { kind: 'user', userId: AUTHOR }, depth: 0 }),
@@ -505,9 +597,15 @@ describe('the stored row', () => {
     it('declares the counted fields where the count writes them', () => {
         const declared = schema.goals.targets.type[0];
         expect(Object.keys(declared.sources)).toEqual(['sprintIds', 'taskIds']);
-        expect(Object.keys(declared.counted)).toEqual(['done', 'total', 'at', 'skipped']);
+        expect(Object.keys(declared.counted)).toEqual(['done', 'total', 'at', 'failedAt', 'failedCode', 'skipped']);
         expect(Object.keys(declared.counted.skipped)).toEqual(['sprintIds', 'taskIds']);
         expect(declared.dirty.type).toBe(Boolean);
+    });
+
+    it('keeps what a failed count leaves on a target', () => {
+        const sent = { id: 't', name: 'T', kind: 'tasks', counted: { done: 1, total: 2, at: T0, failedAt: T0, failedCode: 'error' } };
+        const kept = new Goal({ name: 'N', ownerUserId: AUTHOR, visibility: 'private', targets: [sent] }).toObject().targets[0];
+        expect(kept.counted).toMatchObject({ failedAt: T0, failedCode: 'error' });
     });
 
     it('leaves a target that is not counted from tasks without those fields', () => {

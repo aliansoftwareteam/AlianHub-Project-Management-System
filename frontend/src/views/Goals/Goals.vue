@@ -75,7 +75,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import GoalCreate from "./GoalCreate.vue";
 import GoalPanel from "./GoalPanel.vue";
 import GoalRow from "./GoalRow.vue";
-import { COUNT_POLL_LIMIT, COUNT_POLL_MS } from "@/store/Goals";
+import { COUNT_POLL_MS } from "@/store/Goals";
 import { SORTS, groupGoals, todayOf } from "./goalRequest";
 import { useGoalPeople } from "./useGoalPeople";
 import "./style.css";
@@ -163,20 +163,13 @@ watch(() => store.getters["settings/getSocketInstance"], listenOn, { immediate: 
 
 /* A read can answer with the numbers it has while the server counts again. The goals are then read
    once more COUNT_POLL_MS after the latest answer, whatever brought it, so never more often than
-   that; and not for ever, should a count never come in. */
+   that. A count that fails ends the asking: the server records it and no longer says it is under way. */
 let countTimer = null;
-let countPolls = 0;
 let leaving = false;
 function awaitCounts() {
     clearTimeout(countTimer);
-    if (leaving) return;
-    if (!store.getters["goals/counting"]) {
-        countPolls = 0;
-        return;
-    }
-    if (countPolls >= COUNT_POLL_LIMIT) return;
+    if (leaving || !store.getters["goals/counting"]) return;
     countTimer = setTimeout(async () => {
-        countPolls += 1;
         await store.dispatch("goals/refresh");
         awaitCounts();
     }, COUNT_POLL_MS);

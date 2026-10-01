@@ -157,6 +157,7 @@
 .glt__confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--r-md, 6px); background: var(--danger-bg); color: var(--danger-ink); font: var(--text-small); }
 .glt__confirm > span { flex: 1; min-width: 160px; }
 
+.glt__failed { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 8px 10px; border-radius: var(--r-md, 6px); background: var(--warn-bg); color: var(--warn-ink); font: var(--text-small); }
 .glt__left-out { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: var(--r-md, 6px); background: var(--warn-bg); color: var(--warn-ink); font: var(--text-small); }
 
 .gtf { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 10px 12px; }

@@ -44,7 +44,12 @@ const presentCount = (target, { canEdit, live, now }) => {
     const kept = (kind) => all[kind].filter((id) => !skipped[kind].map(String).includes(id));
     return {
         sources: canEdit ? all : { sprintIds: kept('sprintIds'), taskIds: kept('taskIds') },
-        counted: { done: counted.done || 0, total: counted.total || 0, at: counted.at || null },
+        counted: {
+            done: counted.done || 0,
+            total: counted.total || 0,
+            at: counted.at || null,
+            ...(counted.failedAt ? { failedAt: counted.failedAt, failedCode: counted.failedCode || counts.COUNT_ERROR } : {}),
+        },
         notCounted: skipped.sprintIds.length + skipped.taskIds.length,
         ...(canEdit ? { notCountedSources: { sprintIds: skipped.sprintIds.map(String), taskIds: skipped.taskIds.map(String) } } : {}),
         dirty: target.dirty === true,
@@ -103,10 +108,26 @@ const present = (goal, caller, now = new Date()) => {
     };
 };
 
-const sent = (res, statusText, goal, caller) => res.status(200).json({
+/* Each counted target is sent with the names of the sources this reader can open themselves. The names
+ * are read once for everything in the answer, and an answer whose names could not be read goes out without them. */
+const presentAll = async (goals, caller, now = new Date()) => {
+    const shown = goals.map((goal) => present(goal, caller, now));
+    const counted = (target) => target.kind === rules.TASKS;
+    const linked = sources.merged(shown.flatMap((goal) => goal.targets).filter(counted).map((target) => target.sources));
+    const names = await sources.namesFor(caller.companyId, caller.uid, linked).catch((error) => {
+        logger.error(`goals source names: ${error.message || error}`);
+        return sources.noNames();
+    });
+    return shown.map((goal) => ({
+        ...goal,
+        targets: goal.targets.map((target) => (counted(target) ? { ...target, sourceNames: sources.namesOf(names, target.sources) } : target)),
+    }));
+};
+
+const sent = async (res, statusText, goal, caller) => res.status(200).json({
     status: true,
     statusText,
-    data: goal && access.canSee(goal, caller) ? present(goal, caller) : null,
+    data: goal && access.canSee(goal, caller) ? (await presentAll([goal], caller))[0] : null,
 });
 
 /* The audit log is read by owners and admins, so it records a goal only while the whole workspace can read that goal. */
@@ -243,7 +264,7 @@ exports.listGoals = handled('list', async (req, res, caller) => {
     const now = new Date();
     const listed = goals.filter((goal) => !mine || access.isOwner(goal, caller) || access.isNamed(goal, caller));
     recountBehind(caller.companyId, listed, now);
-    const data = listed.map((goal) => present(goal, caller, now)).sort((a, b) => a.name.localeCompare(b.name));
+    const data = (await presentAll(listed, caller, now)).sort((a, b) => a.name.localeCompare(b.name));
     return res.status(200).json({ status: true, statusText: 'Goals fetched successfully.', data });
 });
 
