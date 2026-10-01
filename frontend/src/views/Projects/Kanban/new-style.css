@@ -178,6 +178,21 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
+.kanban-board .kanban-card .card-rename {
+    flex: 1;
+    min-width: 0;
+    min-height: var(--hit-min);
+    padding: 2px 6px;
+    border: 1px solid var(--brand);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+    font: 500 13px/1.35 var(--font-ui);
+}
+.kanban-board .kanban-card .card-rename:focus-visible { outline: none; box-shadow: var(--focus); }
+/* The card menu's panel is teleported out of the board, so these cannot be scoped to it. */
+.card-menu__sep { height: 1px; margin: 3px 0; background: var(--hairline); }
+.card-menu__danger { color: var(--danger); }
 
 /* Blocked columns tint their cards' border, as in the mock. */
 .kanban-board .kanban-column--danger .kanban-card { border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
@@ -283,7 +298,7 @@
 
 .kanban-board .add-task-icon { display: block; width: 13px; height: 12px; }
 
-/* The menu is the only entry point to ten per-task actions, so it leaves the
+/* The menu is the only entry point to the per-task actions, so it leaves the
    flow rather than taking a permanent 18% bite out of every title. */
 .kanban-card .option-list {
     position: absolute;

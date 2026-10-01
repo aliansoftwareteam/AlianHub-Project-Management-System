@@ -21,7 +21,8 @@ vi.mock('@/composable', () => ({
 import * as env from '@/config/env';
 import en from '@/locales/en';
 import { dismissUndoToast, runUndo, undoToast } from '@/composable/useUndoToast';
-import { rowMenuRights, useListRowMenu } from '@/views/Projects/ListView/useListRowMenu.js';
+import { useListRowMenu } from '@/views/Projects/ListView/useListRowMenu.js';
+import { taskMenuItems, taskMenuRights } from '@/views/Projects/composables/taskMenu';
 import ListRowActions from '@/views/Projects/ListView/ListRowActions.vue';
 import ListRow from '@/views/Projects/ListView/ListRow.vue';
 
@@ -79,25 +80,25 @@ beforeEach(() => {
     dismissUndoToast();
 });
 
-describe('rowMenuRights', () => {
+describe('the row menu rights', () => {
     const check = (granted) => (path) => (path in granted ? granted[path] : true);
 
     it('grants each action on its own task permission, as the bulk bar and task panel do', () => {
-        expect(rowMenuRights(check({}))).toEqual({ archive: true, delete: true, move: true, duplicate: true, undoDuplicate: true });
-        expect(rowMenuRights(check({ 'task.task_archive': false }))).toMatchObject({ archive: false, delete: true });
-        expect(rowMenuRights(check({ 'task.task_delete': null }))).toMatchObject({ delete: false, undoDuplicate: false });
-        expect(rowMenuRights(check({ 'task.task_move': false }))).toMatchObject({ move: false });
-        expect(rowMenuRights(check({ 'task.task_duplicate': false }))).toMatchObject({ duplicate: false });
+        expect(taskMenuRights(check({}))).toMatchObject({ archive: true, delete: true, move: true, duplicate: true });
+        expect(taskMenuRights(check({ 'task.task_archive': false }))).toMatchObject({ archive: false, delete: true });
+        expect(taskMenuRights(check({ 'task.task_delete': null }))).toMatchObject({ delete: false });
+        expect(taskMenuRights(check({ 'task.task_move': false }))).toMatchObject({ move: false });
+        expect(taskMenuRights(check({ 'task.task_duplicate': false }))).toMatchObject({ duplicate: false });
     });
 
-    it('offers none of them while the list shows archived tasks', () => {
-        expect(rowMenuRights(check({}), { archived: true })).toMatchObject({ archive: false, delete: false, move: false, duplicate: false });
+    it('leaves only restore and delete while the list shows archived tasks', () => {
+        expect(taskMenuRights(check({}), { archived: true })).toMatchObject({ archive: false, move: false, duplicate: false, restore: true, delete: true });
     });
 });
 
 describe('ListRowActions', () => {
-    const mountActions = (props = {}) => mount(ListRowActions, {
-        props: { task: task(), href: 'https://x/t1', ...props },
+    const mountActions = ({ task: data = task(), ...rights } = {}) => mount(ListRowActions, {
+        props: { task: data, href: 'https://x/t1', items: taskMenuItems(data, rights) },
         attachTo: document.body,
         global: { stubs: { ShellIcon: true } }
     });
@@ -114,7 +115,7 @@ describe('ListRowActions', () => {
     });
 
     it('shows each item the row is allowed, as a menu item', async () => {
-        const menu = await openMenu(mountActions({ canArchive: true, canDelete: true, canMove: true, canDuplicate: true }));
+        const menu = await openMenu(mountActions({ task: task({ subTasks: 0 }), archive: true, delete: true, move: true, duplicate: true }));
         for (const item of ['archive', 'delete', 'move', 'duplicate']) {
             expect(menu.find(`[data-item="${item}"]`).attributes('role')).toBe('menuitem');
         }
@@ -122,23 +123,24 @@ describe('ListRowActions', () => {
     });
 
     it('offers "Duplicate with subtasks" only for a task that has some', async () => {
-        const menu = await openMenu(mountActions({ task: task({ subTasks: 2 }), canDuplicate: true }));
+        const menu = await openMenu(mountActions({ task: task({ subTasks: 2 }), duplicate: true }));
         expect(menu.find('[data-item="duplicate-subtasks"]').exists()).toBe(true);
     });
 
     it('emits the chosen action and closes', async () => {
-        const wrapper = mountActions({ canArchive: true, canDelete: true, canMove: true, canDuplicate: true, task: task({ subTasks: 1 }) });
-        for (const [item, event] of [['archive', 'archive'], ['delete', 'delete'], ['move', 'move'], ['duplicate', 'duplicate'], ['duplicate-subtasks', 'duplicate-subtasks']]) {
+        const wrapper = mountActions({ archive: true, delete: true, move: true, duplicate: true, task: task({ subTasks: 1 }) });
+        const items = ['archive', 'delete', 'move', 'duplicate', 'duplicate-subtasks'];
+        for (const item of items) {
             const menu = await openMenu(wrapper);
             await menu.find(`[data-item="${item}"]`).trigger('click');
-            expect(wrapper.emitted(event)).toHaveLength(1);
             expect(wrapper.find('[role="menu"]').exists()).toBe(false);
         }
+        expect(wrapper.emitted('choose')).toEqual(items.map((item) => [item]));
         wrapper.unmount();
     });
 
     it('reaches the new items from the keyboard', async () => {
-        const wrapper = mountActions({ canArchive: true });
+        const wrapper = mountActions({ archive: true });
         const menu = await openMenu(wrapper);
         const items = menu.findAll('[role="menuitem"]');
         items[items.length - 2].element.focus();
