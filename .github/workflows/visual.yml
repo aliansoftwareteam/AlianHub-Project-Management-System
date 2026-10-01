@@ -1,7 +1,9 @@
 name: Visual
 
+# Until a baseline is committed there is nothing to compare a pull request with, so the check runs
+# after each merge and on demand. Add `pull_request: branches: [beta]` back with the baseline.
 on:
-  pull_request:
+  push:
     branches: [beta]
   workflow_dispatch:
     inputs:

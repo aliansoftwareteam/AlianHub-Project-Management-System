@@ -32,7 +32,7 @@ The backend serves the built SPA from `frontend/dist`; `cd frontend && npm run b
 | `npm run api:doc:check` | `docs/API.md` and `docs/api/openapi.json` match the routes and `scripts/api-doc.meta.json`. Not run in CI: run `npm run api:doc` and commit both files in the docs pull request that follows merges to `beta` |
 | `npm run visual` | the screenshot check of the core screens; CI only, see [Screenshot check](#screenshot-check) |
 
-`.github/workflows/ci.yml` runs all of that on every pull request to `beta`, `staging` and `main`, except the screenshot check, which has a workflow of its own. The conventions project is the place for a rule that must hold everywhere: it reads the tree and fails with the offending file, so a new rule needs no per-module wiring.
+`.github/workflows/ci.yml` runs all of that on every pull request to `beta`, `staging` and `main`, except the screenshot check, which has a workflow of its own. A pull request that only changes files under `Tasks/` or Markdown under `.claude/` skips the suites: nothing they test can have changed. The conventions project is the place for a rule that must hold everywhere: it reads the tree and fails with the offending file, so a new rule needs no per-module wiring.
 
 The conventions in place:
 
@@ -79,7 +79,7 @@ npm run atlas:compare -- artifacts/atlas/<before> artifacts/atlas/<after>
 
 ### Screenshot check
 
-The atlas shows a look; this check holds one. On every pull request to `beta` the `Visual` workflow (`.github/workflows/visual.yml`, job **Core screens**) opens the core screens, compares each with a PNG in `e2e/visual-baseline/` using Playwright's `toHaveScreenshot`, and fails when one differs. It is a workflow of its own, so a changed look never hides a failing functional test.
+The atlas shows a look; this check holds one. After every merge to `beta`, and on demand from the Actions tab, the `Visual` workflow (`.github/workflows/visual.yml`, job **Core screens**) opens the core screens, compares each with a PNG in `e2e/visual-baseline/` using Playwright's `toHaveScreenshot`, and fails when one differs. It is a workflow of its own, so a changed look never hides a failing functional test.
 
 **What it covers.** The screens marked `core: true` in `scripts/atlas-manifest.js`: Home, Everything, the command palette, Docs, a doc, a dashboard, project List, Board and Table, the task panel and My settings, in light and dark at 1440x900. Those also marked `phone: true` (Home, List, Board, task panel) are taken at 390x844 too: 30 screenshots, viewport only. The data is the e2e harness seed (`e2e/support/fixtures.js`) plus one doc and one dashboard (`e2e/visual/global-setup.js`), in a database made for the run.
 
