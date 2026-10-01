@@ -1,8 +1,8 @@
 const { canReadProject } = require('../../Config/projectAccess');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
-const { projectAccess } = require('../../Config/contentAccess');
+const { visibleProjectIds } = require('../../Config/contentAccess');
 const { canSeeSprint, hiddenSprintIds, sprintIdentities } = require('../Sprints/helpers/sprintVisibility');
-const { pageVisibleTo } = require('../Pages/helpers/pageRules');
+const { pageReachedBy } = require('../Pages/helpers/pageRules');
 const { readsCompanyWide } = require('../Tasks/helpers/taskQueryGuard');
 
 const memoised = (read) => {
@@ -39,9 +39,9 @@ const KEEP = {
         return keepWhere(docs, async (doc) => readsCompanyWide(doc, caller.uid, [])
             && (await inReadableProject(caller, doc.ProjectID)) && !hidden.has(String(doc.sprintId || '')));
     },
-    docs: (caller, docs) => {
-        const docProject = memoised((projectId) => projectAccess(caller.companyId, caller.uid, projectId));
-        return keepWhere(docs, async (doc) => pageVisibleTo(doc, caller.uid) && (!doc.ProjectID || (await docProject(doc.ProjectID)).visible));
+    docs: async (caller, docs) => {
+        const open = new Set(await visibleProjectIds(caller.companyId, caller.uid));
+        return docs.filter((doc) => pageReachedBy(doc, { uid: caller.uid, inProject: (projectId) => open.has(String(projectId)) }));
     },
 };
 
