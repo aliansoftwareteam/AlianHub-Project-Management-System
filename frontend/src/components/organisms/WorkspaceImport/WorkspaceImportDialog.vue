@@ -125,6 +125,7 @@
                             <li v-if="preview.matchedAssignees.length">{{ $t('WorkspaceImport.fact_people', { count: preview.matchedAssignees.length }) }}</li>
                             <li v-if="preview.unmatchedAssignees.length" class="wim__warn">{{ $t('WorkspaceImport.fact_unmatched', { names: preview.unmatchedAssignees.join(', ') }) }}</li>
                             <li v-if="preview.skippedRows.length" class="wim__warn">{{ $t('WorkspaceImport.fact_skipped', { count: preview.skippedRows.length }) }}</li>
+                            <li v-if="cannotAddDetails" class="wim__warn" data-test="wim-add-denied-fact">{{ $t('WorkspaceImport.add_missing_denied') }}</li>
                             <li v-for="issue in shownUnreadDates" :key="`${issue.row}-${issue.column}`" class="wim__warn" data-test="wim-unread-date">{{ $t('WorkspaceImport.fact_unread_date', issue) }}</li>
                             <li v-if="unreadDates.length > shownUnreadDates.length" class="wim__warn">{{ $t('WorkspaceImport.fact_unread_dates_more', { count: unreadDates.length - shownUnreadDates.length }) }}</li>
                             <li v-if="unreadColumns.length" data-test="wim-unread-columns">{{ $t('WorkspaceImport.fact_unread_columns', { names: unreadColumns.join(', ') }) }}</li>

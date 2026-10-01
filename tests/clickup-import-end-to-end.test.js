@@ -569,6 +569,18 @@ describe('undoing an import', () => {
         expect(live()).toHaveLength(38);
     });
 
+    it('lets the same file be imported afresh: a task in the trash no longer counts as already here', async () => {
+        await importFile();
+        await undo(jobs()[0]._id);
+
+        const again = await importFile();
+
+        expect(again.preview.lists.map((list) => list.alreadyImported)).toEqual([0, 18]);
+        expect(again.lists.map((list) => list.data.created)).toEqual([20, 0]);
+        expect(live()).toHaveLength(38);
+        expect(again.summary.fields).toMatchObject({ created: ['Launch Date', 'Approved', 'Site'], reused: ['Budget', 'Stage', 'Story Points'] });
+    });
+
     it('works for any importer, because each one marks what it creates', async () => {
         const res = await call(importers.importFromCsv, { rows: [{ Title: 'From a sheet' }, { Title: 'And another' }], projectId: PROJECT, sprintId: SPRINT }, OWNER);
         expect(res.body.status).toBe(true);

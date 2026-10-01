@@ -143,6 +143,7 @@ describe('what the preview owns up to', () => {
 
         const previews = posted(IMPORT_CLICKUP_PREVIEW);
         expect(previews[previews.length - 1].options).toEqual({ createMissingStatuses: false });
+        expect(wrapper.find('[data-test="wim-add-denied-fact"]').text()).toBe('WorkspaceImport.add_missing_denied');
         await wrapper.find('[data-test="wim-run"]').trigger('click');
         await flushPromises();
         expect(posted(IMPORT_CLICKUP)[0].options).toEqual({ createMissingStatuses: false });
