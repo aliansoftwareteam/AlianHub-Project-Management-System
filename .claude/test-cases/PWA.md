@@ -8,7 +8,7 @@
 | ID | Title | Precondition | Steps | Expected | Actual | Status |
 |----|-------|--------------|-------|----------|--------|--------|
 | PWA-01 | Manifest valid | Built app | DevTools → Application → Manifest | Name, colours, four icons (192 and 512, plain and maskable), standalone; no errors or warnings | | ⬜ |
-| PWA-02 | Worker registers | Built app on https or localhost | DevTools → Application → Service Workers | `sw.js` activated and running, scope `/`; Cache Storage has one `ah-shell-<version>` | | ⬜ |
+| PWA-02 | Worker registers | Built app on https or localhost | DevTools → Application → Service Workers | `sw.js` activated and running, scope `/`; Cache Storage has one `ah-shell-<version>` with the document, manifest, icons, `app`, `chunk-vendors` and `login` files only; `ah-runtime-v1` fills as screens are opened | | ⬜ |
 | PWA-03 | Install | Chrome or Edge, signed in | Profile menu → Install app | The browser's install dialog opens; the app launches standalone; the entry is gone afterwards and in the installed window. No install pop-up appeared on load | | ⬜ |
 | PWA-04 | Offline, signed out | App loaded once, signed out | Airplane mode (or DevTools → Network → Offline), reopen | Sign-in page with "You're offline. Sign in when your connection is back." | | ⬜ |
 | PWA-05 | Offline, signed in | App loaded once, signed in | Go offline, reopen | "You're offline" card under the offline banner, not a blank page or an endless spinner; back online it reloads by itself into the app | | ⬜ |

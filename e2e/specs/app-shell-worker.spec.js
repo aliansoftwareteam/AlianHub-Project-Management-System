@@ -33,7 +33,7 @@ class PublicFiles {
             compilation.hooks.processAssets.tap({ name: 'PublicFiles', stage: Compilation.PROCESS_ASSETS_STAGE_ADDITIONAL }, () => {
                 compilation.emitAsset('manifest.webmanifest', new sources.RawSource('{"name":"shell"}'));
                 compilation.emitAsset('icons/icon-192.png', new sources.RawSource(fs.readFileSync(ICON)));
-                compilation.emitAsset(IMAGE.slice(1), new sources.RawSource(fs.readFileSync(ICON)));
+                compilation.emitAsset(IMAGE.slice(1), new sources.RawSource(fs.readFileSync(ICON)), { immutable: true });
             });
         });
     }
@@ -44,11 +44,13 @@ const build = (number) => new Promise((resolve, reject) => {
     fs.mkdirSync(src, { recursive: true });
     fs.writeFileSync(path.join(src, 'index.html'), '<!doctype html><html><head><meta charset="utf-8"><title>shell</title></head><body><div id="app"></div></body></html>');
     fs.writeFileSync(path.join(src, 'lazy.js'), `export const lazy = 'lazy chunk of build ${number}';`);
+    fs.writeFileSync(path.join(src, 'login.js'), `export const signIn = 'sign-in page of build ${number}';`);
     fs.writeFileSync(path.join(src, 'main.js'), `
 import { registerShellWorker, updateReady, applyUpdate, dropWorkerRuntimeCaches } from ${JSON.stringify(REGISTRATION)};
 window.shell = { updateReady, applyUpdate, dropWorkerRuntimeCaches, build: ${number} };
 document.getElementById('app').textContent = 'build ${number}';
 window.loadLazy = () => import('./lazy.js').then((module) => module.lazy);
+window.loadSignIn = () => import(/* webpackChunkName: "login" */ './login.js').then((module) => module.signIn);
 window.registered = registerShellWorker(window, { production: true }).then((registration) => { window.shellRegistration = registration; return Boolean(registration); });
 `);
     fs.rmSync(dist, { recursive: true, force: true });
@@ -59,7 +61,7 @@ window.registered = registerShellWorker(window, { production: true }).then((regi
         output: { path: dist, filename: 'js/[name].[contenthash:8].js', chunkFilename: 'js/[name].[contenthash:8].js', publicPath: '/' },
         resolve: { modules: [path.join(FRONT, 'node_modules')] },
         performance: false,
-        plugins: [new HtmlWebpackPlugin({ template: path.join(src, 'index.html'), filename: 'index.html' }), new PublicFiles(), new ShellWorkerPlugin()],
+        plugins: [new HtmlWebpackPlugin({ template: path.join(src, 'index.html'), filename: 'index.html' }), new PublicFiles(), new ShellWorkerPlugin({ firstPaintChunks: ['login'] })],
     }, (error, stats) => (error || stats.hasErrors() ? reject(error || new Error(stats.toString('errors-only'))) : resolve()));
 });
 
@@ -97,26 +99,29 @@ const held = (page) => page.evaluate(async () => {
     return out;
 });
 const cacheNames = async (page) => Object.keys(await held(page)).sort();
+const buildCaches = async (page) => (await cacheNames(page)).filter((name) => name.startsWith('ah-shell-'));
 const shown = (page) => page.locator('#app').textContent();
 const ping = (page) => page.evaluate(() => fetch('/api/v2/ping').then((res) => res.json()).then((body) => body.n));
 
-test('the worker installs, stays out of what is not the build, survives no network, updates on request and can be withdrawn', async ({ browser }) => {
+test('the worker installs, keeps other files on first use, stays out of what is not the build, survives no network, updates on request and can be withdrawn', async ({ browser }) => {
     test.setTimeout(120000);
     const context = await browser.newContext({ serviceWorkers: 'allow' });
     const page = await context.newPage();
     const violations = [];
     page.on('console', (message) => { if (/Content Security Policy/i.test(message.text())) violations.push(message.text()); });
 
-    await test.step('first visit: the build is held, and the open tab is left alone', async () => {
+    await test.step('first visit: what a first paint needs is held and no more, and the open tab is left alone', async () => {
         await page.goto(`${origin}/`);
         await expect(page.locator('#app')).toHaveText('build 1');
         expect(await page.evaluate(() => window.registered.then(() => navigator.serviceWorker.ready).then((registration) => registration.active.scriptURL))).toBe(`${origin}/sw.js`);
         expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBe(null);
 
         const caches = await held(page);
-        const [name] = Object.keys(caches);
-        expect(Object.keys(caches)).toHaveLength(1);
+        const [name] = Object.keys(caches).filter((cache) => cache.startsWith('ah-shell-'));
+        expect(await buildCaches(page)).toHaveLength(1);
+        expect(caches['ah-runtime-v1'] || []).toEqual([]);
         expect(name).toMatch(/^ah-shell-[0-9a-f]{16}$/);
+        expect(caches[name].filter((file) => /^\/js\/(app|login)\.[0-9a-f]{8}\.js$/.test(file))).toHaveLength(2);
         expect(caches[name].filter((file) => file.startsWith('/js/'))).toHaveLength(2);
         expect(caches[name]).toEqual(expect.arrayContaining(['/index.html', '/manifest.webmanifest', '/icons/icon-192.png']));
         expect(caches[name].filter((file) => /^\/img\/|\.map$|sw\.js$/.test(file))).toEqual([]);
@@ -136,15 +141,17 @@ test('the worker installs, stays out of what is not the build, survives no netwo
         await shared.close();
 
         await page.evaluate((src) => new Promise((resolve, reject) => { const image = new Image(); image.onload = resolve; image.onerror = reject; image.src = src; }), IMAGE);
-        await expect.poll(async () => (await held(page))['ah-runtime-v1']).toEqual([IMAGE]);
+        expect(await page.evaluate(() => window.loadLazy())).toBe('lazy chunk of build 1');
+        await expect.poll(async () => ((await held(page))['ah-runtime-v1'] || []).map((file) => file.replace(/\.[0-9a-f]{8}\./, '.*.'))).toEqual([IMAGE.replace(/\.[0-9a-f]{8}\./, '.*.'), expect.stringMatching(/^\/js\/\d+\.\*\.js$/)]);
         expect(Object.values(await held(page)).flat().filter((file) => /^\/(api|share)/.test(file))).toEqual([]);
     });
 
-    await test.step('no network: the shell and its chunks open, the API fails, a server-rendered page is not replaced by the shell', async () => {
+    await test.step('no network: the shell, a chunk used before and the sign-in chunk never used open; the API fails; a server-rendered page is not replaced by the shell', async () => {
         await context.setOffline(true);
         await page.reload();
         await expect(page.locator('#app')).toHaveText('build 1');
         expect(await page.evaluate(() => window.loadLazy())).toBe('lazy chunk of build 1');
+        expect(await page.evaluate(() => window.loadSignIn())).toBe('sign-in page of build 1');
         expect(await page.evaluate(() => fetch('/api/v2/ping').then(() => 'answered', () => 'failed'))).toBe('failed');
 
         const shared = await context.newPage();
@@ -156,33 +163,33 @@ test('the worker installs, stays out of what is not the build, survives no netwo
 
     await test.step('sign-out message: runtime caches go, the build stays', async () => {
         await page.evaluate(() => window.shell.dropWorkerRuntimeCaches());
-        await expect.poll(async () => (await cacheNames(page)).filter((name) => !name.startsWith('ah-shell-'))).toEqual([]);
-        expect(await cacheNames(page)).toHaveLength(1);
+        await expect.poll(async () => Object.entries(await held(page)).filter(([name]) => !name.startsWith('ah-shell-')).flatMap(([, files]) => files)).toEqual([]);
+        expect(await buildCaches(page)).toHaveLength(1);
     });
 
-    const [firstBuild] = await cacheNames(page);
+    const [firstBuild] = await buildCaches(page);
 
     await test.step('a new build in an open tab: a notice, nothing moves until Reload', async () => {
         await build(2);
         await page.evaluate(() => window.shellRegistration.update());
         await expect.poll(() => page.evaluate(() => window.shell.updateReady.value)).toBe(true);
         expect(await shown(page)).toBe('build 1');
-        expect(await cacheNames(page)).toHaveLength(2);
+        expect(await buildCaches(page)).toHaveLength(2);
 
         await page.evaluate(() => { window.shell.applyUpdate(); });
         await expect(page.locator('#app')).toHaveText('build 2');
-        await expect.poll(() => cacheNames(page)).toHaveLength(1);
-        expect(await cacheNames(page)).not.toContain(firstBuild);
+        await expect.poll(() => buildCaches(page)).toHaveLength(1);
+        expect(await buildCaches(page)).not.toContain(firstBuild);
         expect(await page.evaluate(() => window.shell.updateReady.value)).toBe(false);
     });
 
-    const [secondBuild] = await cacheNames(page);
+    const [secondBuild] = await buildCaches(page);
 
     await test.step('a new build on a fresh load: it runs at once and its worker moves in with no notice', async () => {
         await build(3);
         await page.reload();
         await expect(page.locator('#app')).toHaveText('build 3');
-        await expect.poll(async () => { const names = await cacheNames(page); return names.length === 1 && names[0] !== secondBuild; }, { timeout: 20000 }).toBe(true);
+        await expect.poll(async () => { const names = await buildCaches(page); return names.length === 1 && names[0] !== secondBuild; }, { timeout: 20000 }).toBe(true);
         expect(await page.evaluate(() => window.shell.updateReady.value)).toBe(false);
         expect(await page.evaluate(() => window.shell.build)).toBe(3);
     });

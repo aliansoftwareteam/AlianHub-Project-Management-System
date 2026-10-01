@@ -28,11 +28,10 @@ const CREDENTIAL_HEADERS = Object.freeze(['authorization', 'refresh-token', 'com
 
 const SECRET_PARAM = /token|secret|signature|password|passwd|credential|session|jwt|auth|otp|apikey|api_key|^key$|^sig$|^code$|^state$|^x-amz-/i;
 
-const BUILD_IMAGE = /^\/img\/[^/]+\.[0-9a-f]{8}\.(?:png|jpe?g|gif|svg|webp|avif|ico)$/i;
-
-const PRECACHED_FOLDERS = /^(?:js|css|fonts|icons)\//;
+const ALWAYS_PRECACHED = /^(?:fonts|icons)\//;
 const PRECACHED_FILES = ['index.html', 'manifest.webmanifest'];
-const NOT_PRECACHED = /\.(?:map|txt)$/i;
+const KEPT_ON_FIRST_USE = /^(?:js|css|img)\//;
+const NEVER_HELD = /\.(?:map|txt)$/i;
 
 const hasHeader = (headers, name) => {
     if (!headers) return false;
@@ -73,25 +72,30 @@ const reasonToStayOut = (request, origin) => {
     return null;
 };
 
-const routeFor = (request, { origin, precached }) => {
+/* `precached` and `lazy` are this build's own lists of exact paths, so a name that merely looks hashed
+ * is never answered or kept. */
+const routeFor = (request, { origin, precached, lazy }) => {
     if (reasonToStayOut(request, origin)) return ROUTE.NETWORK;
     const url = new URL(request.url);
     if (url.search) return ROUTE.NETWORK;
     if (request.mode === 'navigate') return SHELL_PATHS.includes(url.pathname) ? ROUTE.SHELL : ROUTE.NETWORK;
     if (precached.has(url.pathname)) return ROUTE.PRECACHE;
-    if (request.destination === 'image' && BUILD_IMAGE.test(url.pathname)) return ROUTE.RUNTIME;
+    if (lazy.has(url.pathname)) return ROUTE.RUNTIME;
     return ROUTE.NETWORK;
 };
 
-const isPrecachedAsset = (name) => !NOT_PRECACHED.test(name) && (PRECACHED_FILES.includes(name) || PRECACHED_FOLDERS.test(name));
-
-/* Takes webpack's emitted assets as { name, immutable }. A file with a content hash in its name never
- * changes, so a new build copies it from the previous precache instead of downloading it again. */
-const shellAssetsOf = (assets) => {
-    const kept = assets.filter((asset) => isPrecachedAsset(asset.name)).sort((a, b) => (a.name < b.name ? -1 : 1));
+/* Takes webpack's emitted assets as { name, immutable } and the names of the scripts and styles a first
+ * paint needs. Those, with the document, manifest, fonts and icons, are fetched at install. Every other
+ * file with a content hash in its name is kept the first time a page asks for it: the whole bundle is
+ * tens of megabytes, too much to fetch unasked on a phone. */
+const shellAssetsOf = (assets, firstPaint) => {
+    const sorted = assets.filter((asset) => !NEVER_HELD.test(asset.name)).sort((a, b) => (a.name < b.name ? -1 : 1));
+    const atInstall = (asset) => PRECACHED_FILES.includes(asset.name) || ALWAYS_PRECACHED.test(asset.name) || firstPaint.has(asset.name);
+    const paths = (wanted) => sorted.filter(wanted).map((asset) => `/${asset.name}`);
     return {
-        hashed: kept.filter((asset) => asset.immutable).map((asset) => `/${asset.name}`),
-        plain: kept.filter((asset) => !asset.immutable).map((asset) => `/${asset.name}`),
+        hashed: paths((asset) => atInstall(asset) && asset.immutable),
+        plain: paths((asset) => atInstall(asset) && !asset.immutable),
+        lazy: paths((asset) => !atInstall(asset) && asset.immutable && KEPT_ON_FIRST_USE.test(asset.name)),
     };
 };
 
@@ -110,6 +114,6 @@ const isStorable = (path, response) => {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         SHELL_CACHE_PREFIX, RUNTIME_CACHE, SHELL_DOCUMENT, SHELL_PATHS, WORKER_PATH, WITHDRAWN_HEADER, WITHDRAWN_VALUE, MESSAGE, ROUTE, RESERVED_SEGMENTS, CREDENTIAL_HEADERS,
-        reasonToStayOut, routeFor, isPrecachedAsset, shellAssetsOf, isShellCache, isStorable,
+        reasonToStayOut, routeFor, shellAssetsOf, isShellCache, isStorable,
     };
 }

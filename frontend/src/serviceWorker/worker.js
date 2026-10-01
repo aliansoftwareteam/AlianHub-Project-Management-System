@@ -8,6 +8,7 @@
 const SHELL_CACHE = `${SHELL_CACHE_PREFIX}${SHELL.version}`;
 const PRECACHED = new Set([...SHELL.hashed, ...SHELL.plain]);
 const HASHED = new Set(SHELL.hashed);
+const LAZY = new Set(SHELL.lazy);
 // A build is over a hundred files, and a self-hosted server is one process: it is not asked for all of them at once.
 const FETCHES_AT_ONCE = 4;
 const SAME_FILE = { ignoreVary: true };
@@ -29,7 +30,8 @@ const download = async (path) => {
 
 const precache = async () => {
     const names = await caches.keys();
-    const earlier = await Promise.all(names.filter((name) => isShellCache(name) && name !== SHELL_CACHE).map((name) => caches.open(name)));
+    // The runtime cache counts too: a file kept on first use under one build may be a first-paint file of the next.
+    const earlier = await Promise.all(names.filter((name) => (isShellCache(name) && name !== SHELL_CACHE) || name === RUNTIME_CACHE).map((name) => caches.open(name)));
     const cache = await caches.open(SHELL_CACHE);
     const paths = [...PRECACHED];
     try {
@@ -71,30 +73,38 @@ const refillIfEmptied = async () => {
 
 const buildFile = async (request) => (await held(new URL(request.url).pathname)) || fetch(request);
 
-const buildImage = async (event) => {
+const keptOnFirstUse = async (event) => {
+    const path = new URL(event.request.url).pathname;
     const cache = await caches.open(RUNTIME_CACHE);
-    const kept = await cache.match(event.request, SAME_FILE);
+    const kept = await cache.match(path, SAME_FILE);
     if (kept) return kept;
     const response = await fetch(event.request);
-    if (isStorable(new URL(event.request.url).pathname, response)) event.waitUntil(cache.put(event.request, response.clone()));
+    if (isStorable(path, response)) event.waitUntil(cache.put(path, response.clone()));
     return response;
+};
+
+/* A name that is unchanged in the new build stays, so nothing is fetched twice across builds. */
+const dropFilesOfEarlierBuilds = async () => {
+    const cache = await caches.open(RUNTIME_CACHE);
+    const kept = await cache.keys();
+    await Promise.all(kept.filter((request) => !LAZY.has(new URL(request.url).pathname)).map((request) => cache.delete(request)));
 };
 
 self.addEventListener('install', (event) => {
     event.waitUntil(precache());
 });
 
-/* Everything else goes, not only earlier builds: a worker this app shipped before (alianhub-pwa-v1)
+/* Every other cache goes, not only earlier builds: a worker this app shipped before (alianhub-pwa-v1)
  * kept any same-origin answer outside /api, and its cache may still be in a browser. */
 self.addEventListener('activate', (event) => {
-    event.waitUntil(dropCaches((name) => name !== SHELL_CACHE && name !== RUNTIME_CACHE).then(refillIfEmptied));
+    event.waitUntil(dropCaches((name) => name !== SHELL_CACHE && name !== RUNTIME_CACHE).then(dropFilesOfEarlierBuilds).then(refillIfEmptied));
 });
 
 self.addEventListener('fetch', (event) => {
-    const route = routeFor(event.request, { origin: self.location.origin, precached: PRECACHED });
+    const route = routeFor(event.request, { origin: self.location.origin, precached: PRECACHED, lazy: LAZY });
     if (route === ROUTE.SHELL) event.respondWith(shellDocument(event.request));
     else if (route === ROUTE.PRECACHE) event.respondWith(buildFile(event.request));
-    else if (route === ROUTE.RUNTIME) event.respondWith(buildImage(event));
+    else if (route === ROUTE.RUNTIME) event.respondWith(keptOnFirstUse(event));
 });
 
 self.addEventListener('message', (event) => {
@@ -102,5 +112,5 @@ self.addEventListener('message', (event) => {
     // Only a tab's request moves a waiting worker in: taking over on install would swap the build under an open tab.
     if (type === MESSAGE.ACTIVATE) event.waitUntil(self.skipWaiting());
     else if (type === MESSAGE.DROP_RUNTIME_CACHES) event.waitUntil(dropCaches((name) => !isShellCache(name)));
-    else if (type === MESSAGE.DESCRIBE && event.ports && event.ports[0]) event.ports[0].postMessage({ version: SHELL.version, assets: [...PRECACHED] });
+    else if (type === MESSAGE.DESCRIBE && event.ports && event.ports[0]) event.ports[0].postMessage({ version: SHELL.version, assets: [...PRECACHED, ...LAZY] });
 });

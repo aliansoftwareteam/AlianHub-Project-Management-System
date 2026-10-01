@@ -112,7 +112,8 @@ module.exports = defineConfig({
         }
       }),
       // The dev server gets no sw.js, and the app does not register one there.
-      ...(process.env.NODE_ENV === 'production' ? [new ShellWorkerPlugin()] : [])
+      // "login" is the webpackChunkName of the sign-in page in src/router/auth: it has to open with no network.
+      ...(process.env.NODE_ENV === 'production' ? [new ShellWorkerPlugin({ firstPaintChunks: ['login'] })] : [])
     ]
   },
   chainWebpack: config => {

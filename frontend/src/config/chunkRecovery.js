@@ -4,6 +4,8 @@
  * chunk failures reload, and at most once per RELOAD_GUARD_MS: a chunk that is truly
  * missing from the build would otherwise put the tab in a refresh loop. */
 
+import { away, pageUnavailable } from '@/offline';
+
 const CHUNK_ERROR_PATTERN = /ChunkLoadError|Loading (?:CSS )?chunk \S+ failed|Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i;
 
 const RELOAD_FLAG = 'ah:chunk-reloaded-at';
@@ -18,6 +20,8 @@ export const isChunkLoadError = (error) => {
 };
 
 const reloadOnce = (source) => {
+    // With no connection a reload meets the same missing file; App.vue shows the offline screen instead.
+    if (away.value) return false;
     let last = 0;
     try {
         last = Number(window.sessionStorage.getItem(RELOAD_FLAG)) || 0;
@@ -41,6 +45,7 @@ export const installChunkRecovery = (app, router) => {
     if (router && typeof router.onError === 'function') {
         router.onError((error) => {
             if (isChunkLoadError(error)) {
+                if (away.value && router.currentRoute && !router.currentRoute.value.matched.length) pageUnavailable.value = true;
                 reloadOnce('route');
                 return;
             }

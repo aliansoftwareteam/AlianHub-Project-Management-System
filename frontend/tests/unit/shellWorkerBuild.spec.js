@@ -11,7 +11,8 @@ const { ShellWorkerPlugin } = require('../../shellWorkerPlugin.js');
 
 vi.setConfig({ testTimeout: 60000 });
 
-const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ah-shell-worker-'));
+// The real path: under a symlinked temp folder webpack names modules by a path that includes the folder.
+const workDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ah-shell-worker-')));
 afterAll(() => fs.rmSync(workDir, { recursive: true, force: true }));
 
 /* Stands in for the copy of public/ and for the HTML plugin, which add their files before hashing. */
