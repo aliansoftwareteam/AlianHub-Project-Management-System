@@ -13,6 +13,7 @@ const { default: mongoose } = require("mongoose")
 const { updateUnReadCommentsCountFun } = require("../../../notification-count/controller")
 const { handleTaskAttachmentsDuplicateFunctionality } = require(`../../../../common-storage/common-${process.env.STORAGE_TYPE}.js`)
 const { isTaskStoredFile, taskAttachmentKey } = require('../../../../common-storage/taskFileKeys');
+const { copyFieldFiles } = require('../../../CustomField/helpers/fieldFiles');
 const { buildQueryObject, buildHistoryObject, convertToDisplayFormat } = require("../helper");
 const socketEmitter = require('../../../../event/socketEventEmitter');
 const { addCommentCollection, updateCommentCollection } = require('../../../Comments/controller')
@@ -310,8 +311,9 @@ module.exports = {
                         .then((taskResult) => {
                             if(taskResult.status){
                                 resolve({status: true, statusText: "Duplicate Task Added",taskId :taskResult.id });
-                                // UPDATE TASK COUNT IN SPRINT                                
                                 if(duplicateData.includes('Attachments')){
+                                    copyFieldFiles({ companyId, source: selectedTask, target: { _id: taskResult.id, ProjectID: projectData.id } })
+                                        .catch((error) => logger.error(`field files copy on duplicate: ${error && error.message}`));
                                     if(selectedTask.attachments.length > 0) {
                                         /* Only a file stored for the source task is copied; any other key stays as it was, read under its own owner. */
                                         const promises = selectedTask.attachments.map(async (x) => {

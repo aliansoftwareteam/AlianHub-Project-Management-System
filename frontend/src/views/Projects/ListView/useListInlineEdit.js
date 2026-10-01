@@ -18,6 +18,7 @@ import {
     COMPUTED_TYPES, customFieldPayload, emptyFieldDetail, projectFieldDefs, storedEntry, useProjectCustomFields
 } from "@/views/Projects/composables/projectCustomFields";
 import { recomputeCustomFields } from "@/plugins/customFieldView/formulaEngine.js";
+import { fieldTypeUi } from "@/plugins/customFieldView/fieldTypes";
 import { taskUrl } from "@/views/Projects/composables/taskLink";
 
 const ASSIGNEE_OPERATION = { add: "assigneeAdd", remove: "assigneRemove", replace: "replace" };
@@ -104,7 +105,7 @@ export function useListInlineEdit(projectRef) {
         }).catch((error) => {
             console.error("ERROR in list inline edit: ", error);
             if (before) writeTasks({ ...task, ...fields }, before);
-            $toast.error(t(failure), TOAST);
+            $toast.error(error?.serverReason || t(failure), TOAST);
         });
     }
 
@@ -313,12 +314,14 @@ export function useListInlineEdit(projectRef) {
         }).then((response) => {
             if (!response?.status) throw new Error("custom field not saved");
             if (hasComputedFields()) recomputeCustomFields({ taskIds: [task._id], projectId: project()._id || "" });
+        }).catch((error) => {
+            throw Object.assign(new Error("custom field not saved"), { serverReason: error?.error?.response?.data?.statusText || "" });
         });
         keepFocus(row);
         return settle(promise, {
             task, fields, before: { customField: { ...(task.customField || {}) } }, undoing,
             message: t("Toast.Custom_field_updated_successfully"),
-            undo: () => writeField({ ...task, ...fields }, def, previous ? { ...previous } : emptyFieldDetail(def), { undoing: true }),
+            undo: fieldTypeUi(def.fieldType)?.noUndo ? null : () => writeField({ ...task, ...fields }, def, previous ? { ...previous } : emptyFieldDetail(def), { undoing: true }),
             failure: "Toast.something_went_wrong"
         });
     }

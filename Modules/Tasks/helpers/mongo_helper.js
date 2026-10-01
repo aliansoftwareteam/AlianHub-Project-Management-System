@@ -23,6 +23,7 @@ const { updateCommentCollection, addCommentCollection } = require('../../Comment
 const { reconcileSprintTaskCount, scheduleReconciliation } = require('./reconcileTaskCount');
 const { loadSubtree, rewriteDescendantAncestors, sprintCountChange, DELETED } = require('./taskTree');
 const { storableFieldValues } = require('../../CustomField/helpers/fieldValueWrite');
+const { copyFieldFiles } = require('../../CustomField/helpers/fieldFiles');
 
 /* ------------- TASK ------------- */
 exports.HandleTask = async (companyId, object, isUpdate, id = null, userData) => {
@@ -868,6 +869,8 @@ exports.duplicateSubTaskFunction = (companyId, projectData, sprintObj, subtask, 
                 obj.TaskKey = projectData.ProjectCode + '-' +  response.lastTaskId;
                 exports.HandleTask(companyId, obj, false, null, userData).then(async (taskResult) => {
                     if(duplicateData.includes('Attachments')){
+                        copyFieldFiles({ companyId, source: subtask, target: { _id: taskResult.id, ProjectID: projectData.id } })
+                            .catch((error) => logger.error(`field files copy on duplicate: ${error && error.message}`));
                         if(subtask.attachments.length > 0) {
                             /* Only a file stored for the source task is copied; any other key stays as it was, read under its own owner. */
                             const promises = subtask.attachments.map(async (x) => {

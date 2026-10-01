@@ -18,6 +18,7 @@
             :value="stored"
             :editable="editable"
             :label="def.fieldTitle || ''"
+            v-bind="taskPropFor(type, task)"
             @change="$emit('change', $event)"
         />
         <input
@@ -90,7 +91,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AiFieldMark from "@/components/atom/AiFieldMark/AiFieldMark.vue";
 import { isAiField } from "@/views/Projects/composables/aiFields";
 import ComputedComponentViewColumn from "@/plugins/customFieldView/component/atom/customFieldViewColumn/computedComponentViewColumn.vue";
-import { fieldTypeUi } from "@/plugins/customFieldView/fieldTypes";
+import { fieldTypeUi, taskPropFor } from "@/plugins/customFieldView/fieldTypes";
 import {
     COMPUTED_TYPES, customFieldText, dropdownChoices, fieldAppliesToTask, fieldEditValue, fieldIsChecked, storedEntry, storedFieldValue
 } from "@/views/Projects/composables/projectCustomFields";
