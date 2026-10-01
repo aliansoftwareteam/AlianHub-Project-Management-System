@@ -336,7 +336,7 @@ import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption
 
 const {isCustomFields} = customField();
 import * as env from '@/config/env';
-import { indexRepairBody, indexRepairRows } from "@/views/Projects/composables/taskGroupIndex";
+import { indexRepairBody, indexRepairRows, plainGroupValue } from "@/views/Projects/composables/taskGroupIndex";
 import { useI18n } from "vue-i18n";
 import { apiRequest } from "../../../services";
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue"
@@ -1007,7 +1007,7 @@ function updateItem(type,e, item) {
                 isFirstWithRecord: (index === 0 && taskDt.length !== 1 && taskDt.length !== 0) ? true : false,
                 indexName: item.indexName,
                 sprintId: findTask.sprintId,
-                relevantKey: item.searchValue,
+                relevantKey: plainGroupValue(item.searchValue),
                 searchKey: item.searchKey,
                 taskKey: findTask.TaskKey,
                 updateData: UpdateData

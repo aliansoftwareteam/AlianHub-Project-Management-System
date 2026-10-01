@@ -4,7 +4,7 @@
  * project a move, copy or conversion writes into. `destination` lists the keys judged in that project.
  */
 
-const { indexRepairBody, indexRepairRows } = require('../../frontend/src/views/Projects/composables/taskGroupIndex');
+const { indexRepairBody, indexRepairRows, plainGroupValue } = require('../../frontend/src/views/Projects/composables/taskGroupIndex');
 
 const USER = { Employee_Name: 'Max Member', id: '6f0000000000000000000003', companyOwnerId: '6f0000000000000000000001' };
 const CID = '6f00000000000000000000c1';
@@ -129,7 +129,7 @@ const GROUP_DRAGS = [
         source: 'group by assignee',
         holds: { AssigneeUserId: [USER.id] },
         historyKey: 'Assignee_Changed',
-        index: (ids) => indexWrite(ids, 'groupByAssigneeIndex', 'AssigneeUserId', USER.id, { AssigneeUserId: [USER.id] }),
+        index: (ids) => indexWrite(ids, 'groupByAssigneeIndex', 'AssigneeUserId', plainGroupValue(VIEW_GROUPS.assignee.searchValue), { AssigneeUserId: [USER.id] }),
         action: (ids, isUpdateTask) => ({ action: 'updateAssignee', firebaseObj: { AssigneeUserId: [USER.id] }, projectData: projectSlice(ids.projectId), taskData: draggedTask(ids), employeeName: ['Max Member'], type: 'replace', userData: USER, isUpdateTask }),
     },
     {

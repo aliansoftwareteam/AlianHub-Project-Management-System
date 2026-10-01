@@ -95,7 +95,7 @@ import BoardViewDisplayCardComponent from '@/views/Projects/Kanban/BoardViewDisp
 import { useUpdateTasks } from "../helper";
 import { groupTakesTask } from "@/views/Projects/composables/customFieldQuery";
 import * as env from '@/config/env';
-import { indexRepairBody, indexRepairRows } from "@/views/Projects/composables/taskGroupIndex";
+import { indexRepairBody, indexRepairRows, plainGroupValue } from "@/views/Projects/composables/taskGroupIndex";
 import { apiRequest } from "../../../services";
 import { useCustomComposable } from "@/composable";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
@@ -331,7 +331,7 @@ const updateEvent = (event, task) => {
             isFirstWithRecord: (index === 0 && taskDt.tasksArray.length !== 1 && taskDt.tasksArray.length !== 0) ? true : false,
             indexName: task.indexName,
             sprintId: element.sprintId,
-            relevantKey: task.searchValue,
+            relevantKey: plainGroupValue(task.searchValue),
             searchKey: task.searchKey,
             taskKey: element.TaskKey,
             updateData: UpdateData
