@@ -69,6 +69,16 @@ const canOpenTask = async (identity, taskId) => {
     return sprintVisible(identity, task.sprintId);
 };
 
+/* The rule of canOpenTask for a task row already in hand, as the relay to a list the task was added
+ * to needs it: a room of that list was joined on the list alone, and the task's home decides who
+ * reads it. A row with no project behind it is never passed on this way. */
+const canReadTaskRow = async (identity, task) => {
+    if (!task || task.mainChat === true || !OBJECT_ID.test(String(task.ProjectID || ''))) return false;
+    const access = await canReadProject(identity.companyId, identity.uid, String(task.ProjectID));
+    if (!access.allowed || !(await mayListTasksIn(identity.companyId, identity.uid, String(task.ProjectID)))) return false;
+    return sprintVisible(identity, task.sprintId);
+};
+
 const canOpenSprintBoard = async (identity, projectId, sprintId) => {
     if (!OBJECT_ID.test(String(projectId || ''))) return false;
     if (!(await tasksReadable(identity, projectId))) return false;
@@ -131,6 +141,7 @@ module.exports = {
     isSelf,
     projectReadable,
     canOpenTask,
+    canReadTaskRow,
     canOpenSprintBoard,
     canOpenComments,
     pageCommentRoomOf,

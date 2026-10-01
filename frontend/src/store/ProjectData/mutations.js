@@ -2,6 +2,7 @@ import { isOwnTabUpdate } from '@/utils/taskUpdateMarker';
 import { useCustomComposable } from '@/composable/index.js';
 import { isOwnerOrAdmin } from "@/utils/roles";
 import { locate, placeRow, removeRow, treeOf } from "./taskTree";
+import { isStranger, leftList, otherHolders, shownInList } from "./listMembership";
 const { checkPermission } = useCustomComposable();
 
 export const mutateMongoUpdatedTask = (state, payload) => {
@@ -183,7 +184,7 @@ function returnItemCountDetails(tasks, groupBy, updatedFields = null, taskId) {
 }
 
 const GROUP_FIELDS = { 0: ["statusKey"], 1: ["AssigneeUserId"], 2: ["Task_Priority"], 3: ["DueDate"] };
-const MEMBERSHIP_FIELDS = ["deletedStatusKey", "sprintId", "isParentTask"];
+const MEMBERSHIP_FIELDS = ["deletedStatusKey", "sprintId", "isParentTask", "extraLists"];
 
 /* Whether an event from the server can have changed how many tasks a group holds. The
    arithmetic below only knows the group a task left when the store holds that task, and it
@@ -234,8 +235,8 @@ function keepsOwnReorder(bucket, data, updatedFields) {
     return true;
 }
 
-export const mutateUpdateFirebaseTasks = (state, payload) => {
-    const {pid, sprintId, op, data, snap, updatedFields,dragDropcheck, groupBy: payloadGroupBy} = payload;
+function applyTaskChange(state, payload, sprintId) {
+    const {pid, op, data, snap, updatedFields,dragDropcheck, groupBy: payloadGroupBy} = payload;
 
     const projectFound = Object.keys(state.tasks).includes(pid);
 
@@ -243,6 +244,7 @@ export const mutateUpdateFirebaseTasks = (state, payload) => {
         const {groupBy} = state.tasks[pid];
         const sprintFound = state.tasks[pid].sprints.includes(sprintId);
         if(sprintFound) {
+            if(data && data._id && isStranger(state.tasks[pid][sprintId], data, pid, sprintId)) return;
             if(groupBy) {
                 if(snap && changesGroupCounts(groupBy, op, data, updatedFields)) {
                     state.tasks[pid][sprintId].countsStale = (state.tasks[pid][sprintId].countsStale || 0) + 1;
@@ -299,11 +301,21 @@ export const mutateUpdateFirebaseTasks = (state, payload) => {
                     parent.subTasks = Math.max(0, (Number(parent.subTasks) || 0) - 1);
                 }
             }
-            if(data !== null && data.sprintId !== sprintId && updatedFields?.sprintId){
+            if(data !== null && leftList(data, pid, sprintId, updatedFields)){
                 removeRow(bucket, data._id);
             }
         }
     }
+}
+
+export const mutateUpdateFirebaseTasks = (state, payload) => {
+    const {pid, sprintId, op, data} = payload;
+    applyTaskChange(state, payload, sprintId);
+    if(!data?._id || !["modified", "removed"].includes(op)) return;
+    otherHolders(state.tasks[pid], data, pid, sprintId).forEach((holder) => {
+        if(holder.shown) applyTaskChange(state, payload, holder.sprintId);
+        else removeRow(state.tasks[pid][holder.sprintId], data._id);
+    });
 }
 
 export const mutateUpdateFirebaseTableTasks = (state, payload) => {
@@ -562,9 +574,16 @@ export const emptyTableTasks = (state, payload) => {
 }
 
 export const mutateTypesenseTableTasks = (state, payload) => {
-    const {pid, sprintId, data, nextPage, total = 0 } = payload;
+    const {pid, sprintId, data, nextPage, total = 0, op } = payload;
     const keys = Object.keys(state.tableTasks);
     const projectFound = keys.includes(pid);
+    /* An event, unlike a page the Table asked for, can be about a task this list does not show (any more). */
+    if(op && data && !shownInList(data, pid, sprintId)) {
+        const held = projectFound ? state.tableTasks[pid][sprintId]?.tasks : null;
+        const at = held ? held.findIndex((x) => x._id === data._id) : -1;
+        if(at !== -1) held.splice(at, 1);
+        return;
+    }
     if(projectFound) {
         const sprintFound = state.tableTasks[pid].sprints.includes(sprintId);
         if(sprintFound) {

@@ -332,7 +332,9 @@
     const emit = defineEmits(["isConvertSubtaskOPen","dataToMainComp","createTask","bulkMoveConfirm","bulkConvertConfirm"])
     const projectData = (props.selectedProjectObject == undefined || Object.keys(props.selectedProjectObject).length == 0) ? inject("selectedProject") : '';
     const isSidebarOPen = ref(props.closeSideBar);
-    const selectedProjectData = ref(props.selectedProjectObject == undefined ? projectData.value : props.selectedProjectObject);
+    /* The lists read for a project are written onto it. A list picker reads only the lists it offers, so it browses a copy. */
+    const browsed = (project) => (props.listPicker ? { ...project, sprintsObj: {}, sprintsfolders: {} } : project);
+    const selectedProjectData = ref(browsed(props.selectedProjectObject == undefined ? projectData.value : props.selectedProjectObject));
     const sprints = ref(JSON.parse(JSON.stringify(Object.values(selectedProjectData.value.sprintsObj || {}).filter((x)=>x.deletedStatusKey === undefined || x.deletedStatusKey === 0)|| {})));
     const sprintFolders = ref(JSON.parse(JSON.stringify(nestedFolders(selectedProjectData.value.sprintsfolders))));
     const isShowProjectList = ref(false);
@@ -394,7 +396,7 @@
     }
 
     const changeProject =  async(event) => {
-        selectedProjectData.value = event;
+        selectedProjectData.value = browsed(event);
         await getSprintFolderData(selectedProjectData.value._id);
         sprints.value = JSON.parse(JSON.stringify(Object.values(selectedProjectData.value.sprintsObj || {}).filter((x)=>x.deletedStatusKey === undefined || x.deletedStatusKey === 0)|| {}))
         sprintFolders.value = JSON.parse(JSON.stringify(nestedFolders(selectedProjectData.value.sprintsfolders)));

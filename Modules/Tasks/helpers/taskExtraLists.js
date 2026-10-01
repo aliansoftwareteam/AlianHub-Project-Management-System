@@ -157,9 +157,7 @@ const afterHomeMove = async (companyId, task, home) => {
 /* A task's extra lists as this viewer may see them. The ids are on the stored row, which every
  * reader of the task already gets; the list's name and its project's name are added only for a
  * live list the viewer can open. */
-const listsForViewer = async (companyId, uid, task) => {
-    const entries = rules.extraListsOf(task);
-    if (!entries.length) return [];
+const viewerShape = async (companyId, uid, entries) => {
     const [lists, projects, privileged, identities] = await Promise.all([
         findByIds(companyId, SCHEMA_TYPE.SPRINTS, entries.map((entry) => entry.sprintId), LIST_FIELDS),
         findByIds(companyId, SCHEMA_TYPE.PROJECTS, entries.map((entry) => entry.projectId), PROJECT_FIELDS),
@@ -169,7 +167,7 @@ const listsForViewer = async (companyId, uid, task) => {
     const readable = new Map();
     for (const id of projects.keys()) readable.set(id, (await canReadProject(companyId, uid, id)).allowed);
 
-    return entries.map((entry) => {
+    return (entry) => {
         const list = lists.get(String(entry.sprintId));
         const project = projects.get(String(entry.projectId));
         const open = Boolean(list) && Boolean(project) && sameId(list.projectId, entry.projectId)
@@ -183,7 +181,29 @@ const listsForViewer = async (companyId, uid, task) => {
             addedAt: entry.addedAt || null,
             ...(open ? { name: list.name || '', projectName: project.ProjectName || '' } : {}),
         };
-    });
+    };
+};
+
+const listsForViewer = async (companyId, uid, task) => {
+    const entries = rules.extraListsOf(task);
+    return entries.length ? entries.map(await viewerShape(companyId, uid, entries)) : [];
+};
+
+/* The same for a page of rows, read once for all of them: task id to its lists, for the rows that have any. */
+const listsForViewerOf = async (companyId, uid, tasks) => {
+    const held = (tasks || []).filter((task) => rules.extraListsOf(task).length);
+    if (!held.length) return new Map();
+    const shape = await viewerShape(companyId, uid, held.flatMap((task) => rules.extraListsOf(task)));
+    return new Map(held.map((task) => [String(task._id), rules.extraListsOf(task).map(shape)]));
+};
+
+/* Whether the caller may look at this list at all: it is there, in a project whose tasks their role
+ * may list, and not a private sprint they are outside of. A task's row is shown under a list it was
+ * added to only when this holds, on top of the rule of the task's own home. */
+const opensList = async (companyId, uid, sprintId) => {
+    const list = await findById(companyId, SCHEMA_TYPE.SPRINTS, sprintId, LIST_FIELDS);
+    if (!list || list.deletedStatusKey === DELETED) return false;
+    return canReadTask(companyId, uid, { ProjectID: list.projectId, sprintId: list._id });
 };
 
 /* How a history line may name the list: by name only when it sits in the task's own project and
@@ -198,5 +218,5 @@ const listPhrase = (task, entry, list, escape) => {
 module.exports = {
     ...rules,
     MOVE, HISTORY_KEY, TASK_NOT_FOUND, LIST_NOT_FOUND, NOT_IN_LIST, NOT_PERMITTED, TASK_CHANGED,
-    storedTask, storedTasks, homeJudge, destinationFor, removalFor, additionOf, removalOf, pullOfLists, afterHomeMove, listsForViewer, listPhrase,
+    storedTask, storedTasks, homeJudge, destinationFor, removalFor, additionOf, removalOf, pullOfLists, afterHomeMove, listsForViewer, listsForViewerOf, opensList, listPhrase,
 };

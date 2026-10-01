@@ -70,12 +70,15 @@ export function useListInlineEdit(projectRef) {
     }
 
     /* taskClass only writes the List's copy and the actor's socket gets no echo, so a
-     * Table row would keep the old value until a reload. */
+     * Table row would keep the old value until a reload. The row may sit in the table of a
+     * list the task was added to, not only in its home list's. */
     function reflectTable(task, fields) {
         const pid = String(task.ProjectID || project()._id || "");
-        const sprintId = String(task.sprintId || "");
-        const stored = getters["projectData/tableTasks"]?.[pid]?.[sprintId]?.tasks?.find((x) => String(x._id) === String(task._id));
-        if (stored) commit("projectData/mutateTypesenseTableTasks", { pid, sprintId, data: { ...stored, ...fields } });
+        const held = getters["projectData/tableTasks"]?.[pid] || {};
+        (held.sprints || []).forEach((sprintId) => {
+            const stored = held[sprintId]?.tasks?.find((x) => String(x._id) === String(task._id));
+            if (stored) commit("projectData/mutateTypesenseTableTasks", { pid, sprintId, data: { ...stored, ...fields } });
+        });
     }
 
     /* A change can move the row into another group or out of the filter; focus then goes to
