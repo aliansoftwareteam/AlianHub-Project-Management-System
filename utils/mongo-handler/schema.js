@@ -2645,6 +2645,7 @@ const schema = {
             importedWork: { type: Boolean, required: false },
             openedMyWork: { type: Boolean, required: false },
             viewedShortcuts: { type: Boolean, required: false },
+            connectAiSkipped: { type: Boolean, required: false },
             toursOffered: { type: [String], required: false, default: undefined }
         },
         // mode has no default on purpose: see newAccountNavPreferences in Modules/Users/helpers/navPreferencesRules.js.

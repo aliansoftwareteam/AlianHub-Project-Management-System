@@ -1,11 +1,14 @@
 const ctrl = require('./controller');
 const publicApi = require('./publicApi');
+const aiConnection = require('../Mcp/connection');
 
 exports.init = (app) => {
     // whoami — the one api-tokens route PAT auth may call (see Config/jwt.js).
     app.get('/api/v2/api-tokens/me', ctrl.whoami);
     // Owners and admins only; the handler checks the seat itself, whatever the enforcement mode.
     app.get('/api/v2/api-tokens/needing-expiry', ctrl.listTokensNeedingExpiry);
+    // Whether the caller's own AI app has called yet, and what this install lets it do. No token, hash or prefix.
+    app.get('/api/v2/api-tokens/ai-connection', aiConnection.read);
     app.get('/api/v2/api-tokens/step-credentials', ctrl.listStepCredentials);
     app.get('/api/v2/api-tokens/:id/logs', ctrl.listTokenLogs);
     // Mints the scoped token a CLI agent pastes into its MCP client. Before /:id

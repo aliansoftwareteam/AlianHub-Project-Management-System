@@ -2,6 +2,7 @@
     <p v-if="shown" class="ai-model-notice" role="status" data-test="ai-model-notice">
         <ShellIcon name="ai" :size="14" aria-hidden="true" />
         <span>{{ aiAvailability.canConfigureInstance ? $t('AiAvailability.notice_owner') : $t('AiAvailability.notice_member') }}</span>
+        <ConnectAiHint />
         <router-link v-if="aiAvailability.canConfigureInstance" class="ai-model-notice__link" :to="setup">{{ $t('AiAvailability.notice_setup') }}</router-link>
     </p>
 </template>
@@ -10,6 +11,7 @@
 import { computed, inject, unref } from "vue";
 import { useRoute } from "vue-router";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import ConnectAiHint from "./ConnectAiHint.vue";
 import { aiAvailability } from "@/composable/aiAvailability";
 import { AI_GATE, aiGateFor } from "@/router/ai/gate";
 

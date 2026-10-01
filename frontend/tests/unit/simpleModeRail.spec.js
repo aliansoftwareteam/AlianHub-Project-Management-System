@@ -160,8 +160,8 @@ describe('Ask', () => {
         applyAiAvailability({ state: AI_STATE.UNCONFIGURED, loaded: true });
         use('simple');
         const ask = mountNav().rail.find((item) => item.key === 'ai');
-        expect(ask.to).toEqual({ name: 'AiAccounts', params: { cid: 'c1' }, query: undefined });
-        expect(ask.match({ name: 'AiAccounts' })).toBe(true);
+        expect(ask.to).toEqual({ name: 'AiConnect', params: { cid: 'c1' }, query: undefined });
+        expect(ask.match({ name: 'AiConnect' })).toBe(true);
     });
 
     it('leaves Full pointing at Ask with no key, as before', () => {

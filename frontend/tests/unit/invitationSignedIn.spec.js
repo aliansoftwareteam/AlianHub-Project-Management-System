@@ -118,7 +118,7 @@ describe('Invitation page for an invitee who may already have an account', () =>
         expect(JSON.stringify(acceptCalls()[0][2])).not.toContain(USER_ID);
         expect(mocks.getAuth).toHaveBeenCalledWith(USER_ID);
         expect(localStorage.getItem('selectedCompany')).toBe(COMPANY_ID);
-        expect(mocks.replace).toHaveBeenCalledWith(`/${COMPANY_ID}`);
+        expect(mocks.replace).toHaveBeenCalledWith(`/${COMPANY_ID}/welcome/connect-ai`);
         expect(reload).toHaveBeenCalled();
     });
 
