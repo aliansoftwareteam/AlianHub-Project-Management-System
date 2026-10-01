@@ -4,6 +4,7 @@ const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const registry = require('../Agents/registry');
 const { oid } = require('../Automations/engine/tools');
 const work = require('../Agents/workRequests');
+const { opensList } = require('../Tasks/helpers/taskExtraLists');
 const { TASK_ACCESS_FIELDS } = require('./visibility');
 const { GRANT, DOCS_GRANT } = require('./manageFlag');
 const { loadProject, NO_PROJECT, NO_TASK, NO_PAGE } = require('./dataTools');
@@ -12,7 +13,7 @@ const goalTools = require('./goalTools');
 const v2 = require('./v2Flag');
 const cursor = require('./cursor');
 
-// Everyday work on what a person can already open: tags, links between tasks, lists and doc comments.
+// Everyday work on what a person can already open: tags, links between tasks, lists, the lists a task is added to and doc comments.
 // A read needs the read scope and a write the write scope, with no grant. Each write names its target so
 // tools.call checks it against the caller's filter first, then runs as a registry action whose executor is
 // the web route's own handler (Modules/Agents/workRequests.js).
@@ -36,6 +37,9 @@ const taskTarget = (args) => ({ taskId: str(args.taskId, 40) });
 const linkTarget = (args) => ({ taskId: str(args.taskId, 40), relatedTaskId: str(args.relatedTaskId, 40) });
 const listTarget = (args) => ({ projectId: str(args.projectId, 40), sprintId: str(args.sprintId, 40) });
 const pageTarget = (args) => ({ pageId: str(args.pageId, 40) });
+const taskInList = (args) => ({ taskId: str(args.taskId, 40), projectId: str(args.projectId, 40), sprintId: str(args.sprintId, 40) });
+/* The list's project is not the action's `projectId`: the action is filed and judged at the task's home. */
+const taskInListParams = (args) => ({ taskId: str(args.taskId, 40), listProjectId: str(args.projectId, 40), sprintId: str(args.sprintId, 40) });
 const projectParams = (args) => (isId(args.projectId) ? { projectId: String(args.projectId) } : {});
 
 const MENTIONS = 'To mention a member so they are notified, write @[Their Name](their member id).';
@@ -51,6 +55,10 @@ const relationRow = (link) => {
     const row = taskRow(link.task);
     return { type: link.type, label: link.label || link.type, task: Object.fromEntries(LINKED_TASK.map((field) => [field, row[field]])), linkedBy: idOf(link.createdBy), linkedAt: link.createdAt || null };
 };
+
+const extraListRow = (list) => ({
+    projectId: idOf(list.projectId), sprintId: idOf(list.sprintId), name: list.name || '', project: list.projectName || '', addedBy: idOf(list.addedBy), addedAt: list.addedAt || null,
+});
 
 const folderRow = (folder) => ({ folderId: String(folder._id), name: folder.name || '', parentFolderId: idOf(folder.parentFolderId) });
 
@@ -78,6 +86,21 @@ const pageCommentRow = (comment) => ({
 });
 
 const LIVE = Object.freeze({ $in: [0, null] });
+
+const OTHER_LIST = Object.freeze({ ...ID, description: 'The other list (see lists.list)' });
+const LIST_PROJECT = Object.freeze({ ...ID, description: 'The project that list is in' });
+const SEARCH_INPUT = Object.freeze({ sprintId: { type: 'string', description: 'Only the tasks of this list: the ones that live in it and the ones added to it' } });
+
+/* What tasks.search adds for one list: the tasks that live in it and, for a caller who can open the list, the
+ * tasks added to it. It goes beside the caller's own clause, so a task is still read by its home alone. */
+const listRows = async (ctx, vis, sprintId) => {
+    if (!isId(sprintId)) return { error: 'sprintId must be a list id' };
+    const ids = idForms(String(sprintId));
+    const home = { sprintId: { $in: ids } };
+    const list = await findOne(ctx, SCHEMA_TYPE.SPRINTS, { _id: oid(String(sprintId)) }, { projectId: 1 });
+    const open = Boolean(list) && vis.allowsProject(list.projectId) && vis.allowsSprint(list._id) && await opensList(ctx.companyId, ctx.userId, String(sprintId));
+    return { filter: open ? { $or: [home, { extraLists: { $elemMatch: { sprintId: { $in: ids } } } }] } : home };
+};
 
 const TOOLS = [
     {
@@ -109,6 +132,23 @@ const TOOLS = [
             // The route keeps what the person can open; the token's own project list narrows it once more.
             const open = links.filter((link) => link.task && Number(link.task.deletedStatusKey) !== 1 && vis.allowsTask(link.task));
             return { taskId: String(task._id), relations: open.map(relationRow) };
+        },
+    },
+    {
+        name: 'task.lists.list',
+        action: 'task.lists.list',
+        description: 'The lists a task was added to beside its home list, which is the sprintId the task carries. Only lists you can open are listed.',
+        input: input({ taskId: ID }, ['taskId']),
+        visibility: 'filtered',
+        strict: true,
+        run: async (ctx, args, vis) => {
+            const task = await findOne(ctx, SCHEMA_TYPE.TASKS, { _id: oid(String(args.taskId)), deletedStatusKey: { $ne: 1 } }, TASK_ACCESS_FIELDS);
+            if (!vis.allowsTask(task)) return { ...NO_TASK };
+            const lists = await work.extraListsOf(ctx.companyId, ctx.userId, task._id);
+            if (!lists) return { ...NO_TASK };
+            // The route names a list only for a person who can open it; the token's own project list narrows it once more.
+            const open = lists.filter((list) => list.name !== undefined && vis.allowsProject(list.projectId) && vis.allowsSprint(list.sprintId));
+            return { taskId: String(task._id), lists: open.map(extraListRow) };
         },
     },
     {
@@ -197,6 +237,28 @@ const TOOLS = [
         params: (args) => ({ taskId: str(args.taskId, 40), relatedTaskId: str(args.relatedTaskId, 40) }),
     },
     {
+        name: 'task.lists.add',
+        action: 'task.lists.add',
+        visibility: 'filtered',
+        strict: true,
+        filedUnder: GRANT,
+        target: taskInList,
+        description: `Add a top-level task to another list you can open, in its own project or another one. It stays in its home list and keeps that project's statuses; its subtasks show under it. Not a Scrum sprint, a backlog or a personal list, and at most ${work.MAX_EXTRA_LISTS} lists per task. You need to be able to move tasks in the task's project and in the list's.`,
+        input: input({ taskId: ID, projectId: LIST_PROJECT, sprintId: OTHER_LIST, ...REASON }, ['taskId', 'projectId', 'sprintId']),
+        params: taskInListParams,
+    },
+    {
+        name: 'task.lists.remove',
+        action: 'task.lists.remove',
+        visibility: 'filtered',
+        strict: true,
+        filedUnder: GRANT,
+        target: taskInList,
+        description: 'Take a task out of a list it was added to (see task.lists.list). It stays in its home list, which this never changes.',
+        input: input({ taskId: ID, projectId: LIST_PROJECT, sprintId: OTHER_LIST, ...REASON }, ['taskId', 'projectId', 'sprintId']),
+        params: taskInListParams,
+    },
+    {
         name: 'list.create',
         action: 'list.create',
         visibility: 'filtered',
@@ -270,6 +332,7 @@ const SCOPES = Object.freeze({
     'tags.list': 'projects:read',
     'lists.list': 'projects:read',
     'task.relations.list': 'tasks:read',
+    'task.lists.list': 'tasks:read',
     'page.comments.list': 'docs:read',
     ...goalTools.READ_SCOPES,
     ...Object.fromEntries(TOOLS.filter((tool) => !tool.run).map((tool) => [tool.name, 'tasks:write'])),
@@ -283,4 +346,4 @@ const filedUnder = (action) => {
     return (tool && tool.filedUnder) || null;
 };
 
-module.exports = { TOOLS, SCOPES, offered, filedUnder };
+module.exports = { TOOLS, SCOPES, SEARCH_INPUT, offered, filedUnder, listRows };

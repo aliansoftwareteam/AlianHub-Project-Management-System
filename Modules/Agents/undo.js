@@ -12,7 +12,7 @@ const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
 const { canChangeComment } = require('../Comments/helpers/threadWriteAccess');
 const { canSeeSprintById } = require('../Sprints/helpers/sprintVisibility');
 const { followSprintMove, moveDescendants } = require('../Tasks/helpers/sprintPlacement');
-const { pullOfLists } = require('../Tasks/helpers/taskExtraLists');
+const { pullOfLists, opensList } = require('../Tasks/helpers/taskExtraLists');
 const { canUsePage } = require('../Pages/helpers/pageAccess');
 
 // Undo replays the inverse action and logs it as the person who pressed Undo.
@@ -162,6 +162,10 @@ const inverses = {
         await work().linkTasks({ companyId, who: undoer(actor), taskId: u.taskId, relatedTaskId: u.relatedTaskId, type: u.type });
         return { taskId: u.taskId, linked: u.relatedTaskId };
     },
+    async extraList(companyId, u, actor) {
+        await work().setExtraList({ companyId, who: undoer(actor), taskId: u.taskId, listProjectId: u.listProjectId, sprintId: u.sprintId, operation: u.operation === 'add' ? 'remove' : 'add' });
+        return { taskId: u.taskId, sprintId: u.sprintId, restored: true };
+    },
     async list(companyId, u, actor) {
         await work().withdrawList({ companyId, who: undoer(actor), projectId: u.projectId, sprintId: u.sprintId });
         return { sprintId: u.sprintId, deleted: true };
@@ -266,6 +270,7 @@ const targetVisible = async (companyId, uid, u) => {
     if (LIST_KINDS.includes(u.kind)) return isPrivileged(await getRoleType(companyId, uid)) || canSeeSprintById(companyId, uid, u.sprintId);
     if (u.kind === 'relation' || u.kind === 'relationRemoved') return (await taskReadable(companyId, uid, u.taskId)) && taskReadable(companyId, uid, u.relatedTaskId);
     if (u.kind === 'subtask') return taskReadable(companyId, uid, u.subtaskId);
+    if (u.kind === 'extraList') return (await taskReadable(companyId, uid, u.taskId)) && opensList(companyId, uid, u.sprintId);
     if (!(await taskReadable(companyId, uid, u.taskId))) return false;
     if (u.kind !== 'sprint' || isPrivileged(await getRoleType(companyId, uid))) return true;
     return canSeeSprintById(companyId, uid, u.previous && u.previous.sprintId);
