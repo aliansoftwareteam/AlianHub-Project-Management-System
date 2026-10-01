@@ -3156,6 +3156,10 @@ export default {
         "add_task_to": "Add task to {group}…",
         "group_empty": "Nothing in this group yet.",
         "select_group": "Select every task in this group",
+        "select_group_loaded": "Select the {n} loaded tasks in this group ({total} in all)",
+        "load_more": "Load more ({n} left)",
+        "loading_more": "Loading…",
+        "load_more_sorted": "Only the {n} loaded tasks are sorted.",
         "select_task": "Select {name}",
         "select_subtask": "Select subtask {name}",
         "selected": "{n} selected",
@@ -5915,10 +5919,15 @@ export default {
         "saving": "Saving…",
         "saved": "View saved",
         "created": "View added",
-        "failed": "The view could not be saved"
+        "failed": "The view could not be saved",
+        "rename": "Rename",
+        "rename_label": "Rename the view {name}",
+        "rename_failed": "The view could not be renamed"
     },
     "ViewTemplates": {
         "from_template": "From a template",
+        "show_all": "Show all {n} templates",
+        "show_fewer": "Show fewer templates",
         "save_as": "Save as template",
         "save_title": "Save this view as a template",
         "name": "Template name",

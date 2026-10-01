@@ -61,7 +61,7 @@ async function agentClient(agentId) {
     return createApiClient({ baseURL: state.baseURL, accessToken: raw, companyId: state.companyId });
 }
 
-async function proposalToComment(thread, body) {
+async function proposalToComment(thread, body, filedOn = thread) {
     const created = await admin.api.post('/api/v2/agents', {
         name: label('agent'), description: 'server comment writers', autonomy: 1, spendCapUsd: 1,
         projectIds: [], skills: [], allowedActions: ['task.comment'],
@@ -71,12 +71,14 @@ async function proposalToComment(thread, body) {
     agentIds.push(agentId);
     const api = await agentClient(agentId);
     const res = await api.post('/api/v2/agents/proposals', {
-        agentId, taskId: thread.taskId, projectId: thread.projectId, what: label('proposal'), why: 'integration',
+        agentId, taskId: filedOn.taskId, projectId: filedOn.projectId, what: label('proposal'), why: 'integration',
         changes: [{ action: 'task.comment', params: { taskId: thread.taskId, body }, label: 'Comment' }],
     });
     expect(res.body.status).toBe(true);
     return res.body.data._id;
 }
+
+const storedProposal = (proposalId) => db.collection('agent_proposals').findOne({ _id: new ObjectId(String(proposalId)) });
 
 const clientMessage = (session, projectId, message) => session.api.post('/api/v2/billing/client-view/message', { projectId, message });
 
@@ -148,21 +150,52 @@ describe('a comment written through an MCP token follows thread visibility', () 
     });
 });
 
-describe('a comment an approved agent proposal writes follows thread visibility for the approver', () => {
-    it('does not apply a comment on a private sprint the approving member is not on', async () => {
-        const message = label('proposal into private sprint');
+describe('a proposal filed on a thread the approver cannot open is not theirs to decide', () => {
+    const expectNotFound = async (res, proposalId, message) => {
+        expect(res.status).toBe(404);
+        expect(res.body).toMatchObject({ status: false, statusText: 'Proposal not found.', message: 'Proposal not found.' });
+        expect(res.body.data).toBeUndefined();
+        expect(await countByMessage(message)).toBe(0);
+        const stored = await storedProposal(proposalId);
+        expect(stored.status).toBe('pending');
+        expect(stored.decidedBy).toBeFalsy();
+        expect(stored.decidedAt).toBeFalsy();
+    };
+
+    it('answers a member 404 for one on a private sprint they are not on, and leaves it pending', async () => {
+        const message = label('proposal on private sprint');
         const proposalId = await proposalToComment(privateSprint, message);
         const res = await member.api.post(`/api/v2/agents/proposals/${proposalId}/approve`);
 
+        await expectNotFound(res, proposalId, message);
+    });
+
+    it('answers an admin 404 for one on a direct message they are not in, and leaves it pending', async () => {
+        const message = label('proposal on dm');
+        const proposalId = await proposalToComment(dm, message);
+        const res = await admin.api.post(`/api/v2/agents/proposals/${proposalId}/approve`);
+
+        await expectNotFound(res, proposalId, message);
+    });
+});
+
+describe('a comment an approved agent proposal writes follows thread visibility for the approver', () => {
+    it('does not apply a comment on a private sprint the approving member is not on', async () => {
+        const message = label('proposal into private sprint');
+        const proposalId = await proposalToComment(privateSprint, message, open);
+        const res = await member.api.post(`/api/v2/agents/proposals/${proposalId}/approve`);
+
+        expect(res.status).toBe(200);
         expect(res.body.data.applied).toEqual([expect.objectContaining({ action: 'task.comment', ok: false })]);
         expect(await countByMessage(message)).toBe(0);
     });
 
     it('does not apply a comment on a direct message the approving admin is not in', async () => {
         const message = label('proposal into dm');
-        const proposalId = await proposalToComment(dm, message);
+        const proposalId = await proposalToComment(dm, message, open);
         const res = await admin.api.post(`/api/v2/agents/proposals/${proposalId}/approve`);
 
+        expect(res.status).toBe(200);
         expect(res.body.data.applied).toEqual([expect.objectContaining({ action: 'task.comment', ok: false })]);
         expect(await countByMessage(message)).toBe(0);
     });

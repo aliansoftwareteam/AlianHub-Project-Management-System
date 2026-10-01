@@ -14,3 +14,7 @@ export const createSharedView = (projectId, { sourceViewId, title, settings }) =
 export const savePrivateViewSettings = (memberRowId, viewId, settings) => apiRequest('post', `${env.API_MEMBERS}/private-view`, { id: memberRowId, operation: 'settings', data: { id: viewId, settings } }).then(bodyOf);
 
 export const createPrivateView = (memberRowId, view) => apiRequest('post', `${env.API_MEMBERS}/private-view`, { id: memberRowId, operation: 'push', data: view }).then(bodyOf);
+
+export const updatePrivateView = (memberRowId, viewId, field, value) => apiRequest('post', `${env.API_MEMBERS}/private-view`, { id: memberRowId, operation: 'update', key: field, data: { id: viewId, [field]: value } }).then(bodyOf);
+
+export const deletePrivateView = (memberRowId, viewId) => apiRequest('post', `${env.API_MEMBERS}/private-view`, { id: memberRowId, operation: 'delete', data: { id: viewId } }).then(bodyOf);

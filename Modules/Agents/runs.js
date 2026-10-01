@@ -9,6 +9,7 @@ const aiSwitch = require('../AICore/aiSwitch');
 const { MAX_DEPTH } = require('../../event/domainEventBus');
 const telemetry = require('../../Config/telemetry');
 const { dailyRunLimitOf } = require('./dailyRunLimit');
+const { runClause } = require('./privateWork');
 
 // Agent runs and spend. A run is the unit the rail footer counts ("2 running"),
 // the project header chip sums (elapsed, spend) and the audit log links to
@@ -239,17 +240,20 @@ const recordSpend = async (companyId, run, tokens, model) => {
     return { usd, tokens: priced.totalTokens, capReached };
 };
 
-/* projectIds, when given, is the caller's visible set, and hiddenTaskIds the tasks in it they cannot
- * read. Both sit under $and so a projectId or taskId filter the caller sends narrows them, never replaces them. */
-const inProjects = (projectIds, hiddenTaskIds) => {
+/* projectIds, when given, is the caller's visible set, hiddenTaskIds the tasks in it they cannot read, and
+ * privateWork what is someone else's alone (Modules/Agents/privateWork.js). All sit under $and so a projectId
+ * or taskId filter the caller sends narrows them, never replaces them. */
+const inProjects = (projectIds, hiddenTaskIds, privateWork) => {
     const clauses = [];
     if (Array.isArray(projectIds)) clauses.push({ projectId: { $in: idForms(projectIds.map(String)) } });
     if (Array.isArray(hiddenTaskIds) && hiddenTaskIds.length) clauses.push({ taskId: { $nin: hiddenTaskIds.map(String) } });
+    const notPrivate = privateWork ? runClause(privateWork) : {};
+    if (Object.keys(notPrivate).length) clauses.push(notPrivate);
     return clauses.length ? { $and: clauses } : {};
 };
 
-const list = async (companyId, { status, projectId, agentId, taskId, errorType, limit = 50, projectIds, hiddenTaskIds } = {}) => {
-    const match = { ...inProjects(projectIds, hiddenTaskIds) };
+const list = async (companyId, { status, projectId, agentId, taskId, errorType, limit = 50, projectIds, hiddenTaskIds, privateWork } = {}) => {
+    const match = { ...inProjects(projectIds, hiddenTaskIds, privateWork) };
     if (status === 'open') match.status = { $in: OPEN };
     else if (status) match.status = String(status);
     if (projectId) match.projectId = { $in: idForms(String(projectId)) };
@@ -264,8 +268,8 @@ const list = async (companyId, { status, projectId, agentId, taskId, errorType, 
 const usd = (amount) => Math.round(Number(amount || 0) * 100) / 100;
 
 /* What the rail footer and the project header chip show. */
-const summary = async (companyId, { projectId, projectIds, hiddenTaskIds } = {}) => {
-    const match = { status: { $in: OPEN }, ...inProjects(projectIds, hiddenTaskIds) };
+const summary = async (companyId, { projectId, projectIds, hiddenTaskIds, privateWork } = {}) => {
+    const match = { status: { $in: OPEN }, ...inProjects(projectIds, hiddenTaskIds, privateWork) };
     if (projectId) match.projectId = { $in: idForms(String(projectId)) };
     const open = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [match, 'agentId agentName status startedAt spend taskId projectId skill'] }, 'find');
     const now = Date.now();
@@ -285,8 +289,8 @@ const summary = async (companyId, { projectId, projectIds, hiddenTaskIds } = {})
 };
 
 /* Runs by status, for the counts a page shows next to the live summary. */
-const countsByStatus = async (companyId, { projectId, agentId, projectIds, hiddenTaskIds } = {}) => {
-    const match = { ...inProjects(projectIds, hiddenTaskIds) };
+const countsByStatus = async (companyId, { projectId, agentId, projectIds, hiddenTaskIds, privateWork } = {}) => {
+    const match = { ...inProjects(projectIds, hiddenTaskIds, privateWork) };
     if (projectId) match.projectId = { $in: idForms(String(projectId)) };
     if (agentId) match.agentId = String(agentId);
     const rows = await MongoDbCrudOpration(companyId, {

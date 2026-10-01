@@ -46,13 +46,13 @@ function customProperties(body) {
 const base = withoutMedia(list);
 const variables = { ...customProperties(rule(tokens, ':root')), ...customProperties(rule(base, '.lv2')) };
 
-function px(value) {
+function px(value, local = {}) {
     let resolved = value;
     for (let pass = 0; pass < 6 && /var\(/.test(resolved); pass += 1) {
-        resolved = resolved.replace(/var\((--[\w-]+)\)/g, (whole, name) => variables[name] ?? whole);
+        resolved = resolved.replace(/var\((--[\w-]+)(?:,\s*([^()]+))?\)/g, (whole, name, fallback) => local[name] ?? variables[name] ?? fallback ?? whole);
     }
     const sum = resolved.replace(/calc/g, '').replace(/px/g, '');
-    if (!sum.trim() || !/^[\d\s.+\-*()]+$/.test(sum)) throw new Error(`cannot resolve "${value}" (got "${resolved}")`);
+    if (!sum.trim() || !/^[\d\s.+\-*/()]+$/.test(sum)) throw new Error(`cannot resolve "${value}" (got "${resolved}")`);
     return Function(`return (${sum});`)();
 }
 
@@ -104,5 +104,59 @@ describe('the task name uses the free space in its cell', () => {
     it('on a phone the row menu keeps its own place, where it is always shown', () => {
         expect(declared(rule(base, '.lv2__actions'), 'position')).toBe('');
         expect(mediaBlocks(list, '(max-width: 767px)')).not.toMatch(/\.lv2__actions\s*\{[^}]*position/);
+    });
+});
+
+/* axe's target-size rule (WCAG 2.5.8), which the e2e accessibility suite runs: a control is at
+   least 24 by 24 px, or its centre is at least 12px from the nearest edge of every other control. */
+describe('the List controls keep a 24px target', () => {
+    const FLOOR = 24;
+    const group = readFileSync(path.join(SRC, 'views/Projects/ListView/ListGroup.vue'), 'utf8');
+    const size = (selector, property) => px(declared(rule(base, selector), property));
+
+    it('--hit-min is the floor', () => {
+        expect(px('var(--hit-min)')).toBeGreaterThanOrEqual(FLOOR);
+    });
+
+    it('the group select-all sits in a label that keeps the header button 12px or more from its centre', () => {
+        expect(group).toMatch(/<label v-if="canSelect && rows\.length" class="lv2__group-select"[^>]*>\s*<input[^>]*class="ah-check lv2__group-check"/);
+        const label = size('.lv2__group-select', 'width');
+        expect(label).toBeGreaterThanOrEqual(FLOOR);
+        expect(size('.lv2__group-select', 'height')).toBeGreaterThanOrEqual(FLOOR);
+        expect(declared(rule(base, '.lv2__group-select'), 'justify-content')).toBe('center');
+        expect(label / 2).toBeGreaterThanOrEqual(FLOOR / 2);
+    });
+
+    it('the select-all has a name, which says when only the loaded rows are selected', () => {
+        expect(group).toMatch(/class="ah-check lv2__group-check"[\s\S]{0,200}:aria-label="left \? \$t\('List\.select_group_loaded', \{ n: rows\.length, total \}\) : \$t\('List\.select_group'\)"/);
+    });
+
+    it('the label does not move the box or the group caret: the header button gives the room back', () => {
+        const side = px('var(--cell-pad-x, 12px)');
+        const box = px('var(--lv2-check)');
+        const inset = size('.lv2__group-select', 'margin-left');
+        const label = size('.lv2__group-select', 'width');
+        expect(inset + (label - box) / 2).toBe(side);
+        expect(inset + label + size('.lv2__group-select + .lv2__group-head', 'padding-left')).toBe(side + box + side);
+    });
+
+    it('Load more is as tall as the floor', () => {
+        expect(size('.lv2__more-btn', 'min-height')).toBeGreaterThanOrEqual(FLOOR);
+    });
+
+    it('a row action is a full target', () => {
+        expect(size('.lv2__act', 'width')).toBeGreaterThanOrEqual(FLOOR);
+        expect(size('.lv2__act', 'height')).toBeGreaterThanOrEqual(FLOOR);
+    });
+
+    it('a disclosure is small, so its centre stays 12px or more from the status circle beside it', () => {
+        expect(width('.lv2__disclose') / 2 + titleGap()).toBeGreaterThanOrEqual(FLOOR / 2);
+        expect(width('.lv2__status')).toBeGreaterThanOrEqual(FLOOR);
+    });
+
+    it('row actions that are not shown are not targets lying over the task name', () => {
+        const wide = mediaBlocks(list, '(min-width: 768px)');
+        expect(declared(rule(wide, '.lv2__actions'), 'visibility')).toBe('hidden');
+        expect(wide).toMatch(/\.lv2__row:focus-within \.lv2__actions,[^{]*\{[^}]*visibility:\s*visible/);
     });
 });
