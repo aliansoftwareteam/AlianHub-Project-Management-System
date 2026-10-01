@@ -2,6 +2,8 @@
 
 .lv2 {
     --lv2-cols: 28px minmax(0, 1fr) minmax(0, .45fr) 56px 64px 72px 48px 80px 88px;
+    --lv2-grip-w: 12px;
+    --lv2-disclose-w: 10px;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -104,6 +106,7 @@
 
 /* min-height sizes the content box, so the row's padding comes off --row-h. */
 .lv2__row {
+    --lv2-row-tint: transparent;
     display: grid;
     grid-template-columns: var(--lv2-cols);
     gap: 10px;
@@ -117,8 +120,8 @@
 }
 .lv2__c-select, .lv2__c-title { justify-self: stretch; }
 .lv2__c-tags { justify-self: stretch; min-width: 0; }
-.lv2__row:hover { background: var(--surface-hover); }
-.lv2__row.is-selected { background: var(--brand-tint); }
+.lv2__row:hover { --lv2-row-tint: var(--surface-hover); background: var(--lv2-row-tint); }
+.lv2__row.is-selected { --lv2-row-tint: var(--brand-tint); background: var(--lv2-row-tint); }
 .lv2__row.is-agent { box-shadow: inset 0 0 0 1.5px var(--rail); }
 .lv2__row.is-sub {
     padding-block: max(1px, calc(var(--cell-pad-y) - 2px));
@@ -128,12 +131,14 @@
 .lv2__row:last-child { border-bottom: 0; }
 
 .lv2__select { display: flex; align-items: center; }
-.lv2__title { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.lv2__title--sub { padding-left: 22px; }
+.lv2__title { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
+/* Past the parent's grip and disclosure, then one indent step: the subtask's circle and name
+   each start that step to the right of the parent's. */
+.lv2__title--sub { padding-left: calc(var(--lv2-grip-w) + var(--lv2-disclose-w) + 2 * var(--sp-3) + var(--row-indent)); }
 .lv2__disclose {
     background: none; border: 0; padding: 0;
     font-size: 10px; color: var(--ink-2); cursor: pointer; line-height: 1;
-    width: 10px; flex: none;
+    width: var(--lv2-disclose-w); flex: none;
 }
 .lv2__name {
     background: none; border: 0; padding: 0;
@@ -160,6 +165,7 @@
     color: var(--ink-2);
     cursor: grab;
     display: inline-flex;
+    width: var(--lv2-grip-w);
     flex: none;
 }
 .lv2__row:hover .lv2__grip { opacity: 1; }
@@ -282,6 +288,25 @@ button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status
 .lv2__row:hover .lv2__act,
 .lv2__row:focus-within .lv2__act,
 .lv2__act[aria-expanded="true"] { opacity: 1; }
+/* In the flow, the hidden actions held up to 128px of the title cell, and the task name was
+   cut short beside what looked like free space. From tablet width up they sit over the end
+   of the cell on the row's own colour, and take no clicks until they show. No transform
+   here: the row menu inside is fixed to the viewport. */
+@media (min-width: 768px) {
+    .lv2__title { position: relative; }
+    .lv2__actions {
+        position: absolute;
+        top: 0; bottom: 0; right: 0;
+        z-index: 1;
+        padding-left: var(--sp-3);
+        background: linear-gradient(var(--lv2-row-tint), var(--lv2-row-tint)) var(--surface);
+        opacity: 0;
+        pointer-events: none;
+    }
+    .lv2__row:hover .lv2__actions,
+    .lv2__row:focus-within .lv2__actions,
+    .lv2__actions:has([aria-expanded="true"]) { opacity: 1; pointer-events: auto; }
+}
 .lv2__menu { position: fixed; z-index: 30; max-height: calc(100vh - 16px); overflow-y: auto; }
 .lv2__menu .lv2__menu-danger, .lv2__menu .lv2__menu-danger:hover { color: var(--danger); }
 .lv2__create--sub { padding-left: 50px; }

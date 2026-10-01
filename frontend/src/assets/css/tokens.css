@@ -93,6 +93,8 @@
     --chip-h: 22px;
     --chip-font: 11.5px;
     --hit-min: 24px;
+    /* How far a child row (a subtask) steps in from its parent's name. */
+    --row-indent: var(--sp-8);
 }
 
 /* Set on a view root by its saved density (or on :root by a design variant). Phones keep
