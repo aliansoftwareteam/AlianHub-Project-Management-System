@@ -6,7 +6,7 @@ const permissionGuard = require('../../Config/permissionGuard');
 const { isPrivileged } = require('../../Config/roleTypes');
 const { visibleProjectIds } = require('../Agents/scope');
 const { hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
-const { pageReachFilter } = require('../Pages/helpers/pageRules');
+const { pageReachFilter, pageReachedBy, shareFor } = require('../Pages/helpers/pageRules');
 const { COMMENT_TYPES, CHUNK_ONLY_SOURCES } = require('./sources');
 const { chunkGuide, guideMarkdown, guideTitle } = require('./ingest/chunker');
 
@@ -177,8 +177,16 @@ const filterFor = (set, { chunkSources = [] } = {}) => {
     return { sourceTypes, clauses, chunkSources: fromChunks };
 };
 
-const permissionOf = (sourceType, row) => {
+const readByNameOnly = (set, page) => {
+    const uid = set && set.caller ? set.caller.userId : '';
+    if (!shareFor(page, uid)) return false;
+    const open = (set.projectIds || []).map(String);
+    return !pageReachedBy(page, { uid, inProject: (id) => open.includes(String(id)), companyWide: !(set.projectId || projectlessClosed(set)), named: false });
+};
+
+const permissionOf = (sourceType, row, set = null) => {
     if (sourceType === 'page') {
+        if (set && readByNameOnly(set, row)) return { visibility: 'named', via: 'share' };
         if (String(row.visibility || '') === 'private') return { visibility: 'private', via: 'owner' };
         if (!row.ProjectID) return { visibility: 'company', via: 'company' };
         return { visibility: 'project', via: 'project' };
@@ -215,7 +223,7 @@ const editedSince = (row, p) => time(row.updatedAt) > time(p.updatedAt);
  * chunks into is. */
 const RECHECK = {
     task: { fields: '_id' },
-    page: { fields: '_id visibility ProjectID title updatedAt', title: (row) => row.title, stale: editedSince },
+    page: { fields: '_id visibility ProjectID createdBy sharedWith title updatedAt', title: (row) => row.title, stale: editedSince },
     comment: { fields: '_id taskId message updatedAt', title: commentTitle, stale: editedSince, narrow: onVisibleTasks },
     transcript: { fields: '_id title updatedAt', title: (row) => row.title || 'Call notes', stale: editedSince },
     guide: {
@@ -264,7 +272,7 @@ const recheck = async ({ set, passages, onStale }) => {
         .filter(({ p, row }) => row && (!RECHECK[p.sourceType].keep || RECHECK[p.sourceType].keep(row, p)))
         .map(({ p, row }) => {
             const spec = RECHECK[p.sourceType];
-            const permission = permissionOf(p.sourceType, row);
+            const permission = permissionOf(p.sourceType, row, set);
             if (!spec.stale || !spec.stale(row, p)) return { ...p, permission };
             if (onStale) onStale(p);
             return { ...p, title: String(spec.title(row) || '').slice(0, TITLE_LENGTH), excerpt: '', updatedAt: row.updatedAt, permission };

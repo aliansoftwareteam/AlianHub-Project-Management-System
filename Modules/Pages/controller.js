@@ -27,7 +27,7 @@ const {
     blocksToRawText,
 } = require('./helpers/pageContent');
 const { composePage, isAiConfigured } = require('./helpers/pageAi');
-const { canUsePage, canManageShares } = require('./helpers/pageAccess');
+const { canUsePage, canManageShares, canCreatePageIn, readsDocsOnly } = require('./helpers/pageAccess');
 const { normalizeBlockMentions, normalizeMentionHtml } = require('./helpers/pageMentions');
 const { PageImageError, receiveImage, storePageImage, unlinkQuietly } = require('./helpers/pageImages');
 const { projectAccess, isCompanyAdmin, isCompanyMember, visibleProjectIds } = require('../../Config/contentAccess');
@@ -52,9 +52,13 @@ const toListRow = (page, uid) => {
 const shownTo = async (companyId, page, uid) => {
     if (!page) return page;
     const row = plain(page);
-    const manages = await canManageShares(companyId, row, uid);
+    const [manages, canEdit, canChangeProperties] = await Promise.all([
+        canManageShares(companyId, row, uid),
+        canUsePage(companyId, row, uid, { edit: true }),
+        canUsePage(companyId, row, uid, { edit: true, named: false }),
+    ]);
     const sharedCount = sharesOf(row).length;
-    return { ...hideShares(row, uid), canManageShares: manages, ...(manages ? { sharedCount } : {}) };
+    return { ...hideShares(row, uid), canEdit, canChangeProperties, canManageShares: manages, ...(manages ? { sharedCount } : {}) };
 };
 
 const AGENT_STATUSES = ['draft', 'approved'];
@@ -165,11 +169,20 @@ exports.createPage = async (req, res) => {
             return res.send({ status: false, statusText: meta.reason });
         }
         const userId = callerId(req);
-        if (projectId && !(await projectAccess(companyId, userId, projectId)).canEdit) {
-            return fail(res, 'Project not found.', 404);
+        const place = await canCreatePageIn(companyId, userId, projectId);
+        if (!place.allowed) {
+            return place.statusCode === 403
+                ? fail(res, 'You do not have permission to add a doc here.', 403)
+                : fail(res, 'Project not found.', 404);
         }
-        if (parentPageId && !(await findPage(companyId, parentPageId, userId))) {
-            return fail(res, 'Page not found.', 404);
+        if (parentPageId) {
+            const parent = await findPage(companyId, parentPageId, userId);
+            if (!parent) {
+                return fail(res, 'Page not found.', 404);
+            }
+            if (!(await canUsePage(companyId, parent, userId, { edit: true }))) {
+                return fail(res, 'You do not have permission to add a page under this one.', 403);
+            }
         }
         const blocks = contentBlocks !== undefined ? normalizeBlockMentions(contentToEditorData({ blocks: contentBlocks })) : emptyEditorData();
         if (contentBlocks !== undefined && contentTooLarge({ blocks })) {
@@ -526,6 +539,11 @@ exports.deletePage = async (req, res) => {
         }, 'findOne');
         if (!page) {
             return fail(res, 'Page not found.', 404);
+        }
+        if (await readsDocsOnly(companyId, userId)) {
+            return (await canUsePage(companyId, page, userId))
+                ? fail(res, 'You do not have permission to delete this page.', 403)
+                : fail(res, 'Page not found.', 404);
         }
         if (String(page.visibility || '') === 'private') {
             if (String(page.createdBy || '') !== userId && !(await isCompanyAdmin(companyId, userId))) {

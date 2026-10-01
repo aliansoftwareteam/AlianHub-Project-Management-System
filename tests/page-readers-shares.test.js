@@ -33,7 +33,7 @@ describe('the page readers agree on who reaches a page: public links', () => {
             admin: ['shared', 'company', 'closed', 'namedEdit'],
             inside: ['insidePrivate', 'shared', 'company', 'closed', 'namedView', 'namedEdit'],
             outside: ['outsidePrivate', 'shared', 'company'],
-            guest: ['shared', 'company'],
+            guest: [],
             viewer: ['shared', 'company'],
             editor: ['shared', 'company'],
         });
@@ -45,9 +45,9 @@ describe('the page readers agree on who reaches a page: public links', () => {
         });
     });
 
-    it('answers not found for everything else, a doc shared with the person by name included', async () => {
+    it('refuses a guest the link of a doc they read, and answers not found for everything else', async () => {
         expect(await decisions((decision) => !decision.ok && decision.statusCode !== 404)).toEqual({
-            owner: [], admin: [], inside: [], outside: [], guest: [], viewer: [], editor: [],
+            owner: [], admin: [], inside: [], outside: [], guest: ['shared', 'company'], viewer: [], editor: [],
         });
     });
 });

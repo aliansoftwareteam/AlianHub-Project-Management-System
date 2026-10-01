@@ -11,7 +11,7 @@ const { myCache } = require('../Config/config');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { resolveVisibleSet, clausesFor, chunkClausesFor, recheck } = require('../Modules/Knowledge/visibleSet');
 
-const { C, PROJECTS } = world;
+const { C, PEOPLE, PAGES, PROJECTS } = world;
 
 const WHOLE_COMPANY = {
     owner: ['shared', 'company', 'closed', 'namedEdit'],
@@ -88,5 +88,14 @@ describe('the page readers agree on who reaches a page: knowledge retrieval', ()
         const passages = world.pageRows().map((page) => ({ sourceType: 'page', sourceId: page._id, updatedAt: page.updatedAt }));
         const kept = await world.askEveryone(async (uid) => recheck({ set: await setFor(uid), passages }));
         expect(kept).toEqual(WHOLE_COMPANY);
+    });
+
+    it('says how a passage is read: by name, as its author, or through its project', async () => {
+        const passages = [PAGES.namedView, PAGES.namedEdit].map((sourceId) => ({ sourceType: 'page', sourceId, updatedAt: new Date(Date.UTC(2026, 5, 1)) }));
+        const how = async (who) => (await recheck({ set: await setFor(PEOPLE[who]), passages })).map((passage) => passage.permission);
+
+        expect(await how('viewer')).toEqual([{ visibility: 'named', via: 'share' }]);
+        expect(await how('editor')).toEqual([{ visibility: 'named', via: 'share' }]);
+        expect(await how('inside')).toEqual([{ visibility: 'private', via: 'owner' }, { visibility: 'project', via: 'project' }]);
     });
 });

@@ -27,6 +27,7 @@ const notices = require('../Modules/notification/prepare-notification-data/contr
 const { forgetHealedDocNotices } = require('../Modules/notification/docNotices');
 const pages = require('../Modules/Pages/controller');
 const shares = require('../Modules/Pages/shares');
+const pageComments = require('../Modules/Pages/comments');
 const { canUsePage, canManageShares } = require('../Modules/Pages/helpers/pageAccess');
 const { MAX_PAGE_SHARES } = require('../Modules/Pages/helpers/pageRules');
 const { explain } = require('../Modules/WhoCanSee/helpers/explain');
@@ -361,5 +362,87 @@ describe('a doc shared with people by name: readers that take what every reader 
 
         stored(PAGES.namedView).visibility = 'project';
         expect(String(await served())).toContain('Atlas namedView');
+    });
+});
+
+describe('what a person may do with a doc is said on the doc', () => {
+    const canEdit = async (who, pageId) => (await open(who, pageId)).data.canEdit;
+
+    it('tells each reader whether they may change it', async () => {
+        expect(await canEdit('owner', PAGES.shared)).toBe(true);
+        expect(await canEdit('outside', PAGES.shared)).toBe(true);
+        expect(await canEdit('guest', PAGES.shared)).toBe(false);
+        expect(await canEdit('guest', PAGES.company)).toBe(false);
+        expect(await canEdit('viewer', PAGES.namedView)).toBe(false);
+        expect(await canEdit('editor', PAGES.namedEdit)).toBe(true);
+        expect(await canEdit('inside', PAGES.namedView)).toBe(true);
+    });
+});
+
+describe('a guest reads the docs they reach', () => {
+    const create = (who, body) => call(pages.createPage, { uid: PEOPLE[who], body });
+    const pageCount = () => mockDb.store[SCHEMA_TYPE.PAGES].length;
+
+    it('changes a doc only when it is shared with them as an editor', async () => {
+        expect((await open('guest', PAGES.shared)).status).toBe(true);
+        expect((await save('guest', PAGES.shared, { title: 'Taken' })).status).toBe(false);
+        expect((await save('guest', PAGES.company, { title: 'Taken' })).status).toBe(false);
+
+        await name('owner', PAGES.shared, 'guest', 'viewer');
+        expect((await save('guest', PAGES.shared, { title: 'Taken' })).status).toBe(false);
+        expect(stored(PAGES.shared).title).toBe('Atlas shared');
+
+        await name('owner', PAGES.shared, 'guest', 'editor');
+        expect((await save('guest', PAGES.shared, { title: 'Agreed' })).status).toBe(true);
+        expect((await save('guest', PAGES.shared, { isWiki: true })).status).toBe(false);
+        expect(stored(PAGES.shared)).toMatchObject({ title: 'Agreed' });
+    });
+
+    it('creates no doc, in a project or outside one', async () => {
+        const before = pageCount();
+        expect(await create('guest', { title: 'Mine', projectId: PROJECTS.open })).toMatchObject({ status: false, statusCode: 403 });
+        expect(await create('guest', { title: 'Mine' })).toMatchObject({ status: false, statusCode: 403 });
+        expect(await create('guest', { title: 'Mine', parentPageId: PAGES.shared })).toMatchObject({ status: false, statusCode: 403 });
+        expect(pageCount()).toBe(before);
+        expect((await create('outside', { title: 'Theirs', projectId: PROJECTS.open })).status).toBe(true);
+    });
+
+    it('deletes no doc, and does not choose who a doc of theirs is shared with', async () => {
+        const own = mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Atlas early', visibility: 'project', createdBy: PEOPLE.guest, ProjectID: PROJECTS.open, deletedStatusKey: 0 });
+
+        expect(await call(pages.deletePage, { uid: PEOPLE.guest, params: { id: PAGES.shared } })).toMatchObject({ status: false, statusCode: 403 });
+        expect(await call(pages.deletePage, { uid: PEOPLE.guest, params: { id: String(own._id) } })).toMatchObject({ status: false, statusCode: 403 });
+        expect(await call(pages.deletePage, { uid: PEOPLE.guest, params: { id: PAGES.closed } })).toMatchObject({ status: false, statusCode: 404 });
+        expect(await name('guest', String(own._id), 'guest', 'editor')).toMatchObject({ status: false, statusCode: 403 });
+        expect(mockDb.store[SCHEMA_TYPE.PAGES].filter((page) => page.deletedStatusKey === 1).map((page) => String(page._id))).toEqual([PAGES.deleted]);
+    });
+
+    it('still takes part in the comments of a doc they read', async () => {
+        const listed = await call(pageComments.listComments, { uid: PEOPLE.guest, params: { id: PAGES.shared } });
+        expect(listed.status).toBe(true);
+    });
+});
+
+describe('a page under another page needs the right to change that page', () => {
+    const create = (who, body) => call(pages.createPage, { uid: PEOPLE[who], body });
+    const children = (pageId) => mockDb.store[SCHEMA_TYPE.PAGES].filter((page) => String(page.parentPageId || '') === pageId);
+
+    it('refuses a person who only reads the parent, and answers not found to one who cannot open it', async () => {
+        expect(await create('viewer', { title: 'Under', parentPageId: PAGES.namedView })).toMatchObject({ status: false, statusCode: 403 });
+        expect(await create('outside', { title: 'Under', parentPageId: PAGES.namedView })).toMatchObject({ status: false, statusCode: 404 });
+        expect(await create('outside', { title: 'Under', parentPageId: PAGES.closed })).toMatchObject({ status: false, statusCode: 404 });
+        expect(children(PAGES.namedView)).toEqual([]);
+        expect(children(PAGES.closed)).toEqual([]);
+    });
+
+    it('lets a person who may change the parent add to it', async () => {
+        expect((await create('editor', { title: 'Under', parentPageId: PAGES.namedEdit })).status).toBe(true);
+        expect((await create('outside', { title: 'Under', parentPageId: PAGES.shared, projectId: PROJECTS.open })).status).toBe(true);
+        expect(children(PAGES.namedEdit)).toHaveLength(1);
+        expect(children(PAGES.shared)).toHaveLength(1);
+    });
+
+    it('answers not found for a project the person cannot see', async () => {
+        expect(await create('outside', { title: 'There', projectId: PROJECTS.closed })).toMatchObject({ status: false, statusCode: 404 });
     });
 });
