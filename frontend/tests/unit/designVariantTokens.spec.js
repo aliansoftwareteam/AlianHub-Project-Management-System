@@ -63,7 +63,7 @@ describe('the three design variants', () => {
             '--lh-tight', '--lh-snug', '--lh-body', '--fw-strong', '--fw-title',
             '--sp-1', '--sp-2', '--sp-3', '--sp-4', '--sp-5', '--sp-6', '--sp-7', '--sp-8', '--sp-9',
             '--r-chip', '--r-input', '--r-card', '--r-modal',
-            '--shadow-card', '--shadow-pop', '--shadow-panel',
+            '--shadow-card', '--shadow-surface', '--shadow-pop', '--shadow-panel',
             '--row-h', '--row-font', '--cell-pad-y', '--cell-pad-x',
             '--control-h-sm', '--control-h', '--control-h-lg', '--toolbar-h',
         ];
@@ -99,6 +99,11 @@ describe('the three design variants', () => {
             expect(variant.a[name], name).toBe(root[name]);
         });
         expect(variant.a['--shadow-card']).toBe(root['--shadow-card'].replace(/rgba\([^)]*\)/, 'var(--shadow-ink)'));
+        expect(variant.a['--shadow-surface']).toBe('none');
+        [['--r-chip', '--r-sm'], ['--r-input', '--r-md'], ['--r-card', '--r-lg']].forEach(([shared, own]) => {
+            expect(variant.a[shared], shared).toBe(`var(${own})`);
+            expect(variant.a[own], own).toBe(root[shared]);
+        });
         expect(root['--shadow-card']).toContain(root['--shadow-ink']);
         expect(dark['--shadow-card']).toContain(dark['--shadow-ink']);
     });
@@ -113,6 +118,7 @@ describe('the three design variants', () => {
         expect(variant.b['--fs-md']).toBe('13px');
         expect(variant.b['--shadow-card']).toBe('none');
         expect(variant.b['--shadow-panel']).toBe('none');
+        expect(variant.b['--shadow-surface']).toBe('none');
         ['--row-h', '--control-h-sm', '--control-h', '--control-h-lg', '--toolbar-h', '--r-sm', '--r-md', '--r-lg', '--r-modal', '--fs-sm', '--fs-lg', '--fs-xl', '--lh-body'].forEach((name) => {
             expect(px('b', name), name).toBeLessThan(px('a', name));
         });
@@ -130,6 +136,7 @@ describe('the three design variants', () => {
         });
         expect(Number(variant.c['--fw-title'])).toBeGreaterThan(Number(variant.a['--fw-title']));
         expect(variant.c['--shadow-card'].split('var(--shadow-ink)').length).toBeGreaterThan(2);
+        expect(variant.c['--shadow-surface']).toBe('var(--shadow-card)');
     });
 
     it('a list row is a 24px control plus its cell padding in every variant', () => {

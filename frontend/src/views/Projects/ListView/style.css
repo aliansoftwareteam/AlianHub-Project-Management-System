@@ -71,6 +71,7 @@
     background: var(--surface);
     border: 1px solid var(--hairline);
     border-radius: var(--r-card);
+    box-shadow: var(--shadow-surface, none);
     overflow: hidden;
 }
 .lv2__group-head {

@@ -128,6 +128,7 @@ describe('the reference screens take their density, type and elevation from the 
         [LIST, '.lv2__add', 'font-size', ['--row-font']],
         [LIST, '.lv2__skeleton', 'height', ['--cell-pad-y']],
         [LIST, '.lv2__group', 'border-radius', ['--r-card']],
+        [LIST, '.lv2__group', 'box-shadow', ['--shadow-surface']],
 
         [PANEL, '.ah-detail__panel', 'box-shadow', ['--shadow-panel']],
         [PANEL, '.ah-detail__head', 'height', ['--toolbar-h']],
