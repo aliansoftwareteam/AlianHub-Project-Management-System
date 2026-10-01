@@ -275,6 +275,7 @@ module.exports.AUTOMATIONS_BACKTEST = '/api/v2/automations/backtest';
 module.exports.AUTOMATIONS_AI_DRAFT = '/api/v2/automations/draft';
 module.exports.AI_ASK = '/api/v1/ai/ask';
 module.exports.AI_ASK_SOURCES = '/api/v1/ai/ask/sources';
+module.exports.AI_ASK_CARD = '/api/v1/ai/ask/card';
 module.exports.AI_ASK_STREAM = '/api/v1/ai/ask/stream';
 module.exports.AI_ASK_THREADS = '/api/v1/ai/ask/threads';
 module.exports.AI_FEEDBACK = '/api/v1/ai/feedback';

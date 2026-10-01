@@ -365,6 +365,9 @@ const agentSessionEndpointsSchema = new Schema(schema.agentSessionEndpoints, {st
 agentSessionEndpointsSchema.index({ clientId: 1 }, { unique: true, name: 'client_id' });
 const askThreadsSchema = new Schema(schema.askThreads, {strict: true, timestamps: true});
 askThreadsSchema.index({ ownerId: 1, lastTurnAt: -1 });
+const dashboardCardAnswersSchema = new Schema(schema.dashboardCardAnswers, {strict: true, timestamps: false});
+dashboardCardAnswersSchema.index({ dashboardId: 1, cardUid: 1, userId: 1 }, { unique: true, name: 'one_per_card_viewer' });
+dashboardCardAnswersSchema.index({ userId: 1 });
 const aiFeedbackSchema = new Schema(schema.aiFeedback, {strict: true, timestamps: false});
 aiFeedbackSchema.index({ userId: 1, feature: 1, itemId: 1 }, { unique: true, name: 'one_per_person_item' });
 aiFeedbackSchema.index({ createdAt: -1 });
@@ -560,6 +563,7 @@ module.exports = {
     agentSessionsSchema,
     agentSessionEndpointsSchema,
     askThreadsSchema,
+    dashboardCardAnswersSchema,
     aiFeedbackSchema,
     aiEvalRunsSchema,
     assignmentRulesSchema,
