@@ -32,7 +32,7 @@
             :className="'custom__field-radio custom__field-Separator'"
 
         />
-        <DropDown mode="listbox" :zIndex="10" v-if="isType">
+        <DropDown themed mode="listbox" :zIndex="10" v-if="isType">
             <template #button>
                 <div class="formkit__form-wrapper" :ref="customFieldTypeUniqueId">
                     <div class="custom__field-required">

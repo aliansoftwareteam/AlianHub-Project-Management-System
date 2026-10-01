@@ -75,7 +75,7 @@ describe('the calendar controls in the project toolbar', () => {
         const rule = ruleBody(phone, '.pft .top-filter-section');
         expect(rule).toMatch(/box-sizing:\s*border-box/);
         expect(rule).toMatch(/width:\s*auto/);
-        expect(rule).toMatch(/min-width:\s*40px/);
+        expect(rule).toMatch(/min-width:\s*var\(--hit-min\)/);
     });
 
     test('the previous and next chevrons have no white disc', () => {
