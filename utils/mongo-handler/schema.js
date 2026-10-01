@@ -426,6 +426,8 @@ const schema = {
         agentAccount: { type: Object, required: false },
         // Contractor narrowing: when set, tasks.next / tasks.search stay inside these projects.
         projectIds: { type: Array, default: [], required: false },
+        // What the token was created to do beyond its scopes (Modules/Mcp/manageFlag.js); never changed afterwards.
+        grants: { type: Array, default: [], required: false },
     },
     // Per-call audit of token-authenticated API requests
     apiActivityLogs: {
