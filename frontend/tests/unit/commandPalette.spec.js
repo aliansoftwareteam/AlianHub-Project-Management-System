@@ -41,7 +41,7 @@ const TASK = {
     _id: 't1', TaskName: 'Budget plan', TaskKey: 'AH-1', ProjectID: 'p1', sprintId: 's1', folderObjId: '',
     sprintName: 'Sprint 4', folderName: '', updatedAt: twoDaysAgo, status: { text: 'Open', color: '#ccc' }
 };
-const serve = () => apiRequest.mockImplementation((type, url) => {
+const respond = (type, url) => {
     if (type === 'post' && url === '/api/v2/search') {
         return ok({
             tasks: [TASK],
@@ -54,21 +54,23 @@ const serve = () => apiRequest.mockImplementation((type, url) => {
         return ok([{ visitedAt: twoDaysAgo, task: { ...TASK, _id: 't9', TaskName: 'Recently seen', TaskKey: 'AH-9', sprintArray: { name: 'Sprint 2' } } }]);
     }
     return ok([]);
-});
+};
+const serve = () => apiRequest.mockImplementation(respond);
 
-const store = () => createStore({
+const store = ({ roleType = 3, projects = [{ _id: 'p1', ProjectName: 'Budget ops' }], teams = [] } = {}) => createStore({
     modules: {
         users: { namespaced: true, getters: { users: () => [{ _id: 'u1', Employee_Name: 'Budget Bob', Employee_Email: 'bob@example.com' }] } },
-        projectData: { namespaced: true, getters: { projects: () => ({ data: [{ _id: 'p1', ProjectName: 'Budget ops' }] }) } }
+        projectData: { namespaced: true, getters: { projects: () => ({ data: projects }), allProjects: () => ({ data: projects }) } },
+        settings: { namespaced: true, getters: { companyUserDetail: () => ({ roleType }), teams: () => teams } }
     }
 });
 
 const mounted = [];
-const mountPalette = async () => {
+const mountPalette = async (session) => {
     const wrapper = mount(CommandPalette, {
         props: { open: true },
         attachTo: document.body,
-        global: { plugins: [store()], stubs: { ShellIcon: true, teleport: true } }
+        global: { plugins: [store(session)], stubs: { ShellIcon: true, teleport: true } }
     });
     mounted.push(wrapper);
     await flushPromises();
@@ -434,6 +436,70 @@ describe('the "New project" command', () => {
     it('does not use the command\'s own words as the name', async () => {
         await runNewProject('new proj');
         expect(router.push).toHaveBeenCalledWith({ name: 'Projects', params: { cid: 'company-1' }, query: { create: 'project', name: undefined } });
+    });
+});
+
+describe('the "New doc" command', () => {
+    const OPEN_PROJECT = { _id: 'p1', ProjectName: 'Budget ops', isPrivateSpace: false, AssigneeUserId: [] };
+    const PRIVATE_PROJECT = { _id: 'p2', ProjectName: 'Board only', isPrivateSpace: true, AssigneeUserId: ['user-9', 'tId_team-1'] };
+    const projects = [OPEN_PROJECT, PRIVATE_PROJECT];
+    const created = () => apiRequest.mock.calls.filter(([type, url]) => type === 'post' && url === '/api/v2/pages').map(([, , body]) => body);
+    const showProject = (id) => {
+        routeRef.current = reactive({ name: 'ProjectSprint', path: `/company-1/project/${id}/s1`, params: { cid: 'company-1', id, sprintId: 's1' }, query: {} });
+    };
+    const offered = async (session) => {
+        const wrapper = await mountPalette({ projects, ...session });
+        await typeQuery(wrapper, 'new doc');
+        return wrapper;
+    };
+    const runNewDoc = async (session) => {
+        const wrapper = await offered(session);
+        expect(activeOption(wrapper).attributes('data-kind')).toBe('command');
+        expect(activeOption(wrapper).text()).toContain('Docs.new_doc');
+        await key(wrapper, { key: 'Enter' });
+        await flushPromises();
+        return wrapper;
+    };
+
+    beforeEach(() => {
+        apiRequest.mockImplementation((type, url) => (type === 'post' && url === '/api/v2/pages' ? ok({ _id: 'd9' }) : respond(type, url)));
+    });
+
+    it('makes a workspace doc outside a project and opens it', async () => {
+        const wrapper = await runNewDoc();
+        expect(created()).toEqual([{ title: 'Docs.untitled' }]);
+        expect(router.push).toHaveBeenCalledWith({ name: 'PageEditor', params: { cid: 'company-1', pageId: 'd9' } });
+        expect(wrapper.emitted('close')).toBeTruthy();
+    });
+
+    it('makes the doc in the project the page is showing', async () => {
+        showProject('p1');
+        await runNewDoc();
+        expect(created()).toEqual([{ title: 'Docs.untitled', projectId: 'p1' }]);
+        expect(router.push).toHaveBeenCalledWith({ name: 'PageEditor', params: { cid: 'company-1', pageId: 'd9' } });
+    });
+
+    it('is not offered in a private project the person is not on', async () => {
+        showProject('p2');
+        const wrapper = await offered();
+        expect(options(wrapper).some((option) => option.text().includes('Docs.new_doc'))).toBe(false);
+    });
+
+    it('is offered in a private project to its team and to an admin', async () => {
+        showProject('p2');
+        await runNewDoc({ teams: [{ _id: 'team-1', assigneeUsersArray: ['user-1'] }] });
+        mounted.splice(0).forEach((w) => w.unmount());
+        await runNewDoc({ roleType: 2 });
+        expect(created()).toEqual([{ title: 'Docs.untitled', projectId: 'p2' }, { title: 'Docs.untitled', projectId: 'p2' }]);
+    });
+
+    it('says so, and stays put, when the server refuses', async () => {
+        apiRequest.mockImplementation((type, url) => (type === 'post' && url === '/api/v2/pages'
+            ? Promise.resolve({ data: { status: false, statusText: 'Project not found.' } })
+            : respond(type, url)));
+        await runNewDoc();
+        expect(toast.error).toHaveBeenCalledWith('Project not found.', { position: 'top-right' });
+        expect(router.push).not.toHaveBeenCalled();
     });
 });
 
