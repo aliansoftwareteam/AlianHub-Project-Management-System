@@ -1,6 +1,11 @@
 <template>
     <div class="list-head-right">
         <ul class="d-flex align-items-center m-0">
+            <li v-if="clientWidth > 767 && canAutomate" class="mr-10px">
+                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="project-automate" :title="$t('Projects.automate_title')" @click="openAutomate">
+                    <ShellIcon name="automations" :size="14" />{{ $t('Projects.automate') }}
+                </button>
+            </li>
             <li v-if="clientWidth > 767">
                 <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :aria-label="$t('Projects.files_links')" :title="$t('Projects.files_links')" @click="$emit('openSidebar', 'filesLinks')">
                     <img id="projectviewfiles_driver" :src="fileLinks" alt="" aria-hidden="true"/>
@@ -92,6 +97,14 @@
                                     </div>
                                 </DropDownOption>
                             </template>
+                            <DropDownOption v-if="clientWidth <= 767 && canAutomate" data-test="project-automate-menu" @click="openAutomate">
+                                <div class="d-flex align-items-center project-mobile-desc avtar-options project_detail_dropdown_wrapper">
+                                    <div class="d-flex align-items-center mr-20px">
+                                        <ShellIcon name="automations" :size="18" />
+                                    </div>
+                                    <span class="font-size-16 font-weight-400 gray4b">{{ $t('Projects.automate') }}</span>
+                                </div>
+                            </DropDownOption>
                             <DropDownOption @click="$emit('openPermissionSidebar')" v-if="checkPermission('settings.settings_security_permissions') !== null">
                                 <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
                                     <div class="d-flex align-items-center">
@@ -142,6 +155,9 @@
 
 <script setup>
 import { computed, defineProps, defineEmits } from 'vue';
+import { useStore } from 'vuex';
+import { useRoute, useRouter } from 'vue-router';
+import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
 import Assignee from '@/components/molecules/Assignee/Assignee.vue';
@@ -158,6 +174,17 @@ const props = defineProps({
 });
 
 const watcherCount = computed(() => Object.keys(props.projectData?.watchers || {}).length);
+
+const { getters } = useStore();
+const route = useRoute();
+const router = useRouter();
+/* The same owner-or-admin check the automations page and the server apply. */
+const canAutomate = computed(() => [1, 2].includes(Number(getters['settings/companyUserDetail']?.roleType)));
+const openAutomate = () => router.push({
+    name: 'Automations',
+    params: { cid: route.params.cid },
+    query: { templates: '1', project: String(props.projectData._id) },
+});
 
 defineEmits(['openSidebar', 'openWatcher', 'changeAssignee', 'openPermissionSidebar', 'startEditName', 'openColorAvatar', 'archiveProject']);
 

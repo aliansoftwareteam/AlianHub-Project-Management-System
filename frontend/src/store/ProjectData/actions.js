@@ -1,5 +1,6 @@
 import * as env from '@/config/env';
 import { apiRequest } from '../../services/index'
+import { tableSortStages } from '@/views/Projects/composables/customFieldQuery';
 /**
  * This function is used to get all the projects from MongoDB and add into the Vuex project store.
  * @param {*} state 
@@ -363,9 +364,7 @@ export const setTableTasksFromTypesense = ({ state, commit }, payload) => {
                         ],
                     },
                 },
-                {
-                    $sort: sortKey ? { [sortKey.split(':')[0]]: Number(sortKey.split(':')[1]),_id:1 } : item?.indexName ? {[item.indexName]: 1} : {createdAt:1}, // Sort all records
-                },
+                ...(sortKey ? tableSortStages(sortKey) : [{ $sort: item?.indexName ? { [item.indexName]: 1 } : { createdAt: 1 } }]),
                 {
                     $skip: skip,
                 },

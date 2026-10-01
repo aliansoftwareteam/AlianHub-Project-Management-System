@@ -23,5 +23,9 @@ export const renderNotice = (it, { t, changeText }) => {
         const task = [clip(data.taskKey, 40), clip(data.taskName)].filter(Boolean).join(" ");
         return escapeHtml(t("Inbox.agent_session_assigned", { agent: clip(data.clientName), task }));
     }
+    if (it.changeType === "doc_mention") {
+        const doc = escapeHtml(t("Inbox.doc_mention", { doc: clip(data.pageTitle) || t("Docs.untitled") }));
+        return it.message ? `${doc}: ${escapeHtml(it.message)}` : doc;
+    }
     return changeText(notificationHtml(it.message || ""));
 };

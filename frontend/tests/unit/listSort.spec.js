@@ -45,8 +45,8 @@ const ids = (rows) => rows.map((row) => row._id);
 const sorted = (key, dir) => ids(sortTasks(tasks, { key, dir }, { priorities, statuses }));
 
 describe('sortTasks', () => {
-    test('offers manual, due, priority, created, updated, name and status', () => {
-        expect(SORT_KEYS).toEqual(['manual', 'due', 'priority', 'created', 'updated', 'name', 'status']);
+    test('offers manual, due, priority, created, updated, name, status, assignee, points and estimate', () => {
+        expect(SORT_KEYS).toEqual(['manual', 'due', 'priority', 'created', 'updated', 'name', 'status', 'assignee', 'points', 'estimate']);
     });
 
     test('manual keeps the drag order and is the default', () => {

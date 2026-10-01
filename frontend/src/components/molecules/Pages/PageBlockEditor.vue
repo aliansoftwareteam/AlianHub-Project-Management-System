@@ -1,14 +1,32 @@
 <template>
-    <div class="pbe">
-        <div :id="holderId" class="pbe__holder"></div>
+    <div class="pbe" @scroll="closeMention">
+        <div
+            :id="holderId"
+            class="pbe__holder"
+            @input="onEditorInput"
+            @keydown.capture="onEditorKeydown"
+            @keyup="onEditorKeyup"
+            @click="onEditorClick"
+        ></div>
         <AiSelectionPanel ref="selectionPanel" :editor="currentEditor" :target="selectionTarget" @changed="emitChange" />
+        <Teleport to="body">
+            <DocMentionPicker
+                v-if="mention.open"
+                :query="mention.query"
+                :position="mention"
+                :sources="mentionSources"
+                @ready="mentionPicker = $event"
+                @pick="insertMention"
+                @close="closeMention"
+            />
+        </Teleport>
     </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import { useStore } from 'vuex';
 import EditorJS from '@editorjs/editorjs';
 import HeaderTool from '@editorjs/header';
@@ -29,6 +47,8 @@ import { createSelectionTools } from '@/components/molecules/AiSelection/selecti
 import { listsOfProject } from '@/utils/aiTargets';
 import { createBlockTools, TASK_LIST_LIMIT } from './blockTools';
 import { initials } from './docsFormat';
+import { decorateMentions, mentionElement, mentionQueryAt } from './docMentions';
+import { useMentionLinks } from './useMentionLinks';
 
 const { contentToEditorData, blocksToHtml, emptyEditorData } = pageContent.default || pageContent;
 
@@ -36,16 +56,17 @@ defineOptions({ name: 'PageBlockEditor' });
 
 const { t } = useI18n();
 const route = useRoute();
-const router = useRouter();
 const store = useStore();
 const { getUser } = useGetterFunctions();
-const { checkPermission } = useCustomComposable();
+const { checkPermission, checkBucketStorage, getWasabiImageLink } = useCustomComposable();
 
 const props = defineProps({
     seed: { type: Object, default: null },
     editorKey: { type: String, default: 'page' },
     readOnly: { type: Boolean, default: false },
     projectId: { type: String, default: '' },
+    pageId: { type: String, default: '' },
+    beforeLeave: { type: Function, default: () => true },
 });
 
 const emit = defineEmits(['change', 'ready']);
@@ -55,6 +76,10 @@ const editor = ref(null);
 
 const TASK_FIELDS = { TaskName: 1, TaskKey: 1, statusKey: 1, status: 1, AssigneeUserId: 1, ProjectID: 1, sprintId: 1 };
 const liveFilter = { deletedStatusKey: { $in: [0, undefined] } };
+const UPLOAD_REFUSALS = { 400: 'Docs.image_type_refused', 413: 'Docs.image_too_large' };
+const ACTIVE_SEAT = 2;
+
+const { onMentionClick, onMentionKeydown, routeToTask, fetchTask } = useMentionLinks({ beforeLeave: () => props.beforeLeave() });
 
 function projects() {
     const all = store.getters['projectData/allProjects'];
@@ -88,11 +113,7 @@ const toolContext = {
             : statusType === 'open' ? { 'status.type': { $ne: 'close' } } : {};
         return findTasks({ ProjectID: { objId: { $in: [projectId] } }, ...liveFilter, ...byStatus }, TASK_LIST_LIMIT);
     },
-    fetchTask(taskId) {
-        return apiRequest('get', `${env.TASK}/${taskId}`)
-            .then((response) => (response && response.status === 200 && response.data && response.data._id ? response.data : null))
-            .catch(() => null);
-    },
+    fetchTask,
     statusOf(task) {
         if (!task) return null;
         const project = projects().find((p) => String(p._id) === String(task.ProjectID));
@@ -107,16 +128,170 @@ const toolContext = {
         if (!user || user.ghostUser) return null;
         return { name: user.Employee_Name, image: user.Employee_profileImageURL, initials: initials(user.Employee_Name) };
     },
-    openTask(task) {
-        if (!task || !task._id) return;
-        const params = { cid: route.params.cid, id: String(task.ProjectID), taskId: String(task._id) };
-        if (task.sprintId) {
-            router.push({ name: 'ProjectSprintTask', params: { ...params, sprintId: String(task.sprintId) }, query: { detailTab: 'task-detail-tab' } });
-        } else {
-            router.push({ name: 'Project', params: { cid: params.cid, id: params.id } });
-        }
+    openTask: routeToTask,
+    uploadImage(file) {
+        const form = new FormData();
+        form.append('file', file);
+        return apiRequest('post', `${env.PAGES}/${props.pageId}/images`, form, 'form').then((response) => {
+            const body = response && response.data;
+            if (body && body.status && body.data && body.data.key) return body.data.key;
+            throw Object.assign(new Error('image upload refused'), { i18nKey: UPLOAD_REFUSALS[body && body.statusCode] });
+        });
+    },
+    imageUrl(key) {
+        return getWasabiImageLink(route.params.cid, key);
+    },
+    canStoreImage(file) {
+        return Boolean(props.pageId) && checkBucketStorage([file.size], { gettersVal: store.getters }) === true;
+    },
+    openMentionPicker(range, query) {
+        if (query.trim()) openMention(range, query, true);
     },
 };
+
+const labelOf = (id) => (toolContext.userOf(id) || {}).name || '';
+const decorate = () => decorateMentions(document.getElementById(holderId), { labelOf });
+
+let docIndex = null;
+const mentionSources = {
+    people(query) {
+        const wanted = query.trim().toLowerCase();
+        return (store.getters['settings/companyUsers'] || [])
+            .filter((seat) => seat && seat.userId && seat.isDelete !== true && (seat.status === undefined || Number(seat.status) === ACTIVE_SEAT) && !seat.isAgent && !seat.isBot)
+            .map((seat) => ({ id: String(seat.userId), user: toolContext.userOf(seat.userId) }))
+            .filter(({ user }) => user && (!wanted || user.name.toLowerCase().includes(wanted)))
+            .map(({ id, user }) => ({ type: 'user', id, label: user.name, image: user.image, initials: user.initials }));
+    },
+    async docs(query) {
+        if (!docIndex) {
+            docIndex = apiRequest('get', `${env.PAGES}?scope=all`)
+                .then((response) => (response.data && response.data.status && Array.isArray(response.data.data) ? response.data.data : []))
+                .catch(() => { docIndex = null; return []; });
+        }
+        const wanted = query.trim().toLowerCase();
+        return (await docIndex)
+            .filter((page) => String(page._id) !== props.pageId && (!wanted || String(page.title || '').toLowerCase().includes(wanted)))
+            .map((page) => ({ type: 'doc', id: String(page._id), label: page.title || t('Docs.untitled') }));
+    },
+    async tasks(query) {
+        return (await toolContext.searchTasks(query, ''))
+            .map((task) => ({ type: 'task', id: String(task._id), label: [task.TaskKey, task.TaskName].filter(Boolean).join(' '), meta: task.TaskKey || '' }));
+    },
+};
+
+const DocMentionPicker = defineAsyncComponent(() => import('./DocMentionPicker.vue'));
+const mention = reactive({ open: false, query: '', top: 0, left: 0, fromSelection: false });
+const mentionPicker = shallowRef(null);
+const PICKER_GAP = 6;
+const PICKER_HEIGHT = 320;
+const PICKER_WIDTH = 320;
+const EDGE = 8;
+const CARET_KEYS = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+let mentionRange = null;
+
+function placePicker(range) {
+    const rect = range.getBoundingClientRect();
+    const width = Math.min(PICKER_WIDTH, window.innerWidth - EDGE * 2);
+    mention.left = Math.max(EDGE, Math.min(rect.left, window.innerWidth - width - EDGE));
+    const fitsBelow = rect.bottom + PICKER_GAP + PICKER_HEIGHT <= window.innerHeight;
+    mention.top = fitsBelow || rect.top < PICKER_HEIGHT ? rect.bottom + PICKER_GAP : rect.top - PICKER_GAP - PICKER_HEIGHT;
+}
+
+function openMention(range, query, fromSelection = false) {
+    mentionRange = range;
+    mention.query = query;
+    mention.fromSelection = fromSelection;
+    placePicker(range);
+    mention.open = true;
+}
+
+function closeMention() {
+    mention.open = false;
+    mentionPicker.value = null;
+    mentionRange = null;
+}
+
+function caretText() {
+    const selection = window.getSelection();
+    const holder = document.getElementById(holderId);
+    if (!holder || !selection || !selection.rangeCount || !selection.isCollapsed) return null;
+    const node = selection.anchorNode;
+    if (!node || node.nodeType !== Node.TEXT_NODE || !holder.contains(node)) return null;
+    const parent = node.parentElement;
+    if (!parent || !parent.closest('[contenteditable="true"]') || parent.closest('.mention, .pb-image, .pb-picker')) return null;
+    return { node, offset: selection.anchorOffset };
+}
+
+function onEditorInput() {
+    if (props.readOnly) return;
+    const at = caretText();
+    const query = at ? mentionQueryAt(at.node.textContent.slice(0, at.offset)) : null;
+    if (query === null) {
+        closeMention();
+        return;
+    }
+    const range = document.createRange();
+    range.setStart(at.node, at.offset - query.length - 1);
+    range.setEnd(at.node, at.offset);
+    openMention(range, query);
+}
+
+function onEditorKeyup(event) {
+    if (mention.open && !mention.fromSelection && CARET_KEYS.includes(event.key)) onEditorInput();
+}
+
+function onEditorKeydown(event) {
+    if (!mention.open) {
+        onMentionKeydown(event);
+        return;
+    }
+    const picker = mentionPicker.value;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        if (picker) picker.move(event.key === 'ArrowDown' ? 1 : -1);
+    } else if ((event.key === 'Enter' || event.key === 'Tab') && !event.isComposing) {
+        if (!picker || !picker.choose()) {
+            closeMention();
+            return;
+        }
+    } else if (event.key === 'Escape') {
+        closeMention();
+    } else {
+        return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+}
+
+function onEditorClick(event) {
+    if (onMentionClick(event)) return;
+    if (mention.open && !mention.fromSelection) onEditorInput();
+}
+
+function onOutsidePointer(event) {
+    if (!mention.open) return;
+    const holder = document.getElementById(holderId);
+    if (holder && holder.contains(event.target)) return;
+    if (event.target.closest && event.target.closest('.dmp, .ce-inline-toolbar')) return;
+    closeMention();
+}
+
+function insertMention(item) {
+    const range = mentionRange;
+    closeMention();
+    if (!range || props.readOnly) return;
+    const node = mentionElement(item);
+    const space = document.createTextNode('\u00a0');
+    range.deleteContents();
+    range.insertNode(space);
+    range.insertNode(node);
+    decorate();
+    const caret = document.createRange();
+    caret.setStart(space, 1);
+    caret.collapse(true);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(caret);
+}
 
 const tools = {
     header: { class: HeaderTool, inlineToolbar: true, config: { levels: [1, 2, 3], defaultLevel: 2 } },
@@ -150,6 +325,7 @@ function seedData() {
 
 async function emitChange() {
     if (!editor.value) return;
+    decorate();
     const data = await editor.value.save();
     emit('change', { blocks: data, html: blocksToHtml(data) });
 }
@@ -163,7 +339,10 @@ function initEditor() {
         placeholder: t('Docs.slash_hint'),
         minHeight: 200,
         onChange: () => { emitChange(); },
-        onReady: () => { emit('ready'); },
+        onReady: () => {
+            decorate();
+            emit('ready');
+        },
     });
 }
 
@@ -196,7 +375,10 @@ function scrollToBlock(blockId) {
 
 defineExpose({ applyBlocks, restore, emitChange, scrollToBlock });
 
-onMounted(initEditor);
+onMounted(() => {
+    initEditor();
+    document.addEventListener('mousedown', onOutsidePointer, true);
+});
 
 watch(() => props.editorKey, async () => {
     if (editor.value && editor.value.destroy) {
@@ -207,6 +389,8 @@ watch(() => props.editorKey, async () => {
 });
 
 onBeforeUnmount(() => {
+    document.removeEventListener('mousedown', onOutsidePointer, true);
+    closeMention();
     if (editor.value && editor.value.destroy) {
         editor.value.destroy();
         editor.value = null;
@@ -325,6 +509,22 @@ onBeforeUnmount(() => {
 .pbe :deep(.pb-image img) { max-width: 100%; border-radius: var(--r-input); display: block; }
 .pbe :deep(.pb-image__caption) { font: var(--text-small); color: var(--ink-2); margin-top: 6px; outline: none; }
 .pbe :deep(.pb-image__form) { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px dashed var(--border); border-radius: var(--r-input); background: var(--surface-2); }
+.pbe :deep(.pb-image__form.is-over) { border-color: var(--brand); background: var(--brand-tint); }
+.pbe :deep(.pb-image__row) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pbe :deep(.pb-image__row .ah-input) { flex: 1 1 180px; min-width: 0; }
+.pbe :deep(.pb-image__file) { display: none; }
+.pbe :deep(.pb-image__busy) { font: var(--text-small); color: var(--ink-2); }
+.pbe :deep(.pb-image__error) { font: var(--text-small); color: var(--danger-ink); }
+
+.pbe :deep(.mention) {
+    padding: 0 3px; border-radius: 4px;
+    background: var(--brand-tint); color: var(--brand);
+    font-weight: 500; overflow-wrap: anywhere; box-decoration-break: clone; -webkit-box-decoration-break: clone;
+}
+.pbe :deep(.mention[role="link"]) { cursor: pointer; }
+.pbe :deep(.mention[role="link"]:hover) { text-decoration: underline; }
+.pbe :deep(.mention[role="link"]:focus-visible) { outline: none; box-shadow: var(--focus); }
+.pbe :deep(.pb-mention-tool) { font: 600 13px var(--font-ui); color: var(--ink); }
 
 .pbe :deep(.pb-picker) { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 10px; background: var(--surface-2); margin: 6px 0; }
 .pbe :deep(.pb-picker__head) { display: flex; align-items: center; gap: 10px; }

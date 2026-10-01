@@ -153,7 +153,9 @@
     color: var(--brand);
 }
 
+/* The column scrolls: a card that shrank to fit would spill its content over the next card. */
 .kanban-board .kanban-card {
+    flex-shrink: 0;
     background: var(--surface);
     padding: 10px 12px;
     border-radius: 10px;

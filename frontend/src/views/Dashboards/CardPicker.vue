@@ -1,9 +1,9 @@
 <template>
-    <div class="dpick" role="dialog" aria-modal="true" :aria-label="$t('Dash.add_card')" @click.self="$emit('close')">
+    <div class="dpick" role="dialog" aria-modal="true" :aria-label="$t('Dash.add_card')" @click.self="$emit('close')" @keydown.esc.stop="$emit('close')">
         <div class="dpick__panel">
             <header class="dpick__head">
                 <h2 class="ah-h2">{{ $t('Dash.add_card') }}</h2>
-                <p class="dpick__lede">{{ $t('Dash.picker_lede', { built: builtCount, total: totalCount }) }}</p>
+                <p class="dpick__lede">{{ $t(ledeKey, { built: builtCount, total: totalCount }) }}</p>
                 <input
                     ref="searchInput"
                     v-model="search"
@@ -17,7 +17,7 @@
             </header>
 
             <div class="dpick__body ah-scroll">
-                <section v-for="family in families" :key="family.id" class="dpick__family">
+                <section v-for="family in groups" :key="family.id" class="dpick__family">
                     <div class="dpick__family-head">
                         <span class="ah-label">{{ $t(family.labelKey) }}</span>
                         <span class="dpick__question">{{ $t(family.questionKey) }}</span>
@@ -33,8 +33,9 @@
                             <p class="dpick__card-answer">{{ $t(entry.answerKey) }}</p>
                             <div class="dpick__card-foot">
                                 <span class="ah-chip ah-chip--mono">{{ $t(entry.scopeKey) }}</span>
+                                <span v-if="entry.built && !repeatable && added.includes(entry.key)" class="ah-chip dpick__soon" data-test="picker-added">{{ $t('Dash.on_already') }}</span>
                                 <button
-                                    v-if="entry.built"
+                                    v-else-if="entry.built"
                                     type="button"
                                     class="ah-btn ah-btn--outline ah-btn--sm dpick__add"
                                     @click="$emit('add', entry)"
@@ -45,10 +46,10 @@
                     </div>
                 </section>
 
-                <p v-if="!families.length" class="ah-empty dpick__none">{{ $t('Dash.no_cards_match', { q: search }) }}</p>
+                <p v-if="!groups.length" class="ah-empty dpick__none">{{ $t('Dash.no_cards_match', { q: search }) }}</p>
             </div>
 
-            <footer class="dpick__foot">{{ $t('Dash.picker_footer') }}</footer>
+            <footer class="dpick__foot">{{ $t(footerKey) }}</footer>
         </div>
     </div>
 </template>
@@ -61,8 +62,13 @@ import { CARD_FAMILIES, CARD_CATALOG } from '@/plugins/dashboard/cardCatalog';
 
 defineOptions({ name: 'CardPicker' });
 
-defineProps({
+const props = defineProps({
     added: { type: Array, default: () => [] },
+    entries: { type: Array, default: () => CARD_CATALOG },
+    families: { type: Array, default: () => CARD_FAMILIES },
+    repeatable: { type: Boolean, default: true },
+    ledeKey: { type: String, default: 'Dash.picker_lede' },
+    footerKey: { type: String, default: 'Dash.picker_footer' },
 });
 defineEmits(['add', 'close']);
 
@@ -70,8 +76,8 @@ const { t } = useI18n();
 const search = ref('');
 const searchInput = ref(null);
 
-const totalCount = CARD_CATALOG.length;
-const builtCount = CARD_CATALOG.filter((c) => c.built).length;
+const totalCount = computed(() => props.entries.length);
+const builtCount = computed(() => props.entries.filter((c) => c.built).length);
 
 const matches = (entry) => {
     const q = search.value.trim().toLowerCase();
@@ -79,8 +85,8 @@ const matches = (entry) => {
     return `${t(entry.titleKey)} ${t(entry.answerKey)}`.toLowerCase().includes(q);
 };
 
-const families = computed(() => CARD_FAMILIES
-    .map((f) => ({ ...f, cards: CARD_CATALOG.filter((c) => c.family === f.id && matches(c)) }))
+const groups = computed(() => props.families
+    .map((f) => ({ ...f, cards: props.entries.filter((c) => c.family === f.id && matches(c)) }))
     .filter((f) => f.cards.length));
 
 onMounted(() => searchInput.value && searchInput.value.focus());

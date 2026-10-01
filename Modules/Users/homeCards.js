@@ -20,8 +20,8 @@ exports.updateOwnHomeCards = async (req, res) => {
         if (!updated) return refuse(res, 404, "User not found");
         removeCache(`UserData:${req.uid}`);
         removeCache("UserAllData:", true);
-        const hidden = JSON.parse(JSON.stringify((updated.homeCards && updated.homeCards.hidden) || []));
-        return res.status(200).json({ status: true, statusText: "Home cards saved", data: { hidden } });
+        const stored = JSON.parse(JSON.stringify((updated.homeCards && updated.homeCards[checked.field]) || []));
+        return res.status(200).json({ status: true, statusText: "Home cards saved", data: { [checked.field]: stored } });
     } catch (error) {
         logger.error(`updateOwnHomeCards: ${error.message || error}`);
         return refuse(res, 400, "Home cards not saved");

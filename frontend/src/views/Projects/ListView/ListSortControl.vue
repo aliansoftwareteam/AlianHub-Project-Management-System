@@ -1,25 +1,25 @@
 <template>
     <span ref="root" class="lvs" @click.stop>
-        <span v-if="sorted" class="lvs__hint">{{ $t('List.sort_drag_off') }}</span>
+        <span v-if="sorted && dragNote" class="lvs__hint">{{ $t('List.sort_drag_off') }}</span>
         <button
             ref="trigger"
             type="button"
             class="lvs__trigger"
             :class="{ 'is-on': sorted }"
-            :title="sorted ? $t('List.sort_drag_off') : $t('List.sort_title')"
+            :title="sorted && dragNote ? $t('List.sort_drag_off') : $t('List.sort_title')"
             aria-haspopup="dialog"
             :aria-expanded="open ? 'true' : 'false'"
             @click="toggle"
         >
             <span class="lvs__glyph" aria-hidden="true">⇅</span>
-            <span>{{ sorted ? `${$t(`List.sort_${sort.key}`)} ${sort.dir === 'desc' ? '↓' : '↑'}` : $t('List.sort') }}</span>
+            <span>{{ sorted ? `${labelOf(current)} ${sort.dir === 'desc' ? '↓' : '↑'}` : $t('List.sort') }}</span>
         </button>
         <div v-if="open" ref="panel" class="lvs__panel" role="dialog" :aria-label="$t('List.sort_title')" @keydown.esc.stop.prevent="close(true)">
             <fieldset class="lvs__set">
                 <legend class="lvs__legend">{{ $t('List.sort_title') }}</legend>
-                <label v-for="key in SORT_KEYS" :key="key" class="lvs__option">
-                    <input type="radio" name="lvs-key" :value="key" :checked="sort.key === key" @change="$emit('key', key)" />
-                    <span>{{ $t(`List.sort_${key}`) }}</span>
+                <label v-for="choice in choices" :key="choice.key" class="lvs__option">
+                    <input type="radio" name="lvs-key" :value="choice.key" :checked="sort.key === choice.key" @change="$emit('key', choice.key)" />
+                    <span class="lvs__label">{{ labelOf(choice) }}</span>
                 </label>
             </fieldset>
             <fieldset v-if="sorted" class="lvs__set">
@@ -35,12 +35,15 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref } from "vue";
-import { SORT_KEYS } from "@/views/Projects/composables/viewSort";
+import { useI18n } from "vue-i18n";
+import { sortChoices } from "@/views/Projects/composables/viewSort";
 
 defineOptions({ name: "ListSortControl" });
 
 const props = defineProps({
-    sort: { type: Object, required: true }
+    sort: { type: Object, required: true },
+    options: { type: Array, default: () => [] },
+    dragNote: { type: Boolean, default: true }
 });
 defineEmits(["key", "dir"]);
 
@@ -48,7 +51,11 @@ const open = ref(false);
 const root = ref(null);
 const trigger = ref(null);
 const panel = ref(null);
+const { t } = useI18n();
 const sorted = computed(() => props.sort.key !== "manual");
+const choices = computed(() => (props.options.length ? props.options : sortChoices()));
+const current = computed(() => choices.value.find((choice) => choice.key === props.sort.key) || { labelKey: String(props.sort.key).startsWith("cf:") ? "List.sort_fields" : `List.sort_${props.sort.key}` });
+const labelOf = (choice) => (choice.labelKey ? t(choice.labelKey) : choice.label);
 
 function onOutside(event) {
     if (root.value && !root.value.contains(event.target)) close(false);
@@ -101,7 +108,8 @@ onBeforeUnmount(() => document.removeEventListener("mousedown", onOutside, true)
 .lvs__legend { margin: 0 0 4px; padding: 0; font: var(--text-label); color: var(--ink-label); text-transform: uppercase; letter-spacing: .06em; }
 .lvs__option { display: flex; align-items: center; gap: 8px; margin: 0; padding: 4px 2px; border-radius: 6px; cursor: pointer; }
 .lvs__option:hover { background: var(--surface-hover); }
-.lvs__option input { accent-color: var(--brand); margin: 0; }
+.lvs__option input { accent-color: var(--brand); margin: 0; flex: none; }
+.lvs__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lvs__option input:focus-visible { outline: none; box-shadow: var(--focus); }
 .lv2--sorted .lv2__grip { visibility: hidden; }
 

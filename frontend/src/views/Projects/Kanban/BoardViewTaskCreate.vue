@@ -175,7 +175,7 @@
             default: false
         },
         groupValue: {
-            type: Number,
+            type: [Number, String],
             default: 0
         },
         sprintId: {

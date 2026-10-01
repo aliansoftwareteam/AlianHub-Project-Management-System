@@ -11,7 +11,7 @@ const task = { _id: 't1', TaskKey: 'AR-1', TaskName: 'Build the thing', ProjectI
 describe('the skill registry', () => {
     it('resolves every template skill and alias the wizard offers', () => {
         for (const slug of ['qa-review', 'brief.parse', 'project.plan', 'pr.summary', 'risk.flags', 'digest.ceo', 'risk.today', 'project.guide']) expect(getSkill(slug)).toBeTruthy();
-        expect(ALL.map((s) => s.slug)).toEqual(['qa-review', 'brief.parse', 'pr.summary', 'digest.ceo', 'project.guide']);
+        expect(ALL.map((s) => s.slug)).toEqual(['qa-review', 'brief.parse', 'pr.summary', 'digest.ceo', 'project.guide', 'fields.fill', 'prd.draft', 'wiki.upkeep']);
     });
 });
 
@@ -37,7 +37,7 @@ describe('brief.parse (Intake)', () => {
         expect(skill.systemPrompt).toMatch(/MEMORY.*DATA/);
     });
     it('only the skills that render memory ask for it', () => {
-        expect(ALL.filter((s) => s.usesMemory === false).map((s) => s.slug)).toEqual(['qa-review', 'pr.summary', 'digest.ceo']);
+        expect(ALL.filter((s) => s.usesMemory === false).map((s) => s.slug)).toEqual(['qa-review', 'pr.summary', 'digest.ceo', 'fields.fill', 'wiki.upkeep']);
     });
 });
 

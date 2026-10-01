@@ -11,6 +11,7 @@ import { apiRequest } from '../../services';
 import { isOwnerOrAdmin } from "@/utils/roles";
 import { isFavourite } from "@/composable/favourites";
 import { assigneeCondition, assigneeGroups, dueDateBuckets, dueDateCondition, restoreGroupState, sprintToLoad } from "./taskGroups";
+import { customFieldGroups, customFieldIdOf, customGroupUpdate } from "./composables/customFieldQuery";
 
 const projectsList = ref([]);
 const filterdProjects = ref([]);
@@ -475,7 +476,14 @@ export function useUpdateTasks(project) {
         }
     }
 
+    function updateCustomFieldGroup(task, group) {
+        const updateDetail = customGroupUpdate(group);
+        if (!updateDetail) return Promise.reject(new Error("This group cannot take a dropped task"));
+        return taskClass.updateTaskCustomField({ companyId: companyId.value, taskId: task._id, customFieldId: updateDetail._id, updateDetail, taskObj: task });
+    }
+
     function updateTaskByGroup(task, updateTo, groupType, assigneeType = null ,isUpdateTask = true) {
+        if (customFieldIdOf(groupType)) return updateCustomFieldGroup(task, updateTo).then(() => true);
         return new Promise((resolve, reject) => {
             try {
                 if(groupType === undefined || groupType === null) return reject(new Error(`No group type found`));
@@ -928,6 +936,16 @@ export function taskListHelper() {
                     })
 
                     sprint.items = tmp;
+                })
+            } else if(customFieldIdOf(type)) {
+                indexKey.value = "groupByStatusIndex";
+                const fieldId = customFieldIdOf(type);
+                const def = (getters["settings/finalCustomFields"] || []).find((field) => String(field?._id) === fieldId);
+                arr = customFieldGroups(def, { t });
+
+                sprints.forEach((sprint, index) => {
+                    sprint.isExpanded = false;
+                    sprint.items = arr.map((x, arrIndex) => ({ ...x, key: `${index}_${arrIndex}_${x.searchValue}`, tasksArray: tasks }));
                 })
             } else if(type === 3) {
                 // DUE DATE
