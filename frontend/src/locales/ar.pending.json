@@ -10331,7 +10331,7 @@
     "conformationmsg.delete": "This Project's tasks and templates will all be erased. Type project name to confirm that you really do wish to delete all tasks, templates, and this project.",
     "conformationmsg.no_revert_msg": "You won't able to revert this!",
     "conformationmsg.sprintclosemsg": "Type sprint name to confirm that you really do wish to close this sprint",
-    "conformationmsg.subtasks_will_become_subtasks_of": "Subtasks will become subtasks of",
+    "conformationmsg.subtasks_will_become_subtasks_of": "subtasks stay under it and move with it under",
     "conformationmsg.task_will_become_subtasks_of": "task will become subtasks of",
     "conformationmsg.to_unlock_tracker_timesheet": "To Unlock Tracker Timesheet",
     "conformationmsg.to_unlock_user_timesheet": "To Unlock User TimeSheet",

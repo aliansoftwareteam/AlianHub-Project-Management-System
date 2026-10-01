@@ -85,7 +85,7 @@ exports.init = (app) => {
             })
             .catch((error) => {
                 logger.error(`ERROR bulk ${action}: ${error.message}`);
-                res.send({ status: false, statusText: error.message });
+                sendFailure(res, error);
             });
         } catch (error) {
             logger.error(`ERROR bulk dispatch: ${error.message}`);

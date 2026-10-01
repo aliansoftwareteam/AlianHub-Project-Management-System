@@ -6225,7 +6225,7 @@ export default {
         "yes_delete": "Ναι, διαγράψτε το!",
         "task_will_become_subtasks_of": "Η εργασία θα γίνει υποεργασίες του",
         "Are_you_sure_you_want_to_delete": "Είστε σίγουροι ότι θέλετε να διαγράψετε",
-        "subtasks_will_become_subtasks_of": "Οι υποεργασίες θα γίνουν υποεργασίες του",
+        "subtasks_will_become_subtasks_of": "subtasks stay under it and move with it under",
         "unlock_board_view": "Για να ξεκλειδώσετε την προβολή Πίνακα",
         "unlock_project_detail_view": "Για να ξεκλειδώσετε την προβολή Λεπτομερειών Έργου",
         "unlock_table_view": "Για να ξεκλειδώσετε την προβολή Πίνακα",
