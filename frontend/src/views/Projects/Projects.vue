@@ -234,7 +234,7 @@
                                 <span>{{ $t('importTaskButton.import_processing') }}</span>
                             </div>
                         </div>
-                        <div :class="[`list-view-body bg-light-gray`,(clientWidth <= 767 && activeTab === 'ProjectDetail') ? 'overflow-auto' : '',
+                        <div :class="['list-view-body', activeTab === 'ProjectDetail' ? 'list-view-body--detail' : 'bg-light-gray', (clientWidth <= 767 && activeTab === 'ProjectDetail') ? 'overflow-auto' : '',
                                 {
                                 'd-flex': activeTab !== 'ProjectListView' &&
                                             activeTab !== 'Calendar' &&

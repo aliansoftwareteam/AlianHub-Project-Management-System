@@ -272,17 +272,20 @@ describe('the custom field drawer', () => {
 
 describe('custom fields in the task panel', () => {
     test.each([
-        'plugins/customFieldView/component/molecules/customFieldTaskView/style.css',
         'plugins/customFieldView/component/atom/customFieldTaskView/customFieldListing/style.css',
-        'plugins/customFieldView/component/atom/customFieldTaskView/moduleFieldListing.vue'
+        'plugins/customFieldView/component/atom/customFieldTaskView/moduleFieldListing.vue',
+        'plugins/customFieldView/fieldTypes/PeopleFieldValue.vue',
+        'plugins/customFieldView/fieldTypes/UrlFieldValue.vue'
     ])('%s has no hard-coded colour', (rel) => {
         expect(hardCodedColours(withoutScript(read(rel)))).toEqual([]);
     });
 
-    test('the block is a theme surface at phone width', () => {
+    test('the block is a theme surface at phone width, and its title and dividers take tokens', () => {
         const css = read('plugins/customFieldView/component/molecules/customFieldTaskView/style.css');
         const phone = css.slice(css.indexOf('@media (max-width:767px)'));
         expect(ruleBody(phone, '.custom-field__bg')).toMatch(/background-color:\s*var\(--surface\)/);
+        expect(ruleBody(css, '.custom-field__title')).toMatch(/color:\s*var\(--ink\)/);
+        expect(ruleBody(css, '.phone_pipeline::after')).toMatch(/background:\s*var\(--hairline\)/);
     });
 });
 
