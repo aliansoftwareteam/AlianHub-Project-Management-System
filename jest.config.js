@@ -1,3 +1,6 @@
+const clockShifted = Boolean(process.env.CLOCK_SHIFT_DAYS);
+const clockSkip = clockShifted ? require('./tests/support/clock-skip') : { backend: [] };
+
 const base = {
     testEnvironment: 'node',
     rootDir: __dirname,
@@ -6,7 +9,13 @@ const base = {
 
 module.exports = {
     projects: [
-        { ...base, displayName: 'unit', testMatch: ['<rootDir>/tests/*.test.js'] },
+        {
+            ...base,
+            displayName: 'unit',
+            testMatch: ['<rootDir>/tests/*.test.js'],
+            setupFiles: ['<rootDir>/tests/support/shift-clock.js'],
+            testPathIgnorePatterns: [...base.testPathIgnorePatterns, ...clockSkip.backend]
+        },
         { ...base, displayName: 'conventions', testMatch: ['<rootDir>/tests/conventions/*.test.js'] },
         {
             ...base,

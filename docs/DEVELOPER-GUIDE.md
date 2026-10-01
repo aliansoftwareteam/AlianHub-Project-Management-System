@@ -34,6 +34,8 @@ The backend serves the built SPA from `frontend/dist`; `cd frontend && npm run b
 
 `.github/workflows/ci.yml` runs all of that on every pull request to `beta`, `staging` and `main`, except the screenshot check, which has a workflow of its own. A pull request that only changes files under `Tasks/` or Markdown under `.claude/` skips the suites: nothing they test can have changed. The conventions project is the place for a rule that must hold everywhere: it reads the tree and fails with the offending file, so a new rule needs no per-module wiring.
 
+The `Clock` workflow (`.github/workflows/clock.yml`) runs weekly and on demand, never on pull requests: it runs the backend unit suite (two shards) and the frontend suite with the clock moved forward by 3, 40 and 400 days, which catches code that reads the real clock against test data written with fixed dates, something no test file's text can reveal. `tests/support/shift-clock.js` moves `new Date()` and `Date.now()` by `CLOCK_SHIFT_DAYS` days and leaves explicit dates and timers alone; a failing job names each failing test and its offset in the job summary. To run one offset locally, set the variable: `CLOCK_SHIFT_DAYS=40 npx jest --selectProjects unit tests/some.test.js` or `cd frontend && CLOCK_SHIFT_DAYS=40 npx vitest run tests/some.spec.js`. A test that fails only because a TLS certificate looks expired goes in `tests/support/clock-skip.js` with its reason; any other failure means the test or the code under test should own its clock (pin both the data and the clock, or use the file's fake-timer helper).
+
 The conventions in place:
 
 - `v2-guard` — every `/api/v2/*` prefix is in the JWT guard list of `Config/setMiddleware.js`, public by design, or guards itself.
