@@ -199,7 +199,7 @@ const schema = {
         // Provenance of Done — written only by Modules/Tasks/helpers/completion.js:
         // { workBy: [{ actorId, actorType, agentId?, viaAccount, hours }],
         //   checkedBy: { actorId, actorType:'human', at } | null,
-        //   closedBy:  { actorId, actorType:'human', at } | null,
+        //   closedBy:  { actorId, actorType:'human', at, viaAgent? } | null,
         //   badge: 'HUMAN'|'AGENT'|'MIXED'|'UNCHECKED'|null, reopenCount }
         'completion': {
             type: Object,
@@ -1944,6 +1944,27 @@ const schema = {
         },
         turnCount: { type: Number, required: false, default: 0 },
         lastTurnAt: { type: Date, required: false },
+    },
+    // The answer one viewer got from an Ask card on a dashboard (Modules/AI/askCard). It was built from what userId could
+    // open, so it is only ever read back by userId; cited keeps ids alone and they are re-read under that reader's access.
+    dashboardCardAnswers: {
+        dashboardId: { type: String, required: true },
+        cardUid: { type: String, required: true },
+        userId: { type: String, required: true },
+        question: { type: String, required: true },
+        projectId: { type: String, required: false, default: '' },
+        answer: { type: String, required: false, default: '' },
+        cited: {
+            type: [{
+                _id: false,
+                kind: { type: String, required: true },
+                sourceId: { type: String, required: true },
+                ref: { type: String, required: false, default: '' },
+            }],
+            required: false,
+        },
+        askedAt: { type: Date, required: true },
+        autoAskedAt: { type: Date, required: false },
     },
     // One person's thumbs up or down on an AI answer (Modules/AI/feedback). Never the question; the answer and its
     // cited ids only when the person ticked "include the answer" (shared).

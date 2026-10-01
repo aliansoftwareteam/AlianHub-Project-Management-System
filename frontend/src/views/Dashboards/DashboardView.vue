@@ -260,6 +260,7 @@ const weekRange = () => {
     return { dateFrom: start.toISOString(), dateTo: end.toISOString() };
 };
 provide('dashboardGlobalRange', ref(weekRange()));
+provide('dashboardId', computed(() => String(route.params.dashboardId || '')));
 
 const visibilityLabel = computed(() => t(`Dash.vis_${dashboard.value.visibility || 'private'}`));
 const ownerLine = computed(() => (dashboard.value.isMine

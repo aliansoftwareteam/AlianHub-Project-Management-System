@@ -24,12 +24,12 @@
  * Emits
  *   done   the edit is over, saved or not
  */
-import { defineEmits, defineProps, inject, nextTick, onMounted, ref } from "vue";
+import { defineEmits, defineProps, inject } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { useToast } from "vue-toast-notification";
 import { folderIdOf, parentIdOf } from "@/utils/folderTree";
 import { renameFolder } from "@/views/Projects/folderActions";
+import { useRowRename } from "./useRowRename";
 
 defineOptions({ name: "FolderRenameInput" });
 
@@ -47,60 +47,22 @@ const emit = defineEmits(["done"]);
 
 const { t } = useI18n();
 const store = useStore();
-const $toast = useToast();
 const companyId = inject("$companyId");
-
-const input = ref(null);
-const name = ref(props.folder.name);
-const saving = ref(false);
-let over = false;
-
-const complain = (message) => $toast.error(message, { position: "top-right" });
 
 const taken = (wanted) => props.folders.some((item) => folderIdOf(item) !== props.folder.id
     && Number(item.deletedStatusKey) !== DELETED
     && parentIdOf(item) === String(props.folder.parentFolderId || "")
     && String(item.name || "").toLowerCase() === wanted.toLowerCase());
 
-function finish() {
-    if (over) return;
-    over = true;
-    emit("done");
-}
-
-function cancel() {
-    if (!saving.value) finish();
-}
-
-async function save() {
-    const wanted = name.value.trim();
-    if (wanted === props.folder.name) return finish();
-    if (wanted.length < MIN_LENGTH) return complain(t("Projects.folder_name_short", { n: MIN_LENGTH }));
-    if (taken(wanted)) return complain(t("Toast.Folder_already_exists"));
-
-    saving.value = true;
-    const result = await renameFolder(store, { companyId: companyId?.value, projectId: props.project._id, folderId: props.folder.id, folderName: wanted });
-    saving.value = false;
-    if (!result.ok) {
-        complain(result.message || t("Toast.something_went_wrong"));
-        return nextTick(() => input.value?.focus());
-    }
-    return finish();
-}
-
-function onKeydown(event) {
-    if (event.key === "Enter") {
-        event.preventDefault();
-        save();
-    } else if (event.key === "Escape") {
-        event.preventDefault();
-        finish();
-    }
-}
-
-onMounted(() => {
-    input.value?.focus();
-    input.value?.select();
+const { input, name, saving, cancel, onKeydown } = useRowRename({
+    current: props.folder.name,
+    check: (wanted) => {
+        if (wanted.length < MIN_LENGTH) return t("Projects.folder_name_short", { n: MIN_LENGTH });
+        return taken(wanted) ? t("Toast.Folder_already_exists") : "";
+    },
+    save: (wanted) => renameFolder(store, { companyId: companyId?.value, projectId: props.project._id, folderId: props.folder.id, folderName: wanted }),
+    fallbackMessage: () => t("Toast.something_went_wrong"),
+    done: () => emit("done")
 });
 </script>
 
@@ -112,4 +74,5 @@ onMounted(() => {
 }
 .pt-row__rename:focus { outline: none; box-shadow: var(--focus); }
 .pt-row--l3 .pt-row__rename { margin-left: 30px; }
+.pt-row--l4 .pt-row__rename { margin-left: 44px; }
 </style>

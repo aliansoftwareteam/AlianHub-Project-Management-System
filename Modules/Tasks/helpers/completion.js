@@ -3,7 +3,7 @@
 //   completion: {
 //     workBy:    [{ actorId, actorType: 'human'|'agent', agentId?, viaAccount, hours }],
 //     checkedBy: { actorId, actorType: 'human', at } | null,
-//     closedBy:  { actorId, actorType: 'human', at } | null,   // never an agent
+//     closedBy:  { actorId, actorType: 'human', at, viaAgent? } | null,   // the person; viaAgent when their agent closed it for them
 //     badge:     'HUMAN' | 'AGENT' | 'MIXED' | 'UNCHECKED' | null,
 //     reopenCount
 //   }
@@ -83,8 +83,10 @@ const deriveBadge = (completion) => {
 const isReviewStatus = (name) => REVIEW_STATUS_PATTERN.test(String(name || ''));
 
 /* What a status change does to the record. `actor` is { actorId, actorType }.
- * Returns { completion, error } — error when an agent tries to close, which the
- * registry already forbids; this is the second lock on the same door. */
+ * Returns { completion, error } — error when an agent tries to close on its own, which the
+ * registry already forbids; this is the second lock on the same door. An agent closing for the
+ * person whose grant lets it (`actor.onBehalfOf`) records that person, marked `viaAgent`, and
+ * never counts as a check: the work stays unchecked until a person looks at it. */
 const applyStatusChange = ({ completion, fromStatus, toStatus, actor, now = new Date() }) => {
     const c = normalize(completion);
     const toType = String((toStatus && (toStatus.statusType || toStatus.type)) || '');
@@ -94,10 +96,12 @@ const applyStatusChange = ({ completion, fromStatus, toStatus, actor, now = new 
     const human = actor && actor.actorType !== ACTOR_AGENT && actor.actorId;
     const stamp = () => ({ actorId: String(actor.actorId), actorType: ACTOR_HUMAN, at: now });
 
+    const delegatedBy = !human && actor && actor.actorType === ACTOR_AGENT && actor.onBehalfOf ? String(actor.onBehalfOf) : '';
+
     if (toType === DONE_TYPE) {
-        if (!human) return { completion: c, error: 'Only a person can mark a task Done.' };
-        c.closedBy = stamp();
-        if (!c.checkedBy && isReviewStatus(fromName)) c.checkedBy = stamp();
+        if (!human && !delegatedBy) return { completion: c, error: 'Only a person can mark a task Done.' };
+        c.closedBy = human ? stamp() : { actorId: delegatedBy, actorType: ACTOR_HUMAN, at: now, viaAgent: true };
+        if (human && !c.checkedBy && isReviewStatus(fromName)) c.checkedBy = stamp();
     } else {
         if (fromType === DONE_TYPE) {
             c.closedBy = null;

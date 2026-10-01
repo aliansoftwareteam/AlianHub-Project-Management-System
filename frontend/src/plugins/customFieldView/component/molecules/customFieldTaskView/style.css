@@ -7,10 +7,11 @@
     content: "";
     height: 20px;
     width: 1px;
-    background: #DFE1E6;
+    background: var(--hairline);
     display: block;
     margin: 0 10px;
 }
+/* The search field of the country and currency menus, which are legacy panels that stay white in dark. */
 .customfield__form-control {
     height: 30px;
     max-width: 100%;
@@ -35,7 +36,8 @@
     margin: 0px;
 }
 @media (max-width:767px) {
-    .customfield__form-control {
+    /* The search field of the country and currency menus, which are legacy panels that stay white in dark. */
+.customfield__form-control {
         margin: 0px 0px 15px 0px;
     }
     .custom-field__bg {

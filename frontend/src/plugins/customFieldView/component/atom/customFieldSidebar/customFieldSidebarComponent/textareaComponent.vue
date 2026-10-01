@@ -1,5 +1,5 @@
 <template>
-    <div v-show="tabIndexCheck === 1">
+    <div v-show="tabIndexCheck === 1" data-field-tab="1">
         <CustomFieldInputComponent :label="$t('PlaceHolder.field_label')" :type="'text'" :placeholder="$t('PlaceHolder.Enter_Field_Label')"
             :validations="'required:trim|length:0,25'" :bindValue="props.customFieldObject?.fieldTitle ? props.customFieldObject.fieldTitle : fieldLabel"
             :validationVisibility="'blur'" :className="'custom__field-required'" :name="'fieldTitle'"
@@ -40,7 +40,7 @@
             </template>
         </DropDown>
     </div>
-    <div v-show="tabIndexCheck === 2">
+    <div v-show="tabIndexCheck === 2" data-field-tab="2">
         <CustomFieldInputComponent :type="'checkbox'" :options="entryLimits"
             :bindValue="props.customFieldObject?.fieldEntryLimits ? props.customFieldObject.fieldEntryLimits : entryLimitsToggle"
             :validationVisibility="'blur'" :name="'fieldEntryLimits'" :className="'customCheckbox helpCheckbox'"

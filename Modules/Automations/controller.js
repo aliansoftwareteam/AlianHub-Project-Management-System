@@ -273,7 +273,7 @@ exports.createRuleV2 = async (req, res) => {
         if (!companyId) return refuse(res, 400, 'companyId is required.');
         const people = await assignees.peopleNamedIn([req.body || {}]);
         const check = V2.validateRuleV2(req.body || {}, { people });
-        if (!check.valid) return res.send({ status: false, statusText: check.errors[0], errors: check.errors });
+        if (!check.valid) return res.send({ status: false, statusText: check.errors[0], errors: check.errors, issues: check.issues });
         const denied = await access.refuseRuleWrite({ companyId, uid: req.uid, rule: check.value });
         if (denied) return refuse(res, denied.code, denied.statusText);
         const keyed = await keyedConditions(companyId, req.uid, check.value);
@@ -301,7 +301,7 @@ exports.updateRuleV2 = async (req, res) => {
         if (!companyId) return refuse(res, 400, 'companyId is required.');
         const people = await assignees.peopleNamedIn([req.body || {}]);
         const check = V2.validateRuleV2(req.body || {}, { people });
-        if (!check.valid) return res.send({ status: false, statusText: check.errors[0], errors: check.errors });
+        if (!check.valid) return res.send({ status: false, statusText: check.errors[0], errors: check.errors, issues: check.issues });
         const target = await ruleForWrite(req, res, companyId, check.value);
         if (!target) return undefined;
         const keyed = await keyedConditions(companyId, req.uid, check.value);
@@ -453,7 +453,12 @@ exports.dryRun = async (req, res) => {
         await previewNotices(companyId, task, plan);
         const state = await triggerState.of(companyId, trigger.key, task);
         if (state) plan.trigger = state;
-        return res.send({ status: true, statusText: plan.matched ? 'The rule would run.' : 'The rule would not run.', data: plan });
+        // The conditions can hold on a task the trigger does not reach yet, and then nothing would run.
+        const waiting = plan.matched && Boolean(state) && !state.wouldFire;
+        plan.wouldRun = plan.matched && !waiting;
+        if (waiting) plan.actions.forEach((action) => { action.wouldRun = false; });
+        const outcome = waiting ? 'The rule would not run now.' : (plan.matched ? 'The rule would run.' : 'The rule would not run.');
+        return res.send({ status: true, statusText: outcome, data: plan });
     } catch (e) { logger.error(`dryRun: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
@@ -473,20 +478,22 @@ exports.compileSentence = async (req, res) => {
             const people = await assignees.peopleNamedIn([rule]);
             return res.send({
                 status: true,
-                data: { sentence: sentences.describeRule(rule, { people }), rule, errors: check.errors, ambiguities: [], grammar: sentences.grammar() },
+                data: { sentence: sentences.describeRule(rule, { people }), rule, errors: check.errors, issues: check.issues, parseErrors: [], ambiguities: [], grammar: sentences.grammar() },
             });
         }
         if (!String(sentence || '').trim()) return res.send({ status: false, statusText: 'A sentence is required.' });
         const people = companyId && NAMES_PEOPLE.test(String(sentence)) ? await assignees.activePeople(companyId) : [];
         const statuses = companyId && NAMES_STATUS.test(String(sentence)) ? await visibleStatuses(companyId, req.uid, scope) : [];
         const parsed = sentences.parseSentence(sentence, { name, people, statuses, scope });
-        const check = parsed.rule ? V2.validateRuleV2(parsed.rule, { people }) : { valid: false, errors: [] };
+        const check = parsed.rule ? V2.validateRuleV2(parsed.rule, { people }) : { valid: false, errors: [], issues: [] };
         return res.send({
             status: true,
             data: {
                 sentence: parsed.rule ? sentences.describeRule(parsed.rule, { people }) : String(sentence),
                 rule: parsed.rule,
                 errors: parsed.errors.concat(check.errors || []),
+                issues: check.issues,
+                parseErrors: parsed.errors,
                 ambiguities: parsed.ambiguities,
                 grammar: sentences.grammar(),
             },
