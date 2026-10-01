@@ -127,6 +127,7 @@ const paths = {
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.5"/>',
     screen: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
     film: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/>',
-    wave: '<path d="M4 12h1M8 8v8M12 5v14M16 8v8M20 12h1"/>'
+    wave: '<path d="M4 12h1M8 8v8M12 5v14M16 8v8M20 12h1"/>',
+    target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/>'
 };
 </script>
