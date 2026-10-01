@@ -243,7 +243,7 @@ function formatDate(d) {
 .pshare__card {
     width: 520px; max-width: 100%; max-height: calc(100vh - 96px);
     display: flex; flex-direction: column;
-    background: var(--surface); color: var(--ink);
+    background: var(--surface); color: var(--ink); color-scheme: var(--scheme);
     box-shadow: var(--shadow-modal);
     font: var(--text-body); text-align: left; white-space: normal;
 }

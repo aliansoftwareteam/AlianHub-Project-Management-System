@@ -60,6 +60,20 @@ const parentForNewFolder = async (companyId, projectId, parentFolderId) => {
     return parentIn(companyId, projectId, wanted);
 };
 
+/* A list goes only where people can open it: a live folder of its own project, under a live parent. */
+const folderForList = async (companyId, projectId, folderId) => {
+    if (!OBJECT_ID.test(String(folderId || '')) || !OBJECT_ID.test(String(projectId || ''))) throw new ListWriteError('A valid folder id is required.');
+    const folder = await read(companyId, 'findOne', SCHEMA_TYPE.FOLDERS, { _id: oid(folderId), projectId: oid(projectId) }, FOLDER_FIELDS);
+    if (!folder) throw new ListWriteError('That folder is not in this project.');
+    const parent = folder.parentFolderId
+        ? await read(companyId, 'findOne', SCHEMA_TYPE.FOLDERS, { _id: folder.parentFolderId, projectId: folder.projectId }, FOLDER_FIELDS)
+        : null;
+    if (folder.deletedStatusKey || (folder.parentFolderId && (!parent || parent.deletedStatusKey))) {
+        throw new ListWriteError('An archived or deleted folder cannot take a list.');
+    }
+    return folder;
+};
+
 const prepareFolderMove = async (companyId, folderId, parentFolderId) => {
     if (!OBJECT_ID.test(String(folderId || ''))) throw new ListWriteError('A valid folder id is required.');
     if (parentFolderId === undefined) throw new ListWriteError('A move names the parent folder, or null for the top level.');
@@ -89,4 +103,4 @@ const subfoldersFollowing = async (companyId, folder, { from }) => {
     return (rows || []).map((row) => String(row._id));
 };
 
-module.exports = { folderCascade, parentForNewFolder, prepareFolderMove, refuseRestoreUnderHiddenParent, subfoldersFollowing };
+module.exports = { folderCascade, folderForList, parentForNewFolder, prepareFolderMove, refuseRestoreUnderHiddenParent, subfoldersFollowing };

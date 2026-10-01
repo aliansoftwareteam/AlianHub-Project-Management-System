@@ -9,6 +9,8 @@ import { showUndoToast } from "@/composable/useUndoToast";
 import { sprintOf } from "@/utils/assigneeOptions";
 import { snapshotTasks, undoRequests } from "./bulkUndo.js";
 import { taskMenuRights } from "@/views/Projects/composables/taskMenu";
+import { placedSprint } from "@/views/Projects/composables/taskPlacement";
+import { peopleCarried } from "@/utils/duplicatePeople";
 
 const TOAST = { position: "top-right" };
 const DUPLICATE_PARTS = ["Checklists", "Due Date", "Copy Assignees", "Copy Watchers"];
@@ -130,7 +132,7 @@ export function useListRowMenu(projectSource, showArchived) {
         const task = moving.value;
         moving.value = null;
         if (!task || !destination?._id || !sprint?.id) return Promise.resolve();
-        const payload = { sprintObj: sprint, projectData: projectRef(destination) };
+        const payload = { sprintObj: placedSprint(sprint), projectData: projectRef(destination) };
         return perform({ action: "bulkMove", ...payload }, {
             task,
             message: t("List.row_moved", { project: destination.ProjectName || "" }),
@@ -143,16 +145,17 @@ export function useListRowMenu(projectSource, showArchived) {
         const source = project.value;
         const sprint = sprintOf(source, task) || { ...(task.sprintArray || {}), id: task.sprintId };
         const name = t("List.copy_of", { name: task.TaskName || "" });
+        const place = { project: source, sprint, seats: getters["settings/companyUsers"], teams: getters["settings/teams"], rules: getters["settings/rules"] };
         return perform({
             action: "bulkDuplicate",
-            sprintObj: sprint,
+            sprintObj: placedSprint(sprint),
             projectData: projectRef(source),
             oldProject: { id: source._id, ProjectName: source.ProjectName, taskStatusData: source.taskStatusData, taskTypeCounts: source.taskTypeCounts },
             oldSprintObj: { folderId: task.folderObjId || null, name: task.sprintArray?.name || sprint.name || "", folderName: task.sprintArray?.folderName || "" },
             isSubTask: withSubtasks && Number(task.subTasks || 0) > 0,
             duplicateData: DUPLICATE_PARTS,
-            assignee: task.AssigneeUserId || [],
-            watcher: task.watchers || [],
+            assignee: peopleCarried(task.AssigneeUserId, place),
+            watcher: peopleCarried(task.watchers, place),
             taskName: name
         }, {
             task,

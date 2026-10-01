@@ -248,12 +248,13 @@ onMounted(async () => {
         isLoading.value = true;
 
         try {
-            const needsInitialGrouping = !allProjectTasks.value[project.value._id]?.[props.sprints[0].id];
+            /* The sprint being in the store does not say its columns were read: the Table reads a
+               row's subtasks into it. Each column asks, and one that was read answers at once. */
             await new Promise((resolve) => {
-                groupBy(props.grouped, needsInitialGrouping, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
+                groupBy(props.grouped, true, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
                     internalGroupedTasks.value = resp;
-                    resolve(); 
-                });
+                    resolve();
+                }, { firstPageOnly: true });
             });
 
         } catch (error) {

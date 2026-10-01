@@ -1,8 +1,11 @@
-.projectRightside{
+.projectRightside {
     max-width: 375px;
     width: 100%;
     padding: 14px 15px 15px 15px;
-    border-left: 1px solid #DFE1E6;
+    border-left: 1px solid var(--hairline);
+    background: var(--surface);
+    color: var(--ink);
+    color-scheme: var(--scheme);
 }
 .detailsHead{
     line-height: 21px;
@@ -17,7 +20,7 @@
     width: 38%;
     line-height: 21px;
     font-weight: 500;
-    color: #000000;
+    color: var(--ink);
     margin-bottom: 5px;
     font-family: var(--font-ui);
     font-style: normal;
@@ -45,10 +48,12 @@
     margin-bottom: 5px;
     height: 36px;
     padding: 0 10px;
-    border: 1px solid #E0E0E0;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink);
 }
 .hover__on-projectrightside:hover{
-    background: #DFE1E6;
+    background: var(--fill);
     padding: 8.5px 10px 8.5px 10px !important;
     border-radius: 4px;
 }
@@ -57,12 +62,16 @@
 }
 .nohover__project-rightside:nth-child(2) {
     margin-bottom: 6px !important;
-   
 }
+/* A date field shows its date as the placeholder of a read-only input. */
 .projectRightside .calendar-comp::placeholder{
-    color: #000 !important;
+    color: var(--ink) !important;
     font-size: 13px !important;
 }
+.projectRightside input::placeholder { color: var(--ink-2); }
+/* !important: at phone widths the base .form-control forces its fixed greys with it. */
+.projectRightside .form-control { background: var(--surface); border-color: var(--border); color: var(--ink) !important; }
+.projectRightside .form-control::placeholder { color: var(--ink-2) !important; }
 .hover__on-projectrightside .dp__theme_light {
     line-height: 16px !important;
 }
@@ -79,13 +88,18 @@
 .project-created-by {
     max-width: 150px;
 }
+.projectRightside .skills-select__placeholder { color: var(--ink-2); }
+.projectRightside .skills-select__chip { background: var(--brand-tint); color: var(--brand); }
+@media (min-width: 768px) {
+    .projectRightside__details { padding-bottom: 5px; border-bottom: 1px solid var(--hairline); }
+}
 @media(max-width: 767px){
-    .projectRightside {max-width: 100%;}
-    .project-right-side-label {margin-bottom: 0;height: 50px;border-bottom: 1px solid #DFE1E6;justify-content: space-between;align-items: center;}
+    .projectRightside {max-width: 100%; border-left: 0;}
+    .project-right-side-label {margin-bottom: 0;height: 50px;border-bottom: 1px solid var(--hairline);justify-content: space-between;align-items: center;}
     .projectRightside h4{margin-bottom: 0;}
     .projectRightside .calendar-comp {background-position: calc(100% - 125px);text-align: right;font-size: 16px;}
-    .projectRightside .calendar-comp::placeholder, .projectRightside input#inputId::placeholder{font-size: 16px; color: #000;}
-    .projectRightside .calendar-comp::placeholder{color: #000 !important;font-size: 16px !important;}
+    .projectRightside .calendar-comp::placeholder, .projectRightside input#inputId::placeholder{font-size: 16px; color: var(--ink);}
+    .projectRightside .calendar-comp::placeholder{color: var(--ink) !important;font-size: 16px !important;}
     .hover__on-projectrightside {width: calc(100% - 40%);padding: 5px 0 !important;margin-bottom: 0;height: auto;display: block;align-items: center;justify-content: end;text-align: right;}
     .hover__on-projectrightside:hover{background: none;padding: 0 !important;}
     .nohover__project-rightside:nth-child(2) {margin-bottom: 0 !important; display: flex;justify-content: end;}

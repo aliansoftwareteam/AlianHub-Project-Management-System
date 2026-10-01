@@ -158,13 +158,20 @@
                                 :buttonLabel="priorityName ? $t('List.cell_change', { field: $t('List.priority'), value: priorityName }) : $t('List.cell_set', { field: $t('List.priority') })"
                             />
                         </span>
-                        <span v-if="!isSubTask && element?.subTasks" class="d-flex align-items-center task-count-section" :class="myCounts > 0 ? 'mr-5px' : ''">
-                            <img class="mr-5px" src="@/assets/images/png/subTaskShape.png" />
-                            <span class="font-size-12" :style="{'color': (element.isExpanded && element?.subtaskArray?.length > 0) ? 'var(--brand)' : ''}">
-                                {{(showArchiveVar || searchedTask) ? element?.subtaskArray?.length : element?.subTasks}}
-                            </span>
-                            <span v-if="myParentCounts > 0" class="sub-task-count">{{myParentCounts > 99 ? "+99" : myParentCounts}}</span>
-                        </span>
+                        <button
+                            v-if="subtaskCount"
+                            type="button"
+                            class="task-count-section card-subtasks-toggle"
+                            :class="{ 'card-subtasks-toggle--spaced': myCounts > 0 }"
+                            :aria-expanded="subtasksOpen"
+                            :aria-label="subtaskLabel"
+                            :title="subtaskLabel"
+                            @click.stop="subtaskTree?.toggle(element, itemData)"
+                        >
+                            <img src="@/assets/images/png/subTaskShape.png" alt="" />
+                            <span>{{ subtaskText }}</span>
+                            <span v-if="myParentCounts > 0" class="sub-task-count">{{ myParentCounts > 99 ? "+99" : myParentCounts }}</span>
+                        </button>
                         <button
                             type="button"
                             class="d-flex align-items-center board-task-comment-count position-re cursor-pointer"
@@ -178,6 +185,7 @@
                     </div>
                 </div>
             </div>
+            <BoardCardSubtasks v-if="subtasksOpen" :parent="element" :depth="1" :column="itemData" />
             <BoardViewTaskCreate
                 v-if="isSubtaskCreate && !showArchiveVar"
                 :sprintData="element.sprintArray"
@@ -217,6 +225,8 @@
     import Priority from "@/components/molecules/PriorityCompo/PriorityComp.vue"
     import taskClass from "@/utils/TaskOperations";
     import BoardViewTaskCreate from "@/views/Projects/Kanban/BoardViewTaskCreate.vue"
+    import BoardCardSubtasks from "@/views/Projects/Kanban/BoardCardSubtasks.vue"
+    import { MAX_DEPTH, depthOf } from "@taskTreeRules";
     import Assignee from "@/components/molecules/Assignee/Assignee.vue"
     import {useConvertDate,useCustomComposable,useGetterFunctions } from "@/composable";
     import { useTaskSelection } from "@/composable/useTaskSelection.js";
@@ -270,9 +280,10 @@
         && !showArchiveVar.value);
     const isCardSelected = computed(() => cardSelection.isSelected(props.data?._id));
     // A click, not change: only the click event says whether Shift was held.
+    // A card is ticked alone, as a List row is: the server carries its subtasks with it.
     const handleCardCheckboxChange = (evt) => {
         if (!props.data?._id) return;
-        cardSelection.selectFromEvent(props.data, evt, '.kanban-cards');
+        cardSelection.selectFromEvent(props.data, evt, '.kanban-cards', { rowsAlone: true });
     };
     const showSidebar = ref(false);
     const archive = ref(false);
@@ -284,7 +295,18 @@
     const searchedTask = inject('searchedTask');
     const taskCollapsed = inject("taskCollapsed");
     const boardMenu = inject("boardTaskMenu", null);
-    const menuItems = computed(() => taskMenuItems(element.value, boardMenu?.rights.value));
+    const menuItems = computed(() => taskMenuItems(element.value, boardMenu?.rights.value, { canNest: depthOf(element.value) < MAX_DEPTH }));
+    const subtaskTree = inject("boardSubtaskTree", null);
+    const subtasksOpen = computed(() => Boolean(subtaskTree?.isExpanded(element.value?._id)));
+    const subtaskProgress = computed(() => (subtaskTree ? subtaskTree.progressFor(element.value) : null));
+    const subtaskCount = computed(() => {
+        if (subtaskTree) return subtaskTree.totalFor(element.value);
+        return (showArchiveVar.value || searchedTask.value ? element.value?.subtaskArray?.length : element.value?.subTasks) || 0;
+    });
+    const subtaskText = computed(() => (subtaskProgress.value ? `${subtaskProgress.value.done}/${subtaskProgress.value.total}` : String(subtaskCount.value)));
+    const subtaskLabel = computed(() => (subtaskProgress.value
+        ? t('Projects.subtasks_progress', subtaskProgress.value)
+        : t('Projects.subtasks_total', { n: subtaskCount.value })));
     const sidebarMode = ref(null);
     const renaming = ref(false);
     const renameDraft = ref("");
@@ -576,7 +598,10 @@
         const viaSidebar = () => { sidebarMode.value = id; };
         const actions = {
             rename: startRename,
-            subtask: () => { isSubtaskCreate.value = true; },
+            subtask: () => {
+                isSubtaskCreate.value = true;
+                subtaskTree?.expand(element.value, props.itemData);
+            },
             "copy-link": copyTaskLink,
             "copy-key": copyTaskKey,
             "new-tab": openInNewTab,

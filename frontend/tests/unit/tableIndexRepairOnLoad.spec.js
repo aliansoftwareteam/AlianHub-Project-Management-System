@@ -35,12 +35,16 @@ const indexed = (id, extra = {}) => task(id, { groupByStatusIndex: 1, groupByAss
 
 const openTable = async (group, tasks) => {
     const store = createStore({
-        state: { taskSelection: { selectedTaskIds: [], lastAnchorId: null, activeView: 'table' } },
+        state: { rows: tasks, taskSelection: { selectedTaskIds: [], lastAnchorId: null, activeView: 'table' } },
         getters: {
-            'projectData/tableTasks': () => ({ [PID]: { [SPRINT]: { tasks } } }),
+            'projectData/tableTasks': (state) => ({ [PID]: { [SPRINT]: { tasks: state.rows } } }),
             'projectData/searchedTasks': () => []
         },
-        mutations: { 'taskSelection/setActiveView': () => {}, 'taskSelection/setActiveProject': () => {} },
+        mutations: {
+            rowsArrive: (state, rows) => { state.rows = rows; },
+            'taskSelection/setActiveView': () => {},
+            'taskSelection/setActiveProject': () => {}
+        },
         actions: { 'projectData/setTableTasksFromTypesense': () => Promise.resolve() }
     });
     const wrapper = mount(TableViewTable, {
@@ -52,7 +56,11 @@ const openTable = async (group, tasks) => {
         }
     });
     await flushPromises();
-    return wrapper;
+    const arrive = async (rows) => {
+        store.commit('rowsArrive', rows);
+        await flushPromises();
+    };
+    return { wrapper, arrive };
 };
 
 const repairs = () => h.apiRequest.mock.calls.filter(([, url]) => url === env.ONLOAD_UPDATE_TASK_INDEX).map(([, , body]) => body);
@@ -118,5 +126,60 @@ describe('opening the Table view', () => {
 
         expect(repairs().map((body) => body.taskUpdate.data)).toEqual(['2', '3']);
         logged.mockRestore();
+    });
+});
+
+describe('rows that arrive after the Table view opened', () => {
+    test('are asked for once each, as on open', async () => {
+        const { arrive } = await openTable(GROUPS.status, []);
+        expect(repairs()).toEqual([]);
+
+        await arrive([indexed('1'), task('2'), task('3')]);
+
+        expect(repairs().map((body) => body.taskUpdate.data)).toEqual(['2', '3']);
+        expect(repairs()[0]).toEqual({ taskUpdate: { data: '2', item: { indexName: 'groupByStatusIndex', searchKey: 'statusKey', searchValue: 2 }, taskKey: 'PAR-2' }, companyId: 'company-1' });
+    });
+
+    test('are not asked for again when the rows change, the page grows or the index comes back', async () => {
+        const { arrive } = await openTable(GROUPS.status, [task('2')]);
+
+        await arrive([task('2', { TaskName: 'renamed' })]);
+        await arrive([task('2'), indexed('4'), task('5')]);
+        await arrive([task('2', { groupByStatusIndex: 0 }), indexed('4'), task('5', { groupByStatusIndex: 65536 })]);
+        await arrive([task('2', { groupByStatusIndex: 0 }), indexed('4'), task('5', { groupByStatusIndex: 65536 })]);
+
+        expect(repairs().map((body) => body.taskUpdate.data)).toEqual(['2', '5']);
+    });
+
+    test('are not asked for again after a refusal', async () => {
+        const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+        h.apiRequest.mockRejectedValue(new Error('refused'));
+        const { arrive } = await openTable(GROUPS.status, []);
+
+        await arrive([task('2')]);
+        await arrive([task('2'), indexed('3')]);
+        await arrive([task('2')]);
+
+        expect(repairs().map((body) => body.taskUpdate.data)).toEqual(['2']);
+        logged.mockRestore();
+    });
+
+    test('ask for nothing when each one holds its index', async () => {
+        const { arrive } = await openTable(GROUPS.status, []);
+
+        await arrive([indexed('1'), indexed('2')]);
+
+        expect(repairs()).toEqual([]);
+    });
+
+    test('stay on screen while they are asked for', async () => {
+        const { wrapper, arrive } = await openTable(GROUPS.status, [indexed('1')]);
+        let answer;
+        h.apiRequest.mockImplementation(() => new Promise((resolve) => { answer = resolve; }));
+
+        await arrive([indexed('1'), task('2'), task('3')]);
+
+        expect(wrapper.findAllComponents({ name: 'TableRow' })).toHaveLength(3);
+        answer({ data: { status: true } });
     });
 });

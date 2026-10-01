@@ -13,6 +13,9 @@
         </template>
         <div v-else-if="pageIndex === 1">
             <div v-if="currentCompany?.planFeature?.customFields">
+                <button v-if="props.pageInd === 0" type="button" class="ah-btn ah-btn--ghost ah-btn--sm custom_field_back" data-field-back :title="$t('CustomField.back_to_types')" @click="backToTypes(false)">
+                    <ShellIcon name="chevronLeft" :size="13" />{{ $t('CustomField.back') }}
+                </button>
                 <div>
                     <CustomFieldComponentStructure
                         :cfTitle="componentDetail.cfTitle"
@@ -28,7 +31,7 @@
                         :fieldType="componentDetail.cfType"
                         :field="props.customFieldObject"
                         @save="customFieldStore"
-                        @cancel="backToTypes(false)"
+                        @cancel="emit('close')"
                     />
                     <template v-else>
                         <CustomFieldsTabComponent
@@ -42,7 +45,7 @@
                             :customFieldObject="props.customFieldObject"
                             @handleFunction="customFieldStore"
                             @tabIndexUpdate="(val) => tabIndex = val"
-                            @closeSidebar="backToTypes"
+                            @closeSidebar="emit('close')"
                             :isType="isType"
                         />
                     </template>
@@ -69,6 +72,7 @@
     import CustomFieldsTabComponent from "../../atom/customFieldSidebar/customFieldsTabComponent/customFieldsTabComponent.vue"
     import CustomFieldComponentStructure from "../../atom/customFieldSidebar/customFieldComponentStructure/customFieldComponentStructure.vue";
     import ModuleFieldEditor from "@/plugins/customFieldView/fieldTypes/ModuleFieldEditor.vue";
+    import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
     import { fieldTypeCatalogue, fieldTypeUi } from "@/plugins/customFieldView/fieldTypes";
 
     const {getters} = useStore();
@@ -99,7 +103,7 @@
     const forProject = inject('customFieldForProject', false);
     const fieldTypes = computed(() => (forProject ? getters["settings/customFields"] : fieldTypeCatalogue(getters["settings/customFields"], t)));
     const currentCompany = computed(() => getters["settings/selectedCompany"])
-    const emit = defineEmits(['customFieldStore','closeSidebar']);
+    const emit = defineEmits(['customFieldStore','closeSidebar','close']);
     const customFieldStore = (val,isEdit) => {
         val.fieldPrimaryColor = componentDetail.value.cfPrimaryColor;
         val.fieldBackgroundColor = componentDetail.value.cfBackgroundColor;

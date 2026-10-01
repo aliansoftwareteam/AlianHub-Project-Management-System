@@ -212,6 +212,23 @@ const resolveStatus = async (companyId, projectId, statusName) => {
     };
 };
 
+/* The project's own running key, which the web app's create gives every task and subtask. The task helpers pull in
+ * most of the task domain, so they are required on use; where they cannot assign a key the row keeps the one it was
+ * saved with, so a subtask is never left without one. */
+const projectKeyFor = async (companyId, project, row, taskTypeKey) => {
+    if (!project || !Number.isFinite(Number(project.lastTaskId))) return row.TaskKey;
+    try {
+        const internals = require('../../Tasks/helpers/taskMongo/internals.js');
+        await internals.updateTaskKey({
+            companyId, projectCode: project.ProjectCode || 'TASK', projectId: project._id, taskId: row._id, taskTypeKey, sprintId: row.sprintId || '', isParentTask: false,
+        });
+        const keyed = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: row._id }, { TaskKey: 1 }] }, 'findOne');
+        return (keyed && keyed.TaskKey) || row.TaskKey;
+    } catch (error) {
+        return row.TaskKey;
+    }
+};
+
 /* Create a subtask under a task.
  *
  * A subtask is a normal task row with isParentTask:false and ParentTaskId set,
@@ -280,7 +297,9 @@ const createSubtask = async (companyId, parentTaskId, { title, description = '' 
         meta: { runId: context.runId || null, parentTaskId: String(parentTaskId) },
     });
 
-    return { changed: true, subtaskId: String(saved._id), title: name };
+    const key = await projectKeyFor(companyId, project, saved, parent.TaskTypeKey || 1);
+
+    return { changed: true, subtaskId: String(saved._id), key, title: name };
 };
 
 const PRIORITIES = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'];

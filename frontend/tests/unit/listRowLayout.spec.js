@@ -96,7 +96,7 @@ describe('the task name uses the free space in its cell', () => {
 
     it('the hover actions sit over the end of the cell instead of reserving their width', () => {
         expect(declared(rule(wide, '.lv2__actions'), 'position')).toBe('absolute');
-        expect(declared(rule(wide, '.lv2__title'), 'position')).toBe('relative');
+        expect(declared(rule(wide, '.lv2__c-select, .lv2__c-title'), 'position')).toBe('sticky');
     });
 
     it('hidden actions take no clicks from the name under them', () => {

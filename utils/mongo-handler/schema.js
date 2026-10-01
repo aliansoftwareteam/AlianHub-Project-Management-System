@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
-const { objectIdKeys, objectIdIfHex } = require('./objectIdKeys');
+const { objectIdIfHex } = require('./objectIdKeys');
+const { listPlacement } = require('./listPlacement');
 
 /* A Mixed path's required check lets '' through, where the String path it replaced refused it. */
 const notEmpty = { validator: (value) => value !== '', message: 'Path `{PATH}` is required.' };
@@ -86,7 +87,7 @@ const schema = {
         'sprintArray': {
             type: Object,
             required: true,
-            set: objectIdKeys('id', 'folderId'),
+            set: listPlacement,
         },
         'Task_Priority': {
             type: String,
@@ -199,7 +200,7 @@ const schema = {
         // Provenance of Done — written only by Modules/Tasks/helpers/completion.js:
         // { workBy: [{ actorId, actorType, agentId?, viaAccount, hours }],
         //   checkedBy: { actorId, actorType:'human', at } | null,
-        //   closedBy:  { actorId, actorType:'human', at } | null,
+        //   closedBy:  { actorId, actorType:'human', at, viaAgent? } | null,
         //   badge: 'HUMAN'|'AGENT'|'MIXED'|'UNCHECKED'|null, reopenCount }
         'completion': {
             type: Object,

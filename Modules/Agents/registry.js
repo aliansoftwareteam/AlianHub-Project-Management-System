@@ -6,6 +6,11 @@
 // status.set("Done") are ABSENT — not disabled, absent — so a compromised token
 // has nothing to switch on. The guard, the MCP server and the proposal approver
 // all resolve actions through this one file.
+//
+// One exception is deliberate and off by default: with MCP_TOOLS_MANAGE on, a
+// person may create a token whose agent closes tasks for them (task.status.change).
+// Nothing else reaches it, and the close is recorded as theirs, made through the
+// agent, and unchecked.
 
 const performanceFlag = require('./performanceFlag');
 const dataFlag = require('../Mcp/dataFlag');
@@ -24,6 +29,13 @@ const DONE_STATUS_TYPES = Object.freeze(['close', 'done', 'default_close']);
 const AGENT_STATUS_TYPES = Object.freeze(['default_active', 'active']);
 const AGENT_STATUS_NAMES = Object.freeze(['in progress', 'in review']);
 const AGENT_STATUS_NAME_PATTERN = /progress|review|doing|testing|qa/;
+
+const CREATE_PERMISSIONS = Object.freeze({
+    rawDescription: 'task.task_description', AssigneeUserId: 'task.task_assignee', Task_Priority: 'task.task_priority', DueDate: 'task.task_due_date',
+    startDate: ['task.task_due_date', 'task.task_start_date'], status: 'task.task_status', TaskType: 'task.task_type',
+    totalEstimatedTime: 'task.task_estimated_hours', links: 'task.task_attachments',
+});
+const CREATE_FIELDS = Object.freeze(Object.keys(CREATE_PERMISSIONS));
 
 const ACTIONS = Object.freeze([
     { key: 'tasks.next', label: 'Next assigned task', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
@@ -92,12 +104,26 @@ const FLAGGED = Object.freeze([
           constraint: 'only a top-level task; the destination must be one the person behind the agent can move tasks into', permission: 'task.task_move' },
         { key: 'task.archive', label: 'Archive a task with its subtasks', risk: RISK.HIGH, undoable: true, write: true, cost: 'write', permission: 'task.task_archive' },
         { key: 'task.restore', label: 'Restore an archived task', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: { key: 'task.task_list', write: false } },
+        { key: 'task.history', label: 'Read a task\'s activity log', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: { key: 'task.task_activity_log', write: true } },
+        { key: 'task.links.list', label: 'List a task\'s links', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
+        { key: 'task.status.change', label: 'Set any status of the task\'s project, Done included', risk: RISK.HIGH, undoable: true, write: true, cost: 'write',
+          constraint: 'only for a token its person created to manage tasks; the close is recorded as that person\'s, made through the agent, and unchecked', permission: 'task.task_status' },
+        { key: 'task.add', label: 'Create a task with its details', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', fields: CREATE_FIELDS,
+          permission: { key: 'task.task_create', byField: CREATE_PERMISSIONS } },
+        { key: 'subtask.add', label: 'Create a subtask with its details', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', fields: CREATE_FIELDS,
+          permission: { key: 'task.sub_task_create', byField: CREATE_PERMISSIONS } },
+        { key: 'comment.update', label: 'Edit a comment the agent wrote', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'task.task_comment' },
+        { key: 'tasks.batch', label: 'Record a batch of task changes as one group', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
+          constraint: 'changes nothing itself: each change in the batch is its own action, checked and audited on its own', permission: { key: 'task.task_list', write: false } },
+        { key: 'page.create', label: 'Create a doc (a draft until a person approves it)', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
+        { key: 'page.update', label: 'Change a doc\'s title or body', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
     ].map((action) => ({ enabled: manageFlag.enabled, action: Object.freeze(action) })),
 ]);
 
 /* A string maps the whole action at its own level (write for writes, read for
  * reads); { key, write } pins the level; { byField } holds each edited field
- * to the entry, or entries, a person editing that field is held to. */
+ * to the entry, or entries, a person editing that field is held to, beside
+ * the action's own { key } when it has one. */
 const permissionsFor = (key, params = {}) => {
     const action = get(key);
     if (!action) return [];
@@ -105,7 +131,9 @@ const permissionsFor = (key, params = {}) => {
     if (typeof p === 'string') return [{ key: p, write: Boolean(action.write) }];
     if (p && p.byField) {
         const fields = Object.keys(params.fields || {});
-        const keys = [...new Set((fields.length ? fields : action.fields || []).flatMap((f) => p.byField[f] || []))];
+        // With a key of its own the action needs that key and one per field named; without, naming no field asks for every one.
+        const named = p.key || fields.length ? fields : action.fields || [];
+        const keys = [...new Set([...(p.key ? [p.key] : []), ...named.flatMap((f) => p.byField[f] || [])])];
         return keys.map((k) => ({ key: k, write: true }));
     }
     if (p && p.key) return [{ key: p.key, write: typeof p.write === 'boolean' ? p.write : Boolean(action.write) }];
@@ -123,6 +151,7 @@ const validate = (entries) => {
         if (p && p.byField && typeof p.byField === 'object') {
             const unmapped = (a.fields || []).filter((f) => { const keys = [].concat(p.byField[f] || []); return !keys.length || keys.some((k) => !PERMISSION_KEY.test(String(k))); });
             if (!a.fields || !a.fields.length || unmapped.length) throw bad(a, `leaves fields without a permission mapping: ${unmapped.join(', ') || '(no fields)'}`);
+            if (p.key !== undefined && !PERMISSION_KEY.test(String(p.key))) throw bad(a, `has an invalid permission mapping "${p.key}"`);
             return;
         }
         if (p && typeof p.key === 'string' && PERMISSION_KEY.test(p.key)) return;
@@ -248,5 +277,5 @@ const manifest = () => ({
 
 module.exports = {
     ACTIONS, NEVER, RISK, AUTONOMY, DONE_STATUS_TYPE, DONE_STATUS_TYPES, AGENT_STATUS_NAMES,
-    get, has, keys, knows, allowedActionsToStore, isNever, indexActions, evaluate, isAgentSettableStatus, mayActDirectly, manifest, permissionsFor, validate,
+    CREATE_FIELDS, get, has, keys, knows, allowedActionsToStore, isNever, indexActions, evaluate, isAgentSettableStatus, mayActDirectly, manifest, permissionsFor, validate,
 };
