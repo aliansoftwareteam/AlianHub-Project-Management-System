@@ -40,7 +40,7 @@
                                     :class="{ 'is-watching': user.watcher }"
                                     @click="addWatchers(user.id, 'add')"
                                 >
-                                    <UserProfile
+                                    <UserProfile decorative
                                         width="30px"
                                         :thumbnail="'30x30'"
                                         :showDot="false"

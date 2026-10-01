@@ -20,7 +20,7 @@
     font: 600 11px/1 var(--font-ui);
 }
 .xd__mark--dark { background: var(--rail); color: var(--rail-ink-strong); font: 600 9px/1 var(--font-mono); }
-.xd__mark--agent { background: var(--agent-bg); color: var(--agent); }
+.xd__mark--agent { background: var(--agent-bg); color: var(--agent-ink); }
 
 .xd__id { flex: 1; min-width: 0; }
 .xd__name { font: 600 13px/1.3 var(--font-ui); color: var(--ink); }
