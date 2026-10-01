@@ -88,7 +88,7 @@
 import { computed, provide, reactive, ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
-import { CARD_META_KEY } from './useCardMeta';
+import { CARD_META_KEY, REPORT_TIMEOUT_MS } from './useCardMeta';
 
 defineOptions({ name: 'DashboardCard' });
 
@@ -110,8 +110,6 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['period-change', 'refresh', 'settings', 'remove', 'retry', 'empty-action']);
-
-const REPORT_TIMEOUT_MS = 15000;
 
 const { t } = useI18n();
 const meta = reactive({ state: '', note: '', updatedAt: null, emptyText: '', emptyAction: '', error: '' });
@@ -153,9 +151,13 @@ onBeforeUnmount(() => {
 
 const freshness = computed(() => {
     if (props.live) return t('Dash.live_data');
-    if (!loadedAt.value) return '';
-    const mins = Math.floor((now.value - loadedAt.value) / 60000);
-    return mins < 1 ? t('Dash.updated_just_now') : t('Dash.updated_min', { n: mins });
+    const since = meta.updatedAt || loadedAt.value;
+    if (!since) return '';
+    const mins = Math.floor((now.value - since) / 60000);
+    if (mins < 1) return t('Dash.updated_just_now');
+    if (mins < 60) return t('Dash.updated_min', { n: mins });
+    const hours = Math.floor(mins / 60);
+    return hours < 48 ? t('Dash.updated_hours', { n: hours }) : t('Dash.updated_days', { n: Math.floor(hours / 24) });
 });
 const footerLeft = computed(() => [freshness.value, meta.note || props.footerNote].filter(Boolean).join(' · '));
 </script>
