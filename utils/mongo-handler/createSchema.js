@@ -138,6 +138,8 @@ const viewTemplatesSchema = new Schema(schema.view_templates, {strict: true, tim
 viewTemplatesSchema.index({ deletedStatusKey: 1, name: 1 });
 const everythingViewsSchema = new Schema(schema.everything_views, {strict: true, timestamps: true});
 everythingViewsSchema.index({ userId: 1, deletedStatusKey: 1 });
+const whiteboardsSchema = new Schema(schema.whiteboards, {strict: true, timestamps: true});
+whiteboardsSchema.index({ projectId: 1, sprintId: 1 }, { unique: true, partialFilterExpression: { deletedStatusKey: 0 } });
 const remindersSchema = new Schema(schema.reminders, {strict: true, timestamps: true});
 remindersSchema.index({ userId: 1, fired: 1, reminderAt: 1 });
 const notesSchema = new Schema(schema.notes, {strict: true, timestamps: true});
@@ -501,6 +503,7 @@ module.exports = {
     taskTemplatesSchema,
     viewTemplatesSchema,
     everythingViewsSchema,
+    whiteboardsSchema,
     remindersSchema,
     notesSchema,
     generalRemindersSchema,
