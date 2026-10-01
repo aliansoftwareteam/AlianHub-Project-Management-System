@@ -179,6 +179,7 @@ import ListSortControl from './ListSortControl.vue';
 import ConvertToSubTaskSidebar from '@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue';
 import { useListRowMenu } from './useListRowMenu.js';
 import { SUBTASK_EXPANSION, createSubtaskExpansion } from './subtaskExpansion.js';
+import { eachRow } from '@/store/ProjectData/taskTree';
 import TaskMenuSidebars from '@/views/Projects/components/taskMenu/TaskMenuSidebars.vue';
 import { sortChoices, useListSort } from '@/views/Projects/composables/viewSort';
 import { columnCatalogue, gridTracks, listColumnClass, listColumnsAt, useViewColumns } from '@/views/Projects/composables/viewColumns';
@@ -227,10 +228,22 @@ const listCatalogue = computed(() => columnCatalogue('list', {
 }));
 const columnState = useViewColumns(computed(() => project.value?._id), 'list', listCatalogue);
 provide('listColumns', columnState.visibleColumns);
+/* Tags is the one column that shares the free width with the task name. While no row the List
+ * holds has a tag it keeps only the room of its header and the add button. */
+const EMPTY_TAGS_TRACK = '56px';
+const anyTagged = computed(() => {
+    const held = getters['projectData/tasks']?.[project.value?._id] || {};
+    const lists = searchedTask.value
+        ? [getters['projectData/searchedTasks'] || []]
+        : (held.sprints || []).map((sprintId) => held[sprintId]?.tasks || []);
+    return lists.some((rows) => [...eachRow(rows)].some((row) => row.tagsArray?.length));
+});
+const gridColumns = computed(() => listColumnsAt(columnState.visibleColumns.value, clientWidth?.value || 1280)
+    .map((column) => (column.id === 'tags' && !anyTagged.value ? { ...column, track: EMPTY_TAGS_TRACK } : column)));
 /* Phone width keeps the stylesheet's two-line row; wider, the tracks follow the chosen columns. */
 const listGridStyle = computed(() => ((clientWidth?.value || 1280) <= 767
     ? {}
-    : { '--lv2-cols': gridTracks('list', listColumnsAt(columnState.visibleColumns.value, clientWidth?.value || 1280)) }));
+    : { '--lv2-cols': gridTracks('list', gridColumns.value) }));
 
 // EMITS
 defineEmits(['change'])

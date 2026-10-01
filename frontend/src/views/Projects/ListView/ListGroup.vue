@@ -49,28 +49,7 @@
                             @review-agent="$emit('review-agent', $event)"
                             @add-subtask="startSubtask(task)"
                         />
-                        <template v-if="isExpanded(task._id)">
-                            <ListRow
-                                v-for="sub in visibleSubtasks(task)"
-                                :key="sub._id"
-                                :data="sub"
-                                is-sub
-                                :parent="task"
-                                :selected="selection.isSelected(sub._id)"
-                                :can-select="canSelect"
-                                @open="$emit('open', sub)"
-                                @select="onSelect"
-                            />
-                        </template>
-                        <div v-if="subtaskFor === String(task._id)" role="row" class="lv2__aria-row"><div role="cell" class="lv2__create lv2__create--sub">
-                            <CreateTask
-                                :sprint="{ ...task.sprintArray, id: task.sprintId, folderId: task.folderObjId }"
-                                :taskId="task._id"
-                                :assigneeOptions="subtaskAssignees(task)"
-                                :considerWidth="false"
-                                @cancel="subtaskFor = ''"
-                            />
-                        </div></div>
+                        <ListSubtaskRows :parent="task" :depth="1" />
                     </div>
                 </template>
             </draggable>
@@ -114,10 +93,12 @@
 </template>
 
 <script setup>
-import { computed, inject, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, provide, ref, watch } from "vue";
 import { useStore } from "vuex";
 import draggable from "vuedraggable";
 import ListRow from "./ListRow.vue";
+import ListSubtaskRows from "./ListSubtaskRows.vue";
+import { loadedChildren } from "@/store/ProjectData/taskTree";
 import CreateTask from "@/components/atom/CreateTask/CreateTask.vue";
 import { useCustomComposable } from "@/composable";
 import { taskListHelper, useUpdateTasks } from "@/views/Projects/helper.js";
@@ -125,7 +106,7 @@ import { useTaskSelection } from "@/composable/useTaskSelection.js";
 import { useListDragDrop } from "./useListDragDrop.js";
 import { useProjectAgentActivity } from "./useProjectAgentActivity.js";
 import { useSubtaskExpansion } from "./subtaskExpansion.js";
-import { hasSubtasks, indexProgress, pendingExpandIds, progressQuery, progressSignature } from "./subtaskProgress";
+import { hasSubtasks, indexProgress, pendingExpandIds, progressQuery, progressSignature, treeRows as withLoadedLevels } from "./subtaskProgress";
 import { groupLabel, groupRows, listSourceTasks, pagedPast, searchExpandIds } from "./listFilter";
 import { apiRequest } from "@/services";
 import { subtaskCreateAssignees } from "@/utils/assigneeOptions";
@@ -143,7 +124,7 @@ const props = defineProps({
     project: { type: Object, required: true },
     groupType: { type: [Number, String], default: 0 }
 });
-defineEmits(["toggle", "open", "review-agent"]);
+const emit = defineEmits(["toggle", "open", "review-agent"]);
 
 const { getters } = useStore();
 const { checkPermission } = useCustomComposable();
@@ -275,22 +256,27 @@ const isExpanded = (taskId) => expandedIds.value.includes(String(taskId));
 const subtaskCounts = ref({});
 const progressFor = (taskId) => subtaskCounts.value[String(taskId)] || null;
 
+/* The group's rows with every level loaded under them: counts and the expand toggle apply to a parent on any level. */
+const treeRows = computed(() => withLoadedLevels(rows.value));
+
 function loadSubtaskCounts() {
-    const ids = rows.value.filter(hasSubtasks).map((task) => String(task._id));
+    const ids = treeRows.value.filter(hasSubtasks).map((task) => String(task._id));
     if (!ids.length) return;
     apiRequest("post", `${env.TASK}/find`, { findQuery: progressQuery(ids) })
         .then((response) => { subtaskCounts.value = { ...subtaskCounts.value, ...indexProgress(response?.data) }; })
         .catch((error) => console.error("ERROR in list subtask progress: ", error));
 }
-watch(() => progressSignature(rows.value), loadSubtaskCounts, { immediate: true });
+watch(() => progressSignature(treeRows.value), loadSubtaskCounts, { immediate: true });
 
+/* Asked every time a row opens: the store answers at once for a parent whose children it has
+ * read. A row can hold a few children that arrived as events without having read them all. */
 function loadSubtasks(task) {
-    if (task.subtaskArray?.length) return;
     getSprintTasks({
         projectId: props.project._id,
         sprintId: sprintId.value,
         item: props.item,
         fetchNew: true,
+        firstPageOnly: true,
         projectData: props.project,
         parentId: task._id
     });
@@ -311,15 +297,15 @@ function toggleSubtasks(task) {
  * tasks only then. */
 function expandArrivedRows() {
     if (searchedTask.value) {
-        expandedIds.value = [...new Set([...expandedIds.value, ...searchExpandIds(rows.value)])];
+        expandedIds.value = [...new Set([...expandedIds.value, ...searchExpandIds(treeRows.value)])];
         return;
     }
     if (taskCollapsed.value) return;
-    const pending = pendingExpandIds(rows.value, autoExpandedIds.value);
+    const pending = pendingExpandIds(treeRows.value, autoExpandedIds.value);
     if (!pending.length) return;
     autoExpandedIds.value = [...autoExpandedIds.value, ...pending];
     expandedIds.value = [...new Set([...expandedIds.value, ...pending])];
-    rows.value.filter((task) => pending.includes(String(task._id))).forEach(loadSubtasks);
+    treeRows.value.filter((task) => pending.includes(String(task._id))).forEach(loadSubtasks);
 }
 /* Rows are replaced on every change to a task or a subtask in the group, so only the
  * toolbar switch itself may close what the user opened by hand. */
@@ -333,11 +319,11 @@ watch(taskCollapsed, (collapsed) => {
     expandArrivedRows();
 });
 
-/* A searched parent carries only its matching subtasks; when none matched, expanding it
-   shows the full set loaded into the sprint's own copy of the task. */
+/* A searched row carries only its matching subtasks; when none matched, expanding it shows
+   the full set read into the sprint's own copy of the task. */
 function subtasksOf(task) {
     if (task.subtaskArray?.length || !searchedTask.value) return task.subtaskArray || [];
-    return storeTasks.value.find((stored) => stored._id === task._id)?.subtaskArray || [];
+    return loadedChildren(getters["projectData/tasks"]?.[props.project._id]?.[sprintId.value], task._id);
 }
 
 function visibleSubtasks(task) {
@@ -353,11 +339,27 @@ function startSubtask(task) {
     subtaskFor.value = id;
 }
 
-/* A ticked subtask is picked on its own: auto-selecting the parent once every sibling is
- * ticked would pull the parent into the bulk change too. */
+/* Every row is picked on its own. The server carries a task's subtasks with it, so ticking
+ * them too would only add rows it then skips; and ticking a parent because its subtasks are
+ * all ticked would pull it into the bulk change. */
 function onSelect(task, event) {
-    selection.selectFromEvent(task, event, ".lv2", { subtasksAlone: true });
+    selection.selectFromEvent(task, event, ".lv2", { rowsAlone: true });
 }
+
+provide("listGroupTree", {
+    isExpanded,
+    childrenOf: visibleSubtasks,
+    progressFor,
+    isSelected: (taskId) => selection.isSelected(taskId),
+    canSelect,
+    subtaskFor,
+    select: onSelect,
+    toggle: toggleSubtasks,
+    startSubtask,
+    cancelSubtask: () => { subtaskFor.value = ""; },
+    createAssignees: subtaskAssignees,
+    open: (task) => emit("open", task)
+});
 
 function onDragChange(event) {
     applyDrag({ event, item: props.item, groupType: props.groupType, rows: rows.value, project: props.project });

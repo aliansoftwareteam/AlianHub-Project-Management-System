@@ -10,6 +10,7 @@ import { isBundledPriorityImage } from "@/composable/commonFunction";
 import { showUndoToast } from "@/composable/useUndoToast";
 import { taskDueDateAdd, taskDueDateChange } from "@/utils/NotificationTemplate";
 import { permittedAssignees, sprintOf } from "@/utils/assigneeOptions";
+import { locate } from "@/store/ProjectData/taskTree";
 import {
     assigneeInverse, dueChange, dueRestore, dueSnapshot, fieldEditRights, nextAssignees, priorityAppOn, projectHasApp, rowEditRights
 } from "./listRowEdit";
@@ -55,7 +56,7 @@ export function useListInlineEdit(projectRef) {
      * searched copy instead, and only the server can say whether the task still matches. */
     function reflectSearch(task, fields) {
         if (!searched.value) return;
-        const stored = (getters["projectData/searchedTasks"] || []).find((x) => x._id === task._id);
+        const stored = locate({ tasks: getters["projectData/searchedTasks"] || [] }, task._id)?.row;
         if (stored) commit("projectData/mutateSearchTask", { op: "modified", data: [{ ...stored, ...fields }] });
         if (typeof refreshSearch === "function") refreshSearch();
     }

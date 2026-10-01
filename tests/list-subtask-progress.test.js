@@ -173,8 +173,9 @@ describe('progress and the expand toggle reach every level', () => {
     });
 
     test('a level-two row shows its direct children only', () => {
-        expect(P.subtaskProgress(middle, { total: 1, completed: 1 })).toEqual({ done: 1, total: 1 });
-        expect(P.subtaskProgress(root, { total: 2, completed: 0 })).toEqual({ done: 0, total: 2 });
+        expect(P.subtaskProgress({ ...middle, subtaskArray: undefined }, { total: 1, completed: 1 })).toEqual({ done: 1, total: 1 });
+        const closedLeaf = { ...leaf, statusType: 'close' };
+        expect(P.subtaskProgress({ ...root, subtaskArray: [{ ...middle, subtaskArray: [closedLeaf] }, plain] }, null)).toEqual({ done: 0, total: 2 });
     });
 
     test('the aggregate is asked for level-two parents as well, and re-asked when one arrives', () => {
