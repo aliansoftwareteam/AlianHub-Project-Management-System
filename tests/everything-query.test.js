@@ -430,3 +430,34 @@ describe('a role that is denied the task list', () => {
         expect(q.taskListProjectIds(projects, 7, rules(true), rules(true, P2))).toEqual([TASK]);
     });
 });
+
+describe('what a role may change in a project\'s rows', () => {
+    const MEMBER_ROLE = 3;
+    const rules = (permissions, projectId) => {
+        const parent = { _id: `task-${projectId || 'company'}`, key: 'task', isParent: true, roles: [{ key: MEMBER_ROLE, permission: true }] };
+        return [parent, ...Object.entries(permissions).map(([key, permission]) => ({ _id: `${key}-${projectId || 'company'}`, key, isParent: false, parentId: parent._id, projectId, roles: [{ key: MEMBER_ROLE, permission }] }))];
+    };
+    const ALL = { task_list: true, task_status: true, task_priority: true };
+    const rightsFor = (project, company, own = []) => q.rowEditRights(project, q.projectPermissions(MEMBER_ROLE, rules(company), own));
+
+    it('needs the task list and the field, both set to edit', () => {
+        expect(rightsFor({ _id: P1 }, ALL)).toEqual({ status: true, priority: true });
+        expect(rightsFor({ _id: P1 }, { ...ALL, task_priority: false })).toEqual({ status: true, priority: false });
+        expect(rightsFor({ _id: P1 }, { ...ALL, task_status: null })).toEqual({ status: false, priority: true });
+        expect(rightsFor({ _id: P1 }, { ...ALL, task_list: false })).toEqual({ status: false, priority: false });
+        expect(rightsFor({ _id: P1 }, {})).toEqual({ status: false, priority: false });
+    });
+
+    it('reads a project with its own rules by those rules', () => {
+        const own = rules({ ...ALL, task_status: false }, P2);
+        expect(rightsFor({ _id: P2, isGlobalPermission: false }, ALL, own)).toEqual({ status: false, priority: true });
+        expect(rightsFor({ _id: P1, isGlobalPermission: false }, ALL, own)).toEqual({ status: false, priority: false });
+        expect(rightsFor({ _id: P1 }, ALL, own)).toEqual({ status: true, priority: true });
+    });
+
+    it('gives an owner or an admin every edit, and nobody any edit in a closed project', () => {
+        expect(q.rowEditRights({ _id: P1 }, null)).toEqual({ status: true, priority: true });
+        expect(q.rowEditRights({ _id: P1, statusType: 'close' }, null)).toEqual({ status: false, priority: false });
+        expect(rightsFor({ _id: P1, statusType: 'close' }, ALL)).toEqual({ status: false, priority: false });
+    });
+});
