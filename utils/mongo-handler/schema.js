@@ -563,6 +563,15 @@ const schema = {
         updatedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // A person's saved views of the Everything page (Modules/Tasks/controller/everythingViews.js). userId is the
+    // one person who can read or change the row; settings is what parseViewSettings returns.
+    everything_views: {
+        userId: { type: String, required: true },
+        name: { type: String, required: true },
+        settings: { type: Object, default: {}, required: false },
+        isDefault: { type: Boolean, default: false, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Personal reminders (COLLAB-03) — one-shot, per-user. A node-schedule cron
     // (every minute) fires any reminder whose reminderAt has passed and that
     // hasn't fired yet, delivering an in-app notification to userId. Managed by
