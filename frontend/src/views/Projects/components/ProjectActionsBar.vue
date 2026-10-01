@@ -108,7 +108,7 @@
                             <DropDownOption @click="$emit('openPermissionSidebar')" v-if="checkPermission('settings.settings_security_permissions') !== null">
                                 <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
                                     <div class="d-flex align-items-center">
-                                        <img :src="lockIcon" alt="" class="mr-20px">
+                                        <span class="ah-mask-icon mr-20px" :style="maskOf(lockIcon)" aria-hidden="true"></span>
                                     </div>
                                     <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.project_permissions') }}</span>
                                 </div>
@@ -171,6 +171,7 @@ import Assignee from '@/components/molecules/Assignee/Assignee.vue';
 import WasabiImage from '@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue';
 import DuplicateProjectDialog from '@/components/molecules/DuplicateProjectDialog/DuplicateProjectDialog.vue';
 import { useCustomComposable } from '@/composable';
+import { maskOf } from '@/utils/iconMask';
 
 const { checkPermission } = useCustomComposable();
 

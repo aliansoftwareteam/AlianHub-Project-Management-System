@@ -52,7 +52,7 @@ const mark = computed(() => {
     border: 1px solid transparent;
 }
 .sb__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sb--agent { background: #eef2ff; color: #252D75; border-color: #c7d2fe; }
-.sb--agent-after { background: #fff7ed; color: #9a3412; border-color: #fed7aa; }
-.sb--person { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+.sb--agent { background: var(--brand-tint); color: var(--brand); border-color: var(--brand-border); }
+.sb--agent-after { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn); }
+.sb--person { background: var(--fill); color: var(--ink-2); border-color: var(--hairline); }
 </style>

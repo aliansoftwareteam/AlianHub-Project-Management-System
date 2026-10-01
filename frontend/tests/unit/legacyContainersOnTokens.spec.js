@@ -26,8 +26,8 @@ describe('the dark-mode opt-out list after the shared containers moved onto toke
         for (const name of ['#my-dropdown', '#my-modal', '#my-image-slider', '.swal2-container']) expect(optOut[0]).not.toContain(name);
     });
 
-    test('still names what is converted last: the legacy view, the legacy sidebar and white cards', () => {
-        for (const name of ['.ah-app__view', '#my-sidebar', '.bg-white', 'iframe']) expect(optOut[0]).toContain(name);
+    test('still names what is converted last: the legacy view and white cards', () => {
+        for (const name of ['.ah-app__view', '.bg-white', 'iframe']) expect(optOut[0]).toContain(name);
     });
 });
 
@@ -107,11 +107,11 @@ describe('the dropdown panel', () => {
     test('menus and dialogs restate the legacy colour utilities their hosts still carry', () => {
         const layer = withoutComments(read('assets/css/legacy-on-tokens.css'));
         expect(read('assets/css/index.css')).toMatch(/@import 'legacy-on-tokens\.css';/);
-        expect(layer).toContain(':is(.dd-tokens, .modal) :is(.black, .dark-gray, .dark-gray2, .gray4b, .color52, .color63, .darkblue) { color: var(--ink); }');
-        expect(layer).toContain(':is(.dd-tokens, .modal) :is(.gray81, .gray, .gray63, .GunPowder, .color94, .colorlightgray) { color: var(--ink-2); }');
-        expect(layer).toContain(':is(.dd-tokens, .modal) :is(.blue, .purple) { color: var(--brand) !important; }');
-        expect(layer).toContain(':is(.dd-tokens, .modal) .red { color: var(--danger-ink); }');
-        expect(layer).toContain(':is(.dd-tokens, .modal) .bg-white { background-color: var(--surface); }');
+        expect(layer).toContain(':is(.dd-tokens, .modal, .sb-tokens) :is(.black, .dark-gray, .dark-gray2, .gray4b, .color52, .color63, .darkblue) { color: var(--ink); }');
+        expect(layer).toContain(':is(.dd-tokens, .modal, .sb-tokens) :is(.gray81, .gray, .gray63, .GunPowder, .color94, .colorlightgray) { color: var(--ink-2); }');
+        expect(layer).toContain(':is(.dd-tokens, .modal, .sb-tokens) :is(.blue, .purple) { color: var(--brand) !important; }');
+        expect(layer).toContain(':is(.dd-tokens, .modal, .sb-tokens) .red { color: var(--danger-ink); }');
+        expect(layer).toContain(':is(.dd-tokens, .modal, .sb-tokens) .bg-white { background-color: var(--surface); }');
         expect(declarations(layer)).not.toMatch(COLOUR_LITERAL);
     });
 

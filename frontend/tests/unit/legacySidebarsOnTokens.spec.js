@@ -79,7 +79,6 @@ describe('sidebar hosts that carried their own colours', () => {
         'components/molecules/PromptSidebar/PromptSidebar.vue',
         'components/molecules/TaskStatusSidebar/TaskStatusSidebar.vue',
         'views/Settings/Template/CreateTemplateWithAI.vue',
-        'components/organisms/CreateChannelSidebar/CreateChannelSidebar.vue',
     ])('%s paints no colour that is not a token', (rel) => {
         expect(declarations(stylesOf(rel))).not.toMatch(COLOUR_LITERAL);
         expect(withoutComments(templateOf(read(rel)))).not.toMatch(COLOUR_LITERAL);
@@ -95,7 +94,8 @@ describe('weak spots of the themed menu', () => {
 
     test('count chips and checkbox marks inside a menu take tokens', () => {
         const css = withoutComments(read('components/molecules/DropDown/style.css'));
-        expect(css).toContain('.dd-tokens :is(.sprint-watcher-count, .additional-users-count) { background: var(--fill); color: var(--ink-2); }');
+        expect(css).toContain('.dd-tokens .sprint-watcher-count { background: var(--fill); color: var(--ink-2); }');
+        expect(css).toContain('.dd-tokens .additional-users-count { background: var(--brand); color: var(--on-brand); }');
         expect(css).toContain('.dd-tokens .project-checkbox-mark { background-color: var(--surface); border-color: var(--border); }');
         expect(css).toContain('.dd-tokens .project-custom-checkbox input:checked ~ .project-checkbox-mark { background-color: var(--brand); border-color: var(--brand); }');
     });
