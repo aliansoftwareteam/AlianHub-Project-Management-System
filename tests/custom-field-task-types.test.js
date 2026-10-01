@@ -68,7 +68,7 @@ describe('saving a field with task types', () => {
 
     it('keeps a clean list of task type keys', () => {
         expect(cleanTaskTypeList([BUG, String(STORY), BUG])).toEqual([BUG, STORY]);
-        expect(fieldInsertFrom({ fieldTitle: 'Severity', fieldType: 'dropdown', fieldTaskTypes: [BUG, '4'] }).fieldTaskTypes).toEqual([BUG, STORY]);
+        expect(fieldInsertFrom({ fieldTitle: 'Severity', fieldType: 'dropdown', fieldOptions: [{ id: 'high', label: 'High' }], fieldTaskTypes: [BUG, '4'] }).fieldTaskTypes).toEqual([BUG, STORY]);
         expect(fieldUpdateFrom({ key: '$set', id: SCOPED_FIELD, updateObject: { fieldTaskTypes: [] } }).fieldTaskTypes).toEqual([]);
     });
 

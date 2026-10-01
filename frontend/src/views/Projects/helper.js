@@ -833,12 +833,13 @@ export function taskListHelper() {
             }
         })
     }
-    function getGroupCounts({projectId, sprintId, items, projectData}) {
+    function getGroupCounts({projectId, sprintId, items, projectData, totals = []}) {
         if(permit === null && projectData.isGlobalPermission === false) return Promise.resolve();
         return dispatch("projectData/refreshGroupCounts", {
             pid: projectId,
             sprintId,
             items,
+            totals,
             userId: userId.value,
             showAllTasks: projectData.isGlobalPermission === false ? permit : true
         });

@@ -122,7 +122,7 @@
         @closeSidebar="handleCloseSidebar"
         :componentDetail="componentDetail && Object.keys(componentDetail).length ? componentDetail : {}"
         :customFieldObject="componentDetail && Object.keys(componentDetail).length ? customFieldObject : {}"
-        :isCustomField="isCustomField"
+        v-model:isCustomField="isCustomField"
         @handleClose="handleClose()"
     />
     <PromptSidebar v-if="isOpenPromptDeatil" @closePrompt="isOpenPromptDeatil = false" :selectedPrompt="selectedPrompt" @closeMainSidebar="isOpenPromptDeatil = false" :project="projectData" :task="task" />

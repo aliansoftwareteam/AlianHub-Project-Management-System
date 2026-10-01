@@ -185,6 +185,7 @@ import { eachRow } from '@/store/ProjectData/taskTree';
 import TaskMenuSidebars from '@/views/Projects/components/taskMenu/TaskMenuSidebars.vue';
 import { sortChoices, useListSort } from '@/views/Projects/composables/viewSort';
 import { columnCatalogue, listColumnClass, listColumnsAt, listGridVars, useViewColumns } from '@/views/Projects/composables/viewColumns';
+import { totalColumnsOf } from '@/views/Projects/composables/groupTotals';
 
 // UTILS
 const {getters} = useStore();
@@ -244,6 +245,8 @@ const gridColumns = computed(() => listColumnsAt(columnState.visibleColumns.valu
     .map((column) => (column.id === 'tags' && !anyTagged.value ? { ...column, track: EMPTY_TAGS_TRACK } : column)));
 /* Phone width keeps the stylesheet's two-line row; wider, the tracks follow the chosen columns. */
 const listGridStyle = computed(() => ((clientWidth?.value || 1280) <= 767 ? {} : listGridVars(gridColumns.value)));
+/* Not narrowed to the width: the group header keeps its story point total where the columns themselves are folded away. */
+const totalColumns = computed(() => totalColumnsOf(columnState.visibleColumns.value));
 
 // EMITS
 defineEmits(['change'])
@@ -419,19 +422,28 @@ const openSprint = computed(() => groupedTasks.value.find((sprint) => sprint?.is
 function refreshGroupCounts() {
     const sprint = openSprint.value;
     if(!sprint || !project.value?._id) return;
-    getGroupCounts({ projectId: project.value._id, sprintId: sprint.id, items: sprint.items || [], projectData: project.value })
+    getGroupCounts({ projectId: project.value._id, sprintId: sprint.id, items: sprint.items || [], projectData: project.value, totals: totalColumns.value })
         .catch((error) => console.error("ERROR in list group counts: ", error));
 }
+
+function scheduleGroupCounts() {
+    clearTimeout(countTimer);
+    countTimer = setTimeout(refreshGroupCounts, COUNT_SETTLE_MS);
+}
+/* A group that holds only part of its tasks asks for its totals; the answer comes with the counts, for every group at once. */
+provide('listTotals', { columns: totalColumns, refresh: scheduleGroupCounts });
 
 /* The store raises the marker when a change from the server may have moved a task it cannot
  * place. Only a rise while the same sprint is open counts: opening a sprint reads an old one. */
 watch(() => [
     `${project.value?._id}|${openSprint.value?.id}`,
-    getters['projectData/tasks']?.[project.value?._id]?.[openSprint.value?.id]?.countsStale || 0
-], ([sprintKey, stale], [previousKey, previousStale]) => {
-    if(sprintKey !== previousKey || stale <= previousStale) return;
-    clearTimeout(countTimer);
-    countTimer = setTimeout(refreshGroupCounts, COUNT_SETTLE_MS);
+    getters['projectData/tasks']?.[project.value?._id]?.[openSprint.value?.id]?.countsStale || 0,
+    getters['projectData/tasks']?.[project.value?._id]?.[openSprint.value?.id]?.totalsStale || 0
+], ([sprintKey, stale, totalsStale], [previousKey, previousStale, previousTotalsStale]) => {
+    if(sprintKey !== previousKey) return;
+    const totalsMoved = totalColumns.value.length > 0 && totalsStale > previousTotalsStale;
+    if(stale <= previousStale && !totalsMoved) return;
+    scheduleGroupCounts();
 });
 onBeforeUnmount(() => {
     clearTimeout(initTimer);

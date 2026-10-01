@@ -17,14 +17,38 @@ const sprintTaskMatch = ({ pid, sprintId, showAllTasks, userId }) => ({
 
 const countKey = (item) => `${item.searchKey}_${item.searchValue}`;
 
-/* One facet per group over the same match a page uses, so a count is the number of rows its pages will bring. */
-const groupCountsQuery = ({ pid, sprintId, items, showAllTasks, userId }) => [
-    { $match: { ...sprintTaskMatch({ pid, sprintId, showAllTasks, userId }), isParentTask: true } },
-    { $facet: Object.fromEntries((items || []).map((item, index) => [`g${index}`, [{ $match: groupCondition(item) }, { $count: "count" }]])) },
-];
+const totalKey = (index) => `t${index}`;
+
+/* A total is { id, path, wrapped, taskTypes }: a custom field keeps its value under fieldValue, and on a few old tasks as the
+   entry itself. What is not a number (a blank, text) reads as null, which $sum passes over. */
+const totalValue = ({ path, wrapped, taskTypes }) => {
+    const stored = wrapped ? { $ifNull: [`$${path}.fieldValue`, `$${path}`] } : `$${path}`;
+    const number = { $convert: { input: stored, to: 'double', onError: null, onNull: null } };
+    if (!taskTypes?.length) return number;
+    return { $cond: [{ $in: ['$TaskTypeKey', [...taskTypes, ...taskTypes.map(String)]] }, number, null] };
+};
+
+/* One facet per group over the same match a page uses, so a count is the number of rows its pages will bring,
+   and a total is the sum over those same rows. */
+const groupCountsQuery = ({ pid, sprintId, items, showAllTasks, userId, totals = [] }) => {
+    const counted = totals.length
+        ? [{ $group: { _id: null, count: { $sum: 1 }, ...Object.fromEntries(totals.map((total, index) => [totalKey(index), { $sum: `$${totalKey(index)}` }])) } }]
+        : [{ $count: "count" }];
+    return [
+        { $match: { ...sprintTaskMatch({ pid, sprintId, showAllTasks, userId }), isParentTask: true } },
+        ...(totals.length ? [{ $addFields: Object.fromEntries(totals.map((total, index) => [totalKey(index), totalValue(total)])) }] : []),
+        { $facet: Object.fromEntries((items || []).map((item, index) => [`g${index}`, [{ $match: groupCondition(item) }, ...counted]])) },
+    ];
+};
 
 const readGroupCounts = (items, facets) => Object.fromEntries(
     (items || []).map((item, index) => [countKey(item), Number(facets?.[`g${index}`]?.[0]?.count) || 0])
 );
 
-module.exports = { groupCondition, sprintTaskMatch, groupCountsQuery, readGroupCounts };
+const readGroupTotals = (items, facets, totals) => Object.fromEntries(
+    (items || []).map((item, index) => [countKey(item), Object.fromEntries(
+        (totals || []).map((total, at) => [total.id, Number(facets?.[`g${index}`]?.[0]?.[totalKey(at)]) || 0])
+    )])
+);
+
+module.exports = { groupCondition, sprintTaskMatch, groupCountsQuery, readGroupCounts, readGroupTotals };

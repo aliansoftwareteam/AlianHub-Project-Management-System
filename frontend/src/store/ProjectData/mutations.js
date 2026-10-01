@@ -200,6 +200,12 @@ function changesGroupCounts(groupBy, op, data, updatedFields) {
     return fields.some((field) => MEMBERSHIP_FIELDS.includes(field) || (grouping ? grouping.includes(field) : field.startsWith("customField")));
 }
 
+/* A value a group total adds was changed on the server. A group that is only partly loaded cannot add it up itself. */
+function changesGroupTotals(op, data, updatedFields) {
+    if(op !== "modified" || data?.isParentTask === false) return false;
+    return Object.keys(updatedFields || {}).some((field) => field === "points" || field.startsWith("customField"));
+}
+
 /* The sort key of the last row a page brought for a group: where its next page starts. */
 export const mutatePageFrontier = (state, payload) => {
     const {pid, sprintId, key, row} = payload;
@@ -208,9 +214,10 @@ export const mutatePageFrontier = (state, payload) => {
 }
 
 export const mutateGroupCounts = (state, payload) => {
-    const {pid, sprintId, found} = payload;
+    const {pid, sprintId, found, totals} = payload;
     if(!state.tasks?.[pid]?.sprints?.includes(sprintId)) return;
     state.tasks[pid][sprintId].found = {...state.tasks[pid][sprintId].found, ...found};
+    if(totals) state.tasks[pid][sprintId].totals = {...state.tasks[pid][sprintId].totals, ...totals};
 }
 
 // HANDLE TASK
@@ -239,6 +246,9 @@ export const mutateUpdateFirebaseTasks = (state, payload) => {
             if(groupBy) {
                 if(snap && changesGroupCounts(groupBy, op, data, updatedFields)) {
                     state.tasks[pid][sprintId].countsStale = (state.tasks[pid][sprintId].countsStale || 0) + 1;
+                }
+                if(snap && changesGroupTotals(op, data, updatedFields)) {
+                    state.tasks[pid][sprintId].totalsStale = (state.tasks[pid][sprintId].totalsStale || 0) + 1;
                 }
                 if(["modified", "added"]?.includes(op) && data.isParentTask) {
                     const {addKey, removeKey} = returnItemCountDetails(state.tasks[pid][sprintId].tasks, groupBy, updatedFields, data._id);

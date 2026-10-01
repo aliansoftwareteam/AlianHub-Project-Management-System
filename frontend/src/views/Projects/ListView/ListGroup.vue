@@ -67,6 +67,20 @@
                 <span v-if="listSort.key !== 'manual'" class="lv2__more-hint">{{ $t('List.load_more_sorted', { n: rows.length }) }}</span>
             </div></div>
 
+            <div v-if="totalColumns.length && rows.length" role="row" class="lv2__totals" data-group-totals>
+                <span class="lv2__c-select" role="cell"></span>
+                <span class="lv2__c-title lv2__totals-label" role="cell">{{ $t('List.group_total') }}</span>
+                <span
+                    v-for="column in shownColumns"
+                    :key="column.id"
+                    :class="listColumnClass(column)"
+                    class="lv2__totals-cell"
+                    role="cell"
+                    :data-total="column.id"
+                    :title="totalOf(column) ? $t('List.group_total_of', { field: column.field ? column.label : $t(column.labelKey), value: totalOf(column) }) : null"
+                >{{ totalOf(column) }}</span>
+            </div>
+
             <div v-if="creating" role="row" class="lv2__aria-row"><div role="cell" class="lv2__create">
                 <label v-if="templates.length" class="lv2__template">
                     <span class="lv2__template-label">{{ $t('TaskTemplates.template') }}</span>
@@ -114,7 +128,8 @@ import { apiRequest } from "@/services";
 import { subtaskCreateAssignees } from "@/utils/assigneeOptions";
 import * as env from "@/config/env";
 import { applyContext, applyTemplate, defaultTemplateOf, listTemplates } from "@/components/molecules/TaskTemplates/taskTemplates";
-import { pointsTotal } from "@/views/Projects/composables/taskPoints";
+import { loadedTotals, totalColumnsOf, totalText } from "@/views/Projects/composables/groupTotals";
+import { listColumnClass } from "@/views/Projects/composables/viewColumns";
 import { MANUAL, sortTasks } from "@/views/Projects/composables/viewSort";
 import { groupTakesTask, putFrom } from "@/views/Projects/composables/customFieldQuery";
 
@@ -183,7 +198,10 @@ const estimateHours = computed(() => {
     return minutes ? Math.round(minutes / 60) : 0;
 });
 const listColumns = inject("listColumns", null);
-const groupPoints = computed(() => (listColumns?.value?.some((column) => column.id === "points") ? pointsTotal(rows.value) : 0));
+const listTotals = inject("listTotals", null);
+const rowEdit = inject("listRowEdit", null);
+const shownColumns = computed(() => listColumns?.value || []);
+const totalColumns = computed(() => listTotals?.columns.value || totalColumnsOf(shownColumns.value));
 const headMeta = computed(() => {
     const count = found.value === null ? rows.value.length : found.value;
     return estimateHours.value ? `${count} · ${estimateHours.value}H` : String(count);
@@ -193,6 +211,21 @@ const headMeta = computed(() => {
  * Under a filter the whole result is loaded at once, so nothing is left. */
 const total = computed(() => (found.value === null ? rows.value.length : Number(found.value) || 0));
 const left = computed(() => Math.max(0, total.value - rows.value.length));
+
+/* With every task of the group loaded the rows are added up here, so a total follows an edit at once. A group
+ * that holds only part of its tasks shows the server's totals for all of them, and nothing until they arrive. */
+const serverTotals = computed(() => getters["projectData/tasks"]?.[props.project._id]?.[sprintId.value]?.totals?.[`${props.item.searchKey}_${props.item.searchValue}`] || null);
+const groupTotals = computed(() => (left.value > 0
+    ? serverTotals.value
+    : loadedTotals(rows.value, totalColumns.value, { allTasks: rowEdit?.fields?.allTasks.value || [], defs: rowEdit?.fields?.defs.value || [] })));
+const groupPoints = computed(() => groupTotals.value?.points || 0);
+const totalOf = (column) => {
+    const summed = totalColumns.value.find((entry) => entry.id === column.id);
+    return summed ? totalText(summed, groupTotals.value?.[column.id]) : "";
+};
+watch(() => [left.value > 0, totalColumns.value.map((column) => column.id).join()], ([partial, ids]) => {
+    if (partial && ids) listTotals?.refresh();
+}, { immediate: true });
 
 const rowIds = computed(() => rows.value.map((task) => String(task._id)));
 const groupSelection = computed(() => selection.groupState(rowIds.value));
