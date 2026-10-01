@@ -1,5 +1,6 @@
 const { median, percentile, summarise } = require('../scripts/scale/lib/stats');
 const { BUDGETS, verdict, budgetText, markdownTable } = require('../scripts/scale/lib/report');
+const { pacer } = require('../scripts/scale/lib/pace');
 
 const upTo = (n) => Array.from({ length: n }, (_, i) => i + 1);
 
@@ -120,5 +121,37 @@ describe('the markdown table', () => {
 
     it('escapes a pipe inside a cell', () => {
         expect(table[4]).toContain('List: DOM nodes \\| after load');
+    });
+});
+
+describe('pacing under the server request limit', () => {
+    const originalFetch = global.fetch;
+    const answer = (headers) => ({ headers: new Headers(headers), arrayBuffer: async () => new ArrayBuffer(0) });
+    const paced = (headers) => {
+        global.fetch = jest.fn(async () => answer(headers));
+        const wait = jest.fn(async () => {});
+        return { room: pacer({ base: 'http://localhost:4000', wait }), wait };
+    };
+
+    afterEach(() => {
+        global.fetch = originalFetch;
+    });
+
+    it('goes ahead when the requests fit with the reserve left for other users of the server', async () => {
+        const { room, wait } = paced({ 'ratelimit-remaining': '700', 'ratelimit-reset': '30' });
+        expect(await room(500)).toBe(0);
+        expect(wait).not.toHaveBeenCalled();
+    });
+
+    it('waits for the window to reset, plus a second, when they do not fit', async () => {
+        const { room, wait } = paced({ 'ratelimit-remaining': '269', 'ratelimit-reset': '37' });
+        expect(await room(120)).toBe(38);
+        expect(wait).toHaveBeenCalledWith(38000);
+    });
+
+    it('never waits on a server that has the limit switched off', async () => {
+        const { room, wait } = paced({});
+        expect(await room(5000)).toBe(0);
+        expect(wait).not.toHaveBeenCalled();
     });
 });
