@@ -39,8 +39,8 @@
                 @keydown="onGridKey"
             >
                 <div class="tv2__head" role="row">
-                    <span role="columnheader"></span>
-                    <span role="columnheader" class="tv2__head-name" :aria-sort="ariaSort('TaskName')">
+                    <span role="columnheader" class="tv2__c-select"></span>
+                    <span role="columnheader" class="tv2__head-name tv2__c-name" :aria-sort="ariaSort('TaskName')">
                         <button
                             type="button"
                             class="tv2__sort"
@@ -103,9 +103,11 @@
                                 :aria-expanded="isSprintOpen(sprint)"
                                 @click="toggleSprint(sprint)"
                             >
-                                <span class="tv2__caret" :class="{ 'tv2__caret--open': isSprintOpen(sprint) }" aria-hidden="true">▸</span>
-                                <span class="tv2__sprint-name">{{ sprint.name }}</span>
-                                <span class="tv2__sprint-meta" :title="$t('List.sprint_total_hint')">{{ sprint.tasks || 0 }}</span>
+                                <span class="tv2__sprint-label">
+                                    <span class="tv2__caret" :class="{ 'tv2__caret--open': isSprintOpen(sprint) }" aria-hidden="true">▸</span>
+                                    <span class="tv2__sprint-name">{{ sprint.name }}</span>
+                                    <span class="tv2__sprint-meta" :title="$t('List.sprint_total_hint')">{{ sprint.tasks || 0 }}</span>
+                                </span>
                             </button>
                         </span>
                     </div>
@@ -126,7 +128,7 @@
                 </template>
             </div>
 
-            <div v-else class="d-flex align-items-center justify-content-center flex-column">
+            <div v-else class="tv2__empty">
                 <EmptyState
                     v-if="project?.deletedStatusKey !== 2"
                     :title="$t(emptyTitleKey)"

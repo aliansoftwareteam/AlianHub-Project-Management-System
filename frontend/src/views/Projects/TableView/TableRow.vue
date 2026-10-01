@@ -1,6 +1,6 @@
 <template>
     <div ref="rowRef" class="tv2__row" :class="{ 'is-selected': selected, 'is-sub': depth > 0 }" role="row" :data-row="data._id" v-bind="taskNavAttrs(data)" @click="$emit('open', data)">
-        <span role="cell" data-col="select" tabindex="-1" @click.stop>
+        <span role="cell" class="tv2__c-select" data-col="select" tabindex="-1" @click.stop>
             <input
                 v-if="canSelect"
                 type="checkbox"
@@ -12,7 +12,7 @@
             />
         </span>
 
-        <span role="cell" class="tv2__name-cell" data-col="name" tabindex="-1" :style="{ '--tv2-depth': depth }">
+        <span role="cell" class="tv2__name-cell tv2__c-name" data-col="name" tabindex="-1" :style="{ '--tv2-depth': depth }">
             <button
                 v-if="canNest && hasSubtasks"
                 type="button"

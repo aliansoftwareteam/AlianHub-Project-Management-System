@@ -1,11 +1,11 @@
 <template>
-    <div class="p-15px">
-        <div class="d-flex justify-content-between" v-if="!isSubTask">
+    <div class="board-create">
+        <div class="board-create__head" v-if="!isSubTask">
             <DropDown mode="listbox" @isVisible="(val) => isOpend = val">
                 <template #button>
-                    <div ref="sprintName" class="align-items-center cursor-pointer">
-                        <span class="font-size-13" >{{selectedSprint.name}}</span>
-                        <span class="ml-5px"><img src="@/assets/images/table_arrow.png" alt="" :style="`transform: rotateZ(${isOpend ? '90' : '0'}deg); opacity:0.5`"/></span>
+                    <div ref="sprintName" class="board-create__sprint cursor-pointer">
+                        <span>{{selectedSprint.name}}</span>
+                        <span class="ah-mask-icon board-create__caret" :class="{ 'is-open': isOpend }" :style="maskOf(caretIcon)" aria-hidden="true"></span>
                     </div>
                 </template>
 
@@ -14,12 +14,10 @@
                         <div v-if="item.isFolderSprint">
                             <DropDownOption @click="item.isFolderExpand = !item.isFolderExpand">
                                 <div>
-                                    <span>
-                                        <span class="mr-5px"><img src="@/assets/images/table_arrow.png" alt="" :style="`transform: rotateZ(${item.isFolderExpand ? '90' : '0'}deg);`"/></span>
-                                        <span class="m-5px">
-                                            <img class="mr-5px" src="@/assets/images/svg/blue_folder.svg">
-                                            <span class="text-ellipsis">{{item.folderName}}</span>
-                                        </span>
+                                    <span class="board-create__folder">
+                                        <span class="ah-mask-icon board-create__caret" :class="{ 'is-open': item.isFolderExpand }" :style="maskOf(caretIcon)" aria-hidden="true"></span>
+                                        <img src="@/assets/images/svg/blue_folder.svg" alt="">
+                                        <span class="text-ellipsis">{{item.folderName}}</span>
                                     </span>
                                 </div>
                             </DropDownOption>
@@ -32,7 +30,7 @@
                             </DropDownOption>
                         </div>
                         <div v-if="item.isFolderSprint && item.isFolderExpand">
-                            <div v-for="(foldSprint,index) in item.sprints" :key="index" class="ml-32px">
+                            <div v-for="(foldSprint,index) in item.sprints" :key="index" class="board-create__folder-list">
                                 <DropDownOption :selected="foldSprint.id === selectedSprint.id" @click="selectedSprint = foldSprint; $refs.sprintName.click()">
                                     <div>
                                         {{foldSprint.name}}
@@ -44,11 +42,11 @@
                 </template>
             </DropDown>
             <button type="button" class="board-create__close" :aria-label="$t('Projects.close')" @click="$emit('toggle', data.key)">
-                <img src="@/assets/images/crossBoardTaskIcon.png" alt=""/>
+                <span class="ah-mask-icon board-create__cross" :style="maskOf(closeIcon)" aria-hidden="true"></span>
             </button>
         </div>
-        <div class="d-flex align-items-center mt-10px w-100">
-            <div class="mr-10px">
+        <div class="board-create__name">
+            <div>
                 <TaskType
                     class="d-inline-block"
                     :id="selectedSprint.id+taskId+'create_taskType'"
@@ -73,11 +71,11 @@
                     'type':taskName.type,
                     'event':$event.event})"
                 />
-                <div v-if="save" class="position-ab z-index-1 save__error board-create__error" :style="[{fontSize : clientWidth > 480 ? '11px' : '10px', left : clientWidth > 480 ? '0px' : '0px',width : clientWidth > 480 ? '100%' : '320px'},]" >{{taskName.error}}</div>
+                <div v-if="save" class="position-ab z-index-1 save__error board-create__error">{{taskName.error}}</div>
             </div>
         </div>
-        <div class="d-flex justify-content-between align-items-center mt-15px board-create__row">
-            <div class="d-flex justify-content-between align-items-center">
+        <div class="board-create__row">
+            <div class="board-create__fields">
                 <Assignee
                     v-if="groupValue !== 1"
                     :users="assignee"
@@ -85,8 +83,7 @@
                     :num-of-users="3"
                     @selected="changeAssignee(checkApps('MultipleAssignees',projectData) ? 'add' : 'replace', $event)"
                     @removed="changeAssignee('remove', $event)"
-                    imageWidth="25px"
-                    class="mr-4px"
+                    imageWidth="var(--avatar-size)"
                     :isDisplayTeam="true"
                     :multiSelect="checkApps('MultipleAssignees')"
                 />
@@ -99,11 +96,11 @@
                     @SelectedDate="dueDate = $event?.dateVal"
                     :position="`right`"
                     :autoposition="false"
-                    class="ml-4px d-flex align-items-center font-size-11"
+                    class="board-create__due"
 
                 />
 
-                <span class="subtaskShape ml-8px" v-if="groupValue !== 2">
+                <span v-if="groupValue !== 2">
                     <Priority
                         :priorityVal="priority"
                         @select="changePriority"
@@ -111,10 +108,10 @@
                     />
                 </span>
             </div>
-            <div class="d-flex align-items-center board-create__end">
+            <div class="board-create__end">
                 <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click.stop.prevent="saveTask()">{{$t("Projects.save")}}</button>
                 <button v-if="isSubTask" type="button" class="board-create__close" :aria-label="$t('Projects.close')" @click.stop.prevent="$emit('toggle')">
-                    <img src="@/assets/images/crossBoardTaskIcon.png" alt=""/>
+                    <span class="ah-mask-icon board-create__cross" :style="maskOf(closeIcon)" aria-hidden="true"></span>
                 </button>
             </div>
         </div>
@@ -139,8 +136,10 @@
     import { useToast } from "vue-toast-notification";
     import { useI18n } from "vue-i18n";
     import { folderPathLabel } from "@/utils/folderTree";
+    import { maskOf } from "@/utils/iconMask";
     const { t } = useI18n();
-    const clientWidth = inject("$clientWidth");
+    const caretIcon = require("@/assets/images/table_arrow.png");
+    const closeIcon = require("@/assets/images/crossBoardTaskIcon.png");
     const companyId = inject("$companyId");
     const $toast = useToast()
     const {getUser} = useGetterFunctions()
@@ -417,19 +416,35 @@
 
 <style scoped>
 .priority__component {
-    min-width: 22px;
+    min-width: var(--hit-min);
+    min-height: var(--hit-min);
     border-radius: 50%;
     border: 1px solid var(--border);
     display: flex;
     justify-content: center;
     align-items: center;
     overflow: hidden;
-    padding: 6px 6px;
-    font-size: 12px;
+    font-size: var(--fs-sm, 12px);
 }
-.board-create__row { flex-wrap: wrap; gap: 8px; }
-.board-create__end { gap: 8px; margin-left: auto; }
-.board-create__close { display: inline-flex; padding: 0; border: 0; background: none; cursor: pointer; border-radius: 4px; }
+.board-create { padding: var(--card-pad-y, 15px) var(--card-pad-x, 15px); }
+.board-create__head { display: flex; justify-content: space-between; align-items: center; }
+.board-create__sprint { display: flex; align-items: center; gap: var(--gap-row, 5px); min-height: var(--hit-min); font-size: var(--fs-md, 13px); }
+.board-create__caret { width: 5px; height: 9px; color: var(--ink-2); transition: transform var(--t-state) var(--ease); }
+.board-create__caret.is-open { transform: rotate(90deg); }
+.board-create__folder { display: inline-flex; align-items: center; gap: var(--gap-row, 5px); }
+.board-create__folder-list { margin-left: 32px; }
+.board-create__name { display: flex; align-items: center; gap: var(--sp-4); width: 100%; margin-top: var(--gap-row, 10px); }
+.board-create__row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--sp-3); margin-top: var(--gap-stack, 15px); }
+.board-create__fields { display: flex; align-items: center; gap: var(--sp-3); }
+.board-create__due { display: flex; align-items: center; font-size: var(--fs-xs, 11px); }
+.board-create__end { display: flex; align-items: center; gap: var(--sp-3); margin-left: auto; }
+.board-create__close {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: var(--hit-min); height: var(--hit-min);
+    padding: 0; border: 0; background: none; color: var(--ink-2); cursor: pointer; border-radius: var(--r-sm, 4px);
+}
+.board-create__close:hover { background: var(--surface-hover); color: var(--ink); }
 .board-create__close:focus-visible { outline: none; box-shadow: var(--focus); }
-.board-create__error { color: var(--danger); }
+.board-create__cross { width: 10px; height: 10px; }
+.board-create__error { left: 0; width: 100%; font-size: var(--fs-xs, 11px); color: var(--danger); }
 </style>
