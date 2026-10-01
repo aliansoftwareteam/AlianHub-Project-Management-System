@@ -96,6 +96,8 @@
     --hit-min: 24px;
     /* How far a child row (a subtask) steps in from its parent's name. */
     --row-indent: var(--sp-8);
+    /* The least a task name keeps in a row, however many columns are shown beside it. */
+    --row-name-min: 130px;
 
     color-scheme: light;
 }
@@ -113,6 +115,7 @@
         --avatar-font: 9.5px;
         --chip-h: 18px;
         --chip-font: 10.5px;
+        --row-name-min: 110px;
     }
 }
 

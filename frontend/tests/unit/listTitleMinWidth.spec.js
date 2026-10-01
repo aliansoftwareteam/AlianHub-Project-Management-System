@@ -41,6 +41,13 @@ function rule(source, selector) {
     return match ? match[1] : '';
 }
 
+/* The rule whose whole selector this is, where `rule` would also take it as the last of a list. */
+function ownRule(source, selector) {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = source.match(new RegExp(`(?:^|\\})\\s*${escaped}\\s*\\{([^}]*)\\}`));
+    return match ? match[1] : '';
+}
+
 const declared = (body, property) => (body.match(new RegExp(`(?:^|[;\\s])${property}\\s*:\\s*([^;]+)`)) || [])[1]?.trim() || '';
 const customProperties = (body) => Object.fromEntries([...body.matchAll(/(--[\w-]+)\s*:\s*([^;]+)/g)].map(([, name, value]) => [name, value.trim()]));
 
@@ -157,8 +164,9 @@ describe('the List scrolls sideways when its columns do not fit', () => {
         expect(minWidth).toContain('var(--lv2-fixed-w');
         expect(minWidth).toContain('var(--lv2-title-min)');
         expect(declared(rule(wide, '.lv2__cols, .lv2__sprint'), 'min-width')).toBe('var(--lv2-min-w)');
-        const headPad = declared(rule(base, '.lv2__cols'), 'padding').match(/calc\([^)]*\)\)|[\d.]+px/g);
-        expect(contentMin() - px(vars['--lv2-fixed-w']) - titleMin()).toBe(px(headPad[1]) + px(headPad[3]));
+        const pad = 'var(--cell-pad-x, 12px)';
+        expect(declared(rule(base, '.lv2__cols'), 'padding')).toBe(`14px calc(${pad} + 1px) 8px calc(${pad} + 17px)`);
+        expect(contentMin() - px(vars['--lv2-fixed-w']) - titleMin()).toBe(2 * px(pad) + 18);
     });
 
     it('thirteen columns in a 1132px container overflow it, and the scroller scrolls both ways', () => {
@@ -193,8 +201,8 @@ describe('the List scrolls sideways when its columns do not fit', () => {
 });
 
 describe('the checkbox and the task name stay in view', () => {
-    const select = rule(wide, '.lv2__c-select');
-    const title = rule(wide, '.lv2__c-title');
+    const select = ownRule(wide, '.lv2__c-select');
+    const title = ownRule(wide, '.lv2__c-title');
 
     it('both stick to the left of the scroller, from tablet width up', () => {
         expect(declared(rule(wide, '.lv2__c-select, .lv2__c-title'), 'position')).toBe('sticky');
@@ -241,7 +249,11 @@ describe('a group header spans the group and keeps its label in view', () => {
     it('the select-all and the label stick to the left with the rows\' checkbox and name', () => {
         expect(group).toMatch(/<span class="lv2__group-label">\s*<span class="lv2__caret"[\s\S]*?<span class="lv2__group-meta">\{\{ headMeta \}\}<\/span>[\s\S]*?<\/span>\s*<span v-if="wip"/);
         expect(declared(rule(wide, '.lv2__group-select, .lv2__group-label'), 'position')).toBe('sticky');
-        expect(declared(rule(wide, '.lv2__group-select'), 'left')).toBe('0');
-        expect(px(declared(rule(wide, '.lv2__group-label'), 'left'))).toBeGreaterThan(0);
+        const checkRoom = px('var(--lv2-check-room)');
+        const selectLeft = px(declared(ownRule(wide, '.lv2__group-select'), 'left'));
+        expect(selectLeft + checkRoom).toBe(px(declared(ownRule(wide, '.lv2__c-select'), 'padding-left')));
+        const selectWidth = px(declared(rule(base, '.lv2__group-select'), 'width'));
+        const headInset = px(declared(rule(base, '.lv2__group-select + .lv2__group-head'), 'padding-left'));
+        expect(px(declared(ownRule(wide, '.lv2__group-label'), 'left'))).toBe(selectLeft + selectWidth + headInset);
     });
 });
