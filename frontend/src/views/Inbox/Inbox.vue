@@ -394,6 +394,7 @@ const glyphIcon = (it) => {
     if (it.kind === 'mention' || it.changeType === 'doc_mention') return 'at';
     if (it.changeType === 'agent_alert') return 'alert';
     if (it.changeType === 'goal_reached') return 'target';
+    if (it.changeType === 'credential_expiring') return 'key';
     if (it.changeType === 'agent_report') return 'agent';
     if (/milestone/i.test(it.key || '')) return 'alert';
     if (/status/i.test(it.key || '')) return 'refresh';
@@ -794,6 +795,10 @@ const open = (it) => {
     }
     if (it.changeType === 'goal_reached' && it.changeData?.goalId && router.hasRoute('Goal')) {
         router.push({ name: 'Goal', params: { cid: companyId?.value, goalId: String(it.changeData.goalId) } }).catch(() => {});
+        return;
+    }
+    if (it.changeType === 'credential_expiring' && router.hasRoute('AiAccounts')) {
+        router.push({ name: 'AiAccounts', params: { cid: companyId?.value }, query: { tab: it.changeData?.kind === 'connection' ? 'connected' : 'link' } }).catch(() => {});
         return;
     }
     if (alertNotice(it) && router.hasRoute('AiHealth')) {

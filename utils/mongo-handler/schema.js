@@ -446,6 +446,10 @@ const schema = {
         projectIds: { type: Array, default: [], required: false },
         // What the token was created to do beyond its scopes (Modules/Mcp/manageFlag.js); never changed afterwards.
         grants: { type: Array, default: [], required: false },
+        // When the secret in use was issued by a renewal; the lifetime is counted from here.
+        renewedAt: { type: Date, required: false },
+        // Set when the owner was told the token is about to end, so they are told once; a renewal clears it.
+        expiryNoticeAt: { type: Date, required: false },
     },
     // Per-call audit of token-authenticated API requests
     apiActivityLogs: {
@@ -1948,6 +1952,8 @@ const schema = {
         revokedAt: { type: Date, required: false },
         revokedReason: { type: String, required: false },
         lastUsedAt: { type: Date, required: false },
+        // Set when the person was told the grant is about to end, so they are told once.
+        expiryNoticeAt: { type: Date, required: false },
     },
     // kind is code, access, refresh or consent (an answered consent request). purgeAt drives the TTL index; a code outlives its expiry there so a replay is recognised.
     oauthTokens: {

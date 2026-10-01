@@ -276,6 +276,12 @@ describe('the paths no agent reaches', () => {
         expect(await through(session(OWNER), 'PUT', '/api/v2/sso/config')).toBe('passed');
     });
 
+    it('refuses an agent the renewal of a token, its own included', async () => {
+        const renew = `/api/v2/api-tokens/${agentToken(OWNER).apiToken._id}/renew`;
+        expect(await through(agentToken(OWNER), 'POST', renew)).toBe(403);
+        expect(await through(session(OWNER), 'POST', renew)).toBe('passed');
+    });
+
     it('stand in front of every module, so no route is registered ahead of them', () => {
         const source = (file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
         const modules = [...source('index.js').matchAll(/require\(\s*[`'"]\.\/(Modules\/[^`'"]+)[`'"]\s*\)\.init\(\s*app/g)].map((match) => match[1]);
