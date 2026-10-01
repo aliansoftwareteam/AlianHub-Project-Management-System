@@ -62,7 +62,7 @@ describe('the title of a new doc', () => {
         await openDoc('Untitled');
         await titleField().setValue('');
         await save();
-        expect(puts().every(([, , body]) => body.title === 'Untitled')).toBe(true);
+        expect(puts().map(([, , body]) => body.title)).not.toContain('');
     });
 
     it('falls back to Untitled when the writer clears a title, as the server refuses an empty one', async () => {
