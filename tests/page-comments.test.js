@@ -6,8 +6,9 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({
 }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
-jest.mock('../Modules/notification/prepare-notification-data/controllerV2', () => ({ handleNotificationtFun: jest.fn(async () => ({ status: true })) }));
-jest.mock('../Modules/Comments/helpers/noticeItems', () => ({ ensureCommentNoticeItems: jest.fn(async () => undefined) }));
+jest.mock('../Modules/notification/prepare-notification-data/controllerV2', () => ({ handleSingleNotification: jest.fn(async () => []) }));
+jest.mock('../Modules/notification/docNotices', () => ({ ensureDocNoticeSection: jest.fn(async () => undefined) }));
+jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../Config/contentAccess', () => ({
     projectAccess: jest.fn(async (companyId, uid, projectId) => {
         const visible = String(companyId) === mockIds.company && (mockProjectReaders[String(projectId)] || []).includes(String(uid));
@@ -40,9 +41,9 @@ const mockMembers = [];
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { dbCollections } = require('../Config/collections');
-const { Notification_key, COMMENT_NOTICE_ITEMS } = require('../Config/notificationKey');
+const { Notification_key, COMMENT_NOTICE_ITEMS, DOC_NOTICE_SECTION } = require('../Config/notificationKey');
 const socketEmitter = require('../event/socketEventEmitter');
-const { handleNotificationtFun } = require('../Modules/notification/prepare-notification-data/controllerV2');
+const { handleSingleNotification } = require('../Modules/notification/prepare-notification-data/controllerV2');
 const { schema } = require('../utils/mongo-handler/schema');
 const createSchema = require('../utils/mongo-handler/createSchema');
 const { checkType, tableType } = require('../utils/mongo-handler/mongoQueries');
@@ -72,7 +73,7 @@ const call = async (handler, uid, { params = {}, body = {}, companyId = C } = {}
 
 const stored = () => mockDb.store[SCHEMA_TYPE.PAGE_COMMENTS] || [];
 const storedById = (id) => stored().find((row) => String(row._id) === String(id));
-const notices = () => handleNotificationtFun.mock.calls.map(([{ body }]) => body);
+const notices = () => handleSingleNotification.mock.calls.map(([body]) => body);
 const emits = () => socketEmitter.emit.mock.calls.filter(([, payload]) => payload && payload.module === 'pageComments').map(([type, payload]) => ({ type, ...payload }));
 
 const seat = (userId, extra = {}) => mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, status: 2, ...extra });
@@ -363,9 +364,27 @@ describe('live updates', () => {
 });
 
 describe('notifications', () => {
-    test('doc comment notices are settings every member has', () => {
-        const keys = COMMENT_NOTICE_ITEMS.map((item) => item.key);
-        expect(keys).toEqual(expect.arrayContaining([Notification_key.DOC_COMMENT_MENTION, Notification_key.DOC_COMMENT_REPLY]));
+    test('doc comment notices sit in the Docs settings section, push on and email off', () => {
+        const items = DOC_NOTICE_SECTION.items.filter((item) => [Notification_key.DOC_COMMENT_MENTION, Notification_key.DOC_COMMENT_REPLY].includes(item.key));
+        expect(items).toHaveLength(2);
+        items.forEach((item) => expect(item).toMatchObject({ browser: true, mobile: true, email: false }));
+        expect(COMMENT_NOTICE_ITEMS.map((item) => item.key)).not.toEqual(expect.arrayContaining([Notification_key.DOC_COMMENT_MENTION]));
+    });
+
+    test('a settings document that already has the Docs section gains the comment notices, once', async () => {
+        const { ensureDocNoticeSection, forgetHealedDocNotices } = jest.requireActual('../Modules/notification/docNotices');
+        forgetHealedDocNotices();
+        const older = mockDb.seed(SCHEMA_TYPE.NOTIFICATIONS_SETTINGS, {
+            userId: mockIds.member,
+            docs: { key: 'docs', sectionName: 'Docs', items: [{ key: Notification_key.DOC_MENTION, browser: false, mobile: true, email: false }] },
+        });
+        const fresh = mockDb.seed(SCHEMA_TYPE.NOTIFICATIONS_SETTINGS, { userId: mockIds.author });
+        await ensureDocNoticeSection(C, [mockIds.member, mockIds.author]);
+        await ensureDocNoticeSection(C, [mockIds.member, mockIds.author]);
+        const keys = [Notification_key.DOC_MENTION, Notification_key.DOC_COMMENT_MENTION, Notification_key.DOC_COMMENT_REPLY];
+        expect(older.docs.items.map((item) => item.key)).toEqual(keys);
+        expect(older.docs.items[0].browser).toBe(false);
+        expect(fresh.docs.items.map((item) => item.key)).toEqual(keys);
     });
 
     test('a mention tells the people named who can read the doc, and nobody else', async () => {
@@ -375,6 +394,7 @@ describe('notifications', () => {
         expect(rest).toEqual([]);
         expect(notice).toEqual(expect.objectContaining({
             key: Notification_key.DOC_COMMENT_MENTION,
+            type: 'docs',
             companyId: C,
             projectId: mockIds.project,
             userId: mockIds.author,
@@ -385,15 +405,28 @@ describe('notifications', () => {
         expect(storedById(r.body.data._id).mentionIds).toEqual([mockIds.member]);
     });
 
-    test('a company doc names itself where a project would go', async () => {
+    test('a company doc sends a doc notice with no project, naming the doc in its change data', async () => {
         await post(mockIds.author, { message: `Hey @[Out](${mockIds.outsider})` }, { id: mockIds.companyPage });
-        expect(notices()[0]).toEqual(expect.objectContaining({ projectId: mockIds.companyPage, assigneeUsers: [mockIds.outsider] }));
+        const [notice] = notices();
+        expect(notice).toEqual(expect.objectContaining({ type: 'docs', assigneeUsers: [mockIds.outsider] }));
+        expect(notice.projectId).toBeUndefined();
+        expect(notice.changeData.pageId).toBe(mockIds.companyPage);
+    });
+
+    test('a doc comment notice with no project is a row the notifications schema accepts', () => {
+        const Notice = mongoose.models.PageCommentNoticeProbe || mongoose.model('PageCommentNoticeProbe', createSchema.notificationsSchema);
+        const row = new Notice({
+            key: Notification_key.DOC_COMMENT_REPLY, type: 'docs', message: 'Hi', companyId: C, userId: mockIds.author, receiverID: mockIds.member,
+            changeType: 'doc_comment', changeData: { pageId: mockIds.companyPage, commentId: mockIds.page },
+        });
+        const error = row.validateSync();
+        expect(error && error.errors.projectId).toBeUndefined();
     });
 
     test('a reply tells the thread author and earlier repliers, but not whoever it mentions or who wrote it', async () => {
         const root = await post(mockIds.author, { message: 'Root' });
         await post(mockIds.replier, { message: 'First reply', parentId: String(root.body.data._id) });
-        handleNotificationtFun.mockClear();
+        handleSingleNotification.mockClear();
         await post(mockIds.member, { message: `Agreed @[Rep](${mockIds.replier})`, parentId: String(root.body.data._id) });
         const byKey = Object.fromEntries(notices().map((n) => [n.key, n]));
         expect(byKey[Notification_key.DOC_COMMENT_MENTION].assigneeUsers).toEqual([mockIds.replier]);
@@ -402,7 +435,7 @@ describe('notifications', () => {
 
     test('an edit tells only the people it newly mentions', async () => {
         const root = await post(mockIds.author, { message: `Hi @[Member](${mockIds.member})` });
-        handleNotificationtFun.mockClear();
+        handleSingleNotification.mockClear();
         await call(comments.updateComment, mockIds.author, {
             params: { commentId: String(root.body.data._id) },
             body: { message: `Hi @[Member](${mockIds.member}) and @[Rep](${mockIds.replier})` },

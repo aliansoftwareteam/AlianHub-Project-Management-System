@@ -3,10 +3,14 @@
  * server would drop never shows up as an unsaved change. */
 
 const GROUP_BY = [0, 1, 2, 3];
+const CUSTOM_GROUP = /^cf:[a-f0-9]{24}$/i;
 const DONE_BY = ['all', 'human', 'agent', 'mixed', 'unchecked'];
 const SUBTASKS = ['collapsed', 'expanded'];
-const FILTER_TYPES = ['array', 'string', 'date', 'object', 'arrayOfObject'];
-const COMPARISONS = [':', ':!=', ':>', ':<', ':='];
+const WORKLOAD_UNITS = ['hours', 'points', 'count'];
+const FILTER_TYPES = ['array', 'string', 'date', 'object', 'arrayOfObject', 'custom'];
+const CUSTOM_FIELD_TYPES = ['dropdown', 'checkbox', 'date', 'number', 'money', 'text', 'textarea', 'email', 'phone'];
+const CUSTOM_VALUE = /^customField\.([a-f0-9]{24})\.fieldValue$/i;
+const COMPARISONS = [':', ':!=', ':>', ':<', ':=', ':~', ':set', ':empty'];
 const CONDITIONS = ['&&', '||'];
 const FIELD = /^[A-Za-z][A-Za-z0-9_.]{0,63}$/;
 const COLUMN_ID = /^[A-Za-z0-9_][A-Za-z0-9_:-]{0,63}$/;
@@ -25,6 +29,7 @@ const DEFAULT_VIEW_SETTINGS = Object.freeze({
     filters: [],
     sort: null,
     columns: Object.freeze({ order: [], shown: [], hidden: [] }),
+    workloadUnit: 'hours',
 });
 
 const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
@@ -46,10 +51,13 @@ const cleanFilterRow = (row) => {
     const filterOn = row.name.filterOn === undefined ? field : row.name.filterOn;
     if (!FIELD.test(String(field)) || !FIELD.test(String(filterOn))) return null;
     if (!FILTER_TYPES.includes(row.name.type) || !COMPARISONS.includes(row.comparison.value)) return null;
+    const custom = row.name.type === 'custom';
+    const fieldId = CUSTOM_VALUE.exec(String(filterOn))?.[1];
+    if (custom && (!fieldId || field !== `customField.${fieldId}` || !CUSTOM_FIELD_TYPES.includes(row.name.fieldType))) return null;
     const values = (Array.isArray(row.values) ? row.values : []).slice(0, LIMITS.values).map(scalar).filter((v) => v !== undefined);
     if (!values.length) return null;
     return {
-        name: { value: field, name: text(row.name.name, LIMITS.label), type: row.name.type, filterOn },
+        name: { value: field, name: text(row.name.name, LIMITS.label), type: row.name.type, ...(custom ? { fieldType: row.name.fieldType } : {}), filterOn },
         comparison: { value: row.comparison.value, name: text(row.comparison.name, LIMITS.label) },
         values,
         condition: CONDITIONS.includes(row.condition) ? row.condition : '&&',
@@ -87,7 +95,7 @@ const cleanSearchIn = (searchIn) => {
 const cleanViewSettings = (raw) => {
     const settings = isPlainObject(raw) ? raw : {};
     return {
-        groupBy: GROUP_BY.includes(settings.groupBy) ? settings.groupBy : DEFAULT_VIEW_SETTINGS.groupBy,
+        groupBy: GROUP_BY.includes(settings.groupBy) || (typeof settings.groupBy === 'string' && CUSTOM_GROUP.test(settings.groupBy)) ? settings.groupBy : DEFAULT_VIEW_SETTINGS.groupBy,
         me: settings.me === true,
         assignees: cleanAssignees(settings.assignees),
         search: text(settings.search, LIMITS.search),
@@ -97,6 +105,7 @@ const cleanViewSettings = (raw) => {
         filters: (Array.isArray(settings.filters) ? settings.filters : []).slice(0, LIMITS.filters).map(cleanFilterRow).filter(Boolean),
         sort: cleanSort(settings.sort),
         columns: cleanColumns(settings.columns),
+        workloadUnit: WORKLOAD_UNITS.includes(settings.workloadUnit) ? settings.workloadUnit : DEFAULT_VIEW_SETTINGS.workloadUnit,
     };
 };
 

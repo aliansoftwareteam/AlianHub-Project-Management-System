@@ -145,6 +145,22 @@ const READER_CATALOGUE = Object.freeze({
         params: Object.freeze({ maxChars: Object.freeze({ type: 'number', min: 200, max: 20000, default: 8000 }) }),
         fields: Object.freeze(['title', 'text']),
     }),
+    'task.ai_fields': Object.freeze({
+        label: 'The task\'s AI fields',
+        description: 'The AI fields that apply to the task\'s project, each by id and name with its template and whether the task has a value yet.',
+        params: Object.freeze({ limit: Object.freeze({ type: 'number', min: 1, max: 25, default: 10 }) }),
+        fields: Object.freeze(['count', 'empty', 'list', 'ids']),
+    }),
+    'project.pages': Object.freeze({
+        label: 'Stale pages in the project',
+        description: 'The project\'s shared pages that have gone stale: a wiki page past its review date, or any page not updated in the given number of days, oldest first with an excerpt of each.',
+        params: Object.freeze({
+            staleDays: Object.freeze({ type: 'number', min: 7, max: 730, default: 90 }),
+            limit: Object.freeze({ type: 'number', min: 1, max: 30, default: 15 }),
+            excerptChars: Object.freeze({ type: 'number', min: 0, max: 1000, default: 300 }),
+        }),
+        fields: Object.freeze(['count', 'stale', 'list', 'titles']),
+    }),
     url: Object.freeze({
         label: 'A page on a declared host',
         description: 'One GET to a host on the workspace egress allowlist, as text or a diff. A diff reads a GitHub pull request or GitLab merge request link as its .diff, stripped of markup and clipped to 30,000 characters.',
@@ -193,6 +209,7 @@ const EMIT_REQUIRED = Object.freeze({
     'task.link': Object.freeze(['url']),
     'task.status.set': Object.freeze(['status']),
     'task.update': Object.freeze(['fields']),
+    'aifield.fill': Object.freeze(['fieldId']),
     'task.assign': Object.freeze(['assigneeIds']),
     'task.sprint.move': Object.freeze(['sprintId']),
     'page.draft': Object.freeze(['title', 'text']),

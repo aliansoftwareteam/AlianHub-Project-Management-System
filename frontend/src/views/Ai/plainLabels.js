@@ -1,6 +1,6 @@
 // Built-in skills carry persona names ("Reviewer") in their records, which say
 // who rather than what; these keys are named from the i18n map instead.
-const BUILT_IN_SKILLS = Object.freeze(["brief.parse", "project.plan", "pr.summary", "risk.flags", "digest.ceo", "risk.today", "project.guide", "qa-review"]);
+const BUILT_IN_SKILLS = Object.freeze(["brief.parse", "project.plan", "pr.summary", "risk.flags", "digest.ceo", "risk.today", "project.guide", "qa-review", "fields.fill", "prd.draft", "wiki.upkeep"]);
 const NEVER_ACTIONS = Object.freeze(["project.delete", "task.delete", "billing.*", "deploy.production", "git.merge", "member.remove", "permissions.edit", "status.set(\"Done\")"]);
 const AUTONOMY_LEVELS = Object.freeze([0, 1, 2, 3]);
 

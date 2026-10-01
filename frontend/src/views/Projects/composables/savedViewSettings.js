@@ -4,6 +4,7 @@ import { cleanViewSettings, DEFAULT_VIEW_SETTINGS } from '@viewSettings';
 export { cleanViewSettings, DEFAULT_VIEW_SETTINGS };
 
 export const FILTERABLE_VIEWS = Object.freeze(['ProjectListView', 'ProjectKanban', 'TableView', 'Calendar']);
+export const SAVED_SETTINGS_VIEWS = Object.freeze([...FILTERABLE_VIEWS, 'Workload']);
 
 /* A private view copies the catalogue row's `_id`, so its own `id` is what tells it apart. */
 export const viewKeyOf = (view) => {

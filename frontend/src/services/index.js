@@ -4,6 +4,7 @@ import Cookies from 'js-cookie';
 import Store from "@/store/index";
 import { useCustomComposable } from '@/composable';
 import * as offline from '@/offline';
+import { forgetLocalePrefs } from '@/views/Settings/Language/localePrefs';
 const { logOut } = useAuth();
 export const SESSION_EXPIRED_KEY = "ah.sessionExpired";
 const apiHost = env.API_URI;
@@ -316,6 +317,7 @@ export function useAuth() {
         localStorage.removeItem("webTokens");
         localStorage.removeItem("updateToken");
         localStorage.removeItem('logged');
+        forgetLocalePrefs();
         try { offline.clearOffline(); } catch (e) { /* offline cleanup best-effort */ }
         if(value?.withOutRefresh !== true){
             window.location.reload();

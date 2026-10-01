@@ -18,6 +18,7 @@ vi.mock('@/components/atom/AlertBox/helper', () => ({ showAlertModal: vi.fn() })
 
 import DesignationMapping from '@/plugins/importUsers/components/molecules/DesignationMapping.vue';
 import ProjectFiltersToolbar from '@/views/Projects/components/ProjectFiltersToolbar.vue';
+import { PALETTE_OPEN_EVENT } from '@/components/molecules/AdvanceSearch/paletteKeys';
 
 const $t = (key) => key;
 let wrapper;
@@ -104,7 +105,7 @@ describe('the project filters toolbar', () => {
                 mocks: { $t },
                 stubs: {
                     ShellIcon: true, Assignee: true, TaskFilter: true, ProvenanceFilter: true, MonthlyCalendarMilestone: true,
-                    BurndownModal: true, RecentVisitsDropdown: true, GlobalSearchModal: true, EpicsPanel: true,
+                    BurndownModal: true, RecentVisitsDropdown: true, EpicsPanel: true,
                     ExportTasksDropdown: true, PagesPanel: true, PublicShareModal: true, ImportDialog: true,
                     AutoArchiveModal: true, EstimationScaleModal: true, Toggle: true,
                 },
@@ -153,5 +154,17 @@ describe('the project filters toolbar', () => {
         const list = await open('more_features');
         expect(list.getAttribute('role')).toBe('menu');
         expect(list.querySelectorAll('[role="menuitem"]').length).toBeGreaterThan(0);
+    });
+
+    it('global search opens the command palette rather than a search of its own', async () => {
+        const opened = vi.fn();
+        window.addEventListener(PALETTE_OPEN_EVENT, opened);
+        await mountToolbar();
+        const list = await open('more_features');
+        const item = [...list.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent.includes('Projects.global_search'));
+        item.click();
+        await settle();
+        window.removeEventListener(PALETTE_OPEN_EVENT, opened);
+        expect(opened).toHaveBeenCalledTimes(1);
     });
 });

@@ -10,6 +10,7 @@ const ALLOWED_TAGS = [
 const ALLOWED_ATTR = [
     "href", "target", "rel", "src", "alt", "title", "class", "style", "colspan", "rowspan", "width", "height",
     "spellcheck", "data-list", "data-checked", "data-tone", "data-task-id", "data-project-id", "data-status-type", "data-service",
+    "data-mention", "data-id", "data-image-key",
 ];
 
 const LINK_URL = /^(https?:|mailto:)/i;

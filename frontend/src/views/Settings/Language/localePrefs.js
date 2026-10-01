@@ -45,12 +45,28 @@ const DEFAULTS = {
     currency: "USD"
 };
 
-const read = () => {
+const PREF_KEYS = Object.keys(DEFAULTS);
+
+const pickPrefs = (source) => PREF_KEYS.reduce((out, key) => {
+    if (source && typeof source[key] === "string" && source[key]) out[key] = source[key];
+    return out;
+}, {});
+
+const readStored = () => {
     try {
-        return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") };
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
     } catch (error) {
-        return { ...DEFAULTS };
+        return null;
     }
+};
+
+const read = () => ({ ...DEFAULTS, ...pickPrefs(readStored()) });
+
+// A copy without an owner predates the stamp and is taken to be the signed-in person's.
+const storedCopyOf = (uid) => {
+    const stored = readStored();
+    if (!stored || (stored.owner && uid && stored.owner !== String(uid))) return null;
+    return pickPrefs(stored);
 };
 
 export const localePrefs = reactive(read());
@@ -117,7 +133,8 @@ export function formatDate(value, prefs = localePrefs) {
 export function savePrefs(patch) {
     Object.assign(localePrefs, patch || {});
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...localePrefs }));
+        const owner = localStorage.getItem("userId") || undefined;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...localePrefs, owner }));
     } catch (error) {
         // A blocked storage quota must not stop the setting from taking effect.
     }
@@ -132,4 +149,34 @@ export function bootLocaleDirection() {
     const language = localStorage.getItem("language") || stored.language;
     Object.assign(localePrefs, stored, { language });
     return applyDirection(language);
+}
+
+// The account's copy wins on every device; with none, this browser's copy is returned so the
+// caller can send it up once. The profile's languageCode beats the copy's language because
+// My Settings changes only languageCode.
+export function adoptAccountPrefs(user = {}) {
+    const fromAccount = pickPrefs(user.localePreferences);
+    const language = user.languageCode || fromAccount.language || "";
+    const withLanguage = language ? { language } : {};
+    if (Object.keys(fromAccount).length) {
+        savePrefs({ ...DEFAULTS, ...fromAccount, ...withLanguage });
+        return { language, upload: null };
+    }
+    const local = storedCopyOf(user._id || localStorage.getItem("userId"));
+    if (!local) {
+        forgetLocalePrefs();
+        Object.assign(localePrefs, withLanguage);
+        applyDirection(localePrefs.language);
+        return { language, upload: null };
+    }
+    return { language, upload: savePrefs({ ...DEFAULTS, ...local, ...withLanguage }) };
+}
+
+export function forgetLocalePrefs() {
+    try {
+        localStorage.removeItem(STORAGE_KEY);
+    } catch (error) {
+        return;
+    }
+    Object.assign(localePrefs, DEFAULTS, { language: localePrefs.language });
 }

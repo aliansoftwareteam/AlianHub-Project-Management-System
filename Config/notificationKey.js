@@ -4,8 +4,6 @@ const Notification_key = {
   COMMENTS_IM_MENTIONS_IN:"comments_I'm_@mentioned_in",
   COMMENT_REPLY:"comment_reply",
   COMMENT_ASSIGNED:"comment_assigned",
-  DOC_COMMENT_MENTION:"doc_comment_mention",
-  DOC_COMMENT_REPLY:"doc_comment_reply",
   CREATE_TASK:"task_create",
   TASK_NAME:"task_edit",
   TASK_NOTIFICATION:"task_notification",
@@ -49,6 +47,9 @@ const Notification_key = {
   PROJECT_MILESTONE_STATUS_CHANGE:"project_milestone_status_change",
   PROJECT_SPRINT_CREATE:"project_sprint_create",
   PROJECT_FOLDER_CREATE:"project_folder_create",
+  DOC_MENTION:"doc_mention",
+  DOC_COMMENT_MENTION:"doc_comment_mention",
+  DOC_COMMENT_REPLY:"doc_comment_reply",
 }
 const TemplateType = {
  CREATE:'create',
@@ -85,13 +86,26 @@ const ChangeTypes={
 const COMMENT_NOTICE_ITEMS = Object.freeze([
   { name: "Replies to my comments", email: false, browser: true, mobile: true, key: Notification_key.COMMENT_REPLY },
   { name: "Comments assigned to me", email: false, browser: true, mobile: true, key: Notification_key.COMMENT_ASSIGNED },
-  { name: "Doc comments I'm @mentioned in", email: false, browser: true, mobile: true, key: Notification_key.DOC_COMMENT_MENTION },
-  { name: "Replies to my doc comments", email: false, browser: true, mobile: true, key: Notification_key.DOC_COMMENT_REPLY },
 ]);
+
+// A settings section, and items in it, added after users had settings documents; Modules/notification/docNotices.js adds them to older ones.
+const DOC_NOTICE_SECTION = Object.freeze({
+  key: "docs",
+  sectionName: "Docs",
+  items: Object.freeze([
+    Object.freeze({ name: "Docs I'm @mentioned in", email: false, browser: true, mobile: true, key: Notification_key.DOC_MENTION }),
+    Object.freeze({ name: "Doc comments I'm @mentioned in", email: false, browser: true, mobile: true, key: Notification_key.DOC_COMMENT_MENTION }),
+    Object.freeze({ name: "Replies to my doc comments", email: false, browser: true, mobile: true, key: Notification_key.DOC_COMMENT_REPLY }),
+  ]),
+});
+
+const docNoticeSection = () => ({ ...DOC_NOTICE_SECTION, items: DOC_NOTICE_SECTION.items.map((item) => ({ ...item })) });
 
 module.exports = {
     Notification_key,
     COMMENT_NOTICE_ITEMS,
+    DOC_NOTICE_SECTION,
+    docNoticeSection,
     TemplateType,
     ChangeTypes
 };

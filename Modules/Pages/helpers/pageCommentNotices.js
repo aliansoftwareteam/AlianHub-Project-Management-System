@@ -1,11 +1,11 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { ACTIVE_SEAT } = require('../../../Config/seatStatus');
-const { Notification_key: { DOC_COMMENT_MENTION, DOC_COMMENT_REPLY } } = require('../../../Config/notificationKey');
+const { Notification_key: { DOC_COMMENT_MENTION, DOC_COMMENT_REPLY }, DOC_NOTICE_SECTION } = require('../../../Config/notificationKey');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { isPerson } = require('../../Users/helpers/reportingLine');
-const { handleNotificationtFun } = require('../../notification/prepare-notification-data/controllerV2');
-const { ensureCommentNoticeItems } = require('../../Comments/helpers/noticeItems');
+const notices = require('../../notification/prepare-notification-data/controllerV2');
+const { ensureDocNoticeSection } = require('../../notification/docNotices');
 const { parseMentionIds } = require('../../Comments/helpers/parseMentions');
 const { canUsePage } = require('./pageAccess');
 
@@ -34,13 +34,14 @@ const mentionedReaders = (companyId, page, authorId, message) => readersOf(
     parseMentionIds(message).filter((uid) => uid !== text(authorId)),
 );
 
-/* A doc outside any project names itself where the project goes: every notice row has to carry a container id. */
+/* Sent as a doc notice, the way a doc mention is: the row names the doc in changeData, and carries a project only
+ * when the doc has one. */
 const send = async (companyId, key, page, comment, recipients) => {
     if (!recipients.length) return;
-    await ensureCommentNoticeItems(companyId, recipients);
-    await handleNotificationtFun({ body: {
+    await ensureDocNoticeSection(companyId, recipients);
+    await notices.handleSingleNotification({
         key,
-        type: 'tasks',
+        type: DOC_NOTICE_SECTION.key,
         changeType: DOC_COMMENT_CHANGE,
         changeData: {
             pageId: text(page._id),
@@ -51,17 +52,13 @@ const send = async (companyId, key, page, comment, recipients) => {
         },
         message: text(comment.message),
         companyId: text(companyId),
-        projectId: text(page.ProjectID || page._id),
-        taskId: '',
-        sprintId: '',
-        folderId: '',
+        projectId: page.ProjectID ? text(page.ProjectID) : undefined,
         userId: text(comment.userId),
         assigneeUsers: recipients,
         notSeen: recipients,
         directUsers: recipients,
         isSelected: false,
-        comments_id: '',
-    } });
+    });
 };
 
 const earlierRepliers = async (companyId, threadId) => {

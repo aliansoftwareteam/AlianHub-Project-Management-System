@@ -267,7 +267,8 @@
                                 :doneBy="doneBy"
                                 v-model:userSidebar="userSidebar"
                                 v-model:collapsed="collapsed"
-                                v-model:groupBy="groupBy"
+                                :groupBy="shownGroupBy"
+                                @update:groupBy="(value) => groupBy = value"
                                 :groupByOptions="groupByOptions"
                                 :users="users"
                                 :teams="teams"
@@ -311,7 +312,7 @@
                                 :data="selectedEmbedView"
                                 :sprints="sprints"
                                 :projectData="projectData"
-                                :grouped="groupBy"
+                                :grouped="shownGroupBy"
                                 :billingPeriod="billingPer"
                                 :startDate="projectStartDate"
                                 :userIds="projectData?.isPrivateSpace ? (projectData?.AssigneeUserId || []) : users?.map((x) => x._id)"
@@ -416,9 +417,6 @@
         />
     </div>
     <AppState v-else kind="forbidden" />
-    <!-- List and Table ship their own bulk bar (ListBulkBar); the legacy one would
-         otherwise mount on top of it. -->
-    <BulkActionBar v-if="!hasOwnBulkBar" />
 </template>
 
 <script setup>
@@ -438,7 +436,6 @@ import { canUseAi } from '@/composable/aiAvailability';
 
 // COMPONENTS
 import ConfirmationSidebar from '@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue';
-import BulkActionBar from '@/components/molecules/BulkActionBar/BulkActionBar.vue';
 import WasabiImage from '@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue';
 import AddViewMenu from '@/components/molecules/ProjectViews/AddViewMenu.vue';
 import UpgradYourPlanComponent from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
@@ -500,6 +497,8 @@ import { useSavedViews } from './composables/useSavedViews';
 import { viewKeyOf } from './composables/savedViewSettings';
 import { provideViewSettings } from './composables/viewSettingsContext';
 import { VIEW_FILTER_ROWS } from './composables/taskFilterSignal';
+import { useProjectCustomFields } from './composables/projectCustomFields';
+import { customGroupOptions } from './composables/customFieldQuery';
 
 import { useProjectsHelper } from './helper';
 import { isOwnerOrAdmin } from "@/utils/roles";
@@ -760,12 +759,24 @@ const icons = ref({
     Youtube: require('@/assets/images/svg/Youtube.svg'),
     Figma: require('@/assets/images/svg/figma.svg'),
 });
-const groupByOptions = ref([
+const BUILT_IN_GROUPS = [
     { label: 'status', image: require('@/assets/images/groupbySattus.png'), id: 0 },
     { label: 'assignee', image: require('@/assets/images/svg/person.svg'), id: 1 },
     { label: 'priority', image: require('@/assets/images/groupbyFlag.png'), id: 2 },
     { label: 'due_date', image: require('@/assets/images/calendar_month.png'), id: 3 },
+];
+const CUSTOM_GROUP_ICONS = {
+    dropdown: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldDropdownGrey.svg'),
+    checkbox: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldCheckboxGrey.svg'),
+    date: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldDateGrey.svg'),
+};
+const { defs: projectFieldDefs } = useProjectCustomFields(projectData);
+const groupByOptions = computed(() => [
+    ...BUILT_IN_GROUPS,
+    ...customGroupOptions(projectFieldDefs.value).map((option) => ({ ...option, image: CUSTOM_GROUP_ICONS[option.fieldType] })),
 ]);
+/* A view saved on a field that was deleted, or that this person cannot see, groups by status. */
+const shownGroupBy = computed(() => (groupByOptions.value.some((option) => option.id === groupBy.value) ? groupBy.value : 0));
 
 const projectDetailPermission = computed(() => checkPermission('project.project_details', projectData.value.isGlobalPermission, { gettersVal: getters }));
 
@@ -1040,8 +1051,6 @@ const headerSprint = computed(() => (sprints.value.length === 1 && !sprints.valu
 const canAiAssist = computed(() => canUseAi({ project: projectData.value, permitted: checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true }));
 // Only shown where a view actually answers the request (the board injects
 // `addTaskRequest`); other views opt in by injecting it too.
-const OWN_BULK_BAR_VIEWS = ['ProjectListView', 'TableView', 'ProjectKanban'];
-const hasOwnBulkBar = computed(() => OWN_BULK_BAR_VIEWS.includes(activeTab.value));
 const ADD_TASK_VIEWS = ['ProjectKanban'];
 const canAddTask = computed(() => ADD_TASK_VIEWS.includes(activeTab.value) && checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true);
 const addTaskRequest = ref(0);

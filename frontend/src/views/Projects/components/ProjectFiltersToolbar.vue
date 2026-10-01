@@ -89,14 +89,14 @@
                         <template #button="{ triggerAttrs }">
                             <button type="button" class="text-nowrap btn-white border-groupBy pft__pill cursor-pointer" ref="group_by_status" :title="$t('Projects.group_by')" :aria-label="$t('Projects.group_by')" v-bind="triggerAttrs">
                                 <ShellIcon name="layout" :size="14" />
-                                <span>{{ $t(`Projects.${groupByOptions.find(x => x.id === groupBy).label}`) }}</span>
+                                <span class="pft__group-label">{{ groupLabel(groupByOptions.find(x => x.id === groupBy)) }}</span>
                             </button>
                         </template>
                         <template #options>
                             <DropDownOption v-for="item in groupByOptions" :key="item.id" :selected="item.id === groupBy" @click="$emit('update:groupBy', item.id); $refs.group_by_status.click()" :class="{'bg-light-gray' : item.id === groupBy}">
                                 <div>
                                     <img :src="item.image" alt="" class="pr-10px">
-                                    <span :class="{'purple' : item.id === groupBy}">{{ $t(`Projects.${item.label}`) }}</span>
+                                    <span :class="{'purple' : item.id === groupBy}">{{ groupLabel(item) }}</span>
                                 </div>
                             </DropDownOption>
                         </template>
@@ -206,7 +206,6 @@
             </div>
         </div>
         <template v-if="isListLike">
-            <GlobalSearchModal v-model="showGlobalSearch" />
             <RecentVisitsDropdown v-model="showRecent" />
             <BurndownModal v-model="showBurndown" :projectData="projectData" />
             <EpicsPanel v-model="showEpics" :projectData="projectData" />
@@ -222,6 +221,7 @@
 
 <script setup>
 import { ref, computed, defineProps, defineEmits, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { canUseAi } from "@/composable/aiAvailability";
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useRoute } from 'vue-router';
@@ -234,7 +234,7 @@ import ProvenanceFilter from '@/components/molecules/Provenance/ProvenanceFilter
 import MonthlyCalendarMilestone from '@/components/atom/MonthlyCalendarMilestone/MonthlyCalendarMilestone.vue';
 import BurndownModal from '@/components/molecules/Burndown/BurndownModal.vue';
 import RecentVisitsDropdown from '@/components/molecules/RecentVisits/RecentVisitsDropdown.vue';
-import GlobalSearchModal from '@/components/molecules/GlobalSearch/GlobalSearchModal.vue';
+import { openPalette } from '@/components/molecules/AdvanceSearch/paletteKeys';
 import EpicsPanel from '@/components/molecules/Epics/EpicsPanel.vue';
 import ExportTasksDropdown from '@/components/molecules/ExportTasks/ExportTasksDropdown.vue';
 import PagesPanel from '@/components/molecules/Pages/PagesPanel.vue';
@@ -247,6 +247,8 @@ import { clearFilterSignal } from '@/views/Projects/composables/taskFilterSignal
 import ProjectFiltersSheet from './ProjectFiltersSheet.vue';
 
 const PHONE_MAX = 767;
+const { t } = useI18n();
+const groupLabel = (option) => (option?.title !== undefined ? option.title : t(`Projects.${option?.label || 'status'}`));
 const LIST_LIKE_TABS = ['ProjectListView', 'ProjectKanban', 'TableView'];
 // Menus opened from the sheet have to stack above its backdrop.
 const SHEET_MENU_Z = 70;
@@ -256,7 +258,6 @@ InPlace.props = ['open'];
 InPlace.inheritAttrs = false;
 
 const showBurndown = ref(false);
-const showGlobalSearch = ref(false);
 const showEpics = ref(false);
 const showPages = ref(false);
 const showPublicShare = ref(false);
@@ -285,7 +286,7 @@ const props = defineProps({
     doneBy: { type: String, default: 'all' },
     userSidebar: { type: Boolean, default: false },
     collapsed: { type: Boolean, default: true },
-    groupBy: { type: Number, default: 0 },
+    groupBy: { type: [Number, String], default: 0 },
     groupByOptions: { type: Array, default: () => [] },
     users: { type: Array, default: () => [] },
     teams: { type: Array, default: () => [] },
@@ -376,7 +377,7 @@ const moreGroups = computed(() => {
     }
     groups.push(
         { key: 'find', items: [
-            { key: 'search', label: 'Projects.global_search', open: opener(showGlobalSearch) },
+            { key: 'search', label: 'Projects.global_search', open: openPalette },
             { key: 'recent', label: 'Projects.recent_tasks', open: opener(showRecent) }
         ] },
         { key: 'insights', items: [

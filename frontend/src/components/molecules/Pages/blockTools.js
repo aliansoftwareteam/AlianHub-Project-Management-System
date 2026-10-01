@@ -1,9 +1,11 @@
 import { richHtml } from '@/utils/richHtml';
 import { statusChipCss } from '@/utils/statusChipColors';
+import { MENTION_SANITIZE } from './docMentions';
 
 const CALLOUT_TONES = ['info', 'warn', 'ok', 'danger'];
 const STATUS_TYPES = ['open', 'close', 'all'];
 const TASK_LIST_LIMIT = 30;
+const IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 
 const svg = (paths) => `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
 const ICONS = {
@@ -157,47 +159,103 @@ function makeQuote(ctx) {
 }
 
 function makeImage(ctx) {
-    return class ImageByUrl {
+    return class DocImage {
         static get toolbox() { return { title: ctx.t('Docs.block_image'), icon: ICONS.image }; }
         static get isReadOnlySupported() { return true; }
+        static get pasteConfig() {
+            return { files: { mimeTypes: IMAGE_MIME_TYPES } };
+        }
 
         constructor({ data, readOnly }) {
             this.readOnly = readOnly;
-            this.data = { url: (data && data.url) || '', caption: (data && data.caption) || '' };
+            this.data = { url: (data && data.url) || '', key: (data && data.key) || '', caption: (data && data.caption) || '' };
         }
 
         render() {
             this.wrapper = el('figure', 'pb-image');
-            if (this.data.url) this.renderImage(); else this.renderForm();
+            if (this.data.url || this.data.key) this.renderImage(); else this.renderForm();
             return this.wrapper;
         }
 
-        renderForm() {
+        onPaste(event) {
+            if (event.type === 'file') this.upload(event.detail.file);
+        }
+
+        renderForm(message = '') {
             this.wrapper.innerHTML = '';
             if (this.readOnly) return;
             const form = el('div', 'pb-image__form');
+            const picker = el('input', 'pb-image__file');
+            picker.type = 'file';
+            picker.accept = IMAGE_MIME_TYPES.join(',');
+            picker.addEventListener('change', () => { if (picker.files && picker.files[0]) this.upload(picker.files[0]); });
+            const choose = el('button', 'ah-btn ah-btn--sm ah-btn--secondary', ctx.t('Docs.image_upload'));
+            choose.type = 'button';
+            choose.addEventListener('click', () => picker.click());
             const input = el('input', 'ah-input');
             input.type = 'url';
             input.placeholder = ctx.t('Docs.image_url');
+            input.setAttribute('aria-label', ctx.t('Docs.image_url'));
             isolateKeys(input);
             const commit = () => {
                 const url = input.value.trim();
                 if (!/^https?:\/\//i.test(url)) return;
-                this.data.url = url;
+                this.data = { ...this.data, url, key: '' };
                 this.renderImage();
             };
             input.addEventListener('keydown', (event) => { if (event.key === 'Enter') commit(); });
             input.addEventListener('blur', commit);
-            form.append(el('span', 'ah-label', ctx.t('Docs.block_image_hint')), input);
+            form.addEventListener('dragover', (event) => { event.preventDefault(); form.classList.add('is-over'); });
+            form.addEventListener('dragleave', () => form.classList.remove('is-over'));
+            form.addEventListener('drop', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                form.classList.remove('is-over');
+                const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+                if (file) this.upload(file);
+            });
+            const row = el('div', 'pb-image__row');
+            row.append(choose, input);
+            form.append(el('span', 'ah-label', ctx.t('Docs.block_image_hint')), row, picker);
+            if (message) {
+                const note = el('span', 'pb-image__error', message);
+                note.setAttribute('role', 'alert');
+                form.appendChild(note);
+            }
             this.wrapper.appendChild(form);
-            setTimeout(() => input.focus(), 0);
+            setTimeout(() => choose.focus(), 0);
+        }
+
+        async upload(file) {
+            if (this.readOnly || !file) return;
+            if (!IMAGE_MIME_TYPES.includes(String(file.type).toLowerCase())) {
+                this.renderForm(ctx.t('Docs.image_type_refused'));
+                return;
+            }
+            if (!ctx.canStoreImage(file)) return;
+            this.wrapper.innerHTML = '';
+            const busy = el('div', 'pb-image__form pb-image__busy', ctx.t('Docs.image_uploading'));
+            busy.setAttribute('role', 'status');
+            this.wrapper.appendChild(busy);
+            try {
+                const key = await ctx.uploadImage(file);
+                if (!key) throw new Error('no key');
+                this.data = { ...this.data, key, url: '' };
+                this.renderImage();
+            } catch (error) {
+                this.renderForm(ctx.t((error && error.i18nKey) || 'Docs.image_upload_failed'));
+            }
         }
 
         renderImage() {
             this.wrapper.innerHTML = '';
             const img = el('img');
-            img.src = this.data.url;
             img.alt = this.data.caption;
+            if (this.data.key) {
+                ctx.imageUrl(this.data.key).then((src) => { if (src) img.src = src; }).catch(() => {});
+            } else {
+                img.src = this.data.url;
+            }
             this.caption = el('figcaption', 'pb-image__caption');
             this.caption.contentEditable = String(!this.readOnly);
             this.caption.textContent = this.data.caption;
@@ -206,8 +264,33 @@ function makeImage(ctx) {
         }
 
         save() {
-            return { url: this.data.url, caption: this.caption ? this.caption.textContent.trim() : this.data.caption };
+            return {
+                url: this.data.key ? '' : this.data.url,
+                key: this.data.key,
+                caption: this.caption ? this.caption.textContent.trim() : this.data.caption,
+            };
         }
+    };
+}
+
+function makeMention(ctx) {
+    return class MentionInline {
+        static get isInline() { return true; }
+        static get title() { return ctx.t('Docs.mention'); }
+        static get sanitize() { return MENTION_SANITIZE; }
+
+        render() {
+            this.button = el('button', 'ce-inline-tool pb-mention-tool', '@');
+            this.button.type = 'button';
+            this.button.setAttribute('aria-label', ctx.t('Docs.mention'));
+            return this.button;
+        }
+
+        surround(range) {
+            if (range && ctx.openMentionPicker) ctx.openMentionPicker(range.cloneRange(), range.toString());
+        }
+
+        checkState() { return false; }
     };
 }
 
@@ -390,6 +473,7 @@ export function createBlockTools(ctx) {
         image: { class: makeImage(ctx) },
         task: { class: makeTask(ctx) },
         taskList: { class: makeTaskList(ctx) },
+        mention: { class: makeMention(ctx) },
     };
 }
 

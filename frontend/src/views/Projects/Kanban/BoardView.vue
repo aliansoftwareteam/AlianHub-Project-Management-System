@@ -43,6 +43,7 @@
             <template v-if="processedBoardData.length && sprints?.length">
                 <ListBulkBar v-if="projectData?._id" :project="projectData" />
                 <div class="board-card-fields">
+                    <ListSortControl :sort="boardSort.sort.value" :options="sortOptions" :dragNote="false" @key="boardSort.setKey" @dir="boardSort.setDir" />
                     <ViewColumnChooser
                         titleKey="ViewColumns.card_fields"
                         :columns="cardFields.columns.value"
@@ -82,6 +83,9 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 import ViewColumnChooser from '@/views/Projects/components/columns/ViewColumnChooser.vue';
 import { columnCatalogue, useViewColumns } from '@/views/Projects/composables/viewColumns';
+import ListSortControl from '@/views/Projects/ListView/ListSortControl.vue';
+import { sortChoices, sortTasks, useListSort } from '@/views/Projects/composables/viewSort';
+import { useProjectCustomFields } from '@/views/Projects/composables/projectCustomFields';
 
 // Helpers
 import { taskListHelper } from '@/views/Projects/helper.js';
@@ -91,7 +95,7 @@ const route = useRoute();
 
 // --- Props & Emits ---
 const props = defineProps({
-    grouped: { type: Number, default: 0 },
+    grouped: { type: [Number, String], default: 0 },
     commonDateFormatForDate: { type: String, default: "DD/MM/YYYY" },
     sprints: { type: Array, default: () => [] },
     projectData: { type: Object, default: () => { } },
@@ -107,8 +111,21 @@ const searchedTask = inject('searchedTask');
 const project = inject('selectedProject');
 const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
 
-const cardFields = useViewColumns(computed(() => project.value?._id), 'board', computed(() => columnCatalogue('board')));
+const customFields = useProjectCustomFields(project, { archived: showArchiveVar });
+const cardCatalogue = computed(() => columnCatalogue('board', { fields: customFields.defs.value }));
+const cardFields = useViewColumns(computed(() => project.value?._id), 'board', cardCatalogue);
 provide('boardCardFields', cardFields.visibleColumns);
+provide('boardFieldTasks', customFields.allTasks);
+
+const boardSort = useListSort();
+const sortOptions = computed(() => sortChoices(customFields.defs.value));
+const userNames = computed(() => new Map((getters['users/users'] || []).map((user) => [user._id, user.Employee_Name])));
+const sortContext = computed(() => ({
+    priorities: getters['settings/companyPriority'] || [],
+    statuses: project.value?.taskStatusData || [],
+    fields: customFields.defs.value,
+    userName: (id) => userNames.value.get(id)
+}));
 
 // --- Reactive State ---
 const isLoading = ref(true);
@@ -174,9 +191,10 @@ const processedBoardData = computed(() => {
                 tasksForGroup.sort((a, b) => a.groupByPriorityIndex - b.groupByPriorityIndex);
                 break;
             default:
-                tasksForGroup = filteredSourceTasks.filter(task => task[group.searchKey] === group.searchValue);
+                tasksForGroup = filteredSourceTasks.filter(task => (group.customFieldId ? taskInGroup(task, group) : task[group.searchKey] === group.searchValue));
                 break;
         }
+        tasksForGroup = sortTasks(tasksForGroup, boardSort.sort.value, sortContext.value);
 
         // If subtasks don't need filtering here, remove this map.
         const processedTasks = tasksForGroup.map(task => {
@@ -197,7 +215,7 @@ const processedBoardData = computed(() => {
             ...group,
             sprintId: currentSprintId,
             tasksArray: processedTasks,
-            disabled: group.searchKey === "DueDate" && ["Next", "Overdue", "No Due Date"].includes(group.name),
+            disabled: group.dropDisabled || (group.searchKey === "DueDate" && ["Next", "Overdue", "No Due Date"].includes(group.name)),
             totalTaskCounts: dataKeys || {},
         };
     });
@@ -245,5 +263,6 @@ onMounted(async () => {
 <style src="./new-style.css" />
 
 <style>
-.board-card-fields { display: flex; justify-content: flex-end; padding: 6px 20px 0; }
+.board-card-fields { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 6px 20px 0; }
+@media (max-width: 767px) { .board-card-fields { padding: 6px 16px 0; } }
 </style>

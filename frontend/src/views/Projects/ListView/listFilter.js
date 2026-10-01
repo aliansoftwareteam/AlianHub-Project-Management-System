@@ -1,3 +1,5 @@
+import { customGroupMatches } from "@/views/Projects/composables/customFieldQuery";
+
 const assigneeIds = (task) => {
     const ids = task?.AssigneeUserId;
     if (Array.isArray(ids)) return ids.map(String);
@@ -25,6 +27,7 @@ function dueDateMatches(task, item) {
    shared task appears under each of its assignees; the group with no value holds the
    unassigned tasks. */
 export function taskInGroup(task, item) {
+    if (item.customFieldId) return customGroupMatches(task, item);
     if (item.searchKey === "DueDate") return dueDateMatches(task, item);
     if (item.searchKey === "AssigneeUserId") {
         const ids = assigneeIds(task);

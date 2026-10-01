@@ -135,6 +135,17 @@
                     <span class="agent-proposal__who">✦ {{ agentProposal.agentName }}:</span> {{ proposalTitle(t, agentProposal) }}
                     <button type="button" class="agent-proposal__review" @click.stop="openAiInbox()">{{ $t('Projects.review') }}</button>
                 </div>
+                <dl v-if="cardFieldValues.length" class="card-fields">
+                    <div v-for="entry in cardFieldValues" :key="entry.id" class="card-field">
+                        <dt class="card-field__name" :title="entry.label">{{ entry.label }}</dt>
+                        <dd class="card-field__value" :title="entry.text">
+                            <template v-if="entry.choices.length">
+                                <span v-for="option in entry.choices" :key="option.id" class="card-field__chip ah-status-ink" :style="choiceStyle(option)">{{ option.label || option.value }}</span>
+                            </template>
+                            <template v-else>{{ entry.text }}</template>
+                        </dd>
+                    </div>
+                </dl>
                 <div v-if="isTiming || showSplitBadge || cardPoints !== null" class="card-meta">
                     <span v-if="cardPoints !== null" class="card-points" :title="$t('ViewColumns.col_points')">{{ $t('ViewColumns.points_total', { n: cardPoints }) }}</span>
                     <span v-if="isTiming" class="card-timer">● {{ timerClock }}</span>
@@ -243,6 +254,8 @@
     import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
     import ProvenanceBadge from '@/components/molecules/Provenance/ProvenanceBadge.vue';
     import { taskPoints } from '@/views/Projects/composables/taskPoints';
+    import { shownFieldValues } from '@/views/Projects/composables/projectCustomFields';
+    import { statusChipStyle } from '@/utils/statusChipColors';
     import { isAgentWork } from '@/components/molecules/Provenance/provenance';
     import { useUpdateTasks } from "@/views/Projects/helper"
     import TagChip from '@/components/atom/TagChip/TagChip.vue'
@@ -267,7 +280,7 @@
     const { t } = useI18n();
     const props = defineProps({
         data: Object,
-        groupValue: Number,
+        groupValue: [Number, String],
         itemData: Object,
         isSubTask: Boolean,
         parentAssignee: Array,
@@ -351,6 +364,10 @@
     const showSplitBadge = computed(() => isAgentWork(element.value));
     const cardFields = inject("boardCardFields", null);
     const cardPoints = computed(() => (cardFields?.value?.some((field) => field.id === "points") ? taskPoints(element.value) : null));
+    const fieldTasks = inject("boardFieldTasks", ref([]));
+    const dateFormat = inject("$dateFormat", ref("DD/MM/YYYY"));
+    const cardFieldValues = computed(() => shownFieldValues(cardFields?.value, element.value, { allTasks: fieldTasks.value || [], dateFormat: dateFormat.value }));
+    const choiceStyle = (option) => (option.color ? statusChipStyle({ textColor: option.color }) : {});
 
     const canEditDueDate = computed(() => showArchiveVar.value === false
         && checkPermission('task.task_due_date', projectData.value?.isGlobalPermission) === true

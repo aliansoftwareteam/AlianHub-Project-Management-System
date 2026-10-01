@@ -182,7 +182,8 @@ describe.each([
 ])('the %s email', (key, headline) => {
     const page = '6f0000000000000000000f01';
     const docNotice = (extra = {}) => noticeOf(key, {
-        projectId: page,
+        type: 'docs',
+        projectId: undefined,
         sprintId: '',
         taskId: '',
         comments_id: '',

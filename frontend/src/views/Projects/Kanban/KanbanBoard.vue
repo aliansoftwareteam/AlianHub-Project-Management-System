@@ -47,7 +47,7 @@
                     <Draggable
                         class="kanban-cards"
                         :list="column.tasksArray"
-                        group="tasks"
+                        :group="{ name: 'tasks', put: !column.dropDisabled }"
                         item-key="id"
                         @change="updateEvent($event, column)"
                         @scroll="checkScroll($event, column)"
@@ -109,7 +109,7 @@ const props = defineProps({
         default: () => []
     },
     group: {
-        type: Number
+        type: [Number, String]
     },
     sprintId: {
         type: String
@@ -152,9 +152,7 @@ const isDisabled = computed(() => {
     // scroll the column instead of picking a card up.
     const shouldDisableOnPermission = (checkPermission('task.task_list', projectData.value?.isGlobalPermission) !== true || checkPermission('task.task_status', projectData.value?.isGlobalPermission) !== true);
     const shouldDisableOnArchive = (showArchiveVar.value !== false);
-    // Disable drag when multi-select is active (>=2 selected). Multi-move
-    // happens via the BulkActionBar's "Move" action — keeps the drag
-    // behavior unambiguous for the user.
+    // With two or more cards selected, moving goes through the bulk bar, so a drag never means "move all".
     const shouldDisableOnMultiSelect = selection.count.value >= 2;
     const finalDisabled = shouldDisableOnPermission || shouldDisableOnArchive || shouldDisableOnMultiSelect;
     return finalDisabled;
@@ -192,6 +190,7 @@ function init() {
     let taskArray = [];
 
     columns.value.forEach((data) => {
+        if (data.customFieldId) return;
         let withoutIndexTask = data.tasksArray?.filter((x) => {
             return (x[data.indexName] === undefined || x[data.indexName] === null) && x.TaskKey !== '--'
         })
@@ -284,8 +283,9 @@ const updateEvent = (event, task) => {
     }
     if (element) {
         if (event.added) {
-            updateTaskByGroup(element, task, groupValue.value, null, true);
+            updateTaskByGroup(element, task, groupValue.value, null, true).catch((error) => console.error("ERROR in board drop: ", error));
         }
+        if (task.customFieldId) return;
         let relevantIndex
         let tempIndex;
         let taskDt = columns.value.find((x) => x.searchValue === task.searchValue);

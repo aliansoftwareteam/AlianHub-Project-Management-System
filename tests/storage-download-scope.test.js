@@ -13,7 +13,7 @@ jest.mock('../Config/permissionGuard', () => {
     };
 });
 jest.mock('../Config/projectAccess', () => ({ canReadProject: jest.fn() }));
-jest.mock('../Config/contentAccess', () => ({ projectAccess: jest.fn() }));
+jest.mock('../Config/contentAccess', () => ({ projectAccess: jest.fn(), isCompanyMember: jest.fn() }));
 jest.mock('../Modules/Sprints/helpers/sprintVisibility', () => ({ canSeeSprintById: jest.fn(), hiddenSprintIds: jest.fn() }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn() }));
 jest.mock('../Modules/TimeSheet/helpers/timeScope', () => ({
@@ -41,7 +41,7 @@ jest.mock('../Modules/storage/wasabi/controller', () => new Proxy({}, {
 const logger = require('../Config/loggerConfig');
 const { getRoleType, evaluatePermission } = require('../Config/permissionGuard');
 const { canReadProject } = require('../Config/projectAccess');
-const { projectAccess } = require('../Config/contentAccess');
+const { projectAccess, isCompanyMember } = require('../Config/contentAccess');
 const { canSeeSprintById, hiddenSprintIds } = require('../Modules/Sprints/helpers/sprintVisibility');
 const { visibleProjectIds } = require('../Modules/Agents/scope');
 const { resolveSheetScope } = require('../Modules/TimeSheet/helpers/timeScope');
@@ -68,6 +68,11 @@ const FORM = '6f0000000000000000000f01';
 const HIDDEN_FORM = '6f0000000000000000000f02';
 const SUBMISSION = '6f0000000000000000000d01';
 const TRACKER = 'tr-1';
+const PROJECT_DOC = '6f0000000000000000000d11';
+const COMPANY_DOC = '6f0000000000000000000d12';
+const HIDDEN_DOC = '6f0000000000000000000d13';
+const PRIVATE_DOC = '6f0000000000000000000d14';
+const MISSING_DOC = '6f0000000000000000000dff';
 
 const key = {
     ownAttachment: `Project/${OPEN_PROJECT}/Sprint/${OPEN_TASK}/Attachment/spec.pdf`,
@@ -100,6 +105,11 @@ const key = {
     privateSprintComment: `Project/${OPEN_PROJECT}/${PRIVATE_SPRINT}/${PRIVATE_SPRINT_TASK}/Comments/secret.png`,
     lockedFilesAttachment: `Project/${LOCKED_FILES_PROJECT}/Sprint/${LOCKED_FILES_TASK}/Attachment/secret.pdf`,
     missingTaskAttachment: `Project/${OPEN_PROJECT}/Sprint/${MISSING_TASK}/Attachment/secret.pdf`,
+    docImage: `Pages/${PROJECT_DOC}/20260930T101010000Z_0a1b2c3d4e5f60718293a4b5.png`,
+    companyDocImage: `Pages/${COMPANY_DOC}/0a1b2c3d4e5f60718293a4b5.webp`,
+    hiddenDocImage: `Pages/${HIDDEN_DOC}/0a1b2c3d4e5f60718293a4b5.png`,
+    privateDocImage: `Pages/${PRIVATE_DOC}/0a1b2c3d4e5f60718293a4b5.png`,
+    missingDocImage: `Pages/${MISSING_DOC}/0a1b2c3d4e5f60718293a4b5.png`,
     outsideLayouts: 'backups/company.zip',
     unknownProjectFolder: `Project/${OPEN_PROJECT}/Exports/all.csv`,
 };
@@ -155,6 +165,12 @@ beforeEach(() => {
             { _id: CLIP_TASK, ProjectID: OPEN_PROJECT, sprintId: SPRINT, attachments: [{ url: key.attachedClip, userId: OTHER_MEMBER }, { url: key.clipAttachedBySomeoneElse, userId: MEMBER }] },
             { _id: VOICE_TASK, ProjectID: OPEN_PROJECT, sprintId: SPRINT, attachments: [{ url: key.voiceNote }] },
         ],
+        pages: [
+            { _id: PROJECT_DOC, ProjectID: OPEN_PROJECT, visibility: 'project', createdBy: OTHER_MEMBER, deletedStatusKey: 0 },
+            { _id: COMPANY_DOC, visibility: 'project', createdBy: OTHER_MEMBER, deletedStatusKey: 0 },
+            { _id: HIDDEN_DOC, ProjectID: HIDDEN_PROJECT, visibility: 'project', createdBy: OWNER, deletedStatusKey: 0 },
+            { _id: PRIVATE_DOC, ProjectID: OPEN_PROJECT, visibility: 'private', createdBy: OTHER_MEMBER, deletedStatusKey: 0 },
+        ],
         forms: [{ _id: FORM, ProjectID: OPEN_PROJECT, deletedStatusKey: 0 }, { _id: HIDDEN_FORM, ProjectID: HIDDEN_PROJECT, deletedStatusKey: 0 }],
         form_submissions: [{ _id: SUBMISSION, formId: FORM, taskId: FORM_TASK }],
         timesheets: [
@@ -176,6 +192,7 @@ beforeEach(() => {
     });
     visibleProjectIds.mockImplementation(async (companyId, uid) => (ROLES[uid] === ROLE_OWNER ? [OPEN_PROJECT, HIDDEN_PROJECT, LOCKED_FILES_PROJECT] : [OPEN_PROJECT, LOCKED_FILES_PROJECT]));
     hiddenSprintIds.mockImplementation(async () => [PRIVATE_SPRINT]);
+    isCompanyMember.mockImplementation(async (companyId, uid) => ROLES[uid] !== undefined);
     resolveSheetScope.mockImplementation(async (companyId, uid) => ({ uid, everyone: ROLES[uid] === ROLE_OWNER, visible: null }));
 });
 
@@ -240,6 +257,9 @@ const CALLERS = [
     ['priority image', MEMBER, key.priorityImage],
     ['company logo thumbnail', MEMBER, key.companyLogo],
     ['template logo', MEMBER, key.templateLogo],
+    ['doc image in a project doc the caller can read', MEMBER, key.docImage],
+    ['doc image in a company-wide doc', MEMBER, key.companyDocImage],
+    ['doc image in a private doc, for its author', OTHER_MEMBER, key.privateDocImage],
 ];
 
 const REFUSED = [
@@ -255,6 +275,9 @@ const REFUSED = [
     ["a colleague's clip that is on no task", key.unattachedClip],
     ["a colleague's clip on a task, attached by someone else", key.clipAttachedBySomeoneElse],
     ["a colleague's reminder attachment", key.otherReminder],
+    ['an image in a doc of a project the caller cannot open', key.hiddenDocImage],
+    ["an image in a colleague's private doc", key.privateDocImage],
+    ['an image of a doc that does not exist', key.missingDocImage],
     ['a key outside every layout', key.outsideLayouts],
     ['a folder of a project the app never writes', key.unknownProjectFolder],
 ];

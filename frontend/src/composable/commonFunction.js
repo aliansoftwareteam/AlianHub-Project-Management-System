@@ -6,6 +6,7 @@ import { computed } from "vue";
 import * as env from '@/config/env';
 import moment from 'moment';
 import { storageQueryBuilder } from '@/utils/storageQueryBuild';
+import { customFilterCondition } from '@/views/Projects/composables/customFieldQuery';
 
 export const getConvertedTimeString = (n, type) => {
     try {
@@ -765,7 +766,10 @@ export const buildFilterQuery = (queries, userID) => {
         if (filterBy[condition] === undefined) {
             filterBy[condition] = [];
         }
-        if (query.name.type === "arrayOfObject") {
+        if (query.name.type === "custom") {
+            const customCondition = customFilterCondition(query);
+            if (customCondition) filterBy[condition].push(customCondition);
+        } else if (query.name.type === "arrayOfObject") {
             filterBy[condition].push({ [queryField]: { $elemMatch: { [filterOn]: { $in: query.values } } } })
         } else if (query.name.type === "object") {
             const filteField = `${queryField}.${filterOn}`;

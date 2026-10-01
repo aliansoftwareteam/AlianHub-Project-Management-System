@@ -7,6 +7,7 @@ const { formatNotificationDate } = require('../../../utils/dateHelpers');
 const { AI_ACTOR } = require('../../Comments/helpers/aiActor');
 const { subjectText, urlSegment } = require('../../Template/emailText');
 const mainTemplate = require('../../Template/emailTemplate/main-template');
+const { docLink } = require('./docMentionEmail');
 
 const COMMENT_NOTICE_TEXT = {
     [COMMENT_REPLY]: { headline: (who, task) => `${who} replied to a comment on ${task}` },
@@ -37,7 +38,7 @@ const trailOf = (task) => {
 };
 
 /* The doc open with its comments showing, where the Inbox opens it from. */
-const docCommentLink = ({ companyId, changeData = {} }) => `${config.WEBURL}/#/${urlSegment(companyId)}/pages/${urlSegment(changeData.pageId)}?comment=${urlSegment(changeData.commentId)}`;
+const docCommentLink = ({ companyId, changeData = {} }) => `${docLink(companyId, changeData.pageId)}?comment=${urlSegment(changeData.commentId)}`;
 
 const placeOf = (notification, projects, tasks) => {
     if (DOC_KEYS.includes(notification.key)) {

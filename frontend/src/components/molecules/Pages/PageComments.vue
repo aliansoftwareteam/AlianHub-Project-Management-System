@@ -122,6 +122,7 @@ const socket = inject('$socket', ref(null));
 const userId = inject('$userId', ref(''));
 
 const PRIVILEGED_ROLES = [1, 2];
+const ACTIVE_SEAT = 2;
 const EVENTS = ['pageCommentInsert', 'pageCommentUpdate'];
 const EXCERPT = 60;
 
@@ -142,9 +143,13 @@ const composer = ref(null);
 
 const me = computed(() => String((userId && userId.value) || ''));
 const isAdmin = computed(() => PRIVILEGED_ROLES.includes(Number((store.getters['settings/companyUserDetail'] || {}).roleType)));
-const people = computed(() => (store.getters['users/users'] || [])
-    .filter((user) => user && user.Employee_Name && !user.ghostUser && String(user._id) !== me.value)
-    .map((user) => ({ id: String(user._id), name: user.Employee_Name })));
+/* The same people the doc editor's mention picker offers: live seats that are not agents or bots. */
+const people = computed(() => (store.getters['settings/companyUsers'] || [])
+    .filter((seat) => seat && seat.userId && seat.isDelete !== true && (seat.status === undefined || Number(seat.status) === ACTIVE_SEAT)
+        && !seat.isAgent && !seat.isBot && String(seat.userId) !== me.value)
+    .map((seat) => ({ id: String(seat.userId), user: getUser(String(seat.userId)) }))
+    .filter(({ user }) => user && user.Employee_Name && !user.ghostUser)
+    .map(({ id, user }) => ({ id, name: user.Employee_Name })));
 const blockIds = computed(() => (Array.isArray(props.blocks) ? props.blocks.map((block) => block && block.id).filter(Boolean) : null));
 const threads = computed(() => threadsOf(comments.value, blockIds.value));
 const openThreads = computed(() => threads.value.filter((thread) => !thread.root.resolved));
@@ -352,7 +357,7 @@ defineExpose({ startOnBlock });
     background: var(--brand-tint); color: var(--ink); padding: 4px 8px; margin: 0;
     font: 400 12px/1.4 var(--font-ui); text-align: left; cursor: pointer;
 }
-.pcm__anchor--gone { border-left-color: var(--ink-3); background: var(--surface-2); color: var(--ink-2); cursor: default; }
+.pcm__anchor--gone { border-left-color: var(--border); background: var(--surface-2); color: var(--ink-2); cursor: default; }
 .pcm__anchor-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .pcm__item { display: flex; flex-direction: column; gap: 3px; }

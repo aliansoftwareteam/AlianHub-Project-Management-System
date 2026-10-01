@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
+import { reactive } from 'vue';
 
-const { apiRequest, router, perms, toast } = vi.hoisted(() => ({
+const { apiRequest, router, perms, toast, routeRef } = vi.hoisted(() => ({
+    routeRef: { current: null },
     apiRequest: vi.fn(),
     router: {
         push: vi.fn(() => Promise.resolve()),
@@ -15,7 +17,7 @@ const { apiRequest, router, perms, toast } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/services', () => ({ apiRequest, useAuth: () => ({ logOut: vi.fn() }) }));
-vi.mock('vue-router', () => ({ useRouter: () => router, useRoute: () => ({ params: {}, query: {} }) }));
+vi.mock('vue-router', () => ({ useRouter: () => router, useRoute: () => routeRef.current }));
 vi.mock('vue-toast-notification', () => ({ useToast: () => toast }));
 vi.mock('@/components/organisms/Shell/shellState', () => ({ shellState: { theme: 'light' }, toggleTheme: vi.fn() }));
 vi.mock('@/composable', () => ({
@@ -33,6 +35,7 @@ import { applyAiAvailability, resetAiAvailability } from '@/composable/aiAvailab
 const DAY = 24 * 60 * 60 * 1000;
 const twoDaysAgo = new Date(Date.now() - 2 * DAY - 60 * 1000).toISOString();
 const ok = (data) => Promise.resolve({ data: { status: true, data } });
+const RECENTS_URL = '/api/v2/recent-visits?types=task,project,sprint,doc';
 
 const TASK = {
     _id: 't1', TaskName: 'Budget plan', TaskKey: 'AH-1', ProjectID: 'p1', sprintId: 's1', folderObjId: '',
@@ -47,7 +50,7 @@ const serve = () => apiRequest.mockImplementation((type, url) => {
             comments: []
         });
     }
-    if (type === 'get' && url === '/api/v2/recent-visits') {
+    if (type === 'get' && url.startsWith('/api/v2/recent-visits')) {
         return ok([{ visitedAt: twoDaysAgo, task: { ...TASK, _id: 't9', TaskName: 'Recently seen', TaskKey: 'AH-9', sprintArray: { name: 'Sprint 2' } } }]);
     }
     return ok([]);
@@ -89,6 +92,7 @@ const expectTaskPanel = (taskId, extra = {}) => {
 };
 
 beforeEach(() => {
+    routeRef.current = reactive({ name: 'inbox', path: '/company-1/inbox', params: { cid: 'company-1' }, query: {} });
     apiRequest.mockReset();
     serve();
     Object.assign(perms, { 'task.advance_search': true });
@@ -307,7 +311,7 @@ describe('CommandPalette', () => {
 
     it('lists recently opened tasks, with their location, before anything is typed', async () => {
         const wrapper = await mountPalette();
-        expect(apiRequest).toHaveBeenCalledWith('get', '/api/v2/recent-visits');
+        expect(apiRequest).toHaveBeenCalledWith('get', RECENTS_URL);
         const recent = options(wrapper).find((o) => o.text().includes('Recently seen'));
         expect(recent).toBeDefined();
         expect(recent.attributes('data-kind')).toBe('task');
@@ -355,7 +359,7 @@ describe('opening a task from the palette', () => {
     });
 
     it('keeps the folder of a recently opened task', async () => {
-        apiRequest.mockImplementation((type, url) => (url === '/api/v2/recent-visits'
+        apiRequest.mockImplementation((type, url) => (url === RECENTS_URL
             ? ok([{ visitedAt: twoDaysAgo, task: { ...TASK, _id: 't9', TaskName: 'Recently seen', folderObjId: 'f1' } }])
             : ok([])));
         const wrapper = await mountPalette();
@@ -558,5 +562,96 @@ describe('asking AI inside the palette', () => {
         const wrapper = await mountPalette();
         await typeQuery(wrapper, 'budget');
         expect(kinds(wrapper)).not.toContain('ask');
+    });
+});
+
+describe('recently opened projects, sprints and docs', () => {
+    const recentTask = { visitedAt: twoDaysAgo, type: 'task', id: 't9', title: 'Recently seen', task: { ...TASK, _id: 't9', TaskName: 'Recently seen', TaskKey: 'AH-9' } };
+    const recentSprint = { visitedAt: twoDaysAgo, type: 'sprint', id: 's2', title: 'Sprint 2', projectId: 'p1', projectName: 'Budget ops', route: { projectId: 'p1', sprintId: 's2', folderId: 'f1' } };
+    const recentDoc = { visitedAt: twoDaysAgo, type: 'doc', id: 'd1', title: 'Budget wiki', projectId: 'p1', projectName: 'Budget ops', route: { pageId: 'd1', projectId: 'p1' } };
+    const recentProject = { visitedAt: twoDaysAgo, type: 'project', id: 'p2', title: 'Launch', projectId: 'p2', projectName: 'Launch', route: { projectId: 'p2', sprintId: 's7', folderId: '' } };
+    const serveRecents = (items) => apiRequest.mockImplementation((type, url) => (url === RECENTS_URL ? ok(items) : ok([])));
+    const row = (wrapper, text) => options(wrapper).find((o) => o.text().includes(text));
+    const iconOf = (option) => option.find('shell-icon-stub').attributes('name');
+
+    it('lists them with the tasks, newest first, each with its own icon and place', async () => {
+        serveRecents([recentSprint, recentDoc, recentProject, recentTask]);
+        const wrapper = await mountPalette();
+        expect(apiRequest).toHaveBeenCalledWith('get', RECENTS_URL);
+        expect(kinds(wrapper).slice(0, 4)).toEqual(['sprint', 'page', 'project', 'task']);
+        expect(wrapper.find('.pal__group').text()).toBe('Palette.group_recent_opened');
+        expect(iconOf(row(wrapper, 'Sprint 2'))).toBe('layout');
+        expect(row(wrapper, 'Sprint 2').text()).toContain('Palette.sprint_in');
+        expect(iconOf(row(wrapper, 'Budget wiki'))).toBe('docs');
+        expect(row(wrapper, 'Budget wiki').text()).toContain('Budget ops');
+        expect(iconOf(row(wrapper, 'Launch'))).toBe('projects');
+    });
+
+    it('opens a recent sprint, project and doc where they live', async () => {
+        serveRecents([recentSprint, recentDoc, recentProject]);
+        const wrapper = await mountPalette();
+        await row(wrapper, 'Sprint 2').trigger('click');
+        expect(router.push).toHaveBeenLastCalledWith(expect.stringContaining('/project/p1/fs/f1/s2?tab=ProjectListView'));
+        await row(wrapper, 'Launch').trigger('click');
+        expect(router.push).toHaveBeenLastCalledWith(expect.stringContaining('/project/p2/s/s7?tab=ProjectListView'));
+        await row(wrapper, 'Budget wiki').trigger('click');
+        expect(router.push).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Pages', query: { page: 'd1' } }));
+    });
+
+    it('folds a recent project into a recent sprint of the same project', async () => {
+        serveRecents([recentSprint, { ...recentProject, id: 'p1', title: 'Budget ops', projectId: 'p1' }]);
+        const wrapper = await mountPalette();
+        expect(kinds(wrapper).filter((k) => k === 'sprint' || k === 'project')).toEqual(['sprint']);
+    });
+
+    it('keeps sprints under the Projects chip and docs under Docs', async () => {
+        serveRecents([recentSprint, recentDoc, recentProject, recentTask]);
+        const wrapper = await mountPalette();
+        const chip = (name) => wrapper.findAll('.pal__chip').find((c) => c.text() === `Palette.chip_${name}`);
+        await chip('projects').trigger('click');
+        expect(kinds(wrapper).filter((k) => k !== 'command')).toEqual(['sprint', 'project']);
+        await chip('docs').trigger('click');
+        expect(kinds(wrapper).filter((k) => k !== 'command')).toEqual(['page']);
+    });
+});
+
+describe('comments in the search results', () => {
+    const COMMENT = { _id: 'c1', message: 'Budget is approved', taskId: 't1', projectId: 'p1', sprintId: 's1', folderObjId: '', taskKey: 'AH-1', taskName: 'Budget plan' };
+
+    it('finds comments, as the retired search did, and opens their task', async () => {
+        apiRequest.mockImplementation((type, url) => (type === 'post' && url === '/api/v2/search'
+            ? ok({ tasks: [], projects: [], pages: [], comments: [COMMENT] })
+            : ok([])));
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper);
+        const comment = options(wrapper).find((o) => o.attributes('data-kind') === 'comment');
+        expect(comment.text()).toContain('Budget is approved');
+        expect(comment.text()).toContain('Palette.comment_on');
+        await comment.trigger('click');
+        expectTaskPanel('t1');
+    });
+});
+
+describe('closing on navigation', () => {
+    it('closes when the page changes underneath it', async () => {
+        const wrapper = await mountPalette();
+        routeRef.current.path = '/company-1/pages';
+        await flushPromises();
+        expect(wrapper.emitted('close')).toBeTruthy();
+    });
+
+    it('stays open when only the query changes, as when a side panel opens', async () => {
+        const wrapper = await mountPalette();
+        routeRef.current.query = { task: 't1' };
+        await flushPromises();
+        expect(wrapper.emitted('close')).toBeFalsy();
+    });
+
+    it('says nothing when it is already closed', async () => {
+        const wrapper = mount(CommandPalette, { props: { open: false }, global: { plugins: [store()], stubs: { ShellIcon: true, teleport: true } } });
+        mounted.push(wrapper);
+        routeRef.current.path = '/company-1/pages';
+        await flushPromises();
+        expect(wrapper.emitted('close')).toBeFalsy();
     });
 });

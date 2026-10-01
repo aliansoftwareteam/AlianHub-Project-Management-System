@@ -4,11 +4,11 @@ const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { visibleProjectIds } = require("../Agents/scope");
 const { hiddenSprintFilter } = require("../Sprints/helpers/sprintVisibility");
+const { resolveVisits, parseListQuery, VISIT_TYPES } = require("./helpers/resolveVisits");
 
 // One document per user+entity, upserted on every visit.
 
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
-const LIST_LIMIT = 15;
 
 /* Visits belong to the signed-in user. A user id in the request is tolerated only when it is theirs. */
 const ownerOf = (req, claimed) => {
@@ -20,7 +20,7 @@ const ownerOf = (req, claimed) => {
 
 /**
  * POST /api/v2/recent-visits
- * body: { entityType: 'task', entityId }
+ * body: { entityType: 'task' | 'project' | 'sprint' | 'doc', entityId }
  */
 exports.recordVisit = async (req, res) => {
     try {
@@ -33,8 +33,8 @@ exports.recordVisit = async (req, res) => {
         if (!companyId) {
             return res.send({ status: false, statusText: 'companyId is required.' });
         }
-        if (entityType !== 'task' || !OBJECT_ID_PATTERN.test(String(entityId || ''))) {
-            return res.send({ status: false, statusText: 'A valid task entity is required.' });
+        if (!VISIT_TYPES.includes(entityType) || !OBJECT_ID_PATTERN.test(String(entityId || ''))) {
+            return res.send({ status: false, statusText: 'A valid task, project, sprint or doc is required.' });
         }
 
         await MongoDbCrudOpration(companyId, {
@@ -54,10 +54,10 @@ exports.recordVisit = async (req, res) => {
 };
 
 /**
- * GET /api/v2/recent-visits
- * The caller's newest task visits with task summaries. Tasks that were deleted, that
- * moved to a project the caller can no longer open, or that sit in a private sprint the
- * caller is not on, drop out.
+ * GET /api/v2/recent-visits?types=task,project,sprint,doc|all&limit=15
+ * The caller's newest visits, tasks only unless `types` asks for more. Anything deleted,
+ * in a project the caller can no longer open, in a private sprint they are not on, or a
+ * private doc of someone else's, drops out.
  */
 exports.listVisits = async (req, res) => {
     try {
@@ -69,10 +69,11 @@ exports.listVisits = async (req, res) => {
         if (!companyId) {
             return res.send({ status: false, statusText: 'companyId is required.' });
         }
+        const { types, limit } = parseListQuery(req.query);
 
         const visits = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.RECENTVISITS,
-            data: [{ userId: owner.uid, entityType: 'task' }, null, { sort: { visitedAt: -1 }, limit: LIST_LIMIT * 2 }],
+            data: [{ userId: owner.uid, entityType: { $in: types } }, null, { sort: { visitedAt: -1 }, limit: limit * 3 }],
         }, 'find');
 
         if (!visits || !visits.length) {
@@ -80,21 +81,8 @@ exports.listVisits = async (req, res) => {
         }
 
         const visible = await visibleProjectIds(companyId, owner.uid);
-        const projectIds = visible.map((id) => new mongoose.Types.ObjectId(String(id)));
         const sprintClause = await hiddenSprintFilter(companyId, owner.uid, visible);
-        const tasks = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.TASKS,
-            data: [
-                { _id: { $in: visits.map((visit) => visit.entityId) }, ProjectID: { $in: projectIds }, deletedStatusKey: { $ne: 1 }, ...sprintClause },
-                'TaskName TaskKey status statusType ProjectID sprintId folderObjId deletedStatusKey sprintArray updatedAt',
-            ],
-        }, 'find');
-        const taskById = new Map((tasks || []).map((task) => [String(task._id), task]));
-
-        const data = visits
-            .map((visit) => ({ visitedAt: visit.visitedAt, task: taskById.get(String(visit.entityId)) || null }))
-            .filter((item) => item.task)
-            .slice(0, LIST_LIMIT);
+        const data = (await resolveVisits(companyId, owner.uid, visits, { visible, sprintClause })).slice(0, limit);
 
         return res.send({ status: true, statusText: 'Recent visits fetched.', data });
     } catch (error) {

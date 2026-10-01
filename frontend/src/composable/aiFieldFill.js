@@ -55,6 +55,22 @@ export async function openAiFill(field, taskIds) {
     }
 }
 
+/* One more model call for a task whose answer did not fit; the new proposal replaces it in place. */
+export async function retryAiProposal(taskId) {
+    const run = session;
+    const at = aiFieldFill.proposals.findIndex((proposal) => proposal.taskId === taskId);
+    if (at === -1 || aiFieldFill.phase !== PHASE.PREVIEW) return;
+    aiFieldFill.proposals[at] = { ...aiFieldFill.proposals[at], retrying: true };
+    try {
+        const data = await previewAiFill(aiFieldFill.field._id, [taskId]);
+        if (run !== session) return;
+        const fresh = (data?.proposals || []).find((proposal) => proposal.taskId === taskId);
+        aiFieldFill.proposals[at] = fresh || { ...aiFieldFill.proposals[at], retrying: false };
+    } catch (error) {
+        fail(run, error);
+    }
+}
+
 async function poll(run) {
     try {
         const job = await readAiFillJob(aiFieldFill.job._id);

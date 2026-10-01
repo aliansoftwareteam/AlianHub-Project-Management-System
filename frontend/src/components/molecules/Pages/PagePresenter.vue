@@ -6,7 +6,7 @@
                 <div v-else class="pp__slide">
                     <div class="pp__kicker">{{ kicker }}</div>
                     <h1 class="pp__heading">{{ current.heading || title }}</h1>
-                    <div class="pp__body" v-html="bodyHtml"></div>
+                    <div ref="body" class="pp__body" v-html="bodyHtml"></div>
                 </div>
             </div>
             <div class="pp__bar">
@@ -25,10 +25,12 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import pageContent from '@pageContent';
 import { richHtml } from '@/utils/richHtml';
+import { useCustomComposable } from '@/composable';
+import { hydrateDocImages } from './docImages';
 
 const { blocksToSlides, blocksToHtml, escapeHtml } = pageContent.default || pageContent;
 
@@ -43,6 +45,9 @@ const props = defineProps({
 const emit = defineEmits(['close']);
 
 const root = ref(null);
+const body = ref(null);
+const companyId = inject('$companyId');
+const { getWasabiImageLink } = useCustomComposable();
 const index = ref(0);
 
 const slides = computed(() => blocksToSlides(props.blocks || [], props.title));
@@ -58,6 +63,8 @@ const bodyHtml = computed(() => current.value.blocks.map((block) => {
     }
     return richHtml(blocksToHtml([block]));
 }).join(''));
+
+watch(bodyHtml, () => nextTick(() => hydrateDocImages(body.value, (key) => getWasabiImageLink(companyId.value, key))), { immediate: true });
 
 function next() { if (index.value < slides.value.length - 1) index.value += 1; }
 function prev() { if (index.value > 0) index.value -= 1; }

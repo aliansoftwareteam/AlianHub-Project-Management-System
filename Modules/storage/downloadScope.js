@@ -12,6 +12,7 @@ const { safeRelativePath } = require('../../utils/uploadConfig');
 const { REPORT, scopeMode: mode, countReported: countCategory, reportedCounts } = require('../../common-storage/storedFileScope');
 const logger = require('../../Config/loggerConfig');
 const { narrowingFor } = require('../../Config/tokenNarrowing');
+const { canUsePage } = require('../Pages/helpers/pageAccess');
 
 const SERVER_STORAGE = 'server';
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -153,6 +154,13 @@ const clip = async (ctx, [, companyId, userId], key) => {
 
 const reminderAttachment = async (ctx, [, companyId, userId]) => ownFolder(ctx, companyId, userId) || NO_ACCESS;
 
+/* An image uploaded into a doc is for whoever may read that doc. */
+const docImage = async (ctx, [, pageId]) => {
+    const page = await find(ctx, SCHEMA_TYPE.PAGES, { _id: oid(pageId), deletedStatusKey: 0 }, 'ProjectID visibility createdBy');
+    if (!page) return NOT_FOUND;
+    return (await canUsePage(ctx.companyId, page, ctx.uid)) || NO_ACCESS;
+};
+
 /* Settings images every member sees on every screen; the bucket check already made the caller one. */
 const companyAsset = async () => true;
 
@@ -168,6 +176,7 @@ const LAYOUTS = Object.freeze([
     { type: 'form_upload', pattern: layout(`formAttachment/${ID}/[a-f0-9]{24}${THUMBNAIL}\\.[a-z0-9]{1,8}`), allows: formUpload },
     { type: 'clip', pattern: layout(`Clips/${ID}/${ID}/${NAME}`), allows: clip },
     { type: 'reminder_attachment', pattern: layout(`Reminders/${ID}/${ID}/${NAME}`), allows: reminderAttachment },
+    { type: 'doc_image', pattern: layout(`Pages/${ID}/${NAME}`), allows: docImage },
     { type: 'company_asset', pattern: layout(`(?:setting/task_type|taskPriorities|companyIcon|ProjectTemplate)/${NAME}`), allows: companyAsset },
 ]);
 

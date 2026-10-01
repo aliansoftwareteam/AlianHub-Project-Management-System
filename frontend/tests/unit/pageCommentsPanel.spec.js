@@ -17,7 +17,10 @@ vi.mock('@/services', () => ({
 vi.mock('@/composable', () => ({ useGetterFunctions: () => ({ getUser: (id) => ({ Employee_Name: id === 'user-1' ? 'Me' : 'Priya Shah' }) }) }));
 vi.mock('vuex', async (importOriginal) => ({
     ...(await importOriginal()),
-    useStore: () => ({ getters: { 'users/users': [{ _id: 'u2', Employee_Name: 'Priya Shah' }], 'settings/companyUserDetail': { roleType: 3 } } }),
+    useStore: () => ({ getters: {
+        'settings/companyUsers': [{ userId: 'u2', status: 2 }, { userId: 'bot', status: 2, isAgent: true }, { userId: 'gone', status: 2, isDelete: true }],
+        'settings/companyUserDetail': { roleType: 3 },
+    } }),
 }));
 
 import PageComments from '@/components/molecules/Pages/PageComments.vue';
@@ -57,6 +60,15 @@ describe('the doc comments panel', () => {
         const items = wrapper.findAll('.pcm__item');
         expect(items[0].text()).not.toContain('Docs.comment_edit');
         expect(items[1].text()).toContain('Docs.comment_edit');
+    });
+
+    it('offers only people with a live seat to mention, never an agent', async () => {
+        const wrapper = await mountPanel();
+        const field = wrapper.find('.pcm__compose textarea');
+        field.element.value = '@';
+        field.element.setSelectionRange(1, 1);
+        await field.trigger('input');
+        expect(wrapper.findAll('.pcm__compose .pci__name').map((option) => option.text())).toEqual(['Priya Shah']);
     });
 
     it('posts a new comment on the block picked from the doc', async () => {

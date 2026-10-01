@@ -117,7 +117,6 @@ describe('the checklist steps aside for panels, bulk bars and dialogs', () => {
     it.each([
         ['the task panel', '<div class="ah-detail"><div role="dialog" aria-label="Task"></div></div>'],
         ['the list bulk bar', '<div class="lv2-bulk" role="region"></div>'],
-        ['the board bulk bar', '<div class="bulk-action-bar"></div>'],
         ['a create dialog', '<div role="dialog" aria-modal="true"></div>']
     ])('sees %s', (_name, html) => {
         add(html);
