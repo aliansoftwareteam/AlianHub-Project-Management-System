@@ -11,7 +11,7 @@ const { groupItem } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/composable', () => ({
-    useCustomComposable: () => ({ checkPermission: () => true, debounce: (fn) => fn }),
+    useCustomComposable: () => ({ checkPermission: () => true, checkApps: () => true, debounce: (fn) => fn }),
     useGetterFunctions: () => ({ getUser: () => null })
 }));
 vi.mock('@/views/Projects/helper.js', () => ({
