@@ -9,6 +9,7 @@
 
 const performanceFlag = require('./performanceFlag');
 const dataFlag = require('../Mcp/dataFlag');
+const manageFlag = require('../Mcp/manageFlag');
 
 // `permission` names the Security & Permissions catalogue entry
 // (Config/permissionGuard) that governs the same operation for a person.
@@ -74,11 +75,29 @@ const FLAGGED = Object.freeze([
         { key: 'comment.create', label: 'Comment on a task', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'task.task_comment' },
         { key: 'timelog.create', label: 'Log time on a task (own time)', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'sheet_settings.user_timesheet' },
     ].map((action) => ({ enabled: dataFlag.enabled, action: Object.freeze(action) })),
+    // These write through the task routes' own preparation and handlers (Agents/taskRequests.js).
+    ...[
+        { key: 'fields.list', label: 'List a project\'s custom fields', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
+        { key: 'subtasks.list', label: 'List a task\'s subtasks', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
+        { key: 'members.list', label: 'List active members', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
+        { key: 'task.edit', label: 'Edit a task\'s title, description, priority, dates or estimate', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
+          fields: ['TaskName', 'rawDescription', 'Task_Priority', 'DueDate', 'startDate', 'totalEstimatedTime'],
+          permission: { byField: {
+              TaskName: 'task.task_name_edit', rawDescription: 'task.task_description', Task_Priority: 'task.task_priority', DueDate: 'task.task_due_date',
+              startDate: ['task.task_due_date', 'task.task_start_date'], totalEstimatedTime: 'task.task_estimated_hours',
+          } } },
+        { key: 'task.assignees.set', label: 'Set, add or remove a task\'s assignees', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'task.task_assignee' },
+        { key: 'task.field.set', label: 'Set a custom field on a task', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'task.task_custom_field' },
+        { key: 'task.move', label: 'Move a task with its subtasks to another list or project', risk: RISK.HIGH, undoable: false, write: true, cost: 'write',
+          constraint: 'only a top-level task; the destination must be one the person behind the agent can move tasks into', permission: 'task.task_move' },
+        { key: 'task.archive', label: 'Archive a task with its subtasks', risk: RISK.HIGH, undoable: true, write: true, cost: 'write', permission: 'task.task_archive' },
+        { key: 'task.restore', label: 'Restore an archived task', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: { key: 'task.task_list', write: false } },
+    ].map((action) => ({ enabled: manageFlag.enabled, action: Object.freeze(action) })),
 ]);
 
 /* A string maps the whole action at its own level (write for writes, read for
- * reads); { key, write } pins the level; { byField } holds each task.update
- * field to the entry a person editing that field is held to. */
+ * reads); { key, write } pins the level; { byField } holds each edited field
+ * to the entry, or entries, a person editing that field is held to. */
 const permissionsFor = (key, params = {}) => {
     const action = get(key);
     if (!action) return [];
@@ -86,7 +105,7 @@ const permissionsFor = (key, params = {}) => {
     if (typeof p === 'string') return [{ key: p, write: Boolean(action.write) }];
     if (p && p.byField) {
         const fields = Object.keys(params.fields || {});
-        const keys = [...new Set((fields.length ? fields : action.fields || []).map((f) => p.byField[f]).filter(Boolean))];
+        const keys = [...new Set((fields.length ? fields : action.fields || []).flatMap((f) => p.byField[f] || []))];
         return keys.map((k) => ({ key: k, write: true }));
     }
     if (p && p.key) return [{ key: p.key, write: typeof p.write === 'boolean' ? p.write : Boolean(action.write) }];
@@ -102,7 +121,7 @@ const validate = (entries) => {
             return;
         }
         if (p && p.byField && typeof p.byField === 'object') {
-            const unmapped = (a.fields || []).filter((f) => !PERMISSION_KEY.test(String(p.byField[f] || '')));
+            const unmapped = (a.fields || []).filter((f) => { const keys = [].concat(p.byField[f] || []); return !keys.length || keys.some((k) => !PERMISSION_KEY.test(String(k))); });
             if (!a.fields || !a.fields.length || unmapped.length) throw bad(a, `leaves fields without a permission mapping: ${unmapped.join(', ') || '(no fields)'}`);
             return;
         }
@@ -190,10 +209,10 @@ const evaluate = (key, params = {}, { allowedActions } = {}) => {
             return { allowed: false, reason: `Agents cannot perform task.status.set("${label}")`, action };
         }
     }
-    if (action.key === 'task.update') {
+    if (Array.isArray(action.fields)) {
         const fields = Object.keys(params.fields || {});
         const bad = fields.filter((f) => !action.fields.includes(f));
-        if (bad.length) return { allowed: false, reason: `Agents cannot perform task.update on ${bad.join(', ')}`, action };
+        if (bad.length) return { allowed: false, reason: `Agents cannot perform ${action.key} on ${bad.join(', ')}`, action };
     }
     if (action.proposeOnly && !params.__proposal) {
         return { allowed: false, reason: `Agents cannot perform ${action.key} directly — it must be proposed`, action };
