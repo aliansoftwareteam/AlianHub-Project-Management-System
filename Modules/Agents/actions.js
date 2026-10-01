@@ -94,6 +94,21 @@ const FLAGGED_RATINGS = Object.freeze({
     'tasks.batch': write(SCOPE.TASK),
     'page.create': write(SCOPE.PROJECT),
     'page.update': write(SCOPE.PROJECT),
+    'tags.list': read(SCOPE.PROJECT),
+    'task.tags.add': write(SCOPE.TASK),
+    'task.tags.remove': write(SCOPE.TASK),
+    'task.relations.list': read(SCOPE.TASK),
+    // A link is written on both tasks, which may sit in two projects.
+    'task.relation.add': write(SCOPE.PROJECT),
+    'task.relation.remove': write(SCOPE.PROJECT),
+    'lists.list': read(SCOPE.PROJECT),
+    'list.create': write(SCOPE.PROJECT),
+    'list.rename': write(SCOPE.PROJECT),
+    'list.move': write(SCOPE.PROJECT),
+    'page.comments.list': read(SCOPE.PROJECT),
+    'page.comment.create': write(SCOPE.PROJECT),
+    'page.comment.reply': write(SCOPE.PROJECT),
+    'page.comment.assign': write(SCOPE.PROJECT),
 });
 
 const ratingTable = () => ({ ...RATINGS, ...Object.fromEntries(Object.entries(FLAGGED_RATINGS).filter(([k]) => registry.has(k))) });
@@ -421,6 +436,7 @@ const executors = {
 
     ...require('./taskRequests').executors,
     ...require('./pageRequests').executors,
+    ...require('./workRequests').executors,
 };
 
 const COMMENT_ACTIONS = new Set(['task.comment', 'comment.create', 'chat.post', 'comment.update']);
