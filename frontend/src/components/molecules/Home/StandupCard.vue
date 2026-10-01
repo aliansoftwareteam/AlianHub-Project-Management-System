@@ -115,12 +115,12 @@ onMounted(load);
 .hstand__state p { margin: 0; }
 .hstand__section { display: flex; flex-direction: column; gap: 4px; }
 .hstand__heading { margin: 0; font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-label); }
-.hstand__none, .hstand__more { margin: 0; font: 400 12px/1.4 var(--font-ui); color: var(--ink-2); }
+.hstand__none, .hstand__more { margin: 0; font: 400 var(--fs-sm, 12px)/1.4 var(--font-ui); color: var(--ink-2); }
 .hstand__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .hstand__line { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 3px 0; }
 .hstand__kind {
     flex: none; min-width: 64px; padding: 2px 6px; border-radius: var(--r-chip); text-align: center;
-    font: var(--text-data); font-size: 10.5px; background: var(--surface-2); color: var(--ink-label);
+    font: var(--text-data); font-size: var(--fs-xs, 10.5px); background: var(--surface-2); color: var(--ink-label);
 }
 .hstand__kind--completed { background: var(--ok-bg); color: var(--ok-ink); }
 .hstand__kind--tracking { background: var(--brand-tint); color: var(--brand); }
@@ -128,12 +128,12 @@ onMounted(load);
 .hstand__kind--due_today { background: var(--warn-bg); color: var(--warn-ink); }
 .hstand__task {
     flex: 1 1 auto; min-width: 0; border: 0; background: transparent; padding: 2px 0; text-align: left; cursor: pointer;
-    font: 400 13px/1.35 var(--font-ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font: 400 var(--fs-md, 13px)/1.35 var(--font-ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .hstand__task:hover { color: var(--brand); }
 .hstand__task:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
 .hstand__key { font: var(--text-data); color: var(--brand); margin-right: 6px; }
-.hstand__source { margin: 0; font: 400 11.5px/1.4 var(--font-ui); color: var(--ink-2); }
+.hstand__source { margin: 0; font: 400 var(--fs-sm, 11.5px)/1.4 var(--font-ui); color: var(--ink-2); }
 @media (max-width: 767px) {
     .hstand__tool { width: 44px; height: 44px; }
     .hstand__line { min-height: 44px; }

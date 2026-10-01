@@ -225,14 +225,14 @@ onMounted(() => {
 <style scoped>
 .task-ai { display: flex; flex-direction: column; gap: 8px; margin: 2px 0 10px; min-width: 0; }
 .task-ai__row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; }
-.task-ai__mark { color: var(--brand); font-size: 11px; margin-right: 2px; }
+.task-ai__mark { color: var(--brand); font-size: var(--fs-xs, 11px); margin-right: 2px; }
 .task-ai__btn {
     border: 0;
     background: transparent;
     padding: 4px 6px;
     min-height: 28px;
     border-radius: 6px;
-    font: 500 12.5px/1.2 var(--font-ui);
+    font: 500 var(--fs-md, 12.5px)/1.2 var(--font-ui);
     color: var(--ink-2);
     cursor: pointer;
 }
@@ -240,13 +240,13 @@ onMounted(() => {
 .task-ai__btn:focus-visible { outline: none; box-shadow: var(--focus, 0 0 0 3px var(--brand-ring)); }
 .task-ai__btn:disabled { opacity: .6; cursor: default; }
 .task-ai__btn[aria-expanded="true"] { color: var(--brand); }
-.task-ai__error { margin: 0; font: 400 12.5px/1.4 var(--font-ui); color: var(--danger-ink); }
-.task-ai__hint { margin: 0 0 6px; font: 400 12px/1.4 var(--font-ui); color: var(--ink-2); }
+.task-ai__error { margin: 0; font: 400 var(--fs-md, 12.5px)/1.4 var(--font-ui); color: var(--danger-ink); }
+.task-ai__hint { margin: 0 0 6px; font: 400 var(--fs-sm, 12px)/1.4 var(--font-ui); color: var(--ink-2); }
 .task-ai__steps, .task-ai__sources { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
-.task-ai__step { display: flex; gap: 8px; align-items: flex-start; font: 400 13px/1.45 var(--font-ui); color: var(--ink); cursor: pointer; }
+.task-ai__step { display: flex; gap: 8px; align-items: flex-start; font: 400 var(--fs-md, 13px)/1.45 var(--font-ui); color: var(--ink); cursor: pointer; }
 .task-ai__step input { margin-top: 3px; flex: none; accent-color: var(--brand); }
-.task-ai__summary { margin: 0 0 8px; font: 400 13px/1.55 var(--font-ui); color: var(--ink); white-space: pre-wrap; }
-.task-ai__sources a { font: 400 12.5px/1.4 var(--font-ui); color: var(--brand); overflow-wrap: anywhere; }
+.task-ai__summary { margin: 0 0 8px; font: 400 var(--fs-md, 13px)/1.55 var(--font-ui); color: var(--ink); white-space: pre-wrap; }
+.task-ai__sources a { font: 400 var(--fs-md, 12.5px)/1.4 var(--font-ui); color: var(--brand); overflow-wrap: anywhere; }
 @media (max-width: 480px) {
     .task-ai__btn { min-height: 32px; }
 }
