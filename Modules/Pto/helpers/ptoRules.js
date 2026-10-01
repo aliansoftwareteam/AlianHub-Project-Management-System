@@ -3,11 +3,13 @@
 // Unit-tested in tests/pto-rules.test.js.
 
 const { textHtml } = require('../../Template/emailText');
+const { weekendDaysFor } = require('../../Company/helpers/workingDays');
 
 const PTO_TYPES = ['casual', 'privilege', 'sick'];
 const PTO_STATUS = ['pending', 'approved', 'rejected'];
 const DEFAULT_HOURS_PER_DAY = 9; // office mandates a 9-hour working day
-const DEFAULT_WEEKEND = [0, 6]; // Sun, Sat
+// The weekend of a company that never chose its working days; callers pass their company's (Company/helpers/companyWeek.js).
+const DEFAULT_WEEKEND = weekendDaysFor();
 
 const toDate = (v) => {
     if (v instanceof Date) return isNaN(v.getTime()) ? null : v;

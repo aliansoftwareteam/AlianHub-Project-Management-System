@@ -184,6 +184,12 @@
                                 </div>
                             </div>
 
+                            <div class="company-week">
+                                <p class="company-week__label">{{ $t('Settings.working_days') }}</p>
+                                <p class="company-week__hint">{{ $t('Settings.working_days_hint') }}</p>
+                                <WorkingDaysPicker v-model="workingDays" :disabled="!props.editPermission" />
+                            </div>
+
                             <button v-if="props.editPermission" :disabled="isSpinner" ref="refButton"
                                 @click.prevent="SaveChangeToDb()" class="blue_btn" id="blue-btn-savecompany">{{ $t('Settings.save_changes') }}</button>
                         </form>
@@ -209,6 +215,8 @@ import PhoneCountry from "@/components/molecules/CountryPhoneNumberDropdown/Phon
 import Sidebar from '@/components/molecules/Sidebar/Sidebar.vue';
 import InputText from "@/components/atom/InputText/InputText.vue";
 import Toggle from "@/components/atom/Toggle/Toggle.vue";
+import WorkingDaysPicker from "@/components/molecules/WorkingDaysPicker/WorkingDaysPicker.vue";
+import { workingDaysFor } from "@workingDays";
 import { computed, defineComponent, inject, onMounted, ref, watchEffect,defineProps, nextTick, watch } from "vue";
 import { useStore } from "vuex";
 import DropDown from "@/components/molecules/DropDown/DropDown.vue";
@@ -264,6 +272,8 @@ const isTempPreview = ref(false);
 const isCropper = ref(false);
 const base64Image = ref();
 const phoneError = ref("");
+const workingDays = ref(workingDaysFor());
+const sameWeek = (a, b) => a.join() === b.join();
 
 const stencilSize = {
     width: 180,
@@ -331,6 +341,7 @@ onMounted(() => {
     // reads as ON. Only an explicit false turns it off.
     formData.value.trackerEstimateLimit = selectedCompany.value?.trackerEstimateLimit !== false;
     formData.value.format_date = companyDate.value.dateFormat;
+    workingDays.value = workingDaysFor(selectedCompany.value);
     oldFileValue.value = selectedCompany.value?.Cst_profileImage;
     formData.value.Cst_countryCode.value = selectedCompany.value?.Cst_countryCode || 'IN';
     formData.value.Cst_stateCode.value = selectedCompany.value?.Cst_stateCode || 'GJ';
@@ -355,7 +366,8 @@ const SaveChangeToDb = async () => {
                 && formData.value.city.value == selectedCompany.value?.Cst_City && formData.value.format_date == companyDate.value.dateFormat
                 // Compared the same way it is read — absent counts as ON — or flipping only
                 // this switch would be judged "nothing to update" and silently not save.
-                && formData.value.trackerEstimateLimit === (selectedCompany.value?.trackerEstimateLimit !== false)) {
+                && formData.value.trackerEstimateLimit === (selectedCompany.value?.trackerEstimateLimit !== false)
+                && sameWeek(workingDays.value, workingDaysFor(selectedCompany.value))) {
                 return $toast.error(t('Toast.Nothing_to_update'), { position: 'top-right' });
             }
             isSpinner.value = true;
@@ -407,6 +419,7 @@ const SaveChangeToDb = async () => {
                 Cst_City: formData.value.city.value,
                 Cst_LogTimeDays: formData.value.day.value,
                 trackerEstimateLimit: formData.value.trackerEstimateLimit !== false,
+                workingDays: workingDays.value,
                 Cst_countryCode: formData.value.Cst_countryCode.value,
                 Cst_stateCode: formData.value.Cst_stateCode.value,
                 updatedAt: new Date()
@@ -477,6 +490,10 @@ function phoneValidation (number) {
 .invalid-feedback{
     top: unset !important;
 }
+
+.company-week { padding: var(--sp-7) 0 var(--sp-5); border-top: 1px solid var(--hairline); }
+.company-week__label { margin: 0 0 var(--sp-1); font: 500 14px/1.5 var(--font-ui); color: var(--ink); }
+.company-week__hint { margin: 0 0 var(--sp-4); font: var(--text-small); color: var(--ink-2); }
 
 .setting__wasabi-image {
     width: 120px !important;
