@@ -941,6 +941,11 @@ export const mutateFolders = (state,payload) => {
         }
     }
 }
+
+export const replaceFolders = (state, { projectId, folders }) => {
+    state.folders = { ...state.folders, [projectId]: folders };
+}
+
 export const mutateSearchedProjects = (state,payload) => {
     let searchedProjects = [];
     let searchData = payload.data;

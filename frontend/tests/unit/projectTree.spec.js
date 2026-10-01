@@ -91,7 +91,7 @@ beforeEach(() => {
     projectTreePanelState.open = false;
     apiRequest.mockImplementation((method, url) => {
         const match = /sprintFolder\/(\w+)\?collection=(\w+)/.exec(url);
-        if (match) return Promise.resolve({ data: (match[2] === 'sprints' ? SPRINTS : FOLDERS)[match[1]] || [] });
+        if (match) return Promise.resolve({ data: ((match[2] === 'sprints' ? SPRINTS : FOLDERS)[match[1]] || []).map((row) => ({ ...row })) });
         return Promise.resolve({ data: { status: true, data: [] } });
     });
 });
@@ -398,6 +398,7 @@ describe('subfolders in the project tree', () => {
             await vi.dynamicImportSettled();
             await flushPromises();
             document.body.querySelector('[data-action="confirm"]').click();
+            await flushPromises();
             await flushPromises();
         };
 

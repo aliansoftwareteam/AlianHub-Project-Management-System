@@ -20,6 +20,13 @@ const RESTORABLE = {
         permission: DELETE_OR_CLOSE,
         locate: async (companyId, id) => ({ projectId: id }),
     },
+    folders: {
+        permission: ['project.folder_restore', 'project.folder_delete'],
+        locate: async (companyId, id) => {
+            const folder = await storedRecord(companyId, SCHEMA_TYPE.FOLDERS, id, { projectId: 1 });
+            return folder && { projectId: folder.projectId };
+        },
+    },
     lists: {
         permission: ['project.sprint_restore', 'project.sprint_delete'],
         locate: async (companyId, id) => {
@@ -35,6 +42,8 @@ const RESTORABLE = {
         },
     },
 };
+
+const CHAT_KINDS = ['lists', 'tasks'];
 
 const notFound = (res) => res.status(404).json({ status: false, statusText: 'Not found.', error: 'Not Found' });
 
@@ -60,7 +69,7 @@ const requireRestoreAccess = async (req, res, next) => {
             ? await canEditProject(companyId, req.uid, String(place.projectId), [restorable.permission])
             : NO_PROJECT;
         // Chat channels share the sprint and task collections, and their container is not a project.
-        if (decision.missing && kind !== 'projects' && privileged) return next();
+        if (decision.missing && CHAT_KINDS.includes(kind) && privileged) return next();
         if (!decision.allowed) return refuse(res, decision);
         if (!privileged && !(await canSeeSprintById(companyId, req.uid, place.sprintId))) return notFound(res);
         return next();

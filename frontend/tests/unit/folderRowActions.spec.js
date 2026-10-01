@@ -153,10 +153,9 @@ describe('archiving a folder', () => {
         await flushPromises();
         expect(dialog()).toBeNull();
         expect(patches()).toEqual([]);
-        expect(wrapper.emitted('removed')).toBeUndefined();
     });
 
-    it('archives on confirm, stores the folder and the subfolders that went with it, and tells the tree', async () => {
+    it('archives on confirm and stores the folder and the subfolders that went with it', async () => {
         apiRequest.mockResolvedValue(answer('design', 2, [{ _id: 'icons', deletedStatusKey: 6 }]));
         const wrapper = menu('design');
         await choose(wrapper, 'Archive');
@@ -171,7 +170,6 @@ describe('archiving a folder', () => {
             updateObject: { $set: { deletedStatusKey: 2 } }
         }]]);
         expect(commits.map((commit) => [commit.data._id, commit.data.deletedStatusKey])).toEqual([['design', 2], ['icons', 6]]);
-        expect(wrapper.emitted('removed')).toEqual([['design']]);
         expect(dialog()).toBeNull();
     });
 
@@ -204,7 +202,6 @@ describe('archiving a folder', () => {
         await confirm();
         expect(toast.error).toHaveBeenCalledWith('You do not have permission to perform this action.', { position: 'top-right' });
         expect(undoToast.current).toBeNull();
-        expect(wrapper.emitted('removed')).toBeUndefined();
         expect(commits).toEqual([]);
     });
 });
@@ -218,14 +215,13 @@ describe('deleting a folder', () => {
         expect(patches()).toEqual([]);
     });
 
-    it('deletes on confirm and tells the tree', async () => {
+    it('deletes on confirm and stores the folder and its subfolders as deleted', async () => {
         apiRequest.mockResolvedValue(answer('design', 1, [{ _id: 'icons', deletedStatusKey: 1 }]));
         const wrapper = menu('design');
         await choose(wrapper, 'Delete');
         await confirm();
         expect(patches()[0][2]).toMatchObject({ type: 'updateFolder', updateObject: { $set: { deletedStatusKey: 1 } } });
         expect(commits.map((commit) => [commit.data._id, commit.data.deletedStatusKey])).toEqual([['design', 1], ['icons', 1]]);
-        expect(wrapper.emitted('removed')).toEqual([['design']]);
     });
 
     it('offers an undo that restores it from the Trash and reads the folders again', async () => {

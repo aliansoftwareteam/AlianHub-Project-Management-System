@@ -14,7 +14,7 @@ const { push, projects, routeParams, routeQuery, toast, setSprints, setFolders, 
     refreshFolders: vi.fn(() => Promise.resolve())
 }));
 
-vi.mock('@/views/Projects/folderActions', () => ({ refreshFolders }));
+vi.mock('@/views/Projects/folderActions', () => ({ refreshFolders, FOLDERS_CHANGED_EVENT: 'foldersChanged' }));
 
 vi.mock('vue-router', () => ({
     useRouter: () => ({ push }),
@@ -164,6 +164,24 @@ describe('useProjectTree', () => {
 
         mounted.pop().unmount();
         expect(socket.off).toHaveBeenCalledWith('foldersChanged', onChanged);
+    });
+
+    it('drops a folder it folded in earlier once the list no longer returns it, and nothing it did not add', async () => {
+        const project = {
+            _id: 'p6', ProjectName: 'Zeta', isGlobalPermission: true, ProjectRequiredComponent: [{ keyName: 'ProjectListView' }],
+            sprintsfolders: { embedded: { folderId: 'embedded', name: 'Embedded', sprintsObj: {} } }
+        };
+        const folder = (id) => ({ _id: id, name: id, projectId: 'p6', deletedStatusKey: 0, parentFolderId: null });
+        setFolders.mockResolvedValueOnce([folder('f20'), folder('f21')]);
+        projects.value = [project];
+        routeParams.id = 'p6';
+        const { wrapper } = mountTree();
+        await flushPromises();
+        expect(Object.keys(project.sprintsfolders).sort()).toEqual(['embedded', 'f20', 'f21']);
+
+        setFolders.mockResolvedValueOnce([folder('f20')]);
+        await wrapper.vm.loadSprintFolderData('p6', true);
+        expect(Object.keys(project.sprintsfolders).sort()).toEqual(['embedded', 'f20']);
     });
 
     it('keeps the map flat and gives every folder its parent, null at the top level', async () => {
