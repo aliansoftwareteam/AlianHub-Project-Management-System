@@ -380,6 +380,7 @@ module.exports.WORKLOAD_MOVE = '/api/v1/timesheet/workload-move';
 module.exports.WORKLOAD_CAPACITY = '/api/v1/timesheet/workload-capacity';
 module.exports.TIMER_RUNNING = '/api/v2/timetracker/running';
 module.exports.TIMER_TRIM = '/api/v2/timetracker/trim';
+module.exports.TIMER_CAN_START = '/api/v2/timetracker/can-start';
 module.exports.TIMESHEET_APPROVAL_QUEUE = '/api/v2/timesheet-approval/queue';
 module.exports.CAPACITY_MONTHS = '/api/v1/reports/capacity/months';
 module.exports.VARIANCE_SUMMARY = '/api/v1/reports/variance/summary';

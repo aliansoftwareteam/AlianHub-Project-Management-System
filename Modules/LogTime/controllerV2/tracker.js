@@ -29,8 +29,8 @@ const { pinSessionTenant } = require('../../../Config/tenant');
 const { trackerUser, refuse } = require('./sessionUser');
 const { escapeHtml } = require('../../../utils/escapeHtml');
 const { isPeriodLocked, PERIOD_LOCKED } = require('../../TimesheetApproval/helpers/lockGuard');
+const { START_LOCKED } = require('./timerRules');
 
-const START_LOCKED = "This timesheet period is approved and locked — a timer can't start in it.";
 /* A running timer belongs to the day it started, so stopping one that started in an approved
  * period is refused like any other change to that period, as trimming it already is. */
 const STOP_LOCKED = "This timesheet period is approved and locked — this timer's entry can't be changed.";

@@ -342,6 +342,9 @@ exports.listQueue = async (req, res) => {
             const o = typeof doc.toObject === 'function' ? doc.toObject() : doc;
             return {
                 ...o,
+                // The stored totals are the week as first submitted; a reopened week keeps taking time, so the card totals what its split is made of.
+                totalMinutes: split.totalMinutes,
+                entryCount: (entries || []).length,
                 userName: u ? u.Employee_Name || u.Employee_Email || '' : '',
                 userAvatar: u ? u.Employee_profileImageURL || '' : '',
                 billableMinutes: split.billableMinutes,

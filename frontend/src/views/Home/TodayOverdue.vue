@@ -273,15 +273,20 @@ async function onTimer(task) {
     if (timer.active) {
         const previous = timer.active.taskName;
         try {
-            await stop({ companyId: companyId.value, userId: userId.value });
+            const stopped = await stop({ companyId: companyId.value, userId: userId.value });
             $toast.info(t("Home.timer_switched", { task: previous }), { position: "top-right" });
+            if (stopped && !stopped.logged) $toast.info(t("TaskPanel.timer_too_short"), { position: "top-right" });
         } catch (error) {
             console.error("timer stop failed", error);
             $toast.error(t(timeLogFailureKey(error, "Home.timer_log_failed")), { position: "top-right" });
             return;
         }
     }
-    start(task, work.projectOf(task));
+    try {
+        await start(task, work.projectOf(task));
+    } catch (error) {
+        $toast.error(t(timeLogFailureKey(error, "Time.action_failed")), { position: "top-right" });
+    }
 }
 
 function onSetDate(task) {
