@@ -1,22 +1,46 @@
 # 045 progress
 
-- [ ] 1 Filter, group and sort by custom field
-- [ ] 2 Docs: @mentions and image upload
-- [ ] 3 Docs: comments
-- [ ] 4 Subtasks in List rows
-- [ ] 5 One bulk bar
-- [ ] 6 Automation templates
-- [ ] 7 Command palette tidy-up
-- [ ] 8 Home cards
-- [ ] 9 Task types decide which fields show
-- [ ] 10 Burndown, Velocity and Ask dashboard cards
-- [ ] 11 "Who can see this"
-- [ ] 12 Workload by points or task count
-- [ ] 13 `@agent` in chat and DMs
-- [ ] 14 Gantt reschedules dependants
-- [ ] 15 More AI field outputs
+- [x] 1 Filter, group and sort by custom field (#1191, build 664)
+- [x] 2 Docs: @mentions and image upload (#1196, build 663)
+- [x] 3 Docs: comments (#1198, build 669; migration `063-page-comments`)
+- [x] 4 Subtasks in List rows (#1200, build 668)
+- [x] 5 One bulk bar (#1186, build 658)
+- [x] 6 Automation templates (#1190, build 665)
+- [x] 7 Command palette tidy-up (#1185, build 652)
+- [x] 8 Home cards (#1199, build 659)
+- [x] 9 Task types decide which fields show (#1195, build 670)
+- [x] 10 Burndown, Velocity and Ask dashboard cards (#1188, build 654)
+- [x] 11 "Who can see this" (#1194, build 667)
+- [x] 12 Workload by points or task count (#1189, build 653)
+- [x] 13 `@agent` in chat and DMs (#1197, build 657)
+- [x] 14 Gantt reschedules dependants (#1203, build 666)
+- [x] 15 More AI field outputs (#1193, build 656)
 
 ## Log
-- 2026-09-30: the owner asked to start the medium gaps from the build-645 re-check.
-  - Fifteen slices, run in waves of about four next to task 044 because of machine load.
-  - Wave 1: slices 1, 2, 4 and 5.
+- 2026-09-30: the owner asked to start the medium gaps from the build-645 re-check, then to start every queued slice at once.
+  - Fifteen slices ran next to task 044's four. The PC restarted under the load; no work was lost.
+- 2026-10-01: agents resumed with the full suites left to CI, and all fifteen slices merged (builds 652–670).
+  - **Also merged:**
+    - #1201 (build 649): a test on beta compared timestamps unmasked on its fixture day, 2026-10-01, and failed the backend check on most PRs that day.
+    - #1202 (build 655): docs, Ask and agents use the same project visibility rule as projects; only a doc's author can make it private. Found while building slice 11.
+    - #1204 (build 662): Board cards in a full column keep their height on a phone.
+  - **Reviewed by the integrator before merging:** the Ask card (answers stay per viewer), `@agent` channel replies (only what every reader can open), the agent templates' new action, the access fix, and slice 9's drop rule (a List group again accepts drops only from List groups).
+  - **Slices that had to fit each other once merged:**
+    - 3 follows 2's doc notification rules: one Docs section in notification settings, and the page id in `changeData.pageId`.
+    - 4 works with 5's bulk bar and 1's custom-field groups.
+    - 9 makes AI fills, Board cards, and group, filter and sort by custom field leave out a field that does not apply to the task's type.
+  - Checked in dark mode on the owner's local builds 653 and 661.
+- **Left for later** (none blocks the slices):
+  - **Slice 1:** number fields cannot be grouped; a drop onto a labels group replaces all labels; AI field columns in Table have no header sort.
+  - **Slice 2:** uploaded images do not show on public share pages.
+  - **Slice 3:** comments keep their own mention input; no assignment, reactions or attachments.
+  - **Slice 5:** the bar may overflow between 768 and 1100 px; a selection persists on tabs with no bar.
+  - **Slice 6:** the engine has no due-date-passed trigger, no subtask-completion trigger and no notify action, so three recipes were adapted.
+  - **Slice 8:** Burndown, Velocity and Ask are not offered on Home (they need per-card settings).
+  - **Slice 10:** the Ask card asks once per viewer per open.
+  - **Slice 11:** the explainer checks each member in turn, which is slow for thousands of members.
+  - **Slice 12:** capacity in points and tasks is set by each person only.
+  - **Slice 13:** an agent's reply does not bump the DM's unread count; a chat run does not go through the Workflows queue.
+  - **Slice 14:** shifts count calendar days. No project or company working-days setting exists; the owner decides where one should live.
+  - **Slice 15:** a rating is a number field; dates use the filler's time zone.
+  - **Date pickers** have no dark theme (found in the dark-mode check; offered as a task chip).
