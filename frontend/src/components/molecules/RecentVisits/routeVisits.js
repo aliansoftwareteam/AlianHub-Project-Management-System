@@ -17,8 +17,6 @@ export function visitsForRoute(route) {
         add('sprint', params.sprintId);
     } else if (route.name === 'PageEditor') {
         add('doc', params.pageId);
-    } else if (route.name === 'Pages') {
-        add('doc', route.query && route.query.page);
     }
     return visits;
 }

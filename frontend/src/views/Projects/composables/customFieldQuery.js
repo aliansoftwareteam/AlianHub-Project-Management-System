@@ -3,6 +3,8 @@ import { dueDateBuckets } from '../taskGroups';
 import { fieldAppliesToTask, fieldTaskTypes } from '@fieldTaskTypes';
 import { typeModuleOf } from '@fieldTypes';
 import { maxOf as ratingMaxOf, text as ratingText } from '@fieldTypes/rating';
+import { RANGE as PROGRESS_RANGE } from '@fieldTypes/progress';
+import { inBand, numberBands, numberOf } from './numberBands';
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const VALUE_PATH = /^customField\.([a-f0-9]{24})\.fieldValue$/i;
@@ -11,10 +13,11 @@ const TEXT_TYPES = ['text', 'textarea', 'email', 'phone', 'url'];
 const NUMBER_TYPES = ['number', 'money'];
 const NUMERIC_TYPES = [...NUMBER_TYPES, 'rating', 'progress'];
 const LIST_TYPES = ['dropdown', 'people'];
+const BANDED_TYPES = [...NUMBER_TYPES, 'progress'];
 const EMPTY_VALUES = [null, '', []];
 const CHECKED = [true, 'true'];
 
-export const GROUPABLE_TYPES = Object.freeze(['dropdown', 'checkbox', 'date', 'people', 'rating']);
+export const GROUPABLE_TYPES = Object.freeze(['dropdown', 'checkbox', 'date', 'people', 'rating', ...BANDED_TYPES]);
 export const FILTERABLE_TYPES = Object.freeze(['dropdown', 'checkbox', 'date', 'people', ...NUMERIC_TYPES, ...TEXT_TYPES]);
 
 export const valuePath = (fieldId) => `customField.${fieldId}.fieldValue`;
@@ -84,9 +87,66 @@ const groupBase = (def, types) => ({
     tasksArray: []
 });
 
+const isRange = (range) => Array.isArray(range) && range.length === 2 && range.every((end) => typeof end === 'number' && Number.isFinite(end));
+
+/* The ends a field fixes for itself: a progress field always runs 0 to 100, and a number field may set a minimum and a maximum. */
+function ownRange(def) {
+    if (def?.fieldType === 'progress') return [PROGRESS_RANGE.min, PROGRESS_RANGE.max];
+    const ends = [numberOf(def?.fieldMinimum), numberOf(def?.fieldMaximum)];
+    return isRange(ends) && ends[1] > ends[0] ? ends : null;
+}
+
+export const needsProjectRange = (def) => NUMBER_TYPES.includes(def?.fieldType) && !ownRange(def);
+
+/* The lowest and highest value in the project, read as numbers the way the bands' own conditions read them. It goes through
+   the task query, so it counts only tasks the viewer can see. */
+export function numberRangeStages(def, projectId) {
+    const value = converted(valuePath(def._id), 'double');
+    return [
+        { $match: { $and: [{ ProjectID: { objId: { $in: [projectId] } } }, { deletedStatusKey: { $in: [0] } }] } },
+        { $group: { _id: null, min: { $min: value }, max: { $max: value } } }
+    ];
+}
+
+export const rangeFromRows = (rows) => {
+    const range = [rows?.[0]?.min, rows?.[0]?.max];
+    return isRange(range) ? range : null;
+};
+
+function numberRange(def, { range, tasks }) {
+    const own = ownRange(def);
+    if (own) return own;
+    if (isRange(range)) return range;
+    const values = (tasks || []).map((task) => numberOf(storedValue(task, String(def._id)))).filter((number) => number !== null);
+    return values.length ? [Math.min(...values), Math.max(...values)] : null;
+}
+
+function bandName(band, t) {
+    if (band.from === null && band.to === null) return t('ViewGroups.number_any');
+    if (band.from === null) return t('ViewGroups.number_below', { to: band.to });
+    if (band.to === null) return t('ViewGroups.number_from', { from: band.from });
+    return t('ViewGroups.number_between', { from: band.from, to: band.to });
+}
+
+/* A band is a range, not a value, so nothing can be dropped into one. */
+function numberGroups(def, { t, range, tasks, base, none, path, types }) {
+    const value = converted(path, 'double');
+    const bands = numberBands(numberRange(def, { range, tasks })).map((band) => ({
+        ...base,
+        name: bandName(band, t),
+        value: `${band.from ?? ''}..${band.to ?? ''}`,
+        searchValue: `${band.from ?? ''}..${band.to ?? ''}`,
+        numberBand: band,
+        dropDisabled: true,
+        conditions: [valueInTypes(present(value, ...(band.from === null ? [] : [{ $gte: [value, band.from] }]), ...(band.to === null ? [] : [{ $lt: [value, band.to] }])), types)]
+    }));
+    const noValue = blankOrOtherType({ $expr: { $eq: [value, null] } }, { $expr: { $ne: [value, null] } }, types);
+    return [...bands, { ...none, dropDisabled: true, conditions: [noValue] }];
+}
+
 /* Groups carry their own server condition, so each group fetches through the same
    company-scoped, visibility-checked task query as the status groups do. */
-export function customFieldGroups(def, { t = (key) => key, now = new Date(), people = [] } = {}) {
+export function customFieldGroups(def, { t = (key) => key, now = new Date(), people = [], tasks = [], range = null } = {}) {
     if (!hasId(def)) return [];
     const path = valuePath(def._id);
     const types = fieldTaskTypes(def);
@@ -132,6 +192,7 @@ export function customFieldGroups(def, { t = (key) => key, now = new Date(), peo
             { ...none, conditions: [blankOrOtherType({ [path]: { $in: EMPTY_VALUES } }, { [path]: { $nin: EMPTY_VALUES } }, types)] }
         ];
     }
+    if (BANDED_TYPES.includes(def.fieldType)) return numberGroups(def, { t, range, tasks, base, none, path, types });
     if (def.fieldType === 'checkbox') {
         return [
             { ...base, name: t('ViewGroups.checked'), value: true, searchValue: true, conditions: [valueInTypes({ [path]: { $in: CHECKED } }, types)] },
@@ -176,6 +237,7 @@ export function customGroupMatches(task, item) {
         return item.searchValue === '' ? chosen.length === 0 : chosen.includes(String(item.searchValue));
     }
     if (item.customFieldType === 'rating') return item.searchValue === '' ? isBlank(value) : !isBlank(value) && Number(value) === Number(item.searchValue);
+    if (BANDED_TYPES.includes(item.customFieldType)) return item.numberBand ? inBand(numberOf(value), item.numberBand) : numberOf(value) === null;
     if (item.customFieldType === 'checkbox') return CHECKED.includes(value) === (item.searchValue === true);
     if (item.customFieldType === 'date') return dateMatches(timeOf(value), item);
     return false;
@@ -188,7 +250,7 @@ export const groupTakesTask = (item, taskTypeKey) => fieldAppliesToTask({ fieldT
 /* Sortable reads `true` from a put function as "from any list", so an allowed drop names the one drag group it may come from. */
 export const putFrom = (groupName, item) => (to, from, dragged) => (groupTakesTask(item, dragged?.dataset?.taskType) ? [groupName] : false);
 
-/* A date group is a range, not a value, so nothing can be dropped into one. */
+/* A date group or a number band is a range, not a value, so nothing can be dropped into one. */
 export function customGroupUpdate(item) {
     if (!item?.customFieldId || item.dropDisabled) return null;
     if (LIST_TYPES.includes(item.customFieldType)) return { fieldValue: item.searchValue ? [item.searchValue] : [], _id: item.customFieldId };

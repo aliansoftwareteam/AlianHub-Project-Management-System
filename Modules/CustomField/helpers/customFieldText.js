@@ -61,4 +61,18 @@ const customFieldDefinitionOf = async (companyId, fieldId) => {
     return null;
 };
 
-module.exports = { fieldValueText, fieldValueContext, customFieldDefinitionOf };
+/* The definitions of several fields at once, by id. `known` is carried across a batch, with null for an id that names no field. */
+const customFieldDefinitionsOf = async (companyId, fieldIds, known = new Map()) => {
+    let wanted = [...new Set(fieldIds.map(String))].filter((id) => OBJECT_ID.test(id) && !known.has(id));
+    for (const database of [companyId, 'global']) {
+        if (!wanted.length) break;
+        const filter = { _id: { $in: wanted.map((id) => new mongoose.Types.ObjectId(id)) } };
+        const found = await MongoDbCrudOpration(database, { type: SCHEMA_TYPE.CUSTOM_FIELDS, data: [filter] }, 'find').catch(() => []);
+        (found || []).map(plain).forEach((definition) => known.set(String(definition._id), definition));
+        wanted = wanted.filter((id) => !known.has(id));
+    }
+    wanted.forEach((id) => known.set(id, null));
+    return known;
+};
+
+module.exports = { fieldValueText, fieldValueContext, customFieldDefinitionOf, customFieldDefinitionsOf };

@@ -41,7 +41,7 @@ const TASK = {
     _id: 't1', TaskName: 'Budget plan', TaskKey: 'AH-1', ProjectID: 'p1', sprintId: 's1', folderObjId: '',
     sprintName: 'Sprint 4', folderName: '', updatedAt: twoDaysAgo, status: { text: 'Open', color: '#ccc' }
 };
-const serve = () => apiRequest.mockImplementation((type, url) => {
+const respond = (type, url) => {
     if (type === 'post' && url === '/api/v2/search') {
         return ok({
             tasks: [TASK],
@@ -54,21 +54,23 @@ const serve = () => apiRequest.mockImplementation((type, url) => {
         return ok([{ visitedAt: twoDaysAgo, task: { ...TASK, _id: 't9', TaskName: 'Recently seen', TaskKey: 'AH-9', sprintArray: { name: 'Sprint 2' } } }]);
     }
     return ok([]);
-});
+};
+const serve = () => apiRequest.mockImplementation(respond);
 
-const store = () => createStore({
+const store = ({ roleType = 3, projects = [{ _id: 'p1', ProjectName: 'Budget ops' }], teams = [] } = {}) => createStore({
     modules: {
         users: { namespaced: true, getters: { users: () => [{ _id: 'u1', Employee_Name: 'Budget Bob', Employee_Email: 'bob@example.com' }] } },
-        projectData: { namespaced: true, getters: { projects: () => ({ data: [{ _id: 'p1', ProjectName: 'Budget ops' }] }) } }
+        projectData: { namespaced: true, getters: { projects: () => ({ data: projects }), allProjects: () => ({ data: projects }) } },
+        settings: { namespaced: true, getters: { companyUserDetail: () => ({ roleType }), teams: () => teams } }
     }
 });
 
 const mounted = [];
-const mountPalette = async () => {
+const mountPalette = async (session) => {
     const wrapper = mount(CommandPalette, {
         props: { open: true },
         attachTo: document.body,
-        global: { plugins: [store()], stubs: { ShellIcon: true, teleport: true } }
+        global: { plugins: [store(session)], stubs: { ShellIcon: true, teleport: true } }
     });
     mounted.push(wrapper);
     await flushPromises();
@@ -437,6 +439,70 @@ describe('the "New project" command', () => {
     });
 });
 
+describe('the "New doc" command', () => {
+    const OPEN_PROJECT = { _id: 'p1', ProjectName: 'Budget ops', isPrivateSpace: false, AssigneeUserId: [] };
+    const PRIVATE_PROJECT = { _id: 'p2', ProjectName: 'Board only', isPrivateSpace: true, AssigneeUserId: ['user-9', 'tId_team-1'] };
+    const projects = [OPEN_PROJECT, PRIVATE_PROJECT];
+    const created = () => apiRequest.mock.calls.filter(([type, url]) => type === 'post' && url === '/api/v2/pages').map(([, , body]) => body);
+    const showProject = (id) => {
+        routeRef.current = reactive({ name: 'ProjectSprint', path: `/company-1/project/${id}/s1`, params: { cid: 'company-1', id, sprintId: 's1' }, query: {} });
+    };
+    const offered = async (session) => {
+        const wrapper = await mountPalette({ projects, ...session });
+        await typeQuery(wrapper, 'new doc');
+        return wrapper;
+    };
+    const runNewDoc = async (session) => {
+        const wrapper = await offered(session);
+        expect(activeOption(wrapper).attributes('data-kind')).toBe('command');
+        expect(activeOption(wrapper).text()).toContain('Docs.new_doc');
+        await key(wrapper, { key: 'Enter' });
+        await flushPromises();
+        return wrapper;
+    };
+
+    beforeEach(() => {
+        apiRequest.mockImplementation((type, url) => (type === 'post' && url === '/api/v2/pages' ? ok({ _id: 'd9' }) : respond(type, url)));
+    });
+
+    it('makes a workspace doc outside a project and opens it', async () => {
+        const wrapper = await runNewDoc();
+        expect(created()).toEqual([{ title: 'Docs.untitled' }]);
+        expect(router.push).toHaveBeenCalledWith({ name: 'PageEditor', params: { cid: 'company-1', pageId: 'd9' } });
+        expect(wrapper.emitted('close')).toBeTruthy();
+    });
+
+    it('makes the doc in the project the page is showing', async () => {
+        showProject('p1');
+        await runNewDoc();
+        expect(created()).toEqual([{ title: 'Docs.untitled', projectId: 'p1' }]);
+        expect(router.push).toHaveBeenCalledWith({ name: 'PageEditor', params: { cid: 'company-1', pageId: 'd9' } });
+    });
+
+    it('is not offered in a private project the person is not on', async () => {
+        showProject('p2');
+        const wrapper = await offered();
+        expect(options(wrapper).some((option) => option.text().includes('Docs.new_doc'))).toBe(false);
+    });
+
+    it('is offered in a private project to its team and to an admin', async () => {
+        showProject('p2');
+        await runNewDoc({ teams: [{ _id: 'team-1', assigneeUsersArray: ['user-1'] }] });
+        mounted.splice(0).forEach((w) => w.unmount());
+        await runNewDoc({ roleType: 2 });
+        expect(created()).toEqual([{ title: 'Docs.untitled', projectId: 'p2' }, { title: 'Docs.untitled', projectId: 'p2' }]);
+    });
+
+    it('says so, and stays put, when the server refuses', async () => {
+        apiRequest.mockImplementation((type, url) => (type === 'post' && url === '/api/v2/pages'
+            ? Promise.resolve({ data: { status: false, statusText: 'Project not found.' } })
+            : respond(type, url)));
+        await runNewDoc();
+        expect(toast.error).toHaveBeenCalledWith('Project not found.', { position: 'top-right' });
+        expect(router.push).not.toHaveBeenCalled();
+    });
+});
+
 describe('asking AI inside the palette', () => {
     const CITED = [
         { kind: 'task', id: 't1', ref: 'AH-1', title: 'Budget plan', project: 'Budget ops', projectId: 'p1' },
@@ -595,7 +661,7 @@ describe('recently opened projects, sprints and docs', () => {
         await row(wrapper, 'Launch').trigger('click');
         expect(router.push).toHaveBeenLastCalledWith(expect.stringContaining('/project/p2/s/s7?tab=ProjectListView'));
         await row(wrapper, 'Budget wiki').trigger('click');
-        expect(router.push).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Pages', query: { page: 'd1' } }));
+        expect(router.push).toHaveBeenLastCalledWith({ name: 'PageEditor', params: { cid: 'company-1', pageId: 'd1' } });
     });
 
     it('folds a recent project into a recent sprint of the same project', async () => {
@@ -612,6 +678,48 @@ describe('recently opened projects, sprints and docs', () => {
         expect(kinds(wrapper).filter((k) => k !== 'command')).toEqual(['sprint', 'project']);
         await chip('docs').trigger('click');
         expect(kinds(wrapper).filter((k) => k !== 'command')).toEqual(['page']);
+    });
+});
+
+describe('docs in the search results', () => {
+    const PAGES = [
+        { _id: 'd1', title: 'Budget project doc', ProjectID: 'p1', updatedAt: twoDaysAgo },
+        { _id: 'd2', title: 'Budget workspace doc', ProjectID: null, updatedAt: twoDaysAgo },
+        { _id: 'd3', title: 'Budget wiki page', ProjectID: 'p1', isWiki: true, updatedAt: twoDaysAgo },
+        { _id: 'd4', title: 'Budget private doc', ProjectID: 'p2', updatedAt: twoDaysAgo },
+    ];
+    const projects = [{ _id: 'p1', ProjectName: 'Budget ops' }, { _id: 'p2', ProjectName: 'Board only', isPrivateSpace: true, AssigneeUserId: ['user-1'] }];
+    const docRow = (wrapper, title) => options(wrapper).find((o) => o.attributes('data-kind') === 'page' && o.text().includes(title));
+    const searched = async () => {
+        apiRequest.mockImplementation((type, url) => (type === 'post' && url === '/api/v2/search'
+            ? ok({ tasks: [], projects: [], pages: PAGES, comments: [] })
+            : ok([])));
+        const wrapper = await mountPalette({ projects });
+        await typeQuery(wrapper);
+        return wrapper;
+    };
+
+    it.each([
+        ['a project doc', 'Budget project doc', 'd1', 'Budget ops'],
+        ['a workspace doc', 'Budget workspace doc', 'd2', 'Palette.docs_company'],
+        ['a wiki page', 'Budget wiki page', 'd3', 'Budget ops'],
+        ['a doc in a private project the person is on', 'Budget private doc', 'd4', 'Board only'],
+    ])('opens %s in the doc editor', async (_, title, pageId, place) => {
+        const wrapper = await searched();
+        expect(docRow(wrapper, title).text()).toContain(place);
+        await docRow(wrapper, title).trigger('click');
+        expect(router.push).toHaveBeenLastCalledWith({ name: 'PageEditor', params: { cid: 'company-1', pageId } });
+        expect(wrapper.emitted('close')).toBeTruthy();
+    });
+
+    it('copies and opens in a new tab the doc itself, not the Docs hub', async () => {
+        const wrapper = await searched();
+        await wrapper.findAll('.pal__chip').find((c) => c.text() === 'Palette.chip_docs').trigger('click');
+        expect(activeOption(wrapper).attributes('data-kind')).toBe('page');
+        await key(wrapper, { key: 'Enter', metaKey: true });
+        expect(router.resolve).toHaveBeenLastCalledWith({ name: 'PageEditor', params: { cid: 'company-1', pageId: 'd1' } });
+        expect(window.open).toHaveBeenCalledWith(expect.stringContaining('/named/PageEditor'), '_blank', expect.stringContaining('noopener'));
+        expect(router.push).not.toHaveBeenCalled();
     });
 });
 

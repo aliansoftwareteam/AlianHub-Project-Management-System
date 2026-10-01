@@ -2,7 +2,7 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { validateRateInput, buildInvoice } = require("../helpers/billingRules");
 const logger = require("../../../Config/loggerConfig");
-const { resolveTimeScope } = require("../helpers/timeScope");
+const { resolveTimeScope, withoutHidden, openProjects } = require("../helpers/timeScope");
 
 // TIME-07 — billing rates + invoicing. Rates live in the per-company
 // billing_rates collection (one per scope+refId). Invoices are generated from
@@ -65,14 +65,16 @@ exports.listRates = async (req, res) => {
 exports.generateInvoice = async (req, res) => {
     try {
         const companyId = sessionTenantOf(req);
-        if (!(await resolveTimeScope(companyId, req.uid)).canSeeMoney) {
+        const caller = await resolveTimeScope(companyId, req.uid);
+        if (!caller.canSeeMoney) {
             return res.send({ status: true, statusText: MONEY_RESTRICTED, data: null, restricted: true });
         }
         const { start, end, userArray = [], projectArray = [], currency = 'USD', defaultRate = 0 } = req.body || {};
         const match = { billable: { $ne: false } };
         if (start && end) match.LogStartTime = { $gte: Number(start), $lte: Number(end) };
         if (Array.isArray(userArray) && userArray.length) match.Loggeduser = { $in: userArray };
-        if (Array.isArray(projectArray) && projectArray.length) match.ProjectId = { $in: idForms(projectArray) };
+        if (Array.isArray(projectArray) && projectArray.length) match.ProjectId = { $in: idForms(openProjects(caller, projectArray)) };
+        else Object.assign(match, withoutHidden(caller));
         const entries = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
             data: [match, { Loggeduser: 1, ProjectId: 1, LogTimeDuration: 1, billable: 1 }],

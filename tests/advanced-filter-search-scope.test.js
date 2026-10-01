@@ -136,3 +136,39 @@ describe.each(['files', 'links'])('the %s search keeps to the projects the calle
         expect(await found(MEMBER, { pids: [], filterQuery: byFilter([empty, secret]) })).toEqual([empty]);
     });
 });
+
+describe.each(['files', 'links'])('the %s search keeps sprint privacy inside a project the caller can open', (what) => {
+    let hiddenSprint;
+    let sharedSprint;
+    let openSprint;
+
+    beforeEach(() => {
+        const sprint = (name, doc = {}) => String(mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: oid(), name, projectId: new mongoose.Types.ObjectId(empty), deletedStatusKey: 0, ...doc })._id);
+        hiddenSprint = sprint('Private, owner only', { private: true, AssigneeUserId: [OWNER] });
+        sharedSprint = sprint('Private, shared with the member', { private: true, AssigneeUserId: [MEMBER] });
+        openSprint = sprint('Open');
+    });
+
+    /* What each join reads is decided by the stages its pipeline starts with. */
+    const joined = async (uid) => {
+        mockDb.crud.mockClear();
+        await search(what, uid, { sortBy: 'last_update', skipValue: 0, batchSizeValue: 50, filterQuery: {}, pids: [empty] });
+        const [, { data }] = mockDb.crud.mock.calls.find(([, query, method]) => query.type === SCHEMA_TYPE.PROJECTS && method === 'aggregate');
+        const lookups = data[0].filter((stage) => stage.$lookup && ['tasks', 'comments'].includes(stage.$lookup.from)).map((stage) => stage.$lookup);
+        expect(lookups.map((lookup) => lookup.from).sort()).toEqual(['comments', 'tasks']);
+        const reads = (lookup, sprintId) => lookup.pipeline.filter((stage) => stage.$match && stage.$match.sprintId)
+            .every((stage) => fakeMongo.matches({ sprintId }, { sprintId: stage.$match.sprintId }));
+        return Object.fromEntries(lookups.map((lookup) => [lookup.from, { hidden: reads(lookup, hiddenSprint), shared: reads(lookup, sharedSprint), open: reads(lookup, openSprint) }]));
+    };
+
+    it('leaves a member out of the tasks and comments of a private sprint they are not on', async () => {
+        const seen = { hidden: false, shared: true, open: true };
+        expect(await joined(MEMBER)).toEqual({ tasks: seen, comments: seen });
+    });
+
+    it('leaves an owner every sprint', async () => {
+        const seen = { hidden: true, shared: true, open: true };
+        expect(await joined(OWNER)).toEqual({ tasks: seen, comments: seen });
+    });
+});
+
