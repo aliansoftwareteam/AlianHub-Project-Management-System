@@ -15,6 +15,7 @@ vi.mock('@/services', () => ({
         return Promise.resolve({ data: { status: true, data: { ...api.list.find((row) => row._id === versionId), name: body.name } } });
     }),
 }));
+vi.mock('vue-router', () => ({ useRoute: () => ({ params: {} }), useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/composable', () => ({
     useGetterFunctions: () => ({ getUser: (id) => ({ Employee_Name: id === 'user-1' ? 'Me' : 'Priya Shah' }) }),
     useCustomComposable: () => ({ getWasabiImageLink: vi.fn(async () => 'https://files.example/signed.png') }),
@@ -113,7 +114,9 @@ describe('the doc history panel', () => {
 
         expect(wrapper.findAll('.ph__item')[2].attributes('aria-current')).toBe('true');
         expect(wrapper.findAll('.ph__item')[0].attributes('aria-current')).toBeUndefined();
-        expect(blocks(wrapper, 'added')).toHaveLength(1);
+        expect(blocks(wrapper, 'same')).toHaveLength(1);
+        expect(blocks(wrapper, 'added')).toHaveLength(0);
+        expect(wrapper.find('.ph__summary').text()).toBe('Docs.history_first');
         expect(wrapper.find('.ph__detail-title').text()).toContain('Draft');
         wrapper.unmount();
     });

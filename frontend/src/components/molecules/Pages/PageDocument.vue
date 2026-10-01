@@ -32,6 +32,9 @@
                             <ShellIcon name="chat" :size="13" />{{ $t('Docs.comments') }}
                             <span v-if="openComments" class="pd__count">{{ openComments }}</span>
                         </button>
+                        <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" aria-haspopup="dialog" :aria-expanded="showHistory" @click="showHistory = true">
+                            <ShellIcon name="clock" :size="13" />{{ $t('Docs.history') }}
+                        </button>
                         <template v-if="layout === 'panel'">
                             <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="present">
                                 <ShellIcon name="play" :size="11" />{{ $t('Docs.present') }}
@@ -133,6 +136,7 @@
                 ></div>
                 <PageComments
                     v-show="showComments"
+                    :key="`comments-${editorKey}`"
                     :page-id="String(page._id)"
                     :blocks="contentBlocks && contentBlocks.blocks"
                     :focus-id="focusCommentId"
@@ -191,6 +195,17 @@
                 </div>
             </div>
 
+            <PageHistory
+                v-if="showHistory"
+                :page-id="String(page._id)"
+                :current-title="draftTitle"
+                :current-blocks="currentBlocks"
+                :save-pending="savePending"
+                :before-restore="confirmDiscard"
+                @close="showHistory = false"
+                @restored="onRestored"
+            />
+
             <WhoCanSeeModal v-if="showWhoCanSee" v-model="showWhoCanSee" kind="page" :itemId="page?._id || ''" :title="draftTitle" />
 
             <PagePresenter
@@ -221,6 +236,7 @@ import PageBlockEditor from '@/components/molecules/Pages/PageBlockEditor.vue';
 import PageComposeRail from '@/components/molecules/Pages/PageComposeRail.vue';
 import PagePresenter from '@/components/molecules/Pages/PagePresenter.vue';
 import PageComments from '@/components/molecules/Pages/PageComments.vue';
+import PageHistory from '@/components/molecules/Pages/PageHistory.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
@@ -278,6 +294,7 @@ const isSharing = ref(false);
 const presenting = ref(false);
 const route = useRoute();
 const showComments = ref(false);
+const showHistory = ref(false);
 const openComments = ref(0);
 const commentedBlocks = ref([]);
 const focusCommentId = computed(() => String((route && route.query && route.query.comment) || ''));
@@ -291,6 +308,7 @@ const projectName = computed(() => {
 });
 const users = computed(() => (store.getters['users/users'] || []).filter((u) => u && u.Employee_Name));
 const rawDraft = computed(() => blocksToRawText(contentBlocks.value) || contentHtml.value || '');
+const currentBlocks = computed(() => (contentBlocks.value && contentBlocks.value.blocks) || []);
 const isWiki = computed(() => Boolean(page.value && page.value.isWiki));
 const reviewStateValue = computed(() => (page.value && page.value.reviewState) || 'none');
 const needsAttention = computed(() => isWiki.value && (reviewStateValue.value === 'due' || reviewStateValue.value === 'stale'));
@@ -337,13 +355,17 @@ watch(previewHtml, () => nextTick(() => {
     hydrateDocImages(previewEl.value, (key) => getWasabiImageLink(companyId.value, key));
 }));
 
+/* A restore reloads the same doc: a new key is what makes the editor and the comments start over. */
+let reloads = 0;
+
 function loadPage(id) {
     loadFailed.value = false;
+    showHistory.value = false;
     if (!id) {
         page.value = null;
-        return;
+        return Promise.resolve();
     }
-    apiRequest('get', `${env.PAGES}/${id}`)
+    return apiRequest('get', `${env.PAGES}/${id}`)
         .then((response) => {
             if (!response.data?.status) {
                 page.value = null;
@@ -356,7 +378,7 @@ function loadPage(id) {
             contentBlocks.value = contentToEditorData(page.value.content);
             savedSnapshot.value = { title: draftTitle.value, html: contentHtml.value };
             editorSeed.value = page.value.content || { html: contentHtml.value };
-            editorKey.value = String(id);
+            editorKey.value = reloads ? `${id}-r${reloads}` : String(id);
             baselinePending.value = true;
             isPrivate.value = String(page.value.visibility || '') === 'private';
             linkedTasks.value = (page.value.linkedTasks || []).map((x) => ({ id: String(x), key: '' }));
@@ -374,7 +396,17 @@ function loadPage(id) {
         });
 }
 
-watch(() => props.pageId, (id) => loadPage(id), { immediate: true });
+watch(() => props.pageId, (id) => {
+    reloads = 0;
+    loadPage(id);
+}, { immediate: true });
+
+async function onRestored() {
+    if (!page.value) return;
+    reloads += 1;
+    await loadPage(String(page.value._id));
+    if (page.value) emit('saved', page.value);
+}
 
 // A title is one line that wraps; a pasted line break becomes a space, one for one, so the caret stays put.
 function onTitleInput(event) {
@@ -393,10 +425,10 @@ function onTitleEnter(event) {
 }
 
 function savePage() {
-    if (!page.value || isSaving.value || !isDirty.value) return;
+    if (!page.value || isSaving.value || !isDirty.value) return Promise.resolve(false);
     isSaving.value = true;
     const sent = { title: draftTitle.value, html: contentHtml.value };
-    apiRequest('put', `${env.PAGES}/${page.value._id}`, {
+    return apiRequest('put', `${env.PAGES}/${page.value._id}`, {
         title: sent.title,
         contentHtml: sent.html,
         contentBlocks: contentBlocks.value,
@@ -407,11 +439,19 @@ function savePage() {
             if (response.data.data) page.value = { ...page.value, ...response.data.data, content: page.value.content };
             $toast.success(response.data.statusText, { position: 'top-right' });
             emit('saved', page.value);
-        } else {
-            $toast.error(response.data?.statusText || t('Toast.something_went_wrong'), { position: 'top-right' });
+            return true;
         }
-    }).catch((error) => console.error('ERROR in save page: ', error))
-        .finally(() => { isSaving.value = false; });
+        $toast.error(response.data?.statusText || t('Toast.something_went_wrong'), { position: 'top-right' });
+        return false;
+    }).catch((error) => {
+        console.error('ERROR in save page: ', error);
+        return false;
+    }).finally(() => { isSaving.value = false; });
+}
+
+/* A version holds the saved doc, so edits still in the editor are saved before one is kept. */
+function savePending() {
+    return isDirty.value ? savePage() : Promise.resolve(true);
 }
 
 function deletePage() {
@@ -676,6 +716,7 @@ function onKeydown(e) {
         e.preventDefault();
         savePage();
     } else if (e.key === 'Escape') {
+        if (showHistory.value) { showHistory.value = false; return; }
         if (presenting.value) { presenting.value = false; return; }
         if (showShare.value) { showShare.value = false; return; }
         if (showLinker.value) { showLinker.value = false; return; }
