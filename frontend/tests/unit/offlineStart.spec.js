@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 
 const reloadPage = vi.hoisted(() => vi.fn());
 vi.mock('@/utils/reloadPage', () => ({ reloadPage }));
@@ -15,6 +15,8 @@ vi.mock('@/components/templates/AuthShell/AuthShell.vue', () => ({ default: { na
 
 import { isOnline, unreachable, away, markAway } from '@/offline';
 import { readSessionUser } from '@/router/sessionCheck';
+import { apiRequestWithoutSecure } from '@/services';
+import { RETRY_EVERY_MS } from '@/offline/offlineRules';
 import OfflineStart from '@/components/offline/OfflineStart.vue';
 import Login from '@/views/Authentication/Login/Login.vue';
 
@@ -22,8 +24,11 @@ const source = (file) => fs.readFileSync(path.resolve(__dirname, '../../src', fi
 const networkError = () => Object.assign(new Error('Network Error'), { code: 'ERR_NETWORK' });
 const setBrowserOnline = (value) => Object.defineProperty(window.navigator, 'onLine', { value, configurable: true });
 
+afterEach(() => vi.useRealTimers());
+
 beforeEach(() => {
     reloadPage.mockClear();
+    apiRequestWithoutSecure.mockReset();
     isOnline.value = true;
     unreachable.value = false;
     setBrowserOnline(true);
@@ -102,12 +107,53 @@ describe('the screen a signed-in person gets when the app opens with no connecti
         expect(reloadPage).toHaveBeenCalledTimes(1);
     });
 
-    it('reloads by itself when the connection is back', async () => {
-        isOnline.value = false;
+    it('reloads by itself once the server answers again', async () => {
+        apiRequestWithoutSecure.mockResolvedValue({ status: 200, data: { status: true } });
         mountScreen();
         expect(reloadPage).not.toHaveBeenCalled();
-        isOnline.value = true;
+
+        window.dispatchEvent(new Event('online'));
+        await flushPromises();
+
+        expect(apiRequestWithoutSecure).toHaveBeenCalledWith('get', '/version');
         expect(reloadPage).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps asking, and does not reload, while the server gives no answer', async () => {
+        vi.useFakeTimers();
+        apiRequestWithoutSecure.mockRejectedValue(networkError());
+        mountScreen();
+
+        window.dispatchEvent(new Event('online'));
+        await vi.advanceTimersByTimeAsync(RETRY_EVERY_MS * 3);
+
+        expect(apiRequestWithoutSecure).toHaveBeenCalledTimes(4);
+        expect(reloadPage).not.toHaveBeenCalled();
+    });
+
+    it('does not reload because the offline state cleared, which it does on a timer while the server is still down', async () => {
+        isOnline.value = false;
+        apiRequestWithoutSecure.mockRejectedValue(networkError());
+        mountScreen();
+        isOnline.value = true;
+        unreachable.value = false;
+        await flushPromises();
+        expect(reloadPage).not.toHaveBeenCalled();
+    });
+
+    it('does not ask while the browser has no connection, or after it has gone', async () => {
+        vi.useFakeTimers();
+        setBrowserOnline(false);
+        const wrapper = mountScreen();
+        await vi.advanceTimersByTimeAsync(RETRY_EVERY_MS * 2);
+        expect(apiRequestWithoutSecure).not.toHaveBeenCalled();
+
+        setBrowserOnline(true);
+        wrapper.unmount();
+        mounted = [];
+        window.dispatchEvent(new Event('online'));
+        await vi.advanceTimersByTimeAsync(RETRY_EVERY_MS * 2);
+        expect(apiRequestWithoutSecure).not.toHaveBeenCalled();
     });
 
     it('takes the place of the spinner in App.vue while the app is away', () => {

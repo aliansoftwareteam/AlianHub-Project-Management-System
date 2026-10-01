@@ -63,6 +63,12 @@ const shellDocument = async (request) => {
     }
 };
 
+/* A worker that takes over while this one is still installing removes this one's half-filled cache. */
+const refillIfEmptied = async () => {
+    if (await held(SHELL_DOCUMENT)) return;
+    await precache().catch(() => {});
+};
+
 const buildFile = async (request) => (await held(new URL(request.url).pathname)) || fetch(request);
 
 const buildImage = async (event) => {
@@ -78,8 +84,10 @@ self.addEventListener('install', (event) => {
     event.waitUntil(precache());
 });
 
+/* Everything else goes, not only earlier builds: a worker this app shipped before (alianhub-pwa-v1)
+ * kept any same-origin answer outside /api, and its cache may still be in a browser. */
 self.addEventListener('activate', (event) => {
-    event.waitUntil(dropCaches((name) => isShellCache(name) && name !== SHELL_CACHE));
+    event.waitUntil(dropCaches((name) => name !== SHELL_CACHE && name !== RUNTIME_CACHE).then(refillIfEmptied));
 });
 
 self.addEventListener('fetch', (event) => {

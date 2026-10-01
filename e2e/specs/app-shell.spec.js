@@ -1,7 +1,9 @@
-const { test, expect } = require('../support/test');
+const { test, expect, asRole } = require('../support/test');
 
 /* The suite blocks service workers (playwright.config.js); this file is the one place they run. */
 test.use({ serviceWorkers: 'allow' });
+
+const workerActive = (page) => page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
 
 const heldPaths = (page) => page.evaluate(async () => {
     const paths = [];
@@ -12,11 +14,11 @@ const heldPaths = (page) => page.evaluate(async () => {
     return paths;
 });
 
-test.describe('the app shell', () => {
+test.describe('the app shell, signed out', () => {
     test('opens the sign-in page with no network and holds nothing but files of the build', async ({ page, context }) => {
         await page.goto('/#/login');
         await expect(page.locator('#email')).toBeVisible();
-        await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
+        await workerActive(page);
 
         const held = await heldPaths(page);
         expect(held).toContain('/index.html');
@@ -28,5 +30,23 @@ test.describe('the app shell', () => {
 
         await expect(page.locator('#email')).toBeVisible();
         await expect(page.locator('.auth__banner')).toContainText("You're offline");
+    });
+});
+
+test.describe('the app shell, signed in', () => {
+    test.use(asRole('owner'));
+
+    test('opens on an offline screen with no network and comes back by itself', async ({ page, context, state }) => {
+        await page.goto(`/#/${state.companyId}`);
+        await expect(page.locator('.ah-app')).toBeVisible();
+        await workerActive(page);
+
+        await context.setOffline(true);
+        await page.reload();
+        await expect(page.locator('.ah-state--offline')).toBeVisible();
+        expect(await heldPaths(page).then((held) => held.filter((path) => path.startsWith('/api/')))).toEqual([]);
+
+        await context.setOffline(false);
+        await expect(page.locator('.ah-app')).toBeVisible();
     });
 });

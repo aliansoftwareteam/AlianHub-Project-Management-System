@@ -147,12 +147,26 @@ describe('taking over', () => {
         expect(worker.scope.skipWaitingCalls).toBe(1);
     });
 
-    it('removes the builds before it and leaves other caches alone', async () => {
-        const caches = cacheStorage({ 'ah-shell-build-1': { '/index.html': response('old') }, 'ah-runtime-v1': { '/img/a.0a1b2c3d.png': response('image') } });
+    it('removes every cache but its build and the build images, among them the cache of the worker shipped before this one', async () => {
+        const caches = cacheStorage({
+            'ah-shell-build-1': { '/index.html': response('old') },
+            'ah-runtime-v1': { '/img/a.0a1b2c3d.png': response('image') },
+            'alianhub-pwa-v1': { '/share/abc': response('a shared page') },
+        });
         const worker = boot({ caches });
         await worker.dispatch('install');
         await worker.dispatch('activate');
         expect([...caches.stores.keys()].sort()).toEqual(['ah-runtime-v1', 'ah-shell-build-2']);
+    });
+
+    it('fills its cache again if another worker emptied it while it was installing', async () => {
+        const worker = boot();
+        await worker.dispatch('install');
+        worker.caches.stores.delete('ah-shell-build-2');
+
+        await worker.dispatch('activate');
+
+        expect(heldPaths(worker.caches).sort()).toEqual([...SHELL.hashed, ...SHELL.plain].sort());
     });
 
     it('tells a tab which build it holds', async () => {
