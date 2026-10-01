@@ -225,6 +225,25 @@
     gap: 6px;
     margin-top: 7px;
 }
+.kanban-board .card-fields {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+    gap: 3px 8px;
+    margin: 7px 0 0;
+    font-size: 11.5px;
+    line-height: 18px;
+}
+.kanban-board .card-field { display: contents; }
+.kanban-board .card-field__name,
+.kanban-board .card-field__value { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kanban-board .card-field__name { max-width: 110px; color: var(--ink-2); font-weight: 500; }
+.kanban-board .card-field__value { color: var(--ink); }
+.kanban-board .card-field__chip {
+    display: inline-block; max-width: 100%;
+    margin-right: 4px; padding: 0 7px; border-radius: 999px;
+    background: var(--fill); color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: top;
+}
 .kanban-board .card-tags { flex-wrap: wrap; row-gap: 4px; }
 .kanban-board .card-key { font: 600 9.5px/1 var(--font-mono); color: var(--ink-2); margin-right: 5px; }
 .kanban-board .card-points { font: 500 10px/1 var(--font-mono); color: var(--ink-2); padding: 3px 6px; border-radius: 999px; background: var(--surface-2); white-space: nowrap; }

@@ -111,17 +111,19 @@ const searchedTask = inject('searchedTask');
 const project = inject('selectedProject');
 const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
 
-const cardFields = useViewColumns(computed(() => project.value?._id), 'board', computed(() => columnCatalogue('board')));
+const customFields = useProjectCustomFields(project, { archived: showArchiveVar });
+const cardCatalogue = computed(() => columnCatalogue('board', { fields: customFields.defs.value }));
+const cardFields = useViewColumns(computed(() => project.value?._id), 'board', cardCatalogue);
 provide('boardCardFields', cardFields.visibleColumns);
+provide('boardFieldTasks', customFields.allTasks);
 
 const boardSort = useListSort();
-const { defs: fieldDefs } = useProjectCustomFields(project);
-const sortOptions = computed(() => sortChoices(fieldDefs.value));
+const sortOptions = computed(() => sortChoices(customFields.defs.value));
 const userNames = computed(() => new Map((getters['users/users'] || []).map((user) => [user._id, user.Employee_Name])));
 const sortContext = computed(() => ({
     priorities: getters['settings/companyPriority'] || [],
     statuses: project.value?.taskStatusData || [],
-    fields: fieldDefs.value,
+    fields: customFields.defs.value,
     userName: (id) => userNames.value.get(id)
 }));
 
