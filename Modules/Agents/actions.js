@@ -109,6 +109,12 @@ const FLAGGED_RATINGS = Object.freeze({
     'page.comment.create': write(SCOPE.PROJECT),
     'page.comment.reply': write(SCOPE.PROJECT),
     'page.comment.assign': write(SCOPE.PROJECT),
+    'goals.list': read(SCOPE.WORKSPACE),
+    'goal.get': read(SCOPE.WORKSPACE),
+    // A goal belongs to no project and is read by everyone it is shared with.
+    'goal.target.set': write(SCOPE.WORKSPACE),
+    'goal.target.sources.add': write(SCOPE.WORKSPACE),
+    'goal.target.sources.remove': write(SCOPE.WORKSPACE),
 });
 
 const ratingTable = () => ({ ...RATINGS, ...Object.fromEntries(Object.entries(FLAGGED_RATINGS).filter(([k]) => registry.has(k))) });
@@ -437,6 +443,7 @@ const executors = {
     ...require('./taskRequests').executors,
     ...require('./pageRequests').executors,
     ...require('./workRequests').executors,
+    ...require('./goalRequests').executors,
 };
 
 const COMMENT_ACTIONS = new Set(['task.comment', 'comment.create', 'chat.post', 'comment.update']);
