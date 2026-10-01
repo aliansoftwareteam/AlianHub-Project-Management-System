@@ -3,7 +3,7 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const logger = require('../../../Config/loggerConfig');
-const { resolveSheetScope, SHEET_PERMISSION } = require('../helpers/timeScope');
+const { resolveSheetScope, opensProject, SHEET_PERMISSION } = require('../helpers/timeScope');
 const { coversDate } = require('../../TimesheetApproval/helpers/approvalRules');
 const { RUNNING_WINDOW_SEC } = require('../../LogTime/controllerV2/timerRules');
 
@@ -40,7 +40,7 @@ exports.getTaskEntries = async (req, res) => {
 
         // Another person's time is shown where the timesheet screens would show it, the same test writing it takes.
         const sheet = await resolveSheetScope(companyId, uid, SHEET_PERMISSION.user);
-        const seesEveryone = sheet.everyone && (sheet.visible === null || sheet.visible.includes(String(task.ProjectID)));
+        const seesEveryone = sheet.everyone && opensProject(sheet, task.ProjectID);
         const mine = rows.filter((row) => String(row.Loggeduser) === uid);
         const shown = seesEveryone ? rows : mine;
 

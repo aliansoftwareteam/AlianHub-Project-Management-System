@@ -10,7 +10,7 @@ const mongoose = require("mongoose")
 const { updateProjectForTimelog, findAndUpdateProjectOrTaskStartDate, updateRemainingTime } = require('./helpers');
 const { isPeriodLocked, PERIOD_LOCKED } = require('../../TimesheetApproval/helpers/lockGuard');
 const { pinSessionTenant } = require('../../../Config/tenant');
-const { resolveSheetScope, SHEET_PERMISSION } = require('../../TimeSheet/helpers/timeScope');
+const { resolveSheetScope, opensProject, SHEET_PERMISSION } = require('../../TimeSheet/helpers/timeScope');
 const { actingUser } = require('../../Sprints/helpers/actingUser');
 const { escapeHtml } = require('../../../utils/escapeHtml');
 const { nonMembersOf, NOT_A_MEMBER } = require('../../../Config/companyMembers');
@@ -27,7 +27,7 @@ const mayWriteTimeOf = async (companyId, uid, entries) => {
     if (!others.length) return true;
     if (others.some(({ person }) => !OBJECT_ID.test(String(person)))) return false;
     const sheet = await resolveSheetScope(companyId, uid, SHEET_PERMISSION.user);
-    return sheet.everyone && others.every(({ projectId }) => sheet.visible === null || sheet.visible.includes(String(projectId)));
+    return sheet.everyone && others.every(({ projectId }) => opensProject(sheet, projectId));
 };
 
 const refuse = (res, status, statusText) => res.status(status).send({ status: false, statusText, message: statusText });
