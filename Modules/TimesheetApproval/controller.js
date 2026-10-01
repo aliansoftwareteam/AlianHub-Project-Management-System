@@ -285,6 +285,7 @@ exports.reviewTimesheetsBulk = async (req, res) => {
 
 const { summarize: billableSplit } = require('../TimeSheet/helpers/billableRules');
 const pto = require('../Pto/helpers/ptoRules');
+const { companyWeekendDays } = require('../Company/helpers/companyWeek');
 
 /* GET /api/v2/timesheet-approval/queue?hoursPerDay= — the review queue with the
  * context a manager needs on one card: who, the period, billable/internal split
@@ -306,6 +307,7 @@ exports.listQueue = async (req, res) => {
         }, 'find').catch(() => []) : [];
         const userById = {};
         (users || []).forEach((u) => { userById[String(u._id)] = u; });
+        const weekendDays = await companyWeekendDays(companyId);
 
         const data = await Promise.all(docs.map(async (doc) => {
             const start = new Date(doc.periodStart); start.setHours(0, 0, 0, 0);
@@ -321,7 +323,7 @@ exports.listQueue = async (req, res) => {
                 }, 'find').catch(() => []),
             ]);
             const split = billableSplit(entries || []);
-            const cap = pto.computeAvailableCapacity({ rangeStart: start, rangeEnd: end, ptoEntries: ptoRows || [], workingHoursPerDay: hoursPerDay });
+            const cap = pto.computeAvailableCapacity({ rangeStart: start, rangeEnd: end, ptoEntries: ptoRows || [], workingHoursPerDay: hoursPerDay, weekendDays });
             const capacityMinutes = Math.round(cap.availableHours * 60);
             const u = userById[String(doc.userId)];
             const o = typeof doc.toObject === 'function' ? doc.toObject() : doc;
