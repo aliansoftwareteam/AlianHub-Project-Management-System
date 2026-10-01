@@ -18,5 +18,7 @@ module.exports = {
         }
     ],
     maxWorkers: '50%',
+    // A worker that grows past this is replaced between files; without it one long-lived worker ran out of heap in CI.
+    workerIdleMemoryLimit: '1500MB',
     verbose: true
 };
