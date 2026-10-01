@@ -5,6 +5,8 @@ const { isExpired, hasScope } = require('../ApiTokens/helpers/apiTokenRules');
 const registry = require('../Agents/registry');
 const permissions = require('../Agents/permissions');
 const visibility = require('./visibility');
+const manageFlag = require('./manageFlag');
+const manageTools = require('./manageTools');
 
 // An approved MCP proposal runs as the token's person, not as the approver, so
 // approval re-asks everything the original call was asked and adds the
@@ -53,6 +55,7 @@ const refusalFor = async (companyId, p, { decider, isPrivileged, edited }) => {
     if (!token) return refused('The token that filed this proposal has been revoked, deleted or has expired.');
     if (String(token.userId || '') !== String(p.requestedBy || '')) return refused('The token that filed this proposal belongs to someone else now.');
     if (!hasScope(token, 'write')) return refused('The token that filed this proposal no longer has the write scope.');
+    if (changes.some((c) => manageTools.grantOfAction(c.action)) && !manageFlag.holdsGrant(token)) return refused('The token that filed this proposal does not hold the grant this change needs.');
     const tokenLists = [p.tokenProjectIds, token.projectIds].filter((l) => Array.isArray(l) && l.length).map((l) => l.map(String));
 
     for (const c of changes) {
