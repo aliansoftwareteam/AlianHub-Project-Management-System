@@ -1,6 +1,7 @@
 const mcpOAuth = require('../../Config/mcpOAuth');
 const { hasScope } = require('../ApiTokens/helpers/apiTokenRules');
 const { holdsGrant, enabled } = require('./manageFlag');
+const workFlag = require('./workFlag');
 
 const TOOL_SCOPES = Object.freeze({
     'tasks.next': 'tasks:read',
@@ -25,6 +26,8 @@ const scopeForTool = (name) => {
     if (Object.prototype.hasOwnProperty.call(dataTools.SCOPES, name)) return dataTools.SCOPES[name];
     const manageTools = require('./manageTools');
     if (enabled() && Object.prototype.hasOwnProperty.call(manageTools.SCOPES, name)) return manageTools.SCOPES[name];
+    const workTools = require('./workTools');
+    if (workFlag.enabled() && Object.prototype.hasOwnProperty.call(workTools.SCOPES, name)) return workTools.SCOPES[name];
     const sessionTools = require('./sessionTools');
     return sessionTools.owns(name) ? sessionTools.SCOPES[name] : null;
 };
