@@ -18,6 +18,7 @@ const { annotationsFor, isDestructive } = require('./annotations');
 const { propose, outsideMayFile } = require('./propose');
 const sessionTools = require('./sessionTools');
 const dataTools = require('./dataTools');
+const screenTools = require('./screenTools');
 const manageFlag = require('./manageFlag');
 const manageTools = require('./manageTools');
 const workTools = require('./workTools');
@@ -258,9 +259,9 @@ const FLAGGED_TOOLS = [
 const SEARCH_BY_LIST = 'Search tasks you can see by text, status, project or list. A list answers the tasks that live in it and the tasks added to it.';
 const SEARCH_FOR_PLANNING = 'Search tasks you can see by text, status, project, list, assignee or due date. Each task carries its assignees, dates, estimate, subtask count and the tasks above it.';
 
-const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...dataTools.offered(), ...manageTools.offered(), ...workTools.offered(), ...sessionTools.offered()];
+const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...dataTools.offered(), ...screenTools.offered(), ...manageTools.offered(), ...workTools.offered(), ...sessionTools.offered()];
 
-const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...dataTools.TOOLS, ...manageTools.TOOLS, ...Object.values(manageTools.VARIANTS), ...workTools.TOOLS, ...sessionTools.TOOLS];
+const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...dataTools.TOOLS, ...screenTools.TOOLS, ...manageTools.TOOLS, ...Object.values(manageTools.VARIANTS), ...workTools.TOOLS, ...sessionTools.TOOLS];
 
 /* A tool that needs a grant is one only a caller holding that grant lists or runs. */
 const holdsGrantFor = (ctx, tool) => !tool.grant || manageFlag.mayUse(ctx, tool.grant);
@@ -320,6 +321,14 @@ const scopeRefusal = (ctx, tool, write) => {
     if (write) return ctx.canWrite ? '' : 'This token is read-only.';
     return hasScope(ctx.token, 'read') ? '' : 'This token lacks the read scope.';
 };
+
+/* The tools a caller both lists and may run, which is what the instructions and the prompts may name.
+ * tools/list shows a write tool to a connection that only reads; a call of it is refused. */
+const usable = (ctx) => toolsFor(ctx)
+    .filter((tool) => !sessionTools.owns(tool.name))
+    .filter((tool) => !scopeRefusal(ctx, tool, !tool.run))
+    .filter((tool) => !(Array.isArray(ctx.allowedActions) && ctx.allowedActions.length) || ctx.allowedActions.includes(tool.action))
+    .map((tool) => ({ name: tool.name, write: !tool.run }));
 
 /* Run a tool for an MCP caller. Reads are authorised through the registry;
  * writes go through actions.perform, so they are audited and undoable. */
@@ -411,4 +420,4 @@ async function runBatch(ctx, tool, args) {
     };
 }
 
-module.exports = { TOOLS, names: toolNames, manifest, call, registered, actionOf, actionsOffered };
+module.exports = { TOOLS, names: toolNames, manifest, usable, call, registered, actionOf, actionsOffered };

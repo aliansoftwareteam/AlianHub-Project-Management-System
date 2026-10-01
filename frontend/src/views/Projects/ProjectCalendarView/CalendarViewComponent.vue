@@ -17,13 +17,14 @@
 
         <div class="cv__body">
             <div class="cv__main">
-                <div v-if="showSprints && sprintBands.length" class="cv__bands">
+                <div v-if="showSprints && sprintBands.length" class="cv__bands" :style="{ '--lanes': sprintLaneCount }">
                     <span
                         v-for="band in sprintBands"
                         :key="band.id"
                         class="cv__band"
                         :class="{ 'is-current': band.current }"
-                        :style="{ left: `${band.left}%`, width: `${band.width}%` }"
+                        :style="{ left: `${band.left}%`, width: `${band.width}%`, '--lane': band.lane }"
+                        :title="band.label"
                     >{{ band.label }}</span>
                 </div>
 
@@ -100,6 +101,7 @@
     import { proposalTitle } from "@/views/Ai/plainLabels";
     import { eachRow } from "@/store/ProjectData/taskTree";
     import { ancestorsOf } from "@taskTreeRules";
+    import { assignLanes } from "@/views/Projects/composables/sprintLanes";
 
     defineOptions({ name: "CalendarViewComponent" });
 
@@ -293,7 +295,7 @@
         if (!start || !end) return [];
         const span = end.getTime() - start.getTime();
         if (span <= 0) return [];
-        return sprintsOfProject.value
+        const bands = sprintsOfProject.value
             .filter((s) => s.startDate && s.endDate)
             .map((s) => {
                 const from = new Date(s.startDate).getTime();
@@ -304,12 +306,17 @@
                     id: String(s.id || s._id),
                     current: String(s.id || s._id) === String(props.sprint?.id || props.sprint?._id),
                     label: `${(s.name || t('Views.sprint_fallback')).toUpperCase()} · ${dayLabel(formatDate(from))}–${dayLabel(formatDate(to))}`,
+                    from: formatDate(from),
+                    to: formatDate(to),
                     left,
                     width,
                 };
             })
             .filter((band) => band.width > 0 && band.left < 100);
+        return assignLanes(bands);
     });
+
+    const sprintLaneCount = computed(() => Math.max(1, ...sprintBands.value.map((band) => band.lane + 1)));
 
     const sprintRanges = computed(() => sprintsOfProject.value
         .filter((s) => s.startDate && s.endDate)

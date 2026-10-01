@@ -8,6 +8,7 @@ const { isNarrowed } = require('../../Config/tokenNarrowing');
 const logger = require('../../Config/loggerConfig');
 const { recordAuditFromReq } = require('../Audit/recorder');
 const { openableTasks } = require('../Tasks/helpers/taskReadAccess');
+const { defaultCurrencyOf } = require('../Company/helpers/companyCurrency');
 const access = require('./helpers/goalAccess');
 const rules = require('./helpers/goalRules');
 const { withProgress } = require('./helpers/goalProgress');
@@ -240,6 +241,16 @@ const requireCurrencies = async (companyId, targets, fieldAt = () => 'currencyCo
     if (unknownAt !== -1) throw new GoalRefused(fieldAt(unknownAt), 'is not a currency of this workspace');
 };
 
+const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+const namesNoCurrency = (target) => isObject(target) && target.kind === rules.CURRENCY && target.currencyCode === undefined;
+
+/* A money target that names no currency is counted in the company's; with none to take, the target is refused as before. */
+const inCompanyCurrency = async (companyId, targets) => {
+    if (!Array.isArray(targets) || !targets.some(namesNoCurrency)) return targets;
+    const { code } = await defaultCurrencyOf(companyId);
+    return code ? targets.map((target) => (namesNoCurrency(target) ? { ...target, currencyCode: code } : target)) : targets;
+};
+
 const requireNoBody = (body) => {
     if (body !== undefined && body !== null && (typeof body !== 'object' || Object.keys(body).length)) throw new GoalRefused('body', 'must be empty');
 };
@@ -318,7 +329,10 @@ exports.goalsForTask = handled('for task', async (req, res, caller) => {
 
 exports.createGoal = handled('create', async (req, res, caller) => {
     if (!access.canCreate(caller)) return refuse(res, 403, FORBIDDEN, FORBIDDEN);
-    const { targets: newTargets = [], ...fields } = rules.parseGoalBody(req.body, { creating: true });
+    const body = isObject(req.body) && req.body.targets !== undefined
+        ? { ...req.body, targets: await inCompanyCurrency(caller.companyId, req.body.targets) }
+        : req.body;
+    const { targets: newTargets = [], ...fields } = rules.parseGoalBody(body, { creating: true });
     const goal = { description: '', periodStart: '', periodEnd: '', visibility: access.PRIVATE, sharedWith: [], color: '', ...fields, ownerUserId: caller.uid };
     rules.requirePeriodInOrder(goal);
     requireUnsharedWhenPrivate(goal, goal.sharedWith);
@@ -400,7 +414,8 @@ exports.archiveGoal = archiveState('archive', ARCHIVED, 'goal.archive', 'Goal ar
 exports.restoreGoal = archiveState('restore', LIVE, 'goal.restore', 'Goal restored.');
 
 exports.addTarget = handled('add target', async (req, res, caller) => {
-    const target = rules.parseNewTarget(req.body);
+    const [body] = await inCompanyCurrency(caller.companyId, [req.body]);
+    const target = rules.parseNewTarget(body);
     const { saved } = await mutate(caller, req.params.id, access.canEdit, async (goal) => {
         if ((goal.targets || []).length >= rules.MAX_TARGETS) throw new GoalRefused('targets', `holds at most ${rules.MAX_TARGETS} targets`);
         await requireCurrencies(caller.companyId, [target]);

@@ -1,6 +1,5 @@
 const { default: mongoose } = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
-const { ROLE_OWNER } = require('../../../Config/roleTypes');
 const logger = require('../../../Config/loggerConfig');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { HandleHistory } = require('../../Tasks/helpers/helper');
@@ -11,6 +10,7 @@ const projectSkills = require('../../settings/ProjectSkills/helper');
 const { fieldValueText, customFieldDefinitionOf } = require('../../CustomField/helpers/customFieldText');
 const { sourceOrDefault } = require('./projectSourceRules');
 const { checkWorkingDays } = require('../../Company/helpers/workingDays');
+const { companyOwnerOf } = require('../../Company/helpers/companyOwner');
 
 /* The web app filed reopen, avatar, colour and sharing rows under the end-date key; they keep it so older rows and new ones read alike. */
 const SETTINGS_KEY = 'Project_EndDate';
@@ -352,14 +352,6 @@ const describeProjectChanges = async ({
     if (key === '$addToSet' && has(updateObject, 'ProjectRequiredComponent')) return viewAdded(ctx);
     if (key === '$pull' && has(updateObject, 'ProjectRequiredComponent')) return viewRemoved(ctx);
     return assigneeChanged(ctx);
-};
-
-const companyOwnerOf = async (companyId) => {
-    const owner = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.COMPANY_USERS,
-        data: [{ roleType: ROLE_OWNER, isDelete: { $ne: true } }, { userId: 1 }],
-    }, 'findOne').catch(() => null);
-    return owner && owner.userId ? String(owner.userId) : '';
 };
 
 /* Project notifications copy in the company owner, so the owner is looked up rather than taken from the request. */

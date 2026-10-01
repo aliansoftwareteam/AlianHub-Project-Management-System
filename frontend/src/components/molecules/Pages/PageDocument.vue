@@ -183,13 +183,13 @@
                     </div>
                     <div class="ah-card__body pd__share-body">
                         <p class="pd__share-sub"><ShellIcon name="docs" :size="14" /><b>{{ draftTitle || $t('Docs.untitled') }}</b></p>
-                        <div class="pd__share-row">
+                        <div class="pd__share-row" data-test="doc-share-scope">
                             <ShellIcon :name="isPrivate ? 'lock' : 'members'" :size="16" class="pd__share-ico" />
                             <div class="pd__share-copy">
-                                <div class="pd__share-label">{{ isPrivate ? $t('Docs.private') : $t('Docs.shared') }}</div>
-                                <div class="ah-small">{{ isPrivate ? privateDocHint : $t('Projects.doc_shared_hint') }}</div>
+                                <div id="pd-share-scope" class="pd__share-label">{{ $t('Projects.doc_share_scope') }}</div>
+                                <div class="ah-small">{{ isPrivate ? privateScopeHint : $t('Projects.doc_shared_hint') }}</div>
                             </div>
-                            <button type="button" class="pd__switch" :class="{ 'is-on': !isPrivate }" :disabled="privateLocked || propsLocked" :title="privateLocked ? privateHint : null" @click="togglePrivate"><i></i></button>
+                            <button type="button" class="pd__switch" role="switch" aria-labelledby="pd-share-scope" :aria-checked="!isPrivate" :class="{ 'is-on': !isPrivate }" :disabled="privateLocked || propsLocked" :title="privateLocked ? privateHint : null" @click="togglePrivate"><i></i></button>
                         </div>
                         <div class="pd__share-row">
                             <ShellIcon name="globe" :size="16" class="pd__share-ico" />
@@ -344,6 +344,7 @@ const isAuthor = computed(() => String((page.value && page.value.createdBy) || '
 // The server lets only the author make a doc private.
 const privateLocked = computed(() => !isPrivate.value && !isAuthor.value);
 const privateDocHint = computed(() => (isAuthor.value ? t('Projects.doc_private_hint') : t('Projects.doc_private_hint_reader')));
+const privateScopeHint = computed(() => (isAuthor.value ? t('Projects.doc_share_scope_off_hint') : t('Projects.doc_share_scope_off_hint_reader')));
 const privateHint = computed(() => {
     if (privateLocked.value) return t('Projects.doc_private_author_only');
     return isPrivate.value ? privateDocHint.value : t('Projects.doc_shared_hint');
@@ -358,12 +359,20 @@ const sharedLine = computed(() => {
 });
 const onSharesChanged = (count) => { if (page.value) page.value = { ...page.value, sharedCount: count }; };
 
+// The server refuses an empty title, so a doc with none is stored under the fallback; the editor shows that as a placeholder.
+const FALLBACK_TITLE = 'Untitled';
+const bareTitle = (title) => {
+    const text = String(title || '').trim();
+    return !text || text === FALLBACK_TITLE || text === t('Docs.untitled') ? '' : String(title);
+};
+const titleToSave = () => bareTitle(draftTitle.value) || t('Docs.untitled');
+
 const isDirty = computed(() => !!page.value
-    && (draftTitle.value !== savedSnapshot.value.title || contentHtml.value !== savedSnapshot.value.html));
+    && (bareTitle(draftTitle.value) !== savedSnapshot.value.title || contentHtml.value !== savedSnapshot.value.html));
 
 const autosave = createDocAutosave({
     draft: () => (page.value
-        ? { pageId: String(page.value._id), title: draftTitle.value, html: contentHtml.value, blocks: contentBlocks.value }
+        ? { pageId: String(page.value._id), title: titleToSave(), html: contentHtml.value, blocks: contentBlocks.value }
         : null),
     isDirty: () => isDirty.value && !readOnly.value,
     send: (pageId, body) => apiRequest('put', `${env.PAGES}/${pageId}`, body),
@@ -387,8 +396,8 @@ const saveLabel = computed(() => {
    them nothing new, and would have the tree fetched again on every pause. */
 function onSaved(sent, data, { settled }) {
     if (!page.value || String(page.value._id) !== sent.pageId) return;
-    const renamed = sent.title !== savedSnapshot.value.title;
-    savedSnapshot.value = { title: sent.title, html: sent.html };
+    const renamed = bareTitle(sent.title) !== savedSnapshot.value.title;
+    savedSnapshot.value = { title: bareTitle(sent.title), html: sent.html };
     page.value = { ...page.value, ...data, content: page.value.content };
     savedHere.value = true;
     if (settled || renamed) emit('saved', page.value);
@@ -452,7 +461,7 @@ function loadPage(id) {
                 return;
             }
             page.value = response.data.data;
-            draftTitle.value = page.value.title || '';
+            draftTitle.value = bareTitle(page.value.title);
             contentHtml.value = (page.value.content && page.value.content.html) || '';
             contentBlocks.value = contentToEditorData(page.value.content);
             savedSnapshot.value = { title: draftTitle.value, html: contentHtml.value };
@@ -462,7 +471,7 @@ function loadPage(id) {
             savedHere.value = false;
             const unsaved = readOnly.value ? null : autosave.opened(page.value);
             if (unsaved) {
-                draftTitle.value = unsaved.title || '';
+                draftTitle.value = bareTitle(unsaved.title);
                 contentHtml.value = unsaved.html || '';
                 contentBlocks.value = unsaved.blocks || contentToEditorData({ html: contentHtml.value });
                 editorSeed.value = { blocks: contentBlocks.value };

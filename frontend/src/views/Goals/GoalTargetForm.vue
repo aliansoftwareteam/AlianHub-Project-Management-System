@@ -79,6 +79,7 @@ const FIELDS = ["kind", "name", "start", "target", "current", "unit", "currencyC
 const props = defineProps({
     target: { type: Object, default: null },
     currencies: { type: Array, default: () => [] },
+    defaultCurrency: { type: String, default: "" },
     busy: { type: Boolean, default: false },
     refusal: { type: Object, default: null },
     linking: { type: Boolean, default: false }
@@ -124,6 +125,11 @@ function submit() {
     sent = sourcesOf(form.sources);
     emit("save", { ...form, sources: sent });
 }
+
+watch(() => form.kind, (next) => {
+    const offered = props.currencies.some((currency) => currency.code === props.defaultCurrency);
+    if (next === "currency" && !form.currencyCode && offered) form.currencyCode = props.defaultCurrency;
+});
 
 /* What the server refused lands on the field it named; a field this form does not show is said under the form.
    A refused list or task is marked among the ones that were sent. */
