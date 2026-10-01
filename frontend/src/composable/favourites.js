@@ -1,6 +1,7 @@
 import { computed, inject, reactive, watch } from "vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
+import { docRoute } from "@/components/molecules/Pages/docRoute";
 
 export const favouritesState = reactive({ companyId: "", items: [], loaded: false });
 
@@ -96,7 +97,7 @@ export function favouriteRoute(item, cid) {
             ? { name: "ProjectFolderSprintTask", params: { ...base, id: item.projectId, folderId: item.folderId, sprintId: item.sprintId, taskId: item.id } }
             : { name: "ProjectSprintTask", params: { ...base, id: item.projectId, sprintId: item.sprintId, taskId: item.id } };
     }
-    return { name: "PageEditor", params: { ...base, pageId: item.id } };
+    return docRoute(cid, item.id);
 }
 
 export function useFavourites() {

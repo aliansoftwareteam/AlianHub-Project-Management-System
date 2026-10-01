@@ -1,3 +1,5 @@
+import { hubLinkToDoc } from '@/components/molecules/Pages/docRoute';
+
 export default [
     {
         path: '/:cid/pages',
@@ -6,6 +8,7 @@ export default [
             title: 'Docs',
             requiresAuth: true,
         },
+        beforeEnter: hubLinkToDoc,
         component: () => import(/* webpackChunkName: "pages-space" */ '@/views/Pages/PagesSpace.vue'),
     },
     {
