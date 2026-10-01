@@ -6,9 +6,10 @@ const { isShareToken, escapeHtml } = require('../PublicShares/helpers/shareRules
 const { shareStillAuthorised } = require('../PublicShares/helpers/shareAccess');
 const { taskMongo } = require('../Tasks/helpers/task_class_Mongo'); // canonical task create
 const { mapSubmission, buildDescription, buildDescriptionBlock } = require('./helpers/submissionRules');
-const { normalizeSettings, hydrateStored } = require('./helpers/formRules');
-const { typeOf, resolveSpan, GRID_COLUMNS } = require('./helpers/questionTypes');
-const { storeSubmissionFiles, messageFor, REPICK, ACCEPT_ATTR, MAX_FILE_BYTES, MAX_FILES } = require('./helpers/formUpload');
+const { normalizeSettings, hydrateStored, SEEN_FIELD, MORE_ANCHOR } = require('./helpers/formRules');
+const { typeOf, resolveSpan } = require('./helpers/questionTypes');
+const { shownQuestions, hasRules } = require('./helpers/formLogic');
+const { storeSubmissionFiles, discardFiles, messageFor, REPICK, ACCEPT_ATTR, MAX_FILE_BYTES, MAX_FILES } = require('./helpers/formUpload');
 const { publishFormSubmitted } = require('../Automations/engine/formEvent');
 
 // The public half of Forms: an unauthenticated page, and the submission that
@@ -17,8 +18,10 @@ const { publishFormSubmitted } = require('../Automations/engine/formEvent');
 // Server-rendered rather than an SPA route, matching the shared docs: no login,
 // no bundle, and a policy that forbids scripts outright — every widget here is
 // one the browser renders on its own, so the page needs none. That constraint is
-// why conditional logic, one-question-per-page and a signature pad are not
-// offered: each would need script on a page anonymous traffic can reach.
+// why one-question-per-page and a signature pad are not offered: each would need
+// script on a page anonymous traffic can reach. A question shown by an earlier
+// answer needs none, because the rule is applied here on the round trip: the
+// answers come in, and the page that goes back asks what they call for.
 
 const STORED_TASK_FIELDS = { TaskKey: 1, TaskName: 1, statusType: 1, statusKey: 1, Task_Priority: 1 };
 
@@ -91,6 +94,8 @@ const PAGE_STYLE = `
     .note.err{background:#fdf1f0;color:#a33227;border:1px solid #f0cfcb}
     .note.ok{display:flex;align-items:center;gap:9px;margin-bottom:20px;background:#eef8f2;color:#1c6b41;
         border:1px solid #c8e6d5}
+    .more{margin:0;font-size:13px;padding:10px 12px;border-radius:8px;background:#eef2ff;color:#2f3a8f;
+        border:1px solid #c9d0f5}
     .note.ok .tick{flex:0 0 20px;width:20px;height:20px;border-radius:50%;background:#1c7a43;color:#fff;
         display:flex;align-items:center;justify-content:center;font-size:12px}
     .again{display:inline-block;font-size:14px;font-weight:600;color:inherit}
@@ -201,8 +206,35 @@ const echoed = (values, id) => {
     return (Array.isArray(v) ? v : [v]).map((x) => String(x));
 };
 
-/* One question, as markup the browser already knows how to render. */
-function renderQuestion(q, values, errors, layout) {
+/* What the page asked last time, posted back so the next page can tell which
+ * questions are new to this visitor. It only decides whether they get a look at
+ * a new question before the submission is read; what is required, checked and
+ * stored never depends on it. */
+const seenField = (questions) => `<input type="hidden" name="${SEEN_FIELD}"`
+    + ` value="${escapeHtml(JSON.stringify(questions.map((q) => String(q.id))))}">`;
+
+const notYetSeen = (asked, posted) => {
+    let seen;
+    try {
+        seen = JSON.parse(String(Array.isArray(posted) ? posted[0] : posted));
+    } catch (error) {
+        return [];
+    }
+    if (!Array.isArray(seen)) return [];
+    const ids = new Set(seen.map(String));
+    return asked.filter((q) => !ids.has(String(q.id)));
+};
+
+const moreNote = (count) => `<p class="q q--12 more" id="${MORE_ANCHOR}" role="status">`
+    + `${count === 1
+        ? 'Your answers added one more question. Answer it, then submit again.'
+        : `Your answers added ${count} more questions. Answer them, then submit again.`}</p>`;
+
+/* One question, as markup the browser already knows how to render. `lead` marks
+ * the first question new to this visitor: its control takes the focus and is
+ * described by the note above it, which is how a screen reader hears of it on a
+ * page with no script to announce anything. */
+function renderQuestion(q, values, errors, layout, lead) {
     const meta = typeOf(q.type);
     if (!meta) return '';
     const span = resolveSpan(q, layout);
@@ -294,6 +326,8 @@ function renderQuestion(q, values, errors, layout) {
                 + ` value="${one}"${req}>`;
     }
 
+    if (lead) field = field.replace(/<(input|textarea|select) /, `<$1 autofocus aria-describedby="${MORE_ANCHOR}" `);
+
     return `<div class="q${width}${error ? ' bad' : ''}">`
         + `<label for="${id}">${label}${star}${help}</label>${field}`
         + `${error ? `<span class="err-line">${ERROR_ICON}${escapeHtml(error)}</span>` : ''}</div>`;
@@ -320,8 +354,12 @@ function formBody(form, token, questions, opts) {
     const carriesFile = questions.some((q) => (typeOf(q.type) || {}).widget === 'file');
     const enc = carriesFile ? ' enctype="multipart/form-data"' : '';
     body += `<form method="POST" action="/form/${escapeHtml(token)}"${enc} novalidate><div class="grid">`;
-    body += questions.map((q) => renderQuestion(q, o.values, o.errors, s.layout)).join('');
+    const fresh = o.fresh || [];
+    const lead = fresh.find((q) => (typeOf(q.type) || {}).input !== false);
+    body += questions.map((q) => (q === fresh[0] ? moreNote(fresh.length) : '')
+        + renderQuestion(q, o.values, o.errors, s.layout, q === lead)).join('');
     body += '</div>';
+    if (hasRules(form.questions)) body += seenField(questions);
     // Only when no field could carry the message. Repeating "one or more fields
     // are required" under a column of per-field messages says nothing new.
     const fieldErrors = o.errors ? Object.keys(o.errors).length : 0;
@@ -352,7 +390,7 @@ exports.renderForm = async (req, res) => {
         const justSent = String(req.query.sent || '') === '1';
         return send(res, 200, form.title || 'Form', justSent
             ? sentBody(form, req.params.token, settings)
-            : formBody(form, req.params.token, visibleQuestions(form), { settings }), settings);
+            : formBody(form, req.params.token, shownQuestions(visibleQuestions(form), {}), { settings }), settings);
     } catch (error) {
         logger.error(`ERROR in render public form: ${error.message}`);
         return send(res, 500, 'Error', '<h1>Something went wrong.</h1>');
@@ -370,15 +408,32 @@ exports.submitForm = async (req, res) => {
         const { companyId } = resolved;
         const form = liveForm(resolved.form);
         const settings = normalizeSettings(form.settings);
-        const questions = visibleQuestions(form);
+        const answers = req.body || {};
+        const questions = shownQuestions(visibleQuestions(form), answers);
+
+        const fresh = hasRules(form.questions) ? notYetSeen(questions, answers[SEEN_FIELD]) : [];
+        if (fresh.length) {
+            // Nothing is read as a submission until the visitor has seen every
+            // question their answers call for, so nothing is stored either.
+            const repick = {};
+            for (const file of req.files || []) {
+                const target = questions.find((q) => q.id === file.fieldname && (typeOf(q.type) || {}).widget === 'file');
+                if (target) repick[target.id] = REPICK;
+            }
+            discardFiles(req.files);
+            return send(res, 200, form.title || 'Form', formBody(form, req.params.token, questions, {
+                fresh, values: answers, errors: repick, settings,
+            }), settings);
+        }
 
         // A file arrives beside the answers and has to be stored before the
         // mapping runs, because the mapper is pure — no fs, no req — which is what
         // makes it testable without standing Wasabi up.
         //
         // Ordering is deliberate: the form is resolved, each file is matched to a
-        // visible question of the right type on THIS form, checked, and only then
-        // written. A file for a question that does not exist never reaches the
+        // question of the right type that THIS form asks for these answers,
+        // checked, and only then written. A file for a question that does not
+        // exist, or that these answers do not call for, never reaches the
         // tenant's bucket.
         const uploads = await storeSubmissionFiles({
             companyId, form, questions, incoming: req.files || [],
@@ -400,7 +455,7 @@ exports.submitForm = async (req, res) => {
             }
         }
 
-        const mapped = mapSubmission(form, req.body || {}, {
+        const mapped = mapSubmission(form, answers, {
             requireTaskName: settings.createTask,
             files: uploads.files,
             fileErrors,
@@ -413,7 +468,7 @@ exports.submitForm = async (req, res) => {
             return send(res, 200, form.title || 'Form', formBody(form, req.params.token, questions, {
                 reason: mapped.reason,
                 errors: mapped.errors,
-                values: req.body || {},
+                values: answers,
                 settings,
             }), settings);
         }

@@ -27,6 +27,8 @@ export function adjustedLines(totals, t, prefix) {
         }));
 }
 
+export const droppedFieldValuesTotal = (results) => (results || []).reduce((sum, result) => sum + Number(result?.droppedFieldValues || 0), 0);
+
 /* A file that names parents goes in one request: a subtask sent without its parent would arrive as a task. */
 export function importChunks(rows, mapping, size) {
     if (mapping?.parent) return [rows];

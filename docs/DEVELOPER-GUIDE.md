@@ -28,6 +28,7 @@ The backend serves the built SPA from `frontend/dist`; `cd frontend && npm run b
 | `cd frontend && npm run lint -- --no-fix` | Vue CLI ESLint |
 | `node scripts/unused-components.js` | `.vue` files nothing imports (must print nothing) |
 | `node scripts/env-doc.js --check` | env variables described and docs regenerated |
+| `npm run api:doc:check` | `docs/API.md` and `docs/api/openapi.json` match the routes and `scripts/api-doc.meta.json`. Not run in CI: run `npm run api:doc` and commit both files in the docs pull request that follows merges to `beta` |
 | `npm run visual` | the screenshot check of the core screens; CI only, see [Screenshot check](#screenshot-check) |
 
 `.github/workflows/ci.yml` runs all of that on every pull request to `beta`, `staging` and `main`, except the screenshot check, which has a workflow of its own. The conventions project is the place for a rule that must hold everywhere: it reads the tree and fails with the offending file, so a new rule needs no per-module wiring.
@@ -38,6 +39,7 @@ The conventions in place:
 - `tenant-scoping` — tenant ids are not read from `req.body`/`req.query`; a per-file baseline may only fall.
 - `i18n-namespaces` — no `*V2` locale namespace, and every static `t('A.b')` key exists in `frontend/src/locales/en.js`.
 - `env-doc` — every `process.env.*` and `VUE_APP_*` read is described in `scripts/env-doc.meta.json`.
+- `api-doc` — `scripts/api-doc.meta.json` is well formed and the API reference generates from the current tree, the same on every run. It does not compare the committed files, so a pull request that adds or removes a route needs to do nothing: a route with no entry is listed as undocumented until the docs pull request describes it.
 - `unused-components` — no orphaned single-file component.
 - `naming-conventions` — module folder and file naming.
 

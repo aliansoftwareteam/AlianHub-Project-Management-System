@@ -4,7 +4,7 @@
         class="dmp"
         role="listbox"
         :aria-label="$t('Docs.mention_picker')"
-        :style="{ top: `${position.top}px`, left: `${position.left}px` }"
+        :style="placement"
         @mousedown.prevent
     >
         <template v-for="group in groups" :key="group.type">
@@ -66,6 +66,12 @@ const groups = computed(() => [
     { type: 'task', label: 'Docs.mention_tasks', items: tasks.value },
 ].filter((group) => group.items.length));
 const flat = computed(() => groups.value.flatMap((group) => group.items));
+
+/* A `bottom` anchors the list by its foot, for a field with no room below it: the list's height is not known beforehand. */
+const placement = computed(() => ({
+    left: `${props.position.left}px`,
+    ...(props.position.bottom === undefined ? { top: `${props.position.top}px` } : { bottom: `${props.position.bottom}px` }),
+}));
 
 const optionId = (item) => `${listId}-${item.type}-${item.id}`;
 const isActive = (item) => flat.value.indexOf(item) === active.value;

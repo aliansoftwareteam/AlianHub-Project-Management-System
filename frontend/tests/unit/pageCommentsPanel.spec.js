@@ -7,14 +7,20 @@ const api = vi.hoisted(() => ({ rows: [], calls: [] }));
 vi.mock('@/services', () => ({
     apiRequest: vi.fn((method, url, body) => {
         api.calls.push({ method, url, body });
-        if (method === 'get') return Promise.resolve({ data: { status: true, data: api.rows } });
+        if (method === 'get' && url.endsWith('/people')) return Promise.resolve({ data: { status: true, data: ['user-1', 'u2'] } });
+        if (method === 'get' && url.endsWith('/comments')) return Promise.resolve({ data: { status: true, data: api.rows, limit: 500 } });
+        if (method === 'get') return Promise.resolve({ data: { status: true, data: [] } });
         if (method === 'post') return Promise.resolve({ data: { status: true, data: { _id: 'new', userId: 'user-1', createdAt: '2026-09-30T11:00:00Z', ...body } } });
         const id = url.split('/comments/')[1].split('/')[0];
         const row = api.rows.find((r) => r._id === id) || {};
         return Promise.resolve({ data: { status: true, data: { ...row, ...(body || {}) } } });
     }),
 }));
-vi.mock('@/composable', () => ({ useGetterFunctions: () => ({ getUser: (id) => ({ Employee_Name: id === 'user-1' ? 'Me' : 'Priya Shah' }) }) }));
+vi.mock('@/composable', () => ({
+    useGetterFunctions: () => ({ getUser: (id) => ({ Employee_Name: id === 'user-1' ? 'Me' : 'Priya Shah' }) }),
+    useCustomComposable: () => ({ checkBucketStorage: () => true, getWasabiImageLink: () => Promise.resolve(''), debounce: (fn) => fn }),
+}));
+vi.mock('vue-router', () => ({ useRoute: () => ({ params: { cid: 'company-1' }, query: {} }), useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('vuex', async (importOriginal) => ({
     ...(await importOriginal()),
     useStore: () => ({ getters: {
@@ -62,13 +68,17 @@ describe('the doc comments panel', () => {
         expect(items[1].text()).toContain('Docs.comment_edit');
     });
 
-    it('offers only people with a live seat to mention, never an agent', async () => {
+    it('offers the doc’s readers to mention, never the writer or anyone the company list adds', async () => {
         const wrapper = await mountPanel();
         const field = wrapper.find('.pcm__compose textarea');
+        await field.trigger('focusin');
+        await flushPromises();
         field.element.value = '@';
         field.element.setSelectionRange(1, 1);
         await field.trigger('input');
-        expect(wrapper.findAll('.pcm__compose .pci__name').map((option) => option.text())).toEqual(['Priya Shah']);
+        await new Promise((resolve) => setTimeout(resolve, 260));
+        expect([...document.body.querySelectorAll('.dmp__name')].map((option) => option.textContent.trim())).toEqual(['Priya Shah']);
+        wrapper.unmount();
     });
 
     it('posts a new comment on the block picked from the doc', async () => {
