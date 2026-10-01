@@ -34,7 +34,7 @@ function normaliseAiConfig(raw, fieldType) {
     const given = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
     if (given.enabled === false) return { enabled: false };
     const outputs = OUTPUTS_BY_TYPE[fieldType];
-    if (!outputs) throw new AiConfigError('Only a long text, dropdown, number or date field can be filled by AI.');
+    if (!outputs) throw new AiConfigError('Only a long text, dropdown, number, rating or date field can be filled by AI.');
     const output = given.output === undefined || given.output === '' ? outputs[0] : String(given.output);
     if (!outputs.includes(output)) throw new AiConfigError(`A ${fieldType} field cannot hold a "${output}" AI output.`);
     const template = String(given.template || '');

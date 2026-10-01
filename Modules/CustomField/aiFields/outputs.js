@@ -1,4 +1,5 @@
 const { DateTime } = require('luxon');
+const rating = require('../fieldTypes/rating');
 
 const OUTPUT = Object.freeze({ TEXT: 'text', OPTION: 'option', LABELS: 'labels', NUMBER: 'number', RATING: 'rating', DATE: 'date' });
 
@@ -6,6 +7,7 @@ const OUTPUTS_BY_TYPE = Object.freeze({
     textarea: Object.freeze([OUTPUT.TEXT]),
     dropdown: Object.freeze([OUTPUT.OPTION, OUTPUT.LABELS]),
     number: Object.freeze([OUTPUT.NUMBER, OUTPUT.RATING]),
+    rating: Object.freeze([OUTPUT.RATING]),
     date: Object.freeze([OUTPUT.DATE]),
 });
 
@@ -102,13 +104,18 @@ function parseNumber(value, { config }) {
     return filled(String(n), String(n));
 }
 
-function parseRating(value) {
+const isRatingField = (definition) => Boolean(definition) && definition.fieldType === rating.type;
+
+const ratingMaxOf = (definition) => (isRatingField(definition) ? rating.maxOf(definition) : RATING_MAX);
+
+/* A number field keeps its numbers as text; a rating field stores the number itself. */
+function parseRating(value, { definition }) {
     if (isBlank(value)) return blank(OUTPUT.RATING, REASON.NO_ANSWER);
     const n = numberFrom(value);
     if (Number.isNaN(n)) return rejected(OUTPUT.RATING);
     const whole = Math.round(n);
-    if (whole < 1 || whole > RATING_MAX) return rejected(OUTPUT.RATING, REASON.OUT_OF_RANGE);
-    return filled(String(whole), String(whole));
+    if (whole < 1 || whole > ratingMaxOf(definition)) return rejected(OUTPUT.RATING, REASON.OUT_OF_RANGE);
+    return filled(isRatingField(definition) ? whole : String(whole), String(whole));
 }
 
 /* The day is stored as its start in the zone of the person filling, as the date picker stores a picked day. */
@@ -163,7 +170,10 @@ const SPECS = Object.freeze({
     [OUTPUT.NUMBER]: { temperature: 0.1, format: numberFormat, parse: parseNumber },
     [OUTPUT.RATING]: {
         temperature: 0.1,
-        format: () => `The value is a whole number from 1 to ${RATING_MAX}, where 1 is the lowest and ${RATING_MAX} the highest, or null when the task gives no basis for a rating.`,
+        format: (config, context, definition) => {
+            const max = ratingMaxOf(definition);
+            return `The value is a whole number from 1 to ${max}, where 1 is the lowest and ${max} the highest, or null when the task gives no basis for a rating.`;
+        },
         parse: parseRating,
     },
     [OUTPUT.DATE]: { temperature: 0.1, format: dateFormat, parse: parseDate, needsDates: true },
