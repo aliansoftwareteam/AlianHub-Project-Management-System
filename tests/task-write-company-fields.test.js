@@ -544,3 +544,30 @@ describe('every web-app body is served as before', () => {
         expect(served).toEqual({ status: row.route === RELATIONS ? direct.status : wrapped, writes: taskWrites(), tasks: normalise(mockDb.store.tasks) });
     });
 });
+
+describe('a move keeps on the task the few values that name its new list', () => {
+    const { PICKED_LIST, PICKED_FOLDER_LIST, PICKED_FOLDER, movedTo, convertedToListIn } = WEB_APP_BODIES.PLACEMENT;
+    const ids = { taskId: OPEN_TASK, otherTaskId: OPEN_TASK_2, projectId: OPEN_PROJECT, destinationProjectId: OPEN_PROJECT };
+    const moved = () => mockDb.store.tasks.find((task) => String(task._id) === OPEN_TASK);
+    const plain = (value) => JSON.parse(JSON.stringify(value));
+
+    test('a list outside a folder', async () => {
+        const result = await call(PATCH, withSprintIds(movedTo(PICKED_LIST)(ids)));
+
+        expect(result.code).toBe(200);
+        expect(plain(moved().sprintArray)).toEqual({ id: OTHER_SPRINT, name: 'Sprint 2' });
+    });
+
+    test('a list in a folder', async () => {
+        const result = await call(PATCH, withSprintIds(movedTo(PICKED_FOLDER_LIST)(ids)));
+
+        expect(result.code).toBe(200);
+        expect(plain(moved().sprintArray)).toEqual({ id: OTHER_SPRINT, name: 'Sprint 2', folderId: PICKED_FOLDER.folderId, folderName: 'Design' });
+        expect(String(moved().folderObjId)).toBe(PICKED_FOLDER.folderId);
+    });
+
+    test('a list made from a task names its folder by id and name', () => {
+        expect(convertedToListIn(PICKED_FOLDER)(ids).folderData).toEqual({ folderId: PICKED_FOLDER.folderId, name: 'Design' });
+        expect(convertedToListIn({})(ids).folderData).toBeNull();
+    });
+});

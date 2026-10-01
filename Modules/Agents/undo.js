@@ -114,6 +114,11 @@ const inverses = {
         emitPageChange(companyId, 'update', { _id: String(u.pageId), deletedStatusKey: 1, deleted: 1, ids: [String(u.pageId)] });
         return { pageId: u.pageId, deleted: true };
     },
+    /* Archiving carries the subtasks and the list's counts, so it is put back by the handler that made it, as the person undoing. */
+    async archive(companyId, u, actor) {
+        await require('./taskRequests').setArchived({ companyId, uid: String((actor && actor.userId) || ''), taskId: u.taskId, to: u.previous });
+        return { taskId: u.taskId, restored: u.previous };
+    },
 };
 
 const isUndoable = (row) => Boolean(row && row.meta && row.meta.undo && inverses[row.meta.undo.kind] && !row.meta.undoneAt);
@@ -210,7 +215,7 @@ const undoAuditRow = async (companyId, row, actor, ip, ctx) => {
     if (await audit.undoneBefore(companyId, row)) return refuse(companyId, actor, { ...state, undoable: false, reason: REASON.ALREADY_UNDONE }, refusal);
     if (!(await audit.canRecordChange(companyId, row))) return refuse(companyId, actor, { ...state, undoable: false, reason: REASON.UNRECORDABLE }, refusal);
     const u = row.meta.undo;
-    const result = await inverses[u.kind](companyId, u);
+    const result = await inverses[u.kind](companyId, u, actor);
     const unmarked = await audit.markUndone(companyId, row._id, actor.userId).then(() => null, (error) => error);
     await audit.recordUndo(companyId, actor, { originalId: row._id, action: row.meta.action, entityType: row.entityType, entityId: row.entityId, ip });
     if (unmarked) throw unmarked;

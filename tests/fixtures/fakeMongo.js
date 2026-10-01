@@ -2,7 +2,7 @@
 // language for the agent modules (equality including null as missing, array-element equality, a word-match $text, $nor, $expr with $eq/$ne of two operands, $in/$nin (any element of a stored array)/$ne/$gt(e)/$lt(e)/$exists/$type/$size/$elemMatch, $set/$inc/$push/$addToSet/$pull,
 // conditional findOneAndUpdate answering the old document unless asked for the new one (null after an upsert insert, as
 // the driver does), updateOne and findOneAndUpdate with upsert and $setOnInsert and a unique _id, findOneAndDelete, deleteOne, deleteMany,
-// insertMany with a unique _id, bulkWrite of insertOne/updateOne/updateMany, sort/skip/limit on find, sort on findOneAndUpdate, $type 'date'/'string'/'objectId' on the stored value, $match/$unwind (a top-level array)/$project (inclusion or exclusion)/$addFields ($toString, $ifNull, $size, $strLenBytes)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
+// insertMany with a unique _id, bulkWrite of insertOne/updateOne/updateMany, sort/skip/limit on find, sort on findOneAndUpdate, $type 'date'/'string'/'objectId' on the stored value, $match/$unwind (a top-level array)/$project (inclusion or exclusion)/$addFields ($toString, $ifNull, $size, $strLenBytes)/$group (a field, a compound or a $dateToString '%Y-%m-%d' day _id)/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
 // reject a duplicate save or upsert with E11000, declared text indexes that bound $text to their fields) so a test can assert on what was written.
 
 let seq = 1;
@@ -165,7 +165,14 @@ const fieldOf = (doc, ref) => {
     if (ref === '$$ROOT') return doc;
     return typeof ref === 'string' && ref.startsWith('$') ? read(doc, ref.slice(1)) : ref;
 };
-const groupKeyOf = (doc, id) => (id && typeof id === 'object' ? Object.fromEntries(Object.entries(id).map(([k, ref]) => [k, fieldOf(doc, ref)])) : fieldOf(doc, id));
+/* The calendar day a date falls on in a timezone, as $dateToString '%Y-%m-%d' gives it; null for a missing date. */
+const dayKeyOf = (doc, { format, date, timezone = 'UTC' }) => {
+    if (format !== '%Y-%m-%d') throw new Error(`fakeMongo: unsupported $dateToString format ${format}`);
+    const value = fieldOf(doc, date);
+    return value instanceof Date ? new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(value) : null;
+};
+const groupKeyOf = (doc, id) => (id && typeof id === 'object' && id.$dateToString ? dayKeyOf(doc, id.$dateToString) : groupFieldsOf(doc, id));
+const groupFieldsOf = (doc, id) => (id && typeof id === 'object' ? Object.fromEntries(Object.entries(id).map(([k, ref]) => [k, fieldOf(doc, ref)])) : fieldOf(doc, id));
 const ACCUMULATORS = {
     $sum: (prev, v) => (prev || 0) + (typeof v === 'number' ? v : 0),
     $max: (prev, v) => (v == null || (prev != null && sortable(prev) >= sortable(v)) ? prev : v),

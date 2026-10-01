@@ -1,9 +1,8 @@
 /* Task 046 M2, slice E1: POST /api/v2/tasks/everything lists tasks across every project the caller
    can open. The handler runs over fakeMongo with the real project scope, personal-list rule and
    sprint privacy, so each case below is decided by the same code the app uses elsewhere.
-   fakeMongo cannot run $dateToString, and leaves an empty array in place after $unwind where
-   MongoDB drops the field: the due-date grouping and the "unassigned" count are asserted on the
-   stages built (tests/everything-query.test.js), not on rows. */
+   fakeMongo leaves an empty array in place after $unwind where MongoDB drops the field: the
+   "unassigned" count is asserted on the stages built (tests/everything-query.test.js), not on rows. */
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({
@@ -11,7 +10,16 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({
     validateObjectId: (id) => /^[a-f0-9]{24}$/i.test(String(id)),
 }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
-jest.mock('../Modules/settings/securityPermissions/controller', () => ({ fetchRules: jest.fn(async () => []) }));
+const mockRules = { task_list: true, task_status: true, task_priority: true };
+/* The rules as the matrix stores them: a section row and the keys under it, each with a value per role. */
+const mockRulesFor = (permissions, projectId) => {
+    const scope = projectId ? { projectId } : {};
+    const section = { _id: `task-${projectId || 'company'}`, key: 'task', isParent: true, roles: [{ key: 3, permission: true }], ...scope };
+    return [section, ...Object.entries(permissions).map(([key, permission]) => (
+        { _id: `${key}-${projectId || 'company'}`, key, isParent: false, parentId: section._id, roles: [{ key: 3, permission }], ...scope }
+    ))];
+};
+jest.mock('../Modules/settings/securityPermissions/controller', () => ({ fetchRules: jest.fn(async () => mockRulesFor(mockRules)) }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
 
 const { myCache } = require('../Config/config');
@@ -37,8 +45,8 @@ const day = (n) => new Date(Date.UTC(2026, 9, n));
 
 const project = (over = {}) => mockDb.seed(SCHEMA_TYPE.PROJECTS, {
     _id: nextId('a0'), ProjectName: 'Project', ProjectCode: 'PRJ', isPrivateSpace: false, AssigneeUserId: [], deletedStatusKey: 0, statusType: 'active',
-    projectIcon: { type: 'color', data: '#2F3990' }, taskStatusData: [{ key: 1, name: 'To Do', type: 'default_active' }], taskTypeCounts: [{ key: 1, name: 'Task' }],
-    description: 'never returned', ...over,
+    projectIcon: { type: 'color', data: '#2F3990' }, taskStatusData: [{ key: 1, name: 'To Do', type: 'default_active' }], taskTypeCounts: [{ key: 1, name: 'Task' }], apps: [{ key: 'Priority' }],
+    description: 'never returned', lastTaskId: 41, ...over,
 });
 const personalList = (uid) => project({ ProjectName: `Personal list of ${uid}`, isPrivateSpace: true, isPersonal: true, personalOwner: uid, AssigneeUserId: [uid] });
 const sprint = (proj, over = {}) => mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: nextId('b0'), projectId: String(proj._id), name: 'List', private: false, AssigneeUserId: [], ...over });
@@ -67,6 +75,10 @@ const everything = async (uid, body, over) => {
     return res.body.data;
 };
 const names = async (uid, body, over) => (await everything(uid, body, over)).rows.map((row) => row.TaskName).sort();
+const ownRules = (proj, permissions) => {
+    proj.isGlobalPermission = false;
+    mockRulesFor({ task_list: true, task_status: true, task_priority: true, ...permissions }, String(proj._id)).forEach((rule) => mockDb.seed(SCHEMA_TYPE.PROJECT_RULES, rule));
+};
 const taskReads = () => mockDb.calls.filter((c) => c.type === SCHEMA_TYPE.TASKS);
 
 /* Follows nextCursor to the end and returns every row in the order the pages gave them. */
@@ -88,6 +100,7 @@ beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     mockDb.calls.length = 0;
     myCache.flushAll();
+    Object.assign(mockRules, { task_list: true, task_status: true, task_priority: true });
     Object.entries(ROLES).forEach(([userId, roleType]) => mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, roleType, status: 2, isDelete: false }));
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: DEACTIVATED, roleType: 3, status: 2, isDelete: true });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: CANCELLED, roleType: 3, status: 3, isDelete: false });
@@ -198,6 +211,86 @@ describe('what a person sees', () => {
     });
 });
 
+describe('a role that is denied the task list', () => {
+
+    it('sees no project\'s tasks, as on the project page, and keeps their own personal list', async () => {
+        mockRules.task_list = null;
+        expect(await names(MEMBER)).toEqual(['member\'s personal list']);
+        expect(await names(MEMBER, { filter: { projectIds: [String(seeded.open._id)] } })).toEqual([]);
+        expect((await everything(MEMBER, { group: 'project' })).groups.map((g) => g.key)).toEqual([String(seeded.lists[MEMBER]._id)]);
+    });
+
+    it('does not change what an owner or an admin sees', async () => {
+        mockRules.task_list = null;
+        expect(await names(OWNER)).toEqual([...COMPANY_WIDE, 'owner\'s personal list'].sort());
+        expect(await names(ADMIN)).toEqual([...COMPANY_WIDE, 'admin\'s personal list'].sort());
+    });
+
+    it('still shows the tasks to a role that may look but not edit', async () => {
+        mockRules.task_list = false;
+        expect(await names(MEMBER)).toEqual(MEMBER_SEES);
+    });
+
+    it('judges a project with its own rules by those rules, in both directions', async () => {
+        ownRules(seeded.mine, { task_list: null });
+        expect(await names(MEMBER)).toEqual(MEMBER_SEES.filter((name) => name !== 'private, member on it'));
+
+        mockRules.task_list = null;
+        ownRules(seeded.open, {});
+        expect(await names(MEMBER)).toEqual(['open', 'in a private sprint shared with the member', 'member\'s personal list'].sort());
+    });
+
+    it('reads the rules of every project in one query, not one per project', async () => {
+        ownRules(seeded.mine, {});
+        ownRules(seeded.open, {});
+        mockDb.calls.length = 0;
+        await everything(MEMBER);
+        expect(mockDb.calls.filter((c) => c.type === SCHEMA_TYPE.PROJECT_RULES)).toHaveLength(1);
+    });
+});
+
+describe('what a person may change in a row', () => {
+    const editOf = async (uid, proj, body = {}) => (await everything(uid, { filter: { projectIds: [String(proj._id)] }, ...body })).projects[String(proj._id)].edit;
+
+    it('follows the role: status and priority each need their own permission', async () => {
+        expect(await editOf(MEMBER, seeded.open)).toEqual({ status: true, priority: true });
+        mockRules.task_priority = false;
+        expect(await editOf(MEMBER, seeded.open)).toEqual({ status: true, priority: false });
+        mockRules.task_status = null;
+        expect(await editOf(MEMBER, seeded.open)).toEqual({ status: false, priority: false });
+    });
+
+    it('lets a role that may only look at the task list change nothing', async () => {
+        mockRules.task_list = false;
+        expect(await editOf(MEMBER, seeded.open)).toEqual({ status: false, priority: false });
+    });
+
+    it('reads a project with its own rules by those rules', async () => {
+        ownRules(seeded.mine, { task_status: false });
+        expect(await editOf(MEMBER, seeded.mine)).toEqual({ status: false, priority: true });
+        expect(await editOf(MEMBER, seeded.open)).toEqual({ status: true, priority: true });
+    });
+
+    it('is everything for an owner or an admin, and nothing in a closed project', async () => {
+        mockRules.task_status = null;
+        expect(await editOf(OWNER, seeded.open)).toEqual({ status: true, priority: true });
+        expect(await editOf(ADMIN, seeded.open)).toEqual({ status: true, priority: true });
+        task(seeded.closed, 'in a closed project', { deletedStatusKey: 8 });
+        expect(await editOf(OWNER, seeded.closed, { includeClosedProjects: true })).toEqual({ status: false, priority: false });
+    });
+});
+
+describe('a restricted project', () => {
+    it('is left out, as the project page leaves its tasks out', async () => {
+        seeded.open.isRestrict = true;
+        for (const uid of [MEMBER, OWNER]) {
+            const seen = await names(uid);
+            expect(seen).not.toContain('open');
+            expect(seen).toContain('private, member on it');
+        }
+    });
+});
+
 describe('who may ask', () => {
     it.each([['deactivated', DEACTIVATED], ['cancelled', CANCELLED], ['unknown', '6f0000000000000000000009']])('refuses a %s seat before any task is read', async (_what, uid) => {
         const res = await call(uid);
@@ -279,7 +372,8 @@ describe('the request is data, never a pipeline', () => {
         expect(projects).toEqual({
             [String(seeded.open._id)]: {
                 _id: String(seeded.open._id), ProjectName: 'Open', ProjectCode: 'OPN', projectIcon: { type: 'color', data: '#2F3990' },
-                taskStatusData: [{ key: 1, name: 'To Do', type: 'default_active' }], taskTypeCounts: [{ key: 1, name: 'Task' }], statusType: 'active', isPersonal: false,
+                taskStatusData: [{ key: 1, name: 'To Do', type: 'default_active' }], taskTypeCounts: [{ key: 1, name: 'Task' }], apps: [{ key: 'Priority' }],
+                statusType: 'active', isPersonal: false, edit: { status: true, priority: true },
             },
         });
     });
@@ -293,8 +387,8 @@ describe('the request is data, never a pipeline', () => {
 
 describe('filters', () => {
     beforeEach(() => {
-        task(seeded.open, 'urgent bug', { Task_Priority: 'HIGH', TaskType: 'Bug', TaskTypeKey: 2, tagsArray: ['tag-1'], DueDate: day(10), status: { key: 2, text: 'Doing', type: 'active' }, statusKey: 2, AssigneeUserId: [COLLEAGUE] });
-        task(seeded.mine, 'nobody on it (a.b)', { AssigneeUserId: [], DueDate: day(20), status: { key: 7, text: 'Doing', type: 'active' }, statusKey: 7 });
+        task(seeded.open, 'urgent bug', { Task_Priority: 'HIGH', TaskType: 'Bug', TaskTypeKey: 2, tagsArray: ['tag-1'], DueDate: day(10), status: { key: 2, text: 'Doing', type: 'active' }, statusKey: 2, statusType: 'active', AssigneeUserId: [COLLEAGUE] });
+        task(seeded.mine, 'nobody on it (a.b)', { AssigneeUserId: [], DueDate: day(20), status: { key: 7, text: 'Doing', type: 'active' }, statusKey: 7, statusType: 'active' });
     });
 
     it.each([
@@ -303,6 +397,7 @@ describe('filters', () => {
         ['assignee', { assignee: [COLLEAGUE] }, ['urgent bug']],
         ['nobody assigned', { assignee: ['unassigned'] }, ['nobody on it (a.b)']],
         ['priority', { priority: ['HIGH'] }, ['urgent bug']],
+        ['status type', { statusType: ['active'] }, ['nobody on it (a.b)', 'urgent bug']],
         ['task type by name', { taskType: ['Bug'] }, ['urgent bug']],
         ['task type by key', { taskType: [2] }, ['urgent bug']],
         ['tags', { tags: ['tag-1'] }, ['urgent bug']],
@@ -311,6 +406,18 @@ describe('filters', () => {
         ['two filters at once', { status: ['Doing'], priority: ['HIGH'] }, ['urgent bug']],
     ])('filters by %s', async (_what, filter, expected) => {
         expect(await names(MEMBER, { filter })).toEqual(expected);
+    });
+
+    it('hides done work when asked for the open status types only', async () => {
+        task(seeded.open, 'finished', { status: { key: 9, text: 'Done', type: 'close' }, statusKey: 9, statusType: 'close' });
+        task(seeded.open, 'ready for review', { status: { key: 8, text: 'Review', type: 'done' }, statusKey: 8, statusType: 'done' });
+        expect(await names(MEMBER)).toEqual(expect.arrayContaining(['finished', 'ready for review']));
+        const open = await names(MEMBER, { filter: { statusType: ['default_active', 'active'] } });
+        expect(open).toEqual([...MEMBER_SEES, 'nobody on it (a.b)', 'urgent bug'].sort());
+        expect(await names(MEMBER, { filter: { statusType: ['done', 'close'] } })).toEqual(['finished', 'ready for review']);
+        const res = await call(MEMBER, { filter: { statusType: ['finished'] } });
+        expect(res.statusCode).toBe(400);
+        expect(res.body.field).toBe('filter.statusType');
     });
 
     it('reads a regular expression in the search as plain text', async () => {
@@ -368,6 +475,15 @@ describe('group counts come from the same match as the rows', () => {
         const second = await everything(MEMBER, { group: 'status', limit: 2, cursor: first.nextCursor });
         expect(first.groups.length).toBeGreaterThan(0);
         expect(second.groups).toBeNull();
+    });
+
+    it('counts due dates by calendar day in the timezone sent', async () => {
+        const lateOnTheFirst = new Date('2026-10-01T20:00:00.000Z');
+        task(seeded.mine, 'due late on the first, UTC', { DueDate: lateOnTheFirst });
+        task(seeded.mine, 'due on the third', { DueDate: day(3) });
+        const scope = { group: 'dueDate', filter: { projectIds: [String(seeded.mine._id)] } };
+        expect((await everything(MEMBER, scope)).groups).toEqual([{ key: null, count: 2 }, { key: '2026-10-01', count: 1 }, { key: '2026-10-03', count: 1 }]);
+        expect((await everything(MEMBER, { ...scope, timezone: 'Asia/Kolkata' })).groups).toEqual([{ key: null, count: 2 }, { key: '2026-10-02', count: 1 }, { key: '2026-10-03', count: 1 }]);
     });
 
     it('builds the due-date counts over the same match as the rows', async () => {

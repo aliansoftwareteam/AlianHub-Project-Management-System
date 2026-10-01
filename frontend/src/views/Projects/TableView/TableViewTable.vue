@@ -163,32 +163,33 @@ watch(() => props.globalSortKey, () => {
 });
 
 /* A row loses its group index when its group value changes elsewhere, and a row made
- * outside a view may never have had one; the server gives it one so ordering stays stable. */
-function prepareIndexData() {
-    const rows = indexRepairRows(tasks.value, props.data, checkPermission("task.task_list", project.value?.isGlobalPermission));
+ * outside a view may never have had one; the server gives it one so ordering stays stable.
+ * Each row is asked for once, so a refused request is not repeated every time the rows change. */
+const askedFor = new Set();
+let lastRequest = Promise.resolve();
+
+function repairIndexes({ hideRows = false } = {}) {
+    const rows = indexRepairRows(tasks.value, props.data, checkPermission("task.task_list", project.value?.isGlobalPermission))
+        .filter((row) => !askedFor.has(`${row.item.indexName}:${row.data}`));
     if (!rows.length) return;
 
-    if (rows.length > 1) isLoading.value = true;
-
-    const next = (index) => {
-        if (index >= rows.length) {
-            isLoading.value = false;
-            return;
-        }
-        apiRequest("post", env.ONLOAD_UPDATE_TASK_INDEX, indexRepairBody(rows[index], companyId.value))
-            .then(() => next(index + 1))
-            .catch((error) => {
-                console.error("ERROR in update task index: ", error);
-                next(index + 1);
-            });
-    };
-    next(0);
+    rows.forEach((row) => askedFor.add(`${row.item.indexName}:${row.data}`));
+    if (hideRows && rows.length > 1) isLoading.value = true;
+    rows.forEach((row) => {
+        lastRequest = lastRequest
+            .then(() => apiRequest("post", env.ONLOAD_UPDATE_TASK_INDEX, indexRepairBody(row, companyId.value)))
+            .catch((error) => console.error("ERROR in update task index: ", error));
+    });
+    if (hideRows) lastRequest = lastRequest.then(() => { isLoading.value = false; });
 }
+
+/* Rows fetched after the view opened are already on screen, so they are repaired in place. */
+watch(tasks, () => repairIndexes());
 
 onMounted(() => {
     if (observerRef.value) observerRef.value.disconnect();
     addIntersections();
-    prepareIndexData();
+    repairIndexes({ hideRows: true });
 });
 onUnmounted(() => {
     if (observerRef.value) observerRef.value.disconnect();
