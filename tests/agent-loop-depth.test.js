@@ -5,6 +5,10 @@ jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn()
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
 jest.mock('../Modules/Tasks/helpers/completionStore', () => ({ forStatusChange: jest.fn(async () => null), recordWork: jest.fn(async () => null) }));
 jest.mock('../Modules/Agents/permissions', () => ({ holderMay: jest.fn(async () => ({ allowed: true, reason: '' })) }));
+jest.mock('../Modules/Tasks/helpers/taskWritePlacement', () => ({
+    ...jest.requireActual('../Modules/Tasks/helpers/taskWritePlacement'),
+    readableTaskIds: jest.fn(async (companyId, uid, ids) => ids.map(String)),
+}));
 jest.mock('../Modules/Agents/budget', () => ({ check: jest.fn(async () => ({ ok: true, reason: '' })) }));
 jest.mock('../Modules/AICore/usage', () => ({ checkConfiguredModelPriced: () => ({ ok: true, reason: '' }), unpricedMessage: (m) => `No price on file for ${m}`, summarize: jest.fn() }));
 jest.mock('../Modules/Agents/engine/graph', () => ({ resumeGraph: jest.fn(async () => ({ resumed: false })) }));

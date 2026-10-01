@@ -319,7 +319,7 @@ describe('a doc shared with people by name: the notice', () => {
         expect(mail.subject).toContain('Ira shared Atlas with you');
     });
 
-    it('relays the change to the named person\'s own connections only', () => {
+    it('relays the change to the named person\'s own connections only', async () => {
         const socketOf = (uid, companyId = C) => {
             const socket = { identity: { uid, companyId }, rooms: new Set(['room']), emit: jest.fn() };
             return { socket, roomName: 'room' };
@@ -328,7 +328,7 @@ describe('a doc shared with people by name: the notice', () => {
         const others = [socketOf(PEOPLE.inside), socketOf(PEOPLE.outside, 'c000000000000000000000c2')];
         findRoomsByPrefix.mockReturnValue([theirs, ...others]);
 
-        shareRelay.relay({ type: 'update', module: 'pageShares', companyId: C, data: { userId: PEOPLE.outside } });
+        await shareRelay.relay({ type: 'update', module: 'pageShares', companyId: C, data: { userId: PEOPLE.outside } });
 
         expect(theirs.socket.emit).toHaveBeenCalledWith(shareRelay.EVENT, { type: 'update' });
         others.forEach((entry) => expect(entry.socket.emit).not.toHaveBeenCalled());

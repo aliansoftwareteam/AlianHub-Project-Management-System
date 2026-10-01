@@ -314,7 +314,6 @@ module.exports = {
                         ]
                     }
                     MongoDbCrudOpration(companyId, projectObj, "findOneAndUpdate").then((response) => {
-                        socketEmitter.emit('update', { type: "update", data: response , updatedFields: {taskTypeCounts: response.taskTypeCounts,lastTaskId: response.lastTaskId}, module: 'task', companyId });
                         obj.TaskKey = projectData.ProjectCode + '-' +  response.lastTaskId;
                         HandleTask(companyId, obj, false, null, userData,indexObj)
                         .then((taskResult) => {

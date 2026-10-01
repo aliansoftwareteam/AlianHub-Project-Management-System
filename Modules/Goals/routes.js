@@ -1,6 +1,10 @@
 const ctrl = require('./controller');
+const { goalGuard } = require('../Agents/guard');
+
+const PREFIX = '/api/v2/goals';
 
 exports.init = (app) => {
+    app.use(PREFIX, goalGuard);
     app.get('/api/v2/goals', ctrl.listGoals);
     app.post('/api/v2/goals', ctrl.createGoal);
     app.get('/api/v2/goals/for-task/:taskId', ctrl.goalsForTask);

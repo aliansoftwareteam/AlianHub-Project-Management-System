@@ -594,21 +594,21 @@ describe('the live update', () => {
         expect(socketEmitter.emit).not.toHaveBeenCalled();
     });
 
-    it('reaches the sockets of that company and no other, and carries nothing but the kind of change', () => {
+    it('reaches the sockets of that company and no other, and carries nothing but the kind of change', async () => {
         const mine = join(C, 's1');
         const theirs = join(OTHER_COMPANY, 's2');
-        relay({ type: 'update', companyId: C, module: 'goals', data: { _id: 'x', name: 'Secret plan', ownerUserId: AUTHOR } });
+        await relay({ type: 'update', companyId: C, module: 'goals', data: { _id: 'x', name: 'Secret plan', ownerUserId: AUTHOR } });
         expect(mine).toHaveBeenCalledTimes(1);
         expect(mine).toHaveBeenCalledWith(EVENT, { type: 'update' });
         expect(theirs).not.toHaveBeenCalled();
     });
 
-    it('skips a socket in the company\'s room that is not that company\'s, has no identity, or has left', () => {
+    it('skips a socket in the company\'s room that is not that company\'s, has no identity, or has left', async () => {
         const outsider = join(C, 's3', { identity: { companyId: OTHER_COMPANY, uid: ADMIN } });
         const nameless = join(C, 's4', { identity: null });
         const left = join(C, 's5', { stillInRoom: false });
-        relay({ type: 'insert', companyId: C, module: 'goals' });
-        relay({ type: 'insert', module: 'goals' });
+        await relay({ type: 'insert', companyId: C, module: 'goals' });
+        await relay({ type: 'insert', module: 'goals' });
         [outsider, nameless, left].forEach((emit) => expect(emit).not.toHaveBeenCalled());
     });
 

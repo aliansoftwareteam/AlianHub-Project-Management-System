@@ -1,8 +1,7 @@
-const { findRoomsByPrefix } = require('../helper');
+const { toCompanyRoom } = require('../roomAccess');
 const socketEmitter = require('../../event/socketEventEmitter');
 
 const EVENT = 'agentsChanged';
-const COMPANY_ROOM = 'selected_companies_';
 const REMEMBERED_RUNS = 2000;
 
 const lastStatus = new Map();
@@ -31,12 +30,8 @@ const worthTelling = (companyId, data) => {
 const relay = (change) => {
     const companyId = String((change && change.companyId) || '');
     const data = (change && change.data) || {};
-    if (!companyId || !worthTelling(companyId, data)) return;
-    findRoomsByPrefix(`${COMPANY_ROOM}${companyId}`).forEach((entry) => {
-        const identity = entry.socket && entry.socket.identity;
-        if (!identity || identity.companyId !== companyId || !entry.socket.rooms.has(entry.roomName)) return;
-        entry.namespace.to(entry.roomName).emit(EVENT, { kind: data.kind });
-    });
+    if (!companyId || !worthTelling(companyId, data)) return undefined;
+    return toCompanyRoom(companyId, (entry) => entry.namespace.to(entry.roomName).emit(EVENT, { kind: data.kind }));
 };
 
 socketEmitter.on('agent:update', relay);

@@ -33,6 +33,16 @@ const NOTHING = '6f00000000000000000b0eee';
 
 const TASK_EVENTS = ['taskInsert', 'taskUpdate', 'taskDetail_taskUpdate', 'chatTaskUpdate'];
 const COMMENT_EVENTS = ['commentInsert', 'commentUpdate'];
+const OWN_EVENTS = ['userIdNoticationUpdate', 'generalReminderUpdate'];
+const PINGS = {
+    goals: 'goalsChanged',
+    folders: 'foldersChanged',
+    customFields: 'customFieldsChanged',
+    viewTemplates: 'viewTemplatesChanged',
+    projectSnapshots: 'projectTemplatesChanged',
+    agent: 'agentsChanged',
+    pageShares: 'docSharesChanged',
+};
 
 let server;
 let baseURL;
@@ -182,6 +192,14 @@ const projectMessagePosted = (companyId, project) => socketEmitter.emit('insert'
 const countChanged = (companyId, userId) => socketEmitter.emit('update', { type: 'update', module: 'userIdNotification', companyId, data: { userId, notification_counts: 3 } });
 const reminderChanged = (companyId, userId) => socketEmitter.emit('update', { type: 'update', module: 'generalReminder', companyId, data: { _id: NOTHING, userId, title: 'Call back' } });
 const companyChanged = (companyId) => socketEmitter.emit('update', { type: 'update', module: 'companies', data: { data: { _id: companyId, Cst_CompanyName: 'Renamed' } }, updatedFields: {} });
+const pinged = (companyId, userId) => Object.keys(PINGS).forEach((module) => socketEmitter.emit('update', {
+    type: 'update', module, companyId, data: { kind: 'proposal', userId },
+}));
+const typing = (socket, prefix) => socket.emit('commentTyping', { roomPrefix: prefix, typing: true });
+const loseSeat = (db, userId) => {
+    db.store[SCHEMA_TYPE.COMPANY_USERS].find((row) => row.userId === userId).isDelete = true;
+    forgetAccess();
+};
 const boardChanged = (companyId, project, sprint) => socketEmitter.emit('update', {
     type: 'update', module: 'whiteboards', companyId, projectId: String(project._id), sprintId: String(sprint._id), boardId: NOTHING, revision: 2,
 });
@@ -426,6 +444,29 @@ describe('typing in a thread', () => {
         const signals = await received(owner, 'commentTyping', () => admin.emit('commentTyping', { roomPrefix: thread, userId: MEMBER, typing: true }));
         expect(signals).toEqual([{ roomPrefix: thread, userId: ADMIN, typing: true }]);
     });
+
+    it('reaches the other people in the thread while they can still open it', async () => {
+        const member = await connect({ uid: MEMBER });
+        const owner = await connect({ uid: OWNER });
+        const thread = threadOf(home.project, home.openList, home.openTask);
+        expect(await commentRoom(member, thread)).toBe(true);
+        expect(await commentRoom(owner, thread)).toBe(true);
+        expect(await received(member, 'commentTyping', () => typing(owner, thread))).toEqual([{ roomPrefix: thread, userId: OWNER, typing: true }]);
+        expect(await received(owner, 'commentTyping', () => typing(owner, thread))).toEqual([]);
+
+        home.project.AssigneeUserId = [];
+        forgetAccess();
+        expect(await received(member, 'commentTyping', () => typing(owner, thread))).toEqual([]);
+    });
+
+    it('is not carried by a room that is not a thread', async () => {
+        const member = await connect({ uid: MEMBER });
+        const owner = await connect({ uid: OWNER });
+        const prefix = `project_sprint_${idOf(home.project)}_${idOf(home.openList)}`;
+        expect(await listRoom(member, home.project, home.openList)).toBe(true);
+        expect(await listRoom(owner, home.project, home.openList)).toBe(true);
+        expect(await received(member, 'commentTyping', () => typing(owner, prefix))).toEqual([]);
+    });
 });
 
 describe('a person\'s own rooms', () => {
@@ -436,10 +477,9 @@ describe('a person\'s own rooms', () => {
         expect(await ownRooms(here, MEMBER)).toBe(true);
         expect(await ownRooms(there, MEMBER)).toBe(true);
 
-        const events = ['userIdNoticationUpdate', 'generalReminderUpdate'];
-        expect(await heard([here, there], events, () => countChanged(HOME, MEMBER))).toEqual([['userIdNoticationUpdate'], []]);
-        expect(await heard([here, there], events, () => reminderChanged(ELSEWHERE, MEMBER))).toEqual([[], ['generalReminderUpdate']]);
-        expect(await heard([here, there], events, () => {
+        expect(await heard([here, there], OWN_EVENTS, () => countChanged(HOME, MEMBER))).toEqual([['userIdNoticationUpdate'], []]);
+        expect(await heard([here, there], OWN_EVENTS, () => reminderChanged(ELSEWHERE, MEMBER))).toEqual([[], ['generalReminderUpdate']]);
+        expect(await heard([here, there], OWN_EVENTS, () => {
             countChanged(undefined, MEMBER);
             reminderChanged(undefined, MEMBER);
         })).toEqual([[], []]);
@@ -489,8 +529,36 @@ describe('a room that is already open', () => {
         const told = async () => (await heard([owner], ['companiesUpdate'], () => companyChanged(HOME)))[0];
         expect(await told()).toEqual(['companiesUpdate']);
 
-        home.db.store[SCHEMA_TYPE.COMPANY_USERS].find((row) => row.userId === OWNER).isDelete = true;
-        forgetAccess();
+        loseSeat(home.db, OWNER);
+        expect(await told()).toEqual([]);
+    });
+
+    it('carries the workspace\'s change pings to the people seated in it, and stops when the seat is lost', async () => {
+        const owner = await connect({ uid: OWNER });
+        const member = await connect({ uid: MEMBER });
+        expect(await companyRoom(owner, HOME)).toBe(true);
+        expect(await companyRoom(member, HOME)).toBe(true);
+        const told = () => heard([owner, member], Object.values(PINGS), () => pinged(HOME, OWNER));
+        expect(await told()).toEqual([Object.values(PINGS), Object.values(PINGS).filter((event) => event !== PINGS.pageShares)]);
+        expect(await heard([owner, member], Object.values(PINGS), () => {
+            pinged(ELSEWHERE, OWNER);
+            pinged(undefined, OWNER);
+        })).toEqual([[], []]);
+
+        loseSeat(home.db, OWNER);
+        expect(await told()).toEqual([[], Object.values(PINGS).filter((event) => event !== PINGS.pageShares)]);
+    });
+
+    it('stops carrying a person\'s own counts and reminders when they lose their seat', async () => {
+        const member = await connect({ uid: MEMBER });
+        expect(await ownRooms(member, MEMBER)).toBe(true);
+        const told = async () => (await heard([member], OWN_EVENTS, () => {
+            countChanged(HOME, MEMBER);
+            reminderChanged(HOME, MEMBER);
+        }))[0];
+        expect(await told()).toEqual(OWN_EVENTS);
+
+        loseSeat(home.db, MEMBER);
         expect(await told()).toEqual([]);
     });
 });

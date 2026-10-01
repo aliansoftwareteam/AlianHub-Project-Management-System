@@ -88,7 +88,7 @@ const toComment = async (companyId, { run, agent, ownerId, scope, taskId, rebuil
 const toPage = async (companyId, { run, agent, ownerId, scope, projectId, report, rebuild, shared }) => {
     if (!mayWrite(agent, 'page.draft')) return { done: false, reason: 'read_only' };
     if (!(await ownerSeesProject(companyId, ownerId, scope, projectId))) return { done: false, reason: 'not_visible' };
-    // page.draft always files a project-visibility page, so its readers are the project's.
+    // A draft that names no task is filed for the whole project, so its readers are the project's.
     const scoped = await rebuild(await sharedScopeFor(companyId, scope, projectId));
     shared.page = { projectId: String(projectId), counts: scoped.report.counts };
     const day = new Date(run.slotAt || run.startedAt || Date.now()).toISOString().slice(0, 10);

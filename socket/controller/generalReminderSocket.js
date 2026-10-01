@@ -10,13 +10,13 @@ const {
     findRoomsByPrefix,
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
-const { onJoin, roomFor, isSelf, sameCompany } = require('../roomAccess');
+const { onJoin, roomFor, isSelf, toSeated } = require('../roomAccess');
 
 const handleReminderChange = (changeData) => {
-    if (!changeData || changeData.module !== 'generalReminder') return;
+    if (!changeData || changeData.module !== 'generalReminder') return undefined;
     const doc = changeData.data || {};
     const ownerId = doc.userId;
-    if (!ownerId) return;
+    if (!ownerId) return undefined;
 
     // Notify the recipient, and — when the reminder was raised for someone else
     // — the author too, so their "Assigned by me" list stays live.
@@ -28,12 +28,8 @@ const handleReminderChange = (changeData) => {
     const emitData = { type: changeData.type, fullDocument: doc };
 
     // The room is named by the user alone, and a person in two companies has one in each.
-    targets.forEach((uid) => {
-        findRoomsByPrefix(`generalReminder_${uid}`).forEach((data) => {
-            if (!sameCompany(data.socket.identity, changeData) || !data.socket.rooms.has(data.roomName)) return;
-            data.namespace.to(data.roomName).emit('generalReminderUpdate', emitData);
-        });
-    });
+    const rooms = [...targets].flatMap((uid) => findRoomsByPrefix(`generalReminder_${uid}`));
+    return toSeated(rooms, changeData.companyId, (data) => data.namespace.to(data.roomName).emit('generalReminderUpdate', emitData));
 };
 
 exports.generalReminderSocketHandler = ({ socket, namespace }) => {
