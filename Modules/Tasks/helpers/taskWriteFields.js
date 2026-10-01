@@ -215,6 +215,7 @@ const TASK_ACTION_FIELDS = Object.freeze({
     bulkUpdatePriority: spec({ params: ['companyId', 'taskIds', 'firebaseObj', 'priorityObj', ...HISTORY_USER], writes: { firebaseObj: ['Task_Priority', 'Updated_At'] }, company: companyId, ids: TASK_IDS }),
     bulkUpdateDueDate: spec({ params: ['companyId', 'taskIds', 'DueDate', 'commonDateFormatString', ...HISTORY_USER], company: companyId, ids: TASK_IDS }),
     bulkUpdateStartDate: spec({ params: ['companyId', 'taskIds', 'startDate', 'commonDateFormatString', ...HISTORY_USER], company: companyId, ids: TASK_IDS }),
+    bulkUpdateDates: spec({ params: ['companyId', 'dates', ...HISTORY_USER], company: companyId, ids: [['dates', '*', 'taskId']] }),
     bulkUpdateAssignee: spec({ params: ['companyId', 'taskIds', 'employeeName', 'employeeId', 'type', ...HISTORY_USER], company: companyId, ids: TASK_IDS, people: PEOPLE.bulkUpdateAssignee }),
     bulkUpdateTags: spec({ params: ['companyId', 'taskIds', 'tagId', 'operation', ...HISTORY_USER], company: companyId, ids: TASK_IDS, scalars: [['tagId']] }),
     bulkArchive: spec({ params: ['companyId', 'taskIds', ...HISTORY_USER], company: companyId, ids: TASK_IDS }),
