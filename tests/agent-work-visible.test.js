@@ -51,7 +51,6 @@ const { CID, OWNER, MEMBER, OTHER, OUTSIDER, TOKEN, P_OPEN, P_DEST, S_OPEN, S_SE
 const { seed, rows, rpcThrough } = world.create(mockDb);
 const rpc = rpcThrough(server);
 const GUEST = OUTSIDER;
-const TOKEN_2 = '6f0000000000000000000102';
 const WEDNESDAY = new Date('2026-10-07T09:00:00Z');
 const day = (ymd) => new Date(`${ymd}T00:00:00Z`);
 const MINUTE = 60 * 1000;
@@ -78,14 +77,20 @@ const task = (over = {}) => {
 };
 const inSecret = { sprintId: S_SECRET, sprintArray: { id: S_SECRET, name: 'Secret' } };
 
-/* A task nobody owns, found by the day's look and taken by an agent acting for `holder`. */
-const heldTask = async (over = {}, holder = OTHER, tokenId = TOKEN) => {
-    const orphan = task({ AssigneeUserId: [], ...over });
+/* Tasks nobody owns, found by one look of the day, each taken by an agent acting for OTHER through a connection of its own. */
+const TOKENS = [TOKEN, '6f0000000000000000000102', '6f0000000000000000000103'];
+const heldTasks = async (...overs) => {
+    const orphans = overs.map((over) => task({ AssigneeUserId: [], ...over }));
     project(P_OPEN).agentManager = { on: true };
     await dailyLook.runForCompany(CID, WEDNESDAY);
-    const row = stored().find((found) => found.rule === RULE.NO_OWNER && found.taskId === String(orphan._id));
-    await rpc(agent(holder, tokenId), 'queue.claim', { itemId: String(row._id) });
-    return { id: String(orphan._id), itemId: String(row._id) };
+    const held = [];
+    for (const [at, orphan] of orphans.entries()) {
+        const row = stored().find((found) => found.rule === RULE.NO_OWNER && found.taskId === String(orphan._id));
+        // eslint-disable-next-line no-await-in-loop
+        await rpc(agent(OTHER, TOKENS[at]), 'queue.claim', { itemId: String(row._id) });
+        held.push({ id: String(orphan._id), itemId: String(row._id), tokenId: TOKENS[at] });
+    }
+    return held;
 };
 
 const through = async (handler, req) => {
@@ -121,7 +126,7 @@ afterAll(() => { delete process.env.MCP_TOOLS_WORK; });
 
 describe('the tasks an agent holds, for the rows of a list', () => {
     it('say who holds each and since when, to the people who can open the task', async () => {
-        const open = await heldTask();
+        const [open] = await heldTasks({});
         const since = new Date(stored().find((row) => String(row._id) === open.itemId).claim.at).toISOString();
         const entry = { taskId: open.id, projectId: P_OPEN, name: PRIYAS_CLAUDE, since };
         expect(await held(MEMBER)).toEqual([entry]);
@@ -129,9 +134,17 @@ describe('the tasks an agent holds, for the rows of a list', () => {
         expect(JSON.stringify(await held(MEMBER))).not.toMatch(/token:|userId|until/);
     });
 
+    it('keep the time the agent first took the task when it keeps its claim longer', async () => {
+        const [open] = await heldTasks({});
+        const claimed = stored().find((row) => String(row._id) === open.itemId).claim;
+        claimed.at = new Date(Date.now() - 20 * MINUTE);
+        const first = claimed.at.toISOString();
+        await rpc(agent(OTHER, open.tokenId), 'queue.claim', { itemId: open.itemId });
+        expect(await held(MEMBER)).toMatchObject([{ taskId: open.id, since: first }]);
+    });
+
     it('leave out a task in a private list for a member outside it, and every task for a guest', async () => {
-        const open = await heldTask();
-        const secret = await heldTask(inSecret, OTHER, TOKEN_2);
+        const [open, secret] = await heldTasks({}, inSecret);
         expect(await heldIds(OWNER)).toEqual([open.id, secret.id].sort());
         expect(await heldIds(OTHER)).toEqual([open.id, secret.id].sort());
         expect(await heldIds(MEMBER)).toEqual([open.id]);
@@ -139,21 +152,19 @@ describe('the tasks an agent holds, for the rows of a list', () => {
     });
 
     it('leave out a claim that ran out, one given back, and one whose person can no longer open the task, and change nothing', async () => {
-        const ranOut = await heldTask();
-        const givenBack = await heldTask({}, OTHER, TOKEN_2);
-        const lost = await heldTask(inSecret, OTHER, '6f0000000000000000000103');
+        const [ranOut, givenBack, lost] = await heldTasks({}, {}, inSecret);
         const claimOf = (itemId) => stored().find((row) => String(row._id) === itemId).claim;
         expect(await heldIds(OWNER)).toEqual([ranOut.id, givenBack.id, lost.id].sort());
 
         claimOf(ranOut.itemId).until = new Date(Date.now() - MINUTE);
-        await rpc(agent(OTHER, TOKEN_2), 'queue.release', { itemId: givenBack.itemId });
+        await rpc(agent(OTHER, givenBack.tokenId), 'queue.release', { itemId: givenBack.itemId });
         rows(SCHEMA_TYPE.SPRINTS).find((row) => String(row._id) === S_SECRET).AssigneeUserId = [];
         expect(await held(OWNER)).toEqual([]);
         expect(claimOf(lost.itemId)).toBeDefined();
     });
 
     it('show nothing in a project whose switch is off, and nothing to a caller with no company', async () => {
-        await heldTask();
+        await heldTasks({});
         project(P_OPEN).agentManager = { on: false };
         expect(await held(OWNER)).toEqual([]);
         expect((await through(controller.getHeldTasks, { uid: OWNER, headers: {}, params: {}, query: {}, body: {} })).code).toBe(401);
@@ -183,8 +194,7 @@ describe('the tasks an agent holds, for the rows of a list', () => {
 
 describe('the filter "an agent is working on it"', () => {
     it('brings each person the held tasks they can open, whatever ids it is sent', async () => {
-        const open = await heldTask();
-        const secret = await heldTask(inSecret, OTHER, TOKEN_2);
+        const [open, secret] = await heldTasks({}, inSecret);
         task();
         const every = [open.id, secret.id];
 
@@ -206,14 +216,14 @@ describe('a claim that changes', () => {
     const told = () => socketEmitter.emit.mock.calls.filter(([event, sent]) => event === 'update' && sent.module === 'agent' && sent.data.kind === 'claim').map(([, sent]) => sent);
 
     it('tells the open pages of that company, and says nothing of the task', async () => {
-        const { itemId } = await heldTask();
+        const [{ itemId }] = await heldTasks({});
         expect(told()).toEqual([expect.objectContaining({ type: 'update', companyId: CID, data: { kind: 'claim' } })]);
         await rpc(agent(OTHER), 'queue.release', { itemId });
         expect(told()).toHaveLength(2);
     });
 
     it('is told when a person takes the item back', async () => {
-        const { itemId } = await heldTask();
+        const [{ itemId }] = await heldTasks({});
         expect((await workQueue.takeBack(CID, OWNER, itemId)).error).toBeUndefined();
         expect(told()).toHaveLength(2);
     });

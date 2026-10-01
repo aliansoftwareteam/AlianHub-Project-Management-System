@@ -83,6 +83,7 @@ exports.init = (app) => {
     app.delete('/api/v2/agents/standing-approvals/:projectId/:id', standingApprovalsCtrl.endStanding);
     app.get('/api/v2/agents/project-manager/:projectId', projectManagerCtrl.getProjectManager);
     app.put('/api/v2/agents/project-manager/:projectId', projectManagerCtrl.putProjectManager);
+    app.get('/api/v2/agents/work-queue/held', projectManagerCtrl.getHeldTasks);
     app.get('/api/v2/agents/work-queue/task/:taskId', projectManagerCtrl.getTaskQueue);
     app.post('/api/v2/agents/work-queue/task/:taskId/hand-over', projectManagerCtrl.postHandOver);
     app.post('/api/v2/agents/work-queue/:itemId/take-back', projectManagerCtrl.postTakeBack);

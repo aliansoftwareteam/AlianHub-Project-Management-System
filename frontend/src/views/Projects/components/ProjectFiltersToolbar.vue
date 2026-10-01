@@ -136,6 +136,18 @@
                         </button>
                     </div>
                     <ProvenanceFilter :modelValue="doneBy" @update:modelValue="(v) => $emit('update:doneBy', v)" />
+                    <button
+                        type="button"
+                        class="pft__ctl pft__pill pft__agent-work"
+                        :class="{ 'is-active': agentWorking }"
+                        :aria-pressed="agentWorking"
+                        :title="$t('AgentWork.filter_hint')"
+                        data-test="agent-work-filter"
+                        @click="$emit('update:agentWorking', !agentWorking)"
+                    >
+                        <ShellIcon name="ai" :size="14" />
+                        <span>{{ $t('AgentWork.filter') }}</span>
+                    </button>
                 </template>
                 <span v-else class="pft__mode-chip">{{ $t('ProjectSlider.archived_list') }}</span>
                 <DropDown mode="menu" id="more_features" themed :title="$t('Projects.more_features')" :zIndex="sheetMode ? SHEET_MENU_Z : 10">
@@ -288,6 +300,7 @@ const props = defineProps({
     taskDescriptionSearch: { type: Boolean, default: false },
     filterUsers: { type: Array, default: () => [] },
     doneBy: { type: String, default: 'all' },
+    agentWorking: { type: Boolean, default: false },
     userSidebar: { type: Boolean, default: false },
     collapsed: { type: Boolean, default: true },
     groupBy: { type: [Number, String], default: 0 },
@@ -331,6 +344,7 @@ const emit = defineEmits([
     'toggleSearch',
     'manageFilterUsers',
     'update:doneBy',
+    'update:agentWorking',
     'changeAssignee',
     'openAi',
     'openAiAssist',
@@ -363,6 +377,7 @@ const activeFilterCount = computed(() => [
     props.filterUsers.includes(props.userId),
     assigneeFilterCount.value > 0,
     props.doneBy !== DONE_BY_ALL,
+    props.agentWorking,
     advancedApplied.value,
 ].filter(Boolean).length);
 

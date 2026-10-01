@@ -1,6 +1,6 @@
 /* Task 047, T-4: a task an agent holds or is working on carries one mark in List and Table, saying who and since
    when, and "an agent is working on it" narrows the views through the task search they already share. */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { defineComponent, h, nextTick, ref } from 'vue';
 import { createStore } from 'vuex';
@@ -13,7 +13,6 @@ vi.mock('@/composable', async (importOriginal) => {
         useGetterFunctions: () => ({ ...real.useGetterFunctions(), getUser: () => null, getTaskStatus: () => ({ name: 'To do' }) })
     };
 });
-vi.mock('@/services', () => ({ apiRequest: vi.fn(() => Promise.resolve({ data: {} })) }));
 vi.mock('@/views/Projects/TableView/useTaskSummaries.js', () => ({
     useTaskSummaries: () => ({ get: () => ({ state: 'idle' }), ensure: () => {}, generate: () => {}, pin: () => {}, unpin: () => {} })
 }));
@@ -141,6 +140,7 @@ describe('the mark', () => {
 describe('the filter "an agent is working on it"', () => {
     let dispatch;
     let api;
+    let host;
 
     const mountSearch = () => {
         dispatch = vi.fn(() => Promise.resolve());
@@ -155,8 +155,9 @@ describe('the filter "an agent is working on it"', () => {
                 return () => h('div');
             }
         });
-        return mount(Host, { global: { plugins: [searchStore] } });
+        host = mount(Host, { global: { plugins: [searchStore] } });
     };
+    afterEach(() => host.unmount());
     const lastMatch = () => dispatch.mock.calls.at(-1)[0].query[0].$match.$and;
 
     it('asks the shared task search for the marked tasks, inside the project', () => {

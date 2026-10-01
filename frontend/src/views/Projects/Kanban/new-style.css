@@ -247,6 +247,8 @@
 .kanban-board .agent-strip__name { font: var(--text-label); color: var(--rail-ink-strong); flex: 1; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kanban-board .agent-strip__meta { font-size: var(--fs-2xs, 9px); color: var(--rail-ink-2); white-space: nowrap; }
 
+.kanban-board .card-agent-mark { display: flex; min-width: 0; margin-top: var(--kb-gap); }
+
 .kanban-board .agent-proposal {
     margin-top: var(--kb-gap);
     padding: var(--sp-2) var(--sp-3);

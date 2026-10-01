@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
+const socketEmitter = require('../../../event/socketEventEmitter');
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const { getRoleType, evaluatePermission, isWritable } = require('../../../Config/permissionGuard');
 const { ROLE_GUEST } = require('../../../Config/roleTypes');
@@ -43,6 +44,12 @@ const find = async (companyId, type, data) => ((await MongoDbCrudOpration(compan
 const change = async (companyId, filter, update) => plain(await MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.PROJECT_FINDINGS, data: [filter, update, { returnDocument: 'after' }],
 }, 'findOneAndUpdate'));
+
+/* Only the fact of a change goes out, to the company it names (socket/controller/agentSocket.js). Each page reads
+ * the held tasks again and is answered with what its person may open. */
+const announce = (companyId) => socketEmitter.emit('update', {
+    type: 'update', module: 'agent', companyId: String(companyId), data: { kind: 'claim' }, updatedFields: { kind: 'claim' }, actor: { kind: 'agent' }, depth: 1,
+});
 
 const waiting = Object.freeze({ status: STATUS.OPEN, rule: { $in: QUEUE_RULES }, proposalId: null, leftQueue: null });
 
@@ -132,12 +139,15 @@ const executors = {
         const item = await itemFor({ companyId, uid: actor.userId, itemId: params.itemId });
         if (!item) throw new DeterministicError(REFUSAL.NO_ITEM);
         const now = new Date();
-        await heldBy(companyId, item.row, now);
-        const claim = { by: connection, userId: String(actor.userId), name: await nameOf(actor), at: now, until: new Date(now.getTime() + CLAIM_MINUTES * MINUTE_MS) };
+        const held = await heldBy(companyId, item.row, now);
+        // A claim kept longer keeps the time it was first taken: a list of tasks shows it as "since".
+        const at = held && held.by === connection ? held.at : now;
+        const claim = { by: connection, userId: String(actor.userId), name: await nameOf(actor), at, until: new Date(now.getTime() + CLAIM_MINUTES * MINUTE_MS) };
         const taken = await change(companyId, {
             ...waiting, _id: item.row._id, $or: [{ claim: null }, { 'claim.until': { $lte: now } }, { 'claim.by': connection }],
         }, { $set: { claim } });
         if (!taken) throw new DeterministicError(REFUSAL.TAKEN);
+        announce(companyId);
         return {
             result: { itemId: String(item.row._id), claimedUntil: claim.until.toISOString(), minutes: CLAIM_MINUTES },
             undo: { kind: 'queueItem', was: 'claimed', itemId: String(item.row._id), taskId: item.row.taskId, by: connection }, ...entity(item),
@@ -156,6 +166,7 @@ const executors = {
         const set = finished ? { leftQueue: left, ...(handedOver ? { status: STATUS.CLOSED, closedAt: now } : {}) } : null;
         const released = await change(companyId, { _id: item.row._id, 'claim.by': connection }, { $unset: { claim: '' }, ...(set ? { $set: set } : {}) });
         if (!released) throw new DeterministicError(REFUSAL.NOT_HELD);
+        announce(companyId);
         return {
             result: { itemId: String(item.row._id), released: true, finished },
             undo: finished ? { kind: 'queueItem', was: 'finished', itemId: String(item.row._id), taskId: item.row.taskId } : null, ...entity(item),
@@ -168,6 +179,7 @@ const inverses = {
         const restored = u.was === 'claimed'
             ? await change(companyId, { _id: oid(u.itemId), 'claim.by': u.by }, { $unset: { claim: '' } })
             : await change(companyId, { _id: oid(u.itemId), 'leftQueue.why': LEFT.FINISHED }, { $set: { status: STATUS.OPEN }, $unset: { leftQueue: '', closedAt: '' } });
+        if (restored) announce(companyId);
         return { itemId: u.itemId, restored: Boolean(restored) };
     },
 };
@@ -191,6 +203,31 @@ const claimsOf = async (companyId, uid, listed, now = new Date()) => {
         if (!claim) return finding;
         return { ...finding, claim: shown(claim), canTakeBack: Boolean(await mayTakeBack(companyId, uid, row, claim)) };
     }));
+};
+
+/* The holders who can still open what they hold, asked once for each person and not once for each row. Nothing is
+ * written here: a claim its holder lost is dropped by the next read of that item (`heldBy`). */
+const stillHolding = async (companyId, items) => {
+    const idsOf = new Map();
+    items.forEach(({ row }) => idsOf.set(String(row.claim.userId), [...(idsOf.get(String(row.claim.userId)) || []), ...row.taskIds.map(String)]));
+    const open = new Map(await Promise.all([...idsOf].map(async ([holder, ids]) => [holder, new Set(await readableTaskIds(companyId, holder, ids))])));
+    return items.filter(({ row }) => row.taskIds.every((id) => open.get(String(row.claim.userId)).has(String(id))));
+};
+
+const byClaimTime = (a, b) => new Date(a.row.claim.at) - new Date(b.row.claim.at);
+
+/* The marks on a list of tasks: each task an agent holds that the person can open, with who holds it and since
+ * when. One read of the claims serves any number of rows, and no total is sent beside the list. */
+const heldTasks = async (companyId, uid, now = new Date()) => {
+    const projects = await projectsOn(companyId);
+    if (!projects.length) return [];
+    const rows = await find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [
+        { ...waiting, projectId: { $in: idForms(projects.map((project) => String(project._id))) }, 'claim.until': { $gt: now } }, {}, { limit: ROWS_READ },
+    ]);
+    const held = await stillHolding(companyId, await readableBy(companyId, uid, rows.filter((row) => liveClaim(row, now))));
+    const first = new Map();
+    held.sort(byClaimTime).forEach(({ row }) => { if (!first.has(String(row.taskId))) first.set(String(row.taskId), row); });
+    return [...first.values()].map((row) => ({ taskId: String(row.taskId), projectId: String(row.projectId), name: row.claim.name, since: new Date(row.claim.at).toISOString() }));
 };
 
 const openTask = async (companyId, uid, taskId) => {
@@ -245,6 +282,7 @@ const takeBack = async (companyId, uid, itemId, now = new Date()) => {
     await change(companyId, { _id: row._id, status: STATUS.OPEN }, {
         $unset: { claim: '' }, $set: { leftQueue: left, ...(row.rule === HANDED_OVER ? { status: STATUS.CLOSED, closedAt: now } : {}) },
     });
+    announce(companyId);
     return { taskId: row.taskId, projectId: String(row.projectId) };
 };
 
@@ -258,5 +296,5 @@ const closeFinished = async (companyId, projectId, now = new Date()) => {
 };
 
 module.exports = {
-    CLAIM_MINUTES, QUEUE_RULES, LEFT, REFUSAL, LISTED_MAX, connectionOf, liveClaim, itemsFor, itemFor, executors, inverses, claimsOf, aboutTask, handOver, takeBack, closeFinished,
+    CLAIM_MINUTES, QUEUE_RULES, LEFT, REFUSAL, LISTED_MAX, connectionOf, liveClaim, itemsFor, itemFor, executors, inverses, claimsOf, heldTasks, aboutTask, handOver, takeBack, closeFinished,
 };
