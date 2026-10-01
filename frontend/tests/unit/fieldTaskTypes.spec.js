@@ -9,7 +9,7 @@ import en from '@/locales/en';
 vi.mock('@/services', () => ({ apiRequest: vi.fn(() => Promise.resolve({ data: {} })) }));
 vi.mock('@/store/index', () => ({ default: { commit: () => {}, dispatch: () => Promise.resolve(), getters: {}, state: {} } }));
 
-import { fieldAppliesToTask } from '@/views/Projects/composables/projectCustomFields';
+import { fieldAppliesToTask, shownFieldValues } from '@/views/Projects/composables/projectCustomFields';
 import { taskTypeOptions } from '@/plugins/customFieldView/taskTypeOptions';
 import CustomFieldCell from '@/views/Projects/components/columns/CustomFieldCell.vue';
 import CustomFieldRender from '@/plugins/customFieldView/component/molecules/customFieldTaskView/customFieldRender.vue';
@@ -75,6 +75,20 @@ describe('a List or Table cell for a scoped field', () => {
         expect(wrapper.find('input').exists()).toBe(false);
         expect(wrapper.text()).not.toContain('High');
         expect(wrapper.get('.ah-sr-only').text()).toBe(en.ViewColumns.field_not_for_type.replace('{field}', 'Severity'));
+    });
+});
+
+describe('a Board card', () => {
+    const columns = [
+        { id: 'points' },
+        { id: 'cf:f-sev', label: 'Severity', field: SEVERITY },
+        { id: 'cf:f-cust', label: 'Customer', field: { _id: 'f-cust', fieldType: 'text', fieldTitle: 'Customer' } }
+    ];
+    const card = (TaskTypeKey) => ({ ...task(TaskTypeKey), customField: { 'f-sev': { fieldValue: 'High' }, 'f-cust': { fieldValue: 'Acme' } } });
+
+    it('shows a scoped field only on a card of one of its task types', () => {
+        expect(shownFieldValues(columns, card(BUG)).map((entry) => [entry.label, entry.text])).toEqual([['Severity', 'High'], ['Customer', 'Acme']]);
+        expect(shownFieldValues(columns, card(1)).map((entry) => [entry.label, entry.text])).toEqual([['Customer', 'Acme']]);
     });
 });
 
