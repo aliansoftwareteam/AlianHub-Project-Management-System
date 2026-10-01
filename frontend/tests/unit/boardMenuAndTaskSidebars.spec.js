@@ -97,6 +97,7 @@ function mountBoard({ data = task() } = {}) {
         attachTo: document.body,
         global: {
             plugins: [store()],
+            mocks: { $t: (key, params) => [key, ...Object.values(params || {})].join('|') },
             provide: {
                 showArchived: ref(false),
                 toggleTaskDetail: vi.fn(),
@@ -379,8 +380,8 @@ describe('the Merge, Convert and Move sidebars', () => {
     it('paints the panel, its head and its body from the theme', () => {
         const css = withoutComments(read('components/molecules/ConvertToSubTaskSidebar/theme.css'));
         expect(ruleBody(css, '.converted__sidebar .sidebar-content')).toMatch(/background:\s*var\(--surface\)/);
-        expect(ruleBody(css, '.sidebar.converted__sidebar .sidebar-body')).toMatch(/background:\s*var\(--canvas\)/);
-        expect(ruleBody(css, '.converted__sidebar .sbf__name')).toBe('');
+        expect(ruleBody(css, '.converted__sidebar .sidebar-body')).toMatch(/background:\s*var\(--canvas\)/);
+        expect(read('components/molecules/Sidebar/style.css')).not.toMatch(/converted__sidebar/);
         for (const file of ['ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue', 'ConvertToList/ConvertToList.vue']) {
             expect(read(`components/molecules/${file}`), file).toMatch(/<style src="[^"]*theme\.css"><\/style>/);
         }

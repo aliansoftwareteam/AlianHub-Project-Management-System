@@ -73,13 +73,10 @@
                     'type':taskName.type,
                     'event':$event.event})"
                 />
-                <div v-if="isSubTask">
-                    <button class="btn-primary position-ab ifsub__save" @click.stop.prevent="saveTask()">{{$t("Projects.save")}}</button>
-                </div>
-                <div v-if="save" class="red position-ab z-index-1 save__error" :style="[{fontSize : clientWidth > 480 ? '11px' : '10px', left : clientWidth > 480 ? '0px' : '0px',width : clientWidth > 480 ? '100%' : '320px'},]" >{{taskName.error}}</div>
+                <div v-if="save" class="position-ab z-index-1 save__error board-create__error" :style="[{fontSize : clientWidth > 480 ? '11px' : '10px', left : clientWidth > 480 ? '0px' : '0px',width : clientWidth > 480 ? '100%' : '320px'},]" >{{taskName.error}}</div>
             </div>
         </div>
-        <div class="d-flex justify-content-between mt-15px">
+        <div class="d-flex justify-content-between align-items-center mt-15px board-create__row">
             <div class="d-flex justify-content-between align-items-center">
                 <Assignee
                     v-if="groupValue !== 1"
@@ -116,12 +113,12 @@
                     />
                 </span>
             </div>
-        <div v-if="!isSubTask">
-            <button class="btn-primary p0x-10px not__subtask-savebtn" @click.stop.prevent="saveTask()">{{$t("Projects.save")}}</button>
-        </div>
-        <div v-if="isSubTask" class="pr-0px" @click.stop.prevent="() => {$emit('toggle')}">
-            <img class="cursor-pointer" src="@/assets/images/crossBoardTaskIcon.png" alt="close"/>
-        </div>
+            <div class="d-flex align-items-center board-create__end">
+                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click.stop.prevent="saveTask()">{{$t("Projects.save")}}</button>
+                <button v-if="isSubTask" type="button" class="board-create__close" :aria-label="$t('Projects.close')" @click.stop.prevent="$emit('toggle')">
+                    <img src="@/assets/images/crossBoardTaskIcon.png" alt=""/>
+                </button>
+            </div>
         </div>
     </div>
 </template>
@@ -431,4 +428,9 @@
     padding: 6px 6px;
     font-size: 12px;
 }
+.board-create__row { flex-wrap: wrap; gap: 8px; }
+.board-create__end { gap: 8px; margin-left: auto; }
+.board-create__close { display: inline-flex; padding: 0; border: 0; background: none; cursor: pointer; border-radius: 4px; }
+.board-create__close:focus-visible { outline: none; box-shadow: var(--focus); }
+.board-create__error { color: var(--danger); }
 </style>
