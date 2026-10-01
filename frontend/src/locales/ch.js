@@ -6203,7 +6203,16 @@ export default {
         "search_not_loaded": "That message is further back in this conversation — load earlier messages to jump to it.",
         "unread_one": "1 unread message",
         "unread_many": "{count} unread messages",
-        "marked_unread": "Marked as unread from here"
+        "marked_unread": "Marked as unread from here",
+        "reply_in_thread": "Reply in thread",
+        "thread_title": "Thread",
+        "thread_close": "Close thread",
+        "thread_replies_one": "1 reply",
+        "thread_replies_many": "{count} replies",
+        "thread_open_one": "Open the thread, 1 reply",
+        "thread_open_many": "Open the thread, {count} replies",
+        "thread_last_reply": "Last reply {when}",
+        "thread_failed": "This thread could not be opened. It may have been deleted, or you may not have access to it."
     },
     "Filters": {
         "filter": "筛选器",
