@@ -173,6 +173,31 @@ function emitBulkSummary(action, payload) {
     }
 }
 
+/* A Gantt move reaches its whole chain of dependants; past this the request is not one move. */
+const MAX_DATE_ROWS = 500;
+
+const readDate = (value) => {
+    if (value === undefined || value === null || value === '') return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+};
+
+function readDateRows(dates) {
+    if (!Array.isArray(dates) || !dates.length) return { error: 'dates must list at least one task' };
+    if (dates.length > MAX_DATE_ROWS) return { error: `dates may name at most ${MAX_DATE_ROWS} tasks` };
+    const rows = new Map();
+    for (const row of dates) {
+        const taskId = String((row && row.taskId) || '').trim();
+        if (!taskId) return { error: 'each row in dates needs a taskId' };
+        if (rows.has(taskId)) return { error: 'each task may appear once in dates' };
+        const startDate = readDate(row.startDate);
+        const DueDate = readDate(row.DueDate);
+        if (!startDate || !DueDate || DueDate < startDate) return { error: 'each row in dates needs a start date on or before its due date' };
+        rows.set(taskId, { startDate, DueDate });
+    }
+    return { rows };
+}
+
 // ----------------- Mixin -----------------
 
 module.exports = {
@@ -438,6 +463,41 @@ module.exports = {
                 reject(error);
             }
         });
+    },
+
+    async bulkUpdateDates({ companyId, userData, dates }) {
+        if (!companyId) throw new Error('companyId required');
+        const wanted = readDateRows(dates);
+        if (wanted.error) throw new Error(wanted.error);
+
+        const { tasks, skipped } = await loadScopedTasks(companyId, [...wanted.rows.keys()], { includeArchived: false });
+        if (!tasks.length) return summarize({ updated: [], skipped, errors: [] });
+        const fieldsOf = (task) => wanted.rows.get(String(task._id));
+
+        try {
+            await MongoDbCrudOpration(companyId, {
+                type: dbCollections.TASKS,
+                data: [tasks.map((task) => ({ updateOne: { filter: { _id: task._id }, update: { $set: fieldsOf(task) } } }))],
+            }, 'bulkWrite');
+        } catch (error) {
+            logger.error(`bulkUpdateDates bulkWrite error: ${error.message}`);
+            throw error;
+        }
+
+        tasks.forEach((task) => {
+            emitTaskUpdate(task, fieldsOf(task));
+            const historyObj = {
+                key: 'Project_DueDate',
+                sprintId: task.sprintId,
+                message: `<b>${userData?.Employee_Name || ''}</b> rescheduled the task on the Gantt.`,
+            };
+            HandleHistory('task', companyId, task.ProjectID, task._id, historyObj, userData)
+                .catch((err) => logger.error(`bulkUpdateDates history ${task._id}: ${err.message}`));
+        });
+
+        const updated = tasks.map((task) => String(task._id));
+        emitBulkSummary('bulkUpdateDates', { taskIds: updated });
+        return summarize({ updated, skipped, errors: [] });
     },
 
     // ---------------------- START DATE ----------------------
