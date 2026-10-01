@@ -22,9 +22,9 @@
                         </template>
                         <span class="ah-detail__crumb-sep">›</span>
                         <button type="button" class="ah-detail__crumb-link" @click="open('sprint')">{{ sprintName }}</button>
-                        <template v-if="task.isParentTask === false && parentTask">
-                            <span class="ah-detail__crumb-sep">›</span>
-                            <button type="button" class="ah-detail__crumb-link ah-mono" @click="open('parent')">{{ parentTask.TaskKey }}</button>
+                        <template v-if="ancestorChain.length">
+                            <span class="ah-detail__crumb-sep" aria-hidden="true">›</span>
+                            <TaskAncestorTrail :ancestors="ancestorChain" :current="task.TaskName" @open="openAncestor" />
                         </template>
                     </template>
                 </nav>
@@ -91,6 +91,9 @@
 
         <div class="ah-detail__body">
             <div class="ah-detail__main ah-scroll" ref="mainEl">
+                <nav v-if="isMobile && ancestorChain.length" class="ah-detail__trail-row" :aria-label="$t('TaskPanel.parent_tasks')">
+                    <TaskAncestorTrail :ancestors="ancestorChain" @open="openAncestor" />
+                </nav>
                 <div class="ah-detail__title-row">
                     <Skelaton v-if="isSpinner && !task.TaskName" class="ah-detail__title-skeleton" />
                     <TaskDetailTitle
@@ -167,6 +170,7 @@
                                     @click="runQuickAction(action.id)"
                                 ><ShellIcon :name="action.icon" :size="13" />{{ action.label }}</button>
                             </div>
+                            <p v-if="atDepthLimit" class="ah-detail__depth-note ah-small">{{ $t('TaskPanel.subtask_depth_limit') }}</p>
                         </template>
                     </TaskDetailTab>
                     <TaskSubtaskList
@@ -177,6 +181,7 @@
                         :subtasks="subTasks"
                         :isMainSpinner="isSpinner"
                         @open="(sub) => openSubtask(sub)"
+                        @created="loadTask"
                     />
                     <TaskDetailTab
                         v-else-if="activeTab === 'files' && task._id && projectData._id"
@@ -370,6 +375,7 @@ import TaskTrackerHandoff from "./TaskTrackerHandoff.vue";
 import { showUndoToast } from "@/composable/useUndoToast";
 import { useEscapeLayer } from "@/composable/useEscapeLayer";
 import TaskSubtaskList from "./TaskSubtaskList.vue";
+import TaskAncestorTrail from "./TaskAncestorTrail.vue";
 import TaskTimerChip from "./TaskTimerChip.vue";
 import TaskTimeSection from "./TaskTimeSection.vue";
 import TaskAgentStrip from "./TaskAgentStrip.vue";
@@ -385,6 +391,7 @@ import { statusChipStyle } from "@/utils/statusChipColors";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { useUpdateTasks } from "@/views/Projects/helper";
 import { openTask, setTaskMeta } from "./useTaskOverlay";
+import { ancestorsOf, canAddSubtask } from "@/views/Projects/composables/taskDepth";
 import { useRoute, useRouter } from "vue-router";
 
 defineOptions({ name: "TaskDetailPanel" });
@@ -420,6 +427,7 @@ const isMobile = computed(() => clientWidth.value <= 767);
 
 const task = ref({});
 const parentTask = ref(null);
+const ancestorChain = ref([]);
 const projectData = ref({});
 // projectSlice, not projectData: this ref holds the whole detail payload (subtasks,
 // sprints), and the helper forwards what it is given straight into the PATCH body.
@@ -481,7 +489,7 @@ const completeHint = computed(() => (isDone.value
 const quickActions = computed(() => {
     const global = projectData.value?.isGlobalPermission;
     const list = [];
-    if (task.value?.isParentTask !== false && checkPermission("task.sub_task_create", global) === true) {
+    if (canAddSubtask(task.value) && checkPermission("task.sub_task_create", global) === true) {
         list.push({ id: "subtask", icon: "plus", label: t("TaskPanel.action_subtask"), hint: "" });
     }
     list.push({ id: "relate", icon: "link", label: t("TaskPanel.action_relate"), hint: t("TaskPanel.action_relate_hint") });
@@ -493,6 +501,8 @@ const quickActions = computed(() => {
     }
     return list;
 });
+const atDepthLimit = computed(() => Boolean(task.value?._id) && !canAddSubtask(task.value)
+    && checkPermission("task.sub_task_create", projectData.value?.isGlobalPermission) === true);
 const statusName = computed(() => task.value?.status?.text || projectData.value?.taskStatusData?.find((s) => s.key === task.value?.statusKey)?.name || "");
 const statusStyle = computed(() => {
     const status = projectData.value?.taskStatusData?.find((s) => s.key === task.value?.statusKey);
@@ -525,7 +535,7 @@ const tabs = computed(() => {
     const list = [];
     if (isMobile.value && canComment.value) list.push({ id: "activity", label: t("TaskPanel.activity") });
     list.push({ id: "description", label: t("TaskPanel.description") });
-    if (task.value?.isParentTask !== false && checkPermission("task.sub_task_create", projectData.value?.isGlobalPermission) !== null) {
+    if (canAddSubtask(task.value) && checkPermission("task.sub_task_create", projectData.value?.isGlobalPermission) !== null) {
         const c = subtaskCompletion.value;
         list.push({ id: "subtasks", label: t("TaskPanel.subtasks"), count: c.total ? `${c.completed}/${c.total}` : "" });
     }
@@ -700,17 +710,6 @@ function open(val) {
                 router.push({ name: "ProjectFolder", params: { ...base, folderId: task.value.folderObjId }, query });
             }
             break;
-        case "parent":
-            if (parentTask.value) {
-                openTask({
-                    companyId: props.companyId,
-                    projectId: props.projectId,
-                    sprintId: parentTask.value.sprintId || props.sprintId,
-                    folderId: parentTask.value.folderObjId || "",
-                    taskId: parentTask.value._id
-                });
-            }
-            break;
         case "filesLinks":
             activeTab.value = "files";
             break;
@@ -720,6 +719,16 @@ function open(val) {
         default:
             break;
     }
+}
+
+function openAncestor(row) {
+    openTask({
+        companyId: props.companyId,
+        projectId: props.projectId,
+        sprintId: row.sprintId || props.sprintId,
+        folderId: row.folderObjId || "",
+        taskId: row._id
+    });
 }
 
 function openSubtask(sub) {
@@ -797,11 +806,26 @@ function fetchSubtaskCount() {
     }).catch((error) => console.error("ERROR in fetchSubtaskCount: ", error));
 }
 
-function getParentTask() {
-    if (!task.value?.ParentTaskId) { parentTask.value = null; return; }
-    apiRequest("get", `${env.TASK}/${task.value.ParentTaskId}`).then((response) => {
-        if (response?.status === 200 && response?.data) parentTask.value = response.data;
-    }).catch((error) => console.error("error in getting the parent task", error));
+function showAncestors(rows) {
+    ancestorChain.value = rows;
+    parentTask.value = rows.find((row) => String(row._id) === String(task.value.ParentTaskId)) || null;
+}
+
+function loadAncestors() {
+    const parentId = task.value?.ParentTaskId;
+    if (!parentId) { showAncestors([]); return; }
+    const chain = ancestorsOf(task.value);
+    /* A subtask from before the chain was stored names only its parent. */
+    if (!chain.length) {
+        apiRequest("get", `${env.TASK}/${parentId}`).then((response) => {
+            if (response?.status === 200 && response?.data) showAncestors([response.data]);
+        }).catch((error) => console.error("error in getting the parent task", error));
+        return;
+    }
+    apiRequest("post", `${env.TASK}/find`, { findQuery: [{ $match: { _id: { objId: { $in: chain } } } }] }).then((response) => {
+        const byId = new Map((Array.isArray(response?.data) ? response.data : []).map((row) => [String(row._id), row]));
+        showAncestors(chain.map((id) => byId.get(id)).filter(Boolean));
+    }).catch((error) => console.error("error in getting the tasks above", error));
 }
 
 function indexSprintsAndFolders(id, sprintsResult, foldersResult) {
@@ -838,7 +862,7 @@ function loadTask() {
         isSpinner.value = false;
         commit("projectData/setTaskDetailData", { isSubTaskData: true, data: subTasks.value });
         fetchSubtaskCount();
-        getParentTask();
+        loadAncestors();
         fetchRelations();
         refreshLogged();
         setTaskMeta(props.taskId, { taskKey: task.value.TaskKey, taskName: task.value.TaskName });

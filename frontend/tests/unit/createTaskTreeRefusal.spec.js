@@ -53,7 +53,7 @@ async function typeAndSave(wrapper, name) {
 }
 
 describe('creating a subtask the server refuses', () => {
-    beforeEach(() => create.mockReset());
+    beforeEach(() => { create.mockReset(); });
 
     it('says the reason the server gave for a parent on the third level and keeps the name', async () => {
         const reason = 'Subtasks nest three levels deep at most, and that parent is already on the third.';

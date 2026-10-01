@@ -85,3 +85,8 @@
     .duplicatetask__converttask--wrapper .allcheckbox__component-wrapper{max-height: 120px;}
     .converted__sidebar .sidebar-body {background-color: #fff !important;}
 }
+.convert__depth-note {
+    margin: 12px 0 0;
+    color: var(--ink-2);
+    font: 400 13px/1.5 var(--font-ui);
+}

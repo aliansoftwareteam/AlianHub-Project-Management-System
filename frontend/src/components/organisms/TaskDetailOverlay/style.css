@@ -55,6 +55,11 @@
 .ah-detail__crumb-link:hover { color: var(--brand); }
 .ah-detail__crumb-sep { color: var(--ink-2); }
 .ah-detail__crumb-skeleton { width: 180px; height: 14px; border-radius: 4px; }
+.ah-detail__trail { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.ah-detail__crumb-current { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.ah-detail__trail-row { display: flex; min-width: 0; font-size: 12px; color: var(--ink-2); }
+.ah-detail__trail-row .ah-detail__trail { flex-wrap: wrap; }
+.ah-detail__trail-row .ah-detail__crumb-link { max-width: 100%; }
 .ah-detail__key {
     font: 500 10.5px var(--font-mono); color: var(--ink-2); flex: none;
     border: 0; background: transparent; padding: 3px 5px; margin: 0 -5px; border-radius: 5px; cursor: copy;
@@ -193,6 +198,7 @@
 }
 .ah-detail__quick-btn:hover { background: var(--surface-hover); color: var(--ink); }
 .ah-detail__quick-btn:focus-visible { outline: none; box-shadow: var(--focus); }
+.ah-detail__depth-note { margin: 2px 0 0; color: var(--ink-2); }
 .ah-detail__panel .priority__component > [role="button"] { min-width: 24px; min-height: 24px; justify-content: center; }
 .ah-detail__relations .linked-tasks__row { padding: 7px 0; border-color: var(--hairline) !important; }
 .ah-detail__relations .linked-tasks__type-label {
@@ -240,6 +246,7 @@
 }
 .ah-subtasks__name:hover { color: var(--brand); }
 .ah-subtasks__row.is-done .ah-subtasks__name { text-decoration: line-through; color: var(--ink-2); }
+.ah-subtasks__count { font: 500 10.5px var(--font-mono); color: var(--ink-2); flex: none; }
 .ah-subtasks__hours { font: 500 10.5px var(--font-mono); color: var(--ink-2); width: 44px; text-align: right; flex: none; }
 .ah-subtasks__skeleton { height: 26px; border-radius: 6px; }
 .ah-subtasks__empty { padding: 12px; font-size: 12.5px; }

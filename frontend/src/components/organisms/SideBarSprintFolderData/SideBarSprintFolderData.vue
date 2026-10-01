@@ -51,6 +51,7 @@
                 @taskSelect="(e) => $emit('taskSelect',e)"
                 @expand="selectedSprintIndex = index"
                 :item="item"
+                :parentRule="props.parentRule"
             />
         </div>
         <div v-if="allData.isTaskExpanded && props.isMoveTask === false && props.isDuplicate === false && isConvertTask === false" class="sbf__tasks ah-scroll" @scroll="onScroll">
@@ -88,6 +89,7 @@ import TaskInSidebar from '@/components/organisms/TaskInSidebar/TaskInSidebar.vu
 
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { canBeParentOf, parentCandidateMatch } from '@/views/Projects/composables/taskDepth';
 
 const emit = defineEmits(["change", "clickSprint","dataToGrandParent","closeTaskSidebar"])
 
@@ -144,6 +146,11 @@ const props = defineProps({
     item: {
         type: Object,
         default: () => {}
+    },
+    /* { task, height } while one task is being placed under a parent; null in every other mode. */
+    parentRule: {
+        type: Object,
+        default: null
     }
 })
 
@@ -181,7 +188,7 @@ const getMongodbData = () => {
                 }
             }else{
                 if(props.isMergeTask === false){
-                    defaultFilterPrivate = {
+                    defaultFilterPrivate = (props.parentRule && parentCandidateMatch(props.parentRule.task, props.parentRule.height)) || {
                         isParentTask : true,
                     }
                 }else{
@@ -222,7 +229,9 @@ const getMongodbData = () => {
             apiRequest('post', `${env.TASK}/find`, { findQuery: query }).then((response) => {
                 const result = response.data[0];
                 if(result?.results.length > 0){
-                    let arrayData = result.results;
+                    let arrayData = props.parentRule
+                        ? result.results.filter((row) => canBeParentOf(row, props.parentRule.task, props.parentRule.height))
+                        : result.results;
                     items.value = items.value.concat(arrayData.filter(newItem => !items.value.some(existingItem => existingItem._id === newItem._id)));
                     items.value.map(async(x) =>{
                         if(!x.isParentTask) {

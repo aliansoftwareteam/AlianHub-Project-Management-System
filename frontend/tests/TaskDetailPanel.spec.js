@@ -416,6 +416,7 @@ describe('TaskDetailPanel', () => {
 
         it('offers Add subtask and the subtasks tab on a task and on a subtask', async () => {
             for (const task of [levelOne, levelTwo]) {
+                Object.assign(projectPayload, { sprintsObj: [], sprintsfolders: [] });
                 projectPayload.tasks[0] = task;
                 const wrapper = mountPanel();
                 await flushPromises();
