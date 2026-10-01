@@ -213,8 +213,8 @@ describe('the task match', () => {
         expect(matchOf({ filter: { status: [3], assignee: [U1], taskType: [4], dueDate: { to: '2026-10-31T00:00:00.000Z' } } }).$and).toEqual([
             { statusKey: { $in: [3] } },
             { AssigneeUserId: { $in: [U1] } },
-            { TaskTypeKey: { $in: [4] } },
             { DueDate: { $lte: new Date('2026-10-31T00:00:00.000Z') } },
+            { TaskTypeKey: { $in: [4] } },
         ]);
         expect(matchOf({ filter: { dueDate: { none: true }, assignee: ['unassigned'] } }).$and).toEqual([
             { $or: [{ AssigneeUserId: { $size: 0 } }, { AssigneeUserId: null }] },
@@ -251,10 +251,10 @@ describe('one page of rows', () => {
         const [stage] = q.pagePipeline(match, NEWEST, { segment: 'dated', after: { value: at.getTime(), id: TASK }, limit: 10 });
         expect(hexOf(stage.$match.$and)).toEqual(hexOf([
             { Task_Priority: { $in: ['HIGH'] } },
-            { $or: [{ updatedAt: { $lt: at } }, { updatedAt: at, _id: { $gt: TASK } }] },
+            { updatedAt: { $lte: at }, $or: [{ updatedAt: { $lt: at } }, { updatedAt: at, _id: { $gt: TASK } }] },
         ]));
         const [soonest] = q.pagePipeline(match, SOONEST, { segment: 'dated', after: { value: at.getTime(), id: TASK }, limit: 10 });
-        expect(hexOf(soonest.$match.$and[1])).toEqual(hexOf({ $or: [{ DueDate: { $gt: at } }, { DueDate: at, _id: { $gt: TASK } }] }));
+        expect(hexOf(soonest.$match.$and[1])).toEqual(hexOf({ DueDate: { $gte: at }, $or: [{ DueDate: { $gt: at } }, { DueDate: at, _id: { $gt: TASK } }] }));
         expect(soonest.$match.$and[1].$or[1]._id.$gt._bsontype).toBe('ObjectId');
     });
 

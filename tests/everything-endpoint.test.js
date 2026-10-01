@@ -168,7 +168,7 @@ describe('what a person sees', () => {
         task(seeded.open, 'in a closed sprint', { deletedStatusKey: 5 });
         for (const uid of [MEMBER, OWNER]) {
             const seen = await names(uid, { includeSubtasks: true, includeClosedProjects: true });
-            expect(seen).toEqual(expect.not.arrayContaining(['a chat', 'trashed', 'archived', 'in a closed sprint']));
+            ['a chat', 'trashed', 'archived', 'in a closed sprint'].forEach((hidden) => expect(seen).not.toContain(hidden));
             expect(seen).toContain('open');
         }
     });
