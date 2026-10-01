@@ -10,6 +10,9 @@ vi.mock('@/services', () => ({ apiRequest: vi.fn(() => Promise.resolve({ data: {
 vi.mock('@/store/index', () => ({ default: { commit: () => {}, dispatch: () => Promise.resolve(), getters: {}, state: {} } }));
 
 import { fieldAppliesToTask, shownFieldValues } from '@/views/Projects/composables/projectCustomFields';
+import {
+    customFieldGroups, customFilterCondition, customFilterOptions, customGroupMatches, customSortValue, tableSortStages, valuePath
+} from '@/views/Projects/composables/customFieldQuery';
 import { taskTypeOptions } from '@/plugins/customFieldView/taskTypeOptions';
 import CustomFieldCell from '@/views/Projects/components/columns/CustomFieldCell.vue';
 import CustomFieldRender from '@/plugins/customFieldView/component/molecules/customFieldTaskView/customFieldRender.vue';
@@ -89,6 +92,49 @@ describe('a Board card', () => {
     it('shows a scoped field only on a card of one of its task types', () => {
         expect(shownFieldValues(columns, card(BUG)).map((entry) => [entry.label, entry.text])).toEqual([['Severity', 'High'], ['Customer', 'Acme']]);
         expect(shownFieldValues(columns, card(1)).map((entry) => [entry.label, entry.text])).toEqual([['Customer', 'Acme']]);
+    });
+});
+
+describe('group, filter and sort by a scoped field', () => {
+    const TIER = 'a1'.repeat(12);
+    const SIGNED = 'b2'.repeat(12);
+    const EMPTY = [null, '', []];
+    const inType = { TaskTypeKey: { $in: [BUG] } };
+    const otherType = { TaskTypeKey: { $nin: [BUG] } };
+    const tier = { _id: TIER, fieldType: 'dropdown', fieldTitle: 'Tier', fieldTaskTypes: [BUG], fieldOptions: [{ id: 'o1', label: 'Gold' }] };
+    const signed = { _id: SIGNED, fieldType: 'checkbox', fieldTitle: 'Signed', fieldTaskTypes: [BUG] };
+    const valued = (TaskTypeKey) => ({ TaskTypeKey, customField: { [TIER]: { fieldValue: ['o1'] }, [SIGNED]: { fieldValue: true } } });
+    const bug = valued(BUG);
+    const retyped = valued(1);
+
+    it('groups a task of another type under "No value", though its old value is still stored', () => {
+        const [gold, none] = customFieldGroups(tier);
+        expect(gold.conditions).toEqual([{ [valuePath(TIER)]: 'o1', ...inType }]);
+        expect(none.conditions).toEqual([{ $nor: [{ [valuePath(TIER)]: { $nin: EMPTY }, ...inType }] }]);
+        expect([gold, none].map((group) => customGroupMatches(bug, group))).toEqual([true, false]);
+        expect([gold, none].map((group) => customGroupMatches(retyped, group))).toEqual([false, true]);
+
+        const [checked, unchecked] = customFieldGroups(signed);
+        expect(checked.conditions).toEqual([{ [valuePath(SIGNED)]: { $in: [true, 'true'] }, ...inType }]);
+        expect(unchecked.conditions).toEqual([{ $nor: [{ [valuePath(SIGNED)]: { $in: [true, 'true'] }, ...inType }] }]);
+        expect([checked, unchecked].map((group) => customGroupMatches(retyped, group))).toEqual([false, true]);
+    });
+
+    it('a value filter does not match a task of another type, while "is empty" and "is not" do', () => {
+        const row = (comparison, values) => ({ name: customFilterOptions([tier])[0], comparison: { value: comparison }, values });
+        const path = valuePath(TIER);
+        expect(customFilterCondition(row(':', ['o1']), [tier])).toEqual({ [path]: { $in: ['o1'] }, ...inType });
+        expect(customFilterCondition(row(':set', [true]), [tier])).toEqual({ [path]: { $nin: EMPTY }, ...inType });
+        expect(customFilterCondition(row(':empty', [true]), [tier])).toEqual({ $or: [{ [path]: { $in: EMPTY } }, otherType] });
+        expect(customFilterCondition(row(':!=', ['o1']), [tier])).toEqual({ $or: [{ [path]: { $nin: ['o1'] } }, otherType] });
+    });
+
+    it('sorts a task of another type as having no value', () => {
+        expect(customSortValue(tier, bug)).toBe(0);
+        expect(customSortValue(tier, retyped)).toBeNull();
+        const [stage] = tableSortStages(`${valuePath(TIER)}:1`, [tier]);
+        expect(stage.$addFields.cfSortValue.$cond[0]).toEqual({ $in: ['$TaskTypeKey', [BUG]] });
+        expect(stage.$addFields.cfSortValue.$cond[2]).toBeNull();
     });
 });
 
