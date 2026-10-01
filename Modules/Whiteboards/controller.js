@@ -1,7 +1,7 @@
 const logger = require('../../Config/loggerConfig');
 const { tenantOf, TenantError } = require('../../Config/tenant');
 const visibility = require('../Mcp/visibility');
-const { BoardRefused, MAX_ELEMENTS, parsePatch } = require('./boardRules');
+const { BoardRefused, MAX_ELEMENTS, MAX_NOTES, MAX_TEXT_LENGTH, isTask, parsePatch } = require('./boardRules');
 const store = require('./boardStore');
 const { boardAccess } = require('./boardAccess');
 
@@ -20,17 +20,20 @@ const presentCard = (element, task, vis) => {
         : { ...place, withheld: true };
 };
 
+/* A note or a text goes out as stored, to everyone who can read the board. */
 const present = async ({ companyId, projectId, sprintId, vis, canEdit }, board) => {
     const elements = (board && board.elements) || [];
     const tasks = await store.tasksOnBoard(companyId, projectId, sprintId, elements);
     return {
         boardId: board ? String(board._id) : null,
         revision: board ? board.revision : 0,
-        elements: elements.filter((element) => tasks.has(element.taskId)).map((element) => presentCard(element, tasks.get(element.taskId), vis)),
+        elements: elements
+            .filter((element) => !isTask(element) || tasks.has(element.taskId))
+            .map((element) => (isTask(element) ? presentCard(element, tasks.get(element.taskId), vis) : element)),
         savedBy: (board && board.updatedBy) || null,
         savedAt: (board && board.savedAt) || null,
         canEdit,
-        limits: { elements: MAX_ELEMENTS },
+        limits: { elements: MAX_ELEMENTS, notes: MAX_NOTES, text: MAX_TEXT_LENGTH },
     };
 };
 

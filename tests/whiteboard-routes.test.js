@@ -17,7 +17,7 @@ const { myCache } = require('../Config/config');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const socketEmitter = require('../event/socketEventEmitter');
 const { holdNarrowedToken } = require('../Config/narrowedTokenRoutes');
-const { MAX_ELEMENTS, MAX_PATCH_BYTES } = require('../Modules/Whiteboards/boardRules');
+const { MAX_ELEMENTS, MAX_NOTES, MAX_TEXT_LENGTH, MAX_PATCH_BYTES } = require('../Modules/Whiteboards/boardRules');
 
 const C = 'c00000000000000000000001';
 const OTHER_COMPANY = 'c00000000000000000000002';
@@ -111,7 +111,7 @@ describe('a board is read through its list', () => {
     it('is empty at revision 0 before anyone saved it, and says whether the reader may change it', async () => {
         const res = await read(MEMBER, [OPEN, LIST]);
         expect(res.statusCode).toBe(200);
-        expect(res.body.data).toEqual({ boardId: null, revision: 0, elements: [], savedBy: null, savedAt: null, canEdit: true, limits: { elements: MAX_ELEMENTS } });
+        expect(res.body.data).toEqual({ boardId: null, revision: 0, elements: [], savedBy: null, savedAt: null, canEdit: true, limits: { elements: MAX_ELEMENTS, notes: MAX_NOTES, text: MAX_TEXT_LENGTH } });
     });
 
     it('comes back with each card, the task it stands for and that task\'s name', async () => {

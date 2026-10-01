@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const socketEmitter = require('../../event/socketEventEmitter');
-const { MAX_SNAPSHOTS, applyPatch, reasonToKeep, snapshotOf } = require('./boardRules');
+const { MAX_SNAPSHOTS, isTask, applyPatch, reasonToKeep, snapshotOf } = require('./boardRules');
 
 const SOCKET_MODULE = 'whiteboards';
 const TASK_FIELDS = { ProjectID: 1, sprintId: 1, mainChat: 1, AssigneeUserId: 1, TaskName: 1, TaskKey: 1 };
@@ -70,7 +70,7 @@ const conflictWith = async (companyId, projectId, sprintId) => ({ conflict: true
 
 const sameScene = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
 
-/* `admits(task)` says whether the writer may open a task. A new card is left out, with no word of why, when its
+/* `admits(task)` says whether the writer may open a task. Notes and text need no task. A new card is left out, with no word of why, when its
  * task is not a live task of this list or is one the writer may not open: a client whose task list is a moment
  * behind then loses that one card and not the whole save, and the answer is the same for either reason. */
 const saveBoard = async ({ companyId, projectId, sprintId, uid, patch, admits = () => true, now = new Date() }) => {
@@ -81,7 +81,7 @@ const saveBoard = async ({ companyId, projectId, sprintId, uid, patch, admits = 
     const held = new Set(((current && current.elements) || []).map((element) => element.id));
     const next = applyPatch(current ? current.elements : [], patch);
     const tasks = await tasksOnBoard(companyId, projectId, sprintId, next);
-    const elements = next.filter((element) => tasks.has(element.taskId) && (held.has(element.id) || admits(tasks.get(element.taskId))));
+    const elements = next.filter((element) => !isTask(element) || (tasks.has(element.taskId) && (held.has(element.id) || admits(tasks.get(element.taskId)))));
     if (current ? sameScene(current.elements, elements) : !elements.length) return { saved: true, board: current };
 
     const board = current || await startBoard(companyId, projectId, sprintId, uid);
@@ -105,7 +105,7 @@ const restoreBoard = async ({ companyId, projectId, sprintId, uid, revision, now
     const wanted = history.find((entry) => entry.revision === revision);
     if (!board || !wanted) return { missing: true };
     const tasks = await tasksOnBoard(companyId, projectId, sprintId, wanted.elements);
-    const elements = (wanted.elements || []).filter((element) => tasks.has(element.taskId));
+    const elements = (wanted.elements || []).filter((element) => !isTask(element) || tasks.has(element.taskId));
     const reason = reasonToKeep({ board, uid, now, restoring: true });
     const written = await replaceScene({ companyId, projectId, sprintId, uid, board, elements, kept: reason ? snapshotOf(board, reason) : null, now });
     return written ? { saved: true, board: written } : conflictWith(companyId, projectId, sprintId);
