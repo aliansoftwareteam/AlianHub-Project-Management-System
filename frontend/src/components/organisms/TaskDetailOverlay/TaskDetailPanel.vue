@@ -92,7 +92,7 @@
         </header>
 
         <TaskAgentStrip v-if="stripRun" :run="stripRun" />
-        <TaskAgentClaim v-if="task._id" :task-id="String(task._id)" />
+        <TaskAgentClaim v-if="task._id" :task-id="String(task._id)" :round="claimRound" />
 
         <div class="ah-detail__body">
             <div class="ah-detail__main ah-scroll" ref="mainEl">
@@ -277,6 +277,7 @@
                     :isMainSpinner="isSpinner"
                     :clientWidth="clientWidth"
                     @agent-run="loadAgentRun"
+                    @agent-handed="claimRound += 1"
                 >
                     <template #status>
                         <button
@@ -370,7 +371,7 @@ import TaskDetailTab from "@/components/molecules/TaskDetailTab/TaskDetailTab.vu
 import TaskDetailRightSide from "@/components/organisms/TaskDetailRightSide/TaskDetailRightSide.vue";
 import LinkedTasks from "@/components/organisms/LinkedTasks/LinkedTasks.vue";
 import Comments from "@/views/Projects/Comments/Comments.vue";
-import { mentionsAnAgent } from "@/utils/agentMention";
+import { mentionsAnAgent, mentionsOwnAi } from "@/utils/agentMention";
 import ActivityLog from "@/components/templates/ActivityLog/ActivityLog.vue";
 import PagesPanel from "@/components/molecules/Pages/PagesPanel.vue";
 import TagChip from "@/components/atom/TagChip/TagChip.vue";
@@ -1047,12 +1048,16 @@ function onCommentInsert(data) {
     if (String(data?.fullDocument?.taskId || "") !== String(props.taskId)) return;
     summaryRef.value?.refresh?.();
     if (mentionsAnAgent(data.fullDocument.message)) loadAgentRun();
+    // The server files the hand-over just after it saves the comment, so the line is read a moment later.
+    if (mentionsOwnAi(data.fullDocument.message)) setTimeout(() => { claimRound.value += 1; }, HAND_OVER_SETTLE_MS);
 }
 
 /* The strip reads the open run on this task; a parent may still hand one in
  * (agentRun) and that wins, since it already knows more than the poll does. */
 const STRIP_STATUS = { running: "running", queued: "running", waiting_approval: "review" };
 const AGENT_RUN_POLL_MS = 15000;
+const HAND_OVER_SETTLE_MS = 1500;
+const claimRound = ref(0);
 const liveRun = ref(null);
 let agentRunPoll = null;
 const SESSION_STRIP_STATUS = { offered: "running", active: "running", completed: "done", failed: "failed", revoked: "failed", unresponsive: "failed" };

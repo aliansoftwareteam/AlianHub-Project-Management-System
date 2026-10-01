@@ -24,7 +24,8 @@ vi.mock('@/components/atom/UserProfile/UserProfile.vue', () => ({ default: { nam
 import Assignee from '@/components/molecules/Assignee/Assignee.vue';
 import CommentInput from '@/components/atom/CommentInput/CommentInput.vue';
 import TaskAgentClaim from '@/components/organisms/TaskDetailOverlay/TaskAgentClaim.vue';
-import { fetchOwnAi, handToOwnAi, pickAgent } from '@/views/Ai/useRunnableAgents';
+import { fetchOwnAi, fetchRunnableAgents, handToOwnAi, pickAgent } from '@/views/Ai/useRunnableAgents';
+import { AI_STATE, aiAvailability } from '@/composable/aiAvailability';
 import { mentionsOwnAi } from '@/utils/agentMention';
 import en from '@/locales/en';
 
@@ -50,6 +51,20 @@ describe('where the pickers learn of the person\'s own AI', () => {
         await expect(fetchOwnAi('t1')).resolves.toEqual([]);
         apiRequest.mockImplementationOnce(() => { throw new Error('network down'); });
         await expect(fetchOwnAi('t1')).resolves.toEqual([]);
+    });
+
+    it('with no model on the server, offers the connected AI alone and no in-product agent that would fail', async () => {
+        apiRequest.mockResolvedValue({ data: { status: true, data: [ENTRY] } });
+        aiAvailability.state = AI_STATE.UNCONFIGURED;
+        try {
+            await expect(fetchRunnableAgents('t1')).resolves.toEqual([]);
+            expect(apiRequest).not.toHaveBeenCalled();
+            await expect(fetchOwnAi('t1')).resolves.toEqual([OWN_AI]);
+        } finally {
+            aiAvailability.state = AI_STATE.UNKNOWN;
+        }
+        apiRequest.mockResolvedValue({ data: { status: true, data: [REVIEWER] } });
+        await expect(fetchRunnableAgents('t1')).resolves.toEqual([REVIEWER]);
     });
 
     it('hands the task over through the work queue, naming the person and nothing else', async () => {
