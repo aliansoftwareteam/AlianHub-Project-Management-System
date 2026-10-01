@@ -182,6 +182,11 @@ describe('the "Show for task types" choice', () => {
         expect(keys(taskTypeOptions({ companyTypes: [], templates: [], projects: [SANDBOX, DESIGN, null, {}] }))).toEqual([1, 3, BUG, 4]);
     });
 
+    it('offers only keys the server accepts for a field', () => {
+        const odd = { _id: 'p-odd', taskTypeCounts: [type(0, 'Zero'), type('7', 'Seven'), type('x', 'Named'), { name: 'Keyless' }, type(1.5, 'Half')] };
+        expect(keys(taskTypeOptions({ projects: [odd], projectIds: ['p-odd'] }))).toEqual([7]);
+    });
+
     it('offers a company-wide field the company catalogue when it has entries', () => {
         expect(keys(taskTypeOptions({ companyTypes: COMPANY_TYPES, projects: [SANDBOX, DESIGN] }))).toEqual([1, BUG]);
     });

@@ -6407,6 +6407,7 @@ export default {
     "CustomField": {
         "custom_field": "Custom Field",
         "create_custom_field": "Create Custom Field",
+        "edit_custom_field": "Edit Custom Field",
         "formula_expression": "Formula",
         "formula_expression_placeholder": "e.g. {Estimate} * 2 + {Buffer}",
         "referenceable_fields": "Available fields",

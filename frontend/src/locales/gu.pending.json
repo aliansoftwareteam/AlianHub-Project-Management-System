@@ -2893,6 +2893,7 @@
     "ContentSecurity.total": "{n} reports in the last {days} days",
     "CustomField.all_projects": "All Projects",
     "CustomField.country_code": "Country code",
+    "CustomField.edit_custom_field": "Edit Custom Field",
     "CustomField.field_is_required": "{field} is required",
     "CustomField.formula_expression": "Formula",
     "CustomField.formula_expression_placeholder": "e.g. {Estimate} * 2 + {Buffer}",

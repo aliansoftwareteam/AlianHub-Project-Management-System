@@ -6407,6 +6407,7 @@ export default {
     "CustomField": {
         "custom_field": "Champ personnalisé",
         "create_custom_field": "Créer un champ personnalisé",
+        "edit_custom_field": "Edit Custom Field",
         "formula_expression": "Formula",
         "formula_expression_placeholder": "e.g. {Estimate} * 2 + {Buffer}",
         "referenceable_fields": "Available fields",
