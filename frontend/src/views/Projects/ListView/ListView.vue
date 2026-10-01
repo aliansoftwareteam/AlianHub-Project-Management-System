@@ -78,12 +78,13 @@
                     </div>
 
                     <section v-for="sprint in groupedTasks" :key="sprint?.id" class="lv2__sprint" role="presentation" :id="`sprint_${sprint?.id}`">
-                        <div v-if="groupedTasks.length > 1 || !sprint.isExpanded" role="row" class="lv2__aria-row"><div role="cell" class="lv2__aria-row">
+                        <div v-if="groupedTasks.length > 1 || !sprint.isExpanded" role="row" class="lv2__aria-row"><div role="cell" class="lv2__sprint-bar">
                         <button type="button" class="lv2__sprint-head" :aria-expanded="!!sprint.isExpanded" @click="toggleSprints(sprint?.id)">
                             <span class="lv2__caret lv2__caret--sprint" aria-hidden="true">{{ sprint.isExpanded ? '▼' : '►' }}</span>
                             <span class="lv2__sprint-name">{{ sprint.name }}</span>
                             <span class="lv2__sprint-meta" :title="$t('List.sprint_total_hint')">{{ sprintCount(sprint) }}</span>
                         </button>
+                        <ListMenu v-if="project?._id && sprint?.id && !sprint.isFolder" :project="project" :sprint="sprint" :archived-view="Boolean(showArchived)" />
                         </div></div>
 
                         <template v-if="sprint.isExpanded">
@@ -158,6 +159,7 @@ import SprintListing from "@/components/organisms/SprinstList/SprintsList.vue"
 import Skelaton from "@/components/atom/Skelaton/Skelaton.vue"
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import ListGroup from './ListGroup.vue';
+import ListMenu from '@/components/molecules/ListMenu/ListMenu.vue';
 import ListBulkBar from './ListBulkBar.vue';
 import CreateTask from '@/components/atom/CreateTask/CreateTask.vue';
 import isEqual from 'lodash/isEqual';

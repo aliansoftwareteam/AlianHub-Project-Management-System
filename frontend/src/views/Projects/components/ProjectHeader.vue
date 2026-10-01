@@ -45,6 +45,7 @@
                 <router-link v-if="sprintTo" class="ph2__sprint" :to="sprintTo">{{ sprint.name }}</router-link>
                 <span v-else class="ph2__sprint">{{ sprint.name }}</span>
                 <FavouriteStar v-if="sprintId" type="sprint" :id="sprintId" :name="sprint.name" :projectId="project?._id" :folderId="sprint.folderId ? String(sprint.folderId) : undefined" />
+                <ListMenu v-if="sprintId && project?._id" :project="project" :sprint="sprint" :archived-view="Boolean(showArchived)" />
             </span>
 
             <span v-if="rangeLabel" class="ph2__range">{{ rangeLabel }}</span>
@@ -98,6 +99,7 @@ import { computed, defineProps, defineEmits, inject } from 'vue';
 import { useI18n } from 'vue-i18n';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import FavouriteStar from '@/components/atom/FavouriteStar/FavouriteStar.vue';
+import ListMenu from '@/components/molecules/ListMenu/ListMenu.vue';
 import { treeRoute } from '@/components/molecules/ProjectTree/projectTreeModel';
 import { projectTreeShown, toggleProjectTree } from './projectTreePanelState';
 
@@ -117,6 +119,7 @@ defineEmits(['ai-assist', 'add-task', 'select-project']);
 
 const companyId = inject('$companyId', null);
 const clientWidthRef = inject('$clientWidth', null);
+const showArchived = inject('showArchived', null);
 const clientWidth = computed(() => clientWidthRef?.value || 0);
 const treeShown = computed(() => projectTreeShown(clientWidth.value));
 

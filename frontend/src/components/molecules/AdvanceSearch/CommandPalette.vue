@@ -178,6 +178,7 @@ import { docRoute } from '@/components/molecules/Pages/docRoute';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { messageKey } from '@/views/Ai/askWhy';
 import { leaveAskHandoff } from './askHandoff';
+import { canApprove } from '@/views/Approvals/approvalAccess';
 import '@/components/molecules/AdvanceSearch/style.css';
 
 defineOptions({ name: 'CommandPalette' });
@@ -251,6 +252,7 @@ const NAV = computed(() => [
     { key: 'pages', label: t('Shell.docs'), icon: 'docs', route: 'Pages' },
     { key: 'dash', label: t('Shell.dash'), icon: 'dash', route: 'Dashboards' },
     { key: 'time', label: t('Shell.time'), icon: 'time', route: timesheetRoute() },
+    { key: 'approvals', label: t('Time.approvals'), icon: 'checkSquare', route: 'Approvals', sub: t('Shell.time'), show: canApprove(getters['settings/companyUserDetail']) },
     { key: 'ask', label: t('Palette.action_ask'), icon: 'ai', route: 'AiAsk' },
     { key: 'settings', label: t('settingslider.Settings'), icon: 'settings', route: 'Setting' },
     { key: 'members', label: t('settingslider.Members'), icon: 'members', route: 'Members', sub: t('settingslider.Settings') },

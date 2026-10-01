@@ -18,6 +18,7 @@
             <button type="button" :aria-label="$t('Time.next_week')" @click="shiftWeek(1)">›</button>
         </span>
         <span class="ah-chip" :class="statusChip.cls" :title="statusChip.title">{{ statusChip.label }}</span>
+        <ReopenWeek :approval="approval.current" :personName="(getUser(targetUser) || {}).Employee_Name || ''" :range="rangeLabel" @reopened="onReopened" />
         <TimesheetTabs active="mine" />
         <div class="tv-actions">
             <span v-if="timer.running.value" class="ah-chip ah-chip--ok ut2-timer">
@@ -102,6 +103,10 @@
             <span class="ah-dot" :class="previous.dot"></span>
             <span class="ut2-prev">{{ $t('Time.last_week') }} <strong>{{ previous.label }}</strong><span v-if="previous.detail">, {{ previous.detail }}</span><span v-if="previous.hours"> · {{ previous.hours }}</span></span>
         </div>
+        <div v-if="reopening" class="tv-card" data-test="reopen-note">
+            <span class="ah-dot ah-dot--warn"></span>
+            <span>{{ $t('Time.reopened_by', { name: reopening.byName || $t('Time.someone'), date: moment(reopening.at).format('MMM D, HH:mm') }) }}</span>
+        </div>
         <div v-if="underHint" class="tv-card">
             <ShellIcon name="info" :size="13" class="tv-spark" />
             <span class="ut2-hint">{{ underHint.text }}</span>
@@ -133,6 +138,8 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import AppState from '@/components/molecules/AppState/AppState.vue';
 import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
 import LogTimeSheet from '@/views/TimeLog/LogTimeSheet.vue';
+import ReopenWeek from './ReopenWeek.vue';
+import { lastReopenOf } from '@/views/Approvals/approvalAccess';
 import { isOwnerOrAdmin } from "@/utils/roles";
 
 defineOptions({ name: 'UserTimesheet' });
@@ -221,6 +228,11 @@ const statusChip = computed(() => {
     return { cls, label: title ? `${label} · ${doc.rejectionReason}` : label, title };
 });
 const isRejected = computed(() => statusOf(approval.value.current) === 'rejected');
+const reopening = computed(() => lastReopenOf(approval.value.current));
+const onReopened = (doc) => {
+    approval.value = { ...approval.value, current: doc };
+    flash(t('Time.reopened_ok'));
+};
 const canSubmit = computed(() => (isMe.value || isPrivileged.value) && ['draft', 'rejected'].includes(statusOf(approval.value.current)));
 const previous = computed(() => {
     const doc = approval.value.previous;

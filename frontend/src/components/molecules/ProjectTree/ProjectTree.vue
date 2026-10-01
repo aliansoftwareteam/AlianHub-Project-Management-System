@@ -59,12 +59,14 @@
                     @reveal="expanded[`folder:${$event}`] = true"
                     @rename="renamingKey = row.key"
                 />
-                <SprintRowMenu
+                <ListMenu
                     v-if="row.kind === 'sprint' && row.projectId === openProjectId && row.key !== renamingKey"
                     :ref="(el) => setMenuRef(row.key, el)"
+                    in-tree
                     :project="openProject"
                     :sprint="{ id: row.id, name: row.name, folderId: row.folderId || '' }"
                     :folders="openFolders"
+                    :sprints="openSprints"
                     @reveal="revealFolder"
                     @rename="renamingKey = row.key"
                 />
@@ -97,8 +99,8 @@ import { projectColor } from "@/components/molecules/Home/homeFormat";
 import { folderIdOf, isLiveFolder } from "@/utils/folderTree";
 import FolderRenameInput from "./FolderRenameInput.vue";
 import FolderRowMenu from "./FolderRowMenu.vue";
+import ListMenu from "@/components/molecules/ListMenu/ListMenu.vue";
 import SprintRenameInput from "./SprintRenameInput.vue";
-import SprintRowMenu from "./SprintRowMenu.vue";
 import { treeCache, loadProjectTree } from "./projectTreeData";
 import { folderRowKeys, identitiesOf, projectBranch, treeRoute, visibleRows } from "./projectTreeModel";
 

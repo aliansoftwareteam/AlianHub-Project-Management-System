@@ -3,6 +3,7 @@
         <div class="tv-head">
             <h1 class="tv-title">{{ $t('Time.approvals') }}</h1>
             <span v-if="count" class="ap__count">{{ count }}</span>
+            <TimesheetTabs active="approvals" />
             <nav class="tv-tabs ap__tabs" :aria-label="$t('Time.approval_types')">
                 <button v-for="f in filters" :key="f.key" type="button" class="tv-tab" :class="{ 'is-active': filter === f.key }" @click="filter = f.key">{{ $t(f.label) }}</button>
             </nav>
@@ -144,7 +145,8 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useGetterFunctions } from '@/composable';
 import { formatHm } from '@/composable/useTimer';
-import { isOwnerOrAdmin } from "@/utils/roles";
+import { canApprove } from './approvalAccess';
+import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
 import { fetchPendingProposals, sendProposalDecision } from '@/composable/agentProposals';
 import ProposalWhyDialog from './ProposalWhyDialog.vue';
 import { proposalTitle } from '@/views/Ai/plainLabels';
@@ -171,7 +173,7 @@ const currentUserId = inject('$userId');
 
 const cid = computed(() => (companyId && companyId.value) || '');
 const uid = computed(() => (currentUserId && currentUserId.value) || localStorage.getItem('userId') || '');
-const isManager = computed(() => isOwnerOrAdmin((getters['settings/companyUserDetail'] || {}).roleType));
+const isManager = computed(() => canApprove(getters['settings/companyUserDetail']));
 
 const filters = [
     { key: 'all', label: 'Time.filter_all' },
@@ -432,7 +434,7 @@ onMounted(() => { if (isManager.value) load(); });
 <style scoped>
 .ap { max-width: 720px; }
 .ap__count { background: var(--brand); color: var(--on-brand); font: 700 10px/1 var(--font-ui); padding: 4px 7px; border-radius: 9px; }
-.ap__tabs { margin-left: 4px; }
+.ap__tabs { margin-left: auto; }
 .ap__list { display: flex; flex-direction: column; gap: 10px; }
 .ap__card { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; border-radius: 14px; }
 .ap__card--agent { border-color: rgba(107, 92, 231, .35); }

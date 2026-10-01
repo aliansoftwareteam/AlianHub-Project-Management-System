@@ -777,6 +777,23 @@ const schema = {
         reviewedBy: { type: String, required: false },
         reviewerName: { type: String, required: false },
         rejectionReason: { type: String, required: false },
+        // One entry per reopening: who reopened the week and when, and the review that undid.
+        history: {
+            type: [{
+                _id: false,
+                action: { type: String, required: true },
+                from: { type: String, required: false },
+                to: { type: String, required: false },
+                by: { type: String, required: true },
+                byName: { type: String, required: false },
+                at: { type: Date, required: true },
+                reviewedBy: { type: String, required: false },
+                reviewerName: { type: String, required: false },
+                reviewedAt: { type: Date, required: false },
+            }],
+            default: undefined,
+            required: false,
+        },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     // Billing rates — per user / project / default hourly rate — managed by Modules/TimeSheet (TIME-07)
