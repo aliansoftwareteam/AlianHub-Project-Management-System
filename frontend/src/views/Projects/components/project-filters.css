@@ -63,7 +63,6 @@
 .pft__scope-head--ruled { border-bottom: 1px solid var(--hairline); }
 .pft__scope-name { margin-right: var(--sp-4); }
 
-/* bordered controls: group by, subtask, me and people, more, calendar */
 .pft .pft__ctl {
     box-sizing: border-box; height: var(--pft-h);
     border: 1px solid var(--hairline); border-radius: var(--r-input);
@@ -107,7 +106,6 @@
 .pft .pft__ai { border: 1px solid var(--brand-border); color: var(--brand); }
 .pft .pft__ai:hover { background: var(--brand-tint); color: var(--brand); }
 
-/* calendar controls */
 .pft .calendar-button {
     height: var(--pft-h); min-width: var(--pft-h); padding: 0 var(--sp-4);
     border: 1px solid var(--hairline); border-radius: var(--r-input);
