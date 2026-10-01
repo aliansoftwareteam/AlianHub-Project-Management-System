@@ -33,7 +33,7 @@ const socketEmitter = require('../event/socketEventEmitter');
 const { stepProjectCount } = require('../Modules/Project/helpers/projectQuota');
 const { recordProjectCreated } = require('../Modules/Project/helpers/projectHistory');
 const { INLINE_TASK_LIMIT } = require('../Modules/ProjectDuplicate/rules');
-const { MAX_TASKS, MAX_TEMPLATES } = require('../Modules/ProjectSnapshots/rules');
+const { MAX_TASKS, MAX_TEMPLATES, TASKS_PER_ROW } = require('../Modules/ProjectSnapshots/rules');
 
 const C = 'c00000000000000000000001';
 const OWNER = 'a00000000000000000000001';
@@ -461,11 +461,11 @@ describe('a project made from a template', () => {
     it('starts today when no start is sent, and has no dates when they are not wanted', async () => {
         seedTree(launch);
         const template = await saved({ include: { ...WITH_TASKS, dates: true } });
-        const before = Date.now();
+        const days = [Date.now(), 0].map((at) => at - (at % DAY));
         const today = madeFrom(await use(template._id));
-        const due = new Date(byName(today.tasks, 'Draw the set', 'TaskName').DueDate).getTime();
-        expect(due).toBeGreaterThanOrEqual(before + 36 * DAY);
-        expect(due).toBeLessThanOrEqual(Date.now() + 36 * DAY);
+        days[1] = Date.now() - (Date.now() % DAY);
+        expect(days.map((day) => iso(day + 36 * DAY))).toContain(iso(byName(today.tasks, 'Draw the set', 'TaskName').DueDate));
+        expect(days.map(iso)).toContain(iso(today.project.StartDate));
 
         const undated = madeFrom(await use(template._id, { name: 'Undated', include: { ...EVERYTHING, dates: false } }));
         expect(undated.project.DueDate).toBeFalsy();
@@ -636,7 +636,8 @@ describe('a large template', () => {
         const template = await saved({ include: WITH_TASKS });
         const parts = stored().filter((row) => row.kind === 'tasks');
         expect(parts.length).toBeGreaterThanOrEqual(4);
-        expect(Math.max(...parts.map((row) => row.tasks.length))).toBeLessThanOrEqual(100);
+        expect(Math.max(...parts.map((row) => row.tasks.length))).toBeLessThanOrEqual(TASKS_PER_ROW);
+        expect(parts.map((row) => row.part)).toEqual(parts.map((unused, at) => at));
         expect(template.counts.tasks).toBe(INLINE_TASK_LIMIT + 1);
     });
 
@@ -800,5 +801,151 @@ describe('telling the other clients', () => {
             expect(theirs).not.toHaveBeenCalled();
             expect(emitter.on.mock.calls.map(([event]) => event)).toEqual(['projectSnapshots:insert', 'projectSnapshots:update', 'projectSnapshots:delete']);
         });
+    });
+});
+
+describe('who a template is for', () => {
+    const seedRules = (grants) => {
+        const parent = db().seed(SCHEMA_TYPE.RULES, { key: 'project', isParent: true, roles: [{ key: MEMBER_ROLE, permission: true }] });
+        Object.entries(grants).forEach(([path, permission]) => {
+            db().seed(SCHEMA_TYPE.RULES, { key: path.split('.')[1], isParent: false, parentId: String(parent._id), roles: [{ key: MEMBER_ROLE, permission }] });
+        });
+    };
+    const names = async (uid) => (await list({ uid })).body.data.map((row) => row.name);
+    const secretProject = () => seedLaunch({ ProjectName: 'Secret', ProjectCode: 'SEC', isPrivateSpace: true, AssigneeUserId: [OWNER, MEMBER] });
+
+    it('is not made from a personal list', async () => {
+        const personal = seed(SCHEMA_TYPE.PROJECTS, { ProjectName: 'My list', ProjectCode: 'ME', isPersonal: true, personalOwner: OWNER, isPrivateSpace: true, AssigneeUserId: [OWNER], deletedStatusKey: 0 });
+        expect(refused(await save(String(personal._id)), 400)).toMatch(/personal list/i);
+        expect(stored()).toHaveLength(0);
+    });
+
+    it('needs the permission to create a project to save one, to list them and to use one', async () => {
+        const template = await saved({ everyone: true });
+        process.env.PERMISSION_ENFORCEMENT_MODE = 'enforce';
+        seedRules({ 'project.project_create': false });
+        for (const res of [await save(launch.id, { name: 'Mine' }, { uid: MEMBER }), await list({ uid: MEMBER }), await use(template._id, {}, { uid: MEMBER })]) {
+            expect(refused(res, 403)).toMatch(/permission/i);
+            expect(res.body.permission).toBe('project.project_create');
+        }
+        expect(stored()).toHaveLength(1);
+        expect(rowsOf(SCHEMA_TYPE.PROJECTS)).toHaveLength(1);
+    });
+
+    it('is saved and used by a member who holds that permission', async () => {
+        process.env.PERMISSION_ENFORCEMENT_MODE = 'enforce';
+        seedRules({ 'project.project_create': true });
+        const { template } = (await save(launch.id, {}, { uid: MEMBER })).body.data;
+        expect(template).toMatchObject({ createdBy: MEMBER, canManage: true });
+        expect(madeFrom(await use(template._id, {}, { uid: MEMBER })).project.projectCreatedBy).toBe(MEMBER);
+    });
+
+    it('is not made from a project the caller cannot open, a project in the trash or one that is not there', async () => {
+        const secret = seedLaunch({ ProjectName: 'Secret', ProjectCode: 'SEC', isPrivateSpace: true, AssigneeUserId: [OWNER] });
+        refused(await save(secret.id, {}, { uid: OUTSIDER }), 404);
+        refused(await save(oid()), 404);
+        refused(await save('not-an-id'), 404);
+        rowsOf(SCHEMA_TYPE.PROJECTS).find((row) => String(row._id) === launch.id).deletedStatusKey = 1;
+        refused(await save(launch.id), 404);
+        expect(stored()).toHaveLength(0);
+    });
+
+    it('from a private project is offered to the person who saved it, owners and admins', async () => {
+        const secret = secretProject();
+        const { template } = (await save(secret.id, { name: 'Secret plan' }, { uid: MEMBER })).body.data;
+        expect(template).toMatchObject({ everyone: false, sourcePrivate: true });
+        expect(await names(MEMBER)).toEqual(['Secret plan']);
+        expect(await names(OWNER)).toEqual(['Secret plan']);
+        expect(await names(ADMIN)).toEqual(['Secret plan']);
+        expect(await names(OUTSIDER)).toEqual([]);
+        refused(await use(template._id, {}, { uid: OUTSIDER }), 404);
+        refused(await run(EDIT, { uid: OUTSIDER, id: template._id, body: { name: 'Mine' } }), 404);
+        refused(await run(REMOVE, { uid: OUTSIDER, id: template._id }), 404);
+        expect(rowsOf(SCHEMA_TYPE.PROJECTS).filter((row) => row.ProjectName === 'Autumn launch')).toHaveLength(0);
+        expect(headOf(template)).toMatchObject({ name: 'Secret plan', deletedStatusKey: 0 });
+    });
+
+    it('from a private project is offered to everyone who can create projects once the person who saved it says so', async () => {
+        const secret = secretProject();
+        const { template } = (await save(secret.id, { name: 'Secret plan', everyone: true }, { uid: MEMBER })).body.data;
+        expect(await names(OUTSIDER)).toEqual(['Secret plan']);
+        const made = madeFrom(await use(template._id, {}, { uid: OUTSIDER }));
+        expect(made.project).toMatchObject({ isPrivateSpace: true, AssigneeUserId: [OUTSIDER] });
+        expect((await run(EDIT, { uid: MEMBER, id: template._id, body: { everyone: false } })).statusCode).toBe(200);
+        expect(await names(OUTSIDER)).toEqual([]);
+    });
+
+    it('from a public project is offered to everyone unless the person who saved it says otherwise', async () => {
+        expect(await saved({}, { uid: MEMBER })).toMatchObject({ everyone: true, sourcePrivate: false });
+        expect(await saved({ name: 'Kept close', everyone: false }, { uid: MEMBER })).toMatchObject({ everyone: false });
+        expect(await names(OUTSIDER)).toEqual(['Launch plan']);
+        expect(await names(MEMBER)).toEqual(['Kept close', 'Launch plan']);
+    });
+
+    it('that holds a private list of a public project starts out not offered to everyone', async () => {
+        expect(await saved()).toMatchObject({ everyone: false, sourcePrivate: true });
+        expect(await names(OUTSIDER)).toEqual([]);
+    });
+
+    it('keeps a private list only when the person saving is on it, whatever their role, and says what was left', async () => {
+        seedTree(launch);
+        for (const uid of [MEMBER, ADMIN]) {
+            const res = await save(launch.id, { name: `By ${uid}`, include: WITH_TASKS }, { uid });
+            const { template, notes } = res.body.data;
+            expect(headOf(template).snapshot.lists.map((row) => row.name).sort()).toEqual(['Backlog', 'Wireframes']);
+            expect(storedTasks(template).map((task) => task.TaskName)).toEqual(['Kickoff']);
+            expect(notes).toContainEqual({ code: 'private_lists_left', count: 1 });
+            expect(template).toMatchObject({ sourcePrivate: false, counts: { lists: 2, tasks: 1 } });
+        }
+        const mine = await saved({ name: 'By the owner', include: WITH_TASKS });
+        expect(headOf(mine).snapshot.lists.map((row) => row.name).sort()).toEqual(['Backlog', 'Glyphs', 'Wireframes']);
+        expect(storedTasks(mine)).toHaveLength(4);
+    });
+
+    it('gives a list that was private to the person who makes the project, and to nobody the template names', async () => {
+        const template = await saved({ everyone: true, include: { ...WITH_TASKS, assignees: true } });
+        expect(byName(headOf(template).snapshot.lists, 'Glyphs')).toMatchObject({ private: true, AssigneeUserId: [] });
+        const made = madeFrom(await use(template._id, {}, { uid: MEMBER }));
+        expect(byName(made.lists, 'Glyphs')).toMatchObject({ private: true, AssigneeUserId: [MEMBER] });
+        expect(byName(made.lists, 'Backlog').private).toBe(false);
+    });
+
+    it('is changed and deleted by the person who saved it, owners and admins, and by no other member', async () => {
+        const template = await saved({ everyone: true }, { uid: MEMBER });
+        const before = JSON.stringify(headOf(template));
+        expect((await list({ uid: OUTSIDER })).body.data[0]).toMatchObject({ canManage: false });
+        expect(refused(await run(EDIT, { uid: OUTSIDER, id: template._id, body: { name: 'Mine now' } }), 403)).toMatch(/permission/i);
+        expect(refused(await run(EDIT, { uid: OUTSIDER, id: template._id, body: { everyone: false } }), 403)).toMatch(/permission/i);
+        expect(refused(await run(REMOVE, { uid: OUTSIDER, id: template._id }), 403)).toMatch(/permission/i);
+        expect(JSON.stringify(headOf(template))).toBe(before);
+
+        expect((await run(EDIT, { uid: MEMBER, id: template._id, body: { name: 'By its maker' } })).statusCode).toBe(200);
+        expect((await run(EDIT, { uid: ADMIN, id: template._id, body: { description: 'By an admin' } })).statusCode).toBe(200);
+        expect(headOf(template)).toMatchObject({ name: 'By its maker', description: 'By an admin', updatedBy: ADMIN });
+        expect((await run(REMOVE, { uid: OWNER, id: template._id })).statusCode).toBe(200);
+        expect(await names(MEMBER)).toEqual([]);
+    });
+
+    it('holds automations only when saved by someone who manages them, and gives them only to someone who does', async () => {
+        seedRule(launch);
+        const byMember = (await save(launch.id, { name: 'By a member', include: { ...STRUCTURE_ONLY, automations: true } }, { uid: MEMBER })).body.data;
+        expect(byMember.notes).toContainEqual({ code: 'automations_skipped', count: 1 });
+        expect(byMember.template).toMatchObject({ include: { automations: false }, counts: { automations: 0 } });
+        expect(headOf(byMember.template).snapshot.rules).toEqual([]);
+
+        const byOwner = await saved({ everyone: true, include: { ...STRUCTURE_ONLY, automations: true } });
+        const res = await use(byOwner._id, {}, { uid: MEMBER });
+        expect(rowsOf(SCHEMA_TYPE.AUTOMATION_RULES)).toHaveLength(1);
+        expect(res.body.data.notes).toContainEqual({ code: 'automations_skipped', count: 1 });
+    });
+
+    it('stays in its own company', async () => {
+        const ELSEWHERE = 'c00000000000000000000002';
+        db(ELSEWHERE).seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
+        const template = await saved({ everyone: true });
+        expect((await list({ company: ELSEWHERE })).body.data).toEqual([]);
+        refused(await use(template._id, {}, { company: ELSEWHERE }), 404);
+        refused(await run(REMOVE, { company: ELSEWHERE, id: template._id }), 404);
+        expect(rowsOf(SCHEMA_TYPE.PROJECTS, ELSEWHERE)).toHaveLength(0);
     });
 });
