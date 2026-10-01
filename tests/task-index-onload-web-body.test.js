@@ -31,6 +31,7 @@ const ONLOAD = 'POST /api/v1/updateTaskIndexOnload';
 const PRIVATE_PROJECT = LOCKED_PROJECT;
 const PRIVATE_TASK = LOCKED_TASK;
 const FOREIGN_TASK = '6f0000000000000000000b0f';
+const THIRD_TASK = '6f0000000000000000000b0a';
 const STEP = 65536;
 
 const settle = async () => { for (let i = 0; i < 40; i += 1) await new Promise((resolve) => setImmediate(resolve)); };
@@ -149,6 +150,34 @@ describe('the body a task view sends when it opens is accepted and writes the mi
 
         expect(stored(OPEN_TASK).groupByStatusIndex).toBe(0);
         expect(stored(PARITY_TASK).groupByStatusIndex).toBe(5);
+    });
+
+    describe('under a due date group, a window of days the route is not told', () => {
+        const DUE = '2026-10-01T09:30:00.000Z';
+        const due = (id, extra = {}) => taskDoc(id, { DueDate: DUE, ...extra });
+        const dueTask = () => Object.assign(tasksOf().find((task) => task._id === OPEN_TASK), { DueDate: DUE });
+
+        test('a task goes after the last task of its project that has a due date position', async () => {
+            dueTask();
+            mockDbOf(CID).seed(SCHEMA_TYPE.TASKS, due(OPEN_TASK_2, { groupByDueDateIndex: 5 }));
+            mockDbOf(CID).seed(SCHEMA_TYPE.TASKS, due(THIRD_TASK, { DueDate: '2026-11-20T00:00:00.000Z', groupByDueDateIndex: 5 + STEP }));
+            mockDbOf(CID).seed(SCHEMA_TYPE.TASKS, due(PARITY_TASK, { ProjectID: PARITY_PROJECT, groupByDueDateIndex: 9 * STEP }));
+
+            const result = await call(sent(VIEW_GROUPS.dueDate));
+
+            expect(result).toMatchObject({ code: 200, body: { status: true } });
+            expect(stored(OPEN_TASK).groupByDueDateIndex).toBe(5 + 2 * STEP);
+        });
+
+        test('tasks repaired one after another get positions of their own', async () => {
+            dueTask();
+            mockDbOf(CID).seed(SCHEMA_TYPE.TASKS, due(OPEN_TASK_2));
+            mockDbOf(CID).seed(SCHEMA_TYPE.TASKS, taskDoc(THIRD_TASK, { DueDate: null }));
+
+            for (const id of [OPEN_TASK, OPEN_TASK_2, THIRD_TASK]) await call(sent(VIEW_GROUPS.dueDate, id));
+
+            expect([OPEN_TASK, OPEN_TASK_2, THIRD_TASK].map((id) => stored(id).groupByDueDateIndex)).toEqual([0, STEP, 2 * STEP]);
+        });
     });
 
     test('the views name the groups the route knows', () => {

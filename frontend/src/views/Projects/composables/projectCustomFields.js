@@ -2,7 +2,7 @@ import { computed, unref } from 'vue';
 import { useStore } from 'vuex';
 import moment from 'moment';
 import { useCustomComposable } from '@/composable';
-import { computeCustomFieldValue } from '@/plugins/customFieldView/formulaEngine.js';
+import { computeCustomFieldValue, withRollupSources } from '@/plugins/customFieldView/formulaEngine.js';
 import { fieldAppliesToTask, fieldTaskTypes } from '@fieldTaskTypes';
 import { MODULE_FIELD_TYPES, typeModuleOf } from '@fieldTypes';
 
@@ -168,7 +168,9 @@ export function useProjectCustomFields(projectRef, { archived } = {}) {
         && Boolean(getters['settings/selectedCompany']?.planFeature?.customFields)
         && permission.value !== null && permission.value !== undefined);
 
-    const defs = computed(() => (enabled.value ? projectFieldDefs(getters['settings/finalCustomFields'], project.value._id) : []));
+    const defs = computed(() => (enabled.value
+        ? withRollupSources(projectFieldDefs(getters['settings/finalCustomFields'], project.value._id), getters['settings/finalCustomFields'])
+        : []));
     const canEdit = computed(() => enabled.value && permission.value === true && !unref(archived));
     const hasComputed = computed(() => defs.value.some((def) => COMPUTED_TYPES.includes(def.fieldType)));
 

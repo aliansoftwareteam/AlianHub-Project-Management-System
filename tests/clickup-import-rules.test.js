@@ -9,6 +9,7 @@ const {
     parseEstimateMinutes,
     mapClickUpPriority,
 } = require('../Modules/Importers/helpers/clickupRules');
+const { levelRows } = require('../Modules/Tasks/helpers/taskTreeRules');
 
 const rows = readRows();
 const asIs = (name) => name;
@@ -82,11 +83,33 @@ describe('ClickUp rows become tasks', () => {
         expect(task('Ship the release notes').totalEstimatedTime).toBe(45);
     });
 
-    it('hangs subtasks off their parent, a subtask of a subtask off the top task, and an orphan stays a task', () => {
+    it('hangs each subtask off the parent the file names, so a subtask of a subtask keeps its own parent', () => {
         expect(task('Write the billing tests').ParentTaskId).toBe('86a1aaa01');
-        expect(task('Check the rounding').ParentTaskId).toBe('86a1aaa01');
-        expect(task('Follow up with legal').ParentTaskId).toBe('');
+        expect(task('Check the rounding').ParentTaskId).toBe('86a1aaa02');
         expect(task('Set up the billing page').ParentTaskId).toBe('');
+    });
+
+    it('arrives as three levels, and a parent that is not in the file is reported and leaves a task', () => {
+        const { levels, adjusted } = levelRows(transform().tasks);
+        expect(levels.map((level) => level.map((row) => row.TaskName))).toEqual([
+            ['Set up the billing page', 'Ship the release notes', 'Follow up with legal'],
+            ['Write the billing tests'],
+            ['Check the rounding'],
+        ]);
+        expect(adjusted).toEqual([{ _id: '86a1aaa06', TaskName: 'Follow up with legal', reason: 'PARENT_MISSING' }]);
+    });
+
+    it('re-hangs a subtask deeper than three levels on its level-two ancestor and reports it', () => {
+        const chain = ['Root', 'Child', 'Grandchild', 'Too deep', 'Deeper still']
+            .map((name, i) => ({ 'Task ID': `id-${i}`, 'Task Name': name, 'Parent ID': i ? `id-${i - 1}` : '', Status: 'to do' }));
+        const { tasks } = transformClickUpRows({ rows: [...chain].reverse(), statusFor: asIs, leaderId: 'leader-1' });
+        const { levels, parentIdOf, adjusted } = levelRows(tasks);
+        expect(levels.map((level) => level.map((row) => row.TaskName).sort())).toEqual([['Root'], ['Child'], ['Deeper still', 'Grandchild', 'Too deep']]);
+        expect(levels[2].map((row) => parentIdOf.get(row))).toEqual(['id-1', 'id-1', 'id-1']);
+        expect(adjusted.map(({ TaskName, reason }) => ({ TaskName, reason })).sort((a, b) => a.TaskName.localeCompare(b.TaskName))).toEqual([
+            { TaskName: 'Deeper still', reason: 'TOO_DEEP' },
+            { TaskName: 'Too deep', reason: 'TOO_DEEP' },
+        ]);
     });
 
     it('keeps the ClickUp status for the caller to map', () => {

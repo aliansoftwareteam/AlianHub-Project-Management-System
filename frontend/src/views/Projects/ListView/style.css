@@ -3,7 +3,8 @@
 .lv2 {
     --lv2-cols: 28px var(--lv2-title-track) minmax(56px, .45fr) 56px 64px 72px 48px 80px 88px;
     --lv2-grip-w: 12px;
-    --lv2-disclose-w: 10px;
+    /* Wide enough that its centre stays 12px from the status circle at the tightest spacing step. */
+    --lv2-disclose-w: 12px;
     /* The status circle's width. The circle is drawn in other views too, outside this scope, so its own rule keeps the number. */
     --lv2-status-w: 24px;
     --lv2-depth: 1;
