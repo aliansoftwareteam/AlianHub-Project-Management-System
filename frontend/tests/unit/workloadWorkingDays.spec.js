@@ -9,7 +9,7 @@ const { apiRequest, getters, stub } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/services', () => ({ apiRequest }));
-vi.mock('vuex', () => ({ useStore: () => ({ getters }) }));
+vi.mock('vuex', async (importOriginal) => ({ ...(await importOriginal()), useStore: () => ({ getters }) }));
 vi.mock('@/composable', () => ({
     useCustomComposable: () => ({ checkPermission: () => true, debouncerWithPromise: () => Promise.resolve() }),
     useGetterFunctions: () => ({ getUser: () => ({}) }),
@@ -94,12 +94,12 @@ describe('the company workload grid hides the days outside the working week', ()
     it('shows Monday to Friday for a company that never chose a week', async () => {
         company();
         answerWith(null);
-        expect(await openCompanyGrid()).toEqual(['M7', 'T8', 'W9', 'T10', 'F11', 'Time.total']);
+        expect(await openCompanyGrid()).toEqual(['M7', 'T8', 'W9', 'T10', 'F11', 'Time.col_total']);
     });
 
     it('shows Friday to Sunday for a Friday-to-Sunday company', async () => {
         company({ workingDays: FRI_TO_SUN });
         answerWith(FRI_TO_SUN);
-        expect(await openCompanyGrid()).toEqual(['F11', 'S12', 'S13', 'Time.total']);
+        expect(await openCompanyGrid()).toEqual(['F11', 'S12', 'S13', 'Time.col_total']);
     });
 });

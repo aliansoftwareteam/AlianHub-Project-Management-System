@@ -24,7 +24,7 @@ const greyedDays = async (company) => {
     getters['settings/companyUserDetail'] = { roleType: 1 };
     const wrapper = mount(EstimateHourTable, {
         props: { projectId: 'project-1', sprintId: 'sprint-1', taskId: 'task-1', dueDate: new Date(2030, 0, 1), createdAt: new Date(2026, 0, 1), AssigneeUserId: ['user-1'] },
-        global: { stubs: { VDatePicker: true } },
+        global: { stubs: { VDatePicker: { name: 'VDatePicker', props: ['attributes', 'modelValue', 'modelConfig', 'maxDate', 'popover'], render: () => null } } },
     });
     await flushPromises();
     const heads = wrapper.findAll('.estimate__daysdate-tr th');
