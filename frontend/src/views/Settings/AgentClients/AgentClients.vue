@@ -16,17 +16,7 @@
                         <span class="ah-small ah-mono">{{ hostsOf(row) }}</span>
                         <span class="ah-small">{{ $t('AgentClients.requested_by') }} <strong>{{ row.requestedByName || row.requestedBy }}</strong> · {{ formatWhen(row.requestedAt) }}</span>
                     </div>
-                    <fieldset class="ac__scopes">
-                        <legend class="ah-small">{{ $t('AgentClients.scopes_legend') }}</legend>
-                        <label v-for="scope in SCOPES" :key="scope" class="ac__scope">
-                            <input v-model="drafts[row.clientId].scopes" type="checkbox" :value="scope" :data-test="`scope-${scope}`" />
-                            <span>{{ $t(scopeNameKey(scope)) }}</span>
-                        </label>
-                    </fieldset>
-                    <label class="ac__scope">
-                        <input v-model="drafts[row.clientId].privateSprints" type="checkbox" data-test="private-sprints" />
-                        <span>{{ $t('AgentClients.private_label') }}</span>
-                    </label>
+                    <AgentClientScopes v-model:scopes="drafts[row.clientId].scopes" v-model:private-sprints="drafts[row.clientId].privateSprints" :asked="row.requestedScopes" />
                     <div class="ac__actions">
                         <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" data-test="deny" @click="deny(row)">{{ $t('AgentClients.deny') }}</button>
                         <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy || !drafts[row.clientId].scopes.length" data-test="approve" @click="approve(row)">{{ $t('AgentClients.approve') }}</button>
@@ -46,7 +36,15 @@
                         <span v-for="scope in row.scopes" :key="scope" class="ah-chip" data-test="ceiling">{{ $t(scopeNameKey(scope)) }}</span>
                     </div>
                     <span class="ah-small" data-test="private-flag">{{ row.privateSprints ? $t('AgentClients.private_on') : $t('AgentClients.private_off') }}</span>
-                    <div class="ac__actions">
+                    <template v-if="editing[row.clientId]">
+                        <AgentClientScopes v-model:scopes="editing[row.clientId].scopes" v-model:private-sprints="editing[row.clientId].privateSprints" :asked="row.requestedScopes" />
+                        <div class="ac__actions">
+                            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" data-test="cancel-change" @click="stopChanging(row)">{{ $t('AgentClients.cancel') }}</button>
+                            <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy || !editing[row.clientId].scopes.length" data-test="save-change" @click="saveChange(row)">{{ $t('AgentClients.save') }}</button>
+                        </div>
+                    </template>
+                    <div v-else class="ac__actions">
+                        <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" data-test="change" @click="startChanging(row)">{{ $t('AgentClients.change') }}</button>
                         <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" :disabled="busy" data-test="revoke" @click="revoke(row)">{{ $t('AgentClients.revoke') }}</button>
                     </div>
                 </article>
@@ -71,13 +69,14 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
-import { SCOPES, scopeNameKey, refusalOf, formatWhen } from "@/views/OAuth/oauthShared";
+import { SCOPES, PLAIN_SCOPES, scopeNameKey, refusalOf, formatWhen } from "@/views/OAuth/oauthShared";
+import AgentClientScopes from "./AgentClientScopes.vue";
 
 defineOptions({ name: "AgentClientsSettings" });
 
 const { t } = useI18n();
 
-const READ_SCOPES = SCOPES.filter((scope) => scope.endsWith(":read"));
+const READ_SCOPES = PLAIN_SCOPES.filter((scope) => scope.endsWith(":read"));
 
 const rows = ref([]);
 const loading = ref(true);
@@ -86,6 +85,7 @@ const off = ref(false);
 const busy = ref(false);
 const actionError = ref("");
 const drafts = reactive({});
+const editing = reactive({});
 
 const pending = computed(() => rows.value.filter((row) => row.status === "pending"));
 const approved = computed(() => rows.value.filter((row) => row.status === "approved"));
@@ -93,9 +93,10 @@ const past = computed(() => rows.value.filter((row) => row.status === "denied" |
 
 const hostsOf = (row) => [row.clientHost, ...(row.redirectHosts || [])].filter(Boolean).filter((host, i, all) => all.indexOf(host) === i).join(", ");
 
-// What was asked for starts checked; reading is offered too, since an agent that may write must first read.
+// What was asked for starts checked, except a manage permission, which an admin gives only by ticking it.
+// Reading is offered too, since an agent that may write must first read.
 const draftFor = (row) => ({
-    scopes: SCOPES.filter((scope) => (row.requestedScopes || []).includes(scope) || (!(row.requestedScopes || []).length && READ_SCOPES.includes(scope))),
+    scopes: PLAIN_SCOPES.filter((scope) => (row.requestedScopes || []).includes(scope) || (!(row.requestedScopes || []).length && READ_SCOPES.includes(scope))),
     privateSprints: false,
 });
 
@@ -126,9 +127,16 @@ const act = async (path, body) => {
     }
 };
 
-const approve = (row) => {
-    const draft = drafts[row.clientId];
-    return act("approve", { clientId: row.clientId, scopes: SCOPES.filter((scope) => draft.scopes.includes(scope)), privateSprints: Boolean(draft.privateSprints) });
+const approveWith = (row, draft) => act("approve", { clientId: row.clientId, scopes: SCOPES.filter((scope) => draft.scopes.includes(scope)), privateSprints: Boolean(draft.privateSprints) });
+
+const approve = (row) => approveWith(row, drafts[row.clientId]);
+
+const startChanging = (row) => { editing[row.clientId] = { scopes: [...row.scopes], privateSprints: Boolean(row.privateSprints) }; };
+const stopChanging = (row) => { delete editing[row.clientId]; };
+
+const saveChange = async (row) => {
+    await approveWith(row, editing[row.clientId]);
+    if (!actionError.value) stopChanging(row);
 };
 
 const deny = (row) => act("deny", { clientId: row.clientId });
@@ -147,8 +155,6 @@ onMounted(load);
 .ac__row { display: grid; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line, #e5e7eb); }
 .ac__row:first-of-type { border-top: 0; }
 .ac__who { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
-.ac__scopes { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; }
-.ac__scope { display: inline-flex; gap: 6px; align-items: center; }
 .ac__chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .ac__actions { display: flex; gap: 8px; justify-content: flex-end; }
 .ac__error { color: var(--danger, #b42318); }

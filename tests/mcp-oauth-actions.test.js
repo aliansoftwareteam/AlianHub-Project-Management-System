@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { approveInWorkspace } = require('./fixtures/oauthApproval');
+const { approveInWorkspace, ALL_SCOPES } = require('./fixtures/oauthApproval');
 const http = require('http');
 const https = require('https');
 
@@ -62,15 +62,16 @@ const PROJECT = '6f0000000000000000000b51';
 const REDIRECT = 'http://127.0.0.1:41415/callback';
 const CHAIN_KEY = 's10s4-audit-chain-key-0123456789abcdef';
 
-const ENV_KEYS = ['MCP_OAUTH', 'APIURL', 'JWT_SECRET', 'AUDIT_CHAIN', 'AUDIT_CHAIN_KEY', 'AGENT_TAINT_ROUTING'];
+const ENV_KEYS = ['MCP_OAUTH', 'APIURL', 'JWT_SECRET', 'AUDIT_CHAIN', 'AUDIT_CHAIN_KEY', 'AGENT_TAINT_ROUTING', 'MCP_TOOLS_MANAGE'];
 const saved = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
 afterAll(() => { ENV_KEYS.forEach((k) => { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }); });
 
 const challengeOf = (verifier) => crypto.createHash('sha256').update(verifier).digest('base64url');
 
-const mint = async (scopes) => {
+/* `approved` names the scopes of the workspace's approval; left out, the fixture's approval stands as it is. */
+const mint = async (scopes, approved) => {
     const { client } = await clients.register({ kind: 'dynamic', name: 'S10S4 Coder', redirectUris: [REDIRECT], tokenEndpointAuthMethod: 'none' });
-    approveInWorkspace(mockDb, C, client.clientId);
+    approveInWorkspace(mockDb, C, client.clientId, approved ? { scopes: approved } : {});
     const verifier = crypto.randomBytes(32).toString('base64url');
     const { code, grant } = await grants.issueCode({ client, companyId: C, userId: USER, scopes, redirectUri: REDIRECT, codeChallenge: challengeOf(verifier) });
     const issued = await grants.exchangeCode({ client, code, codeVerifier: verifier, redirectUri: REDIRECT, resource: RESOURCE });
@@ -110,6 +111,7 @@ beforeEach(() => {
     delete process.env.AUDIT_CHAIN;
     delete process.env.AUDIT_CHAIN_KEY;
     delete process.env.AGENT_TAINT_ROUTING;
+    delete process.env.MCP_TOOLS_MANAGE;
     mockDb.seed(dbCollections.USERS, { _id: USER, Employee_Name: 'Priya', AssignCompany: C });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: USER, roleType: 2, status: 2, isDelete: false });
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT, ProjectName: 'Shared', isPrivateSpace: false, deletedStatusKey: 0 });
@@ -300,5 +302,81 @@ describe('no token pass-through', () => {
         const written = flatten(mockDb.calls.map((c) => c.data || c.query || c));
         expect(written).not.toContain(raw);
         expect(written).not.toContain(secret);
+    });
+});
+
+describe('the manage tools for an OAuth client', () => {
+    const MANAGING = ['tasks:read', 'tasks:write', 'tasks:manage'];
+    const listed = async (raw) => (await post(raw, { jsonrpc: '2.0', id: 1, method: 'tools/list' })).body.result.tools;
+    const names = async (raw) => (await listed(raw)).map((tool) => tool.name);
+    const proposalRows = () => mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS] || [];
+    const approvalRow = (clientId) => mockDb.store[SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS].find((row) => row.clientId === clientId);
+
+    it('leaves a token minted under the fixture approval with the tools and scopes it had', async () => {
+        const { raw } = await mint(ALL_SCOPES);
+        const before = await listed(raw);
+        process.env.MCP_TOOLS_MANAGE = 'on';
+        expect(await listed(raw)).toEqual(before);
+        const ctx = await require('../Modules/Mcp/oauthAuth').authenticate({ headers: {} }, raw);
+        expect(ctx.oauth.scopes).toEqual(ALL_SCOPES);
+        const res = await post(raw, call('task.archive', { taskId: TASK }));
+        expect(res.statusCode).toBe(403);
+        expect(mockDb.store[SCHEMA_TYPE.TASKS][0].deletedStatusKey).toBe(0);
+    });
+
+    it('cannot be minted with a manage scope under an approval that does not name it', async () => {
+        await expect(mint(MANAGING)).rejects.toMatchObject({ error: 'invalid_grant' });
+    });
+
+    it('lists them once the grant and the approval both name the scope, and drops them on the next call when either stops', async () => {
+        process.env.MCP_TOOLS_MANAGE = 'on';
+        const { raw, client, grant } = await mint(MANAGING, [...ALL_SCOPES, 'tasks:manage']);
+        expect(await names(raw)).toEqual(expect.arrayContaining(['task.update', 'task.archive', 'tasks.batch']));
+        expect(await names(raw)).not.toEqual(expect.arrayContaining(['page.update']));
+
+        approvalRow(client.clientId).scopes = [...ALL_SCOPES];
+        expect(await names(raw)).not.toEqual(expect.arrayContaining(['task.archive']));
+        approvalRow(client.clientId).scopes = [...ALL_SCOPES, 'tasks:manage'];
+        expect(await names(raw)).toEqual(expect.arrayContaining(['task.archive']));
+
+        await grants.withdrawOwnManageScopes(USER, grant.grantId, ['tasks:manage']);
+        expect(await names(raw)).not.toEqual(expect.arrayContaining(['task.archive']));
+        expect((await post(raw, call('task.archive', { taskId: TASK }))).statusCode).toBe(403);
+
+        approvalRow(client.clientId).status = 'revoked';
+        expect((await post(raw, { jsonrpc: '2.0', id: 1, method: 'tools/list' })).statusCode).toBe(401);
+    });
+
+    it('files a routed write for a person under the grant, and approval asks the grant again', async () => {
+        process.env.MCP_TOOLS_MANAGE = 'on';
+        process.env.AGENT_TAINT_ROUTING = 'on';
+        const { raw, client, grant } = await mint(MANAGING, [...ALL_SCOPES, 'tasks:manage']);
+        const res = await post(raw, call('task.archive', { taskId: TASK, reason: 'no longer needed' }));
+        expect(res.statusCode).toBe(200);
+        expect(resultOf(res)).toMatchObject({ ok: false, pending: true });
+        expect(mockDb.store[SCHEMA_TYPE.TASKS][0].deletedStatusKey).toBe(0);
+        const [filed] = proposalRows();
+        expect(filed).toMatchObject({
+            status: 'pending', source: 'mcp', requestedBy: USER, tokenId: '', oauthClientId: client.clientId, oauthGrantId: grant.grantId,
+            changes: [expect.objectContaining({ action: 'task.archive', params: { taskId: TASK } })],
+        });
+
+        const approval = require('../Modules/Mcp/approval');
+        const decide = () => approval.refusalFor(C, filed, { decider: { userId: USER }, isPrivileged: true });
+        expect(await decide()).toBeNull();
+        await grants.withdrawOwnManageScopes(USER, grant.grantId, ['tasks:manage']);
+        expect(await decide()).toMatchObject({ status: 403, error: expect.stringMatching(/no longer holds the grant/) });
+        await grants.revokeOwnGrant(USER, grant.grantId);
+        expect(await decide()).toMatchObject({ status: 403, error: expect.stringMatching(/revoked/) });
+    });
+
+    it('refuses the same routed write to a client without the scope, as before, and files nothing', async () => {
+        process.env.MCP_TOOLS_MANAGE = 'on';
+        process.env.AGENT_TAINT_ROUTING = 'on';
+        const { raw } = await mint(['tasks:read', 'tasks:write']);
+        const res = await post(raw, call('task.create', { projectId: PROJECT, title: 'Filed from outside' }));
+        expect(resultOf(res)).toMatchObject({ refused: true, action: 'task.create' });
+        expect(proposalRows()).toHaveLength(0);
+        expect(automationTools.createTask).not.toHaveBeenCalled();
     });
 });

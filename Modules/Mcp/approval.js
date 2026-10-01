@@ -45,6 +45,26 @@ const liveToken = async (companyId, tokenId) => {
     return token && !isExpired(token) ? token : null;
 };
 
+const tokenFiler = async (companyId, p, changes) => {
+    const token = await liveToken(companyId, p.tokenId);
+    if (!token) return refused('The token that filed this proposal has been revoked, deleted or has expired.');
+    if (String(token.userId || '') !== String(p.requestedBy || '')) return refused('The token that filed this proposal belongs to someone else now.');
+    if (!hasScope(token, 'write')) return refused('The token that filed this proposal no longer has the write scope.');
+    const lacking = changes.map((c) => manageTools.grantOfAction(c.action)).filter(Boolean).some((grant) => !manageFlag.holdsGrant(token, grant));
+    if (lacking) return refused('The token that filed this proposal does not hold the grant this change needs.');
+    return { tokenLists: [p.tokenProjectIds, token.projectIds].filter((l) => Array.isArray(l) && l.length).map((l) => l.map(String)) };
+};
+
+/* An outside client filed it under a person's grant. The grant is asked what a call under it would be asked
+ * now, and every change must be one its manage grant still covers: an outside client files nothing else. */
+const grantFiler = async (companyId, p, changes) => {
+    const held = await require('./oauthAuth').standingOfGrant({ companyId, grantId: p.oauthGrantId, clientId: p.oauthClientId, userId: p.requestedBy });
+    if (!held) return refused('The connection that filed this proposal has been revoked, has expired, or its app is no longer approved in this workspace.');
+    const covered = changes.every((c) => { const grant = manageTools.grantOfAction(c.action); return Boolean(grant) && held.includes(grant); });
+    if (!covered) return refused('The connection that filed this proposal no longer holds the grant this change needs.');
+    return { tokenLists: [] };
+};
+
 /* null when a person may approve this MCP proposal as filed; otherwise { error, status }. */
 const refusalFor = async (companyId, p, { decider, isPrivileged, edited }) => {
     if (Array.isArray(edited) && edited.length) return refused('A proposal from an MCP call is approved or declined as filed; it cannot be edited.', 409);
@@ -52,13 +72,9 @@ const refusalFor = async (companyId, p, { decider, isPrivileged, edited }) => {
     const gated = changes.some((c) => { const a = registry.get(c.action); return a && a.gate === GATE_OWNER_ADMIN; });
     if ((gated || p.gate === GATE_OWNER_ADMIN) && !isPrivileged) return refused('This proposal needs an Owner or Admin.');
 
-    const token = await liveToken(companyId, p.tokenId);
-    if (!token) return refused('The token that filed this proposal has been revoked, deleted or has expired.');
-    if (String(token.userId || '') !== String(p.requestedBy || '')) return refused('The token that filed this proposal belongs to someone else now.');
-    if (!hasScope(token, 'write')) return refused('The token that filed this proposal no longer has the write scope.');
-    const lacking = changes.map((c) => manageTools.grantOfAction(c.action)).filter(Boolean).some((grant) => !manageFlag.holdsGrant(token, grant));
-    if (lacking) return refused('The token that filed this proposal does not hold the grant this change needs.');
-    const tokenLists = [p.tokenProjectIds, token.projectIds].filter((l) => Array.isArray(l) && l.length).map((l) => l.map(String));
+    const filer = p.oauthGrantId ? await grantFiler(companyId, p, changes) : await tokenFiler(companyId, p, changes);
+    if (filer.error) return filer;
+    const { tokenLists } = filer;
 
     for (const c of changes) {
         const target = targetOf(c.params);

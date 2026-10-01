@@ -44,7 +44,7 @@ const PAT = `ahp_${'b'.repeat(48)}`;
 const BETA_401_BODY = { jsonrpc: '2.0', id: null, error: { code: -32001, message: 'A valid bearer token and companyId are required.' } };
 const HOUR = 60 * 60 * 1000;
 
-const ENV_KEYS = ['MCP_OAUTH', 'MCP_OAUTH_ISSUER', 'APIURL', 'JWT_SECRET', 'MCP_OAUTH_TOKEN_SECRET', 'API_TOKEN_STRICT'];
+const ENV_KEYS = ['MCP_OAUTH', 'MCP_OAUTH_ISSUER', 'APIURL', 'JWT_SECRET', 'MCP_OAUTH_TOKEN_SECRET', 'API_TOKEN_STRICT', 'MCP_TOOLS_MANAGE'];
 const saved = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
 afterAll(() => { ENV_KEYS.forEach((k) => { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }); });
 
@@ -94,6 +94,7 @@ beforeEach(() => {
     delete process.env.MCP_OAUTH_ISSUER;
     delete process.env.MCP_OAUTH_TOKEN_SECRET;
     delete process.env.API_TOKEN_STRICT;
+    delete process.env.MCP_TOOLS_MANAGE;
     process.env.MCP_OAUTH = 'both';
     mockDb.seed(dbCollections.USERS, { _id: USER, Employee_Name: 'Priya', AssignCompany: C });
     apiTokens.verifyToken.mockResolvedValue({ _id: '6f0000000000000000000141', name: 'Laptop', userId: USER, scopes: ['read', 'write'], active: true });
@@ -268,6 +269,65 @@ describe('scopes come from the token', () => {
         const res = await post(request({ token: raw, body: call('task.comment', { taskId: 'x', body: 'y' }) }));
         expect(res.statusCode).toBe(200);
         expect(tools.call).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('the manage scopes on /mcp', () => {
+    const PLAIN = ['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write'];
+    const hold = (grant, scopes) => {
+        store(SCHEMA_TYPE.OAUTH_GRANTS).find((row) => row.grantId === grant.grantId).scopes = [...scopes];
+        store(SCHEMA_TYPE.OAUTH_TOKENS).filter((row) => row.grantId === grant.grantId).forEach((row) => { row.scopes = [...scopes]; });
+    };
+
+    it('answers a manage tool with 403 insufficient_scope naming the scope, for a token that holds every other scope', async () => {
+        process.env.MCP_TOOLS_MANAGE = 'on';
+        const { raw } = await mint({ scopes: PLAIN });
+        const res = await post(request({ token: raw, body: call('task.archive', { taskId: 'x' }, 4) }));
+        expect(res.statusCode).toBe(403);
+        expect(res.body).toMatchObject({ id: 4, error: { code: -32004, data: { error: 'insufficient_scope', requiredScopes: ['tasks:manage'] } } });
+        expect(tools.call).not.toHaveBeenCalled();
+    });
+
+    it('does not let a scope the token row names through when the workspace approval does not name it', async () => {
+        process.env.MCP_TOOLS_MANAGE = 'on';
+        const { raw, grant } = await mint({ scopes: ['tasks:read', 'tasks:write'] });
+        hold(grant, ['tasks:read', 'tasks:write', 'tasks:manage', 'docs:manage']);
+        const res = await post(request({ token: raw, body: call('task.archive', { taskId: 'x' }) }));
+        expect(res.statusCode).toBe(403);
+        expect(tools.call).not.toHaveBeenCalled();
+        await post(request({ token: raw, body: call('tasks.search') }));
+        expect(tools.call.mock.calls[0][0].token).toEqual({ oauth: true, scopes: ['tasks:read', 'tasks:write'] });
+    });
+
+    it('lets the call through once the token and the approval both name it, and stops it on the next call when either no longer does', async () => {
+        process.env.MCP_TOOLS_MANAGE = 'on';
+        const { raw, grant } = await mint({ scopes: ['tasks:read', 'tasks:write'] });
+        hold(grant, ['tasks:read', 'tasks:write', 'tasks:manage']);
+        approvals.approvedScopes.mockResolvedValue([...PLAIN, 'tasks:manage']);
+        const archive = () => post(request({ token: raw, body: call('task.archive', { taskId: 'x' }) }));
+        expect((await archive()).statusCode).toBe(200);
+        expect(tools.call.mock.calls[0][0].token.scopes).toEqual(['tasks:read', 'tasks:write', 'tasks:manage']);
+
+        approvals.approvedScopes.mockResolvedValue([...PLAIN]);
+        expect((await archive()).statusCode).toBe(403);
+        approvals.approvedScopes.mockResolvedValue([...PLAIN, 'tasks:manage']);
+        expect((await archive()).statusCode).toBe(200);
+
+        await grants.withdrawOwnManageScopes(USER, grant.grantId, ['tasks:manage']);
+        expect((await archive()).statusCode).toBe(403);
+        expect((await post(request({ token: raw, body: call('tasks.search') }))).statusCode).toBe(200);
+
+        hold(grant, ['tasks:read', 'tasks:write', 'tasks:manage']);
+        expect((await archive()).statusCode).toBe(200);
+        await grants.revokeGrant(grant.grantId, 'revoked_by_user');
+        tools.call.mockClear();
+        expectInvalidToken(await archive());
+    });
+
+    it('asks for no manage scope while the tools are off: the tool does not exist', async () => {
+        const { raw } = await mint({ scopes: PLAIN });
+        const res = await post(request({ token: raw, body: call('task.archive', { taskId: 'x' }) }));
+        expect(res.statusCode).toBe(200);
     });
 });
 

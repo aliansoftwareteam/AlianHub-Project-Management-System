@@ -51,8 +51,8 @@ const clientApprovedInWorkspace = async (companyId, clientId) => {
 };
 
 /* The scopes the workspace still allows the client, read on every request so a narrowed approval narrows tokens
- * already issued. Every scope while the approval module is not installed; null (refuse) for anything else short
- * of a list. */
+ * already issued. Every scope but the manage ones while the approval module is not installed, since those take
+ * an approval that names them; null (refuse) for anything else short of a list. */
 const approvalCeiling = async (companyId, clientId) => {
     let approvals;
     try {
@@ -60,7 +60,7 @@ const approvalCeiling = async (companyId, clientId) => {
     } catch (error) {
         return refuseApproval(clientId, `the approval module failed to load (${error.message})`) || null;
     }
-    if (!approvals) return mcpOAuth.SCOPES;
+    if (!approvals) return mcpOAuth.SCOPES.filter((scope) => !mcpOAuth.MANAGE_SCOPES.includes(scope));
     if (typeof approvals.approvedScopes !== 'function') return refuseApproval(clientId, 'the approval module has no approvedScopes') || null;
     try {
         const ceiling = await approvals.approvedScopes(companyId, clientId);
@@ -68,6 +68,22 @@ const approvalCeiling = async (companyId, clientId) => {
     } catch (error) {
         return refuseApproval(clientId, `approvedScopes failed (${error.message})`) || null;
     }
+};
+
+/* What approving a proposal asks of the grant that filed it: everything a call under that grant would need
+ * now. Answers the scopes it still holds in the workspace, or null when it could no longer make a call at all. */
+const standingOfGrant = async ({ companyId, grantId, clientId, userId, now = new Date() }) => {
+    if (!mcpOAuth.isOn()) return null;
+    const grant = await store.grants.find(String(grantId || ''));
+    if (!grant || grant.revokedAt || new Date(grant.expiresAt).getTime() <= now.getTime()) return null;
+    const sameFiler = String(grant.companyId) === String(companyId) && String(grant.clientId) === String(clientId) && String(grant.userId) === String(userId);
+    if (!sameFiler || grant.resource !== mcpOAuth.resource()) return null;
+    if (!(await clientStanding(grant.clientId)).ok) return null;
+    if (!(await clientApprovedInWorkspace(grant.companyId, grant.clientId))) return null;
+    const ceiling = await approvalCeiling(grant.companyId, grant.clientId);
+    if (!ceiling) return null;
+    if (!(await verifyCompanyMembership(String(grant.userId), String(grant.companyId)))) return null;
+    return mcpOAuth.SCOPES.filter((scope) => (grant.scopes || []).includes(scope) && ceiling.includes(scope));
 };
 
 const taintOf = (clientId, at = new Date()) => ({ tainted: true, taintSources: [{ kind: taint.KINDS.CLIENT, ref: String(clientId).slice(0, 200), at }] });
@@ -104,4 +120,4 @@ const authenticate = async (req, raw, { namedCompanies = [], now = new Date() } 
     };
 };
 
-module.exports = { isAccessToken, looksLikeOAuthSecret, authenticate, clientStanding, clientApprovedInWorkspace };
+module.exports = { isAccessToken, looksLikeOAuthSecret, authenticate, clientStanding, clientApprovedInWorkspace, standingOfGrant };

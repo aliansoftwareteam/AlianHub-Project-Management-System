@@ -34,7 +34,7 @@ exports.metadata = (req, res) => {
         code_challenge_methods_supported: ['S256'],
         token_endpoint_auth_methods_supported: clients.AUTH_METHODS,
         revocation_endpoint_auth_methods_supported: clients.AUTH_METHODS,
-        scopes_supported: config.SCOPES,
+        scopes_supported: config.offeredScopes(),
         client_id_metadata_document_supported: true,
         authorization_response_iss_parameter_supported: true,
     });
@@ -86,7 +86,9 @@ exports.authorize = async (req, res) => {
         if (q.code_challenge_method !== 'S256') return refuse('invalid_request', 'PKCE with code_challenge_method S256 is required');
         if (typeof q.code_challenge !== 'string' || !CHALLENGE_PATTERN.test(q.code_challenge)) return refuse('invalid_request', 'code_challenge must be a base64url SHA-256 digest');
         if (!config.canonicalResource(q.resource)) return refuse('invalid_target', `resource must be ${config.resource()}`);
-        const scopes = q.scope === undefined ? defaultScopes(client) : parseScopes(q.scope);
+        const asked = q.scope === undefined ? defaultScopes(client) : parseScopes(q.scope);
+        // A manage scope asked for where it cannot be given is left out, not refused: a client that asks for every scope the server lists still connects.
+        const scopes = asked && asked.filter((scope) => config.mayAskFor(client, scope));
         if (!scopes || !scopes.length) return refuse('invalid_scope', `scope must be drawn from: ${config.SCOPES.join(' ')}`);
         if (client.scopes && client.scopes.length && !scopes.every((scope) => client.scopes.includes(scope))) return refuse('invalid_scope', 'this client may not ask for that scope');
 

@@ -51,7 +51,7 @@ mongoHelper.getTotalSprintCount = async () => true;
 
 const {
     CID, OWNER, ADMIN, MEMBER, OTHER, OUTSIDER, P_OPEN, P_PRIVATE, P_DEST, PL_OTHER, S_OPEN, S_NEXT, S_SECRET, TASKS_GRANT, DOCS_GRANT,
-    BEFORE, settle, ctx, withGrants, olderToken, readOnly, oauth,
+    BEFORE, settle, ctx, withGrants, olderToken, readOnly, oauth, outside, PLAIN_SCOPES, CLIENT, GRANT_ID,
 } = world;
 const { rules, seed, stored, rows, audits, snapshot, rpcThrough, listedThrough } = world.create(mockDb);
 const rpc = rpcThrough(server);
@@ -80,7 +80,7 @@ beforeEach(() => {
     fx.pagePersonal = mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Mine alone', ProjectID: PL_OTHER, visibility: 'project', createdBy: OTHER, content: { html: '<p>x</p>' }, deletedStatusKey: 0 });
 });
 afterEach(settle);
-afterAll(() => { delete process.env.MCP_TOOLS_MANAGE; delete process.env.MCP_TOOLS_V2; });
+afterAll(() => { delete process.env.MCP_TOOLS_MANAGE; delete process.env.MCP_TOOLS_V2; delete process.env.AGENT_TAINT_ROUTING; });
 
 describe('which tools a token lists', () => {
     it('a token created to manage tasks lists the task tools and not the doc tools', async () => {
@@ -97,7 +97,7 @@ describe('which tools a token lists', () => {
         expect(asDocs.filter((tool) => BEFORE.includes(tool.name))).toEqual(plain);
     });
 
-    it.each([['a token created before the grants', olderToken], ['a read-only token', readOnly], ['an OAuth token', oauth]])('%s lists what it listed before', async (_who, as) => {
+    it.each([['a token created before the grants', olderToken], ['a read-only token', readOnly], ['an OAuth token without the scopes', oauth]])('%s lists what it listed before', async (_who, as) => {
         expect((await listed(as(OWNER))).filter((name) => [...TASK_TOOLS, ...DOC_TOOLS].includes(name))).toEqual([]);
         const off = { ...process.env };
         process.env.MCP_TOOLS_MANAGE = 'off';
@@ -175,7 +175,7 @@ describe('every new tool keeps to what the person behind the token can open', ()
         }
     });
 
-    it.each([['a token without the grant', olderToken], ['a docs-only token', docsOnly], ['a read-only token', readOnly], ['an OAuth token', oauth]])('%s runs none of the task tools', async (_who, as) => {
+    it.each([['a token without the grant', olderToken], ['a docs-only token', docsOnly], ['a read-only token', readOnly], ['an OAuth token without the scope', oauth]])('%s runs none of the task tools', async (_who, as) => {
         const before = snapshot();
         for (const name of TASK_TOOLS) {
             expect(await rpc(as(OWNER), name, { taskId: fx.top._id })).toMatchObject({ isError: true, error: expect.stringMatching(/grant|read-only/) });
@@ -552,6 +552,52 @@ describe('page.create and page.update for a token created to write docs', () => 
         for (const as of [olderToken, readOnly, oauth]) {
             expect(await rpc(as(OWNER), 'page.update', { pageId: fx.pageOpen._id, title: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/grant|read-only/) });
         }
+        expect(snapshot()).toBe(before);
+    });
+});
+
+describe('an outside client whose grant holds a manage scope', () => {
+    const forTasks = (uid) => outside(uid, [...PLAIN_SCOPES, TASKS_GRANT]);
+    const forDocs = (uid) => outside(uid, [...PLAIN_SCOPES, DOCS_GRANT]);
+
+    afterEach(() => { delete process.env.AGENT_TAINT_ROUTING; });
+
+    it('lists the tools of the scope it holds and of no other', async () => {
+        const names = await listed(forTasks(OWNER));
+        expect(names).toEqual(expect.arrayContaining([...BEFORE, ...TASK_TOOLS]));
+        expect(names.filter((name) => DOC_TOOLS.includes(name))).toEqual([]);
+        expect(await listed(forDocs(OWNER))).toEqual([...BEFORE, ...DOC_TOOLS]);
+        expect(await listed(outside(OWNER, PLAIN_SCOPES))).toEqual(BEFORE);
+    });
+
+    it('closes a task for the person with the scope, and is refused the close without it', async () => {
+        expect(await rpc(forTasks(MEMBER), 'task.status.set', { taskId: fx.top._id, status: 'Done' })).toMatchObject({ ok: true, result: { statusType: 'close' } });
+        expect(stored(fx.top._id)).toMatchObject({ statusType: 'close', completion: { closedBy: expect.objectContaining({ actorId: MEMBER, viaAgent: true }) } });
+        const before = snapshot();
+        expect(await rpc(outside(MEMBER, PLAIN_SCOPES), 'task.status.set', { taskId: fx.bug._id, status: 'Done' })).toMatchObject({ isError: true });
+        expect(snapshot()).toBe(before);
+    });
+
+    it('writes a doc with the docs scope and changes no task with it, and the other way round', async () => {
+        expect(await rpc(forDocs(OWNER), 'page.update', { pageId: fx.pageOpen._id, title: 'Runbook, revised', text: 'New body' })).toMatchObject({ ok: true });
+        expect(page(fx.pageOpen._id).title).toBe('Runbook, revised');
+        const before = snapshot();
+        expect(await rpc(forDocs(OWNER), 'task.update', { taskId: fx.top._id, title: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage grant/) });
+        expect(await rpc(forTasks(OWNER), 'page.update', { pageId: fx.pageOpen._id, title: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/docs:manage grant/) });
+        expect(await rpc(forDocs(MEMBER), 'page.update', { pageId: fx.pagePrivate._id, title: 'x' })).toMatchObject({ isError: true });
+        expect(snapshot()).toBe(before);
+    });
+
+    it('files a doc change and a new task for a person while outside calls are routed, each under its own scope', async () => {
+        process.env.AGENT_TAINT_ROUTING = 'on';
+        const before = snapshot();
+        expect(await rpc(forDocs(OWNER), 'page.update', { pageId: fx.pageOpen._id, title: 'Held' })).toMatchObject({ ok: false, pending: true });
+        expect(await rpc(forTasks(OWNER), 'task.create', { projectId: P_OPEN, title: 'Held too' })).toMatchObject({ ok: false, pending: true });
+        expect(proposals.create.mock.calls.map(([, filed]) => [filed.changes[0].action, filed.oauthClientId, filed.oauthGrantId, filed.tokenId])).toEqual([
+            ['page.update', CLIENT, GRANT_ID, ''], ['task.add', CLIENT, GRANT_ID, ''],
+        ]);
+        expect(await rpc(forDocs(OWNER), 'task.create', { projectId: P_OPEN, title: 'No scope for this' })).toMatchObject({ isError: true, refused: true });
+        expect(proposals.create).toHaveBeenCalledTimes(2);
         expect(snapshot()).toBe(before);
     });
 });

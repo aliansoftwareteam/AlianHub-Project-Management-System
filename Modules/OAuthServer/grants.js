@@ -242,23 +242,28 @@ async function revokeClientGrants(clientId, now = new Date(), { companyId = null
     await store.tokens.revokeClient(clientId, now, companyId);
 }
 
-/* A narrowed approval takes its client's grants in that workspace with it: each keeps only the scopes the new
- * ceiling allows, and one left with none is revoked. */
+/* A grant keeps only the scopes still allowed, and so does every token issued under it; left with none, it is
+ * revoked. Tokens are read against their rows on each use, so the next request already has less. */
+async function narrowGrant(grant, allowed, reason, now) {
+    const kept = grant.scopes.filter(allowed);
+    if (kept.length === grant.scopes.length) return;
+    if (!kept.length) {
+        await revokeGrant(grant.grantId, reason, now);
+        return;
+    }
+    await store.grants.setScopes(grant.grantId, kept);
+    for (const token of await store.tokens.liveForGrant(grant.grantId)) {
+        const scopes = (token.scopes || []).filter(allowed);
+        if (scopes.length) await store.tokens.setScopes(token.tokenHash, scopes);
+        else await store.tokens.revoke(token.tokenHash, now);
+    }
+    audit(grant, 'oauth.grant_narrowed', { scopes: kept });
+}
+
+/* A narrowed approval takes its client's grants in that workspace with it. */
 async function narrowClientGrants(clientId, companyId, ceiling, now = new Date()) {
     for (const grant of await store.grants.liveForClient(clientId, companyId)) {
-        const kept = grant.scopes.filter((scope) => ceiling.includes(scope));
-        if (kept.length === grant.scopes.length) continue;
-        if (!kept.length) {
-            await revokeGrant(grant.grantId, REVOKED.APPROVAL_NARROWED, now);
-            continue;
-        }
-        await store.grants.setScopes(grant.grantId, kept);
-        for (const token of await store.tokens.liveForGrant(grant.grantId)) {
-            const scopes = (token.scopes || []).filter((scope) => ceiling.includes(scope));
-            if (scopes.length) await store.tokens.setScopes(token.tokenHash, scopes);
-            else await store.tokens.revoke(token.tokenHash, now);
-        }
-        audit(grant, 'oauth.grant_narrowed', { scopes: kept });
+        await narrowGrant(grant, (scope) => ceiling.includes(scope), REVOKED.APPROVAL_NARROWED, now);
     }
 }
 
@@ -271,6 +276,17 @@ async function revokeOwnGrant(userId, grantId, now = new Date()) {
     return revokeGrant(grant.grantId, REVOKED.REVOKED_BY_USER, now);
 }
 
+/* A person takes back a manage scope they gave and keeps the rest of the connection. */
+async function withdrawOwnManageScopes(userId, grantId, scopes, now = new Date()) {
+    const grant = await store.grants.find(grantId);
+    if (!grant || String(grant.userId) !== String(userId) || grant.revokedAt) return false;
+    const dropped = scopes.filter((scope) => config.isManageScope(scope) && grant.scopes.includes(scope));
+    if (!dropped.length) return false;
+    await narrowGrant(grant, (scope) => !dropped.includes(scope), REVOKED.REVOKED_BY_USER, now);
+    return true;
+}
+
 module.exports = {
     GrantError, REVOKED, issueCode, exchangeCode, refresh, revoke, introspect, revokeGrant, revokeClientGrants, narrowClientGrants, liveGrantsOf, revokeOwnGrant,
+    withdrawOwnManageScopes,
 };

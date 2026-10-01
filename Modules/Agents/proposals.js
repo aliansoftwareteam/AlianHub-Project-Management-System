@@ -14,6 +14,7 @@ const logger = require('../../Config/loggerConfig');
 const access = require('./access');
 const { proposalClause } = require('./privateWork');
 const taint = require('./taint');
+const { externalClientActor } = require('./actor');
 const aiFeedback = require('../AI/feedback');
 
 // AI Inbox proposals (9b). A proposal says what, why and exactly which registry
@@ -123,11 +124,19 @@ const projectOfTask = async (companyId, taskId) => {
 // and runs as that person once approved.
 const SOURCE_MCP = 'mcp';
 const asStrings = (list) => (Array.isArray(list) ? list.map(String) : []);
-const mcpFields = ({ source, requestedBy, tokenId, tokenProjectIds, allowedActions }) => (source === SOURCE_MCP
-    ? { source, requestedBy: String(requestedBy || ''), tokenId: String(tokenId || ''), tokenProjectIds: asStrings(tokenProjectIds), allowedActions: asStrings(allowedActions) }
+const mcpFields = ({ source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId }) => (source === SOURCE_MCP
+    ? {
+        source, requestedBy: String(requestedBy || ''), tokenId: String(tokenId || ''), tokenProjectIds: asStrings(tokenProjectIds), allowedActions: asStrings(allowedActions),
+        ...(oauthGrantId ? { oauthClientId: String(oauthClientId || ''), oauthGrantId: String(oauthGrantId) } : {}),
+    }
     : {});
 
-const create = async (companyId, { agent, runId, taskId, projectId, what, why, changes, gate, priority, cost, taint: marker, source, requestedBy, tokenId, tokenProjectIds, allowedActions }) => {
+/* Who an approved MCP proposal runs as: the person behind the token, or the outside client acting for the person who granted it. */
+const mcpActor = async (p) => (p.oauthGrantId
+    ? { ...(await externalClientActor({ userId: p.requestedBy, clientId: p.oauthClientId, clientName: p.agentName, grantId: p.oauthGrantId })), source: SOURCE_MCP }
+    : { kind: 'agent', userId: p.requestedBy, agentId: null, agentName: p.agentName, runId: null, viaAccount: 'personal', tokenId: p.tokenId || null, source: SOURCE_MCP });
+
+const create = async (companyId, { agent, runId, taskId, projectId, what, why, changes, gate, priority, cost, taint: marker, source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId }) => {
     if (typeof what !== 'string' || !what.trim()) throw Object.assign(new Error('what is required: say in one sentence what the proposal does.'), { status: 400 });
     const check = validateChanges(changes);
     if (!check.valid) throw Object.assign(new Error(check.reason), { status: 400 });
@@ -140,7 +149,7 @@ const create = async (companyId, { agent, runId, taskId, projectId, what, why, c
             changes: changes.map((c) => ({ action: c.action, params: c.params || {}, label: String(c.label || c.action).slice(0, 300), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}) })),
             status: STATUS.PENDING, gate: gateOf(changes, gate), priority: priority || 'normal', cost: cost || null, auditIds: [],
             ...(marker && marker.reason ? { taint: { sources: Array.isArray(marker.sources) ? marker.sources : [], reason: String(marker.reason).slice(0, 2000) } } : {}),
-            ...mcpFields({ source, requestedBy, tokenId, tokenProjectIds, allowedActions }),
+            ...mcpFields({ source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId }),
         },
     }, 'save');
     emit(companyId, saved);
@@ -245,9 +254,11 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     if (!claimed) return alreadyDecided(companyId, id);
 
     const runTrace = run && run.traceId ? { traceId: run.traceId } : {};
-    const marker = taint.record(run);
+    const marker = taint.record(run) || (fromMcp && p.oauthGrantId
+        ? { tainted: true, taintSources: [{ kind: taint.KINDS.CLIENT, ref: String(p.oauthClientId || '').slice(0, 200), at: new Date() }] }
+        : null);
     const agentActor = fromMcp
-        ? { kind: 'agent', userId: p.requestedBy, agentId: null, agentName: p.agentName, runId: null, viaAccount: 'personal', tokenId: p.tokenId || null, source: SOURCE_MCP }
+        ? await mcpActor(p)
         : { kind: 'agent', userId: decider.userId, agentId: p.agentId, agentName: p.agentName, runId: p.runId, viaAccount: 'workspace', tokenId: null, ...runTrace };
     const auditIds = [];
     const applied = [];

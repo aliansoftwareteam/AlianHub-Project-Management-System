@@ -37,17 +37,20 @@ async function details(consent, { session, headers = {} } = {}) {
     return { status: res.status, body: await readJson(res) };
 }
 
-async function answer(consent, { session, decision = 'approve', workspace, csrf, request, headers = {}, cookie } = {}) {
+/* `grant` is the boxes the person ticked: each goes in the form under the same name, as checkboxes do. */
+async function answer(consent, { session, decision = 'approve', workspace, csrf, request, headers = {}, cookie, grant = [] } = {}) {
+    const body = new URLSearchParams(form({
+        request: request === undefined ? consent.request : request,
+        csrf: csrf === undefined ? (consent.cookie && consent.cookie.value) : csrf,
+        decision,
+        workspace,
+    }));
+    for (const scope of grant) body.append('grant', scope);
     const res = await fetch(`${consent.origin}/oauth/consent`, {
         method: 'POST',
         redirect: 'manual',
         headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: cookie === undefined ? cookieHeader(consent, session) : cookie, ...headers },
-        body: form({
-            request: request === undefined ? consent.request : request,
-            csrf: csrf === undefined ? (consent.cookie && consent.cookie.value) : csrf,
-            decision,
-            workspace,
-        }),
+        body: body.toString(),
     });
     const raw = res.headers.get('location');
     return { status: res.status, location: raw ? new URL(raw, consent.origin) : null, body: raw ? null : await readJson(res) };
@@ -63,10 +66,10 @@ async function requestApproval(consent, { session, workspace, csrf, headers = {}
 }
 
 /* The whole browser round: authorize, then answer on the consent page. Answers the final redirect. */
-async function consentThrough(url, { session, workspace, decision = 'approve', headers = {} } = {}) {
+async function consentThrough(url, { session, workspace, decision = 'approve', headers = {}, grant = [] } = {}) {
     const started = await startAuthorization(url);
     if (!started.consent) return started;
-    return answer(started.consent, { session, workspace, decision, headers });
+    return answer(started.consent, { session, workspace, decision, headers, grant });
 }
 
 module.exports = { form, cookieFrom, startAuthorization, details, answer, requestApproval, consentThrough };
