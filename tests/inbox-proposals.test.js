@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const fakeMongo = require('./fixtures/fakeMongo');
 
 const mockDb = fakeMongo.create();
@@ -108,6 +109,17 @@ describe('the approval queue in the Inbox', () => {
         expect(named(listed.proposals)).toEqual(named(await queueOf(uid)));
         expect(counts.approval).toBe(listed.proposals.filter((row) => !row.locked).length + listed.approvals.length);
         expect(counts.approval).toBeGreaterThan(0);
+    });
+
+    it('a member\'s count leaves out what waits on a task in a list they are not on', async () => {
+        const before = (await call(ctrl.counts, MEMBER)).approval;
+        const list = mockDb.seed(SCHEMA_TYPE.SPRINTS, { projectId: new mongoose.Types.ObjectId(P_OPEN), private: true, AssigneeUserId: [OWNER] });
+        const task = mockDb.seed(SCHEMA_TYPE.TASKS, { ProjectID: P_OPEN, sprintId: list._id });
+        seedProposal('in a list of the owner\'s', { taskId: String(task._id), changes: [comment(String(task._id))] });
+
+        expect(named(await queueOf(MEMBER))).not.toContain('in a list of the owner\'s');
+        expect((await call(ctrl.counts, MEMBER)).approval).toBe(before);
+        expect(named(await queueOf(OWNER))).toContain('in a list of the owner\'s');
     });
 
     it('a leave request waits in the same tab for an owner, and the count includes it', async () => {

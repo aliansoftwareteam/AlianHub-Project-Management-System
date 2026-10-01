@@ -218,6 +218,7 @@
                     :message="$t('Automations.empty_sub')"
                     :action-label="$t('Automations.new')"
                     :action-allowed="canManage"
+                    :sentence="canManage ? $t('EmptyState.say_automation') : ''"
                     :secondary-label="canManage ? $t('AutomationTemplates.open') : ''"
                     @action="startNew"
                     @secondary="showGallery = true"

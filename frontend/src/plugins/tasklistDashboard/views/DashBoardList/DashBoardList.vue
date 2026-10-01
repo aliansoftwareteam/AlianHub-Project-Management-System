@@ -162,6 +162,7 @@
                     :image="noSearchResult"
                     :title="showArchived ? $t('ProjectSlider.no_archived') : $t(`EmptyState.${emptyKind}_title`)"
                     :message="showArchived ? '' : $t(`EmptyState.${emptyKind}_msg`)"
+                    :sentence="!showArchived && emptyKind === 'no_tasks' ? $t('EmptyState.say_tasks') : ''"
                     :helpPath="showArchived ? '' : 'tasks'"
                 />
             </div>
