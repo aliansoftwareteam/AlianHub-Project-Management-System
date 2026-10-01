@@ -11,7 +11,7 @@
     <div class="source-select">
         <template v-if="mode === 'inline'">
             <span
-                class="black project-type-name text-ellipsis"
+                class="project-type-name text-ellipsis"
                 :class="[{'font-size-13 font-weight-400': clientWidth > 767, 'font-size-16': clientWidth <= 767}, editable ? 'cursor-pointer' : 'cursor-default']"
                 :title="label"
                 @click="editable ? isVisible = true : null">{{ label }}</span>

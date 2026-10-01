@@ -199,7 +199,7 @@ const schema = {
         // Provenance of Done — written only by Modules/Tasks/helpers/completion.js:
         // { workBy: [{ actorId, actorType, agentId?, viaAccount, hours }],
         //   checkedBy: { actorId, actorType:'human', at } | null,
-        //   closedBy:  { actorId, actorType:'human', at } | null,
+        //   closedBy:  { actorId, actorType:'human', at, viaAgent? } | null,
         //   badge: 'HUMAN'|'AGENT'|'MIXED'|'UNCHECKED'|null, reopenCount }
         'completion': {
             type: Object,
@@ -426,6 +426,8 @@ const schema = {
         agentAccount: { type: Object, required: false },
         // Contractor narrowing: when set, tasks.next / tasks.search stay inside these projects.
         projectIds: { type: Array, default: [], required: false },
+        // What the token was created to do beyond its scopes (Modules/Mcp/manageFlag.js); never changed afterwards.
+        grants: { type: Array, default: [], required: false },
     },
     // Per-call audit of token-authenticated API requests
     apiActivityLogs: {
@@ -559,6 +561,15 @@ const schema = {
         settings: { type: Object, default: {}, required: false },
         createdBy: { type: String, required: false },
         updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // A person's saved views of the Everything page (Modules/Tasks/controller/everythingViews.js). userId is the
+    // one person who can read or change the row; settings is what parseViewSettings returns.
+    everything_views: {
+        userId: { type: String, required: true },
+        name: { type: String, required: true },
+        settings: { type: Object, default: {}, required: false },
+        isDefault: { type: Boolean, default: false, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     // Personal reminders (COLLAB-03) — one-shot, per-user. A node-schedule cron

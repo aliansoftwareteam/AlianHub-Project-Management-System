@@ -1,10 +1,12 @@
 /* One entry per screen. `route` is the address after the #, with :parameters the atlas
  * resolves from the API at run time (scripts/atlas/params.js). `steps` run after the page
- * has settled and may only look: press a shortcut, open a menu, scroll, wait. */
+ * has settled and may only look: press a shortcut, open a menu, scroll, wait.
+ * `core` puts a screen in the screenshot check (npm run visual, and npm run atlas -- --core),
+ * which takes it at 1440x900; `phone` adds 390x844. */
 
 const STEP_ACTIONS = ['press', 'click', 'hover', 'scrollTo', 'waitFor'];
 
-const project = (name, tab) => ({ name, route: `/:cid/project/:projectId/p?tab=${tab}` });
+const project = (name, tab, extra = {}) => ({ name, route: `/:cid/project/:projectId/p?tab=${tab}`, ...extra });
 const settings = (name, path, extra = {}) => ({ name: `settings-${name}`, route: `/:cid/settings/${path}`, ...extra });
 
 const SCREENS = [
@@ -12,12 +14,13 @@ const SCREENS = [
     { name: 'sign-in-sso', route: '/sso', auth: false },
     { name: 'forgot-password', route: '/forgot-password', auth: false },
 
-    { name: 'home', route: '/:cid' },
+    { name: 'home', route: '/:cid', core: true, phone: true },
     { name: 'my-work', route: '/:cid/personal' },
+    { name: 'everything', route: '/:cid/everything', core: true },
     { name: 'inbox', route: '/:cid/inbox' },
     { name: 'planner', route: '/:cid/planner' },
     { name: 'chat', route: '/:cid/chat' },
-    { name: 'command-palette', route: '/:cid', steps: [{ action: 'press', key: 'Control+k' }, { action: 'waitFor', selector: '.pal' }] },
+    { name: 'command-palette', route: '/:cid', core: true, steps: [{ action: 'press', key: 'Control+k' }, { action: 'waitFor', selector: '.pal' }] },
     { name: 'more-menu', route: '/:cid', steps: [{ action: 'click', selector: '.ah-rail__foot .ah-rail__item--btn[aria-haspopup="menu"]' }, { action: 'waitFor', selector: '.ah-rail__pop' }] },
     { name: 'profile-menu', route: '/:cid', steps: [{ action: 'click', selector: '.ah-rail__foot button:has(.ah-rail__avatar)' }, { action: 'waitFor', selector: '.ah-rail__pop--profile' }] },
 
@@ -34,19 +37,19 @@ const SCREENS = [
     { name: 'ai-quality', route: '/:cid/ai/quality' },
     { name: 'ai-accounts', route: '/:cid/ai/accounts' },
 
-    { name: 'docs', route: '/:cid/pages' },
-    { name: 'doc', route: '/:cid/pages/:pageId' },
+    { name: 'docs', route: '/:cid/pages', core: true },
+    { name: 'doc', route: '/:cid/pages/:pageId', core: true },
     { name: 'dashboards', route: '/:cid/dashboards' },
-    { name: 'dashboard', route: '/:cid/dashboards/:dashboardId' },
+    { name: 'dashboard', route: '/:cid/dashboards/:dashboardId', core: true },
 
     { name: 'projects', route: '/:cid/project' },
-    project('project-list', 'ProjectListView'),
-    project('project-board', 'ProjectKanban'),
-    project('project-table', 'TableView'),
+    project('project-list', 'ProjectListView', { core: true, phone: true }),
+    project('project-board', 'ProjectKanban', { core: true, phone: true }),
+    project('project-table', 'TableView', { core: true }),
     project('project-gantt', 'GanttView'),
     project('project-calendar', 'Calendar'),
     project('project-workload', 'Workload'),
-    { name: 'task-detail', route: '/:cid/project/:projectId/s/:sprintId/:taskId?tab=ProjectListView' },
+    { name: 'task-detail', route: '/:cid/project/:projectId/s/:sprintId/:taskId?tab=ProjectListView', core: true, phone: true },
     { name: 'project-recurring', route: '/:cid/project/:projectId/recurring' },
     { name: 'project-billing', route: '/:cid/project/:projectId/billing' },
 
@@ -82,7 +85,7 @@ const SCREENS = [
     settings('roles', 'security-permissions'),
     settings('teams', 'teams'),
     settings('notifications', 'notifications'),
-    settings('my-profile', 'my-profile'),
+    settings('my-profile', 'my-profile', { core: true }),
     settings('appearance', 'my-profile', { steps: [{ action: 'scrollTo', selector: '.ms__theme' }] }),
     settings('language', 'language'),
     settings('change-password', 'change-password'),

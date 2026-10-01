@@ -17,6 +17,7 @@ const { escapeCommentText } = require('../Comments/helpers/plainText');
 const { isPeriodLocked } = require('../TimesheetApproval/helpers/lockGuard');
 const { canPostToThread } = require('../Comments/helpers/threadWriteAccess');
 const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
+const logger = require('../../Config/loggerConfig');
 
 // The single place an agent's action is executed. MCP tools, approved proposals
 // and workspace-agent runs all call perform(): registry check → pending audit
@@ -30,7 +31,7 @@ class RefusedError extends Error {
 
 const oid = tools.oid;
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
-const LINK_KINDS = ['pr', 'branch', 'doc', 'url'];
+const { LINK_KINDS } = require('./taskRequests');
 
 // Risk rating per registry action, read by policy.js: at L2 an agent acts alone
 // only on a reversible, task-scoped write with no money in it; everything else
@@ -75,6 +76,24 @@ const FLAGGED_RATINGS = Object.freeze({
     'timesheet.read': read(SCOPE.WORKSPACE),
     'comment.create': write(SCOPE.TASK),
     'timelog.create': write(SCOPE.TASK),
+    'fields.list': read(SCOPE.PROJECT),
+    'subtasks.list': read(SCOPE.TASK),
+    'members.list': read(SCOPE.WORKSPACE),
+    'task.edit': write(SCOPE.TASK),
+    'task.assignees.set': write(SCOPE.TASK),
+    'task.field.set': write(SCOPE.TASK),
+    'task.move': write(SCOPE.PROJECT, false),
+    'task.archive': write(SCOPE.PROJECT),
+    'task.restore': write(SCOPE.PROJECT),
+    'task.history': read(SCOPE.TASK),
+    'task.links.list': read(SCOPE.TASK),
+    'task.status.change': write(SCOPE.TASK),
+    'task.add': write(SCOPE.PROJECT),
+    'subtask.add': write(SCOPE.TASK),
+    'comment.update': write(SCOPE.TASK),
+    'tasks.batch': write(SCOPE.TASK),
+    'page.create': write(SCOPE.PROJECT),
+    'page.update': write(SCOPE.PROJECT),
 });
 
 const ratingTable = () => ({ ...RATINGS, ...Object.fromEntries(Object.entries(FLAGGED_RATINGS).filter(([k]) => registry.has(k))) });
@@ -127,6 +146,25 @@ const findRunningTimer = (companyId, taskId, userId) => MongoDbCrudOpration(comp
 
 /* ── the executors ─────────────────────────────────────────────────────────── */
 
+/* The people a comment names in the editor's own markup are told the way the comment route tells them.
+ * A delivery that fails is logged: the comment is already written. */
+const announceMentions = async (companyId, commentId) => {
+    try {
+        const { resolveMentionIds, deliverMentions } = require('../Comments/helpers/commentNotifications');
+        const { threadOf } = require('../Comments/helpers/threadWriteAccess');
+        const comment = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: [{ _id: oid(commentId) }] }, 'findOne');
+        if (!comment) return [];
+        const mentionIds = await resolveMentionIds(companyId, comment.userId, threadOf(comment), comment.message);
+        if (!mentionIds.length) return [];
+        await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: [{ _id: oid(commentId) }, { $set: { mentionIds } }] }, 'updateOne');
+        (await deliverMentions(companyId, comment, mentionIds)).forEach((error) => logger.error(`agent comment mention not delivered: ${(error && error.message) || error}`));
+        return mentionIds;
+    } catch (error) {
+        logger.error(`agent comment mentions: ${error.message}`);
+        return [];
+    }
+};
+
 const commentOn = async ({ companyId, actor, params, depth }, action, body) => {
     const r = await tools.addComment(companyId, params.taskId, body, context(actor, action, depth));
     const a = attribution(actor);
@@ -135,7 +173,11 @@ const commentOn = async ({ companyId, actor, params, depth }, action, body) => {
         data: [{ _id: oid(r.commentId) }, { $set: { userId: String(actor.userId || a.actorId), actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null } }],
     }, 'updateOne').catch(() => {});
     if (!actor.runId) await require('./triggers').fromComment(companyId, { authorId: actor.userId, taskId: params.taskId, message: body, depth: clampDepth(depth) + 1 });
-    return { result: { commentId: r.commentId }, undo: { kind: 'comment', commentId: r.commentId, taskId: String(params.taskId) }, entityId: params.taskId };
+    const mentioned = params.notifyMentions ? await announceMentions(companyId, r.commentId) : null;
+    return {
+        result: { commentId: r.commentId, ...(mentioned ? { mentioned } : {}) },
+        undo: { kind: 'comment', commentId: r.commentId, taskId: String(params.taskId) }, entityId: params.taskId,
+    };
 };
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -280,7 +322,7 @@ const executors = {
 
     async 'subtask.create'({ companyId, actor, params, depth }) {
         const r = await tools.createSubtask(companyId, params.taskId, { title: params.title, description: params.description || '' }, context(actor, 'subtask.create', depth));
-        return { result: { subtaskId: r.subtaskId, title: r.title }, undo: { kind: 'subtask', subtaskId: r.subtaskId, parentTaskId: String(params.taskId) }, entityId: params.taskId };
+        return { result: { subtaskId: r.subtaskId, key: r.key || '', title: r.title }, undo: { kind: 'subtask', subtaskId: r.subtaskId, parentTaskId: String(params.taskId) }, entityId: params.taskId };
     },
 
     async 'task.create'({ companyId, actor, params, depth }) {
@@ -355,9 +397,34 @@ const executors = {
         const r = await tools.addComment(companyId, params.taskId, params.body, context(actor, 'chat.post', depth));
         return { result: { commentId: r.commentId }, undo: { kind: 'comment', commentId: r.commentId, taskId: String(params.taskId) }, entityId: params.taskId };
     },
+
+    /* Only a comment an agent wrote for this person, on the task named; the edit itself is the comment route's. */
+    async 'comment.update'({ companyId, actor, params }) {
+        const uid = String(actor.userId || '');
+        const comment = OBJECT_ID.test(String(params.commentId || ''))
+            ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: [{ _id: oid(params.commentId), isDeleted: { $ne: true } }] }, 'findOne')
+            : null;
+        const own = comment && comment.actorType === 'agent' && String(comment.userId) === uid && String(comment.taskId) === String(params.taskId);
+        if (!own) throw new tools.DeterministicError('that comment is not one an agent wrote for you on this task');
+        const body = String(params.body || '').trim();
+        if (!body) throw new tools.DeterministicError('comment body is empty');
+        const answer = await require('./pageRequests').answerOf(require('../Comments/controller').update, { companyId, uid, body: { id: String(comment._id), data: { message: body } } });
+        if (!answer || answer.status !== true) throw new tools.DeterministicError((answer && answer.message) || 'the comment was not changed');
+        return { result: { commentId: String(comment._id) }, undo: { kind: 'commentText', commentId: String(comment._id), taskId: String(params.taskId), previous: comment.message || '' }, entityId: params.taskId };
+    },
+
+    /* The group record of a batch: the changes are the actions it names, each checked and audited on its own. */
+    async 'tasks.batch'({ params }) {
+        const auditIds = (Array.isArray(params.auditIds) ? params.auditIds : []).map(String);
+        return { result: { applied: auditIds.length }, undo: auditIds.length ? { kind: 'batch', auditIds } : null, entityId: params.taskId || '' };
+    },
+
+    ...require('./taskRequests').executors,
+    ...require('./pageRequests').executors,
 };
 
-const COMMENT_ACTIONS = new Set(['task.comment', 'comment.create', 'chat.post']);
+const COMMENT_ACTIONS = new Set(['task.comment', 'comment.create', 'chat.post', 'comment.update']);
+const WRITES_OWN_COMPLETION = new Set(['timelog.stop', 'task.status.set', 'task.status.change', 'tasks.batch']);
 
 /* A task that does not exist is left to the executor, which reports it as not found. */
 const threadMay = async (companyId, actor, action, params) => {
@@ -407,7 +474,7 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
         await audit.failAction(companyId, auditId, e.message);
         throw e;
     }
-    if (isAgent(actor) && params.taskId && action !== 'timelog.stop' && action !== 'task.status.set') {
+    if (isAgent(actor) && params.taskId && !WRITES_OWN_COMPLETION.has(action)) {
         await completionStore.recordWork(companyId, params.taskId, workEntry(actor, 0));
     }
     await audit.applyAction(companyId, auditId, { undo: out.undo, entityType: out.entityType || 'task', entityId: out.entityId, entityName: out.entityName });

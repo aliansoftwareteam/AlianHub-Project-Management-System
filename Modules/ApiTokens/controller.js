@@ -13,6 +13,7 @@ const { strictSince } = require('./helpers/strictSince');
 const { maxLifetimeSince } = require('./helpers/maxLifetimeSince');
 const { stepCredentialsEnabled } = require('../Agents/serviceIdentity');
 const { isKnownCompany } = require('../../Config/knownCompany');
+const manageFlag = require('../Mcp/manageFlag');
 
 // Resolve the acting user. These routes now sit behind the JWT middleware
 // (Config/setMiddleware.js) which populates req.uid; the body userData
@@ -37,6 +38,7 @@ const maskToken = (doc, standing = null, lifetime = null) => ({
     kind: doc.kind || 'personal',
     agentAccount: doc.agentAccount || null,
     projectIds: doc.projectIds || [],
+    grants: doc.grants || [],
     expiresAt: doc.expiresAt || null,
     lastUsedAt: doc.lastUsedAt || null,
     createdAt: doc.createdAt,
@@ -95,19 +97,37 @@ exports.createToken = async (req, res) => {
     }
 };
 
-/* POST /api/v2/api-tokens/mcp  body: { name, mode?, provider?, projectIds?, expiresInDays?, scopes? (strict mode only) }
+const GRANT_REFUSALS = Object.freeze({
+    unknown: 'grants must be a list drawn from: ',
+    off: 'The management tools are not switched on for this server (MCP_TOOLS_MANAGE).',
+    readOnly: 'A token can be given a grant only when it has the write scope.',
+});
+
+/* The grants a new agent token is created with, or why the request is refused. */
+const grantsFor = (asked, scopes) => {
+    if (asked === undefined || asked === null) return { grants: [] };
+    if (!Array.isArray(asked) || asked.some((grant) => !manageFlag.GRANTS.includes(grant))) return { refusal: `${GRANT_REFUSALS.unknown}${manageFlag.GRANTS.join(', ')}.` };
+    if (!asked.length) return { grants: [] };
+    if (!manageFlag.enabled()) return { refusal: GRANT_REFUSALS.off };
+    if (!scopes.includes('write')) return { refusal: GRANT_REFUSALS.readOnly };
+    return { grants: manageFlag.GRANTS.filter((grant) => asked.includes(grant)) };
+};
+
+/* POST /api/v2/api-tokens/mcp  body: { name, mode?, provider?, projectIds?, expiresInDays?, grants?, scopes? (strict mode only) }
  * Mints a token for a CLI/coding agent: kind 'agent', read+write scopes, and the
  * account mode the run is attributed to. Returns the MCP URL to paste. */
 exports.createMcpToken = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
         const userId = actingUserId(req);
-        const { name, mode, provider, projectIds, expiresInDays, label, scopes: askedScopes } = req.body || {};
+        const { name, mode, provider, projectIds, expiresInDays, label, scopes: askedScopes, grants: askedGrants } = req.body || {};
         if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and userId are required.' });
         if (req.apiToken) return res.status(403).send({ status: false, statusText: 'API tokens cannot mint tokens.' });
         const scopes = isStrict() && askedScopes !== undefined ? askedScopes : ['read', 'write'];
         const check = validateCreateInput({ name: name || 'CLI agent', scopes, expiresInDays });
         if (!check.valid) return refuseInput(res, check);
+        const { grants, refusal } = grantsFor(askedGrants, scopes);
+        if (refusal) return res.send({ status: false, statusText: refusal });
         const accounts = require('../Agents/accounts');
         const policy = await accounts.getPolicy(companyId);
         const wanted = accounts.MODES.includes(mode) ? mode : 'personal';
@@ -120,6 +140,7 @@ exports.createMcpToken = async (req, res) => {
             scopes, userId, active: true, kind: 'agent',
             agentAccount: { mode: wanted, provider: accounts.PROVIDERS.includes(provider) ? provider : 'claude-code', linkedAt: new Date(), label: String(label || name || '').slice(0, 80) },
             projectIds: Array.isArray(projectIds) ? projectIds.filter((id) => /^[0-9a-fA-F]{24}$/.test(String(id))).map(String) : [],
+            grants,
         };
         if (expiresInDays) doc.expiresAt = new Date(Date.now() + Number(expiresInDays) * 24 * 60 * 60 * 1000);
         const created = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.API_TOKENS, data: doc }, 'save');
@@ -127,7 +148,7 @@ exports.createMcpToken = async (req, res) => {
         return res.send({
             status: true, statusText: 'Token created. Copy it now — it is not shown again.',
             data: { ...maskToken(created), kind: 'agent', agentAccount: doc.agentAccount, projectIds: doc.projectIds, token: rawToken,
-                    mcpUrl: `${base}/mcp?companyId=${companyId}`, tools: require('../Mcp/tools').names() },
+                    mcpUrl: `${base}/mcp?companyId=${companyId}`, tools: require('../Mcp/tools').manifest({ canWrite: scopes.includes('write'), token: doc }).map((tool) => tool.name) },
         });
     } catch (error) {
         logger.error(`ERROR in create mcp token: ${error.message}`);
@@ -158,6 +179,7 @@ exports.listTokens = async (req, res) => {
             strict, minExpiryDays: MIN_EXPIRY_DAYS, maxExpiryDays: maxExpiryDaysFor({ strict }), scopes: [...SCOPES], graceDays: STRICT_GRACE_DAYS,
             strictSince: since,
             ...(stepCredentialsEnabled() ? { stepCredentials: true } : {}),
+            ...(manageFlag.enabled() ? { grants: [...manageFlag.GRANTS] } : {}),
         };
         const lifetimes = await lifetimeStandings(tokens || [], { strict, now });
         const data = (tokens || []).map((doc, i) => maskToken(doc, graceStanding(doc, { strict, strictSince: since, now }), lifetimes[i]));

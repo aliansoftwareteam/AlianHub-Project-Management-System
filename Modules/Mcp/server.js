@@ -6,6 +6,7 @@ const { RefusedError } = require('../Agents/actions');
 const registry = require('../Agents/registry');
 const tools = require('./tools');
 const scopes = require('./scopes');
+const manageFlag = require('./manageFlag');
 const oauthAuth = require('./oauthAuth');
 const mcpOAuth = require('../../Config/mcpOAuth');
 const { TOKEN_PREFIX } = require('../ApiTokens/helpers/apiTokenRules');
@@ -191,7 +192,9 @@ const handleRpc = async (ctx, message) => {
                 instructions: [
                     'Start with tasks.next, then task.get for the brief before writing code.',
                     'Report findings with task.comment and attach the PR with task.link.',
-                    'You may set status to In progress or In review. A person closes the task.',
+                    manageFlag.managesTasks(ctx)
+                        ? 'You may set any status the task\'s project defines. A task you close is recorded as closed through you and stays unchecked until a person checks it.'
+                        : 'You may set status to In progress or In review. A person closes the task.',
                 ].join(' '),
             });
 
@@ -203,7 +206,7 @@ const handleRpc = async (ctx, message) => {
             return rpcResult(id, {});
 
         case 'tools/list':
-            return rpcResult(id, { tools: tools.manifest() });
+            return rpcResult(id, { tools: tools.manifest(ctx) });
 
         case 'resources/list':
             return rpcResult(id, { resources: [] });
@@ -224,7 +227,7 @@ const handleRpc = async (ctx, message) => {
                             action: name,
                             reason: error.message,
                             auditId: error.auditId || null,
-                            neverAvailable: registry.NEVER,
+                            neverAvailable: manageFlag.neverFor(ctx, registry.NEVER),
                         }),
                         isError: true,
                     });

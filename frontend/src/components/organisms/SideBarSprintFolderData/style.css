@@ -36,7 +36,6 @@
     min-width: 0;
     font-size: 13px;
     color: var(--ink-label);
-    text-transform: capitalize;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

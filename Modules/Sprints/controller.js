@@ -13,10 +13,19 @@ const scrumRules = require("./scrumRules");
 const { escapeHtml } = require("../../utils/escapeHtml");
 const { storedNames, notifySprintCreated, notifyFolderCreated } = require("./helpers/sprintHistory");
 const { ListWriteError, prepareSprintUpdate, prepareFolderUpdate } = require("./helpers/listWrites");
-const { parentForNewFolder, prepareFolderMove } = require("./helpers/folderTree");
+const { folderForList, parentForNewFolder, prepareFolderMove } = require("./helpers/folderTree");
 const socketEmitter = require("../../event/socketEventEmitter");
 
-exports.addSprint = (req, res) => {
+const namedFolderId = (folder) => (folder && typeof folder === 'object' && folder.folderId ? folder.folderId : '');
+
+exports.addSprint = async (req, res) => {
+    try {
+        const { folder, projectId } = req.body;
+        if (namedFolderId(folder)) await folderForList(String(req.headers['companyid'] || ''), projectId, namedFolderId(folder));
+    } catch (error) {
+        if (!refuseListWrite(res, error)) res.json({ status: false, statusText: error.message });
+        return;
+    }
     exports.addSprintFun(req).then((data) => {
         res.json(data);
         const { companyId, projectId, sprintName, mainChat, isPreCompany } = req.body;

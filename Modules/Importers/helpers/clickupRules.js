@@ -174,27 +174,14 @@ const validateClickUpInput = ({ companyId, projectId, sprintId, rows, userId }) 
     return validateClickUpRows(rows);
 };
 
-/* Subtasks of subtasks hang off the top-level task (subtasks here are one level deep);
- * a parent missing from the file leaves the row a task of its own. */
-const topAncestor = (id, parentOf) => {
-    let current = id;
-    const seen = new Set([current]);
-    while (parentOf.has(current) && parentOf.get(current) && parentOf.has(parentOf.get(current))) {
-        const next = parentOf.get(current);
-        if (seen.has(next)) return '';
-        seen.add(next);
-        current = next;
-    }
-    return current === id ? '' : current;
-};
-
 const SKIP_REASONS = { no_name: 'The task has no name.' };
 const skipCode = (row, index) => (cell(row, index, 'name') ? '' : 'no_name');
 const skipEntry = (i, code) => ({ row: i + 1, code, reason: SKIP_REASONS[code] });
 
 /* Transform ClickUp rows into createMultipleTasks input. `statusFor` maps a ClickUp
  * status name to the project status to use. Assignees travel as emails and are
- * resolved later among the company's members only. */
+ * resolved later among the company's members only. Each row keeps the parent the file
+ * names: the create path orders the levels and re-hangs what does not fit in three. */
 const transformClickUpRows = ({ rows, statusFor, leaderId }) => {
     const headers = headersOf(rows);
     const index = columnIndex(headers);
@@ -208,7 +195,6 @@ const transformClickUpRows = ({ rows, statusFor, leaderId }) => {
         else kept.push({ row, id: cell(row, index, 'id') || `row-${i + 1}` });
     });
 
-    const parentOf = new Map(kept.map(({ row, id }) => [id, cell(row, index, 'parent')]));
     const unnamedAssignees = new Set();
 
     const tasks = kept.map(({ row, id }) => {
@@ -234,7 +220,7 @@ const transformClickUpRows = ({ rows, statusFor, leaderId }) => {
             memberEmails: people.filter((person) => person.includes('@')).map((email) => email.toLowerCase()),
             DueDate: due ? due.toISOString() : null,
             rawDescription: cell(row, index, 'description').slice(0, 10000),
-            ParentTaskId: topAncestor(id, parentOf),
+            ParentTaskId: cell(row, index, 'parent'),
         };
         if (start) task.startDate = start.toISOString();
         if (estimate !== null) task.totalEstimatedTime = estimate;

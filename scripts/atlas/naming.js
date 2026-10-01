@@ -1,7 +1,7 @@
 const { parseArgs: rawArgs } = require('../demo/lib/cli');
 
 const THEMES = ['light', 'dark'];
-const VARIANTS = ['a', 'b', 'c'];
+const VARIANTS = ['a', 'b', 'c', 'classic'];
 const DEFAULT_SIZES = '1440x900,390x844';
 const SEPARATOR = '__';
 const SHOT = /^([a-z0-9]+(?:-[a-z0-9]+)*)__([a-z]+)__(\d+x\d+)\.png$/;
@@ -39,6 +39,7 @@ function parseArgs(argv) {
         themes,
         sizes: list(raw.sizes || DEFAULT_SIZES).map(parseSize),
         variant,
+        core: Boolean(raw.core),
         tokenFile: text(raw['token-file']),
         company: text(raw.company),
         project: text(raw.project),

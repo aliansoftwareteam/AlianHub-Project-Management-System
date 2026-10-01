@@ -28,15 +28,16 @@
         </div>
 
         <teleport to="body">
-            <div v-if="mode === 'subfolder'" class="pt-menu__overlay" @click.self="mode = ''">
-                <div class="pt-menu__card" role="dialog" aria-modal="true" :aria-label="t('Projects.new_subfolder')">
-                    <h3 class="ah-h3 pt-menu__title">{{ t('Projects.new_subfolder_in', { folder: folder.name }) }}</h3>
+            <div v-if="mode === 'subfolder' || mode === 'list'" class="pt-menu__overlay" @click.self="mode = ''">
+                <div class="pt-menu__card" role="dialog" aria-modal="true" :aria-label="mode === 'list' ? t('Projects.new_list') : t('Projects.new_subfolder')">
+                    <h3 class="ah-h3 pt-menu__title">{{ mode === 'list' ? t('Projects.new_list_in', { folder: path }) : t('Projects.new_subfolder_in', { folder: folder.name }) }}</h3>
                     <SprintFolderInput
-                        :createSprint="false"
-                        :createFolder="true"
+                        :createSprint="mode === 'list'"
+                        :createFolder="mode === 'subfolder'"
                         :project="project"
-                        :parentFolderId="folder.id"
-                        :subItems="siblings"
+                        :parentFolderId="mode === 'subfolder' ? folder.id : ''"
+                        :folder="mode === 'list' ? { folderId: folder.id, folderName: folder.name } : null"
+                        :subItems="mode === 'list' ? sprints : siblings"
                         @cancel="mode = ''"
                         @updateData="emit('reveal', folder.id)"
                     />
@@ -76,30 +77,32 @@
 
 <script setup>
 /**
- * The actions of one folder row in the project tree: a subfolder under a top-level folder, rename,
- * a move into a top-level folder or out to the top level, archive and delete. Folders nest one
- * level, so a subfolder offers no subfolder and a folder that holds subfolders has nowhere to move.
+ * The actions of one folder row in the project tree: a list in it, a subfolder under a top-level
+ * folder, rename, a move into a top-level folder or out to the top level, archive and delete.
+ * Folders nest one level, so a subfolder offers no subfolder and a folder that holds subfolders has
+ * nowhere to move.
  * Archive and delete ask first and say what goes with the folder; both can be undone.
  *
  * Props
  *   project   Object   the folder's project; its isGlobalPermission decides which rules are read
  *   folder    Object   { id, name, parentFolderId }
  *   folders   Array    the project's folder documents
- *   sprints   Array    the project's sprint documents, to count what an archive or delete takes
+ *   sprints   Array    the project's sprint documents: a new list's siblings, and what an archive or delete takes
  *
  * Emits
  *   reveal(folderId)    a folder now holds something new, so the tree should open it
  *   rename(folderId)    the row should let its name be edited in place
  */
-import { computed, defineAsyncComponent, defineEmits, defineExpose, defineProps, inject, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent, defineEmits, defineExpose, defineProps, inject, nextTick, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import { useCustomComposable } from "@/composable";
 import { showUndoToast } from "@/composable/useUndoToast";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
-import { canHoldSubfolders, folderContents, folderIdOf, folderMoveTargets, parentIdOf } from "@/utils/folderTree";
+import { canHoldSubfolders, folderContents, folderIdOf, folderMoveTargets, folderPathLabel, parentIdOf } from "@/utils/folderTree";
 import { moveFolder, restoreFolderFromTrash, setFolderStatus } from "@/views/Projects/folderActions";
+import { useRowMenu } from "./useRowMenu";
 
 const SprintFolderInput = defineAsyncComponent(() => import("@/components/atom/SprintFolderInput/SprintFolderInput.vue"));
 const MoveToFolderModal = defineAsyncComponent(() => import("@/components/molecules/MoveToFolder/MoveToFolderModal.vue"));
@@ -125,23 +128,23 @@ const $toast = useToast();
 const companyId = inject("$companyId");
 const { checkPermission } = useCustomComposable();
 
-const shown = ref(false);
+const { shown, root, menu, open, close, onMenuKeydown } = useRowMenu();
 const mode = ref("");
 const busy = ref(false);
-const root = ref(null);
-const menu = ref(null);
 const cancelButton = ref(null);
 
 const stored = computed(() => props.folders.find((item) => folderIdOf(item) === props.folder.id) || null);
 const allowed = (key) => props.project?.status !== "close" && checkPermission(key, props.project?.isGlobalPermission) === true;
 const mayCreate = computed(() => allowed("project.project_folder_create"));
 const mayRename = computed(() => allowed("project.project_folder_name_edit"));
+const path = computed(() => folderPathLabel(props.folders, stored.value) || props.folder.name);
 
 const targets = computed(() => folderMoveTargets(props.folders, stored.value).map((item) => ({ id: folderIdOf(item), name: item.name, depth: 0 })));
 const canMove = computed(() => (mayCreate.value || mayRename.value) && Boolean(stored.value) && (Boolean(parentIdOf(stored.value)) || targets.value.length > 0));
 const siblings = computed(() => props.folders.map((item) => ({ ...item, folderId: folderIdOf(item) })));
 
 const entries = computed(() => [
+    allowed("project.project_sprint_create") && Boolean(stored.value) && { kind: "list", icon: "layout", label: t("Projects.new_list") },
     mayCreate.value && canHoldSubfolders(props.folders, stored.value) && { kind: "subfolder", icon: "plus", label: t("Projects.new_subfolder") },
     mayRename.value && { kind: "rename", icon: "file", label: t("Projects.rename") },
     canMove.value && { kind: "move", icon: "arrowRight", label: t("Projects.move_folder") },
@@ -169,33 +172,6 @@ const removal = computed(() => {
 });
 
 watch(removal, (asking) => { if (asking) nextTick(() => cancelButton.value?.focus()); });
-
-const menuItems = () => [...(menu.value?.querySelectorAll('[role="menuitem"]') || [])];
-
-function open() {
-    shown.value = true;
-    nextTick(() => menuItems()[0]?.focus());
-}
-
-function close(refocus = false) {
-    if (!shown.value) return;
-    shown.value = false;
-    if (refocus) root.value?.closest(".pt-row")?.querySelector('[role="treeitem"]')?.focus();
-}
-
-/* The menu sits inside the tree, whose own arrow keys would otherwise walk the rows behind it. */
-function onMenuKeydown(event) {
-    if (event.key === "Escape" || event.key === "Tab") {
-        event.preventDefault();
-        close(true);
-        return;
-    }
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-    event.preventDefault();
-    const items = menuItems();
-    const at = items.indexOf(document.activeElement);
-    items[(at + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
-}
 
 function start(kind) {
     close();
@@ -259,10 +235,6 @@ async function remove() {
     }
     offerUndo(status, context);
 }
-
-const closeOnOutsideClick = (event) => { if (!root.value?.contains(event.target)) close(); };
-onMounted(() => document.addEventListener("click", closeOnOutsideClick));
-onUnmounted(() => document.removeEventListener("click", closeOnOutsideClick));
 
 defineExpose({ open });
 </script>

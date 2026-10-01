@@ -11,7 +11,12 @@ const {
     taskToRow,
     csvEscape,
     rowsToCsv,
+    treeRows,
+    taskRows,
 } = require('../Modules/ExportJobs/helpers/exportRules');
+const XLSX = require('xlsx');
+const { transformCsvRows } = require('../Modules/Importers/helpers/csvRules');
+const { levelRows } = require('../Modules/Tasks/helpers/taskTreeRules');
 
 const COMPANY = '64b7f0c2a1b2c3d4e5f60700';
 const PROJECT = '64b7f0c2a1b2c3d4e5f60711';
@@ -106,6 +111,82 @@ describe('📦 EXPORTS - Rules', () => {
             expect(row.TaskName).toBe('');
             expect(row.Assignees).toBe('');
             expect(row.DueDate).toBe('');
+        });
+    });
+});
+
+describe('the subtask tree in a task export', () => {
+    const task = (n, name, parent, ancestors) => ({
+        _id: `id-${n}`, TaskKey: `WEB-${n}`, TaskName: name, status: { text: 'To Do' }, ParentTaskId: parent ? `id-${parent}` : '', ancestors: (ancestors || []).map((a) => `id-${a}`),
+    });
+    /* As a query returns them: in no order a reader could rely on. */
+    const stored = () => [
+        task(3, 'Grandchild', 2, [1, 2]),
+        task(5, 'Second root'),
+        task(2, 'Child', 1, [1]),
+        task(7, 'Second grandchild', 2, [1, 2]),
+        task(1, 'Root'),
+        task(4, 'Second child', 1, [1]),
+        task(6, 'Parent not exported', 99, [99]),
+    ];
+    const shape = (rows) => rows.map((row) => [row.TaskKey, row.Parent, row.Level]);
+
+    test('a row carries its direct parent\'s key and its level', () => {
+        const rows = taskRows(stored());
+        expect(Object.keys(rows[0]).slice(0, 4)).toEqual(['TaskKey', 'TaskName', 'Parent', 'Level']);
+        const byKey = Object.fromEntries(rows.map((row) => [row.TaskKey, row]));
+        expect(byKey['WEB-1']).toMatchObject({ Parent: '', Level: 1 });
+        expect(byKey['WEB-2']).toMatchObject({ Parent: 'WEB-1', Level: 2 });
+        expect(byKey['WEB-3']).toMatchObject({ Parent: 'WEB-2', Level: 3 });
+    });
+
+    test('every level is exported in tree order: a parent, then its children', () => {
+        expect(shape(taskRows(stored()))).toEqual([
+            ['WEB-5', '', 1],
+            ['WEB-1', '', 1],
+            ['WEB-2', 'WEB-1', 2],
+            ['WEB-3', 'WEB-2', 3],
+            ['WEB-7', 'WEB-2', 3],
+            ['WEB-4', 'WEB-1', 2],
+            ['WEB-6', '', 1],
+        ]);
+    });
+
+    test('a row whose parent is not in the export is a top-level row of the file', () => {
+        const orphan = treeRows(stored()).find(({ task: row }) => row.TaskKey === 'WEB-6');
+        expect(orphan).toMatchObject({ level: 1, parentKey: '' });
+    });
+
+    test('rows that name each other as parents are still exported, once each', () => {
+        const looped = [task(1, 'One', 2), task(2, 'Two', 1), task(3, 'Three')];
+        expect(taskRows(looped).map((row) => row.TaskKey).sort()).toEqual(['WEB-1', 'WEB-2', 'WEB-3']);
+    });
+
+    test('a sparse task is a level-one row', () => {
+        expect(taskToRow({})).toMatchObject({ Parent: '', Level: 1 });
+    });
+
+    test('importing the exported file rebuilds the same parents and levels', () => {
+        const csv = rowsToCsv(taskRows(stored()));
+        const sheet = XLSX.read(csv, { type: 'string', raw: true });
+        const parsed = XLSX.utils.sheet_to_json(sheet.Sheets[sheet.SheetNames[0]], { defval: '', raw: false });
+        const shuffled = [parsed[3], parsed[6], parsed[0], parsed[5], parsed[2], parsed[1], parsed[4]];
+
+        const { tasks, skipped } = transformCsvRows({ rows: shuffled, statusNames: ['To Do'], leaderId: 'u1' });
+        const { levels, parentIdOf, adjusted } = levelRows(tasks);
+        const nameOf = new Map(tasks.map((row) => [row._id, row.TaskName]));
+        const rebuilt = Object.fromEntries(levels.flatMap((level, depth) => level.map((row) => [row.TaskName, { level: depth + 1, parent: nameOf.get(parentIdOf.get(row)) || '' }])));
+
+        expect(skipped).toBe(0);
+        expect(adjusted).toEqual([]);
+        expect(rebuilt).toEqual({
+            Root: { level: 1, parent: '' },
+            'Second root': { level: 1, parent: '' },
+            'Parent not exported': { level: 1, parent: '' },
+            Child: { level: 2, parent: 'Root' },
+            'Second child': { level: 2, parent: 'Root' },
+            Grandchild: { level: 3, parent: 'Child' },
+            'Second grandchild': { level: 3, parent: 'Child' },
         });
     });
 });

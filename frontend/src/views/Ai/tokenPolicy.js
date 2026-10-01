@@ -4,6 +4,8 @@ export const TOKEN_SCOPES = ["read", "write"];
 export const EXPIRY_CHOICES = [7, 30, 90, 180, 365];
 export const DEFAULT_TOKEN_POLICY = { strict: false, scopes: TOKEN_SCOPES, minExpiryDays: 1, maxExpiryDays: 365, graceDays: 30, strictSince: null };
 export const EXPIRY_OVER_MAX = "API_TOKEN_EXPIRY_OVER_MAX";
+export const TASKS_GRANT = "tasks:manage";
+export const DOCS_GRANT = "docs:manage";
 
 const maxDaysOf = (policy) => Number(policy?.maxExpiryDays) || DEFAULT_TOKEN_POLICY.maxExpiryDays;
 
@@ -23,3 +25,15 @@ export const tokenFormProblem = (form, policy) => {
     if (!Array.isArray(form.scopes) || !form.scopes.length) return { field: "scopes", key: "Accounts.token_scope_required" };
     return null;
 };
+
+/* The server names a grant only while its tools are on, and gives it to a token that may write. */
+const canGrant = (grant, form, policy) => Array.isArray(policy?.grants) && policy.grants.includes(grant)
+    && (!policy.strict || (Array.isArray(form.scopes) && form.scopes.includes("write")));
+
+export const canGrantTasks = (form, policy) => canGrant(TASKS_GRANT, form, policy);
+export const canGrantDocs = (form, policy) => canGrant(DOCS_GRANT, form, policy);
+
+export const grantsOf = (form, policy) => [
+    ...(form.manageTasks && canGrantTasks(form, policy) ? [TASKS_GRANT] : []),
+    ...(form.manageDocs && canGrantDocs(form, policy) ? [DOCS_GRANT] : []),
+];
