@@ -1,5 +1,3 @@
-import { i18n } from "@/locales/main";
-
 const BUSY_STATUS = 429;
 const BUSY_CODE = "server_busy";
 export const RETRY_WAIT_CAP_MS = 10000;
@@ -24,7 +22,10 @@ export const retryAfterMs = (error) => {
     return Number.isNaN(at) ? null : Math.max(0, at - Date.now());
 };
 
-const busyMessage = (error) => {
+/* The app's i18n instance is looked up only when a 429 has to be worded: a static import would
+ * create it for everything that imports the request layer. */
+const busyMessage = async (error) => {
+    const { i18n } = await import("@/locales/main");
     const seconds = Math.ceil((retryAfterMs(error) || 0) / 1000);
     return seconds > 0
         ? i18n.global.t("Common.server_busy_retry_in", { n: seconds }, seconds)
@@ -33,8 +34,8 @@ const busyMessage = (error) => {
 
 /* The global limiter (or a proxy in front of it) answers in English or plain text; a route with a
  * limit of its own says why in its body, and the page that called it reads that reason. */
-const describe = (error) => {
-    const text = busyMessage(error);
+const describe = async (error) => {
+    const text = await busyMessage(error);
     const body = error.response.data;
     const ownReason = body && typeof body === "object" && body.code !== BUSY_CODE && (body.statusText || body.message);
     if (ownReason) {
@@ -62,7 +63,7 @@ export const installBusyHandling = (instance) => {
         if (!isBusy(error)) throw error;
         const config = error.config || {};
         const wait = retryAfterMs(error);
-        if (!mayRetry(config, wait)) throw describe(error);
+        if (!mayRetry(config, wait)) throw await describe(error);
         waitingReads += 1;
         try {
             await sleep(wait);
