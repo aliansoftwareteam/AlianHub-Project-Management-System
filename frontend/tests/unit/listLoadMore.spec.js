@@ -209,6 +209,17 @@ describe('the list opens without a wait', () => {
         expect(pagesFor(2).map(skipOf)).toEqual([0]);
     });
 
+    it('asks at once when the sprints only arrive after it has mounted', async () => {
+        await openList({ sprints: [] });
+        expect(pageCalls()).toHaveLength(0);
+
+        await wrapper.setProps({ sprints: sprints() });
+        await settle();
+
+        expect(pagesFor(1).map(skipOf)).toEqual([0]);
+        expect(rowIds('To Do')).toHaveLength(PAGE);
+    });
+
     it('still loads when the group-by changes afterwards', async () => {
         await openList();
         server.calls = [];

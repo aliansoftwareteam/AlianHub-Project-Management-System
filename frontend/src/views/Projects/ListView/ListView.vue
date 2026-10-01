@@ -364,10 +364,10 @@ let initStarted = false;
 let refetchWanted = false;
 let fetchedFor = '';
 
-/* The first call loads at once. The page then calls again several times while the sprint
- * list and the props settle, so later calls wait for the last of a burst, and a fetch is
- * skipped when the same project, grouping and sprints were fetched already: asking again
- * would load each group's next page. */
+/* The first call, and the first one that has sprints to fetch, load at once. The page then
+ * calls again several times while the sprint list and the props settle, so later calls wait
+ * for the last of a burst, and a fetch is skipped when the same project, grouping and sprints
+ * were fetched already. */
 function init (group,refetch,projects,sprints,groupedTasksData,isBoard,isInitial) {
     if(isInitial == true){
         isLoading.value = true;
@@ -377,7 +377,7 @@ function init (group,refetch,projects,sprints,groupedTasksData,isBoard,isInitial
         const signature = JSON.stringify([projects?._id, group, (sprints || []).map((sprint) => sprint?.id)]);
         const fetch = refetchWanted && signature !== fetchedFor;
         refetchWanted = false;
-        if(fetch) fetchedFor = signature;
+        if(fetch && sprints?.length) fetchedFor = signature;
         const heldBefore = Boolean(getters['projectData/tasks']?.[projects?._id]);
         groupBy(group,fetch,projects,sprints,groupedTasksData,isBoard,'list',false,true,(resp)=>{
             groupedTasks.value = resp;
@@ -390,8 +390,9 @@ function init (group,refetch,projects,sprints,groupedTasksData,isBoard,isInitial
         }, { firstPageOnly: true });
     };
     clearTimeout(initTimer);
-    if(!initStarted) {
-        initStarted = true;
+    const atOnce = !initStarted || (refetchWanted && !fetchedFor);
+    initStarted = true;
+    if(atOnce) {
         run();
         return;
     }
