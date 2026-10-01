@@ -287,6 +287,15 @@ describe('caps', () => {
         expect(out.text.split('\n').pop()).toContain('short 80');
     });
 
+    it('the read holds its own caps, whoever calls it', async () => {
+        mockSlack.answers['conversations.history'] = { body: { ok: true, messages: many(80, 'z'.repeat(900)) } };
+        const out = await slackRead.read({ companyId: C, runId: RUN, actor, allowedActions: [], params: { channel: 'releases', limit: 500, maxChars: 900000, hours: 9000 } });
+        expect(mockSlack.calls[1].form.limit).toBe('50');
+        expect(Number(mockSlack.calls[1].form.oldest)).toBeGreaterThan(Date.now() / 1000 - (slackRead.LIMITS.HOURS + 1) * 3600);
+        expect(out.count).toBeLessThanOrEqual(slackRead.LIMITS.MESSAGES);
+        expect(out.chars).toBeLessThanOrEqual(slackRead.LIMITS.CHARS);
+    });
+
     it('long messages are cut at the character cap, newest kept, and the result says it was cut', async () => {
         mockSlack.answers['conversations.history'] = { body: { ok: true, messages: many(30, 'x'.repeat(1500)) } };
         const out = await read();
