@@ -42,8 +42,11 @@ const AUDITED_REFUSALS = [REASON.WINDOW_PASSED, REASON.NOT_VISIBLE, REASON.TARGE
 const LIST_KINDS = Object.freeze(['list', 'listName', 'listFolder']);
 /* A goal belongs to no project: whoever can edit the goal may undo a change to it. */
 const GOAL_KINDS = Object.freeze(['goalValue', 'goalSource']);
+/* A field or a view is the project's own: seeing the project is seeing it, and the route that takes it back asks the rest. */
+const SETUP_KINDS = Object.freeze(['fields', 'view']);
 const work = () => require('./workRequests');
 const goalWork = () => require('./goalRequests');
+const setupWork = () => require('./setupRequests');
 const undoer = (actor) => require('./taskRequests').whoOf(actor);
 
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
@@ -203,6 +206,17 @@ const inverses = {
         await requests.setArchived({ companyId, who: requests.whoOf(actor), taskId: u.taskId, to: u.previous });
         return { taskId: u.taskId, restored: u.previous };
     },
+    /* Fields and views are taken back through the field and project routes, as the person undoing. A field that
+     * holds a value or is on another project now stays, and the answer names it. */
+    async fields(companyId, u, actor) {
+        const out = await setupWork().withdrawFields({ companyId, who: undoer(actor), projectId: u.projectId, fieldIds: u.fieldIds });
+        return { projectId: u.projectId, ...out };
+    },
+    async view(companyId, u, actor) {
+        const out = await setupWork().withdrawView({ companyId, who: undoer(actor), projectId: u.projectId, viewId: u.viewId });
+        return { projectId: u.projectId, viewId: u.viewId, ...out };
+    },
+    ...require('./manager/workQueue').inverses,
 };
 
 const isUndoable = (row) => Boolean(row && row.meta && row.meta.undo && inverses[row.meta.undo.kind] && !row.meta.undoneAt);
@@ -251,7 +265,7 @@ const targetVisible = async (companyId, uid, u) => {
         const comment = await findRow(companyId, SCHEMA_TYPE.COMMENTS, u.commentId, { projectId: 1, sprintId: 1, taskId: 1 });
         return Boolean(comment) && (await canChangeComment(companyId, uid, comment)).allowed;
     }
-    if (u.kind === 'batch') return true;
+    if (u.kind === 'batch' || SETUP_KINDS.includes(u.kind)) return true;
     if (u.kind === 'page' || u.kind === 'pageVersion') {
         const page = await findRow(companyId, SCHEMA_TYPE.PAGES, u.pageId, { visibility: 1, createdBy: 1, ProjectID: 1, sharedWith: 1, deletedStatusKey: 1 });
         /* Undoing a page takes it to the trash, which a person the doc is only shared with may not do; putting

@@ -9,6 +9,8 @@ const { RULE, MOST_URGENT_FIRST } = require('./rules');
 // Stored findings, one row per project and cause. `handled` and `declined` rows are kept so the same change is
 // not offered again: handled until the cause is gone, declined for good.
 const STATUS = Object.freeze({ OPEN: 'open', HANDLED: 'handled', DECLINED: 'declined', CLOSED: 'closed' });
+// A task a person handed to an agent (./workQueue). It is kept as a row here so one list and one rule of who reads it serve both; no rule finds it.
+const HANDED_OVER = 'handed_over';
 const READ = 200;
 const SHOWN = 50;
 const DUPLICATE_KEY = 11000;
@@ -22,6 +24,7 @@ const OFFER_NEEDS = Object.freeze({
     [RULE.NO_OWNER]: 'task.task_assignee',
     [RULE.UNTRIAGED]: 'task.task_assignee',
     [RULE.NO_ESTIMATE]: 'task.task_estimated_hours',
+    [HANDED_OVER]: 'task.task_assignee',
 });
 
 const plain = (row) => (row && typeof row.toObject === 'function' ? row.toObject() : row);
@@ -37,13 +40,13 @@ const described = (finding, now) => ({
 
 /* Every row the look has to weigh: the ones still standing, and any closed one whose cause is found again. */
 const standing = (companyId, projectId, keys) => find(companyId, [{
-    ...inProject(projectId), $or: [{ status: { $in: [STATUS.OPEN, STATUS.HANDLED, STATUS.DECLINED] } }, { key: { $in: keys } }],
+    ...inProject(projectId), rule: { $ne: HANDED_OVER }, $or: [{ status: { $in: [STATUS.OPEN, STATUS.HANDLED, STATUS.DECLINED] } }, { key: { $in: keys } }],
 }]);
 
 /* null when another server filed or reopened the same finding first. */
 const open = async (companyId, projectId, finding, now, closedRow) => {
     const fields = { ...described(finding, now), status: STATUS.OPEN, openedAt: now };
-    if (closedRow) return plain(await change(companyId, { _id: closedRow._id, status: STATUS.CLOSED }, { $set: fields, $unset: { closedAt: '', proposalId: '' } }));
+    if (closedRow) return plain(await change(companyId, { _id: closedRow._id, status: STATUS.CLOSED }, { $set: fields, $unset: { closedAt: '', proposalId: '', claim: '', leftQueue: '' } }));
     try {
         return plain(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECT_FINDINGS, data: { projectId: String(projectId), key: finding.key, ...fields } }, 'save'));
     } catch (error) {
@@ -58,7 +61,7 @@ const settle = (companyId, row, status, now) => change(companyId, { _id: row._id
     $set: { status, ...(status === STATUS.CLOSED ? { closedAt: now } : {}) },
 });
 
-const openedSince = async (companyId, projectId, since) => (await find(companyId, [{ ...inProject(projectId), openedAt: { $gte: since } }, { _id: 1 }])).length;
+const openedSince = async (companyId, projectId, since) => (await find(companyId, [{ ...inProject(projectId), rule: { $ne: HANDED_OVER }, openedAt: { $gte: since } }, { _id: 1 }])).length;
 
 const byUrgency = (a, b) => MOST_URGENT_FIRST.indexOf(a.rule) - MOST_URGENT_FIRST.indexOf(b.rule) || new Date(b.openedAt) - new Date(a.openedAt);
 
@@ -84,4 +87,4 @@ const visibleTo = async (companyId, uid, projectId) => {
     }));
 };
 
-module.exports = { STATUS, OFFER_NEEDS, SHOWN, standing, open, refresh, attach, settle, openedSince, visibleTo };
+module.exports = { STATUS, HANDED_OVER, OFFER_NEEDS, SHOWN, standing, open, refresh, attach, settle, openedSince, visibleTo };

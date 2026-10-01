@@ -424,6 +424,7 @@ const executors = {
     ...require('./pageRequests').executors,
     ...require('./workRequests').executors,
     ...require('./goalRequests').executors,
+    ...require('./manager/workQueue').executors,
 };
 
 const COMMENT_ACTIONS = new Set(['task.comment', 'comment.create', 'chat.post', 'comment.update']);

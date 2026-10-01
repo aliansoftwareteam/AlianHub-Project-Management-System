@@ -244,6 +244,7 @@ module.exports.AGENT_DRAFT = '/api/v2/agents/draft';
 module.exports.AGENT_POLICY = '/api/v2/agents/policy';
 module.exports.AGENT_PROJECT_POLICY = '/api/v2/agents/project-policy';
 module.exports.AGENT_PROJECT_MANAGER = '/api/v2/agents/project-manager';
+module.exports.AGENT_WORK_QUEUE = '/api/v2/agents/work-queue';
 module.exports.WORKFLOW_RUNS = '/api/v2/workflows/runs';
 module.exports.WORKFLOW_APPROVALS = '/api/v2/workflows/approvals';
 module.exports.API_TOKENS = '/api/v2/api-tokens';

@@ -1163,6 +1163,10 @@ const schema = {
         openedAt: { type: Date, required: false },
         lastSeenAt: { type: Date, required: false },
         closedAt: { type: Date, required: false },
+        // The connected agent that holds the item in the work queue: { by, userId, name, at, until }. Absent, or past `until`, the item is free.
+        claim: { type: Object, required: false },
+        // { why: 'taken_back' | 'finished', userId, name, at }: not handed to an agent again while the row stays open.
+        leftQueue: { type: Object, required: false },
     },
     // Agents as teammates — managed by Modules/Agents.
     agents: {

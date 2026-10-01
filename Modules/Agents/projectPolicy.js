@@ -30,6 +30,7 @@ const REASON = Object.freeze({
     NEVER: 'this project has people close its tasks, so a person closes this task',
     APPROVAL: 'this project has a person approve an agent\'s close',
     PROPOSE_ALL: 'this project has connected agents propose every change',
+    PROPOSE_ONLY: 'an agent never makes this kind of change on its own',
 });
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -137,10 +138,12 @@ const closes = async (companyId, action, params) => {
 
 /* What the projects a write reaches hold it to: act as the caller's other rules allow, wait for a person, or
  * not at all. `approved` is true only where a person has approved this very change. A write that names no
- * project, a goal's for one, is outside every project's rule. */
+ * project, a goal's for one, is outside every project's rule. An action the registry marks proposeOnly waits
+ * for a person whatever a project is set to: answered here, a caller files it instead of meeting the registry's refusal. */
 const ask = async ({ companyId, actor, action, params = {}, approved = false }) => {
     const entry = registry.get(action);
     if (!isAgent(actor) || !entry || !entry.write || ASKS_NOTHING.has(entry.key)) return act;
+    if (entry.proposeOnly && !approved) return { decision: DECISION.PROPOSE, reason: REASON.PROPOSE_ONLY };
     const mayClose = STATUS_ACTIONS.has(entry.key) || CREATE_ACTIONS.has(entry.key);
     if (!mayClose && !isConnected(actor)) return act;
     const given = params && typeof params === 'object' ? params : {};

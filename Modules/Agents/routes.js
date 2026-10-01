@@ -80,6 +80,9 @@ exports.init = (app) => {
     app.put('/api/v2/agents/project-policy/:projectId', projectPolicyCtrl.putProjectPolicy);
     app.get('/api/v2/agents/project-manager/:projectId', projectManagerCtrl.getProjectManager);
     app.put('/api/v2/agents/project-manager/:projectId', projectManagerCtrl.putProjectManager);
+    app.get('/api/v2/agents/work-queue/task/:taskId', projectManagerCtrl.getTaskQueue);
+    app.post('/api/v2/agents/work-queue/task/:taskId/hand-over', projectManagerCtrl.postHandOver);
+    app.post('/api/v2/agents/work-queue/:itemId/take-back', projectManagerCtrl.postTakeBack);
 
     app.get('/api/v2/agents', ctrl.listAgents);
     app.post('/api/v2/agents', ctrl.createAgent);

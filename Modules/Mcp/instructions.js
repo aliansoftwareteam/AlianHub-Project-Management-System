@@ -60,6 +60,14 @@ const statusRule = (ctx, has) => {
         : '- You may set status to In progress or In review. A person closes the task.';
 };
 
+const setupRule = (has) => {
+    const makes = [
+        has('fields.create') && '`fields.create` adds fields to a project, all of them in one call',
+        has('view.create') && '`view.create` adds a saved view',
+    ].filter(Boolean);
+    return makes.length ? `- ${joined(makes)}. Everyone on the project sees these, so nothing is made until the person approves it in AlianHub.` : '';
+};
+
 const rules = (ctx, has, changes) => [
     'Rules:',
     changes
@@ -75,6 +83,9 @@ const rules = (ctx, has, changes) => [
     statusRule(ctx, has),
     has('task.comment') && has('task.link') && '- When the person asks you to do a task yourself, read it with `task.get`, report with `task.comment` and attach your result with `task.link`.',
     has('task.from_message') && '- To turn a chat message or a comment into a task, use `task.from_message`. The task keeps the message\'s text and a link back to it.',
+    setupRule(has),
+    has('queue.list') && has('queue.claim') && has('queue.release')
+        && '- `queue.list` shows work waiting for an agent. Take one item with `queue.claim` before you work on it, and give it back with `queue.release` when you are done or cannot go on.',
 ].filter(Boolean);
 
 const limits = (changes) => [

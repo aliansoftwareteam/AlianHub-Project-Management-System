@@ -177,6 +177,7 @@ const TASK_WRITE_ROUTES = Object.freeze({
     'POST /api/v1/ai/notes-to-tasks/propose': notATaskWrite('a proposal; nothing is written'),
     'POST /api/v1/ai/task-summary': notATaskWrite('a summary kept beside the task; the task is not written'),
     'POST /api/v1/ai/task-values': notATaskWrite('a read of kept summaries and areas'),
+    'POST /api/v2/agents/work-queue/task/:taskId/hand-over': notATaskWrite('files a work-queue item about the task, for a person who can open and assign it; the task is not written'),
     'POST /api/v1/ai/task-category': notATaskWrite('a suggestion; the task is not written'),
     'POST /api/v1/ai/task-next-steps': notATaskWrite('a suggestion; applying it goes through AddAiChecklist or createSubTaskWithAi'),
     'POST /api/v1/ai/task-research': notATaskWrite('a suggestion; adding it posts a comment through /api/v1/comments'),
