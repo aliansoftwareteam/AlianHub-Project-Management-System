@@ -2,27 +2,29 @@
 <div v-if="!currentCompany?.planFeature?.projectTimesheet">
     <UpgradePlan
         :buttonText="$t('Upgrades.upgrade_your_plan')"
-        lastTitle="To Unlock Project Timesheet"
-        secondTitle="Unlimited"
-        firstTitle="Upgrade To"
-        message="That feature isn’t available on your current plan"
+        :lastTitle="$t('Upgrades.to_unlock_project_timesheet')"
+        :secondTitle="$t('Upgrades.unlimited')"
+        :firstTitle="$t('Upgrades.upgrade_to')"
+        :message="$t('Upgrades.the_feature_not_available')"
     />
 </div>
 <div v-else>
-    <div class="timesheet_view Usertimesheet_view project-timesheet-contain" v-if="error404">
+    <div class="ah-page timesheet_view Usertimesheet_view project-timesheet-contain" v-if="error404">
         <div class="row">
             <div class="col-md-12">
                 <div class="page_title_row d-flex">
                     <div class="page-title d-flex">
                         <ul class="breadcrumb title_strip">
-                            <li @click="goHome()">
-                                <img class="cursor-pointer" :src="home_icon" alt="home_icon"/>
+                            <li>
+                                <button type="button" class="ts-home" :aria-label="$t('Milestone.home_link')" @click="goHome()">
+                                    <span class="ah-mask-icon" :style="maskOf(home_icon)" aria-hidden="true"></span>
+                                </button>
                             </li>
                             <li class="pro_route_link">
-                                <router-link :to="`/${companyId}/project`" class="text-decoration-underline font-size-18 font-weight-700">{{$t('UserTimesheet.back_projects')}}</router-link>
+                                <router-link :to="`/${companyId}/project`" class="ts-crumb">{{$t('UserTimesheet.back_projects')}}</router-link>
                             </li>
                             <li>
-                                <span class="workload_title font-size-18 font-weight-700">{{$t('UserTimesheet.project_timesheet')}}</span>
+                                <span class="workload_title ts-crumb">{{$t('UserTimesheet.project_timesheet')}}</span>
                             </li>
                         </ul>
                         <TimesheetTabs active="project" class="ts-legacy-tabs" />
@@ -40,9 +42,9 @@
                     />
                     <div class="wf_filter" @click.stop="$refs.filter_pt_click.click()">
                         <span class="timesheet_user_filter">
-                            <DropDown mode="listbox" id="" class="status_change_dropdown" :bodyClass="{'timesheetDropdown_wrapper' : true}">
+                            <DropDown mode="listbox" id="" themed class="status_change_dropdown" :bodyClass="{'timesheetDropdown_wrapper' : true}">
                                 <template #button="{ triggerAttrs }">
-                                    <button type="button" class="btn-white border cursor-pointer dot-btn" v-bind="triggerAttrs" ref="filter_pt_click">
+                                    <button type="button" class="dot-btn" v-bind="triggerAttrs" ref="filter_pt_click">
                                         <span class="link_disable_css">{{$t('Filters.filter_by')}}</span>
                                     </button>
                                 </template>
@@ -59,13 +61,13 @@
                                 <div v-if="filterType!=''">
                                     <div class="wf_header">
                                         <a @click="handleFilterType('back','')">
-                                            <img src="@/assets/images/svg/filter_back_icon.svg"/>&nbsp;
+                                            <span class="ah-mask-icon ts-back" :style="maskOf(backIcon)" aria-hidden="true"></span>&nbsp;
                                             {{ $t('UserTimesheet.back') }}
                                         </a>
                                         <span>{{ $t(`UserTimesheet.${filterType}`) }}</span>
                                     </div>
                                     <span class="filter_search_block">
-                                        <input type="search" class="form-control" ref="filter_dd_search" :placeHolder="$t('PlaceHolder.search')" v-model="filterSearch"/>
+                                        <input type="search" class="ah-input" ref="filter_dd_search" :placeHolder="$t('PlaceHolder.search')" v-model="filterSearch"/>
                                     </span>
                                     <div class="wf_body filter_body_scroll checklist-main" :class="{'filter_body_scroll': optionFilter.length >= 5}">
                                         <span
@@ -74,7 +76,7 @@
                                         :key="index"
                                         v-show="filterType.toLowerCase()=='users' && projectTimesheetPermission">
                                             <a class="vs-dropdown-users d-flex align-items-center">
-                                                <input type="checkbox" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent',true)" :value="item.id" v-model="checkedFilter">&nbsp;
+                                                <input type="checkbox" class="ah-check" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent',true)" :value="item.id" v-model="checkedFilter">&nbsp;
                                                 <UserProfile decorative
                                                     v-if="filterType.toLowerCase() == 'users'"
                                                     :showDot="false"
@@ -105,7 +107,7 @@
                                         :key="index"
                                         v-show="filterType.toLowerCase()=='projects'">
                                             <a class="vs-dropdown-users d-flex align-items-center">
-                                                <input type="checkbox" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent')" :value="item.id" v-model="checkedFilter">&nbsp;
+                                                <input type="checkbox" class="ah-check" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent')" :value="item.id" v-model="checkedFilter">&nbsp;
                                                 <span v-if="item?.projectIcon && item?.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center inital-box" :style="[{'background-color': item?.projectIcon.data}]">{{ item?.name.charAt(0).toUpperCase()}}</span>
                                                 <img v-if="item?.projectIcon && item?.projectIcon.type === 'image' && validateURL(item?.projectIcon.data)" class="profile-sm-square inital-box" :src="item?.projectIcon.data" alt=""/>
                                                 <WasabiImage 
@@ -128,21 +130,20 @@
                                     {{  `${$t(`general.${chip.type.slice(0,-1)}`)} : ${chip.name}` }}
                                         <!-- {{ `${chip.type=='Users' ? 'User' : 'Teams' ? 'Team' : 'Projects' ? 'Projects' : 'Projects'}  ${chip.name}` }} -->
                                 </span>
-                                <button @click="handleFilterItem(chip,'remove')" type="button" class="btn-close vs-chip--close cursor-pointer">
-                                    <img :src="close" alt="cancel"/>
-                                </button>
+                                <button @click="handleFilterItem(chip,'remove')" type="button" class="ts-chip-x" :aria-label="$t('Reports.remove_filter')">×</button>
                             </span>
                         </div>
+                        <span class="ah-mask-icon wf_filter__icon" :style="maskOf(filterIcon)" aria-hidden="true"></span>
                     </div>
                 </div>
                 <div class="d-flex align-items-center">
                     <span class="d-flex align-items-center" :class=" clientWidth <= 1200 ? 'm-0 pt-10px' : 'ml-1 '">
                         <div class="circlegreen mr-6px"></div>
-                        <span class="font-size-14 GunPowder font-weight-400">{{$t('UserTimesheet.tracked_time')}}</span>
+                        <span class="ts-legend">{{$t('UserTimesheet.tracked_time')}}</span>
                     </span>
                     <span class="d-flex align-items-center" :class=" clientWidth <=1200 ? 'm-0 pt-10px ml-1' : 'ml-1'">
                         <div class="circlePurple mr-6px"></div>
-                        <span class="font-size-14 GunPowder font-weight-400">{{ $t('UserTimesheet.manual_time') }}</span>
+                        <span class="ts-legend">{{ $t('UserTimesheet.manual_time') }}</span>
                     </span>
                 </div>
             </div>
@@ -191,6 +192,7 @@
     import { apiRequest } from '../../../services';
     import * as env from '@/config/env';
     import { isOwnerOrAdmin } from "@/utils/roles";
+    import { maskOf } from '@/utils/iconMask';
     const router = useRouter()
     const {checkPermission,debouncerWithPromise} = useCustomComposable();
     const { getters , dispatch} = useStore();
@@ -201,7 +203,8 @@
     const fullLoggedData = ref([]);
     const fullEstimatedData = ref([]);
     const home_icon = require("@/assets/images/home_icon.png");
-    const close = require("@/assets/images/svg/close_timesheet.svg")
+    const backIcon = require("@/assets/images/svg/filter_back_icon.svg");
+    const filterIcon = require("@/assets/images/svg/filter_icon.svg");
     const companyId = inject('$companyId');
     const clientWidth = inject("$clientWidth");
     const users = computed(() => getters["users/users"]);
@@ -764,7 +767,6 @@
     }
 </script>
 <style src="../style.css"></style>
-<style src="../legacyTimesheetTheme.css"></style>
 <style scoped>
     .page-content {
         padding: 15px;
@@ -801,7 +803,7 @@
     ul.breadcrumb.title_strip li {
         list-style: none;
         padding-right:15px;
-        border-left: 1px solid #b7b7b7;
+        border-left: 1px solid var(--border);
         font-family: var(--font-ui);
         font-weight:700;
         padding-left: 15px;
@@ -813,7 +815,8 @@
     }
     span.chipusername_wrapper {
         display: flex;
-        background-color: #f1efef;
+        background-color: var(--fill);
+        color: var(--ink);
         border-radius: 10px;
         margin-right: 10px;
         padding: 2px 4px 2px 8px;
@@ -823,7 +826,7 @@
         min-width: fit-content;
     }
     .link_disable_css {
-        color: #000;
+        color: var(--ink);
         text-decoration: none;
         font-size: 16px;
     }
@@ -836,23 +839,26 @@
         width: 17px;
         height: 17px;
         background: transparent !important;
+        color: var(--ink-2);
+        font: 400 var(--fs-lg, 16px)/1 var(--font-ui);
+        cursor: pointer;
     }
     span.timesheet_user_filter {
         position: sticky;
         left: 0;
-        background-color: #fff;
+        background-color: var(--surface);
         padding: 3px 10px 3px 10px;
         min-width: 75px;
     }
     .wf_filter::-webkit-scrollbar-thumb {
         border-radius: 10px;
-        -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);
-        background-color: #C1C1C1;
+        -webkit-box-shadow: inset 0 0 6px var(--shadow-ink);
+        background-color: var(--border);
     }
     .wf_filter::-webkit-scrollbar {
         width: 5px;
         height: 5px;
-        background-color: #F5F5F5;
+        background-color: var(--fill);
     }
     .chipusername_main {
         display: flex;
@@ -865,13 +871,13 @@
     .circlegreen {
         width: 10px;
         height: 10px;
-        background-color: #1CB303;
+        background-color: var(--ok);
         border-radius: 50%;
     }
     .circlePurple {
         width: 10px;
         height: 10px;
-        background-color: #7367F0;
+        background-color: var(--agent);
         border-radius: 50%;
     }
     @media(max-width: 1599px){

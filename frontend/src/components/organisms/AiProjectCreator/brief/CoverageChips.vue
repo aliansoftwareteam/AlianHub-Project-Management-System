@@ -40,13 +40,13 @@ defineProps({
     border: 1px solid transparent;
 }
 .cov__chip--met {
-    background: #dcfce7;
-    color: #15803d;
+    background: var(--ok-bg);
+    color: var(--ok-ink);
 }
 .cov__chip--missing {
-    background: #fff7ed;
-    color: #9a3412;
-    border-color: #fed7aa;
+    background: var(--warn-bg);
+    color: var(--warn-ink);
+    border-color: var(--warn);
 }
 .cov__mark { font-weight: 700; }
 </style>

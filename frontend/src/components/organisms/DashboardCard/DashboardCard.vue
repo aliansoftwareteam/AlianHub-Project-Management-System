@@ -178,8 +178,8 @@ const footerLeft = computed(() => [freshness.value, meta.note || props.footerNot
 .dcard__head {
     display: flex;
     align-items: center;
-    gap: 7px;
-    padding: 13px 15px 0;
+    gap: calc(var(--sp-2) + 1px);
+    padding: var(--card-pad-y, 13px) var(--card-pad-x, 15px) 0;
     min-width: 0;
 }
 .dcard__title {
@@ -205,19 +205,20 @@ const footerLeft = computed(() => [freshness.value, meta.note || props.footerNot
 .dcard__live {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
     font: var(--text-data);
     color: var(--ok-ink);
     white-space: nowrap;
 }
 .dcard__period {
+    height: var(--control-h-sm, 24px);
     font-family: var(--font-ui);
-    font-size: 11.5px;
+    font-size: var(--fs-sm, 11.5px);
     color: var(--ink-label);
     background: var(--surface);
     border: 1px solid var(--hairline);
     border-radius: var(--r-chip);
-    padding: 2px 6px;
+    padding: 0 var(--sp-2);
     max-width: 108px;
     cursor: pointer;
 }
@@ -226,8 +227,8 @@ const footerLeft = computed(() => [freshness.value, meta.note || props.footerNot
 .dcard__tool {
     display: inline-grid;
     place-items: center;
-    width: 22px;
-    height: 22px;
+    width: var(--hit-min);
+    height: var(--hit-min);
     border: 0;
     border-radius: var(--r-chip);
     background: transparent;
@@ -238,13 +239,13 @@ const footerLeft = computed(() => [freshness.value, meta.note || props.footerNot
 .dcard__tool:hover { color: var(--ink); background: var(--surface-hover); }
 .dcard__tool--danger:hover { color: var(--danger); }
 .dcard__tool:focus-visible { outline: none; box-shadow: var(--focus); }
-.dcard__metric { padding: 8px 15px 0; }
+.dcard__metric { padding: var(--sp-3) var(--card-pad-x, 15px) 0; }
 .dcard__body {
     position: relative;
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
-    padding: 9px 15px 12px;
+    padding: calc(var(--sp-3) + 1px) var(--card-pad-x, 15px) var(--card-pad-y, 12px);
 }
 .dcard__body--covered { overflow: hidden; }
 /* The body keeps its box while it is covered, so a chart inside it measures a real size. */
@@ -255,23 +256,22 @@ const footerLeft = computed(() => [freshness.value, meta.note || props.footerNot
     inset: 0;
     display: flex;
     overflow: auto;
-    padding: 9px 15px 12px;
+    padding: calc(var(--sp-3) + 1px) var(--card-pad-x, 15px) var(--card-pad-y, 12px);
 }
-.dcard__state { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: auto; text-align: center; padding: 6px 0; }
-.dcard__state-text { margin: 0; font: var(--text-small); color: var(--ink-2); max-width: 34ch; line-height: 1.5; }
-.dcard__skeleton { width: 100%; display: flex; flex-direction: column; gap: 8px; margin: auto; }
-.dcard__sk { height: 10px; border-radius: 5px; background: var(--surface-hover); width: 70%; }
+.dcard__state { display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); margin: auto; text-align: center; padding: var(--sp-2) 0; }
+.dcard__state-text { margin: 0; font: var(--text-small); color: var(--ink-2); max-width: 34ch; line-height: var(--lh-body, 1.5); }
+.dcard__skeleton { width: 100%; display: flex; flex-direction: column; gap: var(--sp-3); margin: auto; }
+.dcard__sk { height: 10px; border-radius: var(--r-sm, 5px); background: var(--surface-hover); width: 70%; }
 .dcard__sk--wide { width: 100%; height: 18px; }
 .dcard__sk--short { width: 45%; }
 .dcard__foot {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 7px 15px 11px;
-    margin: 0 0 0 0;
+    gap: var(--sp-3);
+    padding: calc(var(--sp-2) + 1px) var(--card-pad-x, 15px) var(--card-pad-y, 11px);
     border-top: 1px solid var(--hairline);
     font: var(--text-small);
-    font-size: 11.5px;
+    font-size: var(--fs-sm, 11.5px);
     color: var(--ink-2);
 }
 .dcard__note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -283,4 +283,8 @@ const footerLeft = computed(() => [freshness.value, meta.note || props.footerNot
     white-space: nowrap;
 }
 .dcard__link:hover { text-decoration: underline; }
+@media (max-width: 767px) {
+    .dcard__link { display: inline-flex; align-items: center; min-height: var(--hit-min); }
+    .dcard__period { height: var(--hit-min); }
+}
 </style>

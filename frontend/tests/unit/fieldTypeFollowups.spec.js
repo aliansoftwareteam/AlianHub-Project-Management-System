@@ -105,7 +105,7 @@ describe('the types the "create custom field" drawer offers', () => {
         await editor.get('[data-field-title]').setValue('Confidence');
         await editor.get('[data-rating-max]').setValue('7');
         await editor.get('[data-field-save]').trigger('click');
-        expect(drawer.emitted('customFieldStore')).toEqual([[expect.objectContaining({ fieldTitle: 'Confidence', fieldType: 'rating', fieldRatingMax: 7, isDelete: true }), false]]);
+        expect(drawer.emitted('customFieldStore')).toEqual([[expect.objectContaining({ fieldTitle: 'Confidence', fieldType: 'rating', fieldRatingMax: 7, isDelete: true }), false, false]]);
     });
 });
 

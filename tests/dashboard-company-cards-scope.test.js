@@ -7,6 +7,7 @@ jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), 
 
 const { myCache } = require('../Config/config');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
+const { seedTaskListRules } = require('./fixtures/taskListRules');
 const dashboard = require('../Modules/UserDashboard/controller');
 
 const C = '6f0000000000000000000c01';
@@ -44,6 +45,7 @@ const log = (Loggeduser, TicketID, ProjectId, LogTimeDuration, extra = {}) => mo
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     myCache.flushAll();
+    seedTaskListRules(mockDb);
     [[OWNER, 1, 'Olive Owner'], [ADMIN, 2, 'Adam Admin'], [MEMBER, 3, 'Mia Member']].forEach(([userId, roleType, Employee_Name]) => {
         mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, roleType, status: 2, isDelete: false });
         mockDb.seed(SCHEMA_TYPE.USERS, { _id: userId, Employee_Name, isActive: true, AssignCompany: C });

@@ -14,7 +14,7 @@ const v2 = require('./v2Flag');
 const cursor = require('./cursor');
 const names = require('./names');
 const { annotationsFor, isDestructive } = require('./annotations');
-const { propose } = require('./propose');
+const { propose, outsideMayFile } = require('./propose');
 const sessionTools = require('./sessionTools');
 const dataTools = require('./dataTools');
 const manageFlag = require('./manageFlag');
@@ -254,8 +254,8 @@ const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.a
 
 const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...dataTools.TOOLS, ...manageTools.TOOLS, ...Object.values(manageTools.VARIANTS), ...sessionTools.TOOLS];
 
-/* A tool that needs a grant is one only a write token created with that grant lists or runs. */
-const holdsGrantFor = (ctx, tool) => !tool.grant || (Boolean(ctx) && Boolean(ctx.canWrite) && manageFlag.holdsGrant(ctx.token, tool.grant));
+/* A tool that needs a grant is one only a caller holding that grant lists or runs. */
+const holdsGrantFor = (ctx, tool) => !tool.grant || manageFlag.mayUse(ctx, tool.grant);
 
 /* For a caller whose token was created to manage tasks, an existing tool is its fuller form; for everyone else it is as it was. */
 const formFor = (ctx, tool) => {
@@ -301,8 +301,8 @@ const refuseBadArguments = (tool, args) => {
 };
 
 const scopeRefusal = (ctx, tool, write) => {
-    if (tool.grant && !manageFlag.holdsGrant(ctx.token, tool.grant)) return `This token was not created with the ${tool.grant} grant, which ${tool.name} needs.`;
-    if (tool.grant && !ctx.canWrite) return 'This token is read-only.';
+    if (tool.grant && !manageFlag.holdsGrant(ctx.token, tool.grant)) return `This token does not hold the ${tool.grant} grant, which ${tool.name} needs.`;
+    if (tool.grant && !manageFlag.mayUse(ctx, tool.grant)) return 'This token is read-only.';
     if (ctx.token && ctx.token.oauth) {
         const needed = scopes.scopeForTool(tool.name);
         return needed && scopes.grantedScopes(ctx.token).includes(needed) ? '' : `This token lacks the ${needed || 'required'} scope.`;
@@ -347,9 +347,12 @@ const call = async (ctx, name, args = {}) => {
         }
     }
     const held = heldForApproval(ctx, tool.action);
-    if (held) throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params, reason: held, ip: ctx.ip, taint: ctx.taint });
-    if (v2.enabled() && isDestructive(actions.rating(tool.action))) {
-        return propose(ctx, tool, params, str(args.reason, 500) || `${tool.name} via MCP`);
+    // An outside client that holds the tool's manage grant files what is held for a person; without the grant the call is refused, as before.
+    if (held && !outsideMayFile(ctx, tool)) {
+        throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params, reason: held, ip: ctx.ip, taint: ctx.taint });
+    }
+    if (held || (v2.enabled() && isDestructive(actions.rating(tool.action)))) {
+        return propose(ctx, tool, params, str(args.reason, 500) || `${tool.name} via MCP`, held);
     }
     const out = await actions.perform({
         companyId: ctx.companyId,

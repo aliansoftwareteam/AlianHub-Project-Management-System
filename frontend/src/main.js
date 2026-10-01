@@ -38,6 +38,7 @@ import oAuthPlugin from './plugins/oauth/oAuthPlugin';
  */
 
 import "@/assets/css/index.css";
+import "@/assets/css/alerts.css";
 import "@/assets/css/driver.css";
 import { GridLayout, GridItem } from 'grid-layout-plus'
 

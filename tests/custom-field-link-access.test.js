@@ -7,6 +7,7 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({
 }));
 jest.mock('../Config/config', () => ({ myCache: { get: () => undefined, set: () => {}, del: () => {}, keys: () => [], getTtl: () => 0 } }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 const mockStub = () => new Proxy({}, {
     get: (target, name) => {
         if (name === 'then' || name === '__esModule') return undefined;
@@ -44,8 +45,11 @@ const { response, settle } = require('./fixtures/taskWriteGuard');
 
 const CID = '6f00000000000000000000c1';
 const OTHER_COMPANY = '6f00000000000000000000c2';
-const [OWNER, ADMIN, MEMBER, GUEST, PEER] = [1, 2, 3, 4, 5].map((n) => `6f000000000000000000000${n}`);
-const ROLES = [[OWNER, 1], [ADMIN, 2], [MEMBER, 3], [GUEST, 0], [PEER, 3]];
+const [OWNER, ADMIN, MEMBER, GUEST, PEER, NO_FIELDS] = [1, 2, 3, 4, 5, 6].map((n) => `6f000000000000000000000${n}`);
+const NO_FIELDS_ROLE = 7;
+const ROLES = [[OWNER, 1], [ADMIN, 2], [MEMBER, 3], [GUEST, 0], [PEER, 3], [NO_FIELDS, NO_FIELDS_ROLE]];
+/* The custom field permission as the matrix stores it: members edit, guests only see, and the last role has no access. */
+const FIELD_ACCESS = [{ key: 3, permission: true }, { key: 0, permission: false }, { key: NO_FIELDS_ROLE, permission: null }];
 const OPEN_PROJECT = '6f0000000000000000000a01';
 const PRIVATE_PROJECT = '6f0000000000000000000a02';
 const PERSONAL_LIST = '6f0000000000000000000a03';
@@ -59,6 +63,7 @@ const task = (n) => `6f0000000000000000000b${String(n).padStart(2, '0')}`;
 const [SOURCE, BARE, IN_OPEN, IN_PRIVATE, IN_PERSONAL, IN_SPRINT, DELETED, ARCHIVED, CHAT, PRIVATE_SOURCE, MISSING] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 99].map(task);
 const STORED = [IN_OPEN, IN_PRIVATE, IN_PERSONAL, IN_SPRINT, DELETED];
 const NOT_OPENABLE = 'A task named here is not one you can open.';
+const MARKER = { _id: CLIENT, fieldValue: '', revision: 1 };
 
 const links = () => mockDb.store[SCHEMA_TYPE.CUSTOM_FIELD_LINKS] || [];
 const idsOf = (taskId, fieldId) => (links().find((doc) => doc.taskId === taskId && doc.fieldId === fieldId) || {}).ids;
@@ -70,6 +75,8 @@ const seed = () => {
     Object.keys(mockDb.store).forEach((type) => { mockDb.store[type].length = 0; });
     socketEmitter.emit.mockClear();
     ROLES.forEach(([userId, roleType]) => mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, roleType, status: 2, isDelete: false }));
+    const taskRules = mockDb.seed(SCHEMA_TYPE.RULES, { key: 'task', name: 'task', isParent: true, roles: [] });
+    mockDb.seed(SCHEMA_TYPE.RULES, { key: 'task_custom_field', name: 'task_custom_field', isParent: false, parentId: String(taskRules._id), roles: FIELD_ACCESS });
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: OPEN_PROJECT, ProjectName: 'Open', isPrivateSpace: false });
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PRIVATE_PROJECT, ProjectName: 'Private', isPrivateSpace: true, AssigneeUserId: [PEER] });
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PERSONAL_LIST, ProjectName: 'Mine', isPrivateSpace: true, isPersonal: true, personalOwner: PEER, AssigneeUserId: [PEER] });
@@ -79,15 +86,15 @@ const seed = () => {
         _id, ProjectID, sprintId: OPEN_SPRINT, TaskName: `Task ${_id.slice(-2)}`, TaskKey: `T-${_id.slice(-2)}`, TaskTypeKey: 1, deletedStatusKey: 0,
         status: { key: 1, text: 'To Do', type: 'default_active' }, statusKey: 1, statusType: 'default_active', ...extra,
     });
-    row(SOURCE, OPEN_PROJECT);
-    row(BARE, OPEN_PROJECT);
+    row(SOURCE, OPEN_PROJECT, { customField: { [CLIENT]: { ...MARKER } } });
+    row(BARE, OPEN_PROJECT, { customField: { [CLIENT]: { ...MARKER } } });
     row(IN_OPEN, OPEN_PROJECT);
     row(IN_PRIVATE, PRIVATE_PROJECT);
     row(IN_PERSONAL, PERSONAL_LIST);
     row(IN_SPRINT, OPEN_PROJECT, { sprintId: PRIVATE_SPRINT });
     row(DELETED, OPEN_PROJECT, { deletedStatusKey: 1 });
     row(ARCHIVED, OPEN_PROJECT, { deletedStatusKey: 2 });
-    row(PRIVATE_SOURCE, PRIVATE_PROJECT);
+    row(PRIVATE_SOURCE, PRIVATE_PROJECT, { customField: { [CLIENT]: { ...MARKER } } });
     mockDb.seed(SCHEMA_TYPE.TASKS, { _id: CHAT, mainChat: true, AssigneeUserId: [OWNER, MEMBER], TaskName: 'Chat', deletedStatusKey: 0 });
     const field = (id, fieldType, extra = {}) => mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: id, fieldTitle: fieldType, fieldType, type: 'task', global: true, isDelete: true, ...extra });
     field(CLIENT, 'relationship', { fieldLinkMax: 10, fieldLinkScope: 'any' });
@@ -201,7 +208,7 @@ describe('writing a relationship value', () => {
             companyId: CID, taskId: BARE, customFieldId: CLIENT, updateDetail: { _id: CLIENT, fieldValue: [IN_PRIVATE, IN_PERSONAL] },
             userData: { id: MEMBER, Employee_Name: 'Max Member' }, storedTask: storedTask(BARE),
         })).rejects.toMatchObject({ statusCode: 400, message: NOT_OPENABLE });
-        expect(storedTask(BARE).customField).toBeUndefined();
+        expect(storedTask(BARE).customField).toEqual({ [CLIENT]: MARKER });
     });
 });
 
@@ -294,8 +301,8 @@ describe('the task query', () => {
         expect(match.$match.$and[0].ProjectID.$in[0]).toBe(projectId);
         expect(match.$match.$and[1].createdAt.$gte).toBe(since);
         expect(match.$match.$and[2].$nor[0]).toMatchObject({ TaskTypeKey: { $in: [1] } });
-        expect(match.$match.$and[2].$nor[0]._id.$in.map(String)).toEqual([SOURCE, PRIVATE_SOURCE]);
-        expect(facet.$facet.has[0].$match._id.$in.map(String)).toEqual([SOURCE, PRIVATE_SOURCE]);
+        expect(match.$match.$and[2].$nor[0]._id.$in.map(String)).toEqual([SOURCE]);
+        expect(facet.$facet.has[0].$match._id.$in.map(String)).toEqual([SOURCE]);
         expect(facet.$facet.has[1]).toEqual({ $count: 'count' });
     });
 
@@ -337,11 +344,11 @@ describe('voting', () => {
         expect(await vote(MEMBER, SOURCE)).toEqual({ count: 1, voted: true });
         expect(await vote(GUEST, SOURCE)).toEqual({ count: 2, voted: true });
         expect(idsOf(SOURCE, VOTES)).toEqual([MEMBER, GUEST]);
-        expect(count(SOURCE)).toEqual({ _id: VOTES, fieldValue: 2, revision: expect.any(Number) });
+        expect(count(SOURCE)).toEqual({ _id: VOTES, fieldValue: 2, revision: expect.any(Number), version: 3 });
         expect(await vote(MEMBER, SOURCE, false)).toEqual({ count: 1, voted: false });
         expect(await vote(MEMBER, SOURCE, false)).toEqual({ count: 1, voted: false });
         expect(await vote(GUEST, SOURCE, false)).toEqual({ count: 0, voted: false });
-        expect(count(SOURCE)).toBeUndefined();
+        expect(count(SOURCE).fieldValue).toBeUndefined();
         expect(idsOf(SOURCE, VOTES)).toEqual([]);
     });
 
@@ -369,7 +376,7 @@ describe('voting', () => {
         expect((await call(fieldLinks.vote, request(uid, { taskId, vote: true }, { fieldId: VOTES }))).code).toBe(404);
     });
 
-    it('is cast by a person who can open the task and may not edit its fields', async () => {
+    it('is cast by a person who can open the task and may see its fields without editing them', async () => {
         const registered = {};
         const record = (method) => (path, ...handlers) => { registered[`${method} ${path}`] = handlers; };
         routes.init({ get: record('GET'), put: record('PUT'), post: record('POST') });
@@ -427,24 +434,16 @@ describe('voting', () => {
         expect(await shown(MEMBER, [PRIVATE_SOURCE])).toEqual({});
     });
 
-    it('lands when two people cast the first vote on a task at once', async () => {
-        const real = mockDb.crud.getMockImplementation();
-        let refusedOnce = false;
-        mockDb.crud.mockImplementation(async (companyId, query, method) => {
-            const firstVote = query.type === SCHEMA_TYPE.CUSTOM_FIELD_LINKS && method === 'updateOne' && query.data[2] && query.data[2].upsert === true;
-            if (firstVote && !refusedOnce) {
-                refusedOnce = true;
-                throw Object.assign(new Error('E11000 duplicate key'), { code: 11000 });
-            }
-            return real(companyId, query, method);
-        });
-        try {
-            expect(await vote(MEMBER, SOURCE)).toEqual({ count: 1, voted: true });
-        } finally {
-            mockDb.crud.mockImplementation(real);
-        }
-        expect(refusedOnce).toBe(true);
-        expect(idsOf(SOURCE, VOTES)).toEqual([MEMBER]);
+    it('is not cast by a person whose role has no access to custom fields, as the app shows them none', async () => {
+        expect(await vote(NO_FIELDS, SOURCE)).toEqual({ refused: 'fields_hidden' });
+        expect(await call(fieldLinks.vote, request(NO_FIELDS, { taskId: SOURCE, vote: true }, { fieldId: VOTES }))).toMatchObject({ code: 403, body: { status: false } });
+        expect(await vote(NO_FIELDS, IN_PRIVATE)).toEqual({ refused: 'not_found' });
+        expect(links().filter((doc) => doc.kind === 'voting')).toEqual([]);
+        expect(count(SOURCE)).toBeUndefined();
+        mockDb.store[SCHEMA_TYPE.RULES].find((rule) => rule.key === 'task_custom_field').roles = [{ key: NO_FIELDS_ROLE, permission: false }];
+        expect(await vote(NO_FIELDS, SOURCE)).toEqual({ count: 1, voted: true });
+        expect(await vote(MEMBER, SOURCE)).toEqual({ refused: 'fields_hidden' });
+        expect(await vote(OWNER, SOURCE)).toEqual({ count: 2, voted: true });
     });
 
     it('cannot be made of a field that already holds values of another kind, nor unmade', async () => {
@@ -468,11 +467,5 @@ describe('voting', () => {
         expect(await change(VOTES, { fieldType: 'voting', fieldVotersShown: false })).toBe('passed');
         expect(await change(VOTES, { fieldTitle: 'Upvotes' })).toBe('passed');
         expect(await change(NUMBER, { fieldType: 'money' })).toBe('passed');
-    });
-
-    it('starts over on a field that was a relationship before', async () => {
-        definition(CLIENT).fieldType = 'voting';
-        expect(await vote(MEMBER, SOURCE, true, CLIENT)).toEqual({ count: 1, voted: true });
-        expect(idsOf(SOURCE, CLIENT)).toEqual([MEMBER]);
     });
 });

@@ -1,6 +1,5 @@
 'use strict';
 
-const crypto = require('crypto');
 const logger = require('../../Config/loggerConfig');
 const aiSwitch = require('../AICore/aiSwitch');
 const { isAnyProviderConfigured } = require('../AICore/llmProvider');
@@ -9,6 +8,7 @@ const { canPostToThread } = require('../Comments/helpers/threadWriteAccess');
 const { tokenProjectIdsOf, aboutOf } = require('./ask');
 const aiMention = require('./aiMention');
 const { allShared } = require('./publicSources');
+const { citedKey, shareTokenFor, sharedSourcesOf } = require('./shareToken');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 
@@ -16,7 +16,6 @@ const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const CHANNEL_THREAD = 'default';
 const QUESTION_MAX = 1000;
 const ANSWER_MAX = 20000;
-const SHARE_TTL_MS = 30 * 60 * 1000;
 
 const isId = (value) => typeof value === 'string' && OBJECT_ID.test(value);
 
@@ -24,38 +23,6 @@ const threadFrom = (body) => {
     const { projectId, sprintId, taskId } = body || {};
     if (!isId(projectId) || !isId(sprintId) || !(taskId === CHANNEL_THREAD || isId(taskId))) return null;
     return { projectId, sprintId, taskId };
-};
-
-const citedKey = (cited) => (Array.isArray(cited) ? cited : [])
-    .map((c) => [String((c && c.kind) || ''), String((c && c.id) || ''), String((c && c.ref) || ''), String((c && c.projectId) || '')]);
-
-/* A private answer can later be posted as it was given, by the person it was given to, and in the same conversation:
- * the signature covers all of it and the sources it was built from, so posting needs no stored copy and no second
- * model call. */
-const signatureOf = ({ companyId, uid, thread, question, answer, cited, used, issuedAt }) => {
-    const secret = process.env.JWT_SECRET;
-    if (!secret) throw new Error('JWT_SECRET is not set.');
-    const payload = JSON.stringify([companyId, uid, thread.projectId, thread.sprintId, thread.taskId, question, answer, citedKey(cited), used, issuedAt]);
-    return crypto.createHmac('sha256', secret).update(payload).digest('hex');
-};
-
-const shareTokenFor = (fields) => `${fields.issuedAt}.${Buffer.from(JSON.stringify(fields.used || [])).toString('base64url')}.${signatureOf(fields)}`;
-
-/* The sources the answer was built from, or null when the token is not this answer's. */
-const sharedSourcesOf = (token, fields, now = Date.now()) => {
-    const [issued, packed, signature] = String(token || '').split('.');
-    const issuedAt = Number(issued);
-    if (!Number.isFinite(issuedAt) || !packed || !signature || now - issuedAt > SHARE_TTL_MS || issuedAt > now + 60 * 1000) return null;
-    let used;
-    try {
-        used = JSON.parse(Buffer.from(packed, 'base64url').toString('utf8'));
-    } catch (error) {
-        return null;
-    }
-    if (!Array.isArray(used)) return null;
-    const expected = Buffer.from(signatureOf({ ...fields, used, issuedAt }), 'hex');
-    const given = Buffer.from(signature, 'hex');
-    return given.length === expected.length && crypto.timingSafeEqual(given, expected) ? used : null;
 };
 
 const conversationOf = (companyId, thread) => (isId(thread.taskId)

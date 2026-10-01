@@ -73,6 +73,12 @@ describe('the attachments column', () => {
         ]);
         expect(parseAttachmentLinks('')).toEqual([]);
     });
+
+    it('keeps only an address the task panel can draw as a link', () => {
+        expect(parseAttachmentLinks(JSON.stringify([{ title: 'broken', url: 'https://[not-a-host' }, { title: 'fine', url: 'https://files.clickup.test/a.pdf' }]))).toEqual([
+            { url: 'https://files.clickup.test/a.pdf', label: 'fine' },
+        ]);
+    });
 });
 
 describe('ClickUp rows carry their details', () => {

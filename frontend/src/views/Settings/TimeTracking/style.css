@@ -1,4 +1,5 @@
-* {
+/* :where() keeps this at the weight the bare * had, so no class rule loses to it; it used to reach every screen once this file had loaded. */
+:where(.time_tracking_wapper), :where(.time_tracking_wapper) * {
     box-sizing: border-box;
     outline: none;
     text-transform: none;

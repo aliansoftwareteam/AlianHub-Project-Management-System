@@ -1,0 +1,47 @@
+Task ID,Task Custom ID,Task Name,Task Content,Status,Date Created,Date Created Text,Due Date,Due Date Text,Start Date,Start Date Text,Parent ID,Assignees,Tags,Priority,List Name,Folder Name,Space Name,Time Estimated,Time Estimated Text,Time Logged,Time Logged Text,Task Type,Dependencies,Checklists,Comments,Attachments,Budget (currency),Stage (drop down),Launch Date (date),Approved (checkbox),Story Points (number),Site (location),Internal Ref
+86c0a01,MKT-1,Plan the relaunch,"# Goal
+Relaunch the site before the trade fair.
+- New home page
+- Pricing in € and £
+**Deadline:** 1 December
+See [the brief](https://docs.example.test/brief)
+<b>not bold</b>",in progress,1761552000000,"Monday, October 27th 2025",1764579600000,"Monday, December 1st 2025, 9:00 am",1762160400000,"Monday, November 3rd 2025, 9:00 am",,"[max.member@example.test, lee.long@example.test, ghost.writer@example.test, Pat Example]","[launch, Q4]",urgent,Website relaunch,Marketing,Acme,9000000,2h 30m,5400000,1h 30m,milestone,,"[{""name"":""Before go-live"",""items"":[{""name"":""Redirects mapped"",""resolved"":true},{""name"":""Backup taken"",""resolved"":false}]}]","[{""text"":""Bitte die Preise prüfen – danke!"",""by"":""Pat Example"",""date"":""2025-11-05T08:00:00.000Z""},{""text"":""Kick-off moved to Monday"",""by"":""max.member@example.test"",""date"":1762164000000},{""text"":""Agency confirmed the budget"",""by"":{""username"":""Olivia Owner"",""email"":""olivia.owner@example.test""},""date"":""2025-11-04T10:30:00.000Z""}]","[{""title"":""brief.pdf"",""url"":""https://files.example.test/a01/brief.pdf""},{""title"":""tracker"",""url"":""javascript:alert(1)""}]","$12,500.00",Design,1764547200000,true,8,"Halle 4, Köln",R-7
+86c0a02,,Design the home page,,in review,1761552000000,"Monday, October 27th 2025",,"Friday, December 5th 2025",,,86c0a01,[max.member@example.test],[design],high,Website relaunch,Marketing,Acme,,1h 30m,,,task,,,,,lots,Design,,,5,,
+86c0a03,,Hero illustration,,to do,1761552000000,"Monday, October 27th 2025",,,,,86c0a02,[lee.long@example.test],,normal,Website relaunch,Marketing,Acme,,,,,task,,,"[{""text"":""First sketch is in the shared folder"",""by"":""ghost.writer@example.test""}]",,,Build,,maybe,,,
+86c0a04,,Export the SVG,,to do,1761552000000,"Monday, October 27th 2025",,,,,86c0a03,[],,low,Website relaunch,Marketing,Acme,,,,,task,,,,,,,,,,,
+86c0a05,,"Preise & Tarife übersetzen (日本語, Ελληνικά) ✓",Übersetzung für DE und JP – „Preise“ prüfen.,blocked,1761552000000,"Monday, October 27th 2025",,,,,,[],"[content, Q4]",low,Website relaunch,Marketing,Acme,,,,,task,[86c0a06],,,,,,,,,,
+86c0a06,,Write the pricing page,,complete,1761552000000,"Monday, October 27th 2025",,,,,,[],,,Website relaunch,Marketing,Acme,,,,,task,,,,,,,2025-11-20,yes,13,,
+86c0a07,,Collect customer quotes,,backlog,1761552000000,"Monday, October 27th 2025",,,,,,[Pat Example],,normal,Website relaunch,Marketing,Acme,,,,,task,,,,,,,,,,,
+86c0a08,,Map the redirects,,to do,1761552000000,"Monday, October 27th 2025",15/12/2025,,1762765200000,,,[],,high,Website relaunch,Marketing,Acme,,,,,task,,,,,,,,,,,
+86c0a09,,,A row with no name,to do,1761552000000,"Monday, October 27th 2025",,,,,,[],,normal,Website relaunch,Marketing,Acme,,,,,task,,,,,,,,,,,
+86c0a10,,Set up analytics,,in progress,1761552000000,"Monday, October 27th 2025",2025-12-10,,,,,[],[launch],high,Website relaunch,Marketing,Acme,,,,,task,,,,https://files.example.test/a10/plan.xlsx,,,,,,,
+86c0a11,,Tag the buttons,,to do,1761552000000,"Monday, October 27th 2025",,,,,86c0a10,[max.member@example.test],,normal,Website relaunch,Marketing,Acme,,,,,task,,,,,,,,,,,
+86c0a12,,Check the consent banner,,complete,1761552000000,"Monday, October 27th 2025",,,,,86c0a10,[],,normal,Website relaunch,Marketing,Acme,,,,,task,,"[Cookie text, Legal sign-off]",,,,,,,,,
+86c0a08,,Map the redirects (again),,to do,1761552000000,"Monday, October 27th 2025",,,,,,[],,normal,Website relaunch,Marketing,Acme,,,,,task,,,,,,,,,,,
+86c0a14,,Write the launch email,,in review,1761552000000,"Monday, October 27th 2025",,,,,,[lee.long@example.test],[content],normal,Website relaunch,Marketing,Acme,,,,,task,,,,,,,,,,,
+86c0a15,,Book the photographer,,complete,1761552000000,"Monday, October 27th 2025",,,,,,[],,low,Website relaunch,Marketing,Acme,,,,,task,,,,,,,,,,,
+86c0a16,,Agree the page structure,,complete,1761552000000,"Monday, October 27th 2025",,,,,,[],[design],high,Website relaunch,Marketing,Acme,,,,,task,,,,,,,,,,,
+86c0a17,,Migrate the blog posts,,in progress,1761552000000,"Monday, October 27th 2025",,,,,,[max.member@example.test],,normal,Website relaunch,Marketing,Acme,,,,,task,,,,,,,,,3,,
+86c0a18,,Check page speed,,backlog,1761552000000,"Monday, October 27th 2025",,,,,,[],,low,Website relaunch,Marketing,Acme,,,,,task,,,,,,,,,,,
+86c0a19,,Order the stand banner,,blocked,1761552000000,"Monday, October 27th 2025",1763744400000,,,,,[],,urgent,Website relaunch,Marketing,Acme,,,,,task,,,,,,,,,,,
+86c0a20,,Brief the sales team,,to do,1761552000000,"Monday, October 27th 2025",,,,,,[],,normal,Website relaunch,Marketing,Acme,,,,,task,,,,,,,,,,,
+86c0a21,,Draft the press release,,to do,1761552000000,"Monday, October 27th 2025",,,,,,[],[content],normal,Website relaunch,Marketing,Acme,,,,,task,,,,,,,,,,,
+86c0a22,,Publish the changelog,,backlog,1761552000000,"Monday, October 27th 2025",,,,,,[],,low,Website relaunch,Marketing,Acme,,,,,task,,,,,,,,,,,
+86c0b01,,Login fails on Safari,,in progress,1761552000000,"Monday, October 27th 2025",,,,,,[max.member@example.test],"[bug, safari]",urgent,Bugs,,Acme,,,,,task,,,"[{""text"":""Happens on Safari 17 only"",""by"":""lee.long@example.test"",""date"":1762437600000}]",,,Triage,,,3,,
+86c0b02,,Reproduce on iOS 18,,to do,1761552000000,"Monday, October 27th 2025",,,,,86c0b01,[lee.long@example.test],,high,Bugs,,Acme,,,,,task,,,,,,,,,,,
+86c0b03,,Write the regression test,,to do,1761552000000,"Monday, October 27th 2025",,,,,86c0b02,[],,normal,Bugs,,Acme,,,,,task,,,,,,,,,,,
+86c0b04,,Footer overlaps on small screens,,blocked,1761552000000,"Monday, October 27th 2025",,,,,,[],[bug],low,Bugs,,Acme,,,,,task,,,,,,,,,,,
+86c0b05,,Old ticket from the archive,,complete,1761552000000,"Monday, October 27th 2025",,,,,86c0zz9,[],,low,Bugs,,Acme,,,,,task,,,,,,,,,,,
+86c0b06,,Fix the hero image alt text,,to do,1761552000000,"Monday, October 27th 2025",,,,,86c0a03,[],,normal,Bugs,,Acme,,,,,task,,,,,,,,,,,
+86c0b07,,"Search ignores umlauts (ä, ö, ü)",,in review,1761552000000,"Monday, October 27th 2025",,,,,,[],[bug],high,Bugs,,Acme,,,,,task,,,,,,,,,,,
+86c0b08,,Export times out,,backlog,1761552000000,"Monday, October 27th 2025",,,,,,[],,normal,Bugs,,Acme,,,,,task,,,,,,,,,,,
+86c0b09,,Wrong currency on invoices,,in progress,1761552000000,"Monday, October 27th 2025",,,,,,[],[bug],urgent,Bugs,,Acme,,,,,task,,,,,450,,,,,,
+86c0b10,,Avatar upload fails over 5 MB,,to do,1761552000000,"Monday, October 27th 2025",,,,,,[],,normal,Bugs,,Acme,,,,,task,,,,,,,,,,,
+86c0b11,,Password reset mail lands in spam,,in review,1761552000000,"Monday, October 27th 2025",,,,,,[max.member@example.test],,high,Bugs,,Acme,,,,,task,,,,,,,,,,,
+86c0b12,,Calendar shows the wrong week,,complete,1761552000000,"Monday, October 27th 2025",,,,,,[],,normal,Bugs,,Acme,,,,,task,,,,,,,,,,,
+86c0b13,,Tooltip is cut off,,complete,1761552000000,"Monday, October 27th 2025",,,,,,[],,low,Bugs,,Acme,,,,,task,,,,,,,,,,,
+86c0b14,,Slow list with 500 rows,,backlog,1761552000000,"Monday, October 27th 2025",,,,,,[],,normal,Bugs,,Acme,,,,,task,,,,,,,,,many,,
+86c0b15,,Dark mode: unreadable badge,,to do,1761552000000,"Monday, October 27th 2025",,,,,,[],[bug],low,Bugs,,Acme,,,,,task,,,,,,,,,,,
+86c0b16,,Typo on the pricing page,,complete,1761552000000,"Monday, October 27th 2025",,,,,,[],,low,Bugs,,Acme,,,,,task,,,,,,,,,,,
+86c0b17,,Session ends too early,,blocked,1761552000000,"Monday, October 27th 2025",,,,,,[lee.long@example.test],,high,Bugs,,Acme,,,,,task,,,,,,,,,,,
+86c0b18,,Print layout breaks,,to do,1761552000000,"Monday, October 27th 2025",,,,,,[],,normal,Bugs,,Acme,,,,,task,,,,,,,,,,,

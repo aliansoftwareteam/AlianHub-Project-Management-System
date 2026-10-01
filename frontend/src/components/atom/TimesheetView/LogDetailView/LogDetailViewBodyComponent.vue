@@ -101,13 +101,13 @@ watch(()=> props.data,(newValue) => {
 .circlegreen {
   width: 10px;
   height: 10px;
-  background-color: #1CB303;
+  background-color: var(--ok);
   border-radius: 50%;
 }
 .circlePurple {
   width: 10px;
   height: 10px;
-  background-color: #7367F0;
+  background-color: var(--agent);
   border-radius: 50%;
 }
 .timesheet_sidebar-screen {

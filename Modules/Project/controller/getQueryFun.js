@@ -1,8 +1,10 @@
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
+const { canReadTask } = require("../../Tasks/helpers/taskReadAccess");
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const TASK_ACCESS_FIELDS = { ProjectID: 1, sprintId: 1, mainChat: 1, AssigneeUserId: 1 };
 
 /* The folder above the task's own, so a task in a subfolder can be given its full path. */
 const parentFolderOf = async (companyId, projectId, row) => {
@@ -24,6 +26,17 @@ exports.getQueryFun = async (req, res) => {
 
         if (!taskId || !projectId || !subTaskLimit || !companyId) {
             return res.status(400).json({ message: "Missing required parameters." });
+        }
+        if (!OBJECT_ID.test(String(taskId)) || !OBJECT_ID.test(String(projectId))) {
+            return res.status(400).json({ message: "A valid task and project are required." });
+        }
+
+        const task = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [{ _id: new mongoose.Types.ObjectId(taskId) }, TASK_ACCESS_FIELDS]
+        }, "findOne");
+        if (task && !(await canReadTask(companyId, req.uid, task))) {
+            return res.status(404).json({ status: false, statusText: "Task not found.", message: "Task not found." });
         }
 
         const query = [

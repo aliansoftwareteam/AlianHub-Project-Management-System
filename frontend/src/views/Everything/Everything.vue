@@ -81,11 +81,17 @@
                 <strong>{{ $t('Everything.error_title') }}</strong>
                 <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="evr-retry" @click="reload()">{{ $t('Everything.retry') }}</button>
             </div>
-            <div v-else-if="!total" class="ah-empty evr__state" data-test="evr-empty">
-                <strong>{{ $t(filtered ? 'Everything.empty_title' : 'Everything.empty_none_title') }}</strong>
-                <span>{{ $t(filtered ? 'Everything.empty_hint' : 'Everything.empty_none_hint') }}</span>
-                <button v-if="filtered" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="clearFilters">{{ $t('Everything.clear_filters') }}</button>
-            </div>
+            <EmptyState
+                v-else-if="!total"
+                data-test="evr-empty"
+                :illustration="filtered ? 'search' : 'tasks'"
+                :heading-level="2"
+                :title="$t(filtered ? 'Everything.empty_title' : 'Everything.empty_none_title')"
+                :message="$t(filtered ? 'Everything.empty_hint' : 'Everything.empty_none_hint')"
+                :action-label="$t('Everything.clear_filters')"
+                :action-allowed="filtered"
+                @action="clearFilters"
+            />
             <EverythingBoard
                 v-else-if="shownMode === 'board'"
                 :groups="groups"
@@ -136,6 +142,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { onTaskClosed, openTask, useTaskSequenceSource } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 import { useGetterFunctions } from "@/composable";
 import { projectColor } from "@/components/molecules/Home/homeFormat";

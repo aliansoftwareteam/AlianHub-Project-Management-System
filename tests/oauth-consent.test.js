@@ -61,7 +61,7 @@ const GUEST = '6f0000000000000000000a04';
 const REDIRECT = 'http://127.0.0.1:33418/callback';
 const HTTPS_REDIRECT = 'https://agent.s10s3.test/oauth/callback';
 const CIMD_ID = 'https://agent.s10s3.test/oauth/client.json';
-const ENV_KEYS = ['MCP_OAUTH', 'MCP_OAUTH_ISSUER', 'MCP_OAUTH_TOKEN_SECRET', 'MCP_OAUTH_RATE_LIMIT_PER_MIN', 'MCP_OAUTH_DCR', 'CSP_MODE', 'NODE_ENV'];
+const ENV_KEYS = ['MCP_OAUTH', 'MCP_OAUTH_ISSUER', 'MCP_OAUTH_TOKEN_SECRET', 'MCP_OAUTH_RATE_LIMIT_PER_MIN', 'MCP_OAUTH_DCR', 'CSP_MODE', 'NODE_ENV', 'MCP_TOOLS_MANAGE'];
 const savedEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 
 const INDEX_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 's10s3-consent-'));
@@ -107,6 +107,7 @@ beforeEach(() => {
     jest.clearAllMocks();
     delete process.env.CSP_MODE;
     delete process.env.MCP_OAUTH_DCR;
+    delete process.env.MCP_TOOLS_MANAGE;
 });
 
 afterEach(stop);
@@ -172,7 +173,7 @@ describe('flag off', () => {
     it('registers none of the consent, approval or grant routes', async () => {
         await start({ MCP_OAUTH: 'off' });
         for (const [method, p] of [['GET', '/oauth/consent?request=x'], ['GET', '/oauth/consent/details'], ['POST', '/oauth/consent'], ['POST', '/oauth/consent/approval-request'],
-            ['GET', '/api/v2/oauth-client-approvals'], ['POST', '/api/v2/oauth-client-approvals/approve'], ['GET', '/api/v2/oauth-grants'], ['DELETE', '/api/v2/oauth-grants/x']]) {
+            ['GET', '/api/v2/oauth-client-approvals'], ['POST', '/api/v2/oauth-client-approvals/approve'], ['GET', '/api/v2/oauth-grants'], ['DELETE', '/api/v2/oauth-grants/x'], ['POST', '/api/v2/oauth-grants/x/withdraw']]) {
             const res = await fetch(base + p, { method, headers: bearer(OWNER) });
             expect([method, p, res.status]).toEqual([method, p, 404]);
         }
@@ -786,5 +787,192 @@ describe('a consent request is answered once', () => {
         expect((await flow.answer(consent, { session: session(OWNER), decision: 'deny' })).status).toBe(303);
         expect((await flow.answer(consent, { session: session(OWNER), workspace: ALPHA })).status).toBe(400);
         expect(rows(SCHEMA_TYPE.OAUTH_GRANTS)).toHaveLength(0);
+    });
+});
+
+describe('the manage scopes', () => {
+    const TOOLS_ON = { MCP_TOOLS_MANAGE: 'on' };
+    const PLAIN = ['tasks:read', 'tasks:write'];
+    const ASKED = 'tasks:read tasks:write tasks:manage docs:manage';
+    const grantRows = () => rows(SCHEMA_TYPE.OAUTH_GRANTS);
+    const metadata = async () => (await (await fetch(`${base}/.well-known/oauth-authorization-server`)).json()).scopes_supported;
+    const opened = async (clientId, { scope = ASKED, verifier = newVerifier() } = {}) => ({ ...(await flow.startAuthorization(authorizeUrl(clientId, { scope }, verifier))), verifier });
+    const shown = async (clientId, over = {}) => {
+        const { consent } = await opened(clientId, over);
+        return (await flow.details(consent, { session: session(MEMBER) })).body.data;
+    };
+    /* Consent through to tokens, with the boxes in `grant` ticked. */
+    const connected = async (clientId, { scope = ASKED, grant = [], uid = MEMBER } = {}) => {
+        const { consent, verifier } = await opened(clientId, { scope });
+        const done = await flow.answer(consent, { session: session(uid), workspace: ALPHA, grant });
+        expect(done.status).toBe(303);
+        return exchange(clientId, done.location.searchParams.get('code'), verifier);
+    };
+    const withdraw = (uid, grantId, scopes, headers = {}) => fetch(`${base}/api/v2/oauth-grants/${grantId}/withdraw`, { method: 'POST', headers: bearer(uid, headers), body: JSON.stringify({ scopes }) });
+    const preregister = async (scopes) => (await (await fetch(`${base}/api/v2/oauth-clients`, {
+        method: 'POST', headers: bearer(OWNER), body: JSON.stringify({ name: 'S10S3 CI', redirectUris: [REDIRECT], tokenEndpointAuthMethod: 'none', ...(scopes ? { scopes } : {}) }),
+    })).json()).data;
+
+    it('are listed by the server only while their tools are on', async () => {
+        await start();
+        expect(await metadata()).toEqual(['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write']);
+        process.env.MCP_TOOLS_MANAGE = 'on';
+        expect(await metadata()).toEqual(['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write', 'tasks:manage', 'docs:manage']);
+    });
+
+    it('are shown apart from what is granted together, each with the workspaces that approved it by name', async () => {
+        await start(TOOLS_ON);
+        const client = await registerPublicClient();
+        await approve(client.clientId, { companyId: ALPHA, scopes: [...PLAIN, 'tasks:manage'] });
+        await approve(client.clientId, { companyId: BETA, scopes: PLAIN });
+        const data = await shown(client.clientId);
+        expect(data.scopes).toEqual(PLAIN);
+        expect(data.manageScopes).toEqual(['tasks:manage', 'docs:manage']);
+        expect(data.workspaces).toEqual([
+            expect.objectContaining({ id: ALPHA, eligible: true, manageScopes: ['tasks:manage'] }),
+            expect.objectContaining({ id: BETA, eligible: true, manageScopes: [] }),
+        ]);
+    });
+
+    it('are granted when the client asked, the person ticked and the workspace approved by name', async () => {
+        await start(TOOLS_ON);
+        const client = await registerPublicClient();
+        await approve(client.clientId, { scopes: [...PLAIN, 'tasks:manage', 'docs:manage'] });
+        const tokens = await connected(client.clientId, { grant: ['tasks:manage'] });
+        expect(tokens.scope).toBe('tasks:read tasks:write tasks:manage');
+        expect(await grants.introspect(tokens.access_token)).toMatchObject({ active: true, scopes: [...PLAIN, 'tasks:manage'] });
+        expect(grantRows()).toEqual([expect.objectContaining({ userId: MEMBER, scopes: [...PLAIN, 'tasks:manage'] })]);
+    });
+
+    it('are left out when the person ticks nothing, though the client asked and the workspace approved', async () => {
+        await start(TOOLS_ON);
+        const client = await registerPublicClient();
+        await approve(client.clientId, { scopes: [...PLAIN, 'tasks:manage', 'docs:manage'] });
+        const tokens = await connected(client.clientId);
+        expect(tokens.scope).toBe('tasks:read tasks:write');
+        expect(grantRows()).toEqual([expect.objectContaining({ scopes: PLAIN })]);
+    });
+
+    it('are not granted to a client that did not ask, whatever the form carries', async () => {
+        await start(TOOLS_ON);
+        const client = await registerPublicClient();
+        await approve(client.clientId, { scopes: [...PLAIN, 'tasks:manage', 'docs:manage'] });
+        const tokens = await connected(client.clientId, { scope: 'tasks:read tasks:write', grant: ['tasks:manage', 'docs:manage'] });
+        expect(tokens.scope).toBe('tasks:read tasks:write');
+        expect(grantRows()).toEqual([expect.objectContaining({ scopes: PLAIN })]);
+        const asked = await connected(client.clientId, { scope: 'tasks:read tasks:manage', grant: ['docs:manage', 'tasks:write'] });
+        expect(asked.scope).toBe('tasks:read');
+    });
+
+    it('are refused when ticked without the workspace approving them by name, and nothing is issued', async () => {
+        await start(TOOLS_ON);
+        const client = await registerPublicClient();
+        await approve(client.clientId, { scopes: [...PLAIN, 'docs:manage'] });
+        const { consent } = await opened(client.clientId);
+        const res = await flow.answer(consent, { session: session(MEMBER), workspace: ALPHA, grant: ['tasks:manage'] });
+        expect(res.status).toBe(403);
+        expect(res.location).toBeNull();
+        expect(grantRows()).toHaveLength(0);
+        expect(rows(SCHEMA_TYPE.OAUTH_TOKENS).filter((row) => row.kind !== 'consent')).toHaveLength(0);
+    });
+
+    it('are never part of an approval that names no scopes, even when the client asked for them', async () => {
+        await start(TOOLS_ON);
+        const client = await registerPublicClient();
+        const { consent } = await opened(client.clientId);
+        await flow.requestApproval(consent, { session: session(MEMBER), workspace: ALPHA });
+        expect(rows(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS)[0].requestedScopes).toEqual([...PLAIN, 'tasks:manage', 'docs:manage']);
+        expect((await approve(client.clientId)).scopes).toEqual(['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read']);
+        const data = await shown(client.clientId);
+        expect(data.workspaces.find((w) => w.id === ALPHA)).toMatchObject({ eligible: true, manageScopes: [] });
+        expect((await connected(client.clientId)).scope).toBe('tasks:read tasks:write');
+    });
+
+    it('never reach a pre-registered client that named no scopes: not by default, not by name, not by asking', async () => {
+        await start(TOOLS_ON);
+        const client = await preregister();
+        expect(rows(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS)).toEqual([expect.objectContaining({ clientId: client.clientId, status: 'approved', scopes: ['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write'] })]);
+        expect((await approvals.approve(OWNER, { clientId: client.clientId, scopes: [...PLAIN, 'tasks:manage'] })).status).toBe(400);
+        expect((await approve(client.clientId)).scopes).toEqual(['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write']);
+        const data = await shown(client.clientId);
+        expect([data.scopes, data.manageScopes]).toEqual([PLAIN, []]);
+        expect((await connected(client.clientId, { grant: ['tasks:manage', 'docs:manage'] })).scope).toBe('tasks:read tasks:write');
+        const only = await flow.startAuthorization(authorizeUrl(client.clientId, { scope: 'tasks:manage' }));
+        expect(only.consent).toBeNull();
+        expect(only.location.searchParams.get('error')).toBe('invalid_scope');
+    });
+
+    it('reach a pre-registered client that named one only once an owner or admin approves it by name', async () => {
+        await start(TOOLS_ON);
+        const client = await preregister(['tasks:read', 'tasks:manage']);
+        expect(rows(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS)[0].scopes).toEqual(['tasks:read']);
+        expect((await shown(client.clientId, { scope: 'tasks:read tasks:manage' })).workspaces.find((w) => w.id === ALPHA).manageScopes).toEqual([]);
+        expect((await approvals.approve(MEMBER, { clientId: client.clientId, scopes: ['tasks:read', 'tasks:manage'] })).status).toBe(403);
+        await approve(client.clientId, { scopes: ['tasks:read', 'tasks:manage'], uid: ADMIN });
+        expect((await connected(client.clientId, { scope: 'tasks:read tasks:manage', grant: ['tasks:manage'] })).scope).toBe('tasks:read tasks:manage');
+    });
+
+    it('are left out of what any client asks for while their tools are off', async () => {
+        await start();
+        const client = await registerPublicClient();
+        await approve(client.clientId, { scopes: [...PLAIN, 'tasks:manage'] });
+        const data = await shown(client.clientId);
+        expect([data.scopes, data.manageScopes]).toEqual([PLAIN, []]);
+        expect((await connected(client.clientId, { grant: ['tasks:manage'] })).scope).toBe('tasks:read tasks:write');
+        const only = await flow.startAuthorization(authorizeUrl(client.clientId, { scope: 'tasks:manage docs:manage' }));
+        expect(only.location.searchParams.get('error')).toBe('invalid_scope');
+    });
+
+    it('leave the grant and its tokens when an owner or admin takes the scope out of the approval', async () => {
+        await start(TOOLS_ON);
+        const client = await registerPublicClient();
+        await approve(client.clientId, { scopes: [...PLAIN, 'tasks:manage'] });
+        const tokens = await connected(client.clientId, { grant: ['tasks:manage'] });
+        await approve(client.clientId, { scopes: PLAIN, uid: ADMIN });
+        expect(grantRows()[0]).toMatchObject({ scopes: PLAIN, revokedAt: null });
+        expect(await grants.introspect(tokens.access_token)).toMatchObject({ active: true, scopes: PLAIN });
+        const refreshed = await grants.refresh({ client, refreshToken: tokens.refresh_token, resource: RESOURCE });
+        expect(refreshed.scope).toBe('tasks:read tasks:write');
+    });
+
+    it('can be withdrawn by the person who gave them, who keeps the rest of the connection', async () => {
+        await start(TOOLS_ON);
+        const client = await registerPublicClient();
+        await approve(client.clientId, { scopes: [...PLAIN, 'tasks:manage', 'docs:manage'] });
+        const tokens = await connected(client.clientId, { grant: ['tasks:manage', 'docs:manage'] });
+        const [grant] = grantRows();
+        expect((await withdraw(OWNER, grant.grantId, ['tasks:manage'])).status).toBe(404);
+        expect((await withdraw(MEMBER, grant.grantId, ['tasks:manage'], { 'x-test-api-token': '1' })).status).toBe(403);
+        expect((await withdraw(MEMBER, grant.grantId, ['tasks:write'])).status).toBe(404);
+        expect((await withdraw(MEMBER, grant.grantId, 'tasks:manage')).status).toBe(404);
+        expect(grantRows()[0].scopes).toEqual([...PLAIN, 'tasks:manage', 'docs:manage']);
+
+        expect((await withdraw(MEMBER, grant.grantId, ['tasks:manage'])).status).toBe(200);
+        expect(grantRows()[0]).toMatchObject({ scopes: [...PLAIN, 'docs:manage'], revokedAt: null });
+        expect(await grants.introspect(tokens.access_token)).toMatchObject({ active: true, scopes: [...PLAIN, 'docs:manage'] });
+        expect(audited('oauth.grant_narrowed')).toEqual([[ALPHA, expect.objectContaining({ actorId: MEMBER, entityId: grant.grantId, meta: { scopes: [...PLAIN, 'docs:manage'] } })]]);
+        expect((await withdraw(MEMBER, grant.grantId, ['tasks:manage'])).status).toBe(404);
+    });
+
+    it('end the connection when withdrawn from a grant that held nothing else', async () => {
+        await start(TOOLS_ON);
+        const client = await registerPublicClient();
+        await approve(client.clientId, { scopes: ['tasks:read', 'docs:manage'] });
+        const tokens = await connected(client.clientId, { scope: 'docs:manage', grant: ['docs:manage'] });
+        expect(tokens.scope).toBe('docs:manage');
+        expect((await withdraw(MEMBER, grantRows()[0].grantId, ['docs:manage'])).status).toBe(200);
+        expect(grantRows()[0]).toMatchObject({ revokedReason: 'revoked_by_user' });
+        expect((await grants.introspect(tokens.access_token)).active).toBe(false);
+    });
+
+    it('answer access_denied when a client asked for nothing else and the person ticked nothing', async () => {
+        await start(TOOLS_ON);
+        const client = await registerPublicClient();
+        await approve(client.clientId, { scopes: ['tasks:read', 'docs:manage'] });
+        const { consent } = await opened(client.clientId, { scope: 'docs:manage' });
+        const done = await flow.answer(consent, { session: session(MEMBER), workspace: ALPHA });
+        expect(done.status).toBe(303);
+        expect(done.location.searchParams.get('error')).toBe('access_denied');
+        expect(grantRows()).toHaveLength(0);
     });
 });

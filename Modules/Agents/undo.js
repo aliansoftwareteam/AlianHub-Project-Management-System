@@ -12,7 +12,7 @@ const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
 const { canChangeComment } = require('../Comments/helpers/threadWriteAccess');
 const { canSeeSprintById } = require('../Sprints/helpers/sprintVisibility');
 const { followSprintMove, moveDescendants } = require('../Tasks/helpers/sprintPlacement');
-const { pageVisibleTo } = require('../Pages/helpers/pageRules');
+const { canUsePage } = require('../Pages/helpers/pageAccess');
 
 // Undo replays the inverse action and logs it as the person who pressed Undo.
 // Only the descriptors perform() wrote are understood; anything else is
@@ -183,7 +183,7 @@ const taskReadable = async (companyId, uid, taskId) => canReadTask(companyId, ui
     await findRow(companyId, SCHEMA_TYPE.TASKS, taskId, { ProjectID: 1, sprintId: 1, mainChat: 1, AssigneeUserId: 1 }));
 
 /* The project on the row is the one the action was filed under, which need not be where the target
- * sits, so the target is read again: a comment by its thread, a page by its privacy, everything else
+ * sits, so the target is read again: a comment by its thread, a page as the doc editor would, everything else
  * by its task. Moving a task back also lands it in its previous sprint. */
 const targetVisible = async (companyId, uid, u) => {
     if (u.kind === 'comment') {
@@ -195,7 +195,10 @@ const targetVisible = async (companyId, uid, u) => {
         return Boolean(comment) && (await canChangeComment(companyId, uid, comment)).allowed;
     }
     if (u.kind === 'batch') return true;
-    if (u.kind === 'page' || u.kind === 'pageVersion') return pageVisibleTo(await findRow(companyId, SCHEMA_TYPE.PAGES, u.pageId, { visibility: 1, createdBy: 1 }), uid);
+    if (u.kind === 'page' || u.kind === 'pageVersion') {
+        const page = await findRow(companyId, SCHEMA_TYPE.PAGES, u.pageId, { visibility: 1, createdBy: 1, ProjectID: 1, deletedStatusKey: 1 });
+        return Boolean(page) && Number(page.deletedStatusKey || 0) !== 1 && canUsePage(companyId, page, uid, { edit: true });
+    }
     if (u.kind === 'subtask') return taskReadable(companyId, uid, u.subtaskId);
     if (!(await taskReadable(companyId, uid, u.taskId))) return false;
     if (u.kind !== 'sprint' || isPrivileged(await getRoleType(companyId, uid))) return true;

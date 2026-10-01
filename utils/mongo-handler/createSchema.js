@@ -11,6 +11,19 @@ const { CLEARED_RETENTION_SECONDS } = require('../../Modules/Inbox/helpers/inbox
 // privilege-escalation surface flagged in the security audit. If a
 // new legitimate field needs to land, declare it in `./schema.js`.
 const taskSchema = new Schema(schema.tasks, { strict: true, timestamps: true });
+/* A task gains extra lists only on a stored row, through Modules/Tasks/helpers/taskExtraLists.js.
+ * Every writer of a new task document passes one of these two, so a created, imported, copied or
+ * templated row cannot carry the lists of the row it was built from. */
+taskSchema.pre('save', function dropExtraListsFromNewTask() {
+    if (this.isNew) this.set('extraLists', undefined);
+});
+taskSchema.pre('insertMany', function dropExtraListsFromNewTasks(next, docs) {
+    [].concat(docs || []).forEach((doc) => {
+        if (doc && typeof doc.set === 'function') doc.set('extraLists', undefined);
+        else if (doc) delete doc.extraLists;
+    });
+    next();
+});
 const commentSchema = new Schema(schema.comments, { strict: true, timestamps: true });
 const timeSheetSchema = new Schema(schema.timesheet, { strict: true, timestamps: true });
 // BUG-046 / #100 — every other schema in this file already uses
@@ -113,6 +126,8 @@ aiFieldJobsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 6
 const customFieldLinksSchema = new Schema(schema.customFieldLinks, {strict: true, timestamps: true});
 customFieldLinksSchema.index({ taskId: 1, fieldId: 1 }, { unique: true });
 customFieldLinksSchema.index({ fieldId: 1, ids: 1 });
+customFieldLinksSchema.index({ fieldId: 1, kind: 1 });
+customFieldLinksSchema.index({ ids: 1 });
 const epicsSchema = new Schema(schema.epics, {strict: true, timestamps: true});
 epicsSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
 const pagesSchema = new Schema(schema.pages, {strict: true, timestamps: true});
@@ -144,6 +159,11 @@ projectSnapshotsSchema.index({ kind: 1, deletedStatusKey: 1 });
 projectSnapshotsSchema.index({ templateId: 1, part: 1 });
 const everythingViewsSchema = new Schema(schema.everything_views, {strict: true, timestamps: true});
 everythingViewsSchema.index({ userId: 1, deletedStatusKey: 1 });
+const goalsSchema = new Schema(schema.goals, {strict: true, timestamps: true});
+goalsSchema.index({ deletedStatusKey: 1, ownerUserId: 1 });
+goalsSchema.index({ deletedStatusKey: 1, visibility: 1 });
+const whiteboardsSchema = new Schema(schema.whiteboards, {strict: true, timestamps: true});
+whiteboardsSchema.index({ projectId: 1, sprintId: 1 }, { unique: true, partialFilterExpression: { deletedStatusKey: 0 } });
 const remindersSchema = new Schema(schema.reminders, {strict: true, timestamps: true});
 remindersSchema.index({ userId: 1, fired: 1, reminderAt: 1 });
 const notesSchema = new Schema(schema.notes, {strict: true, timestamps: true});
@@ -372,6 +392,9 @@ askThreadsSchema.index({ ownerId: 1, lastTurnAt: -1 });
 const dashboardCardAnswersSchema = new Schema(schema.dashboardCardAnswers, {strict: true, timestamps: false});
 dashboardCardAnswersSchema.index({ dashboardId: 1, cardUid: 1, userId: 1 }, { unique: true, name: 'one_per_card_viewer' });
 dashboardCardAnswersSchema.index({ userId: 1 });
+const taskAiValuesSchema = new Schema(schema.taskAiValues, {strict: true, timestamps: false});
+taskAiValuesSchema.index({ taskId: 1, kind: 1 }, { unique: true, name: 'one_per_task_kind' });
+taskAiValuesSchema.index({ madeBy: 1 });
 const aiFeedbackSchema = new Schema(schema.aiFeedback, {strict: true, timestamps: false});
 aiFeedbackSchema.index({ userId: 1, feature: 1, itemId: 1 }, { unique: true, name: 'one_per_person_item' });
 aiFeedbackSchema.index({ createdAt: -1 });
@@ -436,6 +459,8 @@ taskSchema.index({ DueDate: 1 });
 // The Everything view pages across projects on these; Modules/Tasks/helpers/everythingQuery.js sorts in their order.
 taskSchema.index({ ProjectID: 1, deletedStatusKey: 1, updatedAt: -1, _id: 1 });
 taskSchema.index({ ProjectID: 1, deletedStatusKey: 1, DueDate: 1, _id: 1 });
+// The tasks a list also shows that live elsewhere (Modules/Tasks/helpers/taskExtraLists.js).
+taskSchema.index({ 'extraLists.sprintId': 1, deletedStatusKey: 1 });
 
 // comments: every comment is fetched by task/sprint/project triplet.
 commentSchema.index({ 'objId.taskId': 1, deletedStatusKey: 1 });
@@ -512,6 +537,8 @@ module.exports = {
     viewTemplatesSchema,
     projectSnapshotsSchema,
     everythingViewsSchema,
+    goalsSchema,
+    whiteboardsSchema,
     remindersSchema,
     notesSchema,
     generalRemindersSchema,
@@ -569,6 +596,7 @@ module.exports = {
     agentSessionEndpointsSchema,
     askThreadsSchema,
     dashboardCardAnswersSchema,
+    taskAiValuesSchema,
     aiFeedbackSchema,
     aiEvalRunsSchema,
     assignmentRulesSchema,

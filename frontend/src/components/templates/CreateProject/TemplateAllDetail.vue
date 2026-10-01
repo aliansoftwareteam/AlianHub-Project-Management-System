@@ -189,9 +189,10 @@ const  { checkAllFields } = useValidation();
     cursor: pointer;
 }
 .templateall__submit-btn{
-   background: #2F3990; border-radius: 4px; color: white; border: none; padding: 3px 14.1px;
+   background: var(--brand); border-radius: 4px; color: var(--on-brand); border: none; padding: 3px 14.1px;
 }
 .disableButton {
-    background-color: #818181 !important;
+    background-color: var(--fill) !important;
+    color: var(--ink-2);
 }
 </style>

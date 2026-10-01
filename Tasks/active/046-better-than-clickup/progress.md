@@ -83,7 +83,7 @@ The hierarchy design is in `design-hierarchy.md`. F3 was replaced by "duplicate 
 - [x] E1 The endpoint, the query builder and migration 067 (#1250, build 713)
 - [x] E2 The Everything page, List mode (#1260, inside build 720). Its commits reached `beta` inside #1262; #1260 was then closed without a merge of its own.
 - [x] E3 Board and Table modes, and saved views (#1262, build 720)
-- [ ] E4 Measure at 10,000 tasks and fix: not started
+- [x] E4 Measured at 10,000 tasks (build 752), with one project and with 301: every budget met (slowest request 76 ms of 300, slowest first paint 666 ms of 1,500). One change: a project that is only counted is sent as a heading, 538 kB to 76 kB. Numbers and what was left alone in `docs/PERFORMANCE.md`
 
 **Track B2 — core screens** (started early)
 - [ ] B2.1 The project chrome on design tokens: running

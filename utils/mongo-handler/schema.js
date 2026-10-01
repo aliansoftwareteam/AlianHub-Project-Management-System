@@ -64,6 +64,19 @@ const schema = {
             type: String,
             required: false,
         },
+        // The other lists the task also shows in; its home stays ProjectID and sprintId, and the home alone
+        // decides who reads it. Written only by Modules/Tasks/helpers/taskExtraLists.js, never taken from a client.
+        'extraLists': {
+            type: [{
+                _id: false,
+                projectId: { type: mongoose.Schema.Types.ObjectId, required: true },
+                sprintId: { type: mongoose.Schema.Types.ObjectId, required: true },
+                addedBy: { type: String, required: false },
+                addedAt: { type: Date, required: false },
+            }],
+            default: undefined,
+            required: false,
+        },
         'ProjectID': {
             type: mongoose.Schema.Types.ObjectId,
             required: true,
@@ -593,6 +606,72 @@ const schema = {
         isDefault: { type: Boolean, default: false, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Goals (Modules/Goals). Who may read a row is decided by visibility, ownerUserId and sharedWith
+    // (helpers/goalAccess.js); revision is the guard every write names so two writers cannot overwrite each other.
+    goals: {
+        name: { type: String, required: true },
+        description: { type: String, default: '', required: false },
+        ownerUserId: { type: String, required: true },
+        periodStart: { type: String, default: '', required: false },
+        periodEnd: { type: String, default: '', required: false },
+        visibility: { type: String, required: true },
+        sharedWith: { type: [String], default: [], required: false },
+        color: { type: String, default: '', required: false },
+        progressPct: { type: Number, default: 0, required: false },
+        targets: {
+            type: [{
+                _id: false,
+                id: { type: String, required: true },
+                name: { type: String, required: true },
+                kind: { type: String, required: true },
+                weight: { type: Number, default: 1, required: false },
+                progressPct: { type: Number, default: 0, required: false },
+                reachedAt: { type: Date, default: null, required: false },
+                start: { type: Number, required: false },
+                target: { type: Number, required: false },
+                current: { type: Number, required: false },
+                unit: { type: String, required: false },
+                currencyCode: { type: String, required: false },
+                done: { type: Boolean, required: false },
+                updatedBy: { type: String, required: false },
+                updatedAt: { type: Date, required: false },
+                sources: {
+                    sprintIds: { type: [String], default: undefined, required: false },
+                    taskIds: { type: [String], default: undefined, required: false },
+                },
+                counted: {
+                    done: { type: Number, required: false },
+                    total: { type: Number, required: false },
+                    at: { type: Date, required: false },
+                    skipped: {
+                        sprintIds: { type: [String], default: undefined, required: false },
+                        taskIds: { type: [String], default: undefined, required: false },
+                    },
+                },
+                dirty: { type: Boolean, required: false },
+            }],
+            default: [],
+            required: false,
+        },
+        revision: { type: Number, default: 0, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // A list's whiteboard (Modules/Whiteboards). elements is what applyPatch returns: cards that name a task by id
+    // and never carry its title. history holds the states earlier saves replaced, capped by MAX_SNAPSHOTS.
+    whiteboards: {
+        projectId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        sprintId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        elements: { type: Array, default: [], required: false },
+        revision: { type: Number, default: 0, required: false },
+        history: { type: Array, default: [], required: false },
+        historyKeptAt: { type: Date, required: false },
+        savedAt: { type: Date, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Personal reminders (COLLAB-03) — one-shot, per-user. A node-schedule cron
     // (every minute) fires any reminder whose reminderAt has passed and that
     // hasn't fired yet, delivering an in-app notification to userId. Managed by
@@ -698,6 +777,23 @@ const schema = {
         reviewedBy: { type: String, required: false },
         reviewerName: { type: String, required: false },
         rejectionReason: { type: String, required: false },
+        // One entry per reopening: who reopened the week and when, and the review that undid.
+        history: {
+            type: [{
+                _id: false,
+                action: { type: String, required: true },
+                from: { type: String, required: false },
+                to: { type: String, required: false },
+                by: { type: String, required: true },
+                byName: { type: String, required: false },
+                at: { type: Date, required: true },
+                reviewedBy: { type: String, required: false },
+                reviewerName: { type: String, required: false },
+                reviewedAt: { type: Date, required: false },
+            }],
+            default: undefined,
+            required: false,
+        },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     // Billing rates — per user / project / default hourly rate — managed by Modules/TimeSheet (TIME-07)
@@ -1328,6 +1424,9 @@ const schema = {
         tokenId: { type: String, required: false },
         // the token's project list when it filed; approval refuses a target outside it
         tokenProjectIds: { type: Array, required: false },
+        // Set instead of tokenId when an outside client filed it: the grant approval re-checks, and its client
+        oauthClientId: { type: String, required: false },
+        oauthGrantId: { type: String, required: false },
         allowedActions: { type: Array, required: false },
     },
     automationRuns: {
@@ -1593,6 +1692,9 @@ const schema = {
         // say who wrote the state a version keeps.
         editedBy: { type: String, required: false },
         editedAt: { type: Date, required: false },
+        // Everyone already told that the doc names them. No default: a doc without the list predates it, and a
+        // mongoose array would otherwise read as an empty list and tell everyone it names again.
+        mentionsTold: { type: [String], required: false, default: undefined },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     // Doc history (Modules/Pages/versions.js). savedBy and savedAt are the writer and the time of the state held, not of
@@ -1605,7 +1707,7 @@ const schema = {
         savedBy: { type: String, required: false },
         savedAt: { type: Date, required: false },
         name: { type: String, required: false },
-        // 'author' | 'interval' | 'restore' | 'manual'
+        // 'author' | 'interval' | 'rewrite' | 'restore' | 'manual'
         reason: { type: String, required: false },
         // The doc's visibility while this state was live; a 'private' version is its author's alone for good.
         visibility: { type: String, required: false },
@@ -1955,6 +2057,17 @@ const schema = {
         },
         askedAt: { type: Date, required: true },
         autoAskedAt: { type: Date, required: false },
+    },
+    // The summary or the area an AI column shows for a task (Modules/AI/taskAiValues): one per task and kind, with what
+    // it was made from (basis: the comment count, or a fingerprint of the task text and labels), when, and who asked.
+    // The text is derived from the task and its thread, so it is removed with them and read only through a task read.
+    taskAiValues: {
+        taskId: { type: String, required: true },
+        kind: { type: String, required: true },
+        value: { type: mongoose.Schema.Types.Mixed, required: false },
+        basis: { type: String, required: false, default: '' },
+        madeAt: { type: Date, required: true },
+        madeBy: { type: String, required: false, default: '' },
     },
     // One person's thumbs up or down on an AI answer (Modules/AI/feedback). Never the question; the answer and its
     // cited ids only when the person ticked "include the answer" (shared).
@@ -4629,11 +4742,15 @@ const schema = {
     },
     // What a relationship or a voting field holds on one task: task ids, or the ids of the people who voted.
     customFieldLinks: {
+        // "<taskId>:<fieldId>", so a task holds one document for a field
+        _id: { type: String, required: false },
         taskId: { type: String, required: true },
         fieldId: { type: String, required: true },
         // relationship | voting
         kind: { type: String, required: true },
         ids: { type: [String], default: [], required: false },
+        // steps on every vote, so the count a task shows is the one from the latest
+        version: { type: Number, required: false },
     },
     sprints: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.

@@ -10,7 +10,8 @@ const { placedSprint, moveTaskRequest, duplicateTaskRequest, convertToTaskReques
 const USER = { Employee_Name: 'Max Member', id: '6f0000000000000000000003', companyOwnerId: '6f0000000000000000000001' };
 const CID = '6f00000000000000000000c1';
 const STATUS = { status: { key: 2, value: '', text: 'Doing', type: 'active' }, statusKey: 2, statusType: 'active' };
-const sprintObj = { id: 's2', name: 'Sprint 2', folderId: null };
+/* The list a move, copy or conversion names is stored as the server reads it, so only what that keeps is listed here. */
+const sprintObj = { id: 's2', name: 'Sprint 2' };
 const projectSlice = (projectId) => ({ _id: projectId, CompanyId: CID, lastTaskId: 4, ProjectName: 'Parity', ProjectCode: 'PAR' });
 
 /*

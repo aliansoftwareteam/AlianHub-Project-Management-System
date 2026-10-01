@@ -66,6 +66,17 @@ const standingIn = (companyId, client, approval, scopes) => {
     return { approval: approval.status, eligible: true, reason: '' };
 };
 
+/* A manage scope is the person's to give or keep back: it is granted only when the client asked for it and the
+ * person ticked it. Everything else asked for is granted together, as before. */
+const partsOf = (scopes) => ({
+    asked: scopes.filter((scope) => !config.isManageScope(scope)),
+    optional: scopes.filter((scope) => config.isManageScope(scope)),
+});
+
+const tickedOf = (value) => (Array.isArray(value) ? value : [value]).filter((scope) => typeof scope === 'string');
+
+const grantedOf = (opened, ticked) => opened.scopes.filter((scope) => !config.isManageScope(scope) || ticked.includes(scope));
+
 // The person, from their session, never an API token: a token is not someone consenting.
 const personOrRefuse = (req, res) => {
     if (req.apiToken || !req.uid) {
@@ -96,8 +107,13 @@ exports.details = async (req, res) => {
         if (!csrf) return refuse(res, 403, 'access_denied', 'This sign-in request was started in another browser.');
         const client = await clientOf(opened);
         const [mine, person] = await Promise.all([workspaces.workspacesOf(req.uid), workspaces.personOf(req.uid)]);
-        const standing = await Promise.all(mine.map(async (w) => ({ ...w, ...standingIn(w.id, client, await store.approvals.find(w.id, client.clientId), opened.scopes) })));
-        return noStore(res).send({ status: true, data: { client: clientView(opened, client), person, scopes: opened.scopes, csrf, workspaces: standing } });
+        const { asked, optional } = partsOf(opened.scopes);
+        const standing = await Promise.all(mine.map(async (w) => {
+            const approval = await store.approvals.find(w.id, client.clientId);
+            const state = standingIn(w.id, client, approval, asked);
+            return { ...w, ...state, manageScopes: state.eligible ? optional.filter((scope) => approvals.covers(approval, [scope])) : [] };
+        }));
+        return noStore(res).send({ status: true, data: { client: clientView(opened, client), person, scopes: asked, manageScopes: optional, csrf, workspaces: standing } });
     } catch (error) {
         if (error instanceof clients.ClientError) return refuse(res, 400, error.error, error.message);
         return failed(res, error, 'details');
@@ -118,10 +134,11 @@ exports.answer = async (req, res) => {
             consentRequest.clearCookie(res, opened);
             return redirectWith(res, opened.redirectUri, { ...params, state: opened.state, iss: config.issuer() });
         };
+        const granted = grantedOf(opened, tickedOf(body.grant));
         const spend = async (companyId) => {
             try {
                 await store.consents.spend({
-                    nonce: opened.nonce, clientId: client.clientId, companyId, userId: req.uid, scopes: opened.scopes, resource: config.resource(),
+                    nonce: opened.nonce, clientId: client.clientId, companyId, userId: req.uid, scopes: granted, resource: config.resource(),
                     now: new Date(), expiresAt: new Date(opened.expiresAt),
                 });
                 return true;
@@ -138,8 +155,9 @@ exports.answer = async (req, res) => {
 
         const companyId = single(body.workspace);
         if (!(await workspaces.isMember(req.uid, companyId))) return refuse(res, 403, 'access_denied', 'You are not a member of that workspace.');
+        if (!granted.length) return (await spend('')) ? back({ error: 'access_denied', error_description: 'the user granted nothing that was asked for' }) : alreadyAnswered();
         const approval = await store.approvals.find(companyId, client.clientId);
-        const standing = standingIn(companyId, client, approval, opened.scopes);
+        const standing = standingIn(companyId, client, approval, granted);
         if (!standing.eligible) {
             if (!approval && standing.reason === 'not_approved') {
                 await approvals.request({ companyId, client, userId: req.uid, scopes: opened.scopes, actor: actorOf(req) });
@@ -151,7 +169,7 @@ exports.answer = async (req, res) => {
 
         if (!(await spend(companyId))) return alreadyAnswered();
         const { code } = await grants.issueCode({
-            client, companyId, userId: req.uid, scopes: opened.scopes, redirectUri: opened.redirectUri, codeChallenge: opened.codeChallenge,
+            client, companyId, userId: req.uid, scopes: granted, redirectUri: opened.redirectUri, codeChallenge: opened.codeChallenge,
         });
         return back({ code });
     } catch (error) {

@@ -67,7 +67,9 @@ describe('defect 5 — docs.read honours the token\'s project scope and page vis
     const scoped = (pageId) => tools.call({ ...ctx, projectIds: [P1] }, 'docs.read', { pageId });
 
     it('refuses a page outside the projects the token is scoped to', async () => {
-        const inside = mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'In scope', ProjectID: P1, content: { html: '<p>ok</p>' } });
+        mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: 'u1', roleType: 1, status: 2, isDelete: false });
+        [P1, P2].forEach((_id) => mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id, ProjectName: 'Project', isPrivateSpace: false, deletedStatusKey: 0 }));
+        const inside =mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'In scope', ProjectID: P1, content: { html: '<p>ok</p>' } });
         const outside = mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Out of scope', ProjectID: P2, content: { html: '<p>secret</p>' } });
         const companyWide = mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Company wide', content: { html: '<p>handbook</p>' } });
 

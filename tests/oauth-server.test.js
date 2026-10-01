@@ -58,7 +58,7 @@ const REDIRECT = 'http://127.0.0.1:33418/callback';
 const CIMD_ID = 'https://agent.s10s2.test/oauth/client.json';
 const MINUTE = 60 * 1000;
 const DAY = 24 * 60 * MINUTE;
-const ENV_KEYS = ['APIURL', 'MCP_OAUTH', 'MCP_OAUTH_DCR', 'MCP_OAUTH_ISSUER', 'MCP_OAUTH_ACCESS_TOKEN_MINUTES', 'MCP_OAUTH_REFRESH_TOKEN_DAYS', 'MCP_OAUTH_GRANT_MAX_DAYS', 'MCP_OAUTH_RATE_LIMIT_PER_MIN', 'MCP_OAUTH_TOKEN_SECRET', 'NODE_ENV'];
+const ENV_KEYS = ['APIURL', 'MCP_OAUTH', 'MCP_OAUTH_DCR', 'MCP_OAUTH_ISSUER', 'MCP_OAUTH_ACCESS_TOKEN_MINUTES', 'MCP_OAUTH_REFRESH_TOKEN_DAYS', 'MCP_OAUTH_GRANT_MAX_DAYS', 'MCP_OAUTH_RATE_LIMIT_PER_MIN', 'MCP_OAUTH_TOKEN_SECRET', 'NODE_ENV', 'MCP_TOOLS_MANAGE'];
 const savedEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 
 const newVerifier = () => crypto.randomBytes(32).toString('base64url');
@@ -92,6 +92,7 @@ beforeEach(() => {
     metadataDocument.forget();
     jest.clearAllMocks();
     delete process.env.MCP_OAUTH_DCR;
+    delete process.env.MCP_TOOLS_MANAGE;
     delete process.env.MCP_OAUTH_ACCESS_TOKEN_MINUTES;
     delete process.env.MCP_OAUTH_REFRESH_TOKEN_DAYS;
     delete process.env.MCP_OAUTH_GRANT_MAX_DAYS;
@@ -255,6 +256,50 @@ describe('authorization server metadata (RFC 8414)', () => {
         await start({ MCP_OAUTH_DCR: 'on' });
         const doc = await (await fetch(`${base}/.well-known/oauth-authorization-server`)).json();
         expect(doc.registration_endpoint).toBe(`${ISSUER}/oauth/register`);
+    });
+});
+
+describe('the manage scopes at the authorization server', () => {
+    const scopesSupported = async () => (await (await fetch(`${base}/.well-known/oauth-authorization-server`)).json()).scopes_supported;
+    const PLAIN = ['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write'];
+
+    it('are listed in the metadata only while their tools are on', async () => {
+        await start();
+        expect(await scopesSupported()).toEqual(PLAIN);
+        await stop();
+        await start({ MCP_TOOLS_MANAGE: 'on' });
+        expect(await scopesSupported()).toEqual([...PLAIN, 'tasks:manage', 'docs:manage']);
+    });
+
+    it('are not issued to a client whose workspace approval does not name them, though it asked', async () => {
+        await start({ MCP_TOOLS_MANAGE: 'on' });
+        const client = await registerPublicClient();
+        const verifier = newVerifier();
+        const res = await authorize(validParams(client, verifier, { scope: 'tasks:read tasks:manage docs:manage' }));
+        expect(res.status).toBe(303);
+        const tokens = await exchange(client, { code: res.location.searchParams.get('code'), verifier });
+        seen.push(tokens.body.access_token, tokens.body.refresh_token);
+        expect(tokens.body.scope).toBe('tasks:read');
+        expect(rows(SCHEMA_TYPE.OAUTH_GRANTS)[0].scopes).toEqual(['tasks:read']);
+    });
+
+    it('are left out of what a client registered without them asks for, and refused when it asks for nothing else', async () => {
+        await start({ MCP_TOOLS_MANAGE: 'on' });
+        const client = await registerPublicClient({ scopes: ['tasks:read', 'tasks:write'] });
+        const tokens = await exchange(client, await codeFor(client, newVerifier(), { scope: 'tasks:read tasks:manage' }));
+        seen.push(tokens.body.access_token, tokens.body.refresh_token);
+        expect(tokens.body.scope).toBe('tasks:read');
+        const only = await authorize(validParams(client, newVerifier(), { scope: 'tasks:manage' }));
+        expect(only.location.searchParams.get('error')).toBe('invalid_scope');
+    });
+
+    it('cannot be added by a refresh', async () => {
+        await start({ MCP_TOOLS_MANAGE: 'on' });
+        const client = await registerPublicClient();
+        const tokens = await tokensFor(client);
+        const res = await post('/oauth/token', { grant_type: 'refresh_token', client_id: client.clientId, refresh_token: tokens.refresh_token, scope: 'tasks:read tasks:manage', resource: RESOURCE });
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe('invalid_scope');
     });
 });
 
@@ -1009,6 +1054,21 @@ describe('admin pre-registration', () => {
         const { data } = await (await create(OWNER, { ...spec, tokenEndpointAuthMethod: 'none', redirectUris: [REDIRECT] })).json();
         const res = await authorize(validParams({ clientId: data.clientId }, newVerifier(), { scope: 'tasks:read tasks:write' }));
         expect(res.location.searchParams.get('error')).toBe('invalid_scope');
+    });
+
+    it('approves a client registered with no scopes for every scope but the manage ones, which it then cannot be given', async () => {
+        await start({ MCP_TOOLS_MANAGE: 'on' });
+        const { data } = await (await create(OWNER, { name: 'S10S2 open', redirectUris: [REDIRECT], tokenEndpointAuthMethod: 'none' })).json();
+        const approval = rows(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS).find((row) => row.clientId === data.clientId);
+        expect(approval.scopes).toEqual(['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write']);
+        const client = { clientId: data.clientId };
+        const tokens = await exchange(client, await codeFor(client, newVerifier(), { scope: 'tasks:read tasks:write tasks:manage docs:manage' }));
+        seen.push(tokens.body.access_token, tokens.body.refresh_token);
+        expect(tokens.body.scope).toBe('tasks:read tasks:write');
+        const approvals = require('../Modules/OAuthServer/approvals');
+        const row = rows(SCHEMA_TYPE.OAUTH_CLIENTS).find((r) => r.clientId === data.clientId);
+        await expect(approvals.approve({ companyId: CID, client: row, scopes: ['tasks:read', 'tasks:manage'], actor: { id: OWNER } })).rejects.toMatchObject({ statusCode: 400 });
+        expect((await approvals.approve({ companyId: CID, client: row, actor: { id: OWNER } })).scopes).toEqual(approval.scopes);
     });
 });
 

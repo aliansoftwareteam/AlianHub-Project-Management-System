@@ -1728,52 +1728,8 @@
               "type": "color",
               "data": "#2F3990"
             },
-            "taskStatusData": [
-              {
-                "key": 1,
-                "name": "To Do",
-                "type": "default_active",
-                "bgColor": "#6b728035",
-                "textColor": "#6b7280"
-              },
-              {
-                "key": 2,
-                "name": "Doing",
-                "type": "active",
-                "bgColor": "#2563eb35",
-                "textColor": "#2563eb"
-              },
-              {
-                "key": 3,
-                "name": "Done",
-                "type": "close",
-                "bgColor": "#16a34a35",
-                "textColor": "#16a34a"
-              }
-            ],
-            "taskTypeCounts": [
-              {
-                "key": 1,
-                "name": "Task",
-                "value": "task"
-              },
-              {
-                "key": 2,
-                "name": "Bug",
-                "value": "bug"
-              }
-            ],
-            "apps": [
-              {
-                "key": "Priority"
-              }
-            ],
             "statusType": "active",
-            "isPersonal": false,
-            "edit": {
-              "status": true,
-              "priority": true
-            }
+            "isPersonal": false
           },
           "6f0000000000000000000a02": {
             "_id": "6f0000000000000000000a02",

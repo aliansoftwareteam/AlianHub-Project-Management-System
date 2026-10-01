@@ -1186,8 +1186,7 @@ function confirmRemove(message, remove = removeMessage) {
         title: t('MainChat.confirm_delete'),
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#d33',
+        customClass: { confirm: 'swal2-deny' },
         cancelButtonText: t('MainChat.cancel'),
         confirmButtonText: t('MainChat.confirm_delete_yes'),
     }).then((result) => {

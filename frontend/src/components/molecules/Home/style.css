@@ -170,10 +170,8 @@
     .hc-row__timer { position: static; transform: none; order: 1; margin-left: auto; }
     .hc-row__project { max-width: 60%; }
 }
-.hc-empty { padding: var(--card-pad-y, 14px); border: 1px dashed var(--border); border-radius: var(--r-md, 9px); font: 400 var(--fs-md, 13px)/var(--lh-body, 1.5) var(--font-ui); color: var(--ink-label); }
-.hc-empty strong { font-weight: 600; color: var(--ink); }
-.hc-empty button { border: 0; background: transparent; padding: 0; font: inherit; font-weight: 600; color: var(--ink); cursor: pointer; }
-.hc-empty button:hover { color: var(--brand); }
+.hc-empty-link { border: 0; background: transparent; padding: 0; font: inherit; font-weight: 600; color: var(--ink); cursor: pointer; }
+.hc-empty-link:hover { color: var(--brand); }
 .hc-add { display: flex; align-items: center; gap: 9px; padding: 0 12px; height: var(--control-h-lg, 38px); border: 1px solid var(--border); border-radius: var(--r-md, 9px); background: var(--surface); color: var(--ink-2); font: 400 var(--fs-md, 13px)/1 var(--font-ui); }
 .hc-add:focus-within { border-color: var(--brand); box-shadow: var(--focus); }
 .hc-add__plus { color: var(--brand); font-weight: 600; }

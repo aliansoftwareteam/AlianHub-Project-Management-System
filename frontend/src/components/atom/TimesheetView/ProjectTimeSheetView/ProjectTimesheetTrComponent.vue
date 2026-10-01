@@ -1,16 +1,15 @@
 <template>
     <tr class="white-row" v-bind:class="[{ 'cursor-pointer': trData?.trackdLoggedHours?.time || trData?.manuallyLoggedHours?.time}]">
         <td class="fixed" @click="toggle(trData.id, trData)">
-            <img :style="{'opacity': (trData?.trackdLoggedHours?.time || trData?.manuallyLoggedHours?.time)?1:0.1}" alt="" :src="table_arrow" class="taable_arrow" v-bind:class="[{'row-open': isOpen && (trData?.trackdLoggedHours?.time || trData?.manuallyLoggedHours?.time)}]"/>
+            <span class="ah-mask-icon taable_arrow" :style="[maskOf(table_arrow), {'opacity': (trData?.trackdLoggedHours?.time || trData?.manuallyLoggedHours?.time)?1:0.1}]" v-bind:class="[{'row-open': isOpen && (trData?.trackdLoggedHours?.time || trData?.manuallyLoggedHours?.time)}]" aria-hidden="true"></span>
             <div class="d-flex align-items-center">
                 <div class="d-flex align-items-center">
                     <p class="user_hrs_name" :title="trData.projectName">{{ trData.projectName }}</p>
-                    <!-- AHE — red dot: a task in this project had its estimated hours re-updated. -->
-                    <span v-if="trData.hasEstimateChanged" :title="$t('UserTimesheet.project_estimate_changed')" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#E5484D;margin-left:6px;flex:none;"></span>
-                    <img v-if="trData.status == 'close' || !(trData.deletedStatusKey == 0 || trData.deletedStatusKey == undefined)" :src="logk_icon" alt="loclIcon" class="ml-5px"/>
+                    <span v-if="trData.hasEstimateChanged" :title="$t('UserTimesheet.project_estimate_changed')" class="ts-flag"></span>
+                    <span v-if="trData.status == 'close' || !(trData.deletedStatusKey == 0 || trData.deletedStatusKey == undefined)" class="ah-mask-icon ts-lock ml-5px" :style="maskOf(logk_icon)" aria-hidden="true"></span>
                 </div>
                 <div>
-                    <span class="blue text-decoration-underline cursor-pointer p-0" @click="projectPush(trData.id)">{{trData.projectCode}}  </span>
+                    <span class="ts-code cursor-pointer p-0" @click="projectPush(trData.id)">{{trData.projectCode}}  </span>
                 </div>
                 <div class="inner_div displayRate d-flex">
                     <span class="bg-transparent position-re pt-5px project__log-hours">
@@ -19,7 +18,7 @@
                             <img v-if="trData?.trackdLoggedHours?.time ? trData?.trackdLoggedHours?.time : ''" :src="green_line" />&nbsp;
                             <img v-if="trData?.manuallyLoggedHours?.time ? trData?.manuallyLoggedHours?.time : ''" :src="purple_line" /> 
                         </div>
-                        <DropDown v-if="trData?.trackdLoggedHours?.time && trData?.manuallyLoggedHours?.time" class="p-0 tracktime_dropdown" :title="$t('UserTimesheet.time_split')" :bodyClass="{'tracktime_dropdown_wrapper' : true}" :hover="true" mode="menu">
+                        <DropDown v-if="trData?.trackdLoggedHours?.time && trData?.manuallyLoggedHours?.time" class="p-0 tracktime_dropdown" :title="$t('UserTimesheet.time_split')" :bodyClass="{'tracktime_dropdown_wrapper' : true}" :hover="true" mode="menu" themed>
                             <template #button>
                                 <div class="logType__Img--show p-0">
                                     <img v-if="trData?.trackdLoggedHours?.time ? trData?.trackdLoggedHours?.time : ''" :src="green_line" :alt="$t('UserTimesheet.tracked_time')" />&nbsp;
@@ -28,11 +27,11 @@
                             </template>
                             <template #options>
                                 <div class="d-flex track-option-wrapper">
-                                    <DropDownOption class="font-weight-700 font-size-12 d-block m0-auto track__dropdownoption">
+                                    <DropDownOption class="d-block m0-auto track__dropdownoption">
                                         {{trData?.trackdLoggedHours?.time ? convertedTimeString(trData?.trackdLoggedHours?.time,'update') : ""}}
                                         <img class="d-block m3px-auto" v-if="trData?.trackdLoggedHours?.time" :src="green_line" />
                                     </DropDownOption>
-                                    <DropDownOption class="font-weight-700 font-size-12 d-block m0-auto track__dropdownoption-noborder">
+                                    <DropDownOption class="d-block m0-auto track__dropdownoption-noborder">
                                         {{trData?.manuallyLoggedHours?.time ? convertedTimeString(trData?.manuallyLoggedHours?.time,'update') : ""}}
                                         <img class="d-block m3px-auto" v-if="trData?.manuallyLoggedHours?.time" :src="purple_line"/>
                                     </DropDownOption>
@@ -54,7 +53,7 @@
                         <img v-if="colName.totalLogsType[`${trData.id}`]?.trackdLoggedHours ? colName.totalLogsType[`${trData.id}`]?.trackdLoggedHours : ''" :src="green_line" />&nbsp;
                         <img v-if="colName.totalLogsType[`${trData.id}`]?.manuallyLoggedHours ? colName.totalLogsType[`${trData.id}`]?.manuallyLoggedHours : ''" :src="purple_line" /> 
                     </div>
-                    <DropDown v-if="colName.totalLogsType[`${trData.id}`]?.trackdLoggedHours && colName.totalLogsType[`${trData.id}`]?.manuallyLoggedHours" class="p-0 tracktime_dropdown" :title="$t('UserTimesheet.time_split')" :bodyClass="{'tracktime_dropdown_wrapper' : true}" :hover="true" mode="menu">
+                    <DropDown v-if="colName.totalLogsType[`${trData.id}`]?.trackdLoggedHours && colName.totalLogsType[`${trData.id}`]?.manuallyLoggedHours" class="p-0 tracktime_dropdown" :title="$t('UserTimesheet.time_split')" :bodyClass="{'tracktime_dropdown_wrapper' : true}" :hover="true" mode="menu" themed>
                         <template #button>
                             <div class="logType__Img--show p-0">
                                 <img v-if="colName.totalLogsType[`${trData.id}`]?.trackdLoggedHours ? colName.totalLogsType[`${trData.id}`]?.trackdLoggedHours : ''" :src="green_line" :alt="$t('UserTimesheet.tracked_time')" />&nbsp;
@@ -63,11 +62,11 @@
                         </template>
                         <template #options>
                             <div class="d-flex track-option-wrapper">
-                                <DropDownOption class="font-weight-700 font-size-12 d-block  m0-auto track__dropdownoption">
+                                <DropDownOption class="d-block m0-auto track__dropdownoption">
                                     {{colName.totalLogsType[`${trData.id}`]?.trackdLoggedHours ? convertedTimeString(colName.totalLogsType[`${trData.id}`]?.trackdLoggedHours,'update') : ""}}
                                     <img class="d-block m3px-auto" v-if="colName.totalLogsType[`${trData.id}`]?.trackdLoggedHours" :src="green_line" />
                                 </DropDownOption>
-                                <DropDownOption class="font-weight-700 font-size-12 d-block m0-auto track__dropdownoption-noborder">
+                                <DropDownOption class="d-block m0-auto track__dropdownoption-noborder">
                                     {{colName.totalLogsType[`${trData.id}`]?.manuallyLoggedHours ? convertedTimeString(colName.totalLogsType[`${trData.id}`]?.manuallyLoggedHours,'update') : ""}}
                                     <img class="d-block m3px-auto" v-if="colName.totalLogsType[`${trData.id}`]?.manuallyLoggedHours" :src="purple_line"/>
                                 </DropDownOption>
@@ -101,10 +100,9 @@
                             <div class="d-flex align-items-center">
                                 
                                 <div class="d-flex align-items-center">
-                                    <!-- AHE — red task name when this task's estimate was re-updated. -->
-                                    <p class="user_hrs_name" :style="taskObject.estimateChangedFlag ? 'color:#E5484D;font-weight:600;' : ''" :title="taskObject.TaskName">{{ taskObject.TaskName }}</p>
+                                    <p class="user_hrs_name" :class="{ 'ts-flagged': taskObject.estimateChangedFlag }" :title="taskObject.TaskName">{{ taskObject.TaskName }}</p>
                                 </div>
-                                <div class="blue text-decoration-underline cursor-pointer" @click="taskDetailOpen(taskObject)" >{{taskObject.TaskCode}}  </div>
+                                <div class="ts-code cursor-pointer" @click="taskDetailOpen(taskObject)" >{{taskObject.TaskCode}}  </div>
                                 <div class="inner_div displayRate d-flex">
                                     <span class="total__project-title pt-5px position-re bg-transparent">
                                         <p>{{ taskObject.taskLoggedHours != undefined ? convertedTimeString(taskObject.taskLoggedHours,'update') : ''}}</p>
@@ -112,7 +110,7 @@
                                             <img v-if="taskObject?.trackdLoggedHours ? taskObject?.trackdLoggedHours : ''" :src="green_line" />&nbsp;
                                             <img v-if="taskObject?.manuallyLoggedHours ? taskObject?.manuallyLoggedHours : ''" :src="purple_line" /> 
                                         </div>
-                                        <DropDown v-if="taskObject?.trackdLoggedHours && taskObject?.manuallyLoggedHours" class="p-0 tracktime_dropdown" :title="$t('UserTimesheet.time_split')" :bodyClass="{'tracktime_dropdown_wrapper' : true}" :hover="true" mode="menu">
+                                        <DropDown v-if="taskObject?.trackdLoggedHours && taskObject?.manuallyLoggedHours" class="p-0 tracktime_dropdown" :title="$t('UserTimesheet.time_split')" :bodyClass="{'tracktime_dropdown_wrapper' : true}" :hover="true" mode="menu" themed>
                                             <template #button>
                                                 <div class="logType__Img--show p-0">
                                                     <img v-if="taskObject?.trackdLoggedHours ? taskObject?.trackdLoggedHours : ''" :src="green_line" :alt="$t('UserTimesheet.tracked_time')" />&nbsp;
@@ -121,11 +119,11 @@
                                             </template>
                                             <template #options>
                                                 <div class="d-flex track-option-wrapper">
-                                                    <DropDownOption class="font-weight-700 font-size-12 d-block m0-auto track__dropdownoption">
+                                                    <DropDownOption class="d-block m0-auto track__dropdownoption">
                                                         {{taskObject?.trackdLoggedHours ? convertedTimeString(taskObject?.trackdLoggedHours,'update') : ""}}
                                                         <img class="d-block m3px-auto" v-if="taskObject?.trackdLoggedHours" :src="green_line" />
                                                     </DropDownOption>
-                                                    <DropDownOption class="font-weight-700 font-size-12 d-block m0-auto track__dropdownoption-noborder">
+                                                    <DropDownOption class="d-block m0-auto track__dropdownoption-noborder">
                                                         {{taskObject?.manuallyLoggedHours ? convertedTimeString(taskObject?.manuallyLoggedHours,'update') : ""}}
                                                         <img class="d-block m3px-auto" v-if="taskObject?.manuallyLoggedHours" :src="purple_line"/>
                                                     </DropDownOption>
@@ -147,7 +145,7 @@
                                         <img v-if="colName.totalTaskLogsType[`${taskObject.id}`]?.trackdLoggedHours ? colName.totalTaskLogsType[`${taskObject.id}`]?.trackdLoggedHours : ''" :src="green_line" />&nbsp;
                                         <img v-if="colName.totalTaskLogsType[`${taskObject.id}`]?.manuallyLoggedHours ? colName.totalTaskLogsType[`${taskObject.id}`]?.manuallyLoggedHours : ''" :src="purple_line" /> 
                                     </div>
-                                    <DropDown v-if="colName.totalTaskLogsType[`${taskObject.id}`]?.trackdLoggedHours && colName.totalTaskLogsType[`${taskObject.id}`]?.manuallyLoggedHours" class="p-0 tracktime_dropdown" :title="$t('UserTimesheet.time_split')" :bodyClass="{'tracktime_dropdown_wrapper' : true}" :hover="true" mode="menu">
+                                    <DropDown v-if="colName.totalTaskLogsType[`${taskObject.id}`]?.trackdLoggedHours && colName.totalTaskLogsType[`${taskObject.id}`]?.manuallyLoggedHours" class="p-0 tracktime_dropdown" :title="$t('UserTimesheet.time_split')" :bodyClass="{'tracktime_dropdown_wrapper' : true}" :hover="true" mode="menu" themed>
                                         <template #button>
                                             <div class="logType__Img--show p-0">
                                                 <img v-if="colName.totalTaskLogsType[`${taskObject.id}`]?.trackdLoggedHours ? colName.totalTaskLogsType[`${taskObject.id}`]?.trackdLoggedHours : ''" :src="green_line" :alt="$t('UserTimesheet.tracked_time')" />&nbsp;
@@ -156,11 +154,11 @@
                                         </template>
                                         <template #options>
                                             <div class="d-flex track-option-wrapper">
-                                                <DropDownOption class="font-weight-700 font-size-12 d-block m0-auto track__dropdownoption">
+                                                <DropDownOption class="d-block m0-auto track__dropdownoption">
                                                     {{colName.totalTaskLogsType[`${taskObject.id}`]?.trackdLoggedHours ? convertedTimeString(colName.totalTaskLogsType[`${taskObject.id}`]?.trackdLoggedHours,'update') : ""}}
                                                     <img class="d-block m3px-auto" v-if="colName.totalTaskLogsType[`${taskObject.id}`]?.trackdLoggedHours" :src="green_line" />
                                                 </DropDownOption>
-                                                <DropDownOption class="font-weight-700 font-size-12 d-block m0-auto track__dropdownoption-noborder">
+                                                <DropDownOption class="d-block m0-auto track__dropdownoption-noborder">
                                                     {{colName.totalTaskLogsType[`${taskObject.id}`]?.manuallyLoggedHours ? convertedTimeString(colName.totalTaskLogsType[`${taskObject.id}`]?.manuallyLoggedHours,'update') : ""}}
                                                     <img class="d-block m3px-auto" v-if="colName.totalTaskLogsType[`${taskObject.id}`]?.manuallyLoggedHours" :src="purple_line"/>
                                                 </DropDownOption>
@@ -232,6 +230,7 @@
         filterProjectIds: { type : Array, default : ()=>([]) }
     });
     const table_arrow = ref(require("@/assets/images/table_arrow.png"))
+    import { maskOf } from '@/utils/iconMask';
     const theModel = ref(props.modelValue);
     const trData = ref(props.projectTrData);
     // AHE — trData is snapshotted from the prop on mount, but the parent sets
@@ -439,16 +438,20 @@
     line-height: 28px; 
 }
 .track__dropdownoption{
-    background-color: #fff!important;
-    color:#3E3E3E!important;
+    font-size: var(--fs-sm, 12px);
+    font-weight: var(--fw-title, 700);
+    background-color: var(--surface)!important;
+    color:var(--ink)!important;
     padding: 0px 7px!important;
-    border-right: 1px solid #ececec;
+    border-right: 1px solid var(--hairline);
     border-radius: 0px!important;
 }
 .track__dropdownoption-noborder{
+    font-size: var(--fs-sm, 12px);
+    font-weight: var(--fw-title, 700);
     margin:0 auto;
-    background-color: #fff!important;
-    color:#3E3E3E!important;
+    background-color: var(--surface)!important;
+    color:var(--ink)!important;
     padding: 0px 7px!important;
 }
 /* The trigger takes over the images' absolute placement so its box, and its focus ring, wrap them. */
@@ -467,5 +470,21 @@
 .total__project-etalogs{
     line-height: 30px; 
     cursor: default;
+}
+.ts-flag{
+    display: inline-block;
+    flex: none;
+    width: 8px;
+    height: 8px;
+    margin-left: 6px;
+    border-radius: 50%;
+    background: var(--danger);
+}
+.ts-lock{
+    color: var(--ink-2);
+}
+p.user_hrs_name.ts-flagged{
+    color: var(--danger-ink);
+    font-weight: 600;
 }
 </style>

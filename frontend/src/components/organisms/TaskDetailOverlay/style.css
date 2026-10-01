@@ -25,8 +25,8 @@
     min-width: 0;
 }
 .ah-detail.is-expanded .ah-detail__panel { border-left: 0; box-shadow: none; }
-.ah-detail-enter-active, .ah-detail-leave-active { transition: opacity var(--t-panel) var(--ease); }
-.ah-detail-enter-active .ah-detail__panel, .ah-detail-leave-active .ah-detail__panel { transition: transform var(--t-panel) var(--ease); }
+.ah-detail-enter-active, .ah-detail-leave-active { transition: opacity var(--motion-slow) var(--ease-out); }
+.ah-detail-enter-active .ah-detail__panel, .ah-detail-leave-active .ah-detail__panel { transition: transform var(--motion-slow) var(--ease-out); }
 .ah-detail-enter-from, .ah-detail-leave-to { opacity: 0; }
 .ah-detail-enter-from .ah-detail__panel, .ah-detail-leave-to .ah-detail__panel { transform: translateX(24px); }
 
@@ -133,8 +133,12 @@
 .ah-detail__title-row { display: flex; align-items: flex-start; gap: 10px; }
 .ah-detail__title-skeleton { height: 26px; width: 60%; border-radius: var(--r-sm, 5px); }
 .ah-detail__title { min-width: 0; flex: 1; }
-.ah-detail__title .task-detail-title ul { margin: 0; padding: 0; list-style: none; }
-.ah-detail__title .task-detail-title .task-name { display: flex; align-items: flex-start; gap: 8px; }
+.ah-detail__title .task-detail-title ul { margin: 0; padding: 0; list-style: none; min-width: 0; }
+.ah-detail__title .task-detail-title .task-name { display: flex; align-items: flex-start; gap: 8px; min-width: 0; flex: 1 1 auto; }
+/* The title button is one unbreakable line everywhere else; here it wraps, or it sets the width of the whole panel. */
+.ah-detail__title .task-name .title-name { min-width: 0; }
+.ah-detail__title .task-name .title-name__edit { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+.ah-detail__title .task-name .copy-icon__btn { flex: none; }
 .ah-detail__title .title-name {
     font: var(--fw-title, 600) var(--fs-xl, 20px)/var(--lh-tight, 1.25) var(--font-ui); letter-spacing: -.4px; margin: 0; color: var(--ink);
     white-space: normal; overflow: visible; text-overflow: clip; max-width: none;

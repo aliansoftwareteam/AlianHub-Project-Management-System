@@ -169,7 +169,7 @@ async function onToggle(nextEnabled) {
         showCancelButton: true,
         confirmButtonText: t('ScreenshotRetention.confirm_yes'),
         cancelButtonText: t('Projects.cancel'),
-        confirmButtonColor: '#dc2626'
+        customClass: { confirm: 'swal2-deny' }
     });
     if (!result.isConfirmed) {
         // User backed out; the checkbox briefly flipped — reload from state

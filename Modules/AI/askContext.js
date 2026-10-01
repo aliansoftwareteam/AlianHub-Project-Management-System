@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
-const { pageVisibilityFilter } = require('../Pages/helpers/pageRules');
+const { pageReachFilter } = require('../Pages/helpers/pageRules');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const skillRecord = require('../Agents/skillRecord');
 
@@ -95,7 +95,7 @@ const pinnedSources = async (companyId, uid, { context, projects = [] } = {}) =>
             const page = await findOne(companyId, SCHEMA_TYPE.PAGES, {
                 _id: oid(id),
                 deletedStatusKey: { $ne: 1 },
-                $and: [pageVisibilityFilter(uid), { $or: [{ ProjectID: { $in: visibleIds } }, { ProjectID: { $in: [null, undefined] } }] }],
+                ...pageReachFilter({ uid, projectIds: visibleIds }),
             }, 'title rawText ProjectID visibility updatedAt');
             return page ? pageSource(page, nameById) : null;
         }

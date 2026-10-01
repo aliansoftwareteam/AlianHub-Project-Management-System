@@ -30,3 +30,13 @@
     color: var(--on-brand);
     margin-right: 20px;
 }
+.custom_field-btn--three .formkit-input {
+    font-size: 14px !important;
+    padding: 2.2px 10px !important;
+}
+.custom_field-btn--three > div .formkit-input { margin-right: 8px !important; }
+.custom_field-btn--three > div:nth-child(2) .formkit-input {
+    background: transparent;
+    color: var(--brand);
+    border: 1px solid var(--brand);
+}

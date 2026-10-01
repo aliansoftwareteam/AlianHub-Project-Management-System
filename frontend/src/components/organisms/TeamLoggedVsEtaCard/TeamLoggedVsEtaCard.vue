@@ -164,11 +164,11 @@ onMounted(load);
 
 <style scoped src="@/components/organisms/DashboardCard/cardBody.css"></style>
 <style scoped>
-.tle { gap: 7px; }
+.tle { gap: calc(var(--sp-2) + 1px); }
 .tle__row {
     display: flex;
     align-items: center;
-    gap: 9px;
+    gap: calc(var(--sp-3) + 1px);
     width: 100%;
     padding: 2px 0;
     border: 0;
@@ -179,9 +179,9 @@ onMounted(load);
 .tle__row--team, .tle__row--user { cursor: pointer; }
 .tle__row--team:hover, .tle__row--user:hover { background: var(--surface-hover); }
 .tle__row:focus-visible { outline: none; box-shadow: var(--focus); }
-.tle__name { display: flex; align-items: center; gap: 4px; width: 96px; flex: none; min-width: 0; font-size: 11.5px; color: var(--ink); }
-.tle__name--user { padding-left: 10px; }
-.tle__name--task { padding-left: 20px; color: var(--ink-2); }
+.tle__name { display: flex; align-items: center; gap: var(--sp-1); width: 96px; flex: none; min-width: 0; font-size: var(--fs-sm, 11.5px); color: var(--ink); }
+.tle__name--user { padding-left: var(--sp-4); }
+.tle__name--task { padding-left: var(--sp-8); color: var(--ink-2); }
 .tle__name--click { cursor: pointer; }
 .tle__name--click:hover .tle__label { text-decoration: underline; }
 .tle__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -190,4 +190,7 @@ onMounted(load);
 .tle__caret.is-open { transform: rotate(90deg); }
 .tle__bar { position: relative; display: flex; flex: 1 1 auto; min-width: 0; }
 .tle__marker { position: absolute; top: -2px; bottom: -2px; border-left: 2px solid var(--ink); }
+@media (max-width: 767px) {
+    .tle__row--team, .tle__row--user { min-height: var(--hit-min); }
+}
 </style>

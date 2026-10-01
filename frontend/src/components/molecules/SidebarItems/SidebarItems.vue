@@ -119,10 +119,7 @@ defineProps({
         type: Array,
         default: () => []
     },
-    themed: {
-        type: Boolean,
-        default: false
-    }
+    themed: { type: Boolean, default: true }
 })
 
 defineEmits(["select", "remove"])

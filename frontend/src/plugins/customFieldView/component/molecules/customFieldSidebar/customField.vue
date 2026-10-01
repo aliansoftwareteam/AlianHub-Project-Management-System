@@ -28,6 +28,7 @@
                 <div class="ml-20px mr-20px">
                     <ModuleFieldEditor
                         v-if="fieldTypeUi(componentDetail.cfType)"
+                        :key="props.round"
                         :fieldType="componentDetail.cfType"
                         :field="props.customFieldObject"
                         @save="customFieldStore"
@@ -40,6 +41,7 @@
                             @handleIndex="(val) => tabIndex = val"
                         />
                         <CustomFieldsComponent
+                            :key="props.round"
                             :tabIndex='tabIndex'
                             :componentDetail="componentDetail"
                             :customFieldObject="props.customFieldObject"
@@ -65,7 +67,7 @@
 </template>
 <script setup>
     import { useStore } from 'vuex';
-    import { ref, computed, inject } from "vue";
+    import { ref, computed, inject, watch } from "vue";
     import { useI18n } from "vue-i18n";
     import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
     import CustomFieldsComponent from "../../molecules/customFieldSidebar/customFieldsComponent/customFieldsComponent.vue";
@@ -93,9 +95,15 @@
         isType:{
             type:Boolean,
             default:false
+        },
+        /* Raised to start the same form again, empty, for the next field of this type. */
+        round:{
+            type:Number,
+            default:0
         }
     });
     const tabIndex = ref(1);
+    watch(() => props.round, () => { tabIndex.value = 1; });
     const pageIndex = ref(props.pageInd);
     const componentDetail = ref(props.componentDetails);
 
@@ -104,11 +112,11 @@
     const fieldTypes = computed(() => (forProject ? getters["settings/customFields"] : fieldTypeCatalogue(getters["settings/customFields"], t)));
     const currentCompany = computed(() => getters["settings/selectedCompany"])
     const emit = defineEmits(['customFieldStore','closeSidebar','close']);
-    const customFieldStore = (val,isEdit) => {
+    const customFieldStore = (val,isEdit,another = false) => {
         val.fieldPrimaryColor = componentDetail.value.cfPrimaryColor;
         val.fieldBackgroundColor = componentDetail.value.cfBackgroundColor;
         val.isDelete = true;
-        emit('customFieldStore',val,isEdit);
+        emit('customFieldStore',val,isEdit,another);
     }
     const backToTypes = (val) => {
         emit('closeSidebar',val,pageIndex.value);

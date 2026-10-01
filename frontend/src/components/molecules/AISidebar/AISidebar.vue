@@ -136,20 +136,20 @@ const filterCategories = computed(() => {
 </script>
 <style>
 .import_category{
-    background: linear-gradient(104.48deg, #80E1E5 2.11%, #3664DA 53.8%, #7D2AE7 100.06%);
+    background: linear-gradient(104.48deg, var(--rail-ok) 2.11%, var(--brand) 53.8%, var(--agent) 100.06%);
     border: none;
     height: 30px;
 }
 .ai-sidebar-body{
     padding: 20px;
-    background: #F4F5F7;
-    box-shadow: 0px 2px 12px 3px #00000026;
+    background: var(--canvas);
+    box-shadow: 0px 2px 12px 3px var(--shadow-ink);
 }
 .prompt-div{
-    background: #FFFFFF;
+    background: var(--surface);
     width: 100%;
     height: 38px;
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 10px;
     /* width: calc(25% - 20px); */
@@ -164,20 +164,20 @@ const filterCategories = computed(() => {
 }
 .ai-sidebar .sidebar-content .sidebar-head {
     height: 178px !important;
-    background: linear-gradient(104.48deg, #80E1E5 2.11%, #3664DA 53.8%, #7D2AE7 100.06%);
+    background: linear-gradient(104.48deg, var(--rail-ok) 2.11%, var(--brand) 53.8%, var(--agent) 100.06%);
 }
 .ai-sidebar .close-image{
     text-align: center;
     width: 30px;
     height: 30px;
-    background: #DFE1E6;
+    background: var(--fill);
     position: absolute;
     top: 15px;
     right: 15px;
     border-radius: 5px;
 }
 .read-more-div{
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
     width: 106.14px;
     height: 88px;
     border-radius: 6px;
@@ -187,12 +187,12 @@ const filterCategories = computed(() => {
 .ai-sidebar .ai-input{
     height: 44px;
     max-width: 100%;
-    border: 1px solid #E0E0E0;
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 10px 20px 10px 20px;
     font-family: var(--font-ui);
     font-weight: 400;
-    color: #959595;
+    color: var(--ink-2);
     font-size: 16px;
     width: 667px;
 }
@@ -209,7 +209,7 @@ const filterCategories = computed(() => {
 }
 
 .read-more-less {
-    border: 1px solid #3845B3;
+    border: 1px solid var(--brand);
 }
 
 @media (max-width:576px) {

@@ -16,6 +16,7 @@ const hoursctrl = require('./controller/hoursBySource');
 const taskentriesctrl = require('./controller/taskEntries');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { READ, requireProjectAccess, projectIdsFrom } = require('../../Config/projectAccess');
+const { requireMovedTaskFields } = require('./helpers/planMoveAccess');
 
 const ofTask = projectIdsFrom({ records: [[SCHEMA_TYPE.TASKS, (req) => req.params.taskId]] });
 exports.init = (app) => {
@@ -25,7 +26,7 @@ exports.init = (app) => {
     app.get('/api/v1/timesheet/hours-by-source', hoursctrl.getHoursBySource);
     app.put('/api/v1/timesheet/entries/billable', weekctrl.setEntriesBillable);
     app.post('/api/v1/timesheet/workload-grid', gridctrl.getWorkloadGrid);
-    app.post('/api/v1/timesheet/workload-move', gridctrl.moveWorkloadChip);
+    app.post('/api/v1/timesheet/workload-move', requireMovedTaskFields, gridctrl.moveWorkloadChip);
     app.put('/api/v1/timesheet/workload-capacity', gridctrl.saveWorkloadCapacity);
     app.post('/api/v1/timesheet/billable-summary', billablectrl.getBillableSummary);
     app.post('/api/v1/timesheet/export-csv', csvctrl.exportTimesheetCsv);

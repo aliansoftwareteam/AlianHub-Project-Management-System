@@ -80,6 +80,8 @@ const {
     viewTemplatesSchema,
     projectSnapshotsSchema,
     everythingViewsSchema,
+    goalsSchema,
+    whiteboardsSchema,
     remindersSchema,
     generalRemindersSchema,
     generalReminderQueueSchema,
@@ -137,6 +139,7 @@ const {
     agentSessionEndpointsSchema,
     askThreadsSchema,
     dashboardCardAnswersSchema,
+    taskAiValuesSchema,
     aiFeedbackSchema,
     aiEvalRunsSchema,
     assignmentRulesSchema,
@@ -304,6 +307,10 @@ exports.checkType = (type) => {
             return projectSnapshotsSchema
         case SCHEMA_TYPE.EVERYTHING_VIEWS:
             return everythingViewsSchema
+        case SCHEMA_TYPE.GOALS:
+            return goalsSchema
+        case SCHEMA_TYPE.WHITEBOARDS:
+            return whiteboardsSchema
         case SCHEMA_TYPE.REMINDERS:
             return remindersSchema
         case SCHEMA_TYPE.GENERAL_REMINDERS:
@@ -418,6 +425,8 @@ exports.checkType = (type) => {
             return askThreadsSchema
         case SCHEMA_TYPE.DASHBOARD_CARD_ANSWERS:
             return dashboardCardAnswersSchema
+        case SCHEMA_TYPE.TASK_AI_VALUES:
+            return taskAiValuesSchema
         case SCHEMA_TYPE.AI_FEEDBACK:
             return aiFeedbackSchema
         case SCHEMA_TYPE.AI_EVAL_RUNS:
@@ -598,6 +607,10 @@ exports.tableType = (type) => {
                 return `${dbCollections.PROJECT_SNAPSHOTS}`
         case SCHEMA_TYPE.EVERYTHING_VIEWS:
                 return `${dbCollections.EVERYTHING_VIEWS}`
+        case SCHEMA_TYPE.GOALS:
+                return `${dbCollections.GOALS}`
+        case SCHEMA_TYPE.WHITEBOARDS:
+                return `${dbCollections.WHITEBOARDS}`
         case SCHEMA_TYPE.REMINDERS:
                 return `${dbCollections.REMINDERS}`
         case SCHEMA_TYPE.GENERAL_REMINDERS:
@@ -712,6 +725,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.ASK_THREADS}`
         case SCHEMA_TYPE.DASHBOARD_CARD_ANSWERS:
                 return `${dbCollections.DASHBOARD_CARD_ANSWERS}`
+        case SCHEMA_TYPE.TASK_AI_VALUES:
+                return `${dbCollections.TASK_AI_VALUES}`
         case SCHEMA_TYPE.AI_FEEDBACK:
                 return `${dbCollections.AI_FEEDBACK}`
         case SCHEMA_TYPE.AI_EVAL_RUNS:

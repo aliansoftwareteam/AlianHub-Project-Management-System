@@ -95,14 +95,19 @@
 
                     <section class="hub__section">
                         <div class="hub__section-head"><span class="ah-label">{{ $t('Docs.recent') }}</span></div>
-                        <div v-if="!recent.length" class="hub__empty">
-                            <p class="ah-h3">{{ $t('Docs.no_recent_title') }}</p>
-                            <p class="ah-small">{{ $t('Docs.no_recent_hint') }}</p>
-                            <div class="hub__empty-actions">
-                                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="createDoc({})">{{ $t('Docs.new_doc') }}</button>
-                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="view = 'templates'">{{ $t('Docs.templates') }}</button>
-                            </div>
-                        </div>
+                        <EmptyState
+                            v-if="!recent.length"
+                            class="hub__empty"
+                            illustration="docs"
+                            data-test="docs-empty-recent"
+                            :heading-level="2"
+                            :title="$t('Docs.no_recent_title')"
+                            :message="$t('Docs.no_recent_hint')"
+                            :action-label="$t('Docs.new_doc')"
+                            :secondary-label="$t('Docs.templates')"
+                            @action="createDoc({})"
+                            @secondary="view = 'templates'"
+                        />
                         <div v-else class="hub__grid">
                             <DocCard v-for="page in recent.slice(0, 6)" :key="'rc-' + page._id" :page="page" @open="open" />
                         </div>
@@ -126,7 +131,7 @@
                 </template>
 
                 <template v-else-if="view === 'mine'">
-                    <div v-if="!mine.length" class="hub__empty"><p class="ah-small">{{ $t('Docs.no_mine') }}</p></div>
+                    <EmptyState v-if="!mine.length" class="hub__empty" illustration="docs" data-test="docs-empty-mine" :heading-level="2" :title="$t('Docs.no_mine')" :action-label="$t('Docs.new_doc')" @action="createDoc({})" />
                     <div v-else class="hub__grid">
                         <DocCard v-for="page in mine" :key="'mc-' + page._id" :page="page" @open="open" />
                     </div>
@@ -137,15 +142,22 @@
                         <span class="ah-label">{{ $t('Docs.pages_count', { n: wikiPages.length }) }}<template v-if="staleCount"> · {{ $t('Docs.stale_count', { n: staleCount }) }}</template></span>
                         <button type="button" class="ah-btn ah-btn--sm" :class="onlyDue ? 'ah-btn--outline' : 'ah-btn--secondary'" @click="onlyDue = !onlyDue">{{ $t('Docs.needs_review') }}</button>
                     </div>
-                    <div v-if="!wikiRows.length" class="hub__empty"><p class="ah-small">{{ onlyDue ? $t('Docs.no_review_due') : $t('Docs.no_project_docs') }}</p></div>
+                    <EmptyState
+                        v-if="!wikiRows.length"
+                        class="hub__empty"
+                        illustration="docs"
+                        data-test="docs-empty-wiki"
+                        :heading-level="2"
+                        :title="onlyDue ? $t('Docs.no_review_due') : $t('Docs.no_project_docs')"
+                        :action-label="$t('Docs.new_wiki_page')"
+                        :action-allowed="!onlyDue"
+                        @action="createDoc({ isWiki: true })"
+                    />
                     <WikiTable v-else :rows="wikiRows" @open="open" @review="markReviewed" />
                 </template>
 
                 <template v-else-if="view === 'agents'">
-                    <div v-if="!agentDrafts.length" class="hub__empty">
-                        <p class="ah-h3">{{ $t('Docs.no_agent_drafts_title') }}</p>
-                        <p class="ah-small">{{ $t('Docs.no_agent_drafts_hint') }}</p>
-                    </div>
+                    <EmptyState v-if="!agentDrafts.length" class="hub__empty" illustration="docs" data-test="docs-empty-agents" :heading-level="2" :title="$t('Docs.no_agent_drafts_title')" :message="$t('Docs.no_agent_drafts_hint')" />
                     <AgentList v-else :rows="agentDrafts" @open="open" @approve="approve" />
                 </template>
 
@@ -163,10 +175,7 @@
                 </template>
 
                 <template v-else-if="view === 'trash'">
-                    <div v-if="!trash.length" class="hub__empty">
-                        <p class="ah-small">{{ $t('Docs.no_trash') }}</p>
-                        <p class="ah-small">{{ $t('Docs.trash_hint') }}</p>
-                    </div>
+                    <EmptyState v-if="!trash.length" class="hub__empty" data-test="docs-empty-trash" :heading-level="2" :title="$t('Docs.no_trash')" :message="$t('Docs.trash_hint')" />
                     <div v-else class="ah-card hub__list">
                         <div v-for="page in trash" :key="'tr-' + page._id" class="hub__row">
                             <ShellIcon name="file" :size="14" class="hub__row-icon" />
@@ -187,7 +196,7 @@
                             <ShellIcon name="plus" :size="13" />{{ $t('Docs.new_doc') }}
                         </button>
                     </div>
-                    <div v-if="!projectRows.length" class="hub__empty"><p class="ah-small">{{ $t('Docs.no_project_docs') }}</p></div>
+                    <EmptyState v-if="!projectRows.length" class="hub__empty" illustration="docs" data-test="docs-empty-project" :heading-level="2" :title="$t('Docs.no_project_docs')" :message="$t('Docs.no_project_docs_hint')" />
                     <DocList v-else :rows="projectRows" tree @open="open" />
                 </template>
             </div>
@@ -202,6 +211,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useGetterFunctions } from '@/composable';
@@ -621,9 +631,7 @@ const WikiTable = defineComponent({
 }
 .hub__blank:hover { background: var(--brand-tint); }
 
-.hub__empty { border: 1px dashed var(--border); border-radius: var(--r-lg, 10px); padding: calc(var(--card-pad-x, 16px) + 6px); background: var(--surface-2); display: flex; flex-direction: column; gap: 6px; }
-.hub__empty p { margin: 0; }
-.hub__empty-actions { display: flex; gap: 8px; margin-top: 6px; }
+.hub__empty { border: 1px dashed var(--border); border-radius: var(--r-lg, 10px); background: var(--surface-2); }
 
 @media (max-width: 1279px) {
     .hub__side { display: none; }
@@ -642,7 +650,7 @@ const WikiTable = defineComponent({
     .hub__stats { display: none; }
     .hub__btn-label { display: none; }
     .hub .ah-btn--sm { min-height: var(--hit-min); }
-    .hub__view-select { height: var(--hit-min); }
+    .hub__view-select { height: var(--hit-min); min-width: 0; flex: 0 1 auto; }
     .hub__wiki-btn { width: var(--hit-min); height: var(--hit-min); padding: 0; }
 }
 </style>

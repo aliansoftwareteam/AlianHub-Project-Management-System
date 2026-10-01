@@ -2,7 +2,7 @@
     <div role="rowgroup">
         <div class="tv2__group" role="row">
             <span role="cell" :aria-colspan="columnCount" class="tv2__group-cell">
-                <label v-if="canGroupSelect && groupTaskIds.length" @click.stop>
+                <label v-if="canGroupSelect && groupTaskIds.length" class="tv2__group-select" @click.stop>
                     <input
                         type="checkbox"
                         class="ah-check"

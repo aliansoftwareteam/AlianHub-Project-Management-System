@@ -14,7 +14,7 @@ const STEPS = ['Write the failing test', 'Reproduce and record the cause', 'Ship
 const REMARKS = ['Picked this up, will post an update tomorrow.', 'Reproduced on staging. The cause is in the request handler.', 'Blocked until the design is signed off.', 'Fix is in review.', 'Verified on the latest build.', 'Moving this to the next sprint, it needs more discovery.', 'Can someone confirm the expected behaviour here?', 'Customer reported this again today.'];
 
 // timestamp (4 bytes), a fixed marker and the document kind (5 bytes), a counter (3 bytes): a valid ObjectId that is the same on every run.
-const ID_KINDS = { task: '0', subtask: '1', comment: '2' };
+const ID_KINDS = { task: '0', subtask: '1', comment: '2', smallTask: '3', smallSubtask: '4' };
 const objectIdFor = (kind, at, counter) => new ObjectId(
     Math.floor(at.getTime() / 1000).toString(16).padStart(8, '0') + `5ca1e5eed${ID_KINDS[kind]}` + counter.toString(16).padStart(6, '0'),
 );
@@ -205,4 +205,4 @@ const countersOf = (rows) => {
     return counters;
 };
 
-module.exports = { generateTasks, tally, countersOf, statusesOf, taskTypesOf, objectIdFor };
+module.exports = { generateTasks, tally, countersOf, statusesOf, taskTypesOf, objectIdFor, MAX_SUBTASKS };

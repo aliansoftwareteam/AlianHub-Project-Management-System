@@ -2,8 +2,32 @@ const FLAG_ON = ['true', '1', 'on', 'yes'];
 const MINUTE_MS = 60 * 1000;
 const DAY_MS = 24 * 60 * MINUTE_MS;
 
-const SCOPES = Object.freeze(['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write']);
+/* The manage scopes are never implied: not by a missing scope list, not by a default approval, not by a
+ * personal token's write. A client asks for one, the person ticks it at consent, and an owner or admin
+ * names it in the workspace's approval of that client. */
+const MANAGE_SCOPES = Object.freeze(['tasks:manage', 'docs:manage']);
+const SCOPES = Object.freeze(['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write', ...MANAGE_SCOPES]);
 const READ_SCOPES = Object.freeze(SCOPES.filter((scope) => scope.endsWith(':read')));
+const isManageScope = (scope) => MANAGE_SCOPES.includes(scope);
+const PLAIN_SCOPES = Object.freeze(SCOPES.filter((scope) => !isManageScope(scope)));
+
+// A manage scope unlocks nothing while its tools are off, so it is neither listed nor taken at authorization then.
+const manageOffered = () => require('../Mcp/manageFlag').enabled();
+const offeredScopes = () => (manageOffered() ? [...SCOPES] : [...PLAIN_SCOPES]);
+
+/* The scopes a client named for itself, or null when it named none and may ask for any. A pre-registered
+ * client that named none is taken to have named every scope but the manage ones. */
+const namedScopes = (client) => {
+    const named = Array.isArray(client.scopes) ? client.scopes : [];
+    if (named.length) return named;
+    return client.kind === 'preregistered' ? PLAIN_SCOPES : null;
+};
+
+const mayAskFor = (client, scope) => {
+    if (!isManageScope(scope)) return true;
+    const named = namedScopes(client);
+    return manageOffered() && (!named || named.includes(scope));
+};
 
 const CODE_TTL_MS = MINUTE_MS;
 // A spent code is kept past its expiry so a late replay is still recognised and revokes its grant.
@@ -106,6 +130,6 @@ const endpoints = (env = process.env) => {
 };
 
 module.exports = {
-    SCOPES, READ_SCOPES, CODE_TTL_MS, CODE_REUSE_WINDOW_MS, DEFAULTS, MODE,
+    SCOPES, READ_SCOPES, MANAGE_SCOPES, PLAIN_SCOPES, isManageScope, offeredScopes, namedScopes, mayAskFor, CODE_TTL_MS, CODE_REUSE_WINDOW_MS, DEFAULTS, MODE,
     mode, isOn, dcrOn, lifetimes, rateLimitPerMinute, metadataCacheMs, issuer, issuerProblem, assertIssuer, resource, canonicalResource, endpoints,
 };

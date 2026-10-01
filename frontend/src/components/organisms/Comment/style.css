@@ -50,11 +50,11 @@
  }
 .comment__image{
    object-fit: contain;
-   border: 1px solid #cecece; 
+   border: 1px solid var(--border);
    border-radius: 5px;
 }
 .video_controls{
-    border: 1px solid #cecece; 
+    border: 1px solid var(--border);
     border-radius: 5px;
 }
 .message__profile-image{

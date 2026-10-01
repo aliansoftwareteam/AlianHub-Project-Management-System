@@ -73,3 +73,38 @@ describe('New doc in the Docs hub', () => {
         created().forEach((body) => expect(body).not.toHaveProperty('projectId'));
     });
 });
+
+describe('an empty Docs hub', () => {
+    it('offers a new doc under Recent, and the templates as the quieter choice', async () => {
+        await openHub();
+        const empty = wrapper.find('[data-test="docs-empty-recent"]');
+        expect(empty.find('svg').attributes('data-illustration')).toBe('docs');
+        expect(empty.find('.empty-state__btn').text()).toBe('Docs.new_doc');
+
+        await empty.find('.empty-state__link').trigger('click');
+        expect(wrapper.find('select.hub__view-select').element.value).toBe('templates');
+
+        await wrapper.find('select.hub__view-select').setValue('recent');
+        await wrapper.find('[data-test="docs-empty-recent"] .empty-state__btn').trigger('click');
+        await flushPromises();
+        expect(created()).toHaveLength(1);
+    });
+
+    it('offers a new wiki page under Wiki, but not while only pages due for review are shown', async () => {
+        await openHub('wiki');
+        const empty = () => wrapper.find('[data-test="docs-empty-wiki"]');
+        expect(empty().find('.empty-state__btn').text()).toBe('Docs.new_wiki_page');
+        await empty().find('.empty-state__btn').trigger('click');
+        await flushPromises();
+        expect(created()).toEqual([expect.objectContaining({ isWiki: true })]);
+
+        await wrapper.findAll('button').find((button) => button.text() === 'Docs.needs_review').trigger('click');
+        expect(empty().text()).toContain('Docs.no_review_due');
+        expect(empty().find('button').exists()).toBe(false);
+    });
+
+    it('leaves creating to the New doc button above the list in a project', async () => {
+        await openHub('project:p1');
+        expect(wrapper.find('[data-test="docs-empty-project"]').findAll('button')).toHaveLength(0);
+    });
+});

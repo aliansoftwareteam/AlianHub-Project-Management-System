@@ -70,7 +70,7 @@
             </div>
         </div>
 
-        <aside class="fb__panel">
+        <aside ref="panel" class="fb__panel">
             <template v-if="aiDraft">
                 <div class="fb__panel-head">
                     <span class="fb__panel-mark" aria-hidden="true">✦</span>
@@ -81,9 +81,10 @@
                 <FieldTaskTypesPicker v-model="aiDraft.fieldTaskTypes" :projectIds="selectedProjectIds" />
                 <div class="fb__warn">{{ $t('AiFields.builder_note') }}</div>
                 <div class="fb__panel-foot">
-                    <button type="button" class="ah-btn ah-btn--primary fb__save" data-ai-field-save :disabled="saving" @click="saveAi">
+                    <button type="button" class="ah-btn ah-btn--primary fb__save" data-ai-field-save :disabled="saving" @click="saveAi()">
                         {{ saving ? $t('Fields.saving') : $t('Fields.save_field') }}
                     </button>
+                    <button v-if="!aiDraft._id" type="button" class="ah-btn ah-btn--secondary" data-field-save-another :disabled="saving" @click="saveAi({ another: true })">{{ $t('Fields.save_and_add_another') }}</button>
                     <button type="button" class="ah-btn ah-btn--ghost" @click="closeDraft">{{ $t('Fields.cancel') }}</button>
                 </div>
             </template>
@@ -104,6 +105,7 @@
                         class="ah-input"
                         :class="{ 'ah-input--error': errors.fieldTitle }"
                         :placeholder="$t('Fields.field_label_placeholder')"
+                        @keydown.enter.prevent="saveFromName"
                     />
                     <span v-if="errors.fieldTitle" class="ah-field__error">{{ errors.fieldTitle }}</span>
                 </div>
@@ -173,9 +175,10 @@
                 <div class="fb__warn">{{ draftNote }}</div>
 
                 <div class="fb__panel-foot">
-                    <button type="button" class="ah-btn ah-btn--primary fb__save" :disabled="saving" @click="save">
+                    <button type="button" class="ah-btn ah-btn--primary fb__save" :disabled="saving" @click="save()">
                         {{ saving ? $t('Fields.saving') : $t('Fields.save_field') }}
                     </button>
+                    <button v-if="!draft._id" type="button" class="ah-btn ah-btn--secondary" data-field-save-another :disabled="saving" @click="save({ another: true })">{{ $t('Fields.save_and_add_another') }}</button>
                     <button v-if="draft.fieldType === 'formula'" type="button" class="ah-btn ah-btn--secondary" :disabled="testing" @click="test">{{ $t('Fields.test') }}</button>
                     <button type="button" class="ah-btn ah-btn--ghost" @click="closeDraft">{{ $t('Fields.cancel') }}</button>
                 </div>
@@ -191,7 +194,7 @@
             v-if="legacyVisible"
             :componentDetail="legacyDetail"
             :customFieldObject="legacyObject"
-            :isCustomField="legacyVisible"
+            v-model:isCustomField="legacyVisible"
             :isType="true"
             @customFieldStore="storeLegacyField"
             @closeSidebar="closeLegacy"
@@ -260,6 +263,7 @@ const testing = ref(false);
 const preview = ref({ value: null, error: "" });
 const scopeNames = ref([]);
 const exprRef = ref(null);
+const panel = ref(null);
 const legacyVisible = ref(false);
 const legacyDetail = ref({});
 const legacyObject = ref({});
@@ -319,8 +323,20 @@ function detailFor(fieldType) {
     return option ? { cfType: fieldType, cfTitle: option.label, cfDescrption: option.hint, cfIcon: '', cfIconGrey: '' } : {};
 }
 
+const focusName = () => nextTick(() => panel.value?.querySelector("#fb-title, #ai-field-title")?.focus());
+
 function startNew(fieldType) {
     if (!canEdit.value) return;
+    openNew(fieldType);
+    focusName();
+}
+
+function selectField(field) {
+    openField(field);
+    focusName();
+}
+
+function openNew(fieldType) {
     selectedId.value = "";
     aiDraft.value = null;
     if (fieldType === "ai") {
@@ -355,7 +371,7 @@ function startNew(fieldType) {
     preview.value = { value: null, error: "" };
 }
 
-function selectField(field) {
+function openField(field) {
     selectedId.value = field._id;
     aiDraft.value = null;
     if (isAiField(field)) {
@@ -467,7 +483,11 @@ function validate() {
     return !Object.keys(next).length;
 }
 
-async function save() {
+function saveFromName(event) {
+    if (!event.isComposing && !saving.value) save();
+}
+
+async function save({ another = false } = {}) {
     if (!validate()) return;
     saving.value = true;
     try {
@@ -511,7 +531,8 @@ async function save() {
             commit("settings/mutateFinalCustomFields", { data: { ...created, _id: response?.data?._id || "" }, op: "added" });
         }
         $toast.success(t("Toast.Field_Updated_Successfully"), { position: "top-right" });
-        closeDraft();
+        if (another) startNew(payload.fieldType);
+        else closeDraft();
     } catch (error) {
         const message = error?.response?.data?.message || error?.message || t("Toast.something_went_wrong");
         errors.value = { ...errors.value, formulaExpression: draft.value?.fieldType === "formula" ? message : errors.value.formulaExpression };
@@ -521,7 +542,7 @@ async function save() {
     }
 }
 
-async function saveAi() {
+async function saveAi({ another = false } = {}) {
     const next = validateAiDraft(aiDraft.value, t);
     if (!next.fieldTitle && fields.value.some((field) => field._id !== aiDraft.value._id && slugOf(field.fieldTitle) === slugOf(aiDraft.value.fieldTitle))) {
         next.fieldTitle = t("Fields.error_title_taken");
@@ -551,7 +572,8 @@ async function saveAi() {
             commit("settings/mutateFinalCustomFields", { data: { ...created, _id: response?.data?._id || "" }, op: "added" });
         }
         $toast.success(t("Toast.Field_Updated_Successfully"), { position: "top-right" });
-        closeDraft();
+        if (another) startNew("ai");
+        else closeDraft();
     } catch (error) {
         $toast.error(error?.response?.data?.message || error?.message || t("Toast.something_went_wrong"), { position: "top-right" });
     } finally {

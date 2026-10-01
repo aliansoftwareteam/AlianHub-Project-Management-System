@@ -10,11 +10,15 @@ const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const savedFilters = require("./helpers/savedFilters");
 const { keepVisibleProjectIds } = require('../../Config/projectAccess');
 const { visibleProjectIds } = require('../Agents/scope');
+const { keepTaskListProjectIds } = require('../Tasks/helpers/taskListProjects');
 
 /* The files and links searches name their projects in the saved filter when there is one, so those ids
- * are kept to the projects the caller can open as the route does for `pids`. */
-const visibleObjectIds = async (req, ids) => (await keepVisibleProjectIds(String(req.headers['companyid'] || ''), req.uid, ids))
-    .map((id) => new mongoose.Types.ObjectId(id));
+ * are kept to the projects the caller can open and may list tasks in, as the route does for `pids`. */
+const visibleObjectIds = async (req, ids) => {
+    const companyId = String(req.headers['companyid'] || '');
+    const visible = await keepVisibleProjectIds(companyId, req.uid, ids);
+    return (await keepTaskListProjectIds(companyId, req.uid, visible)).map((id) => new mongoose.Types.ObjectId(id));
+};
 
 /* The files and links searches join a project's tasks and comments, so each join starts by leaving out
  * the private sprints the caller is not on. Owners and admins read past sprint privacy. */

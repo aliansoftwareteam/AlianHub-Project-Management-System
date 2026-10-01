@@ -310,7 +310,7 @@ onMounted(() => {
 .wl__person { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .wl__person .ah-avatar { width: 26px; height: 26px; font-size: 10px; }
 .wl__person-text { min-width: 0; }
-.wl__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wl__name { font-size: var(--row-font, 12.5px); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wl__sub { font-size: 11px; color: var(--ink-2); }
 .wl__sub.is-over { color: var(--danger); }
 .wl__cell { position: relative; background: var(--surface); border: 1px solid var(--hairline); border-radius: 8px; padding: 4px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; transition: border-color var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease); }
@@ -325,7 +325,7 @@ onMounted(() => {
 .wl__chip { pointer-events: auto; cursor: grab; font: 500 9.5px/1.2 var(--font-ui); background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 4px; padding: 2px 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wl__chip:active { cursor: grabbing; }
 .wl__chip--more { color: var(--ink-2); font-family: var(--font-mono); }
-.wl__total { display: grid; place-items: center; font: 600 12px/1 var(--font-mono); }
+.wl__total { display: grid; place-items: center; font: 600 var(--row-font, 12px)/1 var(--font-mono); }
 .wl__total small { font: 400 10px/1 var(--font-mono); color: var(--ink-2); }
 .wl__total.is-over { color: var(--danger); }
 .wl__empty { grid-column: 1 / -1; }

@@ -9,8 +9,10 @@ const indexer = require('./ingest/indexer');
 const erase = require('./ingest/erase');
 const askThreads = require('../AI/askThreads');
 const askCard = require('../AI/askCardStore');
+const taskAiValues = require('../AI/taskAiValues');
 const aiFeedback = require('../AI/feedback');
 const aiProfile = require('../AI/aiProfile');
+const { eraseVoter } = require('../CustomField/helpers/fieldLinkStore');
 
 // The instance console's writes on a workspace's index. Each answers counts, never text, so the
 // caller can audit what it did without holding anything it removed.
@@ -101,7 +103,7 @@ const personExists = async (companyId, userId) => {
         type: SCHEMA_TYPE.COMPANY_USERS,
         data: [{ userId: { $in: [userId, new mongoose.Types.ObjectId(userId)] } }, '_id', { lean: true }],
     }, 'findOne');
-    return Boolean(seat) || (await hasChunks(company, { createdBy: userId })) || (await askThreads.hasThreads(company, userId)) || (await askCard.hasAnswers(company, userId)) || (await aiProfile.hasProfile(company, userId)) || aiFeedback.hasFeedback(company, userId);
+    return Boolean(seat) || (await hasChunks(company, { createdBy: userId })) || (await askThreads.hasThreads(company, userId)) || (await askCard.hasAnswers(company, userId)) || (await taskAiValues.hasValues(company, userId)) || (await aiProfile.hasProfile(company, userId)) || aiFeedback.hasFeedback(company, userId);
 };
 
 const totalOf = (removed) => Object.values(removed).reduce((sum, n) => sum + n, 0);
@@ -150,9 +152,11 @@ const eraseDocument = async (companyId, { sourceType, sourceId }, progress = { r
         await erase.eraseDocument(company, { sourceType: type, sourceId: id }, options);
         Object.entries(counts).forEach(([counted, n]) => add(counted, n));
     };
+    if (sourceType === 'comment') add('ai_task_value', await taskAiValues.forgetSummaryOfComment(company, sourceId));
     if (sourceType !== TASK) {
         await eraseOne(sourceType, sourceId);
     } else {
+        add('ai_task_value', await taskAiValues.forgetTask(company, sourceId));
         const rule = await erase.excludeTask(company, sourceId, options);
         const rows = await chunkStore(company, [taskChunks(sourceId), 'sourceType sourceId', { lean: true }], 'find');
         const sources = new Map((rows || []).map((row) => [`${row.sourceType}:${row.sourceId}`, row]));
@@ -171,10 +175,14 @@ const erasePerson = async (companyId, userId, progress = { removed: {} }, { by =
     if (threads) progress.removed.ask_thread = threads;
     const cardAnswers = await askCard.eraseViewer(company, userId);
     if (cardAnswers) progress.removed.ask_card_answer = cardAnswers;
+    const taskValues = await taskAiValues.erasePerson(company, userId);
+    if (taskValues) progress.removed.ai_task_value = taskValues;
     const feedback = await aiFeedback.eraseUser(company, userId);
     if (feedback) progress.removed.ai_feedback = feedback;
     const profiles = await aiProfile.eraseOwner(company, userId);
     if (profiles) progress.removed.ai_profile = profiles;
+    const votes = await eraseVoter(company, userId);
+    if (votes) progress.removed.field_vote = votes;
     return { removed: progress.removed, total: totalOf(progress.removed) };
 };
 
