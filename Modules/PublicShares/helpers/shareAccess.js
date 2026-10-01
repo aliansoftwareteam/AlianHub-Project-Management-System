@@ -81,4 +81,11 @@ const shareStillAuthorised = async (companyId, share) => {
     return decision.ok;
 };
 
-module.exports = { canManageShare, shareStillAuthorised };
+/* Whether the public page would serve this share right now: on, unexpired, and its author still allowed to publish it. */
+const shareIsLive = async (companyId, share, now = Date.now()) => {
+    if (!share || share.enabled === false) return false;
+    if (share.expiresAt && new Date(share.expiresAt).getTime() < now) return false;
+    return shareStillAuthorised(companyId, share);
+};
+
+module.exports = { canManageShare, shareStillAuthorised, shareIsLive };

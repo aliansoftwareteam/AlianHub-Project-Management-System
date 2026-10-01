@@ -156,6 +156,7 @@ function initializeControllers() {
     require('./Modules/Trash/init').init(app);
     require('./Modules/Forms/init').init(app);
     require('./Modules/PublicShares/init').init(app);
+    require('./Modules/WhoCanSee/init').init(app);
     require('./Modules/Importers/init').init(app);
     require('./Modules/EstimatedTime/init').init(app);
     require('./Modules/CustomField/init').init(app);
