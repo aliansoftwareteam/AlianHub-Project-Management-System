@@ -58,6 +58,7 @@ exports.sendNotificationBody = (body) => {
             var { folderId = "", sprintId = "", projectId = "", companyId = '', taskId = "" } = body
             if (body?.type === "docs") {
                 actionUrl = `${encodeURIComponent(companyId)}/pages/${encodeURIComponent(String(body.changeData?.pageId || ''))}`
+                if (body.changeData?.commentId) actionUrl += `?comment=${encodeURIComponent(String(body.changeData.commentId))}`
             } else if (body?.type?.toLowerCase() === "project") {
                 if (folderId !== undefined && folderId !== null && folderId !== '') {
                     if (sprintId !== undefined && sprintId !== null && sprintId !== '') {
@@ -82,7 +83,7 @@ exports.sendNotificationBody = (body) => {
 
             if (body?.type === "project" && body.key === "comments_I'm_@mentioned_in") {
                 actionUrl = `${body.companyId}/project/${projectId}/p?tab=Comments`;
-            } 
+            }
             var payload = {}
             if (body?.type == "chat") {
                 let Image;

@@ -155,7 +155,7 @@ describe('PAGES - @mention notices', () => {
         const page = seedPage();
         await save(AUTHOR, page._id, blocksWith(mention(ANN, '@Ann')));
         const settings = mockDb.store[SCHEMA_TYPE.NOTIFICATIONS_SETTINGS].find((row) => row.userId === ANN);
-        expect(settings.docs.items).toEqual([expect.objectContaining({ key: 'doc_mention', browser: true })]);
+        expect(settings.docs.items).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'doc_mention', browser: true })]));
     });
 });
 

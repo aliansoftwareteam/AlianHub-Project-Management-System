@@ -175,3 +175,37 @@ describe('an AI-authored reply', () => {
         expect(SendNotificationEmail).not.toHaveBeenCalled();
     });
 });
+
+describe.each([
+    ['doc_comment_mention', /Priya Shah mentioned you in a comment on Launch plan/],
+    ['doc_comment_reply', /Priya Shah replied to a comment on Launch plan/],
+])('the %s email', (key, headline) => {
+    const page = '6f0000000000000000000f01';
+    const docNotice = (extra = {}) => noticeOf(key, {
+        type: 'docs',
+        projectId: undefined,
+        sprintId: '',
+        taskId: '',
+        comments_id: '',
+        changeType: 'doc_comment',
+        changeData: { pageId: page, pageTitle: 'Launch plan', commentId: ids.comment },
+        ...extra,
+    });
+    const docDetails = (notification) => ({ notification, companies: [], projects: [], tasks: [], comments: [] });
+
+    it('names who acted and the doc, and links to the doc with the comment open', async () => {
+        await sendEmailHandlerSingle(docDetails(docNotice()));
+        const { subject, html } = sentMail();
+        expect(subject).toMatch(headline);
+        expect(html).toMatch(headline);
+        expect(html).toContain('The totals on row 4 look off');
+        expect(html).toContain(`href="https://hub.example.test/#/${ids.company}/pages/${page}?comment=${ids.comment}"`);
+    });
+
+    it('escapes the doc title', async () => {
+        await sendEmailHandlerSingle(docDetails(docNotice({ changeData: { pageId: page, pageTitle: '<i>Plan</i>', commentId: ids.comment } })));
+        const { html } = sentMail();
+        expect(html).not.toContain('<i>Plan</i>');
+        expect(html).toContain('&lt;i&gt;Plan&lt;/i&gt;');
+    });
+});

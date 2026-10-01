@@ -435,12 +435,6 @@ describe('the row wires the cells to the shared edit context', () => {
         const items = wrapper.findAll('[role="menu"] [role="menuitem"]').map((i) => i.attributes('data-item'));
         expect(items).toEqual(expect.arrayContaining(['rename', 'subtask', 'copy-link', 'new-tab']));
     });
-
-    it('subtask rows keep their done checkbox and gain no pickers', () => {
-        const wrapper = renderRow(edit(), task({ isParentTask: false, _id: 's1' }), { isSub: true, canSetStatus: true });
-        expect(wrapper.find('button.lv2__status').exists()).toBe(false);
-        expect(wrapper.findAll('button.lv2__cell-btn')).toHaveLength(0);
-    });
 });
 
 describe('every inline change offers Undo through the same update path', () => {

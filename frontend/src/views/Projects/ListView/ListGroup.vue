@@ -31,7 +31,6 @@
                             :expanded="isExpanded(task._id)"
                             :progress="progressFor(task._id)"
                             :can-select="canSelect"
-                            :can-set-status="canSetStatus"
                             :run="agents.runFor(task._id)"
                             :proposal="agents.proposalFor(task._id)"
                             @open="$emit('open', task)"
@@ -46,9 +45,10 @@
                                 :key="sub._id"
                                 :data="sub"
                                 is-sub
-                                :can-set-status="canSetStatus"
+                                :selected="selection.isSelected(sub._id)"
+                                :can-select="canSelect"
                                 @open="$emit('open', sub)"
-                                @toggle-done="toggleDone"
+                                @select="onSelect"
                             />
                         </template>
                         <div v-if="subtaskFor === String(task._id)" role="row" class="lv2__aria-row"><div role="cell" class="lv2__create lv2__create--sub">
@@ -151,7 +151,6 @@ const canCreate = computed(() => !showArchived.value
     && checkPermission("task.task_create", props.project?.isGlobalPermission) === true
     && checkPermission("task.task_list", props.project?.isGlobalPermission) === true);
 const canSelect = computed(() => !showArchived.value && checkPermission("task.task_status", props.project?.isGlobalPermission) === true);
-const canSetStatus = canSelect;
 const canDrag = computed(() => canSelect.value && !searchedTask.value && listSort.value.key === "manual" && !props.item.dropDisabled && props.item.value !== "NO_DUE_DATE" && props.item.value !== "NEXT");
 
 const storeTasks = computed(() => getters["projectData/tasks"]?.[props.project._id]?.[sprintId.value]?.tasks || []);
@@ -275,15 +274,10 @@ function startSubtask(task) {
     subtaskFor.value = id;
 }
 
+/* A ticked subtask is picked on its own: auto-selecting the parent once every sibling is
+ * ticked would pull the parent into the bulk change too. */
 function onSelect(task, event) {
-    selection.selectFromEvent(task, event, ".lv2");
-}
-
-function toggleDone(task, done) {
-    const statuses = props.project?.taskStatusData || [];
-    const next = done ? statuses.find((s) => s.type === "close") : statuses.find((s) => s.type === "default_active") || statuses.find((s) => s.type !== "close");
-    if (!next) return;
-    updateTaskByGroup(task, next, 0).catch((error) => console.error("ERROR in list subtask status: ", error));
+    selection.selectFromEvent(task, event, ".lv2", { subtasksAlone: true });
 }
 
 function onDragChange(event) {
