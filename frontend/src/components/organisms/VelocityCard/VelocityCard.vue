@@ -99,6 +99,6 @@ onMounted(load);
 <style scoped src="@/components/organisms/DashboardCard/cardBody.css"></style>
 <style src="@/views/Projects/Reports/reportsV2.css"></style>
 <style scoped>
-.vel__bars { gap: 8px; min-height: 0; padding-top: 4px; }
+.vel__bars { gap: var(--sp-3); min-height: 0; padding-top: var(--sp-1); }
 .vel__pair { height: 96px; }
 </style>

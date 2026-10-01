@@ -128,17 +128,17 @@ onMounted(load);
 
 <style scoped src="@/components/organisms/DashboardCard/cardBody.css"></style>
 <style scoped>
-.tbs__rows { display: flex; flex-direction: column; gap: 7px; }
+.tbs__rows { display: flex; flex-direction: column; gap: calc(var(--sp-2) + 1px); }
 .tbs__name { width: 104px; }
 .tbs__bar {
     flex: 1 1 auto;
     display: flex;
     height: 18px;
-    border-radius: 4px;
+    border-radius: var(--r-sm, 4px);
     overflow: hidden;
     background: var(--surface-hover);
     min-width: 0;
 }
 .tbs__seg { height: 100%; }
-.tbs__legend { margin-top: auto; padding-top: 4px; }
+.tbs__legend { margin-top: auto; padding-top: var(--sp-1); }
 </style>

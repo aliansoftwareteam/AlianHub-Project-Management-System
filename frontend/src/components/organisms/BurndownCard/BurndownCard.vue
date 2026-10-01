@@ -19,6 +19,8 @@ import { computed, ref, watch, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useCardMeta } from '@/components/organisms/DashboardCard/useCardMeta';
 import { burndownOptions, burndownSeries, fetchBurndown } from '@/views/Projects/Reports/composables/agileReports';
+import { useChartTokens } from '@/utils/chartTokens';
+import { burndownCardOptions } from './burndownCardOptions';
 
 defineOptions({ name: 'BurndownCard' });
 
@@ -35,6 +37,7 @@ const props = defineProps({
 
 const { t } = useI18n();
 const meta = useCardMeta();
+const chartTokens = useChartTokens();
 const report = ref(null);
 
 const sprintId = computed(() => String(props.cardData?.sprintId || ''));
@@ -46,7 +49,7 @@ const series = computed(() => burndownSeries(days.value, {
     remaining: t('Reports.remaining'),
     ideal: t('Reports.ideal'),
 }));
-const options = computed(() => ({ ...burndownOptions(days.value, { id: `burndown-${props.cardUID}` }), legend: { show: false } }));
+const options = computed(() => burndownCardOptions(burndownOptions(days.value, { id: `burndown-${props.cardUID}` }), chartTokens.value));
 
 const total = computed(() => Number(report.value && (metric.value === 'count' ? report.value.totalCount : report.value.totalPoints)) || 0);
 const remainingNow = computed(() => {
@@ -84,8 +87,7 @@ onMounted(load);
 <style src="@/views/Projects/Reports/reportsV2.css"></style>
 <style scoped>
 .burn__chart { flex: 1 1 auto; min-height: 140px; }
-/* The shared options draw remaining work in a literal navy that vanishes on a dark card. */
-.burn__chart :deep(.apexcharts-series:nth-of-type(1) path) { stroke: var(--brand); }
+.burn__chart :deep(.apexcharts-xaxis-label), .burn__chart :deep(.apexcharts-yaxis-label) { font-size: var(--fs-2xs, 10px); }
 .burn__key--remaining { background: var(--brand); }
 .burn__key--ideal { background: transparent; border-top: 1.5px dashed var(--ink-3); border-radius: 0; height: 0; }
 </style>
