@@ -120,9 +120,8 @@ describe('a rule that cannot be saved says what is missing in parts the builder 
 
     it('carries an action\'s own reason in words, without the path', () => {
         const check = validateRuleV2(ruleWith([step('notify', { recipients: [], message: '' })]));
-        const byField = Object.fromEntries(check.issues.map((issue) => [issue.field, issue]));
-        expect(byField.message).toMatchObject({ step: 0, action: 'notify', code: 'required' });
-        expect(byField.recipients.code).toBe('required');
+        expect(check.issues.map((issue) => `${issue.field}:${issue.code}`).sort()).toEqual(['message:required', 'recipients:required']);
+        check.issues.forEach((issue) => expect(issue).toMatchObject({ step: 0, action: 'notify' }));
         check.issues.forEach((issue) => expect(issue.text).not.toMatch(/steps\[|\.config\./));
         const named = validateRuleV2(ruleWith([step('notify', { recipients: ['somebody'], message: 'Hi' })]));
         expect(named.issues).toEqual([{ step: 0, action: 'notify', field: 'recipients', code: 'other', text: '"somebody" is not a person of this workspace' }]);
