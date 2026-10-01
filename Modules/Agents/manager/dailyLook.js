@@ -9,6 +9,7 @@ const { CLOSED_STATUS_TYPES } = require('../../Tasks/helpers/taskSignals');
 const proposals = require('../proposals');
 const rules = require('./rules');
 const findings = require('./findings');
+const workQueue = require('./workQueue');
 
 // The look a project gets once on each of its working days: read a bounded slice of its open work, let the rules
 // say what needs attention, and file what is new. Nothing is changed here; a ready change waits as a proposal.
@@ -146,7 +147,9 @@ const lookAt = async (companyId, project, now = new Date()) => {
         const tasks = await readTasks(companyId, project._id);
         const [blockers, { plans, pto }] = await Promise.all([readBlockers(companyId, tasks), readPlans(companyId, project._id, now)]);
         const found = rules.findingsOf({ tasks, blockers, plans, pto, now, week });
-        return { filed: await reconcile(companyId, project, found, now), found: found.length };
+        const filed = await reconcile(companyId, project, found, now);
+        await workQueue.closeFinished(companyId, project._id, now);
+        return { filed, found: found.length };
     } catch (error) {
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PROJECTS, data: [{ _id: oid(project._id), agentManagerLookedOn: today }, { $unset: { agentManagerLookedOn: '' } }],

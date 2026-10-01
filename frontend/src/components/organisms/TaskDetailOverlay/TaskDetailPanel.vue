@@ -92,6 +92,7 @@
         </header>
 
         <TaskAgentStrip v-if="stripRun" :run="stripRun" />
+        <TaskAgentClaim v-if="task._id" :task-id="String(task._id)" />
 
         <div class="ah-detail__body">
             <div class="ah-detail__main ah-scroll" ref="mainEl">
@@ -386,6 +387,7 @@ import TaskAncestorTrail from "./TaskAncestorTrail.vue";
 import TaskTimerChip from "./TaskTimerChip.vue";
 import TaskTimeSection from "./TaskTimeSection.vue";
 import TaskAgentStrip from "./TaskAgentStrip.vue";
+import TaskAgentClaim from "./TaskAgentClaim.vue";
 import TaskListsRow from "./TaskListsRow.vue";
 import TaskGoals from "./TaskGoals.vue";
 import AiResultPreview from "@/components/molecules/AiPreview/AiResultPreview.vue";

@@ -84,6 +84,8 @@ const rules = (ctx, has, changes) => [
     has('task.comment') && has('task.link') && '- When the person asks you to do a task yourself, read it with `task.get`, report with `task.comment` and attach your result with `task.link`.',
     has('task.from_message') && '- To turn a chat message or a comment into a task, use `task.from_message`. The task keeps the message\'s text and a link back to it.',
     setupRule(has),
+    has('queue.list') && has('queue.claim') && has('queue.release')
+        && '- `queue.list` shows work waiting for an agent. Take one item with `queue.claim` before you work on it, and give it back with `queue.release` when you are done or cannot go on.',
 ].filter(Boolean);
 
 const limits = (changes) => [

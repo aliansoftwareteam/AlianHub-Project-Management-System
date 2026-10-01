@@ -11871,7 +11871,17 @@ export default {
         "offer_no_estimate": "Add an estimate.",
         "fix_slipping_waits": "move {task} {n} day later | move {task} {n} days later",
         "fix_blocked": "ask what {blocker} needs to move",
-        "fix_stale": "ask for an update on {task}"
+        "fix_stale": "ask for an update on {task}",
+        "rule_handed_over": "Handed to an agent",
+        "reason_handed_over": "A person handed this task to an agent",
+        "offer_handed_over": "The agent that takes it does what the task asks.",
+        "claimed_by": "{name} is working on this",
+        "waiting_for_agent": "Waiting for an agent to take it",
+        "take_back": "Take it back",
+        "taken_back": "You took it back. No agent will pick it up.",
+        "take_back_failed": "It could not be taken back.",
+        "hand_over": "Hand to an agent",
+        "hand_over_failed": "It could not be handed to an agent."
     },
     "Memory": {
         "title": "What the agents remember",

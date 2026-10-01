@@ -216,6 +216,7 @@ const inverses = {
         const out = await setupWork().withdrawView({ companyId, who: undoer(actor), projectId: u.projectId, viewId: u.viewId });
         return { projectId: u.projectId, viewId: u.viewId, ...out };
     },
+    ...require('./manager/workQueue').inverses,
 };
 
 const isUndoable = (row) => Boolean(row && row.meta && row.meta.undo && inverses[row.meta.undo.kind] && !row.meta.undoneAt);
