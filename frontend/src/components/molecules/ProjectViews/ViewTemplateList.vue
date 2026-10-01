@@ -2,7 +2,7 @@
     <section ref="root" class="view__group vtl" data-view-templates>
         <h3 class="view__group-title">{{ $t('ViewTemplates.from_template') }}</h3>
         <ul class="vtl__list">
-            <li v-for="template in templates" :key="template._id" class="vtl__row">
+            <li v-for="template in shown" :key="template._id" class="vtl__row">
                 <form
                     v-if="renamingId === template._id"
                     class="vtl__form"
@@ -29,7 +29,7 @@
                         :disabled="adding"
                         @click="$emit('pick', template)"
                     >
-                        <img class="view__cell-icon" :src="projectComponentsIcons(template.viewType)?.icon" alt="" aria-hidden="true">
+                        <span v-if="projectComponentsIcons(template.viewType)?.icon" class="ah-mask-icon view__cell-icon" :style="maskOf(projectComponentsIcons(template.viewType).icon)" aria-hidden="true"></span>
                         <span class="view__cell-name">{{ template.name }}</span>
                         <span class="view__cell-tag">{{ $t(`ViewList.${template.viewName}`) }}</span>
                     </button>
@@ -58,25 +58,42 @@
                 </template>
             </li>
         </ul>
+        <button
+            v-if="foldable"
+            type="button"
+            class="vtl__link vtl__more"
+            data-template-more
+            :aria-expanded="expanded ? 'true' : 'false'"
+            @click="expanded = !expanded"
+        >{{ expanded ? $t('ViewTemplates.show_fewer') : $t('ViewTemplates.show_all', { n: templates.length }) }}</button>
         <p v-if="error" class="vtl__error" role="alert">{{ error }}</p>
     </section>
 </template>
 
 <script setup>
-import { nextTick, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { projectComponentsIcons } from '@/composable/commonFunction';
+import { maskOf } from '@/utils/iconMask';
 import { NAME_LIMIT, deleteViewTemplate, errorText, renameViewTemplate } from './viewTemplates';
 
 defineOptions({ name: 'ViewTemplateList' });
 
-defineProps({
+/* The list sits above the built-in kinds of view, so a long one is folded to keep those in sight. */
+const FOLDED_COUNT = 4;
+
+const props = defineProps({
     templates: { type: Array, default: () => [] },
     adding: { type: Boolean, default: false },
+    showAll: { type: Boolean, default: false },
 });
 const emit = defineEmits(['pick', 'changed']);
 
 const { t } = useI18n();
+
+const expanded = ref(false);
+const foldable = computed(() => !props.showAll && props.templates.length > FOLDED_COUNT);
+const shown = computed(() => (foldable.value && !expanded.value ? props.templates.slice(0, FOLDED_COUNT) : props.templates));
 
 const root = ref(null);
 const renamingId = ref('');
@@ -174,6 +191,9 @@ const remove = (template) => change(() => deleteViewTemplate(template._id), 'Vie
 }
 .vtl__link--danger {
     color: var(--danger);
+}
+.vtl__more {
+    align-self: flex-start;
 }
 .vtl__error {
     margin: 0;

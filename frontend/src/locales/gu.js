@@ -5569,6 +5569,7 @@ export default {
         "expires_optional": "Expires (optional)",
         "password_optional": "Password (optional)",
         "delete_link": "Delete link",
+        "public_link_deleted": "Public link deleted",
         "password_protected": "Password protected",
         "share_expires_on": "Expires",
         "intake_inbox": "Requests",
@@ -5914,10 +5915,15 @@ export default {
         "saving": "Saving…",
         "saved": "View saved",
         "created": "View added",
-        "failed": "The view could not be saved"
+        "failed": "The view could not be saved",
+        "rename": "Rename",
+        "rename_label": "Rename the view {name}",
+        "rename_failed": "The view could not be renamed"
     },
     "ViewTemplates": {
         "from_template": "From a template",
+        "show_all": "Show all {n} templates",
+        "show_fewer": "Show fewer templates",
         "save_as": "Save as template",
         "save_title": "Save this view as a template",
         "name": "Template name",

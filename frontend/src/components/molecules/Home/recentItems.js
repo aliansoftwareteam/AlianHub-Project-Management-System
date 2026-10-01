@@ -1,3 +1,5 @@
+import { docRoute } from "@/components/molecules/Pages/docRoute";
+
 export const RECENT_TYPES = Object.freeze(["task", "project", "doc", "sprint"]);
 
 const textOf = (...values) => values.find((v) => typeof v === "string" && v.trim()) || "";
@@ -41,7 +43,7 @@ export function toRecentItems(rows) {
 
 export function recentRoute(item, cid) {
     if (item.type === "project") return { name: "Project", params: { cid, id: item.id } };
-    if (item.type === "doc") return { name: "PageEditor", params: { cid, pageId: item.id } };
+    if (item.type === "doc") return docRoute(cid, item.id);
     if (item.type === "sprint" && item.projectId) {
         return item.folderId
             ? { name: "ProjectFolderSprint", params: { cid, id: item.projectId, folderId: item.folderId, sprintId: item.id } }

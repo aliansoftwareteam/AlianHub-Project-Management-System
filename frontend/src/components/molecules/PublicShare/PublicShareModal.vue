@@ -1,71 +1,80 @@
 <template>
-    <div v-if="modelValue" class="pshare__overlay" @click.self="close">
-        <div ref="dialogEl" class="pshare__card" role="dialog" aria-modal="true" :aria-labelledby="titleId" tabindex="-1">
-            <div class="d-flex align-items-center justify-content-between pshare__head">
-                <span :id="titleId" class="font-size-16 font-weight-700">{{ $t('Projects.public_link') }}</span>
-                <button type="button" class="font-size-16 pshare__close" :title="$t('Projects.close')" :aria-label="$t('Projects.close')" @click="close">&#10005;</button>
+    <div v-if="modelValue" class="pshare__back" @click.self="close">
+        <div ref="dialogEl" class="ah-card pshare__card" role="dialog" aria-modal="true" :aria-labelledby="titleId" tabindex="-1">
+            <div class="ah-card__head pshare__head">
+                <h3 :id="titleId" class="ah-h3">{{ $t('Projects.public_link') }}</h3>
+                <button type="button" class="pshare__close" :title="$t('Projects.close')" :aria-label="$t('Projects.close')" @click="close">
+                    <ShellIcon name="x" :size="15" />
+                </button>
             </div>
-            <div class="d-flex align-items-center pshare__controls">
-                <span class="font-size-13 font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
-                <select v-model="selectedSprintId" class="pshare__select font-size-13">
-                    <option v-for="sprint in sprintOptions" :key="'ps-'+sprint.id" :value="sprint.id">
-                        {{ listLabel(sprint) }}
-                    </option>
-                </select>
-                <button v-if="selectedSprintId" type="button" class="pshare__who font-size-13 blue ml-10px" @click="showWhoCanSee = true">{{ $t('WhoCanSee.menu_sprint') }}</button>
-            </div>
-            <WhoCanSeeModal v-if="showWhoCanSee" v-model="showWhoCanSee" kind="sprint" :itemId="selectedSprintId" :title="selectedSprintName" />
+            <div class="ah-card__body pshare__body">
+                <label class="ah-field">
+                    <span class="ah-field__label">{{ $t('Projects.select_sprint') }}</span>
+                    <select v-model="selectedSprintId" class="ah-input pshare__select">
+                        <option v-for="sprint in sprintOptions" :key="sprint.id" :value="sprint.id">{{ sprint.label }}</option>
+                    </select>
+                </label>
+                <button v-if="selectedSprintId" type="button" class="ah-btn ah-btn--ghost ah-btn--sm pshare__who" @click="showWhoCanSee = true">
+                    <ShellIcon name="eye" :size="13" />{{ $t('WhoCanSee.menu_sprint') }}
+                </button>
+                <WhoCanSeeModal v-if="showWhoCanSee" v-model="showWhoCanSee" kind="sprint" :itemId="selectedSprintId" :title="selectedSprintName" />
 
-            <template v-if="share">
-                <div class="pshare__linkrow d-flex align-items-center">
-                    <input class="pshare__link font-size-12" :value="shareUrl" readonly @focus="$event.target.select()" />
-                    <button class="btn-primary font-size-12 ml-10px" @click="copyLink">{{ $t('Projects.copy_link') }}</button>
-                </div>
-                <div class="d-flex align-items-center pshare__toggles font-size-13">
-                    <label class="d-flex align-items-center cursor-pointer mr-20px">
-                        <input type="checkbox" :checked="share.enabled" @change="updateShare({ enabled: $event.target.checked })" />
-                        <span class="ml-5px">{{ $t('Projects.link_enabled') }}</span>
-                    </label>
-                    <label class="d-flex align-items-center cursor-pointer">
-                        <input type="checkbox" :checked="share.allowIntake" @change="updateShare({ allowIntake: $event.target.checked })" />
-                        <span class="ml-5px">{{ $t('Projects.allow_intake') }}</span>
-                    </label>
-                </div>
-
-                <div class="d-flex align-items-center pshare__meta font-size-12 gray81">
-                    <span v-if="share.hasPassword" class="mr-10px">🔒 {{ $t('Projects.password_protected') }}</span>
-                    <span v-if="share.expiresAt" class="mr-10px">{{ $t('Projects.share_expires_on') }}: {{ formatDate(share.expiresAt) }}</span>
-                    <span class="cursor-pointer red" @click="deleteShare">{{ $t('Projects.delete_link') }}</span>
-                </div>
-
-                <div v-if="share.allowIntake" class="pshare__intake">
-                    <div class="font-size-13 font-weight-700 mb-5px">{{ $t('Projects.intake_inbox') }} ({{ intakeItems.length }})</div>
-                    <div v-if="!intakeItems.length" class="gray81 font-size-12">{{ $t('Projects.no_intake') }}</div>
-                    <div v-for="item in intakeItems" :key="'intake-'+item._id" class="pshare__intake-row">
-                        <div class="font-size-13 font-weight-600">{{ item.title }}</div>
-                        <div v-if="item.description" class="font-size-12 gray81 pshare__intake-desc">{{ item.description }}</div>
-                        <div class="d-flex align-items-center font-size-12">
-                            <span class="gray81 mr-10px">{{ item.name || $t('Projects.anonymous') }}<template v-if="item.email"> · {{ item.email }}</template></span>
-                            <span class="cursor-pointer blue mr-10px" @click="review(item, 'accept')">{{ $t('Projects.accept') }}</span>
-                            <span class="cursor-pointer red" @click="review(item, 'reject')">{{ $t('Projects.reject') }}</span>
-                        </div>
+                <template v-if="share">
+                    <div class="pshare__linkrow">
+                        <input class="ah-input pshare__link" :value="shareUrl" :aria-label="$t('Projects.public_link')" readonly @focus="$event.target.select()" />
+                        <button type="button" class="ah-btn ah-btn--primary" @click="copyLink">{{ $t('Projects.copy_link') }}</button>
                     </div>
+                    <div class="pshare__toggles">
+                        <label class="pshare__toggle">
+                            <input type="checkbox" class="ah-check" :checked="share.enabled" @change="updateShare({ enabled: $event.target.checked })" />
+                            <span>{{ $t('Projects.link_enabled') }}</span>
+                        </label>
+                        <label class="pshare__toggle">
+                            <input type="checkbox" class="ah-check" :checked="share.allowIntake" @change="updateShare({ allowIntake: $event.target.checked })" />
+                            <span>{{ $t('Projects.allow_intake') }}</span>
+                        </label>
+                    </div>
+                    <div class="pshare__meta">
+                        <span v-if="share.hasPassword" class="pshare__fact"><ShellIcon name="lock" :size="12" />{{ $t('Projects.password_protected') }}</span>
+                        <span v-if="share.expiresAt" class="pshare__fact"><span>{{ $t('Projects.share_expires_on') }}</span><span>{{ formatDate(share.expiresAt) }}</span></span>
+                        <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm pshare__delete" @click="deleteShare">
+                            <ShellIcon name="trash" :size="13" />{{ $t('Projects.delete_link') }}
+                        </button>
+                    </div>
+
+                    <section v-if="share.allowIntake" class="pshare__intake">
+                        <h4 class="ah-h3 pshare__intake-head">{{ $t('Projects.intake_inbox') }}<span class="ah-chip ah-chip--sm">{{ intakeItems.length }}</span></h4>
+                        <p v-if="!intakeItems.length" class="ah-small pshare__none">{{ $t('Projects.no_intake') }}</p>
+                        <div v-for="item in intakeItems" :key="item._id" class="pshare__intake-row">
+                            <div class="pshare__intake-title">{{ item.title }}</div>
+                            <div v-if="item.description" class="ah-small pshare__intake-desc">{{ item.description }}</div>
+                            <div class="pshare__intake-foot">
+                                <span class="ah-small pshare__intake-from"><span>{{ item.name || $t('Projects.anonymous') }}</span><span v-if="item.email">{{ item.email }}</span></span>
+                                <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="review(item, 'accept')">{{ $t('Projects.accept') }}</button>
+                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="review(item, 'reject')">{{ $t('Projects.reject') }}</button>
+                            </div>
+                        </div>
+                    </section>
+                </template>
+                <div v-else class="pshare__create">
+                    <label class="ah-field">
+                        <span class="ah-field__label">{{ $t('Projects.expires_optional') }}</span>
+                        <input v-model="newExpiry" type="date" class="ah-input" />
+                    </label>
+                    <label class="ah-field">
+                        <span class="ah-field__label">{{ $t('Projects.password_optional') }}</span>
+                        <input v-model="newPassword" type="text" class="ah-input" autocomplete="off" />
+                    </label>
+                    <button type="button" class="ah-btn ah-btn--primary pshare__submit" :disabled="!selectedSprintId || isSaving" @click="createShare">{{ $t('Projects.create_public_link') }}</button>
                 </div>
-            </template>
-            <div v-else class="pshare__create">
-                <div class="font-size-12 gray81 mb-5px">{{ $t('Projects.expires_optional') }}</div>
-                <input type="date" v-model="newExpiry" class="pshare__field" />
-                <div class="font-size-12 gray81 mb-5px">{{ $t('Projects.password_optional') }}</div>
-                <input type="text" v-model="newPassword" class="pshare__field" autocomplete="off" />
-                <button class="btn-primary font-size-13" :disabled="!selectedSprintId || isSaving" @click="createShare">{{ $t('Projects.create_public_link') }}</button>
             </div>
         </div>
     </div>
 </template>
 
 <script setup>
-import { computed, defineProps, inject, ref, watch } from "vue";
-import { folderPathLabel, listLabel } from "@/utils/folderTree";
+import { computed, inject, ref, watch } from "vue";
+import { folderPathLabel } from "@/utils/folderTree";
 import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
 
@@ -73,7 +82,10 @@ import { apiRequest } from '@/services';
 import { useGetterFunctions } from "@/composable";
 import { useFocusTrap } from '@/composable/useFocusTrap';
 import { useDialogEscape } from '@/composable/useDialogEscape';
+import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import WhoCanSeeModal from '@/components/molecules/WhoCanSee/WhoCanSeeModal.vue';
+
+defineOptions({ name: 'PublicShareModal' });
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -110,13 +122,14 @@ const showWhoCanSee = ref(false);
 
 const sprintOptions = computed(() => {
     const options = [];
-    Object.values(props.projectData?.sprintsObj || {}).forEach((sprint) => {
-        if (sprint?.id) options.push({ id: sprint.id, name: sprint.name || 'Sprint' });
-    });
+    const add = (sprint, folderName = '') => {
+        if (!sprint?.id) return;
+        const name = sprint.name || t('Projects.sprint');
+        options.push({ id: sprint.id, name, label: [folderName, name].filter(Boolean).join(' / ') });
+    };
+    Object.values(props.projectData?.sprintsObj || {}).forEach((sprint) => add(sprint));
     Object.values(props.projectData?.sprintsfolders || {}).forEach((folder) => {
-        Object.values(folder?.sprintsObj || {}).forEach((sprint) => {
-            if (sprint?.id) options.push({ id: sprint.id, name: sprint.name || 'Sprint', folderName: folder.folderName || '', folderPath: folderPathLabel(props.projectData?.sprintsfolders, folder) });
-        });
+        Object.values(folder?.sprintsObj || {}).forEach((sprint) => add(sprint, folderPathLabel(props.projectData?.sprintsfolders, folder) || folder.folderName));
     });
     return options;
 });
@@ -210,7 +223,7 @@ function deleteShare() {
             intakeItems.value = [];
             newExpiry.value = '';
             newPassword.value = '';
-            $toast.success('Public link deleted', { position: 'top-right' });
+            $toast.success(t('Projects.public_link_deleted'), { position: 'top-right' });
         }
     }).catch((error) => console.error('ERROR in delete share: ', error));
 }
@@ -221,53 +234,54 @@ function formatDate(d) {
 </script>
 
 <style scoped>
-.pshare__overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.35);
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.pshare__back {
+    position: fixed; inset: 0; z-index: 1000;
+    background: color-mix(in srgb, var(--rail) 40%, transparent);
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 72px 16px 16px;
 }
 .pshare__card {
-    background: #fff;
-    border-radius: 10px;
-    width: min(560px, 92vw);
-    max-height: 76vh;
-    overflow-y: auto;
-    padding: 16px 20px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+    width: 520px; max-width: 100%; max-height: calc(100vh - 96px);
+    display: flex; flex-direction: column;
+    background: var(--surface); color: var(--ink);
+    box-shadow: var(--shadow-modal);
+    font: var(--text-body); text-align: left; white-space: normal;
 }
-.pshare__head { margin-bottom: 12px; }
 .pshare__card:focus { outline: none; }
-.pshare__close { border: 0; background: none; padding: 0 4px; line-height: 1; border-radius: var(--r-chip); cursor: pointer; }
-.pshare__close { color: #9a9a9a; }
-.pshare__close:hover { color: #e84a4a; }
-.pshare__controls { margin-bottom: 12px; flex-wrap: wrap; row-gap: 6px; }
-.pshare__who { background: none; border: 0; padding: 0; cursor: pointer; }
-.pshare__select {
-    border: 1px solid #e0e0e0;
-    border-radius: 6px;
-    padding: 6px 8px;
-    background: #fff;
-    min-width: 220px;
+.pshare__head { flex: none; }
+.pshare__body { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+.pshare__close {
+    display: inline-grid; place-items: center;
+    border: 0; background: none; padding: 4px; border-radius: var(--r-chip);
+    color: var(--ink-2); cursor: pointer;
 }
-.pshare__linkrow { margin-bottom: 10px; }
-.pshare__link {
-    flex: 1;
-    border: 1px solid #e0e0e0;
-    border-radius: 6px;
-    padding: 7px 10px;
-    background: #fafafa;
-    color: #555;
+.pshare__close:hover { color: var(--ink); background: var(--surface-hover); }
+.pshare__close:focus-visible { outline: none; box-shadow: var(--focus); }
+.pshare__select { appearance: auto; }
+.pshare__who { align-self: flex-start; color: var(--brand); }
+.pshare__linkrow { display: flex; flex-wrap: wrap; gap: 8px; }
+.pshare__link { flex: 1 1 220px; width: auto; min-width: 0; font: var(--text-data); color: var(--ink-2); background: var(--surface-2); }
+.pshare__toggles { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.pshare__toggle { display: inline-flex; align-items: center; gap: 8px; margin: 0; color: var(--ink); cursor: pointer; }
+.pshare__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font: var(--text-small); color: var(--ink-2); }
+.pshare__fact { display: inline-flex; align-items: center; gap: 5px; }
+.pshare__delete { margin-left: auto; color: var(--danger-ink); }
+.pshare__delete:hover:not(:disabled) { color: var(--danger-ink); background: var(--danger-bg); }
+.pshare__intake { border-top: 1px solid var(--hairline); padding-top: 12px; }
+.pshare__intake-head { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; }
+.pshare__none { margin: 0; }
+.pshare__intake-row { padding: 10px 0; border-bottom: 1px solid var(--hairline); }
+.pshare__intake-row:last-child { border-bottom: 0; }
+.pshare__intake-title { font: var(--text-h3); color: var(--ink); overflow-wrap: anywhere; }
+.pshare__intake-desc { margin: 2px 0 6px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pshare__intake-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pshare__intake-from { display: inline-flex; flex-wrap: wrap; gap: 2px 8px; margin-right: auto; min-width: 0; overflow-wrap: anywhere; }
+.pshare__create { display: flex; flex-direction: column; gap: 12px; }
+.pshare__submit { align-self: flex-start; }
+
+@media (max-width: 480px) {
+    .pshare__back { padding: 12px; align-items: stretch; }
+    .pshare__card { max-height: none; }
+    .pshare__linkrow .ah-btn, .pshare__submit { width: 100%; }
 }
-.pshare__toggles { margin-bottom: 14px; }
-.pshare__create { padding: 10px 0; }
-.pshare__intake { border-top: 1px solid #eee; padding-top: 10px; }
-.pshare__intake-row { padding: 8px 0; border-bottom: 1px solid #f2f2f2; }
-.pshare__intake-desc { margin: 2px 0 4px; white-space: pre-wrap; }
-.pshare__field { display: block; width: 100%; box-sizing: border-box; border: 1px solid #e0e0e0; border-radius: 6px; padding: 7px 10px; margin-bottom: 10px; font-size: 13px; }
-.pshare__meta { margin: 0 0 12px; }
-.pshare__meta .red { margin-left: auto; }
 </style>
