@@ -527,6 +527,37 @@ describe('asking AI inside the palette', () => {
     const answerRegion = (wrapper) => wrapper.find('[aria-live="polite"]');
     const escape = (wrapper) => wrapper.find('[role="dialog"]').trigger('keydown', { key: 'Escape' });
 
+    it('offers to post an answer that carries a token to chat, and opens the dialog with that answer', async () => {
+        serveAsk(() => ok({ ...ANSWER, shareToken: 'signed.token.value' }));
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper, 'budget');
+        await pressAsk(wrapper);
+        expect(kinds(wrapper)).toContain('post');
+        expect(wrapper.find('[data-test="post-dialog"]').exists()).toBe(false);
+
+        await options(wrapper).find((o) => o.attributes('data-kind') === 'post').trigger('mouseenter');
+        await key(wrapper, { key: 'Enter' });
+        await flushPromises();
+
+        const dialog = wrapper.findComponent({ name: 'AskPostToChat' });
+        expect(dialog.props()).toMatchObject({ question: 'budget', answer: ANSWER.answer, cited: CITED, shareToken: 'signed.token.value' });
+        expect(wrapper.emitted('close')).toBeFalsy();
+        expect(apiRequest).toHaveBeenCalledWith('get', '/api/v1/ai/ask/post/targets');
+
+        dialog.vm.$emit('close');
+        await flushPromises();
+        expect(wrapper.find('[data-test="post-dialog"]').exists()).toBe(false);
+    });
+
+    it('does not offer to post an answer that carries no token', async () => {
+        serveAsk(() => ok(ANSWER));
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper, 'budget');
+        await pressAsk(wrapper);
+        expect(kinds(wrapper)).toContain('continue');
+        expect(kinds(wrapper)).not.toContain('post');
+    });
+
     it('answers in the palette on Enter, with the model and the cited task and doc as rows', async () => {
         serveAsk(() => ok(ANSWER));
         const wrapper = await mountPalette();
