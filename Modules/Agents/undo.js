@@ -12,6 +12,7 @@ const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
 const { canChangeComment } = require('../Comments/helpers/threadWriteAccess');
 const { canSeeSprintById } = require('../Sprints/helpers/sprintVisibility');
 const { followSprintMove, moveDescendants } = require('../Tasks/helpers/sprintPlacement');
+const { pullOfLists } = require('../Tasks/helpers/taskExtraLists');
 const { canUsePage } = require('../Pages/helpers/pageAccess');
 
 // Undo replays the inverse action and logs it as the person who pressed Undo.
@@ -40,9 +41,10 @@ const AUDITED_REFUSALS = [REASON.WINDOW_PASSED, REASON.NOT_VISIBLE, REASON.TARGE
 
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 
-const setTask = async (companyId, taskId, set, unset) => {
+const setTask = async (companyId, taskId, set, unset, pull) => {
     const update = { $set: set };
     if (unset) update.$unset = unset;
+    if (pull) update.$pull = pull;
     const updated = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS, data: [{ _id: oid(taskId) }, update, { returnDocument: 'after' }],
     }, 'findOneAndUpdate');
@@ -76,7 +78,7 @@ const inverses = {
         let unset;
         if (u.previous.folderObjId) set.folderObjId = u.previous.folderObjId;
         else if ('folderObjId' in u.previous) unset = { folderObjId: '' };
-        await setTask(companyId, u.taskId, set, unset);
+        await setTask(companyId, u.taskId, set, unset, pullOfLists([u.previous.sprintId]));
         if (before) await followSprintMove(companyId, { taskId: before._id, projectId: before.ProjectID, fromSprintId: before.sprintId, toSprintId: u.previous.sprintId });
         await moveDescendants(companyId, u.taskId, { set, unset }, u.previous.sprintId);
         return { taskId: u.taskId, restored: String(u.previous.sprintId) };

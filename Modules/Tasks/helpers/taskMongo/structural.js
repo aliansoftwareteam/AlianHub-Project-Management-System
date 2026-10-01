@@ -475,7 +475,7 @@ module.exports = {
                                 },
                                 {
                                     $set: {...obj},
-                                    $unset: {...unsetObj, cascadedBy: ''}
+                                    $unset: {...unsetObj, cascadedBy: '', extraLists: ''}
                                 },
                                 {
                                     returnDocument: 'after'
