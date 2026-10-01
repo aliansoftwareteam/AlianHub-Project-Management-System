@@ -2,7 +2,7 @@
     <div class="epic-picker d-flex align-items-center">
         <span class="epic-picker__label">{{ $t('Projects.epics') }}</span>
         <span class="position-re">
-            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm epic-picker__current" :aria-expanded="isOpen ? 'true' : 'false'" @click.stop="toggleOpen">
+            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm epic-picker__current" :class="{ 'is-set': currentEpic }" :aria-expanded="isOpen ? 'true' : 'false'" @click.stop="toggleOpen">
                 <template v-if="currentEpic">
                     <span class="epic-picker__dot" :style="dotStyle(currentEpic)"></span>{{ currentEpic.name }}
                 </template>
@@ -105,6 +105,7 @@ if (props.task?.ProjectID) {
     font: var(--fw-title, 600) var(--fs-lg, 14px)/var(--lh-snug, 1.3) var(--font-ui);
     color: var(--ink);
 }
+.epic-picker .epic-picker__current.is-set { color: var(--ink); }
 .epic-picker__dot {
     width: 9px;
     height: 9px;

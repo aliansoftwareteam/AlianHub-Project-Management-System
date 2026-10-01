@@ -133,7 +133,7 @@ describe('the Add Task Planning sidebar follows the theme', () => {
 
     test('the legacy sidebar chrome is repainted from tokens', () => {
         expect(css).toMatch(/\.estimate-sidebar \.sidebar-content[^{]*\{[^}]*background(-color)?:\s*var\(--surface\)/);
-        expect(css).toMatch(/\.estimate-sidebar \.sidebar-head[^{]*\{[^}]*border-(bottom-)?color:\s*var\(--hairline\)/);
+        expect(css).toMatch(/\.estimate-sidebar \.sidebar-content \.sidebar-head[^{]*\{[^}]*border-(bottom-)?color:\s*var\(--hairline\)/);
         expect(css).toMatch(/:root\[data-theme="dark"\] \.estimate-sidebar[^{]*\{[^}]*color-scheme:\s*dark/);
     });
 
@@ -188,7 +188,7 @@ describe('a doc page', () => {
     const css = styles('components/molecules/Pages/PageDocument.vue');
 
     test('starts the title, the meta row and the body on one left edge', () => {
-        expect(css).toMatch(/--pd-gutter:\s*60px/);
+        expect(css).toMatch(/--pd-gutter:\s*64px/);
         expect(css).toMatch(/\.pd--page \.pd__head\s*\{[^}]*padding-left:\s*var\(--pd-gutter\)/);
         expect(css).toMatch(/\.pd--page \.pd__body\s*\{[^}]*padding-left:\s*0/);
         expect(css).toMatch(/\.pd--page \.pd__body :deep\(\.ce-block__content\)[^{]*\{[^}]*margin-left:\s*var\(--pd-gutter\)/);
