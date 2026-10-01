@@ -4670,6 +4670,10 @@ const schema = {
         legacyId : {
             type: String,
             required:false
+        },
+        parentFolderId: {
+            type: mongoose.Schema.Types.ObjectId,
+            required: false
         }
     },
     preCompanies: {
