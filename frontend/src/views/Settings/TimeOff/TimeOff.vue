@@ -108,6 +108,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useMoment } from '@/composable';
 import { isOwnerOrAdmin } from "@/utils/roles";
+import { weekendDaysFor } from '@workingDays';
 
 // SEC-08 — time-off / PTO. Members request + see their own; owner/admin see the
 // team and approve/reject. Approved PTO reduces available capacity server-side
@@ -135,10 +136,11 @@ const form = reactive({ type: 'casual', startDate: '', endDate: '', hoursPerDay:
 const { changeDateFormate } = useMoment();
 const fmt = (d) => (d ? (changeDateFormate(d) || '—') : '—');
 
-// A full working day is 9h (office standard). Leave "days" = working days
-// (Mon–Fri) in the range × (hoursPerDay / full day) — a 4.5h half day = 0.5.
+// A full working day is 9h (office standard). Leave "days" = the company's working
+// days in the range × (hoursPerDay / full day) — a 4.5h half day = 0.5.
 // Mirrors the server-side ptoRules.leaveDays used for the table + capacity.
 const FULL_DAY_HOURS = 9;
+const weekendDays = computed(() => weekendDaysFor(getters['settings/selectedCompany']));
 const workingDaysBetween = (start, end) => {
     const s = new Date(start), e = new Date(end);
     if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0;
@@ -147,8 +149,7 @@ const workingDaysBetween = (start, end) => {
     if (last < cur) return 0;
     let n = 0;
     while (cur <= last) {
-        const d = cur.getUTCDay();
-        if (d !== 0 && d !== 6) n++;
+        if (!weekendDays.value.includes(cur.getUTCDay())) n++;
         cur.setUTCDate(cur.getUTCDate() + 1);
     }
     return n;
