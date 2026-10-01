@@ -102,6 +102,8 @@ beforeEach(() => {
         soloTask: task(solo, soloList),
         personalTask: task(personal, personalList),
         chatRow: task(chatSpace, channel, { mainChat: true, AssigneeUserId: [AUTHOR] }),
+        strayChatRow: task(open, secondOpenList, { mainChat: true, AssigneeUserId: [AUTHOR] }),
+        misfiledTask: task(solo, list(open, { name: 'Third' })),
     };
     task(open, openList);
     task(open, secondOpenList, done);
@@ -182,6 +184,8 @@ describe('a source the person linking it cannot open', () => {
         ['a chat channel', AUTHOR, () => ({ sprintIds: [world.channel] }), LIST],
         ['a chat channel, for the workspace owner', OWNER, () => ({ sprintIds: [world.channel] }), LIST],
         ['a row of a chat they are in', AUTHOR, () => ({ taskIds: [world.chatRow] }), TASK],
+        ['a chat row filed under a project they can open', AUTHOR, () => ({ taskIds: [world.strayChatRow] }), TASK],
+        ['a task of a private project that names a list of an open one', COLLEAGUE, () => ({ taskIds: [world.misfiledTask] }), TASK],
         ['a list in the trash', AUTHOR, () => ({ sprintIds: [world.trashedList] }), LIST],
     ];
 

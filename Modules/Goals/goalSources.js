@@ -29,10 +29,11 @@ const none = () => ({ sprintIds: [], taskIds: [] });
 const sourcesOf = (target) => ({ sprintIds: ((target.sources || {}).sprintIds || []).map(String), taskIds: ((target.sources || {}).taskIds || []).map(String) });
 const holdsSources = (target) => target.kind === TASKS && KINDS.some((kind) => sourcesOf(target)[kind].length > 0);
 
-/* One person reading with their own access: the owner of a private goal, or whoever links a source. */
+/* One person reading with their own access: the owner of a private goal, or whoever links a source.
+ * Someone without a live seat opens no project, so only the role needs the seat here. */
 const soleReader = async (companyId, uid) => {
     const seat = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMPANY_USERS, data: [{ userId: String(uid), ...ACTIVE_SEAT }, { roleType: 1 }] }, 'findOne');
-    return { sole: String(uid), readers: seat ? [String(uid)] : [], privileged: Boolean(seat) && isPrivileged(seat.roleType) };
+    return { sole: String(uid), readers: [String(uid)], privileged: Boolean(seat) && isPrivileged(seat.roleType) };
 };
 
 const audienceOf = async (companyId, goal) => {

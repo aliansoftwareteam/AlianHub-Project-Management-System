@@ -36,11 +36,13 @@ const markDirty = async (companyId, sprintIds, taskIds) => {
     let marked = 0;
     for (let pass = 0; pass < WRITE_PASSES; pass += 1) {
         const goals = (await crud(companyId, [{ deletedStatusKey: LIVE, targets: { $elemMatch: naming(sprintIds, taskIds) } }, null, { lean: true }], 'find')) || [];
-        if (!goals.length) return marked;
+        let missed = false;
         for (const goal of goals) {
             const targets = goal.targets.map((target) => (names(target, sprintIds, taskIds) ? { ...target, dirty: true } : target));
             if (await writeAtRevision(companyId, goal, { targets })) marked += 1;
+            else missed = true;
         }
+        if (!missed) return marked;
     }
     return marked;
 };
