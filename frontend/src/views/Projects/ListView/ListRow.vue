@@ -9,11 +9,11 @@
     >
         <span class="lv2__select lv2__c-select" role="cell" @click.stop>
             <input
-                v-if="!isSub && canSelect"
+                v-if="canSelect"
                 type="checkbox"
                 class="ah-check"
                 :checked="selected"
-                :aria-label="data.TaskName"
+                :aria-label="$t(isSub ? 'List.select_subtask' : 'List.select_task', { name: data.TaskName })"
                 @click="onSelect($event)"
                 @keydown.shift="onSelect($event)"
             />
@@ -29,18 +29,7 @@
                 :aria-label="$t('List.toggle_subtasks')"
                 @click.stop="$emit('toggle-subtasks')"
             >{{ expanded ? '▾' : '▸' }}</button>
-            <input
-                v-if="isSub"
-                type="checkbox"
-                class="ah-check"
-                :checked="done"
-                :disabled="!canSetStatus"
-                :aria-label="data.TaskName"
-                @click.stop
-                @change="$emit('toggle-done', data, $event.target.checked)"
-            />
             <ListStatusCircle
-                v-else
                 :task="data"
                 :statuses="statuses"
                 :editable="rights.status"
@@ -60,22 +49,22 @@
                 @blur="saveRename"
             />
             <button v-else type="button" class="lv2__name" :title="data.TaskName" @click.stop="open">{{ data.TaskName }}</button>
-            <span v-if="!isSub && !renaming" class="lv2__key">{{ metaText }}</span>
+            <span v-if="!renaming && metaText" class="lv2__key">{{ metaText }}</span>
             <span v-if="tracking" class="lv2__timer" :title="$t('List.tracking_now')">● {{ timerText }}</span>
             <button v-if="agentLine" type="button" class="lv2__agent-line" :title="agentLine" @click.stop="$emit('review-agent', proposal)">
                 ✦ {{ agentLine }}
             </button>
             <ListRowActions
-                v-if="!isSub && edit && !renaming"
+                v-if="edit && !renaming"
                 :task="data"
                 :href="edit.taskHref(data)"
                 :can-rename="rights.rename"
-                :can-subtask="rights.subtask"
-                :can-template="rights.template"
+                :can-subtask="!isSub && rights.subtask"
+                :can-template="!isSub && rights.template"
                 :can-archive="menuRights.archive"
                 :can-delete="menuRights.delete"
-                :can-move="menuRights.move"
-                :can-duplicate="menuRights.duplicate"
+                :can-move="!isSub && menuRights.move"
+                :can-duplicate="!isSub && menuRights.duplicate"
                 @rename="startRename"
                 @add-subtask="$emit('add-subtask', data)"
                 @copy-link="edit.copyLink(data)"
@@ -92,26 +81,26 @@
 
         <template v-for="column in columns" :key="column.id">
             <span v-if="column.id === 'tags'" class="lv2__c-tags" role="cell">
-                <TaskTagCell :task="data" :limit="tagLimit" :can-add="!isSub" />
+                <TaskTagCell :task="data" :limit="tagLimit" />
             </span>
 
             <span v-else-if="column.id === 'assignee'" class="lv2__c-assignee" role="cell">
                 <ListAssigneeCell
                     :task="data"
-                    :editable="!isSub && rights.assignee"
-                    :options="!isSub && rights.assignee ? edit.assigneeOptions(data) : []"
+                    :editable="rights.assignee"
+                    :options="rights.assignee ? edit.assigneeOptions(data) : []"
                     :multiple="Boolean(edit && edit.multipleAssignees.value)"
                     @change="(change) => edit.setAssignee(data, change, { row: rowEl })"
                 />
             </span>
 
             <span v-else-if="column.id === 'due'" class="lv2__c-due" role="cell">
-                <ListDueCell :task="data" :done="done" :editable="!isSub && rights.due" @change="(date) => edit.setDue(data, date, { row: rowEl })" />
+                <ListDueCell :task="data" :done="done" :editable="rights.due" @change="(date) => edit.setDue(data, date, { row: rowEl })" />
             </span>
 
             <span v-else-if="column.id === 'priority'" class="lv2__c-prio" role="cell">
                 <ListPriorityCell
-                    v-if="!isSub && showPriority"
+                    v-if="showPriority"
                     :task="data"
                     :editable="rights.priority"
                     @change="(option) => edit.setPriority(data, option, { row: rowEl })"
@@ -120,7 +109,7 @@
 
             <span v-else-if="column.id === 'estimate'" class="lv2__est lv2__c-est" role="cell">
                 <EstimateCell
-                    v-if="edit && !isSub && rights.estimate"
+                    v-if="edit && rights.estimate"
                     :task="data"
                     editable
                     @change="(minutes, reason) => edit.setEstimate(data, minutes, { row: rowEl, reason })"
@@ -139,7 +128,7 @@
             </span>
 
             <span v-else :class="listColumnClass(column)" role="cell">
-                <TaskColumnCell :column="column" :task="data" :is-sub="isSub" :rowEl="rowEl" />
+                <TaskColumnCell :column="column" :task="data" :rowEl="rowEl" />
             </span>
         </template>
     </div>
@@ -175,12 +164,11 @@ const props = defineProps({
     selected: { type: Boolean, default: false },
     expanded: { type: Boolean, default: false },
     canSelect: { type: Boolean, default: false },
-    canSetStatus: { type: Boolean, default: false },
     run: { type: Object, default: null },
     proposal: { type: Object, default: null },
     progress: { type: Object, default: null }
 });
-const emit = defineEmits(["open", "select", "toggle-subtasks", "toggle-done", "review-agent", "add-subtask"]);
+const emit = defineEmits(["open", "select", "toggle-subtasks", "review-agent", "add-subtask"]);
 
 const { t } = useI18n();
 

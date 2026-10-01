@@ -1,6 +1,7 @@
 import { computed } from 'vue';
 import { useStore } from 'vuex';
 import { NAV_ATTR, readSequence } from '@/components/organisms/TaskDetailOverlay/taskNavigation';
+import { selectionMix, subtaskIdsIn } from './selectionKinds';
 
 // Rows carry data-task-nav in screen order, so the ids read here already follow the
 // view's filter, sort, grouping and collapsed groups.
@@ -24,6 +25,8 @@ export function useTaskSelection() {
     const count = computed(() => selectedTaskIds.value.length);
     const hasSelection = computed(() => selectedTaskIds.value.length > 0);
     const activeView = computed(() => store.state.taskSelection.activeView);
+    const selectedSubtaskIds = computed(() => subtaskIdsIn(store.state.projectData, selectedTaskIds.value));
+    const mix = computed(() => selectionMix(selectedTaskIds.value.length, selectedSubtaskIds.value.length));
 
     const isSelected = (taskId) => {
         if (!taskId) return false;
@@ -91,9 +94,9 @@ export function useTaskSelection() {
         if (box && box.type === 'checkbox') box.checked = isSelected(id);
     };
 
-    // Parent toggled: mirror onto its loaded subtasks. Subtask toggled: the parent is
-    // selected exactly when every sibling is.
-    const toggleAndCascade = (task, evt, visibleTaskIds) => {
+    // Parent toggled: mirror onto its loaded subtasks. Subtask toggled: unless the view
+    // selects subtasks on their own, the parent is selected exactly when every sibling is.
+    const toggleAndCascade = (task, evt, visibleTaskIds, { subtasksAlone = false } = {}) => {
         if (!task?._id) return;
         const id = String(task._id);
         const range = evt?.shiftKey ? rangeTo(id, visibleTaskIds) : null;
@@ -112,7 +115,7 @@ export function useTaskSelection() {
             return;
         }
 
-        if (task.isParentTask === false) {
+        if (task.isParentTask === false && !subtasksAlone) {
             const parent = findTaskWithParent(id)?.parent;
             if (!parent?._id || !Array.isArray(parent.subtaskArray)) return;
             const siblingIds = parent.subtaskArray.map((s) => String(s?._id)).filter(Boolean);
@@ -131,7 +134,7 @@ export function useTaskSelection() {
 
     // Shift+Space selects up to the focused row; Shift+Arrow extends by one row and
     // returns the id that should take focus next.
-    const extendByKey = (task, evt, visibleTaskIds) => {
+    const extendByKey = (task, evt, visibleTaskIds, options = {}) => {
         if (!task?._id || !evt?.shiftKey || evt.ctrlKey || evt.metaKey || evt.altKey) return null;
         const id = String(task._id);
         const ids = (visibleTaskIds || []).map(String);
@@ -139,7 +142,7 @@ export function useTaskSelection() {
             evt.preventDefault();
             const range = rangeTo(id, ids);
             if (range) selectRange(range, id);
-            else toggleAndCascade(task);
+            else toggleAndCascade(task, undefined, undefined, options);
             return id;
         }
         if (evt.key !== 'ArrowDown' && evt.key !== 'ArrowUp') return null;
@@ -152,13 +155,13 @@ export function useTaskSelection() {
         return nextId;
     };
 
-    const selectFromEvent = (task, evt, scopeSelector) => {
+    const selectFromEvent = (task, evt, scopeSelector, options = {}) => {
         const ids = visibleTaskIdsAround(evt?.target, scopeSelector);
         if (evt?.type !== 'keydown') {
-            toggleAndCascade(task, evt, ids);
+            toggleAndCascade(task, evt, ids, options);
             return;
         }
-        const focusId = extendByKey(task, evt, ids);
+        const focusId = extendByKey(task, evt, ids, options);
         if (focusId && focusId !== String(task._id)) focusRowCheckbox(evt.target, scopeSelector, focusId);
     };
 
@@ -195,6 +198,8 @@ export function useTaskSelection() {
         count,
         hasSelection,
         activeView,
+        selectedSubtaskIds,
+        mix,
         isSelected,
         toggle,
         toggleAndCascade,

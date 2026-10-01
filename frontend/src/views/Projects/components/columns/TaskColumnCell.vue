@@ -68,7 +68,6 @@ defineOptions({ name: "TaskColumnCell" });
 const props = defineProps({
     column: { type: Object, required: true },
     task: { type: Object, required: true },
-    isSub: { type: Boolean, default: false },
     rowEl: { default: null }
 });
 
@@ -78,7 +77,7 @@ const project = inject("selectedProject", ref({}));
 const dateFormat = inject("$dateFormat", ref("DD/MM/YYYY"));
 
 const rights = computed(() => edit?.rights.value || {});
-const can = (key) => Boolean(edit) && !props.isSub && rights.value[key] === true;
+const can = (key) => Boolean(edit) && rights.value[key] === true;
 const done = computed(() => isClosedTask(props.task));
 const row = () => unref(props.rowEl);
 

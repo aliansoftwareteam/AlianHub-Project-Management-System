@@ -92,6 +92,7 @@ const renderSub = ({ ctx = edit(), rowMenu = menu(), data = sub('s-a'), props = 
     props: { data, isSub: true, canSelect: true, ...props },
     global: {
         plugins: [rowStore()],
+        mocks: { $t: (key, values) => i18n.global.t(key, values) },
         provide: { listRowEdit: ctx, listRowMenu: rowMenu, listColumns: ref(COLUMNS), selectedProject: ref({ _id: PID }) },
         stubs: {
             ShellIcon: true, ProvenanceBadge: true, TaskTagCell: true, ListStatusCircle: true, ListAssigneeCell: true,
