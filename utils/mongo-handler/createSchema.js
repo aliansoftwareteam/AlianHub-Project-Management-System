@@ -110,6 +110,9 @@ importJobsSchema.index({ userId: 1, createdAt: -1 });
 const aiFieldJobsSchema = new Schema(schema.aiFieldJobs, {strict: true, timestamps: true});
 aiFieldJobsSchema.index({ userId: 1, createdAt: -1 });
 aiFieldJobsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+const customFieldLinksSchema = new Schema(schema.customFieldLinks, {strict: true, timestamps: true});
+customFieldLinksSchema.index({ taskId: 1, fieldId: 1 }, { unique: true });
+customFieldLinksSchema.index({ fieldId: 1, ids: 1 });
 const epicsSchema = new Schema(schema.epics, {strict: true, timestamps: true});
 epicsSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
 const pagesSchema = new Schema(schema.pages, {strict: true, timestamps: true});
@@ -499,6 +502,7 @@ module.exports = {
     exportJobsSchema,
     importJobsSchema,
     aiFieldJobsSchema,
+    customFieldLinksSchema,
     epicsSchema,
     pagesSchema,
     pageVersionsSchema,

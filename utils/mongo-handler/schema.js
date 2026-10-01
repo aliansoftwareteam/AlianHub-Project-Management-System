@@ -4322,7 +4322,9 @@ const schema = {
         // @agent in chat: the question's { state, askerId, agentIds, at, answerIds, code }; on the agent's reply what it cites and the changes it made or proposed.
         agentAsk: { type: Object, required: false },
         agentCitations: { type: Array, required: false },
-        agentChanges: { type: Array, required: false }
+        agentChanges: { type: Array, required: false },
+        // The tool an importer brought the comment from (Modules/Importers); the author and the time are the file's word.
+        importedFrom: { type: String, required: false }
     },
     mainChat: {
         ProjectCode: {
@@ -4668,7 +4670,22 @@ const schema = {
         fieldRatingMax: { type: Number, required: false },
         // files fields: 1 to 20 files, and any | images | documents
         fieldFilesMax: { type: Number, required: false },
-        fieldFilesKind: { type: String, required: false }
+        fieldFilesKind: { type: String, required: false },
+        // relationship fields: 1 to 20 linked tasks, from any | project | list
+        fieldLinkMax: { type: Number, required: false },
+        fieldLinkScope: { type: String, required: false },
+        fieldLinkProjectId: { type: String, required: false },
+        fieldLinkSprintId: { type: String, required: false },
+        // voting fields: false keeps the voters to the server
+        fieldVotersShown: { type: Boolean, required: false }
+    },
+    // What a relationship or a voting field holds on one task: task ids, or the ids of the people who voted.
+    customFieldLinks: {
+        taskId: { type: String, required: true },
+        fieldId: { type: String, required: true },
+        // relationship | voting
+        kind: { type: String, required: true },
+        ids: { type: [String], default: [], required: false },
     },
     sprints: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.
