@@ -13,6 +13,9 @@
                 <button type="button" class="hub__item" :class="{ 'is-active': view === 'mine' }" @click="view = 'mine'">
                     {{ $t('Docs.mine') }}<span class="hub__item-count">{{ mine.length }}</span>
                 </button>
+                <button type="button" class="hub__item" :class="{ 'is-active': view === 'shared' }" data-test="docs-nav-shared" @click="view = 'shared'">
+                    {{ $t('Docs.shared_with_me') }}<span class="hub__item-count">{{ sharedWithMe.length }}</span>
+                </button>
                 <button type="button" class="hub__item" :class="{ 'is-active': view === 'wiki' }" @click="view = 'wiki'">
                     {{ $t('Docs.wiki') }}
                     <span v-if="needsReview.length" class="hub__item-badge hub__item-badge--warn">{{ needsReview.length }}</span>
@@ -67,6 +70,7 @@
                 <select v-model="view" class="hub__view-select">
                     <option value="recent">{{ $t('Docs.recent') }}</option>
                     <option value="mine">{{ $t('Docs.mine') }}</option>
+                    <option value="shared">{{ $t('Docs.shared_with_me') }}</option>
                     <option value="wiki">{{ $t('Docs.wiki') }}</option>
                     <option value="project:">{{ $t('Docs.workspace') }}</option>
                     <option v-for="project in projects" :key="'vs-' + project._id" :value="'project:' + project._id">{{ project.ProjectName }}</option>
@@ -134,6 +138,13 @@
                     <EmptyState v-if="!mine.length" class="hub__empty" illustration="docs" data-test="docs-empty-mine" :heading-level="2" :title="$t('Docs.no_mine')" :action-label="$t('Docs.new_doc')" @action="createDoc({})" />
                     <div v-else class="hub__grid">
                         <DocCard v-for="page in mine" :key="'mc-' + page._id" :page="page" @open="open" />
+                    </div>
+                </template>
+
+                <template v-else-if="view === 'shared'">
+                    <EmptyState v-if="!sharedWithMe.length" class="hub__empty" illustration="docs" data-test="docs-empty-shared" :heading-level="2" :title="$t('Docs.no_shared_with_me')" :message="$t('Docs.no_shared_with_me_hint')" />
+                    <div v-else class="hub__grid" data-test="docs-shared-with-me">
+                        <DocCard v-for="page in sharedWithMe" :key="'sw-' + page._id" :page="page" @open="open" />
                     </div>
                 </template>
 
@@ -205,7 +216,7 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h, onMounted, ref, watch } from 'vue';
+import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useStore } from 'vuex';
@@ -266,6 +277,7 @@ const filtered = computed(() => {
 const byTime = (a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
 const recent = computed(() => [...filtered.value].sort(byTime));
 const mine = computed(() => recent.value.filter((p) => String(p.createdBy || '') === me));
+const sharedWithMe = computed(() => recent.value.filter((p) => Boolean(p.sharedWithMe)));
 const wikiPages = computed(() => recent.value.filter((p) => p.isWiki));
 const needsReview = computed(() => wikiPages.value.filter((p) => p.reviewState === 'due' || p.reviewState === 'stale'));
 const staleCount = computed(() => pages.value.filter((p) => p.isWiki && p.reviewState === 'stale').length);
@@ -321,6 +333,17 @@ function fetchTrash() {
 }
 
 watch(view, (value) => { if (value === 'trash') fetchTrash(); });
+
+const SHARES_CHANGED = 'docSharesChanged';
+let listening = null;
+function listenOn(socket) {
+    if (listening) listening.off(SHARES_CHANGED, fetchPages);
+    listening = socket && typeof socket.on === 'function' ? socket : null;
+    if (listening) listening.on(SHARES_CHANGED, fetchPages);
+}
+/* The socket is replaced when the connection is made again. */
+watch(() => store.getters['settings/getSocketInstance'], listenOn, { immediate: true });
+onBeforeUnmount(() => listenOn(null));
 
 onMounted(() => {
     fetchPages();

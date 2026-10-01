@@ -35,5 +35,8 @@ export const renderNotice = (it, { t, changeText }) => {
         const doc = escapeHtml(t("Inbox.doc_mention", { doc: clip(data.pageTitle) || t("Docs.untitled") }));
         return it.message ? `${doc}: ${escapeHtml(it.message)}` : doc;
     }
+    if (it.changeType === "doc_shared") {
+        return escapeHtml(t("Inbox.doc_shared", { doc: clip(data.pageTitle) || t("Docs.untitled") }));
+    }
     return changeText(notificationHtml(it.message || ""));
 };
