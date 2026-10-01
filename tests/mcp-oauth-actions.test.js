@@ -43,6 +43,7 @@ jest.mock('../Modules/Webhooks/dispatcher', () => {
 });
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
+const { seedTaskListRules } = require('./fixtures/taskListRules');
 const { dbCollections } = require('../Config/collections');
 const server = require('../Modules/Mcp/server');
 const grants = require('../Modules/OAuthServer/grants');
@@ -112,6 +113,7 @@ beforeEach(() => {
     delete process.env.AGENT_TAINT_ROUTING;
     mockDb.seed(dbCollections.USERS, { _id: USER, Employee_Name: 'Priya', AssignCompany: C });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: USER, roleType: 2, status: 2, isDelete: false });
+    seedTaskListRules(mockDb);
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT, ProjectName: 'Shared', isPrivateSpace: false, deletedStatusKey: 0 });
     mockDb.seed(SCHEMA_TYPE.TASKS, { _id: TASK, ProjectID: PROJECT, CompanyId: C, TaskName: 'Fix it', deletedStatusKey: 0 });
 });

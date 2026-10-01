@@ -5,7 +5,7 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({
     validateObjectId: (id) => /^[a-f0-9]{24}$/i.test(String(id)),
 }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
-jest.mock('../Modules/settings/securityPermissions/controller', () => ({ fetchRules: jest.fn(async () => []) }));
+jest.mock('../Modules/settings/securityPermissions/controller', () => ({ fetchRules: jest.fn(async () => require('./fixtures/taskListRules').taskListRules()) }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 
 const mongoose = require('mongoose');

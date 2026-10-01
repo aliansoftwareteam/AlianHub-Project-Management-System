@@ -7,6 +7,7 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({
 }));
 jest.mock('../Config/config', () => ({ myCache: { get: () => undefined, set: () => {}, del: () => {}, keys: () => [], getTtl: () => 0 } }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 const mockStub = () => new Proxy({}, {
     get: (target, name) => {
         if (name === 'then' || name === '__esModule') return undefined;

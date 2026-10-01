@@ -17,6 +17,7 @@ jest.mock('../Modules/Automations/engine/tools', () => {
 });
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
+const { seedTaskListRules } = require('./fixtures/taskListRules');
 const { dbCollections } = require('../Config/collections');
 const jwt = require('../Config/jwt');
 const server = require('../Modules/Mcp/server');
@@ -74,6 +75,7 @@ beforeEach(() => {
     process.env.JWT_SECRET = 's10s4-person-secret';
     mockDb.seed(dbCollections.USERS, { _id: USER, Employee_Name: 'Priya', AssignCompany: C });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: USER, roleType: ADMIN_ROLE, status: ACTIVE, isDelete: false });
+    seedTaskListRules(mockDb);
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT, ProjectName: 'Shared', isPrivateSpace: false, deletedStatusKey: 0 });
     mockDb.seed(SCHEMA_TYPE.TASKS, { _id: TASK, ProjectID: PROJECT, CompanyId: C, TaskName: 'Fix it', deletedStatusKey: 0 });
 });

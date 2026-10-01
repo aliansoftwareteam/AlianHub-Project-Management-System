@@ -35,7 +35,7 @@ const { ACTIVE_SEAT, INVITED_SEAT } = require("./seatStatus");
 const { resolveMode, OFF, ENFORCE } = require("./permissionEnforcement");
 const { recordDecision, REASONS, GLOBAL_SCOPE } = require("./permissionDecisions");
 const { TASK_ACTIONS, BODY_COMPANY_PATHS, requirementsOf, actionEntry } = require("./taskWritePermissions");
-const { arrangeRules, rolePermission } = require("./rulePermissions");
+const { arrangeRules, rolePermission, isWritable, isReadable } = require("./rulePermissions");
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 const ROLE_CACHE_TTL_SECONDS = 60;
@@ -268,9 +268,6 @@ const requireCompanyAdmin = ({ permission = null } = {}) => async (req, res, nex
         return refuse("Permission check failed.");
     }
 };
-
-const isWritable = (permission) => permission === true || permission === 1 || permission === 2;
-const isReadable = (permission) => permission !== null && permission !== undefined && permission !== 0;
 
 const passes = (permission, write) => (write ? isWritable(permission) : isReadable(permission));
 
