@@ -252,6 +252,20 @@ describe('a save that cannot reach the server', () => {
         expect(localStorage.getItem(unsavedKeyOf('p1', 's1'))).toBeNull();
     });
 
+    it('says so when the board cannot be read, moves nothing, and reads it once the connection is back', async () => {
+        apiRequest.mockImplementationOnce(unreachable);
+        await open();
+        expect(wrapper.find('[data-wb-unavailable]').text()).toBe('Views.whiteboard_load_failed');
+        await drag('t1', [40, 50]);
+        await afterTheDelay();
+        expect(calls('patch')).toHaveLength(0);
+
+        window.dispatchEvent(new Event('online'));
+        await settle();
+        expect(wrapper.find('[data-wb-unavailable]').exists()).toBe(false);
+        expect(placeOf('t1')).toEqual([100, 200]);
+    });
+
     it('puts changes left unsaved by an earlier visit back on the board and saves them', async () => {
         localStorage.setItem(unsavedKeyOf('p1', 's1'), JSON.stringify({ t2: { x: 11, y: 12 }, gone: { x: 1, y: 1 } }));
         await open();
