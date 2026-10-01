@@ -5,7 +5,7 @@ export const KNOWN_FEATURES = [
     "agent_run", "project_plan", "project_tasks", "clarifier", "meeting_notes", "task_summary", "description", "task_category",
     "task_estimate", "workload_summary", "ask", "assist", "project_template", "portfolio_summary", "page_compose", "guide", "mcp_brief",
     "ai_field", "agent_builder", "automation_draft", "assignment_rules",
-    "task_assist", "writing_assist",
+    "task_assist", "writing_assist", "transcription",
 ];
 
 export const featureLabelKey = (feature) => (KNOWN_FEATURES.includes(feature) ? `Instance.feature_${feature}` : "Instance.feature_unknown");

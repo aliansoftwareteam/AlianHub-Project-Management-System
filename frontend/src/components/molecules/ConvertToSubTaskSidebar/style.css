@@ -91,6 +91,7 @@
     .duplicate__component-with--convertlist .duplicate_component_only {max-height: 180px !important;}
     .duplicatetask__converttask--wrapper .allcheckbox__component-wrapper{max-height: 120px;}
 }
+.convert__picker-note,
 .convert__depth-note {
     margin: 12px 0 0;
     color: var(--ink-2);

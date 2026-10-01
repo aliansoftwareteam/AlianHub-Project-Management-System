@@ -38,5 +38,9 @@ export const renderNotice = (it, { t, changeText }) => {
     if (it.changeType === "doc_shared") {
         return escapeHtml(t("Inbox.doc_shared", { doc: clip(data.pageTitle) || t("Docs.untitled") }));
     }
+    if (it.changeType === "goal_reached" && data.goalId) {
+        const key = `Inbox.${data.targetId ? "goal_target_reached" : "goal_reached"}${data.byCount ? "" : "_by"}`;
+        return escapeHtml(t(key, { goal: clip(data.goalName), target: clip(data.targetName) }));
+    }
     return changeText(notificationHtml(it.message || ""));
 };

@@ -99,8 +99,16 @@ const forCaller = async (ctx) => {
 
 const refuse = (reason) => Object.assign(new Error(`${NOT_VISIBLE}: ${reason}`), { notVisible: true });
 
-/* Throws unless the write's target — a task, a page, or a project and optional sprint — is inside `vis`. */
-const assertWritable = async (companyId, vis, { taskId, projectId, sprintId, pageId, companyWide } = {}) => {
+const storedTask = (companyId, taskId) => (isId(taskId)
+    ? MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: toOid(taskId), deletedStatusKey: { $ne: 1 } }, TASK_ACCESS_FIELDS] }, 'findOne')
+    : null);
+
+const liveProject = (companyId, projectId) => MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.PROJECTS, data: [{ _id: toOid(projectId), deletedStatusKey: { $nin: [1] } }, { _id: 1 }],
+}, 'findOne');
+
+/* Throws unless the write's target — a task, the task it is linked to, a page, or a project and optional sprint — is inside `vis`. */
+const assertWritable = async (companyId, vis, { taskId, relatedTaskId, projectId, sprintId, pageId, companyWide } = {}) => {
     if (pageId !== undefined) {
         const page = isId(pageId)
             ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PAGES, data: [{ _id: toOid(pageId), deletedStatusKey: { $ne: 1 } }, { ProjectID: 1, visibility: 1, createdBy: 1, sharedWith: 1 }] }, 'findOne')
@@ -108,13 +116,11 @@ const assertWritable = async (companyId, vis, { taskId, projectId, sprintId, pag
         if (!page || !vis.allowsPage(page)) throw refuse('the page is not one the person behind this token can open');
     }
     if (companyWide && !vis.allowsPage({ visibility: 'project' })) throw refuse('a token kept to some projects cannot write outside them');
-    if (taskId !== undefined) {
-        const task = isId(taskId)
-            ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: toOid(taskId), deletedStatusKey: { $ne: 1 } }, TASK_ACCESS_FIELDS] }, 'findOne')
-            : null;
-        if (!vis.allowsTask(task)) throw refuse('the task is not one the person behind this token can open');
+    for (const id of [taskId, relatedTaskId]) {
+        if (id !== undefined && !vis.allowsTask(await storedTask(companyId, id))) throw refuse('the task is not one the person behind this token can open');
     }
-    if (projectId !== undefined && !vis.allowsProject(projectId)) {
+    // Someone who reads company-wide is allowed every id that is not closed to them, a missing one included, so the project is read.
+    if (projectId !== undefined && !(vis.allowsProject(projectId) && await liveProject(companyId, projectId))) {
         throw refuse('the project is not one the person behind this token can open');
     }
     if (sprintId) {

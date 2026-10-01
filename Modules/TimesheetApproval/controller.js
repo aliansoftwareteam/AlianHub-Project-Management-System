@@ -112,6 +112,7 @@ exports.submitTimesheet = async (req, res) => {
             reviewedAt: null,
             reviewedBy: '',
             reviewerName: '',
+            selfApproved: false,
             rejectionReason: '',
             deletedStatusKey: 0,
         };
@@ -212,23 +213,24 @@ const reviewOne = async (req, { id, action, reason, reviewerName = reviewerNameO
 
     const reviewed = action !== 'reopen';
     const actorName = await reviewerName(uid);
+    const at = new Date();
+    // An owner or admin may approve their own week; the approval says so, and so does its history entry.
+    const selfApproved = action === 'approve' && String(doc.userId) === uid;
     const update = {
         status: transition.to,
         rejectionReason: action === 'reject' ? String(reason).trim() : '',
-        reviewedAt: reviewed ? new Date() : null,
+        reviewedAt: reviewed ? at : null,
         reviewedBy: reviewed ? uid : '',
         reviewerName: reviewed ? actorName : '',
+        selfApproved,
     };
+    const entry = { action, from: doc.status, to: transition.to, by: uid, byName: actorName, at };
     // A reopening clears the review it undoes, so the week's history keeps both: who reopened it and whose review that was.
-    const write = reviewed ? { $set: update } : {
-        $set: update,
-        $push: {
-            history: {
-                action, from: doc.status, to: transition.to, by: uid, byName: actorName, at: new Date(),
-                reviewedBy: doc.reviewedBy || '', reviewerName: doc.reviewerName || '', reviewedAt: doc.reviewedAt || null,
-            },
-        },
-    };
+    const history = {
+        approve: { ...entry, selfApproved },
+        reopen: { ...entry, reviewedBy: doc.reviewedBy || '', reviewerName: doc.reviewerName || '', reviewedAt: doc.reviewedAt || null },
+    }[action];
+    const write = history ? { $set: update, $push: { history } } : { $set: update };
     // Matching on the status that was read keeps a second reviewer from overwriting a review that landed in between.
     const updated = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TIMESHEET_APPROVAL,

@@ -393,6 +393,7 @@ const whenLabel = (iso) => formatWhen(iso, timeZone.value, locale?.value);
 const glyphIcon = (it) => {
     if (it.kind === 'mention' || it.changeType === 'doc_mention') return 'at';
     if (it.changeType === 'agent_alert') return 'alert';
+    if (it.changeType === 'goal_reached') return 'target';
     if (it.changeType === 'agent_report') return 'agent';
     if (/milestone/i.test(it.key || '')) return 'alert';
     if (/status/i.test(it.key || '')) return 'refresh';
@@ -789,6 +790,10 @@ const open = (it) => {
     }
     if (['doc_mention', 'doc_shared'].includes(it.changeType) && it.changeData?.pageId) {
         router.push({ name: 'PageEditor', params: { cid: companyId?.value, pageId: String(it.changeData.pageId) } }).catch(() => {});
+        return;
+    }
+    if (it.changeType === 'goal_reached' && it.changeData?.goalId && router.hasRoute('Goal')) {
+        router.push({ name: 'Goal', params: { cid: companyId?.value, goalId: String(it.changeData.goalId) } }).catch(() => {});
         return;
     }
     if (alertNotice(it) && router.hasRoute('AiHealth')) {

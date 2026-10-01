@@ -47,6 +47,7 @@
             />
             <SprintSetupModal v-if="mode === 'sprint-settings'" :sprint="list" @close="mode = ''" @saved="(saved) => sprintChanged(store, saved)" />
             <CloseSprintStep v-if="mode === 'complete-sprint'" :sprint="list" :siblings="siblings" @close="mode = ''" @completed="completed" />
+            <GoalLinkPicker v-if="mode === 'count-toward-goal'" :source="{ kind: 'sprintIds', id: list.id, name: list.name }" @close="mode = ''" />
             <div v-if="mode === 'rename'" class="lm__overlay" @click.self="mode = ''">
                 <div class="lm__card" role="dialog" aria-modal="true" :aria-label="t('Projects.rename_list')">
                     <h3 class="ah-h3 lm__title">{{ t('Projects.rename_list') }}</h3>
@@ -96,7 +97,7 @@
  *   reveal(folderId)   the list now sits in that folder, so a tree should open the way to it
  *   rename(listId)     in a tree: the row should let its name be edited in place
  */
-import { computed, defineAsyncComponent, defineEmits, defineExpose, defineProps, inject, nextTick, ref, watch } from "vue";
+import { computed, defineAsyncComponent, defineEmits, defineExpose, defineProps, inject, nextTick, onMounted, ref, watch } from "vue";
 import { routeLocationKey, routerKey } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -109,12 +110,14 @@ import { folderIdOf, nestedFolders } from "@/utils/folderTree";
 import { treeRoute } from "@/components/molecules/ProjectTree/projectTreeModel";
 import { useRowMenu } from "@/components/molecules/ProjectTree/useRowMenu";
 import { listMenuEntries, listMenuRights, listUrl } from "@/views/Projects/composables/listMenu";
+import { loadLinkableGoals } from "@/views/Goals/goalLinking";
 import { makePlainList, moveSprint, refreshSprints, setSprintStatus, sprintChanged, startSprint } from "@/views/Projects/sprintActions";
 
 const MoveToFolderModal = defineAsyncComponent(() => import("@/components/molecules/MoveToFolder/MoveToFolderModal.vue"));
 const SprintSetupModal = defineAsyncComponent(() => import("@/components/molecules/SprintScrum/SprintSetupModal.vue"));
 const CloseSprintStep = defineAsyncComponent(() => import("@/components/organisms/SprinstList/CloseSprintStep.vue"));
 const SprintRenameInput = defineAsyncComponent(() => import("@/components/molecules/ProjectTree/SprintRenameInput.vue"));
+const GoalLinkPicker = defineAsyncComponent(() => import("@/views/Goals/GoalLinkPicker.vue"));
 
 defineOptions({ name: "ListMenu" });
 
@@ -174,6 +177,9 @@ const asking = computed(() => {
 });
 
 watch(asking, (now) => { if (now) nextTick(() => cancelButton.value?.focus()); });
+
+/* Read once for the workspace, however many menus are drawn: it decides whether "Count toward a goal…" is offered. */
+onMounted(() => loadLinkableGoals(companyId?.value));
 
 const complain = (result) => $toast.error(result.message || t("Toast.something_went_wrong"), TOAST);
 const context = () => ({ companyId: companyId?.value, project: props.project, sprint: { ...list.value } });

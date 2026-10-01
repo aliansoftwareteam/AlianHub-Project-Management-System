@@ -163,6 +163,8 @@ everythingViewsSchema.index({ userId: 1, deletedStatusKey: 1 });
 const goalsSchema = new Schema(schema.goals, {strict: true, timestamps: true});
 goalsSchema.index({ deletedStatusKey: 1, ownerUserId: 1 });
 goalsSchema.index({ deletedStatusKey: 1, visibility: 1 });
+goalsSchema.index({ 'targets.sources.taskIds': 1 });
+goalsSchema.index({ 'targets.sources.sprintIds': 1 });
 const whiteboardsSchema = new Schema(schema.whiteboards, {strict: true, timestamps: true});
 whiteboardsSchema.index({ projectId: 1, sprintId: 1 }, { unique: true, partialFilterExpression: { deletedStatusKey: 0 } });
 const remindersSchema = new Schema(schema.reminders, {strict: true, timestamps: true});
@@ -455,6 +457,9 @@ taskSchema.index({ AssigneeUserId: 1 });
 taskSchema.index({ ParentTaskId: 1 });
 taskSchema.index({ ancestors: 1 });
 taskSchema.index({ TaskKey: 1 });
+// An import looks up what it already brought into a project, and its undo what it created.
+taskSchema.index({ ProjectID: 1, importSourceId: 1 }, { sparse: true });
+taskSchema.index({ importJobId: 1 }, { sparse: true });
 // The due-date trigger reads a day-wide range of this every few minutes (Modules/Automations/engine/dueDateTrigger).
 taskSchema.index({ DueDate: 1 });
 // The Everything view pages across projects on these; Modules/Tasks/helpers/everythingQuery.js sorts in their order.

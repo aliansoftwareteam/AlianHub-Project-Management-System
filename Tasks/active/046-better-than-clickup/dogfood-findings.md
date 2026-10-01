@@ -53,6 +53,11 @@ What an agent still cannot do, most missed first. The order is from the integrat
 
 Deleting is not planned.
 
+## What MCP parity part 3 adds
+- Behind `MCP_TOOLS_WORK` (off by default), for every token that reads or writes, with no grant: `tags.list`, `task.tags.add`, `task.tags.remove` (item 6, tags); `task.relations.list`, `task.relation.add`, `task.relation.remove` (item 7); `lists.list`, `list.create`, `list.rename`, `list.move` (item 9, lists); `page.comments.list`, `page.comment.create`, `page.comment.reply`, `page.comment.assign`.
+- Checked and covered by a test, with nothing to fix: `subtask.create` under a subtask (three levels, no deeper) and `task.link` on a subtask, with and without the grant.
+- Still missing from the list above, nearest first, each one web route away: watchers (item 12), checklists (item 6), folder create, rename and move (item 9), resolving a doc comment, reactions (item 17). Then: list archive and restore and the sprint lifecycle (item 9), converting, merging and duplicating (item 8), editing a project (item 10), attachments (item 11), saved views, dashboards and automations (items 13 to 15), time edits and approval (item 16).
+
 ## Oddities to fix along the way
 - `tasks.search` returns `estimateHours` as the stored minutes divided by 3,600.
 - `task.update` with several fields is not atomic.

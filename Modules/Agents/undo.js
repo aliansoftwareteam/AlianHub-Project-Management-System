@@ -12,6 +12,7 @@ const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
 const { canChangeComment } = require('../Comments/helpers/threadWriteAccess');
 const { canSeeSprintById } = require('../Sprints/helpers/sprintVisibility');
 const { followSprintMove, moveDescendants } = require('../Tasks/helpers/sprintPlacement');
+const { pullOfLists } = require('../Tasks/helpers/taskExtraLists');
 const { canUsePage } = require('../Pages/helpers/pageAccess');
 
 // Undo replays the inverse action and logs it as the person who pressed Undo.
@@ -38,11 +39,16 @@ const MESSAGES = {
 const STATUS_OF = { [REASON.WINDOW_PASSED]: 410, [REASON.NOT_VISIBLE]: 403, [REASON.TARGET_NOT_VISIBLE]: 403, [REASON.UNRECORDABLE]: 503 };
 const AUDITED_REFUSALS = [REASON.WINDOW_PASSED, REASON.NOT_VISIBLE, REASON.TARGET_NOT_VISIBLE];
 
+const LIST_KINDS = Object.freeze(['list', 'listName', 'listFolder']);
+const work = () => require('./workRequests');
+const undoer = (actor) => require('./taskRequests').whoOf(actor);
+
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 
-const setTask = async (companyId, taskId, set, unset) => {
+const setTask = async (companyId, taskId, set, unset, pull) => {
     const update = { $set: set };
     if (unset) update.$unset = unset;
+    if (pull) update.$pull = pull;
     const updated = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS, data: [{ _id: oid(taskId) }, update, { returnDocument: 'after' }],
     }, 'findOneAndUpdate');
@@ -76,7 +82,7 @@ const inverses = {
         let unset;
         if (u.previous.folderObjId) set.folderObjId = u.previous.folderObjId;
         else if ('folderObjId' in u.previous) unset = { folderObjId: '' };
-        await setTask(companyId, u.taskId, set, unset);
+        await setTask(companyId, u.taskId, set, unset, pullOfLists([u.previous.sprintId]));
         if (before) await followSprintMove(companyId, { taskId: before._id, projectId: before.ProjectID, fromSprintId: before.sprintId, toSprintId: u.previous.sprintId });
         await moveDescendants(companyId, u.taskId, { set, unset }, u.previous.sprintId);
         return { taskId: u.taskId, restored: String(u.previous.sprintId) };
@@ -140,6 +146,39 @@ const inverses = {
         await requests.setStatus({ companyId, who: requests.whoOf(actor), taskId: u.taskId, name: u.previous });
         return { taskId: u.taskId, restored: u.previous };
     },
+    /* Tags, links, lists and doc comments are put back by the handlers that changed them, as the person undoing. */
+    async tag(companyId, u, actor) {
+        await work().setTag({ companyId, who: undoer(actor), taskId: u.taskId, tag: u.tagId, operation: u.operation === 'add' ? 'remove' : 'add' });
+        return { taskId: u.taskId, tagId: u.tagId, restored: true };
+    },
+    async relation(companyId, u, actor) {
+        await work().unlinkTasks({ companyId, who: undoer(actor), taskId: u.taskId, relatedTaskId: u.relatedTaskId });
+        return { taskId: u.taskId, unlinked: u.relatedTaskId };
+    },
+    async relationRemoved(companyId, u, actor) {
+        await work().linkTasks({ companyId, who: undoer(actor), taskId: u.taskId, relatedTaskId: u.relatedTaskId, type: u.type });
+        return { taskId: u.taskId, linked: u.relatedTaskId };
+    },
+    async list(companyId, u, actor) {
+        await work().withdrawList({ companyId, who: undoer(actor), projectId: u.projectId, sprintId: u.sprintId });
+        return { sprintId: u.sprintId, deleted: true };
+    },
+    async listName(companyId, u, actor) {
+        await work().renameList({ companyId, who: undoer(actor), projectId: u.projectId, sprintId: u.sprintId, name: u.previous });
+        return { sprintId: u.sprintId, restored: u.previous };
+    },
+    async listFolder(companyId, u, actor) {
+        await work().moveList({ companyId, who: undoer(actor), projectId: u.projectId, sprintId: u.sprintId, folderId: u.previous });
+        return { sprintId: u.sprintId, restored: u.previous || null };
+    },
+    async pageComment(companyId, u, actor) {
+        await require('../Pages/comments').withdrawComment(companyId, u.pageId, u.commentId, String((actor && actor.userId) || ''));
+        return { commentId: u.commentId, deleted: true };
+    },
+    async pageCommentAssign(companyId, u, actor) {
+        await work().assignPageComment({ companyId, uid: String((actor && actor.userId) || ''), pageId: u.pageId, commentId: u.commentId, assigneeId: u.previous });
+        return { commentId: u.commentId, restored: u.previous || null };
+    },
     /* Archiving carries the subtasks and the list's counts, so it is put back by the handler that made it, as the person undoing. */
     async archive(companyId, u, actor) {
         const requests = require('./taskRequests');
@@ -202,6 +241,12 @@ const targetVisible = async (companyId, uid, u) => {
         return Boolean(page) && Number(page.deletedStatusKey || 0) !== 1
             && canUsePage(companyId, page, uid, { edit: true, named: u.kind === 'pageVersion' });
     }
+    if (u.kind === 'pageComment' || u.kind === 'pageCommentAssign') {
+        const page = await findRow(companyId, SCHEMA_TYPE.PAGES, u.pageId, { visibility: 1, createdBy: 1, ProjectID: 1, deletedStatusKey: 1 });
+        return Boolean(page) && Number(page.deletedStatusKey || 0) === 0 && canUsePage(companyId, page, uid);
+    }
+    if (LIST_KINDS.includes(u.kind)) return isPrivileged(await getRoleType(companyId, uid)) || canSeeSprintById(companyId, uid, u.sprintId);
+    if (u.kind === 'relation' || u.kind === 'relationRemoved') return (await taskReadable(companyId, uid, u.taskId)) && taskReadable(companyId, uid, u.relatedTaskId);
     if (u.kind === 'subtask') return taskReadable(companyId, uid, u.subtaskId);
     if (!(await taskReadable(companyId, uid, u.taskId))) return false;
     if (u.kind !== 'sprint' || isPrivileged(await getRoleType(companyId, uid))) return true;

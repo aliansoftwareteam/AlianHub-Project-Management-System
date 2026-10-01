@@ -113,6 +113,7 @@ describe('reopening an approved week', () => {
 
         expect(stored(week._id).history.map((entry) => [entry.action, entry.by, entry.reviewedBy])).toEqual([
             ['reopen', OWNER, ADMIN],
+            ['approve', ADMIN, undefined],
             ['reopen', ADMIN, ADMIN],
         ]);
         expect(stored(week._id).status).toBe('submitted');
@@ -152,9 +153,9 @@ describe('reopening an approved week', () => {
         expect(socketEmitter.emit).not.toHaveBeenCalled();
     });
 
-    it('adds no history to an approval or a rejection', async () => {
+    it('adds no history to a rejection', async () => {
         const week = sheet({ status: 'submitted', reviewedAt: null, reviewedBy: '', reviewerName: '' });
-        await review(OWNER, week._id, { action: 'approve' });
+        await review(OWNER, week._id, { action: 'reject', reason: 'Friday is missing' });
         expect(stored(week._id).history).toBeUndefined();
     });
 });

@@ -60,11 +60,6 @@
 .gls__progress { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .gls__pct { flex: none; width: 36px; text-align: end; font: 500 var(--fs-sm, 12px)/1 var(--font-mono); color: var(--ink); }
 
-.glb { display: block; flex: 1; min-width: 40px; height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; }
-.glb__fill { display: block; height: 100%; border-radius: inherit; background: var(--brand); transition: width var(--t-state) var(--ease); }
-.glb.is-full .glb__fill { background: var(--ok); }
-@media (prefers-reduced-motion: reduce) { .glb__fill { transition: none; } }
-
 .glc { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 10px 12px; margin: 0 0 16px; padding: 12px; }
 .glc__note, .glc__error, .glc__actions { grid-column: 1 / -1; }
 .glc__note { display: flex; align-items: center; gap: 6px; margin: 0; font: var(--text-small); color: var(--ink-2); }
@@ -157,6 +152,7 @@
 .glt__confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--r-md, 6px); background: var(--danger-bg); color: var(--danger-ink); font: var(--text-small); }
 .glt__confirm > span { flex: 1; min-width: 160px; }
 
+.glt__failed { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 8px 10px; border-radius: var(--r-md, 6px); background: var(--warn-bg); color: var(--warn-ink); font: var(--text-small); }
 .glt__left-out { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: var(--r-md, 6px); background: var(--warn-bg); color: var(--warn-ink); font: var(--text-small); }
 
 .gtf { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 10px 12px; }

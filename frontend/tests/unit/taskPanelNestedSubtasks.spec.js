@@ -195,3 +195,44 @@ describe('the subtasks of a task in the panel', () => {
         expect(off.wrapper.find('.ah-time').exists()).toBe(false);
     });
 });
+
+describe('the Lists row in the panel', () => {
+    it('is handed the open task with its project, and its own change reaches the task and the list rows', async () => {
+        payload.tasks = [levelOne];
+        payload.subtasks = [];
+        const committed = vi.fn();
+        const withRows = createStore({
+            getters: {
+                'settings/companyUserDetail': () => ({ roleType: 1 }),
+                'settings/companyOwnerDetail': () => ({}),
+                'projectData/gettaskDetailData': () => null,
+                'settings/companyUsers': () => [],
+                'settings/projectRules': () => ({}),
+                'settings/selectedCompany': () => ({})
+            },
+            actions: { 'projectData/getTaskDetailSnapShot': () => Promise.resolve() },
+            mutations: {
+                'projectData/setTaskDetailData': () => {},
+                'projectData/setTaskdetailPayloadId': () => {},
+                'projectData/mutateUpdateFirebaseTasks': (_, change) => committed(change),
+                'projectData/mutateMongoUpdatedTask': () => {},
+                'projectData/mutateTypesenseTableTasks': () => {}
+            }
+        });
+        const wrapper = mount(TaskDetailPanel, {
+            props: { companyId: 'company-1', projectId: 'proj-1', sprintId: 'sprint-1', taskId: 'task-1' },
+            global: { plugins: [withRows], mocks: { $t: t }, provide: { $userId: ref('u1'), $clientWidth: ref(1280) } }
+        });
+        await flushPromises();
+
+        const row = wrapper.findComponent({ name: 'TaskListsRow' });
+        expect([row.props('task')._id, row.props('project')._id, row.props('homeName')]).toEqual(['task-1', 'proj-1', 'Sprint 1']);
+
+        const entry = { projectId: 'proj-1', sprintId: 'sprint-2', addedBy: 'u1', addedAt: '2026-10-01T00:00:00.000Z' };
+        row.vm.$emit('changed', [entry]);
+        await flushPromises();
+
+        expect(row.props('task').extraLists).toEqual([entry]);
+        expect(committed).toHaveBeenCalledWith(expect.objectContaining({ pid: 'proj-1', sprintId: 'sprint-1', updatedFields: { extraLists: [entry] } }));
+    });
+});
