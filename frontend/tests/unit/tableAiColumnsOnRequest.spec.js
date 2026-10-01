@@ -7,17 +7,18 @@ const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }));
 const echo = (key, params) => (params ? `${key} ${JSON.stringify(params)}` : key);
 
 vi.mock('@/services', () => ({ apiRequest, apiRequestWithoutCompnay: vi.fn() }));
-vi.mock('@/composable', async (importOriginal) => {
-    const real = await importOriginal();
-    return {
-        ...real,
-        useCustomComposable: () => ({ ...real.useCustomComposable(), checkPermission: () => true, checkApps: () => true }),
-        useGetterFunctions: () => ({ ...real.useGetterFunctions(), getUser: () => null, getTaskStatus: () => ({ name: 'To do' }) }),
-    };
-});
+vi.mock('@/composable', () => ({
+    useCustomComposable: () => ({ checkPermission: () => true, checkApps: () => true, makeUniqueId: () => 'uid', debounce: (fn) => fn, changeText: (text) => text }),
+    useGetterFunctions: () => ({ getUser: () => null, getTaskStatus: () => ({ name: 'To do' }) }),
+    useConvertDate: () => ({ convertDateFormat: (value) => String(value || '') }),
+}));
 vi.mock('@/utils/TaskOperations', () => ({ default: {} }));
 
 import { AI_STATE, applyAiAvailability, resetAiAvailability } from '@/composable/aiAvailability';
+import TableRow from '@/views/Projects/TableView/TableRow.vue';
+import AiColumnHead from '@/views/Projects/TableView/AiColumnHead.vue';
+import { useTaskSummaries } from '@/views/Projects/TableView/useTaskSummaries.js';
+import { useTaskCategories } from '@/views/Projects/TableView/useTaskCategories.js';
 
 const KEPT = '/api/v1/ai/task-values';
 const SUMMARY = '/api/v1/ai/task-summary';
@@ -81,16 +82,12 @@ const global = (shown = ['summary', 'area']) => ({
     stubs: { ShellIcon: true, ProvenanceBadge: true, ConfirmationSidebar: true, TaskTagCell: true, TaskColumnCell: true, ListStatusCircle: true },
 });
 
-/* The module state of the two composables is one per page load, so each test loads the page again. */
+/* The two composables hold one entry per task for the life of the page, so each test starts them empty. */
+const forget = (held) => Object.keys(held.entries).forEach((id) => { delete held.entries[id]; });
 const load = async () => {
-    vi.resetModules();
-    const [{ default: TableRow }, { default: AiColumnHead }, summaries, categories] = await Promise.all([
-        import('@/views/Projects/TableView/TableRow.vue'),
-        import('@/views/Projects/TableView/AiColumnHead.vue'),
-        import('@/views/Projects/TableView/useTaskSummaries.js'),
-        import('@/views/Projects/TableView/useTaskCategories.js'),
-    ]);
-    return { TableRow, AiColumnHead, summaries: summaries.useTaskSummaries(), categories: categories.useTaskCategories() };
+    forget(useTaskSummaries());
+    forget(useTaskCategories());
+    return { TableRow, AiColumnHead };
 };
 
 const scrollIntoView = async (TableRow, rows, shown) => {

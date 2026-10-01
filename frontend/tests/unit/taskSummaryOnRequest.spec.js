@@ -87,6 +87,21 @@ describe('the task panel summary', () => {
         expect(modelRequests()).toEqual([]);
     });
 
+    it('says a kept summary is behind when the server says its thread has changed', async () => {
+        apiRequest.mockResolvedValue(kept({ commentCount: 5, summaryCount: 3, stale: true }));
+        const wrapper = await open();
+        expect(wrapper.find('.ah-summary__text').text()).toBe('Shipping on Friday.');
+        expect(wrapper.find('[data-test="summary-behind"]').exists()).toBe(true);
+        expect(wrapper.find('.ah-summary__meta').text()).toBe('TaskPanel.summary_meta');
+        expect(wrapper.emitted('count')[0]).toEqual([5]);
+        expect(modelRequests()).toEqual([]);
+
+        apiRequest.mockResolvedValue(kept({ commentCount: 3, summaryCount: 0, stale: true }));
+        await wrapper.vm.refresh();
+        await flushPromises();
+        expect(wrapper.find('[data-test="summary-behind"]').exists()).toBe(true);
+    });
+
     it('asks again when the person presses refresh', async () => {
         apiRequest.mockResolvedValue(kept());
         const wrapper = await open();

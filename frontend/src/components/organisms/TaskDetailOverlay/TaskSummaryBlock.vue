@@ -46,6 +46,7 @@ const { t } = useI18n();
 const summary = ref("");
 const summaryCount = ref(0);
 const threadCount = ref(0);
+const stale = ref(false);
 const updatedAt = ref("");
 const writing = ref(false);
 const error = ref("");
@@ -54,7 +55,7 @@ let reading = false;
 let pollHandle = null;
 
 const offer = computed(() => !summary.value && !writing.value && threadCount.value > 0);
-const behind = computed(() => Boolean(summary.value) && threadCount.value !== summaryCount.value);
+const behind = computed(() => Boolean(summary.value) && (stale.value || threadCount.value !== summaryCount.value));
 const visible = computed(() => props.enabled && !unavailable.value && Boolean(writing.value || summary.value || error.value || offer.value));
 const meta = computed(() => {
     if (!summary.value || !summaryCount.value) return "";
@@ -76,7 +77,8 @@ async function request(body) {
             emit("count", threadCount.value);
             if (payload.data.pending) return;
             summary.value = payload.data.summary || "";
-            summaryCount.value = threadCount.value;
+            summaryCount.value = Number(payload.data.summaryCount ?? threadCount.value) || 0;
+            stale.value = payload.data.stale === true;
             updatedAt.value = payload.data.updatedAt || "";
         } else if (payload.aiState) {
             unavailable.value = true;
@@ -119,6 +121,7 @@ watch(() => props.taskId, () => {
     summary.value = "";
     summaryCount.value = 0;
     threadCount.value = 0;
+    stale.value = false;
     updatedAt.value = "";
     error.value = "";
     unavailable.value = false;

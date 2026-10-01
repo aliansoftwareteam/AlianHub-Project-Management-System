@@ -53,6 +53,7 @@ module.exports.AI_NOTES_TO_TASKS = "/api/v1/ai/notes-to-tasks";
 module.exports.AI_CHAT_ASK = "/api/v1/ai/chat-ask";
 module.exports.AI_CHAT_ASK_POST = "/api/v1/ai/chat-ask/post";
 module.exports.AI_TASK_SUMMARY = "/api/v1/ai/task-summary";
+module.exports.AI_TASK_VALUES = "/api/v1/ai/task-values";
 module.exports.AI_TASK_CATEGORY = "/api/v1/ai/task-category";
 module.exports.AI_TASK_ASSIST = "/api/v1/ai/task-assist";
 module.exports.AI_TASK_NEXT_STEPS = "/api/v1/ai/task-next-steps";
