@@ -1,8 +1,109 @@
 # Handoff — where to start next session
 
-Updated 2026-10-01. Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
+Updated 2026-10-01 15:50 IST. Read this first, then `Tasks/index.md` and `Tasks/active/046-better-than-clickup/progress.md`. Overwrite this file at the end of every session.
 
-## State of `beta` (`14.36.0-beta.670`)
+## State of `beta` (`14.36.0-beta.720`)
+
+- **The work in hand is task 046, "the plan to be great next to ClickUp"** (tracker AP-441). M1 is nearly done and M2 is well under way.
+  - `progress.md` has every slice with its PR and build.
+  - `task.md` has the plan and the 26 decisions taken so far.
+  - `followups.md` has what each PR left and the checks to do by hand.
+  - `dogfood-findings.md` has what tracking this work in AlianHub itself showed.
+- **`beta` is at build 720** (#1262, merged 15:35). GitHub shows 75 PRs merged today, in 72 builds (649 to 720).
+- **The owner's local server runs build 705** (rebuilt at 14:42, no migration pending). Builds 706 to 720 are merged but not built locally:
+  - #1249, #1251, #1253, #1244 with #1241, #1246, #1257 with #1247, #1245 with #1238, #1250, #1252, #1256, #1258, #1243, #1254, #1261, #1262 with #1260.
+  - The next rebuild runs migrations `066-task-ancestors-repair` and `067-everything-indexes` at start. Preview them first with `npm run migrate -- up --dry-run`.
+  - Three hands-on QA passes ran today, on builds 672, 679 and 705. Nothing after 705 has been used by hand.
+- **`tests/conventions/env-doc` fails on `beta` itself** until #1264 merges. Every open PR's backend check fails on it, whatever the PR changes.
+
+## Merged on 2026-10-01
+
+Builds 649 to 670 are tasks 044 and 045 (22 PRs); see "Earlier" below. The rest, by area, with the build in brackets:
+
+| Area | Merged |
+|---|---|
+| Fields | #1216 (680) people, URL, rating, progress; #1227 (687); #1234 (700); #1236 (703) value checks and follow-ups; #1243 (717) files |
+| Views | #1206 (672); #1211 (676) view templates; #1212 (677) density and menu parity; #1251 (707) |
+| List | #1232 (698); #1246 (710) load more; #1254 (718) three levels |
+| Board and Table | #1248 (702); #1249 (706) |
+| Nested subtasks | #1218 (690) N1; #1226 (696) N2; #1238 and #1245 (712) N3a and N3b; #1254 (718) N4 |
+| Folders and projects | #1219 (681) subfolders, server; #1235 (694) subfolders, web; #1247 and #1257 (711) folder actions, duplicate a project |
+| Everything view | #1250 (713) endpoint; #1260 and #1262 (720) the page in List, Board and Table, saved views |
+| Docs | #1229 (689); #1231 (692) version history; #1237 (704); #1242 (705) |
+| Chat | #1228 (695) threads |
+| Automations | #1222 (684) two triggers and a notify action |
+| Dashboards | #1224 (686) |
+| Timesheets and working days | #1208 (674) bulk approve; #1225 (688) the setting; #1239 (699) used everywhere |
+| Agents and MCP | #1230 (697); #1261 (719) MCP parity part 1 |
+| Design and theme | #1209 (675) date pickers; #1215 (685) three variants; #1252 (714) |
+| Tooling | #1220 (682) scale seed and budgets; #1221 (691) screenshot atlas |
+| Access and storage (see the private notes) | #1213 (678); #1217 (683); #1223 (693); #1233 (701); #1253 (708); #1241 and #1244 (709); #1256 (715) |
+| Desktop tracker | #1258 (716) |
+| Task docs | #1205 (671); #1207 (673); #1214 (679) |
+
+## Open, and why each waits
+
+| PR | What | Waiting for |
+|---|---|---|
+| #1264 | Regenerates `docs/ENV.md` | Its checks. It goes first: `beta` fails `env-doc` without it |
+| #1240 | N5a: the task panel with three levels of subtasks | #1264, then a sync with `beta`. It was held until #1254 merged |
+| #1255 | Move, duplicate and convert send plain values; index repair for every group | #1264, then a sync |
+| #1259 | B0.3: the dense look becomes the default | #1264, then a sync. It changes the look for everyone: check by hand after the rebuild |
+| #1210 | B1.1: colours and legacy classes may only shrink | The open visual PRs. Then its baseline is regenerated against `beta` once. It adds Rule 5 to `CLAUDE.md` |
+| #1263 | The member list returns the fields the app shows | The integrator's review. Access PRs are read before they are queued |
+| #1265 | A new list is created in the folder you are in | Its checks and a review |
+| This PR | Task docs, the beta log and this handoff | Its checks |
+
+## Running when this was written
+
+Ten agents, by branch where the notes name one:
+
+- Dark mode batch 2 (`fix/dark-mode-batch-2`).
+- The List title column's minimum width and the task type image (`fix/list-title-min-width`); the same agent opened #1265.
+- The Ask card and the automation builder (`fix/ask-card-does-not-reask`, `fix/automation-builder-small-bugs`).
+- Access fix 6; #1263 is its first PR.
+- N5b: Board, Table, Calendar and the legacy list with three levels.
+- N6: import and rollups with three levels.
+- MCP parity part 2.
+- B1.3: a screenshot regression test (`test/screenshot-regression`).
+- B2.1: the project chrome on design tokens (`feat/project-chrome-on-tokens`).
+- This docs PR.
+
+A new session cannot see these agents. Look for their branches and PRs with `gh pr list --base beta` and `git branch -r --sort=-committerdate`, and read each worktree under `.claude/worktrees/` before starting the same work again.
+
+## Waiting for the owner
+
+1. **The stored-file download switch.** Reads of stored files are checked and reported, and refused only when `STORAGE_DOWNLOAD_SCOPE=enforce`. The files field (#1243) follows the same switch. The 2026-09-23 decision was to switch after seven days of real downloads with no reported refusal. Still undecided.
+2. **MCP flags on the local server.** Set `MCP_TOOLS_MANAGE=on` and `MCP_TOOLS_DATA=on` in the local `.env`, restart, and create a new token with "Let this agent manage tasks" ticked. Until then the session sees 11 of the 24 tools.
+3. **A bulk write to the tracker** (one subtask per open PR) was refused by the session's permission check and was not retried. Single calls work.
+4. Any of the 26 decisions in the 046 `task.md` can be overruled. The largest: the dense look as the default (24), Monday to Friday as the default week (12), and "duplicate a project" in place of "save as template" (20).
+
+## How this session works
+
+- **One integrator, many agents.** Each slice is one agent in its own worktree and one PR against `beta`. The integrator reviews, queues and merges.
+- **The merge queue.** One runner merges a PR when every named check passes. After each merge the open PRs are synced with `beta` (`gh pr update-branch`). A stacked PR waits for the one under it. Access PRs go to the front.
+- **Low load.** An agent runs only the test files it touched, with one worker. No full suites, no build, no `npm ci`. It pushes early and CI runs the suites.
+- **Agent count.** Four to six is the working limit. On 2026-10-01 the owner asked to raise it step by step to find the machine's limit: add two about every eight minutes while the one-minute load stays under 12 and free memory above 25%; stop adding above 16 or below 20%; pause agents above 24. Step 1 (eight agents) averaged load 5.9. Step 2 (ten agents) was running when this was written. The samples are in the session's scratch folder, which a restart wipes.
+- **Done means used.** A slice is done after its main flow is used in the running app. QA agents work only in the QA Sandbox project. Do not rebuild while one runs, and say which build is live after a rebuild.
+- **AlianHub tracks its own work.** AP-441 holds one subtask per open PR and per running piece of work, written through the MCP endpoint. It needs the local server on port 4000, and the token lasts about a day.
+- **After merges:** `npm run version:log`, then a docs PR that ticks `progress.md` and names the builds.
+
+## Next ten things, in order
+
+1. Merge #1264, then sync and merge #1240, #1255 and #1259 as their checks pass.
+2. Review #1263 and #1265 and queue them.
+3. Rebuild the local server from `beta` (dry-run the migrations first) and tell the owner which build is live.
+4. QA pass 4 on that build, starting with every upload and removal path (#1253), then nested subtasks in the List (#1254), the Everything page (#1260, #1262), duplicate a project (#1257), folder actions (#1247), the files field (#1243) and the dense default look (#1259). The lists are in `followups.md`.
+5. Collect, review and merge what the running agents open: dark mode batch 2, the List and Ask card fixes, N5b, N6, MCP parity part 2, B1.3 and B2.1.
+6. Regenerate #1210's baseline against `beta` once the visual PRs are in, and merge it.
+7. E4: measure the Everything view and the List at 10,000 tasks (`npm run scale:measure`), record the numbers in `docs/PERFORMANCE.md`, and fix what misses its budget.
+8. Get the owner's answers on the download switch and the MCP flags. With the flags on, use the new tools to keep AP-441 current.
+9. Finish the load test and write its numbers into the memory note on agent limits.
+10. Close M1: update the scorecard in the 046 `task.md`, ask the owner to sign it off, and send the next docs PR with the beta log.
+
+## Earlier
+
+### `beta` at 998d0d10, `14.36.0-beta.670`
 
 - **2026-09-30 to 2026-10-01: builds 646–670, tasks 044 and 045 (the ClickUp re-check and its gaps).**
   - **Re-check:** #1180 (646) lists what is still open against ClickUp at build 645, ranked, in `Tasks/active/034-end-to-end-qa-programme/findings/clickup-recheck-2026-09-30.md`.
@@ -111,25 +212,21 @@ Updated 2026-10-01. Read this first, then `Tasks/index.md`. Overwrite this file 
   - **After build 383 (builds 384–403):** writes that name people accept only active members, including projects, sprints and manual time (#918); company reads need an active seat (#916); mail routes send only to company members, password sign-in gives one answer for any failure, and the tracker's pre-login list returns download fields only (#919); stored request addresses follow `TRUST_PROXY` and only pending invitations can be accepted (#922); comment mentions, records and notices are built on the server, and all history and notification text is composed on the server, so the generic `/api/v1/handleHistory`, `/api/v1/handleNotification` and `/api/v1/app-notification/comment` routes are retired (#915, #926, #927, #929); the team board, agent release proposals, agent project lists, and agent runs and proposals show only what the viewer may see (#932, #933, #934); SSO domains are re-checked daily and seats SCIM deactivated for outsiders no longer count as membership (#925); tenant-scoping and hard-coded-text baselines are both empty, with tests that keep them empty (#923, #924, #928); a company's database is no longer recreated after deletion, and each connection compiles its models once (#921); third interface sweep with 21 fixes, including the automation dry run (#931).
   - **Owner decisions implemented:** 1 (#872), 2 (#861), 3 (#874), 7 (#865).
   - **Other:** console figures from stored chunk sizes, migration 043 (#895); tombstoned knowledge chunks purged after `KNOWLEDGE_TOMBSTONE_RETENTION_DAYS`, default 30 (#897); task keys in Ask (#882); spreadsheet and CSV text encodings (#888); step-credential renewal and heartbeats (#889); webhook and domain-event windows fixed from their first emit (#876, #879); agent notes per starter (#893); estimate history built on the server (#907); interface sweeps (#875, #886, #898, #903); i18n batches (#884, #885, #891, #892) and merge-clean pending files (#869); integration suites read only their own rows (#890).
-- **Owner's local server:** build 670, rebuilt 2026-10-01 (frontend built; migration `063-page-comments` applied at start). The PC restarted on 2026-09-30; Docker (`alianhub-mongo`) and the server were started again on 2026-10-01 through the `alianhub-api` launch entry. Earlier: build 593 (f94b134d, the newest green beta commit when rebuilt; its version label read 14.35.0 until #1136, restart to refresh); migrations 049–056 applied 2026-09-28 after a dry run (053: 67 agent runs, 054: 43 proposals, 056: 17 views added, the rest none); before that, migrations 044–048 applied 2026-09-28 after a dry run (044: 750 tasks, 045: 1 milestone, 046: 64 sample tasks, 047: 30 time logs, 048: none), frontend rebuilt 2026-09-27, migrations through 043 applied, frontend built. `.env` still sets `PR_SUMMARY_AS_DATA`, which nothing reads since #874 and can be removed. `GOOGLE_CLIENT_ID` is set, which Google sign-in now requires (#909). `node scripts/seat-check.js`: no memberships without an active seat. The other flags are as recorded on 2026-09-23 (`SKILL_EXTERNAL_READS=on`, `AGENT_EGRESS_ALLOWLIST=true`; the rest off until the owner's sweeps; `STORAGE_DOWNLOAD_SCOPE` in report).
+- **Owner's local server:** build 705, rebuilt 2026-10-01 at 14:42 (see the top of this file). Before that: build 693 at about 13:59 (migration `064-task-ancestors` applied at start), build 679 at 13:09, and build 670 (frontend built; migration `063-page-comments` applied at start). The PC restarted on 2026-09-30; Docker (`alianhub-mongo`) and the server were started again on 2026-10-01 through the `alianhub-api` launch entry. Earlier: build 593 (f94b134d, the newest green beta commit when rebuilt; its version label read 14.35.0 until #1136, restart to refresh); migrations 049–056 applied 2026-09-28 after a dry run (053: 67 agent runs, 054: 43 proposals, 056: 17 views added, the rest none); before that, migrations 044–048 applied 2026-09-28 after a dry run (044: 750 tasks, 045: 1 milestone, 046: 64 sample tasks, 047: 30 time logs, 048: none), frontend rebuilt 2026-09-27, migrations through 043 applied, frontend built. `.env` still sets `PR_SUMMARY_AS_DATA`, which nothing reads since #874 and can be removed. `GOOGLE_CLIENT_ID` is set, which Google sign-in now requires (#909). `node scripts/seat-check.js`: no memberships without an active seat. The other flags are as recorded on 2026-09-23 (`SKILL_EXTERNAL_READS=on`, `AGENT_EGRESS_ALLOWLIST=true`; the rest off until the owner's sweeps; `STORAGE_DOWNLOAD_SCOPE` in report).
 - **Upgrade steps for a deployed instance:**
   1. `node scripts/audit-product-owners.js` (from #645) and review every account it marks REVIEW.
   2. `node scripts/seat-check.js` (from #913): company access now needs an active seat; it lists accounts that would lose access. Re-invite anyone who should stay.
   3. Migrations run at server start (013, 024–031 and later, through 048). Preview first with `npm run migrate -- up --dry-run`; check with `npm run migrate -- verify` (fixed by #1084 — before it, `-- verify` and `-- status` ran `up`). 044–048 convert stored reference ids to ObjectIds; each is guarded, idempotent and keeps `updatedAt`. 046 reports "cannot dry-run" when 044 is pending (it reads what 044 writes); its partial plan still lists the tasks.
+     Migrations `064`–`067` were added on 2026-10-01 (task chains, their catch-up and repair, and the Everything indexes). While 064 is pending, a dry run plans 064 and reports 065 and 066 as "cannot dry-run", because they read what 064 writes.
   4. Google sign-in requires `GOOGLE_OAUTH_CLIENT_ID` or `GOOGLE_CLIENT_ID`; the `*_OAUTH_REQUIRED` switches are gone (#909).
   5. SSO: people who are not yet members sign in only on DNS-verified domains; a configuration without verified domains admits its existing members only (#911).
   6. Invitations stored without a link token must be resent (#908). `POST /api/v2/email-cron-handler` is removed (#910). `TRUST_PROXY` accepts `true`, `false` or a hop count (#914).
   7. Removed routes: `POST /api/v2/sendMail` and `/api/v2/single-notification-email` (#919), `/api/v1/handleHistory` and `/api/v1/handleNotification` (#927), `POST /api/v1/app-notification/comment` (#929). Support chat mail now needs `SUPPORT_MAIL` in the server `.env` (#919). Verified SSO domains are re-checked daily at 03:30; three misses in a row mark a domain unverified (#925).
   8. Operator routes from #655 (`x-preset-key`, `POST /api/v1/setPresetCompany`), `TRACKER_PKCE_LEGACY_UNTIL` (#653), and the off-by-default flags listed in `docs/ENV.md` are unchanged.
 
-## Next up
+## Older open items
 
-**From the ClickUp re-check (2026-10-01), in order:**
-- **Missing custom field types** (people, URL, rating, progress, files): the one large gap left from the re-check. AI ratings are stored as numbers until a rating type exists.
-- **Date pickers have no dark theme:** Workload's date-range input stays white and the calendar popup is light everywhere. The app's calendar stylesheet hard-codes light colours. Offered as a task chip.
-- **Two small access follow-ups after #1202** (details in the owner's private notes): the project list's per-user cache is read before the seat check, and the project search endpoint reads the seat without the active-seat filter.
-- **Not yet checked by eye:** the Burndown, Velocity and Ask cards on a dashboard, an `@agent` message in chat, the Gantt shift preview, doc comments and mentions, the automation gallery, and a drag in List and Board after #1195. See each slice's "Left for later" in the 044 and 045 progress files.
-- **Owner decisions waiting** (from the re-check): nested subtasks, a task in several lists, subfolders, an Everything view, view templates, Goals, chat threads, doc presence and version history, in-form logic, agent connectors, a notetaker bot, a hotkey app, web search, a PWA shell; and where a working-days setting should live, so Gantt shifts can skip non-working days.
+Unchanged since the handoff at build 670. Check each against `git log` before working on it.
 
 1. **In progress at handoff:** task 039's before-and-after screenshots; task 040's next field groups (history, notifications, mentions; customFields; task ids). The other session's open PRs for tasks 041/042 (#1116, #1121, #1122, #1124, #1125, #1129–#1136 at the time of writing). **Blocked by the permission system:** switching `.github/workflows/main.yml` to deploy from `beta` (owner chose beta on 2026-09-27); the staging VPS is 520 builds behind and would run migrations 024–048 on its first beta deploy. **Not started:** the minimised task tray and whiteboard positions are kept only in the browser (product decisions).
 2. **Owner questions:** switch `PERMISSION_ENFORCEMENT_MODE` to enforce — the 2026-09-16 plan was after 14 days without would-be denials, and until then `requirePermission` checks only report for browser sessions (every gate added on 2026-09-28 is a hard check and does not depend on it); row 119 (decision 8 re-check once real downloads are logged); review existing Google sign-in links (details in the owner's private notes).
@@ -138,7 +235,14 @@ Updated 2026-10-01. Read this first, then `Tasks/index.md`. Overwrite this file 
 
 ## Owner decisions recorded
 
-- **2026-09-30 to 2026-10-01:** start task 044 (the quick gaps) and task 045 (the medium gaps) from the re-check, every queued slice at once; after the restart, keep the load off the PC; merge each PR when its checks pass; rebuild the local server after each batch and check the new screens in dark mode. The owner has not yet answered whether to move the session to a cloud machine, whether to do the two access follow-ups, or whether to check local data for roles with no private-projects setting.
+- **2026-10-01:**
+  - The plan for task 046 is confirmed with the recommended definition of "great": "use the draft and start M1".
+  - "Don't wait for my input, you can continue work, you make your own decision." The integrator has since taken 26 decisions. All are in `Tasks/active/046-better-than-clickup/task.md`, each with its reason and how to overrule it.
+  - Use Claude on the owner's plan through MCP in place of AlianHub's paid AI API where possible. This started MCP parity (Track A6).
+  - The AlianHub connector may be reconnected, and the session may track its work in AlianHub.
+  - Agents: four to six at once after the usage limit was reached, then "increase agents step by step to find the system's maximum".
+
+- **2026-09-30 to 2026-10-01:** start task 044 (the quick gaps) and task 045 (the medium gaps) from the re-check, every queued slice at once; after the restart, keep the load off the PC; merge each PR when its checks pass; rebuild the local server after each batch and check the new screens in dark mode. The owner has not yet answered whether to move the session to a cloud machine, whether to do the two access follow-ups, or whether to check local data for roles with no private-projects setting. The integrator took all three later on 2026-10-01 (decisions 10 and 11 in the 046 `task.md`).
 
 - **2026-09-28:** agent autonomy names follow the code (#1116): L0 "Answers and suggests", L1 "Suggests changes", L2 "Acts, you approve the rest", L3 "Acts, also on a schedule". The owner also asked that tasks 041–043 start all at once rather than queued.
 
@@ -166,6 +270,15 @@ Updated 2026-10-01. Read this first, then `Tasks/index.md`. Overwrite this file 
 - Only owners and admins delete agents (#620). `REFRESH_TOKEN_REUSE_GRACE_SECONDS` defaults to 10 (#609). The `e2e` job runs on pushes to `beta` (#634). Webhooks reach private hosts only through an instance-owner allowlist (#647). Timesheet reads respect an admin's "Everyone" grant per screen (#635). `project.project_create` is enforced for API tokens but not for web sessions (#637). A private sprint is visible to its assignees plus owners and admins (#656).
 
 ## Things learned that affect the next session
+
+- **The Claude plan has a session limit, and agents spend it** (2026-10-01). About ten hours of 8 to 13 agents reached it at about 14:58. Three agents stopped mid-run and were resumed from their transcripts after the reset. Resume an agent that already holds the context instead of starting a new one, and have agents commit and push early.
+- **An access fix pushes its test and its fix together** (2026-10-01). The repository is public, and a failing test pushed alone can describe a gap that is still open. Keep test names, commit messages and PR text neutral, put the detail in the private notes, and merge such a PR ahead of the queue. Every other slice still pushes its failing test first.
+- **Merging the top of a stack carries the PRs under it** (2026-10-01). #1238, #1241 and #1247 reached `beta` inside #1245, #1244 and #1257. GitHub marks them merged, but they have no build of their own and no row in `docs/BETA-LOG.md`. #1260 reached `beta` inside #1262 and was then closed, because its branch held one more merge commit. Name both PRs when recording such a build.
+- **Slices that only work together merge together** (2026-10-01). The nested-subtasks server slices were held until the List could show a third level, then merged in order with no local rebuild in between. Write the hold and its reason in the notes when the PR opens.
+- **Two PRs that each regenerate `docs/ENV.md` can break `beta`** (2026-10-01). Each passed alone; merged, one usage line was out of date and `tests/conventions/env-doc` failed on `beta` and on every open PR (#1264). After a hand merge of that file, run `node scripts/env-doc.js` again.
+- **The Browser pane declines the browser's own confirm dialogs** (2026-10-01). A QA agent's click on "Restore this version" did nothing until it answered the dialog another way. A native `confirm` cannot be driven; the app's own dialogs can.
+- **Do not rebuild the local server while a QA agent is using it** (2026-10-01), and say which build is live after each rebuild. `curl localhost:4000/health` answers with the running version and the number of pending migrations.
+- **Using AlianHub to track its own work finds gaps quickly** (2026-10-01). One afternoon of tracking PRs as subtasks through the MCP endpoint produced the list in `Tasks/active/046-better-than-clickup/dogfood-findings.md`.
 
 - **Agents edit and push; CI runs the suites** (2026-10-01). Nineteen agents each running the full suites took the eight-CPU Mac to load 187 (68 jest processes) and it restarted, stopping every agent and wiping the scratchpad under `/private/tmp`. Only commits in worktrees survived. Since then an agent runs just the test files it touched, one worker, pushes early (right after the failing-test commit), and the integrator sends CI failures back. Nine such agents kept the load near 4–13.
 - **`Agent` with `isolation: "remote"` is not a cloud agent in the desktop app.** It starts a local worktree agent. Stopped agents resume from their transcripts with `SendMessage`; `gh pr update-branch` merges `beta` into a PR on GitHub's side, with no local work.
