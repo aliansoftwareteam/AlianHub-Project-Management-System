@@ -1,34 +1,36 @@
 <template>
     <Sidebar :hideHeader="true" :title="title" :visible="modelValue" @update:visible="showSpinner ? '' : $emit('update:modelValue', $event), confirmName = ''" width="607px" :top="clientWidth <= 767 ? '0px' : '46px'">
         <template #body>
-            <div class="bg-light-gray p-020 position-re style-scroll overflow-auto conformation__sidebar-component">
-                <div class="w-100 h-100 bg-dark-gray3 position-ab d-flex align-items-center justify-content-center z-index-7" v-if="showSpinner">
+            <div class="p-020 position-re style-scroll overflow-auto conformation__sidebar-component">
+                <div class="w-100 h-100 position-ab d-flex align-items-center justify-content-center z-index-7 conformation__busy" v-if="showSpinner">
                     <Spinner :isSpinner="true"/>
                 </div>
-                <div class="bg-white border-radius-12-px d-flex align-items-center flex-column p-040 position-re">
+                <div class="ah-card d-flex align-items-center flex-column p-040 position-re">
                      <slot name="head">
-                        <img @click="$emit('update:modelValue', false), confirmName = ''" :src="closeImage" alt="closeImage" class="position-ab cursor-pointer closeee__image-icon">
+                        <button type="button" class="position-ab closeee__image-icon" :aria-label="$t('Projects.close')" @click="$emit('update:modelValue', false), confirmName = ''">
+                            <span class="ah-mask-icon" :style="maskOf(closeImage)" aria-hidden="true"></span>
+                        </button>
                     </slot>
-                    <img :src="frameImage" alt="frameImage" class="mb-1 mw-100">
+                    <img :src="frameImage" alt="" class="mb-1 mw-100">
                     <div class="style-scroll overflow-auto archieve__titledesc--wrapper text-center w-100 mw-100">
-                        <h4 class="mb-0 text-center archive-delete-title font-weight-700">{{title}}</h4>
-                        <p v-if="message" class="text-center archive-delete-desc font-weight-400 font-size-16 gray81" v-html="richHtml(message)"></p>
-                        <slot name="body"> 
-                            <strong class="font-weight-500 text-center d-block mb-7px dark-gray type__confirmation-string">{{ $t('conformationmsg.type') }} <i>{{confirmationString}}</i></strong>
+                        <h4 class="mb-0 text-center archive-delete-title">{{title}}</h4>
+                        <p v-if="message" class="text-center archive-delete-desc" v-html="richHtml(message)"></p>
+                        <slot name="body">
+                            <strong class="text-center d-block mb-7px type__confirmation-string">{{ $t('conformationmsg.type') }} <i>{{confirmationString}}</i></strong>
 
                             <InputText
                                 v-model="confirmName"
                                 :placeholder="confirmationString"
                                 :isDirectFocus="true"
-                                class="text-center font-size-16 font-weight-400 archive-delete-input w-100 gray"
+                                class="text-center archive-delete-input w-100"
                                 height="56px"
                             />
                         </slot>
                     </div>
                         <div class="d-flex align-items-center archive-delete-btnwrapper mb--10px mt-30px">
-                            <button class="outline-primary mr-1 font-size-16 d-flex align-items-center font-ui" @click="$emit('update:modelValue', false), confirmName = ''">{{$t('Projects.cancel')}}</button>
-                            <button v-if="confirmName !== confirmationString && isShowInput" class="btn-secondary cursor-default font-size-16 px3-py14 font-ui">{{acceptButton}}</button>
-                            <button v-else :class="acceptButtonClass" class="px-1 font-size-16 font-ui" @click="$emit('confirm'), confirmName=''">{{acceptButton}}</button>
+                            <button type="button" class="ah-btn ah-btn--secondary" @click="$emit('update:modelValue', false), confirmName = ''">{{$t('Projects.cancel')}}</button>
+                            <button v-if="confirmName !== confirmationString && isShowInput" type="button" class="ah-btn ah-btn--primary" disabled>{{acceptButton}}</button>
+                            <button v-else type="button" class="ah-btn" :class="acceptButtonClass.includes('btn-danger') ? 'ah-btn--danger' : 'ah-btn--primary'" @click="$emit('confirm'), confirmName=''">{{acceptButton}}</button>
                         </div>
                     </div>
             </div>
@@ -45,6 +47,7 @@ import { richHtml } from "@/utils/richHtml";
 import InputText from "@/components/atom/InputText/InputText.vue"
 import Sidebar from "@/components/molecules/Sidebar/Sidebar.vue"
 import Spinner from "@/components/atom/SpinnerComp/SpinnerComp.vue"
+import { maskOf } from "@/utils/iconMask";
 
 // IMAGES
 const frameImage = require("@/assets/images/Frame.png");

@@ -399,30 +399,10 @@ tr.fixed th {
     height: 24px;
     box-shadow: none !important;
     background: transparent;
-    color: var(--ink) !important;
     position: inherit !important;
-}
-/* The select draws a black arrow image made for a white page. */
-:root[data-theme="dark"] .days-selected-dropdown .select-option img {
-    filter: invert(1) hue-rotate(180deg);
 }
 .days-selected-dropdown .select-option__label.text-ellipsis {
     font: var(--fw-strong, 500) var(--fs-lg, 16px)/23.68px var(--font-ui);
-}
-.days-selected-dropdown .select-option-value {
-    background-color: var(--surface);
-    border-color: var(--border);
-    box-shadow: var(--shadow-pop);
-}
-.days-selected-dropdown .custom-select-options {
-    color: var(--ink);
-}
-.days-selected-dropdown .custom-select-options:hover {
-    background-color: var(--surface-hover);
-}
-.days-selected-dropdown .custom-select-options.bg-blue {
-    background-color: var(--brand-tint) !important;
-    color: var(--brand) !important;
 }
 .milestone-report-wrapper .filter_table_wrapper {
     padding: 0px 15px;
@@ -477,11 +457,17 @@ tr.fixed th {
     border-radius: var(--r-input);
     padding: 0px;
     overflow: auto;
-    background-image: url('../../assets/images/svg/filter_icon.svg');
-    background-repeat: no-repeat;
-    background-position: 97% 54%;
     margin-left:0px;
     cursor: pointer;
+}
+.wf_filter__icon {
+    position: sticky;
+    right: 10px;
+    flex: none;
+    width: 10px;
+    height: 11px;
+    margin: 0 10px 0 auto;
+    color: var(--ink-2);
 }
 .milestone-report-wrapper .wf_filter::-webkit-scrollbar-thumb {
     border-radius: 10px;

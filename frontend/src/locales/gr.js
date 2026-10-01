@@ -7504,6 +7504,7 @@ export default {
         "unlock_custom_field": "Για να Ξεκλειδώσετε το Προσαρμοσμένο Πεδίο",
         "to_unlock_milestone": "Για να Ξεκλειδώσετε τον Σταθμό Ορόσημο",
         "to_unlock_milestone_report": "Για να Ξεκλειδώσετε την Αναφορά Σταθμού Ορόσημου",
+        "to_unlock_project_timesheet": "To Unlock Project Timesheet",
         "to_unlock_security": "Για να Ξεκλειδώσετε την Ασφάλεια & Δικαιώματα",
         "to_unlock_team": "Ξεκλείδωμα ομάδας",
         "to_unlcok_project": "Για να Ξεκλειδώσετε το Έργο",

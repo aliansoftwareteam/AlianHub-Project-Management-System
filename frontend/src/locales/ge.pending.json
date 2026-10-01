@@ -8441,6 +8441,7 @@
     "UndoToast.dismiss": "Dismiss",
     "UndoToast.undo": "Undo",
     "UndoToast.undo_hint": "Undo (Ctrl+Z or ⌘Z)",
+    "Upgrades.to_unlock_project_timesheet": "To Unlock Project Timesheet",
     "UserTimesheet.project_estimate_changed": "A task in this project had its estimated hours changed",
     "UserTimesheet.time_split": "Tracked and manual time",
     "UserTimesheet.views_nav": "Timesheet views",

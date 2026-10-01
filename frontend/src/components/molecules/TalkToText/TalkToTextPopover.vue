@@ -61,6 +61,7 @@
                 <input v-model="taskName" class="ttt__input" :maxlength="250" />
                 <label class="ttt__label">{{ $t('TalkToText.project') }}</label>
                 <SelectComp
+                    themed
                     name="ttt_project"
                     displayKey="ProjectName"
                     v-model="selectedProjectItem"
@@ -73,6 +74,7 @@
                 </SelectComp>
                 <label class="ttt__label">{{ $t('TalkToText.sprint') }}</label>
                 <SelectComp
+                    themed
                     name="ttt_sprint"
                     displayKey="name"
                     v-model="selectedSprintItem"
@@ -390,27 +392,25 @@ onBeforeUnmount(() => resetToIdle());
 .ttt__overlay { position: fixed; inset: 0; z-index: 1000; }
 .ttt__panel {
     position: fixed; top: 56px; right: 16px; width: 340px; max-width: calc(100vw - 24px);
-    background: #fff; border: 1px solid #ececf1; border-radius: 12px;
-    box-shadow: 0 14px 40px rgba(17, 24, 39, 0.22); padding: 14px 16px 16px;
+    background: var(--surface); color: var(--ink); border: 1px solid var(--hairline); border-radius: var(--r-card);
+    box-shadow: var(--shadow-pop); padding: 14px 16px 16px;
+    color-scheme: var(--scheme, light);
     font-family: inherit;
 }
 .ttt__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.ttt__title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; color: #171b26; }
-.ttt__dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4757; }
-.ttt__close { cursor: pointer; color: #9aa0ac; font-size: 14px; }
-.ttt__close:hover { color: #e84a4a; }
+.ttt__title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; color: var(--ink); }
+.ttt__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
+.ttt__close { cursor: pointer; color: var(--ink-2); font-size: 14px; }
+.ttt__close:hover { color: var(--danger-ink); }
 
-.ttt__label { display: block; font-size: 12px; font-weight: 600; color: #5b6270; margin: 10px 0 4px; }
-.ttt__input { width: 100%; border: 1px solid #e0e0e6; border-radius: 7px; padding: 8px 10px; font-size: 13px; color: #2b2b2b; outline: none; background: #fff; }
-.ttt__input:focus { border-color: #2f3990; }
-.ttt__error { color: #e84a4a; font-size: 12px; margin-top: 8px; }
+.ttt__label { display: block; font-size: 12px; font-weight: 600; color: var(--ink-2); margin: 10px 0 4px; }
+.ttt__input { width: 100%; border: 1px solid var(--border); border-radius: var(--r-input); padding: 8px 10px; font-size: 13px; color: var(--ink); outline: none; background: var(--surface); }
+.ttt__input:focus { border-color: var(--brand); box-shadow: var(--focus); }
+.ttt__error { color: var(--danger-ink); font-size: 12px; margin-top: 8px; }
 
-/* Enhance the reusable Select's dropdown for THIS popover only (scoped via
-   :deep — the shared Select.vue component itself is left untouched). */
+/* The popover's own spacing for the shared Select; its colours come from the Select's themed look. */
 .ttt__panel :deep(.select-option-value) {
-    border: 1px solid #e6e7ee;
     border-radius: 10px;
-    box-shadow: 0 12px 30px rgba(17, 24, 39, 0.16);
     padding: 6px;
     margin-top: 6px;
     overflow: hidden;
@@ -420,14 +420,8 @@ onBeforeUnmount(() => resetToIdle());
 }
 .ttt__panel :deep(.cutsom-select-search .form-control) {
     height: 34px;
-    border: 1px solid #e0e0e6;
     border-radius: 8px;
     font-size: 13px;
-    color: #2b2b2b;
-}
-.ttt__panel :deep(.cutsom-select-search .form-control:focus) {
-    border-color: #2f3990;
-    box-shadow: 0 0 0 2px rgba(47, 57, 144, 0.12);
 }
 .ttt__panel :deep(.custom-selectoptions-wrapper) {
     max-height: 210px;
@@ -438,38 +432,33 @@ onBeforeUnmount(() => resetToIdle());
     margin: 1px 0;
     border-radius: 8px;
     font-size: 13px;
-    color: #2b3040;
     transition: background 0.12s ease, color 0.12s ease;
 }
-.ttt__panel :deep(.custom-select-options:not(.bg-blue):hover) {
-    background: #eef0fb;
-    color: #2f3990;
-}
 
-.ttt__btn-record { width: 100%; margin-top: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #ff4757; color: #fff; border: none; border-radius: 8px; padding: 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
-.ttt__btn-record:hover { background: #ec3b4b; }
-.ttt__rec-dot { width: 9px; height: 9px; border-radius: 50%; background: #fff; }
+.ttt__btn-record { width: 100%; margin-top: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--danger); color: var(--on-danger); border: none; border-radius: var(--r-input); padding: 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.ttt__btn-record:hover { opacity: .9; }
+.ttt__rec-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--on-danger); }
 
 .ttt__recording { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
-.ttt__rec-live { width: 10px; height: 10px; border-radius: 50%; background: #ff4757; animation: ttt-pulse 1s infinite; flex-shrink: 0; }
-.ttt__timer { font-variant-numeric: tabular-nums; font-weight: 700; color: #171b26; font-size: 14px; }
+.ttt__rec-live { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); animation: ttt-pulse 1s infinite; flex-shrink: 0; }
+.ttt__timer { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); font-size: 14px; }
 .ttt__wave { flex: 1; display: flex; align-items: center; gap: 2px; height: 22px; overflow: hidden; }
-.ttt__bar { width: 2px; height: 40%; background: #c7cbd6; border-radius: 2px; animation: ttt-wave 0.9s ease-in-out infinite; }
+.ttt__bar { width: 2px; height: 40%; background: var(--border); border-radius: 2px; animation: ttt-wave 0.9s ease-in-out infinite; }
 .ttt__icon-btn { width: 30px; height: 30px; border-radius: 50%; border: none; cursor: pointer; font-size: 14px; flex-shrink: 0; }
-.ttt__cancel { background: #f0f0f3; color: #6b7280; }
-.ttt__stop { background: #2f3990; color: #fff; }
+.ttt__cancel { background: var(--fill); color: var(--ink-2); }
+.ttt__stop { background: var(--brand); color: var(--on-brand); }
 
-.ttt__loading { display: flex; align-items: center; gap: 10px; padding: 16px 0; font-size: 13px; color: #4b5162; }
-.ttt__spinner { width: 16px; height: 16px; border: 2px solid #dfe3fb; border-top-color: #2f3990; border-radius: 50%; animation: ttt-spin 0.7s linear infinite; }
+.ttt__loading { display: flex; align-items: center; gap: 10px; padding: 16px 0; font-size: 13px; color: var(--ink-2); }
+.ttt__spinner { width: 16px; height: 16px; border: 2px solid var(--brand-border); border-top-color: var(--brand); border-radius: 50%; animation: ttt-spin 0.7s linear infinite; }
 
-.ttt__complete { font-size: 13px; font-weight: 700; color: #171b26; margin-bottom: 8px; }
+.ttt__complete { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
 .ttt__audio { width: 100%; height: 36px; margin-bottom: 8px; }
-.ttt__transcript { font-size: 13px; line-height: 1.5; color: #2b3040; background: #f7f8fb; border: 1px solid #eef0f4; border-radius: 8px; padding: 10px; max-height: 120px; overflow: auto; white-space: pre-wrap; }
+.ttt__transcript { font-size: 13px; line-height: 1.5; color: var(--ink); background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 8px; padding: 10px; max-height: 120px; overflow: auto; white-space: pre-wrap; }
 .ttt__actions { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
 .ttt__actions button { flex: 1; }
-.ttt__btn-ghost { background: #f0f0f3; border: none; border-radius: 7px; padding: 8px 14px; font-size: 13px; color: #3a3a3a; cursor: pointer; }
-.ttt__btn-ghost:hover { background: #e6e7ec; }
-.ttt__btn-primary { background: #2f3990; color: #fff; border: none; border-radius: 7px; padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.ttt__btn-ghost { background: var(--fill); border: none; border-radius: 7px; padding: 8px 14px; font-size: 13px; color: var(--ink); cursor: pointer; }
+.ttt__btn-ghost:hover { background: var(--track); }
+.ttt__btn-primary { background: var(--brand); color: var(--on-brand); border: none; border-radius: 7px; padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; }
 .ttt__btn-primary:disabled { opacity: 0.6; cursor: default; }
 
 @keyframes ttt-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }

@@ -41,6 +41,7 @@
     --warn-bg: #fdf1e3;
     --warn-ink: #a4470f;
     --danger: #c1121f;
+    --on-danger: #ffffff;
     --danger-bg: #fdeced;
     --danger-ink: #9c1f2e;
     --agent: #6b5ce7;
@@ -81,6 +82,8 @@
     --shadow-pop: 0 6px 16px rgba(0, 0, 0, .14);
     --shadow-panel: none;
     --shadow-modal: 0 30px 80px rgba(0, 0, 0, .35);
+    /* The dimmed page behind a dialog, a drawer or a sheet. */
+    --scrim: rgba(0, 0, 0, .35);
     /* A solid 2px brand ring: the 12% tint it replaced measured about 1.2:1 against white (WCAG 1.4.11 needs 3:1). */
     --focus: 0 0 0 2px var(--brand);
 
@@ -162,6 +165,8 @@
     --danger-ink: #ff8f98;
     /* Used directly as text (overdue labels, due dates); the light red is 2.8:1 on dark surfaces. */
     --danger: #ff7b85;
+    /* Dark --danger is a light red: white on it is 2.6:1. */
+    --on-danger: #111114;
     --agent-bg: rgba(168, 146, 255, .16);
     --shadow-ink: rgba(0, 0, 0, .3);
 
@@ -484,14 +489,14 @@ html, body, #app {
 .ah-btn--secondary { background: var(--surface); border-color: var(--border); }
 .ah-btn--secondary:hover:not(:disabled) { background: var(--surface-hover); }
 .ah-btn--outline { border-color: var(--brand); color: var(--brand); background: var(--brand-tint); }
-.ah-btn--outline:hover:not(:disabled) { background: rgba(47, 57, 144, .16); }
+.ah-btn--outline:hover:not(:disabled) { background: var(--brand-ring, rgba(47, 57, 144, .16)); }
 .ah-btn--ghost { color: var(--ink-2); }
 .ah-btn--ghost:hover:not(:disabled) { background: var(--surface-hover); color: var(--ink); }
-.ah-btn--danger { background: var(--danger); color: #fff; }
+.ah-btn--danger { background: var(--danger); color: var(--on-danger, #fff); }
 .ah-btn--sm { height: var(--control-h, 30px); padding: 0 var(--sp-4); font-size: var(--fs-sm, 12.5px); }
 .ah-btn--lg { height: calc(var(--control-h-lg, 36px) + 6px); padding: 0 calc(var(--sp-6) + 4px); font-size: var(--fs-lg, 14px); }
 .ah-btn--block { width: 100%; }
-.ah-btn--dark { background: var(--rail); color: #fff; }
+.ah-btn--dark { background: var(--rail); color: var(--rail-ink-strong, #fff); }
 
 .ah-field { display: flex; flex-direction: column; gap: 6px; }
 .ah-field__label {
@@ -551,7 +556,7 @@ html, body, #app {
 .ah-chip--agent { background: var(--agent-bg); color: var(--agent); }
 .ah-chip--automation { background: var(--fill); color: var(--ink-2); }
 .ah-chip--mono { font: var(--text-data); }
-.ah-chip--dark { background: var(--rail); color: #fff; }
+.ah-chip--dark { background: var(--rail); color: var(--rail-ink-strong, #fff); }
 .ah-chip--sm { height: 18px; font-size: 10.5px; }
 /* Status and tag colours are workspace data, so statusChipStyle() and tagChipStyle() compute the dark-theme text per chip. */
 :root[data-theme="dark"] .ah-status-ink { --status-ink: var(--status-ink-dark); }
@@ -610,8 +615,7 @@ html, body, #app {
 }
 .ah-check:focus-visible { outline: none; box-shadow: var(--focus); }
 
-.ah-tabs { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: rgba(0, 0, 0, .05); }
-:root[data-theme="dark"] .ah-tabs { background: rgba(255, 255, 255, .07); }
+.ah-tabs { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--track, rgba(0, 0, 0, .05)); }
 .ah-tab {
     height: 26px; padding: 0 10px; border-radius: 6px; border: 0; background: transparent;
     font: 600 12px/1 var(--font-ui); color: var(--ink-2); cursor: pointer;
@@ -686,9 +690,9 @@ html, body, #app {
     background: var(--surface-2);
 }
 
-.ah-scroll { scrollbar-width: thin; scrollbar-color: rgba(0, 0, 0, .18) transparent; }
+.ah-scroll { scrollbar-width: thin; scrollbar-color: var(--border, rgba(0, 0, 0, .18)) transparent; }
 .ah-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
-.ah-scroll::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, .18); border-radius: 8px; }
+.ah-scroll::-webkit-scrollbar-thumb { background: var(--border, rgba(0, 0, 0, .18)); border-radius: 8px; }
 
 .ah-spin {
     display: inline-block; flex: none;

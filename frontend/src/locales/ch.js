@@ -7504,6 +7504,7 @@ export default {
         "unlock_custom_field": "解锁自定义字段",
         "to_unlock_milestone": "解锁里程碑",
         "to_unlock_milestone_report": "解锁里程碑报告",
+        "to_unlock_project_timesheet": "To Unlock Project Timesheet",
         "to_unlock_security": "解锁安全与权限",
         "to_unlock_team": "解锁团队",
         "to_unlcok_project": "解锁项目",

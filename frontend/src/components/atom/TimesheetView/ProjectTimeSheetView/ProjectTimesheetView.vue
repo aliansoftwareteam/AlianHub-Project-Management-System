@@ -24,7 +24,7 @@
                 </th>
                 <th v-for="(colName, index) in theModel" :key="index" v-bind:class="[{ 'weekoff': colName.day == 'Sat' || colName.day == 'Sun', 'current_date': colName.fullDate == colName.currentDate}]">
                     <p>
-                        <span class="color47 mr-4px">{{colName.day}},</span>
+                        <span class="mr-4px">{{colName.day}},</span>
                         <strong class="m-0" v-if="colName.arabiDay != undefined && colName.arabiMonth != undefined">{{colName.date}}<sup>{{colName.arabiDay}}</sup> {{colName.arabiMonth}}</strong>
                         <strong class="m-0" v-else>{{colName.date}} {{colName.dateMonth}}</strong>
                     </p>
@@ -125,4 +125,3 @@
     }
 </script>
 <style src="../style.css"></style>
-<!-- <style src="../"></style> -->

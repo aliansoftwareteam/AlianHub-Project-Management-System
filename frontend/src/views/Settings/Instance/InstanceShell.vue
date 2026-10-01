@@ -82,7 +82,7 @@ watch(() => route.name, revealActiveTab);
 .in-banner--warn { background: var(--warn-bg); color: var(--warn-ink); }
 .in-banner--danger { background: var(--danger-bg); color: var(--danger-ink); }
 .in-banner--ok { background: var(--ok-bg); color: var(--ok-ink); }
-.in-pre { margin: 0; padding: 12px; border-radius: 8px; background: var(--rail); color: #e6e8ef; font: 12px/1.5 var(--font-mono); overflow: auto; max-height: 60vh; white-space: pre-wrap; overflow-wrap: anywhere; }
+.in-pre { margin: 0; padding: 12px; border-radius: 8px; background: var(--rail); color: var(--rail-ink-strong); font: 12px/1.5 var(--font-mono); overflow: auto; max-height: 60vh; white-space: pre-wrap; overflow-wrap: anywhere; }
 .in-field { display: grid; grid-template-columns: minmax(180px, 260px) 1fr; gap: 6px 16px; align-items: start; padding: 10px 0; border-bottom: 1px solid var(--hairline); }
 .in-field__label { font: 600 12.5px/1.3 var(--font-ui); color: var(--ink); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .in-field__help { font: var(--text-small); color: var(--ink-2); }

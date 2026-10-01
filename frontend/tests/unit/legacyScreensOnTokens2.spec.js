@@ -8,7 +8,7 @@ const SRC = path.resolve(HERE, '../../src');
 const exists = (rel) => fs.existsSync(path.join(SRC, rel));
 const read = (rel) => fs.readFileSync(path.join(SRC, rel), 'utf8');
 
-const withoutComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
+const withoutComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '').replace(/&#\d+;/g, '');
 const templateOf = (vue) => vue.slice(vue.indexOf('<template>'), vue.lastIndexOf('</template>'));
 const stylesOf = (rel) => {
     const text = read(rel);
@@ -45,7 +45,6 @@ const CARD_VIEWS = [
 ];
 const SHARED_VIEWS = [
     'components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue',
-    'components/atom/ProjectSettingSidebar/ProjectSettingSidebar.vue',
 ];
 const SETTINGS_VIEWS = [
     'views/Settings/Integrations/Integrations.vue',
@@ -58,7 +57,6 @@ const SHEETS = [
     'components/atom/TimesheetView/style.css',
     'components/atom/TimesheetView/TrackerTimeSheetView/ScreenshotTime.css',
     'components/atom/TimesheetView/TrackerTimeSheetView/TimebarComponent.css',
-    'components/molecules/Select/style.css',
     'components/molecules/ConfirmationSidebar/style.css',
     'views/Settings/settingsShell.css',
 ];
@@ -95,8 +93,7 @@ describe('legacy timesheets', () => {
         for (const rel of ['views/Timesheet/style.css', 'components/atom/TimesheetView/style.css']) {
             const css = stylesOf(rel);
             expect(ruleBody(css, 'table.table.timesheet_table thead,table.table.timesheet_table th'), rel).toMatch(/background:\s*linear-gradient\(var\(--fill\), var\(--fill\)\) var\(--surface-2\)\s*!important/);
-            expect(ruleBody(css, 'table.table.timesheet_table tr th.current_date'), rel).toMatch(/background:\s*var\(--brand\)\s*!important/);
-            expect(ruleBody(css, 'table.table.timesheet_table tr th.current_date'), rel).toMatch(/color:\s*var\(--on-brand\)\s*!important/);
+            expect(css, rel).toMatch(/table\.table\.timesheet_table tr th\.current_date[^{]*\{\s*background:\s*var\(--brand\)\s*!important;\s*color:\s*var\(--on-brand\)\s*!important/);
             expect(ruleBody(css, '.timesheet_table_wrapper'), rel).toMatch(/overflow:\s*auto/);
         }
     });
@@ -105,6 +102,31 @@ describe('legacy timesheets', () => {
         const tracker = templateOf(read('views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue'));
         expect(tracker).not.toMatch(/rectangle_(left|right)Arrow\.png"/);
         expect(tracker.match(/class="ah-mask-icon"/g).length).toBeGreaterThanOrEqual(2);
+    });
+});
+
+describe('timesheet and workload data cells take the row type', () => {
+    test('the week grid of My timesheet', () => {
+        const css = stylesOf('views/Timesheet/UserTimeSheet/UserTimesheet.vue');
+        expect(ruleBody(css, '.ut2-row')).toMatch(/min-height:\s*var\(--row-h\)/);
+        expect(ruleBody(css, '.ut2-row')).toMatch(/padding:\s*var\(--cell-pad-y, 10px\) var\(--cell-pad-x, 14px\)/);
+        expect(ruleBody(css, '.ut2-row')).toMatch(/font:\s*500 var\(--row-font, 12px\)\/1\.2 var\(--font-mono\)/);
+        expect(css).toMatch(/\n\.ut2-task \{[^}]*font:\s*400 var\(--row-font, 12\.5px\)\/1\.3 var\(--font-ui\)/);
+        expect(ruleBody(css, '.ut2-row--head')).toMatch(/font:\s*var\(--text-label\)/);
+    });
+
+    test('the workload grid', () => {
+        const css = stylesOf('views/Timesheet/WorkloadTimesheet/WorkloadTimesheet.vue');
+        expect(ruleBody(css, '.wl__name')).toMatch(/font-size:\s*var\(--row-font, 12\.5px\)/);
+        expect(ruleBody(css, '.wl__total')).toMatch(/font:\s*600 var\(--row-font, 12px\)\/1 var\(--font-mono\)/);
+        expect(ruleBody(css, '.wl__row--head')).toMatch(/font:\s*var\(--text-label\)/);
+        expect(ruleBody(css, '.wl__sub')).toMatch(/font-size:\s*11px/);
+    });
+
+    test('the project timesheet table', () => {
+        for (const rel of ['views/Timesheet/style.css', 'components/atom/TimesheetView/style.css']) {
+            expect(stylesOf(rel).match(/font-size:\s*var\(--row-font, 13px\)/g), rel).toHaveLength(2);
+        }
     });
 });
 
@@ -170,7 +192,7 @@ describe('icons drawn from files become masks', () => {
         const card = templateOf(read('components/molecules/ProjectsListingSetting/ProjectsListingSetting.vue'));
         expect(card).not.toMatch(/<img/);
         expect(card).toMatch(/class="ah-mask-icon pls__star"/);
-        expect(card).toMatch(/class="ah-mask-icon erp_app"/);
+        expect(card.match(/class="ah-mask-icon erp_app /g)).toHaveLength(2);
         const page = templateOf(read('views/Settings/Projects/Projects.vue'));
         expect(page).not.toMatch(/(left|right)_arrow\.svg"/);
         expect(page.match(/class="ah-mask-icon pg__arrow/g).length).toBeGreaterThanOrEqual(4);

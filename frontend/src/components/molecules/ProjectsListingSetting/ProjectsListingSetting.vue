@@ -2,7 +2,9 @@
     <div class="ah-card projectInfoDiv" :class="[{'opacity-5 pointer-event-none' : item?.isRestrict === true}]">
         <div class="projectInfoTopLine d-flex align-items-center justify-content-between font-ui">
             <div class="d-flex align-items-center project__inToplinetextimg-wrapper">
-                <img :class="[{'cursor-pointer' : activeTab === 0}]" :src="isStarred('project', item?._id) ? projectStar : blankStar" @click="!item.isRestrict ? updateFavourite(item) : ''" :title="$t('Projects.favourite')"/>
+                <button type="button" class="pls__star-btn" :class="{ 'is-on': isStarred('project', item?._id), 'pls__star-btn--locked': activeTab !== 0 }" :title="$t('Projects.favourite')" :aria-label="$t('Projects.favourite')" :aria-pressed="isStarred('project', item?._id)" @click="!item.isRestrict ? updateFavourite(item) : ''">
+                    <span class="ah-mask-icon pls__star" :style="maskOf(isStarred('project', item?._id) ? projectStar : blankStar)" aria-hidden="true"></span>
+                </button>
                 <span class="ProjectFirstLatter d-flex align-items-center justify-content-center text-uppercase" v-if="item.projectIcon.type === 'color'" :style="[{'background-color': item.projectIcon.type === 'color' ? item.projectIcon.data : ''}]">{{item.ProjectName ? item.ProjectName.charAt(0) : ''}}</span>
                 <WasabiImage
                     v-else
@@ -127,9 +129,9 @@
                     <span class="sub-title-span pls__label d-block">{{$t('Projects.required_view')}}</span>
                     <ul class="d-flex flex-wrap" v-if="requireComp && requireComp.length > 0" >
                         <li class="pro_block cursor_pointer projectDataColorli" :class="[{'cursor-pointer' : activeTab === 0}]" v-for="(requireObj,requireKey) in requireComp" :key="requireKey">
-                            <img v-if="item.ProjectRequiredComponent?.filter((x) => x.keyName === requireObj.keyName).length > 0" :src="projectComponentsIcons(requireObj.keyName).activeIcon"
-                            @click="!item.isRestrict ? (item.ProjectRequiredComponent.length > 1 ? updateTabs(item,requireObj,'unRead'):null) : ''" :title="requireObj.name || $t('Projects.not_available')" class="erp_app def_req mr-10px">
-                            <img v-else :src="projectComponentsIcons(requireObj.keyName).icon" @click="!item.isRestrict ? updateTabs(item,requireObj,'read') : ''" :title="requireObj.name || $t('Projects.not_available')" class="erp_app tab_req mr-10px">
+                            <span v-if="item.ProjectRequiredComponent?.filter((x) => x.keyName === requireObj.keyName).length > 0" class="ah-mask-icon erp_app def_req is-on mr-10px" :style="maskOf(projectComponentsIcons(requireObj.keyName).activeIcon)" role="img"
+                            @click="!item.isRestrict ? (item.ProjectRequiredComponent.length > 1 ? updateTabs(item,requireObj,'unRead'):null) : ''" :title="requireObj.name || $t('Projects.not_available')" :aria-label="requireObj.name || $t('Projects.not_available')"></span>
+                            <span v-else class="ah-mask-icon erp_app tab_req mr-10px" :style="maskOf(projectComponentsIcons(requireObj.keyName).icon)" role="img" @click="!item.isRestrict ? updateTabs(item,requireObj,'read') : ''" :title="requireObj.name || $t('Projects.not_available')" :aria-label="requireObj.name || $t('Projects.not_available')"></span>
                         </li>
                     </ul>
                     <ul class="d-flex" v-else>

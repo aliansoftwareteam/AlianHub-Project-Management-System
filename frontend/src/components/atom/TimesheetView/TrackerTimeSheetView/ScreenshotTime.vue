@@ -1,11 +1,11 @@
 <template>
     <div>
-        <div class="screenShotTime__header bg-white">
-            <div class="screenShotTime__header--time font-size-18 black" :class="{'screenShotTime__header--activeTime': active}" @click="getTime">
+        <div class="screenShotTime__header">
+            <div class="screenShotTime__header--time" :class="{'screenShotTime__header--activeTime': active}" @click="getTime">
                 <span>{{getTimeName(logRange.time)}}</span>
-                <span class="cursor-pointer"><img alt="Arrow" :src="table_arrow" class="taable_arrow position-re p-3px screen__table-arrow" :class="{'screenShotTime__header-open': active}"/></span>
+                <span class="cursor-pointer"><span class="ah-mask-icon taable_arrow position-re screen__table-arrow" :class="{'screenShotTime__header-open': active}" :style="maskOf(table_arrow)" aria-hidden="true"></span></span>
             </div>
-            <div class="screenShotTime__screenshot bg-white" v-if="active && trackShots?.length">
+            <div class="screenShotTime__screenshot" v-if="active && trackShots?.length">
                 <div class="screenShotTime__screenshot--mainImage"  v-for="(track,index) in trackShots " :key="index" :id="`screenShotTime${index}`">
                     <ScreenShotDisplayComponent :trackshotData="track" :isBorder="borderIndex === index ? true : false" :index="index" @MouseEnter="startLoadComponent(track,index)" @MouseLeave="clearTimeout" @update:getScreenShotForSidebar="getScreenShotDetailFForSidebarFun"/>
                     <div v-if="showComponentId === index">
@@ -15,8 +15,8 @@
                     </div>
                 </div>
             </div>
-            <div class="screenShotTime__screenshot bg-white" v-if="active && trackShots?.length === 0">
-                <div class="screenShotTime__screenshot--mainImage red">
+            <div class="screenShotTime__screenshot" v-if="active && trackShots?.length === 0">
+                <div class="screenShotTime__screenshot--mainImage screenShotTime__none">
                    {{$t('TimeTracker.log_time_found_no_screenshot')}}  
                 </div>
             </div>

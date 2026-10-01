@@ -7504,6 +7504,7 @@ export default {
         "unlock_custom_field": "Para desbloquear el campo personalizado",
         "to_unlock_milestone": "Para desbloquear el hito",
         "to_unlock_milestone_report": "Para desbloquear el informe de hito",
+        "to_unlock_project_timesheet": "To Unlock Project Timesheet",
         "to_unlock_security": "Para desbloquear Seguridad y Permisos",
         "to_unlock_team": "Desbloquear equipo",
         "to_unlcok_project": "Para desbloquear el proyecto",

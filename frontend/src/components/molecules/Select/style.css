@@ -38,3 +38,23 @@
 .custom-selectoptions-wrapper{
     max-height: 182px;
 }
+/* Opt-in through the `themed` prop, as on DropDown: the field, its option list and the search box
+   take the tokens and so follow the theme. Every other select keeps its legacy light colours,
+   because its host still paints a white page. */
+/* Two classes: .form-control, which the field also carries, sets its own greys from another stylesheet. */
+.select-option.sel-tokens {
+    background: var(--surface);
+    color: var(--ink);
+    border-color: var(--border);
+    color-scheme: var(--scheme, light);
+}
+.select-option.sel-tokens.cutom-select-disabled { background: var(--fill); color: var(--ink-2); }
+.sel-tokens.focused { border-color: var(--brand) !important; }
+.sel-tokens .select-option__arrow { width: 10px; height: 10px; color: var(--ink-2); }
+.sel-tokens .select-option-value { background: var(--surface); border-color: var(--border); box-shadow: var(--shadow-pop); }
+.sel-tokens .custom-select-options { color: var(--ink); }
+.sel-tokens .custom-select-options:hover { background: var(--surface-hover); }
+.sel-tokens .custom-select-options.bg-blue { background: var(--brand-tint) !important; color: var(--brand) !important; }
+.sel-tokens .form-control { background: var(--surface); color: var(--ink) !important; border-color: var(--border); }
+.sel-tokens .form-control::placeholder { color: var(--ink-2) !important; }
+.sel-tokens .form-control:focus-visible { outline: none; border-color: var(--brand); box-shadow: var(--focus); }

@@ -172,3 +172,8 @@ label {
     margin-bottom: 10px;
   }
 }
+.pg__arrow {
+  width: 10px;
+  height: 10px;
+  vertical-align: middle;
+}

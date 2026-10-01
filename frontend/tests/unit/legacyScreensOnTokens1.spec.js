@@ -216,8 +216,10 @@ describe('Milestone report', () => {
         expect(ruleBody(css, '.milestone_table_filter_wrapper')).toMatch(/background-color:\s*var\(--canvas\)/);
     });
 
-    test('the black arrow of the year and month select is inverted in dark', () => {
-        expect(css).toMatch(/:root\[data-theme="dark"\] \.days-selected-dropdown \.select-option img \{\s*filter: invert\(1\) hue-rotate\(180deg\);/);
+    test('the year and month select is the themed one, whose arrow is a mask', () => {
+        expect(css).not.toMatch(/:root\[data-theme="dark"\]/);
+        expect(templateOf(read('components/atom/MilestoneReportThead/MilestoneReportThead.vue')).match(/<SelectComp\s+themed/g)).toHaveLength(2);
+        expect(templateOf(read('components/molecules/Select/Select.vue'))).toMatch(/<span v-if="themed" class="ah-mask-icon select-option__arrow"/);
     });
 
     test('the sticky head and the sticky first column sit on opaque token surfaces', () => {
