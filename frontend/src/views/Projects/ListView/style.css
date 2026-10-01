@@ -20,15 +20,15 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 0 20px 24px;
+    padding: 0 var(--page-pad-x, 20px) 24px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--gap-stack, 12px);
     font-size: var(--row-font);
 }
 
-/* The left padding is the 16px group indent plus the group card's 1px border and 12px
-   row padding, so a header label sits on exactly the same x as the cells under it. */
+/* The left padding is the 16px group indent plus the group card's 1px border and the row's
+   side padding, so a header label sits on exactly the same x as the cells under it. */
 .lv2__cols {
     position: sticky;
     top: 0;
@@ -36,9 +36,9 @@
     display: grid;
     grid-template-columns: var(--lv2-cols);
     gap: 10px;
-    padding: 14px 13px 8px 29px;
+    padding: 14px calc(var(--cell-pad-x, 12px) + 1px) 8px calc(var(--cell-pad-x, 12px) + 17px);
     background: var(--canvas);
-    font: var(--text-label);
+    font: 600 var(--fs-xs, 10.5px)/1.2 var(--font-mono);
     letter-spacing: .06em;
     text-transform: uppercase;
     color: var(--ink-label);
@@ -50,7 +50,7 @@
 .lv2__c-field { justify-self: stretch; min-width: 0; }
 .lv2__group-points::before { content: "\00b7"; margin-right: 6px; }
 
-.lv2__sprint { display: flex; flex-direction: column; gap: 12px; }
+.lv2__sprint { display: flex; flex-direction: column; gap: var(--gap-stack, 12px); }
 .lv2__sprint-head {
     display: flex;
     align-items: center;
@@ -63,8 +63,8 @@
     color: var(--ink);
     cursor: pointer;
 }
-.lv2__sprint-name { font: var(--text-h2); letter-spacing: -.3px; }
-.lv2__sprint-meta { font: var(--text-data); color: var(--ink-label); }
+.lv2__sprint-name { font: var(--fw-title, 600) calc(var(--fs-xl, 20px) - 1px)/var(--lh-tight, 1.2) var(--font-ui); letter-spacing: -.3px; }
+.lv2__sprint-meta { font: 500 var(--fs-sm, 11.5px)/1.2 var(--font-mono); color: var(--ink-label); }
 .lv2__aria-row { display: contents; }
 .lv2__sprint > .lv2__group,
 .lv2__sprint .lv2__collapsed-item { margin-left: 16px; }
@@ -73,6 +73,7 @@
     background: var(--surface);
     border: 1px solid var(--hairline);
     border-radius: var(--r-card);
+    box-shadow: var(--shadow-surface, none);
     overflow: hidden;
 }
 /* The group's select-all sits beside the header button, in line with the row checkboxes. */
@@ -90,7 +91,7 @@
     flex: 1;
     min-width: 0;
     min-height: var(--hit-min);
-    padding: var(--cell-pad-y) 12px;
+    padding: var(--cell-pad-y) var(--cell-pad-x, 12px);
     background: var(--surface);
     border: 0;
     text-align: left;
@@ -98,18 +99,18 @@
     cursor: pointer;
 }
 .lv2__caret {
-    font-size: 10px;
+    font-size: var(--fs-2xs, 10px);
     color: var(--ink-2);
     width: 10px;
     flex: none;
     transition: transform var(--t-state) var(--ease);
 }
 .lv2__caret--open { transform: rotate(90deg); }
-.lv2__caret--sprint { font-size: 8px; width: 12px; color: var(--ink-2); transform: none; }
+.lv2__caret--sprint { font-size: calc(var(--fs-2xs, 10px) - 2px); width: 12px; color: var(--ink-2); transform: none; }
 .lv2__swatch { width: 8px; height: 8px; border-radius: 2px; flex: none; background: var(--ink-3); }
-.lv2__group-name { font-weight: 600; }
-.lv2__group-meta { font: var(--text-data); color: var(--ink-label); }
-.lv2__wip { margin-left: auto; font: 500 10px/1 var(--font-mono); color: var(--warn-ink); }
+.lv2__group-name { font-weight: var(--fw-strong, 600); }
+.lv2__group-meta { font: 500 var(--fs-sm, 11.5px)/1.2 var(--font-mono); color: var(--ink-label); }
+.lv2__wip { margin-left: auto; font: 500 var(--fs-2xs, 10px)/1 var(--font-mono); color: var(--warn-ink); }
 .lv2__wip--over { color: var(--danger-ink); }
 
 /* min-height sizes the content box, so the row's padding comes off --row-h. */
@@ -119,7 +120,7 @@
     grid-template-columns: var(--lv2-cols);
     gap: 10px;
     min-height: calc(var(--row-h) - 2 * var(--cell-pad-y));
-    padding: var(--cell-pad-y) 12px;
+    padding: var(--cell-pad-y) var(--cell-pad-x, 12px);
     align-items: center;
     justify-items: end;
     border-bottom: 1px solid var(--hairline);
@@ -132,7 +133,7 @@
 .lv2__row.is-selected { --lv2-row-tint: var(--brand-tint); background: var(--lv2-row-tint); }
 .lv2__row.is-agent { box-shadow: inset 0 0 0 1.5px var(--rail); }
 .lv2__row.is-sub {
-    padding-block: max(1px, calc(var(--cell-pad-y) - 2px));
+    padding: max(1px, calc(var(--cell-pad-y) - 2px)) var(--cell-pad-x, 12px);
     font-size: calc(var(--row-font) - .5px);
     color: var(--ink-2);
 }
@@ -145,12 +146,12 @@
 .lv2__title--sub { padding-left: calc(var(--lv2-grip-w) + var(--lv2-disclose-w) + 2 * var(--sp-3) + var(--row-indent)); }
 .lv2__disclose {
     background: none; border: 0; padding: 0;
-    font-size: 10px; color: var(--ink-2); cursor: pointer; line-height: 1;
+    font-size: var(--fs-2xs, 10px); color: var(--ink-2); cursor: pointer; line-height: 1;
     width: var(--lv2-disclose-w); flex: none;
 }
 .lv2__name {
     background: none; border: 0; padding: 0;
-    font: 600 var(--row-font)/1.3 var(--font-ui);
+    font: var(--fw-strong, 600) var(--row-font)/var(--lh-snug, 1.3) var(--font-ui);
     color: var(--ink);
     cursor: pointer;
     text-align: left;
@@ -159,10 +160,10 @@
 .lv2__name:hover { color: var(--brand); }
 .lv2__row.is-sub .lv2__name { font-weight: 400; }
 .lv2__row.is-sub.is-done .lv2__name { text-decoration: line-through; color: var(--ink-2); opacity: .75; }
-.lv2__key { font: 500 10px/1 var(--font-mono); color: var(--ink-label); flex: none; }
-.lv2__timer { font: 500 10px/1 var(--font-mono); color: var(--ok-ink); display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.lv2__key { font: 500 var(--fs-2xs, 10px)/1 var(--font-mono); color: var(--ink-label); flex: none; }
+.lv2__timer { font: 500 var(--fs-2xs, 10px)/1 var(--font-mono); color: var(--ok-ink); display: inline-flex; align-items: center; gap: 4px; flex: none; }
 .lv2__agent-line {
-    font: 500 10px/1.3 var(--font-ui);
+    font: 500 var(--fs-2xs, 10px)/1.3 var(--font-ui);
     color: var(--brand);
     background: none; border: 0; padding: 0;
     cursor: pointer;
@@ -183,12 +184,12 @@
 .lv2__c-due, .lv2__c-est, .lv2__c-risk, .lv2__c-prio { white-space: nowrap; }
 .lv2__due { color: var(--ink-2); text-transform: capitalize; }
 .lv2__due--overdue { color: var(--danger); }
-.lv2__est { font: 500 11px/1 var(--font-mono); color: var(--ink); }
+.lv2__est { font: 500 var(--fs-xs, 11px)/1 var(--font-mono); color: var(--ink); }
 .lv2__row.is-sub .lv2__est { color: var(--ink-2); }
 
 .lv2__risk {
     display: inline-flex; align-items: center; gap: 5px;
-    font: 500 11px/1 var(--font-mono);
+    font: 500 var(--fs-xs, 11px)/1 var(--font-mono);
     background: none; border: 0; padding: 0;
     color: var(--ink);
     cursor: help;
@@ -200,7 +201,7 @@
 .lv2__add {
     display: flex; align-items: center; gap: 9px;
     min-height: var(--hit-min);
-    padding: calc(var(--cell-pad-y) - 1px) 12px calc(var(--cell-pad-y) - 1px) 50px;
+    padding: calc(var(--cell-pad-y) - 1px) var(--cell-pad-x, 12px) calc(var(--cell-pad-y) - 1px) 50px;
     color: var(--ink-2);
     font-size: var(--row-font);
     background: none; border: 0; width: 100%; text-align: left;
@@ -223,26 +224,26 @@
 .lv2__more-btn:disabled { color: var(--ink-2); cursor: default; }
 .lv2__more-hint { color: var(--ink-2); }
 .lv2__add-plus { color: var(--brand); }
-.lv2__create { padding: 8px 12px; }
-.lv2__template { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px; max-width: 100%; color: var(--ink-label); font: 500 11px/1.2 var(--font-ui); }
-.lv2__template-select { min-width: 0; max-width: 220px; border: 1px solid var(--border); border-radius: var(--r-input, 8px); padding: 4px 6px; background: var(--surface); color: var(--ink); font: 400 12px/1.2 var(--font-ui); }
+.lv2__create { padding: calc(var(--cell-pad-y) - 1px) var(--cell-pad-x, 12px); }
+.lv2__template { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px; max-width: 100%; color: var(--ink-label); font: 500 var(--fs-xs, 11px)/1.2 var(--font-ui); }
+.lv2__template-select { min-width: 0; max-width: 220px; border: 1px solid var(--border); border-radius: var(--r-input, 8px); padding: 4px 6px; background: var(--surface); color: var(--ink); font: 400 var(--fs-sm, 12px)/1.2 var(--font-ui); }
 .lv2__template-select:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 .lv2__first-task { width: 100%; max-width: 560px; }
 
 .lv2__collapsed-item {
     display: inline-flex; align-items: center; gap: 6px;
     align-self: flex-start;
-    background: none; border: 0; padding: 2px 12px;
+    background: none; border: 0; padding: 2px var(--cell-pad-x, 12px);
     cursor: pointer;
     color: var(--ink-2);
-    font-weight: 600;
+    font-weight: var(--fw-strong, 600);
     text-align: left;
 }
 .lv2__collapsed-item:hover { color: var(--ink); }
-.lv2__collapsed-count { font: var(--text-data); color: var(--ink-label); }
+.lv2__collapsed-count { font: 500 var(--fs-sm, 11.5px)/1.2 var(--font-mono); color: var(--ink-label); }
 
-.lv2__empty-group { margin: 0; padding: 10px 12px; color: var(--ink-2); font-size: 12px; }
-.lv2__skeleton { height: 44px; border-radius: var(--r-card); }
+.lv2__empty-group { margin: 0; padding: 10px var(--cell-pad-x, 12px); color: var(--ink-2); font-size: var(--fs-sm, 12px); }
+.lv2__skeleton { height: calc(26px + 2 * var(--cell-pad-y)); border-radius: var(--r-card); }
 
 /* Task 038 — edit from the row: status circle, inline cells, row actions. */
 .lv2__status {
@@ -271,16 +272,16 @@ button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status
     display: inline-flex; align-items: center; justify-content: center; gap: 4px;
     min-width: 24px; min-height: 24px;
     padding: 0 4px;
-    border: 0; border-radius: 6px;
+    border: 0; border-radius: var(--r-sm, 6px);
     background: none;
     color: inherit; font: inherit;
     cursor: pointer;
     white-space: nowrap;
 }
 .lv2__cell-btn:hover { background: var(--surface-hover); }
-.lv2__cell-more { font: 500 10px/1 var(--font-mono); color: var(--ink-2); }
+.lv2__cell-more { font: 500 var(--fs-2xs, 10px)/1 var(--font-mono); color: var(--ink-2); }
 .lv2__cell-empty { color: var(--ink-2); opacity: 0; transition: opacity var(--t-state) var(--ease); }
-.lv2__cell-flag { font-size: 13px; line-height: 1; }
+.lv2__cell-flag { font-size: var(--fs-md, 13px); line-height: 1; }
 .lv2__row:hover .lv2__cell-empty,
 .lv2__row:focus-within .lv2__cell-empty { opacity: 1; }
 .lv2__c-assignee-value { display: inline-flex; min-height: 24px; align-items: center; }
@@ -288,20 +289,20 @@ button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status
 .lv2__rename {
     flex: 1; min-width: 0;
     padding: 2px 6px;
-    border: 1px solid var(--brand); border-radius: 6px;
+    border: 1px solid var(--brand); border-radius: var(--r-sm, 6px);
     background: var(--surface);
     color: var(--ink);
-    font: 600 var(--row-font)/1.3 var(--font-ui);
+    font: var(--fw-strong, 600) var(--row-font)/var(--lh-snug, 1.3) var(--font-ui);
 }
 
 .lv2__actions { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; flex: none; }
 .lv2__act {
     display: inline-flex; align-items: center; justify-content: center;
     width: 24px; height: 24px;
-    padding: 0; border: 0; border-radius: 6px;
+    padding: 0; border: 0; border-radius: var(--r-sm, 6px);
     background: none;
     color: var(--ink-2);
-    font-size: 13px; line-height: 1;
+    font-size: var(--fs-md, 13px); line-height: 1;
     cursor: pointer;
     text-decoration: none;
     opacity: 0;
@@ -366,7 +367,7 @@ button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status
     .lv2__row { min-height: 44px; row-gap: 2px; }
     .lv2__add, .lv2__more { padding-left: 24px; min-height: 44px; }
     /* 16px of a 375px viewport is worth more to the task name than to the indent. */
-    .lv2__cols { padding: 12px 13px 8px; }
+    .lv2__cols { padding: 12px calc(var(--cell-pad-x, 12px) + 1px) 8px; }
     .lv2__sprint > .lv2__group,
     .lv2__sprint .lv2__collapsed-item { margin-left: 0; }
 }

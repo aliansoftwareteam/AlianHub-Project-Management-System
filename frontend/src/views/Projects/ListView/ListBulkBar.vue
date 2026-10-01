@@ -526,7 +526,7 @@ onBeforeUnmount(() => {
     align-items: center;
     padding: 0 20px;
     gap: 14px;
-    font-size: 12.5px;
+    font-size: var(--fs-md, 12.5px);
     white-space: nowrap;
     position: relative;
     z-index: 4;
@@ -562,12 +562,12 @@ onBeforeUnmount(() => {
     color: var(--rail-ink-strong);
     border-radius: 9px;
     box-shadow: var(--shadow-pop);
-    font-size: 12.5px;
+    font-size: var(--fs-md, 12.5px);
 }
 .lv2-undo__btn {
     border: 0; background: transparent; padding: 0;
     color: var(--rail-brand);
-    font: 600 12.5px/1 var(--font-ui);
+    font: 600 var(--fs-md, 12.5px)/1 var(--font-ui);
     cursor: pointer;
 }
 .lv2-undo__btn:disabled { opacity: .4; cursor: not-allowed; }
@@ -575,7 +575,7 @@ onBeforeUnmount(() => {
 .lv2-bulk__btn {
     background: none; border: 0; padding: 0;
     color: var(--rail-ink);
-    font: 400 12.5px/1 var(--font-ui);
+    font: 400 var(--fs-md, 12.5px)/1 var(--font-ui);
     cursor: pointer;
 }
 .lv2-bulk__btn:hover:not(:disabled) { color: var(--rail-ink-strong); }

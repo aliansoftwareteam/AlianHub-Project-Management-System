@@ -5,6 +5,7 @@ const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const { removeCache } = require('../../utils/commonFunctions');
 const logger = require('../../Config/loggerConfig');
 const R = require('./helpers/ptoRules');
+const { companyWeekendDays } = require('../Company/helpers/companyWeek');
 const { createNotificationsBody } = require('../notification/prepare-notification-data/controllerV2');
 const sendMail = require('../service.js');
 
@@ -144,13 +145,14 @@ exports.listPto = async (req, res) => {
         for (const u of (users || [])) {
             nameById[String(u._id)] = u.Employee_Name || `${u.Employee_FName || ''} ${u.Employee_LName || ''}`.trim() || u.Employee_Email || '';
         }
+        const weekendDays = await companyWeekendDays(companyId);
         const data = (rows || []).map((r) => {
             const o = typeof r.toObject === 'function' ? r.toObject() : r;
             // totalDays = working days in the entry's range × (hoursPerDay / full day),
             // so a half-day entry reads as 0.5 (drives the "Total Days" column).
             // createdAt: use the stored value, else derive it from the _id timestamp.
             const createdAt = o.createdAt || new Date(parseInt(String(o._id).substring(0, 8), 16) * 1000);
-            return { ...o, userName: nameById[String(o.userId)] || '', totalDays: R.leaveDays(o), createdAt };
+            return { ...o, userName: nameById[String(o.userId)] || '', totalDays: R.leaveDays(o, R.DEFAULT_HOURS_PER_DAY, weekendDays), createdAt };
         });
         return res.json({ status: true, data, total, page, pageSize });
     } catch (e) { return failed(res, 'listPto', e); }
@@ -228,6 +230,7 @@ exports.getCapacity = async (req, res) => {
         }, 'find');
         const capacity = R.computeAvailableCapacity({
             rangeStart: q.from, rangeEnd: q.to, ptoEntries: entries || [], workingHoursPerDay,
+            weekendDays: await companyWeekendDays(companyId),
         });
         return res.json({ status: true, data: { userId, from: q.from, to: q.to, ...capacity } });
     } catch (e) { return failed(res, 'getCapacity', e); }

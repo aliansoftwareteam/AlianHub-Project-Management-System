@@ -87,7 +87,7 @@ const refuseTargets = async (companyId, agent, row) => {
     if (!wants.taskId && !wants.pageProjectId) return null;
     const scope = await taskScopeFor(companyId, row.ownerId, agent);
     if (wants.taskId && !(await ownerSeesTask(companyId, scope, wants.taskId))) return 'The schedule\'s owner cannot open that task.';
-    if (wants.pageProjectId && !(await ownerSeesProject(companyId, scope, wants.pageProjectId))) return 'The schedule\'s owner cannot open that project.';
+    if (wants.pageProjectId && !(await ownerSeesProject(companyId, row.ownerId, scope, wants.pageProjectId))) return 'The schedule\'s owner cannot open that project.';
     return null;
 };
 
