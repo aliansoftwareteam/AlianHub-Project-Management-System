@@ -156,10 +156,11 @@ const make = async (companyId, p, madeBy, ip) => {
 };
 
 /* Approves the proposal as filed and, once its change is applied, keeps the approval for the same kind of change
- * by the same connection in the same project. Everything `proposals.approve` asks of the approver is asked first,
- * by it; a proposal outside the limits is left pending. */
+ * by the same connection in the same project. The approver is asked everything `proposals.approve` asks of one;
+ * a proposal outside the limits is refused before that, and left pending. */
 const approveAlways = async (companyId, id, { decider, isPrivileged, ip = '', changes: edited, viaToken = false }) => {
     if (viaToken || !decider || decider.kind !== 'human' || decider.tokenId) return refused('Only a person signed in to AlianHub makes a standing approval.', 403);
+    if (!(await seated(companyId, decider.userId))) return refused('A standing approval is made by a member of the workspace.', 403);
     if (Array.isArray(edited) && edited.length) return refused('An edited approval cannot be made a standing one.', 400);
     const proposals = require('./proposals');
     const p = plain(await proposals.get(companyId, id));

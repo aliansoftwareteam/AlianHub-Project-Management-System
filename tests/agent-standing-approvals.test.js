@@ -419,6 +419,7 @@ describe('who may make, list and remove a standing approval', () => {
     const request = (uid, method, path, extra = {}) => ({ uid, method, originalUrl: path, url: path, headers: { companyid: CID }, params: {}, query: {}, body: {}, ip: '1.1.1.1', ...extra });
     const SCRIPT = { apiToken: { _id: TOKEN, userId: OWNER, name: 'Script' } };
     const AGENT = { apiToken: { _id: TOKEN, kind: 'agent', userId: OWNER, name: 'CLI' } };
+    const RUN = { agentRun: { _id: '6f0000000000000000000a92', agentId: '6f0000000000000000000a91', agentName: 'Triage' } };
     const approve = (uid, id, body, extra) => through(agentController.approveProposal, request(uid, 'POST', `/api/v2/agents/proposals/${id}/approve`, { params: { id }, body, ...extra }));
     const listed = (uid, extra) => through(standingController.listStanding, request(uid, 'GET', `/api/v2/agents/standing-approvals/${P_OPEN}`, { params: { projectId: P_OPEN }, ...extra }));
     const removed = (uid, id, extra) => through(standingController.endStanding, request(uid, 'DELETE', `/api/v2/agents/standing-approvals/${P_OPEN}/${id}`, { params: { projectId: P_OPEN, id }, ...extra }));
@@ -451,6 +452,16 @@ describe('who may make, list and remove a standing approval', () => {
         expect(comments()).toHaveLength(0);
     });
 
+    it('a guest makes none even where a guest could approve the change once', async () => {
+        rows(SCHEMA_TYPE.RULES).filter((rule) => !rule.isParent).forEach((rule) => { rule.roles = [...rule.roles, { key: 0, permission: true }]; });
+        const once = await filed(await comment(ctx(OWNER)));
+        expect((await proposals.approve(CID, once, { decider: person(GUEST), isPrivileged: false, ip: '' })).error).toBeUndefined();
+        const id = await filed(await comment(ctx(OWNER), 'Again'));
+        expect(await always(id, GUEST)).toMatchObject({ status: 403 });
+        expect(proposalRows().find((row) => String(row._id) === id).status).toBe('pending');
+        expect(standingRows()).toHaveLength(0);
+    });
+
     it('a person who may not make the change by hand makes none', async () => {
         const id = await filed(await comment(ctx(OWNER)));
         rows(SCHEMA_TYPE.RULES).find((rule) => rule.key === 'task_comment').roles = [];
@@ -476,7 +487,7 @@ describe('who may make, list and remove a standing approval', () => {
         expect((await listed(OTHER)).body.data.rows).toHaveLength(0);
     });
 
-    it.each([['a guest', GUEST, {}], ['an API token', OWNER, SCRIPT], ['an agent\'s token', OWNER, AGENT]])('%s lists none', async (_who, uid, extra) => {
+    it.each([['a guest', GUEST, {}], ['an API token', OWNER, SCRIPT], ['an agent\'s token', OWNER, AGENT], ['an agent\'s run', OWNER, RUN]])('%s lists none', async (_who, uid, extra) => {
         await standingComment(MEMBER);
         const out = await listed(uid, extra);
         expect(out.code).toBeGreaterThanOrEqual(400);
@@ -495,11 +506,14 @@ describe('who may make, list and remove a standing approval', () => {
         ['a guest', GUEST, {}],
         ['an API token', OWNER, SCRIPT],
         ['an agent\'s token', OWNER, AGENT],
+        ['an agent\'s run', OWNER, RUN],
     ])('%s does not remove it', async (_who, uid, extra) => {
         const made = await standingComment(MEMBER);
         const out = await removed(uid, made.id, extra);
         expect(out.code).toBeGreaterThanOrEqual(400);
         expect(standingRows()[0].status).toBe('active');
+        const recorded = rows(SCHEMA_TYPE.AUDIT_LOGS).filter((row) => row.action === 'agent.action_refused' && row.meta.action === standingController.END_ACTION);
+        expect(recorded).toHaveLength(extra === AGENT || extra === RUN ? 1 : 0);
     });
 
     it('one from another project is not removed through this project', async () => {
