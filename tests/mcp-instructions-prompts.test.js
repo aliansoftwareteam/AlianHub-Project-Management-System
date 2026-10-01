@@ -134,6 +134,18 @@ describe('what a connecting agent is told', () => {
         expect(await told(managing(OWNER))).toContain('`members.list`');
     });
 
+    it('names the place tool and message to task only for a connection that can run them', async () => {
+        const plain = await told(managing(OWNER));
+        expect(plain).not.toContain('`person.place`');
+        expect(plain).not.toContain('`task.from_message`');
+        flags('MCP_TOOLS_DATA', 'MCP_TOOLS_MANAGE');
+        expect(await told(ctx(OWNER))).toContain('`person.place`');
+        expect(await told(ctx(OWNER))).not.toContain('`task.from_message`');
+        expect(await told(managing(OWNER))).toContain('`task.from_message`');
+        expect(await told(readOnly(OWNER))).toContain('`person.place`');
+        expect(await told(readOnly(OWNER))).not.toContain('`task.from_message`');
+    });
+
     it('tells a connection that only reads that it only reads, and names no tool that changes anything', async () => {
         flags('MCP_TOOLS_DATA', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK');
         for (const caller of [readOnly(OWNER), outside(OWNER, READ_SCOPES)]) {
