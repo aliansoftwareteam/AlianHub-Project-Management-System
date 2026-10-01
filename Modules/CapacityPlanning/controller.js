@@ -7,7 +7,7 @@ const pto = require('../Pto/helpers/ptoRules');   // SEC-08 — capacity = work 
 const R = require('./helpers/capacityRules');
 const { companyWeekendDays } = require('../Company/helpers/companyWeek');
 const { resolveSheetScope, scopedEstimateMatch, SHEET_PERMISSION } = require('../TimeSheet/helpers/timeScope');
-const { withoutHiddenSprintPlans } = require('../TimeSheet/helpers/planVisibility');
+const { withoutHiddenSprintPlans, namesTimeOff } = require('../TimeSheet/helpers/planVisibility');
 const { visibilityStage } = require('../Tasks/helpers/taskQueryGuard');
 
 const { sessionTenantOf, TenantError } = require('../../Config/tenant');
@@ -76,7 +76,8 @@ exports.getCapacityPlan = async (req, res) => {
                 userId: uid,
                 name: nameById[uid] || '(unknown)',
                 workCapacityHours: cap.totalCapacityHours,
-                ptoHours: cap.ptoHours,
+                unavailableHours: cap.ptoHours,
+                ptoHours: namesTimeOff(scope, uid) ? cap.ptoHours : 0,
                 ...util,
             };
         }).sort((a, b) => b.utilizationPct - a.utilizationPct);
@@ -161,10 +162,14 @@ exports.getMonthlyCapacity = async (req, res) => {
             months.forEach((m) => {
                 const b = M.monthBounds(m);
                 const cap = pto.computeAvailableCapacity({ rangeStart: b.start, rangeEnd: b.end, ptoEntries: ptoByUser[uid] || [], workingHoursPerDay: hoursPerDay, weekendDays });
+                const daysOff = hoursPerDay > 0 ? Math.round(cap.ptoHours / hoursPerDay) : 0;
+                const named = namesTimeOff(scope, uid);
                 byMonth[m] = {
                     availableHours: cap.availableHours,
-                    ptoHours: cap.ptoHours,
-                    ptoDays: hoursPerDay > 0 ? Math.round(cap.ptoHours / hoursPerDay) : 0,
+                    unavailableHours: cap.ptoHours,
+                    unavailableDays: daysOff,
+                    ptoHours: named ? cap.ptoHours : 0,
+                    ptoDays: named ? daysOff : 0,
                     committedHours: committed[`${uid}|${m}`] || 0,
                     pipelineHours: pipeline[`${uid}|${m}`] || 0,
                 };

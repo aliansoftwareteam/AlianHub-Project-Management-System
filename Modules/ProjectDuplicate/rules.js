@@ -193,7 +193,7 @@ const taskLevels = (rows) => {
 };
 
 module.exports = {
-    INLINE_TASK_LIMIT, BATCH, JOB_SOURCE, LIVE, TRASHED, OBJECT_ID, TASK_FIELDS, TASK_DATES,
-    parseRequest, newId, idOf, pick, remap, nextProjectCode, projectCopy,
+    INLINE_TASK_LIMIT, BATCH, MAX_NAME, JOB_SOURCE, LIVE, TRASHED, OBJECT_ID, PROJECT_DATES, LIST_DATES, TASK_FIELDS, TASK_DATES,
+    isPlainObject, refusal, parseRequest, newId, idOf, pick, remap, nextProjectCode, projectCopy,
     isLive, folderCopies, listCopies, ruleTargets, ruleCopy, permissionCopies, withoutPeople, taskLevels,
 };

@@ -105,7 +105,7 @@ onMounted(load);
 
 <style scoped>
 .hstand__tool {
-    width: 26px; height: 26px; display: grid; place-items: center; flex: none;
+    width: var(--control-h, 26px); height: var(--control-h, 26px); display: grid; place-items: center; flex: none;
     border: 0; border-radius: var(--r-chip); background: transparent; color: var(--ink-2); cursor: pointer;
 }
 .hstand__tool:hover { background: var(--surface-hover); color: var(--ink); }
@@ -117,17 +117,17 @@ onMounted(load);
 .hstand__heading { margin: 0; font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-label); }
 .hstand__none, .hstand__more { margin: 0; font: 400 var(--fs-sm, 12px)/1.4 var(--font-ui); color: var(--ink-2); }
 .hstand__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.hstand__line { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 3px 0; }
+.hstand__line { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 1px 0; }
 .hstand__kind {
     flex: none; min-width: 64px; padding: 2px 6px; border-radius: var(--r-chip); text-align: center;
-    font: var(--text-data); font-size: var(--fs-xs, 10.5px); background: var(--surface-2); color: var(--ink-label);
+    font: 500 var(--fs-xs, 10.5px)/1.2 var(--font-ui); background: var(--surface-2); color: var(--ink-label);
 }
 .hstand__kind--completed { background: var(--ok-bg); color: var(--ok-ink); }
 .hstand__kind--tracking { background: var(--brand-tint); color: var(--brand); }
 .hstand__kind--overdue, .hstand__kind--blocked { background: var(--danger-bg); color: var(--danger-ink); }
 .hstand__kind--due_today { background: var(--warn-bg); color: var(--warn-ink); }
 .hstand__task {
-    flex: 1 1 auto; min-width: 0; border: 0; background: transparent; padding: 2px 0; text-align: left; cursor: pointer;
+    flex: 1 1 auto; min-width: 0; min-height: var(--hit-min); border: 0; background: transparent; padding: 0; text-align: left; cursor: pointer;
     font: 400 var(--fs-md, 13px)/1.35 var(--font-ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .hstand__task:hover { color: var(--brand); }
@@ -136,6 +136,7 @@ onMounted(load);
 .hstand__source { margin: 0; font: 400 var(--fs-sm, 11.5px)/1.4 var(--font-ui); color: var(--ink-2); }
 @media (max-width: 767px) {
     .hstand__tool { width: 44px; height: 44px; }
+    .hstand__state .ah-btn--sm { min-height: var(--hit-min); }
     .hstand__line { min-height: 44px; }
 }
 </style>
