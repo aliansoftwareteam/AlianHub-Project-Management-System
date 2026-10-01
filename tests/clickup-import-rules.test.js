@@ -127,14 +127,11 @@ describe('ClickUp rows become tasks', () => {
         expect(transform().unnamedAssignees).toEqual(['Pat Example']);
     });
 
-    it('maps typed custom-field columns onto field types, and the first task defines every field', () => {
-        const first = task('Set up the billing page');
-        expect(first['custom_Story Points']).toEqual({ type: 'number', value: 5 });
-        expect(first['custom_Launch Date']).toEqual({ type: 'date', value: '2026-02-01T00:00:00.000Z' });
-        expect(first.custom_Client).toEqual({ type: 'text', value: 'Acme' });
-        expect(task('Ship the release notes').custom_Client).toEqual({ type: 'text', value: 'Globex' });
-        expect(task('Ship the release notes')['custom_Story Points']).toBeUndefined();
-        expect(Object.keys(first)).not.toContain('custom_Latest Comment');
+    it('carries each typed custom-field column as written, for the importer to plan', () => {
+        expect(task('Set up the billing page').fieldCells).toEqual({ 'Story Points (number)': '5', 'Launch Date (date)': '1769904000000', 'Client (short_text)': 'Acme' });
+        expect(task('Ship the release notes').fieldCells).toEqual({ 'Client (short_text)': 'Globex' });
+        expect(task('Write the billing tests').fieldCells).toBeUndefined();
+        expect(transform().fields.map(({ name, type }) => [name, type])).toEqual([['Story Points', 'number'], ['Launch Date', 'date'], ['Client', 'text']]);
     });
 });
 

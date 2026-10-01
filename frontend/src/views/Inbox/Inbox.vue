@@ -1,5 +1,5 @@
 <template>
-    <div class="ah-page ibx" @keydown="onKey">
+    <div class="ah-page ibx" :data-density="density" @keydown="onKey">
         <aside class="ibx__side">
             <div class="ibx__nav" role="tablist" aria-orientation="vertical" :aria-label="$t('Inbox.tabs_label')">
                 <button
@@ -60,6 +60,7 @@
                 </div>
                 <span class="ah-toolbar__spacer"></span>
                 <span class="ibx__keys ah-mono" aria-hidden="true" :title="$t('Inbox.keys_hint_full')">j k ↵ r e s</span>
+                <ViewDensityControl :model-value="density" @update:model-value="setDensity" />
                 <button
                     v-if="tab === 'primary' || tab === 'other'"
                     type="button"
@@ -104,9 +105,9 @@
                     >
                         <div class="ibx__head">
                             <span v-if="it.kind === 'reminder'" class="ibx__glyph ibx__glyph--reminder"><ShellIcon name="reminder" :size="12" /></span>
-                            <span v-else-if="it.agent" class="ah-avatar ah-avatar--agent ah-avatar--sm"><ShellIcon name="agent" :size="12" /></span>
+                            <span v-else-if="it.agent" class="ah-avatar ah-avatar--agent"><ShellIcon name="agent" :size="12" /></span>
                             <span v-else-if="it.actorId && actorOf(it)" class="ibx__avatar" :title="actorName(it)">
-                                <UserProfile :showDot="false" :isBorder="false" :data="{ image: actorImage(it), title: actorName(it) }" width="22px" thumbnail="40x40" />
+                                <UserProfile :showDot="false" :isBorder="false" :data="{ image: actorImage(it), title: actorName(it) }" width="var(--avatar-size)" thumbnail="40x40" />
                             </span>
                             <span v-else class="ibx__glyph" :class="glyphClass(it)"><ShellIcon :name="glyphIcon(it)" :size="12" /></span>
 
@@ -133,7 +134,7 @@
                                     <span v-else-if="it.taskName" class="ibx__strong">{{ it.taskName }}</span>
                                 </template>
                             </span>
-                            <span v-if="it.agent" class="ah-chip ah-chip--agent ah-chip--mono ibx__agent">{{ $t('Inbox.agent_tag') }}</span>
+                            <span v-if="it.agent" class="ah-chip ah-chip--agent ibx__agent">{{ $t('Inbox.agent_tag') }}</span>
                             <time class="ibx__when" :title="it.createdAt">{{ stamp(it.createdAt) }}</time>
                         </div>
 
@@ -305,6 +306,8 @@ import { renderNotice } from './renderNotice';
 import { SNOOZE_PRESETS, formatWhen, resolveTimeZone, snoozeTarget, toZonedInput } from './snoozePresets';
 import { laterStorageKey, migrateLegacyLater } from './laterMigration';
 import { wakeTimer } from './snoozeWake';
+import { loadInboxDensity, saveInboxDensity } from './inboxDensity';
+import ViewDensityControl from '@/views/Projects/components/columns/ViewDensityControl.vue';
 
 defineOptions({ name: 'InboxPage' });
 
@@ -340,6 +343,8 @@ const approvals = ref([]);
 const counts = ref({ primary: 0, other: 0, later: 0 });
 const loading = ref(true);
 const busy = ref(false);
+const density = ref(loadInboxDensity());
+const setDensity = (value) => { density.value = saveInboxDensity(value); };
 const loadError = ref('');
 const hasMore = ref(false);
 const nextSkip = ref(0);
@@ -901,70 +906,78 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.ibx { display: flex; height: 100%; min-height: 0; background: var(--canvas); color: var(--ink); font-family: var(--font-ui); font-size: 12.5px; }
+/* .ah-label, and the density control's legend, read --text-label: in the Inbox a label is set in the UI font. */
+.ibx {
+    --text-label: 600 var(--fs-xs, 10.5px)/var(--lh-tight, 1.2) var(--font-ui);
+    display: flex; height: 100%; min-height: 0; background: var(--canvas); color: var(--ink); font-family: var(--font-ui); font-size: var(--row-font);
+}
 
 .ibx__side {
-    width: var(--sidebar-w); flex: none; display: flex; flex-direction: column; gap: 14px;
-    padding: 14px 10px; background: var(--surface); border-right: 1px solid var(--hairline); font-size: 13px;
+    width: var(--sidebar-w); flex: none; display: flex; flex-direction: column; gap: var(--sp-6, 14px);
+    padding: var(--sp-6, 14px) var(--sp-4, 10px); background: var(--surface); border-right: 1px solid var(--hairline); font-size: var(--fs-md, 13px);
 }
 .ibx__nav, .ibx__filters { display: flex; flex-direction: column; gap: 1px; }
 .ibx__label { padding: 0 9px 4px; }
 .ibx__navitem {
-    display: flex; align-items: center; gap: 8px; width: 100%;
-    padding: 6px 9px; border: 0; border-radius: 7px; background: transparent; text-align: left;
-    font: 500 13px/1.3 var(--font-ui); color: var(--ink); cursor: pointer;
+    display: flex; align-items: center; gap: 8px; width: 100%; min-height: var(--control-h, 0px);
+    padding: 6px 9px; border: 0; border-radius: var(--r-md, 7px); background: transparent; text-align: left;
+    font: 500 var(--fs-md, 13px)/var(--lh-snug, 1.3) var(--font-ui); color: var(--ink); cursor: pointer;
     transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease);
 }
 .ibx__navitem:hover { background: var(--surface-hover); }
 .ibx__navitem:focus-visible, .ibx__tab:focus-visible { outline: none; box-shadow: var(--focus); }
 .ibx__navitem.is-active { background: var(--brand-tint); color: var(--brand); font-weight: 600; }
 .ibx__navitem--kind { font-weight: 400; }
-.ibx__navcount { margin-left: auto; background: var(--brand); color: var(--on-brand); font: 700 10px/1 var(--font-mono); padding: 3px 6px; border-radius: 9px; }
-.ibx__side-foot { margin-top: auto; padding: 0 9px; font-size: 11.5px; line-height: 1.45; color: var(--ink-2); }
+.ibx__navcount { margin-left: auto; background: var(--brand); color: var(--on-brand); font: 700 var(--fs-2xs, 10px)/1 var(--font-mono); padding: 3px 6px; border-radius: 9px; }
+.ibx__side-foot { margin-top: auto; padding: 0 9px; font-size: var(--fs-sm, 11.5px); line-height: 1.45; color: var(--ink-2); }
 
 .ibx__main { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
-.ibx__toolbar { gap: 4px; }
+.ibx .ibx__toolbar { gap: 4px; padding: 0 var(--page-pad-x, 22px); }
+/* The fallback is Home's, so the three page titles are one size in every look. */
+.ibx__toolbar .ah-toolbar__title { font: var(--fw-title, 600) var(--fs-lg, 14px)/1.2 var(--font-ui); }
 .ibx__tabs { display: flex; gap: 2px; margin-left: 10px; }
 .ibx__tab {
+    min-height: var(--hit-min);
     padding: 6px 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; border-radius: 0;
-    font: 500 12.5px/1 var(--font-ui); color: var(--ink-2); cursor: pointer; white-space: nowrap;
+    font: 500 var(--fs-md, 12.5px)/1 var(--font-ui); color: var(--ink-2); cursor: pointer; white-space: nowrap;
     transition: color var(--t-state) var(--ease), border-color var(--t-state) var(--ease);
 }
 .ibx__tab.is-active { color: var(--ink); font-weight: 600; border-bottom-color: var(--brand); }
-.ibx__tabcount { font: 500 10px/1 var(--font-mono); color: var(--ink-2); margin-left: 2px; }
-.ibx__keys { color: var(--ink-2); font-size: 10.5px; letter-spacing: .12em; }
-.ibx__markall { border: 0; background: transparent; font: 600 12px/1 var(--font-ui); color: var(--brand); cursor: pointer; padding: 8px 0 8px 10px; white-space: nowrap; }
+.ibx__tabcount { font: 500 var(--fs-2xs, 10px)/1 var(--font-mono); color: var(--ink-2); margin-left: 2px; }
+.ibx__keys { color: var(--ink-2); font-size: var(--fs-xs, 10.5px); letter-spacing: .12em; }
+.ibx__markall { min-height: var(--hit-min); border: 0; background: transparent; font: 600 var(--fs-sm, 12px)/1 var(--font-ui); color: var(--brand); cursor: pointer; padding: 0 0 0 10px; white-space: nowrap; }
 .ibx__markall:disabled { opacity: .45; cursor: default; }
 
-.ibx__list { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px 20px; display: flex; flex-direction: column; gap: 8px; }
+.ibx__list { flex: 1; min-height: 0; overflow: auto; padding: var(--page-pad-y, 12px) var(--page-pad-x, 14px) var(--sp-8, 20px); display: flex; flex-direction: column; gap: var(--sp-3, 8px); }
 .ibx__state { padding: 40px 0; text-align: center; color: var(--ink-2); display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .ibx__state--error { color: var(--danger-ink); }
 .ibx__zero { padding: 60px 0; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .ibx__zero-mark { width: 44px; height: 44px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--ok-bg); color: var(--ok-ink); margin-bottom: 8px; }
-.ibx__zero-title { font-size: 15px; font-weight: 600; }
-.ibx__zero-sub { color: var(--ink-2); margin-bottom: 8px; max-width: 420px; }
+.ibx__zero-title { font: var(--fw-title, 600) var(--fs-lg, 15px)/var(--lh-snug, 1.3) var(--font-ui); color: var(--ink); }
+.ibx__zero-sub { font-size: var(--fs-md, 12.5px); color: var(--ink-2); margin-bottom: 8px; max-width: 420px; }
 
+/* A row of the List, opened up: the same height, padding, type and avatar tokens, so compact tightens it too. */
 .ibx__card {
     position: relative;
-    background: var(--surface); border: 1px solid var(--hairline); border-left: 3px solid transparent; border-radius: 10px;
-    padding: 11px 13px; display: flex; flex-direction: column; gap: 7px; outline: none;
+    background: var(--surface); border: 1px solid var(--hairline); border-left: 3px solid transparent; border-radius: var(--r-lg, 10px);
+    padding: calc(var(--cell-pad-y, 9px) + 2px) var(--cell-pad-x, 13px); display: flex; flex-direction: column; gap: var(--gap-row, 7px); outline: none;
     transition: border-color var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease);
 }
 .ibx__card.is-mention, .ibx__card.is-approval, .ibx__card.is-reminder { border-left-color: var(--brand); }
-.ibx__card.is-agent { border-left-color: rgba(47, 57, 144, .5); }
+.ibx__card.is-agent { border-left-color: var(--agent); }
 .ibx__card.is-read { border-left-color: transparent; color: var(--ink-label); }
 .ibx__card.is-cursor, .ibx__card:focus-visible { box-shadow: var(--focus); border-color: var(--brand); }
-.ibx__head { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.ibx__avatar { display: inline-flex; width: 22px; height: 22px; flex: none; }
-.ibx__avatar :deep(.profile-image) { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
-.ibx__glyph { width: 22px; height: 22px; border-radius: 6px; display: inline-grid; place-items: center; background: var(--fill); color: var(--ink-label); flex: none; }
+.ibx__head { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: calc(var(--row-h) - 2 * var(--cell-pad-y)); }
+.ibx__avatar { display: inline-flex; width: var(--avatar-size); height: var(--avatar-size); flex: none; }
+.ibx__avatar :deep(.profile-image) { width: var(--avatar-size); height: var(--avatar-size); border-radius: 50%; object-fit: cover; }
+.ibx__glyph { width: var(--avatar-size); height: var(--avatar-size); border-radius: var(--r-sm, 6px); display: inline-grid; place-items: center; background: var(--fill); color: var(--ink-label); flex: none; }
 .ibx__glyph--reminder { border-radius: 50%; background: var(--warn-bg); color: var(--warn-ink); }
 .ibx__glyph--danger { background: var(--danger-bg); color: var(--danger-ink); }
 .ibx__what { font-weight: 400; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ibx__what strong, .ibx__strong { font-weight: 600; color: var(--ink); }
 .ibx__dim { color: var(--ink-2); font-weight: 400; }
-.ibx__agent { height: 16px; padding: 0 4px; font-size: 8.5px; letter-spacing: .04em; }
-.ibx__when { margin-left: auto; font: 500 10px/1 var(--font-mono); color: var(--ink-2); flex: none; }
+.ibx__agent { height: 16px; padding: 0 4px; font-size: var(--fs-2xs, 8.5px); letter-spacing: .04em; text-transform: uppercase; }
+.ibx__when { margin-left: auto; font: 400 var(--fs-sm, 10px)/1 var(--font-ui); color: var(--ink-2); flex: none; }
 .ibx__body { color: var(--ink-label); line-height: 1.45; overflow-wrap: anywhere; }
 .ibx__body :deep(b), .ibx__body :deep(strong) { color: var(--ink); font-weight: 600; }
 .ibx__body :deep(.mentioned) { color: var(--brand); font-weight: 600; }
@@ -973,16 +986,16 @@ onUnmounted(() => {
 .ibx__chip { margin-right: 6px; }
 .ibx__chip--snooze { background: var(--warn-bg); color: var(--warn-ink); }
 .ibx__state-line { display: flex; flex-wrap: wrap; gap: 6px; }
-.ibx__target { font: 500 10.5px/1 var(--font-mono); color: var(--ink-2); cursor: pointer; }
+.ibx__target { font: 400 var(--fs-sm, 10.5px)/1 var(--font-ui); color: var(--ink-2); cursor: pointer; }
 .ibx__target:hover { color: var(--brand); }
 .ibx__actions { display: flex; gap: 6px; flex-wrap: wrap; }
-.ibx__actions .ah-btn--sm { height: 28px; padding: 0 10px; font-size: 11.5px; }
+.ibx__actions .ah-btn--sm { height: var(--control-h, 28px); padding: 0 var(--sp-4, 10px); font-size: var(--fs-sm, 11.5px); }
 .ibx__reply { display: flex; flex-direction: column; gap: 6px; }
-.ibx__reply-input { min-height: 56px; font-size: 12.5px; }
+.ibx__reply-input { min-height: 56px; font-size: var(--fs-md, 12.5px); }
 .ibx__reply-actions { display: flex; align-items: center; gap: 6px; }
 .ibx__reply-to { color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ibx__more { align-self: center; margin-top: 6px; }
-.ibx__foot { margin-top: auto; padding-top: 12px; text-align: center; font-size: 11.5px; color: var(--ink-2); }
+.ibx__foot { margin-top: auto; padding-top: 12px; text-align: center; font-size: var(--fs-sm, 11.5px); color: var(--ink-2); }
 
 .ibx__snooze {
     position: absolute; right: 12px; top: calc(100% - 6px); z-index: 20;
@@ -990,16 +1003,16 @@ onUnmounted(() => {
 }
 .ibx__snooze-item { justify-content: space-between; }
 .ibx__snooze-item:focus-visible { outline: none; box-shadow: var(--focus); }
-.ibx__snooze-hint { font: 500 11px/1.2 var(--font-mono); color: var(--ink-2); }
+.ibx__snooze-hint { font: 400 var(--fs-sm, 11px)/1.2 var(--font-ui); color: var(--ink-2); }
 .ibx__snooze-custom { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 6px; border-top: 1px solid var(--hairline); }
 .ibx__snooze-custom .ah-btn { align-self: flex-end; }
 
 .ibx__undo {
     position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
-    display: flex; align-items: center; gap: 14px; padding: 9px 14px;
-    background: var(--rail); color: #fff; border-radius: 9px; box-shadow: var(--shadow-pop); font-size: 12.5px; white-space: nowrap;
+    display: flex; align-items: center; gap: var(--sp-6, 14px); min-height: var(--control-h-lg, 33px); padding: 0 var(--sp-6, 14px);
+    background: var(--rail); color: var(--rail-ink-strong); border-radius: var(--r-lg, 9px); box-shadow: var(--shadow-pop); font-size: var(--fs-md, 12.5px); white-space: nowrap;
 }
-.ibx__undo-btn { border: 0; background: transparent; color: #a892ff; font: 600 12.5px/1 var(--font-ui); cursor: pointer; padding: 0; }
+.ibx__undo-btn { min-height: var(--hit-min); border: 0; background: transparent; color: var(--rail-brand); font: 600 var(--fs-md, 12.5px)/1 var(--font-ui); cursor: pointer; padding: 0; }
 
 .ibx__toolbar .ibx__tabs { display: none; }
 @media (max-width: 1279px) {
@@ -1008,12 +1021,13 @@ onUnmounted(() => {
     .ibx__foot { display: block; }
 }
 @media (max-width: 767px) {
-    .ibx__toolbar { flex-wrap: wrap; height: auto; padding: 8px 12px 0; row-gap: 2px; }
+    .ibx .ibx__toolbar { flex-wrap: wrap; height: auto; padding: 8px 12px 0; row-gap: 2px; }
     .ibx__toolbar .ibx__tabs { order: 5; flex-basis: 100%; margin-left: -4px; overflow-x: auto; scrollbar-width: none; }
     .ibx__tab { height: 40px; padding: 0 10px; }
     .ibx__keys { display: none; }
     .ibx__list { padding: 10px; }
-    .ibx__actions .ah-btn--sm { height: 44px; padding: 0 14px; font-size: 13px; }
+    .ibx .ah-btn--sm { min-height: var(--hit-min); }
+    .ibx__actions .ah-btn--sm { height: 44px; padding: 0 14px; font-size: var(--fs-md, 13px); }
     .ibx__snooze { left: 8px; right: 8px; width: auto; }
     .ibx__snooze .ah-pop__item { min-height: 44px; }
 }
