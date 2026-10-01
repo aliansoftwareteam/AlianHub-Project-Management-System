@@ -14,6 +14,7 @@ const { resolveSheetScope, opensProject, SHEET_PERMISSION } = require('../../Tim
 const { actingUser } = require('../../Sprints/helpers/actingUser');
 const { escapeHtml } = require('../../../utils/escapeHtml');
 const { nonMembersOf, NOT_A_MEMBER } = require('../../../Config/companyMembers');
+const { companyOwnerOf } = require('../../Company/helpers/companyOwner');
 
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const NOT_YOUR_TIME = "You can't log or change time for this person.";
@@ -31,6 +32,9 @@ const mayWriteTimeOf = async (companyId, uid, entries) => {
 };
 
 const refuse = (res, status, statusText) => res.status(status).send({ status: false, statusText, message: statusText });
+
+/* A page that has not loaded the owner yet sends none; the entry is still written and the owner is looked up. */
+const ownerToNotify = async (companyId, body) => body.companyOwnerId || companyOwnerOf(companyId);
 
 const findEntry = (companyId, type, timeSheetId) => (OBJECT_ID.test(String(timeSheetId || ''))
     ? MongoDbCrudOpration(companyId, { type, data: [{ _id: new mongoose.Types.ObjectId(String(timeSheetId)) }] }, "findOne")
@@ -142,13 +146,6 @@ exports.manualLogTime = async (req, res) => {
         });
         return;
     }
-    if (!(req.body && req.body.companyOwnerId)) {
-        res.send({
-            status: false,
-            statusText: "companyOwnerId is required"
-        });
-        return;
-    }
     if (!(req.body && req.body.timeZone)) {
         res.send({
             status: false,
@@ -167,6 +164,7 @@ exports.manualLogTime = async (req, res) => {
     const actor = await actingUser(req);
     if (!actor) return refuse(res, 401, SIGNED_IN_REQUIRED);
     const uid = actor.id;
+    const companyOwnerId = await ownerToNotify(companyId, req.body);
     const storedEntry = req.body.isEdit === true ? await findEntry(companyId, type, req.body.timeSheetId) : null;
     const owner = String(req.body.userId || (storedEntry && storedEntry.Loggeduser) || uid);
     const allowed = await mayWriteTimeOf(companyId, uid, [
@@ -240,7 +238,7 @@ exports.manualLogTime = async (req, res) => {
                     };
                     let userDataNoti = {
                         id: uid,
-                        companyOwnerId: req.body.companyOwnerId,
+                        companyOwnerId,
                     }
                     HandleBothNotification({
                         type: 'task',
@@ -312,7 +310,7 @@ exports.manualLogTime = async (req, res) => {
 
                     let userDataNoti = {
                         id: uid,
-                        companyOwnerId: req.body.companyOwnerId,
+                        companyOwnerId,
                     }
 
                     HandleBothNotification({
@@ -437,13 +435,6 @@ exports.deleteManualLogtime = async (req, res) => {
         })
         return;
     }
-    if (!(req.body && req.body.companyOwnerId)) {
-        res.send({
-            status: false,
-            statusText: "companyOwnerId is required"
-        })
-        return;
-    }
     if (!(req.body && req.body.taskName)) {
         res.send({
             status: false,
@@ -463,6 +454,7 @@ exports.deleteManualLogtime = async (req, res) => {
     const actor = await actingUser(req);
     if (!actor) return refuse(res, 401, SIGNED_IN_REQUIRED);
     const uid = actor.id;
+    const companyOwnerId = await ownerToNotify(companyId, req.body);
     const storedEntry = await findEntry(companyId, type, req.body.timeSheetId);
     const owner = String(req.body.userId || (storedEntry && storedEntry.Loggeduser) || uid);
     const allowed = await mayWriteTimeOf(companyId, uid, [
@@ -518,7 +510,7 @@ exports.deleteManualLogtime = async (req, res) => {
                 };
                 let userDataNoti = {
                     id: uid,
-                    companyOwnerId: req.body.companyOwnerId,
+                    companyOwnerId,
                 }
                 HandleBothNotification({
                     type: 'task',

@@ -1,23 +1,129 @@
-jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn() }));
-jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(), isPrivileged: (r) => [1, 2].includes(r) }));
-const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
-const { getRoleType } = require('../Config/permissionGuard');
-const { SCHEMA_TYPE } = require('../Config/schemaType');
-const { __internals } = require('../Modules/Inbox/controller');
+const fakeMongo = require('./fixtures/fakeMongo');
 
-describe('agent proposals in the main Inbox', () => {
-    it('maps a pending proposal to a needs-you row for an owner', async () => {
-        getRoleType.mockResolvedValueOnce(1);
-        const pending = [{ _id: 'p1', agentName: 'Reporter', what: 'digest.ceo: 1 change(s) on AR-48', why: 'Board digest', changes: [{}], taskId: 't1', projectId: 'pr1', createdAt: '2026-09-04T09:36:12Z', cost: { usd: 0.003 } }];
-        MongoDbCrudOpration.mockImplementation(async (companyId, { type }) => (type === SCHEMA_TYPE.AGENT_PROPOSALS ? pending : []));
-        const rows = await __internals.readProposals('c1', 'u1');
-        expect(rows).toHaveLength(1);
-        expect(rows[0]).toMatchObject({ kind: 'proposal', sourceType: 'proposal', proposalId: 'p1', agentName: 'Reporter', changes: 1, unread: true });
-        const [, read] = MongoDbCrudOpration.mock.calls.find(([, query]) => query.type === SCHEMA_TYPE.AGENT_PROPOSALS);
-        expect(read.data[0]).toEqual({ status: 'pending' });
+const mockDb = fakeMongo.create();
+const mockRoles = {};
+const mockVisible = {};
+
+jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
+jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
+jest.mock('../Config/config', () => ({ myCache: { get: () => undefined, set: () => {}, del: () => {} } }));
+jest.mock('../Modules/notification-count/controller', () => ({ updateUnReadCommentsCountFun: jest.fn(() => Promise.resolve({ status: true })) }));
+jest.mock('../Config/permissionGuard', () => ({
+    getRoleType: jest.fn(async (companyId, uid) => (uid in mockRoles ? mockRoles[uid] : null)),
+    isPrivileged: (r) => r === 1 || r === 2,
+}));
+jest.mock('../Modules/Agents/scope', () => ({
+    visibleProjectIds: jest.fn(async (companyId, uid) => mockVisible[uid] || []),
+    visibleProjects: jest.fn(async (companyId, uid) => (mockVisible[uid] || []).map((_id) => ({ _id }))),
+}));
+
+const { SCHEMA_TYPE } = require('../Config/schemaType');
+const ctrl = require('../Modules/Inbox/controller');
+
+const C = '6f0000000000000000000c01';
+const OWNER = '6f0000000000000000000001';
+const ADMIN = '6f0000000000000000000002';
+const MEMBER = '6f0000000000000000000003';
+const GUEST = '6f0000000000000000000004';
+const STRANGER = '6f0000000000000000000005';
+const AGENT = '6f0000000000000000000a01';
+const P_OPEN = '6f0000000000000000000b01';
+const P_CLOSED = '6f0000000000000000000b02';
+const T_OPEN = '6f0000000000000000000701';
+const T_CLOSED = '6f0000000000000000000702';
+
+const comment = (taskId) => ({ action: 'task.comment', params: { taskId, body: 'Ship it' }, label: 'Comment on the task', reversible: true });
+
+const seedProposal = (what, over = {}) => mockDb.seed(SCHEMA_TYPE.AGENT_PROPOSALS, {
+    agentId: AGENT, agentName: 'Reviewer', what, why: `because ${what}`, changes: [comment(T_OPEN)], status: 'pending', gate: null,
+    taskId: T_OPEN, projectId: P_OPEN, createdAt: new Date(), ...over,
+});
+
+const res = () => { const r = { body: null }; r.status = () => r; r.send = (b) => { r.body = b; return r; }; r.json = r.send; return r; };
+const call = async (handler, uid, query = {}) => {
+    const r = res();
+    await handler({ uid, headers: { companyid: C }, query, body: {} }, r);
+    return r.body.data;
+};
+const queueOf = (uid) => ctrl.__internals.readProposals(C, uid);
+const named = (rows) => rows.map((row) => row.what).sort();
+
+beforeEach(() => {
+    Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
+    Object.assign(mockRoles, { [OWNER]: 1, [ADMIN]: 2, [MEMBER]: 3, [GUEST]: 0 });
+    Object.assign(mockVisible, { [OWNER]: [P_OPEN, P_CLOSED], [ADMIN]: [P_OPEN, P_CLOSED], [MEMBER]: [P_OPEN], [GUEST]: [P_OPEN] });
+    seedProposal('plain');
+    seedProposal('gated', { gate: 'owner_admin' });
+    seedProposal('in a closed project', { projectId: P_CLOSED, taskId: T_CLOSED, changes: [comment(T_CLOSED)] });
+    seedProposal('reaching into a closed project', { changes: [comment(T_OPEN), { action: 'task.add', params: { projectId: P_CLOSED, title: 'Follow up' }, label: 'Add a task', reversible: true }] });
+    seedProposal('from a connected agent', { source: 'mcp', requestedBy: MEMBER, agentName: 'Claude' });
+    seedProposal('already decided', { status: 'approved' });
+});
+
+describe('the approval queue in the Inbox', () => {
+    it.each([['an owner', OWNER], ['an admin', ADMIN]])('%s sees every waiting proposal, and none is locked', async (_who, uid) => {
+        const rows = await queueOf(uid);
+        expect(named(rows)).toEqual(['from a connected agent', 'gated', 'in a closed project', 'plain', 'reaching into a closed project']);
+        expect(rows.every((row) => row.locked === false)).toBe(true);
     });
-    it('shows nothing to a member who cannot approve', async () => {
-        getRoleType.mockResolvedValueOnce(3);
-        expect(await __internals.readProposals('c1', 'u2')).toEqual([]);
+
+    it('a member sees what is in a project they can open, with the owner-or-admin one locked', async () => {
+        const rows = await queueOf(MEMBER);
+        expect(named(rows)).toEqual(['from a connected agent', 'gated', 'plain']);
+        expect(rows.filter((row) => row.locked).map((row) => row.what)).toEqual(['gated']);
+    });
+
+    it('a member is not shown a proposal whose project they cannot open, nor one whose change reaches into such a project', async () => {
+        const rows = await queueOf(MEMBER);
+        expect(named(rows)).not.toContain('in a closed project');
+        expect(named(rows)).not.toContain('reaching into a closed project');
+    });
+
+    it('a member who may approve nothing sees the rows locked and a count of nought', async () => {
+        mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS].forEach((p) => { if (p.status === 'pending') p.gate = 'owner_admin'; });
+        const rows = await queueOf(MEMBER);
+        expect(rows.length).toBeGreaterThan(0);
+        expect(rows.every((row) => row.locked)).toBe(true);
+        expect((await call(ctrl.counts, MEMBER)).approval).toBe(0);
+    });
+
+    it.each([['a guest', GUEST], ['someone outside the workspace', STRANGER]])('%s is shown nothing', async (_who, uid) => {
+        expect(await queueOf(uid)).toEqual([]);
+        expect((await call(ctrl.counts, uid)).approval).toBe(0);
+    });
+
+    it('a row says who proposes, what, why and exactly what changes', async () => {
+        const row = (await queueOf(OWNER)).find((r) => r.what === 'from a connected agent');
+        expect(row).toMatchObject({
+            kind: 'proposal', sourceType: 'proposal', proposalId: row.sourceId, agentName: 'Claude', source: 'mcp', requestedBy: MEMBER,
+            why: 'because from a connected agent', editable: false, locked: false, unread: true,
+        });
+        expect(row.changes).toEqual([comment(T_OPEN)]);
+        expect((await queueOf(OWNER)).find((r) => r.what === 'plain').editable).toBe(true);
+    });
+
+    it.each([['an owner', OWNER], ['a member', MEMBER]])('for %s the count on the tab is the rows that wait for them', async (_who, uid) => {
+        const listed = await call(ctrl.list, uid, { tab: 'approval' });
+        const counts = await call(ctrl.counts, uid);
+        expect(named(listed.proposals)).toEqual(named(await queueOf(uid)));
+        expect(counts.approval).toBe(listed.proposals.filter((row) => !row.locked).length + listed.approvals.length);
+        expect(counts.approval).toBeGreaterThan(0);
+    });
+
+    it('a leave request waits in the same tab for an owner, and the count includes it', async () => {
+        const before = (await call(ctrl.counts, OWNER)).approval;
+        mockDb.seed(SCHEMA_TYPE.PTO_ENTRIES, { status: 'pending', userId: MEMBER, type: 'vacation', startDate: new Date(), endDate: new Date(), createdAt: new Date() });
+        const listed = await call(ctrl.list, OWNER, { tab: 'approval' });
+        expect(listed.approvals).toHaveLength(1);
+        expect((await call(ctrl.counts, OWNER)).approval).toBe(before + 1);
+        expect((await call(ctrl.list, MEMBER, { tab: 'approval' })).approvals).toEqual([]);
+    });
+
+    it('Primary no longer carries what waits for approval', async () => {
+        mockDb.seed(SCHEMA_TYPE.PTO_ENTRIES, { status: 'pending', userId: MEMBER, type: 'vacation', startDate: new Date(), endDate: new Date(), createdAt: new Date() });
+        const primary = await call(ctrl.list, OWNER, { tab: 'primary' });
+        expect(primary.proposals).toEqual([]);
+        expect(primary.approvals).toEqual([]);
+        expect((await call(ctrl.counts, OWNER)).primary).toBe(0);
     });
 });

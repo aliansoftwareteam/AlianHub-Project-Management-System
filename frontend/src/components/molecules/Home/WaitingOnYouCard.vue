@@ -15,7 +15,7 @@
                 </div>
                 <div class="hwait__actions">
                     <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="waiting-approve" :disabled="busy" :aria-label="$t('Home.waiting_approve_named', { what: item.what })" @click="approve(item)">{{ $t('Inbox.approve') }}</button>
-                    <button v-if="hasInbox" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="waiting-open" :aria-label="$t('Home.waiting_open_named', { what: item.what })" @click="openInbox">{{ $t('Inbox.open') }}</button>
+                    <button v-if="hasInbox" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="waiting-open" :aria-label="$t(inQueueTab(item) ? 'Inbox.queue_open_named' : 'Home.waiting_open_named', { what: item.what })" @click="openItem(item)">{{ $t('Inbox.open') }}</button>
                 </div>
             </li>
         </ul>
@@ -96,7 +96,11 @@ async function approve(item) {
     }
 }
 
-const openInbox = () => router.push({ name: "AiInbox", params: { cid: companyId?.value ?? companyId } }).catch(() => {});
+// Workflow steps are not in the Inbox's approval tab yet, so they still open where they can be answered.
+const inQueueTab = (item) => item.kind === "proposal" && router.hasRoute("inbox");
+const openItem = (item) => router.push(inQueueTab(item)
+    ? { name: "inbox", params: { cid: companyId?.value ?? companyId }, query: { tab: "approval" } }
+    : { name: "AiInbox", params: { cid: companyId?.value ?? companyId } }).catch(() => {});
 
 watch(aiOff, (off) => { if (!off && !loaded.value) load().catch(() => {}); });
 onMounted(() => { load().catch(() => {}); });

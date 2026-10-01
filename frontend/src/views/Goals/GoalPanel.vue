@@ -155,7 +155,7 @@
                 </ul>
                 <p v-else class="glp__text">{{ $t('Goals.no_targets') }}</p>
                 <template v-if="editable">
-                    <GoalTargetForm v-if="adding" class="glp__add-form" :currencies="currencies" :busy="busy" :refusal="refusal" @save="addTarget" @cancel="stopAdding" />
+                    <GoalTargetForm v-if="adding" class="glp__add-form" :currencies="currencies" :default-currency="defaultCurrency" :busy="busy" :refusal="refusal" @save="addTarget" @cancel="stopAdding" />
                     <p v-else-if="goal.targets.length >= LIMITS.targets" class="glp__text">{{ $t('Goals.targets_full', { n: LIMITS.targets }) }}</p>
                     <button v-else ref="addButton" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="glp-add-target" @click="adding = true">
                         <ShellIcon name="plus" :size="13" />{{ $t('Goals.add_target') }}
@@ -184,6 +184,7 @@ import GoalTargetForm from "./GoalTargetForm.vue";
 import { GOAL_COLORS, periodLabel } from "./goalFormat";
 import { LIMITS, checkGoal, reachedCount } from "./goalRequest";
 import { useGoalWrite } from "./useGoalWrite";
+import { companyCurrency } from "@/utils/companyCurrency";
 
 defineOptions({ name: "GoalPanel" });
 
@@ -224,6 +225,7 @@ const currencies = computed(() => [...new Map((store.getters["settings/allCurren
     .filter((currency) => CURRENCY_CODE.test(currency?.code || ""))
     .map((currency) => [currency.code, { code: currency.code, label: currency.name ? `${currency.code} · ${currency.name}` : currency.code }])).values()]
     .sort((a, b) => a.code.localeCompare(b.code)));
+const defaultCurrency = computed(() => companyCurrency(store.getters["settings/allCurrencyArray"]).code || "");
 
 const sameColor = (color) => String(goal.value.color || "").toLowerCase() === color.toLowerCase();
 

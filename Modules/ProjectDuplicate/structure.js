@@ -9,6 +9,7 @@ const { canManageRules } = require('../Automations/helpers/ruleAccess');
 const matcher = require('../Automations/engine/matcher');
 const { asList, announceFields } = require('../CustomField/helpers/fieldProjects');
 const { removeLinksOfTasks } = require('../CustomField/helpers/fieldLinkStore');
+const { defaultCurrencyOf } = require('../Company/helpers/companyCurrency');
 const rules = require('./rules');
 
 const asId = (id) => new mongoose.Types.ObjectId(String(id));
@@ -76,11 +77,6 @@ const linkCustomFields = async (companyId, fieldIds, projectId) => {
     return fieldIds;
 };
 
-/* What creating a project picks when no currency is chosen: the company's default, or none. */
-const defaultCurrency = async (companyId) => rules.currencyOf(await MongoDbCrudOpration(companyId, {
-    type: SCHEMA_TYPE.CURRENCY_LIST, data: [{ isDefault: true, isDelete: { $ne: true } }, null, { lean: true }],
-}, 'findOne'));
-
 /* Everything of a project but its tasks, written from what readSource answers. `made` names what was written, so a failure later can take it back. */
 const writeStructure = async ({ companyId, caller, bundle, name, code, include, made }) => {
     const { source } = bundle;
@@ -100,7 +96,7 @@ const writeStructure = async ({ companyId, caller, bundle, name, code, include, 
     await insert(companyId, SCHEMA_TYPE.SPRINTS, listRows);
     await insert(companyId, SCHEMA_TYPE.PROJECT_RULES, rules.permissionCopies(bundle.permissions, projectId));
 
-    const currency = rules.hasCurrency(source) ? undefined : await defaultCurrency(companyId);
+    const currency = rules.hasCurrency(source) ? undefined : await defaultCurrencyOf(companyId);
     const project = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.PROJECTS,
         data: rules.projectCopy(source, { id: projectRef, name, code: code || rules.nextProjectCode(source.ProjectCode, codes.map((row) => row.ProjectCode)), caller, companyId, include, ids, currency }),
