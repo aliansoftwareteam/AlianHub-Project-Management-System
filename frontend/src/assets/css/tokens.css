@@ -596,6 +596,11 @@ html, body, #app {
     color: var(--ink-2);
     background: var(--surface-2);
 }
+/* The key beside an action that has a shortcut. A touch device has no keyboard to press it on. */
+.ah-kbd--hint { flex: none; margin-inline-start: auto; white-space: nowrap; }
+@media (hover: none) {
+    .ah-kbd--hint { display: none; }
+}
 
 .ah-divider { height: 1px; background: var(--hairline); border: 0; margin: 0; }
 

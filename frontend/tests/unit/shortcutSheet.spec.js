@@ -67,7 +67,7 @@ const add = (html) => {
 };
 
 beforeEach(() => {
-    nav.items = [{ key: 'home', to: { name: 'Home' } }, { key: 'inbox', to: { name: 'inbox' } }];
+    nav.items = [{ key: 'home', icon: 'home', label: 'Shell.home', to: { name: 'Home' } }, { key: 'inbox', icon: 'inbox', label: 'Inbox.title', to: { name: 'inbox' } }];
     try { localStorage.clear(); } catch (e) { /* jsdom storage */ }
     setSingleKeyShortcuts(true);
     closeShortcutSheet();
@@ -120,7 +120,7 @@ describe('the ? sheet', () => {
         expect(document.activeElement).toBe(opener);
     });
 
-    it('keeps Tab inside the dialog', async () => {
+    it('has a labelled search box and a close button', async () => {
         await mountInBody(KeyboardShortcuts);
         await press('?', document.body, { shiftKey: true });
         const search = sheet().querySelector('[data-test="shortcut-search"]');
