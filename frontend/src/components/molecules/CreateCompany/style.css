@@ -11,7 +11,7 @@ ul.imageUplaod {
     gap: 30px;
 }
 .companyWrapper {
-    background: #FFFFFF;
+    background: var(--surface);
     -webkit-box-shadow: 0px 2px 12px rgb(0 0 0 / 15%);
     box-shadow: 0px 2px 12px rgb(0 0 0 / 15%);
     border-radius: 5px;
@@ -52,7 +52,7 @@ ul.imageUplaod li {
 
 
 .uploadImagewrapper ul.imageUplaod li.active div {
-    border: 2px solid #959595;
+    border: 2px solid var(--border);
     margin-bottom: 20px
 }
 .uploadImagewrapper{
@@ -60,14 +60,14 @@ ul.imageUplaod li {
     height: 180px;
     width: 180px;
     margin-left: 5px;
-    border: 2px solid #959595;
+    border: 2px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .uploadImagewrapper ul.imageUplaod li div {
-    border: 2px solid #959595;
+    border: 2px solid var(--border);
     height: 176px;
     width: 176px;
     display: -webkit-box;
@@ -152,8 +152,8 @@ ul.imageUplaod li span.no-img{
     height: 180px;
     font-size: 64px;
     display: inline-block;
-    background-color: #2f3990;
-    color: #fff;
+    background-color: var(--brand);
+    color: var(--on-brand);
     padding-top: 0px;
     border-radius: 50%;
     display: flex;
@@ -184,7 +184,7 @@ ul.imageUplaod li span.no-img{
     align-items: center;
     padding: 15px;
     justify-content: space-between;
-    border-bottom: 1px solid #DFE1E6;
+    border-bottom: 1px solid var(--border);
 }
 
 .sidebarHeader h3.primaryColor {
@@ -196,16 +196,16 @@ ul.imageUplaod li span.no-img{
 }
 
 .primaryColor {
-    color: #2F3990 !important;
+    color: var(--brand) !important;
 }
 
 .sidebar-body{
-    background-color: #f4f5f7 !important;
+    background-color: var(--canvas) !important;
 }
 
 form.createCompanyform {
     padding: 20px 20px;
-    background-color: rgba(255, 255, 255, 1);
+    background-color: var(--surface);
     margin: 15px;
     border-radius: 8px;
     height: auto;
@@ -229,8 +229,8 @@ form.createCompanyform {
 }
 
 .createCompanyform .placeholder {
-    background: #F4F5F7;
-    border: 1px dashed #959595;
+    background: var(--canvas);
+    border: 1px dashed var(--border);
     border-radius: 5px;
     font-family: var(--font-ui);
     font-size: 13px;
@@ -241,7 +241,7 @@ form.createCompanyform {
 }
 
 .placeholder {
-    background: #f0f0f0;
+    background: var(--fill);
     width: 100%;
     height: 100%;
     display: -webkit-box;
@@ -253,7 +253,7 @@ form.createCompanyform {
     -webkit-box-align: center;
     -ms-flex-align: center;
     align-items: center;
-    color: #333;
+    color: var(--ink);
     font-size: 18px;
     font-family: Helvetica;
 }
@@ -290,12 +290,12 @@ form.createCompanyform .teaminput-sidebar {
     height: 30px;
     max-width: 100%;
     width: 367px;
-    border: 1px solid #E0E0E0;
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 0px 10px;
     font-family: var(--font-ui);
     font-weight: 400;
-    color: #949DA8;
+    color: var(--ink-2);
     font-size: 13px;
     box-sizing: border-box;
 }
@@ -304,12 +304,12 @@ form.createCompanyform .teaminput-sidebar {
     height: 30px;
     max-width: 100%;
     width: 367px;
-    border: 1px solid #E0E0E0;
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 0px 10px;
     font-family: var(--font-ui);
     font-weight: 400;
-    color: #949DA8;
+    color: var(--ink-2);
     font-size: 13px;
 }
 
@@ -317,12 +317,12 @@ form.createCompanyform .teaminput-sidebar {
     border-radius: 5px 0px 0px 5px !important;
     height: 30px;
     display: inline-block;
-    border: 1px solid #DED2D9 !important;
+    border: 1px solid var(--border) !important;
     text-align: left;
 }
 
 .create_company_wrapper .dropdown {
-    border: 1px solid #E0E0E0;
+    border: 1px solid var(--border);
     height: 30px !important;
     display: flex;
     flex-direction: column;
@@ -361,13 +361,13 @@ form.createCompanyform .teaminput-sidebar {
 .white_btn.vs-button-primary.vs-button-filled,
 .white_btn {
     font-size: 16px;
-    background: #fff !important;
+    background: var(--surface) !important;
     padding: 4px 10px;
     /* width: 77px; */
     height: 30px;
     border-radius: 4px;
-    color: #2f3990;
-    border: 1px solid #2f3990;
+    color: var(--brand);
+    border: 1px solid var(--brand);
     margin-left: 15px;
     cursor: pointer;
 }
@@ -379,12 +379,12 @@ button {
 
 .blue_btn {
     font-size: 16px;
-    background: #2f3990 !important;
+    background: var(--brand) !important;
     padding: 7px 10px;
     height: 30px;
     border-radius: 4px;
     border: 0;
-    color: #fff;
+    color: var(--on-brand);
     cursor: pointer;
     margin-left: 15px;
 }

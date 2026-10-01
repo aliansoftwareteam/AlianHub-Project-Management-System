@@ -1,6 +1,6 @@
 .createCompanyform {
   padding: 20px 20px;
-  background-color: #ffffff;
+  background-color: var(--surface);
   margin: 15px;
   border-radius: 8px;
   height: auto;
@@ -13,7 +13,7 @@
 }
 
 .cloud {
-    color: rgb(56, 69, 179);
+    color: var(--brand);
     width: 145px;
     height: 20px;
     margin-top: 13px;

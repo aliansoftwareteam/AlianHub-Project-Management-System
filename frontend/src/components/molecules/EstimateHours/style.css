@@ -95,7 +95,7 @@ th.disbleDate span{
     left: 0px;
     z-index: 2;
     top: 0; 
-    background-color: rgba(0, 0, 0, 0.208);
+    background-color: var(--scrim);
 }
 @media(max-width: 767px){
     .task-detail-right-side-label .task-esitmate-hours{font-size: 16px !important;padding-right: 0 !important;}

@@ -158,7 +158,7 @@ describe('native controls follow the theme', () => {
     test('surfaces that stay white in dark keep light controls, redesigned ones inside opt back in', () => {
         const light = /:root\[data-theme="dark"\] \.ah-app__view,[^{]*\{[^}]*color-scheme:\s*light/.exec(tokens);
         expect(light).not.toBeNull();
-        for (const host of ['#my-sidebar', '.bg-white']) expect(light[0]).toContain(host);
+        for (const host of ['.bg-white', 'iframe']) expect(light[0]).toContain(host);
         const dark = /:root\[data-theme="dark"\] \.ah-app__view \.ah-page,[^{]*\{[^}]*color-scheme:\s*dark/.exec(tokens);
         expect(dark).not.toBeNull();
         for (const surface of ['.lt--page', '.pev', '.chg', '.pal-layer']) expect(dark[0]).toContain(surface);

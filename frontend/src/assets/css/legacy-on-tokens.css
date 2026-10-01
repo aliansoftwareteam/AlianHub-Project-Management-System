@@ -1,25 +1,25 @@
-/* A menu or a dialog is a token surface, but many hosts still fill it with markup that carries the
-   fixed-colour utilities of color.css, border.css, button.css and input.css. Inside those two
-   surfaces the utilities are restated on tokens, so a host reads in either theme before its own
-   markup is converted. !important only where the utility itself has it. */
-:is(.dd-tokens, .modal) :is(.black, .dark-gray, .dark-gray2, .gray4b, .color52, .color63, .darkblue) { color: var(--ink); }
-:is(.dd-tokens, .modal) :is(.gray81, .gray, .gray63, .GunPowder, .color94, .colorlightgray) { color: var(--ink-2); }
-:is(.dd-tokens, .modal) :is(.blue, .purple) { color: var(--brand) !important; }
-:is(.dd-tokens, .modal) .red { color: var(--danger-ink); }
-:is(.dd-tokens, .modal) .green { color: var(--ok-ink); }
-:is(.dd-tokens, .modal) .bg-white { background-color: var(--surface); }
-:is(.dd-tokens, .modal) :is(.bg-light-gray, .bg-light-gray-v1, .bg-lowlight-gray) { background-color: var(--surface-2); }
-:is(.dd-tokens, .modal) :is(.bg-gray91, .bg-lightgray, .bg-colorlightgray, .bg-gray, .bg-gainsboro) { background-color: var(--fill); }
-:is(.dd-tokens, .modal) .bg-blue { background-color: var(--brand); }
-:is(.dd-tokens, .modal) .bg-blue.white { color: var(--on-brand) !important; }
-:is(.dd-tokens, .modal) .hover-purple:hover { color: var(--brand) !important; }
-:is(.dd-tokens, .modal) :is(.hover-bg-lighter-gray-dropdown, .hover-bg-light-gray, .hover-bg-light-blue, .hover-bg-light-purple-v1):hover { background-color: var(--surface-hover) !important; }
-:is(.dd-tokens, .modal) :is(.border, .border-top, .border-bottom, .border-gray, .border-gray-blue, .border-bottom-mobiledrop) { border-color: var(--hairline) !important; }
-:is(.dd-tokens, .modal) .form-control { background: var(--surface); color: var(--ink) !important; border-color: var(--border); }
-:is(.dd-tokens, .modal) .form-control::placeholder { color: var(--ink-2) !important; }
-:is(.dd-tokens, .modal) .form-control:focus-visible { outline-color: var(--brand); }
-:is(.dd-tokens, .modal) .btn-primary:not(.bg-transparent) { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
-:is(.dd-tokens, .modal) .outline-primary { background: var(--brand-tint); border-color: var(--brand); color: var(--brand); }
-:is(.dd-tokens, .modal) .outline-secondary { background: var(--surface); border-color: var(--border); color: var(--ink-2); }
-:is(.dd-tokens, .modal) .btn-white { background: var(--surface); color: var(--ink); }
-:is(.dd-tokens, .modal) .btn-danger { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
+/* A menu, a dialog or a sidebar is a token surface, but many hosts still fill it with markup that
+   carries the fixed-colour utilities of color.css, border.css, button.css and input.css. Inside
+   those surfaces the utilities are restated on tokens, so a host reads in either theme before its
+   own markup is converted. !important only where the utility itself has it. */
+:is(.dd-tokens, .modal, .sb-tokens) :is(.black, .dark-gray, .dark-gray2, .gray4b, .color52, .color63, .darkblue) { color: var(--ink); }
+:is(.dd-tokens, .modal, .sb-tokens) :is(.gray81, .gray, .gray63, .GunPowder, .color94, .colorlightgray) { color: var(--ink-2); }
+:is(.dd-tokens, .modal, .sb-tokens) :is(.blue, .purple) { color: var(--brand) !important; }
+:is(.dd-tokens, .modal, .sb-tokens) :is(.red, .text-red) { color: var(--danger-ink); }
+:is(.dd-tokens, .modal, .sb-tokens) .green { color: var(--ok-ink); }
+:is(.dd-tokens, .modal, .sb-tokens) .bg-white { background-color: var(--surface); }
+:is(.dd-tokens, .modal, .sb-tokens) :is(.bg-light-gray, .bg-light-gray-v1, .bg-lowlight-gray) { background-color: var(--surface-2); }
+:is(.dd-tokens, .modal, .sb-tokens) :is(.bg-gray91, .bg-lightgray, .bg-colorlightgray, .bg-gray, .bg-gainsboro) { background-color: var(--fill); }
+:is(.dd-tokens, .modal, .sb-tokens) .bg-blue { background-color: var(--brand); }
+:is(.dd-tokens, .modal, .sb-tokens) .bg-blue.white { color: var(--on-brand) !important; }
+:is(.dd-tokens, .modal, .sb-tokens) .hover-purple:hover { color: var(--brand) !important; }
+:is(.dd-tokens, .modal, .sb-tokens) :is(.hover-bg-lighter-gray-dropdown, .hover-bg-light-gray, .hover-bg-light-blue, .hover-bg-light-purple-v1):hover { background-color: var(--surface-hover) !important; }
+:is(.dd-tokens, .modal, .sb-tokens) :is(.border, .border-top, .border-bottom, .border-gray, .border-gray-blue, .border-bottom-mobiledrop) { border-color: var(--hairline) !important; }
+:is(.dd-tokens, .modal, .sb-tokens) .form-control { background: var(--surface); color: var(--ink) !important; border-color: var(--border); }
+:is(.dd-tokens, .modal, .sb-tokens) .form-control::placeholder { color: var(--ink-2) !important; }
+:is(.dd-tokens, .modal, .sb-tokens) .form-control:focus-visible { outline-color: var(--brand); }
+:is(.dd-tokens, .modal, .sb-tokens) .btn-primary:not(.bg-transparent) { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+:is(.dd-tokens, .modal, .sb-tokens) .outline-primary { background: var(--brand-tint); border-color: var(--brand); color: var(--brand); }
+:is(.dd-tokens, .modal, .sb-tokens) .outline-secondary { background: var(--surface); border-color: var(--border); color: var(--ink-2); }
+:is(.dd-tokens, .modal, .sb-tokens) .btn-white { background: var(--surface); color: var(--ink); }
+:is(.dd-tokens, .modal, .sb-tokens) .btn-danger { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }

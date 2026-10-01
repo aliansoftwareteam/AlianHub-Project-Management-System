@@ -681,8 +681,8 @@ function confirmData () {
 }
 input.statusInputText.form-control.edit-input:focus-visible{outline-color: none !important;}
 
-/* The three forms inside are shared with hosts that still paint a white page, so they keep their
-   light literals; this sidebar is a token surface and restates them here, scoped to its panel. */
+/* The three forms inside are shared with the template sidebars; here each sits on a card over the
+   canvas, so their colours are restated scoped to the panel. */
 .pss__setting-body { background: var(--canvas); color: var(--ink); }
 .pss__setting-panel {
     --tsf-selected: var(--brand);

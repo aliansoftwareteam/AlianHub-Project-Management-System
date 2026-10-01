@@ -164,7 +164,7 @@
 .circlegreen {
   width: 10px;
   height: 10px;
-  background-color: #1CB303;
+  background-color: var(--ok);
   border-radius: 50%;
   margin-right:6px;
   margin-top:4px;
@@ -172,7 +172,7 @@
 .circlePurple {
   width: 10px;
   height: 10px;
-  background-color: #7367F0;
+  background-color: var(--agent);
   border-radius: 50%;
   margin-right:6px;
   margin-top:4px;
@@ -186,9 +186,9 @@
     padding: 20px;
 }
 .logdetailview-calender-wrapper{
-    border:1px solid #DFE1E6;
+    border:1px solid var(--border);
     height: 30px;
-    background-color: #FFFFFF;
+    background-color: var(--surface);
 }
 .logdetailview-header-time-wrapper{
     width: 375px;
@@ -214,8 +214,8 @@
     font-weight: 700;
 }
 .checkboxBlue {
-    background-color: #2F3990 !important;
-    border: 1px solid #2F3990 !important;
+    background-color: var(--brand) !important;
+    border: 1px solid var(--brand) !important;
 }
 .logdetailview__wrapper{
     width:200px;

@@ -531,11 +531,10 @@ html, body, #app {
 :root[data-theme="dark"] .ah-app__view { color: #17161c; }
 :root[data-theme="dark"] .ah-app__view .ah-page { color: var(--ink); }
 /* color-scheme is what themes native controls, their picker popups and plain scrollbars. A surface
-   that stays white in dark (a legacy view, a legacy sidebar, a white card) keeps light ones: an
+   that stays white in dark (a legacy view, a white card) keeps light ones: an
    unstyled .form-control would otherwise turn into a dark box on white. An iframe keeps light too,
    or the browser paints an opaque canvas behind a page that set none. */
 :root[data-theme="dark"] .ah-app__view,
-:root[data-theme="dark"] #my-sidebar,
 :root[data-theme="dark"] .bg-white,
 :root[data-theme="dark"] iframe { color-scheme: light; }
 :root[data-theme="dark"] .ah-app__view .ah-page,

@@ -3,7 +3,7 @@ input.status__color-input {
     top: 9px;
 }
 .add_status{
-    color: #3845B3;
+    color: var(--brand);
     padding-right: 20px;
 }
 .greenCheck_sidebar{

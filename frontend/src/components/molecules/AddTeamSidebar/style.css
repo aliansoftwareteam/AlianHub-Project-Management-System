@@ -1,5 +1,5 @@
 .cancelButtonTeam{
-    border: 1px solid #2F3990;
+    border: 1px solid var(--brand);
     border-radius: 4px;
     height: 30px;
     padding: 3px 14px;
@@ -14,7 +14,7 @@
     font-family: var(--font-ui);
     font-weight: 500;
     font-size: 14px;
-    color: #3A3A3A;
+    color: var(--ink);
     min-width: 150px;
 }
 
@@ -36,7 +36,7 @@ form.createteamSiebarform {
     border-radius: 2px;
 }
 .ul-color-sidebar{
-    list-style-type : none;
+    list-style-type: none;
     padding: 0px;
     margin: 0 auto;
     height: auto;
@@ -44,23 +44,27 @@ form.createteamSiebarform {
     max-width: 100%;
 }
 .createteamSiebarform .ul-colors li.active{
-    border: 1px solid #000;
+    border: 1px solid var(--ink);
 }
 .blue_btn_save{
     font-size: 16px;
-    background: #2f3990 !important;
+    background: var(--brand) !important;
     padding: 7px 10px;
     border-radius: 4px;
     margin-left: auto;
     display: block;
     font-family: var(--font-ui);
 }
+.blue_btn_save.white {
+    color: var(--on-brand) !important;
+}
 
 .blue_btn_save.disable-btn {
-    background: #959595 !important;
+    background: var(--fill) !important;
+    color: var(--ink-2) !important;
 }
-.mainTeamSidebar .black.sidebar-body.bg-white {
-    background-color: #F4F5F7;
+.mainTeamSidebar .sidebar-body {
+    background-color: var(--canvas);
 }
 .teaminput-sidebar{
     width: 100%;
