@@ -3541,6 +3541,7 @@ export default {
         col_project: "Project",
         col_when: "Deleted",
         restore: "Restore",
+        restore_named: "Restore {name}",
         restored: "Restored.",
         restore_failed: "Could not restore that item.",
         load_failed: "Could not load the trash.",

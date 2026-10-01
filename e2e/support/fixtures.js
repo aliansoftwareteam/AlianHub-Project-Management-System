@@ -166,6 +166,18 @@ async function createTask(api, { project, name, user, companyOwnerId, assigneeId
     return { _id: String(body.id), name: res.body && name, projectId: String(project._id), sprintId };
 }
 
+async function readTask(api, taskId) {
+    const res = await api.get(`/api/v1/task/${taskId}`);
+    return (res.body && (res.body.data || res.body)) || {};
+}
+
+async function findTasksByName(api, projectId, name) {
+    const res = await api.post('/api/v1/task/find', {
+        findQuery: { $match: { $or: [{ objId: { ProjectID: projectId } }, { ProjectID: projectId }], TaskName: name, deletedStatusKey: 0 } },
+    });
+    return Array.isArray(res.body) ? res.body : [];
+}
+
 const pickProject = (project) => ({ _id: String(project._id), name: project.ProjectName, code: project.ProjectCode, isPrivate: Boolean(project.isPrivateSpace) });
 
 async function createFixtures(baseURL) {
@@ -237,12 +249,14 @@ module.exports = {
     createProject,
     createTask,
     emailFor,
+    findTasksByName,
     firstSprint,
     inviteMember,
     listSprints,
     login,
     loginAs,
     readState,
+    readTask,
     storageStatePath,
     uniqueSuffix,
     writeState,
