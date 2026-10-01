@@ -1,6 +1,8 @@
 /* The Calendar's sprint strip gives every sprint that overlaps another its own lane, so two sprints with the
    same dates are stacked, not drawn on top of each other. The real component; only HTTP is a stand-in. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { config, flushPromises, mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import { ref } from 'vue';
@@ -72,8 +74,9 @@ describe('the sprint strip of the calendar', () => {
         expect(stripLanes()).toBe(1);
     });
 
-    it('draws the strip on a phone too', async () => {
-        await openCalendar({ a: sprint('a', 'First', 1, 7) });
-        expect(wrapper.find('.cv__bands').exists()).toBe(true);
+    it('is not hidden on a phone and truncates a long label with an ellipsis', () => {
+        const css = readFileSync(resolve(__dirname, '../../src/views/Projects/ProjectCalendarView/style.css'), 'utf8');
+        expect(css).not.toMatch(/\.cv__bands\s*\{\s*display:\s*none/);
+        expect(css).toMatch(/\.cv__band\s*\{[^}]*text-overflow:\s*ellipsis/);
     });
 });
