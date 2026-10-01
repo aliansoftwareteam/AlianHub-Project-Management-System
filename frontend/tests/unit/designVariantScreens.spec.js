@@ -113,7 +113,7 @@ describe('the reference screens take their density, type and elevation from the 
 
         [LIST, '.lv2__scroll', 'padding', ['--page-pad-x']],
         [LIST, '.lv2__scroll', 'gap', ['--gap-stack']],
-        [LIST, '.lv2__scroll', 'font-size', ['--fs-md']],
+        [LIST, '.lv2__scroll', 'font-size', ['--row-font']],
         [LIST, '.lv2__cols', 'padding', ['--cell-pad-x']],
         [LIST, '.lv2__cols', 'font', ['--fs-xs']],
         [LIST, '.lv2__sprint-name', 'font', ['--fw-title', '--fs-xl']],
@@ -122,9 +122,11 @@ describe('the reference screens take their density, type and elevation from the 
         [LIST, '.lv2__row', 'padding', ['--cell-pad-y', '--cell-pad-x']],
         [LIST, '.lv2__row', 'min-height', ['--row-h', '--cell-pad-y']],
         [LIST, '.lv2__row.is-sub', 'padding', ['--cell-pad-y', '--cell-pad-x']],
-        [LIST, '.lv2__name', 'font', ['--fw-strong', '--fs-md', '--lh-snug']],
+        [LIST, '.lv2__name', 'font', ['--fw-strong', '--row-font', '--lh-snug']],
+        [LIST, '.lv2__rename', 'font', ['--fw-strong', '--row-font', '--lh-snug']],
         [LIST, '.lv2__add', 'padding', ['--cell-pad-y', '--cell-pad-x']],
-        [LIST, '.lv2__skeleton', 'height', ['--row-h']],
+        [LIST, '.lv2__add', 'font-size', ['--row-font']],
+        [LIST, '.lv2__skeleton', 'height', ['--cell-pad-y']],
         [LIST, '.lv2__group', 'border-radius', ['--r-card']],
 
         [PANEL, '.ah-detail__panel', 'box-shadow', ['--shadow-panel']],

@@ -22,7 +22,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--gap-stack, 12px);
-    font-size: var(--fs-md, 12.5px);
+    font-size: var(--row-font, 12.5px);
 }
 
 /* The left padding is the 16px group indent plus the group card's 1px border and the row's
@@ -101,11 +101,12 @@
 .lv2__wip { margin-left: auto; font: 500 var(--fs-2xs, 10px)/1 var(--font-mono); color: var(--warn-ink); }
 .lv2__wip--over { color: var(--danger-ink); }
 
+/* min-height sizes the content box, so the row's padding comes off --row-h. */
 .lv2__row {
     display: grid;
     grid-template-columns: var(--lv2-cols);
     gap: 10px;
-    min-height: calc(var(--row-h, 42px) - 2 * var(--cell-pad-y, 9px));
+    min-height: calc(var(--row-h, 36px) - 2 * var(--cell-pad-y, 9px));
     padding: var(--cell-pad-y, 9px) var(--cell-pad-x, 12px);
     align-items: center;
     justify-items: end;
@@ -119,8 +120,8 @@
 .lv2__row.is-selected { background: var(--brand-tint); }
 .lv2__row.is-agent { box-shadow: inset 0 0 0 1.5px var(--rail); }
 .lv2__row.is-sub {
-    padding: calc(var(--cell-pad-y, 9px) - 2px) var(--cell-pad-x, 12px);
-    font-size: var(--fs-sm, 12px);
+    padding: max(1px, calc(var(--cell-pad-y, 9px) - 2px)) var(--cell-pad-x, 12px);
+    font-size: calc(var(--row-font, 12.5px) - .5px);
     color: var(--ink-2);
 }
 .lv2__row:last-child { border-bottom: 0; }
@@ -135,7 +136,7 @@
 }
 .lv2__name {
     background: none; border: 0; padding: 0;
-    font: var(--fw-strong, 600) var(--fs-md, 12.5px)/var(--lh-snug, 1.3) var(--font-ui);
+    font: var(--fw-strong, 600) var(--row-font, 12.5px)/var(--lh-snug, 1.3) var(--font-ui);
     color: var(--ink);
     cursor: pointer;
     text-align: left;
@@ -183,15 +184,15 @@
 
 .lv2__add {
     display: flex; align-items: center; gap: 9px;
-    padding: var(--cell-pad-y, 8px) var(--cell-pad-x, 12px) var(--cell-pad-y, 8px) 50px;
+    padding: calc(var(--cell-pad-y, 9px) - 1px) var(--cell-pad-x, 12px) calc(var(--cell-pad-y, 9px) - 1px) 50px;
     color: var(--ink-2);
-    font-size: var(--fs-md, 12.5px);
+    font-size: var(--row-font, 12.5px);
     background: none; border: 0; width: 100%; text-align: left;
     cursor: pointer;
 }
 .lv2__add:hover { color: var(--ink-2); background: var(--surface-hover); }
 .lv2__add-plus { color: var(--brand); }
-.lv2__create { padding: var(--cell-pad-y, 8px) var(--cell-pad-x, 12px); }
+.lv2__create { padding: calc(var(--cell-pad-y, 9px) - 1px) var(--cell-pad-x, 12px); }
 .lv2__template { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px; max-width: 100%; color: var(--ink-label); font: 500 var(--fs-xs, 11px)/1.2 var(--font-ui); }
 .lv2__template-select { min-width: 0; max-width: 220px; border: 1px solid var(--border); border-radius: var(--r-input, 8px); padding: 4px 6px; background: var(--surface); color: var(--ink); font: 400 var(--fs-sm, 12px)/1.2 var(--font-ui); }
 .lv2__template-select:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
@@ -210,7 +211,7 @@
 .lv2__collapsed-count { font: 500 var(--fs-sm, 11.5px)/1.2 var(--font-mono); color: var(--ink-label); }
 
 .lv2__empty-group { margin: 0; padding: 10px var(--cell-pad-x, 12px); color: var(--ink-2); font-size: var(--fs-sm, 12px); }
-.lv2__skeleton { height: var(--row-h, 44px); border-radius: var(--r-card); }
+.lv2__skeleton { height: calc(26px + 2 * var(--cell-pad-y, 9px)); border-radius: var(--r-card); }
 
 /* Task 038 — edit from the row: status circle, inline cells, row actions. */
 .lv2__status {
@@ -259,7 +260,7 @@ button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status
     border: 1px solid var(--brand); border-radius: var(--r-sm, 6px);
     background: var(--surface);
     color: var(--ink);
-    font: var(--fw-strong, 600) var(--fs-md, 12.5px)/var(--lh-snug, 1.3) var(--font-ui);
+    font: var(--fw-strong, 600) var(--row-font, 12.5px)/var(--lh-snug, 1.3) var(--font-ui);
 }
 
 .lv2__actions { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; flex: none; }

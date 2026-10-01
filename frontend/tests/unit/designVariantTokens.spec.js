@@ -64,7 +64,7 @@ describe('the three design variants', () => {
             '--sp-1', '--sp-2', '--sp-3', '--sp-4', '--sp-5', '--sp-6', '--sp-7', '--sp-8', '--sp-9',
             '--r-chip', '--r-input', '--r-card', '--r-modal',
             '--shadow-card', '--shadow-pop', '--shadow-panel',
-            '--row-h', '--cell-pad-y', '--cell-pad-x',
+            '--row-h', '--row-font', '--cell-pad-y', '--cell-pad-x',
             '--control-h-sm', '--control-h', '--control-h-lg', '--toolbar-h',
         ];
         expect(needed.filter((name) => !(name in variant.a))).toEqual([]);
@@ -145,8 +145,9 @@ describe('with no variant chosen', () => {
 
     it('the variant-only tokens stay undefined on :root', () => {
         expect(variantOnly.length).toBeGreaterThan(10);
-        expect(variantOnly).toContain('--row-h');
-        expect(variantOnly).toContain('--cell-pad-y');
+        ['--fs-md', '--fw-title', '--r-lg', '--shadow-panel', '--control-h', '--card-pad-y', '--page-pad-x'].forEach((name) => {
+            expect(variantOnly).toContain(name);
+        });
     });
 
     it('every use of a variant-only token falls back to today\'s value', () => {
@@ -155,6 +156,14 @@ describe('with no variant chosen', () => {
             if (new RegExp(`var\\(\\s*${name}\\s*\\)`).test(css)) bare.push(name);
         }));
         expect(bare).toEqual([]);
+    });
+
+    /* The List density setting defines these on :root at today's sizes. One fallback everywhere
+       means the screens look the same whether or not it has landed. */
+    it.each([['--row-h', '36px'], ['--cell-pad-y', '9px'], ['--row-font', '12.5px']])('%s falls back to %s wherever it is read', (name, value) => {
+        const fallbacks = SCREENS.flatMap((rel) => [...read(rel).matchAll(new RegExp(`var\\(${name}, ([^)]+)\\)`, 'g'))].map((m) => m[1]));
+        expect(fallbacks.length).toBeGreaterThan(0);
+        expect([...new Set(fallbacks)]).toEqual([value]);
     });
 
     it('every token a screen reads with a fallback is one the variants set', () => {
