@@ -8,6 +8,7 @@ const { readToken, userIdOf } = require('./atlas/session');
 const { resolveParams } = require('./atlas/params');
 const { decide } = require('./atlas/readOnly');
 const { galleryHtml } = require('./atlas/gallery');
+const { newBudget, noteBudget, roomToLoad } = require('./atlas/pace');
 
 const ROOT = path.resolve(__dirname, '..');
 const NAVIGATION_TIMEOUT_MS = 45000;
@@ -20,7 +21,7 @@ const BUSY = '[class*="skeleton"], [class*="skelaton"], [class*="spinner"], .lds
 const SOCKET_PATH = '/socket.io/';
 const SHELL = '.ah-app';
 const SHELL_TIMEOUT_MS = 30000;
-const ATTEMPTS = 2;
+const ATTEMPTS = 3;
 const BLOCKED_BODY = JSON.stringify({ status: false, statusText: 'Blocked', message: 'The screenshot atlas is read-only.' });
 
 const firstLine = (error) => String((error && error.message) || error).split('\n')[0];
@@ -147,6 +148,12 @@ async function runStep(page, step) {
     throw new Error(`Unknown step "${step.action}"`);
 }
 
+class RateLimited extends Error {
+    constructor() {
+        super('The server\'s rate limit cut this screen short.');
+    }
+}
+
 class SessionRefused extends Error {
     constructor() {
         super('The session was refused: the app went to sign-in. A demo token lasts an hour.');
@@ -165,8 +172,14 @@ async function shellOrSignIn(page) {
     }
 }
 
-async function capture(context, { baseUrl, screen, route, file }) {
+async function capture(context, { baseUrl, screen, route, file, budget }) {
     const page = await context.newPage();
+    let limited = false;
+    page.on('response', (response) => {
+        if (!response.url().startsWith(`${baseUrl}/`)) return;
+        noteBudget(budget, response.headers());
+        if (response.status() === 429) limited = true;
+    });
     try {
         await page.goto(`${baseUrl}/#${route}`, { waitUntil: 'load', timeout: NAVIGATION_TIMEOUT_MS });
         if (screen.auth !== false) await shellOrSignIn(page);
@@ -176,6 +189,7 @@ async function capture(context, { baseUrl, screen, route, file }) {
         await page.evaluate(() => document.fonts.ready.then(() => true));
 
         const landed = routeOf(page.url());
+        if (limited) throw new RateLimited();
         if (screen.auth !== false && landed.startsWith('/login')) throw new SessionRefused();
         await page.screenshot({ path: file, animations: 'disabled', caret: 'hide' });
         const wanted = route.split('?')[0].replace(/\/$/, '') || '/';
@@ -188,10 +202,12 @@ async function capture(context, { baseUrl, screen, route, file }) {
 
 async function captureWithRetry(context, job) {
     for (let attempt = 1; ; attempt += 1) {
+        await roomToLoad(job.budget);
         try {
             return await capture(context, job);
         } catch (error) {
             if (error instanceof SessionRefused || attempt >= ATTEMPTS) throw error;
+            if (error instanceof RateLimited) await roomToLoad(job.budget, { reserve: Infinity });
         }
     }
 }
@@ -217,15 +233,21 @@ function mergeWithEarlierRun(outDir, shots, failures) {
     return { shots: [...kept(earlier.shots), ...shots], failures: [...kept(earlier.failures), ...failures] };
 }
 
+/* The folder is the record: every shot on disk is listed, so a run that was cut short
+ * still gets a gallery from the next one. atlas.json only adds the notes. */
 function writeIndex(outDir, { meta, shots, failures }) {
-    const onDisk = new Set(fs.readdirSync(outDir).filter(parseFileName));
+    const notes = new Map(shots.filter((shot) => shot.note).map((shot) => [shot.file, shot.note]));
     const order = SCREENS.map((screen) => screen.name);
-    const listed = shots.filter((shot) => onDisk.has(shot.file)).sort((a, b) => order.indexOf(a.screen) - order.indexOf(b.screen) || a.size.localeCompare(b.size) || a.theme.localeCompare(b.theme));
-    fs.writeFileSync(path.join(outDir, 'atlas.json'), `${JSON.stringify({ ...meta, shots: listed, failures }, null, 2)}\n`);
+    const listed = fs.readdirSync(outDir).filter(parseFileName)
+        .map((file) => ({ ...parseFileName(file), file, ...(notes.has(file) ? { note: notes.get(file) } : {}) }))
+        .sort((a, b) => order.indexOf(a.screen) - order.indexOf(b.screen) || a.size.localeCompare(b.size) || a.theme.localeCompare(b.theme));
+    const onDisk = new Set(listed.map(keyOf));
+    const stillFailing = failures.filter((failure) => !onDisk.has(keyOf(failure)));
+    fs.writeFileSync(path.join(outDir, 'atlas.json'), `${JSON.stringify({ ...meta, shots: listed, failures: stillFailing }, null, 2)}\n`);
     fs.writeFileSync(path.join(outDir, 'index.html'), galleryHtml({
         title: `Screenshot atlas${meta.variant ? ` (variant ${meta.variant})` : ''}`,
         shots: listed,
-        failures,
+        failures: stillFailing,
         meta: [meta.version && `build ${meta.version}`, meta.baseUrl, meta.createdAt],
     }));
     return listed.length;
@@ -236,6 +258,7 @@ async function main() {
     const screens = selectScreens(args.only);
     const outDir = path.resolve(args.out || path.join(ROOT, 'artifacts', 'atlas', `${timestamp()}${args.variant ? `-variant-${args.variant}` : ''}`));
 
+    const budget = newBudget();
     let session = null;
     let params = {};
     let problems = {};
@@ -243,7 +266,7 @@ async function main() {
         const token = readToken({ tokenFile: args.tokenFile });
         const uid = userIdOf(token);
         const wanted = [...new Set(screens.flatMap((screen) => paramsOf(screen.route)))];
-        ({ params, problems } = await resolveParams({ baseUrl: args.baseUrl, token, uid, wanted, companyHint: args.company, projectHint: args.project }));
+        ({ params, problems } = await resolveParams({ baseUrl: args.baseUrl, token, uid, wanted, companyHint: args.company, projectHint: args.project, budget }));
         session = { token, uid, cid: params.cid };
     }
 
@@ -267,7 +290,7 @@ async function main() {
                     }
                     const file = fileName(entry);
                     try {
-                        const result = await captureWithRetry(screen.auth === false ? signedOut : signedIn, { baseUrl: args.baseUrl, screen, route, file: path.join(outDir, file) });
+                        const result = await captureWithRetry(screen.auth === false ? signedOut : signedIn, { baseUrl: args.baseUrl, screen, route, file: path.join(outDir, file), budget });
                         shots.push({ ...entry, file, ...result });
                         process.stdout.write(`ok    ${file}${result.note ? `  (${result.note})` : ''}\n`);
                     } catch (error) {

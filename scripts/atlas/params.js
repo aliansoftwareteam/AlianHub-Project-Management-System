@@ -1,8 +1,11 @@
 const { decide } = require('./readOnly');
+const { newBudget, noteBudget, roomToLoad, sleep } = require('./pace');
+
+const LOOKUP_ATTEMPTS = 3;
 
 /* The script's own lookups go through the same filter as the browser's requests,
  * so it cannot write either. */
-function createReader({ baseUrl, token, companyId = null, fetchImpl = fetch }) {
+function createReader({ baseUrl, token, companyId = null, fetchImpl = fetch, budget = newBudget(), pause = sleep }) {
     return async function read(method, urlPath, body) {
         const url = `${baseUrl}${urlPath}`;
         const verdict = decide({ method, url, body }, { baseUrl });
@@ -10,9 +13,13 @@ function createReader({ baseUrl, token, companyId = null, fetchImpl = fetch }) {
         const headers = { accept: 'application/json', authorization: `Bearer ${token}` };
         if (companyId) headers.companyid = companyId;
         if (body !== undefined) headers['content-type'] = 'application/json';
-        const response = await fetchImpl(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
-        if (!response.ok) throw new Error(`${method} ${urlPath} answered ${response.status}`);
-        return response.json();
+        for (let attempt = 1; ; attempt += 1) {
+            const response = await fetchImpl(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+            if (response.headers) noteBudget(budget, Object.fromEntries(response.headers));
+            if (response.ok) return response.json();
+            if (response.status !== 429 || attempt >= LOOKUP_ATTEMPTS) throw new Error(`${method} ${urlPath} answered ${response.status}`);
+            await roomToLoad(budget, { reserve: Infinity, pause });
+        }
     };
 }
 
@@ -32,9 +39,9 @@ function pickProject(projects, hint = null) {
     return [...open].sort((a, b) => views(b) - views(a) || oldestFirst(a, b))[0] || null;
 }
 
-async function resolveCompany({ baseUrl, token, uid, hint, fetchImpl }) {
+async function resolveCompany({ baseUrl, token, uid, hint, fetchImpl, budget }) {
     if (hint) return hint;
-    const user = await createReader({ baseUrl, token, fetchImpl })('GET', `/api/v1/user/${uid}`);
+    const user = await createReader({ baseUrl, token, fetchImpl, budget })('GET', `/api/v1/user/${uid}`);
     const companies = (user && user.AssignCompany) || [];
     if (companies.length === 1) return String(companies[0]);
     throw new Error(companies.length ? 'This account belongs to several workspaces. Pass --company <companyId>.' : 'This account belongs to no workspace.');
@@ -79,9 +86,9 @@ LOOKUPS.sprintId = LOOKUPS.taskId;
 
 const ORDER = ['projectId', 'taskId', 'sprintId', 'pageId', 'dashboardId', 'agentId'];
 
-async function resolveParams({ baseUrl, token, uid, wanted, companyHint = null, projectHint = null, fetchImpl = fetch }) {
-    const cid = await resolveCompany({ baseUrl, token, uid, hint: companyHint, fetchImpl });
-    const read = createReader({ baseUrl, token, companyId: cid, fetchImpl });
+async function resolveParams({ baseUrl, token, uid, wanted, companyHint = null, projectHint = null, fetchImpl = fetch, budget = newBudget() }) {
+    const cid = await resolveCompany({ baseUrl, token, uid, hint: companyHint, fetchImpl, budget });
+    const read = createReader({ baseUrl, token, companyId: cid, fetchImpl, budget });
     const params = { cid };
     const problems = {};
     for (const name of ORDER.filter((candidate) => wanted.includes(candidate))) {
