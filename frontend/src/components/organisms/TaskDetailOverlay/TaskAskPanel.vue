@@ -97,12 +97,12 @@ onMounted(() => nextTick(() => input.value && input.value.focus()));
 .task-ask__input { flex: 1 1 220px; min-width: 0; height: 32px; }
 .task-ask__actions { display: flex; gap: 6px; }
 .task-ask__scope,
-.task-ask__status { margin: 0; font: 400 12px/1.4 var(--font-ui); color: var(--ink-2); }
-.task-ask__answer { margin: 0; font: 400 13px/1.55 var(--font-ui); color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.task-ask__status { margin: 0; font: 400 var(--fs-sm, 12px)/1.4 var(--font-ui); color: var(--ink-2); }
+.task-ask__answer { margin: 0; font: 400 var(--fs-md, 13px)/1.55 var(--font-ui); color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
 .task-ask__sources { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-.task-ask__sources-label { font: 500 11.5px/1.3 var(--font-ui); color: var(--ink-2); }
+.task-ask__sources-label { font: 500 var(--fs-sm, 11.5px)/1.3 var(--font-ui); color: var(--ink-2); }
 .task-ask__source { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.task-ask__error { margin: 0; font: 400 12.5px/1.4 var(--font-ui); color: var(--danger-ink); }
+.task-ask__error { margin: 0; font: 400 var(--fs-md, 12.5px)/1.4 var(--font-ui); color: var(--danger-ink); }
 @media (max-width: 480px) {
     .task-ask__actions { flex: 1 1 100%; }
     .task-ask__actions .ah-btn { flex: 1 1 auto; }

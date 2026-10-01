@@ -27,13 +27,13 @@ const ownerMayRun = async (companyId, agent, ownerId) => {
     return { ok: false, reason: REFUSAL.NOT_ALLOWED };
 };
 
-/* The owner's task filter; {} means every project in the company. */
+/* The owner's task filter; one that names no ProjectID reads every project in the company. */
 const taskScopeFor = async (companyId, ownerId, agent) => {
     const stage = await visibilityStage(companyId, ownerId);
     const scope = stage ? { ...stage.$match } : {};
     const scoped = ((agent && agent.projectIds) || []).map(String);
     if (!scoped.length) return scope;
-    const visible = stage ? stage.$match.ProjectID.$in.map(String) : scoped;
+    const visible = scope.ProjectID ? scope.ProjectID.$in.map(String) : scoped;
     scope.ProjectID = { $in: toObjectIds(visible.filter((id) => scoped.includes(id))) };
     return scope;
 };

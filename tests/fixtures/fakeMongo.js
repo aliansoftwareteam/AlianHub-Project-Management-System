@@ -1,8 +1,8 @@
 // A tiny in-memory stand-in for MongoDbCrudOpration: enough of the query
-// language for the agent modules (equality including null as missing, array-element equality, a word-match $text, $nor, $in/$nin (any element of a stored array)/$ne/$gt(e)/$lt(e)/$exists/$type/$size/$elemMatch, $set/$inc/$push/$addToSet/$pull,
+// language for the agent modules (equality including null as missing, array-element equality, a word-match $text, $nor, $expr with $eq/$ne of two operands, $in/$nin (any element of a stored array)/$ne/$gt(e)/$lt(e)/$exists/$type/$size/$elemMatch, $set/$inc/$push/$addToSet/$pull,
 // conditional findOneAndUpdate answering the old document unless asked for the new one (null after an upsert insert, as
 // the driver does), updateOne and findOneAndUpdate with upsert and $setOnInsert and a unique _id, findOneAndDelete, deleteOne, deleteMany,
-// bulkWrite of insertOne/updateOne/updateMany, sort/skip/limit on find, sort on findOneAndUpdate, $type 'date'/'string'/'objectId' on the stored value, $match/$unwind (a top-level array)/$project (inclusion or exclusion)/$addFields ($toString, $ifNull, $size, $strLenBytes)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
+// insertMany with a unique _id, bulkWrite of insertOne/updateOne/updateMany, sort/skip/limit on find, sort on findOneAndUpdate, $type 'date'/'string'/'objectId' on the stored value, $match/$unwind (a top-level array)/$project (inclusion or exclusion)/$addFields ($toString, $ifNull, $size, $strLenBytes)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
 // reject a duplicate save or upsert with E11000, declared text indexes that bound $text to their fields) so a test can assert on what was written.
 
 let seq = 1;
@@ -38,7 +38,22 @@ const TYPE_CHECKS = {
     objectId: (raw) => Boolean(raw) && raw._bsontype === 'ObjectId',
 };
 
+/* $expr comparing two operands with $eq or $ne; a "$field" operand reads the row, and a missing field compares as null. */
+const exprOperand = (doc, operand) => {
+    const value = typeof operand === 'string' && operand.startsWith('$') ? read(doc, operand.slice(1)) : operand;
+    if (value === undefined || value === null) return null;
+    return value instanceof Date ? value.getTime() : hex(value);
+};
+const exprHolds = (doc, expr) => {
+    const [op, operands] = Object.entries(expr)[0];
+    const [left, right] = operands.map((operand) => exprOperand(doc, operand));
+    if (op === '$eq') return left === right;
+    if (op === '$ne') return left !== right;
+    throw new Error(`fakeMongo: unsupported $expr operator ${op}`);
+};
+
 const matches = (doc, filter = {}, textFields) => Object.entries(filter).every(([key, cond]) => {
+    if (key === '$expr') return exprHolds(doc, cond);
     if (key === '$or') return cond.some((f) => matches(doc, f, textFields));
     if (key === '$and') return cond.every((f) => matches(doc, f, textFields));
     if (key === '$nor') return !cond.some((f) => matches(doc, f, textFields));
@@ -246,6 +261,13 @@ const create = ({ mongooseCasting = false } = {}) => {
             list.push(doc);
             return clone(doc);
         }
+        if (method === 'insertMany') {
+            const docs = (data[0] || []).map((doc) => ({ ...doc, _id: doc._id ? String(doc._id) : nextId() }));
+            const taken = new Set(list.map((d) => String(d._id)));
+            docs.forEach((doc) => { if (taken.has(doc._id)) throw duplicateKey(['_id']); taken.add(doc._id); });
+            list.push(...docs);
+            return docs.map(clone);
+        }
         if (method === 'find') return ordered(list.filter((d) => matches(d, data[0], textFields)), data[2]).map(clone);
         if (method === 'findOne') return clone(list.find((d) => matches(d, data[0], textFields)) || null);
         if (method === 'countDocuments') return list.filter((d) => matches(d, data[0], textFields)).length;
@@ -314,6 +336,8 @@ const create = ({ mongooseCasting = false } = {}) => {
                 if (stage.$limit) return docs.slice(0, stage.$limit);
                 if (stage.$count) return docs.length ? [{ [stage.$count]: docs.length }] : [];
                 if (stage.$facet) return [Object.fromEntries(Object.entries(stage.$facet).map(([name, sub]) => [name, run(docs, sub)]))];
+                if (stage.$unionWith) return [...docs, ...run(rows(stage.$unionWith.coll), stage.$unionWith.pipeline || [])];
+                if (stage.$unset) return docs.map((d) => Object.fromEntries(Object.entries(d).filter(([key]) => ![].concat(stage.$unset).includes(key))));
                 if (stage.$lookup) {
                     const { from, localField, foreignField, as, pipeline: inner = [] } = stage.$lookup;
                     return docs.map((d) => ({ ...d, [as]: run(rows(from).filter((f) => String(hex(read(f, foreignField))) === String(hex(read(d, localField)))), inner) }));
