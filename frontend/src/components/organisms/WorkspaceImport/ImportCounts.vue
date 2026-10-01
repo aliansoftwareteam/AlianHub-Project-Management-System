@@ -42,9 +42,11 @@ const notes = computed(() => countNotes(props.summary, t, "WorkspaceImport", pro
 
 <style scoped>
 .imc { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.imc__table { width: 100%; border-collapse: collapse; font-size: var(--text-small, 13px); color: var(--ink); }
+.imc__table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--text-small, 13px); color: var(--ink); }
 .imc__caption { caption-side: top; text-align: left; font-weight: 600; padding: 0 0 4px; color: var(--ink); }
-.imc__table th, .imc__table td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--hairline, var(--border)); vertical-align: top; font-weight: 400; overflow-wrap: anywhere; }
+.imc__table th, .imc__table td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--hairline, var(--border)); vertical-align: top; font-weight: 400; overflow-wrap: normal; word-break: normal; }
+.imc__table th:first-child { width: 46%; }
+.imc__table th:not(:first-child), .imc__table td { width: 27%; }
 .imc__table thead th { font-weight: 600; color: var(--ink-2); }
 .imc__out { color: var(--warn-ink, var(--ink)); }
 .imc__notes { margin: 0; padding-left: 18px; display: grid; gap: 4px; color: var(--ink-2); overflow-wrap: anywhere; }
