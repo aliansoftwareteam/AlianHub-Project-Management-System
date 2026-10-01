@@ -11,7 +11,7 @@ const { requireTaskActionPermission, requireTaskWritePermission } = require('../
 const { TASK_ACTIONS, PRE_V2_TASK_ACTIONS, RELATION_ACTIONS, TASK_WRITE_ROUTES, actionEntry } = require('../../Config/taskWritePermissions');
 const { TASK_ACTION_FIELDS, PRE_V2_ACTION_FIELDS, specFor, writtenTaskId, prepareOrRefuse, sendFailure } = require('./helpers/taskWriteFields');
 const { importTargetAccess, refuseImport } = require('../Importers/helpers/importAccess');
-const { taskPatchGuard } = require('../Agents/guard');
+const { taskPatchGuard, taskCreateGuard, relationGuard, agentsRefused } = require('../Agents/guard');
 
 const agentRule = (fields) => taskPatchGuard((body) => writtenTaskId(fields, body));
 
@@ -35,7 +35,7 @@ exports.init = (app) => {
         });
     });
 
-    app.post('/api/v2/tasks', taskWritePermission('POST /api/v2/tasks'), async (req, res) => {
+    app.post('/api/v2/tasks', taskWritePermission('POST /api/v2/tasks'), taskCreateGuard, async (req, res) => {
         try {
             const payload = await prepareOrRefuse(req, res, TASK_ACTION_FIELDS.create, 'create');
             if (!payload) return;
@@ -112,7 +112,7 @@ exports.init = (app) => {
 
     app.get('/api/v2/tasks/:id/lists', getTaskCtrl.getTaskLists);
 
-    app.post('/api/v2/tasks/relations', taskActionPermission(RELATION_ACTIONS), async (req, res) => {
+    app.post('/api/v2/tasks/relations', taskActionPermission(RELATION_ACTIONS), relationGuard, async (req, res) => {
         try {
             const relation = actionEntry(RELATION_ACTIONS, req.body && req.body.action);
             if (!relation) {
@@ -136,7 +136,7 @@ exports.init = (app) => {
         }
     });
 
-    app.patch('/api/v1/importTasks', taskWritePermission('PATCH /api/v1/importTasks'), async (req, res) => {
+    app.patch('/api/v1/importTasks', taskWritePermission('PATCH /api/v1/importTasks'), agentsRefused('tasks.import'), async (req, res) => {
         const payload = await prepareOrRefuse(req, res, TASK_ACTION_FIELDS.createMultipleTasks, 'createMultipleTasks');
         if (!payload) return;
         const projectData = payload.projectData || {};
@@ -168,7 +168,7 @@ exports.init = (app) => {
 
     app.post('/api/v1/task/find', getTaskCtrl.getTaskByQyery);
 
-    app.put('/api/v1/task', getTaskCtrl.updateTask);
+    app.put('/api/v1/task', agentsRefused('tasks.cascade'), getTaskCtrl.updateTask);
 
     app.get('/task-import/events/:id', (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream');
