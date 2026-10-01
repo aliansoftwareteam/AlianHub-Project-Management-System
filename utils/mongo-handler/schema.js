@@ -2526,6 +2526,8 @@ const schema = {
             viewedBoard: { type: Boolean, required: false },
             viewedNotifications: { type: Boolean, required: false },
             importedWork: { type: Boolean, required: false },
+            openedMyWork: { type: Boolean, required: false },
+            viewedShortcuts: { type: Boolean, required: false },
             toursOffered: { type: [String], required: false, default: undefined }
         },
         navPreferences: {

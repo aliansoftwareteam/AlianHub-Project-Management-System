@@ -215,6 +215,18 @@ describe('offered again', () => {
         expect(apiRequestWithoutCompnay).not.toHaveBeenCalled();
     });
 
+    it('gives the focus back to the More button when the menu item it started from is gone', async () => {
+        document.body.insertAdjacentHTML('beforeend', '<button class="ah-rail__item--btn" aria-haspopup="menu">More</button><button id="item">Take the tour</button>');
+        mountTour();
+        document.getElementById('item').focus();
+        openPanel('tourAsked');
+        await flushPromises();
+        document.getElementById('item').remove();
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await flushPromises();
+        expect(document.activeElement.className).toBe('ah-rail__item--btn');
+    });
+
     it('is the tour item of the More menu', () => {
         const nav = fs.readFileSync(path.join(SRC, 'components/organisms/Shell/navItems.js'), 'utf8');
         expect(nav).toMatch(/key: "tour", label: "Home\.take_tour", icon: "tour", panel: "tourAsked"/);
