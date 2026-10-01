@@ -63,6 +63,8 @@ describe('the gantt reads the tokens', () => {
         ['.gv__replan-close', 'height', 'var(--hit-min)'],
         [deep('.gv__chart', '.gantt_cell'), 'font-size', 'var(--fs-md, 12.5px)'],
         [deep('.gv__chart', '.gantt_grid_head_cell'), 'font', 'var(--text-label)'],
+        [deep('.gv__chart', '.gantt_task .gantt_task_scale .gantt_scale_cell'), 'color', 'var(--ink-2)'],
+        [deep('.gv__chart', '.gantt_task .gantt_task_scale .gantt_scale_cell'), 'border-color', 'var(--hairline)'],
         [deep('.gv__chart', '.gantt_task_line'), 'background', 'var(--brand)'],
         [deep('.gv__chart', '.gantt_task_line.gv-critical'), 'background', 'var(--danger)'],
         [deep('.gv__chart', '.gantt_task_cell.gv-off'), 'background', 'var(--fill)'],

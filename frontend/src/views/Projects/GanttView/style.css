@@ -112,8 +112,10 @@
 .gv__chart :deep(.gantt_task) { font-family: var(--font-ui); background: var(--surface); border-color: var(--hairline); color: var(--ink); }
 .gv__chart :deep(.gantt_grid_scale),
 .gv__chart :deep(.gantt_task_scale) { background: var(--surface); border-bottom: 1px solid var(--hairline); color: var(--ink-2); }
+/* The vendor sheet loads later and greys the timeline scale with three classes (2.4:1 on white); the last selector outweighs it. */
 .gv__chart :deep(.gantt_grid_head_cell),
-.gv__chart :deep(.gantt_scale_cell) { font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); border-color: var(--hairline); }
+.gv__chart :deep(.gantt_scale_cell),
+.gv__chart :deep(.gantt_task .gantt_task_scale .gantt_scale_cell) { font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); border-color: var(--hairline); }
 .gv__chart :deep(.gantt_grid_data .gantt_row),
 .gv__chart :deep(.gantt_task_row) { border-bottom: 1px solid var(--hairline); background: var(--surface); }
 .gv__chart :deep(.gantt_grid_data .gantt_row.odd) { background: var(--surface); }
