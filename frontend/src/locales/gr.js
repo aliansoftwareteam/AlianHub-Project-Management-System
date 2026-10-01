@@ -9630,7 +9630,7 @@ export default {
         "Folder created successfully": "Ο φάκελος δημιουργήθηκε με επιτυχία",
         "Folder updated successfully": "Ο φάκελος ενημερώθηκε με επιτυχία",
         "Folder_moved_successfully": "Folder moved successfully",
-        "Folde restored successfully": "Ο φάκελος αποκαταστάθηκε με επιτυχία",
+        "Folder restored successfully": "Ο φάκελος αποκαταστάθηκε με επιτυχία",
         "Folder closed successfully": "Ο φάκελος έκλεισε με επιτυχία",
         "Folder archived successfully": "Ο φάκελος αρχειοθετήθηκε με επιτυχία",
         "Folder deleted successfully": "Ο φάκελος διαγράφηκε με επιτυχία",

@@ -9630,7 +9630,7 @@ export default {
         "Folder created successfully": "फ़ोल्डर सफलतापूर्वक बनाया गया",
         "Folder updated successfully": "फ़ोल्डर सफलतापूर्वक अपडेट किया गया",
         "Folder_moved_successfully": "Folder moved successfully",
-        "Folde restored successfully": "फ़ोल्डर सफलतापूर्वक पुनर्स्थापित किया गया",
+        "Folder restored successfully": "फ़ोल्डर सफलतापूर्वक पुनर्स्थापित किया गया",
         "Folder closed successfully": "फ़ोल्डर सफलतापूर्वक बंद किया गया",
         "Folder archived successfully": "फ़ोल्डर सफलतापूर्वक संग्रहित किया गया",
         "Folder deleted successfully": "फ़ोल्डर सफलतापूर्वक हटाया गया",

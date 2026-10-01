@@ -9630,7 +9630,7 @@ export default {
         "Folder created successfully": "Cartella creata con successo",
         "Folder updated successfully": "Cartella aggiornata con successo",
         "Folder_moved_successfully": "Folder moved successfully",
-        "Folde restored successfully": "Cartella ripristinata con successo",
+        "Folder restored successfully": "Cartella ripristinata con successo",
         "Folder closed successfully": "Cartella chiusa con successo",
         "Folder archived successfully": "Cartella archiviata con successo",
         "Folder deleted successfully": "Cartella eliminata con successo",

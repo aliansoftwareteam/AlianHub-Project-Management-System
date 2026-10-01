@@ -9630,7 +9630,7 @@ export default {
         "Folder created successfully": "Папка успешно создана",
         "Folder updated successfully": "Папка успешно обновлена",
         "Folder_moved_successfully": "Folder moved successfully",
-        "Folde restored successfully": "Папка успешно восстановлена",
+        "Folder restored successfully": "Папка успешно восстановлена",
         "Folder closed successfully": "Папка успешно закрыта",
         "Folder archived successfully": "Папка успешно архивирована",
         "Folder deleted successfully": "Папка успешно удалена",

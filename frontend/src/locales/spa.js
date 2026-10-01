@@ -9630,7 +9630,7 @@ export default {
         "Folder created successfully": "Carpeta creada con éxito",
         "Folder updated successfully": "Carpeta actualizada con éxito",
         "Folder_moved_successfully": "Folder moved successfully",
-        "Folde restored successfully": "Carpeta restaurada con éxito",
+        "Folder restored successfully": "Carpeta restaurada con éxito",
         "Folder closed successfully": "Carpeta cerrada con éxito",
         "Folder archived successfully": "Carpeta archivada con éxito",
         "Folder deleted successfully": "Carpeta eliminada con éxito",

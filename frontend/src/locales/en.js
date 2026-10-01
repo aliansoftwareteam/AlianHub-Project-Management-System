@@ -9870,7 +9870,7 @@ export default {
         "Folder created successfully": "Folder created successfully",
         "Folder updated successfully": "Folder updated successfully",
         Folder_moved_successfully: "Folder moved successfully",
-        "Folde restored successfully": "Folder restored successfully",
+        "Folder restored successfully": "Folder restored successfully",
         "Folder closed successfully": "Folder closed successfully",
         "Folder archived successfully": "Folder archived successfully",
         "Folder deleted successfully": "Folder deleted successfully",
