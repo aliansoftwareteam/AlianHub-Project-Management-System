@@ -76,7 +76,8 @@ const scopePipeline = (query, scope, ownRowsMatch) => {
     const stages = isPlainObject(query) ? [query] : query;
     if (!Array.isArray(stages) || !stages.length) throw new TimesheetQueryRefused('queryeta must be an aggregation pipeline.');
     const checked = walk(stages, scope);
-    return scope.companyWide ? checked : [{ $match: ownRowsMatch(scope) }, ...checked];
+    const own = ownRowsMatch(scope);
+    return Object.keys(own).length ? [{ $match: own }, ...checked] : checked;
 };
 
 const scopeTimesheetPipeline = (query, scope) => scopePipeline(query, scope, scopedTimeMatch);
