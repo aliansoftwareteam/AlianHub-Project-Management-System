@@ -131,3 +131,15 @@ describe('the trash lists only what the caller can open', () => {
         expect(await titles(OUTSIDER, 'docs')).toEqual([]);
     });
 });
+
+describe('a trashed chat is listed to the people in it', () => {
+    const chat = (TaskName, people) => mockDb.seed(SCHEMA_TYPE.TASKS, { _id: oid(), TaskName, ProjectID: oid(), mainChat: true, AssigneeUserId: people, deletedStatusKey: 1 });
+
+    it('leaves an owner out of a chat between other people, and keeps their own', async () => {
+        chat('Chat of two members', [MEMBER, OUTSIDER]);
+        chat('Chat with the owner', [OWNER, MEMBER]);
+        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: oid(), TaskName: 'Task outside any project', ProjectID: oid(), deletedStatusKey: 1 });
+        expect(await titles(OWNER, 'tasks')).toEqual(['Chat with the owner', 'Task outside any project']);
+    });
+});
+
