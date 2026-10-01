@@ -99,6 +99,7 @@ import OfflineBanner from '@/components/offline/OfflineBanner.vue';
 import { initOffline } from '@/offline';
 import * as env from '@/config/env';
 import {tabSyncHelper} from '@/utils/tabSyncs.js';
+import { adoptAccountPrefs } from '@/views/Settings/Language/localePrefs';
 const AiOffPage = defineAsyncComponent(() => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiOffPage.vue'));
 import { aiAvailability, loadAiAvailability, trackAiPlan } from '@/composable/aiAvailability';
 import { AI_GATE, aiGateFor } from '@/router/ai/gate';
@@ -276,11 +277,21 @@ async function getFirebaseData() {
                     userData = userResult.data;
                 }
 
-                if(userData.languageCode){
-                    localStorage.setItem('language', userData.languageCode);
-                    const updateLanguage = await changeLanguage(userData.languageCode);
-                    locale.value = userData.languageCode;
-                    setLocaleMessage(userData.languageCode, updateLanguage || "en");
+                // Without the profile, an upload could overwrite an account copy we never read.
+                const { language, upload } = userData._id ? adoptAccountPrefs(userData) : {};
+                if(language){
+                    localStorage.setItem('language', language);
+                    const updateLanguage = await changeLanguage(language);
+                    locale.value = language;
+                    setLocaleMessage(language, updateLanguage || "en");
+                }
+                if(upload){
+                    apiRequestWithoutCompnay("put", env.USER_UPATE, {
+                        userId: userId.value,
+                        updateObject: { $set: { localePreferences: upload } }
+                    }).catch((error) => {
+                        console.error("ERROR in saving locale preferences: ", error);
+                    });
                 }
 
                 await dispatch('settings/setCompanies', userData?.AssignCompany)
