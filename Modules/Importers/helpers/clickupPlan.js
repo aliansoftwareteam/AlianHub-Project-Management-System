@@ -25,15 +25,15 @@ const commentsOf = (tasks, { memberIdByEmail }, allowed) => {
     return { imported: comments.length, skipped: 0, reason: '', unmatchedAuthors: unique(strangers) };
 };
 
-const fieldsOf = ({ columns }) => {
+const fieldsSummary = ({ columns }) => {
     const named = (action) => columns.filter((column) => column.action === action).map((column) => column.name);
-    const skipped = named('skipped');
+    const skipped = columns.filter((column) => column.action === 'skipped');
     return {
         created: named('create'),
         reused: named('reuse'),
         asText: columns.filter((column) => column.asText && ['create', 'reuse'].includes(column.action)).map((column) => column.name),
-        skipped,
-        reason: skipped.length ? NO_PERMISSION : '',
+        skipped: skipped.map((column) => column.name),
+        reason: skipped.length ? skipped[0].reason : '',
         valuesSet: columns.reduce((sum, column) => sum + column.set, 0),
         valuesDropped: columns.reduce((sum, column) => sum + column.dropped, 0),
     };
@@ -67,7 +67,7 @@ const planClickUpList = ({ tasks, columns, unnamedAssignees = [], state, people,
         tasks: levels[0].length,
         subtasks: { level2: levels[1].length, level3: levels[2].length },
         comments: commentsOf(tasks, people, allowed.comments),
-        fields: fieldsOf(fieldPlan),
+        fields: fieldsSummary(fieldPlan),
         checklistItems: total(tasks, (task) => total(task.checklists || [], (checklist) => checklist.items.length)),
         tags: tagsOf(tasks, state.tags, allowed.tags),
         links: total(tasks, (task) => (task.links || []).length),
@@ -121,4 +121,4 @@ const mergeSummaries = (summaries) => {
     return merged;
 };
 
-module.exports = { emptySummary, planClickUpList, stateAfter, mergeSummaries };
+module.exports = { emptySummary, planClickUpList, stateAfter, mergeSummaries, fieldsSummary };

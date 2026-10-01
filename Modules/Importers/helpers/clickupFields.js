@@ -192,6 +192,11 @@ const planFields = ({ columns, tasks, definitions = [], projectId = '', idByEmai
     return { columns: planned, values, unmatchedPeople: uniqueBy(unmatchedPeople, lower) };
 };
 
+/* Everyone the file's people columns name, for the importer to look up before it plans. */
+const namedPeople = (columns, tasks) => columns
+    .filter((column) => column.type === 'people')
+    .flatMap((column) => tasks.flatMap((task) => listOf(task.fieldCells && task.fieldCells[column.column])));
+
 const US = Object.freeze({ en: 'United States', flag: '🇺🇸', code: 'US', dialCode: '+1', mask: '(999) 999-9999', maskWithDialCode: '(###) ###-####' });
 
 const TYPE_SETTINGS = Object.freeze({
@@ -226,4 +231,4 @@ const fieldDefinitionFrom = (draft, { projectId, userId }) => {
     };
 };
 
-module.exports = { FIELD_TYPES, NO_PERMISSION, fieldTypeOf, planFields, fieldDefinitionFrom };
+module.exports = { FIELD_TYPES, NO_PERMISSION, fieldTypeOf, planFields, namedPeople, fieldDefinitionFrom };

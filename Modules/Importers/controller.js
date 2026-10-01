@@ -13,6 +13,7 @@ const { validateClickUpInput, validateClickUpRows, transformClickUpRows, preview
 const { STATUS_FALLBACK_TYPE, appendStatuses, applyImportTags } = require('./helpers/projectDetails');
 const { adjustedReport, adjustedSentences } = require('./helpers/importTree');
 const { mapStatusName } = require('./helpers/jiraRules');
+const { prepareClickUpDetails, previewClickUpPlan } = require('./helpers/clickupImport');
 const { importTargetAccess, previewAccess, refuseImport } = require('./helpers/importAccess');
 const { findCompanyMembers, activeMemberIdSet } = require('./helpers/companyMembers');
 const { sessionActor } = require('../Tasks/helpers/taskWriteFields');
@@ -124,6 +125,15 @@ const keepMemberAssignees = async (companyId, tasks) => {
     });
 };
 
+const checklistRow = (row) => ({ id: new mongoose.Types.ObjectId().toString(), AssigneeUserId: [], isExpand: false, ...row });
+
+/* The task panel reads a checklist as one flat list: a row for the checklist, then its items naming it as their parent. */
+const checklistRows = (checklists) => checklists.flatMap((checklist) => {
+    const items = (Array.isArray(checklist.items) ? checklist.items : []).filter((item) => item && item.name);
+    const head = checklistRow({ name: checklist.name || 'Checklist', isChecked: items.length > 0 && items.every((item) => item.isChecked) });
+    return [head, ...items.map((item) => checklistRow({ name: item.name, isChecked: !!item.isChecked, parentId: head.id }))];
+});
+
 /* Map the parser's rich card data onto each task into the shapes the task
  * create path persists (S3-01): resolve member emails → assignees, build
  * checklistArray + attachment link-references, and fold Trello labels into the
@@ -155,13 +165,7 @@ const enrichImportTasks = async (companyId, tasks) => {
     const unmatchedEmails = emails.filter((email) => !emailToId[String(email).toLowerCase()]);
 
     tasks.forEach((task) => {
-        if (Array.isArray(task.checklists) && task.checklists.length) {
-            task.checklistArray = task.checklists.map((cl) => ({
-                id: new mongoose.Types.ObjectId().toString(),
-                name: cl.name || 'Checklist',
-                items: (Array.isArray(cl.items) ? cl.items : []).map((it) => ({ name: it.name, isChecked: !!it.isChecked })),
-            }));
-        }
+        if (Array.isArray(task.checklists) && task.checklists.length) task.checklistArray = checklistRows(task.checklists);
         if (Array.isArray(task.attachments) && task.attachments.length) {
             task.attachments = task.attachments.map((att) => ({
                 id: new mongoose.Types.ObjectId().toString(),
@@ -197,8 +201,8 @@ const countImportedComments = async (companyId, { projectId, sprintId, taskId, a
     } });
 };
 
-/* Create the parsed Trello comments on the freshly-created tasks. Each input
- * task was stamped with `createdTaskId` by createMultipleTasks. Best-effort:
+/* Create the parsed Trello comments on the freshly-created tasks. Each row
+ * was stamped with `createdTaskId` by createMultipleTasks. Best-effort:
  * a failed comment never fails the import. */
 const createImportComments = async (companyId, projectData, sprintId, folderId, tasks, userId) => {
     for (const task of tasks) {
@@ -234,8 +238,9 @@ const createImportComments = async (companyId, projectData, sprintId, folderId, 
 };
 
 /* Record the job, feed the bulk-create pipeline, update the job. Returns the
- * response envelope. Identical create path to the Jira importer. */
-const finishImport = async (companyId, { source, project, sprint, actor, statusArray, tasks, skipped, addsTags = false, report = null }) => {
+ * response envelope. Identical create path to the Jira importer. `details`
+ * writes what needs the created task ids and answers the import's summary. */
+const finishImport = async (companyId, { source, project, sprint, actor, statusArray, tasks, skipped, addsTags = false, report = null, details = null }) => {
     const userId = actor.id;
     const sprintId = sprint.id;
     const job = await MongoDbCrudOpration(companyId, {
@@ -275,8 +280,13 @@ const finishImport = async (companyId, { source, project, sprint, actor, statusA
             statusArray,
             sprint,
         });
-        await createImportComments(companyId, projectData, sprintId, sprint.folderId, tasksWithSprint, userId)
-            .catch((commentErr) => logger.error(`[importers] comment import error: ${commentErr.message}`));
+        // The create path stamps the rows it was handed, or the copies it made of them when it also defined fields.
+        const createdRows = Array.isArray(result?.createdTasks) ? result.createdTasks : tasksWithSprint;
+        const summary = details
+            ? await details.afterCreate({ createdRows, droppedFieldValues: result?.droppedFieldValues || 0 })
+            : await createImportComments(companyId, projectData, sprintId, sprint.folderId, createdRows, userId)
+                .catch((commentErr) => logger.error(`[importers] comment import error: ${commentErr.message}`));
+        const droppedFieldValues = summary ? summary.fields.valuesDropped : (result?.droppedFieldValues || 0);
         const createdCount = Array.isArray(result?.data) ? result.data.length : tasks.length;
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.IMPORT_JOBS,
@@ -285,7 +295,7 @@ const finishImport = async (companyId, { source, project, sprint, actor, statusA
         const detail = report ? { skippedRows: report.skippedRows, unmatchedAssignees: [...unmatchedEmails, ...report.unnamedAssignees] } : {};
         const adjusted = adjustedReport(result?.adjusted);
         const statusText = [`Imported ${createdCount} tasks from ${source} (${skipped} skipped).`, ...adjustedSentences(adjusted)].join(' ');
-        return { status: true, statusText, data: { jobId: job._id, projectId: String(project._id), created: createdCount, skipped, ...detail, ...(adjusted ? { adjusted } : {}), ...(result?.droppedFieldValues ? { droppedFieldValues: result.droppedFieldValues } : {}) } };
+        return { status: true, statusText, data: { jobId: job._id, projectId: String(project._id), created: createdCount, skipped, ...detail, ...(adjusted ? { adjusted } : {}), ...(droppedFieldValues ? { droppedFieldValues } : {}), ...(summary ? { summary } : {}) } };
     } catch (creationError) {
         logger.error(`[importers] ${source} job ${job._id} failed: ${creationError.message}`);
         await MongoDbCrudOpration(companyId, {
@@ -522,18 +532,21 @@ const clickUpStatusContext = async (companyId, project, statusArray, rows, addsS
 
 const runClickUpImport = async (req, { companyId, userId, project, sprint, statusArray, rows, addsDetails }) => {
     const context = await clickUpStatusContext(companyId, project, statusArray, rows, addsDetails);
-    const { tasks, skipped, skippedRows, unnamedAssignees } = transformClickUpRows({ rows, statusFor: context.statusFor, leaderId: userId });
+    const { tasks, fields, skipped, skippedRows, unnamedAssignees } = transformClickUpRows({ rows, statusFor: context.statusFor, leaderId: userId });
     if (!tasks.length) return { status: false, statusText: 'No importable tasks found (every row needs a task name).' };
+    const actor = await sessionActor(req);
+    const details = await prepareClickUpDetails(companyId, { actor, project, sprint, tasks, columns: fields, unnamedAssignees, addsTags: addsDetails });
     return finishImport(companyId, {
         source: 'clickup',
         project,
         sprint,
-        actor: await sessionActor(req),
+        actor,
         statusArray: context.statusArray,
         tasks,
         skipped,
         addsTags: addsDetails,
-        report: { skippedRows, unnamedAssignees },
+        report: { skippedRows, unnamedAssignees: details.unmatchedPeople },
+        details,
     });
 };
 
@@ -621,12 +634,14 @@ exports.importClickUpAsProject = async (req, res) => {
 };
 
 /* POST /api/v2/imports/clickup/preview
- * body: { rows, projectId? } — what the file holds, per list, with nothing written. */
+ * body: { rows, projectId?, options? } — what the file holds, per list, and what importing it
+ * would bring in and leave out, with nothing written. */
 exports.previewClickUp = async (req, res) => {
     try {
         const companyId = pinSessionTenant(req, res);
         if (!companyId) return undefined;
         const { rows, projectId } = req.body || {};
+        const options = (req.body && req.body.options) || {};
         const check = validateClickUpRows(rows);
         if (!check.valid) return res.send({ status: false, statusText: check.reason });
 
@@ -644,6 +659,12 @@ exports.previewClickUp = async (req, res) => {
             : [];
         const matched = new Set(members.map((member) => lowerName(member.Employee_Email)));
         const knownTags = new Set(((project && project.project.tagsArray) || []).map((tag) => lowerName(tag && tag.tagName)));
+        const plan = await previewClickUpPlan(companyId, String(req.uid || ''), {
+            rows,
+            lists: preview.lists,
+            project: project ? project.project : null,
+            addsTags: Boolean(options.createMissingStatuses),
+        });
 
         return res.send({
             status: true,
@@ -654,6 +675,7 @@ exports.previewClickUp = async (req, res) => {
                 newTags: preview.tags.filter((tag) => !knownTags.has(lowerName(tag))),
                 matchedAssignees: preview.assigneeEmails.filter((email) => matched.has(email)),
                 unmatchedAssignees: [...preview.assigneeEmails.filter((email) => !matched.has(email)), ...preview.unnamedAssignees],
+                plan,
             },
         });
     } catch (error) {
