@@ -9,13 +9,15 @@ const { Notification_key } = require('../../../Config/notificationKey.js');
 const MENTION_KEY = Notification_key.COMMENTS_IM_MENTIONS_IN;
 
 //   all / notifications / mentions / archive — the tabs of the first Inbox, still served
+//   approval — what waits for the reader's decision: agent proposals and leave requests
 //   primary  — unread, not snoozed, not cleared, and not a watched-only update
 //   other    — the same, for updates that reached the reader only because they watch the item
 //   later    — snoozed rows, until their time comes (or, for "until it changes", new activity)
 //   done     — read rows
 //   cleared  — rows the reader cleared in the last 30 days
-const TABS = Object.freeze(['all', 'notifications', 'mentions', 'archive', 'primary', 'other', 'later', 'done', 'cleared']);
-const INBOX_TABS = Object.freeze(['primary', 'other', 'later', 'done', 'cleared']);
+const APPROVAL_TAB = 'approval';
+const TABS = Object.freeze(['all', 'notifications', 'mentions', 'archive', APPROVAL_TAB, 'primary', 'other', 'later', 'done', 'cleared']);
+const INBOX_TABS = Object.freeze([APPROVAL_TAB, 'primary', 'other', 'later', 'done', 'cleared']);
 const CLEARABLE_TABS = Object.freeze(['primary', 'other', 'later', 'done']);
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -284,6 +286,7 @@ const mentionMatch = (userId, { tab, source = 'all', kind = 'all', now = new Dat
 
 module.exports = {
     TABS,
+    APPROVAL_TAB,
     INBOX_TABS,
     CLEARABLE_TABS,
     MENTION_KEY,

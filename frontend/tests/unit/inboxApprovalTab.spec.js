@@ -60,7 +60,8 @@ describe('the Needs your approval tab', () => {
         await open();
         const first = wrapper.findAll('.ibx__nav [role="tab"]')[0];
         expect(first.attributes('data-tab')).toBe('approval');
-        expect(first.text()).toContain('Needs your approval');
+        expect(first.text()).toContain('Inbox.tab_approval');
+        expect(en.Inbox.tab_approval).toBe('Needs your approval');
         expect(first.find('.ibx__navcount').text()).toBe('3');
     });
 
