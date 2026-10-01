@@ -47,6 +47,12 @@ The `task-manager` skill in [.claude/skills/task-manager/](.claude/skills/task-m
 - After merging PRs into `beta`, run `npm run version:log` and commit `docs/BETA-LOG.md` in the follow-up docs PR that ticks task progress, naming the build numbers those merges became.
 - Commit and PR titles stay Conventional Commits, because the next version is computed from them (`feat` → minor, `!` or `BREAKING CHANGE` → major, anything else → patch).
 
+### Rule 5 — Every colour comes from a token
+
+- Styles never ship a hard-coded colour (`#hex`, `rgb()`/`hsl()`, `white`, `black`) or a legacy utility class (`bg-white`, `GunPowder`, `btn-white`, `font-size-13`, …): use the tokens in `frontend/src/assets/css/tokens.css` (`var(--surface)`, `var(--ink)`, `var(--brand)`, …) and the `ah-` classes.
+- `npm run style:check` (also `tests/conventions/style-check.test.js`) fails when a `.vue`, `.css` or `.scss` file under `frontend/src` grows past its baseline in `scripts/style-baseline.json`, or when the baseline is higher than the file now needs; the baseline may only shrink. `npm run style:check -- <file>` lists that file's findings by line.
+- After removing colours or legacy classes, run `npm run style:baseline` and commit the lowered baseline in the same PR. It refuses to raise a count: `npm run style:baseline -- --allow-increase` is for a deliberate exception (a file that moved, a colour that cannot be a token), named in the PR body. On a merge conflict keep the higher count and re-run `npm run style:baseline`.
+
 ---
 
 ## What is AlianHub?
