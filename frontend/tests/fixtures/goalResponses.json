@@ -1571,5 +1571,1049 @@
       "statusText": "Goal not found.",
       "message": "Goal not found."
     }
+  },
+  "tasksGoal": {
+    "as": "me",
+    "request": {
+      "method": "post",
+      "path": "/api/v2/goals",
+      "body": {
+        "name": "Deliver the release"
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal saved.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "private",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 0,
+        "targets": [],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksAdded": {
+    "as": "me",
+    "request": {
+      "method": "post",
+      "path": "/api/v2/goals/000000000000000000000028/targets",
+      "body": {
+        "kind": "tasks",
+        "name": "Release tasks",
+        "weight": 1,
+        "sources": {
+          "sprintIds": [
+            "6f0000000000000000000b01",
+            "6f0000000000000000000b03"
+          ],
+          "taskIds": [
+            "6f0000000000000000000d05"
+          ]
+        }
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Target added.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "private",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 33,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 33,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01",
+                "6f0000000000000000000b03"
+              ],
+              "taskIds": [
+                "6f0000000000000000000d05"
+              ]
+            },
+            "counted": {
+              "done": 2,
+              "total": 6,
+              "at": "2026-10-01T07:01:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksAddedEmpty": {
+    "as": "me",
+    "request": {
+      "method": "post",
+      "path": "/api/v2/goals/000000000000000000000028/targets",
+      "body": {
+        "kind": "tasks",
+        "name": "Stretch tasks",
+        "weight": 1,
+        "sources": {
+          "sprintIds": [],
+          "taskIds": []
+        }
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Target added.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "private",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 17,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 33,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01",
+                "6f0000000000000000000b03"
+              ],
+              "taskIds": [
+                "6f0000000000000000000d05"
+              ]
+            },
+            "counted": {
+              "done": 2,
+              "total": 6,
+              "at": "2026-10-01T07:01:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:02:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksNotFound": {
+    "as": "me",
+    "request": {
+      "method": "post",
+      "path": "/api/v2/goals/000000000000000000000028/targets",
+      "body": {
+        "kind": "tasks",
+        "name": "Old tasks",
+        "weight": 1,
+        "sources": {
+          "sprintIds": [
+            "6f0000000000000000000b01",
+            "6f0000000000000000000b09"
+          ],
+          "taskIds": []
+        }
+      }
+    },
+    "statusCode": 400,
+    "response": {
+      "status": false,
+      "statusText": "Request refused",
+      "message": "sources.sprintIds.1 is not a list you can open",
+      "field": "sources.sprintIds.1",
+      "code": "source_not_found"
+    }
+  },
+  "tasksValueRefused": {
+    "as": "me",
+    "request": {
+      "method": "put",
+      "path": "/api/v2/goals/000000000000000000000028/targets/6f0000000000000000009003/value",
+      "body": {
+        "current": 3
+      }
+    },
+    "statusCode": 400,
+    "response": {
+      "status": false,
+      "statusText": "Request refused",
+      "message": "current is counted from tasks and cannot be set by hand",
+      "field": "current",
+      "code": "counted_from_tasks"
+    }
+  },
+  "tasksWouldDrop": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/000000000000000000000028",
+      "body": {
+        "visibility": "workspace"
+      }
+    },
+    "statusCode": 400,
+    "response": {
+      "status": false,
+      "statusText": "Request refused",
+      "message": "visibility cannot change while the goal counts tasks that not everyone who would read it can open. Remove those sources first",
+      "field": "visibility",
+      "code": "sources_would_drop",
+      "sources": {
+        "sprintIds": [
+          "6f0000000000000000000b03"
+        ],
+        "taskIds": []
+      }
+    }
+  },
+  "tasksDropped": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/000000000000000000000028/targets/6f0000000000000000009003",
+      "body": {
+        "sources": {
+          "sprintIds": [
+            "6f0000000000000000000b01"
+          ],
+          "taskIds": [
+            "6f0000000000000000000d05"
+          ]
+        }
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Target saved.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "private",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 13,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 25,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01"
+              ],
+              "taskIds": [
+                "6f0000000000000000000d05"
+              ]
+            },
+            "counted": {
+              "done": 1,
+              "total": 4,
+              "at": "2026-10-01T07:06:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:02:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksOpened": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/000000000000000000000028",
+      "body": {
+        "visibility": "workspace"
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal saved.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 13,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 25,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01"
+              ],
+              "taskIds": [
+                "6f0000000000000000000d05"
+              ]
+            },
+            "counted": {
+              "done": 1,
+              "total": 4,
+              "at": "2026-10-01T07:07:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:07:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksNotShared": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/000000000000000000000028/targets/6f0000000000000000009003",
+      "body": {
+        "sources": {
+          "sprintIds": [
+            "6f0000000000000000000b01",
+            "6f0000000000000000000b03"
+          ],
+          "taskIds": [
+            "6f0000000000000000000d05"
+          ]
+        }
+      }
+    },
+    "statusCode": 400,
+    "response": {
+      "status": false,
+      "statusText": "Request refused",
+      "message": "sources.sprintIds.1 cannot be counted on this goal: not everyone who reads the goal can open it. Share the goal with fewer people, or use a number target instead",
+      "field": "sources.sprintIds.1",
+      "code": "source_not_shared",
+      "sources": {
+        "sprintIds": [
+          "6f0000000000000000000b03"
+        ],
+        "taskIds": []
+      }
+    }
+  },
+  "tasksRelinked": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/000000000000000000000028/targets/6f0000000000000000009003",
+      "body": {
+        "sources": {
+          "sprintIds": [
+            "6f0000000000000000000b01",
+            "6f0000000000000000000b02"
+          ],
+          "taskIds": []
+        }
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Target saved.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 20,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 40,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01",
+                "6f0000000000000000000b02"
+              ],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 2,
+              "total": 5,
+              "at": "2026-10-01T07:09:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:07:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksReadReader": {
+    "as": "sam",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals/000000000000000000000028"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal fetched successfully.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": false,
+        "color": "",
+        "progressPct": 20,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 40,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01",
+                "6f0000000000000000000b02"
+              ],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 2,
+              "total": 5,
+              "at": "2026-10-01T07:09:00.000Z"
+            },
+            "notCounted": 0,
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:07:00.000Z"
+            },
+            "notCounted": 0,
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": false,
+        "canSetValue": false,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksReadStale": {
+    "as": "me",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals/000000000000000000000028"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal fetched successfully.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 20,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 40,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01",
+                "6f0000000000000000000b02"
+              ],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 2,
+              "total": 5,
+              "at": "2026-10-01T07:09:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": true,
+            "updatedBy": "",
+            "updatedAt": null
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:07:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": true,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksReadLeftOut": {
+    "as": "me",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals/000000000000000000000028"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal fetched successfully.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 17,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 33,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01",
+                "6f0000000000000000000b02"
+              ],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 1,
+              "total": 3,
+              "at": "2026-10-01T07:22:00.000Z"
+            },
+            "notCounted": 1,
+            "notCountedSources": {
+              "sprintIds": [
+                "6f0000000000000000000b02"
+              ],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:22:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksReadLeftOutReader": {
+    "as": "sam",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals/000000000000000000000028"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal fetched successfully.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": false,
+        "color": "",
+        "progressPct": 17,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 33,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01"
+              ],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 1,
+              "total": 3,
+              "at": "2026-10-01T07:22:00.000Z"
+            },
+            "notCounted": 1,
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:22:00.000Z"
+            },
+            "notCounted": 0,
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": false,
+        "canSetValue": false,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksUncounted": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/000000000000000000000028/targets/6f0000000000000000009003",
+      "body": {
+        "sources": {
+          "sprintIds": [
+            "6f0000000000000000000b01"
+          ],
+          "taskIds": []
+        }
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Target saved.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 17,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 33,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01"
+              ],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 1,
+              "total": 3,
+              "at": "2026-10-01T07:25:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:22:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
   }
 }

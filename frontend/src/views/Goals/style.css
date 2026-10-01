@@ -157,9 +157,52 @@
 .glt__confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--r-md, 6px); background: var(--danger-bg); color: var(--danger-ink); font: var(--text-small); }
 .glt__confirm > span { flex: 1; min-width: 160px; }
 
+.glt__left-out { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: var(--r-md, 6px); background: var(--warn-bg); color: var(--warn-ink); font: var(--text-small); }
+
 .gtf { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 10px 12px; }
-.gtf__kind, .gtf__name, .gtf__fixed, .gtf__error, .gtf__actions { grid-column: 1 / -1; }
+.gtf__kind, .gtf__name, .gtf__fixed, .gtf__sources, .gtf__error, .gtf__actions { grid-column: 1 / -1; }
 .gtf__fixed { margin: 0; font: var(--text-small); color: var(--ink-2); }
+.gtf__sources { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+
+.gsc { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; }
+.gsc__chip {
+    display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: var(--hit-min, 24px);
+    padding: 2px 8px; border: 1px solid var(--border); border-radius: var(--r-md, 6px);
+    background: var(--surface); color: var(--ink); font: var(--text-small);
+}
+.gsc__chip.is-unknown .gsc__name { color: var(--ink-2); font-style: italic; }
+.gsc__chip.is-refused { border-color: var(--danger); background: var(--danger-bg); color: var(--danger-ink); }
+.gsc__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-strong, 500); }
+.gsc__project { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); }
+.gsc__chip.is-refused .gsc__project { color: inherit; }
+.gsc__remove {
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: var(--hit-min, 24px); height: var(--hit-min, 24px); margin-inline-end: -6px;
+    padding: 0; border: 0; border-radius: var(--r-sm, 4px);
+    background: transparent; color: inherit; cursor: pointer;
+}
+.gsc__remove:hover { background: var(--surface-hover); }
+.gsc__remove:focus-visible { outline: none; box-shadow: var(--focus); }
+.gsc__remove:disabled { opacity: .5; cursor: default; }
+
+.gsp { display: flex; flex-direction: column; gap: 8px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.gsp legend.ah-field__label { float: none; width: auto; margin: 0 0 6px; padding: 0; }
+.gsp__note { margin: 0; font: var(--text-small); color: var(--ink-2); }
+.gsp__options { display: flex; flex-direction: column; max-height: 220px; padding: 4px; overflow-y: auto; border: 1px solid var(--hairline); border-radius: var(--r-md, 6px); background: var(--surface); }
+.gsp__options .gsp__note { padding: 4px 6px; }
+.gsp__group { margin: 0; padding: 6px 6px 2px; font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-label); }
+.gsp__option {
+    display: flex; align-items: center; gap: 8px; flex: none; width: 100%; min-height: max(var(--hit-min, 24px), 28px);
+    padding: 2px 6px; border: 0; border-radius: var(--r-sm, 4px);
+    background: transparent; color: var(--ink); font: var(--text-body); text-align: start; cursor: pointer;
+}
+.gsp__option:hover:not(:disabled) { background: var(--surface-hover); }
+.gsp__option:focus-visible { outline: none; box-shadow: var(--focus); }
+.gsp__option:disabled { color: var(--ink-2); cursor: default; }
+.gsp__option-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gsp__option-place { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--text-small); color: var(--ink-2); }
+
+.glv__drop { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 
 /* Below this the list and the panel do not fit side by side: the panel takes the page, and closing it brings the list back. */
 @media (max-width: 1023px) {

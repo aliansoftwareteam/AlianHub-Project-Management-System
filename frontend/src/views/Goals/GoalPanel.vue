@@ -279,7 +279,7 @@ async function addTarget(form) {
     const result = await write("addTarget", { id: goal.value._id, form });
     busy.value = false;
     if (result.ok) stopAdding();
-    else refusal.value = { field: result.field, message: result.message };
+    else refusal.value = result;
 }
 
 /* What the person is typing is theirs until they leave the field; a change from elsewhere fills the rest. */

@@ -1,6 +1,6 @@
 <template>
     <li class="glt" :class="{ 'is-reached': reached }" data-test="glt" :data-kind="target.kind">
-        <GoalTargetForm v-if="editing" :target="target" :currencies="currencies" :busy="busy" :refusal="refusal" @save="saveEdit" @cancel="stopEditing" />
+        <GoalTargetForm v-if="editing" :target="target" :currencies="currencies" :busy="busy" :refusal="refusal" :linking="linking" @save="saveEdit" @cancel="stopEditing" />
         <template v-else>
             <div class="glt__head">
                 <span class="glt__name">{{ target.name }}</span>
@@ -9,7 +9,7 @@
                 </span>
                 <span class="glt__weight">{{ $t('Goals.weight_n', { n: target.weight }) }}</span>
                 <span v-if="changeable" class="glt__actions">
-                    <button ref="editButton" type="button" class="glt__icon" data-test="glt-edit" :aria-label="$t('Goals.edit_target', { name: target.name })" :title="$t('Goals.edit_target', { name: target.name })" @click="editing = true">
+                    <button ref="editButton" type="button" class="glt__icon" data-test="glt-edit" :aria-label="$t('Goals.edit_target', { name: target.name })" :title="$t('Goals.edit_target', { name: target.name })" @click="startEditing(false)">
                         <ShellIcon name="edit" :size="14" />
                     </button>
                     <button ref="removeButton" type="button" class="glt__icon" data-test="glt-remove" :aria-label="$t('Goals.remove_target', { name: target.name })" :title="$t('Goals.remove_target', { name: target.name })" @click="askRemove">
@@ -50,7 +50,24 @@
                 </label>
                 <span v-else class="glt__now">{{ $t(target.done ? 'Goals.done' : 'Goals.not_done') }}</span>
             </div>
-            <span v-if="error" :id="`${uid}-error`" class="ah-field__error" role="alert" data-error-for="current">{{ error }}</span>
+            <template v-else-if="view === 'counted'">
+                <div v-if="unlinked" class="glt__value" data-test="glt-empty">
+                    <span class="glt__range">{{ $t('Goals.sources_none') }}</span>
+                    <button v-if="changeable" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="glt-link" @click="startEditing(true)">
+                        <ShellIcon name="link" :size="13" />{{ $t('Goals.link_sources') }}
+                    </button>
+                </div>
+                <div v-else class="glt__value">
+                    <span class="glt__now" data-test="glt-counted">{{ $t('Goals.tasks_done', { done: tally.done, total: tally.total }) }}</span>
+                    <span v-if="target.updating" class="glt__saving" role="status" data-test="glt-updating">{{ $t('Goals.updating') }}</span>
+                </div>
+                <GoalSourceChips :sources="countedSources" data-test="glt-sources" />
+                <div v-if="target.notCounted > 0" class="glt__left-out" data-test="glt-not-counted">
+                    <span>{{ $t('Goals.not_counted', { n: target.notCounted }, target.notCounted) }}</span>
+                    <GoalSourceChips v-if="target.notCountedSources" :sources="target.notCountedSources" :removable="changeable" :busy="busy" @remove="unlink" />
+                </div>
+            </template>
+            <span v-if="error" :id="`${uid}-error`" class="ah-field__error" role="alert" :data-error-for="view === 'counted' ? 'sources' : 'current'">{{ error }}</span>
 
             <div class="glt__progress">
                 <GoalBar :value="target.progressPct" :label="$t('Goals.progress_of', { name: target.name })" />
@@ -58,6 +75,7 @@
                 <span v-if="target.saving" class="glt__saving" role="status">{{ $t('Goals.saving') }}</span>
             </div>
             <p v-if="updated" class="glt__updated">{{ updated }}</p>
+            <p v-else-if="countedAt" class="glt__updated" data-test="glt-counted-at">{{ countedAt }}</p>
 
             <div v-if="removing" class="glt__confirm" role="group" :aria-label="$t('Goals.remove_target', { name: target.name })" @keydown.esc.stop="stopRemoving">
                 <span>{{ $t('Goals.remove_confirm') }}</span>
@@ -73,9 +91,10 @@ import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import GoalBar from "./GoalBar.vue";
+import GoalSourceChips from "./GoalSourceChips.vue";
 import GoalTargetForm from "./GoalTargetForm.vue";
 import { formatAmount, formatWhen } from "./goalFormat";
-import { isReached, kindOf, rangeOf } from "./goalRequest";
+import { isReached, kindOf, rangeOf, sourceCount, withoutSources } from "./goalRequest";
 import { useGoalPeople } from "./useGoalPeople";
 import { useGoalWrite } from "./useGoalWrite";
 
@@ -93,6 +112,7 @@ const { write } = useGoalWrite();
 const uid = `glt-${Math.random().toString(36).slice(2, 8)}`;
 
 const editing = ref(false);
+const linking = ref(false);
 const removing = ref(false);
 const busy = ref(false);
 const refusal = ref(null);
@@ -104,8 +124,9 @@ const keepButton = ref(null);
 const text = (value) => (value === undefined || value === null ? "" : String(value));
 const draft = ref(text(props.target.current));
 
-/* 'measured' and 'flag' are the kinds a person sets by hand. Any other kind is read only here:
-   it shows its name, weight and the server's percentage, and a view for it is added as a branch above. */
+/* 'measured' and 'flag' are the kinds a person sets by hand, and 'counted' is the one the server counts
+   from tasks: its numbers are only shown. Any other kind is read only here: it shows its name, weight
+   and the server's percentage, and a view for it is added as a branch above. */
 const view = computed(() => kindOf(props.target));
 const known = computed(() => view.value !== "other");
 const live = computed(() => !props.goal.archived);
@@ -120,6 +141,15 @@ const dirty = computed(() => text(draft.value) !== "" && Number(draft.value) !==
 const updated = computed(() => {
     const when = formatWhen(props.target.updatedAt, locale.value);
     return props.target.updatedBy && when ? t("Goals.updated_by", { name: personOf(props.target.updatedBy).name, when }) : "";
+});
+
+const tally = computed(() => ({ done: Number(props.target.counted?.done) || 0, total: Number(props.target.counted?.total) || 0 }));
+/* Someone who can edit the goal is sent every linked source, the ones left out of the count among them. */
+const countedSources = computed(() => withoutSources(props.target.sources, props.target.notCountedSources));
+const unlinked = computed(() => !sourceCount(props.target.sources) && !(props.target.notCounted > 0));
+const countedAt = computed(() => {
+    const when = view.value === "counted" && !unlinked.value ? formatWhen(props.target.counted?.at, locale.value) : "";
+    return when ? t("Goals.counted_at", { when }) : "";
 });
 
 const showStored = () => { draft.value = text(props.target.current); };
@@ -139,6 +169,11 @@ function saveValue() {
 
 const saveFlag = (done) => setValue(done);
 
+function startEditing(toLink) {
+    linking.value = toLink;
+    editing.value = true;
+}
+
 async function stopEditing() {
     editing.value = false;
     refusal.value = null;
@@ -151,7 +186,15 @@ async function saveEdit(form) {
     const result = await write("editTarget", { id: props.goal._id, target: props.target, form });
     busy.value = false;
     if (result.ok) stopEditing();
-    else refusal.value = { field: result.field, message: result.message };
+    else refusal.value = result;
+}
+
+async function unlink(source) {
+    busy.value = true;
+    error.value = "";
+    const result = await write("setSources", { id: props.goal._id, target: props.target, sources: withoutSources(props.target.sources, { [source.kind]: [source.id] }) });
+    busy.value = false;
+    if (!result.ok && result.message) error.value = result.message;
 }
 
 async function askRemove() {

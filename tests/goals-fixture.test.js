@@ -8,13 +8,18 @@ const path = require('path');
 
 const mockDb = require('./fixtures/fakeMongo').create();
 
-jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...args) => mockDb.crud(...args) }));
+jest.mock('../utils/mongo-handler/mongoQueries', () => ({
+    MongoDbCrudOpration: (...args) => mockDb.crud(...args),
+    validateObjectId: (id) => /^[a-f0-9]{24}$/i.test(String(id)),
+}));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
+jest.mock('../Modules/settings/securityPermissions/controller', () => ({ fetchRules: jest.fn(async () => []) }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
 jest.mock('../Modules/Audit/recorder', () => ({ recordAuditFromReq: jest.fn() }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const goals = require('../Modules/Goals/controller');
+const counts = require('../Modules/Goals/goalCounts');
 const { withProgress } = require('../Modules/Goals/helpers/goalProgress');
 const request = require('../frontend/src/views/Goals/goalRequest');
 
@@ -37,6 +42,15 @@ const SECRET = '6f0000000000000000000e06';
 const ROLLOUT = '6f0000000000000000000e07';
 const target = (n) => `6f0000000000000000000f${String(n).padStart(2, '0')}`;
 
+const WEBSITE = '6f0000000000000000000a01';
+const HIRING_PLAN = '6f0000000000000000000a02';
+const SPRINT = '6f0000000000000000000b01';
+const BACKLOG = '6f0000000000000000000b02';
+const TEAM_LIST = '6f0000000000000000000b03';
+const NO_LIST = '6f0000000000000000000b09';
+const task = (n) => `6f0000000000000000000d${String(n).padStart(2, '0')}`;
+const LOOSE_TASK = task(5);
+
 const SEEDED_AT = new Date('2026-09-20T09:00:00.000Z');
 const NOW = new Date('2026-10-01T06:30:00.000Z');
 const TIMERS_LEFT_REAL = ['nextTick', 'setImmediate', 'clearImmediate', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'queueMicrotask', 'hrtime', 'performance'];
@@ -47,6 +61,28 @@ const seedGoal = (_id, name, ownerUserId, over = {}, targets = []) => mockDb.see
     ...over,
     ...withProgress(targets.map((entry) => ({ weight: 1, updatedBy: ownerUserId, updatedAt: SEEDED_AT, ...entry })), SEEDED_AT),
 });
+
+const seedList = (_id, projectId, name) => mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id, projectId, name, private: false, AssigneeUserId: [], deletedStatusKey: 0 });
+const seedTask = (n, ProjectID, sprintId, TaskName, statusType = 'default_active') => mockDb.seed(SCHEMA_TYPE.TASKS, {
+    _id: task(n), TaskName, ProjectID, sprintId, deletedStatusKey: 0, isParentTask: true, statusType,
+});
+
+/* An open project with two lists, and a private one that only two of the people are on. Seeded after
+   the goals' own steps, so the ids the stand-in database hands out in those steps stay as recorded. */
+const seedWork = () => {
+    mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: WEBSITE, ProjectName: 'Website', isPrivateSpace: false, AssigneeUserId: [], deletedStatusKey: 0 });
+    mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: HIRING_PLAN, ProjectName: 'Hiring plan', isPrivateSpace: true, AssigneeUserId: [ME, SAM], deletedStatusKey: 0 });
+    seedList(SPRINT, WEBSITE, 'Sprint 1');
+    seedList(BACKLOG, WEBSITE, 'Backlog');
+    seedList(TEAM_LIST, HIRING_PLAN, 'Interviews');
+    seedTask(1, WEBSITE, SPRINT, 'Design the home page', 'close');
+    seedTask(2, WEBSITE, SPRINT, 'Build the home page');
+    seedTask(3, WEBSITE, SPRINT, 'Write the copy');
+    seedTask(4, WEBSITE, BACKLOG, 'Pick a font', 'close');
+    seedTask(5, WEBSITE, BACKLOG, 'Fix the footer');
+    seedTask(6, HIRING_PLAN, TEAM_LIST, 'Phone screens', 'close');
+    seedTask(7, HIRING_PLAN, TEAM_LIST, 'On-site days');
+};
 
 const seed = () => {
     Object.entries(ROLES).forEach(([userId, roleType]) => mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, roleType, status: 2, isDelete: false }));
@@ -108,6 +144,8 @@ const record = async () => {
         jest.setSystemTime(new Date(NOW.getTime() + minute * 60000));
         minute += 1;
         out[name] = await ask(asked, as);
+        /* A count that a read starts runs behind its answer: it is over before the next request is made. */
+        await counts.idle();
         return out[name].response.data;
     };
 
@@ -146,6 +184,28 @@ const record = async () => {
     await step('restored', request.restoreRequest(created._id));
     await step('handedOver', request.updateRequest(created._id, { ownerUserId: SAM }));
     await step('readHandedOver', request.readRequest(created._id));
+
+    seedWork();
+    const tasksForm = (name, sources) => ({ kind: 'tasks', name, weight: '1', sources });
+    const delivery = (await step('tasksGoal', request.createRequest({ name: 'Deliver the release' })))._id;
+    const linked = await step('tasksAdded', request.addTargetRequest(delivery, tasksForm('Release tasks', { sprintIds: [SPRINT, TEAM_LIST], taskIds: [LOOSE_TASK] })));
+    await step('tasksAddedEmpty', request.addTargetRequest(delivery, tasksForm('Stretch tasks', { sprintIds: [], taskIds: [] })));
+    await step('tasksNotFound', request.addTargetRequest(delivery, tasksForm('Old tasks', { sprintIds: [SPRINT, NO_LIST], taskIds: [] })));
+    await step('tasksValueRefused', request.valueRequest(delivery, linked.targets[0], '3'));
+    await step('tasksWouldDrop', request.updateRequest(delivery, { visibility: 'workspace' }));
+    const wouldDrop = out.tasksWouldDrop.response.sources;
+    const kept = await step('tasksDropped', request.sourcesRequest(delivery, linked.targets[0], request.withoutSources(linked.targets[0].sources, wouldDrop)));
+    await step('tasksOpened', request.updateRequest(delivery, { visibility: 'workspace' }));
+    await step('tasksNotShared', request.editTargetRequest(delivery, kept.targets[0], tasksForm('Release tasks', { sprintIds: [SPRINT, TEAM_LIST], taskIds: [LOOSE_TASK] })));
+    await step('tasksRelinked', request.editTargetRequest(delivery, kept.targets[0], tasksForm('Release tasks', { sprintIds: [SPRINT, BACKLOG], taskIds: [] })));
+    await step('tasksReadReader', request.readRequest(delivery), 'sam');
+
+    Object.assign(mockDb.store[SCHEMA_TYPE.SPRINTS].find((row) => String(row._id) === BACKLOG), { private: true, AssigneeUserId: [ME] });
+    minute += 11;
+    await step('tasksReadStale', request.readRequest(delivery));
+    const leftOut = await step('tasksReadLeftOut', request.readRequest(delivery));
+    await step('tasksReadLeftOutReader', request.readRequest(delivery), 'sam');
+    await step('tasksUncounted', request.sourcesRequest(delivery, leftOut.targets[0], request.withoutSources(leftOut.targets[0].sources, leftOut.targets[0].notCountedSources)));
     return out;
 };
 
@@ -168,7 +228,10 @@ afterAll(() => jest.useRealTimers());
 test('the fixture the web app is tested against is what the handlers answer to the page\'s own requests', async () => {
     const recorded = withSteadyIds(await record());
 
-    const REFUSED = { readMissing: 404, createRefused: 400, createRefusedGuest: 403, sharedRefused: 400, editRefused: 403, valueRefused: 403, valueTooLarge: 400, targetAddRefused: 400, archivedRefused: 409, readHandedOver: 404 };
+    const REFUSED = {
+        readMissing: 404, createRefused: 400, createRefusedGuest: 403, sharedRefused: 400, editRefused: 403, valueRefused: 403, valueTooLarge: 400, targetAddRefused: 400, archivedRefused: 409, readHandedOver: 404,
+        tasksNotFound: 400, tasksValueRefused: 400, tasksWouldDrop: 400, tasksNotShared: 400,
+    };
     Object.entries(recorded).forEach(([name, entry]) => {
         expect({ name, statusCode: entry.statusCode, status: entry.response.status }).toEqual({ name, statusCode: REFUSED[name] || 200, status: !REFUSED[name] });
     });
@@ -209,6 +272,31 @@ test('the fixture the web app is tested against is what the handlers answer to t
     expect(recorded.readArchived.response.data.archived).toBe(true);
     expect(recorded.restored.response.data.archived).toBe(false);
     expect(recorded.handedOver.response).toEqual({ status: true, statusText: 'Goal saved.', data: null });
+
+    const counted = (entry, at = 0) => entry.response.data.targets[at];
+    const withTeam = { sprintIds: [SPRINT, TEAM_LIST], taskIds: [LOOSE_TASK] };
+    expect(recorded.tasksAdded.request.body).toEqual({ kind: 'tasks', name: 'Release tasks', weight: 1, sources: withTeam });
+    expect(counted(recorded.tasksAdded)).toMatchObject({ kind: 'tasks', progressPct: 33, sources: withTeam, counted: { done: 2, total: 6 }, notCounted: 0, notCountedSources: { sprintIds: [], taskIds: [] }, dirty: false, updating: false });
+    expect(counted(recorded.tasksAddedEmpty, 1)).toMatchObject({ kind: 'tasks', progressPct: 0, sources: { sprintIds: [], taskIds: [] }, counted: { done: 0, total: 0 }, notCounted: 0 });
+    expect(recorded.tasksNotFound.response).toMatchObject({ status: false, field: 'sources.sprintIds.1', code: 'source_not_found' });
+    expect(recorded.tasksValueRefused.response).toMatchObject({ status: false, field: 'current', code: 'counted_from_tasks' });
+    expect(recorded.tasksWouldDrop.response).toMatchObject({ status: false, field: 'visibility', code: 'sources_would_drop', sources: { sprintIds: [TEAM_LIST], taskIds: [] } });
+    expect(recorded.tasksDropped.request.body).toEqual({ sources: { sprintIds: [SPRINT], taskIds: [LOOSE_TASK] } });
+    expect(counted(recorded.tasksDropped)).toMatchObject({ counted: { done: 1, total: 4 }, progressPct: 25 });
+    expect(recorded.tasksOpened.response.data.visibility).toBe('workspace');
+    expect(recorded.tasksNotShared.request.body).toEqual({ sources: withTeam });
+    expect(recorded.tasksNotShared.response).toMatchObject({ status: false, code: 'source_not_shared', sources: { sprintIds: [TEAM_LIST], taskIds: [] } });
+    expect(recorded.tasksRelinked.request.body).toEqual({ sources: { sprintIds: [SPRINT, BACKLOG], taskIds: [] } });
+    expect(counted(recorded.tasksRelinked)).toMatchObject({ counted: { done: 2, total: 5 }, progressPct: 40 });
+    expect(recorded.tasksReadReader.response.data).toMatchObject({ canEdit: false, canSetValue: false });
+    expect(counted(recorded.tasksReadReader)).toMatchObject({ sources: { sprintIds: [SPRINT, BACKLOG], taskIds: [] }, counted: { done: 2, total: 5 }, notCounted: 0 });
+    expect(counted(recorded.tasksReadReader).notCountedSources).toBeUndefined();
+    expect(counted(recorded.tasksReadStale)).toMatchObject({ updating: true, counted: { done: 2, total: 5 } });
+    expect(counted(recorded.tasksReadLeftOut)).toMatchObject({ updating: false, counted: { done: 1, total: 3 }, notCounted: 1, notCountedSources: { sprintIds: [BACKLOG], taskIds: [] } });
+    expect(counted(recorded.tasksReadLeftOutReader)).toMatchObject({ notCounted: 1, sources: { sprintIds: [SPRINT], taskIds: [] } });
+    expect(JSON.stringify(recorded.tasksReadLeftOutReader.response)).not.toContain(BACKLOG);
+    expect(recorded.tasksUncounted.request.body).toEqual({ sources: { sprintIds: [SPRINT], taskIds: [] } });
+    expect(counted(recorded.tasksUncounted)).toMatchObject({ notCounted: 0, counted: { done: 1, total: 3 } });
 
     if (process.env.UPDATE_GOALS_FIXTURE === '1') {
         fs.mkdirSync(path.dirname(FIXTURE), { recursive: true });

@@ -1,9 +1,12 @@
 import { apiRequest } from '@/services';
 import {
-    addTargetRequest, archiveRequest, createRequest, editTargetRequest, listRequest, readRequest, removeTargetRequest, restoreRequest, updateRequest, valueOf, valueRequest
+    addTargetRequest, archiveRequest, createRequest, editTargetRequest, listRequest, readRequest, removeTargetRequest, restoreRequest, sourcesRequest, updateRequest, valueOf, valueRequest
 } from '@/views/Goals/goalRequest';
 
 export const REFETCH_DELAY_MS = 400;
+/* A count the server has started is asked for again this long after its last answer, this many times at most. */
+export const COUNT_POLL_MS = 2000;
+export const COUNT_POLL_LIMIT = 30;
 
 const READY = 'ready';
 const LOADING = 'loading';
@@ -26,8 +29,12 @@ const send = async ({ method, path, body }) => {
 const failure = (error) => {
     const status = error?.response?.status || 0;
     const data = error?.response?.data || {};
-    return Object.assign(new Error(data.message || error?.message || 'Request failed'), { kind: KIND_OF_STATUS[status] || 'failed', status, field: data.field || '' });
+    return Object.assign(new Error(data.message || error?.message || 'Request failed'), {
+        kind: KIND_OF_STATUS[status] || 'failed', status, field: data.field || '', code: data.code || '', sources: data.sources || null
+    });
 };
+
+const isCounting = (goal) => (goal?.targets || []).some((target) => target.updating === true);
 
 const sameId = (goal, id) => String(goal._id) === String(id);
 const byName = (a, b) => String(a.name).localeCompare(String(b.name));
@@ -65,6 +72,7 @@ export default {
         goals: (state) => state.goals,
         filters: (state) => state.filters,
         open: (state) => state.open,
+        counting: (state) => state.goals.some(isCounting) || isCounting(state.open.goal),
         goalById: (state) => (id) => state.goals.find((goal) => sameId(goal, id)) || null
     },
     mutations: {
@@ -185,6 +193,7 @@ export default {
         restore: (context, id) => write(context, id, restoreRequest(id)),
         addTarget: (context, { id, form }) => write(context, id, addTargetRequest(id, form)),
         removeTarget: (context, { id, targetId }) => write(context, id, removeTargetRequest(id, targetId)),
+        setSources: (context, { id, target, sources }) => write(context, id, sourcesRequest(id, target, sources)),
 
         editTarget(context, { id, target, form }) {
             const request = editTargetRequest(id, target, form);

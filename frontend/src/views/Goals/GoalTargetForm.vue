@@ -46,6 +46,11 @@
             </label>
         </template>
 
+        <div v-if="kind === TASKS" class="gtf__sources">
+            <GoalSourcePicker :model-value="form.sources" :refused="refused" :error="errors.sources" :error-id="idOf('sources')" @update:modelValue="setSources" />
+            <span class="ah-field__hint">{{ $t('Goals.sources_hint') }}</span>
+        </div>
+
         <label class="ah-field">
             <span class="ah-field__label">{{ $t('Goals.weight') }}</span>
             <input v-model="form.weight" type="number" min="1" :max="LIMITS.weight" step="1" inputmode="numeric" class="ah-input" data-test="gtf-weight" v-bind="state('weight')" @input="clear('weight')" />
@@ -64,17 +69,19 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { KINDS, LIMITS, NUMBER, checkTarget, isMeasured } from "./goalRequest";
+import GoalSourcePicker from "./GoalSourcePicker.vue";
+import { KINDS, LIMITS, NUMBER, TASKS, checkTarget, isMeasured, refusedSources, sourcesOf } from "./goalRequest";
 
 defineOptions({ name: "GoalTargetForm" });
 
-const FIELDS = ["kind", "name", "start", "target", "current", "unit", "currencyCode", "weight"];
+const FIELDS = ["kind", "name", "start", "target", "current", "unit", "currencyCode", "sources", "weight"];
 
 const props = defineProps({
     target: { type: Object, default: null },
     currencies: { type: Array, default: () => [] },
     busy: { type: Boolean, default: false },
-    refusal: { type: Object, default: null }
+    refusal: { type: Object, default: null },
+    linking: { type: Boolean, default: false }
 });
 const emit = defineEmits(["save", "cancel"]);
 
@@ -84,9 +91,11 @@ const root = ref(null);
 
 const text = (value) => (value === undefined || value === null ? "" : String(value));
 const form = reactive(props.target
-    ? { kind: props.target.kind, name: props.target.name, start: text(props.target.start), target: text(props.target.target), current: "", unit: text(props.target.unit), currencyCode: text(props.target.currencyCode), weight: text(props.target.weight || 1) }
-    : { kind: NUMBER, name: "", start: "", target: "", current: "", unit: "", currencyCode: "", weight: "1" });
+    ? { kind: props.target.kind, name: props.target.name, start: text(props.target.start), target: text(props.target.target), current: "", unit: text(props.target.unit), currencyCode: text(props.target.currencyCode), weight: text(props.target.weight || 1), sources: sourcesOf(props.target.sources) }
+    : { kind: NUMBER, name: "", start: "", target: "", current: "", unit: "", currencyCode: "", weight: "1", sources: sourcesOf() });
 const errors = reactive({});
+const refused = ref(null);
+let sent = null;
 
 const kind = computed(() => form.kind);
 const measured = computed(() => isMeasured(form.kind));
@@ -96,6 +105,11 @@ const state = (field) => (errors[field]
     ? { class: "ah-input--error", "aria-invalid": "true", "aria-describedby": idOf(field) }
     : {});
 const clear = (field) => { errors[field] = ""; errors.form = ""; };
+function setSources(sources) {
+    form.sources = sources;
+    clear("sources");
+    refused.value = null;
+}
 
 function show(found) {
     [...FIELDS, "form"].forEach((field) => { errors[field] = found[field] || ""; });
@@ -105,13 +119,19 @@ function show(found) {
 function submit() {
     const found = Object.fromEntries(Object.entries(checkTarget(form)).map(([field, key]) => [field, t(key)]));
     show(found);
-    if (!Object.keys(found).length && !props.busy) emit("save", { ...form });
+    refused.value = null;
+    if (Object.keys(found).length || props.busy) return;
+    sent = sourcesOf(form.sources);
+    emit("save", { ...form, sources: sent });
 }
 
-/* What the server refused lands on the field it named; a field this form does not show is said under the form. */
+/* What the server refused lands on the field it named; a field this form does not show is said under the form.
+   A refused list or task is marked among the ones that were sent. */
 watch(() => props.refusal, (refusal) => {
-    if (refusal?.message) show({ [FIELDS.includes(refusal.field) ? refusal.field : "form"]: refusal.message });
+    if (!refusal?.message) return;
+    show({ [FIELDS.includes(refusal.field) ? refusal.field : "form"]: refusal.message });
+    refused.value = refusal.field === "sources" ? refusedSources({ field: refusal.pointer, sources: refusal.sources }, sent) : null;
 });
 
-onMounted(() => root.value?.querySelector("select, input")?.focus());
+onMounted(() => root.value?.querySelector(props.linking ? ".gsp__search" : "select, input")?.focus());
 </script>

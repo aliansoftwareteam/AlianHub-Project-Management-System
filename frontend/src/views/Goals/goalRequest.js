@@ -6,18 +6,20 @@ const V2_GOALS = '/api/v2/goals';
 const NUMBER = 'number';
 const CURRENCY = 'currency';
 const BOOLEAN = 'boolean';
-const KINDS = [NUMBER, CURRENCY, BOOLEAN];
+const TASKS = 'tasks';
+const KINDS = [NUMBER, CURRENCY, BOOLEAN, TASKS];
 const VISIBILITIES = ['private', 'people', 'workspace'];
 const SORTS = ['name', 'progress'];
 const PERIODS = ['current', 'upcoming', 'past', 'none'];
-const LIMITS = Object.freeze({ name: 120, description: 2000, unit: 20, targets: 20, weight: 100 });
+const LIMITS = Object.freeze({ name: 120, description: 2000, unit: 20, targets: 20, weight: 100, sprintIds: 20, taskIds: 100 });
+const SOURCE_KINDS = ['sprintIds', 'taskIds'];
 
 const GOAL_KEYS = ['name', 'description', 'periodStart', 'periodEnd', 'visibility', 'sharedWith', 'color', 'ownerUserId'];
-const FIELDS = [...GOAL_KEYS, 'kind', 'weight', 'start', 'target', 'current', 'unit', 'currencyCode', 'done', 'targets'];
+const FIELDS = [...GOAL_KEYS, 'kind', 'weight', 'start', 'target', 'current', 'unit', 'currencyCode', 'done', 'targets', 'sources'];
 
-/* How a target is drawn and set. A kind added later (the server's "tasks done") gets a row here and a
-   branch in GoalTarget.vue; until then a kind that is not listed is shown with its progress and nothing to press. */
-const KIND_VIEW = Object.freeze({ [NUMBER]: 'measured', [CURRENCY]: 'measured', [BOOLEAN]: 'flag' });
+/* How a target is drawn and set. A kind added later gets a row here and a branch in GoalTarget.vue;
+   until then a kind that is not listed is shown with its progress and nothing to press. */
+const KIND_VIEW = Object.freeze({ [NUMBER]: 'measured', [CURRENCY]: 'measured', [BOOLEAN]: 'flag', [TASKS]: 'counted' });
 const kindOf = (target) => KIND_VIEW[target && target.kind] || 'other';
 const isMeasured = (kind) => KIND_VIEW[kind] === 'measured';
 
@@ -41,8 +43,17 @@ const goalFields = (form, { keepEmpty = false } = {}) => Object.fromEntries(GOAL
 
 const weightOf = (value) => (blank(value) ? 1 : Number(value));
 
+const sourcesOf = (sources) => Object.fromEntries(SOURCE_KINDS.map((kind) => [kind, [...new Set(((sources || {})[kind] || []).map(String))]]));
+const sourceCount = (sources) => SOURCE_KINDS.reduce((count, kind) => count + sourcesOf(sources)[kind].length, 0);
+const withoutSources = (sources, dropped) => {
+    const out = sourcesOf(dropped);
+    return Object.fromEntries(Object.entries(sourcesOf(sources)).map(([kind, ids]) => [kind, ids.filter((id) => !out[kind].includes(id))]));
+};
+const sameSources = (a, b) => sourceCount(a) === sourceCount(b) && sourceCount(withoutSources(a, b)) === 0;
+
 const targetFields = (form) => {
     const base = { kind: form.kind, name: squeezed(form.name), weight: weightOf(form.weight) };
+    if (form.kind === TASKS) return { ...base, sources: sourcesOf(form.sources) };
     if (!isMeasured(form.kind)) return base;
     const unit = String(form.unit || '').trim();
     const optional = { start: numberOf(form.start), target: numberOf(form.target), current: numberOf(form.current), unit: unit || undefined };
@@ -53,13 +64,15 @@ const targetFields = (form) => {
     };
 };
 
-/* Only what differs from the stored target is sent: its kind is fixed, and its value has a request of its own. */
+/* Only what differs from the stored target is sent: its kind is fixed, and its value has a request of its own.
+   The lists and tasks it is counted from are one value: the server replaces the set it holds with the set it is sent. */
 const targetChanges = (stored, form) => {
     const wanted = { name: squeezed(form.name), weight: weightOf(form.weight) };
     if (isMeasured(stored.kind)) Object.assign(wanted, { start: Number(form.start), target: Number(form.target), unit: String(form.unit || '').trim() });
     if (stored.kind === CURRENCY) wanted.currencyCode = form.currencyCode;
     const was = { unit: '', ...stored };
-    return Object.fromEntries(Object.entries(wanted).filter(([key, value]) => value !== was[key]));
+    const changed = Object.fromEntries(Object.entries(wanted).filter(([key, value]) => value !== was[key]));
+    return stored.kind === TASKS && !sameSources(stored.sources, form.sources) ? { ...changed, sources: sourcesOf(form.sources) } : changed;
 };
 
 const listRequest = ({ archived = false, mine = false } = {}) => {
@@ -73,6 +86,7 @@ const archiveRequest = (id) => ({ method: 'post', path: `${goalPath(id)}/archive
 const restoreRequest = (id) => ({ method: 'post', path: `${goalPath(id)}/restore` });
 const addTargetRequest = (id, form) => ({ method: 'post', path: `${goalPath(id)}/targets`, body: targetFields(form) });
 const editTargetRequest = (id, stored, form) => ({ method: 'patch', path: targetPath(id, stored.id), body: targetChanges(stored, form) });
+const sourcesRequest = (id, target, sources) => ({ method: 'patch', path: targetPath(id, target.id), body: { sources: sourcesOf(sources) } });
 const removeTargetRequest = (id, targetId) => ({ method: 'delete', path: targetPath(id, targetId) });
 const valueOf = (target, value) => (target.kind === BOOLEAN ? { done: value === true } : { current: Number(value) });
 const valueRequest = (id, target, value) => ({ method: 'put', path: `${targetPath(id, target.id)}/value`, body: valueOf(target, value) });
@@ -118,6 +132,11 @@ const checkTarget = (form) => {
     const errors = {};
     if (!squeezed(form.name) || squeezed(form.name).length > LIMITS.name) errors.name = 'Goals.error_name';
     if (!blank(form.weight) && !wholeWeight(form.weight)) errors.weight = 'Goals.error_weight';
+    if (form.kind === TASKS) {
+        const linked = sourcesOf(form.sources);
+        if (linked.sprintIds.length > LIMITS.sprintIds) errors.sources = 'Goals.sources_lists_full';
+        else if (linked.taskIds.length > LIMITS.taskIds) errors.sources = 'Goals.sources_tasks_full';
+    }
     if (!isMeasured(form.kind)) return errors;
     const [start, target, current] = [form.start, form.target, form.current].map(numberOf);
     if (start !== undefined && !Number.isFinite(start)) errors.start = 'Goals.error_number';
@@ -130,9 +149,24 @@ const checkTarget = (form) => {
     return errors;
 };
 
-/* The server names the field it refused, nested for a target sent with its goal ("targets.1.kind"). */
-const fieldOf = (field) => String(field || '').split('.').pop();
+/* The server names the field it refused, nested for a target sent with its goal ("targets.1.kind")
+   and down to the one list or task for what a target is counted from ("sources.sprintIds.1"). */
+const pathOf = (field) => String(field || '').split('.');
+const fieldOf = (field) => (pathOf(field).includes('sources') ? 'sources' : pathOf(field).pop());
 const errorKey = (field) => (FIELDS.includes(fieldOf(field)) ? `Goals.error_${fieldOf(field)}` : 'Goals.error_generic');
+
+const REFUSAL_CODES = ['source_not_found', 'source_not_shared', 'sources_would_drop', 'counted_from_tasks'];
+const refusalKey = ({ code, field } = {}) => (REFUSAL_CODES.includes(code) ? `Goals.error_${code}` : errorKey(field));
+
+/* A refusal lists the sources at fault, or points at one by its place in the set that was sent. */
+const refusedSources = ({ field, sources } = {}, sent) => {
+    if (sources) return sourcesOf(sources);
+    const path = pathOf(field);
+    const [kind, place] = path.slice(path.indexOf('sources') + 1);
+    const pointed = path.includes('sources') && SOURCE_KINDS.includes(kind) && place !== undefined;
+    const id = pointed ? sourcesOf(sent)[kind][Number(place)] : undefined;
+    return sourcesOf(id ? { [kind]: [id] } : {});
+};
 
 /* What the person who hands a goal over is left with, by the server's own access rule
    (Modules/Goals/helpers/goalAccess.js): said to them before they confirm. */
@@ -145,8 +179,9 @@ const afterHandover = (goal, { myId, privileged }) => {
 };
 
 module.exports = {
-    V2_GOALS, KINDS, VISIBILITIES, SORTS, PERIODS, LIMITS, NUMBER, CURRENCY, BOOLEAN,
+    V2_GOALS, KINDS, VISIBILITIES, SORTS, PERIODS, LIMITS, NUMBER, CURRENCY, BOOLEAN, TASKS, SOURCE_KINDS,
     kindOf, isMeasured, listRequest, readRequest, createRequest, updateRequest, archiveRequest, restoreRequest,
-    addTargetRequest, editTargetRequest, removeTargetRequest, valueRequest, valueOf,
+    addTargetRequest, editTargetRequest, sourcesRequest, removeTargetRequest, valueRequest, valueOf,
+    sourcesOf, sourceCount, withoutSources, refusalKey, refusedSources,
     todayOf, periodBucket, groupGoals, isReached, reachedCount, rangeOf, checkGoal, checkTarget, fieldOf, errorKey, afterHandover
 };

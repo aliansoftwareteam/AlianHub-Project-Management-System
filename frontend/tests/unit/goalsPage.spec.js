@@ -509,7 +509,7 @@ describe('targets', () => {
         await openGoal('Cut churn');
         await at('glp-add-target').trigger('click');
         const form = () => at('gtf');
-        expect(at('gtf-kind', form()).findAll('option').map((option) => option.text())).toEqual(['Number', 'Currency', 'True or false']);
+        expect(at('gtf-kind', form()).findAll('option').map((option) => option.text())).toEqual(['Number', 'Currency', 'True or false', 'Counted from tasks']);
         expect(at('gtf-currency', form()).exists()).toBe(false);
 
         await at('gtf-kind', form()).setValue('boolean');
@@ -581,13 +581,13 @@ describe('targets', () => {
 describe('a kind of target this build does not know', () => {
     it('is shown with its progress and nothing to press, beside the ones it does know', async () => {
         const [, revenue] = fixture.list.response.data;
-        const counted = { id: '6f0000000000000000000f99', name: 'Launch tasks done', kind: 'tasks', weight: 3, progressPct: 40, reachedAt: null, counted: { done: 4, total: 10 }, updatedBy: '', updatedAt: null };
-        listOf({ ...revenue, targets: [...revenue.targets, counted] });
+        const scored = { id: '6f0000000000000000000f99', name: 'Launch score', kind: 'formula', weight: 3, progressPct: 40, reachedAt: null, updatedBy: '', updatedAt: null };
+        listOf({ ...revenue, targets: [...revenue.targets, scored] });
         await open();
         await openGoal('Grow revenue');
 
-        const unknown = targetOf('Launch tasks done');
-        expect(unknown.attributes('data-kind')).toBe('tasks');
+        const unknown = targetOf('Launch score');
+        expect(unknown.attributes('data-kind')).toBe('formula');
         expect(unknown.find('[role="progressbar"]').attributes('aria-valuenow')).toBe('40');
         expect(unknown.find('.glt__weight').text()).toBe('Weight 3');
         expect(unknown.findAll('input, button, select')).toHaveLength(0);
