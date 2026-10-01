@@ -200,7 +200,7 @@ const groupHolds = (group, kinds, given) => {
 };
 
 /**
- * The ids of the questions shown for `answers`, in form order.
+ * The questions shown for `answers`, in form order.
  *
  * `answers` is keyed by question id and holds what a browser posts: text, or a
  * list of texts, with a choice given by its label. A question the form hides is
@@ -208,17 +208,17 @@ const groupHolds = (group, kinds, given) => {
  * rules below it. A stored rule that checkRule refuses shows its question:
  * asking one question too many loses nothing, and hiding one could lose an answer.
  */
-const visibleIds = (questions, answers) => {
+const shownQuestions = (questions, answers) => {
     const list = Array.isArray(questions) ? questions : [];
     const posted = isPlainObject(answers) ? answers : {};
     const kinds = new Map();
     const given = new Map();
-    const shown = [];
 
-    list.forEach((question, index) => {
-        if (!isQuestion(question)) return;
-        if (!kinds.has(question.id)) kinds.set(question.id, kindOf(question.type));
-        if (question.hidden === true) return;
+    return list.filter((question, index) => {
+        if (!isPlainObject(question)) return false;
+        const named = isQuestion(question);
+        if (named && !kinds.has(question.id)) kinds.set(question.id, kindOf(question.type));
+        if (question.hidden === true) return false;
 
         let visible = true;
         try {
@@ -227,15 +227,14 @@ const visibleIds = (questions, answers) => {
         } catch (error) {
             visible = true;
         }
-        if (!visible) return;
-
-        shown.push(question.id);
-        if (!given.has(question.id)) {
+        if (visible && named && !given.has(question.id)) {
             given.set(question.id, answerOf(question, has(posted, question.id) ? posted[question.id] : undefined));
         }
+        return visible;
     });
-    return shown;
 };
+
+const visibleIds = (questions, answers) => shownQuestions(questions, answers).filter(isQuestion).map((q) => q.id);
 
 const pruneAnswers = (questions, answers) => {
     const posted = isPlainObject(answers) ? answers : {};
@@ -259,6 +258,7 @@ module.exports = {
     kindOf,
     operatorsFor,
     checkRule,
+    shownQuestions,
     visibleIds,
     pruneAnswers,
     hasRules,
