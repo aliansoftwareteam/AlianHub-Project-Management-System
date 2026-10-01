@@ -20,7 +20,24 @@
                                 :aria-label="$t('Common.select_task_named', { name: element.TaskName })"
                             />
                         </label>
+                        <input
+                            v-if="renaming"
+                            ref="renameInput"
+                            v-model="renameDraft"
+                            type="text"
+                            class="card-rename ml-5px"
+                            maxlength="250"
+                            :aria-label="$t('List.rename_label')"
+                            @click.stop
+                            @mousedown.stop
+                            @pointerdown.stop
+                            @keydown.enter.prevent="saveRename"
+                            @keydown.esc.stop.prevent="endRename"
+                            @blur="saveRename"
+                        />
                         <div
+                            v-else
+                            ref="titleEl"
                             class="card-title font-weight-500 ml-5px"
                             :title="element.TaskName"
                             role="button"
@@ -49,68 +66,12 @@
                                     </button>
                                 </template>
                                 <template #options>
-                                    <DropDownOption @click="copyTaskLink()">
-                                        <div class="d-flex align-items-center">
-                                            <img :src="linkIcon" alt="" class="mr-10px">
-                                            {{$t('ProjectDetails.copy_task_link')}}
-                                        </div>
-                                    </DropDownOption>
-                                    <DropDownOption @click="copyTaskKey()">
-                                        <div class="d-flex align-items-center">
-                                            <img :src="splitScreen" alt="" class="mr-10px">
-                                            {{$t('ProjectDetails.copy_task_key')}}
-                                        </div>
-                                    </DropDownOption>
-                                    <DropDownOption v-if="element.deletedStatusKey === undefined || element.deletedStatusKey === 0 && checkPermission('task.task_archive',projectData.isGlobalPermission) == true" @click="showSidebar = true, archive = true">
-                                        <div class="d-flex align-items-center">
-                                            <img :src="inventoryIcon" alt="" class="mr-10px">
-                                            {{$t('Projects.archive')}}
-                                        </div>
-                                    </DropDownOption>
-                                    <DropDownOption v-if="element.deletedStatusKey === 2" @click="updateTask(0)">
-                                        <div class="d-flex align-items-center">
-                                            <img :src="inventoryIcon" alt="" class="mr-10px">
-                                            {{$t('Projects.restore')}}
-                                        </div>
-                                    </DropDownOption>
-                                    <DropDownOption
-                                        @click="showSidebar = true, archive = false"
-                                        v-if="checkPermission('task.task_delete',projectData.isGlobalPermission) == true">
-                                        <div class="d-flex align-items-center">
-                                            <img :src="deleteIcon" alt="" class="mr-10px">
-                                            {{$t("Projects.delete")}}
-                                        </div>
-                                    </DropDownOption>
-                                    <DropDownOption @click="convertToSubTask()" v-if="checkPermission('task.sub_task_create',projectData.isGlobalPermission) === true && !showArchiveVar && task?.isParentTask && checkPermission('task.task_convert_to_subtask',projectData.isGlobalPermission) === true">
-                                        <div class="d-flex align-items-center">
-                                            <img :src="subTaskIcon" alt="" class="mr-10px">
-                                            {{$t('ProjectDetails.convert_subtask')}}
-                                        </div>
-                                    </DropDownOption>
-                                    <DropDownOption @click="convertToList()" v-if="checkPermission('project.project_sprint_create',projectData.isGlobalPermission) === true && !showArchiveVar && checkPermission('task.task_convert_to_list',projectData.isGlobalPermission) === true">
-                                        <div>
-                                            <img :src="combinedIcon" alt="" />
-                                            <span class="dropdown-label">{{$t('ProjectDetails.convert_list')}}</span>
-                                        </div>
-                                    </DropDownOption>
-                                    <DropDownOption @click="duplicateTask()" v-if="!showArchiveVar && checkPermission('task.task_duplicate',projectData.isGlobalPermission) == true">
-                                        <div>
-                                            <img :src="copyIcon" alt="" class="copyIcon"/>
-                                            <span class="dropdown-label">{{$t('Projects.duplicate')}}</span>
-                                        </div>
-                                    </DropDownOption>
-                                    <DropDownOption @click="moveTask()" v-if="!showArchiveVar && checkPermission('task.task_move',projectData.isGlobalPermission) == true">
-                                        <div>
-                                            <img :src="moveIcon" alt="" />
-                                            <span class="dropdown-label">{{$t('ProjectDetails.move')}}</span>
-                                        </div>
-                                    </DropDownOption>
-                                    <DropDownOption @click="mergeTask()" v-if="!showArchiveVar && checkPermission('task.task_merge',projectData.isGlobalPermission) == true">
-                                        <div>
-                                            <img :src="mergeIcon" alt="" />
-                                            <span class="dropdown-label">{{$t('ProjectDetails.merge')}}</span>
-                                        </div>
-                                    </DropDownOption>
+                                    <template v-for="item in menuItems" :key="item.id">
+                                        <div v-if="item.separated" class="card-menu__sep" role="separator"></div>
+                                        <DropDownOption :data-item="item.id" @click="runMenu(item.id)">
+                                            <span :class="{ 'card-menu__danger': item.danger }">{{ $t(item.labelKey) }}</span>
+                                        </DropDownOption>
+                                    </template>
                                 </template>
                             </DropDown>
                         </div>
@@ -237,17 +198,12 @@
                 :acceptButton="`${archive ? $t('Projects.archive') : $t('Projects.delete')}`"
                 @confirm="updateTask(), showSidebar = false"
             />
-            <ConvertToSubTaskSidebar 
-                v-if="openConvertSubTaskSidebar === true" :closeSideBar="openConvertSubTaskSidebar"
-                @isConvertSubtaskOPen="(val) => {sidebarOPen(val)}" :isMoveTask="openMoveSidebar" 
-                :openMoveSubTask="openMoveSubTask" :isMergeTask="openMergeTask" :isDuplicate="duplicateTaskSidebar" 
-                :task="element" :isOpenSubTask="openSubTaskSideabr"/>
-            <ConvertToList v-if="converrtToListSidebar === true" :openSidebar="converrtToListSidebar" @closeSidebar="(val) => {converrtToListSidebar = val}" :task="element" />
-        </div> 
+            <TaskMenuSidebars :mode="sidebarMode" :task="element" @close="sidebarMode = null" />
+        </div>
     </div>
 </template>
 <script setup>
-    import {ref,inject,computed,watch,onMounted,onUnmounted} from "vue";
+    import {ref,inject,computed,watch,nextTick,onMounted,onUnmounted} from "vue";
     import { useStore } from "vuex";
     import { useToast } from "vue-toast-notification";
     import { useRoute, useRouter } from "vue-router"
@@ -270,8 +226,10 @@
     import DropDown from '@/components/molecules/DropDown/DropDown.vue'
     import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
     import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
-    import ConvertToSubTaskSidebar from '@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue';
-    import ConvertToList from '@/components/molecules/ConvertToList/ConvertToList.vue';
+    import TaskMenuSidebars from '@/views/Projects/components/taskMenu/TaskMenuSidebars.vue';
+    import { taskMenuItems } from '@/views/Projects/composables/taskMenu';
+    import { taskUrl } from '@/views/Projects/composables/taskLink';
+    import { openTemplateDialog } from '@/components/molecules/TaskTemplates/taskTemplates';
     import DueDateCompo from '@/components/molecules/DueDateCompo/DueDateCompo.vue';
     import { useI18n } from "vue-i18n";
     import { proposalTitle, skillLabel } from "@/views/Ai/plainLabels";
@@ -320,25 +278,18 @@
     const showSidebar = ref(false);
     const archive = ref(false);
     const horizontalDots = require("@/assets/images/svg/horizontalDots.svg");
-    const linkIcon = require("@/assets/images/png/link.png");
-    const splitScreen = require("@/assets/images/png/splitscreen.png");
     const inventoryIcon = require("@/assets/images/inventory_2.png");
     const deleteIcon = require("@/assets/images/DeleteIcon.png");
-    const moveIcon = require("@/assets/images/png/moveIcon.png");
-    const mergeIcon = require("@/assets/images/png/mergeIcon.png");
-    const combinedIcon = require("@/assets/images/png/Combined_shape.png");
-    const subTaskIcon = require("@/assets/images/png/subTaskIcon.png");
-    const copyIcon = require("@/assets/images/copy.png");
     const route = useRoute()
     const searchedTask = inject('searchedTask');
-    const openConvertSubTaskSidebar = ref(false);
-    const converrtToListSidebar = ref(false);
-    const openMoveSubTask = ref(false);
-    const openMoveSidebar = ref(false);
     const taskCollapsed = inject("taskCollapsed");
-    const openMergeTask = ref(false);
-    const duplicateTaskSidebar = ref(false);
-    const openSubTaskSideabr = ref(false)
+    const boardMenu = inject("boardTaskMenu", null);
+    const menuItems = computed(() => taskMenuItems(element.value, boardMenu?.rights.value));
+    const sidebarMode = ref(null);
+    const renaming = ref(false);
+    const renameDraft = ref("");
+    const renameInput = ref(null);
+    const titleEl = ref(null);
     const dueDate = computed(() => element.value.DueDate)
     const dueDateText = computed(() => (element.value.DueDate ? convertDateFormat(element.value.DueDate, '', { showDayName: false }) : ''))
     const assigneeNames = computed(() => (element.value.AssigneeUserId || [])
@@ -593,34 +544,52 @@
             console.error(err);
         })
     }
-    const convertToSubTask = () => {
-        openConvertSubTaskSidebar.value = true;
-        openSubTaskSideabr.value = true;
+    function startRename() {
+        renameDraft.value = element.value.TaskName || "";
+        renaming.value = true;
+        nextTick(() => {
+            renameInput.value?.focus();
+            renameInput.value?.select();
+        });
     }
-    const sidebarOPen = (val) => {
-        openConvertSubTaskSidebar.value = val;
-        openMoveSubTask.value = false;
-        openMoveSidebar.value = false;
-        duplicateTaskSidebar.value = false;
+    function endRename() {
+        renaming.value = false;
+        nextTick(() => titleEl.value?.focus());
     }
-    const convertToList = () => {
-        converrtToListSidebar.value = true;
+    function saveRename() {
+        if (!renaming.value) return;
+        endRename();
+        boardMenu.rename(element.value, renameDraft.value);
     }
-    const moveTask = () => {
-        if(props.data?.isParentTask === true){
-            openMoveSidebar.value = true;
-        }else if(props.data?.isParentTask === false){
-            openMoveSubTask.value = true;
-        }
-        openConvertSubTaskSidebar.value = true;
+    function openInNewTab() {
+        const href = taskUrl(router, { companyId: companyId.value, project: projectData.value, task: element.value });
+        if (href) window.open(href, "_blank", "noopener");
     }
-    const mergeTask= () => {
-        openConvertSubTaskSidebar.value = true;
-        openMergeTask.value = true;
+    function confirmRemoval(archiving) {
+        archive.value = archiving;
+        showSidebar.value = true;
     }
-    const duplicateTask = () => {
-        openConvertSubTaskSidebar.value = true;
-        duplicateTaskSidebar.value = true;
+    function runMenu(id) {
+        const viaSidebar = () => { sidebarMode.value = id; };
+        const actions = {
+            rename: startRename,
+            subtask: () => { isSubtaskCreate.value = true; },
+            "copy-link": copyTaskLink,
+            "copy-key": copyTaskKey,
+            "new-tab": openInNewTab,
+            open: () => toggleTaskDetail(element.value),
+            "save-template": () => openTemplateDialog({ mode: "save", task: element.value, project: projectData.value }),
+            "convert-subtask": viaSidebar,
+            "convert-list": viaSidebar,
+            move: viaSidebar,
+            duplicate: viaSidebar,
+            "duplicate-subtasks": () => boardMenu.duplicate(element.value, { withSubtasks: true }),
+            merge: viaSidebar,
+            archive: () => confirmRemoval(true),
+            restore: () => updateTask(0),
+            delete: () => confirmRemoval(false)
+        };
+        actions[id]?.();
     }
     function changeRoute() {
         const paramsObj = {

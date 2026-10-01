@@ -108,9 +108,11 @@ This is an estimate, not a promise.
 - **Realistic: 4 to 6 weeks**, if decisions are answered within a day. M1 in week 1, M2 in weeks 2–3, M3 in weeks 3–4, M4 in weeks 5–6.
 - The largest risks to that: nested subtasks and tasks in several lists (they touch every query), the doc history rebuild, and the connectors (each depends on an outside service).
 
-## Decisions the owner needs to make first
+## Decisions
 
-| # | Decision | Recommendation |
+On 2026-10-01 the owner said: "Don't wait for my input, you can continue work, you make your own decision." The integrator took every recommendation below on that day. Each is its own slice or a setting, so the owner can overrule any of them later.
+
+| # | Decision | Decided |
 |---|---|---|
 | 1 | Who is the judge of "great"? | Teams of 5–200 that want control and AI without credits (the draft above) |
 | 2 | Hierarchy: nested subtasks, subfolders, an Everything view, a task in several lists, Goals | Yes to nested subtasks (three levels), subfolders and Everything in M2; a task in several lists and Goals in M3 |

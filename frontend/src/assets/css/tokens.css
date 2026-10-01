@@ -82,6 +82,33 @@
     --ease: cubic-bezier(.2, .7, .2, 1);
     --t-state: 150ms;
     --t-panel: 240ms;
+
+    /* Row density of the List and the Table: the comfortable sizes. --row-h is a floor, and
+       --hit-min is the smallest a control in a row may get, so no density overrides it. */
+    --row-h: 36px;
+    --cell-pad-y: 9px;
+    --row-font: 12.5px;
+    --row-lines: 2;
+    --avatar-size: 24px;
+    --avatar-font: 11px;
+    --chip-h: 22px;
+    --chip-font: 11.5px;
+    --hit-min: 24px;
+}
+
+/* Set on a view root by its saved density (or on :root by a design variant). Phones keep
+   the comfortable sizes: their rows fold onto two lines and need the height to be tapped. */
+@media (min-width: 768px) {
+    [data-density="compact"] {
+        --row-h: 28px;
+        --cell-pad-y: 2px;
+        --row-font: 12px;
+        --row-lines: 1;
+        --avatar-size: 20px;
+        --avatar-font: 9.5px;
+        --chip-h: 18px;
+        --chip-font: 10.5px;
+    }
 }
 
 :root[data-theme="dark"] {
@@ -434,10 +461,10 @@ html, body, #app {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    height: 22px;
+    height: var(--chip-h);
     padding: 0 8px;
     border-radius: var(--r-chip);
-    font: 600 11.5px/1 var(--font-ui);
+    font: 600 var(--chip-font)/1 var(--font-ui);
     background: var(--fill);
     color: var(--ink);
     white-space: nowrap;
@@ -460,10 +487,10 @@ html, body, #app {
 .ah-dot--danger { background: var(--danger); }
 
 .ah-avatar {
-    width: 24px; height: 24px; border-radius: 50%;
+    width: var(--avatar-size); height: var(--avatar-size); border-radius: 50%;
     display: inline-flex; align-items: center; justify-content: center;
     background: var(--brand); color: var(--on-brand);
-    font: 600 11px/1 var(--font-ui);
+    font: 600 var(--avatar-font)/1 var(--font-ui);
     flex: none; overflow: hidden; object-fit: cover;
 }
 .ah-avatar--agent { border-radius: 6px; background: var(--agent); color: #fff; }
