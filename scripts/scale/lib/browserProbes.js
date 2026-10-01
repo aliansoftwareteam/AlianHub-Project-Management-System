@@ -5,6 +5,10 @@ const { median, summarise } = require('./stats');
 const VIEWPORT = { width: 1440, height: 900 };
 const LIST_ROW = '.lv2__row:not(.is-sub)';
 const BOARD_CARD = '.kanban-card';
+const EVERYTHING_ROW = '.evr__row';
+const TASK_FIND = '/api/v1/task/find';
+const EVERYTHING_READ = '/api/v2/tasks/everything';
+const EVERYTHING_VIEWS = '/api/v2/tasks/everything/views';
 const LIST_SCROLLER = '#list_scroll';
 const STATUS_PICKER = 'Select Task Status';
 const TASK_PANEL = '[role="dialog"][aria-label="Task detail"]';
@@ -32,7 +36,7 @@ async function launchBrowser() {
  * never early. It reads performance.now(), not the frame's own timestamp, which is the scheduled time and runs up to
  * seconds early while the page is busy rendering. The clock starts at navigation and the numbers carry no round trip
  * to this script. The conditions live here because the app's content security policy refuses code passed in as text. */
-const instrument = ({ userId, companyId, selectors }) => {
+const instrument = ({ userId, companyId, selectors, queryPath, ignoredPath }) => {
     localStorage.setItem('userId', userId);
     localStorage.setItem('selectedCompany', companyId);
     localStorage.setItem('isLogging', 'true');
@@ -70,7 +74,8 @@ const instrument = ({ userId, companyId, selectors }) => {
      * answer, then drawing. The view's queries are the first burst; later ones (subtask progress) are not waited for. */
     const timeline = (seenAt) => {
         const [navigation] = performance.getEntriesByType('navigation');
-        const queries = performance.getEntriesByType('resource').filter((entry) => entry.name.includes('/api/v1/task/find') && entry.startTime < seenAt);
+        const queries = performance.getEntriesByType('resource')
+            .filter((entry) => entry.name.includes(queryPath) && !(ignoredPath && entry.name.includes(ignoredPath)) && entry.startTime < seenAt);
         const sent = queries.length ? Math.min(...queries.map((entry) => entry.startTime)) : null;
         const burst = queries.filter((entry) => entry.startTime <= sent + 100);
         return {
@@ -184,7 +189,7 @@ async function openTaskPanel(page) {
 async function measureBrowser({ browser, base, session, list, loads, room, log = () => {} }) {
     const context = await browser.newContext({ viewport: VIEWPORT });
     await context.addCookies([{ name: 'accessToken', value: session.accessToken, url: base }]);
-    await context.addInitScript(instrument, { userId: session.userId, companyId: session.companyId, selectors: [LIST_ROW, BOARD_CARD] });
+    await context.addInitScript(instrument, { userId: session.userId, companyId: session.companyId, selectors: [LIST_ROW, BOARD_CARD], queryPath: TASK_FIND });
     const viewUrl = (tab) => `${base}/#/${session.companyId}/project/${session.project._id}/s/${list.id}?tab=${tab}`;
     const metric = (key, label, unit, samples, detail) => {
         const row = { key, label, unit, ...summarise(samples), detail };
@@ -258,4 +263,37 @@ async function measureBrowser({ browser, base, session, list, loads, room, log =
     }
 }
 
-module.exports = { launchBrowser, measureBrowser };
+/* The Everything page: from navigation to the frame after the first task row is on screen, loaded like the List. The
+ * page reads the person's saved views before its tasks, so that request is not counted as the task query. */
+async function measureEverythingPage({ browser, base, session, loads, room, log = () => {} }) {
+    const context = await browser.newContext({ viewport: VIEWPORT });
+    await context.addCookies([{ name: 'accessToken', value: session.accessToken, url: base }]);
+    await context.addInitScript(instrument, {
+        userId: session.userId, companyId: session.companyId, selectors: [EVERYTHING_ROW], queryPath: EVERYTHING_READ, ignoredPath: EVERYTHING_VIEWS,
+    });
+    const row = (key, label, unit, samples, detail) => {
+        const metric = { key, label, unit, ...summarise(samples), detail };
+        log(`${label}: median ${metric.median} ${unit}${detail ? `, ${detail}` : ''}`);
+        return metric;
+    };
+    const label = 'Everything: first rows visible';
+    try {
+        const view = await loadView({ context, url: `${base}/#/${session.companyId}/everything`, selector: EVERYTHING_ROW, loads, room });
+        await view.page.close();
+        const { samples, timeline, shown, weight } = view;
+        const story = `page scripts ready at ${timeline.scriptsReady} ms, task query sent at ${timeline.queriesSent} ms and answered by ${timeline.queriesAnswered} ms; first load, with an empty browser cache, ${Math.round(samples[0])} ms`;
+        return [
+            row('everything.firstRows', label, 'ms', samples, `${shown} rows shown; ${story}`),
+            row('everything.domNodes', 'Everything: DOM nodes after load', 'nodes', [weight.nodes], shown ? `about ${Math.round(weight.nodes / shown)} for each row shown, the rest of the page included` : ''),
+            row('everything.heap', 'Everything: JS heap after load', 'MB', [weight.heapMb]),
+        ];
+    } catch (error) {
+        const reason = String(error.message || error).split('\n')[0];
+        log(`${label}: not measured: ${reason}`);
+        return [{ key: 'everything.firstRows', label, unit: 'ms', ...summarise([]), detail: `not measured: ${reason}` }];
+    } finally {
+        await context.close();
+    }
+}
+
+module.exports = { launchBrowser, measureBrowser, measureEverythingPage };
