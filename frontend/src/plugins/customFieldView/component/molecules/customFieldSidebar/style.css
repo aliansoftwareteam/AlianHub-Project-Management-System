@@ -10,29 +10,10 @@
 .custom_field_content .line-height-22px {
     line-height: 22.4px;
 }
-.custom_field_content .activeClass {
-    border-bottom: 2px solid darkblue;
-}
 .custom_field_content .custom_field-border{
-    border-bottom:1px solid #CFCFCF;
-    border-top:1px solid #CFCFCF;
+    border-bottom:1px solid var(--hairline);
+    border-top:1px solid var(--hairline);
 }
-.customFieldSidebar .sidebar-body {
-    background-color: white !important;
-}
-.customFieldSidebar .sidebar-head {
-    background-color: #DAE1E7 !important;
-    height: 62px;
-}
-.customFieldSidebar .customfield__form-control {
-    height: 30px;
-    max-width: 100%;
-    width: 100%;
-    border: 1px solid #E0E0E0;
-    border-radius: 6px;
-    padding: 0px 10px;
-    font-family: var(--font-ui);
-    font-weight: 400;
-    color: #949DA8;
-    font-size: 13px;
+.custom_field_back {
+    margin: 12px 20px 0;
 }

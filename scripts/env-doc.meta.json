@@ -754,7 +754,7 @@
   },
   "MCP_TOOLS_MANAGE": {
     "group": "ai",
-    "description": "MCP task management tools: \"on\" registers and offers fields.list, subtasks.list and members.list (reads), extends tasks.search with assignee, list and due-date filters, and offers task.update, task.assign, task.field.set, task.move, task.archive and task.restore. Each write runs through the task routes' own preparation and handlers as the person behind the token, and is listed and run only by a personal access token created with the tasks:manage grant, so a token made earlier gains none of them. Default \"off\" leaves the registry and the MCP tool list as they were.",
+    "description": "MCP management tools: \"on\" registers and offers, to a personal access token created with the tasks:manage grant, fields.list, subtasks.list, members.list, task.history and task.links.list (reads), task.update, task.assign, task.field.set, task.move, task.archive, task.restore, comment.update and tasks.batch (up to 25 writes in one call), and fuller forms of tasks.search, task.get, task.create, subtask.create, task.comment and task.status.set (any status of the task's project, Done included, recorded as closed through the agent and unchecked); and, to a token created with the docs:manage grant, page.create and page.update. Each write runs through the web app's own route preparation and handlers as the person behind the token. A grant is chosen when the token is created and never added afterwards, so a token made earlier lists and runs exactly what it did before. Default \"off\" leaves the registry and the MCP tool list as they were.",
     "default": "off"
   },
   "MCP_TOOLS_V2": {

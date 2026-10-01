@@ -28,8 +28,9 @@ The backend serves the built SPA from `frontend/dist`; `cd frontend && npm run b
 | `cd frontend && npm run lint -- --no-fix` | Vue CLI ESLint |
 | `node scripts/unused-components.js` | `.vue` files nothing imports (must print nothing) |
 | `node scripts/env-doc.js --check` | env variables described and docs regenerated |
+| `npm run visual` | the screenshot check of the core screens; CI only, see [Screenshot check](#screenshot-check) |
 
-`.github/workflows/ci.yml` runs all of that on every pull request to `beta`, `staging` and `main`. The conventions project is the place for a rule that must hold everywhere: it reads the tree and fails with the offending file, so a new rule needs no per-module wiring.
+`.github/workflows/ci.yml` runs all of that on every pull request to `beta`, `staging` and `main`, except the screenshot check, which has a workflow of its own. The conventions project is the place for a rule that must hold everywhere: it reads the tree and fails with the offending file, so a new rule needs no per-module wiring.
 
 The conventions in place:
 
@@ -57,9 +58,10 @@ npm run atlas:compare -- artifacts/atlas/<before> artifacts/atlas/<after>
 | `--base-url` | `http://localhost:4000` | the running app |
 | `--out` | `artifacts/atlas/<UTC timestamp>/` (git-ignored) | output folder; a second run into the same folder replaces only the shots it retakes |
 | `--only` | every screen | comma-separated screen names from the manifest |
+| `--core` | off | only the screens marked `core` in the manifest, at the sizes the screenshot check takes them |
 | `--themes` | `light,dark` | written to `localStorage 'ah.theme'` before the app loads |
 | `--sizes` | `1440x900,390x844` | viewport sizes |
-| `--variant a\|b\|c` | none | written to `localStorage 'ah.variant'` |
+| `--variant a\|b\|c\|classic` | none, which is the dense default (the same as `b`) | written to `localStorage 'ah.variant'`; `classic` is the look before the dense default |
 | `--company`, `--project` | the account's only workspace; the project with the most views | which workspace and project the `:cid` and `:projectId` routes open |
 | `--token-file` | `ATLAS_TOKEN_FILE` | file holding the session token when `ATLAS_TOKEN` is unset |
 
@@ -69,6 +71,40 @@ npm run atlas:compare -- artifacts/atlas/<before> artifacts/atlas/<after>
 - **Add a screen** with one line in `scripts/atlas-manifest.js`; `tests/atlas-manifest.test.js` fails when its route is not one the router declares. Routes left out, and why, are in `LEFT_OUT` in the same file.
 - **Compare** writes `before/`, `after/` and `diff/` images and an `index.html` ordered by the share of pixels that changed. It decodes PNGs with `sharp`, already a dependency; `--threshold` (default 8 of 255 per channel) sets how far a pixel must move to count.
 - Chromium comes from Playwright: `npx playwright install chromium` once (the e2e suite needs the same).
+
+### Screenshot check
+
+The atlas shows a look; this check holds one. On every pull request to `beta` the `Visual` workflow (`.github/workflows/visual.yml`, job **Core screens**) opens the core screens, compares each with a PNG in `e2e/visual-baseline/` using Playwright's `toHaveScreenshot`, and fails when one differs. It is a workflow of its own, so a changed look never hides a failing functional test.
+
+**What it covers.** The screens marked `core: true` in `scripts/atlas-manifest.js`: Home, Everything, the command palette, Docs, a doc, a dashboard, project List, Board and Table, the task panel and My settings, in light and dark at 1440x900. Those also marked `phone: true` (Home, List, Board, task panel) are taken at 390x844 too: 30 screenshots, viewport only. The data is the e2e harness seed (`e2e/support/fixtures.js`) plus one doc and one dashboard (`e2e/visual/global-setup.js`), in a database made for the run.
+
+**Where it runs.** In CI only, inside `mcr.microsoft.com/playwright:v<version>-noble`, the image of the `@playwright/test` version in `package.json`; `tests/visual-report.test.js` fails when the two differ. Operating system, fonts and browser build are the same on every run. A screenshot made on macOS or Windows never matches, so `npm run visual` refuses to run outside CI. `VISUAL_LOCAL=1 npm run visual` runs it anyway, against a baseline in `e2e/.state/` that is never committed, which is how to debug the check itself (it needs `npm run e2e:db`, `E2E_MONGODB_URL` and a built frontend, like `npm run e2e`).
+
+**Accept an intended change.** The failing run names the screens in its summary and uploads two artifacts: `visual-report` (the Playwright report with expected, actual and diff for each) and `visual-baseline` (the new screenshot of every changed or missing screen). Look at the diff, then:
+
+```bash
+npm run visual:accept -- <run id>   # the number in the run's address; needs `gh auth status` to pass
+git add e2e/visual-baseline && git commit -m "test(visual): new baseline for <what changed>"
+```
+
+A pull request that changes a core screen on purpose carries the new PNGs in the same pull request.
+
+**A screen with no baseline** is skipped, not failed, and its first screenshot is in the same `visual-baseline` artifact. That is how the baseline starts and how a new screen joins: add `core: true` (and `phone: true` if it matters at 390 px) to its manifest entry, push, accept the run. A route with a parameter the seed has no record for needs that record added in `e2e/visual/global-setup.js`. Removing the mark means deleting the screen's PNGs; `tests/visual-core.test.js` fails on a PNG that belongs to no core screen, and on a baseline over 10 MB (it is about 2 MB).
+
+**What holds a screen still.**
+
+- Clock: the page runs at 2026-01-14 10:00 UTC, `en-US` (`e2e/visual/freeze.js`), through Playwright's clock. Time moves on from there, because a frozen `Date` stops every debounce in the app.
+- Dates from the server: the seed is stamped with the real time of the run. Every ISO date in an API response that falls inside the run is rewritten to 08:00 that morning, plus a millisecond per real second so records keep their order. Dates outside the run pass through. Socket messages are not rewritten.
+- Writes: every request that is not a read is refused in the browser, with the atlas's list (`scripts/atlas/readOnly.js`), so one screenshot cannot change what the next one sees.
+- Motion: animations and transitions off, reduced motion on, carets and focus outlines hidden, scrollbars hidden (`captureCss` in `e2e/visual/masks.js`). A screenshot is taken only once two in a row are identical.
+- Fonts and images: the check waits for `document.fonts.ready` and for every image, and fails with its own message when Inter Tight did not load. The fonts come from Google Fonts, so that failure is the network, not the design.
+- A screen that opens on "not found", "no access" or "offline" fails instead of becoming a baseline.
+
+**What is masked or hidden** is listed with a reason each in `e2e/visual/masks.js`. Masked (painted over): the presence dot on avatars. Hidden (taken out of the layout): the live strip of running agents and timers, the running-agents count in the rail, toasts. Add an entry only for something the list above cannot hold still.
+
+**Tolerance.** `THRESHOLD` (how far a pixel may move) and `MAX_DIFF_PIXEL_RATIO` (how much of a screenshot may) are in `e2e/visual/settings.js`. To measure the noise, re-run the job on one commit: with the baseline committed, any screen it reports is noise. `npm run visual -- --update` (the `update` input of the workflow, which GitHub offers once the workflow is on the default branch) goes further and proposes every screenshot whose bytes differ at all; `npm run atlas:compare -- e2e/visual-baseline <downloaded artifact>` then shows by how much.
+
+The job is not a required check yet (`continue-on-error: true`). To make it one: commit the baseline, tune the tolerance, remove that line from the workflow and add **Core screens** to the required checks of `beta`.
 
 ## Change it
 
