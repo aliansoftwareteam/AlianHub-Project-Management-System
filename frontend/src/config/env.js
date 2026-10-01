@@ -243,6 +243,7 @@ module.exports.AGENT_PAUSE_ALL = '/api/v2/agents/pause-all';
 module.exports.AGENT_DRAFT = '/api/v2/agents/draft';
 module.exports.AGENT_POLICY = '/api/v2/agents/policy';
 module.exports.AGENT_PROJECT_POLICY = '/api/v2/agents/project-policy';
+module.exports.AGENT_STANDING_APPROVALS = '/api/v2/agents/standing-approvals';
 module.exports.AGENT_PROJECT_MANAGER = '/api/v2/agents/project-manager';
 module.exports.WORKFLOW_RUNS = '/api/v2/workflows/runs';
 module.exports.WORKFLOW_APPROVALS = '/api/v2/workflows/approvals';

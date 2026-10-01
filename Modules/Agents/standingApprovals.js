@@ -72,6 +72,7 @@ const proposalRefusal = (p) => {
 };
 
 const offerable = (p) => proposalRefusal(p) === '';
+const labelOf = (action) => (registry.get(action) || {}).label || String(action);
 
 const reachRefusal = async (companyId, projectId, change) => {
     const params = change.params || {};
@@ -145,7 +146,7 @@ const make = async (companyId, p, madeBy, ip) => {
     const saved = plain(await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_STANDING_APPROVALS,
         data: {
-            ...key, label: registry.get(change.action).label, agentId: String(p.agentId || ''), agentName: p.agentName || '',
+            ...key, label: labelOf(change.action), agentId: String(p.agentId || ''), agentName: p.agentName || '',
             madeBy: String(madeBy), madeAt: now, proposalId: String(p._id), expiresAt: new Date(now.getTime() + LIFETIME_MS), status: STATUS.ACTIVE, uses: 0,
         },
     }, 'save'));
@@ -235,4 +236,4 @@ const end = async (companyId, id, { projectId, by, ip = '' }) => {
     return { row: shape(ended || row) };
 };
 
-module.exports = { LIFETIME_MS, STATUS, ENDED, kindRefusal, proposalRefusal, offerable, approveAlways, covering, recordUse, list, end, endForProject };
+module.exports = { LIFETIME_MS, STATUS, ENDED, kindRefusal, proposalRefusal, offerable, labelOf, approveAlways, covering, recordUse, list, end, endForProject };

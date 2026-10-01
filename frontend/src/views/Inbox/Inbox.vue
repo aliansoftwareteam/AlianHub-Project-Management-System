@@ -87,7 +87,7 @@
                 </div>
 
                 <EmptyState
-                    v-else-if="!rows.length && !queue.length"
+                    v-else-if="!rows.length && !queue.length && !applied.length"
                     class="ibx__zero"
                     illustration="inbox"
                     data-test="inbox-zero"
@@ -100,7 +100,7 @@
                 />
 
                 <template v-else>
-                    <ApprovalQueue v-if="queue.length" :proposals="queue" :stamp="stamp" @decided="onQueueDecided" />
+                    <ApprovalQueue v-if="queue.length || applied.length" :proposals="queue" :applied="applied" :stamp="stamp" @decided="onQueueDecided" @undone="onQueueUndone" />
                     <article
                         v-for="(it, i) in rows"
                         :key="rowKey(it)"
@@ -341,6 +341,7 @@ const kind = ref(KINDS.includes(route.query.kind) ? route.query.kind : 'all');
 const items = ref([]);
 const approvals = ref([]);
 const queue = ref([]);
+const applied = ref([]);
 const counts = ref({ approval: 0, primary: 0, other: 0, later: 0 });
 const loading = ref(true);
 const busy = ref(false);
@@ -433,18 +434,18 @@ const load = async (append = false) => {
         const res = await apiRequest('get', `${env.INBOX}?${q.toString()}`);
         if (!res?.data?.status) {
             loadError.value = res?.data?.statusText || t('Inbox.load_failed');
-            if (!append) { items.value = []; approvals.value = []; queue.value = []; }
+            if (!append) { items.value = []; approvals.value = []; queue.value = []; applied.value = []; }
             return;
         }
         const d = res.data.data || {};
         items.value = append ? [...items.value, ...(d.items || [])] : (d.items || []);
-        if (!append) { approvals.value = d.approvals || []; queue.value = d.proposals || []; }
+        if (!append) { approvals.value = d.approvals || []; queue.value = d.proposals || []; applied.value = d.applied || []; }
         hasMore.value = !!d.hasMore;
         nextSkip.value = d.nextSkip || 0;
         if (!append) cursor.value = 0;
     } catch (e) {
         loadError.value = e?.message || t('Inbox.load_failed');
-        if (!append) { items.value = []; approvals.value = []; queue.value = []; }
+        if (!append) { items.value = []; approvals.value = []; queue.value = []; applied.value = []; }
     } finally {
         loading.value = false;
         busy.value = false;
@@ -837,6 +838,10 @@ const onQueueDecided = ({ id, verb, undo: canUndo }) => {
     const undoIds = [...(undo.value?.undoIds || []), ...(canUndo ? [id] : [])];
     showUndo(t('Inbox.queue_approved', { n: approved.length }, approved.length), undoIds.length ? () => undoApprovals(undoIds) : null);
     Object.assign(undo.value, { approved, undoIds });
+};
+const onQueueUndone = ({ id }) => {
+    applied.value = applied.value.filter((p) => p.proposalId !== id);
+    $toast.success(t('Inbox.always_undone'), { position: 'top-right' });
 };
 const reviewInAiInbox = () => router.push({ name: 'AiInbox', params: { cid: companyId?.value } }).catch(() => {});
 

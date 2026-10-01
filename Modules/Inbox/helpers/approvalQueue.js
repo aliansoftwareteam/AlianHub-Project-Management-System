@@ -29,6 +29,12 @@ const namedProjects = (proposal) => (Array.isArray(proposal.changes) ? proposal.
 const staysInside = (projectIds) => (proposal) => !Array.isArray(projectIds)
     || namedProjects(proposal).every((id) => projectIds.includes(id));
 
+/* Whether "Always do this" is offered on the row, and the kind of change it would cover. */
+const alwaysOf = (caller, proposal) => {
+    const offered = access.mayDecideProposal(caller, proposal) && standingApprovals.offerable(proposal);
+    return offered ? { always: true, alwaysKind: standingApprovals.labelOf(proposal.changes[0].action) } : { always: false };
+};
+
 const toRow = (caller, previews) => (proposal) => ({
     sourceType: 'proposal',
     sourceId: String(proposal._id),
@@ -48,7 +54,7 @@ const toRow = (caller, previews) => (proposal) => ({
     cost: proposal.cost || null,
     gate: proposal.gate || null,
     locked: !access.mayDecideProposal(caller, proposal),
-    always: access.mayDecideProposal(caller, proposal) && standingApprovals.offerable(proposal),
+    ...alwaysOf(caller, proposal),
     // approval.refusalFor refuses an edited approval of a change a connected agent filed.
     editable: proposal.source !== SOURCE_MCP,
     tainted: Boolean(proposal.taint && proposal.taint.reason),
