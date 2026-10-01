@@ -13,7 +13,7 @@
                         </div>
                     </div>
                     <div class="d-flex align-items-center w-65" v-else>
-                        <UserProfile
+                        <UserProfile decorative
                             v-if="data.profileImage && data.profileImage != null && data.profileImage != ''"
                             :showDot="false"
                             class="timesheet_user_profile p-0 mr-10px timesheet__profile-user"

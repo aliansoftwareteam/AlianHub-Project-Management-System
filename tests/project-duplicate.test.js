@@ -489,6 +489,30 @@ describe('tasks', () => {
         expect(byName(copy.tasks, 'Overscored', 'TaskName').customField).toEqual({});
     });
 
+    it('point a linked task at its copy, keep a link out of the project the caller can open, and bring no votes', async () => {
+        const field = (fieldTitle, fieldType) => String(seed(SCHEMA_TYPE.CUSTOM_FIELDS, { fieldTitle, fieldType, type: 'task', global: true, isDelete: true })._id);
+        const client = field('Client', 'relationship');
+        const votes = field('Upvotes', 'voting');
+        const elsewhere = seedLaunch({ ProjectName: 'Elsewhere', ProjectCode: 'ELS' });
+        const closed = seedLaunch({ ProjectName: 'Closed', ProjectCode: 'CLO', isPrivateSpace: true, AssigneeUserId: [OWNER] });
+        const outside = String(seedTask(elsewhere, elsewhere.backlog, { TaskName: 'Outside' })._id);
+        const unseen = String(seedTask(closed, closed.backlog, { TaskName: 'Unseen' })._id);
+        const spec = String(seedTask(launch, launch.backlog, { TaskName: 'Spec' })._id);
+        const build = String(seedTask(launch, launch.backlog, {
+            TaskName: 'Build', customField: { [client]: { _id: client, fieldValue: '', revision: 3 }, [votes]: { _id: votes, fieldValue: 2, revision: 3 } },
+        })._id);
+        seed(SCHEMA_TYPE.CUSTOM_FIELD_LINKS, { taskId: build, fieldId: client, kind: 'relationship', ids: [spec, outside, unseen] });
+        seed(SCHEMA_TYPE.CUSTOM_FIELD_LINKS, { taskId: build, fieldId: votes, kind: 'voting', ids: [OWNER, MEMBER] });
+
+        const copy = copyOf(await duplicate(launch.id, { include: { tasks: true, assignees: false, dates: false } }, { uid: MEMBER }));
+
+        const built = byName(copy.tasks, 'Build', 'TaskName');
+        const kept = rowsOf(SCHEMA_TYPE.CUSTOM_FIELD_LINKS).filter((row) => row.taskId === String(built._id));
+        expect(kept).toEqual([expect.objectContaining({ fieldId: client, kind: 'relationship', ids: [String(byName(copy.tasks, 'Spec', 'TaskName')._id), outside] })]);
+        expect(built.customField).toEqual({ [client]: { _id: client, fieldValue: '', revision: expect.any(Number) } });
+        expect(rowsOf(SCHEMA_TYPE.CUSTOM_FIELD_LINKS).find((row) => row.taskId === build && row.fieldId === client).ids).toEqual([spec, outside, unseen]);
+    });
+
     it('lose their people and dates unless asked for', async () => {
         seedTree(launch);
         const bare = byName(copyOf(await duplicate(launch.id, { include: { tasks: true, assignees: false, dates: false } })).tasks, 'Draw the set', 'TaskName');

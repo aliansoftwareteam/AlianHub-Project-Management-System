@@ -8,6 +8,7 @@ const {generalReminderSocketHandler} = require('./controller/generalReminderSock
 const {callSocketHandler} = require('./controller/callSocket');
 require('./controller/agentSessionSocket').registerWhenOn();
 require('./controller/viewTemplateSocket');
+require('./controller/projectTemplateSocket');
 require('./controller/agentSocket');
 require('./controller/folderSocket');
 require('./controller/customFieldSocket');

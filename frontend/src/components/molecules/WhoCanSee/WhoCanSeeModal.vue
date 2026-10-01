@@ -47,7 +47,7 @@
                             </div>
                             <ul class="wcs__people">
                                 <li v-for="userId in shownPeople(group)" :key="userId" class="wcs__person">
-                                    <UserProfile :data="{ title: nameOf(userId), image: getUser(userId)?.Employee_profileImageURL }" width="24px" :showDot="false" :isBorder="false" thumbnail="30x30" />
+                                    <UserProfile decorative :data="{ title: nameOf(userId), image: getUser(userId)?.Employee_profileImageURL }" width="24px" :showDot="false" :isBorder="false" thumbnail="30x30" />
                                     <span class="wcs__name">{{ nameOf(userId) }}</span>
                                 </li>
                             </ul>

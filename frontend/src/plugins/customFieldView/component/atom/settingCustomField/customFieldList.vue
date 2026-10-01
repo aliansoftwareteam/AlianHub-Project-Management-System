@@ -41,7 +41,7 @@
                         <tbody>
                             <tr v-for="(item, index) in finalCustomFieldData.sort((a,b) => new Date(b?.createdAt)?.getTime() - new Date(a?.createdAt)?.getTime())" :key="index" :class="[{'disable':!item.isDelete}]">
                                 <td>
-                                    <span class="field__title text-capitalize text-ellipsis field__title__name" :title="item?.fieldTitle">{{item?.fieldTitle}}</span>
+                                    <span class="field__title text-ellipsis field__title__name" :title="item?.fieldTitle">{{item?.fieldTitle}}</span>
                                 </td>
                                 <td>
                                     <span>{{convertDateFormat(item?.createdAt,'',{showDayName: false})}}</span>
@@ -54,8 +54,8 @@
                                 </td>
                                 <td>
                                     <div class="d-flex align-items-center created_by">
-                                        <UserProfile :data="{title: getUser(item?.userId)?.Employee_Name, image: (getUser(item?.userId)?.Employee_profileImageURL)}" width="30px" :showDot="false" :thumbnail="'30x30'"/>
-                                        <span class="text-capitalize pl-5px text-ellipsis field__user_name" :title="getUser(item?.userId)?.Employee_Name">{{getUser(item?.userId)?.Employee_Name}}</span>
+                                        <UserProfile decorative :data="{title: getUser(item?.userId)?.Employee_Name, image: (getUser(item?.userId)?.Employee_profileImageURL)}" width="30px" :showDot="false" :thumbnail="'30x30'"/>
+                                        <span class="pl-5px text-ellipsis field__user_name" :title="getUser(item?.userId)?.Employee_Name">{{getUser(item?.userId)?.Employee_Name}}</span>
                                     </div>
                                 </td>
                                 <td :class="[{'pointer-event-none':!item.isDelete}]">

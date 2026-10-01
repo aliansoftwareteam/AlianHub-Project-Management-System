@@ -121,6 +121,25 @@ const requireFieldSettings = (touchesCompanyWide) => async (req, res, next) => {
     }
 };
 
+const keptBesideTheTask = (fieldType) => Boolean((typeModuleOf(fieldType) || {}).sideStored);
+
+/* A relationship or a voting field keeps its values beside the tasks and a marker or a count on them, so a field never
+   becomes one or stops being one: what its tasks already carry would be read as the other kind's. */
+const requireSameKind = (readStored) => async (req, res, next) => {
+    const refuse = (statusCode, statusText) => res.status(statusCode).json({ status: false, statusText, message: statusText });
+    try {
+        const wanted = req.body.updateObject.fieldType;
+        if (wanted === undefined) return next();
+        const stored = await readStored(req);
+        const held = stored ? stored.fieldType : undefined;
+        if (held === wanted || (!keptBesideTheTask(held) && !keptBesideTheTask(wanted))) return next();
+        return refuse(400, 'A field cannot be changed to or from a relationship or a voting field.');
+    } catch (error) {
+        logger.error(`requireSameKind: ${error.message || error}`);
+        return refuse(500, 'The field could not be checked.');
+    }
+};
+
 const checkFieldWrite = (readWrite) => (req, res, next) => {
     try {
         readWrite(req.body || {});
@@ -138,5 +157,6 @@ module.exports = {
     isCompanyWide,
     widensToCompany,
     requireFieldSettings,
+    requireSameKind,
     checkFieldWrite,
 };

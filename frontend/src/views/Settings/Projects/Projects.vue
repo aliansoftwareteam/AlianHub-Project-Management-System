@@ -8,7 +8,7 @@
         <div v-if="checkPermission('settings.settings_project_list') != null && checkPermission('project.project_details') != null">
             <div class="lising_mainDiv p-1 position-re">
                 <div class="totalCountActiveClose d-flex justify-content-between position-re">
-                    <input type="text" class="form-control project-search" v-model="searchValue" :placeholder="$t('PlaceHolder.search')"/>
+                    <input type="text" class="ah-input project-search" v-model="searchValue" :placeholder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')"/>
                     <div class="d-flex">
                         <span class="tab-option" @click="activeTab = 0" :class="{'activeTab': activeTab === 0}">{{$t('Projects.all_project')}} ({{filterActiveProjects && filterActiveProjects.length ? filterActiveProjects.length : 0 }})</span>
                         <span class="tab-option" @click="activeTab = 1" :class="{'activeTab': activeTab === 1}">{{$t('Projects.closed_project')}} ({{filterCloseProject && filterCloseProject.length ? filterCloseProject.length : 0}})</span>

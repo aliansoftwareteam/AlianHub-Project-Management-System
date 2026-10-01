@@ -472,7 +472,7 @@ function createSubTasks () {
     font: 600 11.5px/1 var(--font-ui);
     cursor: pointer;
 }
-.stx__ai { color: var(--agent); }
+.stx__ai { color: var(--agent-ink); }
 .stx__ai:disabled { opacity: .55; cursor: not-allowed; }
 .stx__link { margin-left: auto; color: var(--brand); }
 .stx__ai:hover, .stx__link:hover { text-decoration: underline; }

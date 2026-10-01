@@ -2,6 +2,7 @@ import { computed, reactive, ref } from "vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { adjustedTotals } from "@/plugins/importTasks/importTree";
+import { mergeSummaries } from "./importSummary";
 
 const failure = (error) => error?.response?.data?.statusText || error?.message || "";
 
@@ -22,10 +23,11 @@ export function useClickUpImport() {
         Object.assign(progress, { done: 0, total: 0, current: "" });
     };
 
-    const loadPreview = async (projectId = "") => {
+    const loadPreview = async (projectId = "", addMissing = false) => {
         previewError.value = "";
         try {
-            const { data } = await apiRequest("post", env.IMPORT_CLICKUP_PREVIEW, { rows: rows.value, ...(projectId ? { projectId } : {}) });
+            const target = projectId ? { projectId, options: { createMissingStatuses: addMissing } } : {};
+            const { data } = await apiRequest("post", env.IMPORT_CLICKUP_PREVIEW, { rows: rows.value, ...target });
             if (!data?.status) throw new Error(data?.statusText || "");
             preview.value = data.data;
             return true;
@@ -72,6 +74,10 @@ export function useClickUpImport() {
     const skippedRows = computed(() => (preview.value?.skippedRows || []));
     const unmatchedAssignees = computed(() => Array.from(new Set(results.value.flatMap((result) => result.unmatchedAssignees || []))));
     const adjusted = computed(() => adjustedTotals(results.value));
+    const summary = computed(() => {
+        const summaries = results.value.filter((result) => result.ok && result.summary).map((result) => result.summary);
+        return summaries.length ? mergeSummaries(summaries) : null;
+    });
 
-    return { rows, preview, previewError, running, progress, results, totals, skippedRows, unmatchedAssignees, adjusted, reset, loadPreview, run };
+    return { rows, preview, previewError, running, progress, results, totals, skippedRows, unmatchedAssignees, adjusted, summary, reset, loadPreview, run };
 }
