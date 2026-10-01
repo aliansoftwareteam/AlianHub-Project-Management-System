@@ -14,7 +14,7 @@ defineOptions({ name: "ConnectAiHint" });
 const router = useRouter();
 const companyId = inject("$companyId", "");
 
-const shown = computed(() => aiAvailability.state === AI_STATE.UNCONFIGURED && Boolean(router?.hasRoute(CONNECT_AI_ROUTE)));
+const shown = computed(() => aiAvailability.state === AI_STATE.UNCONFIGURED && Boolean(router?.hasRoute?.(CONNECT_AI_ROUTE)));
 const target = computed(() => ({ name: CONNECT_AI_ROUTE, params: { cid: unref(companyId) } }));
 </script>
 
