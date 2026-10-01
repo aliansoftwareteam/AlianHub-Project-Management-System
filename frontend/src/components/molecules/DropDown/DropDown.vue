@@ -113,10 +113,7 @@ const props = defineProps({
         type: Boolean,
         default: false
     },
-    themed: {
-        type: Boolean,
-        default: false
-    }
+    themed: { type: Boolean, default: true }
 });
 
 const TRIGGER_MARKER = "data-dropdown-trigger";

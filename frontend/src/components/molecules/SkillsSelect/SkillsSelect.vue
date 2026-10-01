@@ -224,15 +224,16 @@ const toggle = (slug) => {
 .skills-select__search {
     width: 100%;
     box-sizing: border-box;
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 4px 8px;
     margin-bottom: 4px;
-    background: #ffffff;
+    background: var(--surface);
+    color: var(--ink);
     outline: none;
 }
 .skills-select__search:focus {
-    border-color: #2F3990;
+    border-color: var(--brand);
 }
 .skills-select__option {
     gap: 8px;
@@ -247,7 +248,7 @@ const toggle = (slug) => {
     max-width: 220px;
 }
 .skills-select__empty {
-    color: #818181;
+    color: var(--ink-2);
     padding: 6px 4px;
 }
 </style>

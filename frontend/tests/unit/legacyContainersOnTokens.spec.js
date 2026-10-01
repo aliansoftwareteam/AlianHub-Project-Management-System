@@ -104,12 +104,22 @@ describe('the dropdown panel', () => {
         expect(css).toMatch(/:root\[data-theme="dark"\] \.drop-down-menu:not\(\.dd-tokens\) \{ color-scheme: light; \}/);
     });
 
-    test('the themed panel restates the legacy colour utilities its hosts still carry', () => {
-        expect(css).toMatch(/\.dd-tokens :is\(\.black, [^)]*\.GunPowder[^)]*\) \{ color: var\(--ink\)/);
-        expect(css).toMatch(/\.dd-tokens :is\(\.gray81, [^)]*\) \{ color: var\(--ink-2\)/);
-        expect(css).toMatch(/\.dd-tokens \.blue \{ color: var\(--brand\)/);
-        expect(css).toMatch(/\.dd-tokens \.red \{ color: var\(--danger-ink\)/);
-        expect(css).toMatch(/\.dd-tokens \.bg-white \{ background-color: var\(--surface\)/);
+    test('menus and dialogs restate the legacy colour utilities their hosts still carry', () => {
+        const layer = withoutComments(read('assets/css/legacy-on-tokens.css'));
+        expect(read('assets/css/index.css')).toMatch(/@import 'legacy-on-tokens\.css';/);
+        expect(layer).toContain(':is(.dd-tokens, .modal) :is(.black, .dark-gray, .dark-gray2, .gray4b, .color52, .color63, .darkblue) { color: var(--ink); }');
+        expect(layer).toContain(':is(.dd-tokens, .modal) :is(.gray81, .gray, .gray63, .GunPowder, .color94, .colorlightgray) { color: var(--ink-2); }');
+        expect(layer).toContain(':is(.dd-tokens, .modal) :is(.blue, .purple) { color: var(--brand) !important; }');
+        expect(layer).toContain(':is(.dd-tokens, .modal) .red { color: var(--danger-ink); }');
+        expect(layer).toContain(':is(.dd-tokens, .modal) .bg-white { background-color: var(--surface); }');
+        expect(declarations(layer)).not.toMatch(COLOUR_LITERAL);
+    });
+
+    test('colours the option component and known hosts set inside the panel are restated on tokens', () => {
+        expect(css).toContain('.dd-tokens :is(.dropDelete, .mobile-deleteIcon, .mobile-delete-status) { color: var(--danger-ink) !important; }');
+        expect(css).toContain('.dd-tokens :is(.mainDiv, .option):hover { background: var(--surface-hover); }');
+        expect(css).toContain('.dropdown-back-drop { background-color: var(--scrim);}');
+        expect(css).toContain('.dd-tokens .drop-down-item { background: var(--fill) !important; color: var(--ink) !important; }');
     });
 
     test('the hosts left white are exactly the listed ones', () => {

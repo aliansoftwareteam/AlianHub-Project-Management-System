@@ -431,8 +431,7 @@ async function removeMember(item) {
         text: `${t("conformationmsg.Are_you_sure_you_want_to_delete")} ${item.Employee_Name || item.userEmail}?`,
         showCancelButton: true,
         icon: "warning",
-        confirmButtonColor: "#2F3990",
-        cancelButtonColor: "#c1121f",
+        customClass: { confirm: 'swal2-deny' },
         cancelButtonText: t("Home.no"),
         confirmButtonText: t("Home.yes")
     });

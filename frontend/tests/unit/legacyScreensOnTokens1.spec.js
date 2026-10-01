@@ -78,7 +78,7 @@ describe('the dark-mode opt-out list in tokens.css', () => {
     });
 
     test('still names the shared legacy containers of the later slices', () => {
-        for (const name of ['.ah-app__view', '#my-sidebar', '#my-modal', '#my-dropdown', '#my-image-slider', '.bg-white', '.swal2-container', 'iframe']) {
+        for (const name of ['.ah-app__view', '#my-sidebar', '.bg-white', 'iframe']) {
             expect(optOut[0]).toContain(name);
         }
     });

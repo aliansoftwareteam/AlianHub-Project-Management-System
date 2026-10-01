@@ -520,8 +520,7 @@ const deleteAttachments = (attachment) => {
         text: `${t('Toast.Are_you_sure_to_delete_this_file')} ?`,
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#d33',
+        customClass: { confirm: 'swal2-deny' },
         cancelButtonText: t('Projects.cancel'),
         confirmButtonText: t('conformationmsg.yes_delete')
     }).then((result)=>{
