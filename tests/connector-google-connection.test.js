@@ -75,6 +75,7 @@ const res = () => {
     r.status = (c) => { r.code = c; return r; };
     r.send = (b) => { r.body = b; return r; };
     r.json = r.send;
+    r.set = () => r;
     r.redirect = (code, url) => { r.code = url ? code : 302; r.location = url || code; return r; };
     return r;
 };
@@ -490,11 +491,24 @@ describe('a connection is usable only while the person has a seat', () => {
         expect(await handleFor(MEMBER)).toEqual({ handle: null, reason: 'no_seat' });
     });
 
-    it('no handle in another workspace, for another person, or for someone who never connected', async () => {
+    it('no handle for another person or for someone who never connected', async () => {
         await connectAs(MEMBER);
-        expect(await handleFor(MEMBER, OTHER_COMPANY)).toEqual({ handle: null, reason: 'not_connected' });
         expect(await handleFor(ADMIN)).toEqual({ handle: null, reason: 'not_connected' });
         expect(await handleFor(COLLEAGUE)).toEqual({ handle: null, reason: 'not_connected' });
+    });
+
+    // The fake database is one store whatever company is named, so the company is read from the calls.
+    it('reads and writes only the database of the workspace it is asked for', async () => {
+        await connectAs(MEMBER);
+        await handleFor(MEMBER);
+        await call(ctrl.mine, MEMBER);
+        await call(ctrl.members, OWNER);
+        await call(ctrl.disconnect, MEMBER, { params: { connector: G } });
+        await settle();
+        expect([...new Set(mockDb.calls.map((c) => String(c.companyId)))]).toEqual([C]);
+        mockDb.calls.length = 0;
+        await handleFor(MEMBER, OTHER_COMPANY);
+        expect([...new Set(mockDb.calls.map((c) => String(c.companyId)))]).toEqual([OTHER_COMPANY]);
     });
 });
 
@@ -511,7 +525,7 @@ describe('disconnecting', () => {
         expect(mockGoogle.calls[0]).toMatchObject({ url: REVOKE_URL, workspace: C, authorization: undefined });
         expect(mockGoogle.calls[0].form).toEqual({ token: refresh });
         expect(sealed()).toHaveLength(0);
-        for (const handle of handles) await expect(store.resolve({ companyId: C, handle })).rejects.toMatchObject({ code: 'revoked' });
+        for (const handle of handles) expect(await store.resolve({ companyId: C, handle })).toBeNull();
         expect(rowOf(MEMBER)).toBeUndefined();
         expect(rows(T)[0]).toMatchObject({ status: 'revoked', secretHandles: {}, deletedStatusKey: 1, disconnectedBy: 'self' });
         expect(await handleFor(MEMBER)).toEqual({ handle: null, reason: 'not_connected' });
