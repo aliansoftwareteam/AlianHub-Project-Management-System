@@ -31,6 +31,7 @@ import { LIST_MENU, listMenuEntries, sprintState } from '@/views/Projects/compos
 import { resetProjectTreeCache } from '@/components/molecules/ProjectTree/projectTreeData';
 import { resetFavourites } from '@/composable/favourites';
 import { undoToast } from '@/composable/useUndoToast';
+import { loadLinkableGoals, resetLinkableGoals } from '@/views/Goals/goalLinking';
 
 const i18n = config.global.plugins[0];
 i18n.global.setLocaleMessage('en', en);
@@ -154,6 +155,7 @@ beforeEach(async () => {
     Object.values(toast).forEach((spy) => spy.mockClear());
     resetProjectTreeCache();
     resetFavourites();
+    resetLinkableGoals();
     Object.assign(getters, {
         'settings/companyUserDetail': { roleType: MEMBER },
         'settings/rules': rulesGranting(...KEYS),
@@ -187,7 +189,7 @@ describe('the places that draw a list menu take it from the one source', () => {
     it('the menu component knows no entry the source does not list', () => {
         const ids = LIST_MENU.map((entry) => entry.id);
         expect(new Set(ids).size).toBe(ids.length);
-        expect(ids).toEqual(['rename', 'copy-link', 'move', 'start-sprint', 'complete-sprint', 'sprint-settings', 'plain-list', 'archive', 'restore', 'delete']);
+        expect(ids).toEqual(['rename', 'copy-link', 'move', 'count-toward-goal', 'start-sprint', 'complete-sprint', 'sprint-settings', 'plain-list', 'archive', 'restore', 'delete']);
     });
 });
 
@@ -384,5 +386,58 @@ describe('what the entries do, from a place that had none of them before', () =>
         wrapper.vm.run('archive');
         await flushPromises();
         expect(document.body.querySelector('[role="alertdialog"]').textContent).toContain('Archive Roadmap?');
+    });
+});
+
+describe('counting a list toward a goal', () => {
+    const GOAL = { _id: 'g1', name: 'Launch the site', canEdit: true, archived: false, targets: [{ id: 't1', name: 'Launch tasks', kind: 'tasks', sources: { sprintIds: [], taskIds: [] } }] };
+    const goalsAre = async (goals) => {
+        apiRequest.mockImplementation((method, url) => Promise.resolve({ data: { status: true, data: url === '/api/v2/goals' ? goals : [] } }));
+        await loadLinkableGoals('company-1');
+    };
+    const WITH_ENTRY = ['rename', 'copy-link', 'move', 'count-toward-goal', 'sprint-settings', 'archive', 'delete'];
+
+    it('is offered in every place to someone who can edit a goal, and to nobody else', async () => {
+        await goalsAre([GOAL]);
+        expect(await everywhere('plain')).toEqual(inEveryPlace(WITH_ENTRY));
+
+        resetLinkableGoals();
+        await goalsAre([{ ...GOAL, canEdit: false }]);
+        expect(await everywhere('plain')).toEqual(inEveryPlace(WITH_ENTRY.filter((id) => id !== 'count-toward-goal')));
+    });
+
+    it('is not offered for an archived list, in a closed project, or for a chat channel', async () => {
+        await goalsAre([GOAL]);
+        const offered = (seen) => Object.values(seen).some((ids) => ids.includes('count-toward-goal'));
+        expect(offered(await everywhere('shelved', project(), true))).toBe(false);
+        expect(offered(await everywhere('plain', project({ status: 'close' })))).toBe(false);
+        const { checkPermission } = useCustomComposable();
+        const ids = (list) => listMenuEntries({ project: project(), list, folders: [], check: (key) => checkPermission(key, true) }).map((entry) => entry.id);
+        expect(ids({ ...grouped('plain'), mainChat: true })).not.toContain('count-toward-goal');
+        expect(ids(grouped('plain'))).toContain('count-toward-goal');
+    });
+
+    it('is read once for the menus of a page', async () => {
+        await goalsAre([GOAL]);
+        apiRequest.mockClear();
+        show(ListMenu, { project: project(), sprint: grouped('plain') });
+        show(ListMenu, { project: project(), sprint: grouped('planned') });
+        await flushPromises();
+        expect(apiRequest.mock.calls.filter(([, url]) => url === '/api/v2/goals')).toEqual([]);
+    });
+
+    it('opens the picker for that list, which sends the target\'s sources with the list added', async () => {
+        await goalsAre([GOAL]);
+        const wrapper = show(ListMenu, { headless: true, project: project(), sprint: grouped('plain') });
+        wrapper.vm.run('count-toward-goal');
+        await vi.waitFor(() => expect(document.body.querySelector('[data-test="glk"]')).not.toBeNull());
+        await flushPromises();
+        expect(document.body.querySelector('[data-test="glk"]').textContent).toContain('the list Roadmap');
+
+        apiRequest.mockClear();
+        document.body.querySelector('[data-test="glk"]').dispatchEvent(new Event('submit', { cancelable: true }));
+        await flushPromises();
+        expect(apiRequest).toHaveBeenCalledWith('patch', '/api/v2/goals/g1/targets/t1', { sources: { sprintIds: ['plain'], taskIds: [] } });
+        expect(document.body.querySelector('[data-test="glk"]')).toBeNull();
     });
 });

@@ -14,7 +14,7 @@
 </template>
 
 <script setup>
-import { computed, watch } from "vue";
+import { computed } from "vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { SOURCE_KINDS, sourcesOf } from "./goalRequest";
 import { useGoalSources } from "./useGoalSources";
@@ -23,19 +23,18 @@ defineOptions({ name: "GoalSourceChips" });
 
 const props = defineProps({
     sources: { type: Object, default: null },
+    names: { type: Object, default: null },
     refused: { type: Object, default: null },
     removable: { type: Boolean, default: false },
     busy: { type: Boolean, default: false }
 });
 defineEmits(["remove"]);
 
-const { sourceOf, nameTasks } = useGoalSources();
+const { sourceOf } = useGoalSources();
 
 const linked = computed(() => sourcesOf(props.sources));
 const chips = computed(() => {
     const refused = sourcesOf(props.refused);
-    return SOURCE_KINDS.flatMap((kind) => linked.value[kind].map((id) => ({ ...sourceOf(kind, id), refused: refused[kind].includes(id) })));
+    return SOURCE_KINDS.flatMap((kind) => linked.value[kind].map((id) => ({ ...sourceOf(kind, id, props.names), refused: refused[kind].includes(id) })));
 });
-
-watch(() => linked.value.taskIds, nameTasks, { immediate: true });
 </script>

@@ -157,3 +157,48 @@ describe('statuses, priorities and estimates', () => {
         expect(parseEstimateMinutes('', '')).toBeNull();
     });
 });
+
+describe('dates written as numbers with the day first', () => {
+    const read = (dueDates, dayFirst) => transformClickUpRows({
+        rows: dueDates.map((due, at) => ({ 'Task ID': `d${at}`, 'Task Name': `Task ${at}`, Status: 'to do', 'Due Date': due })),
+        statusFor: asIs,
+        leaderId: 'leader-1',
+        dayFirst,
+    });
+    const day = (iso) => { const date = new Date(iso); return [date.getFullYear(), date.getMonth() + 1, date.getDate()]; };
+
+    it('are read day first when one of the column has a day past the twelfth and none a month past it', () => {
+        const { tasks, unreadDates } = read(['15/12/2025', '05/12/2025', '1.2.2026']);
+        expect(tasks.map((task) => day(task.DueDate))).toEqual([[2025, 12, 15], [2025, 12, 5], [2026, 2, 1]]);
+        expect(unreadDates).toEqual([]);
+    });
+
+    it('are read month first, as before, when nothing in the column says otherwise', () => {
+        expect(day(read(['05/12/2025']).tasks[0].DueDate)).toEqual([2025, 5, 12]);
+    });
+
+    it('are reported, not guessed, in a column that mixes both orders', () => {
+        const { tasks, unreadDates } = read(['15/12/2025', '12/15/2025']);
+        expect(tasks[0].DueDate).toBeNull();
+        expect(day(tasks[1].DueDate)).toEqual([2025, 12, 15]);
+        expect(unreadDates).toEqual([{ row: 1, name: 'Task 0', column: 'Due Date', value: '15/12/2025' }]);
+    });
+
+    it('follow the order the whole file was found to hold, when the importer is told it', () => {
+        expect(day(read(['05/12/2025'], ['due']).tasks[0].DueDate)).toEqual([2025, 12, 5]);
+        expect(read(['31/02/2025'], ['due']).unreadDates).toHaveLength(1);
+    });
+});
+
+describe('a task id that a row above already holds', () => {
+    it('leaves the later row out and says so', () => {
+        const repeated = [
+            { 'Task ID': 'r1', 'Task Name': 'First', Status: 'to do' },
+            { 'Task ID': 'r1', 'Task Name': 'Second', Status: 'to do' },
+            { 'Task ID': 'r2', 'Task Name': 'Child', Status: 'to do', 'Parent ID': 'r1' },
+        ];
+        const { tasks, skippedRows } = transformClickUpRows({ rows: repeated, statusFor: asIs, leaderId: 'leader-1' });
+        expect(tasks.map((task) => task.TaskName)).toEqual(['First', 'Child']);
+        expect(skippedRows).toEqual([{ row: 2, code: 'repeated_id', reason: 'A row above has the same task id.' }]);
+    });
+});

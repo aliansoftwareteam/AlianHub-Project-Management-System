@@ -93,7 +93,7 @@ const paymentInit = inject("paymentInit");
 // import logo from '@/assets/images/png/logo.png'
 const logo = "/api/v1/getlogo?key=logo&type=desktop";
 import { useRoute, useRouter } from 'vue-router';
-import { languageTranslateHelper } from './composable/index';
+import { applyStoredLocale } from '@/locales/main';
 import {socketHelper} from './composable/socketHelper';
 import { useFieldDefinitionsSync } from '@/plugins/customFieldView/fieldDefinitionsSync';
 import { apiRequest,apiRequestWithoutCompnay } from './services';
@@ -112,8 +112,6 @@ defineComponent({
     name: 'App'
 })
 
-const {selectedLanguageCode, changeLanguage} = languageTranslateHelper();
-const { locale, setLocaleMessage } = useI18n();
 
 const companyId = ref(localStorage.getItem('selectedCompany') !== null ? localStorage.getItem('selectedCompany') : "")
 const logged = ref(false);
@@ -287,9 +285,7 @@ async function getFirebaseData() {
                 const { language, upload } = userData._id ? adoptAccountPrefs(userData) : {};
                 if(language){
                     localStorage.setItem('language', language);
-                    const updateLanguage = await changeLanguage(language);
-                    locale.value = language;
-                    setLocaleMessage(language, updateLanguage || "en");
+                    await applyStoredLocale();
                 }
                 if(upload){
                     apiRequestWithoutCompnay("put", env.USER_UPATE, {
@@ -593,12 +589,6 @@ const onPaletteKey = (e) => {
 }
 
 
-const changeLanguageHandler = async () => {
-    const updateLanguage = await changeLanguage(selectedLanguageCode.value);
-    locale.value = selectedLanguageCode.value;
-    setLocaleMessage(selectedLanguageCode.value, updateLanguage || "en");
-}
-
 const handleSocketsConnection = async () => {
     try {
         const updateObject = {
@@ -679,7 +669,6 @@ const handleSocketsConnection = async () => {
 }
 
 onMounted(() => {
-    changeLanguageHandler()
     localStorage.removeItem('ForgotEmail');
     if(getters['brandSettingTab/brandSettings'] && !(getters['brandSettingTab/brandSettings']).length){
         dispatch('brandSettingTab/setBrandSettings').catch((error) =>{

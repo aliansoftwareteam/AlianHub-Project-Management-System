@@ -15,6 +15,7 @@
 const performanceFlag = require('./performanceFlag');
 const dataFlag = require('../Mcp/dataFlag');
 const manageFlag = require('../Mcp/manageFlag');
+const workFlag = require('../Mcp/workFlag');
 
 // `permission` names the Security & Permissions catalogue entry
 // (Config/permissionGuard) that governs the same operation for a person.
@@ -118,12 +119,33 @@ const FLAGGED = Object.freeze([
         { key: 'page.create', label: 'Create a doc (a draft until a person approves it)', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
         { key: 'page.update', label: 'Change a doc\'s title or body', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
     ].map((action) => ({ enabled: manageFlag.enabled, action: Object.freeze(action) })),
+    // These run the web app's own tag, relation, list and doc comment handlers (Agents/workRequests.js).
+    ...[
+        { key: 'tags.list', label: 'List a project\'s tags', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
+        { key: 'task.tags.add', label: 'Add a tag to a task', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'task.task_tag' },
+        { key: 'task.tags.remove', label: 'Remove a tag from a task', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'task.task_tag' },
+        { key: 'task.relations.list', label: 'List the tasks a task is linked to', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
+        { key: 'task.relation.add', label: 'Link two tasks', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
+          constraint: 'both tasks must be ones the person behind the agent can open', permission: { key: 'task.task_list', write: false } },
+        { key: 'task.relation.remove', label: 'Remove the link between two tasks', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
+          constraint: 'both tasks must be ones the person behind the agent can open', permission: { key: 'task.task_list', write: false } },
+        { key: 'lists.list', label: 'List a project\'s lists and folders', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_list' },
+        { key: 'list.create', label: 'Create a list in a project or folder', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'project.project_sprint_create' },
+        { key: 'list.rename', label: 'Rename a list', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'project.project_sprint_name_edit' },
+        { key: 'list.move', label: 'Move a list into or out of a folder', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
+          permission: { anyOf: ['project.project_sprint_name_edit', 'project.sprint_type_change', 'project.project_sprint_create'] } },
+        { key: 'page.comments.list', label: 'Read a doc\'s comments', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_details' },
+        { key: 'page.comment.create', label: 'Comment on a doc', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
+        { key: 'page.comment.reply', label: 'Reply to a comment on a doc', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
+        { key: 'page.comment.assign', label: 'Assign a doc comment thread', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
+    ].map((action) => ({ enabled: workFlag.enabled, action: Object.freeze(action) })),
 ]);
 
 /* A string maps the whole action at its own level (write for writes, read for
  * reads); { key, write } pins the level; { byField } holds each edited field
  * to the entry, or entries, a person editing that field is held to, beside
- * the action's own { key } when it has one. */
+ * the action's own { key } when it has one; { anyOf } is met by any one of its
+ * entries, as a route that takes several keys for one control is. */
 const permissionsFor = (key, params = {}) => {
     const action = get(key);
     if (!action) return [];
@@ -137,6 +159,7 @@ const permissionsFor = (key, params = {}) => {
         return keys.map((k) => ({ key: k, write: true }));
     }
     if (p && p.key) return [{ key: p.key, write: typeof p.write === 'boolean' ? p.write : Boolean(action.write) }];
+    if (p && Array.isArray(p.anyOf)) return [{ key: p.anyOf[0], anyOf: [...p.anyOf], write: Boolean(action.write) }];
     return [];
 };
 
@@ -155,6 +178,7 @@ const validate = (entries) => {
             return;
         }
         if (p && typeof p.key === 'string' && PERMISSION_KEY.test(p.key)) return;
+        if (p && Array.isArray(p.anyOf) && p.anyOf.length && p.anyOf.every((k) => PERMISSION_KEY.test(String(k)))) return;
         throw bad(a, 'has no permission mapping; every action must name the catalogue entry that governs it for a person');
     });
     return entries;

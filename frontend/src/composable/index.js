@@ -824,20 +824,7 @@ export function draggble() {
 
 
 export function languageTranslateHelper() {
-    const storedLanguage = localStorage.getItem('language');
-    const selectedLanguageCode = ref(storedLanguage ? storedLanguage : 'en');
+    const selectedLanguageCode = ref(localStorage.getItem('language') || 'en');
 
-    const changeLanguage = async (selectedLanguage = "en") => {
-        try {
-            const module = await import(`../locales/${selectedLanguage}.js`);
-            console.log("Loaded language file:", selectedLanguage);
-            return module.default;
-        } catch (error) {
-            console.error("Language file not found:", error);
-            return null;
-        }
-    };
-    
-
-    return { selectedLanguageCode, changeLanguage };
+    return { selectedLanguageCode };
 }

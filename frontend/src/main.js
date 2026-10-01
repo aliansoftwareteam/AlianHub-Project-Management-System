@@ -15,7 +15,7 @@ import { plugin, defaultConfig } from '@formkit/vue'
 import { createProPlugin, inputs } from '@formkit/pro'
 import { DatePicker } from 'v-calendar';
 import 'v-calendar/style.css';
-import {i18n } from '@/locales/main';
+import { i18n, applyStoredLocale } from '@/locales/main';
 import VueApexCharts from "vue3-apexcharts";
 import DemoBanner from "@/components/atom/DemoBanner/DemoBanner.vue";
 import { installChunkRecovery } from '@/config/chunkRecovery';
@@ -71,30 +71,25 @@ app.use(i18n);
 // Registered before mount so the root App.vue template can resolve it.
 app.component('DemoBanner', DemoBanner);
 installChunkRecovery(app, router);
-app.mount('#app');
-// Use plugin defaults (optional)
-app.component('ApexChart', VueApexCharts); // Register the apexchart component globally
+app.component('ApexChart', VueApexCharts);
 app.component('VDatePicker', DatePicker)
 app.component('GridLayout', GridLayout)
 app.component('GridItem', GridItem)
 
+const TELEPORT_TARGETS = ['my-sidebar', 'my-modal', 'my-dropdown', 'my-image-slider'];
 
-// SIDEBAR
-let element = document.createElement('div');
-element.id="my-sidebar"
-document.getElementById("app")?.appendChild(element)
-// MODAL
-element = document.createElement('div');
-element.id="my-modal"
-document.getElementById("app")?.appendChild(element)
-// DROP DOWN
-element = document.createElement('div');
-element.id="my-dropdown"
-document.getElementById("app")?.appendChild(element)
-// DROP DOWN
-element = document.createElement('div');
-element.id="my-image-slider"
-document.getElementById("app")?.appendChild(element)
+const mountApp = () => {
+  app.mount('#app');
+  // Mounting empties #app, so the teleport targets go in afterwards.
+  TELEPORT_TARGETS.forEach((id) => {
+    const element = document.createElement('div');
+    element.id = id;
+    document.getElementById('app')?.appendChild(element);
+  });
+};
+
+// The first paint waits for the stored language's file; English alone needs no wait.
+applyStoredLocale().then(mountApp);
 
 // firebase-messaging-sw.js only exists once frontend/config.sh has copied it into public/.
 if (firebaseConfigured && 'serviceWorker' in navigator) {

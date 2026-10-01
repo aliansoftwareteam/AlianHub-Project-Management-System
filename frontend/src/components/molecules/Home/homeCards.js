@@ -8,7 +8,8 @@ export const HOME_CARDS = Object.freeze([
     { id: "waiting", labelKey: "Home.card_waiting", hintKey: "Home.card_waiting_hint" },
     { id: "standup", labelKey: "Home.card_standup", hintKey: "Home.card_standup_hint" },
     { id: "assigned_comments", labelKey: "Home.assigned_comments", hintKey: "Home.card_assigned_comments_hint" },
-    { id: "recents", labelKey: "Home.card_recents", hintKey: "Home.card_recents_hint" }
+    { id: "recents", labelKey: "Home.card_recents", hintKey: "Home.card_recents_hint" },
+    { id: "goals", labelKey: "Home.card_goals", hintKey: "Home.card_goals_hint" }
 ]);
 
 // Dashboard cards that need no per-card setup; each loads through its own endpoint, which applies the dashboard's access rules.

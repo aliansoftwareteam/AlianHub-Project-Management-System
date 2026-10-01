@@ -6,6 +6,7 @@ const mongoose = require("mongoose");
 const { ensureNotificationDefaults } = require("../../notification/defaults");
 const { ensureCommentNoticeItems } = require("../../Comments/helpers/noticeItems");
 const { ensureDocNoticeSection } = require("../../notification/docNotices");
+const { ensureGoalNoticeSection } = require("../../notification/goalNotices");
 
 const OBJECT_ID_RE = /^[0-9a-f]{24}$/i;
 
@@ -83,6 +84,7 @@ exports.getNotifications = async (req, res) => {
 
         await ensureCommentNoticeItems(companyId, [id]);
         await ensureDocNoticeSection(companyId, [id]);
+        await ensureGoalNoticeSection(companyId, [id]);
         const cacheKey = `notification:${id}:${companyId}`;
         const value = myCache.get(cacheKey);
 

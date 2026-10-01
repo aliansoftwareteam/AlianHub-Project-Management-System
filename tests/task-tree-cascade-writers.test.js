@@ -83,6 +83,22 @@ describe('the agent sprint move', () => {
         expect(announced).toEqual(expect.arrayContaining(FAMILY));
     });
 
+    test('into a list the task is also in leaves it there once, and so does the undo', async () => {
+        const THIRD_LIST = '6f0000000000000000000503';
+        const entry = (sprintId) => ({ projectId: oid(PROJECT), sprintId: oid(sprintId) });
+        const extraListsOf = (id) => stored(id).extraLists.map((item) => String(item.sprintId));
+        stored(ROOT).extraLists = [entry(TARGET_SPRINT), entry(THIRD_LIST)];
+
+        const out = await move(ROOT, TARGET_SPRINT);
+        expect(extraListsOf(ROOT)).toEqual([THIRD_LIST]);
+
+        stored(ROOT).extraLists.push(entry(SPRINT));
+        await inverses[out.undo.kind](C, out.undo);
+
+        expect(String(stored(ROOT).sprintId)).toBe(SPRINT);
+        expect(extraListsOf(ROOT)).toEqual([THIRD_LIST]);
+    });
+
     test('refuses a subtask on its own', async () => {
         const refused = await move(CHILD, TARGET_SPRINT).catch((error) => error);
 

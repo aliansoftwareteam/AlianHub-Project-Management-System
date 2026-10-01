@@ -138,7 +138,7 @@ const HIDDEN_ITEMS = new Set([
     "after_3_hours_today_pending_hours", "logged_hours_notification"
 ]);
 const META_KEYS = new Set(["updatedAt", "createdAt", "_id", "userId", "__v", "quietHours", "agentActivity", "dailyDigest", "aiAlerts"]);
-const SECTION_ORDER = ["tasks", "project", "docs", "before", "chat"];
+const SECTION_ORDER = ["tasks", "project", "docs", "goals", "before", "chat"];
 
 const channels = [
     { key: "inbox", field: "browser", label: "Settings.ch_inbox" },

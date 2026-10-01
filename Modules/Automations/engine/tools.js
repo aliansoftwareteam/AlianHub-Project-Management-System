@@ -75,14 +75,14 @@ const emitAutomationUpdate = (doc, updatedFields, depth) => {
 /* Apply a $set to a task and announce it. `context` carries the run and the
  * originating event's depth so the audit row can point back at the rule and the
  * loop guard keeps counting. */
-const updateTask = async (companyId, taskId, set, context = {}, unset = null) => {
+const updateTask = async (companyId, taskId, set, context = {}, unset = null, pull = null) => {
     const _id = oid(taskId);
     if (!_id) throw new DeterministicError(`invalid task id "${taskId}"`);
     if (!set || !Object.keys(set).length) return { changed: false };
 
     const updated = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS,
-        data: [{ _id }, unset ? { $set: set, $unset: unset } : { $set: set }, { returnDocument: 'after' }],
+        data: [{ _id }, { $set: set, ...(unset ? { $unset: unset } : {}), ...(pull ? { $pull: pull } : {}) }, { returnDocument: 'after' }],
     }, 'findOneAndUpdate');
 
     if (!updated || !updated._id) throw new DeterministicError(`task ${taskId} not found`);

@@ -7,6 +7,7 @@ const permissions = require('../Agents/permissions');
 const visibility = require('./visibility');
 const manageFlag = require('./manageFlag');
 const manageTools = require('./manageTools');
+const workTools = require('./workTools');
 
 // An approved MCP proposal runs as the token's person, not as the approver, so
 // approval re-asks everything the original call was asked and adds the
@@ -21,6 +22,7 @@ const refused = (error, status = 403) => ({ error, status });
 const targetOf = (params = {}) => {
     const target = {};
     if (params.taskId) target.taskId = String(params.taskId);
+    if (params.relatedTaskId) target.relatedTaskId = String(params.relatedTaskId);
     if (params.projectId) target.projectId = String(params.projectId);
     if (params.projectId && params.sprintId) target.sprintId = String(params.sprintId);
     if (params.pageId) target.pageId = String(params.pageId);
@@ -60,7 +62,7 @@ const tokenFiler = async (companyId, p, changes) => {
 const grantFiler = async (companyId, p, changes) => {
     const held = await require('./oauthAuth').standingOfGrant({ companyId, grantId: p.oauthGrantId, clientId: p.oauthClientId, userId: p.requestedBy });
     if (!held) return refused('The connection that filed this proposal has been revoked, has expired, or its app is no longer approved in this workspace.');
-    const covered = changes.every((c) => { const grant = manageTools.grantOfAction(c.action); return Boolean(grant) && held.includes(grant); });
+    const covered = changes.every((c) => { const grant = manageTools.grantOfAction(c.action) || workTools.filedUnder(c.action); return Boolean(grant) && held.includes(grant); });
     if (!covered) return refused('The connection that filed this proposal no longer holds the grant this change needs.');
     return { tokenLists: [] };
 };

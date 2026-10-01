@@ -22,6 +22,7 @@ const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
 const { TaskWriteRefusal } = require('../taskWriteFields');
 const { REFUSALS, PLACEMENT_FIELDS, slotUnder, levelRows } = require('../taskTree');
+const { importMarkOf } = require('../importMark');
 
 const treeRefusal = (code) => new TaskWriteRefusal(code === 'PARENT_NOT_FOUND' ? 404 : 400, REFUSALS[code], code);
 
@@ -46,11 +47,12 @@ const importedDetails = (task) => ({
 });
 
 module.exports = {
-    create({data, user, projectData ,indexObj, setNotif}) {
+    /* `importMark` is handed over by the importers alone; the task routes drop it from a body. */
+    create({data, user, projectData ,indexObj, setNotif, importMark = null}) {
         return new Promise((resolve,reject) => {
             try {
                 placeInTree(projectData.CompanyId, data)
-                .then(() => HandleTask(projectData.CompanyId, data, false, data.id || null, user , indexObj))
+                .then(() => HandleTask(projectData.CompanyId, data, false, data.id || null, user, { importMark }))
                 .then((taskResult) => {
                     if(taskResult.status){
                         resolve(taskResult);
@@ -224,14 +226,16 @@ module.exports = {
         })
     },
 
-    createMultipleTasks({ tasks, userData, projectData, indexObj, statusArray, sprint, eventId }) {
+    /* `importMark` and `storedParents` come from the importers alone; the task routes drop both from a body.
+     * `storedParents` maps an id a row may name as its parent to a task already stored, so a row can go under it. */
+    createMultipleTasks({ tasks, userData, projectData, indexObj, statusArray, sprint, eventId, importMark = null, storedParents = new Map() }) {
         return new Promise((resolve, reject) => {
             // Check if any task contains a custom field
             const hasCustomFields = tasks.some(task => Object.keys(task).some(key => key.startsWith("custom_")));
             let createdCustomFields;
             // Function to handle actual task creation logic
             const processTasks = (tasks) => {
-                const { levels: [parentTasks, ...subtaskLevels], parentIdOf, adjusted } = levelRows(tasks);
+                const { levels: [parentTasks, ...subtaskLevels], parentIdOf, storedParentOf, adjusted } = levelRows(tasks, storedParents);
                 const totalTasks = tasks.length;
     
                 const idMapping = {};
@@ -292,7 +296,8 @@ module.exports = {
                         user: userData,
                         projectData,
                         indexObj,
-                        setNotif: true
+                        setNotif: true,
+                        importMark: importMarkOf(importMark, task),
                     }).then(taskResult => {
                         idMapping[task._id] = taskResult.id;
                         task.createdTaskId = taskResult.id;
@@ -314,7 +319,7 @@ module.exports = {
                             'dueDateDeadLine': task.dueDateDeadLine || [],
                             'TaskType': task.TaskType || "task",
                             'TaskTypeKey': task.TaskTypeKey || 1,
-                            'ParentTaskId': idMapping[parentIdOf.get(task)] || "",
+                            'ParentTaskId': storedParentOf.get(task) || idMapping[parentIdOf.get(task)] || "",
                             'ProjectID': projectData._id,
                             'CompanyId': projectData.CompanyId,
                             'status': {
@@ -345,7 +350,8 @@ module.exports = {
                             user: userData,
                             projectData,
                             indexObj,
-                            setNotif: true
+                            setNotif: true,
+                            importMark: importMarkOf(importMark, task),
                         }).then((taskResult) => {
                             idMapping[task._id] = taskResult.id;
                             task.createdTaskId = taskResult.id;

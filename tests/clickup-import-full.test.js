@@ -114,7 +114,7 @@ describe('a ClickUp file imported into a project', () => {
         created.forEach((field) => expect(field).toMatchObject({ global: false, projectId: [PROJECT], type: 'task', isDelete: true, userId: OWNER }));
         expect(first.body.data.summary.fields).toMatchObject({ created: created.map((field) => field.fieldTitle), reused: [], asText: ['Site'] });
 
-        const second = await importRows();
+        const second = await importRows({ options: { createMissingStatuses: true, existing: 'update' } });
         expect(store(SCHEMA_TYPE.CUSTOM_FIELDS).filter((field) => field.fieldDescription === 'Imported from ClickUp.')).toHaveLength(15);
         expect(second.body.data.summary.fields).toMatchObject({ created: [], reused: created.map((field) => field.fieldTitle), valuesSet: 22, valuesDropped: 7 });
     });
