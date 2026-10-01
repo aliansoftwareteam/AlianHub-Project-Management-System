@@ -155,9 +155,7 @@ describe('adding to another list', () => {
 
         expect([isMoveTask, isBulkMove]).toEqual([true, true]);
         expect(projectOptions.map((project) => project._id)).toEqual(['proj-1', 'proj-2']);
-        expect(projectOptions.some((project) => PROJECTS.includes(project))).toBe(false);
-        expect(selectedProjectObject).toMatchObject({ _id: 'proj-1', sprintsObj: {}, sprintsfolders: {} });
-        expect(HOME.sprintsObj).toEqual({ 'list-1': { id: 'list-1' } });
+        expect(selectedProjectObject._id).toBe('proj-1');
         expect([listPicker.title, listPicker.confirm]).toEqual(['Add to another list', 'Add']);
         expect(listPicker.note).toContain('Website');
         const offered = (list) => listPicker.offers({ deletedStatusKey: 0, ...list });

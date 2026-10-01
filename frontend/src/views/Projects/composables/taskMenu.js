@@ -1,4 +1,5 @@
 import { rowEditRights } from "@/views/Projects/ListView/listRowEdit";
+import { isAddedRow } from "@/views/Projects/composables/taskHomeMark";
 
 const hasKey = (task) => Boolean(task.TaskKey) && task.TaskKey !== "--";
 const hasSubtasks = (task) => Number(task.subTasks || 0) > 0;
@@ -17,6 +18,7 @@ export const TASK_MENU = Object.freeze([
     { id: "convert-subtask", labelKey: "ProjectDetails.convert_subtask", group: "change", shown: ({ rights, isSub }) => rights.convertSubtask && !isSub },
     { id: "convert-list", labelKey: "ProjectDetails.convert_list", group: "change", shown: ({ rights }) => rights.convertList },
     { id: "move", labelKey: "List.menu_move", group: "change", shown: ({ rights }) => rights.move },
+    { id: "remove-from-list", labelKey: "TaskLists.menu_remove_here", group: "change", shown: ({ rights, addedHere }) => rights.removeFromList && addedHere },
     { id: "duplicate", labelKey: "List.menu_duplicate", group: "change", shown: ({ rights }) => rights.duplicate },
     { id: "duplicate-subtasks", labelKey: "List.menu_duplicate_subtasks", group: "change", shown: ({ rights, isSub, task }) => rights.duplicate && !isSub && hasSubtasks(task) },
     { id: "merge", labelKey: "ProjectDetails.merge", group: "change", shown: ({ rights }) => rights.merge },
@@ -39,6 +41,7 @@ export function taskMenuRights(check, { archived = false } = {}) {
         convertSubtask: live && yes("task.sub_task_create") && yes("task.task_convert_to_subtask"),
         convertList: live && yes("project.project_sprint_create") && yes("task.task_convert_to_list"),
         move: live && yes("task.task_move"),
+        removeFromList: live && yes("task.task_move"),
         duplicate: live && yes("task.task_duplicate"),
         merge: live && yes("task.task_merge"),
         archive: live && yes("task.task_archive"),
@@ -48,9 +51,10 @@ export function taskMenuRights(check, { archived = false } = {}) {
 }
 
 /* `canNest` says whether the task may take a subtask. A view that shows one level leaves it
- * out, and only a top-level task is offered one there. */
-export function taskMenuItems(task, rights, { isSub = task?.isParentTask === false, canNest = !isSub } = {}) {
-    const context = { task: task || {}, rights: rights || {}, isSub, canNest };
+ * out, and only a top-level task is offered one there. `listId` is the list on screen: a task
+ * shown there because it was added to it can be taken out of it again. */
+export function taskMenuItems(task, rights, { isSub = task?.isParentTask === false, canNest = !isSub, listId = "" } = {}) {
+    const context = { task: task || {}, rights: rights || {}, isSub, canNest, addedHere: !isSub && isAddedRow(task, listId) };
     let group = null;
     return TASK_MENU
         .filter((item) => !item.shown || item.shown(context))

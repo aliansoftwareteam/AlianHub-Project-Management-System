@@ -78,6 +78,7 @@ const { getUser } = useGetterFunctions();
 const selection = useTaskSelection();
 
 const project = inject("selectedProject");
+provide("viewedList", computed(() => ({ sprintId: props.sprintId, projectId: project?.value?._id })));
 const companyId = inject("$companyId");
 const userId = inject("$userId");
 const searchedTask = inject("searchedTask");

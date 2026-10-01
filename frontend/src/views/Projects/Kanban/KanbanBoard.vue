@@ -84,6 +84,8 @@ import { ref, defineProps, nextTick, inject, provide, watch, onMounted, onUnmoun
 import Draggable from 'vuedraggable'
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import { useToast } from "vue-toast-notification";
+import { isAddedRow } from "@/views/Projects/composables/taskHomeMark";
 
 //Cmponents
 import BoardViewTaskCreateVue from "@/views/Projects/Kanban/BoardViewTaskCreate"
@@ -135,6 +137,7 @@ const hoveredColumnIndex = ref(null)
 const timer = ref(null)
 const { dispatch, commit } = useStore()
 const { t } = useI18n()
+const $toast = useToast();
 const { updateTaskByGroup } = useUpdateTasks()
 const { checkPermission } = useCustomComposable();
 
@@ -279,6 +282,11 @@ const updateEvent = (event, task) => {
     if (element) {
         if (event.added) {
             updateTaskByGroup(element, task, groupValue.value, null, true).catch((error) => console.error("ERROR in board drop: ", error));
+        }
+        /* A card of a task added to this list takes the column it is dropped in; its place is kept by the list it lives in. */
+        if (isAddedRow(element, columns.value[0]?.sprintId || props.sprintId)) {
+            if (event.moved) $toast.info(t("TaskLists.order_kept_at_home"), { position: "top-right" });
+            return;
         }
         if (task.customFieldId) return;
         let relevantIndex

@@ -37,8 +37,10 @@ export function addTargets(projects, check) {
     return (projects || []).filter((project) => canBeExtraList({}, project).ok && check(MOVE, project) === true);
 }
 
-export const offersList = (task, entries) => (list) => !list.deletedStatusKey
-    && !isScrumList(list)
+/* The lists any task could be added to; which of several tasks a list already holds is for the server to say. */
+export const offersAnyTask = (list) => !list.deletedStatusKey && !isScrumList(list);
+
+export const offersList = (task, entries) => (list) => offersAnyTask(list)
     && canAddToList({ sprintId: task.sprintId, extraLists: entries }, idOf(list)).ok;
 
 /* The server lets an entry go by the right to move the task at its home, or by the same right in the list's project. */
