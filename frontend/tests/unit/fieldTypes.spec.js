@@ -29,6 +29,7 @@ import {
     customSortValue, tableSortStages, valuePath
 } from '@/views/Projects/composables/customFieldQuery';
 import { sortTasks } from '@/views/Projects/composables/viewSort';
+import { aiDraftFrom, aiFieldPayload, aiOutputOf, aiRatingMaxOf, isAiField, newAiDraft } from '@/views/Projects/composables/aiFields';
 import { cleanViewSettings } from '@viewSettings';
 import { fieldTypeUi, peopleOptions } from '@/plugins/customFieldView/fieldTypes';
 import PeopleFieldValue from '@/plugins/customFieldView/fieldTypes/PeopleFieldValue.vue';
@@ -42,6 +43,7 @@ import FieldBuilder from '@/plugins/customFieldView/component/organisms/FieldBui
 
 const i18n = createI18n({ legacy: false, locale: 'en', messages: { en }, missingWarn: false, fallbackWarn: false });
 config.global.plugins = [i18n];
+config.global.mocks = {};
 
 const [OLIVIA, MAX, ZED] = Object.keys(USERS);
 const userName = (id) => USERS[id]?.Employee_Name;
@@ -76,7 +78,8 @@ const getters = {
     'projectData/alltasks': () => [],
     'users/users': () => Object.entries(USERS).map(([_id, user]) => ({ _id, ...user }))
 };
-const store = createStore({ getters });
+const mutations = { 'settings/mutateFinalCustomFields': () => {} };
+const store = createStore({ getters, mutations });
 
 const Assignee = {
     name: 'Assignee',
@@ -84,7 +87,7 @@ const Assignee = {
     emits: ['selected', 'removed'],
     template: '<div data-picker><slot name="trigger" :open="() => {}" /></div>'
 };
-const global = { plugins: [i18n, store], provide: { $dateFormat: ref('DD/MM/YYYY'), selectedProject: ref({ _id: 'p1' }), $clientWidth: ref(1280) }, stubs: { Assignee, AiFieldMark: true } };
+const global = { plugins: [store], provide: { $dateFormat: ref('DD/MM/YYYY'), selectedProject: ref({ _id: 'p1' }), $clientWidth: ref(1280) }, stubs: { Assignee, AiFieldMark: true } };
 
 beforeEach(() => apiRequest.mockReset());
 
@@ -330,7 +333,7 @@ describe('the task panel', () => {
 
     it('is read-only without the right, and hides a field the task\'s type does not use', async () => {
         const scoped = createStore({ getters: { ...getters, 'settings/finalCustomFields': () => [{ ...score, fieldTaskTypes: [2] }, done] } });
-        const wrapper = mount(CustomFieldRender, { props: { task: task(), editPermission: false }, global: { ...global, plugins: [i18n, scoped] } });
+        const wrapper = mount(CustomFieldRender, { props: { task: task(), editPermission: false }, global: { ...global, plugins: [scoped] } });
         await vi.waitFor(() => expect(wrapper.findAll('[data-field-type]').map((row) => row.attributes('data-field-type'))).toEqual(['progress']), { timeout: 4000 });
         expect(wrapper.find('input').exists()).toBe(false);
         wrapper.unmount();
@@ -385,7 +388,7 @@ describe('filter, group and sort', () => {
     });
 
     it('lets the server keep a saved view that filters on the new types', () => {
-        const filters = DEFS.map((def) => ({ ...row(def, ':set'), condition: '&&' }));
+        const filters = DEFS.map((def) => ({ ...row(def, ':set', [true]), condition: '&&' }));
         expect(cleanViewSettings({ filters }).filters.map((filter) => filter.name.fieldType)).toEqual(['people', 'url', 'rating', 'progress']);
     });
 
@@ -433,10 +436,29 @@ describe('filter, group and sort', () => {
     });
 
     it('sorts a Table by a people column on the server, by the order of the names', () => {
-        const [addFields, sort] = tableSortStages(`${valuePath(PEOPLE)}:1`, DEFS, { peopleByName: [MAX, OLIVIA] });
-        expect(JSON.stringify(addFields.$addFields.cfSortValue)).toContain(JSON.stringify({ $indexOfArray: [[MAX, OLIVIA], { $arrayElemAt: [{ $cond: [{ $isArray: `$${valuePath(PEOPLE)}` }, `$${valuePath(PEOPLE)}`, []] }, 0] }] }));
+        const [addFields, sort] = tableSortStages(`${valuePath(PEOPLE)}:1`, DEFS, { users: store.getters['users/users'] });
+        expect(JSON.stringify(addFields.$addFields.cfSortValue)).toContain(JSON.stringify({ $indexOfArray: [[MAX, OLIVIA, ZED], { $arrayElemAt: [{ $cond: [{ $isArray: `$${valuePath(PEOPLE)}` }, `$${valuePath(PEOPLE)}`, []] }, 0] }] }));
         expect(sort).toEqual({ $sort: { cfSortValue: 1, _id: 1 } });
         expect(tableSortStages(`${valuePath(SCORE)}:-1`, DEFS)[0].$addFields.cfSortValue.$convert.to).toBe('double');
+    });
+});
+
+describe('an AI rating', () => {
+    const aiScore = { ...score, fieldRatingMax: 10, fieldAi: { enabled: true, template: 'custom', output: 'rating', prompt: 'How sure are we?', reads: ['title'] } };
+
+    it('set on a rating field stays a rating field with its own maximum', () => {
+        expect(isAiField(aiScore)).toBe(true);
+        expect(aiOutputOf(aiScore)).toBe('rating');
+        expect(aiRatingMaxOf(aiScore)).toBe(10);
+        const payload = aiFieldPayload(aiDraftFrom(aiScore));
+        expect(payload).toMatchObject({ fieldType: 'rating', fieldAi: { output: 'rating' } });
+        expect(payload).not.toHaveProperty('fieldMaximum');
+    });
+
+    it('made in the builder is still a number field from 1 to 5', () => {
+        const payload = aiFieldPayload({ ...newAiDraft(), fieldTitle: 'Risk', output: 'rating', template: 'custom', prompt: 'How risky?' });
+        expect(payload).toMatchObject({ fieldType: 'number', fieldMinimum: '1', fieldMaximum: '5' });
+        expect(aiRatingMaxOf({ fieldType: 'number' })).toBe(5);
     });
 });
 

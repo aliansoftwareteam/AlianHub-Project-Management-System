@@ -4489,7 +4489,9 @@ const schema = {
             type:Array,
             required: false,
             default:[]
-        }
+        },
+        // people fields: false holds one person
+        fieldMultiple: { type: Boolean, required: false }
     },
     sprints: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.

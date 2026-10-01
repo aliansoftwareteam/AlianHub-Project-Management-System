@@ -45,6 +45,7 @@ const PRIVATE_PROJECT = '6f0000000000000000000a09';
 const PRIVATE_TASK = '6f0000000000000000000b09';
 const INVITED = '6f0000000000000000000004';
 const STRANGER = '6f0000000000000000000005';
+const OUTSIDER = '6f0000000000000000000006';
 const FIELD = { people: '6f0000000000000000000e01', single: '6f0000000000000000000e02', url: '6f0000000000000000000e03', rating: '6f0000000000000000000e04', ten: '6f0000000000000000000e05', progress: '6f0000000000000000000e06' };
 const settle = async () => { for (let i = 0; i < 30; i += 1) await new Promise((resolve) => setImmediate(resolve)); };
 
@@ -241,7 +242,7 @@ describe('writing a value on a task', () => {
             expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'task', updatedFields: { [`customField.${FIELD.people}`]: { _id: FIELD.people, fieldValue: [OWNER, MEMBER] } } }));
         });
 
-        it.each([['someone with no seat', STRANGER], ['someone whose invitation is still pending', INVITED]])('refuses %s', async (_who, id) => {
+        it.each([['someone with no seat', OUTSIDER], ['someone whose invitation is still pending', INVITED]])('refuses %s', async (_who, id) => {
             await refused(await write(FIELD.people, [OWNER, id]), /active members/i);
             expect(stored(FIELD.people).fieldValue).toEqual([STRANGER]);
         });
@@ -265,7 +266,7 @@ describe('writing a value on a task', () => {
             expect(stored(FIELD.people).fieldValue).toEqual([STRANGER, MEMBER]);
         });
 
-        it.each([['a bare id', OWNER], ['a team', [`tId_${OWNER}`]], ['a condition', [{ $ne: null }]], ['a number', 7]])('refuses %s', async (_what, value) => {
+        it.each([['a bare id', OWNER], ['a team', [`tId_${OWNER}`]], ['an object', [{ id: OWNER }]], ['a number', 7]])('refuses %s', async (_what, value) => {
             await refused(await write(FIELD.people, value), /list of people/i);
             expect(stored(FIELD.people).fieldValue).toEqual([STRANGER]);
         });

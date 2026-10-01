@@ -3883,6 +3883,8 @@ export default {
         hint_email: "validated, clickable",
         type_phone: "Phone",
         hint_phone: "validated, clickable",
+        type_people: "People",
+        hint_people: "one or several members",
         type_formula: "Formula",
         hint_formula: "computed from other fields",
         type_rollup: "Rollup",
@@ -3894,6 +3896,11 @@ export default {
         task_types_empty: "This workspace has no task types yet.",
         task_type_missing: "Removed type {key}",
         task_types_shown: "Only {types}",
+    },
+    FieldTypes: {
+        builder_note: "This field is edited on the task: in the task panel and in List and Table cells.",
+        people_multiple_label: "Allow several people",
+        people_multiple_hint: "Untick to hold one person at a time.",
     },
     Import: {
         title: "Import tasks",
