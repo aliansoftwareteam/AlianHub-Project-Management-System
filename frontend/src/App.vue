@@ -520,19 +520,6 @@ async function changeCompany(cid) {
         }
         let checkCompany = companyDetail?.isDisable || false;
         const userDataRes = await apiRequest('get',`${env.USER_UPATE}/${uid}`);
-        if(uid){
-            const updateObject = {
-                $set: {
-                    'lastSelectedCompany': cid
-                }
-            }
-            apiRequestWithoutCompnay("put",env.USER_UPATE,{
-                userId: uid,
-                updateObject : updateObject
-            }).catch((error)=>{
-                console.error(error);
-            });
-        }
         let userData = {}
         if(userDataRes.status === 200){
             userData = userDataRes.data;
@@ -542,6 +529,14 @@ async function changeCompany(cid) {
             let routeObj = {name: route.name, params: {cid: companyId.value}};
             router.replace(routeObj);
             return;
+        }
+        if(uid){
+            apiRequestWithoutCompnay("put",env.USER_UPATE,{
+                userId: uid,
+                updateObject : { $set: { lastSelectedCompany: cid } }
+            }).catch((error)=>{
+                console.error(error);
+            });
         }
         if(checkCompany === false){
             companyId.value = cid;
