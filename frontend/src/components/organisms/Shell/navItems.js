@@ -3,6 +3,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useCustomComposable } from "@/composable";
 import { isAiSectionRoute } from "@/router/ai/section";
+import { CONNECT_AI_ROUTE } from "@/router/ai/connect";
 import { aiReachable, canUseAi } from "@/composable/aiAvailability";
 import { isOwnerOrAdmin as isOwnerOrAdminRole } from "@/utils/roles";
 import { canApprove } from "@/views/Approvals/approvalAccess";
@@ -10,7 +11,6 @@ import { keepOnRail, shellState } from "./shellState";
 import { SIMPLE_PLACES } from "./navMode";
 
 const PROJECT_ROUTE_PREFIX = "Project";
-const CONNECT_AI_ROUTE = "AiAccounts";
 
 export function useNavItems(companyId) {
     const route = useRoute();

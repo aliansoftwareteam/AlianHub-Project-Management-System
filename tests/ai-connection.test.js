@@ -149,7 +149,7 @@ describe('GET /api/v2/api-tokens/ai-connection', () => {
         expect((await read({ uid: '' })).statusCode).toBe(403);
     });
 
-    it('is registered under the guarded token prefix, ahead of the id routes', () => {
+    it('is registered under the guarded token prefix', () => {
         const paths = [];
         require('../Modules/ApiTokens/routes').init({ get: (path) => paths.push(path), post: () => {}, put: () => {}, delete: () => {}, use: () => {} });
         expect(paths).toContain('/api/v2/api-tokens/ai-connection');

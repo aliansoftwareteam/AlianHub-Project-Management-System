@@ -40,6 +40,16 @@ An app connected before these scopes existed, and any connection where one of th
 
 Taking it back works at each level and takes effect on the app's next call: an owner or admin removes the permission from the app, or revokes the app, under Settings, Agent clients; the person withdraws the one permission, or revokes the whole connection, under Accounts, Connected apps.
 
+## Connect your AI
+
+Sign-up ends on a step called **Connect your AI**, and the same page stays under AI, Connect your AI. It can be skipped; the setup card on Home offers it again.
+
+- **Claude and ChatGPT** connect by address. The page shows the address (`<your AlianHub URL>/mcp`) only while `MCP_OAUTH` is on; with it off the page says so and points to the token instead.
+- **Claude Code and other tools** connect with a token, made on the AI accounts page as described below. With `MCP_OAUTH=only` tokens are refused, and the page says that instead.
+- The page lists what an agent can do on this install, and names each of `MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE` and `MCP_TOOLS_WORK` that is off.
+- The page says **Connected** once the person's own agent has made a call: an agent token of theirs, or an app they connected, that has a last-used time in this workspace. It reads `GET /api/v2/api-tokens/ai-connection`, which answers for the signed-in person only and returns no token, hash or prefix. Another person's connection never counts.
+- An agent works while its app is open or running on a schedule. AI that runs inside AlianHub with nobody's app open (the Ask card, AI fields, agents on a schedule) needs a model key on the server; that key is optional.
+
 ## Creating a token
 
 In the web app, open the AI accounts page, choose **My account**, then **New token**.

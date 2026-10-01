@@ -17,7 +17,7 @@
         <button v-if="active?.alt" type="button" class="hc-setup__alt" data-test="setup-alt" @click="$emit('action', active.alt.key)">{{ $t(active.alt.label) }}</button>
         <button type="button" class="hc-setup__dismiss" @click="$emit('dismiss')">{{ $t('Home.dismiss') }}</button>
         <ol v-if="expanded" id="hc-setup-steps" class="hc-setup__steps">
-            <li v-for="step in steps" :key="step.key" class="hc-setup__step" :class="{ 'is-done': step.done, 'is-active': step.key === active?.key }">
+            <li v-for="step in steps" :key="step.key" class="hc-setup__step" :class="{ 'is-done': step.done, 'is-skipped': step.skipped && !step.done, 'is-active': step.key === active?.key }">
                 <span v-if="step.done" class="hc-setup__mark" role="img" :aria-label="$t('Home.done')"><ShellIcon name="check" :size="13" /></span>
                 <span v-else class="hc-setup__mark hc-setup__mark--todo" aria-hidden="true"></span>
                 <span class="hc-setup__label">
@@ -56,6 +56,6 @@ defineEmits(["action", "dismiss"]);
 
 const expanded = ref(true);
 const doneCount = computed(() => props.steps.filter((s) => s.done).length);
-const active = computed(() => props.steps.find((s) => !s.done) || null);
+const active = computed(() => props.steps.find((s) => !s.done && !s.skipped) || null);
 const markImported = () => saveOnboarding({ importedWork: true });
 </script>

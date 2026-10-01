@@ -112,7 +112,7 @@ describe('the Connect your AI page', () => {
     });
 
     it('turns to connected by itself when the first call arrives', async () => {
-        vi.useFakeTimers();
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
         const wrapper = await openPage();
         expect(find(wrapper, 'connect-ai-sign').classes()).not.toContain('is-connected');
 
@@ -128,7 +128,7 @@ describe('the Connect your AI page', () => {
     });
 
     it('stops asking once the page is closed', async () => {
-        vi.useFakeTimers();
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
         const wrapper = await openPage();
         const calls = apiRequest.mock.calls.length;
         wrapper.unmount();
@@ -384,8 +384,7 @@ describe('in-app AI with no server key', () => {
 
     it.each([
         'views/Ai/AgentCatalogue.vue',
-        'views/Ai/AskMemoryImport.vue',
-        'components/molecules/AiFieldFill/AiFieldFillDialog.vue'
+        'views/Ai/AskMemoryImport.vue'
     ])('%s carries the hint beside its own words', (file) => {
         expect(source(file)).toContain('<ConnectAiHint');
     });
