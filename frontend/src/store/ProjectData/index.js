@@ -11,6 +11,7 @@ export default {
         items: [],
         currentProjectDetails: {},
         searchedTasks: [],
+        otherProjectChanges: 0,
         searchedProjects: [],
         projectTemplate : [],
         defaultTemplate : [],
@@ -57,6 +58,7 @@ export default {
             }
         },
         tasks: state => state.tasks,
+        otherProjectChanges: state => state.otherProjectChanges,
         tableTasks : state => state.tableTasks, 
         estimates: state => state.estimates,
         projectTasks: state => state.items,

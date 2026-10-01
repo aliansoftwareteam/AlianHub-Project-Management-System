@@ -49,6 +49,7 @@ import { useStore } from "vuex";
 import TableRow from "./TableRow.vue";
 import TableSubtaskRows from "./TableSubtaskRows.vue";
 import { parentIdOf } from "@/store/ProjectData/taskTree";
+import { inList } from "@/store/ProjectData/listMembership";
 import { useSubtaskTree } from "@/views/Projects/composables/subtaskTree";
 import Skelaton from "@/components/atom/Skelaton/Skelaton.vue";
 import { apiRequest } from "@/services";
@@ -101,7 +102,7 @@ const canGroupSelect = computed(() => checkPermission("task.task_status", projec
 
 const storeTasks = computed(() => {
     if (searchedTask?.value) {
-        return (getters["projectData/searchedTasks"] || []).filter((task) => task.sprintId === props.sprintId);
+        return (getters["projectData/searchedTasks"] || []).filter((task) => inList(task, props.sprintId));
     }
     return getters["projectData/tableTasks"]?.[project.value?._id]?.[props.sprintId]?.tasks || [];
 });

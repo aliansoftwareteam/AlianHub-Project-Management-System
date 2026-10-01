@@ -10,6 +10,7 @@
             <TaskTypeIcon v-if="hasTypeIcon" :taskType="taskType" class="evr__type" aria-hidden="true" />
             <button type="button" class="evr__name" :title="task.TaskName" @click.stop="$emit('open', task)">{{ task.TaskName }}</button>
             <span v-if="task.subTasks" class="evr__subs" :title="$t('Everything.subtasks_n', { n: task.subTasks })">{{ task.subTasks }}</span>
+            <slot name="lists"><TaskListChips :task="task" /></slot>
         </div>
 
         <span class="evr__status" @click.stop>
@@ -38,6 +39,7 @@ import ListAssigneeCell from "@/views/Projects/ListView/ListAssigneeCell.vue";
 import ListDueCell from "@/views/Projects/ListView/ListDueCell.vue";
 import ListPriorityCell from "@/views/Projects/ListView/ListPriorityCell.vue";
 import { taskNavAttrs } from "@/components/organisms/TaskDetailOverlay/taskNavigation";
+import TaskListChips from "@/views/Projects/components/TaskListChips.vue";
 import { useRowState } from "./useRowState";
 
 defineOptions({ name: "EverythingRow" });

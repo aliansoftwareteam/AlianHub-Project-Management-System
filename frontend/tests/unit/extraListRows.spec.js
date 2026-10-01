@@ -34,7 +34,8 @@ vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 
 import { mutateTypesenseTableTasks, mutateUpdateFirebaseTasks } from '@/store/ProjectData/mutations';
 import { getPaginatedTasks, refreshGroupCounts, setTableTasksFromTypesense } from '@/store/ProjectData/actions';
 import { homeListOf, isStranger, leftList, shownInList } from '@/store/ProjectData/listMembership';
-import { homeMarkText, homeOf, isAddedRow } from '@/views/Projects/composables/taskHomeMark';
+import { homeMarkText, homeOf, isAddedRow, putBack } from '@/views/Projects/composables/taskHomeMark';
+import { listSourceTasks } from '@/views/Projects/ListView/listFilter';
 import { taskMenuItems, taskMenuRights } from '@/views/Projects/composables/taskMenu';
 import { placementActions } from '@/views/Projects/ListView/bulkPlacement';
 import { useListDragDrop } from '@/views/Projects/ListView/useListDragDrop';
@@ -411,7 +412,35 @@ describe('the Board and the Table', () => {
         expect(edit).toBeGreaterThan(-1);
         expect(guard).toBeGreaterThan(edit);
         expect(place).toBeGreaterThan(guard);
-        expect(board.slice(guard, place)).toMatch(/if \(event\.moved\) \$toast\.info\(t\("TaskLists\.order_kept_at_home"\)[^\n]*\n\s*return;/);
+        expect(board.slice(guard, place)).toMatch(/if \(event\.moved\) \{\s*putBack\(task\.tasksArray, event\.moved\);\s*\$toast\.info\(t\("TaskLists\.order_kept_at_home"\)[^\n]*\n\s*\}\s*return;/);
+    });
+
+    it('a card whose reorder is refused goes back to where it was, with no refresh', () => {
+        const cards = [{ _id: 'b' }, { _id: 'c' }, { _id: 'a' }];
+
+        putBack(cards, { element: cards[2], oldIndex: 0, newIndex: 2 });
+        expect(cards.map((card) => card._id)).toEqual(['a', 'b', 'c']);
+
+        putBack(cards, { element: { _id: 'gone' }, oldIndex: 0, newIndex: 2 });
+        putBack(undefined, { element: cards[0], oldIndex: 0, newIndex: 1 });
+        expect(cards.map((card) => card._id)).toEqual(['a', 'b', 'c']);
+    });
+});
+
+describe('under a search or a filter', () => {
+    const source = (file) => readFileSync(path.resolve(__dirname, '../../src', file), 'utf8');
+    const found = [added('t1'), task('t2', { sprintId: HERE }), task('t3'), added('t4', { extraLists: [entry(THIRD)] })];
+
+    it('the List keeps a matching row of a task added to the list, as it keeps one that lives there', () => {
+        expect(listSourceTasks({ searched: true, searchedTasks: found, sprintId: HERE }).map((row) => row._id)).toEqual(['t1', 't2']);
+        expect(listSourceTasks({ searched: true, searchedTasks: found, sprintId: HOME }).map((row) => row._id)).toEqual(['t1', 't3', 't4']);
+        expect(listSourceTasks({ searched: false, storeTasks: found, sprintId: HERE })).toBe(found);
+    });
+
+    it('the Board, the Table and the list of lists follow the same rule', () => {
+        expect(source('views/Projects/Kanban/BoardView.vue')).toContain('searchedTasksData.value.filter(task => inList(task, currentSprintId))');
+        expect(source('views/Projects/TableView/TableViewTable.vue')).toContain('.filter((task) => inList(task, props.sprintId))');
+        expect(source('views/Projects/Projects.vue').match(/inList\(y, x\.id\)/g)).toHaveLength(2);
     });
 });
 

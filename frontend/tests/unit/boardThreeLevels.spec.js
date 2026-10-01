@@ -25,7 +25,7 @@ vi.mock('@/composable/firstRunProgress', () => ({ markFirstRunStep: () => {}, FI
 import '@/services';
 import Store from '@/store/index';
 import BoardView from '@/views/Projects/Kanban/BoardView.vue';
-import { childReads, resetServer, server } from '../fakeTaskServer';
+import { apiRequest, childReads, resetServer, server } from '../fakeTaskServer';
 import { PID, PROJECT, SPRINT, TODO_GROUP, fromSocket, readTable, seedStore, threeLevels, under } from '../threeLevelTasks';
 
 const i18n = createI18n({ legacy: false, locale: 'en', messages: { en }, missingWarn: false, fallbackWarn: false });
@@ -236,5 +236,53 @@ describe('dragging a card', () => {
         await settle();
         expect(movedByGroup.mock.calls.map(([task]) => task._id)).toEqual(['t1']);
         expect(server.posts.map((post) => post.body?.taskId).filter(Boolean)).toEqual(['t1']);
+    });
+});
+
+describe('cards of tasks added to the list from other projects', () => {
+    const OTHER = 'p9';
+    const card = {
+        _id: OTHER, ProjectName: 'Operations', ProjectCode: 'OPS', taskTypeCounts: [], apps: [], statusType: 'active', edit: { status: true, priority: true },
+        taskStatusData: [{ key: 7, name: 'Done', type: 'close', bgColor: '#16a34a35', textColor: '#16a34a' }, { key: 8, name: 'In review', type: 'active', bgColor: '#7c3aed35', textColor: '#7c3aed' }]
+    };
+    const visitor = (id, name, key, text) => ({
+        _id: id, TaskName: name, TaskKey: 'OPS-4', ProjectID: OTHER, sprintId: 's9', sprintArray: { id: 's9', name: 'Ops queue' },
+        status: { key, text }, statusKey: key, statusType: 'active', AssigneeUserId: [], isParentTask: true, subTasks: 0,
+        extraLists: [{ projectId: PID, sprintId: SPRINT, name: 'List', projectName: 'Scale Test' }]
+    });
+    const column = (name) => wrapper.findAll('.kanban-column').find((el) => el.find('.column-title').text() === name);
+    const namesIn = (el) => el.findAll('.evr__card .evr__name').map((entry) => entry.text());
+    let answerTasks;
+
+    beforeEach(() => {
+        Store.state.projectData.allProjects = { data: [PROJECT, { _id: OTHER, ProjectName: 'Operations', statusType: 'active' }] };
+        answerTasks = apiRequest.getMockImplementation();
+        const rows = [visitor('x1', 'Renew the contract', 7, 'Done'), visitor('x2', 'Audit the vendors', 8, 'In review')];
+        apiRequest.mockImplementation((method, url, body) => (String(url).endsWith('/tasks/everything')
+            ? Promise.resolve({ data: { status: true, data: { rows, projects: { [OTHER]: card }, nextCursor: null } } })
+            : answerTasks(method, url, body)));
+    });
+    afterEach(() => {
+        apiRequest.mockImplementation(answerTasks);
+        Store.state.projectData.allProjects = [];
+    });
+
+    it('sit under the column named like their own status, and the rest in a column of their own', async () => {
+        await openBoard();
+
+        expect(namesIn(column('Done'))).toEqual(['Renew the contract']);
+        expect(namesIn(column('To Do'))).toEqual([]);
+        expect(wrapper.find('[data-other-project-column] .column-title').text()).toBe('From other projects');
+        expect(namesIn(wrapper.find('[data-other-project-column]'))).toEqual(['Audit the vendors']);
+        expect(cardNames()).not.toContain('Renew the contract');
+    });
+
+    it('cannot be dragged, and say where they live', async () => {
+        await openBoard();
+        const visiting = column('Done').find('.evr__card');
+
+        expect(visiting.attributes('draggable')).toBe('false');
+        expect(visiting.find('[data-home-mark]').attributes('title')).toBe('Lives in Ops queue, in Operations');
+        expect(column('Done').findAllComponents(DraggableStub)[0].props('list').map((task) => task._id)).not.toContain('x1');
     });
 });

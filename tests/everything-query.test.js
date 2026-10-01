@@ -288,7 +288,7 @@ describe('one page of rows', () => {
     });
 
     it('returns what a List row needs and nothing heavier', () => {
-        ['TaskName', 'TaskKey', 'status', 'statusKey', 'statusType', 'Task_Priority', 'AssigneeUserId', 'DueDate', 'startDate', 'ProjectID', 'sprintId', 'TaskType', 'TaskTypeKey', 'tagsArray', 'subTasks', 'ancestors', 'ParentTaskId', 'isParentTask', 'updatedAt']
+        ['TaskName', 'TaskKey', 'status', 'statusKey', 'statusType', 'Task_Priority', 'AssigneeUserId', 'DueDate', 'startDate', 'ProjectID', 'sprintId', 'TaskType', 'TaskTypeKey', 'tagsArray', 'subTasks', 'ancestors', 'ParentTaskId', 'isParentTask', 'updatedAt', 'sprintArray']
             .forEach((field) => expect(q.ROW_FIELDS[field]).toBe(1));
         ['description', 'rawDescription', 'descriptionBlock', 'customField', 'watchers', 'attachments', 'checklistArray', 'CompanyId', 'updateToken']
             .forEach((field) => expect(q.ROW_FIELDS).not.toHaveProperty(field));
