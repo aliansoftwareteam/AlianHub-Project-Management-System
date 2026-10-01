@@ -41,6 +41,7 @@ mongoHelper.getTotalSprintCount = async () => true;
 
 const SPRINT = '6f0000000000000000000e01';
 const OTHER_SPRINT = '6f0000000000000000000e02';
+const FIELD = '6f0000000000000000000e0f';
 const FOLDER = '6f0000000000000000000f01';
 const OTHER_TASK = '6f0000000000000000000b09';
 const OTHER_PROJECT_ID = PARITY_PROJECT;
@@ -120,6 +121,8 @@ const reset = () => {
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: 3, status: 2, isDelete: false });
     mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: SPRINT, name: 'Sprint 1', projectId: OPEN_PROJECT });
+    mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: OTHER_SPRINT, name: 'Sprint 2', projectId: OPEN_PROJECT });
+    mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: FIELD, fieldTitle: 'Customer', fieldType: 'text', type: 'task', global: true, isDelete: true });
 mockDb.seed('tasks', taskDoc(OPEN_TASK));
     mockDb.seed('tasks', taskDoc(OPEN_TASK_2));
 };
@@ -142,8 +145,8 @@ const BULK = 'POST /api/v2/tasks/bulk';
 const RELATIONS = 'POST /api/v2/tasks/relations';
 const PRE_V2 = 'PATCH /api/tasks/';
 
-/* The fixtures name sprints s1 and s2; the handlers cast sprint ids, so they are given real ones here. */
-const withSprintIds = (body) => JSON.parse(JSON.stringify(body, (key, value) => ({ s1: SPRINT, s2: OTHER_SPRINT }[value] || value)));
+/* The fixtures name sprints s1 and s2 and a field cf1; the handlers read each by id, so they are given real ones here. */
+const withSprintIds = (body) => JSON.parse(JSON.stringify(body, (key, value) => ({ s1: SPRINT, s2: OTHER_SPRINT, cf1: FIELD }[value] || value)));
 
 /* One body per dispatchable name; web-app actions use their fixture shape, the rest a shape their handler reads. */
 const fixtureBody = (route, action) => {

@@ -25,7 +25,7 @@ const TRASHED = 1;
 const ARCHIVED = 2;
 const ARCHIVED_WITH_PARENT = 3;
 const ASSIGN_MODES = Object.freeze(['set', 'add', 'remove']);
-const CANNOT_OPEN_PROJECT = 'A person named here cannot open this project.';
+const { CANNOT_OPEN_PROJECT, peopleWhoOpen, cannotOpen } = require('../../Config/projectPeople');
 const SUBTASK_MOVES_WITH_PARENT = 'A subtask moves with its parent: move the top-level task instead.';
 
 const refuse = (message) => new tools.DeterministicError(message);
@@ -163,24 +163,7 @@ const EDITS = Object.freeze({
     },
 });
 
-const cannotOpen = async (companyId, projectId, userIds) => {
-    const { canReadProject } = require('../../Config/projectAccess');
-    for (const id of userIds) {
-        if (!(await canReadProject(companyId, id, projectId)).allowed) return true;
-    }
-    return false;
-};
-
-const peopleWhoOpen = async (companyId, projectId, userIds) => {
-    const { canReadProject } = require('../../Config/projectAccess');
-    const kept = [];
-    for (const id of userIds) {
-        if ((await canReadProject(companyId, id, projectId)).allowed) kept.push(id);
-    }
-    return kept;
-};
-
-const flatStatus = (row) => (row && row.convertStatus ? row.convertStatus : row);
+const flatStatus = (row) => require('../Tasks/helpers/taskWritePlacement').flatStatus(row);
 
 /* The source project's statuses and task types, each with the destination's it becomes: the mapping a
  * person picks in the move dialog, chosen here by name, then by kind, then the destination's first. */
@@ -202,22 +185,9 @@ const mappedForMove = (source, destination) => {
     };
 };
 
-/* The move handler reads each row's status and type out of this mapping after it has taken the row off
- * its list, so a row the mapping does not cover is refused before anything is written. */
-const coveredByMapping = (rows, mapping) => rows.every((row) => {
-    const status = mapping.taskStatusData.find((entry) => entry.key === row.statusKey);
-    const type = mapping.taskTypeCounts.find((entry) => entry.value === row.TaskType);
-    return Boolean(status && status.convertStatus && type && type.convertType);
-});
+const coveredByMapping = (rows, mapping) => require('../Tasks/helpers/taskWritePlacement').coveredByMapping(rows, mapping);
 
-const sprintRef = async (companyId, sprint) => {
-    const { sprintPlacementOf } = require('../Tasks/helpers/sprintPlacement');
-    const { sprintArray } = (await sprintPlacementOf(companyId, sprint)).set;
-    return {
-        id: idOf(sprintArray.id), name: sprintArray.name,
-        ...(sprintArray.folderId ? { folderId: idOf(sprintArray.folderId), folderName: sprintArray.folderName || '' } : {}),
-    };
-};
+const sprintRef = (companyId, sprint) => require('../Tasks/helpers/taskWritePlacement').listRef(companyId, sprint);
 
 const destinationOf = async ({ companyId, actor, uid, params }) => {
     const { canReadProject } = require('../../Config/projectAccess');
