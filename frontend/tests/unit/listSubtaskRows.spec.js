@@ -23,6 +23,7 @@ vi.mock('@/views/Projects/ListView/useListDragDrop.js', () => ({ useListDragDrop
 import ListRow from '@/views/Projects/ListView/ListRow.vue';
 import ListGroup from '@/views/Projects/ListView/ListGroup.vue';
 import { snapshotTasks } from '@/views/Projects/ListView/bulkUndo.js';
+import { selectionShape } from '@/views/Projects/ListView/bulkPlacement.js';
 
 const i18n = createI18n({ legacy: false, locale: 'en', messages: { en }, missingWarn: false, fallbackWarn: false });
 config.global.plugins = [i18n];
@@ -174,12 +175,12 @@ describe('a subtask row edits in place like a task row', () => {
     });
 });
 
-const selectionStore = (selected = []) => createStore({
+const selectionStore = (selected = [], tasks = [parent(), loner()]) => createStore({
     modules: {
         taskSelection: { ...taskSelection, state: () => ({ selectedTaskIds: [...selected], lastAnchorId: null, activeView: 'list', activeProjectId: PID }) },
         projectData: {
             namespaced: true,
-            state: () => ({ tasks: { [PID]: { sprints: [SPRINT], [SPRINT]: { tasks: [parent(), loner()], found: { statusKey_1: 2 } } } }, searchedTasks: [] }),
+            state: () => ({ tasks: { [PID]: { sprints: [SPRINT], [SPRINT]: { tasks, found: { statusKey_1: 2 } } } }, searchedTasks: [] }),
             getters: {
                 tasks: (s) => s.tasks,
                 searchedTasks: (s) => s.searchedTasks
@@ -207,8 +208,8 @@ describe('the List selects subtask rows on their own', () => {
         setup: (props, { slots }) => () => h('div', props.list.map((element) => slots.item({ element })))
     });
     const statusItem = { key: '0_0_Open', name: 'Open', isExpanded: true, searchKey: 'statusKey', searchValue: 1, indexName: 'groupByStatusIndex' };
-    const mountGroup = (store) => mount(ListGroup, {
-        props: { item: statusItem, sprint: { id: SPRINT }, project: { _id: PID, taskStatusData: [OPEN, DONE] }, groupType: 0 },
+    const mountGroup = (store, item = statusItem, groupType = 0) => mount(ListGroup, {
+        props: { item, sprint: { id: SPRINT }, project: { _id: PID, taskStatusData: [OPEN, DONE] }, groupType },
         global: {
             plugins: [store],
             provide: { searchedTask: ref(false), showArchived: ref(false), taskCollapsed: ref(false) },
@@ -244,6 +245,21 @@ describe('the List selects subtask rows on their own', () => {
         await wrapper.find('.row[data-id="t1"]').trigger('click');
         expect(selected(store)).toEqual(['s-a', 's-b', 't1']);
     });
+
+    it('a subtask under a task in a custom-field group is selectable, whatever its own field value', async () => {
+        const stage = {
+            key: 'cf_cf1_opt-a', name: 'Stage A', isExpanded: true, customFieldId: 'cf1', customFieldType: 'dropdown',
+            searchKey: 'customField.cf1', searchValue: 'opt-a', indexName: 'groupByStatusIndex'
+        };
+        const store = selectionStore([], [parent({ customField: { cf1: { fieldValue: ['opt-a'] } } }), loner()]);
+        const wrapper = mountGroup(store, stage, 'cf:cf1');
+        await flushPromises();
+        expect(wrapper.findAll('.row').map((row) => row.attributes('data-id'))).toEqual(['t1']);
+        const subs = wrapper.findAll('.row-sub');
+        expect(subs.map((row) => row.attributes('data-can-select'))).toEqual(['true', 'true']);
+        await subs[1].trigger('click');
+        expect(selected(store)).toEqual(['s-b']);
+    });
 });
 
 describe('a selected subtask is told apart by its loaded task', () => {
@@ -258,5 +274,11 @@ describe('a selected subtask is told apart by its loaded task', () => {
 
     it('and under a searched task, where a filtered List takes its subtask rows from', () => {
         expect(snapshotTasks(state(), ['s-z'])).toMatchObject({ 's-z': { statusKey: 2, sprintId: SPRINT } });
+    });
+
+    it('the bulk bar reads the selected subtasks, and which of them have their task selected too', () => {
+        expect(selectionShape(state(), ['s-a', 's-b'])).toEqual({ count: 2, subtasks: 2, looseSubtasks: 2 });
+        expect(selectionShape(state(), ['t1', 's-a', 't2'])).toEqual({ count: 3, subtasks: 1, looseSubtasks: 0 });
+        expect(selectionShape(state(), ['s-z'])).toEqual({ count: 1, subtasks: 1, looseSubtasks: 1 });
     });
 });

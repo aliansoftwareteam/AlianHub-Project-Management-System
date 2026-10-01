@@ -211,6 +211,9 @@ describe('ListBulkBar placement', () => {
         const moveProject = item(wrapper, 'List.bulk_move_project');
         expect(moveProject.attributes('disabled')).toBeDefined();
         expect(moveProject.attributes('title')).toBe('BulkActions.reason_subtask_moves_with_its_parent');
+        const sprintHere = item(wrapper, 'Sprint 1');
+        expect(sprintHere.attributes('disabled')).toBeDefined();
+        expect(sprintHere.attributes('title')).toBe('BulkActions.reason_subtask_moves_with_its_parent');
     });
 
     it('makes the selection subtasks of the chosen task', async () => {
