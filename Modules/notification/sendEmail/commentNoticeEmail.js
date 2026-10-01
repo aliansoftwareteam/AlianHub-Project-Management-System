@@ -1,6 +1,6 @@
 const config = require('../../../Config/config');
 const {
-    Notification_key: { COMMENT_REPLY, COMMENT_ASSIGNED, DOC_COMMENT_MENTION, DOC_COMMENT_REPLY },
+    Notification_key: { COMMENT_REPLY, COMMENT_ASSIGNED, DOC_COMMENT_MENTION, DOC_COMMENT_REPLY, DOC_COMMENT_ASSIGNED },
     TemplateType,
 } = require('../../../Config/notificationKey');
 const { formatNotificationDate } = require('../../../utils/dateHelpers');
@@ -15,8 +15,9 @@ const COMMENT_NOTICE_TEXT = {
     [COMMENT_ASSIGNED]: { headline: (who, task) => `${who} assigned you a comment on ${task}` },
     [DOC_COMMENT_MENTION]: { headline: (who, doc) => `${who} mentioned you in a comment on ${doc}` },
     [DOC_COMMENT_REPLY]: { headline: (who, doc) => `${who} replied to a comment on ${doc}` },
+    [DOC_COMMENT_ASSIGNED]: { headline: (who, doc) => `${who} assigned you a comment on ${doc}` },
 };
-const DOC_KEYS = [DOC_COMMENT_MENTION, DOC_COMMENT_REPLY];
+const DOC_KEYS = [DOC_COMMENT_MENTION, DOC_COMMENT_REPLY, DOC_COMMENT_ASSIGNED];
 const SOMEONE = 'Someone';
 const A_TASK = 'a task';
 const A_DOC = 'a doc';
