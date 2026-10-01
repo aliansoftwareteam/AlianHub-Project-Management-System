@@ -25,13 +25,17 @@ const GUEST_OUT = '6f0000000000000000000007';
 const AUDITOR = '6f0000000000000000000008';
 const REMOVED = '6f0000000000000000000009';
 const STRANGER = '6f000000000000000000000a';
+const NO_PRIVATE = '6f000000000000000000000b';
+const UNLISTED = '6f000000000000000000000c';
 
 const PRIVATE_PROJECT = '6f00000000000000000000a1';
 const PUBLIC_PROJECT = '6f00000000000000000000a2';
 const TEAM = '6f00000000000000000000b1';
 
 const AUDITOR_ROLE = 4;
-const SEATS = { [OWNER]: 1, [ADMIN]: 2, [ASSIGNED]: 3, [IN_TEAM]: 3, [BYSTANDER]: 3, [GUEST_IN]: 0, [GUEST_OUT]: 0, [AUDITOR]: AUDITOR_ROLE };
+const NO_PRIVATE_ROLE = 5;
+const UNLISTED_ROLE = 6;
+const SEATS = { [OWNER]: 1, [ADMIN]: 2, [ASSIGNED]: 3, [IN_TEAM]: 3, [BYSTANDER]: 3, [GUEST_IN]: 0, [GUEST_OUT]: 0, [AUDITOR]: AUDITOR_ROLE, [NO_PRIVATE]: NO_PRIVATE_ROLE, [UNLISTED]: UNLISTED_ROLE };
 const EVERYONE = [...Object.keys(SEATS), REMOVED, STRANGER];
 
 const rule = (parentId, key, roles) => ({ parentId, key, roles: Object.entries(roles).map(([role, permission]) => ({ key: Number(role), permission })) });
@@ -39,7 +43,7 @@ const rule = (parentId, key, roles) => ({ parentId, key, roles: Object.entries(r
 const seedRules = () => {
     const project = mockDb.seed(SCHEMA_TYPE.RULES, { isParent: true, key: 'project', roles: [] });
     const task = mockDb.seed(SCHEMA_TYPE.RULES, { isParent: true, key: 'task', roles: [] });
-    mockDb.seed(SCHEMA_TYPE.RULES, rule(project._id, 'private_projects', { 3: 1, 0: 1, [AUDITOR_ROLE]: 2 }));
+    mockDb.seed(SCHEMA_TYPE.RULES, rule(project._id, 'private_projects', { 3: 1, 0: 1, [AUDITOR_ROLE]: 2, [NO_PRIVATE_ROLE]: false }));
     mockDb.seed(SCHEMA_TYPE.RULES, rule(project._id, 'project_details', { 3: false, 0: false, [AUDITOR_ROLE]: false }));
     mockDb.seed(SCHEMA_TYPE.RULES, rule(project._id, 'project_sprint_create', { 3: true, 0: false, [AUDITOR_ROLE]: false }));
     mockDb.seed(SCHEMA_TYPE.RULES, rule(task._id, 'task_create', { 3: true, 0: false, [AUDITOR_ROLE]: false }));
@@ -182,6 +186,15 @@ describe('who can see a doc', () => {
         const listed = await expectAgreesWithEnforcement('page', page._id);
         expect(listed.get(IN_TEAM).reason).toBe('team');
         expect(listed.get(AUDITOR).reason).toBe('role');
+    });
+
+    it('keeps a private project\'s doc from a role that is refused, or not named, in the private project rule', async () => {
+        const page = seedPage({ ProjectID: PRIVATE_PROJECT });
+        const listed = people(await explain('page', C, page._id, OWNER));
+        for (const uid of [NO_PRIVATE, UNLISTED]) {
+            expect({ uid, listed: listed.has(uid), read: await enforcedRead.page(uid, page._id), project: await enforcedRead.project(uid, PRIVATE_PROJECT) })
+                .toEqual({ uid, listed: false, read: false, project: false });
+        }
     });
 
     it('lists only the author of a private doc', async () => {
