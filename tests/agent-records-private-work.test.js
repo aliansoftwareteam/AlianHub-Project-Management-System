@@ -215,6 +215,50 @@ describe('the person the work belongs to', () => {
     });
 });
 
+describe('a proposal on a thread the approver cannot open, and a comment that would go to one', () => {
+    const SPRINT = '6f0000000000000000000801';
+    const T_SPRINT = '6f0000000000000000000705';
+    const NOT_FOUND = { status: false, statusText: 'Proposal not found.', message: 'Proposal not found.' };
+    const stored = (p) => rows(SCHEMA_TYPE.AGENT_PROPOSALS).find((row) => String(row._id) === String(p._id));
+    const commentOn = (taskId) => [{ action: 'task.comment', params: { taskId, body: 'x' }, label: 'Comment' }];
+    const seedOn = (over) => mockDb.seed(SCHEMA_TYPE.AGENT_PROPOSALS, { agentId: AGENT, agentName: 'Reviewer', what: 'x', why: 'x', status: 'pending', gate: null, runId: null, ...over });
+
+    beforeEach(() => {
+        mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: SPRINT, name: 'Private', projectId: P_OPEN, private: true, AssigneeUserId: [OWNER], deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: T_SPRINT, TaskName: 'On a private sprint', ProjectID: P_OPEN, sprintId: SPRINT, deletedStatusKey: 0 });
+    });
+
+    it('answers a member 404 for a proposal on a private sprint they are not on, and leaves it pending', async () => {
+        const p = seedOn({ taskId: T_SPRINT, projectId: P_OPEN, changes: commentOn(T_SPRINT) });
+        const r = await call(ctrl.approveProposal, req(OTHER, { params: { id: String(p._id) } }));
+        expect(r.code).toBe(404);
+        expect(r.body).toEqual(NOT_FOUND);
+        expect(stored(p)).toMatchObject({ status: 'pending' });
+        expect(stored(p).decidedBy).toBeUndefined();
+        expect(rows(SCHEMA_TYPE.COMMENTS)).toHaveLength(0);
+    });
+
+    it('answers an admin 404 for a proposal on a direct message they are not in, and leaves it pending', async () => {
+        const p = seedOn({ taskId: T_CHAT, projectId: DIRECT_SPACE, changes: commentOn(T_CHAT) });
+        const r = await call(ctrl.approveProposal, req(ADMIN, { params: { id: String(p._id) } }));
+        expect(r.code).toBe(404);
+        expect(r.body).toEqual(NOT_FOUND);
+        expect(stored(p)).toMatchObject({ status: 'pending' });
+        expect(stored(p).decidedBy).toBeUndefined();
+    });
+
+    it.each([
+        ['a member, a private sprint they are not on', OTHER, T_SPRINT],
+        ['an admin, a direct message they are not in', ADMIN, T_CHAT],
+    ])('still answers 200 with the change not applied when the approver sees the proposal but its comment targets a thread they cannot open (%s)', async (_who, uid, target) => {
+        const p = seedOn({ taskId: T_OPEN, projectId: P_OPEN, changes: commentOn(target) });
+        const r = await call(ctrl.approveProposal, req(uid, { params: { id: String(p._id) } }));
+        expect(r.code).toBe(200);
+        expect(r.body.data.applied).toEqual([expect.objectContaining({ action: 'task.comment', ok: false, error: expect.stringMatching(/^not_visible/) })]);
+        expect(rows(SCHEMA_TYPE.COMMENTS)).toHaveLength(0);
+    });
+});
+
 describe('the rule has one meaning as a query clause and as a check on a record already read', () => {
     it('for runs and for proposals, for an owner, an admin and a member', async () => {
         const privateWork = require('../Modules/Agents/privateWork');
