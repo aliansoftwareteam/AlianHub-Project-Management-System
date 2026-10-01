@@ -47,7 +47,12 @@ const i18n = config.global.plugins[0];
 i18n.global.setLocaleMessage('en', en);
 
 const MEMBER = 3;
-const rulesGranting = (permission) => ({ project: { project_create: { roles: [{ key: MEMBER, permission }] } } });
+const OTHER_KEYS = ['project_name_edit', 'project_assignee', 'project_close', 'project_delete'];
+const role = (permission) => ({ roles: [{ key: MEMBER, permission }] });
+const rulesGranting = (permission) => ({
+    project: { project_create: role(permission), ...Object.fromEntries(OTHER_KEYS.map((key) => [key, role(false)])) },
+    settings: { settings_security_permissions: role(false) }
+});
 const ALPHA = { _id: 'p1', ProjectName: 'Alpha', isGlobalPermission: true, deletedStatusKey: 0, favouriteTasks: [], watchers: {} };
 const COPY = { _id: 'p2', ProjectName: 'Alpha (copy)', ProjectCode: 'ALP2' };
 
@@ -56,6 +61,8 @@ const store = () => createStore({
     getters: {
         'projectData/allProjects': () => ({ data: [ALPHA, { ...ALPHA, _id: 'mine', ProjectName: 'My list', isPersonal: true }] }),
         'settings/selectedCompany': () => ({}),
+        'settings/companyUsers': () => [],
+        'users/users': () => [],
         'settings/companyUserDetail': () => getters['settings/companyUserDetail']
     },
     mutations: { 'projectData/mutateProjects': (state, payload) => commits.push(payload) }
@@ -154,17 +161,21 @@ describe('the duplicate dialog', () => {
         expect(dialog().querySelector('[role="alert"]').textContent).toContain('The project could not be duplicated.');
     });
 
-    it('sends once however often the button is pressed', async () => {
+    it('sends once however often the button is pressed, and stays until the answer is in', async () => {
         let release;
         apiRequest.mockReturnValue(new Promise((resolve) => { release = resolve; }));
-        openDialog();
+        const wrapper = openDialog();
         dialog().querySelector('[data-action="duplicate"]').click();
         dialog().querySelector('[data-action="duplicate"]').click();
         await flushPromises();
         expect(dialog().querySelector('[data-action="duplicate"]').disabled).toBe(true);
+        expect(dialog().querySelector('[data-action="cancel"]').disabled).toBe(true);
+        dialog().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        expect(wrapper.emitted('close')).toBeUndefined();
         expect(posts()).toHaveLength(1);
         release(answer());
         await flushPromises();
+        expect(wrapper.emitted('close')).toHaveLength(1);
     });
 
     it('says when automations came across switched off', async () => {
@@ -220,6 +231,7 @@ describe('a long copy', () => {
         await vi.advanceTimersByTimeAsync(1600);
         expect(toast.error).toHaveBeenCalledTimes(1);
         expect(toast.error.mock.calls[0][0]).toContain('400');
+        expect(toast.success).not.toHaveBeenCalled();
         expect(push).toHaveBeenCalledWith({ name: 'Project', params: { cid: 'c1', id: 'p2' } });
     });
 
@@ -245,7 +257,10 @@ describe('where Duplicate project is offered', () => {
         attachTo: document.body,
         global: { plugins: [store()], mocks: { $t: i18n.global.t }, stubs: { DropDown, DropDownOption, Assignee: true, WasabiImage: true } }
     }));
-    const page = () => keep(mount(ProjectsListPage, { attachTo: document.body, global: { plugins: [store()], mocks: { $t: i18n.global.t }, stubs: { 'router-link': true } } }));
+    const page = () => {
+        apiRequest.mockResolvedValue({ data: { status: true, data: [] } });
+        return keep(mount(ProjectsListPage, { attachTo: document.body, global: { plugins: [store()], mocks: { $t: i18n.global.t }, stubs: { 'router-link': true } } }));
+    };
     const rowEntry = async (wrapper, at) => {
         await wrapper.findAll('.pl2__dots')[at].trigger('click');
         return wrapper.find('[data-test="duplicate-project"]');
@@ -271,9 +286,9 @@ describe('where Duplicate project is offered', () => {
         expect((await rowEntry(page(), 0)).exists()).toBe(false);
     });
 
-    it('not for a personal list', async () => {
+    it('not for a personal list, which the project list never shows', () => {
         expect(bar({ ...ALPHA, isPersonal: true }).find('[data-test="duplicate-project"]').exists()).toBe(false);
-        expect((await rowEntry(page(), 1)).exists()).toBe(false);
+        expect(page().findAll('.pl2__dots')).toHaveLength(1);
     });
 
     it('in the row menu of the project list', async () => {

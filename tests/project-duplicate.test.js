@@ -102,7 +102,7 @@ const seedLaunch = (extra = {}) => {
         ProjectName: 'Launch', ProjectCode: 'LAU', CompanyId: asId(C), isPrivateSpace: false, isGlobalPermission: true,
         AssigneeUserId: [OWNER, MEMBER], LeadUserId: [OWNER], projectCreatedBy: OWNER,
         taskStatusData: STATUSES, taskTypeCounts: [{ key: 1, value: 'task', name: 'Task', taskCount: 4 }, { key: 2, value: 'bug', name: 'Bug', taskCount: 0 }],
-        apps: ['Priority', 'CustomFields'], workingDays: { override: true, days: [1, 2, 3, 4] }, lastTaskId: 4,
+        apps: ['Priority', 'CustomFields'], workingDays: [1, 2, 3, 4], lastTaskId: 4,
         StartDate: new Date('2026-01-05'), DueDate: new Date('2026-03-01'), deletedStatusKey: 0,
         favouriteTasks: [{ userId: MEMBER }], watchers: { [MEMBER]: true }, lastProjectActivity: new Date('2026-02-01'),
         ...extra,
@@ -290,7 +290,7 @@ describe('the project itself', () => {
         expect(project.taskStatusData).toEqual(STATUSES);
         expect(project.taskTypeCounts.map((type) => [type.key, type.taskCount])).toEqual([[1, 0], [2, 0]]);
         expect(project.apps).toEqual(['Priority', 'CustomFields']);
-        expect(project.workingDays).toEqual({ override: true, days: [1, 2, 3, 4] });
+        expect(project.workingDays).toEqual([1, 2, 3, 4]);
         expect(project.ProjectRequiredComponent.map((view) => view.keyName)).toEqual(['ListView', 'ProjectKanban']);
         expect(project.ProjectRequiredComponent[0].settings).toEqual({ groupBy: 'status', filters: [{ field: 'sprintId', value: String(byName(lists, 'Wireframes')._id) }] });
     });
@@ -511,6 +511,42 @@ describe('tasks', () => {
         expect(inserts.length).toBeGreaterThanOrEqual(3);
         expect(Math.max(...inserts)).toBeLessThanOrEqual(100);
         expect(byName(copyOf(res).lists, 'Backlog').tasks).toBe(230);
+    });
+});
+
+/* The stand-in database keeps any field; the real collections are strict and drop what their schema does not declare. */
+describe('what is written fits the schemas', () => {
+    const { checkType } = jest.requireActual('../utils/mongo-handler/mongoQueries');
+    const models = {};
+    const modelOf = (type) => {
+        models[type] = models[type] || mongoose.model(`duplicate_fit_${type}`, checkType(type));
+        return models[type];
+    };
+    const TYPES = [SCHEMA_TYPE.PROJECTS, SCHEMA_TYPE.FOLDERS, SCHEMA_TYPE.SPRINTS, SCHEMA_TYPE.TASKS, SCHEMA_TYPE.AUTOMATION_RULES, SCHEMA_TYPE.PROJECT_RULES, SCHEMA_TYPE.IMPORT_JOBS];
+
+    it('with nothing dropped and nothing missing', async () => {
+        seedTree(launch);
+        for (let i = 0; i <= INLINE_TASK_LIMIT; i += 1) seedTask(launch, launch.backlog, { TaskName: `Bulk ${i}` });
+        const own = rowsOf(SCHEMA_TYPE.PROJECTS).find((row) => String(row._id) === launch.id);
+        Object.assign(own, {
+            isGlobalPermission: false, ProjectCurrency: { code: 'USD' }, ProjectType: 'fixed', projectIcon: { type: 'color', data: 'blue' },
+            projectStatusData: [{ key: 1, value: 'active' }], status: 'active', statusType: 'active', ProjectRequiredDefaultComponent: 'ListView',
+        });
+        seed(SCHEMA_TYPE.PROJECT_RULES, { key: 'task', name: 'Task', isParent: true, projectId: launch.id, roles: [{ key: MEMBER_ROLE, permission: true }] });
+        seed(SCHEMA_TYPE.AUTOMATION_RULES, { name: 'Close out', enabled: true, version: 2, scope: { allProjects: false, projectIds: [launch.id] }, trigger: { type: 'event', event: 'task.created' }, steps: [] });
+        const res = await duplicate(launch.id, { include: { tasks: true, assignees: true, dates: true } });
+        expect(res.body.status).toBe(true);
+
+        const written = db().calls
+            .filter((call) => TYPES.includes(call.type) && ['save', 'insertMany'].includes(call.method))
+            .flatMap((call) => (call.method === 'save' ? [call.data] : call.data[0]).map((doc) => [call.type, doc]));
+        expect([...new Set(written.map(([type]) => type))].sort()).toEqual([...TYPES].sort());
+        written.forEach(([type, doc]) => {
+            const cast = new (modelOf(type))(doc);
+            expect([type, cast.validateSync() || null]).toEqual([type, null]);
+            const kept = cast.toObject({ minimize: false });
+            expect([type, Object.keys(doc).filter((key) => doc[key] !== undefined && !(key in kept))]).toEqual([type, []]);
+        });
     });
 });
 

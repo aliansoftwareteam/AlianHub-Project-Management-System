@@ -94,25 +94,22 @@ const nextProjectCode = (sourceCode, taken) => {
 
 const withCaller = (people, caller) => [...new Set([...(Array.isArray(people) ? people : []).map(String), String(caller)])];
 
-const projectCopy = (source, { id, name, code, caller, companyId, include, ids }) => {
-    return {
-        ...remap(pick(source, PROJECT_SETTINGS), ids),
-        ...(include.dates ? pick(source, PROJECT_DATES) : {}),
-        _id: id,
-        ProjectName: name,
-        ProjectCode: code,
-        CompanyId: new mongoose.Types.ObjectId(companyId),
-        AssigneeUserId: source.isPrivateSpace === true ? withCaller(source.AssigneeUserId, caller) : (source.AssigneeUserId || []).map(String),
-        LeadUserId: [caller],
-        projectCreatedBy: caller,
-        taskTypeCounts: (source.taskTypeCounts || []).map((type) => ({ ...type, taskCount: 0 })),
-        lastTaskId: 0,
-        deletedStatusKey: LIVE,
-        source: 'other',
-        sprintsObj: {},
-        sprintsfolders: {},
-    };
-};
+/* The copy is a project of its own: no proposal id, favourites, watchers or activity of the source come with it. */
+const projectCopy = (source, { id, name, code, caller, companyId, include, ids }) => ({
+    ...remap(pick(source, PROJECT_SETTINGS), ids),
+    ...(include.dates ? pick(source, PROJECT_DATES) : {}),
+    _id: id,
+    ProjectName: name,
+    ProjectCode: code,
+    CompanyId: new mongoose.Types.ObjectId(companyId),
+    AssigneeUserId: source.isPrivateSpace === true ? withCaller(source.AssigneeUserId, caller) : (source.AssigneeUserId || []).map(String),
+    LeadUserId: [caller],
+    projectCreatedBy: caller,
+    taskTypeCounts: (source.taskTypeCounts || []).map((type) => ({ ...type, taskCount: 0 })),
+    lastTaskId: 0,
+    deletedStatusKey: LIVE,
+    source: 'other',
+});
 
 const isLive = (row) => Number(row.deletedStatusKey || 0) === LIVE;
 
