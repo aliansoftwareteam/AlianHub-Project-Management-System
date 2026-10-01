@@ -139,6 +139,7 @@ import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequestWithoutSecure, getAuth } from "@/services";
 import * as env from "@/config/env";
+import { connectAiWelcomePath } from "@/router/ai/connect";
 import { readSetupStatus, markInstalled } from "@/router/setupStatus";
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, meetsPasswordRule } from "@passwordRule";
 
@@ -247,7 +248,7 @@ async function enter({ userId, companyId, session }) {
     localStorage.setItem("isLogging", "true");
     localStorage.setItem("SubmenuScreen", "project");
     try { await getAuth(userId, true); } catch (e) { router.replace({ name: "Log-in" }); return; }
-    window.location.assign(`${window.location.origin}/#/${companyId}`);
+    window.location.assign(`${window.location.origin}/#${connectAiWelcomePath(companyId)}`);
     window.location.reload();
 }
 

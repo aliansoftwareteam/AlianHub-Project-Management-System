@@ -1,6 +1,7 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig, configDefaults } from 'vitest/config';
 import vue from '@vitejs/plugin-vue';
 import path from 'path';
+import { createRequire } from 'module';
 
 // Components load images with webpack's `require("@/assets/...")`, which Node's
 // require cannot resolve; under test the asset path itself is a fine value.
@@ -13,6 +14,9 @@ const requireAssetsAsUrls = {
         return code.replace(/require\((['"])(@\/assets\/[^'"]+)\1\)/g, '$1$2$1');
     }
 };
+
+const require = createRequire(import.meta.url);
+const clockSkip = process.env.CLOCK_SHIFT_DAYS ? require('../tests/support/clock-skip').frontend : [];
 
 export default defineConfig({
     plugins: [requireAssetsAsUrls, vue()],
@@ -43,7 +47,8 @@ export default defineConfig({
         environment: 'jsdom',
         globals: true,
         include: ['tests/**/*.spec.js'],
-        setupFiles: ['tests/setup.js'],
+        exclude: [...configDefaults.exclude, ...clockSkip],
+        setupFiles: ['tests/shift-clock.setup.js', 'tests/setup.js'],
         clearMocks: true
     }
 });

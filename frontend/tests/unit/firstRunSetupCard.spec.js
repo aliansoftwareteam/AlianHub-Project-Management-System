@@ -62,15 +62,15 @@ beforeEach(() => {
 });
 
 describe('the owner card', () => {
-    it.each(['owner', 'admin'])('gives an %s the five steps in order when the instance has AI', (role) => {
+    it.each(['owner', 'admin'])('gives an %s the six steps in order when the instance has AI', (role) => {
         applyAiAvailability({ state: AI_STATE.OFF_WORKSPACE });
-        expect(checklist({ role: ROLE[role] }).steps.value.map((s) => s.key)).toEqual(['project', 'task', 'invite', 'look', 'ai']);
-        expect(ADMIN_STEPS).toHaveLength(5);
+        expect(checklist({ role: ROLE[role] }).steps.value.map((s) => s.key)).toEqual(['connect_ai', 'project', 'task', 'invite', 'look', 'ai']);
+        expect(ADMIN_STEPS).toHaveLength(6);
     });
 
     it.each([AI_STATE.UNKNOWN, AI_STATE.OFF_INSTANCE, AI_STATE.UNCONFIGURED])('hides the AI step when the instance state is %s', (state) => {
         applyAiAvailability({ state });
-        expect(checklist().steps.value.map((s) => s.key)).toEqual(['project', 'task', 'invite', 'look']);
+        expect(checklist().steps.value.map((s) => s.key)).toEqual(['connect_ai', 'project', 'task', 'invite', 'look']);
     });
 
     it('offers the import as the second action of the project step', () => {
@@ -155,18 +155,18 @@ describe('each owner step is one click away', () => {
 });
 
 describe('the member card', () => {
-    it('has their own three steps and none of the workspace ones', () => {
+    it('has their own four steps and none of the workspace ones', () => {
         applyAiAvailability({ state: AI_STATE.ON });
         const api = checklist({ role: ROLE.member, projects: [SAMPLE, { ...OPS, lastTaskId: 3 }], users: [{ userId: 'user-1' }, { userId: 'user-2' }] });
-        expect(api.steps.value.map((s) => s.key)).toEqual(['my_work', 'notifications', 'shortcuts']);
-        expect(MEMBER_STEPS).toHaveLength(3);
+        expect(api.steps.value.map((s) => s.key)).toEqual(['connect_ai', 'my_work', 'notifications', 'shortcuts']);
+        expect(MEMBER_STEPS).toHaveLength(4);
         expect(api.steps.value.filter((s) => s.done)).toEqual([]);
     });
 
     it('reads each step from the user record, so it follows them to another device', () => {
-        me.value = { ...me.value, homeChecklist: { openedMyWork: true, viewedNotifications: true, viewedShortcuts: true } };
+        me.value = { ...me.value, homeChecklist: { connectAiSkipped: true, openedMyWork: true, viewedNotifications: true, viewedShortcuts: true } };
         const api = checklist({ role: ROLE.member });
-        expect(api.steps.value.every((s) => s.done)).toBe(true);
+        expect(api.steps.value.every((s) => s.done || s.skipped)).toBe(true);
         expect(api.show.value).toBe(false);
     });
 

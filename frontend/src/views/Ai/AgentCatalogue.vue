@@ -31,7 +31,7 @@
                         </div>
                         <div v-if="draftError" class="ah-field__error" role="alert">{{ draftError }}</div>
                     </section>
-                    <p v-else class="ah-small ac-builder__off" data-test="builder-off">{{ builderOffText }}</p>
+                    <p v-else class="ah-small ac-builder__off" data-test="builder-off">{{ builderOffText }} <ConnectAiHint /></p>
 
                     <div class="ac-browse">
                         <label class="ah-field__label" for="ac-search">{{ $t('AgentCatalogue.templates_title') }}</label>
@@ -95,6 +95,7 @@
 import { computed, nextTick, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import ConnectAiHint from "@/components/molecules/AiUnavailable/ConnectAiHint.vue";
 import { aiAvailability, AI_STATE } from "@/composable/aiAvailability";
 import { useAgents } from "./useAgents";
 import { autonomyName, autonomyTip, skillAbout, skillLabel } from "./plainLabels";

@@ -114,6 +114,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useCustomComposable } from "@/composable";
 import { apiRequest, apiRequestWithoutCompnay, apiRequestWithoutSecure, getAuth, useAuth } from "@/services";
 import * as env from "@/config/env";
+import { connectAiWelcomePath } from "@/router/ai/connect";
 import { ROLE_OWNER } from "@/utils/roles";
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, PASSWORD_RULE_MESSAGE, meetsPasswordRule } from "@passwordRule";
 
@@ -269,7 +270,7 @@ const acceptInvitation = async () => {
         // The session's workspaces are fixed when its token is issued; a fresh one includes the one just joined.
         await getAuth(localStorage.getItem("userId"));
         localStorage.setItem("selectedCompany", companyIdRoute.value);
-        await router.replace(`/${companyIdRoute.value}`);
+        await router.replace(connectAiWelcomePath(companyIdRoute.value));
         window.location.reload();
     } catch (error) {
         console.error(error);

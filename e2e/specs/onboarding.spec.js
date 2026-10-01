@@ -107,4 +107,22 @@ test.describe('a brand-new account', () => {
         await expect(page.locator('[data-test="nav-mode"]').getByRole('radio', { name: /Full/ })).toBeChecked();
         await expect(rail.getByRole('link', { name: 'Everything' })).toBeVisible();
     });
+
+    test('skips Connect your AI in one click and lands in the app', async ({ page, state, loginAs }) => {
+        const owner = await loginAs('owner');
+        const suffix = uniqueSuffix();
+        const email = emailFor('member', suffix);
+        await inviteMember({ baseURL: state.baseURL, ownerApi: owner.api, companyId: state.companyId, role: 'member', email, firstName: 'Cal', lastName: `Connector${suffix}`, navMode: null });
+        await signInThroughForm(page, { email, password: state.password, companyId: state.companyId });
+
+        await page.goto(`/#/${state.companyId}/welcome/connect-ai`);
+        await expect(page.getByRole('heading', { level: 1, name: 'Connect your AI' })).toBeVisible();
+        await expect(page.getByRole('navigation', { name: 'Primary' })).toHaveCount(0);
+        await expect(page.locator('[data-test="connect-ai-sign"]')).toContainText('Not connected yet');
+        await expect(page.locator('[data-test="connect-ai-way-token"]')).toBeVisible();
+
+        await page.getByRole('button', { name: 'Skip for now' }).click();
+        await expect(page).not.toHaveURL(/welcome/);
+        await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
+    });
 });

@@ -8,7 +8,7 @@
                     <div class="aq__what"><strong>{{ whoOf(p) }}</strong> {{ t('Inbox.wants_to') }} {{ titleOf(p) }}</div>
                     <ul class="aq__changes">
                         <li v-for="(change, i) in p.changes" :key="i" class="aq__change">
-                            <span class="aq__change-label">{{ change.label }}</span>
+                            <span class="aq__change-label">{{ changeText(change) }}</span>
                             <span v-if="!change.reversible" class="ah-chip ah-chip--warn">{{ t('Ai.not_reversible') }}</span>
                         </li>
                     </ul>
@@ -61,19 +61,20 @@
                     <time v-if="stamp(p.createdAt)" class="aq__when" :title="p.createdAt">{{ stamp(p.createdAt) }}</time>
                 </div>
 
-                <p class="aq__why"><span class="aq__label">{{ t('Ai.why') }}</span> {{ p.why || t('Time.why_no_reason') }}</p>
+                <p class="aq__why"><span class="aq__label">{{ t('Ai.why') }}</span> {{ whyOf(p) || t('Time.why_no_reason') }}</p>
 
                 <div class="aq__label">{{ t('Inbox.queue_changes_label') }}</div>
                 <ul class="aq__changes">
                     <li v-for="(change, i) in changesOf(p)" :key="i" class="aq__change">
-                        <span class="aq__change-label">{{ change.label }}</span>
+                        <IntentPreview v-if="change.preview" class="aq__intent" :preview="change.preview" />
+                        <span v-else class="aq__change-label">{{ change.label }}</span>
                         <span v-if="!change.reversible" class="ah-chip ah-chip--warn" data-test="queue-permanent">{{ t('Ai.not_reversible') }}</span>
                         <button
                             v-if="isEditing(p)"
                             type="button"
                             class="ah-btn ah-btn--ghost ah-btn--sm"
                             data-test="queue-drop"
-                            :aria-label="t('Inbox.queue_drop_named', { change: change.label })"
+                            :aria-label="t('Inbox.queue_drop_named', { change: changeText(change) })"
                             @click="kept.splice(i, 1)"
                         >{{ t('Ai.drop') }}</button>
                         <SlackPostPreview v-if="change.action === SLACK_POST" class="aq__slack" :change="change" />
@@ -152,9 +153,12 @@ import { useI18n } from 'vue-i18n';
 import { useGetterFunctions } from '@/composable';
 import { sendProposalDecision } from '@/composable/agentProposals';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import IntentPreview from '@/components/molecules/IntentPreview/IntentPreview.vue';
+import { intentSummary, intentTitle } from '@/components/molecules/IntentPreview/intentLines';
 import SlackPostPreview from '@/views/Ai/SlackPostPreview.vue';
 import { DECLINE_REASONS } from '@/views/Ai/episodeText';
 import { proposalTitle } from '@/views/Ai/plainLabels';
+import { findingFix, findingReasons } from '@/views/Projects/ProjectDetail/findingText';
 import { decideEach, decideOne } from './approvalQueue';
 
 defineOptions({ name: 'ApprovalQueue' });
@@ -167,6 +171,7 @@ const emit = defineEmits(['decided']);
 
 const SLACK_POST = 'slack.message.post';
 const SOURCE_MCP = 'mcp';
+const SOURCE_SYSTEM = 'system';
 const DECLINE_REASON_MAX = 200;
 const REVIEW_TITLE_ID = 'aq-review-title';
 const SELECT_ALL_ID = 'aq-select-all';
@@ -188,8 +193,16 @@ const declining = ref('');
 const declineReason = ref('');
 const declineNote = ref('');
 
-const titleOf = (p) => proposalTitle(t, p);
+// A connected agent's proposal is filed under its tool's name and description, which is no sentence for a person.
+const onlyPreview = (p) => (p.source === SOURCE_MCP && (p.changes || []).length === 1 ? p.changes[0].preview : null);
+/* A change the project's rules filed is worded here from the facts it carries; its stored text is the fallback. */
+const titleOf = (p) => (p.finding && findingFix(t, p.finding)) || intentTitle(t, onlyPreview(p)) || proposalTitle(t, p);
+const whyOf = (p) => (p.finding && findingReasons(t, p.finding).join(' · ')) || p.why;
+const changeText = (change) => intentSummary(t, change.preview) || change.label;
+// The preview is the server's reading of a change for this viewer, never part of the change sent back.
+const asFiled = (change) => Object.fromEntries(Object.entries(change).filter(([key]) => key !== 'preview'));
 const whoOf = (p) => {
+    if (p.source === SOURCE_SYSTEM) return t('Inbox.queue_system_for', { project: p.finding?.projectName || p.agentName });
     const person = p.source === SOURCE_MCP && p.requestedBy ? getUser(p.requestedBy)?.Employee_Name : '';
     return person ? t('Inbox.queue_for', { agent: p.agentName, person }) : p.agentName;
 };
@@ -224,7 +237,7 @@ const approve = async (p) => {
     const edited = isEditing(p) && kept.value.length !== (p.changes || []).length;
     busy.value = true;
     summary.value = '';
-    const result = await send(p.proposalId, 'approve', edited ? { changes: kept.value.map((change) => ({ ...change })) } : {});
+    const result = await send(p.proposalId, 'approve', edited ? { changes: kept.value.map(asFiled) } : {});
     busy.value = false;
     if (result.ok) { editing.value = ''; summary.value = failuresLine(result.unapplied); }
     settle(p, 'approve', result);
@@ -313,6 +326,7 @@ const approveReviewed = async () => {
 .aq__changes { display: flex; flex-direction: column; gap: 4px; }
 .aq__change { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 5px 8px; border-radius: var(--r-sm, 6px); background: var(--fill); color: var(--ink); min-width: 0; }
 .aq__change-label { flex: 1 1 12ch; min-width: 0; overflow-wrap: anywhere; }
+.aq__intent { flex: 1 1 16ch; }
 .aq__slack { flex: 1 1 100%; margin: 4px 0 0; }
 .aq__error { margin: 0; }
 .aq__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }

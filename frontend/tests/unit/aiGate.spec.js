@@ -10,7 +10,7 @@ import AiModelNotice from '@/components/molecules/AiUnavailable/AiModelNotice.vu
 import aiRoutes from '@/router/ai';
 
 const STATES = ['unknown', 'on', 'unconfigured', 'off_instance', 'off_workspace'];
-const CONFIG_ONLY = ['AiSkills', 'AiAgent', 'AgentTeammates', 'AgentRouting', 'AiHealth', 'AiAccounts', 'WorkflowRun', 'WorkflowLineage', 'WorkflowBuilder', 'Connections'];
+const CONFIG_ONLY = ['AiSkills', 'AiAgent', 'AgentTeammates', 'AgentRouting', 'AiHealth', 'AiAccounts', 'WorkflowRun', 'WorkflowLineage', 'WorkflowBuilder', 'Connections', 'AiConnect', 'ConnectAiWelcome'];
 
 const expected = (route, state) => {
     if (!MODEL_DRIVEN_ROUTES.includes(route)) return null;
@@ -68,6 +68,7 @@ describe('the non-blocking notice', () => {
             routes: [
                 { path: '/:cid/ai/ask', name: 'AiAsk', component: blank },
                 { path: '/:cid/ai/skills', name: 'AiSkills', component: blank },
+                { path: '/:cid/ai/connect', name: 'AiConnect', component: blank },
                 { path: '/:cid/settings/instance/settings', name: 'InstanceSettings', component: blank },
             ],
         });
@@ -81,13 +82,14 @@ describe('the non-blocking notice', () => {
     it('shows the owner a set-up link on Ask when no provider is configured', async () => {
         const wrapper = await mountOn('AiAsk', { state: 'unconfigured', canConfigureInstance: true });
         expect(wrapper.find('[role="status"]').text()).toContain('AiAvailability.notice_owner');
-        expect(wrapper.find('a').attributes('href')).toBe('/c1/settings/instance/settings?group=ai');
+        expect(wrapper.find('a.ai-model-notice__link').attributes('href')).toBe('/c1/settings/instance/settings?group=ai');
+        expect(wrapper.find('[data-test="connect-ai-hint"]').attributes('href')).toBe('/c1/ai/connect');
     });
 
-    it('tells a member answers are not available yet, with nothing to click', async () => {
+    it('tells a member answers are not available yet, with their own AI as the one thing to click', async () => {
         const wrapper = await mountOn('AiAsk', { state: 'unconfigured', canConfigureInstance: false });
         expect(wrapper.text()).toContain('AiAvailability.notice_member');
-        expect(wrapper.find('a').exists()).toBe(false);
+        expect(wrapper.findAll('a').map((link) => link.attributes('href'))).toEqual(['/c1/ai/connect']);
     });
 
     it('says nothing on a configuration screen or when AI is on', async () => {
