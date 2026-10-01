@@ -17,3 +17,21 @@
 .custom_field_back {
     margin: 12px 20px 0;
 }
+.custom_field_type {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+/* A button does not let the card's margin collapse with the next card's, as the row did when it was a div. */
+.custom_field_type { margin-top: 20px; }
+.custom_field_type:last-child { margin-bottom: 20px; }
+.custom_field_type .custom_field_wrapper { margin: 0 20px; }
+.custom_field_type:focus-visible { outline: none; }
+.custom_field_type:focus-visible .custom_field_wrapper { box-shadow: var(--focus); }

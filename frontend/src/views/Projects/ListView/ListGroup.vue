@@ -12,11 +12,13 @@
             />
         </label>
         <button type="button" class="lv2__group-head" :aria-expanded="!!item.isExpanded" @click="$emit('toggle')">
-            <span class="lv2__caret" :class="{ 'lv2__caret--open': item.isExpanded }" aria-hidden="true">▸</span>
-            <span class="lv2__swatch" :style="{ background: swatch }"></span>
-            <span class="lv2__group-name">{{ groupName }}</span>
-            <span class="lv2__group-meta">{{ headMeta }}</span>
-            <span v-if="groupPoints" class="lv2__group-meta lv2__group-points">{{ $t('ViewColumns.points_total', { n: groupPoints }) }}</span>
+            <span class="lv2__group-label">
+                <span class="lv2__caret" :class="{ 'lv2__caret--open': item.isExpanded }" aria-hidden="true">▸</span>
+                <span class="lv2__swatch" :style="{ background: swatch }"></span>
+                <span class="lv2__group-name">{{ groupName }}</span>
+                <span class="lv2__group-meta">{{ headMeta }}</span>
+                <span v-if="groupPoints" class="lv2__group-meta lv2__group-points">{{ $t('ViewColumns.points_total', { n: groupPoints }) }}</span>
+            </span>
             <span v-if="wip" class="lv2__wip" :class="{ 'lv2__wip--over': wip.over }">{{ $t('List.wip', { used: wip.used, limit: wip.limit }) }}</span>
         </button>
         </div></div>

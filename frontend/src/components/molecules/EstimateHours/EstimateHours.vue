@@ -37,7 +37,7 @@
                                     :is-disabled="true"
                                     :placeHolder="$t('PlaceHolder.Enter_Project_Name')"
                                     autocomplete="off"
-                                    class="form-control login-input text-capitalize"
+                                    class="form-control login-input"
                                     maxlength="100"
                                     type="text"
                                 />

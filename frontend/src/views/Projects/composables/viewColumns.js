@@ -27,13 +27,13 @@ const AI_COLUMNS = ['summary', 'risk', 'area'];
 /* `base` columns keep the List's responsive tracks: the others drop out below 1024px. */
 const VIEWS = {
     list: {
-        lead: ['28px', 'minmax(0, 1fr)'],
+        lead: ['28px', 'var(--lv2-title-track)'],
         columns: ['tags', 'assignee', 'due', 'start', 'priority', 'estimate', 'points', 'created', 'updated', 'risk', 'doneBy'],
         defaults: ['tags', 'assignee', 'due', 'priority', 'estimate', 'risk', 'doneBy'],
         base: ['tags', 'assignee', 'due', 'priority', 'estimate', 'risk', 'doneBy'],
         fieldsShown: false,
         tracks: {
-            tags: 'minmax(0, .45fr)', assignee: '56px', due: '64px', start: '64px', priority: '72px', estimate: '48px',
+            tags: 'minmax(56px, .45fr)', assignee: '56px', due: '64px', start: '64px', priority: '72px', estimate: '48px',
             points: '44px', created: '72px', updated: '72px', risk: '80px', doneBy: '88px'
         },
         fieldTrack: '112px'
@@ -150,6 +150,20 @@ export function gridTracks(viewId, columns) {
     const view = VIEWS[viewId];
     if (!view) return '';
     return [...view.lead, ...columns.map((column) => column.track || view.fieldTrack)].join(' ');
+}
+
+const LIST_GAP = 10;
+const trackFloor = (track) => Number((/^(?:minmax\(\s*)?([\d.]+)px/.exec(track) || [])[1]) || 0;
+
+/* What the List hands its stylesheet: the tracks, and the room they take besides the task name's
+   own floor (each track's floor and the gap before it). The stylesheet adds the name's floor and
+   scrolls sideways under that width. */
+export function listGridVars(columns) {
+    const beside = [VIEWS.list.lead[0], ...columns.map((column) => column.track || VIEWS.list.fieldTrack)];
+    return {
+        '--lv2-cols': gridTracks('list', columns),
+        '--lv2-fixed-w': `${beside.reduce((sum, track) => sum + trackFloor(track) + LIST_GAP, 0)}px`
+    };
 }
 
 const FR_WIDTH = 200;

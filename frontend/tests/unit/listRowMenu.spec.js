@@ -55,6 +55,8 @@ const makeStore = () => createStore({
         'settings/companyOwnerDetail': () => ({ userId: 'owner' }),
         'settings/companyPriority': () => [],
         'settings/companyMembers': () => [],
+        'settings/companyUsers': () => ['u1', 'u2'].map((userId) => ({ userId, roleType: 3, status: 2, isDelete: false })),
+        'settings/rules': () => ({}),
         'projectData/currentProjectDetails': () => ({}),
         'settings/teams': () => []
     }

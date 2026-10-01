@@ -743,7 +743,7 @@ span.duedate-new .due-date span, span.key-new {
 .spr__dot--plain { background: rgba(0, 0, 0, .2); }
 .spr__title-wrap { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 6px; }
 .spr__title { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.spr__name { font-weight: 600; text-transform: capitalize; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spr__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .spr__window { color: var(--ink-2); white-space: nowrap; }
 .spr__bar { height: 5px; max-width: 200px; border-radius: 99px; background: rgba(0, 0, 0, .07); overflow: hidden; }
 :root[data-theme="dark"] .spr__bar { background: rgba(255, 255, 255, .12); }
@@ -751,7 +751,7 @@ span.duedate-new .due-date span, span.key-new {
 
 .spr__actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .spr__pts { color: var(--ink-2); }
-.spr__ai { border: 0; background: transparent; padding: 0; color: var(--agent); font: 600 12.5px/1 var(--font-ui); cursor: pointer; }
+.spr__ai { border: 0; background: transparent; padding: 0; color: var(--agent-ink); font: 600 12.5px/1 var(--font-ui); cursor: pointer; }
 .spr__ai:disabled { opacity: .55; cursor: not-allowed; }
 .spr__ai:hover:not(:disabled) { text-decoration: underline; }
 .spr__hours { display: flex; align-items: center; gap: 12px; }
