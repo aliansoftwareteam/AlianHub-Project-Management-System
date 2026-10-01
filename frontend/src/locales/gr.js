@@ -1677,7 +1677,9 @@ export default {
         "key_esc": "Esc",
         "key_enter": "Enter",
         "key_shift_enter": "Shift + Enter",
-        "key_tab": "Tab"
+        "key_tab": "Tab",
+        "server_busy": "The server is busy. Try again in a moment.",
+        "server_busy_retry_in": "The server is busy. Try again in {n} second. | The server is busy. Try again in {n} seconds."
     },
     "Time": {
         "loading": "Loading…",
@@ -3108,7 +3110,8 @@ export default {
         "reason_carried_with_its_parent": "moved with its parent task",
         "reason_already_a_top_level_task": "already a task, not a subtask",
         "reason_subtask_moves_with_its_parent": "a subtask moves with its parent — use Convert to Task or Convert to Subtask",
-        "reason_skipped": "skipped"
+        "reason_skipped": "skipped",
+        "subtask_moves_hint": "A subtask moves with its parent — use Convert to Task or Convert to Subtask"
     },
     "Trash": {
         "title": "Trash",
@@ -3173,6 +3176,7 @@ export default {
         "bulk_due_clear": "Clear due date",
         "bulk_move_project": "Another project…",
         "bulk_convert": "Convert",
+        "bulk_more": "More",
         "bulk_no_subtasks": "Select a subtask to turn it into a task.",
         "ai_summarise": "Summarise the selected tasks",
         "ai_scope_note": "Runs on up to 10 tasks at a time.",
@@ -5752,6 +5756,11 @@ export default {
         "new": "New",
         "new_list": "New list",
         "new_folder": "New folder",
+        "new_subfolder": "New subfolder",
+        "new_subfolder_in": "New subfolder in {folder}",
+        "move_folder": "Move folder",
+        "move_folder_hint": "Choose where {folder} goes",
+        "top_level": "Top level of the project",
         "new_menu_task": "Task",
         "menu_view": "View",
         "menu_find": "Find",
@@ -6183,7 +6192,16 @@ export default {
         "search_not_loaded": "That message is further back in this conversation — load earlier messages to jump to it.",
         "unread_one": "1 unread message",
         "unread_many": "{count} unread messages",
-        "marked_unread": "Marked as unread from here"
+        "marked_unread": "Marked as unread from here",
+        "reply_in_thread": "Reply in thread",
+        "thread_title": "Thread",
+        "thread_close": "Close thread",
+        "thread_replies_one": "1 reply",
+        "thread_replies_many": "{count} replies",
+        "thread_open_one": "Open the thread, 1 reply",
+        "thread_open_many": "Open the thread, {count} replies",
+        "thread_last_reply": "Last reply {when}",
+        "thread_failed": "This thread could not be opened. It may have been deleted, or you may not have access to it."
     },
     "Filters": {
         "filter": "Φίλτρο",
@@ -8843,6 +8861,7 @@ export default {
         "Upgrade_your_plan_you_have_reached_the_limit_for_creating_sprints": "Αναβαθμίστε το σχέδιό σας. Έχετε φτάσει το όριο για τη δημιουργία sprints.",
         "Folder created successfully": "Ο φάκελος δημιουργήθηκε με επιτυχία",
         "Folder updated successfully": "Ο φάκελος ενημερώθηκε με επιτυχία",
+        "Folder_moved_successfully": "Folder moved successfully",
         "Folde restored successfully": "Ο φάκελος αποκαταστάθηκε με επιτυχία",
         "Folder closed successfully": "Ο φάκελος έκλεισε με επιτυχία",
         "Folder archived successfully": "Ο φάκελος αρχειοθετήθηκε με επιτυχία",
@@ -11290,7 +11309,8 @@ export default {
         "show": "Show the project tree",
         "hide": "Hide the project tree",
         "close": "Close the project tree",
-        "tasks": "{n} tasks"
+        "tasks": "{n} tasks",
+        "folder_actions": "Actions for {folder}"
     },
     "TaskTemplates": {
         "save_as": "Save as template",

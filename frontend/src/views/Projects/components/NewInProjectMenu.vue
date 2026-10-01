@@ -17,15 +17,20 @@
             <button v-if="canFolder" type="button" class="ah-pop__item" role="menuitem" @click="start('folder')">
                 <ShellIcon name="file" :size="14" />{{ $t('Projects.new_folder') }}
             </button>
+            <button v-if="canFolder && folderInView" type="button" class="ah-pop__item" role="menuitem" @click="start('subfolder')">
+                <ShellIcon name="file" :size="14" />{{ $t('Projects.new_subfolder') }}
+            </button>
         </div>
 
         <teleport to="body">
             <div v-if="mode" class="nip__overlay" @click.self="mode = ''">
                 <div class="nip__card" role="dialog" aria-modal="true">
-                    <h3 class="ah-h3 nip__title">{{ $t(mode === 'sprint' ? 'Projects.new_list' : 'Projects.new_folder') }}</h3>
+                    <h3 class="ah-h3 nip__title">{{ title }}</h3>
                     <SprintFolderInput
                         :createSprint="mode === 'sprint'"
-                        :createFolder="mode === 'folder'"
+                        :createFolder="mode !== 'sprint'"
+                        :project="projectData"
+                        :parentFolderId="mode === 'subfolder' ? folderInView.folderId : ''"
                         :subItems="subItems"
                         @cancel="mode = ''"
                         @updateData="onCreated"
@@ -39,14 +44,18 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, defineProps } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { useCustomComposable } from '@/composable';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import SprintFolderInput from '@/components/atom/SprintFolderInput/SprintFolderInput.vue';
 import { openQuickCreate } from '@/components/organisms/QuickCreateTask/quickCreateTask';
+import { canHoldSubfolders } from '@/utils/folderTree';
 
 const props = defineProps({
     projectData: { type: Object, required: true }
 });
+
+const { t } = useI18n();
 
 const { checkPermission } = useCustomComposable();
 const router = useRouter();
@@ -59,6 +68,18 @@ const canList = computed(() => checkPermission('project.project_sprint_create', 
 const canTask = computed(() => checkPermission('task.task_create', props.projectData?.isGlobalPermission) === true
     && checkPermission('task.task_list', props.projectData?.isGlobalPermission) === true);
 const canFolder = computed(() => checkPermission('project.project_folder_create', props.projectData?.isGlobalPermission) === true);
+
+/* Folders nest one level, so only a live top-level folder in view takes a subfolder. */
+const folderInView = computed(() => {
+    const folders = props.projectData?.sprintsfolders || {};
+    const folder = folders[route.params?.folderId];
+    return canHoldSubfolders(folders, folder) ? folder : null;
+});
+
+const title = computed(() => {
+    if (mode.value === 'sprint') return t('Projects.new_list');
+    return mode.value === 'subfolder' ? t('Projects.new_subfolder_in', { folder: folderInView.value?.name }) : t('Projects.new_folder');
+});
 
 const subItems = computed(() => [
     ...Object.values(props.projectData?.sprintsfolders || {}).map((f) => ({ ...f, name: f.name || f.folderName })),
