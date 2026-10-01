@@ -247,6 +247,24 @@ describe('the Board card and the List row show the same menu', () => {
     });
 });
 
+describe('Add subtask on the Board follows the depth of the task', () => {
+    const offered = async (overrides) => {
+        const board = mountBoard({ data: task(overrides) });
+        const ids = (await boardItems(board.wrapper)).map(([id]) => id);
+        board.wrapper.unmount();
+        return ids;
+    };
+
+    it('a task and a subtask take one', async () => {
+        expect(await offered({})).toContain('subtask');
+        expect(await offered({ isParentTask: false, ParentTaskId: 'a', ancestors: ['a'] })).toContain('subtask');
+    });
+
+    it('a sub-subtask is on the last level and takes none', async () => {
+        expect(await offered({ isParentTask: false, ParentTaskId: 'b', ancestors: ['a', 'b'] })).not.toContain('subtask');
+    });
+});
+
 describe('what the Board gained', () => {
     it('renames in place through the shared rename', async () => {
         const { wrapper, boardMenu } = mountBoard();

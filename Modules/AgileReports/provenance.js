@@ -6,6 +6,7 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const rollup = require('../Tasks/helpers/provenanceRollup');
+const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
 const SCOPE_FILTER = { deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true };
@@ -34,7 +35,9 @@ exports.getProvenance = async (req, res) => {
             : null;
         if (bySprint && !sprint) return res.send({ status: false, statusText: 'Sprint not found.' });
 
-        const scope = bySprint ? { sprintId: oid(sprintId) } : { ProjectID: oid(projectId) };
+        const scope = bySprint
+            ? { sprintId: oid(sprintId) }
+            : { ProjectID: oid(projectId), ...(await hiddenSprintFilter(companyId, req.uid, [projectId])) };
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS, data: [{ ...scope, ...SCOPE_FILTER }, TASK_FIELDS],
         }, 'find') || [];

@@ -1,59 +1,57 @@
 <template>
     <div class="pto">
         <div class="pto-grid">
-            <!-- Request form -->
-            <div class="pto-card">
-                <h3 class="pto-form-title">{{ $t('Pto.add_title') }}</h3>
-                <div class="pto-row">
-                    <label>{{ $t('Pto.type') }}</label>
-                    <select v-model="form.type" class="form-control">
+            <div class="ah-card pto-card">
+                <h3 class="ah-h3 pto-form-title">{{ $t('Pto.add_title') }}</h3>
+                <div class="ah-field pto-row">
+                    <label class="ah-field__label" for="pto-type">{{ $t('Pto.type') }}</label>
+                    <select id="pto-type" v-model="form.type" class="ah-input">
                         <option v-for="t in types" :key="t" :value="t">{{ $t('Pto.types.' + t) }}</option>
                     </select>
                 </div>
                 <div class="pto-row two">
-                    <div><label>{{ $t('Pto.start') }}</label><input v-model="form.startDate" type="date" :max="form.endDate || undefined" class="form-control" /></div>
-                    <div><label>{{ $t('Pto.end') }}</label><input v-model="form.endDate" type="date" :min="form.startDate || undefined" class="form-control" /></div>
+                    <div class="ah-field"><label class="ah-field__label" for="pto-start">{{ $t('Pto.start') }}</label><input id="pto-start" v-model="form.startDate" type="date" :max="form.endDate || undefined" class="ah-input" /></div>
+                    <div class="ah-field"><label class="ah-field__label" for="pto-end">{{ $t('Pto.end') }}</label><input id="pto-end" v-model="form.endDate" type="date" :min="form.startDate || undefined" class="ah-input" /></div>
                 </div>
-                <div class="pto-row">
-                    <label>{{ $t('Pto.duration') }}</label>
-                    <select v-model="dayType" class="form-control">
+                <div class="ah-field pto-row">
+                    <label class="ah-field__label" for="pto-duration">{{ $t('Pto.duration') }}</label>
+                    <select id="pto-duration" v-model="dayType" class="ah-input">
                         <option value="full">{{ $t('Pto.full_day') }}</option>
                         <option value="half">{{ $t('Pto.half_day') }}</option>
                         <option value="custom">{{ $t('Pto.custom_hours') }}</option>
                     </select>
                 </div>
-                <div class="pto-row" v-if="dayType === 'custom'">
-                    <label>{{ $t('Pto.hours_per_day') }}</label>
-                    <input v-model.number="form.hoursPerDay" type="number" min="1" max="24" step="0.5" class="form-control" />
+                <div class="ah-field pto-row" v-if="dayType === 'custom'">
+                    <label class="ah-field__label" for="pto-hours">{{ $t('Pto.hours_per_day') }}</label>
+                    <input id="pto-hours" v-model.number="form.hoursPerDay" type="number" min="1" max="24" step="0.5" class="ah-input" />
                 </div>
-                <div class="pto-row"><label>{{ $t('Pto.reason') }}</label><input v-model="form.reason" class="form-control" :placeholder="$t('Pto.reason_ph')" /></div>
+                <div class="ah-field pto-row"><label class="ah-field__label" for="pto-reason">{{ $t('Pto.reason') }}</label><input id="pto-reason" v-model="form.reason" class="ah-input" :placeholder="$t('Pto.reason_ph')" /></div>
                 <div class="pto-row pto-days" v-if="form.startDate && form.endDate && !dateError">{{ $t('Pto.total_days') }}: <b>{{ formDays }}</b></div>
-                <div v-if="dateError" class="pto-date-err">{{ dateError }}</div>
+                <div v-if="dateError" class="ah-field__error pto-date-err">{{ dateError }}</div>
                 <div class="pto-actions">
-                    <button class="pto-btn" :disabled="busy || !!dateError" @click="addEntry">{{ busy ? $t('Pto.saving') : $t('Pto.request') }}</button>
-                    <span v-if="msg" class="pto-msg" :class="msgType">{{ msg }}</span>
+                    <button type="button" class="ah-btn ah-btn--primary" :disabled="busy || !!dateError" @click="addEntry">{{ busy ? $t('Pto.saving') : $t('Pto.request') }}</button>
+                    <span v-if="msg" class="pto-msg" :class="`pto-msg--${msgType}`">{{ msg }}</span>
                 </div>
             </div>
         </div>
 
-        <!-- Schedule -->
-        <div class="pto-card">
+        <div class="ah-card pto-card">
             <div class="pto-list-head">
-                <h3 class="m-0">{{ isAdmin ? $t('Pto.team_title') : $t('Pto.my_title') }}</h3>
+                <h3 class="ah-h3">{{ isAdmin ? $t('Pto.team_title') : $t('Pto.my_title') }}</h3>
                 <div class="pto-filters">
-                    <input v-if="isAdmin" v-model="filters.search" type="text" class="pto-filter" :placeholder="$t('Pto.search_member')" @input="onSearchInput" />
-                    <select v-model="filters.status" class="pto-filter" @change="applyFilters">
+                    <input v-if="isAdmin" v-model="filters.search" type="text" class="ah-input pto-filter" :placeholder="$t('Pto.search_member')" :aria-label="$t('Pto.search_member')" @input="onSearchInput" />
+                    <select v-model="filters.status" class="ah-input pto-filter" :aria-label="$t('Pto.col_status')" @change="applyFilters">
                         <option value="">{{ $t('Pto.all_status') }}</option>
                         <option v-for="s in statuses" :key="s" :value="s">{{ $t('Pto.status.' + s) }}</option>
                     </select>
-                    <select v-model="filters.type" class="pto-filter" @change="applyFilters">
+                    <select v-model="filters.type" class="ah-input pto-filter" :aria-label="$t('Pto.col_type')" @change="applyFilters">
                         <option value="">{{ $t('Pto.all_types') }}</option>
                         <option v-for="t in types" :key="t" :value="t">{{ $t('Pto.types.' + t) }}</option>
                     </select>
-                    <button class="pto-btn-ghost" :disabled="loading" @click="load">{{ $t('Pto.refresh') }}</button>
+                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="loading" @click="load">{{ $t('Pto.refresh') }}</button>
                 </div>
             </div>
-            <div class="pto-table-wrap">
+            <div class="pto-table-wrap ah-scroll">
                 <table class="pto-table">
                     <thead>
                         <tr>
@@ -76,14 +74,16 @@
                             <td>{{ $t('Pto.types.' + (e.type || 'casual')) }}</td>
                             <td>{{ $t('Time.per_day', { h: e.hoursPerDay }) }}</td>
                             <td class="pto-nowrap">{{ e.totalDays != null ? e.totalDays : leaveDays(e.startDate, e.endDate, e.hoursPerDay) }}</td>
-                            <td><span class="pto-badge" :class="e.status">{{ $t('Pto.status.' + e.status) }}</span></td>
+                            <td><span class="ah-chip pto-badge" :class="`pto-badge--${e.status}`">{{ $t('Pto.status.' + e.status) }}</span></td>
                             <td class="pto-reason" :title="e.reason || ''">{{ e.reason || '—' }}</td>
-                            <td class="pto-rowactions">
-                                <template v-if="isAdmin && e.status === 'pending'">
-                                    <button class="pto-mini ok" @click="setStatus(e, 'approved')">{{ $t('Pto.approve') }}</button>
-                                    <button class="pto-mini no" @click="setStatus(e, 'rejected')">{{ $t('Pto.reject') }}</button>
-                                </template>
-                                <button class="pto-mini del" :disabled="e.status === 'approved'" :title="e.status === 'approved' ? $t('Pto.delete_locked') : ''" @click="remove(e)">{{ $t('Pto.delete') }}</button>
+                            <td>
+                                <div class="pto-rowactions">
+                                    <template v-if="isAdmin && e.status === 'pending'">
+                                        <button type="button" class="ah-btn ah-btn--sm pto-mini--ok" @click="setStatus(e, 'approved')">{{ $t('Pto.approve') }}</button>
+                                        <button type="button" class="ah-btn ah-btn--sm pto-mini--no" @click="setStatus(e, 'rejected')">{{ $t('Pto.reject') }}</button>
+                                    </template>
+                                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="e.status === 'approved'" :title="e.status === 'approved' ? $t('Pto.delete_locked') : ''" @click="remove(e)">{{ $t('Pto.delete') }}</button>
+                                </div>
                             </td>
                         </tr>
                         <tr v-if="!entries.length && !loading"><td :colspan="isAdmin ? 9 : 8" class="pto-empty">{{ $t('Pto.empty') }}</td></tr>
@@ -92,9 +92,9 @@
                 </table>
             </div>
             <div class="pto-pager" v-if="totalPages > 1">
-                <button class="pto-btn-ghost" :disabled="page <= 1 || loading" @click="goToPage(page - 1)">{{ $t('Pto.prev') }}</button>
+                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="page <= 1 || loading" @click="goToPage(page - 1)">{{ $t('Pto.prev') }}</button>
                 <span class="pto-pager-info">{{ $t('Pto.page') }} {{ page }} / {{ totalPages }} · {{ total }}</span>
-                <button class="pto-btn-ghost" :disabled="page >= totalPages || loading" @click="goToPage(page + 1)">{{ $t('Pto.next') }}</button>
+                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="page >= totalPages || loading" @click="goToPage(page + 1)">{{ $t('Pto.next') }}</button>
             </div>
         </div>
     </div>
@@ -225,45 +225,43 @@ onMounted(load);
 </script>
 
 <style scoped>
-.pto { padding: 20px; }
-.pto-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 16px; }
-@media (max-width: 800px) { .pto-grid { grid-template-columns: 1fr; } }
-.pto-card { background: #fff; color: #17161c; border: 1px solid #e6e7ee; border-radius: 10px; padding: 18px; }
-.pto-form-title { margin: 0 0 16px; }
-.pto-days { color: #3a3f52; font-size: 13px; }
-.pto-days b { font-weight: 700; }
-.pto-date-err { color: #c0392b; font-size: 12.5px; margin-bottom: 12px; }
-.pto-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
-.pto-row > label { font-size: 12.5px; font-weight: 600; color: #3a3f52; }
-.pto-row.two { flex-direction: row; gap: 12px; }
-.pto-row.two > div { flex: 1; display: flex; flex-direction: column; gap: 5px; }
-.pto-actions { display: flex; align-items: center; gap: 12px; }
-.pto-list-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.pto { padding: var(--page-pad-y, 20px) var(--page-pad-x, 20px); }
+.pto-grid { display: grid; grid-template-columns: 1fr; gap: var(--sp-7); margin-bottom: var(--sp-7); }
+.pto-card { padding: var(--card-pad-y, 18px) var(--card-pad-x, 18px); min-width: 0; }
+.pto-form-title { margin: 0 0 var(--sp-7); }
+.pto-days { color: var(--ink-2); font-size: var(--fs-md, 13px); }
+.pto-days b { font-weight: 700; color: var(--ink); }
+.pto-date-err { margin-bottom: var(--sp-5); }
+.pto-row { margin-bottom: var(--sp-5); }
+.pto-row.two { display: flex; gap: var(--sp-5); }
+.pto-row.two > div { flex: 1; min-width: 0; }
+.pto-actions { display: flex; align-items: center; gap: var(--sp-5); flex-wrap: wrap; }
+.pto-list-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); flex-wrap: wrap; margin-bottom: var(--sp-5); }
 .pto-table-wrap { overflow-x: auto; }
-.pto-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.pto-table th { text-align: left; background: #f7f8fc; color: #3a3f52; font-weight: 700; padding: 9px 12px; border-bottom: 1px solid #e6e7ee; white-space: nowrap; }
-.pto-table td { padding: 9px 12px; border-bottom: 1px solid #f0f1f6; color: #3a3f52; }
+.pto-table { width: 100%; border-collapse: collapse; font-size: var(--fs-md, 13px); }
+.pto-table th { text-align: left; background: var(--surface-2); color: var(--ink-2); font-weight: var(--fw-title, 700); padding: var(--cell-pad-y, 9px) var(--cell-pad-x, 12px); border-bottom: 1px solid var(--border); white-space: nowrap; }
+.pto-table td { height: var(--row-h); padding: var(--cell-pad-y, 9px) var(--cell-pad-x, 12px); border-bottom: 1px solid var(--hairline); color: var(--ink); }
+.pto-table tbody tr:hover { background: var(--surface-hover); }
 .pto-nowrap { white-space: nowrap; }
 .pto-reason { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pto-badge { font-size: 11px; font-weight: 700; border-radius: 5px; padding: 2px 8px; text-transform: capitalize; }
-.pto-badge.pending { background: #fff8e6; color: #9a6b00; }
-.pto-badge.approved { background: #e7f6ee; color: #1c7a43; }
-.pto-badge.rejected { background: #fdecec; color: #c0392b; }
-.pto-empty { text-align: center; color: #6b7280; padding: 20px; }
-.pto-rowactions { display: flex; gap: 6px; justify-content: flex-end; }
-.pto-btn { background: #2f3a8f; color: #fff; border: none; border-radius: 7px; padding: 8px 16px; font-size: 13px; cursor: pointer; }
-.pto-btn:disabled { opacity: .55; cursor: default; }
-.pto-btn-ghost { background: #fff; color: #2f3a8f; border: 1px solid #cdd2e6; border-radius: 7px; padding: 6px 13px; font-size: 12.5px; cursor: pointer; }
-.pto-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-.pto-filter { border: 1px solid #cdd2e6; border-radius: 7px; padding: 6px 10px; font-size: 12.5px; color: #3a3f52; background: #fff; }
-.pto-filter:focus { outline: none; border-color: #2f3a8f; }
-.pto-pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 14px; }
-.pto-pager-info { font-size: 12.5px; color: #6b7280; }
-.pto-mini { border: none; border-radius: 5px; padding: 4px 9px; font-size: 12px; cursor: pointer; }
-.pto-mini.ok { background: #1c7a43; color: #fff; }
-.pto-mini.no { background: #c0392b; color: #fff; }
-.pto-mini.del { background: #eef0f6; color: #3a3f52; }
-.pto-mini:disabled { opacity: .5; cursor: not-allowed; }
-.pto-msg.ok { color: #1c7a43; font-size: 13px; }
-.pto-msg.err { color: #c0392b; font-size: 13px; }
+.pto-badge { text-transform: capitalize; }
+.pto-badge--pending { background: var(--warn-bg); color: var(--warn-ink); }
+.pto-badge--approved { background: var(--ok-bg); color: var(--ok-ink); }
+.pto-badge--rejected { background: var(--danger-bg); color: var(--danger-ink); }
+.pto-table td.pto-empty { text-align: center; color: var(--ink-2); padding: var(--sp-8); }
+.pto-rowactions { display: flex; gap: var(--sp-2); justify-content: flex-end; }
+.pto-filters { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; justify-content: flex-end; }
+.ah-input.pto-filter { width: auto; max-width: 100%; height: var(--control-h, 30px); padding: 0 var(--sp-4); font-size: var(--fs-sm, 12.5px); }
+.pto-pager { display: flex; align-items: center; justify-content: center; gap: var(--sp-5); margin-top: var(--sp-6); }
+.pto-pager-info { font-size: var(--fs-sm, 12.5px); color: var(--ink-2); }
+.pto-mini--ok { background: var(--ok-bg); color: var(--ok-ink); }
+.pto-mini--no { background: var(--danger-bg); color: var(--danger-ink); }
+.pto-msg { font-size: var(--fs-md, 13px); }
+.pto-msg--ok { color: var(--ok-ink); }
+.pto-msg--err { color: var(--danger-ink); }
+@media (max-width: 767px) {
+    .pto-row.two { flex-direction: column; }
+    .pto-filters { width: 100%; justify-content: flex-start; }
+    .ah-input.pto-filter { flex: 1 1 120px; }
+}
 </style>
