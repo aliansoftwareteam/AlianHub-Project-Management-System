@@ -18,7 +18,11 @@
         <template v-else>
             <template v-if="filteredCustomFields.length">
                 <template v-for="item in filteredCustomFields" :key="item._id">
-                    <div class="position-re" :class="itemClasses">
+                    <div v-if="fieldTypeUi(item?.fieldType)" class="position-re">
+                        <ModuleFieldListing :detail="item" :editable="props.editPermission === true" @change="handleFieldValue(item, $event)" />
+                        <AiFieldMark v-if="isAiField(item)" class="custom-field__ai" :def="item" :task="props.task" :canFill="props.editPermission === true" show-text />
+                    </div>
+                    <div v-else class="position-re" :class="itemClasses">
                         <component
                             :is="getView(item?.fieldType)"
                             :detail="item"
@@ -48,6 +52,8 @@
     import EmailComponentListing from '../../atom/customFieldTaskView/emailComponentListing.vue';
     import PhoneComponentListing from '../../atom/customFieldTaskView/phoneComponentListing.vue';
     import ComputedComponentListing from '../../atom/customFieldTaskView/computedComponentListing.vue';
+    import ModuleFieldListing from '../../atom/customFieldTaskView/moduleFieldListing.vue';
+    import { fieldTypeUi } from '@/plugins/customFieldView/fieldTypes';
     import { computeCustomFieldValue, recomputeCustomFields } from '@/plugins/customFieldView/formulaEngine.js';
     import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
     import AiFieldMark from '@/components/atom/AiFieldMark/AiFieldMark.vue';
@@ -74,7 +80,7 @@
         }
     });
     // Emits
-    const emit = defineEmits(['blurUpdate','isCustomField','editCustomField']);
+    const emit = defineEmits(['blurUpdate','isCustomField','editCustomField','fieldValue']);
 
     // Injections
     const clientWidth = inject("$clientWidth");
@@ -232,6 +238,11 @@
                 fieldValue: value
             };
         }
+    };
+
+    const handleFieldValue = (item, value) => {
+        emit('fieldValue', item, value);
+        requestRecompute();
     };
 
     const handleEdit = (val) => {
