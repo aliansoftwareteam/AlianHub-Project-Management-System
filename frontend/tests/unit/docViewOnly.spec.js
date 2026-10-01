@@ -125,7 +125,7 @@ describe('a doc the person may only read', () => {
         await wrapper.findAll('.pd__actions button').find((button) => button.text().includes('Docs.share')).trigger('click');
         await flushPromises();
 
-        expect(wrapper.find('.pd__share').text()).toContain('Projects.doc_private_hint_reader');
+        expect(wrapper.find('.pd__share').text()).toContain('Projects.doc_share_scope_off_hint_reader');
         expect(wrapper.findAll('.pd__share .pd__switch').every((toggle) => toggle.attributes('disabled') !== undefined)).toBe(true);
     });
 });
