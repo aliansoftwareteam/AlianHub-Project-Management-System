@@ -278,24 +278,6 @@ describe(ID, () => {
         const methods = mockDbFor(C1).calls.map((c) => c.method);
         expect(methods.indexOf('createIndexes')).toBeGreaterThan(methods.lastIndexOf('bulkWrite'));
     });
-
-    test('verify reports the rows still to write and a missing index, and neither once it has run', async () => {
-        seedCompany(C1);
-        seedTask(C2, 'root', undefined);
-        seedTask(C2, 'child', T.root);
-
-        expect(await migration.verify(contextFor([C1, C2]))).toEqual([
-            `${C1} 5 subtasks without the right ancestors`,
-            `${C1} 2 subtasks below level three`,
-            `${C1} tasks have no ancestors index`,
-            `${C2} 1 subtask without the right ancestors`,
-            `${C2} tasks have no ancestors index`,
-        ]);
-
-        await migration.up(contextFor([C1, C2]));
-
-        expect(await migration.verify(contextFor([C1, C2]))).toEqual([]);
-    });
 });
 
 /* The dry run's write guard patches the driver's Collection; here that class answers from fakeMongo,
@@ -347,18 +329,25 @@ describe(`${ID} under migrate up --dry-run and migrate verify`, () => {
         process.stdout.write(`\n${text}\n`);
     });
 
-    test('verify runs read-only and passes once the migration has run', async () => {
+    /* `migrate verify` exits 1 on any failing check. What 064 wrote is true of the rows that existed
+       when it ran; a subtask a writer saves afterwards, or a workspace made afterwards, is not its
+       to judge, so it carries no check and a healthy database verifies clean. */
+    test('migrate verify does not fail on rows and workspaces that came after the migration', async () => {
         seedCompany(C1);
+        await migration.up(contextFor([C1]));
+        mockDbFor(C1).seed(SCHEMA_TYPE.TASKS, { TaskName: 'saved after the migration', isParentTask: false, ParentTaskId: T.root, sprintId: oid(SPRINT), ancestors: [] });
+        seedTask(C2, 'root', undefined);
+        seedTask(C2, 'child', T.root, { ancestors: [] });
         const store = createMemoryStore();
         store.docs.set(ID, { _id: ID, ok: true });
-        const makeContext = () => contextFor([C1], driverCrud);
+        mockDbFor(C1).calls.length = 0;
 
-        const failing = await verifyMigrations({ store, migrations: [migration], makeContext, guard });
-        expect(failing.results).toEqual([{ id: ID, status: 'fail', problems: [`${C1} 5 subtasks without the right ancestors`, `${C1} 2 subtasks below level three`, `${C1} tasks have no ancestors index`], error: null }]);
+        const result = await verifyMigrations({ store, migrations: [migration], makeContext: () => contextFor([C1, C2, '6f00000000000000000000c3'], driverCrud), guard });
 
-        await migration.up(contextFor([C1]));
-        const passing = await verifyMigrations({ store, migrations: [migration], makeContext, guard });
-        expect(passing.results).toEqual([{ id: ID, status: 'pass', problems: [], error: null }]);
-        expect(formatVerify(passing)).toContain(`${ID}  pass`);
+        expect(mockIndexes[C2]).toBeUndefined();
+        expect(result.results).toEqual([{ id: ID, status: 'no-check', problems: [] }]);
+        expect(result.results.filter((r) => r.status === 'fail')).toEqual([]);
+        expect(formatVerify(result)).toContain('0 fail');
+        expect(mockDbFor(C1).calls).toEqual([]);
     });
 });
