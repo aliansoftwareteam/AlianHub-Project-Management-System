@@ -8,12 +8,14 @@ const { isPrivileged } = require('../../../Config/roleTypes');
 const logger = require('../../../Config/loggerConfig');
 const { visibleProjectIds } = require('../../Agents/scope');
 const { hiddenSprintIds } = require('../../Sprints/helpers/sprintVisibility');
+const { fetchRules } = require('../../settings/securityPermissions/controller');
+const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const {
-    EverythingRefused, parseRequest, scopedProjectIds, projectMatch, buildMatch, pagePipeline, positionOf,
+    EverythingRefused, parseRequest, scopedProjectIds, projectMatch, taskListProjectIds, projectPermissions, rowEditRights, buildMatch, pagePipeline, positionOf,
     groupPipeline, shapeGroups, queryBinding, encodeCursor, decodeCursor,
 } = require('../helpers/everythingQuery');
 
-const PROJECT_CARD_FIELDS = { ProjectName: 1, ProjectCode: 1, projectIcon: 1, taskStatusData: 1, taskTypeCounts: 1, statusType: 1, isPersonal: 1 };
+const PROJECT_CARD_FIELDS = { ProjectName: 1, ProjectCode: 1, projectIcon: 1, taskStatusData: 1, taskTypeCounts: 1, apps: 1, statusType: 1, isPersonal: 1, isGlobalPermission: 1 };
 
 /* Without JWT_SECRET a cursor is signed with a key that lasts as long as the process, so a
  * restart only ends the pages in flight. */
@@ -28,16 +30,29 @@ const objectId = (id) => new mongoose.Types.ObjectId(String(id));
 const aggregateTasks = (companyId, pipeline) => MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [pipeline] }, 'aggregate');
 
 /* The projects the request reads: what the caller can open (a narrowed token's list included),
- * less trashed, archived and, unless asked for, closed ones. A project the request names can only
- * narrow that set. */
-const readableProjectIds = async (companyId, uid, request) => {
+ * less trashed, archived, restricted and, unless asked for, closed ones, and less the ones whose
+ * task list the caller's role may not read. A project the request names can only narrow that set.
+ * `permissionOf` reads the caller's role in any of them, and is null for an owner or an admin. */
+const readableProjects = async (companyId, uid, roleType, request) => {
     const candidates = scopedProjectIds(await visibleProjectIds(companyId, uid), request.filter.projectIds);
-    if (!candidates.length) return [];
+    if (!candidates.length) return { projectIds: [], permissionOf: null };
     const projects = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.PROJECTS,
-        data: [projectMatch(candidates, uid, request.includeClosedProjects), { _id: 1 }, { lean: true }],
-    }, 'find');
-    return (projects || []).map((project) => String(project._id));
+        data: [projectMatch(candidates, uid, request.includeClosedProjects), { _id: 1, isGlobalPermission: 1, isPersonal: 1 }, { lean: true }],
+    }, 'find') || [];
+    if (isPrivileged(roleType)) return { projectIds: projects.map((project) => String(project._id)), permissionOf: null };
+
+    const withOwnRules = projects.filter((project) => project.isGlobalPermission === false).map((project) => String(project._id));
+    const [companyRules, projectRules] = await Promise.all([
+        fetchRules(companyId),
+        withOwnRules.length
+            ? MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECT_RULES, data: [{ projectId: { $in: idForms(withOwnRules) } }, null, { lean: true }] }, 'find')
+            : [],
+    ]);
+    return {
+        projectIds: taskListProjectIds(projects, roleType, companyRules, projectRules),
+        permissionOf: projectPermissions(roleType, companyRules, projectRules),
+    };
 };
 
 const readPage = async (companyId, match, request, after) => {
@@ -53,7 +68,7 @@ const readPage = async (companyId, match, request, after) => {
     return { rows: rows.slice(0, limit), more: rows.length > limit };
 };
 
-const projectCards = async (companyId, uid, projectIds) => {
+const projectCards = async (companyId, uid, projectIds, permissionOf) => {
     if (!projectIds.length) return {};
     const projects = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.PROJECTS,
@@ -66,8 +81,10 @@ const projectCards = async (companyId, uid, projectIds) => {
         projectIcon: project.projectIcon,
         taskStatusData: project.taskStatusData || [],
         taskTypeCounts: project.taskTypeCounts || [],
+        apps: project.apps || [],
         statusType: project.statusType,
         isPersonal: project.isPersonal === true,
+        edit: rowEditRights(project, permissionOf),
     }]));
 };
 
@@ -89,7 +106,7 @@ exports.listEverything = async (req, res) => {
         const binding = queryBinding({ companyId, uid }, request);
         const after = request.cursor ? decodeCursor(request.cursor, binding, cursorKey()) : null;
 
-        const projectIds = await readableProjectIds(companyId, uid, request);
+        const { projectIds, permissionOf } = await readableProjects(companyId, uid, seat.roleType, request);
         if (!projectIds.length) {
             return res.status(200).json({ status: true, statusText: 'Tasks fetched successfully.', data: nothingToRead(request) });
         }
@@ -112,7 +129,7 @@ exports.listEverything = async (req, res) => {
                 rows: page.rows,
                 groups,
                 nextCursor: page.more ? encodeCursor(positionOf(page.rows[page.rows.length - 1], request.sort), binding, cursorKey()) : null,
-                projects: await projectCards(companyId, uid, [...named]),
+                projects: await projectCards(companyId, uid, [...named], permissionOf),
             },
         });
     } catch (error) {
