@@ -222,6 +222,17 @@ describe('creating a subtask', () => {
         expect(String(row.sprintId)).toBe(OTHER_SPRINT);
     });
 
+    test('a task that still holds the chain it had as a subtask is read as the root it is', async () => {
+        Object.assign(stored(FOLDERLESS_ROOT), { ancestors: [ROOT, CHILD] });
+
+        const res = await call(CREATE, createBody({ isParentTask: false, ParentTaskId: FOLDERLESS_ROOT }));
+
+        expect(res.body).toMatchObject({ status: true });
+        const row = await underRealSchema(saves()[0].data);
+        expect(row.ancestors).toEqual([FOLDERLESS_ROOT]);
+        expect(String(row.sprintId)).toBe(OTHER_SPRINT);
+    });
+
     test.each([
         ['a parent that does not exist', MISSING, {}],
         ['a deleted parent', DELETED_ROOT, {}],
