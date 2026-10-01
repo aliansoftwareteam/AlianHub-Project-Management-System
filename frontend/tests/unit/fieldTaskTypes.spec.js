@@ -1,6 +1,6 @@
 /* Task 045 slice 9 — a custom field can be limited to task types. */
 import { describe, expect, it, vi } from 'vitest';
-import { config, mount } from '@vue/test-utils';
+import { config, mount, shallowMount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import { createStore } from 'vuex';
 import { ref } from 'vue';
@@ -12,6 +12,8 @@ vi.mock('@/store/index', () => ({ default: { commit: () => {}, dispatch: () => P
 import { fieldAppliesToTask } from '@/views/Projects/composables/projectCustomFields';
 import { taskTypeOptions } from '@/plugins/customFieldView/taskTypeOptions';
 import CustomFieldCell from '@/views/Projects/components/columns/CustomFieldCell.vue';
+import CustomFieldRender from '@/plugins/customFieldView/component/molecules/customFieldTaskView/customFieldRender.vue';
+import TextComponentListing from '@/plugins/customFieldView/component/atom/customFieldTaskView/textComponentListing.vue';
 import FieldTaskTypesPicker from '@/plugins/customFieldView/component/atom/FieldTaskTypesPicker/FieldTaskTypesPicker.vue';
 
 const i18n = createI18n({ legacy: false, locale: 'en', messages: { en }, missingWarn: false, fallbackWarn: false });
@@ -35,6 +37,24 @@ describe('fieldAppliesToTask in the web app', () => {
         expect(fieldAppliesToTask(SEVERITY, task(BUG))).toBe(true);
         expect(fieldAppliesToTask(SEVERITY, task(1))).toBe(false);
         expect(fieldAppliesToTask({ ...SEVERITY, fieldTaskTypes: [] }, task(1))).toBe(true);
+    });
+});
+
+describe('the task panel', () => {
+    const CUSTOMER = { _id: 'f-cust', fieldType: 'text', fieldTitle: 'Customer', isDelete: true, type: 'task', global: true };
+    const store = createStore({ getters: { 'settings/finalCustomFields': () => [SEVERITY, CUSTOMER], 'projectData/tasks': () => ({}), 'projectData/alltasks': () => [] } });
+    const shown = (wrapper) => wrapper.findAllComponents(TextComponentListing).map((field) => field.props('detail'));
+
+    it('hides a field the task\'s type does not use, and brings it back with its value when the type changes', async () => {
+        const wrapper = shallowMount(CustomFieldRender, {
+            props: { task: task(1), editPermission: true },
+            global: { plugins: [i18n, store], provide: { $clientWidth: ref(1280) } }
+        });
+        await vi.waitFor(() => expect(shown(wrapper).map((detail) => detail.fieldTitle)).toEqual(['Customer']), { timeout: 4000 });
+
+        await wrapper.setProps({ task: task(BUG) });
+        await vi.waitFor(() => expect(shown(wrapper).map((detail) => [detail.fieldTitle, detail.fieldValue])).toEqual([['Severity', 'High'], ['Customer', undefined]]), { timeout: 4000 });
+        wrapper.unmount();
     });
 });
 
