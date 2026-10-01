@@ -16,6 +16,19 @@ export async function duplicateProject(projectId, { name, include }) {
     }
 }
 
+export const linkedTo = (field, projectId) => field.global !== true && [].concat(field.projectId || []).map(String).includes(String(projectId));
+
+/* The server links a new project to these definitions and tells no client; a list that lacked the project would take the field off it on the next edit. */
+export function shareFields(store, fieldIds, projectId) {
+    const known = store.getters['settings/finalCustomFields'] || [];
+    (fieldIds || []).forEach((id) => {
+        const field = known.find((item) => String(item._id) === String(id));
+        if (field && !linkedTo(field, projectId)) {
+            store.commit('settings/mutateFinalCustomFields', { op: 'modified', data: { ...field, projectId: [...[].concat(field.projectId || []), projectId] } });
+        }
+    });
+}
+
 /* The tasks of a large copy arrive after the answer; `copyId` is the new project. Null when a read fails, so the caller asks again. */
 export async function duplicateProgress(copyId) {
     try {

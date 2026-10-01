@@ -14,23 +14,28 @@
             @change="$emit('toggle', task)"
         />
         <button type="button" class="hc-row__title" :title="task.TaskName" @click="$emit('open', task)">{{ task.TaskName }}</button>
-        <span v-if="showPriority && prio.cls" class="hc-row__prio" :class="prio.cls">{{ $t(prio.label) }}</span>
-        <button
-            v-if="timer && !done"
-            type="button"
-            class="hc-row__act"
-            :class="{ 'is-on': tracking }"
-            :title="$t('Home.start_timer')"
-            @click="$emit('timer', task)"
-        >
-            <ShellIcon :name="tracking ? 'pause' : 'play'" :size="13" />
-        </button>
-        <span v-if="showProject && projectName" class="hc-row__meta" :title="projectName">{{ projectName }}</span>
-        <template v-if="!done">
-            <span v-if="task.DueDate" class="hc-row__meta" :class="{ 'hc-row__meta--danger': overdue }">{{ due }}</span>
-            <button v-else-if="setDate" type="button" class="hc-row__meta hc-row__meta--brand" @click="$emit('set-date', task)">{{ $t('Home.set_date') }}</button>
-        </template>
-        <span v-if="draggable" class="hc-row__grip" aria-hidden="true"><ShellIcon name="grip" :size="13" /></span>
+        <span class="hc-row__tail">
+            <button
+                v-if="timer && !done"
+                type="button"
+                class="hc-row__act hc-row__timer"
+                :class="{ 'is-on': tracking }"
+                :title="$t('Home.start_timer')"
+                :aria-label="$t('Home.start_timer')"
+                @click="$emit('timer', task)"
+            >
+                <ShellIcon :name="tracking ? 'pause' : 'play'" :size="13" />
+            </button>
+            <span v-if="showPriority && prio.cls" class="hc-row__prio" :class="prio.cls">{{ $t(prio.label) }}</span>
+            <span v-if="showProject && projectName" class="hc-row__project" :title="projectName">{{ projectName }}</span>
+            <template v-if="!done">
+                <span v-if="task.DueDate" class="hc-row__meta" :class="{ 'hc-row__meta--danger': overdue }">{{ due }}</span>
+                <button v-else-if="setDate" type="button" class="hc-row__act hc-row__date" :title="setDateLabel" :aria-label="setDateLabel" @click="$emit('set-date', task)">
+                    <ShellIcon name="calendar" :size="14" class="hc-row__date-icon" />
+                </button>
+            </template>
+        </span>
+        <span v-if="draggable" class="hc-row__grip" aria-hidden="true"><ShellIcon name="grip" :size="10" /></span>
     </div>
 </template>
 
@@ -60,7 +65,8 @@ defineEmits(["toggle", "open", "timer", "set-date"]);
 const { t } = useI18n();
 const prio = computed(() => priorityMeta(props.task.Task_Priority));
 const overdue = computed(() => dueBucket(props.task) === "overdue");
-const due = computed(() => (overdue.value ? dueLabel(props.task.DueDate, t) : dueLabel(props.task.DueDate, t)));
+const due = computed(() => dueLabel(props.task.DueDate, t));
+const setDateLabel = computed(() => t("List.cell_set", { field: t("List.due_date") }));
 
 function onDragStart(event) {
     event.dataTransfer.setData("application/x-ah-task", props.task._id);

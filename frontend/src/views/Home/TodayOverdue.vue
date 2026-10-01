@@ -77,7 +77,7 @@
                             </template>
                             <section v-if="firstRun && !timer.active" class="hc-card">
                                 <div class="hc-personal__title">{{ $t('Home.personal_list') }}</div>
-                                <p class="hc-hint" style="margin: 0">{{ $t('Home.personal_hint') }}</p>
+                                <p class="hc-hint hc-personal__hint">{{ $t('Home.personal_hint') }}</p>
                                 <router-link class="hc-personal__open" :to="{ name: 'PersonalList', params: { cid: companyId } }">{{ $t('Home.open') }}</router-link>
                             </section>
                             <TimerChip />
