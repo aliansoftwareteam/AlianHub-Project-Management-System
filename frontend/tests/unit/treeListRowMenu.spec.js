@@ -67,7 +67,7 @@ const rowOf = (id) => {
     const stored = SPRINTS.find((item) => item._id === id);
     return { id, name: stored.name, folderId: stored.folderId || '' };
 };
-const menu = (id, handed = project()) => show(SprintRowMenu, { project: handed, sprint: rowOf(id), folders: FOLDERS, sprints: SPRINTS });
+const menu = (id, handed = project()) => show(SprintRowMenu, { project: handed, sprint: rowOf(id), folders: FOLDERS });
 const entries = async (wrapper) => {
     if (!wrapper.find('.pt-row__more').exists()) return [];
     await wrapper.find('.pt-row__more').trigger('click');
