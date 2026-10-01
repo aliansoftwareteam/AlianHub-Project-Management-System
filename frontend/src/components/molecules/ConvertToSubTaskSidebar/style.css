@@ -93,7 +93,7 @@
 }
 .convert__picker-note,
 .convert__depth-note {
-    margin: 12px 0 0;
+    margin: 12px 0;
     color: var(--ink-2);
     font: 400 13px/1.5 var(--font-ui);
 }
