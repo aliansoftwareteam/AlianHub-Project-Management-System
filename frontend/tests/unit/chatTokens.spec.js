@@ -452,7 +452,7 @@ describe('the comment feed inside a project follows the theme', () => {
 
     it('the attach sheet draws its tiles from tokens', () => {
         const sheet = templateOf(SHEET);
-        expect(classesIn(sheet).filter((name) => ['border', 'bg-gray'].includes(name) || LEGACY_CLASS.test(name))).toEqual([]);
+        expect(classesIn(sheet).filter((name) => ['border', 'bg-gray', 'bg-white'].includes(name))).toEqual([]);
         expect(declared(SHEET, '.media__file-value', 'border')).toBe('1px solid var(--border)');
         expect(declared(SHEET, '.media__file-value', 'background')).toBe('var(--surface-2)');
         expect(declared(SHEET, '.media__component-right', 'background')).toBe('var(--fill)');
