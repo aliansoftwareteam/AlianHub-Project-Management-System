@@ -10,6 +10,8 @@ const rules = require('./rules');
 const { tenantOf, TenantError } = require('../../Config/tenant');
 const { visibleTrash } = require('./listAccess');
 const { sessionActor } = require('../Tasks/helpers/taskWriteFields');
+const { announce } = require('../Goals/goalStore');
+const { removeCache } = require('../../utils/commonFunctions');
 
 const ObjectId = mongoose.Types.ObjectId;
 
@@ -113,6 +115,26 @@ exports.restore = async (req, res) => {
     }
 };
 
+const trashWhere = (companyId, type, filter) => MongoDbCrudOpration(companyId, {
+    type, data: [{ ...filter, deletedStatusKey: { $ne: rules.TRASHED } }, { $set: { deletedStatusKey: rules.TRASHED } }]
+}, 'updateMany').then((outcome) => Number(outcome && outcome.modifiedCount) || 0);
+
+/* A field held by the sample project alone goes with it; one a person also linked to another project stays. */
+const switchOffSampleFields = async (companyId, projectId) => {
+    const linked = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.CUSTOM_FIELDS,
+        data: [{ global: { $ne: true }, projectId: String(projectId), isDelete: { $ne: false } }, 'projectId']
+    }, 'find');
+    const ids = (linked || []).filter((field) => [].concat(field.projectId).length === 1).map((field) => field._id);
+    if (!ids.length) return 0;
+    await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.CUSTOM_FIELDS,
+        data: [{ _id: { $in: ids } }, { $set: { isDelete: false, updatedAt: new Date() } }]
+    }, 'updateMany');
+    removeCache(`customField:${companyId}`);
+    return ids.length;
+};
+
 exports.removeSampleData = async (req, res) => {
     const companyId = companyOrRefuse(req, res);
     if (!companyId) return undefined;
@@ -121,7 +143,7 @@ exports.removeSampleData = async (req, res) => {
             type: SCHEMA_TYPE.PROJECTS,
             data: [{ ProjectCode: rules.SAMPLE_PROJECT_CODE, deletedStatusKey: { $ne: rules.TRASHED } }, '_id']
         }, 'find');
-        let tasks = 0;
+        const removed = { projects: (projects || []).length, tasks: 0, folders: 0, lists: 0, docs: 0, fields: 0, goals: 0 };
         for (const project of projects || []) {
             const id = String(project._id);
             await updateProjectInternal(companyId, id, { deletedStatusKey: rules.TRASHED });
@@ -129,9 +151,15 @@ exports.removeSampleData = async (req, res) => {
                 type: SCHEMA_TYPE.TASKS,
                 data: [{ ProjectID: new ObjectId(id), deletedStatusKey: 0 }, { $set: { deletedStatusKey: rules.TRASHED } }]
             }, 'updateMany');
-            tasks += Number(outcome && outcome.modifiedCount) || 0;
-                }
-        return res.send({ status: true, statusText: 'Sample data removed.', data: { projects: (projects || []).length, tasks } });
+            removed.tasks += Number(outcome && outcome.modifiedCount) || 0;
+            removed.folders += await trashWhere(companyId, SCHEMA_TYPE.FOLDERS, { projectId: new ObjectId(id) });
+            removed.lists += await trashWhere(companyId, SCHEMA_TYPE.SPRINTS, { projectId: new ObjectId(id) });
+            removed.docs += await trashWhere(companyId, SCHEMA_TYPE.PAGES, { ProjectID: new ObjectId(id) });
+            removed.fields += await switchOffSampleFields(companyId, id);
+        }
+        removed.goals = await trashWhere(companyId, SCHEMA_TYPE.GOALS, { sample: true });
+        if (removed.goals) announce('update', companyId);
+        return res.send({ status: true, statusText: 'Sample data removed.', data: removed });
     } catch (error) {
         logger.error(`ERROR in remove sample data: ${error.message}`);
         return fail(res, error.message, 500);
