@@ -62,8 +62,8 @@ import { useGetterFunctions } from '@/composable';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 
-const KINDS = ['projects', 'lists', 'tasks', 'docs'];
-const ICONS = { projects: 'projects', lists: 'layout', tasks: 'checkSquare', docs: 'file' };
+const KINDS = ['projects', 'folders', 'lists', 'tasks', 'docs'];
+const ICONS = { projects: 'projects', folders: 'book', lists: 'layout', tasks: 'checkSquare', docs: 'file' };
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -116,7 +116,7 @@ async function restore(row) {
         $toast.success(t('Trash.restored'), { position: 'top-right' });
     } catch (error) {
         console.error('ERROR in restore: ', error);
-        $toast.error(t('Trash.restore_failed'), { position: 'top-right' });
+        $toast.error(error?.response?.data?.statusText || t('Trash.restore_failed'), { position: 'top-right' });
     } finally {
         busy.value = '';
     }

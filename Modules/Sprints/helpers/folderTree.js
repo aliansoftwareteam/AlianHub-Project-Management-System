@@ -21,6 +21,12 @@ const FOLDER_CASCADE = {
     [ARCHIVED]: { from: LIVE, to: ARCHIVED_WITH_FOLDER },
 };
 
+/* A delete leaves no mark of its own, so a restore from the trash brings back every trashed row under
+   the folder, as a list's restore from the trash does for its tasks. */
+const TRASH_RESTORE = { from: { $in: [ARCHIVED_WITH_FOLDER, DELETED] }, to: LIVE };
+
+const folderCascade = (status, fromTrash = false) => (fromTrash && status === LIVE ? TRASH_RESTORE : FOLDER_CASCADE[status]);
+
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
 const read = (companyId, method, type, filter, fields) => MongoDbCrudOpration(companyId, { type, data: [filter, fields] }, method);
 
@@ -78,10 +84,9 @@ const refuseRestoreUnderHiddenParent = async (companyId, folder) => {
     if (!parent || parent.deletedStatusKey || parent.parentFolderId) throw new ListWriteError('The parent folder is archived or deleted. Restore the parent folder first.');
 };
 
-const subfoldersFollowing = async (companyId, folder, status) => {
-    const { from, to } = FOLDER_CASCADE[status];
+const subfoldersFollowing = async (companyId, folder, { from }) => {
     const rows = await read(companyId, 'find', SCHEMA_TYPE.FOLDERS, { parentFolderId: folder._id, projectId: folder.projectId, deletedStatusKey: from }, { _id: 1 });
-    return { ids: (rows || []).map((row) => String(row._id)), from, to };
+    return (rows || []).map((row) => String(row._id));
 };
 
-module.exports = { FOLDER_CASCADE, parentForNewFolder, prepareFolderMove, refuseRestoreUnderHiddenParent, subfoldersFollowing };
+module.exports = { folderCascade, parentForNewFolder, prepareFolderMove, refuseRestoreUnderHiddenParent, subfoldersFollowing };
