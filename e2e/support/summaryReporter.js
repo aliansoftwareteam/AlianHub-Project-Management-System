@@ -5,7 +5,8 @@ const BODY_LIMIT = 3600;
 
 const escapeData = (text) => text.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
 const escapeProperty = (text) => escapeData(text).replace(/:/g, '%3A').replace(/,/g, '%2C');
-const plain = (text) => String(text || '').replace(/\u001b\[[0-9;]*m/g, '');
+const ESCAPE = String.fromCharCode(27);
+const plain = (text) => String(text || '').replace(new RegExp(`${ESCAPE}\\[[0-9;]*m`, 'g'), '');
 
 /* A dialog is what a test was working in, so it comes first; the shell navigation and the project
  * picker repeat on every page and would push it out of the limit. */
