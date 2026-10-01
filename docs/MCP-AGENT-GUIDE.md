@@ -195,7 +195,7 @@ An owner or admin sets two things per project, on the project's detail screen un
 | Connected agents | `single_task` (default) | Nothing extra is held: the rules under "What happens to a write" decide |
 | | `propose_all` | Every write in the project is filed as a proposal |
 
-A task created already in a done status counts as a close. A write that reaches two projects (a move, a link between tasks) follows the stricter of the two. The workspace's "a person checks before Done" switch always wins over the project. An app connected through OAuth that holds no manage scope cannot file a proposal, so its held call is refused. An agent's token on the web app's own routes cannot file one either, so there a held write is refused and the MCP tool is the way to propose it.
+A task created already in a done status counts as a close. A write that reaches two projects (a move, a link between tasks) follows the stricter of the two. The workspace's "a person checks before Done" switch always wins over the project. An app connected through OAuth files a proposal only for a tool its manage scope covers, so a held call of any other tool (a comment, a link, a timer) is refused, as is every held call of an app with no manage scope. An agent's token on the web app's own routes cannot file one either, so there a held write is refused and the MCP tool is the way to propose it.
 
 ### Changing a task
 

@@ -231,6 +231,19 @@ describe('where every agent write asks', () => {
             expect(String(stored(fx.bug._id).ProjectID)).toBe(P_OPEN);
         });
 
+        it('an outside client that holds the manage grant files its write, and one filed under no grant is refused', async () => {
+            const scopes = [...PLAIN_SCOPES, TASKS_GRANT];
+            seedGrant(OWNER, scopes);
+            expect(await rpc(outside(OWNER, scopes), 'task.update', { taskId: fx.top._id, title: 'Renamed' })).toMatchObject({ pending: true });
+            expect(proposals.create.mock.calls[0][1]).toMatchObject({ changes: [{ action: 'task.edit' }], oauthGrantId: world.GRANT_ID });
+            expect(await rpc(outside(OWNER, scopes), 'task.comment', { taskId: fx.top._id, body: 'Hello' })).toMatchObject({ refused: true });
+            expect(await rpc(outside(OWNER, scopes), 'task.link', { taskId: fx.top._id, url: 'https://example.com/pr/1' })).toMatchObject({ refused: true });
+            expect(proposals.create).toHaveBeenCalledTimes(1);
+            expect(rows(SCHEMA_TYPE.COMMENTS)).toHaveLength(0);
+            expect(stored(fx.top._id)).toMatchObject({ TaskName: 'Task OPN-1' });
+            expect(stored(fx.top._id).links || []).toHaveLength(0);
+        });
+
         it('an outside client that cannot file a proposal is refused, and changes nothing', async () => {
             seedGrant(OWNER, PLAIN_SCOPES);
             const out = await rpc(outside(OWNER, PLAIN_SCOPES), 'task.comment', { taskId: fx.top._id, body: 'Hello' });
