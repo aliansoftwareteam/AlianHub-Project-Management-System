@@ -51,7 +51,7 @@ async function holdStill(context, { baseURL, startedAt }) {
     });
 }
 
-const firstRunDone = ({ theme }) => {
+const browserStorage = ({ theme }) => {
     localStorage.setItem('ah.theme', theme);
     for (const screen of ['shell', 'project', 'board', 'list']) localStorage.setItem(`ah.tour.skipped.${screen}`, '1');
     sessionStorage.setItem('ah.gs.dismissed', '1');
@@ -141,7 +141,7 @@ for (const [group, shots] of groups) {
 
                 await holdStill(context, { baseURL, startedAt: state.visual.startedAt });
                 await page.clock.install({ time: new Date(NOW) });
-                await page.addInitScript(firstRunDone, { theme });
+                await page.addInitScript(browserStorage, { theme });
 
                 await page.goto(`/#${route}`);
                 await page.locator(SHELL).first().waitFor({ state: 'visible', timeout: SHELL_TIMEOUT_MS });
