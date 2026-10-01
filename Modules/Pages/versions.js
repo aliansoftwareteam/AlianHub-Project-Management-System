@@ -10,6 +10,7 @@ const { isObjectIdString, reviewState } = require('./helpers/pageRules');
 const { EDITOR_VERSION, blocksToHtml, blocksToRawText } = require('./helpers/pageContent');
 const rules = require('./helpers/pageVersionRules');
 const versions = require('./helpers/pageVersions');
+const pageSettle = require('./helpers/pageSettle');
 
 const PAGE_NOT_FOUND = 'Page not found.';
 const VERSION_NOT_FOUND = 'Version not found.';
@@ -156,12 +157,14 @@ exports.restoreVersion = async (req, res) => {
             editedBy: uid,
             editedAt: now,
         };
+        update.mentionsTold = [...new Set([...pageSettle.toldOf(page), ...pageSettle.namedIn(update.content)])];
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
             data: [{ _id: oid(page._id), deletedStatusKey: 0 }, { $set: update }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
         if (!updated) return fail(res, PAGE_NOT_FOUND, 404);
 
+        pageSettle.cancel(companyId, page._id);
         emitPageChange(companyId, 'update', updated);
         const data = typeof updated.toObject === 'function' ? updated.toObject() : updated;
         data.reviewState = reviewState(data);

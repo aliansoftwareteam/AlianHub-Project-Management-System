@@ -13,7 +13,7 @@ jest.mock('../Modules/notification/prepare-notification-data/controllerV2', () =
 jest.mock('../Modules/notification/docNotices', () => ({ ensureDocNoticeSection: jest.fn(async () => undefined) }));
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../Modules/Pages/helpers/pageAi', () => ({ composePage: jest.fn(), isAiConfigured: () => false }));
-jest.mock('../Modules/Pages/helpers/pageMentionNotices', () => ({ notifyNewMentions: jest.fn(async () => undefined) }));
+jest.mock('../Modules/Pages/helpers/pageMentionNotices', () => ({ notifyMentioned: jest.fn(async () => undefined) }));
 jest.mock('../Config/contentAccess', () => ({
     projectAccess: jest.fn(async (companyId, uid, projectId) => {
         const inCompany = String(companyId) === mockIds.company;
@@ -46,7 +46,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { schema } = require('../utils/mongo-handler/schema');
 const socketEmitter = require('../event/socketEventEmitter');
-const { notifyNewMentions } = require('../Modules/Pages/helpers/pageMentionNotices');
+const { notifyMentioned } = require('../Modules/Pages/helpers/pageMentionNotices');
 const pages = require('../Modules/Pages/controller');
 const history = require('../Modules/Pages/versions');
 const comments = require('../Modules/Pages/comments');
@@ -172,35 +172,35 @@ describe('the fields a version and a doc store', () => {
 });
 
 describe('when a version is kept', () => {
-    it('is not one per save: the same person saving again inside ten minutes updates the doc only', async () => {
+    it('is not one per save: the same person adding to the doc inside ten minutes updates the doc only', async () => {
         at(3);
-        expect(await save(AUTHOR, [para('a', 'Two')])).toMatchObject({ status: true });
+        expect(await save(AUTHOR, [para('a', 'One, two')])).toMatchObject({ status: true });
         at(6);
-        await save(AUTHOR, [para('a', 'Three')]);
+        await save(AUTHOR, [para('a', 'One, two, three')]);
 
         expect(kept()).toEqual([]);
-        expect(storedPage().rawText).toBe('Three');
+        expect(storedPage().rawText).toBe('One, two, three');
     });
 
     it('keeps the state being replaced once ten minutes have passed since a version was kept, under the time it was written', async () => {
         at(3);
-        await save(AUTHOR, [para('a', 'Two')]);
+        await save(AUTHOR, [para('a', 'One, two')]);
         at(12);
-        await save(AUTHOR, [para('a', 'Three')]);
+        await save(AUTHOR, [para('a', 'One, two, three')]);
 
         expect(kept()).toHaveLength(1);
-        expect(kept()[0]).toMatchObject({ title: 'Launch plan', rawText: 'Two', savedBy: AUTHOR, reason: 'interval', visibility: 'project' });
+        expect(kept()[0]).toMatchObject({ title: 'Launch plan', rawText: 'One, two', savedBy: AUTHOR, reason: 'interval', visibility: 'project' });
         expect(kept()[0].savedAt).toEqual(new Date(T0 + 3 * MINUTE));
-        expect(textOf(kept()[0])).toBe('Two');
+        expect(textOf(kept()[0])).toBe('One, two');
         expect(String(kept()[0].pageId)).toBe(mockIds.page);
 
         at(15);
-        await save(AUTHOR, [para('a', 'Four')]);
+        await save(AUTHOR, [para('a', 'One, two, three, four')]);
         expect(kept()).toHaveLength(1);
 
         at(23);
-        await save(AUTHOR, [para('a', 'Five')]);
-        expect(kept().map((row) => [row.rawText, row.savedAt])).toEqual([['Two', new Date(T0 + 3 * MINUTE)], ['Four', new Date(T0 + 15 * MINUTE)]]);
+        await save(AUTHOR, [para('a', 'One, two, three, four, five')]);
+        expect(kept().map((row) => [row.rawText, row.savedAt])).toEqual([['One, two', new Date(T0 + 3 * MINUTE)], ['One, two, three, four', new Date(T0 + 15 * MINUTE)]]);
     });
 
     it('keeps what one person wrote when another person edits', async () => {
@@ -221,6 +221,24 @@ describe('when a version is kept', () => {
             ['Launch plan', 'One', AUTHOR, 'author'],
             ['Launch plan v2', 'Edited again', EDITOR, 'author'],
         ]);
+    });
+
+    it('keeps one version per writer in ten minutes when two people save in turn', async () => {
+        const turns = [[EDITOR, 'One, two'], [AUTHOR, 'One, two, three'], [EDITOR, 'One, two, three, four'], [AUTHOR, 'One, two, three, four, five'], [EDITOR, 'One, two, three, four, five, six']];
+        for (const [index, [uid, text]] of turns.entries()) {
+            at(1 + index);
+            await save(uid, [para('a', text)]);
+        }
+
+        expect(kept().map((row) => [row.rawText, row.savedBy, row.reason])).toEqual([
+            ['One', AUTHOR, 'author'],
+            ['One, two', EDITOR, 'author'],
+        ]);
+
+        at(13);
+        await save(AUTHOR, [para('a', 'One, two, three, four, five, six, seven')]);
+        expect(kept()).toHaveLength(3);
+        expect(kept()[2]).toMatchObject({ rawText: 'One, two, three, four, five, six', savedBy: EDITOR, reason: 'author' });
     });
 
     it('does not count a save that changes nothing, or a change to the doc’s properties', async () => {
@@ -254,6 +272,73 @@ describe('when a version is kept', () => {
         expect(ids).not.toContain(String(old[1]._id));
         [old[2], named, legacy, elsewhere].forEach((row) => expect(ids).toContain(String(row._id)));
         expect(kept()).toHaveLength(5);
+    });
+});
+
+describe('when a save loses text', () => {
+    const LONG = 'The launch moves to the second week of March because the supplier contract is not signed yet.';
+    const firstDraft = () => {
+        storedPage().content = { html: '<p>First draft</p>', blocks: { blocks: [para('a', 'First draft')] } };
+        storedPage().rawText = 'First draft';
+    };
+
+    it('keeps the first text of a doc when its writer replaces it five minutes later', async () => {
+        firstDraft();
+        at(5);
+        await save(AUTHOR, [para('a', 'Second draft')]);
+
+        expect(kept()).toHaveLength(1);
+        expect(kept()[0]).toMatchObject({ rawText: 'First draft', savedBy: AUTHOR, reason: 'rewrite', visibility: 'project' });
+        expect(kept()[0].savedAt).toEqual(new Date(T0));
+        expect(schema.pageVersions.reason).toBeDefined();
+        expect(rules.REASONS).toContain('rewrite');
+
+        const restored = await restore(AUTHOR, kept()[0]._id);
+        expect(restored).toMatchObject({ status: true, data: { rawText: 'First draft' } });
+    });
+
+    it('keeps each text a rewrite replaces, however recently a version was kept', async () => {
+        firstDraft();
+        at(1);
+        await save(AUTHOR, [para('a', LONG)]);
+        at(2);
+        await save(AUTHOR, [para('a', 'The launch moves to April.')]);
+
+        expect(kept().map((row) => [row.rawText, row.reason])).toEqual([['First draft', 'rewrite'], [LONG, 'rewrite']]);
+    });
+
+    it('keeps what a save removes most of, a minute after the last version', async () => {
+        storedPage().content = { html: `<p>Kept line</p><p>${LONG}</p>`, blocks: { blocks: [para('a', 'Kept line'), para('b', LONG)] } };
+        seedVersion({ savedAt: new Date(T0), createdAt: new Date(T0) });
+        at(1);
+        await save(AUTHOR, [para('a', 'Kept line')]);
+
+        expect(kept()).toHaveLength(2);
+        expect(kept()[1]).toMatchObject({ rawText: `Kept line ${LONG}`, reason: 'rewrite' });
+    });
+
+    it('coalesces a run of small edits: typing on, and fixing a word', async () => {
+        storedPage().content = { html: `<p>${LONG}</p>`, blocks: { blocks: [para('a', LONG)] } };
+        const steps = [`${LONG} Legal`, `${LONG} Legal reviews it`, `${LONG} Legal reviews it on Monday.`, `${LONG.replace('supplier', 'vendor')} Legal reviews it on Monday.`];
+        for (const [index, text] of steps.entries()) {
+            at(1 + index);
+            await save(AUTHOR, [para('a', text)]);
+        }
+
+        expect(kept()).toEqual([]);
+        expect(storedPage().rawText).toBe(steps[3]);
+    });
+
+    it('stays inside the cap on unnamed versions', async () => {
+        firstDraft();
+        Array.from({ length: rules.MAX_UNNAMED_VERSIONS }, (_, index) => seedVersion({
+            savedAt: new Date(T0 - (index + 1) * MINUTE), createdAt: new Date(T0 - (index + 1) * MINUTE), hash: `seeded-${index}`,
+        }));
+        at(5);
+        await save(AUTHOR, [para('a', 'Second draft')]);
+
+        expect(kept()).toHaveLength(rules.MAX_UNNAMED_VERSIONS);
+        expect(kept().some((row) => row.rawText === 'First draft' && row.reason === 'rewrite')).toBe(true);
     });
 });
 
@@ -529,7 +614,7 @@ describe('restoring a version', () => {
         expect(pageEvents()).toHaveLength(1);
         expect(pageEvents()[0]).toMatchObject({ type: 'update', module: 'pages', companyId: C, data: { title: 'Launch plan (draft)', rawText: 'Intro then' } });
         expect(String(pageEvents()[0].data._id)).toBe(mockIds.page);
-        expect(notifyNewMentions).not.toHaveBeenCalled();
+        expect(notifyMentioned).not.toHaveBeenCalled();
     });
 
     it('is refused to a reader, and leaves the doc alone when the current state cannot be kept first', async () => {

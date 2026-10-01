@@ -26,11 +26,11 @@ const {
 const { composePage, isAiConfigured } = require('./helpers/pageAi');
 const { canUsePage } = require('./helpers/pageAccess');
 const { normalizeBlockMentions, normalizeMentionHtml } = require('./helpers/pageMentions');
-const { notifyNewMentions } = require('./helpers/pageMentionNotices');
 const { PageImageError, receiveImage, storePageImage, unlinkQuietly } = require('./helpers/pageImages');
 const { projectAccess, isCompanyAdmin, isCompanyMember, visibleProjectIds } = require('../../Config/contentAccess');
 const versionRules = require('./helpers/pageVersionRules');
 const pageVersions = require('./helpers/pageVersions');
+const pageSettle = require('./helpers/pageSettle');
 
 const LIST_FIELDS = 'title parentPageId ProjectID visibility createdBy linkedTasks updatedBy updatedAt createdAt order '
     + 'isWiki ownerId reviewDate reviewedAt reviewedBy createdByAgent agentName agentStatus rawText';
@@ -88,24 +88,37 @@ const inVisibleProjects = (visibleIds) => ({
     ],
 });
 
-/* Delivery never holds up or fails the save that caused it. */
-const announceMentions = (companyId, page, actorId, before, after) => {
-    notifyNewMentions({ companyId, page, actorId, before, after })
-        .catch((error) => logger.error(`ERROR in doc mention notices: ${error.message}`));
-};
-
 const htmlOf = (content) => String((content && content.html) || '');
 
-/* Whether a save changes what a version holds: the title or the body. */
-const changesState = (existing, update) => {
-    const next = { title: update.title !== undefined ? update.title : existing.title, content: update.content || existing.content };
-    return versionRules.snapshotOf(next).hash !== versionRules.snapshotOf(existing).hash
+/* The state a save leaves behind, when it changes what a version holds: the title or the body. */
+const incomingState = (existing, update) => {
+    const next = versionRules.snapshotOf({
+        title: update.title !== undefined ? update.title : existing.title,
+        content: update.content || existing.content,
+    });
+    const changed = next.hash !== versionRules.snapshotOf(existing).hash
         || (Boolean(update.content) && htmlOf(update.content) !== htmlOf(existing.content));
+    return changed ? next : null;
 };
 
 /* History never holds up or fails the save that feeds it. */
-const keepOutgoingVersion = (companyId, page, editorId, now) => pageVersions.keepOutgoing(companyId, page, editorId, { now })
+const keepOutgoingVersion = (companyId, page, editorId, now, incoming) => pageVersions.keepOutgoing(companyId, page, editorId, { now, incoming })
     .catch((error) => logger.error(`ERROR keeping a page version: ${error.message}`));
+
+const stampOf = (value) => {
+    const time = value ? new Date(value).getTime() : 0;
+    return Number.isNaN(time) ? 0 : time;
+};
+
+/* What an autosave is answered with: enough to move the editor's base on, never the body it just sent. */
+const savedRow = (page) => ({
+    _id: String(page._id),
+    title: page.title,
+    updatedAt: page.updatedAt,
+    updatedBy: page.updatedBy,
+    editedAt: page.editedAt,
+    editedBy: page.editedBy,
+});
 
 /* A non-deleted (or trashed) page the caller may act on, or null. */
 const findPage = async (companyId, id, uid, { deletedStatusKey = 0, edit = false } = {}) => {
@@ -185,9 +198,10 @@ exports.createPage = async (req, res) => {
         if (parentPageId) {
             doc.parentPageId = new mongoose.Types.ObjectId(parentPageId);
         }
+        doc.mentionsTold = pageSettle.namedIn(doc.content);
         const created = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PAGES, data: doc }, 'save');
         emitPageChange(companyId, 'insert', created);
-        announceMentions(companyId, created, userId, null, blocks);
+        pageSettle.tell(companyId, created, userId, doc.mentionsTold);
         return res.send({ status: true, statusText: 'Page created.', data: created });
     } catch (error) {
         logger.error(`ERROR in create page: ${error.message}`);
@@ -270,13 +284,17 @@ exports.getPage = async (req, res) => {
 };
 
 /* PUT /api/v2/pages/:id  body: { title?, contentHtml?, contentBlocks?, visibility?, linkedTasks?,
- *   isWiki?, ownerId?, reviewDate?, agentStatus? } */
+ *   isWiki?, ownerId?, reviewDate?, agentStatus?, baseEditedAt?, autosave?, settle? }
+ * baseEditedAt is the doc's editedAt as the editor last saw it ('' for none): a title or body save from an editor
+ * that is behind is refused with 409, never merged. autosave defers what a save announces (helpers/pageSettle.js);
+ * settle, with nothing else, says the person stopped editing. */
 exports.updatePage = async (req, res) => {
     try {
         const companyId = tenantOf(req);
         const { id } = req.params;
         const {
             title, contentHtml, contentBlocks, visibility, linkedTasks, isWiki, ownerId, reviewDate, agentStatus,
+            baseEditedAt, autosave, settle,
         } = req.body || {};
         const meta = readPageMeta({ visibility, isWiki, ownerId, reviewDate, agentStatus });
         if (meta.reason) {
@@ -314,6 +332,18 @@ exports.updatePage = async (req, res) => {
         if (meta.patch.visibility === 'private' && !canMakePrivate(existing, userId)) {
             return fail(res, 'Only the author of a doc can make it private.', 403);
         }
+        const writesBody = title !== undefined || contentHtml !== undefined || contentBlocks !== undefined;
+        if (writesBody && baseEditedAt !== undefined && stampOf(baseEditedAt) !== stampOf(existing.editedAt)) {
+            return fail(res, 'This doc was changed after you opened it.', 409, {
+                conflict: true,
+                data: { editedBy: existing.editedBy, editedAt: existing.editedAt },
+            });
+        }
+        const bodyOnly = !Object.keys(meta.patch).length && linkedTasks === undefined;
+        if (!writesBody && bodyOnly && settle) {
+            await pageSettle.settleNow(companyId, existing, userId);
+            return res.send({ status: true, statusText: 'Page saved.', data: savedRow(existing) });
+        }
 
         const update = { updatedBy: userId };
         if (title !== undefined) update.title = String(title).trim();
@@ -335,21 +365,35 @@ exports.updatePage = async (req, res) => {
             }
             update.linkedTasks = [...new Set(linkedTasks.map(String))].map((x) => new mongoose.Types.ObjectId(x));
         }
-        if ((update.title !== undefined || update.content) && changesState(existing, update)) {
+        const incoming = update.title !== undefined || update.content ? incomingState(existing, update) : null;
+        const deferred = Boolean(autosave) && writesBody && bodyOnly;
+        if (writesBody && bodyOnly && !incoming) {
+            if (!deferred) await pageSettle.settleNow(companyId, existing, userId);
+            return res.send({ status: true, statusText: 'Page saved.', data: deferred ? savedRow(existing) : existing });
+        }
+        if (incoming) {
             const now = new Date();
-            await keepOutgoingVersion(companyId, existing, userId, now);
+            await keepOutgoingVersion(companyId, existing, userId, now, incoming);
             update.editedBy = userId;
             update.editedAt = now;
+        }
+        const told = pageSettle.toldOf(existing);
+        const untold = writesBody && !deferred ? pageSettle.untoldIn({ mentionsTold: told }, update.content || existing.content) : [];
+        if (untold.length || (update.content && !Array.isArray(existing.mentionsTold))) {
+            update.mentionsTold = [...told, ...untold];
         }
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
             data: [{ _id: pageObjId }, { $set: update }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
 
-        emitPageChange(companyId, 'update', updated);
-        if (update.content) {
-            announceMentions(companyId, updated || existing, userId, contentToEditorData(existing.content), contentToEditorData(update.content));
+        if (deferred) {
+            pageSettle.settleLater(companyId, id);
+            return res.send({ status: true, statusText: 'Page saved.', data: savedRow(updated || existing) });
         }
+        if (writesBody) pageSettle.cancel(companyId, id);
+        emitPageChange(companyId, 'update', updated);
+        if (untold.length) pageSettle.tell(companyId, updated || existing, userId, untold);
         return res.send({ status: true, statusText: 'Page saved.', data: updated });
     } catch (error) {
         logger.error(`ERROR in update page: ${error.message}`);
