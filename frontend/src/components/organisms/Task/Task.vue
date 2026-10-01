@@ -302,6 +302,7 @@ import ConvertToList from '@/components/molecules/ConvertToList/ConvertToList.vu
 import SubtaskProgressBadge from '@/components/atom/SubtaskProgressBadge/SubtaskProgressBadge.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { subtaskProgress as countSubtasks } from '@/views/Projects/ListView/subtaskProgress';
 
 import TaskQuickMenu from './components/TaskQuickMenu.vue';
 import { useTaskActions } from './composables/useTaskActions';
@@ -410,24 +411,14 @@ const projectTaskType = computed(() => projectData.value.taskTypeCounts);
 const taskStatus = computed(() => projectData.value.taskStatusData.find((x) => x.key === task.value.statusKey));
 const taskType = computed(() => projectData.value.taskTypeCounts.find((x) => x.key === task.value.TaskTypeKey));
 
-// Subtask completion (AHE-3776) for the list-row badge shown after the subtask
-// count. When the row is expanded its subtasks are loaded into `subtaskArray`
-// (used live); when collapsed they aren't loaded, so we fetch a lightweight
-// done/total count once on mount (`fetchedProgress`) and fall back to it — that
-// way the badge shows on a collapsed row right after reload. A subtask is done
-// when statusType is 'close'; only non-deleted subtasks count.
+// Subtask completion (AHE-3776) for the badge after the subtask count, by the List's rule:
+// the loaded subtasks are counted only when the row holds all of them, and the count fetched
+// on mount answers otherwise. A row can hold a few that arrived as events.
 const fetchedProgress = ref({ total: 0, completed: 0 });
 
 const subtaskProgress = computed(() => {
-    const loaded = Array.isArray(task.value?.subtaskArray)
-        ? task.value.subtaskArray.filter((s) => s && (s.deletedStatusKey === 0 || s.deletedStatusKey === undefined))
-        : [];
-    if (loaded.length) {
-        const completed = loaded.filter((s) => (s?.status?.type || s?.statusType) === 'close').length;
-        return { total: loaded.length, completed };
-    }
-    // Collapsed row — subtasks not loaded; use the count fetched on mount.
-    return fetchedProgress.value;
+    const progress = countSubtasks(task.value, fetchedProgress.value);
+    return progress ? { total: progress.total, completed: progress.done } : { total: 0, completed: 0 };
 });
 
 // One-time, read-only count of this parent's subtasks (done vs total) so the
@@ -438,7 +429,7 @@ const subtaskProgress = computed(() => {
 function fetchSubtaskProgress() {
     if (!task.value?.isParentTask) return;
     if ((Number(task.value?.subTasks) || 0) <= 0) return;
-    if (Array.isArray(task.value?.subtaskArray) && task.value.subtaskArray.length) return;
+    if ((task.value?.subtaskArray || []).length >= Number(task.value.subTasks)) return;
     const findQuery = [
         { $match: { ParentTaskId: String(task.value._id), deletedStatusKey: { $in: [0, undefined] } } },
         { $group: { _id: null, total: { $sum: 1 }, completed: { $sum: { $cond: [{ $eq: ['$statusType', 'close'] }, 1, 0] } } } },
