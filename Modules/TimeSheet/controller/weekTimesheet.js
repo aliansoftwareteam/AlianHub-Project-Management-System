@@ -8,6 +8,7 @@ const socketEmitter = require('../../../event/socketEventEmitter');
 const { removeCache } = require('../../../utils/commonFunctions');
 const { parsePeriod } = require('../../TimesheetApproval/helpers/approvalRules');
 const R = require('../helpers/weekRules');
+const { workingDaysOf, weekendOf } = require('../../Company/helpers/companyWeek');
 
 const RUNNING_WINDOW_SEC = 10 * 60;
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
@@ -88,7 +89,8 @@ exports.getWeekTimesheet = async (req, res) => {
             type: SCHEMA_TYPE.PTO_ENTRIES,
             data: [{ userId, status: 'approved', deletedStatusKey: { $ne: 1 }, startDate: { $lte: new Date(q.end) }, endDate: { $gte: new Date(q.start) } }],
         }, 'find').catch(() => []);
-        const dayCaps = R.dayCapacity({ days, hoursPerDay, ptoDays: R.ptoDaysIn(ptoRows, days) });
+        const workingDays = await workingDaysOf(companyId, q.projectId);
+        const dayCaps = R.dayCapacity({ days, hoursPerDay, ptoDays: R.ptoDaysIn(ptoRows, days), weekendDays: weekendOf(workingDays) });
         const totals = R.totals(rows, days);
         const today = DateTime.now().setZone(zone).toISODate();
 
@@ -110,6 +112,7 @@ exports.getWeekTimesheet = async (req, res) => {
                 userId,
                 zone,
                 hoursPerDay,
+                workingDays,
                 days: dayCaps,
                 rows,
                 totals: { ...totals, capacityMinutes: dayCaps.reduce((s, d) => s + d.capacityMinutes, 0) },

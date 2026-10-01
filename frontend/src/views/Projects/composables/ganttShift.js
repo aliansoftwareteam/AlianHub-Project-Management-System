@@ -2,30 +2,12 @@
  * (finish-to-start, the only dependency AlianHub stores) moves later by whole days, keeping its
  * length. Moving a blocker earlier pulls nothing back. CommonJS so the jest suite can require it. */
 
-const MAX_STEPS = 36600;
+const { MAX_STEPS, workingDaySet, nextWorkingDay, addWorkingDays } = require('./workingCalendar');
 
 const toDate = (value) => {
     if (value === null || value === undefined || value === '') return null;
     const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
     return Number.isNaN(date.getTime()) ? null : date;
-};
-
-const workingDaySet = (days) => (Array.isArray(days) && days.length ? new Set(days.map(Number)) : null);
-
-/* Local-calendar steps, so a daylight-saving change never nudges a bar off its hour. */
-const nextWorkingDay = (date, working) => {
-    const next = new Date(date.getTime());
-    for (let i = 0; i < 7; i += 1) {
-        next.setDate(next.getDate() + 1);
-        if (!working || working.has(next.getDay())) return next;
-    }
-    return next;
-};
-
-const addWorkingDays = (date, count, working) => {
-    let at = date;
-    for (let i = 0; i < count; i += 1) at = nextWorkingDay(at, working);
-    return at;
 };
 
 /* The due date is the instant a task ends, so its last occupied day is the one just before it. */

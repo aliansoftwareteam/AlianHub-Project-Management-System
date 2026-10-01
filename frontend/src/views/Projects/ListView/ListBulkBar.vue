@@ -1,20 +1,30 @@
 <template>
-    <div v-if="selection.hasSelection.value" class="lv2-bulk" role="region" :aria-label="$t('List.bulk_region')">
-        <span class="lv2-bulk__count">{{ $t('List.selected', { n: selection.count.value }) }}</span>
-        <button type="button" class="lv2-bulk__clear" :aria-label="$t('BulkActions.clear_selection')" :title="$t('BulkActions.clear_selection')" @click.stop="selection.clear()">
+    <div v-if="selection.hasSelection.value" ref="bar" class="lv2-bulk" role="region" :aria-label="$t('List.bulk_region')">
+        <span class="lv2-bulk__count" data-bulk-fixed>{{ $t('List.selected', { n: selection.count.value }) }}</span>
+        <button type="button" class="lv2-bulk__clear" data-bulk-fixed :aria-label="$t('BulkActions.clear_selection')" :title="$t('BulkActions.clear_selection')" @click.stop="selection.clear()">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
         </button>
 
-        <span v-for="menu in menus" :key="menu.key" class="lv2-bulk__menu-wrap">
+        <span
+            v-for="host in hosts"
+            :key="host.key"
+            class="lv2-bulk__menu-wrap"
+            :class="{ 'lv2-bulk__more': host.more, 'is-unused': host.unused }"
+            :data-bulk-action="host.more ? null : host.key"
+            :data-bulk-more="host.more ? '' : null"
+            :aria-hidden="host.unused ? 'true' : null"
+        >
             <button
                 type="button"
                 class="lv2-bulk__btn"
-                :disabled="working || !menu.enabled"
-                @click.stop="toggle(menu.key)"
-            >{{ menu.label }} ▾</button>
-            <div v-if="open === menu.key" class="lv2-bulk__menu" @click.stop>
+                :class="host.tone ? `lv2-bulk__btn--${host.tone}` : null"
+                :disabled="working || !host.enabled || host.unused"
+                :aria-expanded="host.run ? null : String(Boolean(host.panel))"
+                @click.stop="activate(host)"
+            >{{ host.label }}<template v-if="!host.run && !host.plain"> ▾</template></button>
+            <div v-if="host.panel" class="lv2-bulk__menu" @click.stop>
                 <CalenderCompo
-                    v-if="menu.calendar"
+                    v-if="host.panel.calendar"
                     modelValue=""
                     :hideExtraLayouts="['time', 'minutes', 'hours', 'seconds']"
                     menuClass="calender-menu-class-duedate"
@@ -25,44 +35,27 @@
                     </template>
                 </CalenderCompo>
                 <button
-                    v-for="option in menu.options"
+                    v-for="option in host.panel.options"
                     :key="option.id"
                     type="button"
                     class="lv2-bulk__item"
-                    :class="{ 'lv2-bulk__item--split': option.split }"
+                    :class="{ 'lv2-bulk__item--split': option.split, 'lv2-bulk__item--danger': option.danger }"
                     :disabled="option.disabled"
                     :title="option.title"
                     :aria-pressed="option.pressed"
-                    @click="option.action ? option.action() : menu.pick(option)"
+                    v-bind="option.attrs"
+                    @click="option.action ? option.action() : host.panel.pick(option)"
                 >
                     <span v-if="option.pressed" class="lv2-bulk__check" aria-hidden="true">{{ PRESSED_MARK[option.pressed] }}</span>
                     <span v-if="option.color" class="lv2-bulk__dot" :style="{ background: option.color }"></span>
                     {{ option.label }}
                 </button>
-                <p v-if="!menu.options.length && !menu.calendar" class="lv2-bulk__note">{{ $t('List.bulk_no_options') }}</p>
+                <p v-if="host.panel.note" class="lv2-bulk__note">{{ host.panel.note }}</p>
+                <p v-else-if="!host.panel.options.length && !host.panel.calendar" class="lv2-bulk__note">{{ $t('List.bulk_no_options') }}</p>
             </div>
         </span>
 
-        <span v-if="canUseAi({ project })" class="lv2-bulk__menu-wrap">
-            <button type="button" class="lv2-bulk__btn lv2-bulk__btn--ai" :disabled="working" @click.stop="toggle('ai')">✦ {{ $t('List.ask_ai') }}</button>
-            <div v-if="open === 'ai'" class="lv2-bulk__menu" @click.stop>
-                <button type="button" class="lv2-bulk__item" @click="summarise">{{ $t('List.ai_summarise') }}</button>
-                <button
-                    v-for="field in aiFields"
-                    :key="field._id"
-                    type="button"
-                    class="lv2-bulk__item"
-                    :data-ai-field-fill="field._id"
-                    @click="fillAiField(field)"
-                >{{ $t('AiFields.bulk_fill', { field: field.fieldTitle, n: selection.count.value }) }}</button>
-                <p class="lv2-bulk__note">{{ $t('List.ai_scope_note') }}</p>
-            </div>
-        </span>
-
-        <button v-if="canArchive" type="button" class="lv2-bulk__btn" :disabled="working" @click.stop="ask('bulkArchive')">{{ $t('Projects.bulk_archive') }}</button>
-        <button v-if="canDelete" type="button" class="lv2-bulk__btn lv2-bulk__btn--danger" :disabled="working" @click.stop="ask('bulkTrash')">{{ $t('Projects.bulk_delete') }}</button>
-
-        <span class="lv2-bulk__esc">{{ $t('List.esc') }}</span>
+        <span class="lv2-bulk__esc" data-bulk-fixed>{{ $t('List.esc') }}</span>
     </div>
     <ConfirmationSidebar
         v-if="confirmOpen"
@@ -96,7 +89,7 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, inject, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, defineAsyncComponent, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { canUseAi } from "@/composable/aiAvailability";
 import { useStore } from "vuex";
 import { useToast } from "vue-toast-notification";
@@ -113,6 +106,7 @@ import { useOtherProjectRules } from "@/composable/otherProjectRules";
 import { snapshotTasks, statusPayload, undoRequests } from "./bulkUndo.js";
 import { bulkReport, convertTargets, moveTargets, parentTargets, placementActions, selectionShape } from "./bulkPlacement.js";
 import { priorityAppOn, projectHasApp } from "./listRowEdit.js";
+import { PHONE_INLINE_LIMIT, fitInline } from "./bulkBarFit.js";
 import { placedSprint } from "@/views/Projects/composables/taskPlacement";
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue";
 import CalenderCompo from "@/components/atom/CalenderCompo/CalenderCompo.vue";
@@ -220,7 +214,19 @@ const conversions = computed(() => [
 const priorities = computed(() => getters["settings/companyPriority"] || []);
 const showPriority = computed(() => priorityAppOn(props.project, getters["settings/selectedCompany"]?.planFeature));
 
-const menus = computed(() => [
+const aiOptions = computed(() => [
+    { id: "summarise", label: t("List.ai_summarise"), action: summarise },
+    ...aiFields.value.map((field) => ({
+        id: field._id,
+        label: t("AiFields.bulk_fill", { field: field.fieldTitle, n: selection.count.value }),
+        attrs: { "data-ai-field-fill": field._id },
+        action: () => fillAiField(field)
+    }))
+]);
+
+/* Every action the bar offers, defined once: the bar and its More menu both read this list.
+ * One with `run` acts at once; the others open a menu of options. */
+const actions = computed(() => [
     { key: "status", label: t("List.status"), enabled: canStatus.value, options: statuses.value, pick: pickStatus },
     showPriority.value && {
         key: "priority", label: t("List.priority"), enabled: canPriority.value,
@@ -233,11 +239,74 @@ const menus = computed(() => [
     },
     { key: "sprint", label: t("List.sprint"), enabled: canMove.value, options: sprints.value, pick: pickSprint },
     { key: "tags", label: t("List.tags"), enabled: canTag.value, options: tags.value, pick: pickTag },
-    { key: "convert", label: t("List.bulk_convert"), enabled: canMakeSubtasks.value || canMakeTasks.value, options: conversions.value }
+    { key: "convert", label: t("List.bulk_convert"), enabled: canMakeSubtasks.value || canMakeTasks.value, options: conversions.value },
+    canUseAi({ project: props.project }) && {
+        key: "ai", label: `✦ ${t("List.ask_ai")}`, tone: "ai", plain: true, enabled: true, options: aiOptions.value, note: t("List.ai_scope_note")
+    },
+    canArchive.value && { key: "archive", label: t("Projects.bulk_archive"), enabled: true, run: () => ask("bulkArchive") },
+    canDelete.value && { key: "delete", label: t("Projects.bulk_delete"), tone: "danger", enabled: true, run: () => ask("bulkTrash") }
 ].filter(Boolean));
+
+const bar = ref(null);
+const clientWidth = inject("$clientWidth", ref(1280));
+const onPhone = computed(() => (clientWidth?.value || 1280) <= 767);
+/* null until the bar has been measured, and again while it is being measured: everything is in the bar then. */
+const inlineKeys = ref(null);
+const isInline = (action) => !inlineKeys.value || inlineKeys.value.includes(action.key);
+const overflow = computed(() => actions.value.filter((action) => !isInline(action)));
+
+const more = computed(() => ({
+    key: "more",
+    more: true,
+    unused: !overflow.value.length,
+    label: t("List.bulk_more"),
+    enabled: true,
+    options: overflow.value.map((action) => ({
+        id: action.key,
+        label: action.label,
+        danger: action.tone === "danger",
+        disabled: !action.enabled,
+        attrs: { "data-bulk-item": action.key },
+        action: () => activate(action)
+    }))
+}));
+
+/* More also shows the options of an action picked from its list, whose own button is not in the bar. */
+function panelFor(host) {
+    if (open.value === host.key) return host;
+    return host.more ? overflow.value.find((action) => action.key === open.value && !action.run) || null : null;
+}
+
+const hosts = computed(() => [...actions.value.filter(isInline), more.value].map((host) => ({ ...host, panel: panelFor(host) })));
 
 function toggle(key) {
     open.value = open.value === key ? "" : key;
+}
+
+function activate(action) {
+    if (action.run) action.run();
+    else toggle(action.key);
+}
+
+/* The bar measures itself rather than the window: its width also depends on the rail and
+ * the project tree beside it. Every action is put back in the bar first, so each is laid
+ * out and has a width to read. */
+async function fit() {
+    if (!bar.value) return;
+    inlineKeys.value = null;
+    await nextTick();
+    const el = bar.value;
+    if (!el) return;
+    const style = getComputedStyle(el);
+    const gap = parseFloat(style.columnGap) || 0;
+    const fixed = [...el.querySelectorAll("[data-bulk-fixed]")].map((node) => node.offsetWidth).filter(Boolean);
+    const available = el.clientWidth
+        - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0)
+        - fixed.reduce((total, width) => total + width, 0) - gap * Math.max(0, fixed.length - 1);
+    inlineKeys.value = fitInline(
+        [...el.querySelectorAll("[data-bulk-action]")].map((node) => ({ key: node.dataset.bulkAction, width: node.offsetWidth })),
+        { available, moreWidth: el.querySelector("[data-bulk-more]")?.offsetWidth || 0, gap, limit: onPhone.value ? PHONE_INLINE_LIMIT : Infinity }
+    );
 }
 
 function userData() {
@@ -420,12 +489,29 @@ function onClick(event) {
     open.value = "";
 }
 
+let barObserver = null;
+watch(bar, (el) => {
+    barObserver?.disconnect();
+    barObserver = null;
+    if (!el) return;
+    fit();
+    if (typeof ResizeObserver === "undefined") return;
+    barObserver = new ResizeObserver(() => fit());
+    barObserver.observe(el);
+}, { flush: "post" });
+watch(
+    () => [onPhone.value, selection.count.value, ...actions.value.map((action) => `${action.key}:${action.label}`)].join("|"),
+    fit,
+    { flush: "post" }
+);
+
 onMounted(() => {
     document.addEventListener("keydown", onKey);
     document.addEventListener("click", onClick);
 });
 onBeforeUnmount(() => {
     clearTimeout(undoTimer);
+    barObserver?.disconnect();
     document.removeEventListener("keydown", onKey);
     document.removeEventListener("click", onClick);
 });
@@ -442,9 +528,15 @@ onBeforeUnmount(() => {
     padding: 0 20px;
     gap: 14px;
     font-size: var(--fs-md, 12.5px);
+    white-space: nowrap;
     position: relative;
     z-index: 4;
 }
+/* Nothing shrinks or wraps: what does not fit is moved behind More by the bar itself. */
+.lv2-bulk > * { flex: none; }
+/* More keeps its place in the layout tree while unused, so its width can be read. */
+.lv2-bulk__more.is-unused { position: absolute; visibility: hidden; pointer-events: none; }
+.lv2-bulk__more .lv2-bulk__menu { left: auto; right: 0; }
 /* In flow the bar's 40px came out of the list's height, so the first checkbox click
    moved every row out from under the pointer. Table and Board mount this same bar in
    containers that are not positioned, so only the list takes it out of flow. */
@@ -501,6 +593,7 @@ onBeforeUnmount(() => {
     min-width: 200px;
     max-height: 280px;
     overflow-y: auto;
+    white-space: normal;
     background: var(--surface);
     color: var(--ink);
     border: 1px solid var(--hairline);
@@ -520,7 +613,8 @@ onBeforeUnmount(() => {
 }
 .lv2-bulk__item:hover:not(:disabled) { background: var(--surface-hover); }
 .lv2-bulk__item:disabled { opacity: .45; cursor: not-allowed; }
-.lv2-bulk__item--split { margin-top: 4px; padding-top: 9px; border-top: 1px solid var(--hairline); border-radius: 0 0 6px 6px; }
+.lv2-bulk__item--danger, .lv2-bulk__item--danger:hover:not(:disabled) { color: var(--danger); }
+.lv2-bulk__item--split {margin-top: 4px; padding-top: 9px; border-top: 1px solid var(--hairline); border-radius: 0 0 6px 6px; }
 .lv2-bulk__check { width: 12px; flex: none; text-align: center; color: var(--ink); font-weight: 600; }
 .lv2-bulk__clear {
     display: inline-flex; align-items: center; justify-content: center;
@@ -539,13 +633,12 @@ onBeforeUnmount(() => {
 .lv2 > .lv2-bulk .lv2-bulk__menu { top: auto; bottom: calc(100% + 8px); }
 
 @media (max-width: 767px) {
-    .lv2-bulk { padding: 0 16px; gap: 10px; overflow-x: auto; white-space: nowrap; }
-    .lv2-bulk > * { flex: none; }
+    .lv2-bulk { padding: 0 16px; gap: 10px; }
     .lv2-bulk__esc { display: none; }
     .lv2-bulk__clear { width: 36px; height: 36px; }
     .lv2 > .lv2-bulk { position: fixed; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px)); }
     .lv2 > .lv2-bulk ~ .lv2__scroll { padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px)); }
-    /* The bar scrolls sideways here, which would clip a menu positioned inside it. */
+    /* A menu takes the width of the screen here, whichever button opened it. */
     .lv2 > .lv2-bulk .lv2-bulk__menu { position: fixed; left: 16px; right: 16px; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 48px); }
     .lv2-undo { bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 12px); }
 }

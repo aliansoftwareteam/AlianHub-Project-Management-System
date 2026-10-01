@@ -231,15 +231,6 @@ const sprintName = (id) => {
 
 const blocksOf = (task) => (task.relations || []).filter((r) => r.type === 'blocks').map((r) => String(r.taskId));
 
-const critical = computed(() => criticalPath(scheduled.value.map((task) => ({
-    id: String(task._id), startDate: task.startDate, DueDate: task.DueDate, blocks: blocksOf(task),
-}))));
-// The toggle decides what is painted, not what is known: Replan reads the chain either way.
-const criticalIds = computed(() => (showCritical.value ? new Set(critical.value.path) : new Set()));
-const collisionLinks = computed(() => fsCollisionLinks(scheduled.value.map((task) => ({
-    id: String(task._id), startDate: task.startDate, DueDate: task.DueDate, blocks: blocksOf(task),
-}))));
-
 const workingDays = computed(() => workingDaysFor(getters['settings/selectedCompany'], props.projectData));
 const everyDayWorks = computed(() => countsEveryDay(workingDays.value));
 const shiftDaysKey = computed(() => (everyDayWorks.value ? 'Views.shift_days' : 'Views.shift_working_days'));
@@ -247,6 +238,17 @@ const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 const MONDAY_FIRST = [1, 2, 3, 4, 5, 6, 0];
 const workingDayNames = computed(() => MONDAY_FIRST.filter((day) => workingDays.value.includes(day))
     .map((day) => t(`weekName.${WEEKDAY_KEYS[day]}`)).join(', '));
+/* Only the day scale has a column per day; a week column cannot be a day off. */
+const dayOffClass = (date) => (zoom.value === 'Day' && !workingDays.value.includes(date.getDay()) ? 'gv-off' : '');
+
+const critical = computed(() => criticalPath(scheduled.value.map((task) => ({
+    id: String(task._id), startDate: task.startDate, DueDate: task.DueDate, blocks: blocksOf(task),
+})), { workingDays: workingDays.value }));
+// The toggle decides what is painted, not what is known: Replan reads the chain either way.
+const criticalIds = computed(() => (showCritical.value ? new Set(critical.value.path) : new Set()));
+const collisionLinks = computed(() => fsCollisionLinks(scheduled.value.map((task) => ({
+    id: String(task._id), startDate: task.startDate, DueDate: task.DueDate, blocks: blocksOf(task),
+}))));
 
 const shortDate = (value) => new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 const taskLabel = (task) => (task && (task.TaskName || task.TaskKey)) || t('Views.untitled');
@@ -551,7 +553,7 @@ const replanLines = computed(() => {
     const chain = path.map((id) => findTask(id)).filter(Boolean);
     const last = chain[chain.length - 1];
     const end = last ? new Date(last.DueDate) : null;
-    const lines = [t('Views.replan_chain', {
+    const lines = [t(everyDayWorks.value ? 'Views.replan_chain' : 'Views.replan_chain_working', {
         n: chain.length,
         days: critical.value.durationDays,
         date: end ? end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '',
@@ -642,6 +644,8 @@ onMounted(async () => {
             if (collisionLinks.value.has(`${link.source}_${link.target}`)) classes.push('gv-link-collision');
             return classes.join(' ');
         };
+        gantt.templates.timeline_cell_class = (task, date) => dayOffClass(date);
+        gantt.templates.scale_cell_class = (date) => dayOffClass(date);
         applyScales(zoom.value);
 
         gantt.init(ganttEl.value);
@@ -706,6 +710,7 @@ async function loadProposals() {
 
 watch(signature, () => { if (ready && !suppress) renderData(); });
 watch(criticalIds, () => { if (ready && !suppress) renderData(); });
+watch(workingDays, () => { if (ready && gantt) gantt.render(); });
 
 watch(readOnly, (ro) => {
     if (!ready || !gantt) return;

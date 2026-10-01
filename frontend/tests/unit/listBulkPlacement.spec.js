@@ -5,6 +5,7 @@ import { ref } from 'vue';
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 import taskSelection from '@/store/TaskSelection';
+import en from '@/locales/en';
 
 const { apiRequest, toast, denied } = vi.hoisted(() => ({
     apiRequest: vi.fn(),
@@ -95,7 +96,7 @@ describe('bulk placement helpers', () => {
     it('disables each placement action with the reason it cannot apply', () => {
         const all = { move: true, toSubtask: true, toTask: true };
         expect(placementActions({ count: 1, subtasks: 1, looseSubtasks: 1 }, all).moveProject)
-            .toEqual({ enabled: false, reason: 'BulkActions.reason_subtask_moves_with_its_parent' });
+            .toEqual({ enabled: false, reason: 'BulkActions.subtask_moves_hint' });
         expect(placementActions({ count: 2, subtasks: 0, looseSubtasks: 0 }, all).toTask)
             .toEqual({ enabled: false, reason: 'List.bulk_no_subtasks' });
         const none = placementActions({ count: 2, subtasks: 1, looseSubtasks: 1 }, { move: false, toSubtask: false, toTask: false });
@@ -210,10 +211,16 @@ describe('ListBulkBar placement', () => {
         await menu(wrapper, 'List.sprint').trigger('click');
         const moveProject = item(wrapper, 'List.bulk_move_project');
         expect(moveProject.attributes('disabled')).toBeDefined();
-        expect(moveProject.attributes('title')).toBe('BulkActions.reason_subtask_moves_with_its_parent');
+        expect(moveProject.attributes('title')).toBe('BulkActions.subtask_moves_hint');
         const sprintHere = item(wrapper, 'Sprint 1');
         expect(sprintHere.attributes('disabled')).toBeDefined();
-        expect(sprintHere.attributes('title')).toBe('BulkActions.reason_subtask_moves_with_its_parent');
+        expect(sprintHere.attributes('title')).toBe('BulkActions.subtask_moves_hint');
+    });
+
+    it('words that reason as a sentence of its own, and keeps the skipped-count reason a fragment', () => {
+        expect(en.BulkActions.subtask_moves_hint).toMatch(/^A subtask moves with its parent/);
+        expect(en.BulkActions.reason_subtask_moves_with_its_parent).toMatch(/^a subtask moves with its parent/);
+        expect(en.BulkActions.result_skipped).toBe('{n} skipped ({reason})');
     });
 
     it('makes the selection subtasks of the chosen task', async () => {
