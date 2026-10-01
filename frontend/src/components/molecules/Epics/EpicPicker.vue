@@ -1,13 +1,13 @@
 <template>
     <div class="epic-picker d-flex align-items-center">
-        <span class="font-size-14 font-weight-700 epic-picker__label">{{ $t('Projects.epics') }}</span>
+        <span class="epic-picker__label">{{ $t('Projects.epics') }}</span>
         <span class="position-re">
-            <span class="epic-picker__current font-size-13 cursor-pointer" @click.stop="toggleOpen">
+            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm epic-picker__current" :aria-expanded="isOpen ? 'true' : 'false'" @click.stop="toggleOpen">
                 <template v-if="currentEpic">
-                    <span class="epic-picker__dot" :style="{background: currentEpic.color || '#7b68ee'}"></span>{{ currentEpic.name }}
+                    <span class="epic-picker__dot" :style="dotStyle(currentEpic)"></span>{{ currentEpic.name }}
                 </template>
                 <template v-else>{{ $t('Projects.select_epic') }}</template>
-            </span>
+            </button>
             <span v-if="isOpen" class="epic-picker__overlay" @click.stop="isOpen = false"></span>
             <div v-if="isOpen" class="epic-picker__panel">
                 <div
@@ -17,13 +17,13 @@
                     :class="{'epic-picker__row--active': String(task.epicId) === String(epic._id)}"
                     @click="assign(epic._id)"
                 >
-                    <span class="epic-picker__dot" :style="{background: epic.color || '#7b68ee'}"></span>
+                    <span class="epic-picker__dot" :style="dotStyle(epic)"></span>
                     <span class="epic-picker__name">{{ epic.name }}</span>
                 </div>
-                <div v-if="task.epicId" class="cursor-pointer epic-picker__row font-size-13 red" @click="assign(null)">
+                <div v-if="task.epicId" class="cursor-pointer epic-picker__row epic-picker__row--danger font-size-13" @click="assign(null)">
                     {{ $t('Projects.remove_from_epic') }}
                 </div>
-                <div v-if="!epics.length" class="gray81 font-size-12 epic-picker__row">{{ $t('Projects.no_epics') }}</div>
+                <div v-if="!epics.length" class="ah-muted font-size-12 epic-picker__row">{{ $t('Projects.no_epics') }}</div>
             </div>
         </span>
     </div>
@@ -57,6 +57,8 @@ const currentEpic = computed(() => {
     if (!id) return null;
     return epics.value.find((epic) => String(epic._id) === String(id)) || null;
 });
+
+const dotStyle = (epic) => (epic.color ? { '--epic-dot': epic.color } : null);
 
 function toggleOpen() {
     isOpen.value = !isOpen.value;
@@ -98,13 +100,10 @@ if (props.task?.ProjectID) {
 
 <style scoped>
 .epic-picker { margin-top: 10px; }
-.epic-picker__label { margin-right: 12px; }
-.epic-picker__current {
-    border: 1px solid #e0e0e0;
-    border-radius: 6px;
-    padding: 4px 10px;
-    display: inline-flex;
-    align-items: center;
+.epic-picker__label {
+    margin-right: 12px;
+    font: var(--fw-title, 600) var(--fs-lg, 14px)/var(--lh-snug, 1.3) var(--font-ui);
+    color: var(--ink);
 }
 .epic-picker__dot {
     width: 9px;
@@ -113,6 +112,7 @@ if (props.task?.ProjectID) {
     margin-right: 6px;
     display: inline-block;
     flex: none;
+    background: var(--epic-dot, var(--agent));
 }
 .epic-picker__overlay { position: fixed; inset: 0; z-index: 19; }
 .epic-picker__panel {
@@ -123,14 +123,16 @@ if (props.task?.ProjectID) {
     min-width: 220px;
     max-height: 240px;
     overflow-y: auto;
-    background: #fff;
-    border: 1px solid #e0e0e0;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--border);
     border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--shadow-pop);
     padding: 4px 0;
 }
 .epic-picker__row { padding: 7px 12px; min-width: 0; }
-.epic-picker__row:hover { background: #f7f9fc; }
-.epic-picker__row--active { background: #f3f0ff; }
+.epic-picker__row:hover { background: var(--surface-hover); }
+.epic-picker__row--active { background: var(--brand-tint); }
+.epic-picker__row--danger { color: var(--danger); }
 .epic-picker__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

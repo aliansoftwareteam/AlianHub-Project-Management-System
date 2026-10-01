@@ -18,7 +18,7 @@
                                 <a v-if="!items?.length && !checkDefault.length" class="formkit-input" @click="isVisible = true">{{ detail.fieldPlaceholder }}</a>
                                 <div class="d-flex" v-else>
                                     <div class="mr-10px font-size-12 font-weight-400 cursor-pointer" v-for="(item) in items && items.length ? items || [] : checkDefault || []" :key="item.id" @click="isVisible = true">
-                                        <span class="d-block border-radius-15-px p3x-14px" :style="[{ color: item.color, backgroundColor: item.color + '20' }]">
+                                        <span class="d-block border-radius-15-px p3x-14px" :class="{ 'ah-status-ink': !props.isProjectDetail }" :style="optionChipStyle(item)">
                                             {{ item.label }}
                                         </span>
                                     </div>
@@ -46,6 +46,7 @@
 import ToolTip from "@/components/molecules/ToolTip/ToolTip.vue";
 import { ref, defineProps, defineEmits, onMounted,watch, nextTick } from "vue";
 import useCustomFieldImage from '@/composable/customFieldIcon.js';
+import { optionChipStyle } from '@/utils/statusChipColors';
 const { getImageData } = useCustomFieldImage();
 
 // Components

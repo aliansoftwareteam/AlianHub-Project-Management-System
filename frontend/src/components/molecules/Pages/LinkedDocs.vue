@@ -1,10 +1,10 @@
 <template>
     <div class="overflow-auto style-scroll mobile__bg--withPadding mt-10px">
         <div class="w-100 d-flex align-items-center justify-content-between">
-            <span :class="{'font-size-16 font-weight-600' : clientWidth <= 767 , 'font-size-14 font-weight-700' : clientWidth > 767 }" class="font-weight-700 font-size-14">{{$t('Projects.linked_docs')}}</span>
-            <div v-if="!mode" class="d-flex align-items-center">
-                <span @click="startCreating" class="blue font-size-14 font-weight-500 cursor-pointer pl-20px text-decoration-underline">+ {{$t('Projects.add_page')}}</span>
-                <span @click="startAdding" class="blue font-size-14 font-weight-500 cursor-pointer pl-20px text-decoration-underline">+ {{$t('Projects.task_link_doc')}}</span>
+            <span class="linked-docs__title">{{$t('Projects.linked_docs')}}</span>
+            <div v-if="!mode" class="d-flex align-items-center linked-docs__actions">
+                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="startCreating">+ {{$t('Projects.add_page')}}</button>
+                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="startAdding">+ {{$t('Projects.task_link_doc')}}</button>
             </div>
         </div>
 
@@ -17,7 +17,7 @@
             >
                 <div class="d-flex align-items-center linked-docs__row-main" @click="$emit('open', doc)">
                     <span class="linked-docs__icon" v-html="ICON_DOC"></span>
-                    <span class="font-size-13 font-weight-400 blue linked-docs__name" :title="doc.title">{{ doc.title || $t('Projects.untitled_page') }}</span>
+                    <span class="font-size-13 font-weight-400 linked-docs__name linked-docs__name--link" :title="doc.title">{{ doc.title || $t('Projects.untitled_page') }}</span>
                     <span v-if="doc.visibility === 'private'" class="font-size-11 font-weight-500 linked-docs__chip">{{$t('Projects.doc_private')}}</span>
                 </div>
                 <span
@@ -28,7 +28,7 @@
                 >&#10005;</span>
             </div>
         </div>
-        <div v-else-if="!mode && !isLoading" class="gray81 font-size-12 py-10px">
+        <div v-else-if="!mode && !isLoading" class="ah-muted font-size-12 py-10px">
             {{$t('Projects.task_no_docs')}}
         </div>
 
@@ -42,9 +42,9 @@
                     class="linked-docs__input font-size-13"
                     :placeholder="$t('Projects.search_pages')"
                 />
-                <span @click="closeRow" class="font-size-13 cursor-pointer gray81 pl-10px">{{$t('Projects.cancel')}}</span>
+                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="closeRow">{{$t('Projects.cancel')}}</button>
             </div>
-            <div v-if="isSearching" class="gray81 font-size-12 py-5px">{{$t('Projects.searching')}}</div>
+            <div v-if="isSearching" class="ah-muted font-size-12 py-5px">{{$t('Projects.searching')}}</div>
             <div v-else-if="candidates.length > 0" class="linked-docs__results">
                 <div
                     v-for="doc in candidates"
@@ -57,7 +57,7 @@
                     <span class="font-size-13 font-weight-400 linked-docs__name">{{ doc.title || $t('Projects.untitled_page') }}</span>
                 </div>
             </div>
-            <div v-else class="gray81 font-size-12 py-5px">
+            <div v-else class="ah-muted font-size-12 py-5px">
                 {{ searchQuery ? $t('Projects.no_pages_match') : $t('Projects.doc_all_linked') }}
             </div>
         </div>
@@ -74,20 +74,21 @@
                     :placeholder="$t('Projects.page_title_placeholder')"
                     @keyup.enter="createDoc"
                 />
-                <span
-                    class="blue font-size-13 font-weight-500 cursor-pointer pl-10px"
-                    :class="{'pointer-event-none opacity-5': !newTitle.trim() || isCreating}"
+                <button
+                    type="button"
+                    class="ah-btn ah-btn--ghost ah-btn--sm linked-docs__create"
+                    :disabled="!newTitle.trim() || isCreating"
                     @click="createDoc"
-                >{{$t('Projects.create')}}</span>
-                <span @click="closeRow" class="font-size-13 cursor-pointer gray81 pl-10px">{{$t('Projects.cancel')}}</span>
+                >{{$t('Projects.create')}}</button>
+                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="closeRow">{{$t('Projects.cancel')}}</button>
             </div>
-            <div class="gray81 font-size-12 py-5px">{{$t('Projects.doc_create_hint')}}</div>
+            <div class="ah-muted font-size-12 py-5px">{{$t('Projects.doc_create_hint')}}</div>
         </div>
     </div>
 </template>
 
 <script setup>
-import { computed, defineProps, inject, nextTick, ref, watch } from 'vue';
+import { computed, defineProps, nextTick, ref, watch } from 'vue';
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
@@ -106,7 +107,6 @@ const emit = defineEmits(['open']);
 
 const { t } = useI18n();
 const $toast = useToast();
-const clientWidth = inject("$clientWidth");
 
 const ICON_DOC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>';
 
@@ -256,7 +256,18 @@ watch(() => props.refreshKey, loadLinked);
    row that never arrives, and stacks against the next section's own spacing. */
 .linked-docs__list .linked-docs__row:not(:last-child),
 .linked-docs__results .linked-docs__row:not(:last-child) {
-    border-bottom: 1px solid #e5e5e5;
+    border-bottom: 1px solid var(--hairline);
+}
+.linked-docs__title {
+    font: var(--fw-title, 600) var(--fs-lg, 14px)/var(--lh-snug, 1.3) var(--font-ui);
+    color: var(--ink);
+}
+.linked-docs__actions,
+.linked-docs__add-row .d-flex {
+    gap: 4px;
+}
+.linked-docs__name--link {
+    color: var(--brand);
 }
 .linked-docs__row-main {
     min-width: 0;
@@ -268,7 +279,7 @@ watch(() => props.refreshKey, loadLinked);
     width: 15px;
     height: 15px;
     margin-right: 8px;
-    color: #9a9a9a;
+    color: var(--ink-2);
     display: inline-flex;
 }
 .linked-docs__icon :deep(svg) {
@@ -284,19 +295,19 @@ watch(() => props.refreshKey, loadLinked);
     text-decoration: underline;
 }
 .linked-docs__chip {
-    background: #f0f0f0;
+    background: var(--fill);
     border-radius: 10px;
     padding: 2px 8px;
     margin-left: 10px;
-    color: #9a9a9a;
+    color: var(--ink-2);
     white-space: nowrap;
 }
 .linked-docs__remove {
-    color: #9a9a9a;
+    color: var(--ink-2);
     padding: 0 4px;
 }
 .linked-docs__remove:hover {
-    color: #e84a4a;
+    color: var(--danger);
 }
 .linked-docs__add-row {
     padding: 8px 0;
@@ -306,12 +317,17 @@ watch(() => props.refreshKey, loadLinked);
     min-width: 0;
     height: 32px;
     padding: 0 10px;
-    border: 1px solid #e0e0e0;
-    border-radius: 5px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm, 6px);
+    background: var(--surface);
+    color: var(--ink);
     outline: none;
 }
+.linked-docs__input::placeholder {
+    color: var(--ink-2);
+}
 .linked-docs__input:focus {
-    border-color: #7b68ee;
+    border-color: var(--brand);
 }
 .linked-docs__results {
     max-height: 220px;

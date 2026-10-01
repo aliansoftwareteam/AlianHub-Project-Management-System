@@ -35,17 +35,17 @@
                     </th>
                 </tr>
                 <tr v-if="weekRange.length" class="estimate__daysdate-tr">
-                    <th v-for="(data,ind) in weekRange" :key="ind" :class="{'disbleDate': (data.day === 0 || data.day === 6)}" class="text-center" :style="`${data.today ? 'background-color: #2F3990;' : ''}`">
+                    <th v-for="(data,ind) in weekRange" :key="ind" :class="{'disbleDate': (data.day === 0 || data.day === 6), 'is-today': data.today}" class="text-center">
                         <div class="d-grid">
-                            <b :class="{'white': data.today}">{{ addZero(data.date.getDate()) }}</b>
-                            <span :class="{'white': data.today}">{{ days[data.day] }}</span>
+                            <b>{{ addZero(data.date.getDate()) }}</b>
+                            <span>{{ days[data.day] }}</span>
                         </div>
                     </th>
                 </tr>
             </thead>
             <tbody>
                 <tr v-for="user in totalUsers" :key="user.id">
-                    <td class="full-width bg-white total__users" :title="user.Employee_Name">
+                    <td class="full-width total__users" :title="user.Employee_Name">
                         <div class="d-flex align-items-center">
                             <!-- <img :src="user.userProfile" class="table-user-w30" /> -->
                             <UserProfile 
@@ -57,14 +57,13 @@
                                 width="30px"
                                 :showDot="false"
                             />
-                            <span class="font-size-13 font-weight-500 black">{{user.Employee_Name}}</span>
+                            <span class="font-size-13 font-weight-500">{{user.Employee_Name}}</span>
                         </div>
                     </td>
                     <template v-if="Object.keys(selectedWeekDays).length">
-                        <td :style="`${element.today ? 'background-color: #DBF1FF;' : ''}`" v-for="element in selectedWeekDays[user.id]" :key="element.id" class="est_esditing_block bg-white p-0" :class="{'disbleDate': (element.day === 0 || element.day === 6)}">
+                        <td v-for="element in selectedWeekDays[user.id]" :key="element.id" class="est_esditing_block p-0" :class="{'disbleDate': (element.day === 0 || element.day === 6), 'is-today': element.today}">
                             <span @click="element.disabled ? '' : showTimeInput(element)" v-if="!element?.edit">
-                                <span v-if="false" class="font-size-14" :class="{'gray81': element.disabled || element.day === 0 || element.day === 6}">00:00</span>
-                                <span v-else class="font-size-14" :class="{'gray81': element.disabled || element.day === 0 || element.day === 6}"> {{element.time.HH}}:{{element.time.mm}}</span>
+                                <span class="font-size-14" :class="{'ah-muted': element.disabled || element.day === 0 || element.day === 6}"> {{element.time.HH}}:{{element.time.mm}}</span>
                             </span>
                             <span v-else class="vs-con-loading__container" id="div-with-loading-Estimated-TimeInput" @focusout="() => handleClickOutside(element)">
                                 <vue-timepicker
@@ -330,7 +329,9 @@ function handleClickOutside(element) {
 .table-Estimataed-hour-Wrapper .vue__time-picker input.vue__time-picker-input{
     width: 48px !important;
     height: 30px !important;
-    border: 1px solid  #DFE1E6;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink);
 }
 .table-Estimataed-hour-Wrapper .durationTimepicker input {
     border-radius: 5px;

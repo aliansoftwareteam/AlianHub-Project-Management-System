@@ -810,6 +810,17 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 
 .pd__missing { padding: 24px; }
 
+/* Editor.js centres its 760px column and hangs the block toolbar to its left. On a full page that put
+   the body a long way right of the title, so the column starts at a gutter wide enough for the toolbar
+   and the title, the meta row and the preview start there too. */
+@media (min-width: 768px) {
+    .pd--page { --pd-gutter: 60px; }
+    .pd--page .pd__head { padding-left: var(--pd-gutter); }
+    .pd--page .pd__body { padding-left: 0; }
+    .pd--page .pd__body :deep(.ce-block__content),
+    .pd--page .pd__body :deep(.ce-toolbar__content) { margin-left: var(--pd-gutter); }
+    .pd--page .pd__preview { padding-left: var(--pd-gutter); max-width: calc(760px + var(--pd-gutter)); }
+}
 @media (max-width: 767px) {
     .pd__head, .pd--page .pd__head { padding: 14px 16px 6px; }
     .pd__body, .pd--page .pd__body { padding: 0 16px; }

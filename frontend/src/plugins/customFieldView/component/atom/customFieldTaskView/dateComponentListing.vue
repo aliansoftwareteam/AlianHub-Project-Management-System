@@ -72,7 +72,7 @@
 </script>
 <style scoped>
     .formkit__content-wrapper input::placeholder{
-        color: #505050 !important;
+        color: var(--ink-2) !important;
         font-family: var(--font-ui);
         font-size: 13px;
         font-style: normal;
@@ -82,7 +82,7 @@
     .formkit__content-wrapper .formkit__error-message {
         left: 9px;
         bottom: -1px;
-        color: red;
+        color: var(--danger);
         font-size: 11px;
     }
 </style>

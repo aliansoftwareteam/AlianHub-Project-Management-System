@@ -32,7 +32,6 @@ const hardCodedColours = (source) => {
 const PANEL_SOURCES = [
     'components/organisms/TaskDetailRightSide/style.css',
     'components/organisms/TaskDetailRightSide/TaskDetailRightSide.vue',
-    'components/molecules/TaskDetailAction/style.css',
     'components/molecules/Pages/LinkedDocs.vue',
     'components/molecules/Epics/EpicPicker.vue',
     'components/molecules/EstimateHours/EstimateHours.vue',
@@ -67,10 +66,24 @@ describe('the task panel paints from tokens', () => {
         expect(ruleBody(css, '.formkit__content-wrapper input::placeholder')).toMatch(/color:\s*var\(--ink-2\)/);
     });
 
-    test('the watcher count and the header buttons use theme fills', () => {
-        const css = read('components/molecules/TaskDetailAction/style.css');
-        const badge = ruleBody(css, '.task-detail-action .watcher-action .watcher-count');
-        expect(badge).toMatch(/background-color:\s*var\(--fill\)/);
+    // The rest of that stylesheet paints the watcher menu, which is a legacy white dropdown in both themes.
+    test.each([
+        '.task-detail-action ul li',
+        '.task-detail-action .watcher-action',
+        '.task-detail-action .watcher-action .watcher-count',
+        '.task-detail-action .close-icon',
+        '.reminder-modal',
+        '.reminder-modal__label',
+        '.reminder-modal__field',
+    ])('the header rule %s has no hard-coded colour', (selector) => {
+        const rule = ruleBody(read('components/molecules/TaskDetailAction/style.css'), selector);
+        expect(rule).not.toBe('');
+        expect(hardCodedColours(rule)).toEqual([]);
+    });
+
+    test('the watcher count is an opaque theme chip over the button border', () => {
+        const badge = ruleBody(read('components/molecules/TaskDetailAction/style.css'), '.task-detail-action .watcher-action .watcher-count');
+        expect(badge).toMatch(/background-color:\s*var\(--surface-2\)/);
         expect(badge).toMatch(/color:\s*var\(--ink\)/);
     });
 });
@@ -245,7 +258,9 @@ describe('the task panel in both themes', () => {
                 <span class="epic-picker__label">Epics</span>
                 <h3 class="custom-field__title">Custom Field</h3>
                 <h3 class="checklist-main__title">Checklist</h3>
-                <button class="ah-btn ah-btn--ghost ah-btn--sm">+ New page</button>
+                <div class="linked-docs__actions"><button class="ah-btn ah-btn--ghost ah-btn--sm">+ New page</button></div>
+                <button class="ah-btn ah-btn--ghost ah-btn--sm epic-picker__current">Add to epic</button>
+                <button class="ah-btn ah-btn--ghost ah-btn--sm custom-field__add">+ Custom Field</button>
                 <button class="ah-detail__quick-btn">Add subtask</button>
                 <span class="checklist-main__suggest">Suggest Checklists</span>
             </div>`;
@@ -283,10 +298,12 @@ describe('the task panel in both themes', () => {
     });
 
     test('section actions share the ghost button', () => {
-        const ghost = style('.ah-btn--ghost');
         const quick = style('.ah-detail__quick-btn');
-        expect(ghost.fontSize).toBe(quick.fontSize);
-        expect(ghost.height).toBe(quick.height);
+        expect(quick.fontSize).toBe('var(--fs-sm, 12px)');
+        for (const selector of ['.linked-docs__actions .ah-btn', '.epic-picker__current', '.custom-field__add']) {
+            const action = style(selector);
+            expect(`${selector} ${action.fontSize} ${action.height} ${action.borderTopWidth}`).toBe(`${selector} ${quick.fontSize} ${quick.height} ${quick.borderTopWidth}`);
+        }
         expect(style('.checklist-main__suggest').textDecoration).toMatch(/none/);
     });
 

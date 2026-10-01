@@ -94,6 +94,8 @@
     --chip-h: 22px;
     --chip-font: 11.5px;
     --hit-min: 24px;
+
+    color-scheme: light;
 }
 
 /* Set on a view root by its saved density. A design variant sets its comfortable sizes on
@@ -147,6 +149,8 @@
     --agent-bg: rgba(168, 146, 255, .16);
     --shadow-ink: rgba(0, 0, 0, .3);
     --shadow-card: 0 2px 6px rgba(0, 0, 0, .3);
+
+    color-scheme: dark;
 }
 
 /* High contrast (Settings → Contrast, or prefers-contrast: more): body text at 7:1 or more, borders at 3:1 or more. */
@@ -348,6 +352,26 @@ html, body, #app {
    redesigned views opt in with .ah-page. */
 :root[data-theme="dark"] .ah-app__view { color: #17161c; }
 :root[data-theme="dark"] .ah-app__view .ah-page { color: var(--ink); }
+/* color-scheme is what themes native controls, their picker popups and plain scrollbars. A surface
+   that stays white in dark (a legacy view, a legacy sidebar, menu or modal, a white card, an alert)
+   keeps light ones: an unstyled .form-control would otherwise turn into a dark box on white. An
+   iframe keeps light too, or the browser paints an opaque canvas behind a page that set none. */
+:root[data-theme="dark"] .ah-app__view,
+:root[data-theme="dark"] #my-sidebar,
+:root[data-theme="dark"] #my-modal,
+:root[data-theme="dark"] #my-dropdown,
+:root[data-theme="dark"] #my-image-slider,
+:root[data-theme="dark"] .bg-white,
+:root[data-theme="dark"] .pls__apps,
+:root[data-theme="dark"] .pto-card,
+:root[data-theme="dark"] .scim-card,
+:root[data-theme="dark"] .swal2-container,
+:root[data-theme="dark"] iframe { color-scheme: light; }
+:root[data-theme="dark"] .ah-app__view .ah-page,
+:root[data-theme="dark"] .ah-app__view .lt--page,
+:root[data-theme="dark"] .ah-app__view .pev,
+:root[data-theme="dark"] .ah-app__view .chg,
+:root[data-theme="dark"] #my-modal .pal-layer { color-scheme: dark; }
 /* Legacy Projects.vue wraps the redesigned List/Board/Table in white panels. Darken them only
    when a redesigned page, or the themed upgrade wall (.upw), is inside; legacy views keep their
    light panels and dark ink. */

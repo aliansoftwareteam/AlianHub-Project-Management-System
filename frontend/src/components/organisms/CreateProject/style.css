@@ -59,6 +59,17 @@
 .ah-cp__spin { display: flex; justify-content: center; padding: 24px; }
 .ah-cp .dp__input { height: 40px; border: 1.5px solid var(--border); border-radius: var(--r-input); font: 400 13.5px/1 var(--font-ui); background: var(--surface); color: var(--ink); }
 .ah-cp .dp__input:focus { border-color: var(--brand); box-shadow: var(--focus); }
+/* Source and Skills are shared with legacy white forms and hard-code a white field; here they take the dialog's input chrome. */
+.ah-cp .ah-cp__form .source-select .source-select__field,
+.ah-cp .ah-cp__form .skills-select .skills-select__chips--field {
+    min-height: 40px; height: auto; padding: 4px 12px; border: 1.5px solid var(--border); border-radius: var(--r-input);
+    background: var(--surface); color: var(--ink);
+}
+.ah-cp .ah-cp__form .skills-select .skills-select__chips--field:hover { border-color: var(--brand-border); }
+.ah-cp__form .source-select .source-select__value { color: var(--ink); font-size: 13.5px; }
+.ah-cp__form .source-select .source-select__placeholder,
+.ah-cp__form .skills-select .skills-select__placeholder { color: var(--ink-2); font-size: 13.5px; }
+.ah-cp__form .skills-select .skills-select__chip { background: var(--brand-tint); color: var(--brand); }
 @media (max-width: 1023px) {
     .ah-cp { padding: 12px; }
     .ah-cp__left { width: 340px; }
@@ -70,6 +81,8 @@
     .ah-cp__right { padding: 16px; }
     .ah-cp__row { flex-direction: column; }
     .ah-cp__form .ah-input, .ah-cp .dp__input { height: 44px; }
+    .ah-cp .ah-cp__form .source-select .source-select__field,
+    .ah-cp .ah-cp__form .skills-select .skills-select__chips--field { min-height: 44px; }
     .ah-cp__foot .ah-btn { height: 44px; flex: 1; }
 }
 :root[data-theme="dark"] .ah-cp__tpl-icon, :root[data-theme="dark"] .ah-cp__status { background: rgba(255, 255, 255, .1); }
