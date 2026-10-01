@@ -22,17 +22,22 @@ const canon = (value) => {
     return value;
 };
 const same = (a, b) => JSON.stringify(canon(a)) === JSON.stringify(canon(b));
-const recordedAs = (body) => Object.keys(fixture).find((name) => same(fixture[name].request, body));
+const TASKS = '/api/v2/tasks/everything';
+/* A saved view's requests are recorded with their method and path; a read of tasks is its body. */
+const recordedAs = (body, method = 'post', url = TASKS) => Object.keys(fixture).find((name) => {
+    const { request } = fixture[name];
+    return request.path ? request.method === method && request.path === url && same(request.body, body) : url === TASKS && method === 'post' && same(request, body);
+});
 
 const answer = (method, url, body) => {
-    const name = recordedAs(body);
-    if (!name) return Promise.reject(new Error(`a request the server never recorded: ${JSON.stringify(body)}`));
+    const name = recordedAs(body, method, url);
+    if (!name) return Promise.reject(new Error(`a request the server never recorded: ${method} ${url} ${JSON.stringify(body)}`));
     const { statusCode, response } = fixture[name];
     return statusCode === 200 ? Promise.resolve({ data: response }) : Promise.reject({ response: { status: statusCode, data: response } });
 };
 
 const sent = () => apiRequest.mock.calls.map(([, , body]) => body);
-const sentNames = () => sent().map(recordedAs);
+const sentNames = () => apiRequest.mock.calls.map(([method, url, body]) => recordedAs(body, method, url));
 const names = (group) => group.rows.map((row) => row.TaskName);
 
 let store;
@@ -268,6 +273,150 @@ describe('a quiet refresh, on focus and after an edit', () => {
         expect(sentNames()).toEqual(['statusCounts', 'statusDoing']);
         expect(names(group('status:Doing'))).toEqual(['Rotate the keys', 'Fix the footer']);
         expect(group('status:To Do')).toMatchObject({ loaded: false, rows: [] });
+    });
+});
+
+describe('the board', () => {
+    const allProjects = { data: Object.values(fixture.projectCounts.response.data.projects) };
+    const boardStore = () => {
+        store = createStore({ modules: { everything, projectData: { namespaced: true, getters: { allProjects: () => allProjects } } } });
+        store.commit('everything/setPageSize', 2);
+    };
+
+    it('asks for statuses whatever the list is grouped by, and makes a column of each, the empty ones too', async () => {
+        boardStore();
+        await applySettings({ mode: 'board', group: 'project' });
+
+        expect(sentNames()).toEqual(['statusCounts']);
+        expect(groups().map(({ key, count, loaded }) => ({ key, count, loaded }))).toEqual([
+            { key: 'To Do', count: 2, loaded: false },
+            { key: 'Doing', count: 3, loaded: false },
+            { key: 'Waiting on a supplier', count: 0, loaded: true }
+        ]);
+    });
+
+    it('shows the closed statuses once done work is shown', async () => {
+        boardStore();
+        await applySettings({ mode: 'board', hideDone: false });
+        expect(sentNames()).toEqual(['boardCounts']);
+        expect(groups().map((column) => column.key)).toEqual(['To Do', 'Doing', 'Waiting on a supplier', 'Done']);
+    });
+
+    it('pages each column on its own, the status sent as a filter, and asks for nothing in an empty column', async () => {
+        boardStore();
+        await applySettings({ mode: 'board' });
+        await loadGroup('status:Doing');
+        await loadGroup('status:Waiting on a supplier');
+
+        expect(sentNames()).toEqual(['statusCounts', 'statusDoing']);
+        expect(sent().at(-1).filter.status).toEqual(['Doing']);
+        expect(names(group('status:Doing'))).toEqual(['Rotate the keys', 'Fix the footer']);
+    });
+
+    it('moves a card to its new column at once, with both counts, and back again if told to', async () => {
+        boardStore();
+        await applySettings({ mode: 'board' });
+        await loadGroup('status:Doing');
+        const waiting = { status: { text: 'Waiting on a supplier', key: 4, type: 'active' }, statusKey: 4, statusType: 'active' };
+        const before = { status: { key: 2, text: 'Doing', type: 'active' }, statusKey: 2, statusType: 'active' };
+
+        store.commit('everything/patchRow', { taskId: '6f0000000000000000000f05', fields: waiting });
+        expect(names(group('status:Doing'))).toEqual(['Fix the footer']);
+        expect(group('status:Doing').count).toBe(2);
+        expect(group('status:Waiting on a supplier')).toMatchObject({ count: 1 });
+        expect(group('status:Waiting on a supplier').rows[0]).toMatchObject({ TaskName: 'Rotate the keys', statusKey: 4 });
+
+        store.commit('everything/patchRow', { taskId: '6f0000000000000000000f05', fields: before });
+        expect(names(group('status:Doing'))).toEqual(['Rotate the keys', 'Fix the footer']);
+        expect(group('status:Doing').count).toBe(3);
+        expect(group('status:Waiting on a supplier')).toMatchObject({ count: 0, rows: [] });
+    });
+
+    it('takes a row out of a group that no longer holds it even when its new group is not on screen', async () => {
+        await applySettings({ group: 'priority' });
+        await loadGroup('priority:HIGH');
+        store.commit('everything/patchRow', { taskId: '6f0000000000000000000f05', fields: { Task_Priority: 'URGENT' } });
+        expect(names(group('priority:HIGH'))).toEqual(['Write the brief']);
+        expect(group('priority:HIGH').count).toBe(1);
+    });
+
+    it('leaves a row where it is when the edit is not what the rows are grouped by', async () => {
+        await applySettings({ group: 'status' });
+        await loadGroup('status:Doing');
+        store.commit('everything/patchRow', { taskId: '6f0000000000000000000f05', fields: { Task_Priority: 'LOW' } });
+        expect(names(group('status:Doing'))).toEqual(['Rotate the keys', 'Fix the footer']);
+        expect(group('status:Doing').rows[0].Task_Priority).toBe('LOW');
+    });
+});
+
+describe('saved views', () => {
+    const views = () => store.getters['everything/views'];
+    const created = fixture.viewCreated.response.data;
+
+    it('are read from the person\'s own list', async () => {
+        await store.dispatch('everything/loadViews');
+        expect(apiRequest.mock.calls[0].slice(0, 2)).toEqual(['get', '/api/v2/tasks/everything/views']);
+        expect(sentNames()).toEqual(['viewsNone']);
+        expect(views()).toEqual([]);
+        expect(store.getters['everything/viewsLoaded']).toBe(true);
+    });
+
+    it('save the page\'s settings under a name, and that view becomes the one in use', async () => {
+        store.commit('everything/setSettings', { mode: 'board', hideDone: false });
+        const view = await store.dispatch('everything/saveView', { name: 'My board' });
+
+        expect(sentNames()).toEqual(['viewCreated']);
+        expect(view).toEqual(created);
+        expect(views()).toEqual([created]);
+        expect(store.getters['everything/activeView']).toEqual(created);
+    });
+
+    it('can be renamed, made the default and saved again with the settings on screen', async () => {
+        store.commit('everything/setViews', [created]);
+        await store.dispatch('everything/updateView', { id: created._id, name: 'Board, with done' });
+        expect(sentNames().at(-1)).toBe('viewRenamed');
+        expect(views()[0].name).toBe('Board, with done');
+
+        await store.dispatch('everything/updateView', { id: created._id, isDefault: true });
+        expect(sentNames().at(-1)).toBe('viewDefault');
+        expect(store.getters['everything/defaultView']._id).toBe(created._id);
+
+        store.commit('everything/setSettings', { mode: 'table', group: 'project', hideDone: true });
+        await store.dispatch('everything/updateView', { id: created._id, settings: true });
+        expect(sentNames().at(-1)).toBe('viewChanged');
+        expect(views()[0].settings).toMatchObject({ mode: 'table', group: 'project' });
+    });
+
+    it('keep one default at a time', () => {
+        store.commit('everything/setViews', [{ ...created, _id: 'a', name: 'A', isDefault: true }, { ...created, _id: 'b', name: 'B' }]);
+        store.commit('everything/putView', { ...created, _id: 'b', name: 'B', isDefault: true });
+        expect(views().map((view) => [view.name, view.isDefault])).toEqual([['A', false], ['B', true]]);
+    });
+
+    it('open with their settings and read the tasks again', async () => {
+        store.commit('everything/setViews', [{ ...created, settings: { ...created.settings, mode: 'list', hideDone: true, group: 'status' } }]);
+        await store.dispatch('everything/openView', { id: created._id, ...VIEWER });
+
+        expect(store.getters['everything/settings']).toMatchObject({ mode: 'list', group: 'status', hideDone: true });
+        expect(store.getters['everything/activeView']._id).toBe(created._id);
+        expect(sentNames()).toEqual(['statusCounts']);
+    });
+
+    it('are forgotten once deleted, and stop being the view in use', async () => {
+        store.commit('everything/setViews', [created]);
+        store.commit('everything/setActiveView', created._id);
+        await store.dispatch('everything/deleteView', created._id);
+
+        expect(sentNames()).toEqual(['viewDeleted']);
+        expect(views()).toEqual([]);
+        expect(store.getters['everything/activeView']).toBeNull();
+    });
+
+    it('pass on a refusal instead of pretending the view was saved', async () => {
+        apiRequest.mockImplementationOnce(() => Promise.reject({ response: { status: 400, data: fixture.viewRefused.response } }));
+        await expect(store.dispatch('everything/saveView', { name: 'Not a view' })).rejects.toBeTruthy();
+        expect(views()).toEqual([]);
+        expect(store.getters['everything/activeView']).toBeNull();
     });
 });
 

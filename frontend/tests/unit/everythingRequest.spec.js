@@ -3,7 +3,8 @@
    tested against (tests/everything-fixture.test.js). */
 import { describe, expect, it } from 'vitest';
 import {
-    DEFAULT_SETTINGS, OPEN_STATUS_TYPES, PAGE_SIZE, baseRequest, cleanSettings, dueWindows, firstRequest, foldDueDays, groupRequest, groupsFrom
+    DEFAULT_SETTINGS, MODES, OPEN_STATUS_TYPES, PAGE_SIZE, baseRequest, boardColumns, cleanSettings, dropDecision, dueWindows, firstRequest,
+    foldDueDays, groupRequest, groupsFrom, queryGroup, sameSettings, viewBody, viewPatch
 } from '@/views/Everything/everythingRequest';
 
 const KOLKATA_NOON = { now: new Date('2026-10-01T06:30:00.000Z'), timeZone: 'Asia/Kolkata' };
@@ -161,5 +162,86 @@ describe('a page inside a group', () => {
     it('carries the cursor of the page before it', () => {
         expect(groupRequest(base, {}, { cursor: 'abc.def', limit: 20 })).toMatchObject({ cursor: 'abc.def', limit: 20 });
         expect(groupRequest(base, {})).toMatchObject({ limit: PAGE_SIZE });
+    });
+});
+
+describe('modes', () => {
+    it('are list, board and table, kept with the other settings', () => {
+        expect(MODES).toEqual(['list', 'board', 'table']);
+        expect(DEFAULT_SETTINGS.mode).toBe('list');
+        expect(cleanSettings({ mode: 'board' }).mode).toBe('board');
+        expect(cleanSettings({ mode: 'gantt' }).mode).toBe('list');
+    });
+
+    it('are never sent to the server: the board asks for statuses, whatever the list is grouped by', () => {
+        const board = settings({ mode: 'board', group: 'project' });
+        expect(queryGroup(board)).toBe('status');
+        expect(firstRequest(board, KOLKATA_NOON)).toMatchObject({ group: 'status', limit: 1 });
+        expect(firstRequest(board, KOLKATA_NOON)).not.toHaveProperty('mode');
+        expect(queryGroup(settings({ mode: 'table', group: 'project' }))).toBe('project');
+        expect(groupsFrom([{ key: 'Doing', count: 3 }], board, KOLKATA_NOON)).toEqual([{ id: 'status:Doing', key: 'Doing', count: 3, filter: { status: ['Doing'] } }]);
+    });
+});
+
+describe('the board\'s columns', () => {
+    const STATUSES = [
+        { name: 'Done', type: 'close' }, { name: 'Doing', type: 'active' }, { name: 'To Do', type: 'default_active' },
+        { name: 'Waiting', type: 'active' }, { name: 'Doing', type: 'active' }, { name: 'Shipped', type: 'done' }
+    ];
+    const counted = [{ id: 'status:Doing', key: 'Doing', count: 3, filter: { status: ['Doing'] } }];
+    const names = (columns) => columns.map((column) => `${column.key} ${column.count}`);
+
+    it('merge by status name, in the order to do, active, done, and include the statuses no task holds yet', () => {
+        expect(names(boardColumns(counted, STATUSES, settings({ mode: 'board', hideDone: false })))).toEqual(['To Do 0', 'Doing 3', 'Waiting 0', 'Done 0', 'Shipped 0']);
+    });
+
+    it('leave out the closed statuses while done work is hidden, and anything outside a status filter', () => {
+        expect(names(boardColumns(counted, STATUSES, settings({ mode: 'board' })))).toEqual(['To Do 0', 'Doing 3', 'Waiting 0']);
+        expect(names(boardColumns(counted, STATUSES, settings({ mode: 'board', status: ['Doing', 'Waiting'] })))).toEqual(['Doing 3', 'Waiting 0']);
+    });
+
+    it('give an empty column the filter that would ask for its rows', () => {
+        const waiting = boardColumns(counted, STATUSES, settings({ mode: 'board' })).find((column) => column.key === 'Waiting');
+        expect(waiting).toEqual({ id: 'status:Waiting', key: 'Waiting', count: 0, filter: { status: ['Waiting'] } });
+    });
+
+    it('still show a counted status the project list does not know', () => {
+        expect(names(boardColumns(counted, [], settings({ mode: 'board' })))).toEqual(['Doing 3']);
+    });
+});
+
+describe('dropping a card on a column', () => {
+    const project = { edit: { status: true }, taskStatusData: [{ key: 1, name: 'To Do', type: 'default_active' }, { key: 4, name: 'Waiting on a supplier', type: 'active' }] };
+    const task = { _id: 't1', status: { text: 'To Do' }, statusKey: 1 };
+
+    it('is allowed when the task\'s own project has a status with that exact name', () => {
+        expect(dropDecision(task, project, 'Waiting on a supplier')).toEqual({ allowed: true, status: project.taskStatusData[1] });
+    });
+
+    it('is refused, with the reason, when the project has no such status or the role may not change status', () => {
+        expect(dropDecision(task, project, 'Doing')).toEqual({ allowed: false, reason: 'no_status' });
+        expect(dropDecision(task, project, 'waiting on a supplier')).toEqual({ allowed: false, reason: 'no_status' });
+        expect(dropDecision(task, { ...project, edit: { status: false } }, 'Waiting on a supplier')).toEqual({ allowed: false, reason: 'no_permission' });
+        expect(dropDecision(task, null, 'Waiting on a supplier')).toEqual({ allowed: false, reason: 'no_permission' });
+    });
+
+    it('changes nothing when the card is dropped where it already is', () => {
+        expect(dropDecision(task, project, 'To Do')).toEqual({ allowed: false, reason: 'same' });
+    });
+});
+
+describe('a saved view', () => {
+    it('is sent as a name and the cleaned settings, mode included', () => {
+        const body = viewBody('My board', { ...settings({ mode: 'board', status: ['Doing'] }), findQuery: [] });
+        expect(body).toEqual({ name: 'My board', settings: settings({ mode: 'board', status: ['Doing'] }) });
+        expect(viewPatch({ name: 'Renamed' })).toEqual({ name: 'Renamed' });
+        expect(viewPatch({ isDefault: false })).toEqual({ isDefault: false });
+        expect(viewPatch({ settings: settings({ mode: 'table' }) })).toEqual({ settings: settings({ mode: 'table' }) });
+    });
+
+    it('is unchanged or changed by comparing what would be saved', () => {
+        expect(sameSettings(settings(), { ...settings(), unknown: 1 })).toBe(true);
+        expect(sameSettings(settings(), settings({ mode: 'board' }))).toBe(false);
+        expect(sameSettings(settings({ status: ['A'] }), settings({ status: ['A'] }))).toBe(true);
     });
 });

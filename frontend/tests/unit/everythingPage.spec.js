@@ -52,9 +52,12 @@ const canon = (value) => {
 };
 const shapeOf = (body) => JSON.stringify(canon({ ...body, timezone: undefined, limit: undefined }));
 const recordedAs = (body) => Object.keys(fixture).find((name) => shapeOf(fixture[name].request) === shapeOf(body));
-const answer = (method, url, body) => Promise.resolve({ data: (fixture[recordedAs(body)] || fixture.nothing).response });
+const TASKS = '/api/v2/tasks/everything';
+/* This person has saved no view; the saved views have a spec of their own (everythingModes.spec.js). */
+const answer = (method, url, body) => Promise.resolve({ data: url === TASKS ? (fixture[recordedAs(body)] || fixture.nothing).response : fixture.viewsNone.response });
 
-const sent = () => apiRequest.mock.calls.map(([, , body]) => body);
+const reads = () => apiRequest.mock.calls.filter(([, url]) => url === TASKS);
+const sent = () => reads().map(([, , body]) => body);
 const sentNames = () => sent().map(recordedAs);
 
 const projectList = Object.values({ ...fixture.projectCounts.response.data.projects }).map((card) => ({ ...card, deletedStatusKey: 0 }));
@@ -158,7 +161,7 @@ describe('the list', () => {
         await open();
         vi.useFakeTimers();
         await test('evr-search').setValue('nothing is called this');
-        expect(apiRequest).toHaveBeenCalledTimes(1);
+        expect(reads()).toHaveLength(1);
         vi.advanceTimersByTime(300);
         vi.useRealTimers();
         await flushPromises();
@@ -176,6 +179,7 @@ describe('the list', () => {
     });
 
     it('shows an error with a way to try again', async () => {
+        apiRequest.mockImplementationOnce(answer);
         apiRequest.mockImplementationOnce(() => Promise.reject(new Error('network')));
         await open();
         expect(test('evr-error').exists()).toBe(true);
@@ -251,9 +255,9 @@ describe('the controls', () => {
         await search.setValue('fo');
         await search.setValue('footer');
         vi.advanceTimersByTime(299);
-        expect(apiRequest).toHaveBeenCalledTimes(1);
+        expect(reads()).toHaveLength(1);
         vi.advanceTimersByTime(1);
-        expect(apiRequest).toHaveBeenCalledTimes(2);
+        expect(reads()).toHaveLength(2);
         expect(sent().at(-1).filter.search).toBe('footer');
     });
 });
@@ -357,7 +361,7 @@ describe('inline edits', () => {
         fail({ status: false });
         await flushPromises();
         expect(statusCell('Rotate the keys').text()).toBe('Doing');
-        expect(apiRequest).not.toHaveBeenCalled();
+        expect(reads()).toHaveLength(0);
     });
 
     it('shows priority only where the project has the Priority app, and writes it for that project', async () => {
@@ -405,14 +409,14 @@ describe('freshness', () => {
         apiRequest.mockClear();
         closeTask();
         await flushPromises();
-        expect(apiRequest).toHaveBeenCalledTimes(1);
+        expect(reads()).toHaveLength(1);
 
         wrapper.unmount();
         wrapper = null;
         apiRequest.mockClear();
         window.dispatchEvent(new Event('focus'));
         await flushPromises();
-        expect(apiRequest).not.toHaveBeenCalled();
+        expect(reads()).toHaveLength(0);
     });
 });
 

@@ -27,7 +27,8 @@ process.env.JWT_SECRET = 'a fixed secret, so the fixture cursors do not change b
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { listEverything } = require('../Modules/Tasks/controller/everything');
-const { DEFAULT_SETTINGS, baseRequest, firstRequest, groupsFrom, groupRequest } = require('../frontend/src/views/Everything/everythingRequest');
+const views = require('../Modules/Tasks/controller/everythingViews');
+const { DEFAULT_SETTINGS, baseRequest, firstRequest, groupsFrom, groupRequest, viewBody, viewPatch } = require('../frontend/src/views/Everything/everythingRequest');
 
 const FIXTURE = path.join(__dirname, '..', 'frontend', 'tests', 'fixtures', 'everythingResponses.json');
 const C = '6f0000000000000000000c01';
@@ -86,6 +87,21 @@ const ask = async (body) => {
     return JSON.parse(JSON.stringify({ request: body, statusCode: res.statusCode, response: res.body }));
 };
 
+const VIEWS = '/api/v2/tasks/everything/views';
+const SAVED_AT = '2026-10-01T06:30:00.000Z';
+
+/* A changed view answers with the time it was saved, which is the one value here that is not the
+   same on every run; the recording keeps a fixed time in its place. */
+const askViews = async (handler, { method, body, id }) => {
+    const res = { statusCode: 200, body: undefined };
+    res.status = (code) => { res.statusCode = code; return res; };
+    res.json = (payload) => { res.body = payload; return res; };
+    await handler({ method: method.toUpperCase(), headers: { companyid: C }, aud: C, uid: ME, body, params: id ? { id } : {} }, res);
+    const entry = JSON.parse(JSON.stringify({ request: { method, path: id ? `${VIEWS}/${id}` : VIEWS, body }, statusCode: res.statusCode, response: res.body }));
+    if (entry.response.data && entry.response.data.updatedAt) entry.response.data.updatedAt = SAVED_AT;
+    return entry;
+};
+
 /* 12:00 on Thursday 1 October in the viewer's timezone: the week has Friday and Saturday left. */
 const VIEWER = { now: new Date('2026-10-01T06:30:00.000Z'), timeZone: 'Asia/Kolkata' };
 const PAGE = 2;
@@ -128,6 +144,21 @@ const record = async () => {
     const byDue = settings({ group: 'dueDate' });
     out.dueCounts = await ask(firstRequest(byDue, VIEWER, PAGE));
     for (const bucket of DUE_BUCKETS) out[`due_${bucket}`] = await page('dueCounts', byDue, `dueDate:${bucket}`);
+
+    const board = settings({ mode: 'board', hideDone: false });
+    out.boardCounts = await ask(firstRequest(board, VIEWER, PAGE));
+    out.boardDone = await page('boardCounts', board, 'status:Done');
+    out.boardDoing = await page('boardCounts', board, 'status:Doing');
+
+    out.viewsNone = await askViews(views.listViews, { method: 'get' });
+    out.viewCreated = await askViews(views.createView, { method: 'post', body: viewBody('My board', board) });
+    const id = out.viewCreated.response.data._id;
+    out.viewsOne = await askViews(views.listViews, { method: 'get' });
+    out.viewRenamed = await askViews(views.updateView, { method: 'patch', id, body: viewPatch({ name: 'Board, with done' }) });
+    out.viewDefault = await askViews(views.updateView, { method: 'patch', id, body: viewPatch({ isDefault: true }) });
+    out.viewChanged = await askViews(views.updateView, { method: 'patch', id, body: viewPatch({ settings: settings({ mode: 'table', group: 'project' }) }) });
+    out.viewRefused = await askViews(views.createView, { method: 'post', body: { ...viewBody('Not a view', board), projectId: WEB } });
+    out.viewDeleted = await askViews(views.deleteView, { method: 'delete', id });
     return out;
 };
 
@@ -138,7 +169,7 @@ beforeAll(seed);
 test('the fixture the web app is tested against is what the handler answers to the page\'s own requests', async () => {
     const recorded = await record();
 
-    Object.entries(recorded).filter(([name]) => name !== 'staleCursor').forEach(([name, entry]) => {
+    Object.entries(recorded).filter(([name]) => !['staleCursor', 'viewRefused'].includes(name)).forEach(([name, entry]) => {
         expect({ name, statusCode: entry.statusCode, message: entry.response.message }).toEqual({ name, statusCode: 200, message: undefined });
     });
     expect(recorded.staleCursor).toMatchObject({ statusCode: 400, response: { status: false, field: 'cursor' } });
@@ -165,6 +196,19 @@ test('the fixture the web app is tested against is what the handler answers to t
     expect(Object.fromEntries(DUE_BUCKETS.map((bucket) => [bucket, taskNames(recorded[`due_${bucket}`])]))).toEqual({
         overdue: ['Write the brief'], today: ['Draw the home page'], week: ['Fix the footer'], later: ['Renew the domain'], none: ['Rotate the keys'],
     });
+
+    expect(recorded.boardCounts.request).toEqual({ ...recorded.statusCounts.request, filter: {} });
+    expect(recorded.boardCounts.response.data.groups).toEqual([{ key: 'Doing', count: 3 }, { key: 'Done', count: 1 }, { key: 'To Do', count: 2 }]);
+    expect(taskNames(recorded.boardDone)).toEqual(['Archive last year']);
+
+    expect(recorded.viewsNone.response.data).toEqual([]);
+    expect(recorded.viewCreated.response.data).toMatchObject({ name: 'My board', isDefault: false, settings: { mode: 'board', hideDone: false, group: 'none' } });
+    expect(recorded.viewsOne.response.data).toEqual([recorded.viewCreated.response.data]);
+    expect(recorded.viewRenamed.response.data).toMatchObject({ name: 'Board, with done', updatedAt: SAVED_AT });
+    expect(recorded.viewDefault.response.data.isDefault).toBe(true);
+    expect(recorded.viewChanged.response.data.settings).toMatchObject({ mode: 'table', group: 'project', hideDone: true });
+    expect(recorded.viewRefused).toMatchObject({ statusCode: 400, response: { status: false, field: 'projectId' } });
+    expect(recorded.viewDeleted.response).toEqual({ status: true, statusText: 'View deleted.' });
 
     if (process.env.UPDATE_EVERYTHING_FIXTURE === '1') {
         fs.mkdirSync(path.dirname(FIXTURE), { recursive: true });
