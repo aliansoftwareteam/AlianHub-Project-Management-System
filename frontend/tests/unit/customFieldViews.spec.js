@@ -105,6 +105,14 @@ describe('group by custom field', () => {
         expect(customGroupMatches(withField(DUE, ''), noDate)).toBe(true);
     });
 
+    test('an AI field stores the same shapes: several labels sit in each of their groups', () => {
+        const [idea, build, none] = customFieldGroups(stage, { t });
+        const labelled = withField(STAGE, ['o1', 'o2']);
+        expect([idea, build, none].map((group) => customGroupMatches(labelled, group))).toEqual([true, true, false]);
+        expect(customSortValue(stage, labelled)).toBe(0);
+        expect(customSortValue(size, withField(SIZE, '4'))).toBe(4);
+    });
+
     test('dropping a row on a group writes that group value to the field', () => {
         const [idea, , none] = customFieldGroups(stage, { t });
         expect(customGroupUpdate(idea)).toEqual({ fieldValue: ['o1'], _id: STAGE });
