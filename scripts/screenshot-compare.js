@@ -58,11 +58,10 @@ async function main() {
     fs.writeFileSync(path.join(outDir, 'compare.json'), `${JSON.stringify({ ...meta, rows: ordered }, null, 2)}\n`);
     fs.writeFileSync(path.join(outDir, 'index.html'), compareHtml({ rows: ordered, meta: [`before: ${beforeDir}`, `after: ${afterDir}`] }));
 
-    const changed = ordered.filter((row) => row.status !== 'both' || row.changed > 0);
-    process.stdout.write(`${changed.length} of ${ordered.length} changed.\n`);
-    for (const row of changed.slice(0, 15)) {
-        process.stdout.write(`  ${row.status === 'both' ? `${(row.ratio * 100).toFixed(2)}%`.padStart(7) : row.status.padStart(7)}  ${row.file}\n`);
-    }
+    const changed = ordered.filter((row) => row.status === 'both' && row.changed > 0);
+    const missing = ordered.filter((row) => row.status !== 'both');
+    process.stdout.write(`${changed.length} changed, ${missing.length} added or removed, ${ordered.length - changed.length - missing.length} unchanged.\n`);
+    for (const row of changed.slice(0, 15)) process.stdout.write(`  ${`${(row.ratio * 100).toFixed(2)}%`.padStart(7)}  ${row.file}\n`);
     process.stdout.write(`${path.join(outDir, 'index.html')}\n`);
 }
 

@@ -50,7 +50,7 @@ describe('atlas compare: pixel diff', () => {
 });
 
 describe('atlas compare: ordering', () => {
-    test('most changed first, added and removed above every diff, unchanged last, name breaks ties', () => {
+    test('most changed first, then added, then removed, unchanged last, name breaks ties', () => {
         const ordered = orderByChange([
             { file: 'b.png', status: 'both', ratio: 0 },
             { file: 'c.png', status: 'both', ratio: 0.4 },
@@ -59,7 +59,7 @@ describe('atlas compare: ordering', () => {
             { file: 'd.png', status: 'both', ratio: 0.9 },
             { file: 'f.png', status: 'added', ratio: 1 },
         ]);
-        expect(ordered.map((row) => row.file)).toEqual(['e.png', 'f.png', 'd.png', 'c.png', 'a.png', 'b.png']);
+        expect(ordered.map((row) => row.file)).toEqual(['d.png', 'c.png', 'f.png', 'e.png', 'a.png', 'b.png']);
     });
 
     test('does not reorder the caller\'s list', () => {

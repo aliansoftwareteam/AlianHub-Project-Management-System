@@ -1,3 +1,4 @@
+/* global window, document, getComputedStyle -- used inside functions that run in the page */
 const fs = require('fs');
 const path = require('path');
 const { SCREENS } = require('./atlas-manifest');
@@ -11,11 +12,15 @@ const { galleryHtml } = require('./atlas/gallery');
 const ROOT = path.resolve(__dirname, '..');
 const NAVIGATION_TIMEOUT_MS = 45000;
 const STEP_TIMEOUT_MS = 10000;
-const SETTLE_QUIET_MS = 800;
-const SETTLE_LIMIT_MS = 20000;
+const QUIET_MS = 1000;
+const QUIET_LIMIT_MS = 20000;
+const BUSY_LIMIT_MS = 12000;
+const BUSY_POLL_MS = 250;
+const BUSY = '[class*="skeleton"], [class*="skelaton"], [class*="spinner"], .lds-roller, [aria-busy="true"]';
 const SOCKET_PATH = '/socket.io/';
 const SHELL = '.ah-app';
 const SHELL_TIMEOUT_MS = 30000;
+const ATTEMPTS = 2;
 const BLOCKED_BODY = JSON.stringify({ status: false, statusText: 'Blocked', message: 'The screenshot atlas is read-only.' });
 
 const firstLine = (error) => String((error && error.message) || error).split('\n')[0];
@@ -39,12 +44,20 @@ async function launch() {
     }
 }
 
+function jsonBodyOf(request) {
+    try {
+        return request.postDataJSON();
+    } catch {
+        return null;
+    }
+}
+
 /* An aborted request looks like a lost connection to the app, which then shows its offline
  * banner and queues the write for later. A refusal with a status does neither. */
 async function guard(context, baseUrl, blocked) {
     await context.route('**/*', (route) => {
         const request = route.request();
-        const verdict = decide({ method: request.method(), url: request.url() }, { baseUrl });
+        const verdict = decide({ method: request.method(), url: request.url(), body: jsonBodyOf(request) }, { baseUrl });
         if (verdict.allow) return route.continue();
         blocked.add(verdict.reason);
         return route.fulfill({ status: 403, contentType: 'application/json', body: BLOCKED_BODY });
@@ -74,7 +87,7 @@ async function newContext(browser, { baseUrl, theme, size, variant, session, blo
     return context;
 }
 
-function settle(page) {
+function networkQuiet(page) {
     return new Promise((resolve) => {
         const inFlight = new Set();
         let quiet = null;
@@ -88,7 +101,7 @@ function settle(page) {
         };
         const arm = () => {
             clearTimeout(quiet);
-            if (!inFlight.size) quiet = setTimeout(finish, SETTLE_QUIET_MS);
+            if (!inFlight.size) quiet = setTimeout(finish, QUIET_MS);
         };
         const onStart = (request) => {
             if (request.url().includes(SOCKET_PATH)) return;
@@ -99,12 +112,29 @@ function settle(page) {
             inFlight.delete(request);
             arm();
         };
-        const limit = setTimeout(finish, SETTLE_LIMIT_MS);
+        const limit = setTimeout(finish, QUIET_LIMIT_MS);
         page.on('request', onStart);
         page.on('requestfinished', onEnd);
         page.on('requestfailed', onEnd);
         arm();
     });
+}
+
+const showsBusy = (page) => page.evaluate((selector) => [...document.querySelectorAll(selector)].some((element) => {
+    const box = element.getBoundingClientRect();
+    return box.width > 0 && box.height > 0 && getComputedStyle(element).visibility !== 'hidden';
+}), BUSY);
+
+// A view can pause longer than the quiet window before it asks for its rows, so a skeleton on screen outranks a quiet network.
+async function settle(page) {
+    await networkQuiet(page);
+    const deadline = Date.now() + BUSY_LIMIT_MS;
+    while (await showsBusy(page)) {
+        if (Date.now() > deadline) return { note: 'still showing a loading state' };
+        await page.waitForTimeout(BUSY_POLL_MS);
+    }
+    await networkQuiet(page);
+    return {};
 }
 
 async function runStep(page, step) {
@@ -117,35 +147,52 @@ async function runStep(page, step) {
     throw new Error(`Unknown step "${step.action}"`);
 }
 
-// The shell draws only once the socket has answered, and that wait makes no request settle() can see.
-async function shellOrSignIn(page) {
-    try {
-        await page.locator(SHELL).first().waitFor({ state: 'visible', timeout: SHELL_TIMEOUT_MS });
-    } catch {
-        if (routeOf(page.url()).startsWith('/login')) throw new Error('The session was refused: the app went to sign-in.');
-        throw new Error('The app shell did not appear.');
+class SessionRefused extends Error {
+    constructor() {
+        super('The session was refused: the app went to sign-in. A demo token lasts an hour.');
     }
 }
 
 const routeOf = (url) => (new URL(url).hash || '#/').slice(1).split('?')[0].replace(/\/$/, '') || '/';
+
+// The shell draws only once the socket has answered, and that wait makes no request networkQuiet() can see.
+async function shellOrSignIn(page) {
+    try {
+        await page.locator(SHELL).first().waitFor({ state: 'visible', timeout: SHELL_TIMEOUT_MS });
+    } catch {
+        if (routeOf(page.url()).startsWith('/login')) throw new SessionRefused();
+        throw new Error('The app shell did not appear.');
+    }
+}
 
 async function capture(context, { baseUrl, screen, route, file }) {
     const page = await context.newPage();
     try {
         await page.goto(`${baseUrl}/#${route}`, { waitUntil: 'load', timeout: NAVIGATION_TIMEOUT_MS });
         if (screen.auth !== false) await shellOrSignIn(page);
-        await settle(page);
+        let { note } = await settle(page);
         for (const step of screen.steps || []) await runStep(page, step);
-        if ((screen.steps || []).length) await settle(page);
+        if ((screen.steps || []).length) ({ note } = await settle(page));
         await page.evaluate(() => document.fonts.ready.then(() => true));
 
         const landed = routeOf(page.url());
-        if (screen.auth !== false && landed.startsWith('/login')) throw new Error('The session was refused: the app went to sign-in.');
+        if (screen.auth !== false && landed.startsWith('/login')) throw new SessionRefused();
         await page.screenshot({ path: file, animations: 'disabled', caret: 'hide' });
         const wanted = route.split('?')[0].replace(/\/$/, '') || '/';
-        return landed === wanted ? {} : { landedOn: landed };
+        const notes = [landed === wanted ? null : `landed on ${landed}`, note].filter(Boolean);
+        return notes.length ? { note: notes.join('; ') } : {};
     } finally {
         await page.close();
+    }
+}
+
+async function captureWithRetry(context, job) {
+    for (let attempt = 1; ; attempt += 1) {
+        try {
+            return await capture(context, job);
+        } catch (error) {
+            if (error instanceof SessionRefused || attempt >= ATTEMPTS) throw error;
+        }
     }
 }
 
@@ -220,10 +267,11 @@ async function main() {
                     }
                     const file = fileName(entry);
                     try {
-                        const result = await capture(screen.auth === false ? signedOut : signedIn, { baseUrl: args.baseUrl, screen, route, file: path.join(outDir, file) });
+                        const result = await captureWithRetry(screen.auth === false ? signedOut : signedIn, { baseUrl: args.baseUrl, screen, route, file: path.join(outDir, file) });
                         shots.push({ ...entry, file, ...result });
-                        process.stdout.write(`ok    ${file}${result.landedOn ? `  (landed on ${result.landedOn})` : ''}\n`);
+                        process.stdout.write(`ok    ${file}${result.note ? `  (${result.note})` : ''}\n`);
                     } catch (error) {
+                        if (error instanceof SessionRefused && !shots.some((shot) => SCREENS.find((known) => known.name === shot.screen).auth !== false)) throw error;
                         failures.push({ ...entry, reason: firstLine(error) });
                         process.stdout.write(`FAIL  ${file}  ${firstLine(error)}\n`);
                     }

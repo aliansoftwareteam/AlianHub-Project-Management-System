@@ -25,6 +25,7 @@ main { padding: 20px; }
 .shot img { display: block; width: 100%; height: auto; }
 figcaption { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); }
 figcaption span { color: var(--dim); font-size: 12px; white-space: nowrap; }
+.note { margin: 0; padding: 0 12px 8px; color: var(--hot); font-size: 12px; overflow-wrap: anywhere; }
 .row { background: var(--card); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 16px; }
 .row h2 { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; margin: 0; padding: 10px 14px; font-size: 14px; border-bottom: 1px solid var(--line); }
 .row h2 span { color: var(--dim); font-weight: 400; font-size: 12px; }
@@ -165,7 +166,7 @@ const failureList = (failures) => (failures.length
 function galleryHtml({ title = 'Screenshot atlas', shots, failures = [], meta = [] }) {
     const cards = shots.map((shot) => {
         const label = `${shot.screen} · ${shot.theme} · ${shot.size}`;
-        return `<figure class="card" ${itemAttrs(shot)}>${shotButton(src(shot.file), label)}<figcaption><strong>${escapeHtml(shot.screen)}</strong><span>${escapeHtml(shot.theme)} · ${escapeHtml(shot.size)}</span></figcaption></figure>`;
+        return `<figure class="card" ${itemAttrs(shot)}>${shotButton(src(shot.file), label)}<figcaption><strong>${escapeHtml(shot.screen)}</strong><span>${escapeHtml(shot.theme)} · ${escapeHtml(shot.size)}</span></figcaption>${shot.note ? `<p class="note">${escapeHtml(shot.note)}</p>` : ''}</figure>`;
     }).join('\n');
     const body = `${failureList(failures)}${shots.length ? `<div class="grid">\n${cards}\n</div>` : '<p class="empty">No screenshots in this folder.</p>'}`;
     return page({ title, meta: [`${shots.length} screenshots`, ...meta], bar: filterBar(shots), body });
@@ -185,9 +186,15 @@ function compareHtml({ title = 'Atlas compare', rows, meta = [] }) {
 <div class="trio">${cell('before', row, row.status !== 'added')}${cell('after', row, row.status !== 'removed')}${cell('diff', row, row.status === 'both')}</div>
 </section>`;
     }).join('\n');
-    const changedCount = rows.filter((row) => row.status !== 'both' || row.changed > 0).length;
+    const count = (test) => rows.filter(test).length;
+    const summary = [
+        `${count((row) => row.status === 'both' && row.changed > 0)} changed`,
+        `${count((row) => row.status === 'added')} added`,
+        `${count((row) => row.status === 'removed')} removed`,
+        `${count((row) => row.status === 'both' && !row.changed)} unchanged`,
+    ].join(', ');
     const bar = filterBar(rows, '<span class="sep"></span><button type="button" class="chip" data-filter="changedOnly" data-value="yes" aria-pressed="false">Changed only</button>');
-    return page({ title, meta: [`${changedCount} of ${rows.length} changed`, 'most changed first', ...meta], bar, body: body || '<p class="empty">Nothing to compare.</p>' });
+    return page({ title, meta: [summary, 'most changed first', ...meta], bar, body: body || '<p class="empty">Nothing to compare.</p>' });
 }
 
 module.exports = { escapeHtml, galleryHtml, compareHtml };

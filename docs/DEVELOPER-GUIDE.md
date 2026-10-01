@@ -42,6 +42,33 @@ The conventions in place:
 
 Writing a frontend spec: mount with `@vue/test-utils`; `frontend/tests/setup.js` installs i18n, `$t`, and the shell provides (`$userId`, `$companyId`, `$clientWidth`, `$socket`). Mock `@/services` and heavy children with `vi.mock`; keep shared mocks in `vi.hoisted`. `frontend/tests/TaskDetailPanel.spec.js` is the template for a large component, `useProjectTree.spec.js` for a composable.
 
+### Screenshot atlas
+
+Unit specs cannot show what a visual change did. `npm run atlas` opens every screen in `scripts/atlas-manifest.js` in a headless Chromium and saves one PNG per screen, theme and size, plus an `index.html` gallery that opens from disk. `npm run atlas:compare` puts two atlases side by side.
+
+```bash
+ATLAS_TOKEN=$(npm run -s demo:token -- --email rahul.manager@demo.test 2>/dev/null | tail -1) npm run atlas
+npm run atlas -- --only home,project-board --themes dark --sizes 1440x900   # a few screens
+npm run atlas:compare -- artifacts/atlas/<before> artifacts/atlas/<after>
+```
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--base-url` | `http://localhost:4000` | the running app |
+| `--out` | `artifacts/atlas/<UTC timestamp>/` (git-ignored) | output folder; a second run into the same folder replaces only the shots it retakes |
+| `--only` | every screen | comma-separated screen names from the manifest |
+| `--themes` | `light,dark` | written to `localStorage 'ah.theme'` before the app loads |
+| `--sizes` | `1440x900,390x844` | viewport sizes |
+| `--variant a\|b\|c` | none | written to `localStorage 'ah.variant'` |
+| `--company`, `--project` | the account's only workspace; the project with the most views | which workspace and project the `:cid` and `:projectId` routes open |
+| `--token-file` | `ATLAS_TOKEN_FILE` | file holding the session token when `ATLAS_TOKEN` is unset |
+
+- **Session.** The app keeps its session in the `accessToken` cookie and in `localStorage` (`userId`, `selectedCompany`, `isLogging`); the atlas sets those from the token, so it never types a password. A demo token lasts an hour ([QA-DEMO-TEAM.md](QA-DEMO-TEAM.md)). The token is never printed or written to the output.
+- **Read-only.** Every request that is not a GET is answered with a 403 inside the browser and never reaches the server, except the POSTs the app reads with, listed with their reasons in `scripts/atlas/readOnly.js`. The script's own lookups pass through the same filter. Setup steps in the manifest may only press a shortcut, open a menu, hover, scroll and wait. Two things follow: the Personal List shows its error state (opening it creates the list on a first visit, so that call stays blocked), and AI summaries stay empty. The refused requests are listed at the end of the run and in `atlas.json`.
+- **Add a screen** with one line in `scripts/atlas-manifest.js`; `tests/atlas-manifest.test.js` fails when its route is not one the router declares. Routes left out, and why, are in `LEFT_OUT` in the same file.
+- **Compare** writes `before/`, `after/` and `diff/` images and an `index.html` ordered by the share of pixels that changed. It decodes PNGs with `sharp`, already a dependency; `--threshold` (default 8 of 255 per channel) sets how far a pixel must move to count.
+- Chromium comes from Playwright: `npx playwright install chromium` once (the e2e suite needs the same).
+
 ## Change it
 
 ### Requests and tenants

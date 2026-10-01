@@ -3,7 +3,11 @@ const { parseFileName } = require('./naming');
 const CHANGED_COLOUR = [255, 0, 102, 255];
 const DEFAULT_THRESHOLD = 8;
 const FADE = 0.25;
-const STATUS_RANK = { removed: 0, added: 1, both: 2 };
+const rank = (row) => {
+    if (row.status === 'added') return 1;
+    if (row.status === 'removed') return 2;
+    return row.ratio > 0 ? 0 : 3;
+};
 
 function pairShots(beforeFiles, afterFiles) {
     const before = new Set(beforeFiles.filter(parseFileName));
@@ -56,7 +60,7 @@ function diffPixels(before, after, { threshold = DEFAULT_THRESHOLD } = {}) {
 
 function orderByChange(rows) {
     return [...rows].sort((a, b) => (
-        STATUS_RANK[a.status] - STATUS_RANK[b.status]
+        rank(a) - rank(b)
         || b.ratio - a.ratio
         || a.file.localeCompare(b.file)
     ));

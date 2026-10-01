@@ -5,7 +5,7 @@ const { decide } = require('./readOnly');
 function createReader({ baseUrl, token, companyId = null, fetchImpl = fetch }) {
     return async function read(method, urlPath, body) {
         const url = `${baseUrl}${urlPath}`;
-        const verdict = decide({ method, url }, { baseUrl });
+        const verdict = decide({ method, url, body }, { baseUrl });
         if (!verdict.allow) throw new Error(`Refused: ${verdict.reason}`);
         const headers = { accept: 'application/json', authorization: `Bearer ${token}` };
         if (companyId) headers.companyid = companyId;
