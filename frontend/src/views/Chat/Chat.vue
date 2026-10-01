@@ -38,7 +38,8 @@
                 :avatarSrc="isDirect ? (selectedChat.image || '') : ''"
                 :channel="isDirect ? null : selectedChat"
                 :linked-project="linkedProject"
-                :presence="isDirect ? !selectedChat.isDnd : null"
+                :presence="isDirect && !selectedChat.isAgent ? !selectedChat.isDnd : null"
+                :agentId="isDirect ? (selectedChat.agentId || '') : ''"
                 :sendMessageAllowed="sendMessageAllowed"
                 :details-open="detailsOpen"
                 @created="onChatCreated"
@@ -97,6 +98,9 @@ import ChatSidebar from './ChatSidebar.vue';
 import { useMainChat } from './helper';
 import { useChatDirectory } from './useChatDirectory';
 import { isOwnerOrAdmin } from "@/utils/roles";
+import { canUseAi } from "@/composable/aiAvailability";
+import { fetchChatAgents, openAgentConversation } from "@/views/Ai/useRunnableAgents";
+import { useToast } from 'vue-toast-notification';
 
 defineOptions({ name: 'ChatView' });
 
@@ -144,7 +148,8 @@ function visibleChatProjects(list) {
     return canViewDirectMessages.value ? rows : rows.filter((p) => p.default === false);
 }
 
-const directory = useChatDirectory({ projects, userId, canStartDirect: canSendDirectMessages });
+const directAgents = ref([]);
+const directory = useChatDirectory({ projects, userId, canStartDirect: canSendDirectMessages, agents: directAgents });
 const { channelGroups, directMessages, people, directProject, channelProjects, directSprint, findChannel, findDirect, findPerson, sprintsOf } = directory;
 
 const paneBusy = computed(() => loadingChats.value || directory.loading.value);
@@ -176,7 +181,7 @@ const selection = computed(() => {
             return { project, chat: justCreated.value, kind: 'direct' };
         }
         const person = findPerson(sid);
-        if (!person) return null;
+        if (!person || person.isAgent) return null;
         const sprint = directSprint();
         return { project, chat: { ...person, sprintId: sprint ? sprint._id : '', newChat: true }, kind: 'direct' };
     }
@@ -244,10 +249,29 @@ function open(projectId, id) {
     router.push({ name: 'chat_project_channel', params: { cid: companyId.value, pid: projectId, sid: id } });
 }
 
+const $toast = useToast();
+
+async function openAgent(item) {
+    if (!directProject.value) return;
+    try {
+        const conversation = await openAgentConversation(item.agentId);
+        if (!findDirect(conversation._id)) commit('mainChat/mutateChats', [{ snap: {}, op: 'added', data: conversation }]);
+        justCreated.value = { ...conversation, id: conversation._id, isAgent: true, name: item.name, newChat: false };
+        open(directProject.value._id, conversation._id);
+    } catch (error) {
+        $toast.error(t('Chat.agent_unavailable'), { position: 'top-right' });
+    }
+}
+
 function onSelect({ kind, item }) {
     if (kind === 'channel') open(item.projectId, item.id);
+    else if (kind === 'person' && item.isAgent) openAgent(item);
     else if (directProject.value) open(directProject.value._id, item.id);
 }
+
+watch(() => [canSendDirectMessages.value, canUseAi()], async ([allowed, usable]) => {
+    directAgents.value = allowed && usable ? await fetchChatAgents() : [];
+}, { immediate: true });
 
 function backToList() {
     router.push({ name: 'chats', params: { cid: companyId.value } });

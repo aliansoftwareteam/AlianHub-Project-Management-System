@@ -31,6 +31,9 @@
 .ms__arrow { color: var(--ink-2); }
 .ms__cap { display: flex; align-items: center; gap: 6px; }
 .ms__wh .ms__cap-input { width: 72px; height: 34px; padding: 0 10px; }
+.ms__wh .ms__cap-per { width: auto; height: 34px; padding: 0 8px; }
+.ms__wh-row--units { row-gap: 8px; column-gap: 16px; }
+.ms__unit-hint { margin: -4px 0 0 82px; color: var(--ink-2); }
 .ms__theme { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .ms__theme-opts { display: flex; gap: 5px; margin-left: auto; }
 .ms__theme-opt {
@@ -61,4 +64,5 @@
     .ms__grid { grid-template-columns: 1fr; }
     .ms__theme-opts { margin-left: 0; }
     .ms__day, .ms__signout { min-height: 44px; min-width: 44px; }
+    .ms__unit-hint { margin-left: 0; }
 }

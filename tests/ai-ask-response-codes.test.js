@@ -109,6 +109,17 @@ describe('the answer response keeps its shape for the why-this-answer panel', ()
         });
     });
 
+    it('passes on the code of a refused model call, so a spend cap can be named', async () => {
+        knowledgeFlag.enabledFor.mockResolvedValue(true);
+        askSources.mockResolvedValue(retrieved);
+        const refused = Object.assign(new Error('The workspace AI budget is used up.'), { code: 'ai_budget_exhausted' });
+        getProvider.mockReturnValue({ chat: jest.fn(async () => { throw refused; }) });
+
+        const out = await call(ask, { body: { question: 'salary bands' } });
+
+        expect(out).toEqual({ status: false, statusText: 'The workspace AI budget is used up.', code: 'ai_budget_exhausted' });
+    });
+
     it('returns sources without a permission field when retrieval is off', async () => {
         isAnyProviderConfigured.mockReturnValue(false);
         mockDb.seed(require('../Config/schemaType').SCHEMA_TYPE.TASKS, { TaskName: 'Budget review', TaskKey: 'OPS-1', statusType: 'open', ProjectID: PROJECT, deletedStatusKey: 0, updatedAt: new Date('2026-09-01T00:00:00Z') });

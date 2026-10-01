@@ -127,6 +127,22 @@ describe('PAGES - @mention notices', () => {
         expect(notice.projectId).toBeUndefined();
     });
 
+    test('a save refused because only the author may make a doc private changes nothing and tells nobody', async () => {
+        projectAccess.mockImplementation(async () => ({ visible: true, canEdit: true }));
+        const page = seedPage();
+        const blocks = blocksWith(mention(BOB, '@Bob'));
+
+        const refused = await save(ANN, page._id, blocks, { visibility: 'private' });
+        expect(refused).toMatchObject({ status: false, statusCode: 403 });
+        expect(notices.handleSingleNotification).not.toHaveBeenCalled();
+        expect(socketEmitter.emit).not.toHaveBeenCalled();
+        expect(mockDb.store[SCHEMA_TYPE.PAGES][0].content.blocks.blocks).toEqual([]);
+
+        const allowed = await save(ANN, page._id, blocks);
+        expect(allowed.status).toBe(true);
+        expect(sentNotices().map((notice) => notice.assigneeUsers)).toEqual([[BOB]]);
+    });
+
     test('creating a doc that already mentions someone tells them', async () => {
         const res = response();
         await ctrl.createPage(request(AUTHOR, { body: { title: 'Notes', projectId: PROJECT, contentBlocks: blocksWith(mention(ANN, '@Ann')) } }), res);

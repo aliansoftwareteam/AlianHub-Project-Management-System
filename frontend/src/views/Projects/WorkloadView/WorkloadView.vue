@@ -47,7 +47,19 @@
                 <button type="button" :aria-label="$t('Views.remove')" @click="selectedUserIds = selectedUserIds.filter((x) => x !== id)">×</button>
             </span>
             <div class="ah-toolbar__spacer"></div>
-            <div class="ah-tabs wv__mode">
+            <div class="ah-tabs wv__mode" role="radiogroup" :aria-label="$t('Views.workload_unit')">
+                <button
+                    v-for="u in WORKLOAD_UNITS"
+                    :key="u"
+                    type="button"
+                    class="ah-tab"
+                    role="radio"
+                    :aria-checked="unit === u"
+                    :class="{ 'is-on': unit === u }"
+                    @click="viewSettings.setWorkloadUnit(u)"
+                >{{ $t(`Views.unit_${u}`) }}</button>
+            </div>
+            <div v-if="unit === 'hours'" class="ah-tabs wv__mode">
                 <button type="button" class="ah-tab" :class="{ 'is-on': mode === 'estimate' }" @click="mode = 'estimate'">{{ $t('Views.by_estimate') }}</button>
                 <button type="button" class="ah-tab" :class="{ 'is-on': mode === 'logged' }" @click="mode = 'logged'">{{ $t('Views.by_logged') }}</button>
             </div>
@@ -93,14 +105,14 @@
                                 class="wv__fill"
                                 :class="{ 'is-over': isOver(d), 'is-tentative': isTentative(d.date) }"
                                 :style="{ height: `${fillPct(d)}%` }"
-                            >{{ hLabel(value(d)) }}</div>
-                            <div v-if="mode === 'estimate' && d.chips.length" class="wv__chips">
+                            >{{ amountLabel(value(d)) }}</div>
+                            <div v-if="(gridUnit !== 'hours' || mode === 'estimate') && d.chips.length" class="wv__chips">
                                 <span
                                     v-for="c in d.chips.slice(0, 2)"
-                                    :key="c.estimateId"
+                                    :key="c.estimateId || c.taskId"
                                     class="wv__chip-task"
                                     draggable="true"
-                                    :title="`${c.name} · ${hLabel(c.minutes)}`"
+                                    :title="`${c.name} · ${amountLabel(size(c))}`"
                                     @dragstart="onDragStart($event, u, d, c)"
                                     @dragend="onDragEnd"
                                     @click="openChip(c)"
@@ -111,20 +123,21 @@
                     </div>
 
                     <div class="wv__total" :class="{ 'is-over': u.utilizationPct > 100 }">
-                        {{ hLabel(mode === 'estimate' ? u.totalEstimated : u.totalLogged) }}<small>/{{ Math.round(u.capacityMinutes / 60) }}</small>
+                        {{ amountLabel(u.total) }}<small>/{{ capacityLabel(u.capacity) }}</small>
                     </div>
                 </div>
 
                 <div v-if="!rows.length" class="ah-empty wv__empty">
-                    {{ isSpinner ? $t('Views.loading') : $t('Views.workload_empty') }}
+                    {{ isSpinner ? $t('Views.loading') : (gridUnit === 'hours' ? $t('Views.workload_empty') : $t('Views.workload_empty_tasks')) }}
                 </div>
             </div>
 
             <div class="wv__foot">
                 <div class="wv__legend">
-                    <span><i class="wv__key"></i>{{ mode === 'estimate' ? $t('Views.legend_estimated') : $t('Views.legend_logged') }}</span>
+                    <span><i class="wv__key"></i>{{ legendLabel }}</span>
                     <span><i class="wv__key wv__key--tentative"></i>{{ $t('Views.legend_tentative') }}</span>
                     <span><i class="wv__key wv__key--over"></i>{{ $t('Views.legend_over') }}</span>
+                    <span v-if="gridUnit === 'points' && unpointed" class="wv__unpointed">{{ $t('Views.unpointed_note', { n: unpointed }, unpointed) }}</span>
                 </div>
                 <div v-if="hint" class="wv__hint">
                     <ShellIcon name="info" :size="13" class="wv__spark" />
@@ -154,6 +167,8 @@
     import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
     import { apiRequest } from '../../../services';
     import * as env from '@/config/env';
+    import { useViewSettings } from '@/views/Projects/composables/viewSettingsContext';
+    import { WORKLOAD_UNITS, cellLoad, chipSize, dailyCapacity, plannedLoad, roundAmount } from './workloadUnits';
 
     defineOptions({ name: "WorkloadView" });
 
@@ -182,6 +197,10 @@
     const dropKey = ref('');
     const hint = ref(null);
     const isEveryOne = ref(false);
+    const unpointed = ref(0);
+    const gridUnit = ref('hours');
+    const viewSettings = useViewSettings();
+    const unit = computed(() => (WORKLOAD_UNITS.includes(viewSettings.workloadUnit?.value) ? viewSettings.workloadUnit.value : 'hours'));
 
     const currentCompany = computed(() => getters["settings/selectedCompany"]);
     const teams = computed(() => getters["settings/teams"] || []);
@@ -204,6 +223,18 @@
         const h = (Number(minutes) || 0) / 60;
         return `${h >= 10 || Number.isInteger(h) ? Math.round(h) : Math.round(h * 10) / 10}h`;
     };
+    const amountLabel = (amount) => {
+        const n = roundAmount(amount);
+        if (gridUnit.value === 'points') return t('Views.points_short', { n }, n);
+        if (gridUnit.value === 'count') return t('Views.tasks_short', { n }, n);
+        return hLabel(amount);
+    };
+    const capacityLabel = (capacity) => (gridUnit.value === 'hours' ? Math.round(capacity / 60) : roundAmount(capacity));
+    const legendLabel = computed(() => {
+        if (gridUnit.value === 'points') return t('Views.legend_points');
+        if (gridUnit.value === 'count') return t('Views.legend_tasks');
+        return mode.value === 'estimate' ? t('Views.legend_estimated') : t('Views.legend_logged');
+    });
 
     /* Capacity is the person's own working day (My settings → working hours) minus
      * approved PTO, so a 6h contract is not read as an under-loaded 8h one. */
@@ -212,39 +243,47 @@
         const capacity = Number(wh.capacity);
         return Number.isFinite(capacity) && capacity > 0 ? capacity : 8;
     };
-    const worksOn = (userId, date) => {
+    const workDaysOf = (userId) => {
         const wh = getUser(userId)?.workingHours || {};
-        const list = Array.isArray(wh.days) && wh.days.length ? wh.days.map(Number) : [1, 2, 3, 4, 5];
-        return list.includes(moment(date).day());
+        return Array.isArray(wh.days) && wh.days.length ? wh.days.map(Number) : [1, 2, 3, 4, 5];
     };
+    const worksOn = (userId, date) => workDaysOf(userId).includes(moment(date).day());
 
     // Weekends are dropped from the grid: an empty Sat/Sun column costs a tenth of
     // the width and says nothing.
     const visibleDays = computed(() => days.value.filter((d) => ![0, 6].includes(moment(d).day())));
 
+    const value = (d) => cellLoad(gridUnit.value, mode.value, d);
+    const planned = (d) => plannedLoad(gridUnit.value, d);
+    const size = (chip) => chipSize(gridUnit.value, chip);
+
     const rows = computed(() => users.value.map((u) => {
-        const perDay = hoursFor(u.userId) * 60;
+        const perDay = dailyCapacity({ unit: gridUnit.value, hoursPerDay: hoursFor(u.userId), rule: u.capacityRule, workDays: workDaysOf(u.userId).length });
         const cells = (u.days || [])
             .filter((d) => visibleDays.value.includes(d.date))
-            .map((d) => ({ ...d, capacityMinutes: d.pto || !worksOn(u.userId, d.date) ? 0 : perDay }));
-        const capacityMinutes = cells.reduce((sum, d) => sum + d.capacityMinutes, 0);
-        const totalEstimated = cells.reduce((sum, d) => sum + (d.estimated || 0), 0);
-        const totalLogged = cells.reduce((sum, d) => sum + (d.logged || 0), 0);
+            .map((d) => ({ ...d, chips: d.chips || [], capacity: d.pto || !worksOn(u.userId, d.date) ? 0 : perDay }));
+        const capacity = cells.reduce((sum, d) => sum + d.capacity, 0);
+        const total = cells.reduce((sum, d) => sum + value(d), 0);
+        const plannedTotal = cells.reduce((sum, d) => sum + planned(d), 0);
         return {
             ...u,
             cells,
-            capacityMinutes,
-            totalEstimated,
-            totalLogged,
+            capacity,
+            total,
+            plannedTotal,
             hoursPerDay: hoursFor(u.userId),
-            utilizationPct: capacityMinutes > 0 ? Math.round((totalEstimated / capacityMinutes) * 100) : (totalEstimated > 0 ? 100 : 0),
+            utilizationPct: capacity > 0 ? Math.round((plannedTotal / capacity) * 100) : (plannedTotal > 0 ? 100 : 0),
         };
     }));
 
-    const value = (d) => (mode.value === 'estimate' ? d.estimated : d.logged) || 0;
-    const isOver = (d) => (d.capacityMinutes > 0 ? value(d) > d.capacityMinutes : value(d) > 0);
-    const fillPct = (d) => (d.capacityMinutes > 0 ? Math.min(100, (value(d) / d.capacityMinutes) * 100) : (value(d) ? 100 : 0));
+    const isOver = (d) => (d.capacity > 0 ? value(d) > d.capacity : value(d) > 0);
+    const fillPct = (d) => (d.capacity > 0 ? Math.min(100, (value(d) / d.capacity) * 100) : (value(d) ? 100 : 0));
     const isTentative = (date) => moment(date).isAfter(moment().endOf('isoWeek'));
+    const capacityRuleLabel = (u) => {
+        const rule = u.capacityRule || {};
+        const key = `Views.${gridUnit.value === 'points' ? 'points' : 'tasks'}_per_${rule.per === 'day' ? 'day' : 'week'}`;
+        return t(key, { n: roundAmount(rule.value) });
+    };
     const subLabel = (u) => {
         if (u.utilizationPct > 100) return t('Views.pct_period', { pct: u.utilizationPct });
         const pto = u.cells.filter((d) => d.pto);
@@ -254,9 +293,9 @@
                 : `${moment(pto[0].date).format('ddd')}–${moment(pto[pto.length - 1].date).format('ddd')}`;
             return t('Views.pto_range', { range });
         }
-        return t('Views.per_day', { h: u.hoursPerDay });
+        return gridUnit.value === 'hours' ? t('Views.per_day', { h: u.hoursPerDay }) : capacityRuleLabel(u);
     };
-    const pctAfter = (u, delta) => (u.capacityMinutes > 0 ? Math.round(((u.totalEstimated + delta) / u.capacityMinutes) * 100) : 0);
+    const pctAfter = (u, delta) => (u.capacity > 0 ? Math.round(((u.plannedTotal + delta) / u.capacity) * 100) : 0);
 
     const timeZone = computed(() => getUser(currentUserId?.value)?.Time_Zone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
 
@@ -272,13 +311,17 @@
                 userIds: selectedUserIds.value,
                 hoursPerDay: 8,
                 timeZone: timeZone.value,
+                unit: unit.value,
             })) || {}).data || {};
             if (!body.status) throw new Error(body.statusText || 'load_failed');
             users.value = body.data?.users || [];
             days.value = body.data?.days || [];
+            gridUnit.value = WORKLOAD_UNITS.includes(body.data?.unit) ? body.data.unit : 'hours';
+            unpointed.value = Number(body.data?.unpointed) || 0;
         } catch (e) {
             error.value = t('Views.load_failed');
             users.value = [];
+            unpointed.value = 0;
         } finally {
             isSpinner.value = false;
         }
@@ -344,12 +387,12 @@
         hint.value = {
             text: t('Views.dragging', {
                 task: chip.name,
-                h: hLabel(chip.minutes),
+                h: amountLabel(size(chip)),
                 name: u.name,
                 day: moment(d.date).format('ddd'),
                 from: fromUser.name,
-                fromPct: pctAfter(fromUser, same ? 0 : -chip.minutes),
-                toPct: pctAfter(u, same ? 0 : chip.minutes),
+                fromPct: pctAfter(fromUser, same ? 0 : -size(chip)),
+                toPct: pctAfter(u, same ? 0 : size(chip)),
             }),
         };
     };
@@ -367,38 +410,38 @@
     const suggestBalance = () => {
         let worst = null;
         rows.value.forEach((u) => u.cells.forEach((d) => {
-            if (!d.pto && d.chips.length && d.capacityMinutes > 0 && d.estimated > d.capacityMinutes
-                && (!worst || d.estimated - d.capacityMinutes > worst.d.estimated - worst.d.capacityMinutes)) {
+            if (!d.pto && d.chips.length && d.capacity > 0 && planned(d) > d.capacity
+                && (!worst || planned(d) - d.capacity > planned(worst.d) - worst.d.capacity)) {
                 worst = { u, d };
             }
         }));
         if (!worst) { hint.value = { text: t('Views.balance_none') }; return; }
-        const chip = [...worst.d.chips].sort((a, b) => b.minutes - a.minutes)[0];
+        const chip = [...worst.d.chips].sort((a, b) => size(b) - size(a))[0];
         let target = null;
         rows.value.forEach((u) => {
             if (u.userId === worst.u.userId) return;
             const d = u.cells.find((x) => x.date === worst.d.date);
-            if (!d || d.pto || d.capacityMinutes <= 0) return;
-            const room = d.capacityMinutes - d.estimated;
-            if (room >= chip.minutes && (!target || room > target.room)) target = { u, d, room };
+            if (!d || d.pto || d.capacity <= 0) return;
+            const room = d.capacity - planned(d);
+            if (room >= size(chip) && (!target || room > target.room)) target = { u, d, room };
         });
         if (!target) { hint.value = { text: t('Views.balance_none') }; return; }
         hint.value = {
             text: t('Views.balance_hint', {
                 task: chip.name,
-                h: hLabel(chip.minutes),
+                h: amountLabel(size(chip)),
                 from: worst.u.name,
                 day: moment(worst.d.date).format('ddd'),
                 to: target.u.name,
-                fromPct: pctAfter(worst.u, -chip.minutes),
-                toPct: pctAfter(target.u, chip.minutes),
+                fromPct: pctAfter(worst.u, -size(chip)),
+                toPct: pctAfter(target.u, size(chip)),
             }),
             apply: { chip, fromUser: worst.u, fromDay: worst.d, toUser: target.u, toDay: target.d },
         };
     };
     const applyHint = () => { if (hint.value && hint.value.apply && !busy.value) move(hint.value.apply); };
 
-    watch([() => dateRange.value.startDate, () => dateRange.value.endDate, selectedUserIds, projectId], ([start, end]) => {
+    watch([() => dateRange.value.startDate, () => dateRange.value.endDate, selectedUserIds, projectId, unit], ([start, end]) => {
         if (!start || !end) return;
         debouncerWithPromise(400).then(() => load());
     });
