@@ -60,6 +60,7 @@ const keys = (out) => out.tasks.map((t) => t.key).sort();
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     jest.clearAllMocks();
+    [P_A, P_B, P_C].forEach((_id) => mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id, deletedStatusKey: 0 }));
     const sprint = (projectId, extra = {}) => mockDb.seed(SCHEMA_TYPE.SPRINTS, { projectId, name: 'Sprint', AssigneeUserId: [], ...extra });
     const sOpen = sprint(P_A);
     const sPriv = sprint(P_A, { private: true, AssigneeUserId: [SOMEONE] });

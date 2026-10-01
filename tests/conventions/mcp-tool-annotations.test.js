@@ -12,7 +12,7 @@ const expectedFrom = (r) => ({
 });
 
 describe('every MCP tool is rated and its annotations agree with the rating', () => {
-    const saved = { v2: process.env.MCP_TOOLS_V2, perf: process.env.AGENT_PERFORMANCE_READ, data: process.env.MCP_TOOLS_DATA, manage: process.env.MCP_TOOLS_MANAGE };
+    const saved = { v2: process.env.MCP_TOOLS_V2, perf: process.env.AGENT_PERFORMANCE_READ, data: process.env.MCP_TOOLS_DATA, manage: process.env.MCP_TOOLS_MANAGE, work: process.env.MCP_TOOLS_WORK };
     let tools;
     let actions;
 
@@ -21,6 +21,7 @@ describe('every MCP tool is rated and its annotations agree with the rating', ()
         process.env.AGENT_PERFORMANCE_READ = 'on';
         process.env.MCP_TOOLS_DATA = 'on';
         process.env.MCP_TOOLS_MANAGE = 'on';
+        process.env.MCP_TOOLS_WORK = 'on';
         tools = require('../../Modules/Mcp/tools');
         actions = require('../../Modules/Agents/actions');
     });
@@ -30,10 +31,11 @@ describe('every MCP tool is rated and its annotations agree with the rating', ()
         if (saved.perf === undefined) delete process.env.AGENT_PERFORMANCE_READ; else process.env.AGENT_PERFORMANCE_READ = saved.perf;
         if (saved.data === undefined) delete process.env.MCP_TOOLS_DATA; else process.env.MCP_TOOLS_DATA = saved.data;
         if (saved.manage === undefined) delete process.env.MCP_TOOLS_MANAGE; else process.env.MCP_TOOLS_MANAGE = saved.manage;
+        if (saved.work === undefined) delete process.env.MCP_TOOLS_WORK; else process.env.MCP_TOOLS_WORK = saved.work;
     });
 
     it('offers every tool, flagged ones included', () => {
-        expect(tools.manifest().map((t) => t.name)).toEqual(expect.arrayContaining(['tasks.next', 'task.comment', 'performance.read', 'projects.list', 'comment.create', 'timelog.create', 'task.update', 'task.move']));
+        expect(tools.manifest().map((t) => t.name)).toEqual(expect.arrayContaining(['tasks.next', 'task.comment', 'performance.read', 'projects.list', 'comment.create', 'timelog.create', 'task.update', 'task.move', 'task.tags.add', 'list.move']));
     });
 
     it('rates the action behind every tool', () => {

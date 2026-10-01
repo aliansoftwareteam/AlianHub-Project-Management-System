@@ -244,6 +244,27 @@ exports.resolveComment = async (req, res) => {
     }
 };
 
+const removeComment = async (companyId, comment, uid) => {
+    const gone = { $set: { isDeleted: true, deletedBy: uid, deletedAt: new Date() } };
+    const updated = await saveChange(companyId, comment, gone);
+    if (!updated) return null;
+    if (!comment.parentId) {
+        await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PAGE_COMMENTS,
+            data: [{ parentId: oid(comment._id), ...LIVE }, gone],
+        }, 'updateMany');
+    }
+    emitChange(companyId, 'update', updated);
+    return updated;
+};
+
+/* What an undo of a comment made for a person takes back: the live comment on that doc, with its replies. */
+exports.withdrawComment = async (companyId, pageId, commentId, uid) => {
+    if (!isObjectIdString(pageId) || !isObjectIdString(commentId)) return null;
+    const comment = await findComment(companyId, { _id: pageId }, commentId);
+    return comment ? removeComment(companyId, comment, String(uid)) : null;
+};
+
 /* DELETE /api/v2/pages/:id/comments/:commentId — the author or an admin; a thread goes with its replies. */
 exports.deleteComment = async (req, res) => {
     try {
@@ -253,16 +274,7 @@ exports.deleteComment = async (req, res) => {
         if (String(comment.userId) !== uid && !(await isCompanyAdmin(companyId, uid))) {
             return fail(res, 'Only the author or an admin can delete this comment.', 403);
         }
-        const gone = { $set: { isDeleted: true, deletedBy: uid, deletedAt: new Date() } };
-        const updated = await saveChange(companyId, comment, gone);
-        if (!updated) return fail(res, COMMENT_NOT_FOUND, 404);
-        if (!comment.parentId) {
-            await MongoDbCrudOpration(companyId, {
-                type: SCHEMA_TYPE.PAGE_COMMENTS,
-                data: [{ parentId: oid(comment._id), ...LIVE }, gone],
-            }, 'updateMany');
-        }
-        emitChange(companyId, 'update', updated);
+        if (!(await removeComment(companyId, comment, uid))) return fail(res, COMMENT_NOT_FOUND, 404);
         return res.send({ status: true, statusText: 'Comment deleted.', data: { _id: String(comment._id) } });
     } catch (error) {
         return failed(res, 'delete page comment', error);
