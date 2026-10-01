@@ -92,7 +92,7 @@ describe('the hybrid resolver', () => {
         expect(byKey['old.one']).toBeUndefined();
         expect(byKey['qa-review']).toMatchObject({ source: 'code', enabled: true, inputs: ['public_url'], emits: ['subtask.create', 'task.comment'], risk: 'low' });
         expect(list.filter((s) => s.key === 'brief.parse')).toHaveLength(1);
-        expect(list.map((s) => s.key)).toEqual(['brief.parse', 'task.summary', 'qa-review', 'pr.summary', 'digest.ceo', 'project.guide']);
+        expect(list.map((s) => s.key)).toEqual(['brief.parse', 'task.summary', 'qa-review', 'pr.summary', 'digest.ceo', 'project.guide', 'fields.fill', 'prd.draft', 'wiki.upkeep']);
         expect((await skillRecord.listSkills(C, { includeRetired: true })).some((s) => s.key === 'old.one')).toBe(true);
     });
 
