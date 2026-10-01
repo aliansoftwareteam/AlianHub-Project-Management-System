@@ -10,6 +10,7 @@ const { GRANT, DOCS_GRANT } = require('./manageFlag');
 const { loadProject, NO_PROJECT, NO_TASK, NO_PAGE } = require('./dataTools');
 const { taskRow } = require('./taskRows');
 const goalTools = require('./goalTools');
+const queueTools = require('./queueTools');
 const v2 = require('./v2Flag');
 const cursor = require('./cursor');
 
@@ -325,6 +326,7 @@ const TOOLS = [
         params: (args) => ({ pageId: str(args.pageId, 40), commentId: str(args.commentId, 40), assigneeId: args.assigneeId === null ? '' : str(args.assigneeId, 40) }),
     },
     ...goalTools.TOOLS,
+    ...queueTools.TOOLS,
 ];
 
 /* OAuth has no write scope for projects or docs, so each write is held to the one a comment or a task change needs. */
@@ -335,6 +337,7 @@ const SCOPES = Object.freeze({
     'task.lists.list': 'tasks:read',
     'page.comments.list': 'docs:read',
     ...goalTools.READ_SCOPES,
+    ...queueTools.READ_SCOPES,
     ...Object.fromEntries(TOOLS.filter((tool) => !tool.run).map((tool) => [tool.name, 'tasks:write'])),
 });
 

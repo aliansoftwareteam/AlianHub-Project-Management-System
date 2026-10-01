@@ -203,6 +203,7 @@ const inverses = {
         await requests.setArchived({ companyId, who: requests.whoOf(actor), taskId: u.taskId, to: u.previous });
         return { taskId: u.taskId, restored: u.previous };
     },
+    ...require('./manager/workQueue').inverses,
 };
 
 const isUndoable = (row) => Boolean(row && row.meta && row.meta.undo && inverses[row.meta.undo.kind] && !row.meta.undoneAt);

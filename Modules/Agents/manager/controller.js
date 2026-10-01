@@ -8,6 +8,7 @@ const agentAudit = require('../agentAudit');
 const settings = require('./settings');
 const findings = require('./findings');
 const dailyLook = require('./dailyLook');
+const workQueue = require('./workQueue');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const EDIT_ACTION = 'project.agent_manager.edit';
@@ -27,7 +28,7 @@ const openProject = async (req, res) => {
 /* No total is sent beside the list: a count of what the reader cannot open would give it away. */
 const answer = async (companyId, uid, projectId, canEdit) => {
     const [held, list] = await Promise.all([settings.read(companyId, projectId), findings.visibleTo(companyId, uid, projectId)]);
-    return { ...held, canEdit, findings: held.on ? list : [] };
+    return { ...held, canEdit, findings: held.on ? await workQueue.claimsOf(companyId, uid, list) : [] };
 };
 
 /* An API token never turns it on or off, whoever holds it. */
@@ -66,4 +67,46 @@ const saveProjectManager = async (req, res) => {
     } catch (e) { logger.error(`saveProjectManager: ${e.message}`); return fail(res, 500, e.message); }
 };
 
-module.exports = { getProjectManager, putProjectManager: [agentsRefused(EDIT_ACTION), saveProjectManager], EDIT_ACTION };
+/* The work queue as people meet it: the line on a task, handing a task over, and taking an item back from an agent. */
+const person = (req, res) => {
+    const companyId = String(req.headers.companyid || '');
+    if (!companyId || !req.uid) { fail(res, 401, 'Unauthorized.'); return null; }
+    if (req.apiToken) { fail(res, 403, 'An API token cannot hand work to an agent or take it back.'); return null; }
+    return companyId;
+};
+
+const getTaskQueue = async (req, res) => {
+    try {
+        const companyId = String(req.headers.companyid || '');
+        if (!companyId || !req.uid) return fail(res, 401, 'Unauthorized.');
+        return res.json({ status: true, statusText: 'Work queue fetched.', data: await workQueue.aboutTask(companyId, req.uid, req.params.taskId) });
+    } catch (e) { logger.error(`getTaskQueue: ${e.message}`); return fail(res, 500, e.message); }
+};
+
+const handOverTask = async (req, res) => {
+    try {
+        const companyId = person(req, res);
+        if (!companyId) return undefined;
+        const handed = await workQueue.handOver(companyId, req.uid, req.params.taskId);
+        if (handed.error) return fail(res, handed.status, handed.error);
+        return res.json({ status: true, statusText: 'Handed to an agent.', data: handed.about });
+    } catch (e) { logger.error(`handOverTask: ${e.message}`); return fail(res, 500, e.message); }
+};
+
+const takeBackItem = async (req, res) => {
+    try {
+        const companyId = person(req, res);
+        if (!companyId) return undefined;
+        const taken = await workQueue.takeBack(companyId, req.uid, req.params.itemId);
+        if (taken.error) return fail(res, taken.status, taken.error);
+        return res.json({ status: true, statusText: 'Taken back.', data: await workQueue.aboutTask(companyId, req.uid, taken.taskId) });
+    } catch (e) { logger.error(`takeBackItem: ${e.message}`); return fail(res, 500, e.message); }
+};
+
+const HAND_OVER_ACTION = 'queue.hand_over';
+const TAKE_BACK_ACTION = 'queue.take_back';
+
+module.exports = {
+    getProjectManager, putProjectManager: [agentsRefused(EDIT_ACTION), saveProjectManager], EDIT_ACTION,
+    getTaskQueue, postHandOver: [agentsRefused(HAND_OVER_ACTION), handOverTask], postTakeBack: [agentsRefused(TAKE_BACK_ACTION), takeBackItem],
+};
