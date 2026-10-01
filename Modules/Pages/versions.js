@@ -6,7 +6,7 @@ const { fail } = require('../../Config/respond');
 const logger = require('../../Config/loggerConfig');
 const { emitPageChange } = require('./helpers/pageEvents');
 const { canUsePage } = require('./helpers/pageAccess');
-const { isObjectIdString, reviewState } = require('./helpers/pageRules');
+const { isObjectIdString, reviewState, hideShares } = require('./helpers/pageRules');
 const { EDITOR_VERSION, blocksToHtml, blocksToRawText } = require('./helpers/pageContent');
 const rules = require('./helpers/pageVersionRules');
 const versions = require('./helpers/pageVersions');
@@ -166,7 +166,7 @@ exports.restoreVersion = async (req, res) => {
 
         pageSettle.cancel(companyId, page._id);
         emitPageChange(companyId, 'update', updated);
-        const data = typeof updated.toObject === 'function' ? updated.toObject() : updated;
+        const data = hideShares(typeof updated.toObject === 'function' ? updated.toObject() : { ...updated }, uid);
         data.reviewState = reviewState(data);
         return res.send({ status: true, statusText: 'Version restored.', data });
     } catch (error) {

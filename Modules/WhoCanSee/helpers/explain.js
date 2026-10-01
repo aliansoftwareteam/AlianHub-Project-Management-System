@@ -5,7 +5,8 @@ const { ACTIVE_SEAT } = require('../../../Config/seatStatus');
 const { ROLE_GUEST, isPrivileged } = require('../../../Config/roleTypes');
 const { canReadProject, canEditProject, DETAILS } = require('../../../Config/projectAccess');
 const { TEAM_PREFIX, canSeeSprint, sprintIdentities } = require('../../Sprints/helpers/sprintVisibility');
-const { canUsePage } = require('../../Pages/helpers/pageAccess');
+const { canUsePage, canManageShares } = require('../../Pages/helpers/pageAccess');
+const { shareFor } = require('../../Pages/helpers/pageRules');
 const { shareIsLive } = require('../../PublicShares/helpers/shareAccess');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -16,7 +17,7 @@ const SPRINT_MANAGE = ['project.project_sprint_name_edit', 'project.sprint_type_
 // A public doc link serves its subtree this many levels down (Modules/PublicShares/publicRenderer.js).
 const SHARED_TREE_MAX_DEPTH = 12;
 const CONCURRENCY = 8;
-const REASON_ORDER = ['personal', 'author', 'admin', 'sprint_member', 'sprint_team', 'member', 'team', 'guest', 'role', 'everyone'];
+const REASON_ORDER = ['personal', 'author', 'named', 'admin', 'sprint_member', 'sprint_team', 'member', 'team', 'guest', 'role', 'everyone'];
 const SPRINT_REASONS = { member: 'sprint_member', team: 'sprint_team', guest: 'guest' };
 const LEVELS = ['view', 'edit', 'manage'];
 
@@ -154,17 +155,22 @@ const sprintSubject = async (companyId, id) => {
     };
 };
 
-const pageSubject = async (companyId, id) => {
+/* Who a doc is shared with by name is shown to the people who manage that list, and to each named person
+ * about themselves; every other reader sees the rest of the answer. */
+const pageSubject = async (companyId, id, caller) => {
     const page = await findOne(companyId, SCHEMA_TYPE.PAGES, { _id: oid(id), deletedStatusKey: 0 });
     if (!page) return null;
     const isPrivate = String(page.visibility || '') === 'private';
     const project = isId(page.ProjectID) ? await findOne(companyId, SCHEMA_TYPE.PROJECTS, { _id: oid(page.ProjectID) }) : null;
     const teams = project ? await teamsIn(companyId, project.AssigneeUserId) : [];
+    const seesNamed = await canManageShares(companyId, page, caller);
+    const namedOnly = async (uid) => Boolean(shareFor(page, uid)) && !(await canUsePage(companyId, page, uid, { named: false }));
     return {
         title: page.title || '',
-        canRead: (uid) => canUsePage(companyId, page, uid),
+        canRead: async (uid) => (await canUsePage(companyId, page, uid)) && (uid === caller || seesNamed || !(await namedOnly(uid))),
         level: async (uid) => ((await canUsePage(companyId, page, uid, { edit: true })) ? 'edit' : 'view'),
-        reason: (uid, roleType) => {
+        reason: async (uid, roleType) => {
+            if (await namedOnly(uid)) return { reason: 'named' };
             if (isPrivate) return { reason: 'author' };
             return project ? projectReason(project, teams, uid, roleType) : { reason: 'everyone' };
         },
@@ -200,12 +206,12 @@ const explain = async (kind, companyId, itemId, callerUid) => {
 
     const members = await activeMembers(company);
     if (!members.has(caller)) return null;
-    const subject = await subjectOf(company, String(itemId));
+    const subject = await subjectOf(company, String(itemId), caller);
     if (!subject || !(await subject.canRead(caller, members.get(caller)))) return null;
 
     const entries = await mapLimit([...members], CONCURRENCY, async ([uid, roleType]) => {
         if (uid !== caller && !(await subject.canRead(uid, roleType))) return null;
-        return { uid, can: await subject.level(uid), ...subject.reason(uid, roleType) };
+        return { uid, can: await subject.level(uid), ...(await subject.reason(uid, roleType)) };
     });
     return {
         kind,

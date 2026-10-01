@@ -235,8 +235,11 @@ const targetVisible = async (companyId, uid, u) => {
     }
     if (u.kind === 'batch') return true;
     if (u.kind === 'page' || u.kind === 'pageVersion') {
-        const page = await findRow(companyId, SCHEMA_TYPE.PAGES, u.pageId, { visibility: 1, createdBy: 1, ProjectID: 1, deletedStatusKey: 1 });
-        return Boolean(page) && Number(page.deletedStatusKey || 0) !== 1 && canUsePage(companyId, page, uid, { edit: true });
+        const page = await findRow(companyId, SCHEMA_TYPE.PAGES, u.pageId, { visibility: 1, createdBy: 1, ProjectID: 1, sharedWith: 1, deletedStatusKey: 1 });
+        /* Undoing a page takes it to the trash, which a person the doc is only shared with may not do; putting
+         * a version back is an edit of its text. */
+        return Boolean(page) && Number(page.deletedStatusKey || 0) !== 1
+            && canUsePage(companyId, page, uid, { edit: true, named: u.kind === 'pageVersion' });
     }
     if (u.kind === 'pageComment' || u.kind === 'pageCommentAssign') {
         const page = await findRow(companyId, SCHEMA_TYPE.PAGES, u.pageId, { visibility: 1, createdBy: 1, ProjectID: 1, deletedStatusKey: 1 });

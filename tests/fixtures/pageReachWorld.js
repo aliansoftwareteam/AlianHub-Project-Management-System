@@ -11,9 +11,11 @@ const PEOPLE = {
     inside: 'a000000000000000000000a3',
     outside: 'a000000000000000000000a4',
     guest: 'a000000000000000000000a5',
+    viewer: 'a000000000000000000000a6',
+    editor: 'a000000000000000000000a7',
 };
 
-const ROLES = { owner: ROLE_OWNER, admin: ROLE_ADMIN, inside: ROLE_MEMBER, outside: ROLE_MEMBER, guest: ROLE_GUEST };
+const ROLES = { owner: ROLE_OWNER, admin: ROLE_ADMIN, inside: ROLE_MEMBER, outside: ROLE_MEMBER, guest: ROLE_GUEST, viewer: ROLE_MEMBER, editor: ROLE_MEMBER };
 
 const PROJECTS = {
     open: 'b000000000000000000000b1',
@@ -31,7 +33,12 @@ const PAGES = {
     closed: 'e000000000000000000000e5',
     orphaned: 'e000000000000000000000e6',
     deleted: 'e000000000000000000000e7',
+    namedView: 'e000000000000000000000e8',
+    namedEdit: 'e000000000000000000000e9',
 };
+
+const SHARED_AT = new Date(Date.UTC(2026, 0, 20));
+const namedTo = (who, role, by) => [{ userId: PEOPLE[who], role, by: PEOPLE[by], at: SHARED_AT }];
 
 const pageRows = () => [
     { _id: PAGES.insidePrivate, visibility: 'private', createdBy: PEOPLE.inside, ProjectID: PROJECTS.open },
@@ -41,6 +48,8 @@ const pageRows = () => [
     { _id: PAGES.closed, visibility: 'project', createdBy: PEOPLE.owner, ProjectID: PROJECTS.closed },
     { _id: PAGES.orphaned, visibility: 'project', createdBy: PEOPLE.owner, ProjectID: PROJECTS.trashed },
     { _id: PAGES.deleted, visibility: 'project', createdBy: PEOPLE.owner, ProjectID: PROJECTS.open, deletedStatusKey: 1 },
+    { _id: PAGES.namedView, visibility: 'private', createdBy: PEOPLE.inside, ProjectID: PROJECTS.closed, sharedWith: namedTo('viewer', 'viewer', 'inside') },
+    { _id: PAGES.namedEdit, visibility: 'project', createdBy: PEOPLE.owner, ProjectID: PROJECTS.closed, sharedWith: namedTo('editor', 'editor', 'owner') },
 ].map((row, index) => ({
     title: `Atlas ${nameOf(row._id)}`,
     rawText: 'atlas notes',
@@ -53,6 +62,8 @@ const pageRows = () => [
 }));
 
 const nameOf = (id) => Object.keys(PAGES).find((name) => PAGES[name] === String(id)) || String(id);
+
+const nameOfPerson = (id) => Object.keys(PEOPLE).find((who) => PEOPLE[who] === String(id)) || String(id);
 
 /* The pages a reader answered with, by name and in the world's own order. */
 const named = (rows) => {
@@ -78,4 +89,4 @@ const askEveryone = async (read) => {
     return answers;
 };
 
-module.exports = { C, PEOPLE, ROLES, PROJECTS, PAGES, TASK, pageRows, nameOf, named, seed, askEveryone };
+module.exports = { C, PEOPLE, ROLES, PROJECTS, PAGES, TASK, pageRows, nameOf, nameOfPerson, named, seed, askEveryone };

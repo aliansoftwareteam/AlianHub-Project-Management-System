@@ -94,6 +94,9 @@
                             <button type="button" class="pd__unlink" :title="$t('Docs.unlink')" @click="unlinkTask(task.id)">✕</button>
                         </span>
                     </span>
+                    <span v-if="sharedLine" class="pd__prop pd__shared-line" data-test="doc-shared-line">
+                        <ShellIcon name="members" :size="11" />{{ sharedLine }}
+                    </span>
                     <span class="pd__prop pd__prop--muted pd__save-state" role="status" :title="saveError || null">
                         <span class="ah-dot" :class="saveDot"></span>
                         {{ saveLabel }}
@@ -195,6 +198,7 @@
                             <input class="ah-input pd__share-url" type="text" readonly :value="shareUrl" @focus="$event.target.select()" />
                             <button type="button" class="ah-btn ah-btn--primary ah-btn--block" @click="copyShareLink">{{ $t('Projects.doc_copy_public_link') }}</button>
                         </template>
+                        <PageSharePeople v-if="page.canManageShares" :page-id="String(page._id)" @changed="onSharesChanged" />
                         <button type="button" class="ah-btn ah-btn--secondary ah-btn--block pd__who" @click="showWhoCanSee = true">
                             <ShellIcon name="eye" :size="13" />{{ $t('WhoCanSee.menu_doc') }}
                         </button>
@@ -245,6 +249,7 @@ import PageComposeRail from '@/components/molecules/Pages/PageComposeRail.vue';
 import PagePresenter from '@/components/molecules/Pages/PagePresenter.vue';
 import PageComments from '@/components/molecules/Pages/PageComments.vue';
 import PageHistory from '@/components/molecules/Pages/PageHistory.vue';
+import PageSharePeople from '@/components/molecules/Pages/PageSharePeople.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
@@ -331,6 +336,14 @@ const privateHint = computed(() => {
     return isPrivate.value ? t('Projects.doc_private_hint') : t('Projects.doc_shared_hint');
 });
 const shareUrl = computed(() => (share.value ? `${window.location.origin}/share/${share.value.token}` : ''));
+const sharedLine = computed(() => {
+    if (!page.value) return '';
+    if (page.value.sharedWithMe) return t('Docs.shared_with_you');
+    const count = page.value.canManageShares ? Number(page.value.sharedCount) || 0 : 0;
+    if (!count) return '';
+    return count === 1 ? t('Docs.shared_with_one') : t('Docs.shared_with_n', { n: count });
+});
+const onSharesChanged = (count) => { if (page.value) page.value = { ...page.value, sharedCount: count }; };
 
 const isDirty = computed(() => !!page.value
     && (draftTitle.value !== savedSnapshot.value.title || contentHtml.value !== savedSnapshot.value.html));
@@ -884,6 +897,7 @@ onBeforeUnmount(() => {
 .pd__prop--btn:disabled { opacity: .6; cursor: not-allowed; }
 .pd__prop--wrap { flex-wrap: wrap; }
 .pd__prop--muted { margin-left: auto; }
+.pd__shared-line { color: var(--ink-2); }
 .pd__k { color: var(--ink-label); }
 .pd__k--strong { color: var(--ink); font-weight: 500; }
 .pd__select, .pd__date {

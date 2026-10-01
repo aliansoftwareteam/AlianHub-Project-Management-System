@@ -29,21 +29,25 @@ beforeEach(() => {
 describe('the page readers agree on who reaches a page: public links', () => {
     it('lets a person manage the link of a doc they can change', async () => {
         expect(await decisions((decision) => decision.ok)).toEqual({
-            owner: ['shared', 'company', 'closed'],
-            admin: ['shared', 'company', 'closed'],
-            inside: ['insidePrivate', 'shared', 'company', 'closed'],
+            owner: ['shared', 'company', 'closed', 'namedEdit'],
+            admin: ['shared', 'company', 'closed', 'namedEdit'],
+            inside: ['insidePrivate', 'shared', 'company', 'closed', 'namedView', 'namedEdit'],
             outside: ['outsidePrivate', 'shared', 'company'],
             guest: ['shared', 'company'],
+            viewer: ['shared', 'company'],
+            editor: ['shared', 'company'],
         });
     });
 
     it('marks the author\'s own private doc, which takes no new link', async () => {
         expect(await decisions((decision) => decision.privateDoc === true)).toEqual({
-            owner: [], admin: [], inside: ['insidePrivate'], outside: ['outsidePrivate'], guest: [],
+            owner: [], admin: [], inside: ['insidePrivate', 'namedView'], outside: ['outsidePrivate'], guest: [], viewer: [], editor: [],
         });
     });
 
-    it('answers not found for everything else', async () => {
-        expect(await decisions((decision) => !decision.ok && decision.statusCode !== 404)).toEqual({ owner: [], admin: [], inside: [], outside: [], guest: [] });
+    it('answers not found for everything else, a doc shared with the person by name included', async () => {
+        expect(await decisions((decision) => !decision.ok && decision.statusCode !== 404)).toEqual({
+            owner: [], admin: [], inside: [], outside: [], guest: [], viewer: [], editor: [],
+        });
     });
 });

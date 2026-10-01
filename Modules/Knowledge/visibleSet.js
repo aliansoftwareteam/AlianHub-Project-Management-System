@@ -80,6 +80,8 @@ const resolveVisibleSet = async ({ companyId, caller, scope } = {}) => {
     const hidden = privileged || !projectIds.length ? [] : await hiddenSprintIds(company, uid, projectIds);
     const wanted = scope && Array.isArray(scope.sourceTypes) ? scope.sourceTypes : SOURCE_TYPES;
     const fileProjectIds = wanted.includes('file') ? await attachmentProjects(company, uid, privileged, projectIds) : [];
+    const inScope = projectId ? [projectId] : null;
+    const namedProjectIds = narrowing ? (inScope || narrowing).filter((id) => narrowing.includes(id)) : inScope;
 
     return {
         companyId: company,
@@ -91,6 +93,7 @@ const resolveVisibleSet = async ({ companyId, caller, scope } = {}) => {
         hiddenSprintIds: hidden.map(String),
         fileProjectIds,
         sourceTypes: SOURCE_TYPES.filter((type) => wanted.includes(type)),
+        ...(namedProjectIds ? { namedProjectIds } : {}),
         ...(narrowing ? { projectBound: true, reachesProjectless: false } : {}),
     };
 };
@@ -99,12 +102,21 @@ const resolveVisibleSet = async ({ companyId, caller, scope } = {}) => {
  * it only as far as that module allows. */
 const projectlessClosed = (set) => Boolean(set.projectBound) && !set.reachesProjectless;
 
+/* Where a page shared with the caller by name is still read: anywhere, unless the search is scoped to a
+ * project, or the set is kept to some (a narrowed token's own list, an agent's projects). */
+const namedWithin = (set) => {
+    if (Array.isArray(set.namedProjectIds)) return objectIds(set.namedProjectIds);
+    return set.projectId || set.projectBound ? objectIds(set.projectIds) : null;
+};
+
 /* A page with no project is the company's, unless the caller scoped to one project. */
-const pageReach = (set, projectField) => pageReachFilter({
+const pageReach = (set, projectField, sharedAsIds = false) => pageReachFilter({
     uid: set.caller.userId,
     projectIds: objectIds(set.projectIds),
     companyWide: !(set.projectId || projectlessClosed(set)),
     projectField,
+    namedProjectIds: namedWithin(set),
+    sharedAsIds,
 });
 
 /* A call belongs to the people on it; its project narrows only a search scoped to one project, or
@@ -142,7 +154,7 @@ const liveChunk = (set, sourceType) => ({ companyId: set.companyId, sourceType, 
 const chunkClausesFor = (set) => {
     const hidden = set.hiddenSprintIds.length ? { sprintId: { $nin: objectIds(set.hiddenSprintIds) } } : {};
     return {
-        page: { ...liveChunk(set, 'page'), ...pageReach(set, 'projectId') },
+        page: { ...liveChunk(set, 'page'), ...pageReach(set, 'projectId', true) },
         comment: { ...liveChunk(set, 'comment'), projectId: { $in: objectIds(set.projectIds) }, ...hidden },
         guide: { ...liveChunk(set, 'guide'), projectId: { $in: objectIds(set.projectIds) } },
         file: { ...liveChunk(set, 'file'), projectId: { $in: objectIds(set.fileProjectIds || []) }, ...hidden },
