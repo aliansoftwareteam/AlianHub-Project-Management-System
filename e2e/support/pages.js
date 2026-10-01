@@ -1,3 +1,4 @@
+/* eslint-env browser */
 const fs = require('node:fs');
 const path = require('node:path');
 const { storageStatePath } = require('./fixtures');
