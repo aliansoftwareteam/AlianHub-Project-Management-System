@@ -447,6 +447,29 @@ describe('voting', () => {
         expect(idsOf(SOURCE, VOTES)).toEqual([MEMBER]);
     });
 
+    it('cannot be made of a field that already holds values of another kind, nor unmade', async () => {
+        const registered = {};
+        const record = (method) => (path, ...handlers) => { registered[`${method} ${path}`] = handlers; };
+        routes.init({ get: record('GET'), put: record('PUT'), post: record('POST') });
+        const sameKind = registered['PUT /api/v1/customField'].at(-2);
+        const NUMBER = '6f0000000000000000000e35';
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: NUMBER, fieldTitle: 'Points', fieldType: 'number', type: 'task', global: true, isDelete: true });
+        const change = async (id, updateObject) => {
+            const res = response();
+            let passed = false;
+            await sameKind(request(OWNER, { key: '$set', type: 'updateOne', id, updateObject }), res, () => { passed = true; });
+            return passed ? 'passed' : res.statusCode;
+        };
+        expect(await change(NUMBER, { fieldType: 'voting' })).toBe(400);
+        expect(await change(NUMBER, { fieldType: 'relationship' })).toBe(400);
+        expect(await change(VOTES, { fieldType: 'number' })).toBe(400);
+        expect(await change(CLIENT, { fieldType: 'voting' })).toBe(400);
+        expect(await change(MISSING, { fieldType: 'voting' })).toBe(400);
+        expect(await change(VOTES, { fieldType: 'voting', fieldVotersShown: false })).toBe('passed');
+        expect(await change(VOTES, { fieldTitle: 'Upvotes' })).toBe('passed');
+        expect(await change(NUMBER, { fieldType: 'money' })).toBe('passed');
+    });
+
     it('starts over on a field that was a relationship before', async () => {
         definition(CLIENT).fieldType = 'voting';
         expect(await vote(MEMBER, SOURCE, true, CLIENT)).toEqual({ count: 1, voted: true });

@@ -5,7 +5,7 @@ const fieldLinks = require('./fieldLinksController');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { requireProjectAccess } = require('../../Config/projectAccess');
-const { fieldInsertFrom, fieldUpdateFrom, isCompanyWide, widensToCompany, requireFieldSettings, checkFieldWrite } = require('./helpers/fieldWrite');
+const { fieldInsertFrom, fieldUpdateFrom, isCompanyWide, widensToCompany, requireFieldSettings, requireSameKind, checkFieldWrite } = require('./helpers/fieldWrite');
 
 const CUSTOM_FIELD_EDIT = [['project.project_custom_field', 'task.task_custom_field']];
 
@@ -13,7 +13,7 @@ const projectsOf = (field) => (field && field.global !== true && field.projectId
 
 const storedField = (req) => MongoDbCrudOpration(req.headers['companyid'], {
     type: SCHEMA_TYPE.CUSTOM_FIELDS,
-    data: [{ _id: new mongoose.Types.ObjectId(String(req.body.id)) }, { global: 1, projectId: 1 }],
+    data: [{ _id: new mongoose.Types.ObjectId(String(req.body.id)) }, { global: 1, projectId: 1, fieldType: 1 }],
 }, 'findOne');
 
 const insertedFieldProjects = (req) => projectsOf(req.body.updateObject);
@@ -34,6 +34,7 @@ exports.init = (app) => {
         checkFieldWrite(fieldUpdateFrom),
         requireProjectAccess({ projectIds: updatedFieldProjects, permissions: () => CUSTOM_FIELD_EDIT }),
         requireFieldSettings(updateTouchesCompanyWide),
+        requireSameKind(storedField),
         ctrl.updateCustomField)
     app.post('/api/v1/customField',
         checkFieldWrite(({ updateObject }) => fieldInsertFrom(updateObject)),
