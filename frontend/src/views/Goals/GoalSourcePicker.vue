@@ -1,7 +1,7 @@
 <template>
     <fieldset class="gsp" data-test="gsp">
         <legend class="ah-field__label">{{ $t('Goals.sources') }}</legend>
-        <GoalSourceChips :sources="linked" :refused="refused" removable @remove="remove" />
+        <GoalSourceChips :sources="linked" :names="names" :refused="refused" removable @remove="remove" />
         <p v-if="!count" class="gsp__note" data-test="gsp-empty">{{ $t('Goals.sources_none') }}</p>
 
         <label class="gsp__find">
@@ -53,6 +53,7 @@ const SEARCH_DELAY_MS = 250;
 
 const props = defineProps({
     modelValue: { type: Object, default: null },
+    names: { type: Object, default: null },
     refused: { type: Object, default: null },
     error: { type: String, default: "" },
     errorId: { type: String, default: "" }

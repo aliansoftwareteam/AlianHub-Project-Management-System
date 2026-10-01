@@ -2,6 +2,11 @@
  * and the import carries it out, so both count the same way. Pure, no I/O. */
 const { levelRows } = require('../../Tasks/helpers/taskTreeRules');
 const { planFields, NO_PERMISSION } = require('./clickupFields');
+const { newComments } = require('./importComments');
+
+const SKIP = 'skip';
+const UPDATE = 'update';
+const NOTHING_HERE = Object.freeze({ mode: SKIP, stored: new Map(), commentKeys: new Map() });
 
 const lower = (value) => String(value === undefined || value === null ? '' : value).trim().toLowerCase();
 const unique = (values) => values.filter((value, index) => values.findIndex((other) => lower(other) === lower(value)) === index);
@@ -16,10 +21,11 @@ const emptySummary = () => ({
     tags: { added: [], skipped: [] },
     links: 0,
     people: { unmatched: [], cannotOpen: [] },
+    existing: { skipped: 0, updated: 0 },
 });
 
-const commentsOf = (tasks, { authorIdByEmail }, allowed) => {
-    const comments = tasks.flatMap((task) => task.comments || []);
+const commentsOf = (tasks, { authorIdByEmail }, allowed, commentKeys) => {
+    const comments = tasks.flatMap((task) => newComments(task, commentKeys));
     if (!allowed) return { imported: 0, skipped: comments.length, reason: comments.length ? NO_PERMISSION : '', unmatchedAuthors: [] };
     const strangers = comments.filter((comment) => comment.author && !authorIdByEmail.has(comment.email)).map((comment) => comment.author);
     return { imported: comments.length, skipped: 0, reason: '', unmatchedAuthors: unique(strangers) };
@@ -48,9 +54,17 @@ const tagsOf = (tasks, known, allowed) => {
 /* `state` is the project as the import finds it: its id, the field definitions it may use and its tag names. `people`
  * maps each email the file names to a member, to a member who can open the project, and to a member whose comments
  * this import may keep under their own name. `allowed` says whether the person importing may edit fields, comment,
- * and add tags. */
-const planClickUpList = ({ tasks, columns, unnamedAssignees = [], state, people, allowed }) => {
-    const { levels } = levelRows(tasks);
+ * and add tags. `existing` holds the tasks of the project a row's ClickUp id already names (`stored`, as
+ * `{ id, ancestors, sprintId, folderId }`), the imported comments those tasks hold, and whether such a row is left
+ * alone or updates its task. A row that is left alone takes no part in the plan; a new row whose parent is already here
+ * goes under it. */
+const planClickUpList = ({ tasks: rows, columns, unnamedAssignees = [], state, people, allowed, existing = NOTHING_HERE }) => {
+    const again = rows.filter((task) => existing.stored.has(task.importSourceId));
+    const fresh = rows.filter((task) => !existing.stored.has(task.importSourceId));
+    const updates = existing.mode === UPDATE ? again : [];
+    updates.forEach((task) => { task.storedTask = existing.stored.get(task.importSourceId); });
+    const tasks = [...fresh, ...updates];
+    const { levels } = levelRows(fresh, existing.stored);
     const fieldPlan = planFields({
         columns,
         tasks,
@@ -67,17 +81,18 @@ const planClickUpList = ({ tasks, columns, unnamedAssignees = [], state, people,
     const summary = {
         tasks: levels[0].length,
         subtasks: { level2: levels[1].length, level3: levels[2].length },
-        comments: commentsOf(tasks, people, allowed.comments),
+        comments: commentsOf(tasks, people, allowed.comments, existing.commentKeys),
         fields: fieldsSummary(fieldPlan),
-        checklistItems: total(tasks, (task) => total(task.checklists || [], (checklist) => checklist.items.length)),
+        checklistItems: total(fresh, (task) => total(task.checklists || [], (checklist) => checklist.items.length)),
         tags: tagsOf(tasks, state.tags, allowed.tags),
-        links: total(tasks, (task) => (task.links || []).length),
+        links: total(fresh, (task) => (task.links || []).length),
         people: {
             unmatched: unique([...outside.filter((entry) => !people.memberIdByEmail.has(lower(entry))), ...unnamedAssignees]),
             cannotOpen: outside.filter((entry) => people.memberIdByEmail.has(lower(entry))),
         },
+        existing: { skipped: again.length - updates.length, updated: updates.length },
     };
-    return { summary, fieldPlan, assignees };
+    return { summary, fieldPlan, assignees, fresh, updates };
 };
 
 /* The project as the next list of the same file finds it: the fields and tags this list added are there. */
@@ -116,10 +131,11 @@ const mergeSummaries = (summaries) => {
         tags: { added: unique([...sum.tags.added, ...one.tags.added]), skipped: unique([...sum.tags.skipped, ...one.tags.skipped]) },
         links: sum.links + one.links,
         people: { unmatched: unique([...sum.people.unmatched, ...one.people.unmatched]), cannotOpen: unique([...sum.people.cannotOpen, ...one.people.cannotOpen]) },
+        existing: { skipped: sum.existing.skipped + ((one.existing || {}).skipped || 0), updated: sum.existing.updated + ((one.existing || {}).updated || 0) },
     }), emptySummary());
     const created = new Set(merged.fields.created.map(lower));
     merged.fields.reused = merged.fields.reused.filter((name) => !created.has(lower(name)));
     return merged;
 };
 
-module.exports = { emptySummary, planClickUpList, stateAfter, mergeSummaries, fieldsSummary };
+module.exports = { SKIP, UPDATE, emptySummary, planClickUpList, stateAfter, mergeSummaries, fieldsSummary };

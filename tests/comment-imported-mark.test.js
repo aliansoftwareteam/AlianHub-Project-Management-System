@@ -60,7 +60,7 @@ beforeEach(() => {
 
 describe('where a comment was imported from is the importer\'s word alone', () => {
     it('names the field, and drops it from what a client sent', () => {
-        expect(IMPORT_FIELDS).toEqual(['importedFrom']);
+        expect(IMPORT_FIELDS).toEqual(['importedFrom', 'importJobId', 'importKey']);
         expect(withoutImportFields({ message: 'hi', importedFrom: 'clickup' })).toEqual({ message: 'hi' });
         expect(withoutImportFields(undefined)).toBeUndefined();
     });

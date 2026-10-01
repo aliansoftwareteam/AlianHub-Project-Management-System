@@ -47,7 +47,7 @@
         </template>
 
         <div v-if="kind === TASKS" class="gtf__sources">
-            <GoalSourcePicker :model-value="form.sources" :refused="refused" :error="errors.sources" :error-id="idOf('sources')" @update:modelValue="setSources" />
+            <GoalSourcePicker :model-value="form.sources" :names="target?.sourceNames" :refused="refused" :error="errors.sources" :error-id="idOf('sources')" @update:modelValue="setSources" />
             <span class="ah-field__hint">{{ $t('Goals.sources_hint') }}</span>
         </div>
 

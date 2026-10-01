@@ -19,10 +19,13 @@ const filedBy = (ctx) => (ctx.oauth
     : { tokenId: String((ctx.token && ctx.token._id) || ''), tokenProjectIds: Array.isArray(ctx.projectIds) ? ctx.projectIds : [] });
 
 /* An outside client files a proposal only where approval can ask its grant again: a tool that needs a manage
- * grant the caller holds, for an action that grant alone reaches. */
+ * grant the caller holds, for an action that grant alone reaches, or a tool whose held calls are filed under
+ * a manage grant the caller holds. */
 const outsideMayFile = (ctx, tool) => {
     const { grantOfAction } = require('./manageTools');
-    return Boolean(tool.grant) && grantOfAction(tool.action) === tool.grant && manageFlag.mayUse(ctx, tool.grant);
+    if (tool.grant) return grantOfAction(tool.action) === tool.grant && manageFlag.mayUse(ctx, tool.grant);
+    const under = require('./workTools').filedUnder(tool.action);
+    return Boolean(under) && tool.filedUnder === under && manageFlag.mayUse(ctx, under);
 };
 
 /* A destructive call is filed, not run. The same registry and holder checks a

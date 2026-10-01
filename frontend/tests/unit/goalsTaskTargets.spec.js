@@ -1,7 +1,7 @@
 /* Task 046 M3, slice G4: a target counted from tasks, on the Goals page. The goals store is the real
    one and the server's answers are the recorded ones (tests/fixtures/goalResponses.json), each given
-   to the request the page really sends. The lists come from a project store shaped like the app's;
-   the task search and the read of tasks by id belong to other modules and are answered here. */
+   to the request the page really sends. The lists a person can pick come from a project store shaped
+   like the app's; the task search belongs to another module and is answered here. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { config, flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
@@ -29,7 +29,6 @@ const LOOSE_TASK = '6f0000000000000000000d05';
 const DELIVERY = fixture.tasksGoal.response.data._id;
 const GOALS = '/api/v2/goals';
 const SEARCH = '/api/v2/search';
-const FIND = '/api/v1/task/find';
 
 vi.mock('@/services', () => ({ apiRequest }));
 vi.mock('vue-router', () => ({ useRoute: () => route.value, useRouter: () => router }));
@@ -38,7 +37,7 @@ vi.mock('@/composable', () => ({
     useGetterFunctions: () => ({ getUser: (id) => ({ id, Employee_Name: NAMES[id] || 'Ghost User', Employee_profileImageURL: '' }) })
 }));
 
-import goals, { COUNT_POLL_LIMIT, COUNT_POLL_MS, REFETCH_DELAY_MS } from '@/store/Goals';
+import goals, { COUNT_GIVE_UP_MS, COUNT_POLL_MS, REFETCH_DELAY_MS } from '@/store/Goals';
 import Goals from '@/views/Goals/Goals.vue';
 import GoalSourcePicker from '@/views/Goals/GoalSourcePicker.vue';
 
@@ -73,7 +72,6 @@ const reply = (name) => {
 };
 const answer = (method, url, body) => {
     if (url === SEARCH) return Promise.resolve({ data: { status: true, data: { tasks: tasks.filter((task) => task.TaskName.toLowerCase().includes(body.query.toLowerCase())) } } });
-    if (url === FIND) return Promise.resolve({ status: 200, data: tasks.filter((task) => body.findQuery[0].$match._id.objId.$in.includes(task._id)) });
     const name = recordedAs(method, url, body);
     return name ? reply(name) : Promise.reject(new Error(`a request the server never recorded: ${method} ${url} ${JSON.stringify(body)}`));
 };
@@ -106,10 +104,9 @@ const open = async (from, { as = 'me', projects = PROJECTS } = {}) => {
     viewer = as;
     route.value = reactive({ name: 'Goal', params: { cid: 'company-1', goalId: DELIVERY } });
     store = newStore(projects);
-    if (from) {
-        once(from);
-        listOf();
-    }
+    if (typeof from === 'string') once(from);
+    else if (from) apiRequest.mockImplementationOnce(() => Promise.resolve({ data: from }));
+    if (from) listOf();
     wrapper = mount(Goals, { global: { plugins: [store], provide: { $userId: ref(as === 'me' ? ME : SAM) } }, attachTo: document.body });
     await flushPromises();
     return wrapper;
@@ -191,15 +188,17 @@ describe('a target counted from tasks', () => {
         expect(at('glt-value-save', target).exists()).toBe(false);
     });
 
-    it('names each list and task it counts, with its project', async () => {
-        await open('tasksAdded');
+    it('names each list and task it counts with the names the server sent, and asks for nothing else', async () => {
+        await open('tasksAdded', { projects: [] });
         expect(chipsOf(at('glt-sources', targetOf('Release tasks')))).toEqual([['Sprint 1', 'Website'], ['Interviews', 'Hiring plan'], ['Fix the footer', 'Website']]);
-        expect(apiRequest.mock.calls.filter(([, url]) => url === FIND)).toHaveLength(1);
+        expect(apiRequest.mock.calls.filter(([, url]) => !url.startsWith(GOALS))).toEqual([]);
     });
 
-    it('does not name a list or task the person cannot open', async () => {
-        tasks = [{ ...FOOTER, ProjectID: 'a-project-not-in-the-store' }];
-        await open('tasksAdded', { projects: [PROJECTS[0]] });
+    it('does not name a list or task the server sent no name for', async () => {
+        const answered_ = JSON.parse(JSON.stringify(fixture.tasksAdded.response));
+        delete answered_.data.targets[0].sourceNames.sprintIds[TEAM_LIST];
+        delete answered_.data.targets[0].sourceNames.taskIds[LOOSE_TASK];
+        await open(answered_, { projects: [] });
         expect(chipsOf(at('glt-sources', targetOf('Release tasks')))).toEqual([['Sprint 1', 'Website'], ['A list you cannot open', ''], ['A task you cannot open', '']]);
         expect(wrapper.text()).not.toContain('Interviews');
         expect(wrapper.text()).not.toContain('Fix the footer');
@@ -261,13 +260,44 @@ describe('a count the server is still making', () => {
         expect(goalCalls()).toHaveLength(6);
     });
 
-    it('is not asked for for ever', async () => {
+    it('is asked for as long as the server says it is counting', async () => {
         fakeTimeouts();
         readsAnswer('tasksReadStale');
         await open();
-        await pass(COUNT_POLL_MS * (COUNT_POLL_LIMIT + 5));
-        expect(goalCalls()).toHaveLength(2 + 2 * COUNT_POLL_LIMIT);
+        await pass(COUNT_POLL_MS * 40);
+        expect(goalCalls()).toHaveLength(2 + 2 * 40);
         expect(at('glt-updating', targetOf('Release tasks')).exists()).toBe(true);
+    });
+
+    it('is no longer asked for once the server has called it under way for two and a half minutes, and is shown as failed', async () => {
+        fakeTimeouts();
+        readsAnswer('tasksReadStale');
+        await open();
+        await pass(COUNT_GIVE_UP_MS - COUNT_POLL_MS);
+        expect(at('glt-updating', targetOf('Release tasks')).exists()).toBe(true);
+        expect(at('glt-count-failed', targetOf('Release tasks')).exists()).toBe(false);
+
+        await pass(COUNT_POLL_MS * 2);
+        const asked = goalCalls().length;
+        expect(at('glt-updating', targetOf('Release tasks')).exists()).toBe(false);
+        expect(at('glt-count-failed', targetOf('Release tasks')).text()).toContain('The tasks could not be counted.');
+        expect(at('glt-recount', targetOf('Release tasks')).exists()).toBe(true);
+        await pass(COUNT_POLL_MS * 20);
+        expect(goalCalls()).toHaveLength(asked);
+    });
+
+    it('is asked for afresh once a count has come in', async () => {
+        fakeTimeouts();
+        readsAnswer('tasksReadStale');
+        await open();
+        await pass(COUNT_GIVE_UP_MS + COUNT_POLL_MS);
+        expect(store.getters['goals/countGivenUp']).toBe(true);
+
+        readsAnswer('tasksReadLeftOut');
+        await store.dispatch('goals/refresh');
+        await flushPromises();
+        expect(store.getters['goals/countGivenUp']).toBe(false);
+        expect(at('glt-count-failed', targetOf('Release tasks')).exists()).toBe(false);
     });
 
     it('stops being asked for when the page is left', async () => {
@@ -278,6 +308,46 @@ describe('a count the server is still making', () => {
         wrapper = null;
         await pass(COUNT_POLL_MS * 3);
         expect(goalCalls()).toHaveLength(2);
+    });
+});
+
+describe('a count that failed', () => {
+    it('is said in place of the waiting, is not asked for again, and is made again when the person asks', async () => {
+        fakeTimeouts();
+        readsAnswer('tasksReadBeforeFailing', 'tasksReadFailed');
+        await open();
+        expect(at('glt-updating', targetOf('Release tasks')).exists()).toBe(true);
+        expect(at('glt-count-failed', targetOf('Release tasks')).exists()).toBe(false);
+
+        await pass(COUNT_POLL_MS);
+        const failed = at('glt-count-failed', targetOf('Release tasks'));
+        expect(failed.text()).toContain('The tasks could not be counted.');
+        expect(failed.attributes('role')).toBe('status');
+        expect(at('glt-updating', targetOf('Release tasks')).exists()).toBe(false);
+        expect(at('glt-counted', targetOf('Release tasks')).text()).toBe('1 of 3 tasks done');
+        const asked = goalCalls().length;
+        await pass(COUNT_POLL_MS * 10);
+        expect(goalCalls()).toHaveLength(asked);
+
+        const target = fixture.tasksReadFailed.response.data.targets[0];
+        await click(at('glt-recount', failed));
+        expect(apiRequest.mock.calls.at(-1)).toEqual(['patch', `${GOALS}/${DELIVERY}/targets/${target.id}`, { sources: target.sources }]);
+        expect(at('glt-count-failed', targetOf('Release tasks')).exists()).toBe(false);
+    });
+
+    it('is said to a reader, who is given nothing to press', async () => {
+        await open('tasksReadFailedReader', { as: 'sam' });
+        const failed = at('glt-count-failed', targetOf('Release tasks'));
+        expect(failed.text()).toBe('The tasks could not be counted. It will be tried again shortly.');
+        expect(at('glt-recount').exists()).toBe(false);
+    });
+
+    it('is not said for a target with nothing linked, or while it is counted again', async () => {
+        const answered_ = JSON.parse(JSON.stringify(fixture.tasksReadFailed.response));
+        answered_.data.targets[0].updating = true;
+        await open(answered_);
+        expect(at('glt-count-failed').exists()).toBe(false);
+        expect(at('glt-updating', targetOf('Release tasks')).exists()).toBe(true);
     });
 });
 

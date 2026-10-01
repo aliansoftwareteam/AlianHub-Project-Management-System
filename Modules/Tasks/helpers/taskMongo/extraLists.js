@@ -6,9 +6,8 @@ const { HandleHistory } = require('../mongo_helper');
 const { TaskWriteRefusal, taskNotFound, plainIdOf, escapeText } = require('../taskWriteFields');
 const extraLists = require('../taskExtraLists');
 
-const { TASK_NOT_FOUND, TASK_CHANGED } = extraLists;
+const { TASK_NOT_FOUND, TASK_CHANGED, HISTORY_KEY } = extraLists;
 
-const HISTORY_KEY = 'Task_Extra_List';
 const MAX_TASKS_PER_REQUEST = 500;
 
 const refusalOf = (verdict) => (verdict === TASK_NOT_FOUND ? taskNotFound() : new TaskWriteRefusal(verdict.statusCode, verdict.reason, verdict.code));

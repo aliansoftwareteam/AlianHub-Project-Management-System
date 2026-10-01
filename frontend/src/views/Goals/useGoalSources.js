@@ -6,13 +6,13 @@ import * as env from "@/config/env";
 
 export const SEARCH_FROM = 2;
 
-/* A goal's answer carries the ids of its lists and tasks, not their names. A name is shown only
-   from what this person can already open: a list in the project store, or a task whose project
-   (and, read back by id, whose list) is there. Anything else is said to be out of their reach. */
-const tasksByStore = new WeakMap();
-const tasksOf = (store) => {
-    if (!tasksByStore.has(store)) tasksByStore.set(store, { seen: reactive(new Map()), asking: reactive(new Set()), asked: new Set() });
-    return tasksByStore.get(store);
+/* The server names each source this person can open (`sourceNames` on the target). What they pick
+   in the form before it is saved is named from where they picked it: a list in the project store,
+   or a task the search answered with. Anything else is said to be out of their reach. */
+const foundByStore = new WeakMap();
+const foundIn = (store) => {
+    if (!foundByStore.has(store)) foundByStore.set(store, reactive(new Map()));
+    return foundByStore.get(store);
 };
 
 const listsIn = (project) => [
@@ -23,7 +23,7 @@ const listsIn = (project) => [
 export function useGoalSources() {
     const store = useStore();
     const { t } = useI18n();
-    const { seen, asking, asked } = tasksOf(store);
+    const found = foundIn(store);
 
     const projects = computed(() => (store.getters["projectData/allProjects"]?.data || []).filter((project) => project && !project.deletedStatusKey));
     const projectNames = computed(() => new Map(projects.value.map((project) => [String(project._id), project.ProjectName || ""])));
@@ -36,39 +36,22 @@ export function useGoalSources() {
         }))).values()]);
     const listsById = computed(() => new Map(lists.value.map((list) => [list.id, list])));
 
-    const taskFrom = (row) => ({ kind: "taskIds", id: String(row._id), name: row.TaskName || "", projectName: projectNames.value.get(String(row.ProjectID)) || "" });
-    const openable = (row, { listToo }) => projectNames.value.has(String(row?.ProjectID)) && (!listToo || listsById.value.has(String(row.sprintId)));
-    const remember = (rows, rule) => rows.filter((row) => row?._id && openable(row, rule)).forEach((row) => seen.set(String(row._id), taskFrom(row)));
-
-    const unnamed = (kind, id) => {
-        if (kind === "sprintIds") return t("Goals.source_list_unknown");
-        return t(asking.has(String(id)) ? "Goals.source_task" : "Goals.source_task_unknown");
-    };
-    const sourceOf = (kind, id) => {
-        const known = kind === "sprintIds" ? listsById.value.get(String(id)) : seen.get(String(id));
-        return known ? { ...known, known: true } : { kind, id: String(id), known: false, name: unnamed(kind, id), projectName: "" };
+    const picked = (kind, id) => (kind === "sprintIds" ? listsById.value.get(id) : found.get(id));
+    const sourceOf = (kind, id, names) => {
+        const named = names?.[kind]?.[String(id)];
+        if (named) return { kind, id: String(id), name: named.name || "", projectName: named.projectName || "", known: true };
+        const known = picked(kind, String(id));
+        if (known) return { ...known, known: true };
+        return { kind, id: String(id), known: false, name: t(kind === "sprintIds" ? "Goals.source_list_unknown" : "Goals.source_task_unknown"), projectName: "" };
     };
 
-    /* The search answers only with tasks this person can open, so its rows need no second check. */
+    /* The search answers only with tasks this person can open. */
     async function searchTasks(query) {
         const response = await apiRequest("post", env.GLOBAL_SEARCH, { query });
-        const rows = response?.data?.status ? response.data.data?.tasks || [] : [];
-        remember(rows, { listToo: false });
-        return rows.map((row) => seen.get(String(row?._id))).filter(Boolean);
+        const rows = (response?.data?.status ? response.data.data?.tasks || [] : []).filter((row) => row?._id && projectNames.value.has(String(row.ProjectID)));
+        rows.forEach((row) => found.set(String(row._id), { kind: "taskIds", id: String(row._id), name: row.TaskName || "", projectName: projectNames.value.get(String(row.ProjectID)) || "" }));
+        return rows.map((row) => found.get(String(row._id)));
     }
 
-    async function nameTasks(ids) {
-        const unknown = [...new Set(ids.map(String))].filter((id) => !seen.has(id) && !asked.has(id));
-        if (!unknown.length) return;
-        unknown.forEach((id) => { asked.add(id); asking.add(id); });
-        try {
-            const response = await apiRequest("post", `${env.TASK}/find`, { findQuery: [{ $match: { _id: { objId: { $in: unknown } } } }] });
-            remember(Array.isArray(response?.data) ? response.data : [], { listToo: true });
-        } catch (error) {
-            unknown.forEach((id) => asked.delete(id));
-        }
-        unknown.forEach((id) => asking.delete(id));
-    }
-
-    return { lists, sourceOf, searchTasks, nameTasks };
+    return { lists, sourceOf, searchTasks };
 }

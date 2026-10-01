@@ -13,9 +13,12 @@ const { validateClickUpInput, validateClickUpRows, transformClickUpRows, preview
 const { STATUS_FALLBACK_TYPE, appendStatuses, applyImportTags } = require('./helpers/projectDetails');
 const { adjustedReport, adjustedSentences } = require('./helpers/importTree');
 const { mapStatusName } = require('./helpers/jiraRules');
-const { prepareClickUpDetails, previewClickUpPlan } = require('./helpers/clickupImport');
+const { planClickUpImport, prepareClickUpDetails, previewClickUpPlan } = require('./helpers/clickupImport');
 const { saveImportedComments } = require('./helpers/importComments');
-const { importTargetAccess, previewAccess, refuseImport } = require('./helpers/importAccess');
+const { importTargetAccess, previewAccess, refuseImport, canAddDetails } = require('./helpers/importAccess');
+const { undoImportJob } = require('./helpers/undoImport');
+const { UPDATE, SKIP } = require('./helpers/clickupPlan');
+const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const { findCompanyMembers, activeMemberIdSet } = require('./helpers/companyMembers');
 const { sessionActor } = require('../Tasks/helpers/taskWriteFields');
 const { sprintPlacementOf } = require('../Tasks/helpers/sprintPlacement');
@@ -55,6 +58,34 @@ exports.importFromJira = async (req, res) => {
     }
 };
 
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const DUPLICATE = 'duplicate';
+
+/* POST /api/v2/imports/:id/undo
+ * body: { keepEdited? } — see helpers/undoImport. */
+exports.undoImport = async (req, res) => {
+    try {
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
+        const id = String((req.params && req.params.id) || '');
+        if (!req.uid) return res.status(401).send({ status: false, statusText: 'A signed-in user is required.' });
+        const job = OBJECT_ID.test(id)
+            ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.IMPORT_JOBS, data: [{ _id: new mongoose.Types.ObjectId(id), source: { $ne: DUPLICATE } }] }, 'findOne')
+            : null;
+        if (!job) return res.status(404).send({ status: false, statusText: 'Import not found.' });
+
+        const out = await undoImportJob(companyId, { job, actor: await sessionActor(req), keepEdited: Boolean(req.body && req.body.keepEdited) });
+        if (out.refused) {
+            const { statusCode, ...refusal } = out.refused;
+            return res.status(statusCode).send({ status: false, ...refusal });
+        }
+        return res.send({ status: true, statusText: `${out.trashed} imported task(s) moved to the trash.`, data: out });
+    } catch (error) {
+        logger.error(`ERROR in undo import: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
 exports.listImports = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
@@ -65,10 +96,16 @@ exports.listImports = async (req, res) => {
         if (req.query && req.query.uid && String(req.query.uid) !== userId) {
             return res.status(403).send({ status: false, statusText: 'You can only list your own imports.' });
         }
+        const projectId = req.query && OBJECT_ID.test(String(req.query.projectId || '')) ? String(req.query.projectId) : '';
+        const everyones = isPrivileged(await getRoleType(companyId, userId));
         // The task copy of a duplicated project keeps its progress in this collection too (Modules/ProjectDuplicate).
         const jobs = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.IMPORT_JOBS,
-            data: [{ userId, source: { $ne: 'duplicate' } }, 'source status total processed created errorList createdAt', { sort: { createdAt: -1 }, limit: 20 }],
+            data: [
+                { ...(everyones ? {} : { userId }), ...(projectId ? { projectId: new mongoose.Types.ObjectId(projectId) } : {}), source: { $ne: DUPLICATE } },
+                'userId source projectId status total processed created updated errorList createdAt undoneAt',
+                { sort: { createdAt: -1 }, limit: 20 },
+            ],
         }, 'find');
         return res.send({ status: true, statusText: 'Imports fetched.', data: jobs || [] });
     } catch (error) {
@@ -184,26 +221,36 @@ const enrichImportTasks = async (companyId, tasks) => {
     return { unmatchedEmails };
 };
 
+const startImportJob = (companyId, { source, project, sprint, actor, total }) => MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.IMPORT_JOBS,
+    data: {
+        userId: actor.id,
+        source,
+        projectId: project._id,
+        sprintId: new mongoose.Types.ObjectId(sprint.id),
+        status: 'processing',
+        total,
+        processed: 0,
+        created: 0,
+        errorList: [],
+    },
+}, 'save');
+
+const failImportJob = (companyId, job, error) => MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.IMPORT_JOBS,
+    data: [{ _id: job._id }, { $set: { status: 'failed', errorList: [String((error && error.message) || error).slice(0, 300)] } }],
+}, 'updateOne').catch(() => {});
+
 /* Record the job, feed the bulk-create pipeline, update the job. Returns the
  * response envelope. Identical create path to the Jira importer. `details`
- * writes what needs the created task ids and answers the import's summary. */
-const finishImport = async (companyId, { source, project, sprint, actor, statusArray, tasks, skipped, addsTags = false, report = null, details = null }) => {
+ * writes what needs the created task ids and answers the import's summary.
+ * Every task and comment the import creates is marked with the job, so the
+ * import can be found again and undone. `updates` are rows whose task is
+ * already in the project; `storedParents` lets a new row go under such a task. */
+const finishImport = async (companyId, { source, project, sprint, actor, statusArray, tasks, skipped, addsTags = false, report = null, details = null, job: started = null, updates = [], storedParents = new Map() }) => {
     const userId = actor.id;
     const sprintId = sprint.id;
-    const job = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.IMPORT_JOBS,
-        data: {
-            userId,
-            source,
-            projectId: project._id,
-            sprintId: new mongoose.Types.ObjectId(sprintId),
-            status: 'processing',
-            total: tasks.length,
-            processed: 0,
-            created: 0,
-            errorList: [],
-        },
-    }, 'save');
+    const job = started || await startImportJob(companyId, { source, project, sprint, actor, total: tasks.length });
 
     const projectData = {
         _id: project._id,
@@ -215,41 +262,43 @@ const finishImport = async (companyId, { source, project, sprint, actor, statusA
     // S3-01: fold Trello rich data (checklists, attachments, members, labels)
     // onto each task before creation; comments are added after (they need ids).
     const { unmatchedEmails } = await enrichImportTasks(companyId, tasks);
-    await applyImportTags(companyId, project, tasks, { create: addsTags });
+    await applyImportTags(companyId, project, [...tasks, ...updates], { create: addsTags });
     const tasksWithSprint = tasks.map((task) => ({ ...task, sprintId, sprintArray: sprint }));
 
     try {
-        const result = await taskMongo.createMultipleTasks({
-            tasks: tasksWithSprint,
-            userData: actor,
-            projectData,
-            indexObj: {},
-            statusArray,
-            sprint,
-        });
+        const result = tasks.length
+            ? await taskMongo.createMultipleTasks({
+                tasks: tasksWithSprint,
+                userData: actor,
+                projectData,
+                indexObj: {},
+                statusArray,
+                sprint,
+                importMark: { jobId: String(job._id) },
+                storedParents,
+            })
+            : { createdTasks: [], data: [], adjusted: [] };
         // The create path stamps the rows it was handed, or the copies it made of them when it also defined fields.
         const createdRows = Array.isArray(result?.createdTasks) ? result.createdTasks : tasksWithSprint;
         const summary = details
             ? await details.afterCreate({ createdRows, droppedFieldValues: result?.droppedFieldValues || 0 })
-            : await saveImportedComments(companyId, { source, project: projectData, sprint, rows: createdRows, actorId: userId })
+            : await saveImportedComments(companyId, { source, project: projectData, sprint, rows: createdRows, actorId: userId, jobId: job._id })
                 .then(() => null)
                 .catch((commentErr) => logger.error(`[importers] comment import error: ${commentErr.message}`));
         const droppedFieldValues = summary ? summary.fields.valuesDropped : (result?.droppedFieldValues || 0);
         const createdCount = Array.isArray(result?.data) ? result.data.length : tasks.length;
+        const updatedCount = summary && summary.existing ? summary.existing.updated : 0;
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.IMPORT_JOBS,
-            data: [{ _id: job._id }, { $set: { status: 'done', processed: tasks.length, created: createdCount } }],
+            data: [{ _id: job._id }, { $set: { status: 'done', processed: tasks.length + updates.length, created: createdCount, ...(updates.length ? { updated: updatedCount } : {}) } }],
         }, 'updateOne');
         const detail = report ? { skippedRows: report.skippedRows, unmatchedAssignees: [...unmatchedEmails, ...report.unnamedAssignees] } : {};
         const adjusted = adjustedReport(result?.adjusted);
-        const statusText = [`Imported ${createdCount} tasks from ${source} (${skipped} skipped).`, ...adjustedSentences(adjusted)].join(' ');
+        const statusText = [`Imported ${createdCount} tasks from ${source} (${skipped} skipped).`, ...adjustedSentences(adjusted), ...(updatedCount ? [`${updatedCount} task(s) that were already here were updated.`] : [])].join(' ');
         return { status: true, statusText, data: { jobId: job._id, projectId: String(project._id), created: createdCount, skipped, ...detail, ...(adjusted ? { adjusted } : {}), ...(droppedFieldValues ? { droppedFieldValues } : {}), ...(summary ? { summary } : {}) } };
     } catch (creationError) {
         logger.error(`[importers] ${source} job ${job._id} failed: ${creationError.message}`);
-        await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.IMPORT_JOBS,
-            data: [{ _id: job._id }, { $set: { status: 'failed', errorList: [String(creationError.message || creationError).slice(0, 300)] } }],
-        }, 'updateOne').catch(() => {});
+        await failImportJob(companyId, job, creationError);
         return { status: false, statusText: `Import failed: ${creationError.message}` };
     }
 };
@@ -478,25 +527,49 @@ const clickUpStatusContext = async (companyId, project, statusArray, rows, addsS
     return { statusArray: statuses, statusFor };
 };
 
-const runClickUpImport = async (req, { companyId, userId, project, sprint, statusArray, rows, addsDetails }) => {
+const withoutRow = ({ row, ...entry }) => entry;
+
+/* `existingMode` says what happens to a row whose ClickUp id a task of the project already holds: it is left alone, or
+ * its task takes the file's values. Either way no task is created twice. */
+const runClickUpImport = async (req, { companyId, userId, project, sprint, statusArray, rows, addsDetails, existingMode = SKIP, dayFirst }) => {
     const context = await clickUpStatusContext(companyId, project, statusArray, rows, addsDetails);
-    const { tasks, fields, skipped, skippedRows, unnamedAssignees } = transformClickUpRows({ rows, statusFor: context.statusFor, leaderId: userId });
+    const { tasks, fields, skipped, skippedRows, unreadDates, unnamedAssignees } = transformClickUpRows({ rows, statusFor: context.statusFor, leaderId: userId, dayFirst });
     if (!tasks.length) return { status: false, statusText: 'No importable tasks found (every row needs a task name).' };
     const actor = await sessionActor(req);
-    const details = await prepareClickUpDetails(companyId, { actor, project, sprint, tasks, columns: fields, unnamedAssignees, addsTags: addsDetails });
-    return finishImport(companyId, {
+    const plan = await planClickUpImport(companyId, { actor, project, tasks, columns: fields, unnamedAssignees, addsTags: addsDetails, existingMode });
+    const alreadyImported = plan.summary.existing.skipped;
+    const read = { skippedRows, unreadDates: unreadDates.map(withoutRow), alreadyImported };
+    if (!plan.fresh.length && !plan.updates.length) {
+        return { status: true, statusText: `Every task of this list is already here (${alreadyImported}). Nothing was imported.`, data: { projectId: String(project._id), created: 0, updated: 0, skipped, ...read, unmatchedAssignees: [], summary: plan.summary } };
+    }
+
+    const job = await startImportJob(companyId, { source: 'clickup', project, sprint, actor, total: plan.fresh.length + plan.updates.length });
+    let details;
+    try {
+        details = await prepareClickUpDetails(companyId, { plan, project, sprint, statusArray: context.statusArray, jobId: job._id });
+    } catch (error) {
+        await failImportJob(companyId, job, error);
+        throw error;
+    }
+    const out = await finishImport(companyId, {
         source: 'clickup',
         project,
         sprint,
         actor,
         statusArray: context.statusArray,
-        tasks,
+        tasks: plan.fresh,
         skipped,
         addsTags: addsDetails,
         report: { skippedRows, unnamedAssignees: details.unmatchedPeople },
         details,
+        job,
+        updates: plan.updates,
+        storedParents: plan.storedParents,
     });
+    return out.status ? { ...out, data: { ...out.data, ...read, updated: out.data.summary.existing.updated } } : out;
 };
+
+const existingModeOf = (options) => (options && options.existing === UPDATE ? UPDATE : SKIP);
 
 /* POST /api/v2/imports/clickup
  * body: { rows, projectId, sprintId, options: { createMissingStatuses } } */
@@ -517,7 +590,9 @@ exports.importFromClickUp = async (req, res) => {
         const ctx = await loadImportContext(companyId, projectId);
         if (ctx.error) return res.send({ status: false, statusText: ctx.error });
 
-        const out = await runClickUpImport(req, { companyId, userId, project: ctx.project, sprint: target.sprint, statusArray: ctx.statusArray, rows, addsDetails });
+        const out = await runClickUpImport(req, {
+            companyId, userId, project: ctx.project, sprint: target.sprint, statusArray: ctx.statusArray, rows, addsDetails, existingMode: existingModeOf(options), dayFirst: options.dayFirst,
+        });
         return res.send(out);
     } catch (error) {
         logger.error(`ERROR in clickup import: ${error.message}`);
@@ -607,11 +682,12 @@ exports.previewClickUp = async (req, res) => {
             : [];
         const matched = new Set(members.map((member) => lowerName(member.Employee_Email)));
         const knownTags = new Set(((project && project.project.tagsArray) || []).map((tag) => lowerName(tag && tag.tagName)));
-        const plan = await previewClickUpPlan(companyId, String(req.uid || ''), {
+        const { plan, alreadyImported } = await previewClickUpPlan(companyId, String(req.uid || ''), {
             rows,
             lists: preview.lists,
             project: project ? project.project : null,
             addsTags: Boolean(options.createMissingStatuses),
+            existingMode: existingModeOf(options),
         });
 
         return res.send({
@@ -619,6 +695,9 @@ exports.previewClickUp = async (req, res) => {
             statusText: 'Preview ready.',
             data: {
                 ...preview,
+                lists: preview.lists.map((list, at) => ({ ...list, alreadyImported: alreadyImported[at] })),
+                alreadyImported: alreadyImported.reduce((sum, count) => sum + count, 0),
+                canAddDetails: project ? await canAddDetails(companyId, req.uid, projectId) : true,
                 newStatuses: project ? resolveStatuses({ wanted: preview.statuses, existing: project.statusArray }).missing : preview.statuses,
                 newTags: preview.tags.filter((tag) => !knownTags.has(lowerName(tag))),
                 matchedAssignees: preview.assigneeEmails.filter((email) => matched.has(email)),

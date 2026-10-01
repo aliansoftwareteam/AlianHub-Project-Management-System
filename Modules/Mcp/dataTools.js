@@ -351,4 +351,4 @@ const SCOPES = Object.freeze({
 
 const offered = () => TOOLS.filter((t) => registry.has(t.action));
 
-module.exports = { TOOLS, SCOPES, offered, listOf, loadProject, NO_PROJECT, NO_TASK };
+module.exports = { TOOLS, SCOPES, offered, listOf, loadProject, NO_PROJECT, NO_TASK, NO_PAGE };

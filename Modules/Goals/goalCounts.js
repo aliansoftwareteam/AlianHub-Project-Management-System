@@ -8,10 +8,15 @@ const { TASKS } = require('./helpers/goalRules');
 const { withProgress } = require('./helpers/goalProgress');
 const { LIVE, crud, announce, writeAtRevision } = require('./goalStore');
 const sources = require('./goalSources');
+const reached = require('./goalReached');
 
 const STALE_AFTER_MS = 10 * 60 * 1000;
 const RECOUNT_GAP_MS = 30 * 1000;
+const COUNT_TIMEOUT_MS = 2 * 60 * 1000;
 const WRITE_ATTEMPTS = 3;
+const STORE_UNAVAILABLE = 'unavailable';
+const COUNT_ERROR = 'error';
+const TIMED_OUT = 'timeout';
 
 /* A task's deletedStatusKey: 0 is live, and 5 and 8 are a task as it stood when its list or its project was
  * closed. Closing finished work must not empty the goal that counted it, so those are counted; a task that
@@ -46,12 +51,16 @@ const tally = async (companyId, counted) => {
     };
 };
 
-const countedAt = (target) => (target.counted && target.counted.at ? new Date(target.counted.at).getTime() : null);
+const stampOf = (target, key) => (target.counted && target.counted[key] ? new Date(target.counted[key]).getTime() : null);
+const countedAt = (target) => stampOf(target, 'at');
 
 /* A count is made again when it was never made, when it is ten minutes old (which heals an event
- * that never arrived), or when a task changed and the last count is at least thirty seconds old. */
+ * that never arrived), or when a task changed and the last count is at least thirty seconds old.
+ * One that failed waits those thirty seconds too, so a read is never told a count is on its way for ever. */
 const isDue = (target, now = new Date()) => {
     if (target.kind !== TASKS) return false;
+    const failedAt = stampOf(target, 'failedAt');
+    if (failedAt !== null && now.getTime() - failedAt < RECOUNT_GAP_MS) return false;
     const at = countedAt(target);
     if (at === null) return true;
     const age = now.getTime() - at;
@@ -73,18 +82,63 @@ const recounted = async (companyId, goal, { now = new Date(), only = () => true 
     return (goal.targets || []).map((target) => fresh.get(target.id) || target);
 };
 
+/* Only the kind of failure is stored: an error's own text can carry what it was reading. */
+const reasonOf = (error) => (/timeout|network|selection|notconnected/i.test(String((error && error.name) || '')) ? STORE_UNAVAILABLE : COUNT_ERROR);
+
+const failed = (goal, due, now, failedCode) => (goal.targets || [])
+    .map((target) => (due(target) ? { ...target, counted: { ...(target.counted || {}), failedAt: now, failedCode } } : target));
+
+const liveGoal = (companyId, goalId) => crud(companyId, [{ _id: new mongoose.Types.ObjectId(String(goalId)), deletedStatusKey: LIVE }, null, { lean: true }], 'findOne');
+
+/* Answers once the goal's due counts are settled: counted, or stored as failed. It throws only when a failure could not be stored. */
 const refresh = async (companyId, goalId) => {
+    let failure = null;
     for (let attempt = 0; attempt < WRITE_ATTEMPTS; attempt += 1) {
         const now = new Date();
-        const goal = await crud(companyId, [{ _id: new mongoose.Types.ObjectId(String(goalId)), deletedStatusKey: LIVE }, null, { lean: true }], 'findOne');
+        const goal = await liveGoal(companyId, goalId);
         if (!goal || !hasDue(goal, now)) return false;
-        const targets = await recounted(companyId, goal, { now, only: (target) => isDue(target, now) });
-        if (await writeAtRevision(companyId, goal, withProgress(targets, now))) {
+        const due = (target) => isDue(target, now);
+        failure = null;
+        const targets = await recounted(companyId, goal, { now, only: due }).catch((error) => { failure = error; return null; });
+        const crossing = failure ? { set: { targets: failed(goal, due, now, reasonOf(failure)) }, due: [] } : reached.stamped(goal, withProgress(targets, now), now);
+        const saved = await writeAtRevision(companyId, goal, crossing.set);
+        if (saved) {
             announce('update', companyId);
-            return true;
+            if (failure) logger.error(`goals recount ${goalId} in company ${companyId}: ${failure.message || failure}`);
+            await reached.tell(companyId, saved, crossing.due);
+            return !failure;
         }
     }
+    if (failure) throw failure;
     return false;
+};
+
+const storeTimeout = async (companyId, goalId) => {
+    const now = new Date();
+    const goal = await liveGoal(companyId, goalId);
+    if (!goal || !hasDue(goal, now)) return true;
+    const saved = await writeAtRevision(companyId, goal, { targets: failed(goal, (target) => isDue(target, now), now, TIMED_OUT) });
+    if (saved) announce('update', companyId);
+    return Boolean(saved);
+};
+
+const ABANDONED = new Error('the count did not finish in time');
+
+const abandonedAfter = (ms, work) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(ABANDONED), ms);
+    if (typeof timer.unref === 'function') timer.unref();
+    work.then(resolve, reject).finally(() => clearTimeout(timer));
+});
+
+/* When this process first tried a count that has not settled since. A count that hangs is given up after
+ * COUNT_TIMEOUT_MS and stored as failed; one whose failure cannot be stored stays here, and a read
+ * that finds it older than that says it failed, so no reader is told for ever that a count is on its way. */
+const trying = new Map();
+const keyOf = (companyId, goalId) => `${companyId}:${goalId}`;
+
+const timedOutAt = (companyId, goalId, now = new Date()) => {
+    const since = trying.get(keyOf(companyId, goalId));
+    return since !== undefined && now.getTime() - since >= COUNT_TIMEOUT_MS ? new Date(since + COUNT_TIMEOUT_MS) : null;
 };
 
 /* One recount at a time in a company, and a goal waits in line once however many reads ask for it. */
@@ -96,10 +150,16 @@ const recountSoon = (companyId, goalId) => {
     const id = String(goalId);
     if (lane.waiting.has(id)) return;
     lane.waiting.add(id);
+    const key = keyOf(companyId, id);
+    if (!trying.has(key)) trying.set(key, Date.now());
     const run = lane.tail
-        .then(() => refresh(companyId, id))
-        .catch((error) => logger.error(`goals recount ${id} in company ${companyId}: ${error.message || error}`))
-        .then(() => {
+        .then(() => abandonedAfter(COUNT_TIMEOUT_MS, refresh(companyId, id)))
+        .then(() => true, async (error) => {
+            logger.error(`goals recount ${id} in company ${companyId}: ${error.message || error}`);
+            return error === ABANDONED && storeTimeout(companyId, id).catch(() => false);
+        })
+        .then((settled) => {
+            if (settled) trying.delete(key);
             lane.waiting.delete(id);
             if (lane.tail === run && !lane.waiting.size) lanes.delete(companyId);
         });
@@ -110,4 +170,9 @@ const idle = async () => {
     while (lanes.size) await Promise.all([...lanes.values()].map((lane) => lane.tail));
 };
 
-module.exports = { STALE_AFTER_MS, RECOUNT_GAP_MS, COUNTED_STATES, countPipeline, tally, isDue, hasDue, recounted, refresh, recountSoon, idle };
+const forgetTries = () => trying.clear();
+
+module.exports = {
+    STALE_AFTER_MS, RECOUNT_GAP_MS, COUNT_TIMEOUT_MS, COUNTED_STATES, STORE_UNAVAILABLE, COUNT_ERROR, TIMED_OUT,
+    countPipeline, tally, isDue, hasDue, recounted, refresh, recountSoon, timedOutAt, idle, forgetTries,
+};
