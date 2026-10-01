@@ -114,7 +114,8 @@ describe('the date picker follows the theme', () => {
     test('every colour the library reads is a token that both themes define', () => {
         const declarations = mapping().body.split(';').map((line) => line.trim()).filter(Boolean);
         const libraryCss = fs.readFileSync(path.resolve(HERE, '../../node_modules/@vuepic/vue-datepicker/dist/main.css'), 'utf8');
-        const libraryColours = [...new Set(block(libraryCss, '.dp__theme_light').match(/--dp-[\w-]+(?=:)/g))];
+        const libraryTheme = /\.dp__theme_light\s*\{([^}]*)\}/.exec(libraryCss)[1];
+        const libraryColours = [...new Set(libraryTheme.match(/--dp-[\w-]+(?=\s*:)/g))];
         expect(libraryColours.length).toBeGreaterThan(20);
         expect(libraryColours.filter((name) => !declarations.some((line) => line.startsWith(`${name}:`)))).toEqual([]);
 
