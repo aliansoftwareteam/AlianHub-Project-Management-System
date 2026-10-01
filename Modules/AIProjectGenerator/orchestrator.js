@@ -858,7 +858,7 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
     }, 'updateOne').catch(() => {});
 
     for (const d of docs) {
-        try { socketEmitter.emit('insert', { type: 'insert', data: d, module: 'task' }); } catch (_e) { /* ignore */ }
+        try { socketEmitter.emit('insert', { type: 'insert', data: d, module: 'task', companyId }); } catch (_e) { /* ignore */ }
     }
 
     // Activity-log entry per created task — mirrors the manual task-create

@@ -25,7 +25,7 @@ const recordCompletion = ({ companyId, taskId, task, newStatus, userData, eventA
     .then((outcome) => {
         if (!outcome || outcome.error || !outcome.completion) return null;
         return completionStore.save(companyId, taskId, outcome.completion).then((saved) => {
-            socketEmitter.emit('update', { type: 'update', data: saved, updatedFields: { completion: outcome.completion }, module: 'task', ...(eventActor ? { actor: eventActor } : {}) });
+            socketEmitter.emit('update', { type: 'update', data: saved, updatedFields: { completion: outcome.completion }, module: 'task', companyId, ...(eventActor ? { actor: eventActor } : {}) });
         });
     })
     .catch((error) => logger.error(`ERROR in task completion record: ${error.message}`));

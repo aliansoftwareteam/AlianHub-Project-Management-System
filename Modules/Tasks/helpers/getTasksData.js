@@ -122,7 +122,7 @@ exports.updateTask = async (req, res) => {
         const updatedFields = { deletedStatusKey: cascade.to };
         (tasks || []).forEach((task) => {
             const plain = typeof task.toObject === "function" ? task.toObject() : task;
-            socketEmitter.emit("update", { type: "update", data: { ...plain, ...updatedFields }, updatedFields, module: "task" });
+            socketEmitter.emit("update", { type: "update", data: { ...plain, ...updatedFields }, updatedFields, module: "task", companyId });
         });
         removeCache("UserProjectData:", true);
 

@@ -58,7 +58,7 @@ const markTask = async (companyId, { taskId, fieldId, marker, announce = true, n
         type: SCHEMA_TYPE.TASKS,
         data: [{ _id: oid(taskId), ...unseen }, { $set: { [path]: marker } }, { returnDocument: 'after' }],
     }, 'findOneAndUpdate');
-    if (updated && announce) socketEmitter.emit('update', { type: 'update', data: updated, updatedFields: { [path]: marker }, module: 'task' });
+    if (updated && announce) socketEmitter.emit('update', { type: 'update', data: updated, updatedFields: { [path]: marker }, module: 'task', companyId });
     return updated;
 };
 

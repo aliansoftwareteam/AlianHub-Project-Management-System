@@ -61,7 +61,7 @@ const copyFieldFiles = async ({ companyId, source, target }) => {
         type: SCHEMA_TYPE.TASKS,
         data: [{ _id: new mongoose.Types.ObjectId(String(target._id)) }, { $set: set }, { returnDocument: 'after' }],
     }, 'findOneAndUpdate');
-    if (updated) socketEmitter.emit('update', { type: 'update', data: updated, updatedFields: set, module: 'task' });
+    if (updated) socketEmitter.emit('update', { type: 'update', data: updated, updatedFields: set, module: 'task', companyId });
     return copied;
 };
 

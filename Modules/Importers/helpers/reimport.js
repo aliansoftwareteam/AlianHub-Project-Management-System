@@ -119,7 +119,7 @@ const updateStoredTasks = async (companyId, { rows, project, actor, statusArray,
             }, 'findOneAndUpdate');
             if (!task) continue;
             updated += 1;
-            socketEmitter.emit('update', { type: 'update', data: task, updatedFields: set, module: 'task', actor: importActorOf(actor) });
+            socketEmitter.emit('update', { type: 'update', data: task, updatedFields: set, module: 'task', companyId, actor: importActorOf(actor) });
 
             const change = statusChangeOf(row, plain(task), { statusByName, knowsStatus });
             if (change.skipped) skippedCells.push(change.skipped);

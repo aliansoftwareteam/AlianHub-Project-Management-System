@@ -59,7 +59,7 @@ const taskRow = (extra = {}) => ({
     _id: ids.task, TaskName: 'Write the brief', ProjectID: ids.home, sprintId: ids.homeList, AssigneeUserId: [ON_BOTH],
     extraLists: [entry(ids.home, ids.secondList), entry(ids.elsewhere, ids.thereList)], ...extra,
 });
-const change = (data, extra = {}) => socketEmitter.emit('update', { type: 'update', module: 'task', data, updatedFields: { TaskName: data.TaskName }, ...extra });
+const change = (data, extra = {}) => socketEmitter.emit('update', { type: 'update', module: 'task', companyId: C1, data, updatedFields: { TaskName: data.TaskName }, ...extra });
 
 const connect = (uid) => new Promise((resolve, reject) => {
     const socket = connectClient(`${baseURL}/userid_${C1}_${uid}`, {

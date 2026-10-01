@@ -39,20 +39,19 @@ exports.commentSocketHandler = ({ socket, namespace }) => {
      * inheriting that failure mode.
      */
     socket.on('commentTyping', (data) => {
-        if (!data || !data.roomPrefix || !socket.rooms.has(roomFor(socket, data.roomPrefix))) return;
+        const { identity } = socket;
+        if (!identity || !data || !data.roomPrefix || !socket.rooms.has(roomFor(socket, data.roomPrefix))) return;
 
         const payload = {
             roomPrefix: data.roomPrefix,
-            userId: data.userId,
+            userId: identity.uid,
             typing: !!data.typing,
         };
 
-        const companyId = socket.identity && socket.identity.companyId;
         findRoomsByPrefix(data.roomPrefix).forEach((entry) => {
-            // Never echo to the author — including their own other tabs, which the
-            // client also guards against by user id.
+            // The author's other tabs are in the room too; the client drops those by user id.
             if (!entry.socket || entry.socket === socket || entry.socket.disconnected) return;
-            if (!companyId || !entry.socket.identity || entry.socket.identity.companyId !== companyId) return;
+            if (!entry.socket.identity || entry.socket.identity.companyId !== identity.companyId) return;
             entry.socket.emit('commentTyping', payload);
         });
     });

@@ -155,7 +155,7 @@ async function markFailed({ companyId, definition, taskId, reason, trigger }) {
         type: SCHEMA_TYPE.TASKS,
         data: [{ _id: new mongoose.Types.ObjectId(String(taskId)) }, { $set: { [path]: failed } }, { returnDocument: 'after' }],
     }, 'findOneAndUpdate');
-    if (task) socketEmitter.emit('update', { type: 'update', data: task, updatedFields: { [path]: failed }, module: 'task' });
+    if (task) socketEmitter.emit('update', { type: 'update', data: task, updatedFields: { [path]: failed }, module: 'task', companyId });
 }
 
 const refusedProposal = (taskId, reason) => ({ taskId: String(taskId), proposalId: null, text: '', fieldValue: null, empty: true, reason });
