@@ -1,18 +1,19 @@
 <template>
-    <tr class="bg-white project_name_wrapper">
+    <tr class="project_name_wrapper">
         <td class="project_name_td" :class="[{'td_class_border':props.daysOrMonth && props.daysOrMonth.length ? new Date().getMonth() === 0 && new Date().getDate() === 1 : new Date().getMonth() === 0}]">
             <div class="d-flex justify-content-between">
                 <div class="thtitle">
-                    <img v-if="props.project._id === projectId" :src="arrowToogle" alt="arrowToogle" @click="handleToogleProject(props.project._id)" class="rotate_arrow cursor-pointer">
-                    <img v-else :src="arrowToogle" alt="arrowToogle" @click="handleToogleProject(props.project._id)" class="cursor-pointer">
-                    <span @click="redirectProjectList(props.project)" :class="[{'cursor-pointer':props.project.statusType !== 'close'}]" class="thtitle_currency_family GunPowder short_name padding_wrapper_left_arrow" :title="props.project.ProjectName">{{props.project.ProjectName}}</span>
-                    <img  class="pl-20px vertical-middle" v-if="props.project.isPrivateSpace === false" :src="publicFolder" alt="private-project">
+                    <button type="button" class="mr-toggle" :class="{ 'is-open': props.project._id === projectId }" :aria-expanded="props.project._id === projectId" :aria-label="$t('Milestone.toggle_rows', { name: props.project.ProjectName })" @click="handleToogleProject(props.project._id)">
+                        <span class="ah-mask-icon" :style="maskOf(arrowToogle)" aria-hidden="true"></span>
+                    </button>
+                    <span @click="redirectProjectList(props.project)" :class="[{'cursor-pointer':props.project.statusType !== 'close'}]" class="thtitle_currency_family short_name padding_wrapper_left_arrow" :title="props.project.ProjectName">{{props.project.ProjectName}}</span>
+                    <span v-if="props.project.isPrivateSpace === false" class="ah-mask-icon mr-public" :style="maskOf(publicFolder)" role="img" :aria-label="$t('Milestone.public_project')"></span>
                 </div>
                 <div class="thtitle"></div>
-                <div class="thtitle thtitle_currency_family GunPowder padding_wrappper_thtitle">
+                <div class="thtitle thtitle_currency_family padding_wrappper_thtitle">
                     {{props.project.StartDate ? convertDateFormat(props.project.StartDate,'',{showDayName: false}) : ''}}
                 </div>
-                <div class="thtitle thtitle_currency_family GunPowder">
+                <div class="thtitle thtitle_currency_family">
                     {{props.project.EndDate ? convertDateFormat(props.project.EndDate,'',{showDayName: false}) : ''}}
                 </div>
             </div>
@@ -22,7 +23,7 @@
                     'border-color-highlight-left':props.daysOrMonth.length === 0 ? new Date().getMonth() === monthIndex : new Date().getMonth() === new Date(monthDate.date).getMonth() && new Date().getDate() === monthIndex + 1,
                     'border-color-highlight-left-next':props.daysOrMonth.length === 0 ? new Date().getMonth() + 1 === monthIndex : new Date().getMonth() === new Date(monthDate.date).getMonth() && new Date().getDate() === monthIndex
                 }]"
-                class="border_currency totalAmountCurrencyFamily lightGrey text-center font-weight-500 text-ellipsis"
+                class="border_currency totalAmountCurrencyFamily mr-amount--project text-center text-ellipsis"
                 :title="`${totalProject(monthDate,monthIndex) === 0 ? '' : `${props.currencySymbol} ${getCommaSeperatedNumber(totalProject(monthDate,monthIndex))}`}`"
             >
                 {{totalProject(monthDate,monthIndex) === 0 ? '' : `${props.currencySymbol} ${getCommaSeperatedNumber(totalProject(monthDate,monthIndex))}`}}
@@ -40,11 +41,11 @@
             />
         </template>
     </template>
-    <tr class="bg-white project_name_wrapper" v-if="props.project._id === projectId">
+    <tr class="project_name_wrapper" v-if="props.project._id === projectId">
         <td class="project_name_mil_td" :class="[{'td_class_border':props.daysOrMonth && props.daysOrMonth.length ? new Date().getMonth() === 0 && new Date().getDate() === 1 : new Date().getMonth() === 0}]">
             <div class="d-flex justify-content-between align-items-center">
                 <div class="thtitle">
-                    <div class="thtitle_currency_family_mil lightGreyColor font-weight-500">
+                    <div class="thtitle_currency_family_mil mr-label">
                         {{$t('Milestone.refunded_amount')}}
                     </div>
                 </div>
@@ -61,7 +62,7 @@
                     'border-color-highlight-left':props.daysOrMonth.length === 0 ? new Date().getMonth() === monthIndex : new Date().getMonth() === new Date(monthDate.date).getMonth() && new Date().getDate() === monthIndex + 1,
                     'border-color-highlight-left-next':props.daysOrMonth.length === 0 ? new Date().getMonth() + 1 === monthIndex : new Date().getMonth() === new Date(monthDate.date).getMonth() && new Date().getDate() === monthIndex
                 }]"
-                class="border_currency totalMilestoneCurrencyFamily lightGrey text-center"
+                class="border_currency totalMilestoneCurrencyFamily text-center"
             >
                 {{handleRefundedAmount(monthDate,monthIndex) !== 0 ? `${props.currencySymbol} - ${getCommaSeperatedNumber(handleRefundedAmount(monthDate,monthIndex))}` : ''}}
             </td>
@@ -75,6 +76,7 @@
     import MilestoneReportTbodyMilestone from '@/components/atom/MilestoneReportTbodyMilestone/MilestoneReportTbodyMilestone.vue'
     import { useRouter } from 'vue-router';
     import {milestoneData} from '@/components/organisms/FixMilestone/helper.js';
+    import { maskOf } from '@/utils/iconMask';
     const { getCommaSeperatedNumber } = milestoneData();
     const router = useRouter();
     const { convertDateFormat } = useConvertDate();

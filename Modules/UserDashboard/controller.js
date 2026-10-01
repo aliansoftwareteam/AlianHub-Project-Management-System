@@ -23,6 +23,7 @@ const { ACTIVE_SEAT } = require('../../Config/seatStatus');
 const { arrangeRules, rolePermission, PRIVATE_PROJECTS, seesEveryPrivateProject } = require('../../Config/rulePermissions');
 const { ownOrNotPersonal, othersPersonalListIds } = require('../PersonalList/ownership');
 const { companyWideMatch } = require('../Tasks/helpers/taskQueryGuard');
+const { forgetCards } = require('../AI/askCardStore');
 
 // Parse a client-built advanced-filter match from the request body.
 function bodyTaskMatch(body) {
@@ -3090,6 +3091,10 @@ const dropDashboardCaches = (userId) => {
     if (userId) myCache.del(`dashboard_${userId}`);
 };
 
+// A failed clean-up leaves rows nobody can reach, so it never fails the save it follows.
+const forgetCardAnswers = (companyId, dashboardId, keptUids) => forgetCards(companyId, dashboardId, keptUids)
+    .catch((error) => logger.error(`dashboard card answers clean-up: ${error && error.message ? error.message : error}`));
+
 exports.listDashboards = async (req, res) => {
     try {
         const companyId = req.headers["companyid"];
@@ -3242,6 +3247,7 @@ exports.updateSharedDashboardCards = async (req, res) => {
             data: [{ _id: doc._id }, { $set: { cards, updatedBy: uid, updatedAt: new Date() } }, { new: true, useFindAndModify: false }],
         }, "findOneAndUpdate");
         dropDashboardCaches(dashboardOwner(doc));
+        await forgetCardAnswers(companyId, doc._id, cards.map((c) => c.uid));
         return res.status(200).json({ status: true, statusText: "Dashboard saved.", data: { cards: (updated && updated.cards) || cards } });
     } catch (error) {
         logger.error(`updateSharedDashboardCards error: ${error && error.message ? error.message : error}`);
@@ -3303,9 +3309,12 @@ exports.deleteSharedDashboard = async (req, res) => {
             data: [{ _id: doc._id }, { $set: { isDeleted: true, updatedBy: uid, updatedAt: new Date() } }, { new: true, useFindAndModify: false }],
         }, "findOneAndUpdate");
         dropDashboardCaches(dashboardOwner(doc));
+        await forgetCardAnswers(companyId, doc._id);
         return res.status(200).json({ status: true, statusText: "Dashboard deleted.", data: { _id: String(doc._id) } });
     } catch (error) {
         logger.error(`deleteSharedDashboard error: ${error && error.message ? error.message : error}`);
         return res.status(400).json({ status: false, message: "An error occurred while deleting the dashboard." });
     }
 };
+
+Object.assign(exports, { findDashboardById, canViewDashboard, visibleProjectIds });

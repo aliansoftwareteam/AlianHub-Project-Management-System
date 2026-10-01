@@ -2,6 +2,8 @@ const CELL = '[role="cell"][data-col]';
 const ROW = '[role="row"][data-row]';
 const TYPING = 'input:not([type="checkbox"]), textarea, select, [contenteditable="true"]';
 const CONTROL = '[data-cell-edit], button:not([disabled]), input[type="checkbox"]:not([disabled]), a[href]';
+/* What Enter runs in a cell that holds another control before it: the task name after its disclosure. */
+const PRIMARY = '[data-cell-primary]';
 
 const cellsOf = (row) => [...row.querySelectorAll(CELL)].filter((cell) => cell.closest(ROW) === row);
 
@@ -36,7 +38,7 @@ export function handleGridKey(event, root) {
     if (inEditor) return false;
 
     if (event.key === 'Enter' && target === cell) {
-        const control = cell.querySelector(CONTROL);
+        const control = cell.querySelector(PRIMARY) || cell.querySelector(CONTROL);
         if (!control) return false;
         event.preventDefault();
         control.focus();

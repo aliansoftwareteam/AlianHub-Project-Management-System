@@ -11,7 +11,7 @@
 
                 <div class="rp-side__group">
                     <span class="rp-side__label">{{ $t('Reports.source') }}</span>
-                    <select v-model="cfg.source" class="rp-select" style="max-width: none" @change="onSourceChange">
+                    <select v-model="cfg.source" class="rp-select rp-select--wide" @change="onSourceChange">
                         <option value="tasks">{{ $t('Reports.src_tasks') }}</option>
                         <option value="timelogs">{{ $t('Reports.src_timelogs') }}</option>
                     </select>
@@ -23,7 +23,7 @@
                         <span>{{ f.label }}</span>
                         <button type="button" class="rp-filter__x" :aria-label="$t('Reports.remove_filter')" @click="clearFilter(f.key)">×</button>
                     </div>
-                    <select v-model="filterDraft" class="rp-select" style="max-width: none" @change="addFilter">
+                    <select v-model="filterDraft" class="rp-select rp-select--wide" @change="addFilter">
                         <option value="">{{ $t('Reports.add_filter') }}</option>
                         <option v-for="opt in filterOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                     </select>
@@ -42,7 +42,7 @@
 
                 <div class="rp-side__group">
                     <span class="rp-side__label">{{ $t('Reports.measure') }}</span>
-                    <select v-model="cfg.metric" class="rp-select" style="max-width: none" @change="runPreview">
+                    <select v-model="cfg.metric" class="rp-select rp-select--wide" @change="runPreview">
                         <option v-for="m in metrics" :key="m.key" :value="m.key">{{ m.label }}</option>
                     </select>
                 </div>
@@ -60,11 +60,11 @@
 
                 <div class="rp-side__group">
                     <span class="rp-side__label">{{ $t('Reports.saved') }}</span>
-                    <select v-model="savedPick" class="rp-select" style="max-width: none" @change="loadSaved">
+                    <select v-model="savedPick" class="rp-select rp-select--wide" @change="loadSaved">
                         <option value="">{{ $t('Reports.saved_pick') }}</option>
                         <option v-for="s in saved" :key="s._id" :value="String(s._id)">{{ s.name }}</option>
                     </select>
-                    <select v-model="tplPick" class="rp-select" style="max-width: none" @change="applyTemplate">
+                    <select v-model="tplPick" class="rp-select rp-select--wide" @change="applyTemplate">
                         <option value="">{{ $t('Reports.template_pick') }}</option>
                         <option v-for="tp in templates" :key="tp.key" :value="tp.key">{{ tp.name }}</option>
                     </select>
@@ -167,6 +167,7 @@ import { useStore } from 'vuex';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import ReportsTabs from '@/views/Projects/Reports/ReportsTabs.vue';
+import { useChartTokens } from '@/utils/chartTokens';
 
 defineOptions({ name: 'CustomReportBuilder' });
 
@@ -268,21 +269,23 @@ const chartSeries = computed(() => (cfg.chartType === 'pie'
     ? rows.value.map((r) => Math.round((r.value || 0) * 100) / 100)
     : [{ name: metricLabel.value, data: rows.value.map((r) => Math.round((r.value || 0) * 100) / 100) }]));
 
+const chart = useChartTokens();
 const chartOptions = computed(() => ({
     chart: {
         id: 'custom-report',
         toolbar: { show: false },
         animations: { enabled: false },
         fontFamily: 'Inter Tight, sans-serif',
+        foreColor: chart.value.ink2,
         events: { dataPointSelection: (event, ctx, opts) => drill(rows.value[opts.dataPointIndex]) },
     },
-    colors: ['#2F3990', '#2f9e7e', '#d98324', '#6b5ce7', '#c1121f', '#9aa0b4'],
+    colors: chart.value.series,
     labels: rows.value.map((r) => r.label),
     dataLabels: { enabled: cfg.chartType === 'pie' },
     plotOptions: { bar: { columnWidth: '52%', borderRadius: 4 } },
-    stroke: { width: cfg.chartType === 'line' ? 3 : 0, curve: 'straight' },
+    stroke: { width: cfg.chartType === 'line' ? 3 : 0, curve: 'straight', colors: cfg.chartType === 'pie' ? [chart.value.surface] : undefined },
     legend: { position: 'bottom', fontSize: '11px' },
-    grid: { borderColor: 'rgba(0,0,0,.07)' },
+    grid: { borderColor: chart.value.grid },
     xaxis: { categories: rows.value.map((r) => r.label), labels: { style: { fontSize: '11px' }, hideOverlappingLabels: true } },
     yaxis: { labels: { style: { fontSize: '10px' } } },
 }));
@@ -437,6 +440,7 @@ onMounted(() => {
 <style src="@/views/Projects/Reports/reportsV2.css"></style>
 <style>
 .rp-page--flush { padding: 0; }
+.rp-select.rp-select--wide { max-width: none; }
 .rp-builder { flex: 1; min-height: 0; }
 .rp-name { border: 0; background: transparent; font: 600 18px/1.2 var(--font-ui); letter-spacing: -.3px; color: var(--ink); padding: 0; min-width: 220px; }
 .rp-name:focus { outline: none; border-bottom: 1.5px solid var(--brand); }

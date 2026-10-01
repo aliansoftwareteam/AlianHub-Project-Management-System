@@ -1,22 +1,7 @@
-const fs = require('node:fs');
-const path = require('node:path');
 const { chromium } = require('@playwright/test');
 const { startHarness } = require('./harness');
-const { ROLE_NAMES, storageStatePath } = require('./fixtures');
-const { signInThroughForm } = require('./pages');
-
-async function saveStorageState(browser, state, role) {
-    const context = await browser.newContext({ baseURL: state.baseURL });
-    try {
-        const page = await context.newPage();
-        await signInThroughForm(page, { email: state.users[role].email, password: state.password, companyId: state.companyId });
-        const file = storageStatePath(role);
-        fs.mkdirSync(path.dirname(file), { recursive: true });
-        await context.storageState({ path: file });
-    } finally {
-        await context.close();
-    }
-}
+const { ROLE_NAMES } = require('./fixtures');
+const { saveStorageState } = require('./pages');
 
 module.exports = async () => {
     const harness = await startHarness({ name: 'e2e' });

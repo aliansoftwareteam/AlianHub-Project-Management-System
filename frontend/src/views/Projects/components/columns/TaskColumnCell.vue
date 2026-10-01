@@ -3,7 +3,7 @@
         v-if="column.id === 'assignee'"
         :task="task"
         :editable="can('assignee')"
-        :options="can('assignee') ? edit.assigneeOptions(task) : []"
+        :options="can('assignee') ? edit.assigneeOptions(task, parent) : []"
         :multiple="Boolean(edit && edit.multipleAssignees.value)"
         @change="(change) => edit.setAssignee(task, change, { row: row() })"
     />
@@ -68,6 +68,7 @@ defineOptions({ name: "TaskColumnCell" });
 const props = defineProps({
     column: { type: Object, required: true },
     task: { type: Object, required: true },
+    parent: { type: Object, default: null },
     rowEl: { default: null }
 });
 

@@ -1,4 +1,4 @@
-/* global window, document, getComputedStyle -- used inside functions that run in the page */
+/* global window, document -- used inside functions that run in the page */
 const fs = require('fs');
 const path = require('path');
 const { SCREENS } = require('./atlas-manifest');
@@ -9,28 +9,22 @@ const { resolveParams } = require('./atlas/params');
 const { decide } = require('./atlas/readOnly');
 const { galleryHtml } = require('./atlas/gallery');
 const { newBudget, noteBudget, roomToLoad } = require('./atlas/pace');
+const { coreScreens, inCore } = require('./atlas/core');
+const { SHELL, SHELL_TIMEOUT_MS, routeOf, settle, runStep } = require('./atlas/browser');
 
 const ROOT = path.resolve(__dirname, '..');
 const NAVIGATION_TIMEOUT_MS = 45000;
-const STEP_TIMEOUT_MS = 10000;
-const QUIET_MS = 1000;
-const QUIET_LIMIT_MS = 20000;
-const BUSY_LIMIT_MS = 12000;
-const BUSY_POLL_MS = 250;
-const BUSY = '[class*="skeleton"], [class*="skelaton"], [class*="spinner"], .lds-roller, [aria-busy="true"]';
-const SOCKET_PATH = '/socket.io/';
-const SHELL = '.ah-app';
-const SHELL_TIMEOUT_MS = 30000;
 const ATTEMPTS = 3;
 const BLOCKED_BODY = JSON.stringify({ status: false, statusText: 'Blocked', message: 'The screenshot atlas is read-only.' });
 
 const firstLine = (error) => String((error && error.message) || error).split('\n')[0];
 
-function selectScreens(only) {
-    if (!only) return SCREENS;
-    const unknown = only.filter((name) => !SCREENS.some((screen) => screen.name === name));
-    if (unknown.length) throw new Error(`Unknown screen: ${unknown.join(', ')}. Known: ${SCREENS.map((screen) => screen.name).join(', ')}.`);
-    return SCREENS.filter((screen) => only.includes(screen.name));
+function selectScreens(only, { core = false } = {}) {
+    const pool = core ? coreScreens(SCREENS) : SCREENS;
+    if (!only) return pool;
+    const unknown = only.filter((name) => !pool.some((screen) => screen.name === name));
+    if (unknown.length) throw new Error(`Unknown ${core ? 'core ' : ''}screen: ${unknown.join(', ')}. Known: ${pool.map((screen) => screen.name).join(', ')}.`);
+    return pool.filter((screen) => only.includes(screen.name));
 }
 
 async function launch() {
@@ -88,66 +82,6 @@ async function newContext(browser, { baseUrl, theme, size, variant, session, blo
     return context;
 }
 
-function networkQuiet(page) {
-    return new Promise((resolve) => {
-        const inFlight = new Set();
-        let quiet = null;
-        const finish = () => {
-            clearTimeout(quiet);
-            clearTimeout(limit);
-            page.off('request', onStart);
-            page.off('requestfinished', onEnd);
-            page.off('requestfailed', onEnd);
-            resolve();
-        };
-        const arm = () => {
-            clearTimeout(quiet);
-            if (!inFlight.size) quiet = setTimeout(finish, QUIET_MS);
-        };
-        const onStart = (request) => {
-            if (request.url().includes(SOCKET_PATH)) return;
-            inFlight.add(request);
-            clearTimeout(quiet);
-        };
-        const onEnd = (request) => {
-            inFlight.delete(request);
-            arm();
-        };
-        const limit = setTimeout(finish, QUIET_LIMIT_MS);
-        page.on('request', onStart);
-        page.on('requestfinished', onEnd);
-        page.on('requestfailed', onEnd);
-        arm();
-    });
-}
-
-const showsBusy = (page) => page.evaluate((selector) => [...document.querySelectorAll(selector)].some((element) => {
-    const box = element.getBoundingClientRect();
-    return box.width > 0 && box.height > 0 && getComputedStyle(element).visibility !== 'hidden';
-}), BUSY);
-
-// A view can pause longer than the quiet window before it asks for its rows, so a skeleton on screen outranks a quiet network.
-async function settle(page) {
-    await networkQuiet(page);
-    const deadline = Date.now() + BUSY_LIMIT_MS;
-    while (await showsBusy(page)) {
-        if (Date.now() > deadline) return { note: 'still showing a loading state' };
-        await page.waitForTimeout(BUSY_POLL_MS);
-    }
-    await networkQuiet(page);
-    return {};
-}
-
-async function runStep(page, step) {
-    if (step.action === 'press') return page.keyboard.press(step.key);
-    const target = page.locator(step.selector).first();
-    if (step.action === 'click') return target.click({ timeout: STEP_TIMEOUT_MS });
-    if (step.action === 'hover') return target.hover({ timeout: STEP_TIMEOUT_MS });
-    if (step.action === 'scrollTo') return target.scrollIntoViewIfNeeded({ timeout: STEP_TIMEOUT_MS });
-    if (step.action === 'waitFor') return target.waitFor({ state: 'visible', timeout: STEP_TIMEOUT_MS });
-    throw new Error(`Unknown step "${step.action}"`);
-}
-
 class RateLimited extends Error {
     constructor() {
         super('The server\'s rate limit cut this screen short.');
@@ -159,8 +93,6 @@ class SessionRefused extends Error {
         super('The session was refused: the app went to sign-in. A demo token lasts an hour.');
     }
 }
-
-const routeOf = (url) => (new URL(url).hash || '#/').slice(1).split('?')[0].replace(/\/$/, '') || '/';
 
 // The shell draws only once the socket has answered, and that wait makes no request networkQuiet() can see.
 async function shellOrSignIn(page) {
@@ -263,7 +195,7 @@ function writeIndex(outDir, { meta, shots, failures }) {
 
 async function main() {
     const args = parseArgs(process.argv.slice(2));
-    const screens = selectScreens(args.only);
+    const screens = selectScreens(args.only, { core: args.core });
     const outDir = path.resolve(args.out || path.join(ROOT, 'artifacts', 'atlas', `${timestamp()}${args.variant ? `-variant-${args.variant}` : ''}`));
 
     const budget = newBudget();
@@ -291,6 +223,7 @@ async function main() {
                 const signedIn = session ? await newContext(browser, { ...shared, session }) : null;
                 const signedOut = await newContext(browser, shared);
                 for (const screen of screens) {
+                    if (args.core && !inCore(screen, size.label)) continue;
                     const entry = { screen: screen.name, theme, size: size.label };
                     const { path: route, missing } = resolveRoute(screen.route, params);
                     if (!route) {

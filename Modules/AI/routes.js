@@ -6,6 +6,7 @@ const meetingNotes = require('./meetingNotes');
 const askController = require('./ask');
 const askStream = require('./askStream');
 const askThreads = require('./askThreads');
+const askCard = require('./askCard');
 const feedback = require('./feedback');
 const quality = require('./quality');
 const aiProfile = require('./aiProfile');
@@ -52,6 +53,8 @@ exports.init = (app) => {
     app.get('/api/v1/ai/ask/threads/:id', askThreads.getThread);
     app.put('/api/v1/ai/ask/threads/:id', askThreads.renameThread);
     app.delete('/api/v1/ai/ask/threads/:id', askThreads.deleteThread);
+    app.get('/api/v1/ai/ask/card/:dashboardId/:cardUid', askCard.readAnswer);
+    app.post('/api/v1/ai/ask/card/:dashboardId/:cardUid', askCard.askAnswer);
     app.put('/api/v1/ai/feedback', feedback.saveFeedback);
     app.get('/api/v1/ai/feedback/mine', feedback.listMine);
     app.delete('/api/v1/ai/feedback/:id', feedback.removeFeedback);
