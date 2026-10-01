@@ -5,6 +5,7 @@ const { resolveActor, isAgent } = require('./actor');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
+const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
 
 // Middleware that applies the registry to the ordinary REST routes when the
 // caller is an agent token. Humans pass straight through — the guard never
@@ -42,7 +43,9 @@ const storedRow = (companyId, type, id, fields) => (idText(id)
     ? MongoDbCrudOpration(companyId, { type, data: [{ _id: new mongoose.Types.ObjectId(idText(id)) }, fields] }, 'findOne')
     : null);
 
-const projectOfTask = async (companyId, taskId) => {
+/* The project of a task the person behind the token can open; a task they cannot open reads as a missing one. */
+const projectOfTask = async (companyId, uid, taskId) => {
+    if (!(await readableTaskIds(companyId, uid, [idText(taskId)])).length) return '';
     const task = await storedRow(companyId, SCHEMA_TYPE.TASKS, taskId, { ProjectID: 1 });
     return task && task.ProjectID ? String(task.ProjectID).toLowerCase() : '';
 };
@@ -63,9 +66,9 @@ const ARCHIVE_ACTIONS = { 0: 'task.restore', 2: 'task.archive' };
 
 /* The registry key, or keys, each task action is; every one must be allowed. An action absent here is refused. */
 const TASK_PATCH_ACTIONS = {
-    updateStatus: async (body, { companyId, taskId }) => {
+    updateStatus: async (body, { companyId, uid, taskId }) => {
         const sent = body.newStatus && typeof body.newStatus === 'object' ? body.newStatus : {};
-        const stored = await storedStatus(companyId, await projectOfTask(companyId, taskId), sent.statusKey);
+        const stored = await storedStatus(companyId, await projectOfTask(companyId, uid, taskId), sent.statusKey);
         return [stored, { statusType: sent.statusType, name: sent.status && sent.status.text }]
             .map((status) => ({ action: 'task.status.set', params: { taskId, status } }));
     },
@@ -81,8 +84,8 @@ const TASK_PATCH_ACTIONS = {
     updateTaskTotalEstimate: fields('totalEstimatedTime'),
     updateChecklists: fields('checklistArray'),
     updateTags: fields('tagsArray'),
-    moveTask: async (body, { companyId, taskId }) => {
-        const home = await projectOfTask(companyId, taskId);
+    moveTask: async (body, { companyId, uid, taskId }) => {
+        const home = await projectOfTask(companyId, uid, taskId);
         const stays = Boolean(home) && idText(body.projectData && body.projectData.id) === home;
         return { action: stays ? 'task.sprint.move' : 'task.move', params: { taskId } };
     },
@@ -107,7 +110,7 @@ const evaluateOnRoute = (action, params) => {
 const taskPatchGuard = (taskIdOf) => withActor(async (req, res, next, actor) => {
     const companyId = req.headers['companyid'] || '';
     const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const checks = await taskPatchChecks(body, { companyId, taskId: taskIdOf(body) });
+    const checks = await taskPatchChecks(body, { companyId, uid: req.uid, taskId: taskIdOf(body) });
     for (const { action, params } of checks) {
         const check = evaluateOnRoute(action, params);
         if (!check.allowed) return refuse(req, res, actor, { action, reason: check.reason, params, entityId: params.taskId });
