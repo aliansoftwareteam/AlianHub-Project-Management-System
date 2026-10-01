@@ -10,11 +10,8 @@ const { withActingUser } = require('./helpers/actingUser');
 const { newSprintNamesOnlyMembers, sprintPatchNamesOnlyMembers } = require('./helpers/sprintPeople');
 const { CHAT_CHANNEL, CHAT_CATEGORY, isChatSpace, requireChatAccess } = require('./helpers/chatAccess');
 
-// Whitelist of functions allowed to be called via PATCH /sprint/:id
 const ALLOWED_SPRINT_TYPES = ['editSprintName', 'updateSprint', 'deleteChannel'];
-
-// Whitelist of functions allowed to be called via PATCH /folder/:id
-const ALLOWED_FOLDER_TYPES = ['editFolderName', 'updateFolder'];
+const ALLOWED_FOLDER_TYPES = ['editFolderName', 'updateFolder', 'moveFolder'];
 
 // Gated on project_sprint_create rather than a new project_sprint_manage key: the
 // permission catalogue in utils/data.js is seeded at COMPANY IMPORT, so a brand-new key
@@ -24,6 +21,7 @@ const SPRINT_EDIT = ['project.project_sprint_name_edit', 'project.sprint_type_ch
 const SPRINT_SHARE = 'project.sprint_type_change';
 const SPRINT_STATUS = { 0: 'project.sprint_restore', 1: 'project.sprint_delete', 2: 'project.sprint_archive', 5: 'project.sprint_archive' };
 const FOLDER_RENAME = 'project.project_folder_name_edit';
+const FOLDER_MOVE = [FOLDER_RENAME, 'project.project_folder_create'];
 const FOLDER_STATUS = { 0: 'project.folder_restore', 1: 'project.folder_delete', 2: 'project.folder_archive' };
 
 const bodyOf = (req) => req.body || {};
@@ -67,6 +65,7 @@ const sprintPatchPermissions = (req) => {
 const folderPatchPermissions = (req) => {
     const { type, updateObject } = bodyOf(req);
     if (type === 'editFolderName') return [FOLDER_RENAME];
+    if (type === 'moveFolder') return [FOLDER_MOVE];
     return orRefused(() => [FOLDER_STATUS[writtenStatus(folderUpdateFrom(updateObject))]], FOLDER_RENAME);
 };
 

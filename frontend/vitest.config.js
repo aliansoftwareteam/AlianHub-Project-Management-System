@@ -28,6 +28,7 @@ export default defineConfig({
             '@passwordRule': path.resolve(__dirname, '../Modules/Auth/helpers/passwordRule.js'),
             '@viewSettings': path.resolve(__dirname, '../Modules/Project/helpers/viewSettings.js'),
             '@fieldTaskTypes': path.resolve(__dirname, '../Modules/CustomField/helpers/fieldTaskTypes.js'),
+            '@fieldTypes': path.resolve(__dirname, '../Modules/CustomField/fieldTypes'),
             '@automationTemplates': path.resolve(__dirname, '../Modules/Automations/templates.js'),
             '@workingDays': path.resolve(__dirname, '../Modules/Company/helpers/workingDays.js')
         }
