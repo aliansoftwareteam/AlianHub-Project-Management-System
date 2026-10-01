@@ -1,10 +1,10 @@
 import DOMPurify from "dompurify";
 import markdownit from "markdown-it";
 
-/* What a description may put on the page. The editor's tools write a block's text with innerHTML, and Editor.js sets
-   the HTML it is handed on an element before its own cleaning runs, so both the text form of a description and a
-   stored document pass through here first. A description is words and structure: no image, frame, script, style or
-   handler, and a link goes to an http, https or mailto address only. */
+/* What a stored editor document may put on the page. Editor.js tools write a block's text with innerHTML, and Editor.js
+   sets the HTML it is handed on an element before its own cleaning runs, so a document, and the text form of a
+   description, pass through here first. A description is words and structure: no image, frame, script, style or
+   handler, and a link goes to an http, https or mailto address only. A doc page keeps what its preview keeps. */
 
 const INLINE_TAGS = ["b", "strong", "i", "em", "u", "s", "del", "mark", "code", "a", "br", "sub", "sup"];
 const BLOCK_TAGS = ["p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "blockquote", "pre", "hr", "table", "thead", "tbody", "tr", "th", "td"];
@@ -49,11 +49,7 @@ export const descriptionTextHtml = (value) => EDITOR_TAGS.reduce(
     purifier.sanitize(markdown.render(String(value ?? "")), TEXT_CONFIG)
 );
 
-const inline = (value) => (typeof value === "string" ? purifier.sanitize(value, INLINE_CONFIG) : "");
-
-const listItems = (items) => (Array.isArray(items) ? items : []).map((item) => (typeof item === "string"
-    ? inline(item)
-    : { ...item, content: inline(item?.content), items: listItems(item?.items) }));
+const strictInline = (value) => purifier.sanitize(value, INLINE_CONFIG);
 
 // The frames the embed tool builds for the services it knows; a gist is a script from gist.github.com in a data: frame.
 const EMBED_HOSTS = [
@@ -78,28 +74,38 @@ const sourceLink = (address) => {
     const link = document.createElement("a");
     link.setAttribute("href", String(address || ""));
     link.textContent = String(address || "");
-    const text = inline(link.outerHTML);
+    const text = strictInline(link.outerHTML);
     return text.includes("href=") ? { type: "paragraph", data: { text } } : null;
 };
 
-const BLOCKS = {
-    paragraph: (data) => ({ ...data, text: inline(data.text) }),
-    header: (data) => ({ ...data, text: inline(data.text) }),
-    list: (data) => ({ ...data, items: listItems(data.items) }),
-    checklist: (data) => ({ ...data, items: (Array.isArray(data.items) ? data.items : []).map((item) => ({ ...item, text: inline(item?.text) })) }),
-    table: (data) => ({ ...data, content: (Array.isArray(data.content) ? data.content : []).map((row) => (Array.isArray(row) ? row.map(inline) : [])) }),
-    embed: (data) => ({ ...data, caption: inline(data.caption) })
+const cleanerOf = (clean) => {
+    const inline = (value) => (typeof value === "string" ? clean(value) : "");
+    const listItems = (items) => (Array.isArray(items) ? items : []).map((item) => (typeof item === "string"
+        ? inline(item)
+        : { ...item, content: inline(item?.content), items: listItems(item?.items) }));
+    return {
+        paragraph: (data) => ({ ...data, text: inline(data.text) }),
+        header: (data) => ({ ...data, text: inline(data.text) }),
+        list: (data) => ({ ...data, items: listItems(data.items) }),
+        checklist: (data) => ({ ...data, items: (Array.isArray(data.items) ? data.items : []).map((item) => ({ ...item, text: inline(item?.text) })) }),
+        table: (data) => ({ ...data, content: (Array.isArray(data.content) ? data.content : []).map((row) => (Array.isArray(row) ? row.map(inline) : [])) }),
+        embed: (data) => ({ ...data, caption: inline(data.caption) })
+    };
 };
 
-const safeBlock = (block) => {
+const safeBlock = (block, blocks) => {
     if (!block || typeof block !== "object") return null;
     const data = block.data && typeof block.data === "object" ? block.data : {};
     if (block.type === "embed" && !isKnownFrame(data.embed)) return sourceLink(data.source);
-    return BLOCKS[block.type] ? { ...block, data: BLOCKS[block.type](data) } : block;
+    return blocks[block.type] ? { ...block, data: blocks[block.type](data) } : block;
 };
 
-/* A stored description document with every piece of text its blocks draw held to the same list. A block type the
-   editor has no tool for is drawn as a placeholder, and a code block is set as a text area's value. */
-export const safeDescriptionDocument = (description) => (description && Array.isArray(description.blocks)
-    ? { ...description, blocks: description.blocks.map(safeBlock).filter(Boolean) }
-    : description);
+/* A stored document with the text of every block the stock Editor.js tools draw held to a list: the short one above
+   by default, or the caller's own cleaner (`inline`), as a doc page passes the one its preview uses. A block type with
+   a tool of the app's own is left to that tool, which cleans what it draws, and a code block is set as a text area's
+   value. */
+export const safeEditorDocument = (stored, { inline = strictInline } = {}) => {
+    if (!stored || !Array.isArray(stored.blocks)) return stored;
+    const blocks = cleanerOf(inline);
+    return { ...stored, blocks: stored.blocks.map((block) => safeBlock(block, blocks)).filter(Boolean) };
+};

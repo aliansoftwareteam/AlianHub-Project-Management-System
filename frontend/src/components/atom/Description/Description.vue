@@ -75,7 +75,7 @@ import * as env from '@/config/env';
 import { useCustomComposable } from '@/composable';
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 import taskClass from '@/utils/TaskOperations';
-import { descriptionTextHtml, safeDescriptionDocument } from '@/utils/descriptionHtml';
+import { descriptionTextHtml, safeEditorDocument } from '@/utils/editorHtml';
 const aiIcon = require('@/assets/images/svg/ai_image.svg');
 
 
@@ -472,7 +472,7 @@ function renderDescription(replace = false) {
                 blockIndex.value = 1;
                 injectDescription(props.description,replace);
             }else{
-                editor.value?.render(safeDescriptionDocument(props.description))
+                editor.value?.render(safeEditorDocument(props.description))
                 .then(() => {
                     checkContentSize()
                 });
@@ -587,7 +587,7 @@ async function injectBlocks (newBlocks) {
     newBlocks.forEach((block, index) => {
         blocks.splice(blockIndex.value-1, index === 0 ? 1 : 0, block);
     })
-    await editor.value.render(safeDescriptionDocument({...tempBlock.value, blocks}))
+    await editor.value.render(safeEditorDocument({...tempBlock.value, blocks}))
     checkContentSize()
     // The AI "Use this" path renders programmatically (no editor onChange fires),
     // so persist explicitly once the generated content is in the editor —

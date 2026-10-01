@@ -10,10 +10,12 @@ import CodeTool from '@editorjs/code';
 import InlineCode from '@editorjs/inline-code';
 import Embed from '@editorjs/embed';
 import Table from '@editorjs/table';
-import { descriptionTextHtml, safeDescriptionDocument } from '@/utils/descriptionHtml';
+import { descriptionTextHtml, safeEditorDocument } from '@/utils/editorHtml';
+import { richHtml } from '@/utils/richHtml';
 
-/* A description is read in two forms: text (markdown, or HTML the app wrote) and the document the editor stores.
-   Both end as HTML an editor tool sets on an element, so each is checked here at every point it is set. */
+/* A description is read in two forms: text (markdown, or HTML the app wrote) and the document the editor stores. A doc
+   page is such a document too. Each ends as HTML an editor tool sets on an element, so each is checked here at every
+   point it is set. */
 
 const RAN = 'window.__ran = 1';
 const REMOTE = 'https://remote.example.test';
@@ -49,14 +51,20 @@ const LINK = /^(https?:|mailto:)/i;
 
 const inert = (html) => new DOMParser().parseFromString(String(html), 'text/html').body;
 
-/* Everything in `root` that could run or fetch: a tag from the list, a handler, a style, or an address outside a plain link. */
-const problemsIn = (root, { allow = '' } = {}) => {
+const PICTURE = /^(https?:|data:image\/(png|gif|jpe?g|webp|bmp);)/i;
+
+/* Everything in `root` that could run or fetch: a tag from the list, a handler, a style, or an address outside a plain
+   link. A doc page (`page`) also keeps a picture from a web address and a plain colour, as its preview does. */
+const problemsIn = (root, { allow = '', page = false } = {}) => {
     const found = [];
     root.querySelectorAll('*').forEach((node) => {
         const tag = node.tagName.toLowerCase();
-        if (node.matches(LOADING) && !(allow && node.matches(allow))) found.push(`<${tag}>`);
+        const picture = page && tag === 'img';
+        if (node.matches(LOADING) && !picture && !(allow && node.matches(allow))) found.push(`<${tag}>`);
         [...node.attributes].forEach(({ name, value }) => {
             const attr = name.toLowerCase();
+            if (picture && attr === 'src' && PICTURE.test(value.trim())) return;
+            if (page && attr === 'style' && !/url|expression|[()<>{}]/i.test(value.replace(/rgba?\([\d\s,.]+\)/gi, ''))) return;
             if (attr.startsWith('on') || attr === 'style' || ADDRESS_ATTRS.includes(attr)) found.push(`${tag}[${attr}]`);
             if (attr === 'href' && !(tag === 'a' && LINK.test(value.trim()))) found.push(`${tag}[href=${value.slice(0, 20)}]`);
         });
@@ -70,7 +78,7 @@ describe('markup in a description is shown as text', () => {
     });
 
     it.each(Object.entries(MARKUP))('in a stored document: %s', (_name, source) => {
-        const shown = safeDescriptionDocument({ time: 1, version: '2.30.7', blocks: [
+        const shown = safeEditorDocument({ time: 1, version: '2.30.7', blocks: [
             { type: 'paragraph', data: { text: source } },
             { type: 'header', data: { text: source, level: 2 } },
             { type: 'list', data: { style: 'unordered', items: [{ content: source, items: [{ content: source, items: [] }] }, source] } },
@@ -88,6 +96,49 @@ describe('markup in a description is shown as text', () => {
         }[block.type]()));
         expect(texts).toHaveLength(9);
         texts.forEach((text) => expect(problemsIn(inert(text))).toEqual([]));
+    });
+});
+
+const storedWith = (source) => ({ time: 1, version: '2.30.7', blocks: [
+    { type: 'paragraph', data: { text: source } },
+    { type: 'header', data: { text: source, level: 2 } },
+    { type: 'list', data: { style: 'unordered', items: [{ content: source, items: [{ content: source, items: [] }] }] } },
+    { type: 'checklist', data: { items: [{ text: source, checked: false }] } },
+    { type: 'table', data: { withHeadings: false, content: [[source]] } },
+] });
+const textsOf = (stored) => stored.blocks.flatMap((block) => ({
+    paragraph: () => [block.data.text],
+    header: () => [block.data.text],
+    list: () => [block.data.items[0].content, block.data.items[0].items[0].content],
+    checklist: () => [block.data.items[0].text],
+    table: () => block.data.content[0],
+}[block.type]()));
+const safePage = (stored) => safeEditorDocument(stored, { inline: richHtml });
+
+describe('markup in a doc page is shown as text', () => {
+    it.each(Object.entries(MARKUP))('in a stored page: %s', (_name, source) => {
+        const texts = textsOf(safePage(storedWith(source)));
+        expect(texts).toHaveLength(6);
+        texts.forEach((text) => expect(problemsIn(inert(text), { page: true })).toEqual([]));
+    });
+
+    it('keeps what a page\'s preview keeps: a mention, a picture, a colour, and the blocks the app\'s own tools draw', () => {
+        const mention = 'Ask <span class="mention" data-mention="user" data-id="6f0000000000000000000001">@Max</span> <span style="color: #ff0000">today</span>';
+        const picture = '<img src="https://example.test/chart.png" alt="chart">';
+        const callout = { type: 'callout', data: { tone: 'warn', text: '<b>Careful</b>' } };
+        const image = { type: 'image', data: { key: 'Docs/abc.png', caption: 'A chart' } };
+        const page = safePage({ blocks: [{ type: 'paragraph', data: { text: mention } }, { type: 'paragraph', data: { text: picture } }, callout, image] });
+        expect(page.blocks[0].data.text).toBe('Ask <span class="mention" data-mention="user" data-id="6f0000000000000000000001">@Max</span> <span style="color:#ff0000">today</span>');
+        expect(page.blocks[1].data.text).toBe(picture);
+        expect(page.blocks.slice(2)).toEqual([callout, image]);
+    });
+
+    it('keeps a frame the editor embeds and turns any other into a link, as a description does', () => {
+        const frame = (embed) => ({ type: 'embed', data: { service: 'youtube', embed, source: `${REMOTE}/page`, caption: '' } });
+        expect(safePage({ blocks: [frame('https://www.youtube.com/embed/abc')] }).blocks[0].type).toBe('embed');
+        expect(safePage({ blocks: [frame(`${REMOTE}/frame`)] }).blocks).toEqual([
+            { type: 'paragraph', data: { text: `<a href="${REMOTE}/page" target="_blank" rel="noopener noreferrer">${REMOTE}/page</a>` } },
+        ]);
     });
 });
 
@@ -125,7 +176,7 @@ describe('what a description keeps', () => {
 });
 
 describe('what a stored document keeps', () => {
-    const only = (block) => safeDescriptionDocument({ blocks: [block] }).blocks;
+    const only = (block) => safeEditorDocument({ blocks: [block] }).blocks;
 
     it('keeps the editor\'s own formatting and leaves code as it was typed', () => {
         const blocks = [
@@ -133,7 +184,7 @@ describe('what a stored document keeps', () => {
             { id: 'b', type: 'code', data: { code: '<script>let x = 1;</script>' } },
             { id: 'c', type: 'table', data: { withHeadings: true, content: [['a', '<b>b</b>']] } },
         ];
-        expect(safeDescriptionDocument({ time: 5, version: '2.30.7', blocks })).toEqual({ time: 5, version: '2.30.7', blocks });
+        expect(safeEditorDocument({ time: 5, version: '2.30.7', blocks })).toEqual({ time: 5, version: '2.30.7', blocks });
     });
 
     it('keeps a frame of a service the editor embeds, and turns any other into a link to where it came from', () => {
@@ -153,10 +204,10 @@ describe('what a stored document keeps', () => {
     });
 
     it('passes on what is not a document', () => {
-        expect(safeDescriptionDocument('older text')).toBe('older text');
-        expect(safeDescriptionDocument(undefined)).toBeUndefined();
-        expect(safeDescriptionDocument({})).toEqual({});
-        expect(safeDescriptionDocument({ blocks: [null, 'x', { type: 'paragraph' }] }).blocks).toEqual([{ type: 'paragraph', data: { text: '' } }]);
+        expect(safeEditorDocument('older text')).toBe('older text');
+        expect(safeEditorDocument(undefined)).toBeUndefined();
+        expect(safeEditorDocument({})).toEqual({});
+        expect(safeEditorDocument({ blocks: [null, 'x', { type: 'paragraph' }] }).blocks).toEqual([{ type: 'paragraph', data: { text: '' } }]);
     });
 });
 
@@ -193,7 +244,7 @@ describe('through the editor itself', () => {
         await converter.blocks.renderFromHTML(descriptionTextHtml(source));
         await settle();
         const { blocks } = await converter.save();
-        await editor.render(safeDescriptionDocument({ blocks }));
+        await editor.render(safeEditorDocument({ blocks }));
         await settle(30);
         return { blocks, page: document.querySelector('#description-editor .codex-editor__redactor') };
     };
@@ -216,6 +267,17 @@ describe('through the editor itself', () => {
         expect(page.querySelector('.ce-paragraph').innerHTML).toBe('Do <b>this</b> then <a href="https://example.test/spec" target="_blank" rel="noopener noreferrer">read</a>.');
     }, 15000);
 
+    it.each(Object.entries(MARKUP))('nothing that runs is set on the page from a stored doc page: %s', async (_name, source) => {
+        written.length = 0;
+        delete window.__ran;
+        await editor.render(safePage(storedWith(source)));
+        await settle(30);
+        const page = document.querySelector('#description-editor .codex-editor__redactor');
+        written.forEach((html) => expect(problemsIn(inert(html), { ...ownIcons, page: true })).toEqual([]));
+        expect(problemsIn(page, { ...ownIcons, page: true })).toEqual([]);
+        expect(window.__ran).toBeUndefined();
+    }, 15000);
+
     it('leaves the address of a video as an address: text alone never becomes a frame', async () => {
         for (const source of ['https://www.youtube.com/watch?v=dQw4w9WgXcQ', '<div>https://www.youtube.com/watch?v=dQw4w9WgXcQ</div>', '<span>https://codepen.io/pat/pen/abcdef</span>']) {
             const { blocks, page } = await show(source);
@@ -233,11 +295,24 @@ describe('the description component reads a description only this way', () => {
         expect(source.match(/renderFromHTML\(([^)]*)\)/g)).toEqual(['renderFromHTML(descriptionTextHtml(description)']);
         const rendered = [...source.matchAll(/editor\.value\??\.render\(([^\n]*)/g)].map((match) => match[1]);
         expect(rendered).toHaveLength(3);
-        rendered.forEach((argument) => expect(argument).toMatch(/^(safeDescriptionDocument\(|obj\))/));
+        rendered.forEach((argument) => expect(argument).toMatch(/^(safeEditorDocument\(|obj\))/));
     });
 
     it('converts text with no tool that builds a frame', () => {
         expect(source).toMatch(/tools: converterTools\(\)/);
         expect(source).toMatch(/const converterTools = \(\) => Object\.fromEntries\(Object\.entries\(editorTools\)\.filter\(\(\[name\]\) => name !== 'embed'\)\);/);
+    });
+});
+
+describe('the docs editor draws a page only this way', () => {
+    const source = readFileSync(path.resolve(__dirname, '../../src/components/molecules/Pages/PageBlockEditor.vue'), 'utf8');
+
+    it('holds the page it opens with, and every page it draws later, to what the preview shows', () => {
+        expect(source).toMatch(/const safePage = \(data\) => safeEditorDocument\(data, \{ inline: richHtml \}\);/);
+        expect(source).toMatch(/return safePage\(contentToEditorData\(props\.seed \|\| \{\}\)\);/);
+        expect(source).toMatch(/data: seedData\(\),/);
+        const rendered = [...source.matchAll(/editor\.value\.render\(([^\n]*)/g)].map((match) => match[1]);
+        expect(rendered).toHaveLength(2);
+        rendered.forEach((argument) => expect(argument).toMatch(/\? safePage\((incoming|data)\) : emptyEditorData\(\)\);$/));
     });
 });
