@@ -113,6 +113,27 @@ describe('placement', () => {
     });
 });
 
+describe('the rows of an import, in the order they are created', () => {
+    const row = (_id, ParentTaskId = '') => ({ _id, TaskName: `Row ${_id}`, ParentTaskId });
+    const idsIn = (level) => level.map((r) => r._id);
+
+    test('parents come before their children, three levels at most', () => {
+        const rows = [row('c', 'b'), row('b', 'a'), row('a'), row('d', 'c'), row('lone')];
+        const { levels, parentIdOf, adjusted } = tree.levelRows(rows);
+
+        expect(levels.map(idsIn)).toEqual([['a', 'lone'], ['b'], ['c', 'd']]);
+        expect(rows.map((r) => parentIdOf.get(r))).toEqual(['b', 'a', '', 'b', '']);
+        expect(adjusted).toEqual([{ _id: 'd', TaskName: 'Row d', reason: 'TOO_DEEP' }]);
+    });
+
+    test('a parent that is not among the rows, a loop and a row that names itself make tasks', () => {
+        const { levels, adjusted } = tree.levelRows([row('a', 'gone'), row('b', 'a'), row('x', 'y'), row('y', 'x'), row('z', 'x'), row('self', 'self')]);
+
+        expect(levels.map(idsIn)).toEqual([['a', 'x', 'y', 'z', 'self'], ['b'], []]);
+        expect(adjusted.map((entry) => `${entry._id} ${entry.reason}`)).toEqual(['a PARENT_MISSING', 'x CYCLE', 'y CYCLE', 'z CYCLE', 'self CYCLE']);
+    });
+});
+
 describe('the subtree in the database', () => {
     const tasks = (companyId) => mockDbFor(companyId).store[SCHEMA_TYPE.TASKS] || [];
     const stored = (companyId, id) => tasks(companyId).find((t) => String(t._id) === id);
@@ -124,6 +145,21 @@ describe('the subtree in the database', () => {
         seed(companyId, OTHER_ROOT);
         seed(companyId, OTHER_CHILD, { ParentTaskId: OTHER_ROOT, ancestors: [OTHER_ROOT], deletedStatusKey: 0 });
     };
+
+    test('the slot under a parent is its chain and the placement of its root, within the company', async () => {
+        const placement = { ProjectID: oid('6f0000000000000000000a01'), sprintId: oid('6f0000000000000000000e01'), sprintArray: { id: oid('6f0000000000000000000e01'), name: 'Sprint 1' } };
+        seed(C1, ROOT, placement);
+        seed(C1, CHILD, { ParentTaskId: ROOT, ancestors: [ROOT], sprintId: oid('6f0000000000000000000e02') });
+        seed(C1, GRANDCHILD, { ParentTaskId: CHILD, ancestors: [ROOT, CHILD] });
+        seed(C2, OTHER_ROOT, placement);
+
+        expect(await tree.slotUnder(C1, CHILD)).toMatchObject({ ok: true, ancestors: [ROOT, CHILD], placement });
+        expect(await tree.slotUnder(C1, oid(ROOT))).toMatchObject({ ok: true, ancestors: [ROOT], placement });
+        expect(await tree.slotUnder(C1, GRANDCHILD)).toMatchObject({ ok: false, code: 'PARENT_AT_MAX_DEPTH' });
+        expect(await tree.slotUnder(C1, OTHER_ROOT)).toEqual({ ok: false, code: 'PARENT_NOT_FOUND', reason: tree.REFUSALS.PARENT_NOT_FOUND });
+        expect(await tree.slotUnder(C1, 'not-an-id')).toMatchObject({ ok: false, code: 'PARENT_NOT_FOUND' });
+        expect(mockDbFor(C2).calls).toEqual([]);
+    });
 
     test('loads every descendant by ancestors, within the company', async () => {
         seedTree(C1);

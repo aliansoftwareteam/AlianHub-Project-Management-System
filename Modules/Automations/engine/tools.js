@@ -7,6 +7,7 @@ const socketEmitter = require('../../../event/socketEventEmitter');
 const knowledgeEvents = require('../../Knowledge/ingest/events');
 const { canPostToThread } = require('../../Comments/helpers/threadWriteAccess');
 const { sprintPlacementOf } = require('../../Tasks/helpers/sprintPlacement');
+const { slotUnder } = require('../../Tasks/helpers/taskTree');
 
 // The only way an action is allowed to touch data.
 //
@@ -222,6 +223,8 @@ const createSubtask = async (companyId, parentTaskId, { title, description = '' 
     const parent = await getTask(companyId, parentTaskId);
     const name = String(title || '').trim();
     if (!name) throw new DeterministicError('subtask title is empty');
+    const slot = await slotUnder(companyId, parent._id);
+    if (!slot.ok) throw new DeterministicError(slot.reason);
 
     // A new subtask starts in the project's OPENING status, never the parent's.
     // Inheriting the parent's status means a QA agent that files findings on a
@@ -248,10 +251,10 @@ const createSubtask = async (companyId, parentTaskId, { title, description = '' 
             description: String(description || '').slice(0, 4000),
             rawDescription: String(description || '').slice(0, 4000),
             CompanyId: String(companyId),
-            ProjectID: parent.ProjectID,
-            sprintId: parent.sprintId,
-            sprintArray: parent.sprintArray || {},
+            sprintArray: {},
+            ...slot.placement,
             ParentTaskId: String(parentTaskId),
+            ancestors: slot.ancestors,
             isParentTask: false,
             TaskType: parent.TaskType || 'task',
             TaskTypeKey: parent.TaskTypeKey || 1,
