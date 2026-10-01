@@ -1,6 +1,7 @@
 /* eslint-env browser */
 const fs = require('fs');
 const { median, summarise } = require('./stats');
+const everythingPage = require('../../../frontend/src/views/Everything/everythingRequest');
 
 const VIEWPORT = { width: 1440, height: 900 };
 const LIST_ROW = '.lv2__row:not(.is-sub)';
@@ -36,7 +37,8 @@ async function launchBrowser() {
  * never early. It reads performance.now(), not the frame's own timestamp, which is the scheduled time and runs up to
  * seconds early while the page is busy rendering. The clock starts at navigation and the numbers carry no round trip
  * to this script. The conditions live here because the app's content security policy refuses code passed in as text. */
-const instrument = ({ userId, companyId, selectors, queryPath, ignoredPath }) => {
+const instrument = ({ userId, companyId, selectors, queryPath, ignoredPath, storage = {} }) => {
+    Object.entries(storage).forEach(([key, value]) => localStorage.setItem(key, value));
     localStorage.setItem('userId', userId);
     localStorage.setItem('selectedCompany', companyId);
     localStorage.setItem('isLogging', 'true');
@@ -85,7 +87,10 @@ const instrument = ({ userId, companyId, selectors, queryPath, ignoredPath }) =>
         };
     };
 
-    window.__scale = { firstSeen, until, nextClick, timeline };
+    const queries = () => performance.getEntriesByType('resource')
+        .filter((entry) => entry.name.includes(queryPath) && !(ignoredPath && entry.name.includes(ignoredPath))).length;
+
+    window.__scale = { firstSeen, until, nextClick, timeline, queries };
 };
 
 const scrollFrames = ({ selector, ms }) => new Promise((resolve) => {
@@ -143,7 +148,7 @@ async function loadView({ context, url, selector, loads, room }) {
     const shown = await page.locator(selector).count();
     const middle = (key) => Math.round(median(timelines.map((timeline) => timeline[key])));
     const timeline = { scriptsReady: middle('scriptsReady'), queriesSent: middle('queriesSent'), queriesAnswered: middle('queriesAnswered') };
-    return { page, samples, shown, timeline, weight: await pageWeight(page) };
+    return { page, samples, shown, timeline, queries: await page.evaluate(() => window.__scale.queries()), weight: await pageWeight(page) };
 }
 
 async function changeStatus(page, statuses) {
@@ -263,37 +268,56 @@ async function measureBrowser({ browser, base, session, list, loads, room, log =
     }
 }
 
-/* The Everything page: from navigation to the frame after the first task row is on screen, loaded like the List. The
- * page reads the person's saved views before its tasks, so that request is not counted as the task query. */
+/* How the Everything page is opened. A first visit holds nothing in the browser, so the page reads the saved views
+ * before its tasks; a grouped view is what the browser kept from the visit before, which the page opens straight away. */
+const EVERYTHING_PAGES = [
+    { key: 'everything', label: 'Everything', group: null },
+    { key: 'everything.grouped', label: 'Everything grouped by status', group: 'status' },
+    { key: 'everything.byProject', label: 'Everything grouped by project', group: 'project' },
+];
+
+const keptPage = (session, group) => (group ? {
+    [`ah.everything.${session.companyId}.${session.userId}`]: JSON.stringify({ ...everythingPage.cleanSettings({ ...everythingPage.DEFAULT_SETTINGS, group }), search: '', viewId: '' }),
+} : {});
+
+const metricKey = (prefix, name) => (prefix.includes('.') ? `${prefix}${name.charAt(0).toUpperCase()}${name.slice(1)}` : `${prefix}.${name}`);
+
+/* The Everything page: from navigation to the frame after the first task row is on screen, loaded like the List, and
+ * what it has asked for and drawn once it is quiet. The saved-views request is not counted as a task query. */
 async function measureEverythingPage({ browser, base, session, loads, room, log = () => {} }) {
-    const context = await browser.newContext({ viewport: VIEWPORT });
-    await context.addCookies([{ name: 'accessToken', value: session.accessToken, url: base }]);
-    await context.addInitScript(instrument, {
-        userId: session.userId, companyId: session.companyId, selectors: [EVERYTHING_ROW], queryPath: EVERYTHING_READ, ignoredPath: EVERYTHING_VIEWS,
-    });
     const row = (key, label, unit, samples, detail) => {
         const metric = { key, label, unit, ...summarise(samples), detail };
         log(`${label}: median ${metric.median} ${unit}${detail ? `, ${detail}` : ''}`);
         return metric;
     };
-    const label = 'Everything: first rows visible';
-    try {
-        const view = await loadView({ context, url: `${base}/#/${session.companyId}/everything`, selector: EVERYTHING_ROW, loads, room });
-        await view.page.close();
-        const { samples, timeline, shown, weight } = view;
-        const story = `page scripts ready at ${timeline.scriptsReady} ms, task query sent at ${timeline.queriesSent} ms and answered by ${timeline.queriesAnswered} ms; first load, with an empty browser cache, ${Math.round(samples[0])} ms`;
-        return [
-            row('everything.firstRows', label, 'ms', samples, `${shown} rows shown; ${story}`),
-            row('everything.domNodes', 'Everything: DOM nodes after load', 'nodes', [weight.nodes], shown ? `about ${Math.round(weight.nodes / shown)} for each row shown, the rest of the page included` : ''),
-            row('everything.heap', 'Everything: JS heap after load', 'MB', [weight.heapMb]),
-        ];
-    } catch (error) {
-        const reason = String(error.message || error).split('\n')[0];
-        log(`${label}: not measured: ${reason}`);
-        return [{ key: 'everything.firstRows', label, unit: 'ms', ...summarise([]), detail: `not measured: ${reason}` }];
-    } finally {
-        await context.close();
+    const metrics = [];
+    for (const opened of EVERYTHING_PAGES) {
+        const label = `${opened.label}: first rows visible`;
+        const context = await browser.newContext({ viewport: VIEWPORT });
+        try {
+            await context.addCookies([{ name: 'accessToken', value: session.accessToken, url: base }]);
+            await context.addInitScript(instrument, {
+                userId: session.userId, companyId: session.companyId, selectors: [EVERYTHING_ROW], queryPath: EVERYTHING_READ, ignoredPath: EVERYTHING_VIEWS,
+                storage: keptPage(session, opened.group),
+            });
+            const view = await loadView({ context, url: `${base}/#/${session.companyId}/everything`, selector: EVERYTHING_ROW, loads, room });
+            await view.page.close();
+            const { samples, timeline, shown, weight, queries } = view;
+            const story = `page scripts ready at ${timeline.scriptsReady} ms, first task query sent at ${timeline.queriesSent} ms and answered by ${timeline.queriesAnswered} ms; first load, with an empty browser cache, ${Math.round(samples[0])} ms`;
+            metrics.push(
+                row(metricKey(opened.key, 'firstRows'), label, 'ms', samples, `${shown} rows drawn by ${queries} task ${queries === 1 ? 'query' : 'queries'} once the page is quiet; ${story}`),
+                row(metricKey(opened.key, 'domNodes'), `${opened.label}: DOM nodes after load`, 'nodes', [weight.nodes], shown ? `about ${Math.round(weight.nodes / shown)} for each row shown, the rest of the page included` : ''),
+                row(metricKey(opened.key, 'heap'), `${opened.label}: JS heap after load`, 'MB', [weight.heapMb]),
+            );
+        } catch (error) {
+            const reason = String(error.message || error).split('\n')[0];
+            log(`${label}: not measured: ${reason}`);
+            metrics.push({ key: metricKey(opened.key, 'firstRows'), label, unit: 'ms', ...summarise([]), detail: `not measured: ${reason}` });
+        } finally {
+            await context.close();
+        }
     }
+    return metrics;
 }
 
-module.exports = { launchBrowser, measureBrowser, measureEverythingPage };
+module.exports = { launchBrowser, measureBrowser, measureEverythingPage, EVERYTHING_PAGES, keptPage, metricKey };

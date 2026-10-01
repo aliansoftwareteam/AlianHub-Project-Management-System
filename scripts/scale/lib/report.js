@@ -10,6 +10,8 @@ const BUDGETS = {
     'api.listFirstPage': { limit: 300, unit: 'ms' },
     'api.listOpen': { limit: 300, unit: 'ms' },
     'everything.firstRows': { limit: 1500, unit: 'ms' },
+    'everything.groupedFirstRows': { limit: 1500, unit: 'ms' },
+    'everything.byProjectFirstRows': { limit: 1500, unit: 'ms' },
 };
 
 /* Every request the Everything page makes is a task query's first page, so each has that budget. */
