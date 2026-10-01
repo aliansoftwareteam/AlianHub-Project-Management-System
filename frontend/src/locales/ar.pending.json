@@ -3554,6 +3554,7 @@
     "Docs.history_removed": "Removed",
     "Docs.history_restore": "Restore this version",
     "Docs.history_restore_confirm": "Restore this version? The doc as it is now is kept as a version first.",
+    "Docs.history_restore_private_confirm": "This version is from when the doc was private. Restoring it shows it to everyone who can read the doc now. The doc as it is now is kept as a version first. Restore it?",
     "Docs.history_restored": "Version restored.",
     "Docs.history_save_version": "Save a version",
     "Docs.history_saved": "Version saved.",

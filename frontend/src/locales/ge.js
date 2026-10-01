@@ -1605,6 +1605,7 @@ export default {
         "history_named": "Version name saved.",
         "history_restore": "Restore this version",
         "history_restore_confirm": "Restore this version? The doc as it is now is kept as a version first.",
+        "history_restore_private_confirm": "This version is from when the doc was private. Restoring it shows it to everyone who can read the doc now. The doc as it is now is kept as a version first. Restore it?",
         "history_restored": "Version restored.",
         "history_back": "Back to the versions",
         "history_read_only": "Read-only",

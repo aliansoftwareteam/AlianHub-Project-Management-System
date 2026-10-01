@@ -200,6 +200,7 @@
                 :page-id="String(page._id)"
                 :current-title="draftTitle"
                 :current-blocks="currentBlocks"
+                :doc-private="isPrivate"
                 :save-pending="savePending"
                 :before-restore="confirmDiscard"
                 @close="showHistory = false"

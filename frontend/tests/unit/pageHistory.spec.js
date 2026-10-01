@@ -145,6 +145,22 @@ describe('the doc history panel', () => {
         wrapper.unmount();
     });
 
+    it('warns before a version from the doc’s private time is restored into a shared doc', async () => {
+        const wrapper = await mountPanel();
+        await wrapper.findAll('.ph__item')[1].trigger('click');
+        await flushPromises();
+
+        await wrapper.find('.ph__restore').trigger('click');
+        await flushPromises();
+        expect(window.confirm).toHaveBeenLastCalledWith('Docs.history_restore_private_confirm');
+
+        await wrapper.setProps({ docPrivate: true });
+        await wrapper.find('.ph__restore').trigger('click');
+        await flushPromises();
+        expect(window.confirm).toHaveBeenLastCalledWith('Docs.history_restore_confirm');
+        wrapper.unmount();
+    });
+
     it('does not restore when the reader says no, or when leaving unsaved edits is refused', async () => {
         window.confirm.mockReturnValue(false);
         const wrapper = await mountPanel();

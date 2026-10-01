@@ -156,6 +156,7 @@ const props = defineProps({
     pageId: { type: String, required: true },
     currentTitle: { type: String, default: '' },
     currentBlocks: { type: Array, default: () => [] },
+    docPrivate: { type: Boolean, default: false },
     savePending: { type: Function, default: () => Promise.resolve(true) },
     beforeRestore: { type: Function, default: () => true },
 });
@@ -361,7 +362,8 @@ async function submitName() {
 
 async function restore() {
     if (!selected.value || busy.value) return;
-    if (!window.confirm(t('Docs.history_restore_confirm'))) return;
+    const goesPublic = selected.value.visibility === 'private' && !props.docPrivate;
+    if (!window.confirm(t(goesPublic ? 'Docs.history_restore_private_confirm' : 'Docs.history_restore_confirm'))) return;
     if (!props.beforeRestore()) return;
     const page = await write('post', `${base()}/${selected.value._id}/restore`);
     if (!page) return;
