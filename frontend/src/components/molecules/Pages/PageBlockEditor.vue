@@ -7,6 +7,8 @@
             @keydown.capture="onEditorKeydown"
             @keyup="onEditorKeyup"
             @click="onEditorClick"
+            @focusin="rememberBlock"
+            @mouseup="rememberBlock"
         ></div>
         <AiSelectionPanel ref="selectionPanel" :editor="currentEditor" :target="selectionTarget" @changed="emitChange" />
         <Teleport to="body">
@@ -373,7 +375,30 @@ function scrollToBlock(blockId) {
     if (node) node.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-defineExpose({ applyBlocks, restore, emitChange, scrollToBlock });
+/* Editor.js forgets its current block as soon as focus leaves the editor, so the last one touched is kept here. */
+let lastBlockId = '';
+function rememberBlock(event) {
+    const node = event.target && event.target.closest ? event.target.closest('.ce-block[data-id]') : null;
+    if (node) lastBlockId = node.getAttribute('data-id');
+}
+
+function blockNode(blockId) {
+    return blockId ? document.querySelector(`#${holderId} .ce-block[data-id="${CSS.escape(blockId)}"]`) : null;
+}
+
+function currentBlock() {
+    const node = blockNode(lastBlockId);
+    return node ? { id: lastBlockId, text: node.textContent.replace(/\s+/g, ' ').trim() } : null;
+}
+
+function markCommented(blockIds) {
+    const wanted = new Set(blockIds || []);
+    document.querySelectorAll(`#${holderId} .ce-block[data-id]`).forEach((node) => {
+        node.classList.toggle('pbe-commented', wanted.has(node.getAttribute('data-id')));
+    });
+}
+
+defineExpose({ applyBlocks, restore, emitChange, scrollToBlock, currentBlock, markCommented });
 
 onMounted(() => {
     initEditor();
@@ -406,6 +431,7 @@ onBeforeUnmount(() => {
     padding: 4px 0 32px;
 }
 .pbe__holder { min-height: 200px; }
+.pbe :deep(.ce-block.pbe-commented > .ce-block__content) { background: var(--brand-tint); box-shadow: inset 3px 0 0 var(--brand); border-radius: 0 6px 6px 0; }
 
 .pbe :deep(.codex-editor__redactor) { padding-bottom: 60px !important; }
 .pbe :deep(.ce-block__content),

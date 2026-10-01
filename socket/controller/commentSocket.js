@@ -6,7 +6,8 @@ const {
     findRoomsByPrefix,
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
-const { onJoin, roomFor, prefixOfOwnRoom, canOpenComments } = require('../roomAccess');
+const logger = require('../../Config/loggerConfig');
+const { onJoin, roomFor, prefixOfOwnRoom, canOpenComments, pageCommentRoomOf, readablePage } = require('../roomAccess');
 
 exports.commentSocketHandler = ({ socket, namespace }) => {
     onJoin(socket, 'joinCommentRoom',
@@ -101,6 +102,33 @@ const handleCommentChange = (changeData, includeUpdatedFields = false) => {
 // `comments` (task-level comments) and `comments_project` (project-level
 // comments). Subscribe to both namespaces so the handler still receives
 // every relevant event while ignoring task/companies/notification fan-out.
+const PAGE_COMMENT_EVENTS = { insert: 'pageCommentInsert', update: 'pageCommentUpdate' };
+
+/* Sent to each room member only while they can still read the doc: a doc made private keeps its old viewers
+ * in the room until they leave it, and they must not see what is said after. */
+exports.relayPageComment = async (changeData) => {
+    const comment = (changeData && changeData.data) || {};
+    const eventName = PAGE_COMMENT_EVENTS[changeData && changeData.type];
+    if (!eventName || !comment.pageId) return;
+    const rooms = findRoomsByPrefix(pageCommentRoomOf(comment.pageId));
+    if (!rooms.length) return;
+    const companyId = String(changeData.companyId || '');
+    const decisions = new Map();
+    for (const entry of rooms) {
+        const identity = entry.socket && entry.socket.identity;
+        if (!identity || identity.companyId !== companyId || !entry.socket.rooms.has(entry.roomName)) continue;
+        if (!decisions.has(identity.uid)) {
+            // eslint-disable-next-line no-await-in-loop
+            decisions.set(identity.uid, Boolean(await readablePage(identity, comment.pageId).catch(() => null)));
+        }
+        if (decisions.get(identity.uid)) entry.namespace.to(entry.roomName).emit(eventName, { fullDocument: comment });
+    }
+};
+
+const relayOrLog = (changeData) => exports.relayPageComment(changeData)
+    .catch((error) => logger.error(`Page comment relay failed: ${error.message || error}`));
+socketEmitter.on('pageComments:insert', relayOrLog);
+socketEmitter.on('pageComments:update', relayOrLog);
 socketEmitter.on('comments:update', changeData => handleCommentChange(changeData, true));
 socketEmitter.on('comments:insert', changeData => handleCommentChange(changeData, false));
 socketEmitter.on('comments_project:update', changeData => handleCommentChange(changeData, true));

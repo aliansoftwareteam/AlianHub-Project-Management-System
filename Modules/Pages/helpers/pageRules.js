@@ -43,6 +43,9 @@ const pageVisibleTo = (page, uid) => Boolean(page)
 
 const pageVisibilityFilter = (uid) => ({ $or: [{ visibility: { $ne: 'private' } }, { createdBy: String(uid || '') }] });
 
+/* Whoever can read a doc may comment on it; a doc in the trash is read-only. */
+const pageTakesComments = (page) => Boolean(page) && Number(page.deletedStatusKey || 0) === 0;
+
 /* Once private, a page is readable by its author alone, so nobody else may make it private. */
 const canMakePrivate = (page, uid) => Boolean(page) && Boolean(uid) && String(page.createdBy || '') === String(uid);
 
@@ -87,6 +90,7 @@ module.exports = {
     htmlToRawText,
     pageVisibleTo,
     pageVisibilityFilter,
+    pageTakesComments,
     canMakePrivate,
     parseDate,
     nextReviewDate,

@@ -48,6 +48,8 @@ const Notification_key = {
   PROJECT_SPRINT_CREATE:"project_sprint_create",
   PROJECT_FOLDER_CREATE:"project_folder_create",
   DOC_MENTION:"doc_mention",
+  DOC_COMMENT_MENTION:"doc_comment_mention",
+  DOC_COMMENT_REPLY:"doc_comment_reply",
 }
 const TemplateType = {
  CREATE:'create',
@@ -86,12 +88,14 @@ const COMMENT_NOTICE_ITEMS = Object.freeze([
   { name: "Comments assigned to me", email: false, browser: true, mobile: true, key: Notification_key.COMMENT_ASSIGNED },
 ]);
 
-// A settings section added after users had settings documents; Modules/notification/docNotices.js adds it to older ones.
+// A settings section, and items in it, added after users had settings documents; Modules/notification/docNotices.js adds them to older ones.
 const DOC_NOTICE_SECTION = Object.freeze({
   key: "docs",
   sectionName: "Docs",
   items: Object.freeze([
     Object.freeze({ name: "Docs I'm @mentioned in", email: false, browser: true, mobile: true, key: Notification_key.DOC_MENTION }),
+    Object.freeze({ name: "Doc comments I'm @mentioned in", email: false, browser: true, mobile: true, key: Notification_key.DOC_COMMENT_MENTION }),
+    Object.freeze({ name: "Replies to my doc comments", email: false, browser: true, mobile: true, key: Notification_key.DOC_COMMENT_REPLY }),
   ]),
 });
 

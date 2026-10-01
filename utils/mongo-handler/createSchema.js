@@ -119,6 +119,9 @@ pagesSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
 pagesSchema.index({ linkedTasks: 1, deletedStatusKey: 1 });
 const pageVersionsSchema = new Schema(schema.pageVersions, {strict: true, timestamps: true});
 pageVersionsSchema.index({ pageId: 1, createdAt: -1 });
+const pageCommentsSchema = new Schema(schema.pageComments, {strict: true, timestamps: true});
+pageCommentsSchema.index({ pageId: 1, isDeleted: 1, createdAt: 1 });
+pageCommentsSchema.index({ parentId: 1 });
 const publicSharesSchema = new Schema(schema.publicShares, {strict: true, timestamps: true});
 publicSharesSchema.index({ token: 1 }, { unique: true });
 const intakeItemsSchema = new Schema(schema.intakeItems, {strict: true, timestamps: true});
@@ -480,6 +483,7 @@ module.exports = {
     epicsSchema,
     pagesSchema,
     pageVersionsSchema,
+    pageCommentsSchema,
     publicSharesSchema,
     intakeItemsSchema,
     publicShareIndexSchema,
