@@ -102,3 +102,9 @@ describe('The toolbar on a phone', () => {
         expect(ruleBody(css, '.ah-toolbar')).toMatch(/min-height:\s*var\(--toolbar-h\)/);
     });
 });
+
+describe('Menu rows', () => {
+    test('a link row is as wide as a button row, padding included, so the More sheet does not pan', () => {
+        expect(ruleBody(read('assets/css/tokens.css'), '.ah-pop__item')).toMatch(/box-sizing:\s*border-box/);
+    });
+});
