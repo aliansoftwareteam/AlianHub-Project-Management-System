@@ -346,7 +346,7 @@ const verifyJWTTokenWithCRoute = [
     '/api/v2/public-shares',
     '/api/v2/intake',
     // Who can see a project, sprint or doc (Modules/WhoCanSee): the answer is only for someone who can see it.
-    '/api/v2/who-can-see',
+    "/api/v2/who-can-see",
     // Project billing (Modules/Milestone billing.* + Modules/Invoice project
     // invoices). Every handler reads or writes contract money and takes the
     // actor from req.uid — which only this middleware sets. The GUEST-facing

@@ -170,7 +170,7 @@ watch(() => [props.modelValue, props.kind, props.itemId], ([open]) => {
 .wcs__group-ico { flex: none; margin-top: 2px; color: var(--ink-2); }
 .wcs__group-copy { flex: 1 1 auto; min-width: 0; }
 .wcs__group-title { font-size: 13.5px; font-weight: 500; color: var(--ink); }
-.wcs__meta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 2px; color: var(--ink-3); }
+.wcs__meta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 2px; color: var(--ink-2); }
 .wcs__can {
     flex: none; padding: 2px 8px; border-radius: var(--r-chip);
     font-size: 11.5px; font-weight: 500; white-space: nowrap;
@@ -182,7 +182,7 @@ watch(() => [props.modelValue, props.kind, props.itemId], ([open]) => {
 .wcs__person { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
 .wcs__name { font-size: 12.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wcs__more { margin: 8px 0 0 27px; padding: 0; background: none; border: 0; color: var(--brand); font-size: 12.5px; cursor: pointer; }
-.wcs__note { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--hairline); color: var(--ink-3); }
+.wcs__note { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--hairline); color: var(--ink-2); }
 
 @media (max-width: 480px) {
     .wcs__back { padding: 12px; align-items: stretch; }
