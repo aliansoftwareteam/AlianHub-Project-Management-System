@@ -1,15 +1,15 @@
 <template>
     <span class="lv2__actions" @click.stop>
-        <button v-if="canRename" type="button" class="lv2__act lv2__act--hover" data-action="rename" :aria-label="t('List.action_rename', { name })" :title="t('List.menu_rename')" @click="emit('rename')">
+        <button v-if="has('rename')" type="button" class="lv2__act lv2__act--hover" data-action="rename" :aria-label="t('List.action_rename', { name })" :title="t('List.menu_rename')" @click="emit('choose', 'rename')">
             <span aria-hidden="true">✎</span>
         </button>
-        <button v-if="canSubtask" type="button" class="lv2__act lv2__act--hover" data-action="subtask" :aria-label="t('List.action_subtask', { name })" :title="t('List.menu_subtask')" @click="emit('add-subtask')">
+        <button v-if="has('subtask')" type="button" class="lv2__act lv2__act--hover" data-action="subtask" :aria-label="t('List.action_subtask', { name })" :title="t('List.menu_subtask')" @click="emit('choose', 'subtask')">
             <ShellIcon name="plus" :size="13" aria-hidden="true" />
         </button>
-        <button type="button" class="lv2__act lv2__act--hover" data-action="copy-link" :aria-label="t('List.action_copy_link', { name })" :title="t('List.menu_copy_link')" @click="emit('copy-link')">
+        <button v-if="has('copy-link')" type="button" class="lv2__act lv2__act--hover" data-action="copy-link" :aria-label="t('List.action_copy_link', { name })" :title="t('List.menu_copy_link')" @click="emit('choose', 'copy-link')">
             <ShellIcon name="link" :size="13" aria-hidden="true" />
         </button>
-        <a class="lv2__act lv2__act--hover" data-action="new-tab" :href="href" target="_blank" rel="noopener" :aria-label="t('List.action_new_tab', { name })" :title="t('List.menu_new_tab')">
+        <a v-if="has('new-tab')" class="lv2__act lv2__act--hover" data-action="new-tab" :href="href" target="_blank" rel="noopener" :aria-label="t('List.action_new_tab', { name })" :title="t('List.menu_new_tab')">
             <ShellIcon name="external" :size="13" aria-hidden="true" />
         </a>
         <span class="lv2__menu-anchor">
@@ -27,20 +27,10 @@
                 <ShellIcon name="dots" :size="14" aria-hidden="true" />
             </button>
             <div v-if="open" ref="menu" class="ah-pop lv2__menu" :style="menuStyle" role="menu" :aria-label="t('List.action_menu', { name })" @keydown="onMenuKey">
-                <button v-if="canRename" type="button" class="ah-pop__item" role="menuitem" data-item="rename" @click="choose('rename')">{{ t('List.menu_rename') }}</button>
-                <button v-if="canSubtask" type="button" class="ah-pop__item" role="menuitem" data-item="subtask" @click="choose('add-subtask')">{{ t('List.menu_subtask') }}</button>
-                <button type="button" class="ah-pop__item" role="menuitem" data-item="copy-link" @click="choose('copy-link')">{{ t('List.menu_copy_link') }}</button>
-                <button v-if="taskKey" type="button" class="ah-pop__item" role="menuitem" data-item="copy-key" @click="choose('copy-key')">{{ t('List.menu_copy_key') }}</button>
-                <a class="ah-pop__item" role="menuitem" data-item="new-tab" :href="href" target="_blank" rel="noopener" @click="close(false)">{{ t('List.menu_new_tab') }}</a>
-                <button type="button" class="ah-pop__item" role="menuitem" data-item="open" @click="choose('open')">{{ t('List.menu_open') }}</button>
-                <button v-if="canTemplate" type="button" class="ah-pop__item" role="menuitem" data-item="save-template" @click="choose('save-template')">{{ t('TaskTemplates.save_as') }}</button>
-                <template v-if="canArchive || canDelete || canMove || canDuplicate">
-                    <div class="ah-pop__sep" role="separator"></div>
-                    <button v-if="canMove" type="button" class="ah-pop__item" role="menuitem" data-item="move" @click="choose('move')">{{ t('List.menu_move') }}</button>
-                    <button v-if="canDuplicate" type="button" class="ah-pop__item" role="menuitem" data-item="duplicate" @click="choose('duplicate')">{{ t('List.menu_duplicate') }}</button>
-                    <button v-if="canDuplicate && hasSubtasks" type="button" class="ah-pop__item" role="menuitem" data-item="duplicate-subtasks" @click="choose('duplicate-subtasks')">{{ t('List.menu_duplicate_subtasks') }}</button>
-                    <button v-if="canArchive" type="button" class="ah-pop__item" role="menuitem" data-item="archive" @click="choose('archive')">{{ t('List.menu_archive') }}</button>
-                    <button v-if="canDelete" type="button" class="ah-pop__item lv2__menu-danger" role="menuitem" data-item="delete" @click="choose('delete')">{{ t('List.menu_delete') }}</button>
+                <template v-for="item in items" :key="item.id">
+                    <div v-if="item.separated" class="ah-pop__sep" role="separator"></div>
+                    <a v-if="item.id === 'new-tab'" class="ah-pop__item" role="menuitem" :data-item="item.id" :href="href" target="_blank" rel="noopener" @click="close(false)">{{ t(item.labelKey) }}</a>
+                    <button v-else type="button" class="ah-pop__item" :class="{ 'lv2__menu-danger': item.danger }" role="menuitem" :data-item="item.id" @click="choose(item.id)">{{ t(item.labelKey) }}</button>
                 </template>
             </div>
         </span>
@@ -58,15 +48,9 @@ defineOptions({ name: "ListRowActions" });
 const props = defineProps({
     task: { type: Object, required: true },
     href: { type: String, default: "" },
-    canRename: { type: Boolean, default: false },
-    canSubtask: { type: Boolean, default: false },
-    canTemplate: { type: Boolean, default: false },
-    canArchive: { type: Boolean, default: false },
-    canDelete: { type: Boolean, default: false },
-    canMove: { type: Boolean, default: false },
-    canDuplicate: { type: Boolean, default: false }
+    items: { type: Array, default: () => [] }
 });
-const emit = defineEmits(["rename", "add-subtask", "copy-link", "copy-key", "open", "save-template", "archive", "delete", "move", "duplicate", "duplicate-subtasks"]);
+const emit = defineEmits(["choose"]);
 
 const { t } = useI18n();
 const open = ref(false);
@@ -75,10 +59,9 @@ const menuButton = ref(null);
 const menuStyle = ref({});
 
 const name = computed(() => props.task.TaskName || "");
-const hasSubtasks = computed(() => Number(props.task.subTasks || 0) > 0);
-const taskKey = computed(() => (props.task.TaskKey && props.task.TaskKey !== "--" ? props.task.TaskKey : ""));
+const has = (id) => props.items.some((item) => item.id === id);
 
-const items = () => [...(menu.value?.querySelectorAll('[role="menuitem"]') || [])];
+const menuItems = () => [...(menu.value?.querySelectorAll('[role="menuitem"]') || [])];
 
 function onOutside(event) {
     if (!menu.value?.contains(event.target) && event.target !== menuButton.value && !menuButton.value?.contains(event.target)) close(false);
@@ -93,7 +76,7 @@ function toggle() {
     open.value = true;
     document.addEventListener("click", onOutside, true);
     window.addEventListener("scroll", onScroll, true);
-    nextTick(() => items()[0]?.focus());
+    nextTick(() => menuItems()[0]?.focus());
 }
 
 const MENU_ROOM = 400;
@@ -119,15 +102,15 @@ function close(returnFocus) {
     if (returnFocus) nextTick(() => menuButton.value?.focus());
 }
 
-const MOVES_FOCUS = ["rename", "add-subtask", "open", "save-template", "move"];
+const MOVES_FOCUS = ["rename", "subtask", "open", "save-template", "move", "convert-subtask", "convert-list", "merge"];
 
-function choose(action) {
-    close(!MOVES_FOCUS.includes(action));
-    emit(action);
+function choose(id) {
+    close(!MOVES_FOCUS.includes(id));
+    emit("choose", id);
 }
 
 function onMenuKey(event) {
-    const list = items();
+    const list = menuItems();
     const index = list.indexOf(document.activeElement);
     if (event.key === "Escape") {
         event.preventDefault();

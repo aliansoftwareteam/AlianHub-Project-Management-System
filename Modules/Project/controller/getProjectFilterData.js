@@ -3,6 +3,7 @@ const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueri
 const { fetchRules } = require("../../settings/securityPermissions/controller");
 const mongoose = require("mongoose")
 const { escapeRegex } = require("../../../utils/escapeRegex");
+const { ACTIVE_SEAT } = require("../../../Config/seatStatus");
 
 exports.projectFilter = async (req, res) => {
     try {
@@ -17,15 +18,18 @@ exports.projectFilter = async (req, res) => {
             return res.status(404).json({ message: "Type is not found" });
         }
 
+        const [teams, seat] = await Promise.all([
+            getTeamData(uid, companyId),
+            getActiveSeat(uid, companyId)
+        ]);
+        if (!seat) {
+            return res.status(200).json([]);
+        }
+
         const response = await fetchRules(companyId);
 
-        const [teams, companyUsers] = await Promise.all([
-            getTeamData(uid, companyId),
-            getCompanyUser(uid, companyId)
-        ]);
-
         const teamIds = teams.map((team) => 'tId_' + team._id);
-        const roleType = companyUsers?.roleType;
+        const { roleType } = seat;
         const isNonAdmin = roleType !== 1 && roleType !== 2;
 
         const rule = response && response.length ? response?.find((x) => x?.key === 'public_projects') : {};
@@ -77,11 +81,11 @@ const getTeamData = async (uid, companyId) => {
     return await MongoDbCrudOpration(companyId, teamObj, 'find');
 };
 
-const getCompanyUser = async (uid, companyId) => {
+const getActiveSeat = async (uid, companyId) => {
     const companyObj = {
         type: SCHEMA_TYPE.COMPANY_USERS,
         data: [
-            { userId: uid },
+            { userId: uid, ...ACTIVE_SEAT },
             { roleType: 1, _id: 0 }
         ]
     };
