@@ -4270,7 +4270,9 @@ const schema = {
         // @agent in chat: the question's { state, askerId, agentIds, at, answerIds, code }; on the agent's reply what it cites and the changes it made or proposed.
         agentAsk: { type: Object, required: false },
         agentCitations: { type: Array, required: false },
-        agentChanges: { type: Array, required: false }
+        agentChanges: { type: Array, required: false },
+        // The tool an importer brought the comment from (Modules/Importers); the author and the time are the file's word.
+        importedFrom: { type: String, required: false }
     },
     mainChat: {
         ProjectCode: {

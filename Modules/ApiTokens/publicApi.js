@@ -134,3 +134,5 @@ exports.init = (app) => {
     app.get('/api/public-v1/tasks/:key', tokenAuth, requireScope('read'), getTaskByKey);
     app.get('/api/public-v1/tasks', tokenAuth, requireScope('read'), listTasks);
 };
+
+exports.tokenAuth = tokenAuth;

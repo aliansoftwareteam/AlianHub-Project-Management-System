@@ -227,10 +227,21 @@ describe('changing a portfolio', () => {
     });
 
     it.each([
-        ['a member who can open some of its projects', OPENS_SOME],
-        ['a member who can open all of them', OPENS_ALL],
+        ['a member who sees it through one of its projects', OPENS_SOME],
+        ['a member who can open all of its projects', OPENS_ALL],
+    ])('is not removed by %s, who can still edit it', async (_who, uid) => {
+        expect((await remove(uid)).statusCode).toBe(403);
+        expect(stored(board._id).deletedStatusKey).toBe(0);
+        expect((await listFor(uid))[0].canDelete).toBe(false);
+        expect((await update(uid, { name: 'Renamed' })).statusCode).toBe(200);
+    });
+
+    it.each([
+        ['its creator', CREATOR],
         ['an owner', OWNER],
-    ])('lets %s delete it', async (_who, uid) => {
+        ['an admin', ADMIN],
+    ])('is removed by %s', async (_who, uid) => {
+        expect((await listFor(uid))[0].canDelete).toBe(true);
         expect((await remove(uid)).statusCode).toBe(200);
         expect(stored(board._id).deletedStatusKey).toBe(1);
     });

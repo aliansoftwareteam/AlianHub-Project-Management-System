@@ -4,7 +4,8 @@
 // A ClickUp List becomes a sprint: into the chosen sprint of an existing project,
 // or into a new project named after the list (one project per list).
 const { isObjectIdString } = require('./jiraRules');
-const { parseDate } = require('./csvRules');
+const { parseClickUpDate, parseComments, parseChecklists, parseAttachmentLinks } = require('./clickupDetails');
+const { fieldTypeOf } = require('./clickupFields');
 
 const MAX_ROWS = 2000;
 const MAX_TAGS = 20;
@@ -28,25 +29,22 @@ const COLUMNS = {
     startText: ['start date text'],
     estimate: ['time estimated', 'time estimate'],
     estimateText: ['time estimated text', 'time estimate text'],
+    attachments: ['attachments'],
+    checklists: ['checklists'],
+    comments: ['comments'],
 };
 
 const KNOWN = new Set([
     ...Object.values(COLUMNS).flat(),
     'task custom id', 'date created', 'date created text', 'date updated', 'date updated text', 'date closed', 'date closed text',
-    'date done', 'date done text', 'attachments', 'checklists', 'comments', 'assigned comments', 'time spent', 'time spent text',
+    'date done', 'date done text', 'assigned comments', 'time spent', 'time spent text',
     'rolled up time', 'rolled up time text', 'time logged', 'time logged text', 'time logged rolled up with subtasks',
     'time logged rolled up with subtasks text', 'list id', 'folder id', 'space id', 'task type', 'watchers', 'creator', 'created by',
-    'latest comment', 'points', 'sprint points', 'linked tasks', 'dependencies', 'url', 'task url',
+    'latest comment', 'points', 'sprint points', 'linked tasks', 'dependencies', 'url', 'task url', 'task link', 'subtask ids',
 ]);
 
 // ClickUp names each custom-field column "<field> (<type>)".
 const CUSTOM_COLUMN = /^(.+?)\s*\(([a-z_ ]+)\)\s*$/i;
-const CUSTOM_TYPES = {
-    number: 'number', currency: 'number', money: 'number', rating: 'number', progress: 'number',
-    manual_progress: 'number', automatic_progress: 'number', date: 'date',
-    short_text: 'text', text: 'text', long_text: 'text', drop_down: 'text', dropdown: 'text', labels: 'text', email: 'text',
-    phone: 'text', url: 'text', checkbox: 'text', location: 'text', emoji: 'text', users: 'text', tasks: 'text', formula: 'text',
-};
 
 const trimmed = (value) => (value === undefined || value === null ? '' : String(value).trim());
 const lower = (value) => trimmed(value).toLowerCase();
@@ -66,9 +64,7 @@ const headersOf = (rows) => Array.from(new Set((rows || []).flatMap((row) => Obj
 const customColumns = (headers) => headers.flatMap((header) => {
     if (KNOWN.has(lower(header))) return [];
     const match = CUSTOM_COLUMN.exec(trimmed(header));
-    if (!match) return [];
-    const kind = CUSTOM_TYPES[lower(match[2]).replace(/\s+/g, '_')];
-    return kind ? [{ column: header, name: match[1].trim().slice(0, 80), type: kind }] : [];
+    return match ? [{ column: header, name: match[1].trim().slice(0, 80), ...fieldTypeOf(match[2]) }] : [];
 });
 
 const ignoredColumns = (headers) => {
@@ -79,22 +75,6 @@ const ignoredColumns = (headers) => {
 const cell = (row, index, key) => trimmed(index[key] ? row[index[key]] : '');
 
 const parseList = (raw) => trimmed(raw).replace(/^\[|\]$/g, '').split(/[,;]/).map((entry) => entry.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
-
-const parseClickUpDate = (raw) => {
-    const text = trimmed(raw);
-    if (!text) return null;
-    if (/^\d{11,14}$/.test(text)) {
-        const date = new Date(Number(text));
-        return Number.isNaN(date.getTime()) ? null : date;
-    }
-    const direct = parseDate(text);
-    if (direct) return direct;
-    const cleaned = text.replace(/^[A-Za-z]+day,\s*/i, '').replace(/(\d+)(st|nd|rd|th)\b/gi, '$1');
-    const parsed = new Date(cleaned);
-    if (!Number.isNaN(parsed.getTime())) return parsed;
-    const dayOnly = new Date(cleaned.split(',')[0]);
-    return Number.isNaN(dayOnly.getTime()) ? null : dayOnly;
-};
 
 const UNIT_MINUTES = { w: 7 * 24 * 60, d: 24 * 60, h: 60, m: 1 };
 
@@ -178,10 +158,16 @@ const SKIP_REASONS = { no_name: 'The task has no name.' };
 const skipCode = (row, index) => (cell(row, index, 'name') ? '' : 'no_name');
 const skipEntry = (i, code) => ({ row: i + 1, code, reason: SKIP_REASONS[code] });
 
+const fieldCellsOf = (row, custom) => Object.fromEntries(custom
+    .map((field) => [field.column, trimmed(row[field.column])])
+    .filter(([, value]) => value));
+
 /* Transform ClickUp rows into createMultipleTasks input. `statusFor` maps a ClickUp
  * status name to the project status to use. Assignees travel as emails and are
  * resolved later among the company's members only. Each row keeps the parent the file
- * names: the create path orders the levels and re-hangs what does not fit in three. */
+ * names: the create path orders the levels and re-hangs what does not fit in three.
+ * Comments, checklists, attachment links and field cells ride on the task as read;
+ * `fields` lists the file's field columns for the importer to plan. */
 const transformClickUpRows = ({ rows, statusFor, leaderId }) => {
     const headers = headersOf(rows);
     const index = columnIndex(headers);
@@ -225,36 +211,17 @@ const transformClickUpRows = ({ rows, statusFor, leaderId }) => {
         if (start) task.startDate = start.toISOString();
         if (estimate !== null) task.totalEstimatedTime = estimate;
         if (tagNames.length) task.tagNames = tagNames.slice(0, MAX_TAGS);
-        custom.forEach((field) => {
-            const value = customValue(field.type, row[field.column]);
-            if (value !== null) task[`custom_${field.name}`] = { type: field.type, value };
-        });
+        const details = {
+            fieldCells: fieldCellsOf(row, custom),
+            comments: parseComments(cell(row, index, 'comments')),
+            checklists: parseChecklists(cell(row, index, 'checklists')),
+            links: parseAttachmentLinks(cell(row, index, 'attachments')),
+        };
+        Object.entries(details).forEach(([key, value]) => { if (Object.keys(value).length) task[key] = value; });
         return task;
     });
 
-    // createCustomFields defines the project's fields from the first task's keys alone.
-    if (tasks.length) {
-        custom.forEach((field) => {
-            const key = `custom_${field.name}`;
-            if (!tasks[0][key]) tasks[0][key] = { type: field.type, value: null };
-        });
-    }
-
-    return { tasks, skipped: skippedRows.length, skippedRows, unnamedAssignees: Array.from(unnamedAssignees) };
-};
-
-const customValue = (type, raw) => {
-    const text = trimmed(raw);
-    if (!text) return null;
-    if (type === 'number') {
-        const number = Number(text.replace(/[^0-9.-]/g, ''));
-        return Number.isFinite(number) ? number : null;
-    }
-    if (type === 'date') {
-        const date = parseClickUpDate(text);
-        return date ? date.toISOString() : null;
-    }
-    return text.slice(0, 1000);
+    return { tasks, fields: custom, skipped: skippedRows.length, skippedRows, unnamedAssignees: Array.from(unnamedAssignees) };
 };
 
 /* What an import would bring in, per ClickUp list, with nothing written. */
