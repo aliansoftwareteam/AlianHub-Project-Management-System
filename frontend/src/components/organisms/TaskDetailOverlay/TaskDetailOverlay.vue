@@ -38,10 +38,10 @@
 </template>
 
 <script setup>
-import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
-import TaskDetailPanel from "./TaskDetailPanel.vue";
+import { loadTaskDetailPanel } from "./lazyPanel";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { initTimer } from "./useTaskTimer";
@@ -58,6 +58,8 @@ import UndoToast from "@/components/molecules/UndoToast/UndoToast.vue";
 import "./style.css";
 
 defineOptions({ name: "TaskDetailOverlay" });
+
+const TaskDetailPanel = defineAsyncComponent(loadTaskDetailPanel);
 
 defineProps({
     /** Set by the host when an agent run is in progress for the open task; the panel renders a strip for it. */
