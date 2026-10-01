@@ -37,10 +37,11 @@ const placeOf = (id) => { const { left, top } = cardOf(id).element.style; return
 const settle = async () => { await flushPromises(); await flushPromises(); };
 const afterTheDelay = async () => { vi.advanceTimersByTime(SAVE_DELAY_MS); await settle(); };
 
+const pointer = (type, at, extra = {}) => Object.assign(new Event(type, { bubbles: true, cancelable: true }), { clientX: at[0], clientY: at[1], button: 0, pointerId: 1, ...extra });
 const drag = async (id, to) => {
-    await cardOf(id).trigger('mousedown', { clientX: 0, clientY: 0 });
-    window.dispatchEvent(new MouseEvent('mousemove', { clientX: to[0], clientY: to[1] }));
-    window.dispatchEvent(new MouseEvent('mouseup', { clientX: to[0], clientY: to[1] }));
+    cardOf(id).element.dispatchEvent(pointer('pointerdown', [0, 0]));
+    window.dispatchEvent(pointer('pointermove', to));
+    window.dispatchEvent(pointer('pointerup', to));
     await flushPromises();
 };
 
@@ -98,8 +99,9 @@ describe('a whiteboard read from the server', () => {
         const placeholder = wrapper.find('[data-wb-withheld="w"]');
         expect(placeholder.text()).toBe('Views.whiteboard_card_withheld');
         expect([placeholder.element.style.left, placeholder.element.style.top]).toEqual(['700px', '800px']);
-        await placeholder.trigger('mousedown', { clientX: 0, clientY: 0 });
-        window.dispatchEvent(new MouseEvent('mouseup', { clientX: 50, clientY: 50 }));
+        placeholder.element.dispatchEvent(pointer('pointerdown', [0, 0]));
+        window.dispatchEvent(pointer('pointermove', [50, 50]));
+        window.dispatchEvent(pointer('pointerup', [50, 50]));
         await afterTheDelay();
         expect(calls('patch')).toHaveLength(0);
     });
