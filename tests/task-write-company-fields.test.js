@@ -515,13 +515,21 @@ const linkTasks = () => {
     link(OPEN_TASK_2, OPEN_TASK, 'blocked_by');
 };
 
+/* The list a move names is stored as the server holds it, so a move into a folder list needs the list to sit in that folder. */
+const listInFolder = () => {
+    const { folderId, name } = WEB_APP_BODIES.PLACEMENT.PICKED_FOLDER;
+    mockDb.store.sprints.find((sprint) => String(sprint._id) === OTHER_SPRINT).folderId = folderId;
+    mockDb.seed(SCHEMA_TYPE.FOLDERS, { _id: folderId, name, projectId: OPEN_PROJECT });
+};
+
 describe('every web-app body is served as before', () => {
     const rows = WEB_APP_BODIES.map((row) => [`${row.route}${row.action ? ` ${row.action}` : ''} (${row.source})`, row]);
+    const SEEDS = { remove: linkTasks, 'ConvertToSubTaskSidebar.vue move into a folder list': listInFolder };
 
     test.each(rows)('%s', async (_, row) => {
         const ids = { taskId: OPEN_TASK, otherTaskId: OPEN_TASK_2, projectId: OPEN_PROJECT, destinationProjectId: OPEN_PROJECT };
         const body = completed(row, withSprintIds(row.body(ids)));
-        const before = row.action === 'remove' ? linkTasks : () => {};
+        const before = SEEDS[row.action] || SEEDS[row.source] || (() => {});
 
         const prepared = prepareTaskWrite({ headers: { companyid: CID }, aud: CID, body: clone(body) }, specOfRow(row), 'web app');
         expect(prepared.dropped).toEqual([]);
@@ -562,6 +570,7 @@ describe('a move keeps on the task the few values that name its new list', () =>
     });
 
     test('a list in a folder', async () => {
+        listInFolder();
         const result = await call(PATCH, withSprintIds(movedTo(PICKED_FOLDER_LIST)(ids)));
 
         expect(result.code).toBe(200);
