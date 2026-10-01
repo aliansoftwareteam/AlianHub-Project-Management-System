@@ -700,6 +700,31 @@ describe('who may duplicate', () => {
     });
 });
 
+describe('a copy that fails after its tasks were made', () => {
+    it('takes the linked tasks of the copies back with them', async () => {
+        const client = String(seed(SCHEMA_TYPE.CUSTOM_FIELDS, { fieldTitle: 'Client', fieldType: 'relationship', type: 'task', global: true, isDelete: true })._id);
+        const spec = String(seedTask(launch, launch.backlog, { TaskName: 'Spec' })._id);
+        const build = String(seedTask(launch, launch.backlog, { TaskName: 'Build', customField: { [client]: { _id: client, fieldValue: '', revision: 3 } } })._id);
+        seed(SCHEMA_TYPE.CUSTOM_FIELD_LINKS, { taskId: build, fieldId: client, kind: 'relationship', ids: [spec] });
+        const real = db().crud.getMockImplementation();
+        let linksCopied = false;
+        db().crud.mockImplementation(async (companyId, query, method) => {
+            if (linksCopied && query.type === SCHEMA_TYPE.PROJECTS && method === 'findOne') throw new Error('connection lost');
+            const answer = await real(companyId, query, method);
+            if (query.type === SCHEMA_TYPE.CUSTOM_FIELD_LINKS && method === 'findOneAndUpdate') linksCopied = true;
+            return answer;
+        });
+
+        const res = await duplicate(launch.id, { include: { tasks: true, assignees: false, dates: false } });
+
+        expect(res.body.status).toBe(false);
+        expect(linksCopied).toBe(true);
+        nothingCopied();
+        expect(rowsOf(SCHEMA_TYPE.TASKS).map((row) => row.TaskName).sort()).toEqual(['Build', 'Spec']);
+        expect(rowsOf(SCHEMA_TYPE.CUSTOM_FIELD_LINKS).map((row) => [row.taskId, row.ids])).toEqual([[build, [spec]]]);
+    });
+});
+
 describe('the request', () => {
     const bad = async (body) => {
         const res = await run(DUPLICATE, { id: launch.id, body });
