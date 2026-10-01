@@ -2,7 +2,7 @@
     <div>
         <span
             class="task-esitmate-hours"
-            :class="{'cursor-pointer': permission,'red': totalHoursInMinute > task.totalEstimatedTime }"
+            :class="{'cursor-pointer': permission,'task-esitmate-hours--over': totalHoursInMinute > task.totalEstimatedTime }"
             @click="showEtaSidebar()"
         >
             {{ totalHours }}
@@ -12,15 +12,15 @@
             v-model:visible="isVisible"
             width="607px"
             :zIndex="zIndexEstimate"
+            className="estimate-sidebar"
         >
             <template #head-left>
-                <h3 class="blue" :class="clientWidth > 767 ? 'font-size-18' : 'font-size-16' ">{{$t('Milestone.adding_taskPlanning')}}</h3>
+                <h3 class="estimate-sidebar__title">{{$t('Milestone.adding_taskPlanning')}}</h3>
             </template>
             <template #head-right>
-                <div>
-                    <button class="outline-primary font-size-16 mr-10px" :style="[{padding : clientWidth > 767 ? '5px 13.2px' : '5px'}]"  @click="isVisible = false">{{$t('Projects.cancel')}}</button>
-                    <button v-if="!savingETA" class="btn-primary font-size-16" :style="[{padding : clientWidth > 767 ? '5px 14.41px' : '5px 10px'}]"  @click="saveEta()">{{$t('Projects.save')}}</button>
-                    <button v-else class="btn-secondary font-size-16" :style="[{padding : clientWidth > 767 ? '5px 14.41px' : '5px 10px'}]">{{$t('Projects.save')}}</button>
+                <div class="estimate-sidebar__actions">
+                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="isVisible = false">{{$t('Projects.cancel')}}</button>
+                    <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="savingETA" @click="saveEta()">{{$t('Projects.save')}}</button>
                 </div>
             </template>
             <template #body>
@@ -28,7 +28,7 @@
                     <div v-if="savingETA" class="position-ab h-100 w-100 saving__eta">
                         <Spinner :isSpinner="true"/>
                     </div>
-                    <div class="bg-white border-radius-8-px" :class="clientWidth <=767 ? 'p-0' : 'p-20px'">
+                    <div class="estimate-sidebar__card" :class="clientWidth <=767 ? 'p-0' : 'p-20px'">
                         <div :class="clientWidth <=767 ? 'd-block' : 'd-flex'">
                             <label :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}">{{$t('Projects.issue')}}</label>
                             <div class="input-field-group">
@@ -104,13 +104,14 @@
             v-model:visible="isVisible"
             width="607px"
             :zIndex="zIndexEstimate"
+            className="estimate-sidebar"
         >
             <template #head-left>
                 <div></div>
             </template>
             <template #head-right>
-                <div>
-                    <button class="outline-primary font-size-16 mr-10px" :style="[{padding : clientWidth > 767 ? '5px 13.2px' : '5px'}]"  @click="isVisible = false">{{$t('Projects.cancel')}}</button>
+                <div class="estimate-sidebar__actions">
+                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="isVisible = false">{{$t('Projects.cancel')}}</button>
                 </div>
             </template>
             <template #body>

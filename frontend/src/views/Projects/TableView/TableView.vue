@@ -162,7 +162,7 @@ import { useViewSettings } from '@/views/Projects/composables/viewSettingsContex
 import { useListRowEdit } from '@/views/Projects/ListView/useListInlineEdit.js';
 import { columnCatalogue, gridMinWidth, gridTracks, useViewColumns } from '@/views/Projects/composables/viewColumns';
 import { handleGridKey } from './gridKeyboard';
-import { valuePath } from '@/views/Projects/composables/customFieldQuery';
+import { isSortableField, valuePath } from '@/views/Projects/composables/customFieldQuery';
 
 // PACKAGES
 import { useStore } from 'vuex';
@@ -302,7 +302,10 @@ const ariaSort = (field) => {
     return direction === -1 ? 'descending' : 'ascending';
 };
 const COLUMN_SORT_FIELDS = { estimate: 'totalEstimatedTime', points: 'points' };
-const sortFieldOf = (column) => (column.field ? valuePath(column.field._id) : COLUMN_SORT_FIELDS[column.id] || null);
+const sortFieldOf = (column) => {
+    if (!column.field) return COLUMN_SORT_FIELDS[column.id] || null;
+    return isSortableField(column.field) ? valuePath(column.field._id) : null;
+};
 const toggleSort = (field) => {
     viewSettings.setSort({ field, dir: sortOf(field) === 1 ? -1 : 1 });
 };

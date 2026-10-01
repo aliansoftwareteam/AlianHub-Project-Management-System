@@ -162,7 +162,7 @@
 .hc-agenda__nav { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font: 500 var(--fs-xs, 10.5px)/1 var(--font-mono); color: var(--ink-2); }
 .hc-agenda__nav button { min-width: 24px; min-height: 24px; margin: -5px 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; padding: 2px 4px; border-radius: var(--r-sm, 4px); }
 .hc-agenda__nav button:hover { color: var(--brand); background: var(--brand-tint); }
-.hc-connect { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px dashed var(--home-accent-dash); border-radius: var(--r-md, 8px); font: 600 var(--fs-sm, 12px)/1.2 var(--font-ui); color: var(--brand); background: transparent; cursor: pointer; text-align: left; width: 100%; text-decoration: none; }
+.hc-connect { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px dashed var(--home-accent-dash); border-radius: var(--r-md, 8px); font: 600 var(--fs-sm, 12px)/1.2 var(--font-ui); color: var(--brand); background: transparent; cursor: pointer; text-align: left; width: 100%; box-sizing: border-box; text-decoration: none; }
 .hc-connect:hover { background: var(--brand-tint); text-decoration: none; color: var(--brand); }
 .hc-connect__ico { width: 14px; height: 14px; border-radius: 3px; border: 1.5px solid currentColor; flex: none; }
 .hc-agenda__item { display: flex; gap: 10px; font: 400 var(--fs-md, 12.5px)/1.3 var(--font-ui); align-items: stretch; }

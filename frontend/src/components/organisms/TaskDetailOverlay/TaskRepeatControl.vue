@@ -244,7 +244,7 @@ watch(() => props.task?._id, () => { close(); load(); }, { immediate: true });
 .ah-repeat__summary span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ah-repeat__summary.is-set { color: var(--ink); }
 .ah-repeat__summary:hover:not(:disabled) { background: var(--surface-hover); }
-.ah-repeat__summary:focus-visible, .ah-repeat__day:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.ah-repeat__summary:focus-visible, .ah-repeat__day:focus-visible { outline: none; box-shadow: var(--focus); }
 .ah-repeat__summary:disabled { cursor: default; }
 .ah-repeat__editor {
     display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--border);

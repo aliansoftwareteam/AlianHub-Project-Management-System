@@ -657,7 +657,7 @@ const submitFieldValue = (def, input) => {
     }).catch((err) => {
         console.error('Error in updating the custom field',err);
         commit('projectData/mutateUpdateFirebaseTasks', {snap: null, op: 'modified', pid: props.task.ProjectID || '', sprintId: props.task?.sprintId || '', data: {...props.task, customField}, updatedFields: {customField}});
-        $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
+        $toast.error(err?.error?.response?.data?.statusText || t('Toast.something_went_wrong'), {position: 'top-right' });
     });
 };
 const insertCustomField = (detail) => {

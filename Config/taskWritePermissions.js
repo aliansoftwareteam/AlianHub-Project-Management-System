@@ -184,6 +184,7 @@ const TASK_WRITE_ROUTES = Object.freeze({
     'PUT /api/v1/taskPriority': notATaskWrite('company settings, owners and admins only'),
     'POST /api/v1/tabSyncTask': notATaskWrite('a read'),
     'POST /api/v1/task/find': notATaskWrite('a read'),
+    'POST /api/v2/tasks/everything': notATaskWrite('a read'),
     'POST /api/v1/advance/filter/search/tasks': notATaskWrite('a read'),
     'POST /api/v1/dashboard/team-tasktype-breakdown': notATaskWrite('a read'),
     'POST /api/v1/dashboard/my-next-tasks': notATaskWrite('a read'),

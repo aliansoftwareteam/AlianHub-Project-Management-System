@@ -2,7 +2,7 @@
     max-width: 375px;
     width: 100%;
     padding: 15px 13px 15px 17px;
-    border-left: 1px solid #DFE1E6;
+    border-left: 1px solid var(--hairline);
 }
 .task-detail-right-side-label {
     padding-top: 9px;
@@ -16,22 +16,10 @@
     line-height: 21px;
     font-size: 14px;
     font-weight: 500;
-    color: #000000;
+    color: var(--ink-2);
     margin-bottom: 0px;
     font-family: var(--font-ui);
     font-style: normal;
-}
-
-.task-detail-right-side-label span {
-    border-radius: 7px;
-    border-width: 2px;
-    height: 24px;
-    font-size: 13px;
-    font-family: var(--font-ui);
-    font-style: normal;
-    font-weight: 400;
-    line-height: 23px;
-    padding: 3px 8px 0px 8px;
 }
 .details-heading {
     font-family: var(--font-ui);
@@ -39,40 +27,18 @@
     font-weight: 700;
     font-size: 14px;
     line-height: 21px;
-    color: #000000;
+    color: var(--ink);
     margin: 0px 0px 12px 0px
-}
-
-.reporter-img{
-    vertical-align: middle;
-    width:25px;
-    height:25px;
-    border-radius: 30px;
-    border: 2px solid #fff;
-}
-
-.priority-comp span{
-    border-radius: 7px;
-    border-width: 2px;
-    height: 24px;
-    font-size: 13px;
-    font-family: var(--font-ui);
-    font-style: normal;
-    font-weight: 400;
-    line-height: 23px;
-    padding: 0px 8px 3px 8px;
 }
 .taskdetail-label{
     font-weight: 400;
-    font-size: 13px !important;
     line-height: 19px !important;
-    color: #000000;
+    color: var(--ink);
 }
 .priority-comp:hover {
-    background-color: #dfe1e6;
+    background-color: var(--fill);
     cursor: pointer;
     padding-left: 10px;
-    color: #818181;
     position: relative;
     left: 0px;
     width: 65%;
@@ -83,14 +49,9 @@
     padding: 8.5px 10px;
 }
 .due-date.taskdetail-label:hover {
-    background-color: #dfe1e6;
+    background-color: var(--fill);
 }
 .due-date.taskdetail-label{
-    /* padding: 8.5px 10px;
-    max-width: 189px;
-    width: 100%;
-    border-radius: 4px;
-    cursor: pointer; */
     padding: 8.5px 10px;
     border-radius: 4px;
     cursor: pointer;
@@ -104,7 +65,6 @@
 }
 
 .remaining-estimate-text{
-    font-size: 13px;
     font-family: var(--font-ui);
 }
 @media(max-width: 1199px){
@@ -119,9 +79,9 @@
 @media(max-width: 767px){
     .task-detail-right-side .details-heading {font-size: 16px;font-weight: 600 !important;}
     .due-date.taskdetail-label:hover {background-color: transparent;}
-    .task-detail-right-side {max-width: 100%; background-color: #fff;padding:0;margin-top: 20px;padding: 10px;}
+    .task-detail-right-side {max-width: 100%; background-color: var(--surface);padding:0;margin-top: 20px;padding: 10px;}
     .due-date.taskdetail-label {width: calc(100% - 35%);text-align: right;padding: 0 !important;}
-    .task-detail-right-side-label{margin-bottom: 0;height: 50px;border-bottom: 1px solid #DFE1E6;justify-content: space-between;}
+    .task-detail-right-side-label{margin-bottom: 0;height: 50px;border-bottom: 1px solid var(--hairline);justify-content: space-between;}
     .task-detail-right-wrapper{justify-content: flex-end;text-align: right;width: auto;width: calc(100% - 35%);display: flex;}
     .priority-comp:hover,.priority-comp.taskdetail-label {text-align: right;width: calc(100% - 35%);justify-content: end;display: flex;}
     .task-detail-right-side-label .task-detail-field-name{width: 35%;font-size: 16px;font-weight: 400;}
@@ -185,13 +145,6 @@
     height: 16px;
     pointer-events: none;
 }
-/* Inline ring spinner. The `.task-detail-right-side-label span` rule
-   above (lines 25-35) targets every <span> inside the label container
-   and forces height/padding/border-radius/line-height on it — which
-   squashes the spinner into a pill if we don't override it. We bump
-   specificity with the `.ai-estimate-btn` ancestor selector (which
-   wins against the bare-element rule) and explicitly reset every
-   property the parent rule touches. */
 .ai-estimate-btn .ai-estimate-spinner {
     display: inline-block;
     box-sizing: border-box;
@@ -199,8 +152,8 @@
     height: 14px;
     padding: 0;
     line-height: 0;
-    border: 2px solid #E2E6FA;
-    border-top-color: #6473E8;
+    border: 2px solid var(--brand-tint);
+    border-top-color: var(--brand);
     border-radius: 50%;
     font-size: 0;
     animation: ai-estimate-spin 0.7s linear infinite;

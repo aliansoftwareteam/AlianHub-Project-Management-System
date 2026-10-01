@@ -503,7 +503,6 @@ onBeforeUnmount(() => {
 }
 .qct__chip:focus-within, .qct__select:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 .qct__chip select { max-width: 160px; cursor: pointer; }
-.qct__chip input[type="date"] { color-scheme: light dark; }
 .qct__dot { width: 8px; height: 8px; border-radius: 2px; flex: none; }
 .qct__error { margin: 0; color: var(--danger); font-size: 12px; }
 .qct__foot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--hairline); padding-top: 12px; }

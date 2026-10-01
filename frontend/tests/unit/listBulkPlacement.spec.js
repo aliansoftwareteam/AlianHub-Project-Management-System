@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 import taskSelection from '@/store/TaskSelection';
 import en from '@/locales/en';
+import { REFUSALS } from '@taskTreeRules';
 
 const { apiRequest, toast, denied } = vi.hoisted(() => ({
     apiRequest: vi.fn(),
@@ -93,6 +94,17 @@ describe('bulk placement helpers', () => {
         expect(selectionShape(state, ['t2', 'unknown'])).toEqual({ count: 2, subtasks: 0, looseSubtasks: 0 });
     });
 
+    it('a level-three row is loose unless a task anywhere above it is selected too', () => {
+        const leaf = { _id: 'g-1', isParentTask: false, ParentTaskId: 's-a', ancestors: ['t1', 's-a'], statusKey: 1, sprintId: 's1' };
+        const state = projectDataState();
+        state.tasks.p1.s1.tasks[0] = { ...parent, subtaskArray: [{ ...child, subTasks: 1, subtaskArray: [leaf] }] };
+        expect(selectionShape(state, ['g-1'])).toEqual({ count: 1, subtasks: 1, looseSubtasks: 1 });
+        expect(selectionShape(state, ['g-1', 's-a'])).toEqual({ count: 2, subtasks: 2, looseSubtasks: 1 });
+        expect(selectionShape(state, ['g-1', 't1'])).toEqual({ count: 2, subtasks: 1, looseSubtasks: 0 });
+        expect(placementActions(selectionShape(state, ['g-1']), { move: true, toSubtask: true, toTask: true }).moveProject)
+            .toEqual({ enabled: false, reason: 'BulkActions.subtask_moves_hint' });
+    });
+
     it('disables each placement action with the reason it cannot apply', () => {
         const all = { move: true, toSubtask: true, toTask: true };
         expect(placementActions({ count: 1, subtasks: 1, looseSubtasks: 1 }, all).moveProject)
@@ -117,6 +129,25 @@ describe('bulk placement helpers', () => {
         }, t);
         expect(text).toContain('BulkActions.result_skipped{"n":3,"reason":"BulkActions.reason_already_a_top_level_task"}');
         expect(text).toContain('BulkActions.result_failed{"n":1}');
+    });
+
+    it('names the three-level rule when that is why a conversion failed', () => {
+        const t = (key, params) => (params ? `${key}${JSON.stringify(params)}` : key);
+        const deep = bulkReport({ updated: [], skipped: [], errors: [{ reason: REFUSALS.SUBTREE_TOO_DEEP }, { reason: REFUSALS.SUBTREE_TOO_DEEP }, { reason: 'boom' }] }, t);
+        expect(deep).toBe('BulkActions.result_failed_reason{"n":3,"reason":"BulkActions.reason_subtree_too_deep"}');
+        expect(bulkReport({ errors: [{ reason: REFUSALS.PARENT_IS_DESCENDANT }] }, t))
+            .toBe('BulkActions.result_failed_reason{"n":1,"reason":"BulkActions.reason_parent_is_descendant"}');
+        expect(bulkReport({ skipped: [{ reason: 'carried-with-its-parent' }] }, t))
+            .toBe('BulkActions.result_skipped{"n":1,"reason":"BulkActions.reason_carried_with_its_parent"}');
+    });
+
+    it('words the skip reasons so they read for a row on any level', () => {
+        expect(en.BulkActions.reason_carried_with_its_parent).toBe('carried by a selected task above it');
+        expect(en.BulkActions.reason_subtask_moves_with_its_parent).toMatch(/^a subtask moves with its parent/);
+        expect(en.BulkActions.reason_subtree_too_deep).toBeTruthy();
+        expect(en.BulkActions.reason_parent_at_max_depth).toBeTruthy();
+        expect(en.BulkActions.reason_parent_is_descendant).toBeTruthy();
+        expect(en.BulkActions.result_failed_reason).toBe('{n} failed ({reason})');
     });
 
     it('undoes an assignee or tag removal by giving it back to the tasks that had it', () => {
@@ -221,6 +252,32 @@ describe('ListBulkBar placement', () => {
         expect(en.BulkActions.subtask_moves_hint).toMatch(/^A subtask moves with its parent/);
         expect(en.BulkActions.reason_subtask_moves_with_its_parent).toMatch(/^a subtask moves with its parent/);
         expect(en.BulkActions.result_skipped).toBe('{n} skipped ({reason})');
+    });
+
+    it('shows the server\'s own reason when it refuses the parent that was picked', async () => {
+        const wrapper = mountBar(['t2']);
+        apiRequest.mockImplementation((method) => (method === 'post'
+            ? Promise.reject({ message: 'Request failed with status code 400', response: { data: { status: false, statusText: REFUSALS.PARENT_AT_MAX_DEPTH, code: 'PARENT_AT_MAX_DEPTH' } } })
+            : Promise.resolve({ data: [] })));
+        await menu(wrapper, 'List.bulk_convert').trigger('click');
+        await item(wrapper, 'BulkActions.convert_subtask_title').trigger('click');
+        await flushPromises();
+        sidebar(wrapper).vm.$emit('bulkConvertConfirm', { task: { _id: 'deep' } });
+        await flushPromises();
+        expect(toast.error).toHaveBeenCalledWith(REFUSALS.PARENT_AT_MAX_DEPTH);
+        expect(store.state.taskSelection.selectedTaskIds).toEqual(['t2']);
+    });
+
+    it('offers to undo making tasks subtasks, back to the sprint they were in', async () => {
+        const wrapper = mountBar(['t2']);
+        await menu(wrapper, 'List.bulk_convert').trigger('click');
+        await item(wrapper, 'BulkActions.convert_subtask_title').trigger('click');
+        await flushPromises();
+        sidebar(wrapper).vm.$emit('bulkConvertConfirm', { task: { _id: 't1' } });
+        await flushPromises();
+        await wrapper.find('.lv2-undo button').trigger('click');
+        await flushPromises();
+        expect(bodies()[1]).toMatchObject({ action: 'bulkConvertToTask', taskIds: ['t2'], sprintObj: { id: 's1' }, projectData: { id: 'p1' } });
     });
 
     it('makes the selection subtasks of the chosen task', async () => {

@@ -30,13 +30,13 @@ const { checkedFieldDetail, FieldValueRefused } = require('../../../CustomField/
 const FIELD_NOT_FOR_TASK_TYPE = 'This custom field is not used for this task type.';
 
 /* The value as it is stored, or a refusal: the field is not for this task's type, or the value does not fit the field's type. */
-const fieldDetailToStore = async ({ companyId, taskId, customFieldId, storedTask, updateDetail }) => {
+const fieldDetailToStore = async ({ companyId, taskId, customFieldId, storedTask, updateDetail, actorId }) => {
     const definition = await customFieldDefinitionOf(companyId, customFieldId);
     if (!definition) return updateDetail;
     const task = storedTask || await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: new mongoose.Types.ObjectId(taskId) }] }, 'findOne');
     if (!fieldAppliesToTask(definition, task)) throw new TaskWriteRefusal(400, FIELD_NOT_FOR_TASK_TYPE);
     try {
-        return await checkedFieldDetail({ companyId, definition, task, updateDetail });
+        return await checkedFieldDetail({ companyId, definition, task, updateDetail, actorId });
     } catch (error) {
         if (error instanceof FieldValueRefused) throw new TaskWriteRefusal(400, error.message);
         throw error;
@@ -293,7 +293,7 @@ module.exports = {
     },
 
     async updateTaskCustomField({companyId,taskId,updateDetail: sentDetail,customFieldId,userData,storedTask,filledByAi = false}) {
-        const updateDetail = await fieldDetailToStore({ companyId, taskId, customFieldId, storedTask, updateDetail: sentDetail });
+        const updateDetail = await fieldDetailToStore({ companyId, taskId, customFieldId, storedTask, updateDetail: sentDetail, actorId: userData && userData.id });
         return new Promise((resolve,reject) => {
             try {
                 const query = {

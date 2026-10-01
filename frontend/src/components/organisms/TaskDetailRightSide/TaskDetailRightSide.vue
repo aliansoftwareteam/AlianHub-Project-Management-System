@@ -238,8 +238,8 @@
                 <template #body>
                     <textarea
                         v-model.trim="estimateReasonText"
-                        class="w-100 border-radius-6-px font-size-14"
-                        style="min-height:90px; resize:vertical; border:1px solid #DFE1E6; outline:none; padding:8px;"
+                        class="w-100 border border-radius-6-px font-size-14"
+                        style="min-height:90px; resize:vertical; outline:none; padding:8px;"
                         :placeholder="$t('TaskPanel.estimate_reason_ph')"
                         @input="estimateReasonError = false"
                     ></textarea>
