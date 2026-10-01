@@ -236,8 +236,8 @@ const TASK_ACTION_FIELDS = Object.freeze({
 
     addTaskRelation: spec({ params: ['companyId', 'taskId', 'relatedTaskId', 'type', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ['relatedTaskId']], task: TASK_ID[0], others: [['relatedTaskId']] }),
     removeTaskRelation: spec({ params: ['companyId', 'taskId', 'relatedTaskId', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ['relatedTaskId']], task: TASK_ID[0] }),
-    getTaskRelations: spec({ params: ['companyId', 'taskId'], company: companyId, ids: TASK_ID, task: TASK_ID[0] }),
-    getOpenBlockers: spec({ params: ['companyId', 'taskId'], company: companyId, ids: TASK_ID, task: TASK_ID[0] }),
+    getTaskRelations: spec({ params: ['companyId', 'taskId'], company: companyId, ids: TASK_ID, task: TASK_ID[0], actor: HISTORY_USER }),
+    getOpenBlockers: spec({ params: ['companyId', 'taskId'], company: companyId, ids: TASK_ID, task: TASK_ID[0], actor: HISTORY_USER }),
 
     bulkUpdateStatus: spec({ params: ['companyId', 'taskIds', 'newStatus', ...HISTORY_USER], writes: { newStatus: STATUS_FIELDS }, company: companyId, ids: TASK_IDS, listed: LISTED_TASKS }),
     bulkUpdatePriority: spec({ params: ['companyId', 'taskIds', 'firebaseObj', 'priorityObj', ...HISTORY_USER], writes: { firebaseObj: ['Task_Priority', 'Updated_At'] }, company: companyId, ids: TASK_IDS, listed: LISTED_TASKS }),
@@ -286,6 +286,12 @@ const TASK_INDEX_ONLOAD_FIELDS = spec({
 });
 
 const specFor = (table, action) => (typeof action === 'string' && Object.hasOwn(table, action) ? table[action] : null);
+
+/* The task the action in `body` writes, read as the preparation reads it; null when it names none. */
+const writtenTaskId = (table, body) => {
+    const taskSpec = specFor(table, isPlainObject(body) ? body.action : undefined);
+    return (taskSpec && taskSpec.task && plainIdOf(valueAt(body, taskSpec.task)).id) || null;
+};
 
 const setAt = (target, [key, ...rest], value) => {
     if (!rest.length) {
@@ -733,6 +739,7 @@ module.exports = {
     taskFilterOf,
     validatedCompanyOf,
     specFor,
+    writtenTaskId,
     prepareTaskWrite,
     prepareTaskRequest,
     prepareOrRefuse,

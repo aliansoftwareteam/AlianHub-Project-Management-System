@@ -4,9 +4,14 @@ const aiFields = require('./aiFields/controller');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { requireProjectAccess } = require('../../Config/projectAccess');
+const { requireTaskWritePermission } = require('../../Config/permissionGuard');
+const { TASK_ACTIONS } = require('../../Config/taskWritePermissions');
 const { fieldInsertFrom, fieldUpdateFrom, isCompanyWide, widensToCompany, requireFieldSettings, checkFieldWrite } = require('./helpers/fieldWrite');
 
 const CUSTOM_FIELD_EDIT = [['project.project_custom_field', 'task.task_custom_field']];
+
+/* Storing a computed value on a task is held to what editing a field value on it is held to. */
+const COMPUTED_VALUES = Object.freeze({ needs: TASK_ACTIONS.updateTaskCustomField.needs, tasks: [['taskIds', '*']] });
 
 const projectsOf = (field) => (field && field.global !== true && field.projectId ? [].concat(field.projectId) : []);
 
@@ -41,7 +46,7 @@ exports.init = (app) => {
         ctrl.insertCustomField)
     app.get('/api/v2/custom-fields/formula/scope', ctrl.formulaScope)
     app.post('/api/v2/custom-fields/formula/validate', ctrl.validateFormula)
-    app.post('/api/v2/custom-fields/compute', ctrl.computeFields)
+    app.post('/api/v2/custom-fields/compute', requireTaskWritePermission(COMPUTED_VALUES), ctrl.computeFields)
     app.post('/api/v2/custom-fields/:fieldId/ai/preview', aiFields.preview)
     app.post('/api/v2/custom-fields/:fieldId/ai/apply', aiFields.apply)
     app.post('/api/v2/custom-fields/:fieldId/ai/jobs', aiFields.startJob)
