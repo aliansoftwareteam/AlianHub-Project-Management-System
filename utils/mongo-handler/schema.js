@@ -564,6 +564,26 @@ const schema = {
         updatedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Project templates saved from a project (Modules/ProjectSnapshots). A `template` row is the template: `snapshot` holds the rows a
+    // duplicate would write, under ids of their own, with dates as milliseconds from the project's start. Its tasks sit in `tasks` rows
+    // of a few each that name it by templateId, so no one document grows with the project.
+    project_snapshots: {
+        kind: { type: String, required: true },
+        name: { type: String, required: false },
+        description: { type: String, default: '', required: false },
+        everyone: { type: Boolean, default: false, required: false },
+        sourcePrivate: { type: Boolean, default: false, required: false },
+        include: { type: Object, default: {}, required: false },
+        counts: { type: Object, default: {}, required: false },
+        statuses: { type: Array, default: undefined, required: false },
+        snapshot: { type: Object, required: false },
+        templateId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        part: { type: Number, required: false },
+        tasks: { type: Array, default: undefined, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // A person's saved views of the Everything page (Modules/Tasks/controller/everythingViews.js). userId is the
     // one person who can read or change the row; settings is what parseViewSettings returns.
     everything_views: {
@@ -4253,7 +4273,9 @@ const schema = {
         // @agent in chat: the question's { state, askerId, agentIds, at, answerIds, code }; on the agent's reply what it cites and the changes it made or proposed.
         agentAsk: { type: Object, required: false },
         agentCitations: { type: Array, required: false },
-        agentChanges: { type: Array, required: false }
+        agentChanges: { type: Array, required: false },
+        // The tool an importer brought the comment from (Modules/Importers); the author and the time are the file's word.
+        importedFrom: { type: String, required: false }
     },
     mainChat: {
         ProjectCode: {
@@ -4599,7 +4621,22 @@ const schema = {
         fieldRatingMax: { type: Number, required: false },
         // files fields: 1 to 20 files, and any | images | documents
         fieldFilesMax: { type: Number, required: false },
-        fieldFilesKind: { type: String, required: false }
+        fieldFilesKind: { type: String, required: false },
+        // relationship fields: 1 to 20 linked tasks, from any | project | list
+        fieldLinkMax: { type: Number, required: false },
+        fieldLinkScope: { type: String, required: false },
+        fieldLinkProjectId: { type: String, required: false },
+        fieldLinkSprintId: { type: String, required: false },
+        // voting fields: false keeps the voters to the server
+        fieldVotersShown: { type: Boolean, required: false }
+    },
+    // What a relationship or a voting field holds on one task: task ids, or the ids of the people who voted.
+    customFieldLinks: {
+        taskId: { type: String, required: true },
+        fieldId: { type: String, required: true },
+        // relationship | voting
+        kind: { type: String, required: true },
+        ids: { type: [String], default: [], required: false },
     },
     sprints: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.

@@ -1,7 +1,8 @@
 /* What the web app adds to each type module in Modules/CustomField/fieldTypes: an icon, the component that shows and edits a value
    ({ def, value, editable, compact, label } in, `change` out with what the person entered), and for a type with settings of its
    own the builder component for them (v-model on the draft) and the message shown when they do not fit. `needsTask` also hands
-   the value component the task, and `noUndo` marks a change that cannot be taken back because it moved a stored file. */
+   the value component the task, and `noUndo` marks a change that cannot be taken back: it moved a stored file, or the
+   person changing it sees only part of what the field holds. */
 import { MODULE_FIELD_TYPES, typeModuleOf } from '@fieldTypes';
 import { fieldTaskTypes } from '@fieldTaskTypes';
 import PeopleFieldValue from './PeopleFieldValue.vue';
@@ -12,6 +13,10 @@ import RatingFieldSettings from './RatingFieldSettings.vue';
 import ProgressFieldValue from './ProgressFieldValue.vue';
 import FilesFieldValue from './FilesFieldValue.vue';
 import FilesFieldSettings from './FilesFieldSettings.vue';
+import RelationshipFieldValue from './RelationshipFieldValue.vue';
+import RelationshipFieldSettings from './RelationshipFieldSettings.vue';
+import VotingFieldValue from './VotingFieldValue.vue';
+import VotingFieldSettings from './VotingFieldSettings.vue';
 
 export { activeMemberIds, peopleOptions } from './people';
 
@@ -20,7 +25,9 @@ const UI = Object.freeze({
     url: { icon: 'link', value: UrlFieldValue, settings: null },
     rating: { icon: 'star', value: RatingFieldValue, settings: RatingFieldSettings, settingsError: 'FieldTypes.rating_max_error' },
     progress: { icon: 'reports', value: ProgressFieldValue, settings: null },
-    files: { icon: 'paperclip', value: FilesFieldValue, settings: FilesFieldSettings, settingsError: 'FieldTypes.files_settings_error', needsTask: true, noUndo: true }
+    files: { icon: 'paperclip', value: FilesFieldValue, settings: FilesFieldSettings, settingsError: 'FieldTypes.files_settings_error', needsTask: true, noUndo: true },
+    relationship: { icon: 'share', value: RelationshipFieldValue, settings: RelationshipFieldSettings, settingsError: 'FieldTypes.relationship_settings_error', needsTask: true, noUndo: true },
+    voting: { icon: 'upvote', value: VotingFieldValue, settings: VotingFieldSettings, needsTask: true }
 });
 
 export const fieldTypeUi = (fieldType) => (Object.keys(UI).includes(fieldType) ? UI[fieldType] : null);

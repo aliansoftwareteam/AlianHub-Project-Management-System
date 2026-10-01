@@ -1,23 +1,10 @@
-// Flag-gated modules register their routes only when switched on, so every flag is on here.
-Object.assign(process.env, {
-    STORAGE_TYPE: 'server',
-    MCP_OAUTH: 'on',
-    MCP_OAUTH_DCR: 'on',
-    MCP_OAUTH_ISSUER: 'https://hub.example.test',
-    EXTERNAL_AGENT_SESSIONS: 'on',
-    CSP_MODE: 'report',
-});
+const { WALK_ENV, MODULE_GUARDS, buildApp, listRoutes } = require('../../scripts/route-walk');
+
+Object.assign(process.env, WALK_ENV);
 
 jest.mock('../../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
 jest.mock('../../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn(async () => null) }));
 jest.mock('../../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
-
-const fs = require('fs');
-const path = require('path');
-const express = require('express');
-
-const ROOT = path.join(__dirname, '..', '..');
-const INDEX = fs.readFileSync(path.join(ROOT, 'index.js'), 'utf8');
 
 /* app.use only guards the prefixes it is given, so a module that forgets to list its prefix in
  * Config/setMiddleware.js is either open to anyone or, when its handler reads req.uid, refuses every
@@ -131,83 +118,9 @@ const PUBLIC_ROUTES = [
     'GET /version',
 ];
 
-/* Guards a module installs with its own app.use, which the stack walk cannot see through; each is probed live below. */
-const MODULE_GUARDS = [
-    { prefix: '/api/v2/instance', probe: 'GET /api/v2/instance/settings' },
-];
-
 const intervals = [];
 
-function buildApp() {
-    const realSetInterval = global.setInterval;
-    global.setInterval = (...args) => {
-        const handle = realSetInterval(...args);
-        intervals.push(handle);
-        return handle;
-    };
-    try {
-        const app = express();
-        const { setMiddlewareWithCV2, setMiddlewareV2 } = require('../../Config/setMiddleware');
-        setMiddlewareWithCV2(app);
-        setMiddlewareV2(app);
-        app.locals.firstModuleLayer = app._router.stack.length;
-        const modules = [...INDEX.matchAll(/require\(\s*[`'"]\.\/(Modules\/[^`'"]+)[`'"]\s*\)\.init\(\s*app/g)].map((m) => m[1]);
-        for (const mod of modules) {
-            const variants = mod.includes('${currentDirectory}') ? ['server', 'wasabi'].map((dir) => mod.replace('${currentDirectory}', dir)) : [mod];
-            for (const file of variants) require(path.join(ROOT, file)).init(app);
-        }
-        for (const m of INDEX.matchAll(/app\.(get|post|put|patch|delete)\(\s*["'](\/[^"']*)["']/g)) app[m[1]](m[2], (req, res) => res.end());
-        return app;
-    } finally {
-        global.setInterval = realSetInterval;
-    }
-}
-
-const jwt = require('../../Config/jwt');
-const { requireInstanceAdmin } = require('../../Modules/Instance/guard');
-
-const GUARD_HANDLERS = new Set([jwt.verifyJWTTokenWithCV2, jwt.verifyJWTTokenV2, requireInstanceAdmin]);
-const ROOT_MOUNT = '^\\/?(?=\\/|$)';
-const samplePath = (routePath) => routePath.replace(/:\w+(\([^)]*\))?\??/g, 'x1').replace(/\*/g, 'x');
-const mountPathOf = (layer) => {
-    const mounted = layer.regexp.source.replace(/^\^/, '').replace(/\\\/\?\(\?=\\\/\|\$\)$/, '').replace(/\\\//g, '/');
-    if (/[\\()[\]|?*+^$]/.test(mounted)) throw new Error(`cannot read the mount path of ${layer.regexp}`);
-    return mounted;
-};
-
-function listRoutes(app) {
-    const top = app._router.stack;
-    const routes = [];
-    const moduleGuardAt = new Map();
-    const walk = (stack, prefix, topIndex) => stack.forEach((layer, i) => {
-        const at = topIndex === undefined ? i : topIndex;
-        if (layer.route) {
-            for (const routePath of [].concat(layer.route.path)) {
-                if (typeof routePath !== 'string') throw new Error(`route path ${routePath} is not a string; teach this test to read it`);
-                const inline = layer.route.stack.some((l) => GUARD_HANDLERS.has(l.handle));
-                for (const method of Object.keys(layer.route.methods)) routes.push({ key: `${method.toUpperCase()} ${prefix}${routePath}`, path: prefix + routePath, at, inline });
-            }
-        } else if (layer.name === 'router') {
-            walk(layer.handle.stack, prefix + mountPathOf(layer), at);
-        } else if (topIndex === undefined && i >= app.locals.firstModuleLayer && layer.regexp.source !== ROOT_MOUNT) {
-            const mounted = mountPathOf(layer);
-            if (MODULE_GUARDS.some((g) => g.prefix === mounted)) moduleGuardAt.set(mounted, i);
-            else routes.push({ key: `USE ${mounted}`, path: mounted, at, inline: false });
-        }
-    });
-    walk(top, '');
-    const guardLayers = top.filter((l) => GUARD_HANDLERS.has(l.handle));
-    const underModuleGuard = (route, sample) => [...moduleGuardAt].some(([prefix, at]) => at < route.at && sample.toLowerCase().startsWith(`${prefix.toLowerCase()}/`));
-    for (const route of routes) {
-        const sample = samplePath(route.path);
-        route.guarded = route.inline
-            || guardLayers.some((l) => top.indexOf(l) < route.at && l.match(sample))
-            || underModuleGuard(route, sample);
-    }
-    return { routes: [...new Map(routes.map((r) => [r.key, r])).values()], guardLayers, moduleGuardAt };
-}
-
-const app = buildApp();
+const app = buildApp({ intervals });
 const { routes, guardLayers, moduleGuardAt } = listRoutes(app);
 const keys = new Set(routes.map((r) => r.key));
 const open = routes.filter((r) => !r.guarded).map((r) => r.key);

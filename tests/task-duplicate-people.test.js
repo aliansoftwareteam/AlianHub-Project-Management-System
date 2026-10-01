@@ -195,3 +195,52 @@ describe('the people on a task duplicated from a list row', () => {
         expect(copies()).toEqual([]);
     });
 });
+
+describe('the linked tasks and the votes of a duplicated task', () => {
+    const CLIENT = '6f0000000000000000000f01';
+    const VOTES = '6f0000000000000000000f02';
+    const SUBTASK = '6f0000000000000000000b02';
+    const OUTSIDE = '6f0000000000000000000b03';
+    const UNSEEN = '6f0000000000000000000b04';
+    const links = () => mockDb.store[SCHEMA_TYPE.CUSTOM_FIELD_LINKS] || [];
+    const linksOf = (taskId) => links().filter((row) => row.taskId === String(taskId));
+
+    beforeEach(() => {
+        const field = (_id, fieldType) => mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id, fieldTitle: fieldType, fieldType, type: 'task', global: true, isDelete: true });
+        field(CLIENT, 'relationship');
+        field(VOTES, 'voting');
+        const original = mockDb.store.tasks.find((task) => task._id === TASK);
+        Object.assign(mockDb.store.projects.find((row) => row._id === OPEN_PROJECT), { isPrivateSpace: false });
+        Object.assign(original, { subTasks: 1, customField: { [CLIENT]: { _id: CLIENT, fieldValue: '', revision: 3 }, [VOTES]: { _id: VOTES, fieldValue: 2, revision: 3 } } });
+        const row = (_id, TaskName, extra = {}) => mockDb.seed('tasks', { ...original, _id, TaskName, TaskKey: `OPN-${_id.slice(-1)}`, subTasks: 0, customField: {}, AssigneeUserId: [], watchers: [], ...extra });
+        row(SUBTASK, 'Check the brief', { isParentTask: false, ParentTaskId: TASK, ancestors: [TASK] });
+        row(OUTSIDE, 'Outside');
+        row(UNSEEN, 'Unseen', { ProjectID: PERSONAL_PROJECT, sprintId: PERSONAL_SPRINT });
+        mockDb.store.projects.find((row) => row._id === PERSONAL_PROJECT).personalOwner = ADMIN;
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELD_LINKS, { taskId: TASK, fieldId: CLIENT, kind: 'relationship', ids: [SUBTASK, OUTSIDE, UNSEEN] });
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELD_LINKS, { taskId: SUBTASK, fieldId: CLIENT, kind: 'relationship', ids: [TASK] });
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELD_LINKS, { taskId: TASK, fieldId: VOTES, kind: 'voting', ids: [OWNER, ADMIN] });
+    });
+
+    it('follow the copy: a link to a copied subtask points at its copy, a link outside is kept when the person copying can open it', async () => {
+        const result = await call('PATCH /api/v2/tasks', { action: 'duplicateTask', ...placement(OPEN_PROJECT), isSubTask: true, selectedTaskId: TASK, duplicateData: [] });
+        expect(result.code).toBe(200);
+
+        const copied = mockDb.store.tasks.filter((task) => ![TASK, SUBTASK, OUTSIDE, UNSEEN].includes(String(task._id)));
+        const top = copied.find((task) => task.isParentTask === true);
+        const under = copied.find((task) => String(task.ParentTaskId) === String(top._id));
+        expect(linksOf(top._id)).toEqual([expect.objectContaining({ fieldId: CLIENT, kind: 'relationship', ids: [String(under._id), OUTSIDE] })]);
+        expect(linksOf(under._id)).toEqual([expect.objectContaining({ fieldId: CLIENT, ids: [String(top._id)] })]);
+        expect(top.customField).toEqual({ [CLIENT]: { _id: CLIENT, fieldValue: '', revision: expect.any(Number) } });
+        expect(linksOf(TASK).map((row) => row.ids)).toEqual([[SUBTASK, OUTSIDE, UNSEEN], [OWNER, ADMIN]]);
+    });
+
+    it('are carried without the subtasks too, and the votes never are', async () => {
+        const result = await duplicate(OPEN_PROJECT, {}, []);
+        expect(result.code).toBe(200);
+
+        const [copy] = mockDb.store.tasks.filter((task) => ![TASK, SUBTASK, OUTSIDE, UNSEEN].includes(String(task._id)));
+        expect(linksOf(copy._id)).toEqual([expect.objectContaining({ fieldId: CLIENT, ids: [SUBTASK, OUTSIDE] })]);
+        expect(copy.customField[VOTES]).toBeUndefined();
+    });
+});

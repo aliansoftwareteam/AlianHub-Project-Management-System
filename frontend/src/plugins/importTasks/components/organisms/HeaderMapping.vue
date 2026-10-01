@@ -40,6 +40,7 @@ import ConfirmField from '../atoms/ConfirmField.vue';
 import { useI18n } from "vue-i18n";
 import { showAlertModal } from '@/components/atom/AlertBox/helper';
 import { useStore } from "vuex";
+import { typeModuleOf } from "@fieldTypes";
 
 const { getters } = useStore();
 const { t } = useI18n();
@@ -145,7 +146,7 @@ let keywords = [
 const customFieldList = computed(() => (getters['settings/finalCustomFields']));
 const customFieldsArray = computed(() => {
 	return (customFieldList.value || [])
-	.filter(field => field.projectId.includes(props.currentProjectId))
+	.filter(field => field.projectId.includes(props.currentProjectId) && !typeModuleOf(field.fieldType)?.sideStored)
 	.map((field) => ({
 		header: field.fieldTitle,
 		key: field._id,
