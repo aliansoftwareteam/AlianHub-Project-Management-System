@@ -8,30 +8,22 @@
             :message="$t('Upgrades.the_feature_not_available')"
         />
     </div>
-    <div v-else>
+    <div v-else class="board-view" :data-density="density">
         <template v-if="isLoading">
             <div class="kanban-board-skeleton">
                 <div class="kanban-column-skeleton" v-for="j in skeletonColumns" :key="j">
-                    <div class="d-flex justify-content-between w-100 mb-15px">
-                        <Skelaton class="border-radius-5-px" style="height: 25px; width: 70px;" />
-                        <span class="cursor-pointer">
-                            <Skelaton class="border-radius-5-px" style="height: 25px; width: 24px;" />
-                        </span>
+                    <div class="kanban-column-skeleton__head">
+                        <Skelaton class="kanban-skel kanban-skel--count" />
+                        <Skelaton class="kanban-skel kanban-skel--add" />
                     </div>
-                    <div class="">
-                        <div class="kanban-card-wrapper-skeleton">
-                            <div class="kanban-card-skeleton pt-10px pl-10px pr-10px pb-5px w-100 mb-10px" v-for="i in SKELETON_CARDS" :key="i">
-                                <Skelaton class="border-radius-5-px mt-5px" style="height: 22px; width: 278px;" />
-                                <div class="d-flex align-items-center mt-5px justify-content-between">
-                                    <div class="d-flex align-items-center">
-                                        <Skelaton class="mr-8px border-radius-50-per" style="height: 21px; width: 21px;" />
-                                    </div>
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <Skelaton class="mr-8px border-radius-50-per" style="height: 21px; width: 21px;" />
-                                        <Skelaton class="mr-8px border-radius-50-per" style="height: 21px; width: 21px;" />
-                                        <Skelaton class="mr-8px border-radius-5-px" style="height: 21px; width: 30px;" />
-                                        <Skelaton class="border-radius-50-per" style="height: 21px; width: 21px;" />
-                                    </div>
+                    <div class="kanban-column-skeleton__cards">
+                        <div class="kanban-card-skeleton" v-for="i in SKELETON_CARDS" :key="i">
+                            <Skelaton class="kanban-skel kanban-skel--title" />
+                            <div class="kanban-card-skeleton__foot">
+                                <Skelaton class="kanban-skel kanban-skel--avatar" />
+                                <div class="kanban-card-skeleton__chips">
+                                    <Skelaton class="kanban-skel kanban-skel--chip" />
+                                    <Skelaton class="kanban-skel kanban-skel--chip" />
                                 </div>
                             </div>
                         </div>
@@ -51,11 +43,12 @@
                         @move="cardFields.move"
                         @reset="cardFields.reset"
                     />
+                    <ViewDensityControl :model-value="density" @update:model-value="setDensity" />
                 </div>
                 <KanbanBoard :data="processedBoardData" :group="grouped" :sprintId="sprintId" />
             </template>
             <template v-else>
-                <div class="d-flex align-items-center justify-content-center flex-column mt-1">
+                <div class="board-view__empty">
                     <EmptyState
                         v-if="project?.deletedStatusKey !== 2"
                         :title="$t(emptyTitleKey)"
@@ -82,6 +75,8 @@ import { taskInGroup } from '@/views/Projects/ListView/listFilter';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 import ViewColumnChooser from '@/views/Projects/components/columns/ViewColumnChooser.vue';
+import ViewDensityControl from '@/views/Projects/components/columns/ViewDensityControl.vue';
+import { useViewSettings } from '@/views/Projects/composables/viewSettingsContext';
 import { columnCatalogue, useViewColumns } from '@/views/Projects/composables/viewColumns';
 import ListSortControl from '@/views/Projects/ListView/ListSortControl.vue';
 import { sortChoices, sortTasks, useListSort } from '@/views/Projects/composables/viewSort';
@@ -125,6 +120,7 @@ const rowMenu = useListRowMenu(project, showArchiveVar);
 provide('boardTaskMenu', { rights: rowMenu.rights, duplicate: rowMenu.duplicate, rename: useListInlineEdit(project).rename });
 
 const boardSort = useListSort();
+const { density, setDensity } = useViewSettings();
 const sortOptions = computed(() => sortChoices(customFields.defs.value));
 const userNames = computed(() => new Map((getters['users/users'] || []).map((user) => [user._id, user.Employee_Name])));
 const sortContext = computed(() => ({
@@ -271,6 +267,6 @@ onMounted(async () => {
 <style src="./new-style.css" />
 
 <style>
-.board-card-fields { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 6px 20px 0; }
-@media (max-width: 767px) { .board-card-fields { padding: 6px 16px 0; } }
+.board-card-fields { display: flex; justify-content: flex-end; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--page-pad-x, 20px) 0; }
+@media (max-width: 767px) { .board-card-fields { padding: var(--sp-2) 16px 0; } }
 </style>
