@@ -8,6 +8,7 @@ const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const socketEmitter = require('../../event/socketEventEmitter');
 const tools = require('../Automations/engine/tools');
 const permissions = require('./permissions');
+const { descriptionBlockFrom } = require('../Tasks/helpers/descriptionBlock');
 
 // Task changes an agent makes the way a person makes them: each goes through the task routes' own
 // preparation (Modules/Tasks/helpers/taskWriteFields) and handler (taskMongo), as the person behind
@@ -118,8 +119,7 @@ const EDITS = Object.freeze({
         same: (task, value) => (task.rawDescription || '') === value,
         previous: (task) => ({ rawDescription: task.rawDescription === undefined ? null : task.rawDescription, descriptionBlock: task.descriptionBlock === undefined ? null : task.descriptionBlock }),
         write: ({ companyId, who, task, value }) => {
-            const { buildDescriptionBlock } = require('../Forms/helpers/submissionRules');
-            return asRoute(companyId, who, 'updateDescription', { companyId, task: { _id: idOf(task._id) }, text: { blocks: buildDescriptionBlock(value), text: value } });
+            return asRoute(companyId, who, 'updateDescription', { companyId, task: { _id: idOf(task._id) }, text: { blocks: descriptionBlockFrom(value), text: value } });
         },
     },
     Task_Priority: {
@@ -338,9 +338,8 @@ const createFieldsOf = async ({ companyId, actor, who, project, fields }) => {
     const zone = await zoneOf(who.uid);
     const set = {};
     if (given.rawDescription !== undefined) {
-        const { buildDescriptionBlock } = require('../Forms/helpers/submissionRules');
         set.rawDescription = EDITS.rawDescription.clean(given.rawDescription);
-        set.descriptionBlock = buildDescriptionBlock(set.rawDescription);
+        set.descriptionBlock = descriptionBlockFrom(set.rawDescription);
     }
     if (given.Task_Priority !== undefined) set.Task_Priority = EDITS.Task_Priority.clean(given.Task_Priority);
     if (given.DueDate !== undefined && given.DueDate !== null) {

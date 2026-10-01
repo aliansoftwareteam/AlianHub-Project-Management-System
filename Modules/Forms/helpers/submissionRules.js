@@ -1,12 +1,8 @@
 // Turning a public submission into a task. Pure — no db, no request — so the
 // mapping can be tested against hostile input without standing anything up.
 
-const crypto = require('crypto');
 const { TASK_PROPERTIES, isTaskProperty, typeOf, isMulti } = require('./questionTypes');
-const { escapeHtml } = require('../../PublicShares/helpers/shareRules');
-
-/* The version the manual and AI paths both stamp on a saved block document. */
-const EDITORJS_VERSION = '2.30.7';
+const { descriptionBlockFrom } = require('../../Tasks/helpers/descriptionBlock');
 
 const MAX_ANSWER_LENGTH = 5000;
 const MAX_NAME_ANSWER_LENGTH = 200;
@@ -282,34 +278,8 @@ const buildDescription = (transcript, body) => {
     return lines.length ? `${head}\n\n${lines.join('\n')}` : head;
 };
 
-/**
- * The description as the task editor stores it.
- *
- * A task's description is read from `descriptionBlock` — an Editor.js document —
- * and `rawDescription` is only the plain-text mirror used by search. Writing just
- * the latter left the description blank on the task, which is what happened here.
- *
- * Built locally rather than importing the AI generator's `wrapDescriptionBlock`:
- * that module pulls in socket emitters, notifications and an AI estimator at
- * require time, none of which belong on an unauthenticated submission path. The
- * shape is the contract, and it is asserted in the tests.
- *
- * Editor.js inserts a paragraph's `text` as HTML, and this text is whatever an
- * anonymous submitter typed, so every line is escaped on the way in.
- */
-const buildDescriptionBlock = (text) => {
-    const body = String(text === undefined || text === null ? '' : text);
-    if (!body.trim()) return {};
-    return {
-        time: Date.now(),
-        version: EDITORJS_VERSION,
-        blocks: body.split('\n').map((line) => ({
-            id: crypto.randomBytes(6).toString('hex').slice(0, 10),
-            type: 'paragraph',
-            data: { text: escapeHtml(line) },
-        })),
-    };
-};
+/* What a stranger typed into a public form, as the task editor stores it: text alone, with no link made of an address. */
+const buildDescriptionBlock = (text) => descriptionBlockFrom(text, { links: false });
 
 module.exports = {
     mapSubmission,
