@@ -327,7 +327,7 @@ onMounted(load);
 .ai-quality__reasons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .ai-quality__notes { margin: 8px 0 0; padding-left: 18px; font: var(--text-small); color: var(--ink-2); overflow-wrap: anywhere; }
 .ai-quality__shared { margin-top: 10px; padding: 8px 10px; border-radius: 7px; background: var(--fill); }
-.ai-quality__answer { margin: 4px 0 0; font: var(--text-small); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); max-height: 180px; overflow: auto; }
+.ai-quality__answer { margin: 4px 0 0; font: var(--text-body); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); max-height: 180px; overflow: auto; }
 .ai-quality__sources { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; color: var(--ink-2); }
 .ai-quality__pass { margin: 4px 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
 .ai-quality__figure { font-size: 18px; font-weight: 600; color: var(--ink); }

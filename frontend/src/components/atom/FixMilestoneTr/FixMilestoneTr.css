@@ -62,8 +62,11 @@
 #my-dropdown .milestone_status_panel .dropdown_option {
     padding: 0 !important;
 }
+.milestone_refund_rule {
+    border-bottom: 1px solid var(--border);
+}
 .border_bottom_status {
-    border-bottom: 1px solid #DFE1E6;
+    border-bottom: 1px solid var(--hairline);
     border-radius: 0 !important;
     padding: 12px 19px 12px 19px !important;
     margin-bottom: 0 !important;
@@ -104,6 +107,6 @@
 }
 .user_detail_mil {
     padding: 6px 20px !important;
-    border-bottom: 1px solid #DFE1E6;
+    border-bottom: 1px solid var(--hairline);
     border-radius: 0 !important;
 }

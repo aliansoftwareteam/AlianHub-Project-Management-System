@@ -152,10 +152,10 @@ onMounted(load);
 <style>
 .ac { display: grid; gap: 12px; }
 .ac__card { padding: 12px 16px; display: grid; gap: 10px; }
-.ac__row { display: grid; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line, #e5e7eb); }
+.ac__row { display: grid; gap: 8px; padding: 10px 0; border-top: 1px solid var(--hairline); }
 .ac__row:first-of-type { border-top: 0; }
 .ac__who { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
 .ac__chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .ac__actions { display: flex; gap: 8px; justify-content: flex-end; }
-.ac__error { color: var(--danger, #b42318); }
+.ac__error { color: var(--danger-ink); }
 </style>

@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
-const { objectIdKeys, objectIdIfHex } = require('./objectIdKeys');
+const { objectIdIfHex } = require('./objectIdKeys');
+const { listPlacement } = require('./listPlacement');
 
 /* A Mixed path's required check lets '' through, where the String path it replaced refused it. */
 const notEmpty = { validator: (value) => value !== '', message: 'Path `{PATH}` is required.' };
@@ -86,7 +87,7 @@ const schema = {
         'sprintArray': {
             type: Object,
             required: true,
-            set: objectIdKeys('id', 'folderId'),
+            set: listPlacement,
         },
         'Task_Priority': {
             type: String,
