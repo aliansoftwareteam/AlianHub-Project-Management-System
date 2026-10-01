@@ -121,7 +121,7 @@ beforeEach(() => {
 describe('the AI config on a long text or dropdown field', () => {
     it('fills in the defaults: reads the title and description, no auto-refill', () => {
         expect(config.normaliseAiConfig({ template: 'summary' }, 'textarea')).toEqual({
-            enabled: true, template: 'summary', language: '', prompt: '', reads: ['title', 'description'], autoRefill: false,
+            enabled: true, template: 'summary', output: 'text', language: '', prompt: '', reads: ['title', 'description'], autoRefill: false,
         });
     });
 
@@ -148,7 +148,7 @@ describe('the AI config on a long text or dropdown field', () => {
         expect(() => fieldUpdateFrom({ key: '$set', id: '6a9954186dd786246031e499', updateObject: { fieldAi: { template: 'summary' } } })).toThrow(FieldWriteError);
         const updateObject = { fieldTitle: 'Notes', fieldType: 'textarea', fieldAi: { template: 'summary', autoRefill: 'yes', extra: 1 } };
         fieldInsertFrom(updateObject);
-        expect(updateObject.fieldAi).toEqual({ enabled: true, template: 'summary', language: '', prompt: '', reads: ['title', 'description'], autoRefill: false });
+        expect(updateObject.fieldAi).toEqual({ enabled: true, template: 'summary', output: 'text', language: '', prompt: '', reads: ['title', 'description'], autoRefill: false });
     });
 
     it('can be switched off', () => {

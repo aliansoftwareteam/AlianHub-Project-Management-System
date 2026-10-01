@@ -58,6 +58,18 @@ export function customFieldText(def, task, { allTasks = [], dateFormat = 'DD/MM/
     }
 }
 
+export function shownFieldValues(columns, task, options = {}) {
+    return (columns || [])
+        .filter((column) => column?.field)
+        .map((column) => ({
+            id: column.id,
+            label: column.label || column.field.fieldTitle || '',
+            text: customFieldText(column.field, task, options),
+            choices: column.field.fieldType === 'dropdown' ? dropdownChoices(column.field, storedEntry(task, column.field)?.fieldValue) : []
+        }))
+        .filter((entry) => entry.text);
+}
+
 export const fieldIsChecked = (def, task) => {
     const value = rawValue(task, def, []);
     return value === true || value === 'true';

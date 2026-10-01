@@ -15,6 +15,7 @@ const {
     reviewState,
     pageVisibleTo,
     pageVisibilityFilter,
+    canMakePrivate,
 } = require('./helpers/pageRules');
 const {
     emptyEditorData,
@@ -286,6 +287,9 @@ exports.updatePage = async (req, res) => {
         const existing = await findPage(companyId, id, userId, { edit: true });
         if (!existing) {
             return res.send({ status: false, statusText: 'Page not found.' });
+        }
+        if (meta.patch.visibility === 'private' && !canMakePrivate(existing, userId)) {
+            return fail(res, 'Only the author of a doc can make it private.', 403);
         }
 
         const update = { updatedBy: userId };

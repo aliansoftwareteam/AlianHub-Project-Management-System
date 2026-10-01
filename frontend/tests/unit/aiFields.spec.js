@@ -72,7 +72,7 @@ describe('AI field config in the field builder', () => {
         const text = aiFieldPayload({ ...newAiDraft(), fieldTitle: 'Summary', autoRefill: true });
         expect(text).toEqual(expect.objectContaining({
             fieldTitle: 'Summary', fieldType: 'textarea', type: 'task',
-            fieldAi: { enabled: true, template: 'summary', language: '', prompt: '', reads: ['title', 'description'], autoRefill: true }
+            fieldAi: { enabled: true, template: 'summary', output: 'text', language: '', prompt: '', reads: ['title', 'description'], autoRefill: true }
         }));
         const dropdown = aiFieldPayload({ ...newAiDraft(), fieldTitle: 'Area', output: 'dropdown', template: 'category', options: [{ id: 'o1', label: 'Backend' }, { id: '', label: ' Design ' }, { label: '' }] });
         expect(dropdown.fieldType).toBe('dropdown');

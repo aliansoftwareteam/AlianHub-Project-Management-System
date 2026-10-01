@@ -37,6 +37,19 @@
                 <span v-if="isEdited" class="mc-edited">({{ $t('MainChat.edited') }})</span>
             </div>
 
+            <ul v-if="agentChanges.length" class="mc-agent-changes" data-test="agent-changes">
+                <li v-for="(change, index) in agentChanges" :key="index" class="mc-agent-change">
+                    <span class="mc-agent-tag">{{ $t(`AgentChat.change_${change.outcome}`) }}</span>
+                    <router-link
+                        v-if="change.outcome === 'proposed' && companyId"
+                        :to="{ name: 'AiInbox', params: { cid: companyId } }"
+                        class="mc-agent-change-label"
+                    >{{ change.label }}</router-link>
+                    <span v-else class="mc-agent-change-label">{{ change.label }}</span>
+                </li>
+            </ul>
+            <div v-if="agentAskNote" class="mc-agent-note" :data-test="`agent-ask-${agentAskState}`">{{ agentAskNote }}</div>
+
             <div v-if="actionable" class="mc-msg-acts">
                 <button type="button" class="mc-act" @click="$emit('reply', message)">{{ $t('Chat.reply') }}</button>
                 <button v-if="isText" type="button" class="mc-act mc-act--task" @click="$emit('make-task', { message, text: plainText })">{{ $t('Chat.make_task') }}</button>
@@ -114,7 +127,8 @@
  * messages from the same author inside the grouping window drops the repeated
  * header. Agent posts carry the rounded-square avatar and the AGENT tag.
  */
-import { computed, defineProps, defineEmits, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, defineProps, defineEmits, inject, onBeforeUnmount, ref, unref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import moment from 'moment';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
@@ -173,6 +187,19 @@ watch(pickerOpen, (open) => {
 onBeforeUnmount(() => {
     document.removeEventListener('click', onDocumentClick);
     document.removeEventListener('keydown', onKeydown);
+});
+
+const { t } = useI18n();
+const injectedCompanyId = inject('$companyId', '');
+const companyId = computed(() => unref(injectedCompanyId) || '');
+const CHANGE_OUTCOMES = ['done', 'proposed', 'refused', 'failed'];
+const agentChanges = computed(() => (Array.isArray(props.message.agentChanges) ? props.message.agentChanges : [])
+    .filter((change) => change && CHANGE_OUTCOMES.includes(change.outcome)));
+const agentAskState = computed(() => (props.message.agentAsk && props.message.agentAsk.state) || '');
+const agentAskNote = computed(() => {
+    if (agentAskState.value === 'answering') return t('AgentChat.replying');
+    if (agentAskState.value === 'failed') return t('AgentChat.could_not_reply');
+    return '';
 });
 
 const isAi = computed(() => !!aiAuthorOf(props.message));

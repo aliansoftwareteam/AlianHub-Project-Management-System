@@ -103,7 +103,8 @@
 .wv__error { margin: 0; }
 
 .wv__foot { margin-top: auto; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
-.wv__legend { display: flex; gap: 14px; align-items: center; font-size: 11.5px; color: var(--ink-2); }
+.wv__legend { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; font-size: 11.5px; color: var(--ink-2); }
+.wv__unpointed { color: var(--warn-ink); font-weight: 600; }
 .wv__key { display: inline-block; width: 9px; height: 9px; border-radius: 2px; background: var(--brand); vertical-align: middle; margin-right: 5px; }
 .wv__key--tentative { opacity: .5; }
 .wv__key--over { background: var(--danger); }
