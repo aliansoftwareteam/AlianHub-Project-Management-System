@@ -357,6 +357,7 @@ export const setTableTasksFromTypesense = ({ state, commit, rootGetters }, paylo
                                         }
                                     },
                                     {deletedStatusKey: { $in: [0] }},
+                                    {isParentTask: true},
                                 ]
                             },
                             {

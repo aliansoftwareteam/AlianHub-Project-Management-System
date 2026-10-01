@@ -278,5 +278,10 @@ max-width: 100% !important;
     justify-content: flex-end;
     padding: 0 4px 6px;
 }
-
-
+/* The blue end of the AI gradient is 3.3:1 on a dark surface. */
+:root[data-theme="dark"] .ai-write-desc-bar .ai-color {
+    background: none;
+    color: var(--brand);
+    border-image: none;
+    border-bottom-color: var(--brand);
+}

@@ -91,7 +91,7 @@
                     </div>
                     <!-- Read-only display — original behaviour for users without permission. -->
                     <div v-else class="d-flex align-items-center">
-                        <UserProfile
+                        <UserProfile decorative
                             :data="{
                                 image: taskLeaderData.Employee_profileImageURL,
                                 title: taskLeaderData.Employee_Name

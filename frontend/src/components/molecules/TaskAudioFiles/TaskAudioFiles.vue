@@ -40,7 +40,7 @@
                                                 <div class="align-items-center border-radius-5-px justify-content-between hover-purple cursor-pointer text-nowrap drop-down-item">
                                                     <div class="d-flex align-items-center" :title="user1.Employee_Name" @click.stop.prevent="user1.isSelected = !user1.isSelected,getDataWithUserFilter()">
                                                         <input type="checkbox" :class="[{'checkboxBlueFileLink' : user1.isSelected}]" :id="'checkboxlinkfile'+user1.id" v-model="user1.isSelected" />
-                                                        <UserProfile
+                                                        <UserProfile decorative
                                                             :showDot="false"
                                                             :data="{
                                                                 image: getUser(user1.id).Employee_profileImageURL,

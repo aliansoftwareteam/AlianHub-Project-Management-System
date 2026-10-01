@@ -120,7 +120,7 @@
                                             <div class="d-flex align-items-center justify-content-between w-100 user__activity">
                                                 <div class="d-flex align-items-center">
                                                     <div class="mr-5px">
-                                                        <UserProfile
+                                                        <UserProfile decorative
                                                             width="30px"
                                                             :thumbnail="'30x30'"
                                                             :showDot="false"

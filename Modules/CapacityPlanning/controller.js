@@ -6,6 +6,9 @@ const logger = require('../../Config/loggerConfig');
 const pto = require('../Pto/helpers/ptoRules');   // SEC-08 — capacity = work hours − approved PTO
 const R = require('./helpers/capacityRules');
 const { companyWeekendDays } = require('../Company/helpers/companyWeek');
+const { resolveSheetScope, scopedEstimateMatch, SHEET_PERMISSION } = require('../TimeSheet/helpers/timeScope');
+const { withoutHiddenSprintPlans } = require('../TimeSheet/helpers/planVisibility');
+const { visibilityStage } = require('../Tasks/helpers/taskQueryGuard');
 
 const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 const failed = (res, where, e) => {
@@ -15,9 +18,21 @@ const failed = (res, where, e) => {
 };
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 
+/* Capacity is the workload sheet in totals, so the workload grant decides whose plans it reads:
+ * everyone's, from the projects and sprints the caller can open, or the caller's own. */
+const capacityScope = (companyId, uid) => resolveSheetScope(companyId, uid, SHEET_PERMISSION.workload);
+
+const memberIdsOf = (members) => [...new Set((members || []).map((m) => String(m.userId)).filter(Boolean))];
+const peopleIn = (scope, memberIds) => (scope.everyone ? memberIds : memberIds.filter((id) => id === scope.uid));
+
+const plansIn = async (companyId, scope, userIds, window) => withoutHiddenSprintPlans(companyId, scope.uid, await MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.ESTIMATES_TIME,
+    data: [{ ...scopedEstimateMatch(scope), UserId: { $in: userIds }, Date: window }, { UserId: 1, TaskId: 1, ProjectId: 1, Date: 1, EstimatedTime: 1 }],
+}, 'find').catch(() => []));
+
 // GET /api/v1/reports/capacity?from=&to=&hoursPerDay=
 // Per-member capacity (working hours − approved PTO) vs allocation (planned hours
-// from estimated_time), with over-allocation flagged. companyId-scoped.
+// from estimated_time), with over-allocation flagged.
 exports.getCapacityPlan = async (req, res) => {
     try {
         const companyId = sessionTenantOf(req);
@@ -25,10 +40,11 @@ exports.getCapacityPlan = async (req, res) => {
         if (!q.from || !q.to) return res.status(400).json({ status: false, statusText: 'from and to are required.' });
         const hoursPerDay = Number(q.hoursPerDay) > 0 ? Number(q.hoursPerDay) : 8;
 
+        const scope = await capacityScope(companyId, req.uid);
         const members = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMPANY_USERS, data: [{ isDelete: { $ne: true } }, { userId: 1, userEmail: 1 }],
         }, 'find');
-        const userIds = [...new Set((members || []).map((m) => String(m.userId)).filter(Boolean))];
+        const userIds = peopleIn(scope, memberIdsOf(members));
         if (!userIds.length) return res.json({ status: true, data: { from: q.from, to: q.to, totals: R.summarize([]), users: [] } });
 
         // Display names from the global users collection.
@@ -47,11 +63,7 @@ exports.getCapacityPlan = async (req, res) => {
         const ptoByUser = {};
         (ptoRows || []).forEach((p) => { (ptoByUser[String(p.userId)] = ptoByUser[String(p.userId)] || []).push(p); });
 
-        // Planned/allocated time (estimated_time, MINUTES) in the window, summed by user.
-        const estRows = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.ESTIMATES_TIME,
-            data: [{ UserId: { $in: userIds }, Date: { $gte: new Date(q.from), $lte: new Date(q.to) } }, { UserId: 1, EstimatedTime: 1 }],
-        }, 'find').catch(() => []);
+        const estRows = await plansIn(companyId, scope, userIds, { $gte: new Date(q.from), $lte: new Date(q.to) });
         const allocMinByUser = {};
         (estRows || []).forEach((e) => { allocMinByUser[String(e.UserId)] = (allocMinByUser[String(e.UserId)] || 0) + (Number(e.EstimatedTime) || 0); });
 
@@ -93,10 +105,13 @@ exports.getMonthlyCapacity = async (req, res) => {
         const rangeStart = M.monthBounds(months[0]).start;
         const rangeEnd = M.monthBounds(months[months.length - 1]).end;
 
+        const scope = await capacityScope(companyId, req.uid);
         const members = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMPANY_USERS, data: [{ isDelete: { $ne: true } }, { userId: 1 }],
         }, 'find');
-        const userIds = [...new Set((members || []).map((m) => String(m.userId)).filter(Boolean))];
+        const memberIds = memberIdsOf(members);
+        const userIds = peopleIn(scope, memberIds);
+        const openToCaller = (await visibilityStage(companyId, req.uid)).$match;
         const [gusers, teamsRaw, ptoRows, estRows, taskRows] = await Promise.all([
             userIds.length ? MongoDbCrudOpration(dbCollections.GLOBAL, {
                 type: SCHEMA_TYPE.USERS, data: [{ _id: { $in: userIds.map(oid).filter(Boolean) } }, { Employee_Name: 1, Employee_Email: 1 }],
@@ -106,16 +121,14 @@ exports.getMonthlyCapacity = async (req, res) => {
                 type: SCHEMA_TYPE.PTO_ENTRIES,
                 data: [{ userId: { $in: userIds }, status: 'approved', deletedStatusKey: { $ne: 1 }, startDate: { $lte: rangeEnd }, endDate: { $gte: rangeStart } }],
             }, 'find').catch(() => []),
-            MongoDbCrudOpration(companyId, {
-                type: SCHEMA_TYPE.ESTIMATES_TIME,
-                data: [{ UserId: { $in: userIds }, Date: { $gte: rangeStart, $lte: rangeEnd } }, { UserId: 1, TaskId: 1, Date: 1, EstimatedTime: 1 }],
-            }, 'find').catch(() => []),
+            plansIn(companyId, scope, userIds, { $gte: rangeStart, $lte: rangeEnd }),
             MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TASKS,
                 data: [{
                     deletedStatusKey: { $in: [0, 2, null] }, isParentTask: true,
                     statusType: { $nin: ['done', 'close', 'completed'] },
                     totalEstimatedTime: { $gt: 0 }, DueDate: { $gte: rangeStart, $lte: rangeEnd },
+                    $and: [openToCaller],
                 }, { AssigneeUserId: 1, DueDate: 1, totalEstimatedTime: 1 }],
             }, 'find').catch(() => []),
         ]);
@@ -135,10 +148,10 @@ exports.getMonthlyCapacity = async (req, res) => {
         (taskRows || []).forEach((t) => {
             const m = M.monthOf(t.DueDate);
             if (!m || plannedTaskMonths.has(`${t._id}|${m}`)) return;
-            const assignees = (Array.isArray(t.AssigneeUserId) ? t.AssigneeUserId : []).map(String).filter((a) => userIds.includes(a));
+            const assignees = (Array.isArray(t.AssigneeUserId) ? t.AssigneeUserId : []).map(String).filter((a) => memberIds.includes(a));
             if (!assignees.length) return;
             const share = (Number(t.totalEstimatedTime) || 0) / 60 / assignees.length;
-            assignees.forEach((a) => { pipeline[`${a}|${m}`] = (pipeline[`${a}|${m}`] || 0) + share; });
+            assignees.filter((a) => userIds.includes(a)).forEach((a) => { pipeline[`${a}|${m}`] = (pipeline[`${a}|${m}`] || 0) + share; });
         });
 
         const weekendDays = await companyWeekendDays(companyId);
@@ -158,7 +171,9 @@ exports.getMonthlyCapacity = async (req, res) => {
             });
             users[uid] = { name: nameById[uid] || '(unknown)', months: byMonth };
         });
-        const teams = (teamsRaw || []).map((t) => ({ teamId: String(t._id), name: t.name || '', memberIds: (t.assigneeUsersArray || []).map(String).filter((a) => userIds.includes(a)) }));
+        const teams = (teamsRaw || [])
+            .map((t) => ({ teamId: String(t._id), name: t.name || '', memberIds: (t.assigneeUsersArray || []).map(String).filter((a) => userIds.includes(a)) }))
+            .filter((team) => scope.everyone || team.memberIds.length);
         const summary = M.summarizeTeams({ teams, users, months });
         return res.json({ status: true, statusText: 'OK', data: { from: months[0], to: months[months.length - 1], months, hoursPerDay, ...summary } });
     } catch (e) { return failed(res, 'getMonthlyCapacity', e); }
