@@ -5,6 +5,8 @@
     --lv2-grip-w: 12px;
     --lv2-disclose-w: 10px;
     --lv2-depth: 1;
+    --lv2-check: 15px;
+    --lv2-check-room: calc((var(--hit-min) + 2px - var(--lv2-check)) / 2);
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -86,7 +88,16 @@
     background: var(--surface);
     border-bottom: 1px solid var(--hairline);
 }
-.lv2__group-check { flex: none; margin: 0 0 0 var(--cell-pad-x, 12px); }
+/* The box is drawn 15px. Its label keeps a square a little over --hit-min clear around it, so
+   the header button starts at least 12px from the box's centre, which is what the 24px target
+   rule measures. The button gives the same room back, so the caret stays where it was. */
+.lv2__group-select {
+    flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: calc(var(--hit-min) + 2px); height: var(--hit-min);
+    margin-left: calc(var(--cell-pad-x, 12px) - var(--lv2-check-room));
+    cursor: pointer;
+}
 .lv2__group-head {
     display: flex;
     align-items: center;
@@ -101,6 +112,7 @@
     color: var(--ink);
     cursor: pointer;
 }
+.lv2__group-select + .lv2__group-head { padding-left: calc(var(--cell-pad-x, 12px) - var(--lv2-check-room)); }
 .lv2__caret {
     font-size: var(--fs-2xs, 10px);
     color: var(--ink-2);
@@ -220,6 +232,8 @@
     font-size: var(--row-font);
 }
 .lv2__more-btn {
+    display: inline-flex; align-items: center;
+    min-height: var(--hit-min);
     background: none; border: 0; padding: 0;
     color: var(--brand);
     font: var(--fw-strong, 600) var(--row-font)/var(--lh-snug, 1.3) var(--font-ui);
@@ -331,10 +345,12 @@ button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status
         background: linear-gradient(var(--lv2-row-tint), var(--lv2-row-tint)) var(--surface);
         opacity: 0;
         pointer-events: none;
+        /* Unseen buttons lying over the name would still count as targets beside it. */
+        visibility: hidden;
     }
     .lv2__row:hover .lv2__actions,
     .lv2__row:focus-within .lv2__actions,
-    .lv2__actions:has([aria-expanded="true"]) { opacity: 1; pointer-events: auto; }
+    .lv2__actions:has([aria-expanded="true"]) { opacity: 1; pointer-events: auto; visibility: visible; }
 }
 .lv2__menu { position: fixed; z-index: 30; max-height: calc(100vh - 16px); overflow-y: auto; }
 .lv2__menu .lv2__menu-danger, .lv2__menu .lv2__menu-danger:hover { color: var(--danger); }

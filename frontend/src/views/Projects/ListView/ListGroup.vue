@@ -1,16 +1,16 @@
 <template>
     <div class="lv2__group" role="rowgroup">
         <div role="row" class="lv2__aria-row"><div role="rowheader" class="lv2__group-bar">
-        <input
-            v-if="canSelect && rows.length"
-            type="checkbox"
-            class="ah-check lv2__group-check"
-            :checked="groupSelection === 'all'"
-            :indeterminate.prop="groupSelection === 'some'"
-            :aria-label="left ? $t('List.select_group_loaded', { n: rows.length, total }) : $t('List.select_group')"
-            :title="left ? $t('List.select_group_loaded', { n: rows.length, total }) : null"
-            @change="selection.toggleGroup(rowIds)"
-        />
+        <label v-if="canSelect && rows.length" class="lv2__group-select" :title="left ? $t('List.select_group_loaded', { n: rows.length, total }) : null">
+            <input
+                type="checkbox"
+                class="ah-check lv2__group-check"
+                :checked="groupSelection === 'all'"
+                :indeterminate.prop="groupSelection === 'some'"
+                :aria-label="left ? $t('List.select_group_loaded', { n: rows.length, total }) : $t('List.select_group')"
+                @change="selection.toggleGroup(rowIds)"
+            />
+        </label>
         <button type="button" class="lv2__group-head" :aria-expanded="!!item.isExpanded" @click="$emit('toggle')">
             <span class="lv2__caret" :class="{ 'lv2__caret--open': item.isExpanded }" aria-hidden="true">▸</span>
             <span class="lv2__swatch" :style="{ background: swatch }"></span>
