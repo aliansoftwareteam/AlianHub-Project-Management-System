@@ -98,6 +98,7 @@ const inScope = (rule, envelope) => {
  * priority change, is an infinite loop that costs one tenant their database. */
 const acceptsActor = (rule, envelope) => {
     const kind = envelope.actor?.kind;
+    if (kind === 'import') return false;
     if (kind !== 'automation' && kind !== 'agent') return true;
     return rule.reactToAutomation === true;
 };
