@@ -360,7 +360,7 @@ const stopTimer = async () => {
     busy.value.timer = true;
     try {
         const stopped = await timer.stop();
-        if (stopped) flash(t('Time.logged_ok', { h: formatHm(stopped.minutes), task: stopped.taskName }));
+        if (stopped) flash(stopped.tooShort ? t('TaskPanel.timer_too_short') : t('Time.logged_ok', { h: formatHm(stopped.minutes), task: stopped.taskName }));
         await load();
     } catch (e) {
         error.value = t(timeLogFailureKey(e, 'Time.log_failed'));

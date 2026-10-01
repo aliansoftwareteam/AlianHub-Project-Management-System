@@ -319,6 +319,7 @@ const verifyJWTTokenWithCRoute = [
     // Web timer reconciliation (Modules/LogTime webTimer) — JWT+company so req.uid scopes the caller's sessions.
     '/api/v2/timetracker/running',
     '/api/v2/timetracker/trim',
+    "/api/v2/timetracker/can-start",
     '/api/v1/reports/schedules',
     // Email-to-task management (AUTO-01). NOTE: only the /inboxes management
     // routes are JWT-protected; the public inbound webhook /api/v1/email-in/:token
