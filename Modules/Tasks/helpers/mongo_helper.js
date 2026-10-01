@@ -29,6 +29,7 @@ const { withoutImportMark } = require('./importMark');
 const { cleanDescription } = require('./cleanRichText');
 const { copyFieldFiles } = require('../../CustomField/helpers/fieldFiles');
 const extraLists = require('./taskExtraLists');
+const { historyFields } = require('../../Agents/actingAgent');
 
 /* ------------- TASK ------------- */
 exports.HandleTask = async (companyId, object, isUpdate, id = null, userData, { importMark = null } = {}) => {
@@ -170,6 +171,7 @@ exports.HandleHistory = (type, companyId, projectId, taskId, object, userData) =
                 'ProjectId': projectId,
                 'TaskId': taskId !== null ? taskId : "",
                 'Message': object.message,
+                ...historyFields(),
             }
             let typeSchema = SCHEMA_TYPE.HISTORY
           

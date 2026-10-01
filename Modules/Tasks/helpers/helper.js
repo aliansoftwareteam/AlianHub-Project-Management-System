@@ -10,6 +10,7 @@ const { taskCheckListEdit, taskCheckList, taskCheckListRemove, taskCheckListChec
 const { default: mongoose } = require("mongoose");
 const { insertCustomFieldPromise } = require('../../CustomField/controller');
 const { escapeHtml } = require('../../../utils/escapeHtml');
+const { historyFields } = require('../../Agents/actingAgent');
 
 
 /* ------------- HANDLE HISTIRY FOR ALL THE ACTIVITIES ------------- */
@@ -38,6 +39,7 @@ exports.HandleHistory = (type, companyId, projectId, taskId, object, userData) =
                 'ProjectId': projectId,
                 'TaskId': taskId !== null ? taskId : "",
                 'Message': object.message,
+                ...historyFields(),
             }
             let typeSchema = SCHEMA_TYPE.HISTORY
           

@@ -5623,6 +5623,14 @@ export default {
         "toast_open_pipeline": "Open pipeline",
         "toast_dismiss": "Dismiss"
     },
+    "ActivityLog": {
+        "agent_mark": "AGENT",
+        "agent_mark_title": "Made by {agent}, an agent",
+        "filter_label": "Which changes to show",
+        "filter_all": "All",
+        "filter_agents": "Made by an agent",
+        "no_agent_activity": "No changes made by an agent"
+    },
     "Provenance": {
         "nav_external_data": "External data",
         "col_done_by": "Done by",

@@ -38,6 +38,7 @@ const world = require('./fixtures/mcpManageWorld');
 const mongoHelper = require('../Modules/Tasks/helpers/mongo_helper');
 const notifications = require('../Modules/Tasks/helpers/handleNotification');
 const { attribution } = require('../Modules/Agents/actor');
+const { shownAs } = require('../Modules/Agents/actingAgent');
 const actions = require('../Modules/Agents/actions');
 const taskRequests = require('../Modules/Agents/taskRequests');
 const workRequests = require('../Modules/Agents/workRequests');
@@ -130,14 +131,24 @@ describe('the history row of a person\'s own change', () => {
 
 describe('one wording on both agent paths', () => {
     it.each([
-        ['a personal token', token],
-        ['a connected app', connectedApp],
-    ])('attribution names %s as "Agent, for Person"', (_kind, actor) => {
-        expect(attribution(actor)).toMatchObject({ actorType: 'agent', agentName: 'Claude', label: 'Claude, for Olivia Owner' });
+        ['a personal token', token, 'Olivia Owner via Claude'],
+        ['a connected app', connectedApp, 'Claude for Olivia Owner'],
+    ])('%s is shown to people as "Agent, for Person", and the audit log keeps its own label', (_kind, actor, label) => {
+        expect(shownAs(actor)).toBe('Claude, for Olivia Owner');
+        expect(attribution(actor)).toMatchObject({ actorType: 'agent', label });
+    });
+
+    it('takes the tool\'s name from the rule the audit log uses', () => {
+        const linked = { ...token, agentName: 'Laptop token', provider: 'claude-code' };
+        expect(shownAs(linked)).toBe('claude-code, for Olivia Owner');
+        expect(attribution(linked).label).toBe('Olivia Owner via claude-code');
+        expect(shownAs({ ...connectedApp, personName: '' })).toBe('Claude, for Member');
     });
 
     it('names a workspace agent by its own name', () => {
-        expect(attribution({ kind: 'agent', userId: OWNER, agentId: '6f0000000000000000000a01', agentName: 'Reviewer', viaAccount: 'workspace' })).toMatchObject({ agentName: 'Reviewer', label: 'Reviewer' });
+        const reviewer = { kind: 'agent', userId: OWNER, agentId: '6f0000000000000000000a01', agentName: 'Reviewer', viaAccount: 'workspace' };
+        expect(shownAs(reviewer)).toBe('Reviewer');
+        expect(attribution(reviewer).label).toBe('Reviewer');
     });
 
     it('leaves a person as a person', () => {

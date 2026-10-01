@@ -39,6 +39,7 @@ const matcher = require('../Modules/Automations/engine/matcher');
 const actions = require('../Modules/Agents/actions');
 const taskRequests = require('../Modules/Agents/taskRequests');
 const workRequests = require('../Modules/Agents/workRequests');
+const actingAgent = require('../Modules/Agents/actingAgent');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 
 mongoHelper.getTotalSprintCount = async () => true;
@@ -82,21 +83,39 @@ describe('a change an agent makes through the task route', () => {
         await close(agent, 0);
         await afterWindow();
         expect(statusEvents()).toHaveLength(1);
-        expect(statusEvents()[0]).toMatchObject({ companyId: CID, actor: { kind: 'system', userId: null }, depth: 0 });
+        expect(statusEvents()[0]).toMatchObject({ companyId: CID, actor: { kind: 'agent', userId: OWNER }, depth: 1 });
+        published.filter((envelope) => envelope.entity.id === String(fx.top._id)).forEach((envelope) => expect(envelope.actor.kind).toBe('agent'));
+    });
+
+    it('counts on from the depth of the event the agent answered', async () => {
+        await close(agent, 2);
+        await afterWindow();
+        expect(statusEvents()[0]).toMatchObject({ actor: { kind: 'agent' }, depth: 3 });
     });
 
     it('wakes a rule only where the rule opted in to changes made by automations and agents', async () => {
         await close(agent, 0);
         await afterWindow();
         const [envelope] = statusEvents();
-        expect(matcher.acceptsActor(plainRule, envelope)).toBe(true);
+        expect(matcher.acceptsActor(plainRule, envelope)).toBe(false);
         expect(matcher.acceptsActor(optedIn, envelope)).toBe(true);
     });
 
     it('stops a chain at the depth limit', async () => {
         await close(agent, domainEventBus.MAX_DEPTH);
         await afterWindow();
-        expect(statusEvents()).toHaveLength(1);
+        expect(published.filter((envelope) => envelope.entity.id === String(fx.top._id))).toHaveLength(0);
+        expect(logger.error).toHaveBeenCalledWith(expect.stringMatching(/exceeds 3/));
+    });
+
+    it('does not hand its mark to what the event wakes', async () => {
+        const seen = [];
+        const onStatus = () => seen.push(actingAgent.current());
+        domainEventBus.bus.on('task.status_changed', onStatus);
+        await close(agent, 0);
+        await afterWindow();
+        domainEventBus.bus.off('task.status_changed', onStatus);
+        expect(seen).toEqual([null]);
     });
 
     it('carries the mark through a tag change too', async () => {
@@ -104,7 +123,7 @@ describe('a change an agent makes through the task route', () => {
         await afterWindow();
         const tagged = published.filter((envelope) => envelope.entity.id === String(fx.top._id));
         expect(tagged.length).toBeGreaterThan(0);
-        tagged.forEach((envelope) => expect(envelope).toMatchObject({ actor: { kind: 'system' }, depth: 0 }));
+        tagged.forEach((envelope) => expect(envelope).toMatchObject({ actor: { kind: 'agent', userId: OWNER }, depth: 2 }));
     });
 });
 
