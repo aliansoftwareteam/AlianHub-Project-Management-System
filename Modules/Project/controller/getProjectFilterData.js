@@ -4,6 +4,11 @@ const { fetchRules } = require("../../settings/securityPermissions/controller");
 const mongoose = require("mongoose")
 const { escapeRegex } = require("../../../utils/escapeRegex");
 const { ACTIVE_SEAT } = require("../../../Config/seatStatus");
+const { isPrivileged } = require("../../../Config/roleTypes");
+const { arrangeRules, rolePermission, PRIVATE_PROJECTS, seesEveryPrivateProject } = require("../../../Config/rulePermissions");
+const { ownOrNotPersonal, othersPersonalListIds } = require("../../PersonalList/ownership");
+const { visibleProjectIds } = require("../../Agents/scope");
+const { sprintIdentities, visibleSprintClause } = require("../../Sprints/helpers/sprintVisibility");
 
 exports.projectFilter = async (req, res) => {
     try {
@@ -26,17 +31,15 @@ exports.projectFilter = async (req, res) => {
             return res.status(200).json([]);
         }
 
-        const response = await fetchRules(companyId);
-
         const teamIds = teams.map((team) => 'tId_' + team._id);
         const { roleType } = seat;
-        const isNonAdmin = roleType !== 1 && roleType !== 2;
 
-        const rule = response && response.length ? response?.find((x) => x?.key === 'public_projects') : {};
-        const showAllProjects = rule?.roles?.find((role) => role.key === roleType)?.permission === true;
+        // The same rule as decideProjectAccess in Config/projectAccess.js, so the search never names a project the caller cannot open.
+        const everyPrivateProject = isPrivileged(roleType)
+            || seesEveryPrivateProject(rolePermission(arrangeRules(await fetchRules(companyId)), roleType, PRIVATE_PROJECTS));
 
-        const privateQuery = preparePrivateQuery(uid, teamIds, isNonAdmin);
-        const publicQuery = preparePublicQuery(uid, teamIds, isNonAdmin, showAllProjects);
+        const privateQuery = preparePrivateQuery(uid, teamIds, everyPrivateProject);
+        const publicQuery = preparePublicQuery(uid);
 
         let projectQuery;
         if (req.body.type === 'sprint') {
@@ -54,7 +57,7 @@ exports.projectFilter = async (req, res) => {
         } else if (req.body.type === 'projectFilter_sprint') {
             projectQuery = buildProjectFilterSprintQuery(req, privateQuery, publicQuery,uid);
         } else if (req.body.type === 'showArchiveOnly') {
-            projectQuery = buildArchivedProjectQuery();
+            projectQuery = buildArchivedProjectQuery(await archiveScope(companyId, uid, roleType));
         }
         if (req.body.skip) projectQuery.push({ $skip: Number(req.body.skip) });
         if (req.body.limit) projectQuery.push({ $limit: Number(req.body.limit) });
@@ -92,19 +95,36 @@ const getActiveSeat = async (uid, companyId) => {
     return await MongoDbCrudOpration(companyId, companyObj, 'findOne');
 };
 
-const preparePrivateQuery = (uid, teamIds, isNonAdmin) => ({
+const preparePrivateQuery = (uid, teamIds, everyPrivateProject) => ({
     isPrivateSpace: true,
     deletedStatusKey: { $in: [0,undefined] },
     statusType: {$nin: ['close']},
-    ...(isNonAdmin && { AssigneeUserId: { $in: [uid, ...teamIds] } })
+    ...ownOrNotPersonal(uid),
+    ...(everyPrivateProject ? {} : { AssigneeUserId: { $in: [uid, ...teamIds] } })
 });
 
-const preparePublicQuery = (uid, teamIds, isNonAdmin, showAllProjects) => ({
+// Public means visible to every member: the public_projects permission does not narrow it.
+const preparePublicQuery = (uid) => ({
     isPrivateSpace: false,
     deletedStatusKey: { $in: [0,undefined] },
     statusType: {$nin: ['close']},
-    ...(isNonAdmin && !showAllProjects && { AssigneeUserId: { $in: [uid, ...teamIds] } })
+    ...ownOrNotPersonal(uid)
 });
+
+const toObjectIds = (ids) => ids.map((id) => new mongoose.Types.ObjectId(String(id)));
+
+/* Archived sprints and folders are listed across projects, so the scope is the projects the caller
+ * can open. Owners and admins keep every project, trashed ones included, short of someone else's
+ * personal list, and read past sprint privacy. */
+const archiveScope = async (companyId, uid, roleType) => {
+    if (isPrivileged(roleType)) {
+        const personalLists = toObjectIds(await othersPersonalListIds(companyId, uid));
+        const projects = personalLists.length ? { projectId: { $nin: personalLists } } : {};
+        return { sprints: projects, folders: projects };
+    }
+    const projects = { projectId: { $in: toObjectIds(await visibleProjectIds(companyId, uid)) } };
+    return { sprints: { ...projects, ...visibleSprintClause(await sprintIdentities(companyId, uid)) }, folders: projects };
+};
 
 const buildProjection = (fields, additionalField) => {
     const projection = {};
@@ -975,16 +995,14 @@ const buildProjectFilterSprintQuery = (req, privateQuery, publicQuery,userId) =>
     return qry
 }
 
-const buildArchivedProjectQuery = () => {
+const buildArchivedProjectQuery = (scope) => {
     let qry = [
         {
             $match: {
-                $expr: {
-                    $or: [
-                        { $eq: ["$deletedStatusKey", 2] },
-                        { $gt: ["$archiveTaskCount", 1] }
-                    ]
-                }
+                $and: [
+                    scope.sprints,
+                    { $or: [{ deletedStatusKey: 2 }, { archiveTaskCount: { $gt: 1 } }] }
+                ]
             }
         },
         {
@@ -995,20 +1013,19 @@ const buildArchivedProjectQuery = () => {
                 as: "folderData"
             }
         },
-        // Add source identifier for "sprint" documents
         {
             $addFields: {
                 source: "matchedDocuments"
             }
         },
-        // Use $unionWith to include "folders" collection
         {
             $unionWith: {
-                coll: "folders", // The collection to union with
+                coll: "folders",
                 pipeline: [
                     {
                         $match: {
-                            deletedStatusKey: 2 
+                            ...scope.folders,
+                            deletedStatusKey: 2
                         }
                     },
                     {

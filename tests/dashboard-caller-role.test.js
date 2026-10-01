@@ -70,19 +70,10 @@ describe('dashboard resolveVisibleProjectFilter', () => {
         await expect(resolveVisibleProjectFilter(COMPANY, USER)).resolves.toEqual(NO_PROJECT);
     });
 
-    it.each([1, 2])('leaves every project to role %s', async (roleType) => {
+    it.each([1, 2])('leaves role %s every project but someone else\'s personal list', async (roleType) => {
         withSeat({ roleType });
-        await expect(resolveVisibleProjectFilter(COMPANY, USER)).resolves.toBeNull();
-    });
-
-    it.each([0, 3])('keeps role %s to the projects they or their teams are assigned to', async (roleType) => {
-        withSeat({ roleType });
-        const assigned = { $in: [USER, `tId_${TEAM}`] };
         await expect(resolveVisibleProjectFilter(COMPANY, USER)).resolves.toEqual({
-            $or: [
-                { isPrivateSpace: true, AssigneeUserId: assigned },
-                { isPrivateSpace: false, AssigneeUserId: assigned },
-            ],
+            $or: [{ isPersonal: { $ne: true } }, { personalOwner: USER }],
         });
     });
 });
