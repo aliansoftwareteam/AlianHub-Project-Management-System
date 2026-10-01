@@ -152,7 +152,7 @@ div.au__errors ul { margin: 4px 0 0; padding-left: 14px; }
 .au-tpl__heading { flex: 1; min-width: 0; }
 .au-tpl__sub { margin: 4px 0 0; }
 .au-tpl__controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
-.au-tpl__search { flex: 1 1 240px; min-width: 0; }
+.ah-input.au-tpl__search { flex: 1 1 240px; min-width: 0; }
 .au-tpl__project { display: inline-flex; align-items: center; gap: 6px; font: var(--text-body); min-width: 0; }
 .au-tpl__cats { display: flex; flex-wrap: wrap; gap: 6px; }
 .au-tpl__cat {
