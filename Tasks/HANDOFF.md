@@ -1,10 +1,42 @@
 # Handoff — where to start next session
 
-Updated 2026-09-28. Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
+Updated 2026-10-01. Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
 
-## State of `beta` (`14.36.0-beta.644`)
+## State of `beta` (`14.36.0-beta.670`)
 
-- **2026-09-29: builds 636–644, follow-ups from tasks 041–043.** The owner's local server is on 644 (backend pulled; the frontend was last built at 635, and nothing since changed it).
+- **2026-09-30 to 2026-10-01: builds 646–670, tasks 044 and 045 (the ClickUp re-check and its gaps).**
+  - **Re-check:** #1180 (646) lists what is still open against ClickUp at build 645, ranked, in `Tasks/active/034-end-to-end-qa-programme/findings/clickup-recheck-2026-09-30.md`.
+  - **Task 044, quick gaps, is done** (all four slices; tracker AP-439, in review):
+    - #1183 (650): Board cards show the chosen custom fields.
+    - #1184 (651): language settings are restored from the account on a new device.
+    - #1187 (660): a form response opens the task it created.
+    - #1192 (661): the Field Filler, PRD Writer and Wiki Upkeep agent templates can be picked. Each has a built-in skill; `aifield.fill` is a new agent action.
+  - **Task 045, medium gaps, is done** (all fifteen slices; tracker AP-440):
+    - #1185 (652): the command palette lists recent projects, docs and sprints, closes on a page change, and replaces the old search modal.
+    - #1189 (653): Workload in hours, points or task count.
+    - #1188 (654): Burndown, Velocity and Ask dashboard cards.
+    - #1193 (656): AI fields fill numbers, ratings, labels and dates, and an invalid answer is never stored.
+    - #1197 (657): an agent can be mentioned in chat or messaged directly.
+    - #1186 (658): one bulk bar, with move to another project and convert; the legacy bar is deleted.
+    - #1199 (659): Home cards can be added, reordered and removed, with a Recents card.
+    - #1196 (663): docs take @mentions of people, docs and tasks, and uploaded images.
+    - #1191 (664): filter, group and sort by custom field.
+    - #1190 (665): an automation template gallery and an Automate button in projects.
+    - #1203 (666): moving a blocker in Gantt shifts its dependants after a preview.
+    - #1194 (667): "Who can see this" on projects, sprints and docs.
+    - #1200 (668): subtask rows in List edit in place and can be selected.
+    - #1198 (669): comments on docs and blocks; migration `063-page-comments`.
+    - #1195 (670): a custom field can be limited to task types.
+  - **Fixes:**
+    - #1201 (649): `tests/task-write-company-fields.test.js` compared run-stamped times unmasked on its fixture day, 2026-10-01.
+    - #1202 (655): docs, Ask and agents use the same project visibility rule as projects (`Config/rulePermissions.js`), the project list included; only a doc's author can make it private. Details are in the owner's private notes.
+    - #1204 (662): Board cards in a full column keep their height on a phone.
+  - **Docs:** #1181 (648) and #1182 (647) opened the two tasks.
+  - **The owner's local server** was rebuilt at 653 and 661 and checked in dark mode both times; see the line below for its current build.
+
+### Earlier: `beta` at d7e144bf, `14.36.0-beta.645`
+
+- **2026-09-29: builds 636–645, follow-ups from tasks 041–043.** The owner's local server was on 644 (backend pulled; the frontend was last built at 635, and nothing since changed it).
   - **Login guard:**
     - #1171 (636): memory, feedback, quality and notes-to-tasks routes.
     - #1174 (640): `tests/conventions/route-guard-coverage.test.js` walks every route: 856 in total, 767 guarded, 88 public with reasons. It also guarded `/api/v1/ai/chat-ask`.
@@ -79,7 +111,7 @@ Updated 2026-09-28. Read this first, then `Tasks/index.md`. Overwrite this file 
   - **After build 383 (builds 384–403):** writes that name people accept only active members, including projects, sprints and manual time (#918); company reads need an active seat (#916); mail routes send only to company members, password sign-in gives one answer for any failure, and the tracker's pre-login list returns download fields only (#919); stored request addresses follow `TRUST_PROXY` and only pending invitations can be accepted (#922); comment mentions, records and notices are built on the server, and all history and notification text is composed on the server, so the generic `/api/v1/handleHistory`, `/api/v1/handleNotification` and `/api/v1/app-notification/comment` routes are retired (#915, #926, #927, #929); the team board, agent release proposals, agent project lists, and agent runs and proposals show only what the viewer may see (#932, #933, #934); SSO domains are re-checked daily and seats SCIM deactivated for outsiders no longer count as membership (#925); tenant-scoping and hard-coded-text baselines are both empty, with tests that keep them empty (#923, #924, #928); a company's database is no longer recreated after deletion, and each connection compiles its models once (#921); third interface sweep with 21 fixes, including the automation dry run (#931).
   - **Owner decisions implemented:** 1 (#872), 2 (#861), 3 (#874), 7 (#865).
   - **Other:** console figures from stored chunk sizes, migration 043 (#895); tombstoned knowledge chunks purged after `KNOWLEDGE_TOMBSTONE_RETENTION_DAYS`, default 30 (#897); task keys in Ask (#882); spreadsheet and CSV text encodings (#888); step-credential renewal and heartbeats (#889); webhook and domain-event windows fixed from their first emit (#876, #879); agent notes per starter (#893); estimate history built on the server (#907); interface sweeps (#875, #886, #898, #903); i18n batches (#884, #885, #891, #892) and merge-clean pending files (#869); integration suites read only their own rows (#890).
-- **Owner's local server:** build 593 (f94b134d, the newest green beta commit when rebuilt; its version label read 14.35.0 until #1136, restart to refresh); migrations 049–056 applied 2026-09-28 after a dry run (053: 67 agent runs, 054: 43 proposals, 056: 17 views added, the rest none); before that, migrations 044–048 applied 2026-09-28 after a dry run (044: 750 tasks, 045: 1 milestone, 046: 64 sample tasks, 047: 30 time logs, 048: none), frontend rebuilt 2026-09-27, migrations through 043 applied, frontend built. `.env` still sets `PR_SUMMARY_AS_DATA`, which nothing reads since #874 and can be removed. `GOOGLE_CLIENT_ID` is set, which Google sign-in now requires (#909). `node scripts/seat-check.js`: no memberships without an active seat. The other flags are as recorded on 2026-09-23 (`SKILL_EXTERNAL_READS=on`, `AGENT_EGRESS_ALLOWLIST=true`; the rest off until the owner's sweeps; `STORAGE_DOWNLOAD_SCOPE` in report).
+- **Owner's local server:** build 661, rebuilt 2026-10-01 (frontend built). The PC restarted on 2026-09-30; Docker (`alianhub-mongo`) and the server were started again on 2026-10-01 through the `alianhub-api` launch entry. Earlier: build 593 (f94b134d, the newest green beta commit when rebuilt; its version label read 14.35.0 until #1136, restart to refresh); migrations 049–056 applied 2026-09-28 after a dry run (053: 67 agent runs, 054: 43 proposals, 056: 17 views added, the rest none); before that, migrations 044–048 applied 2026-09-28 after a dry run (044: 750 tasks, 045: 1 milestone, 046: 64 sample tasks, 047: 30 time logs, 048: none), frontend rebuilt 2026-09-27, migrations through 043 applied, frontend built. `.env` still sets `PR_SUMMARY_AS_DATA`, which nothing reads since #874 and can be removed. `GOOGLE_CLIENT_ID` is set, which Google sign-in now requires (#909). `node scripts/seat-check.js`: no memberships without an active seat. The other flags are as recorded on 2026-09-23 (`SKILL_EXTERNAL_READS=on`, `AGENT_EGRESS_ALLOWLIST=true`; the rest off until the owner's sweeps; `STORAGE_DOWNLOAD_SCOPE` in report).
 - **Upgrade steps for a deployed instance:**
   1. `node scripts/audit-product-owners.js` (from #645) and review every account it marks REVIEW.
   2. `node scripts/seat-check.js` (from #913): company access now needs an active seat; it lists accounts that would lose access. Re-invite anyone who should stay.
@@ -92,12 +124,21 @@ Updated 2026-09-28. Read this first, then `Tasks/index.md`. Overwrite this file 
 
 ## Next up
 
+**From the ClickUp re-check (2026-10-01), in order:**
+- **Missing custom field types** (people, URL, rating, progress, files): the one large gap left from the re-check. AI ratings are stored as numbers until a rating type exists.
+- **Date pickers have no dark theme:** Workload's date-range input stays white and the calendar popup is light everywhere. The app's calendar stylesheet hard-codes light colours. Offered as a task chip.
+- **Two small access follow-ups after #1202** (details in the owner's private notes): the project list's per-user cache is read before the seat check, and the project search endpoint reads the seat without the active-seat filter.
+- **Not yet checked by eye:** the Burndown, Velocity and Ask cards on a dashboard, an `@agent` message in chat, the Gantt shift preview, doc comments and mentions, the automation gallery, and a drag in List and Board after #1195. See each slice's "Left for later" in the 044 and 045 progress files.
+- **Owner decisions waiting** (from the re-check): nested subtasks, a task in several lists, subfolders, an Everything view, view templates, Goals, chat threads, doc presence and version history, in-form logic, agent connectors, a notetaker bot, a hotkey app, web search, a PWA shell; and where a working-days setting should live, so Gantt shifts can skip non-working days.
+
 1. **In progress at handoff:** task 039's before-and-after screenshots; task 040's next field groups (history, notifications, mentions; customFields; task ids). The other session's open PRs for tasks 041/042 (#1116, #1121, #1122, #1124, #1125, #1129–#1136 at the time of writing). **Blocked by the permission system:** switching `.github/workflows/main.yml` to deploy from `beta` (owner chose beta on 2026-09-27); the staging VPS is 520 builds behind and would run migrations 024–048 on its first beta deploy. **Not started:** the minimised task tray and whiteboard positions are kept only in the browser (product decisions).
 2. **Owner questions:** switch `PERMISSION_ENFORCEMENT_MODE` to enforce — the 2026-09-16 plan was after 14 days without would-be denials, and until then `requirePermission` checks only report for browser sessions (every gate added on 2026-09-28 is a hard check and does not depend on it); row 119 (decision 8 re-check once real downloads are logged); review existing Google sign-in links (details in the owner's private notes).
 3. **Owner actions:** edit the held-out question set (decision 12; Sprint 9 waits, decision 13); the sweeps in rows 77, 83 and 94 (headless passes done in #903 and #931); the Sprint 5 workflow screens (task 028); Stats, Upgrade and the Docker label (task 033); the quota recompute; the duplicate migration 021; rotating the two API keys named in the owner's local notes.
 4. **Open follow-ups:** 57, 77, 79, 83, 84, 89, 94, 96, 98, 101, 114, 119, 124, 127, 143, 149 in `Tasks/active/034-end-to-end-qa-programme/followups.md`. The #945 items are fixed (U5-28 by #990). Of the accessibility items only A11Y-O1 remains, as task 039 (O2 by #994, O3 by #991, O4 by #995, O5 by #989, O6 by 64e5274b, O7 by #978, O8 by #979). Task 013 keeps B.2 (deploy from beta — blocked, see above), V2 and V4 (owner and member sweeps).
 
 ## Owner decisions recorded
+
+- **2026-09-30 to 2026-10-01:** start task 044 (the quick gaps) and task 045 (the medium gaps) from the re-check, every queued slice at once; after the restart, keep the load off the PC; merge each PR when its checks pass; rebuild the local server after each batch and check the new screens in dark mode. The owner has not yet answered whether to move the session to a cloud machine, whether to do the two access follow-ups, or whether to check local data for roles with no private-projects setting.
 
 - **2026-09-28:** agent autonomy names follow the code (#1116): L0 "Answers and suggests", L1 "Suggests changes", L2 "Acts, you approve the rest", L3 "Acts, also on a schedule". The owner also asked that tasks 041–043 start all at once rather than queued.
 
@@ -125,6 +166,15 @@ Updated 2026-09-28. Read this first, then `Tasks/index.md`. Overwrite this file 
 - Only owners and admins delete agents (#620). `REFRESH_TOKEN_REUSE_GRACE_SECONDS` defaults to 10 (#609). The `e2e` job runs on pushes to `beta` (#634). Webhooks reach private hosts only through an instance-owner allowlist (#647). Timesheet reads respect an admin's "Everyone" grant per screen (#635). `project.project_create` is enforced for API tokens but not for web sessions (#637). A private sprint is visible to its assignees plus owners and admins (#656).
 
 ## Things learned that affect the next session
+
+- **Agents edit and push; CI runs the suites** (2026-10-01). Nineteen agents each running the full suites took the eight-CPU Mac to load 187 (68 jest processes) and it restarted, stopping every agent and wiping the scratchpad under `/private/tmp`. Only commits in worktrees survived. Since then an agent runs just the test files it touched, one worker, pushes early (right after the failing-test commit), and the integrator sends CI failures back. Nine such agents kept the load near 4–13.
+- **`Agent` with `isolation: "remote"` is not a cloud agent in the desktop app.** It starts a local worktree agent. Stopped agents resume from their transcripts with `SendMessage`; `gh pr update-branch` merges `beta` into a PR on GitHub's side, with no local work.
+- **A test can depend on the calendar** (2026-10-01). A fixture day chosen months earlier became "today", and times stamped during the run stopped being masked (#1201). When the same unrelated test fails on many PRs at once, look at `beta` and at the date first.
+- **CI caught what each agent's own test files could not:** a removed response field that integration tests still read (#1187), a dialog that ran its setup while hidden (#1194), a pinned registry list (#1192), and four convention specs (guard-list quoting, `--ink-3` text, an unscoped rule sizing an `.ah-input`). Brief agents to run `v2-guard`, `route-guard-coverage`, `inkTextContrast.spec.js` and `uiSweepThirdPass.spec.js` alone before pushing.
+- **Sortable's `put` as a function returning `true` accepts drops from every group**; return the group name to keep "same group only" (#1195 review).
+- **A flex column with a max height squeezes children that have an explicit `min-height`** (#1204): the phone rule's `min-height: 44px` replaced the content-based minimum, so Board cards shrank and overlapped. Scrolling lists want `flex-shrink: 0` on their items.
+- **Checking dark mode in the Browser pane:** screenshots shrink under an emulated viewport, so scan the DOM for light backgrounds at 1440 px and take screenshots at the pane's own size. A query-only route change keeps the command palette open, by design.
+- **Merge order for a batch that shares files:** update every open PR with `beta` after a fix lands on it, queue them all, and expect each merge to put one or two others into conflict (locales at the end of the file, shared fixtures, view-settings constants). Before the last PR of a pair that edits the same component merges, update its branch so CI tests the combination.
 
 - **An AI output posted where others read it may only use what every reader can open** (2026-09-28). Public `@ai` replies (#1168) and scheduled reports delivered to tasks or pages (#1165) were held until they followed this. Private answers keep the asker's full access. Check every new "AI writes into a shared place" feature against this rule.
 - **Batches that add to shared registries conflict after every merge** (2026-09-28). The shared files are the five schema/collection files, `Modules/AICore/features.js`/`taskClass.js`, `Modules/AI/routes.js`, `frontend/src/config/env.js` and the locales. Resolve by keeping both sides and re-checking the braces in `utils/mongo-handler/schema.js`. Merge the first green PR at once and have the others merge beta again.
