@@ -1081,6 +1081,7 @@
     "AiFields.empty_no_answer": "AI had no answer for this task.",
     "AiFields.empty_no_fit": "None of the options fits, so it stays empty.",
     "AiFields.empty_no_source": "The task has nothing for AI to read yet.",
+    "AiFields.empty_not_for_task_type": "This field is not used for this task's type.",
     "AiFields.empty_not_found": "Task not found, or not open to you.",
     "AiFields.empty_not_in_project": "This field is not used in this task's project.",
     "AiFields.empty_out_of_range": "Couldn't fill: AI's answer is outside the field's range.",

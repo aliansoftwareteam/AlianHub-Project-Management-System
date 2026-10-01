@@ -11519,6 +11519,7 @@ export default {
         empty_not_found: "Task not found, or not open to you.",
         empty_forbidden: "You cannot edit this field on this task.",
         empty_not_in_project: "This field is not used in this task's project.",
+        empty_not_for_task_type: "This field is not used for this task's type.",
         fill_with_ai: "Fill with AI",
         ai_field_hint: "AI field, not filled yet",
         filled_by_ai: "Filled by AI · {date}",

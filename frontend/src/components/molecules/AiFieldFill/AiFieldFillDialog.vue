@@ -111,7 +111,7 @@ const finishedText = computed(() => {
     return t(`AiFields.stop_${STOP_REASONS.includes(current.stopReason) ? current.stopReason : "error"}`);
 });
 
-const EMPTY_REASONS = ["no_fit", "no_source", "no_answer", "not_found", "forbidden", "not_in_project", "invalid", "out_of_range", "date_rule"];
+const EMPTY_REASONS = ["no_fit", "no_source", "no_answer", "not_found", "forbidden", "not_in_project", "not_for_task_type", "invalid", "out_of_range", "date_rule"];
 
 const errorText = computed(() => {
     if (STOP_REASONS.includes(state.errorCode)) return t(`AiFields.stop_${state.errorCode}`);
