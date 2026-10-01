@@ -12,8 +12,9 @@
 const people = require('./people');
 const url = require('./url');
 const rating = require('./rating');
+const progress = require('./progress');
 
-const MODULES = Object.freeze({ people, url, rating });
+const MODULES = Object.freeze({ people, url, rating, progress });
 const MODULE_FIELD_TYPES = Object.freeze(Object.keys(MODULES));
 
 const typeModuleOf = (fieldType) => (MODULE_FIELD_TYPES.includes(fieldType) ? MODULES[fieldType] : null);

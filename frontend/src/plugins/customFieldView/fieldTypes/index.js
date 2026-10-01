@@ -6,13 +6,15 @@ import PeopleFieldSettings from './PeopleFieldSettings.vue';
 import UrlFieldValue from './UrlFieldValue.vue';
 import RatingFieldValue from './RatingFieldValue.vue';
 import RatingFieldSettings from './RatingFieldSettings.vue';
+import ProgressFieldValue from './ProgressFieldValue.vue';
 
 export { activeMemberIds, peopleOptions } from './people';
 
 const UI = Object.freeze({
     people: { icon: 'users', value: PeopleFieldValue, settings: PeopleFieldSettings },
     url: { icon: 'link', value: UrlFieldValue, settings: null },
-    rating: { icon: 'star', value: RatingFieldValue, settings: RatingFieldSettings, settingsError: 'FieldTypes.rating_max_error' }
+    rating: { icon: 'star', value: RatingFieldValue, settings: RatingFieldSettings, settingsError: 'FieldTypes.rating_max_error' },
+    progress: { icon: 'reports', value: ProgressFieldValue, settings: null }
 });
 
 export const fieldTypeUi = (fieldType) => (Object.keys(UI).includes(fieldType) ? UI[fieldType] : null);

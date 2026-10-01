@@ -45,7 +45,7 @@ const props = defineProps({
 const emit = defineEmits(["update:modelValue"]);
 
 const LIST_TYPES = ["dropdown", "people"];
-const NUMBER_TYPES = ["number", "money", "rating"];
+const NUMBER_TYPES = ["number", "money", "rating", "progress"];
 const USER_ID = /^[a-f0-9]{24}$/i;
 
 /* The assignee filter's list also carries "me" and teams; a people field holds people only. */
