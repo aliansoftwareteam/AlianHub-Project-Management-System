@@ -38,6 +38,7 @@ const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { seedSampleTasks, demoTasksForFocus } = require('../utils/sampleTasks');
 const trash = require('../Modules/Trash/controller');
 const socketEmitter = require('../event/socketEventEmitter');
+const { removeCache } = require('../utils/commonFunctions');
 const goalsRules = require('../Modules/Goals/helpers/goalRules');
 
 const COMPANY = '6f0000000000000000000c01';
@@ -227,6 +228,99 @@ describe('removing the sample', () => {
         await removeSample();
         expect(mockDb.crud.mock.calls.length).toBeGreaterThan(5);
         expect(new Set(mockDb.crud.mock.calls.map(([company]) => company))).toEqual(new Set([COMPANY]));
+    });
+});
+
+describe('what removing the sample tells everyone else', () => {
+    beforeEach(seedSample);
+
+    const sentBy = async (act) => {
+        socketEmitter.emit.mockClear();
+        await act();
+        return socketEmitter.emit.mock.calls.map(([type, payload]) => ({ type, ...payload }));
+    };
+
+    test('the folders and the docs are announced as their own trash paths announce them, each with the company', async () => {
+        const docIds = rows(SCHEMA_TYPE.PAGES).filter((p) => inSample(p, 'ProjectID')).map((p) => String(p._id));
+        const sent = await sentBy(removeSample);
+        expect(sent.filter((event) => event.module === 'folders')).toEqual([{ type: 'update', companyId: COMPANY, module: 'folders' }]);
+        const docs = sent.filter((event) => event.module === 'pages');
+        expect(docs).toHaveLength(1);
+        expect(docs[0]).toMatchObject({ type: 'update', companyId: COMPANY, data: { deletedStatusKey: 1, deleted: docIds.length, ids: docIds } });
+        expect(sent.length).toBeGreaterThanOrEqual(3);
+        sent.forEach((event) => expect(event.companyId).toBe(COMPANY));
+    });
+
+    test('the cached project lists are dropped after the last list and folder is written', async () => {
+        removeCache.mockClear();
+        mockDb.crud.mockClear();
+        await removeSample();
+        const cleared = removeCache.mock.calls
+            .map((args, index) => ({ args, order: removeCache.mock.invocationCallOrder[index] }))
+            .filter(({ args }) => args[0] === 'UserProjectData:' && args[1] === true);
+        expect(cleared.length).toBeGreaterThan(0);
+        const writes = mockDb.crud.mock.calls
+            .map(([, query, method], index) => ({ type: query.type, method, order: mockDb.crud.mock.invocationCallOrder[index] }))
+            .filter(({ type, method }) => method === 'updateMany' && [SCHEMA_TYPE.SPRINTS, SCHEMA_TYPE.FOLDERS].includes(type));
+        expect(writes.length).toBeGreaterThanOrEqual(2);
+        expect(cleared[cleared.length - 1].order).toBeGreaterThan(Math.max(...writes.map((write) => write.order)));
+    });
+
+    test('nothing is announced when there was no sample to remove', async () => {
+        await removeSample();
+        const sent = await sentBy(removeSample);
+        expect(sent).toEqual([]);
+    });
+});
+
+describe("a person's own task that was added to a sample list", () => {
+    beforeEach(seedSample);
+
+    const oid = (value) => new mongoose.Types.ObjectId(String(value));
+    const sampleSubfolderList = () => {
+        const sub = rows(SCHEMA_TYPE.FOLDERS).find((f) => f.parentFolderId);
+        return rows(SCHEMA_TYPE.SPRINTS).find((l) => String(l.folderId) === String(sub._id));
+    };
+    const seedOwnTask = () => {
+        const home = mockDb.seed(SCHEMA_TYPE.SPRINTS, { name: 'Mine', projectId: OWN_PROJECT_ID, deletedStatusKey: 0 });
+        const second = mockDb.seed(SCHEMA_TYPE.SPRINTS, { name: 'Also mine', projectId: OWN_PROJECT_ID, deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.TASKS, {
+            TaskName: 'My task', ProjectID: OWN_PROJECT_ID, sprintId: oid(home._id), deletedStatusKey: 0, CompanyId: COMPANY,
+            extraLists: [
+                { projectId: PROJECT_ID, sprintId: oid(sampleSubfolderList()._id), addedBy: OWNER, addedAt: new Date() },
+                { projectId: OWN_PROJECT_ID, sprintId: oid(second._id), addedBy: OWNER, addedAt: new Date() },
+            ],
+        });
+        return { second };
+    };
+    const ownTask = () => rows(SCHEMA_TYPE.TASKS).find((t) => t.TaskName === 'My task');
+
+    test('leaves the sample list and stays where it lives, with its other lists', async () => {
+        const { second } = seedOwnTask();
+        await removeSample();
+        expect(ownTask().deletedStatusKey).toBe(0);
+        expect(ownTask().extraLists.map((entry) => String(entry.sprintId))).toEqual([String(second._id)]);
+    });
+
+    test('the list it left is named in the task event, so the row goes from that list on every open client', async () => {
+        seedOwnTask();
+        const sampleList = String(sampleSubfolderList()._id);
+        socketEmitter.emit.mockClear();
+        await removeSample();
+        const told = socketEmitter.emit.mock.calls.map(([, payload]) => payload)
+            .filter((payload) => payload.module === 'task' && String(payload.data._id) === String(ownTask()._id));
+        expect(told).toHaveLength(1);
+        expect(told[0]).toMatchObject({ type: 'update', companyId: COMPANY, leftLists: [{ projectId: MARK, sprintId: sampleList }] });
+        expect(told[0].updatedFields.extraLists).toHaveLength(1);
+    });
+
+    test("the sample's own task keeps its entry, so restoring the project from the trash brings it back whole", async () => {
+        seedOwnTask();
+        const sampleList = String(sampleSubfolderList()._id);
+        await removeSample();
+        const kept = rows(SCHEMA_TYPE.TASKS).filter((t) => inSample(t, 'ProjectID') && (t.extraLists || []).length);
+        expect(kept).toHaveLength(1);
+        expect(String(kept[0].extraLists[0].sprintId)).toBe(sampleList);
     });
 });
 
