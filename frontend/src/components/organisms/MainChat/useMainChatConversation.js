@@ -16,6 +16,11 @@
  * Conversation shape, mirroring the existing behaviour exactly:
  *   one-to-one  -> default chat project, taskId = the DM task id, sprintId = its sprint
  *   channel     -> normal chat project, taskId = "default",     sprintId = the channel id
+ *
+ * A thread is the same engine pointed at one message (`thread`): its transcript is that
+ * message and the replies stored under it, and what it sends carries the message's id as
+ * `parentId`. It takes its live events from the conversation's engine (`observe` there,
+ * `receive` here) rather than joining the socket room a second time.
  */
 import { ref, computed } from 'vue';
 import * as env from '@/config/env';
@@ -68,7 +73,14 @@ export function useMainChatConversation(options) {
         watcherPrefs = () => ({}),
         // () => ({ id, Employee_Name, companyOwnerId }) — the sender
         currentUser = () => ({}),
+        // () => the message a thread hangs under; set only on a thread's engine
+        thread = null,
+        // (doc) => void — every live comment event, before the transcript applies it
+        observe = null,
     } = options;
+
+    const inThread = typeof thread === 'function';
+    const rootId = () => (inThread ? idOf(thread() || {}) : '');
 
     const messages = ref([]);
     const loading = ref(false);
@@ -124,6 +136,7 @@ export function useMainChatConversation(options) {
             envelope.objId.taskId = taskId;
         }
         if (folderId) envelope.objId.folderId = folderId;
+        if (inThread) envelope.parentId = rootId();
 
         return envelope;
     }
@@ -153,8 +166,35 @@ export function useMainChatConversation(options) {
         });
     }
 
+    async function fetchThread() {
+        const response = await apiRequest('get', `${env.API_COMMENTS}/replies?parentId=${encodeURIComponent(rootId())}`);
+        const body = (response && response.data) || {};
+        if (!body.status) throw new Error(body.statusText || 'thread');
+        return [body.root || thread(), ...(body.data || [])].filter(Boolean);
+    }
+
+    /** A thread reads whole: the message it hangs under, then its replies, oldest first. */
+    async function loadThread() {
+        const known = thread();
+        messages.value = known && known.userId ? [decorate(known)] : [];
+        hasMore.value = false;
+        loading.value = messages.value.length === 0;
+        try {
+            messages.value = (await fetchThread()).map(decorate);
+            totalLoaded.value = messages.value.length;
+            return true;
+        } catch (error) {
+            console.error('MainChat: load thread failed', error);
+            messages.value = [];
+            return false;
+        } finally {
+            loading.value = false;
+        }
+    }
+
     /** First load for a conversation: newest batch, rendered oldest-first. */
     async function load() {
+        if (inThread) return loadThread();
         messages.value = [];
         totalLoaded.value = 0;
         hasMore.value = true;
@@ -197,7 +237,14 @@ export function useMainChatConversation(options) {
      * live updates
      * ------------------------------------------------------------------ */
 
-    function upsert(doc) {
+    /** A message from a page that is not loaded yet: appending it would put it after the newest. */
+    function olderThanLoaded(doc) {
+        const first = messages.value[0];
+        if (!hasMore.value || !first || !first.createdAt || !doc.createdAt) return false;
+        return new Date(doc.createdAt).getTime() < new Date(first.createdAt).getTime();
+    }
+
+    function upsert(doc, { append = true } = {}) {
         if (!doc) return;
         const key = idOf(doc);
         const at = messages.value.findIndex((m) => idOf(m) === key);
@@ -223,8 +270,25 @@ export function useMainChatConversation(options) {
             messages.value[pendingAt] = decorate(doc);
             return;
         }
+        if (!append || olderThanLoaded(doc)) return;
         messages.value.push(decorate(doc));
         totalLoaded.value += 1;
+    }
+
+    /** A live event in the conversation: replies belong to their thread, not to the transcript. */
+    function onLiveEvent(doc, inserted) {
+        if (!doc) return;
+        if (observe) observe(doc);
+        if (doc.parentId) return;
+        upsert(doc, { append: inserted });
+    }
+
+    /** A thread's share of the conversation's live events: its own message and the replies under it. */
+    function receive(doc) {
+        if (!inThread || !doc) return;
+        const root = rootId();
+        if (idOf(doc) === root) upsert(doc, { append: false });
+        else if (String(doc.parentId || '') === root) upsert(doc);
     }
 
     /**
@@ -243,6 +307,14 @@ export function useMainChatConversation(options) {
      * already hold just refreshes it.
      */
     async function catchUp() {
+        if (inThread) {
+            try {
+                (await fetchThread()).forEach((row) => receive(row));
+            } catch (error) {
+                console.error('MainChat: thread catch-up failed', error);
+            }
+            return;
+        }
         const { projectId, sprintId, taskId, isDefaultProject } = ctx.value;
         if (!projectId || !sprintId || !taskId) return;
 
@@ -289,7 +361,7 @@ export function useMainChatConversation(options) {
     }
 
     function sendTypingSignal(typing) {
-        if (!socket || !socket.value) return;
+        if (inThread || !socket || !socket.value) return;
         const { projectId, sprintId, taskId } = ctx.value;
         if (!projectId || !sprintId || !taskId) return;
 
@@ -379,14 +451,14 @@ export function useMainChatConversation(options) {
     }
 
     function attach() {
-        if (!socket || !socket.value) return;
+        if (inThread || !socket || !socket.value) return;
         detach();
         joinConversationRoom();
 
-        socket.value.on('commentInsert', (data) => upsert(data && data.fullDocument));
-        socket.value.on('commentUpdate', (data) => upsert(data && data.fullDocument));
-        socket.value.on('commentDelete', (data) => upsert(data && data.fullDocument));
-        socket.value.on('commentReplace', (data) => upsert(data && data.fullDocument));
+        socket.value.on('commentInsert', (data) => onLiveEvent(data && data.fullDocument, true));
+        socket.value.on('commentUpdate', (data) => onLiveEvent(data && data.fullDocument, false));
+        socket.value.on('commentDelete', (data) => onLiveEvent(data && data.fullDocument, false));
+        socket.value.on('commentReplace', (data) => onLiveEvent(data && data.fullDocument, false));
         socket.value.on('commentTyping', onTypingSignal);
 
         /*
@@ -415,7 +487,7 @@ export function useMainChatConversation(options) {
     }
 
     function detach() {
-        if (!socket || !socket.value) return;
+        if (inThread || !socket || !socket.value) return;
 
         // Tell the room we stopped before we go, so we do not leave a "typing…" behind
         // on someone else's screen waiting for the expiry to clear it.
@@ -507,8 +579,9 @@ export function useMainChatConversation(options) {
         }).catch((error) => console.error('MainChat: last-message update failed', error));
     }
 
+    /* A thread reply is announced by the server, to the people in that thread only. */
     function announce(doc) {
-        if (!doc) return;
+        if (!doc || inThread) return;
         pushNotification(doc);
         touchConversationPreview(doc);
     }
@@ -830,7 +903,7 @@ export function useMainChatConversation(options) {
             // Only when the edited message is still the newest — editing something
             // further back must not overwrite the preview with older text.
             const newest = messages.value[messages.value.length - 1];
-            if (newest && idOf(newest) === idOf(message)) {
+            if (!inThread && newest && idOf(newest) === idOf(message)) {
                 touchConversationPreview({ ...message, message: escapeMessage(body) });
             }
         } catch (error) {
@@ -854,7 +927,7 @@ export function useMainChatConversation(options) {
             // If the newest message just went, the list preview would otherwise keep
             // quoting text that no longer exists. Same substitution Comments.vue makes.
             const newest = messages.value[messages.value.length - 1];
-            if (newest && idOf(newest) === idOf(msg)) {
+            if (!inThread && newest && idOf(newest) === idOf(msg)) {
                 touchConversationPreview({ ...msg, type: 'text', message: 'general.message_deleted' });
             }
 
@@ -876,6 +949,7 @@ export function useMainChatConversation(options) {
         load,
         loadOlder,
         catchUp,
+        receive,
         typingUsers,
         setTyping,
         attach,

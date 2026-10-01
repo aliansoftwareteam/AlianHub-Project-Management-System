@@ -35,6 +35,11 @@
                 <span v-if="project?.ProjectCode" class="ph2__code">{{ project.ProjectCode }}</span>
             </template>
 
+            <span v-for="crumb in folderCrumbs" :key="crumb.id" class="ph2__folder-crumb">
+                <span class="ph2__sep" aria-hidden="true">›</span>
+                <router-link class="ph2__sprint ph2__folder" :to="crumb.to" :title="crumb.name">{{ crumb.name }}</router-link>
+            </span>
+
             <span v-if="sprint?.name" class="ph2__crumb">
                 <span class="ph2__sep" aria-hidden="true">›</span>
                 <router-link v-if="sprintTo" class="ph2__sprint" :to="sprintTo">{{ sprint.name }}</router-link>
@@ -73,6 +78,7 @@
  *   project       Object   the project document (ProjectName, ProjectCode, projectIcon)
  *   projects      Array    the user's projects; two or more render the switcher (emits select-project(id))
  *   sprint        Object   { id, name, folderId, startDate, endDate } — the sprint in view, or null; its crumb links to it
+ *   folders       Array    [{ id, name }] — the folder in view and, before it, its parent; each crumb links to its page
  *   agentSummary  Object   { agents, running, elapsedMs, spendUsd } from GET /api/v2/agents/runs — chip hidden when nothing runs
  *   showAiAssist / showAddTask   Boolean
  *
@@ -101,6 +107,7 @@ const props = defineProps({
     project: { type: Object, default: () => ({}) },
     projects: { type: Array, default: () => [] },
     sprint: { type: Object, default: null },
+    folders: { type: Array, default: () => [] },
     agentSummary: { type: Object, default: null },
     showAiAssist: { type: Boolean, default: false },
     showAddTask: { type: Boolean, default: true }
@@ -117,6 +124,10 @@ const sprintId = computed(() => String(props.sprint?.id || props.sprint?._id || 
 const sprintTo = computed(() => (sprintId.value && props.project?._id && companyId?.value
     ? treeRoute('sprint', { cid: companyId.value, projectId: props.project._id, folderId: props.sprint.folderId ? String(props.sprint.folderId) : '', id: sprintId.value })
     : null));
+
+const folderCrumbs = computed(() => (props.project?._id && companyId?.value ? props.folders : [])
+    .filter((folder) => folder?.id && folder?.name)
+    .map((folder) => ({ ...folder, to: treeRoute('folder', { cid: companyId.value, projectId: props.project._id, id: folder.id }) })));
 
 const PALETTE = ['#2F3990', '#2f9e7e', '#d98324', '#6b5ce7', '#0EA5E9', '#EC4899'];
 

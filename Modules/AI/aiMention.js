@@ -10,6 +10,7 @@ const { getProvider, isAnyProviderConfigured } = require('../AICore/llmProvider'
 const { FEATURES } = require('../AICore/features');
 const { threadOf, canPostToThread } = require('../Comments/helpers/threadWriteAccess');
 const { AI_ACTOR, isAiAuthored } = require('../Comments/helpers/aiActor');
+const { announceThread } = require('../Comments/helpers/chatThreads');
 const { gather, promptFor, tokenProjectIdsOf, SYSTEM, ASK_TOKENS } = require('./ask');
 const { loadMessages, namesOf, _internal: { plainMessage } } = require('./chatSummary');
 const { threadReaders, sharedProjects, publicSources } = require('./publicSources');
@@ -99,9 +100,14 @@ const sourcesForAll = async (companyId, { question, thread, task, conversation, 
     return { sources, projects, intent: null };
 };
 
-const conversationLines = async (companyId, thread, accessMatch) => {
+const withinThread = (accessMatch, rootId) => (isId(rootId)
+    ? { $and: [accessMatch || {}, { $or: [{ _id: oid(rootId) }, { parentId: oid(rootId) }] }] }
+    : accessMatch || {});
+
+/* `rootId` narrows the conversation to one chat thread: its first message and the replies under it. */
+const conversationLines = async (companyId, thread, accessMatch, rootId = null) => {
     if (!isId(thread.projectId) || !isId(thread.sprintId)) return [];
-    const rows = (await loadMessages(companyId, thread, accessMatch || {})) || [];
+    const rows = (await loadMessages(companyId, thread, withinThread(accessMatch, rootId))) || [];
     const names = await namesOf(companyId, rows);
     return rows
         .map((row) => ({ who: isAiAuthored(row) ? 'AI' : (row.agentName || names[String(row.userId)] || 'Someone'), text: plainMessage(withoutAiMention(row.message)) }))
@@ -145,10 +151,10 @@ const citationsOf = (answer, sources) => sources
  * otherwise from what the asker can open. `task` adds the task being discussed. `about`, the asker's private profile,
  * is only for an answer the asker alone reads. */
 const answerFor = async (companyId, {
-    askerId, question, thread, accessMatch, task = null, conversation = null, tokenProjectIds = [], about = '', forAll = true,
+    askerId, question, thread, accessMatch, task = null, conversation = null, tokenProjectIds = [], about = '', forAll = true, rootId = null,
 }) => {
     const [lines, gathered] = await Promise.all([
-        conversationLines(companyId, thread, accessMatch),
+        conversationLines(companyId, thread, accessMatch, rootId),
         forAll
             ? sourcesForAll(companyId, { question, thread, task, conversation, tokenProjectIds })
             : gather(companyId, askerId, { question, projectId: task ? String(task.ProjectID) : undefined, tokenProjectIds }),
@@ -175,7 +181,8 @@ const emit = (companyId, type, data) => socketEmitter.emit(type, {
     type, data, updatedFields: {}, module: 'comments', companyId, actor: { kind: 'system', userId: null }, depth: 1,
 });
 
-/* A task thread gets a threaded reply; chat has no threads, so the answer follows the question and quotes it. */
+/* A question asked in a thread, on a task or in chat, is answered in that thread; a chat message asked in the
+ * conversation itself is followed by an answer that quotes it. */
 const postAnswer = async (companyId, { chat, thread, askerId, answer, cited, question }) => {
     const base = {
         project: false,
@@ -192,7 +199,7 @@ const postAnswer = async (companyId, { chat, thread, askerId, answer, cited, que
         aiQuestionId: question._id ? String(question._id) : '',
         aiCitations: cited,
     };
-    const placed = chat
+    const placed = chat && !question.parentId
         ? {
             ...base,
             hasReply: true,
@@ -205,6 +212,9 @@ const postAnswer = async (companyId, { chat, thread, askerId, answer, cited, que
         : { ...base, parentId: oid(question.parentId || question._id) };
     const saved = plain(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: placed }, 'save'));
     if (saved && saved._id) emit(companyId, 'insert', saved);
+    if (chat && saved && saved.parentId) {
+        await announceThread(companyId, saved.parentId).catch((error) => logger.error(`[ai-mention] thread count not sent: ${error.message}`));
+    }
     return saved;
 };
 
@@ -232,6 +242,7 @@ const answerComment = async (companyId, { questionId, askerId, question, tokenPr
         }
         const { answer, cited } = await answerFor(companyId, {
             askerId, question, thread, accessMatch: access.match, task: place.task, conversation: place.conversation, tokenProjectIds,
+            rootId: place.chat ? row.parentId : null,
         });
         if (!answer) {
             await setState(companyId, questionId, { state: STATE.FAILED, code: 'empty' });

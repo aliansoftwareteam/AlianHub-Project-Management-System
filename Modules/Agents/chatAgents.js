@@ -236,7 +236,8 @@ const settleChanges = async (companyId, { agent, run, askerId, changes }) => {
     return { outcomes, proposalIds: filed };
 };
 
-/* Chat has no threads, so the reply follows the message and quotes it, as an @ai answer does. */
+/* As an @ai answer does: a message in a thread is answered in that thread, any other is followed by a reply
+ * that quotes it. */
 const postReply = async (companyId, { agent, run, thread, question, text, cited, changes }) => {
     const saved = plain(await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.COMMENTS,
@@ -258,15 +259,21 @@ const postReply = async (companyId, { agent, run, thread, question, text, cited,
             isDeleted: false,
             agentCitations: cited,
             ...(changes.length ? { agentChanges: changes } : {}),
-            hasReply: true,
-            reply_id: String(question._id),
-            reply_userId: String(question.userId || ''),
-            reply_type: 'text',
-            reply_message: String(question.message || ''),
-            ...(question.createdAt ? { reply_createdAt: question.createdAt } : {}),
+            ...(question.parentId ? { parentId: oid(question.parentId) } : {
+                hasReply: true,
+                reply_id: String(question._id),
+                reply_userId: String(question.userId || ''),
+                reply_type: 'text',
+                reply_message: String(question.message || ''),
+                ...(question.createdAt ? { reply_createdAt: question.createdAt } : {}),
+            }),
         },
     }, 'save'));
     if (saved && saved._id) emitComment(companyId, 'insert', saved);
+    if (saved && saved.parentId) {
+        await require('../Comments/helpers/chatThreads').announceThread(companyId, saved.parentId)
+            .catch((error) => logger.error(`[agent-chat] thread count not sent: ${error.message}`));
+    }
     return saved;
 };
 
@@ -282,7 +289,7 @@ const answerAs = async (companyId, { agent, run, questionRow, askerId, forAll, c
     }
     const question = questionOf(questionRow.message);
     const [lines, found, offered] = await Promise.all([
-        lazy.aiMention.conversationLines(companyId, thread, access.match),
+        lazy.aiMention.conversationLines(companyId, thread, access.match, questionRow.parentId),
         sourcesFor(companyId, { agent, askerId, question, thread, conversation, forAll, tokenProjectIds }),
         offeredActions(companyId, agent),
     ]);

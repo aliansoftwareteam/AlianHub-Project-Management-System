@@ -1677,7 +1677,9 @@ export default {
         "key_esc": "Esc",
         "key_enter": "Enter",
         "key_shift_enter": "Shift + Enter",
-        "key_tab": "Tab"
+        "key_tab": "Tab",
+        "server_busy": "The server is busy. Try again in a moment.",
+        "server_busy_retry_in": "The server is busy. Try again in {n} second. | The server is busy. Try again in {n} seconds."
     },
     "Time": {
         "loading": "Loading…",
@@ -2826,7 +2828,7 @@ export default {
         "schedule_report": "Report",
         "schedule_every": "How often",
         "schedule_every_option_daily": "Every day",
-        "schedule_every_option_weekdays": "Weekdays",
+        "schedule_every_option_weekdays": "Monday to Friday",
         "schedule_every_option_weekly": "Once a week",
         "schedule_weekday": "Day",
         "schedule_weekday_0": "Sunday",
@@ -2864,7 +2866,7 @@ export default {
         "schedule_error_days": "Days ahead must be a whole number from 1 to 30.",
         "schedule_error_task": "That task cannot be used.",
         "schedule_every_daily": "Every day at {at} ({zone})",
-        "schedule_every_weekdays": "Weekdays at {at} ({zone})",
+        "schedule_every_weekdays": "Monday to Friday at {at} ({zone})",
         "schedule_every_weekly": "Every {day} at {at} ({zone})",
         "schedule_off": "Paused: it will not run",
         "schedule_next_unknown": "Next run not worked out yet",
@@ -3366,6 +3368,7 @@ export default {
         "map_all_placed": "All tasks placed.",
         "replan_none": "Nothing on the critical path yet — link tasks with blocks / blocked by to see one.",
         "replan_chain": "Critical path: {n} tasks, {days} days, ending {date}.",
+        "replan_chain_working": "Critical path: {n} tasks, {days} working days, ending {date}.",
         "replan_late": "{task} is past its due date, so everything after it moves.",
         "shift_title": "{task} now ends later",
         "shift_intro": "{n} task that waits on it would move later: | {n} tasks that wait on it would move later:",
@@ -5762,6 +5765,11 @@ export default {
         "new": "New",
         "new_list": "New list",
         "new_folder": "New folder",
+        "new_subfolder": "New subfolder",
+        "new_subfolder_in": "New subfolder in {folder}",
+        "move_folder": "Move folder",
+        "move_folder_hint": "Choose where {folder} goes",
+        "top_level": "Top level of the project",
         "new_menu_task": "Task",
         "menu_view": "View",
         "menu_find": "Find",
@@ -6193,7 +6201,16 @@ export default {
         "search_not_loaded": "That message is further back in this conversation — load earlier messages to jump to it.",
         "unread_one": "1 unread message",
         "unread_many": "{count} unread messages",
-        "marked_unread": "Marked as unread from here"
+        "marked_unread": "Marked as unread from here",
+        "reply_in_thread": "Reply in thread",
+        "thread_title": "Thread",
+        "thread_close": "Close thread",
+        "thread_replies_one": "1 reply",
+        "thread_replies_many": "{count} replies",
+        "thread_open_one": "Open the thread, 1 reply",
+        "thread_open_many": "Open the thread, {count} replies",
+        "thread_last_reply": "Last reply {when}",
+        "thread_failed": "This thread could not be opened. It may have been deleted, or you may not have access to it."
     },
     "Filters": {
         "filter": "फ़िल्टर",
@@ -8853,6 +8870,7 @@ export default {
         "Upgrade_your_plan_you_have_reached_the_limit_for_creating_sprints": "अपनी योजना को अपग्रेड करें। आपने स्प्रिंट बनाने की सीमा तक पहुँच चुके हैं।",
         "Folder created successfully": "फ़ोल्डर सफलतापूर्वक बनाया गया",
         "Folder updated successfully": "फ़ोल्डर सफलतापूर्वक अपडेट किया गया",
+        "Folder_moved_successfully": "Folder moved successfully",
         "Folde restored successfully": "फ़ोल्डर सफलतापूर्वक पुनर्स्थापित किया गया",
         "Folder closed successfully": "फ़ोल्डर सफलतापूर्वक बंद किया गया",
         "Folder archived successfully": "फ़ोल्डर सफलतापूर्वक संग्रहित किया गया",
@@ -11300,7 +11318,8 @@ export default {
         "show": "Show the project tree",
         "hide": "Hide the project tree",
         "close": "Close the project tree",
-        "tasks": "{n} tasks"
+        "tasks": "{n} tasks",
+        "folder_actions": "Actions for {folder}"
     },
     "TaskTemplates": {
         "save_as": "Save as template",

@@ -8,6 +8,7 @@ const { commentThreadAccess } = require('./threadAccess');
 const { threadOf } = require('./threadWriteAccess');
 const { ensureCommentNoticeItems } = require('./noticeItems');
 const { AI_ACTOR, isAiAuthored } = require('./aiActor');
+const { CHAT_THREAD_REPLY, isChannelMessage } = require('./chatThreads');
 
 const text = (value) => (value === undefined || value === null ? '' : String(value));
 
@@ -20,7 +21,7 @@ const readersAmong = async (companyId, thread, userIds) => {
 
 const noticeText = (comment) => text(comment.message) || text(comment.mediaOriginalName) || text(comment.mediaName) || '…';
 
-const send = (companyId, key, comment, actorId, recipients) => handleNotificationtFun({ body: {
+const send = (companyId, key, comment, actorId, recipients, place = {}) => handleNotificationtFun({ body: {
     key,
     type: 'tasks',
     message: noticeText(comment),
@@ -36,7 +37,21 @@ const send = (companyId, key, comment, actorId, recipients) => handleNotificatio
     isSelected: false,
     changeType: key,
     comments_id: String(comment._id),
+    ...place,
 } });
+
+/* A chat notice opens the conversation, which a channel names by its sprint, with the thread beside it. The type
+ * stays 'tasks' because that is where each person's "replies to my comments" preference is kept. */
+const chatPlaceOf = (reply) => ({
+    taskId: isChannelMessage(reply) ? text(reply.sprintId) : text(reply.taskId),
+    changeType: CHAT_THREAD_REPLY,
+    changeData: { threadId: text(reply.parentId), commentId: String(reply._id) },
+});
+
+const findRoot = (companyId, rootId) => MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.COMMENTS,
+    data: [{ _id: new mongoose.Types.ObjectId(String(rootId)) }, { userId: 1, assigneeId: 1, projectId: 1, sprintId: 1, taskId: 1 }],
+}, 'findOne');
 
 const threadReplies = (companyId, parentId) => MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.COMMENTS,
@@ -53,13 +68,16 @@ const replyRecipients = async (companyId, reply, parent, mentionIds = []) => {
     return readersAmong(companyId, threadOf(parent), [...new Set(named)]);
 };
 
-/* The AI's answer is written straight to the thread and never comes here; the guard keeps it that way. */
-const notifyReply = async (companyId, reply, parent, mentionIds) => {
+/* The AI's answer is written straight to the thread and never comes here; the guard keeps it that way. A chat
+ * thread is counted from its first message, whichever reply the new one answered. */
+const notifyReply = async (companyId, reply, parent, mentionIds, { chat = false } = {}) => {
     if (isAiAuthored(reply)) return [];
-    const recipients = await replyRecipients(companyId, reply, parent, mentionIds);
+    const root = chat && String(parent._id) !== String(reply.parentId) ? await findRoot(companyId, reply.parentId) : parent;
+    if (!root) return [];
+    const recipients = await replyRecipients(companyId, reply, root, mentionIds);
     if (!recipients.length) return [];
     await ensureCommentNoticeItems(companyId, recipients);
-    await send(companyId, COMMENT_REPLY, reply, reply.userId, recipients);
+    await send(companyId, COMMENT_REPLY, reply, reply.userId, recipients, chat ? chatPlaceOf(reply) : {});
     return recipients;
 };
 
