@@ -258,6 +258,9 @@
 @media (max-width: 767px) {
     /* .ah-page.billing outranks the shared .ah-toolbar height and .ah-page .ah-toolbar padding whichever stylesheet loads last. */
     .ah-page.billing .billing__bar { flex-wrap: wrap; height: auto; padding: 10px 14px; row-gap: 6px; }
+    .billing__title { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .billing__bar .ah-toolbar__spacer { display: none; }
+    .billing__client { order: 2; flex-basis: 100%; }
     .billing__tabs { order: 1; margin-left: 0; width: 100%; }
     .billing__body { display: block; overflow-y: auto; }
     .billing__body .billing__main { overflow: visible; border-right: 0; }
