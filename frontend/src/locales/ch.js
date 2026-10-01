@@ -2040,6 +2040,8 @@ export default {
         "summary_loading": "Reading the thread…",
         "summary_failed": "Could not summarise this thread.",
         "refresh_summary": "Refresh summary",
+        "summarise_thread": "Summarise this thread",
+        "summary_behind": "The thread has changed since this summary. Refresh it to bring it up to date.",
         "description": "Description",
         "subtasks": "Subtasks",
         "files": "Files",
