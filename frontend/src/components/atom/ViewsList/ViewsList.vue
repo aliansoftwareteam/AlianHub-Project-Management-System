@@ -41,6 +41,12 @@
                                     <span class="font-ui font-weight-400 font-size-14 line-height-19 text-left gray81">{{!item?.setAsDefault ? $t('ViewList.set_as_default') :$t('ViewList.remove_as_default') }}</span>
                                 </button>
                             </li>
+                            <li role="none" v-if="keepsSetup">
+                                <button type="button" role="menuitem" class="embed-edit-options mb-7px view-list__menuitem cursor-pointer" data-action="save-view-template" @click="savingTemplate = true">
+                                    <img :src="templateIcon" class="mr-14-px list__edit" alt="" aria-hidden="true" />
+                                    <span class="font-ui font-weight-400 font-size-14 line-height-19 text-left gray81">{{ $t('ViewTemplates.save_as') }}</span>
+                                </button>
+                            </li>
                             <li role="none" v-if="isDeleteDisabled == false">
                                 <button type="button" role="menuitem" class="embed-edit-options view-list__menuitem cursor-pointer" @click="isDelete = true">
                                     <img :src="deleteImage" class="mr-14-px list__edit" alt="" aria-hidden="true"/>
@@ -64,6 +70,13 @@
                 <div></div>
             </template>
         </ConfirmationSidebar>
+        <SaveViewTemplateDialog
+            v-if="savingTemplate"
+            :view="item"
+            :viewName="viewName"
+            :projectId="String(project?._id || '')"
+            @close="savingTemplate = false"
+        />
     </div>
 </template>
 
@@ -84,6 +97,8 @@ import { projectComponentsIcons } from '@/composable/commonFunction';
 // COMPONENTS
 import DropDown from '@/components/molecules/DropDown/DropDown.vue'
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
+import SaveViewTemplateDialog from '@/components/molecules/ProjectViews/SaveViewTemplateDialog.vue'
+import { TEMPLATE_VIEW_TYPES } from '@/components/molecules/ProjectViews/viewTemplates'
 
 const viewDefaultIcon = require("@/assets/images/svg/list_home_icon.svg");
 const pin = require("@/assets/images/svg/pin.svg")
@@ -91,7 +106,9 @@ const activePin = require("@/assets/images/svg/active-pin.svg")
 const defaultView = require("@/assets/images/svg/HomeVector.svg")
 const dots  = require("@/assets/images/svg/PriorityIcon/dotsIcon.svg") 
 const deleteImage = require('@/assets/images/svg/delete-red.svg')
+const templateIcon = require('@/assets/images/svg/template_icon_gray.svg')
 const isDelete = ref(false)
+const savingTemplate = ref(false)
 const route = useRoute();
 const router = useRouter();
 const companyId = inject('$companyId')
@@ -131,6 +148,7 @@ const props = defineProps({
 
 const commentBadge = computed(() => (props.commentCount > 99 ? '+99' : props.commentCount));
 const viewName = computed(() => props.item?.title || t(`ViewList.${props.item?.name}`));
+const keepsSetup = computed(() => TEMPLATE_VIEW_TYPES.includes(props.item?.keyName));
 /* A private view is not in the project's list, so the project default cannot point at it. */
 const canToggleDefault = computed(() => {
     const views = project.value?.ProjectRequiredComponent;
