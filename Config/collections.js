@@ -73,6 +73,7 @@ const dbCollections = {
     PUBLIC_SHARE_INDEX: "publicShareIndex",
     RECURRING_TASKS: "recurring_tasks",
     TASK_TEMPLATES: "task_templates",
+    VIEW_TEMPLATES: "view_templates",
     REMINDERS: "reminders",
     NOTES: "notes",
     GENERAL_REMINDERS: "general_reminders",

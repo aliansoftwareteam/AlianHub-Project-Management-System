@@ -377,13 +377,14 @@ describe('renaming and deleting', () => {
 describe('POST /api/v1/project/:id/views with a template', () => {
     it('adds a view of the template\'s kind with its setup, named after the template', async () => {
         seedRules({ 'project.view_list': true });
-        const template = seedTemplate();
+        const fitsAlpha = cleanViewSettings({ ...SETUP, columns: { ...SETUP.columns, hidden: ['tags'] }, filters: [customRow(ALPHA_FIELD, 'Size'), statusRow([1, 3]), priorityRow] });
+        const template = seedTemplate({ settings: fitsAlpha });
         const res = await addView(MEMBER, ALPHA, { templateId: String(template._id) });
         expect(res.statusCode).toBe(200);
         const views = storedProject(ALPHA).ProjectRequiredComponent;
         expect(views).toHaveLength(4);
         expect(views[3]).toMatchObject({ keyName: 'ProjectListView', name: 'List', title: 'Sprint list', sourceViewId: LIST_ID, setAsDefault: false, isPin: false });
-        expect(views[3].settings).toEqual(cleanViewSettings(SETUP));
+        expect(views[3].settings).toEqual(fitsAlpha);
         expect(views[3]._id).toMatch(/^[a-f0-9]{24}$/);
         expect(views[3]._id).not.toBe(LIST_ID);
         expect(res.body.data._id).toBe(views[3]._id);
