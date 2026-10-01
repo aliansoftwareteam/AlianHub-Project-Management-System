@@ -45,6 +45,8 @@
     --danger-ink: #9c1f2e;
     --agent: #6b5ce7;
     --agent-bg: #eeebfd;
+    /* --agent is a fill (the agent avatar, white on it). Text takes --agent-ink, which reads on --agent-bg and on a surface. */
+    --agent-ink: #5747d6;
 
     --font-ui: "Inter Tight", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
     --font-mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
@@ -169,6 +171,7 @@
     /* Used directly as text (overdue labels, due dates); the light red is 2.8:1 on dark surfaces. */
     --danger: #ff7b85;
     --agent-bg: rgba(168, 146, 255, .16);
+    --agent-ink: #b3a4ff;
     --shadow-ink: rgba(0, 0, 0, .3);
 
     --scheme: dark;
@@ -203,6 +206,7 @@
     --danger: #a00d18;
     --danger-ink: #7a0f1b;
     --agent: #4a3cc2;
+    --agent-ink: #372b9c;
     --focus: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink);
 }
 
@@ -232,6 +236,7 @@
     --danger: #ff9ea5;
     --danger-ink: #ffb8bd;
     --agent-bg: rgba(201, 189, 255, .2);
+    --agent-ink: #d6cdff;
 }
 
 /* Many controls draw focus as a box-shadow and switch the outline off; here the outline wins. */
@@ -555,7 +560,7 @@ html, body, #app {
 .ah-chip--warn { background: var(--warn-bg); color: var(--warn-ink); }
 .ah-chip--danger { background: var(--danger-bg); color: var(--danger-ink); }
 .ah-chip--brand { background: var(--brand-tint); color: var(--brand); }
-.ah-chip--agent { background: var(--agent-bg); color: var(--agent); }
+.ah-chip--agent { background: var(--agent-bg); color: var(--agent-ink); }
 .ah-chip--automation { background: var(--fill); color: var(--ink-2); }
 .ah-chip--mono { font: var(--text-data); }
 .ah-chip--dark { background: var(--rail); color: #fff; }
