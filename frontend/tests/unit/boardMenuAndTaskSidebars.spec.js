@@ -298,7 +298,7 @@ describe('the project header with an agent at work', () => {
     const css = withoutComments(read('views/Projects/components/project-header.css'));
     const desktop = css.slice(0, css.indexOf('@media'));
 
-    it('wraps its actions onto a second row instead of squeezing the title under them', () => {
+    it('wraps its actions onto a second row instead of squeezing the title under the pill', () => {
         expect(ruleBody(desktop, '.ph2__bar')).toMatch(/flex-wrap:\s*wrap/);
         const actions = ruleBody(desktop, '.ph2__actions');
         expect(actions).toMatch(/flex-wrap:\s*wrap/);
@@ -310,8 +310,11 @@ describe('the project header with an agent at work', () => {
         expect(ruleBody(css, '.ph2__title-slot')).toMatch(/flex:\s*none/);
     });
 
-    it('drops the pill\'s time and spend first where the header also has + Task', () => {
-        expect(css).toMatch(/@media \(max-width: 1599px\)\s*\{\s*\.ph2__actions:has\(> \.ah-btn--primary\) \.ph2__agents-meta\s*\{\s*display:\s*none/);
+    it('lets the project name give way first, down to 120 px, and never grow past its text', () => {
+        const name = ruleBody(desktop, '.ph2__project, .ph2__switch');
+        expect(name).toMatch(/flex:\s*1 1 120px/);
+        expect(name).toMatch(/max-width:\s*max-content/);
+        expect(desktop.indexOf('.ph2__project, .ph2__switch {')).toBeGreaterThan(desktop.indexOf('max-width: none'));
     });
 });
 

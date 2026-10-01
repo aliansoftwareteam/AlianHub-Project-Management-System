@@ -43,9 +43,9 @@
                     </div>
                 </template>
             </DropDown>
-            <div  @click="() => {$emit('toggle', data.key)}">
-                <img class="cursor-pointer" src="@/assets/images/crossBoardTaskIcon.png" alt="close"/>
-            </div>
+            <button type="button" class="board-create__close" :aria-label="$t('Projects.close')" @click="$emit('toggle', data.key)">
+                <img src="@/assets/images/crossBoardTaskIcon.png" alt=""/>
+            </button>
         </div>
         <div class="d-flex align-items-center mt-10px w-100">
             <div class="mr-10px">
@@ -91,7 +91,6 @@
                     :multiSelect="checkApps('MultipleAssignees')"
                 />
 
-                <!-- DUE DATE -->
                 <DueDateCompo
                     v-if="groupValue !== 3"
                     id="due-date-task"
@@ -104,7 +103,6 @@
 
                 />
 
-                <!-- PRIORITY -->
                 <span class="subtaskShape ml-8px" v-if="groupValue !== 2">
                     <Priority
                         :priorityVal="priority"
