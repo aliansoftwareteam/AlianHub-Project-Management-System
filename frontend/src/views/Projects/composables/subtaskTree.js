@@ -3,7 +3,7 @@ import { useStore } from "vuex";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { useCustomComposable } from "@/composable";
-import { loadedChildren } from "@/store/ProjectData/taskTree";
+import { loadedChildren, locate, parentIdOf } from "@/store/ProjectData/taskTree";
 import { indexProgress, progressQuery, subtaskProgress, subtaskTotal } from "@/views/Projects/ListView/subtaskProgress";
 
 const idOf = (task) => String(task?._id ?? "");
@@ -11,10 +11,9 @@ const own = (task) => (Array.isArray(task?.subtaskArray) ? task.subtaskArray : [
 
 /* The subtasks under the rows a view shows, three levels deep. They are read into the sprint's
  * task tree, the one the List fills, so every view shows the same rows and one socket event
- * updates them all. A view whose own rows live elsewhere (the Table) still finds them there:
- * the tree holds children for a parent it has not placed. */
+ * updates them all. */
 export function useSubtaskTree({ project, sprintId, rows, showArchived, searched }) {
-    const { getters, dispatch } = useStore();
+    const { getters, dispatch, commit } = useStore();
     const { checkPermission } = useCustomComposable();
     const userId = inject("$userId", ref(""));
     const expandedIds = ref([]);
@@ -46,11 +45,19 @@ export function useSubtaskTree({ project, sprintId, rows, showArchived, searched
     }
     watch(signature, loadCounts, { immediate: true });
 
+    /* A Table row lives in the Table's own store. It is put in the tree before its subtasks are
+     * read, so they sit under it for everything that walks the tree: the bulk bar's undo, a move. */
+    function plant(task) {
+        if (parentIdOf(task) !== "" || (bucket.value && locate(bucket.value, task._id))) return;
+        commit("projectData/mutateTypesenseTasks", { pid: project.value._id, sprintId: sprintId.value, data: { ...task }, nextPage: {}, found: {} });
+    }
+
     /* Asked every time a row opens: the store answers at once for a parent whose children it has read. */
     function read(task, item) {
         const current = project.value || {};
         const permit = checkPermission("task.show_tasks", current.isGlobalPermission);
         if ((permit === null && current.isGlobalPermission === false) || !item) return Promise.resolve();
+        plant(task);
         return dispatch("projectData/getPaginatedTasks", {
             pid: current._id,
             sprintId: sprintId.value,
@@ -82,6 +89,9 @@ export function useSubtaskTree({ project, sprintId, rows, showArchived, searched
     watch(() => (searched?.value ? withLoadedLevels(rows.value).filter((task) => own(task).length).map(idOf).join(",") : ""), (matched) => {
         if (matched) expandedIds.value = [...new Set([...expandedIds.value, ...matched.split(",")])];
     }, { immediate: true });
+
+    /* Those rows were opened without a read, so they close when the search ends. */
+    watch(() => Boolean(searched?.value), (on) => { if (!on) expandedIds.value = []; });
 
     return { isExpanded, toggle, expand, childrenOf, hasChildren, progressFor, totalFor };
 }

@@ -370,14 +370,19 @@
 
 /* The count opens the card's subtasks, so it is a control of full size. */
 .kanban-board .card-subtasks-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-1);
     min-width: var(--hit-min);
     min-height: var(--hit-min);
-    justify-content: center;
     background: none;
     font: inherit;
+    font-size: var(--fs-sm, 12px);
     color: var(--ink-2);
     cursor: pointer;
 }
+.kanban-board .card-subtasks-toggle--spaced { margin-right: var(--sp-1); }
 .kanban-board .card-subtasks-toggle:hover,
 .kanban-board .card-subtasks-toggle[aria-expanded="true"] { color: var(--brand); border-color: var(--brand); }
 .kanban-board .card-subtasks-toggle:focus-visible { outline: none; box-shadow: var(--focus); }

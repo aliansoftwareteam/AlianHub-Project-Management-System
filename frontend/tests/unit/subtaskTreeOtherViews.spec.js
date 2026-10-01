@@ -11,6 +11,7 @@ import '@/services';
 import Store from '@/store/index';
 import { loadedChildren } from '@/store/ProjectData/taskTree';
 import { useSubtaskTree } from '@/views/Projects/composables/subtaskTree';
+import { snapshotTasks } from '@/views/Projects/ListView/bulkUndo';
 import { childReads, resetServer, server } from '../fakeTaskServer';
 import { PID, PROJECT, SPRINT, TODO_GROUP, fromSocket, readGroup, readTable, seedStore, threeLevels, under } from '../threeLevelTasks';
 
@@ -133,6 +134,13 @@ describe('the Table reads a row\'s subtasks from the same tree', () => {
         expect(ids(loadedChildren(bucket(), 't1'))).toEqual(['s1', 's2']);
     });
 
+    it('puts the row in the tree with its subtasks, where the bulk bar looks for a ticked row', async () => {
+        await open(tableRow('t1'));
+        await open(tree.childrenOf(tableRow('t1'))[0]);
+        expect(ids(bucket().tasks)).toEqual(['t1']);
+        expect(Object.keys(snapshotTasks(Store.state.projectData, ['s2', 'g1'])).sort()).toEqual(['g1', 's2']);
+    });
+
     it('opens the third level from the second', async () => {
         await open(tableRow('t1'));
         await open(tree.childrenOf(tableRow('t1'))[0]);
@@ -171,5 +179,22 @@ describe('a searched view shows the subtasks that matched, on every level', () =
         expect(ids(tree.childrenOf(searched[0]))).toEqual(['s1']);
         expect(ids(tree.childrenOf(searched[0].subtaskArray[0]))).toEqual(['g1']);
         expect(childReads('t1')).toHaveLength(0);
+    });
+
+    it('closes them again when the search ends, since they were opened without a read', async () => {
+        const [parent, first] = threeLevels();
+        const searching = ref(true);
+        const Host = defineComponent({
+            setup() {
+                tree = useSubtaskTree({ project: ref(PROJECT), sprintId: ref(SPRINT), rows: ref([{ ...parent, subtaskArray: [first] }]), searched: searching, showArchived: ref(false) });
+                return () => h('div');
+            }
+        });
+        wrapper = mount(Host, { global: { plugins: [Store], provide: { $userId: ref('u1') } } });
+        await flushPromises();
+        expect(tree.isExpanded('t1')).toBe(true);
+        searching.value = false;
+        await flushPromises();
+        expect(tree.isExpanded('t1')).toBe(false);
     });
 });

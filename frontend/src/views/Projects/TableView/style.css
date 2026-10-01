@@ -179,6 +179,7 @@
     cursor: pointer;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.tv2__row.is-sub .tv2__name { font-weight: 400; }
 .tv2__name:hover { color: var(--brand); }
 .tv2__name:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 3px; }
 .tv2 .tv2__status { justify-self: start; }

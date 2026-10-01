@@ -159,24 +159,19 @@
                             />
                         </span>
                         <button
-                            v-if="subtaskTree && subtaskCount"
+                            v-if="subtaskCount"
                             type="button"
-                            class="d-flex align-items-center task-count-section card-subtasks-toggle"
-                            :class="myCounts > 0 ? 'mr-5px' : ''"
+                            class="task-count-section card-subtasks-toggle"
+                            :class="{ 'card-subtasks-toggle--spaced': myCounts > 0 }"
                             :aria-expanded="subtasksOpen"
                             :aria-label="subtaskLabel"
                             :title="subtaskLabel"
-                            @click.stop="subtaskTree.toggle(element, itemData)"
+                            @click.stop="subtaskTree?.toggle(element, itemData)"
                         >
-                            <img class="mr-5px" src="@/assets/images/png/subTaskShape.png" alt="" />
-                            <span class="font-size-12">{{ subtaskText }}</span>
-                            <span v-if="myParentCounts > 0" class="sub-task-count">{{myParentCounts > 99 ? "+99" : myParentCounts}}</span>
+                            <img src="@/assets/images/png/subTaskShape.png" alt="" />
+                            <span>{{ subtaskText }}</span>
+                            <span v-if="myParentCounts > 0" class="sub-task-count">{{ myParentCounts > 99 ? "+99" : myParentCounts }}</span>
                         </button>
-                        <span v-else-if="!isSubTask && subtaskCount" class="d-flex align-items-center task-count-section" :class="myCounts > 0 ? 'mr-5px' : ''">
-                            <img class="mr-5px" src="@/assets/images/png/subTaskShape.png" alt="" />
-                            <span class="font-size-12">{{ subtaskText }}</span>
-                            <span v-if="myParentCounts > 0" class="sub-task-count">{{myParentCounts > 99 ? "+99" : myParentCounts}}</span>
-                        </span>
                         <button
                             type="button"
                             class="d-flex align-items-center board-task-comment-count position-re cursor-pointer"
