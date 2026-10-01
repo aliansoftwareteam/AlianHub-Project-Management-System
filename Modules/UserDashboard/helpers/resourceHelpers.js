@@ -127,9 +127,9 @@ function bucketForStatus(statusName, statusType) {
  * @returns {Promise<{loggedByUserTask:Object.<string,number>, taskMap:Object.<string,object>, userIds:Set<string>}>}
  */
 async function getLoggedAndTasksInRange(companyId, opts = {}) {
-    const { fromSec, toSec, projectIds = [], projectMode = 'all', statusKeys = [], visibleUserIds = null, taskMatch = null } = opts;
+    const { fromSec, toSec, projectIds = [], projectMode = 'all', statusKeys = [], visibleUserIds = null, taskMatch = null, cardScope = { tasks: {}, time: {} } } = opts;
 
-    const tsFilter = { LogStartTime: { $gte: fromSec, $lte: toSec } };
+    const tsFilter = { LogStartTime: { $gte: fromSec, $lte: toSec }, ...cardScope.time };
     if (Array.isArray(visibleUserIds)) {
         tsFilter.Loggeduser = { $in: visibleUserIds.map(String) };
     }
@@ -154,7 +154,7 @@ async function getLoggedAndTasksInRange(companyId, opts = {}) {
         const validIds = Array.from(ticketIds)
             .filter((id) => mongoose.Types.ObjectId.isValid(id))
             .map((id) => new mongoose.Types.ObjectId(id));
-        const taskFilter = { _id: { $in: validIds }, deletedStatusKey: 0 };
+        const taskFilter = { _id: { $in: validIds }, deletedStatusKey: 0, ...cardScope.tasks };
         const lgProjClause = projectScopeClause(projectMode, projectIds);
         if (lgProjClause) {
             taskFilter.ProjectID = lgProjClause;

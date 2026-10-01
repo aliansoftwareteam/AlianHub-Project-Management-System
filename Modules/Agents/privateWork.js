@@ -46,6 +46,12 @@ const proposalClause = (scope) => nor([
     inDirectMessageOfOthers(scope),
 ]);
 
+/* The comments of the same private work, for a read that reaches the comments collection itself. */
+const commentClause = (scope) => nor([
+    scope.personalLists.length && { projectId: { $in: idForms(scope.personalLists) } },
+    inDirectMessageOfOthers(scope),
+]);
+
 const within = (ids, id) => ids.map(String).includes(String(id === undefined || id === null ? '' : id));
 
 const readsDirectMessage = (scope, record) => !within(scope.directSpaces, record.projectId) || within(scope.myChats, record.taskId);
@@ -58,4 +64,4 @@ const readsProposal = (scope, proposal) => (!within(scope.personalLists, proposa
         || within(scope.myRuns, proposal.runId) || String(proposal.requestedBy || '') === scope.uid)
     && readsDirectMessage(scope, proposal);
 
-module.exports = { privateWorkOf, runClause, proposalClause, readsRun, readsProposal };
+module.exports = { privateWorkOf, runClause, proposalClause, commentClause, readsRun, readsProposal };
