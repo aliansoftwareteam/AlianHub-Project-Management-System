@@ -61,6 +61,7 @@
                             <div class="kanban-card" :class="{ 'is-agent-run': !!runFor(element._id) }" :data-task-type="element.TaskTypeKey" v-bind="taskNavAttrs(element)">
                                 <BoardViewDisplayCardComponent
                                     :data="element"
+                                    :itemData="column"
                                     :groupValue="groupValue"
                                     :isSubTask="false"
                                     :agentRun="runFor(element._id)"
@@ -82,7 +83,7 @@
 </template>
 
 <script setup>
-import { ref, defineProps, nextTick, inject, watch, onMounted, onUnmounted, computed } from 'vue'
+import { ref, defineProps, nextTick, inject, provide, watch, onMounted, onUnmounted, computed } from 'vue'
 import Draggable from 'vuedraggable'
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -103,6 +104,7 @@ import { useProjectAgents } from "@/views/Projects/Kanban/useProjectAgents";
 import { tabUpdateMarker } from "@/utils/taskUpdateMarker";
 import { taskNavAttrs } from "@/components/organisms/TaskDetailOverlay/taskNavigation";
 import { useTaskSequenceSource } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
+import { useSubtaskTree } from "@/views/Projects/composables/subtaskTree";
 
 //Props
 const props = defineProps({
@@ -147,6 +149,26 @@ setActiveView('kanban');
 watch(() => projectData.value?._id, (newId) => {
     if (newId) setActiveProject(String(newId));
 }, { immediate: true });
+
+/* The open subtask lists are held here, not in the card, so a card keeps its list when it is
+   redrawn or dropped in another column. */
+const subtasks = useSubtaskTree({
+    project: projectData,
+    sprintId: computed(() => columns.value[0]?.sprintId || props.sprintId),
+    rows: computed(() => columns.value.flatMap((column) => column.tasksArray || [])),
+    showArchived: showArchiveVar,
+    searched: inject("searchedTask", ref(false))
+});
+const subtaskFor = ref("");
+provide("boardSubtaskTree", {
+    ...subtasks,
+    subtaskFor,
+    startSubtask: (task, column) => {
+        subtasks.expand(task, column);
+        subtaskFor.value = String(task._id);
+    },
+    cancelSubtask: () => { subtaskFor.value = ""; }
+});
 
 // Computed properties
 const isDisabled = computed(() => {
