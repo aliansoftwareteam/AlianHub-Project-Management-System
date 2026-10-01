@@ -257,6 +257,14 @@ describe('task.status.set for a token created to manage tasks', () => {
         expect(stored(fx.top._id).statusKey).toBe(1);
     });
 
+    it('leaves the close to a person where the workspace has a person check an agent\'s work first', async () => {
+        mockDb.store.companies[0].agentPolicy = { requireCheckBeforeDone: true };
+        const out = await rpc(ctx(OWNER), 'task.status.set', { taskId: fx.top._id, status: 'Done' });
+        expect(out).toMatchObject({ isError: true, error: expect.stringMatching(/a person closes this task/) });
+        expect(stored(fx.top._id).statusKey).toBe(2);
+        expect((await rpc(ctx(OWNER), 'task.status.set', { taskId: fx.top._id, status: 'To Do' })).ok).toBe(true);
+    });
+
     it('is refused to a member whose role may not change a status', async () => {
         rules.setRule(null, 'task_status', null);
         expect(await rpc(ctx(MEMBER), 'task.status.set', { taskId: fx.top._id, status: 'Done' })).toMatchObject({ refused: true, reason: expect.stringMatching(/^permission_denied: task\.task_status/) });

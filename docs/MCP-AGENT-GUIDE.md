@@ -137,7 +137,7 @@ Arguments are JSON. A result is JSON text.
 
 These need `tasks:manage`, except where a plain form is described.
 
-`task.status.set`: without the grant, an in-progress or in-review status only; a person closes the task. With it, any status the task's project defines, a done or closed one included. A close made this way is recorded as closed for the person through the agent, and the work stays marked unchecked until a person checks it. It applies at once and can be undone.
+`task.status.set`: without the grant, an in-progress or in-review status only; a person closes the task. With it, any status the task's project defines, a done or closed one included. A close made this way is recorded as closed for the person through the agent, and the work stays marked unchecked until a person checks it. It applies at once and can be undone. Where the workspace's agent policy has a person check an agent's work before it is closed, the close is refused and a person closes the task.
 
 ```json
 { "name": "task.status.set", "arguments": { "taskId": "<task id>", "status": "Done", "reason": "Pull request merged" } }
