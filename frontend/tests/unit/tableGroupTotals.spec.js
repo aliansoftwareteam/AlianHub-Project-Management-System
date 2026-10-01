@@ -182,7 +182,7 @@ describe('List and Table', () => {
         const totals = totalColumnsOf(columnCatalogue('table', { fields: [COST, BUDGET] }));
         const payload = { pid: PID, sprintId: SPRINT, items: [item], showAllTasks: false, userId: 'u1', totals };
         await refreshGroupCounts({ state: { tasks: {}, tableTasks: {} }, commit }, { ...payload, table: true });
-        expect(api.apiRequest).toHaveBeenCalledWith('post', expect.any(String), { findQuery: groupCountsQuery(payload) });
+        expect(api.apiRequest).toHaveBeenCalledWith('post', expect.any(String), { findQuery: groupCountsQuery(payload), inList: SPRINT });
         expect(commit).toHaveBeenCalledWith('mutateTableGroupCounts', expect.objectContaining({
             found: { statusKey_1: 40 },
             totals: { statusKey_1: { points: 4200, [idOf(COST)]: 9000.25, [idOf(BUDGET)]: 0 } }
