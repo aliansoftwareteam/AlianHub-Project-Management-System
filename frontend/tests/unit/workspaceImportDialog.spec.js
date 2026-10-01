@@ -14,6 +14,7 @@ vi.mock('@/components/organisms/ImportDialog/ImportSourceModals.vue', () => ({
 
 import WorkspaceImportDialog from '@/components/organisms/WorkspaceImport/WorkspaceImportDialog.vue';
 import { IMPORT_CLICKUP, IMPORT_CLICKUP_PREVIEW, IMPORT_CLICKUP_PROJECT } from '@/config/env';
+import { resetProjectTreeCache } from '@/components/molecules/ProjectTree/projectTreeData';
 
 const ROWS = [
     { 'Task Name': 'Plan', 'List Name': 'Backlog' },
@@ -66,11 +67,19 @@ const summaryOf = (over = {}) => ({
     ...over
 });
 
+const TREE = {
+    sprints: [{ _id: 's1', projectId: 'p1', name: 'Sprint 1' }, { _id: 's2', projectId: 'p1', folderId: 'f1', name: 'Sprint 2' }],
+    folders: [{ _id: 'f1', projectId: 'p1', name: 'Q3' }]
+};
+
 beforeEach(() => {
+    resetProjectTreeCache();
     reloadFields.mockClear();
     permissions.create = true;
     readSheet.mockResolvedValue(ROWS);
     apiRequest.mockImplementation(async (method, url, body) => {
+        if (method === 'get' && url.endsWith('collection=sprints')) return { data: TREE.sprints };
+        if (method === 'get' && url.endsWith('collection=folders')) return { data: TREE.folders };
         if (url === IMPORT_CLICKUP_PREVIEW) return { data: { status: true, data: PREVIEW } };
         if (url === IMPORT_CLICKUP_PROJECT) return { data: { status: true, data: { projectId: `new-${body.listName}`, created: body.rows.length, skipped: 0, unmatchedAssignees: ['ghost@nowhere.test'] } } };
         if (url === IMPORT_CLICKUP) return { data: { status: true, data: { created: body.rows.length, skipped: 0 } } };
@@ -203,6 +212,7 @@ describe('the workspace import dialog', () => {
         const projects = wrapper.find('[data-test="wim-project"]');
         expect(projects.findAll('option').map((o) => o.text())).toEqual(['WorkspaceImport.project_pick', 'Web']);
         await projects.setValue('p1');
+        await flushPromises();
         await wrapper.find('[data-test="wim-sprint"]').setValue('s2');
         await wrapper.find('[data-test="wim-next"]').trigger('click');
         await flushPromises();
@@ -241,6 +251,7 @@ describe('the workspace import dialog', () => {
         await wrapper.find('[data-source="jira"]').trigger('click');
         expect(step(wrapper)).toBe('WorkspaceImport.step_target');
         await wrapper.find('[data-test="wim-project"]').setValue('p1');
+        await flushPromises();
         await wrapper.find('[data-test="wim-next"]').trigger('click');
         const modals = wrapper.find('.modals-stub');
         expect(modals.attributes('data-source')).toBe('jira');
