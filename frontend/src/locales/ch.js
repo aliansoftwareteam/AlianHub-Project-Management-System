@@ -9707,7 +9707,7 @@ export default {
         "Folder created successfully": "文件夹创建成功",
         "Folder updated successfully": "文件夹更新成功",
         "Folder_moved_successfully": "Folder moved successfully",
-        "Folde restored successfully": "文件夹恢复成功",
+        "Folder restored successfully": "文件夹恢复成功",
         "Folder closed successfully": "文件夹关闭成功",
         "Folder archived successfully": "文件夹归档成功",
         "Folder deleted successfully": "文件夹删除成功",

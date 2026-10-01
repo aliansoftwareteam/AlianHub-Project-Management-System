@@ -162,7 +162,7 @@ import { useConvertDate, useCustomComposable, useGetterFunctions } from "@/compo
 import { useStore } from "vuex";
 import { useToast } from "vue-toast-notification"
 import { useUpdateTasks } from "@/views/Projects/helper"
-import { permittedAssignees, selfAssignable } from "@/utils/assigneeOptions"
+import { permittedAssignees, removePerson, selfAssignable } from "@/utils/assigneeOptions"
 import {customField} from '../../../../customFieldView/helper.js';
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
@@ -399,8 +399,7 @@ function changeAssignee(type, value) {
     })
     .then(() => {
         if(operation === "assigneRemove"){
-           let index = task.value.AssigneeUserId.findIndex((x) => x === value.id);
-            task.value.AssigneeUserId.splice(index,1);
+            removePerson(task.value.AssigneeUserId, value.id);
             commit("projectData/mutateSearchTask", {op:"modified", data: [task.value]});
         }
         delete assigneeInProgress.value[value?.id];

@@ -31,6 +31,7 @@ vi.mock('@/composable', () => ({
 }));
 
 import {
+    assigneeIdsFor,
     canCreateTasksIn,
     closeQuickCreate,
     creatableProjects,
@@ -392,5 +393,45 @@ describe('QuickCreateTask', () => {
         expect(readDraft()).toBe('Half a thought');
         await open(wrapper);
         expect(title(wrapper).element.value).toBe('Half a thought');
+    });
+});
+
+describe('who may be assigned from the create dialog', () => {
+    const seat = { roleType: 3, status: 2, isDelete: false };
+    const others = { AssigneeUserId: ['user-2', 'user-3'] };
+    const ids = (chosen, extra = {}) => assigneeIdsFor(chosen, { me: 'user-1', seat, teams: [], rules: {}, mayAssignOthers: true, ...extra });
+
+    it('offers the creator first in a project anyone in the workspace can open', () => {
+        expect(ids(project('open', others))).toEqual(['user-1', 'user-2', 'user-3']);
+    });
+
+    it('keeps the project order when the creator is already on it', () => {
+        expect(ids(project('open', { AssigneeUserId: ['user-2', 'user-1'] }))).toEqual(['user-2', 'user-1']);
+    });
+
+    it('leaves the creator out of a private project that does not hold them', () => {
+        expect(ids(project('closed-door', { ...others, isPrivateSpace: true }))).toEqual(['user-2', 'user-3']);
+    });
+
+    it('offers the creator in a private project they are on through a team', () => {
+        const viaTeam = project('team-door', { AssigneeUserId: ['user-2', 'tId_team1'], isPrivateSpace: true });
+        expect(ids(viaTeam, { teams: [{ _id: 'team1', assigneeUsersArray: ['user-1'] }] })).toEqual(['user-1', 'user-2', 'tId_team1']);
+    });
+
+    it('leaves out a creator whose seat is cancelled', () => {
+        expect(ids(project('open', others), { seat: { ...seat, status: 3 } })).toEqual(['user-2', 'user-3']);
+    });
+
+    it('offers only the creator on the personal list or without the right to assign others', () => {
+        expect(ids(PERSONAL)).toEqual(['user-1']);
+        expect(ids(project('open', others), { mayAssignOthers: false })).toEqual(['user-1']);
+    });
+
+    it('lists the creator in the dialog and assigns the task to them by default', async () => {
+        const wrapper = await mountDialog({ projects: [PERSONAL, project('open', others)] });
+        await open(wrapper, { projectId: 'open' });
+        const offered = [...document.body.querySelectorAll('[data-field="assignee"] option')].map((option) => option.value);
+        expect(offered).toEqual(expect.arrayContaining(['user-1', 'user-2', 'user-3']));
+        expect(field(wrapper, 'assignee').element.value).toBe('user-1');
     });
 });

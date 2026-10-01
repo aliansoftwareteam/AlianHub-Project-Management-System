@@ -250,6 +250,8 @@ function selectFun(event) {
         emit('agent', event);
         return;
     }
+    // The panel closes itself only on a new pick; taking the one person off must close it too.
+    if (!props.multiSelect) visible.value = false;
     selectedUser.value.includes(event.id) ? emit('removed', event) : emit('selected', event)
 }
 // Temporary team assign hide
