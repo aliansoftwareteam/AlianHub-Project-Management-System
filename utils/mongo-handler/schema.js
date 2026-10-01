@@ -776,8 +776,10 @@ const schema = {
         reviewedAt: { type: Date, required: false },
         reviewedBy: { type: String, required: false },
         reviewerName: { type: String, required: false },
+        // The standing approval was given by the person whose week it is
+        selfApproved: { type: Boolean, default: false, required: false },
         rejectionReason: { type: String, required: false },
-        // One entry per reopening: who reopened the week and when, and the review that undid.
+        // One entry per approval (who, when, and whether it was their own week) and per reopening (who, when, and the review that undid).
         history: {
             type: [{
                 _id: false,
@@ -787,6 +789,7 @@ const schema = {
                 by: { type: String, required: true },
                 byName: { type: String, required: false },
                 at: { type: Date, required: true },
+                selfApproved: { type: Boolean, required: false },
                 reviewedBy: { type: String, required: false },
                 reviewerName: { type: String, required: false },
                 reviewedAt: { type: Date, required: false },
