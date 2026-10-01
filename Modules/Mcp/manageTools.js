@@ -412,7 +412,7 @@ const VARIANTS = Object.freeze({
         grant: GRANT,
         strict: true,
         target: taskTarget,
-        description: 'Set a task to any status its project defines (see statuses.list), a done or closed one included. A close is recorded as made for you through this agent, and the work stays marked unchecked until a person checks it.',
+        description: 'Set a task to any status its project defines (see statuses.list), a done or closed one included. A close is recorded as made for you through this agent, and the work stays marked unchecked until a person checks it. A project may hold a close for a person\'s approval, or leave it to a person: the answer says which.',
         input: input({ taskId: ID, status: { type: 'string', minLength: 1, maxLength: 60 }, ...REASON }, ['taskId', 'status']),
         params: (args) => ({ taskId: str(args.taskId, 40), status: { name: str(args.status, 60) } }),
     },

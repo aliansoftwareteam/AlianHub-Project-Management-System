@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
-const tools = require('../Automations/engine/tools');
 const registry = require('./registry');
 const accounts = require('./accounts');
 const { isAgent } = require('./actor');
@@ -110,12 +109,14 @@ const projectsOf = async (companyId, params) => {
 
 const isDoneType = (statusType) => registry.DONE_STATUS_TYPES.includes(String(statusType || '').toLowerCase());
 
-/* A status the project does not define is the executor's to refuse; a failed read is not swallowed. */
-const statusNamed = async (companyId, projectId, name) => {
-    try { return await tools.resolveStatus(companyId, projectId, name); } catch (error) {
-        if (error && error.deterministic) return null;
-        throw error;
-    }
+/* The project's done statuses of that name, matched as the status tools match one (resolveStatus in
+ * Automations/engine/tools). Every status of the name counts, so a name two statuses share never reads as the open one. */
+const doneStatusesNamed = async (companyId, projectId, name) => {
+    const wanted = String(name || '').trim().toLowerCase();
+    const project = wanted ? await storedRow(companyId, SCHEMA_TYPE.PROJECTS, projectId, { taskStatusData: 1 }) : null;
+    return (Array.isArray(project && project.taskStatusData) ? project.taskStatusData : [])
+        .map((row) => (row && row.convertStatus ? row.convertStatus : row))
+        .filter((status) => status && String(status.name || '').trim().toLowerCase() === wanted && isDoneType(status.type));
 };
 
 /* Whether the change leaves a task in a done status it is not in now: a status change, or a task created already done. */
@@ -124,13 +125,12 @@ const closes = async (companyId, action, params) => {
         const status = params.status && typeof params.status === 'object' ? params.status : {};
         if (isDoneType(status.statusType || status.type)) return true;
         const task = await storedRow(companyId, SCHEMA_TYPE.TASKS, params.taskId, { ProjectID: 1, statusKey: 1 });
-        const next = task ? await statusNamed(companyId, task.ProjectID, status.name || status.text) : null;
-        return Boolean(next) && isDoneType(next.statusType) && next.statusKey !== task.statusKey;
+        if (!task) return false;
+        return (await doneStatusesNamed(companyId, task.ProjectID, status.name || status.text)).some((next) => String(next.key) !== String(task.statusKey));
     }
     if (CREATE_ACTIONS.has(action) && params.fields && params.fields.status !== undefined) {
         const projectId = idOf(params.projectId) || await projectOfRow(companyId, SCHEMA_TYPE.TASKS, params.taskId);
-        const next = projectId ? await statusNamed(companyId, projectId, params.fields.status) : null;
-        return Boolean(next) && isDoneType(next.statusType);
+        return (await doneStatusesNamed(companyId, projectId, params.fields.status)).length > 0;
     }
     return false;
 };

@@ -183,11 +183,25 @@ With `MCP_TOOLS_WORK` on, `tasks.search` takes `sprintId` for every token: the t
 { "name": "subtask.create", "arguments": { "taskId": "<task id>", "title": "Pull request 1261", "status": "In review", "assigneeIds": ["<member id>"], "links": [{ "url": "https://example.com/acme/app/pull/1261", "label": "PR 1261" }] } }
 ```
 
+### A project's own policy
+
+An owner or admin sets two things per project, on the project's detail screen under "Agents in this project". Both only hold an agent back: they never give a connection more than its grants and its person's permissions allow.
+
+| Setting | Values | What a call gets |
+|---|---|---|
+| Agents and Done | `never` | A close is refused. A person closes the task |
+| | `approval` (default) | A close is filed as a proposal (`pending: true`) and applies when a person approves it |
+| | `yes` | A close applies at once and the work stays marked unchecked |
+| Connected agents | `single_task` (default) | Nothing extra is held: the rules under "What happens to a write" decide |
+| | `propose_all` | Every write in the project is filed as a proposal |
+
+A task created already in a done status counts as a close. A write that reaches two projects (a move, a link between tasks) follows the stricter of the two. The workspace's "a person checks before Done" switch always wins over the project. An app connected through OAuth that holds no manage scope cannot file a proposal, so its held call is refused. An agent's token on the web app's own routes cannot file one either, so there a held write is refused and the MCP tool is the way to propose it.
+
 ### Changing a task
 
 These need `tasks:manage`, except where a plain form is described.
 
-`task.status.set`: without the grant, an in-progress or in-review status only; a person closes the task. With it, any status the task's project defines, a done or closed one included. A close made this way is recorded as closed for the person through the agent, and the work stays marked unchecked until a person checks it. It applies at once and can be undone. Where the workspace's agent policy has a person check an agent's work before it is closed, the close is refused and a person closes the task.
+`task.status.set`: without the grant, an in-progress or in-review status only; a person closes the task. With it, any status the task's project defines, a done or closed one included. A close made this way is recorded as closed for the person through the agent, and the work stays marked unchecked until a person checks it. Whether it applies at once is the project's choice (see "A project's own policy" below): by default the close is filed as a proposal and a person approves it. Where the workspace's agent policy has a person check an agent's work before it is closed, the close is refused and a person closes the task, whatever the project says.
 
 ```json
 { "name": "task.status.set", "arguments": { "taskId": "<task id>", "status": "Done", "reason": "Pull request merged" } }
