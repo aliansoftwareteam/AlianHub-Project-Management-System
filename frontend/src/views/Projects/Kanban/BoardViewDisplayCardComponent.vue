@@ -280,7 +280,7 @@
     const { t } = useI18n();
     const props = defineProps({
         data: Object,
-        groupValue: Number,
+        groupValue: [Number, String],
         itemData: Object,
         isSubTask: Boolean,
         parentAssignee: Array,
