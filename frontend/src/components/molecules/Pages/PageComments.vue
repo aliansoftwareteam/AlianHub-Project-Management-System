@@ -370,7 +370,7 @@ defineExpose({ startOnBlock });
 .pcm__edit, .pcm__reply { display: flex; flex-direction: column; gap: 6px; }
 
 .pcm__compose { flex: none; border-top: 1px solid var(--hairline); padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; background: var(--surface-2); }
-.pcm__target { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.pcm__target { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
 .pcm__chip { min-width: 0; max-width: 100%; }
 .pcm__hint { margin: 0; font: var(--text-small); color: var(--ink-2); flex: 1 1 auto; }
 .pcm__unanchor { border: 0; background: none; padding: 0 0 0 4px; color: inherit; cursor: pointer; font-size: 10px; }
