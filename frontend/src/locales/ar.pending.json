@@ -10409,6 +10409,7 @@
     "Trash.projects": "Projects",
     "Trash.restore": "Restore",
     "Trash.restore_failed": "Could not restore that item.",
+    "Trash.restore_named": "Restore {name}",
     "Trash.restored": "Restored.",
     "Trash.tasks": "Tasks",
     "Trash.title": "Trash",
