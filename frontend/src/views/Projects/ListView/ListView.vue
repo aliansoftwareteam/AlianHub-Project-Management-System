@@ -178,6 +178,7 @@ import { isAiField, loadedViewTasks } from '@/views/Projects/composables/aiField
 import ListSortControl from './ListSortControl.vue';
 import ConvertToSubTaskSidebar from '@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue';
 import { useListRowMenu } from './useListRowMenu.js';
+import { SUBTASK_EXPANSION, createSubtaskExpansion } from './subtaskExpansion.js';
 import TaskMenuSidebars from '@/views/Projects/components/taskMenu/TaskMenuSidebars.vue';
 import { sortChoices, useListSort } from '@/views/Projects/composables/viewSort';
 import { columnCatalogue, gridTracks, listColumnClass, listColumnsAt, useViewColumns } from '@/views/Projects/composables/viewColumns';
@@ -207,6 +208,8 @@ provide('listRowEdit', rowEdit);
 const aiColumnTasks = computed(() => loadedViewTasks(getters, project.value?._id, { searched: Boolean(searchedTask?.value) }));
 const rowMenu = useListRowMenu(project, showArchived);
 provide('listRowMenu', rowMenu);
+const subtaskExpansion = createSubtaskExpansion();
+provide(SUBTASK_EXPANSION, subtaskExpansion);
 const sortState = useListSort();
 const { density, setDensity } = useViewSettings();
 provide('listSort', sortState.sort);
@@ -279,6 +282,8 @@ setActiveView('list');
 watch(() => project.value?._id, (newId) => {
     creatingFirstTask.value = false;
     openedEmptyGroups.value.clear();
+    subtaskExpansion.expandedIds.value = [];
+    subtaskExpansion.autoExpandedIds.value = [];
     if (newId) {
         setActiveProject(String(newId));
         agents.load(newId);
