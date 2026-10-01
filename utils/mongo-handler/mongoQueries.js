@@ -134,6 +134,7 @@ const {
     auditRedactionsSchema,
     auditChainKeySchema,
     egressAllowlistsSchema,
+    connectorConnectionsSchema,
     instructionPatternsSchema,
     agentSessionsSchema,
     agentSessionEndpointsSchema,
@@ -415,6 +416,8 @@ exports.checkType = (type) => {
             return auditChainKeySchema
         case SCHEMA_TYPE.EGRESS_ALLOWLISTS:
             return egressAllowlistsSchema
+        case SCHEMA_TYPE.CONNECTOR_CONNECTIONS:
+            return connectorConnectionsSchema
         case SCHEMA_TYPE.INSTRUCTION_PATTERNS:
             return instructionPatternsSchema
         case SCHEMA_TYPE.AGENT_SESSIONS:
@@ -715,6 +718,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.AUDIT_CHAIN_KEY}`
         case SCHEMA_TYPE.EGRESS_ALLOWLISTS:
                 return `${dbCollections.EGRESS_ALLOWLISTS}`
+        case SCHEMA_TYPE.CONNECTOR_CONNECTIONS:
+                return `${dbCollections.CONNECTOR_CONNECTIONS}`
         case SCHEMA_TYPE.INSTRUCTION_PATTERNS:
                 return `${dbCollections.INSTRUCTION_PATTERNS}`
         case SCHEMA_TYPE.AGENT_SESSIONS:

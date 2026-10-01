@@ -310,6 +310,11 @@
     "group": "limits",
     "description": "Largest file the cloud-storage importer will copy into a project."
   },
+  "CONNECTORS": {
+    "group": "integrations",
+    "description": "Agent connectors to switch on, as a list separated by commas: slack is the only one so far. Default off: no connector route, no connector action in the agent registry and no section on the Integrations screen. With slack named, an owner or admin connects the workspace's Slack app under Integrations > Slack (the bot token and the signing secret go straight into the secrets store under the kind connector and are never shown again) and chooses the channels agents may post to; an agent can then propose a Slack message (slack.message.post), and nothing is sent until an owner or admin approves the exact channel and text in the AI Inbox. Needs SECRETS_STORE with a usable SECRETS_KEY and AGENT_TAINT_ROUTING on: without them the connector stays off, the server says why in one startup log line and the Integrations screen shows the same reason. While AGENT_EGRESS_ALLOWLIST is on and the workspace has a host list, slack.com must be on it.",
+    "default": "off"
+  },
   "CORS_ORIGINS": {
     "group": "security",
     "description": "Extra origins allowed by CORS, comma-separated (WEBURL and APIURL are always allowed).",

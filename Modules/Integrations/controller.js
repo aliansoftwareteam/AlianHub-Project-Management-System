@@ -38,7 +38,10 @@ const managerOrRefuse = async (req, res) => {
 };
 
 exports.listCatalog = async (req, res) => {
-    try { return res.send({ status: true, data: R.getCatalog() }); }
+    try {
+        const slack = require('../Agents/connectors/flag').status('slack');
+        return res.send({ status: true, data: R.getCatalog(), ...(slack.requested ? { connectors: { slack: { on: slack.on, problems: slack.problems.map((p) => p.code) } } } : {}) });
+    }
     catch (e) { logger.error(`listCatalog: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 

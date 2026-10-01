@@ -16,6 +16,7 @@ const { proposalClause } = require('./privateWork');
 const taint = require('./taint');
 const { externalClientActor } = require('./actor');
 const aiFeedback = require('../AI/feedback');
+const slackPost = require('./connectors/slackPost');
 
 // AI Inbox proposals (9b). A proposal says what, why and exactly which registry
 // actions it would run. Approving applies them through perform() — so they are
@@ -140,13 +141,14 @@ const create = async (companyId, { agent, runId, taskId, projectId, what, why, c
     if (typeof what !== 'string' || !what.trim()) throw Object.assign(new Error('what is required: say in one sentence what the proposal does.'), { status: 400 });
     const check = validateChanges(changes);
     if (!check.valid) throw Object.assign(new Error(check.reason), { status: 400 });
+    const prepared = slackPost.hasSlackChange(changes) ? await slackPost.prepareChanges(companyId, changes) : changes;
     const scopedProjectId = projectId || await projectOfTask(companyId, taskId);
     const saved = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_PROPOSALS,
         data: {
             agentId: String(agent._id), agentName: agent.name, runId: runId || null, taskId: taskId || null, projectId: scopedProjectId || null,
             what: what.trim().slice(0, 300), why: String(why || '').slice(0, 2000),
-            changes: changes.map((c) => ({ action: c.action, params: c.params || {}, label: String(c.label || c.action).slice(0, 300), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}) })),
+            changes: prepared.map((c) => ({ action: c.action, params: c.params || {}, label: String(c.label || c.action).slice(0, 300), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}) })),
             status: STATUS.PENDING, gate: gateOf(changes, gate), priority: priority || 'normal', cost: cost || null, auditIds: [],
             ...(marker && marker.reason ? { taint: { sources: Array.isArray(marker.sources) ? marker.sources : [], reason: String(marker.reason).slice(0, 2000) } } : {}),
             ...mcpFields({ source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId }),
@@ -239,6 +241,9 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         const check = validateChanges(edited);
         if (!check.valid) return { error: check.reason, status: 400 };
         changes = edited.map((c) => ({ action: c.action, params: c.params || {}, label: c.label || c.action }));
+        if (slackPost.hasSlackChange(changes)) {
+            try { changes = await slackPost.prepareChanges(companyId, changes); } catch (e) { return { error: e.message, status: e.status || 400 }; }
+        }
         status = STATUS.EDITED;
     }
 
@@ -273,7 +278,12 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         }
     }
     const undoUntil = new Date(Date.now() + UNDO_WINDOW_MS);
-    const updated = await setStatus(companyId, id, { status, changes, undoUntil, auditIds });
+    const delivery = slackPost.deliveryOf(changes, applied);
+    // A message that was approved and never sent must not read as done.
+    const unsent = delivery.length && !applied.some((a) => a.ok)
+        ? { status: STATUS.FAILED, failedReason: String(delivery[0].error || '').slice(0, 300), failedAt: new Date() }
+        : {};
+    const updated = await setStatus(companyId, id, { status, changes, undoUntil, auditIds, ...(delivery.length ? { delivery } : {}), ...unsent });
     await audit.recordProposalDecision(companyId, { ...decider, ...runTrace }, { proposalId: id, decision: status, agentName: p.agentName, runId: p.runId, changes: applied, ip });
     const row = typeof p.toObject === 'function' ? p.toObject() : p;
     await quietly(`remember approved changes of ${id}`, () => memory.rememberApprovedChanges({ companyId, projectId: p.projectId, proposal: { ...row, changes, decidedBy: decider.userId }, applied }));

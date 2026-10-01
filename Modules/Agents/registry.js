@@ -15,6 +15,7 @@
 const performanceFlag = require('./performanceFlag');
 const dataFlag = require('../Mcp/dataFlag');
 const manageFlag = require('../Mcp/manageFlag');
+const connectorsFlag = require('./connectors/flag');
 
 // `permission` names the Security & Permissions catalogue entry
 // (Config/permissionGuard) that governs the same operation for a person.
@@ -118,6 +119,12 @@ const FLAGGED = Object.freeze([
         { key: 'page.create', label: 'Create a doc (a draft until a person approves it)', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
         { key: 'page.update', label: 'Change a doc\'s title or body', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
     ].map((action) => ({ enabled: manageFlag.enabled, action: Object.freeze(action) })),
+    {
+        enabled: connectorsFlag.slackOn,
+        action: Object.freeze({ key: 'slack.message.post', label: 'Propose a Slack message', risk: RISK.HIGH, undoable: false, write: true, cost: 'write',
+            gate: 'owner_admin', proposeOnly: true, constraint: 'only to a channel on the workspace\'s Slack allow-list; plain text, no files; never sent without a person\'s approval',
+            permission: 'settings.settings_edit_company' }),
+    },
 ]);
 
 /* A string maps the whole action at its own level (write for writes, read for

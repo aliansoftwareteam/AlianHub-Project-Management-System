@@ -63,4 +63,23 @@ const readDeclared = async ({ companyId, actor, url, declaredHosts, credential, 
     return { status: res.status, body, sha256, bytes: res.bytes, hops: res.hops || [], taint: found };
 };
 
-module.exports = { audit: inWorkspace('audit'), postJson: inWorkspace('postJson'), readDeclared };
+/* A connector's call to its provider: the host is fixed in code, never taken from a task or a model, and the call
+ * always names a workspace, so that workspace's egress list applies to it like any other agent fetch. The token
+ * lives only in the Authorization header, which safeFetch drops at the first hop to another origin, and no
+ * redirect is followed. Nothing read here enters a run's context, so no host is noted as a taint source. */
+const callProvider = async (url, { form = {}, token, timeoutMs, maxBytes } = {}) => {
+    if (!(egressContext.get() || {}).companyId) {
+        throw Object.assign(new Error('a connector call names no workspace, so it was refused'), { code: 'no_workspace' });
+    }
+    const res = await fetcher.safeFetch(String(url), {
+        method: 'post',
+        data: new URLSearchParams(form).toString(),
+        timeoutMs,
+        maxBytes,
+        maxRedirects: 0,
+        headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Bearer ${token}` },
+    });
+    return { status: res.status, headers: res.headers || {}, body: res.body };
+};
+
+module.exports = { audit: inWorkspace('audit'), postJson: inWorkspace('postJson'), readDeclared, callProvider };
