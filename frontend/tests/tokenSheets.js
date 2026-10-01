@@ -114,6 +114,8 @@ const rules = (rel) => [...styleOf(rel).matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((
     declarations: body.split(';').map((d) => d.trim()).filter(Boolean),
 }));
 const outsideVar = (declaration) => declaration.replace(/var\((?:[^()]|\([^()]*\))*\)/g, '');
+/* A size is a look's when it comes from a type token, with or without a fixed step added to it. */
+const TYPE_TOKEN = /var\(\s*--(?:fs-|text-|row-font|chip-font|avatar-font|[\w-]+-(?:fs|font)\b)/;
 
 export const hexColours = (rel) => styleOf(rel).match(/#[0-9a-fA-F]{3,8}\b(?![-\w])/g) || [];
 /* A scrim darkens whatever is behind it in either theme, so it is the one colour written out. */
@@ -123,7 +125,7 @@ export const literalColours = (rel, { scrims = [] } = {}) => rules(rel).flatMap(
     .map((d) => `${selector} { ${d} }`));
 export const fixedFontSizes = (rel) => rules(rel).flatMap(({ selector, declarations: list }) => list
     .filter((d) => /^font(-size)?\s*:/.test(d))
-    .filter((d) => /\d(px|rem|em)\b/.test(outsideVar(d)))
+    .filter((d) => /\d(px|rem|em)\b/.test(outsideVar(d)) && !TYPE_TOKEN.test(d))
     .map((d) => `${selector} { ${d} }`));
 export const unsetWithoutFallback = (rel) => UNSET_IN_CLASSIC.filter((name) => new RegExp(`var\\(\\s*${name}\\s*\\)`).test(styleOf(rel)));
 export const inkThreeText = (rel) => rules(rel).flatMap(({ selector, declarations: list }) => list
