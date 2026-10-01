@@ -164,6 +164,7 @@ describe('the List scrolls sideways when its columns do not fit', () => {
         expect(minWidth).toContain('var(--lv2-fixed-w');
         expect(minWidth).toContain('var(--lv2-title-min)');
         expect(declared(rule(wide, '.lv2__cols, .lv2__sprint'), 'min-width')).toBe('var(--lv2-min-w)');
+        expect(declared(ownRule(wide, '.lv2__cols'), 'box-sizing')).toBe('border-box');
         const pad = 'var(--cell-pad-x, 12px)';
         expect(declared(rule(base, '.lv2__cols'), 'padding')).toBe(`14px calc(${pad} + 1px) 8px calc(${pad} + 17px)`);
         expect(contentMin() - px(vars['--lv2-fixed-w']) - titleMin()).toBe(2 * px(pad) + 18);
@@ -204,16 +205,19 @@ describe('the checkbox and the task name stay in view', () => {
     const select = ownRule(wide, '.lv2__c-select');
     const title = ownRule(wide, '.lv2__c-title');
 
-    it('both stick to the left of the scroller, from tablet width up', () => {
+    /* A sticky offset counts from inside the scroller's padding, so a cell stuck at 0 would leave
+       the page gutter open beside it, with the passing columns showing in it. */
+    it('both stick to the left edge of the scroller, from tablet width up', () => {
         expect(declared(rule(wide, '.lv2__c-select, .lv2__c-title'), 'position')).toBe('sticky');
-        expect(declared(select, 'left')).toBe('0');
+        expect(declared(rule(base, '.lv2__scroll'), 'padding')).toBe('0 var(--page-pad-x, 20px) 24px');
+        expect(px(declared(select, 'left'))).toBe(-px('var(--page-pad-x, 20px)'));
         expect(base).not.toMatch(/\.lv2__c-select[^{]*\{[^}]*position:\s*sticky/);
         expect(phone).not.toMatch(/position:\s*sticky/);
     });
 
     it('the name sticks right after the checkbox, in the header and in the rows alike', () => {
         const selectWidth = px(declared(select, 'padding-left')) + 28 + gap();
-        expect(px(declared(title, 'left'))).toBe(selectWidth);
+        expect(px(declared(title, 'left'))).toBe(px(declared(select, 'left')) + selectWidth);
         expect(px(declared(select, 'margin-right'))).toBe(-gap());
         expect(px(declared(select, 'padding-right'))).toBe(gap());
         expect(wide).not.toMatch(/\.lv2__cols[^{]*\.lv2__c-(select|title)[^{]*\{[^}]*left\s*:/);
@@ -251,7 +255,8 @@ describe('a group header spans the group and keeps its label in view', () => {
         expect(declared(rule(wide, '.lv2__group-select, .lv2__group-label'), 'position')).toBe('sticky');
         const checkRoom = px('var(--lv2-check-room)');
         const selectLeft = px(declared(ownRule(wide, '.lv2__group-select'), 'left'));
-        expect(selectLeft + checkRoom).toBe(px(declared(ownRule(wide, '.lv2__c-select'), 'padding-left')));
+        const rowSelect = ownRule(wide, '.lv2__c-select');
+        expect(selectLeft + checkRoom).toBe(px(declared(rowSelect, 'left')) + px(declared(rowSelect, 'padding-left')));
         const selectWidth = px(declared(rule(base, '.lv2__group-select'), 'width'));
         const headInset = px(declared(rule(base, '.lv2__group-select + .lv2__group-head'), 'padding-left'));
         expect(px(declared(ownRule(wide, '.lv2__group-label'), 'left'))).toBe(selectLeft + selectWidth + headInset);

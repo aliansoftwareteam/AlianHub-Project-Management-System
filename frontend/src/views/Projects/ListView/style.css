@@ -4,6 +4,7 @@
     --lv2-cols: 28px var(--lv2-title-track) minmax(56px, .45fr) 56px 64px 72px 48px 80px 88px;
     --lv2-grip-w: 12px;
     --lv2-disclose-w: 10px;
+    /* The status circle's width. The circle is drawn in other views too, outside this scope, so its own rule keeps the number. */
     --lv2-status-w: 24px;
     --lv2-depth: 1;
     --lv2-depth-max: 2;
@@ -280,7 +281,7 @@
 .lv2__status {
     --lv2-status: var(--ink-2);
     flex: none;
-    width: var(--lv2-status-w); height: var(--lv2-status-w);
+    width: 24px; height: 24px;
     display: inline-flex; align-items: center; justify-content: center;
     padding: 0; border: 0; border-radius: 50%;
     background: none;
@@ -349,9 +350,12 @@ button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status
    here: the row menu inside is fixed to the viewport. */
 @media (min-width: 768px) {
     .lv2__cols, .lv2__sprint { min-width: var(--lv2-min-w); }
+    .lv2__cols { box-sizing: border-box; }
     /* The checkbox and the name stay in view while the other columns pass under them, and the
        hover actions anchor to the name's cell. A sticky box paints as a layer of its own, so the
-       row whose menu is open is lifted over the rows after it and over the header. */
+       row whose menu is open is lifted over the rows after it and over the header. An offset
+       counts from inside the scroller's padding, so each one takes the page gutter back and the
+       stuck cells reach the scroller's edge with nothing showing beside them. */
     .lv2__c-select, .lv2__c-title {
         position: sticky;
         z-index: 1;
@@ -361,19 +365,19 @@ button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status
     /* The checkbox's cell reaches over the gap to the name and over the row's padding, less the
        2px an agent row's ring is drawn in. */
     .lv2__c-select {
-        left: 0;
+        left: calc(0px - var(--page-pad-x, 20px));
         margin-left: calc(2px - var(--cell-pad-x, 12px));
         padding-left: calc(var(--cell-pad-x, 12px) - 2px);
         margin-right: -10px;
         padding-right: 10px;
     }
-    .lv2__c-title { left: calc(var(--cell-pad-x, 12px) + 36px); }
+    .lv2__c-title { left: calc(var(--cell-pad-x, 12px) + 36px - var(--page-pad-x, 20px)); }
     .lv2__cols > .lv2__c-select, .lv2__cols > .lv2__c-title { background: var(--canvas); }
     .lv2__c-title:has(.lv2__menu) { z-index: 3; }
     /* A group's bar is as wide as its rows; its select-all and label keep to the left with them. */
     .lv2__group-select, .lv2__group-label { position: sticky; }
-    .lv2__group-select { left: calc(var(--cell-pad-x, 12px) - 2px - var(--lv2-check-room)); }
-    .lv2__group-label { left: calc(2 * var(--cell-pad-x, 12px) - 2 * var(--lv2-check-room) + var(--hit-min)); }
+    .lv2__group-select { left: calc(var(--cell-pad-x, 12px) - 2px - var(--lv2-check-room) - var(--page-pad-x, 20px)); }
+    .lv2__group-label { left: calc(2 * var(--cell-pad-x, 12px) - 2 * var(--lv2-check-room) + var(--hit-min) - var(--page-pad-x, 20px)); }
     .lv2__actions {
         position: absolute;
         top: 0; bottom: 0; right: 0;
