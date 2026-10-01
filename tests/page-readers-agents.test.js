@@ -9,9 +9,10 @@ jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 
 const { myCache } = require('../Config/config');
 const audit = require('../Modules/Agents/agentAudit');
-const { undoStateOf } = require('../Modules/Agents/undo');
+const { SCHEMA_TYPE } = require('../Config/schemaType');
+const { undoStateOf, undoAuditRow, REASON } = require('../Modules/Agents/undo');
 
-const { C, PROJECTS } = world;
+const { C, PEOPLE, PROJECTS, PAGES } = world;
 
 const draftedPage = (pageId, kind) => ({
     action: audit.ACTION_DONE,
@@ -36,14 +37,24 @@ beforeEach(() => {
 
 describe('the page readers agree on who reaches a page: undoing an agent\'s page', () => {
     const EXPECTED = {
-        owner: ['shared', 'company', 'closed', 'orphaned', 'deleted'],
-        admin: ['shared', 'company', 'closed', 'orphaned', 'deleted'],
-        inside: ['insidePrivate', 'shared', 'company', 'closed', 'orphaned', 'deleted'],
-        outside: ['outsidePrivate', 'shared', 'company', 'closed', 'orphaned', 'deleted'],
-        guest: ['shared', 'company', 'closed', 'orphaned', 'deleted'],
+        owner: ['shared', 'company', 'closed'],
+        admin: ['shared', 'company', 'closed'],
+        inside: ['insidePrivate', 'shared', 'company', 'closed'],
+        outside: ['outsidePrivate', 'shared', 'company'],
+        guest: ['shared', 'company'],
     };
 
     it.each(['page', 'pageVersion'])('offers undo of a %s action filed under a project the person can open', async (kind) => {
         expect(await undoable(kind)).toEqual(EXPECTED);
+    });
+
+    it('runs the undo only for a page the person can change', async () => {
+        const stored = () => mockDb.store[SCHEMA_TYPE.PAGES].find((page) => String(page._id) === PAGES.closed);
+        const undo = (who) => undoAuditRow(C, draftedPage(PAGES.closed, 'page'), { userId: PEOPLE[who] }, '127.0.0.1', { undoHours: 24, run: null });
+
+        expect(await undo('outside')).toMatchObject({ ok: false, reason: REASON.TARGET_NOT_VISIBLE });
+        expect(stored().deletedStatusKey).toBe(0);
+        expect(await undo('inside')).toMatchObject({ ok: true });
+        expect(stored().deletedStatusKey).toBe(1);
     });
 });

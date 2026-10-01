@@ -108,8 +108,6 @@ describe('the page readers agree on who reaches a page: the rule itself', () => 
                 const options = { uid: PEOPLE[who], companyWide };
                 expect(world.named(byRow(options, projectIds))).toEqual(world.named(byFilter({ ...options, projectIds })));
             }
-            const anywhere = { uid: PEOPLE[who], everyProject: true };
-            expect(world.named(byRow(anywhere, []))).toEqual(world.named(byFilter(anywhere)));
         }
     });
 
@@ -117,9 +115,9 @@ describe('the page readers agree on who reaches a page: the rule itself', () => 
         const inOpen = { projectIds: [PROJECTS.open] };
         expect(world.named(byFilter({ uid: PEOPLE.inside, ...inOpen }))).toEqual(['insidePrivate', 'shared', 'company', 'deleted']);
         expect(world.named(byFilter({ uid: PEOPLE.outside, ...inOpen, companyWide: false }))).toEqual(['outsidePrivate', 'shared', 'deleted']);
-        expect(world.named(byFilter({ uid: PEOPLE.owner, everyProject: true }))).toEqual(['shared', 'company', 'closed', 'orphaned', 'deleted']);
-        expect(world.named(byFilter({ uid: PEOPLE.owner, everyProject: true, companyWide: false }))).toEqual(['shared', 'closed', 'orphaned', 'deleted']);
-        expect(world.named(byFilter({ uid: PEOPLE.owner, everyProject: true, exceptProjectIds: [PROJECTS.closed] }))).toEqual(['shared', 'company', 'orphaned', 'deleted']);
+        const everywhere = { projectIds: Object.values(PROJECTS) };
+        expect(world.named(byFilter({ uid: PEOPLE.owner, ...everywhere }))).toEqual(['shared', 'company', 'closed', 'orphaned', 'deleted']);
+        expect(world.named(byFilter({ uid: PEOPLE.owner, ...everywhere, exceptProjectIds: [PROJECTS.closed] }))).toEqual(['shared', 'company', 'orphaned', 'deleted']);
         expect(world.named(byFilter({ uid: PEOPLE.guest }))).toEqual(['company']);
     });
 
