@@ -38,6 +38,11 @@ const grants = {
         {},
         { sort: { createdAt: -1 }, limit: 200 },
     ], 'find')) || []).map(plain),
+    usedIn: async (companyId, now) => ((await db(SCHEMA_TYPE.OAUTH_GRANTS, [
+        { companyId: String(companyId), revokedAt: null, expiresAt: { $gt: now }, lastUsedAt: { $ne: null } },
+        {},
+        { sort: { lastUsedAt: -1 }, limit: 500 },
+    ], 'find')) || []).map(plain),
     endingFor: async (companyId, after, by) => ((await db(SCHEMA_TYPE.OAUTH_GRANTS, [
         { companyId: String(companyId), revokedAt: null, expiryNoticeAt: null, expiresAt: { $gt: after, $lte: by } },
         {},

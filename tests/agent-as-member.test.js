@@ -39,6 +39,8 @@ const world = require('./fixtures/mcpManageWorld');
 const findings = require('../Modules/Agents/manager/findings');
 const workQueue = require('../Modules/Agents/manager/workQueue');
 const controller = require('../Modules/Agents/manager/controller');
+const commentsCtrl = require('../Modules/Comments/controller');
+const { parseMentionIds, parseAgentMentionIds } = require('../Modules/Comments/helpers/parseMentions');
 const server = require('../Modules/Mcp/server');
 const { projectFindingsSchema } = require('../utils/mongo-handler/createSchema');
 
@@ -171,7 +173,7 @@ describe('who is shown a person\'s connected AI', () => {
         connect(OTHER, { lastUsedAt: new Date(Date.now() - 5 * MINUTE), agentAccount: { mode: 'personal', provider: 'Codex' } });
         connect(OTHER);
         connect(MEMBER, { agentAccount: { mode: 'personal', provider: 'Codex' } });
-        expect(await seenBy(OWNER)).toEqual(['Claude, for Priya Other', 'Codex, for Mia Member']);
+        expect(await seenBy(OWNER)).toEqual(['Codex, for Mia Member', 'Claude, for Priya Other']);
     });
 
     it('is not given to an API token', async () => {
@@ -227,7 +229,7 @@ describe('handing a task to your own AI', () => {
         expect(await queued(agent(OWNER))).toEqual(['OPN-ANY']);
         const itemId = String(handed().find((row) => row.taskId === String(mine._id))._id);
         expect(await rpc(agent(OTHER), 'queue.claim', { itemId })).toMatchObject({ ok: false, error: workQueue.REFUSAL.NO_ITEM });
-        expect(await rpc(agent(MEMBER), 'queue.claim', { itemId })).toMatchObject({ itemId });
+        expect(await rpc(agent(MEMBER), 'queue.claim', { itemId })).toMatchObject({ ok: true, result: { itemId } });
     });
 
     it('is refused for another person\'s AI, and for a person with no AI connected', async () => {
@@ -335,5 +337,28 @@ describe('naming your own AI with @ in a comment', () => {
         await say(MEMBER, mine._id, `@[Priya Other](${OTHER}) a person`);
         await say(GUEST, mine._id, `@[Claude](myai_${GUEST}) a guest`);
         expect(handed()).toEqual([]);
+    });
+
+    it('is a comment like any other: the name is no person, and a comment sent with a token hands nothing over', async () => {
+        connect(MEMBER);
+        switchOn();
+        const mine = task({ TaskKey: 'OPN-MINE' });
+        const message = `@[Claude](myai_${MEMBER}) please`;
+        expect(parseMentionIds(message)).toEqual([]);
+        expect(parseAgentMentionIds(message)).toEqual([]);
+        const post = (extra) => through(commentsCtrl.save, request(MEMBER, 'POST', '/api/v1/comments', {
+            ...extra, body: { data: { objId: { projectId: P_OPEN, sprintId: S_OPEN, taskId: String(mine._id) }, message, type: 'text', userId: MEMBER } },
+        }));
+
+        await post({ apiToken: { _id: TOKEN, kind: 'agent', userId: MEMBER, name: 'CLI' } });
+        await post({ mcp: true });
+        expect(handed()).toEqual([]);
+
+        await post();
+        expect(handed()).toMatchObject([{ taskId: String(mine._id), facts: { handedBy: MEMBER, handedTo: MEMBER } }]);
+        const comments = rows(SCHEMA_TYPE.COMMENTS).filter((row) => String(row.taskId) === String(mine._id));
+        expect(comments.length).toBeGreaterThan(0);
+        comments.forEach((row) => expect(row.mentionIds || []).toEqual([]));
+        expect(rows(SCHEMA_TYPE.TASKS).find((row) => String(row._id) === String(mine._id)).AssigneeUserId).toEqual([OTHER]);
     });
 });

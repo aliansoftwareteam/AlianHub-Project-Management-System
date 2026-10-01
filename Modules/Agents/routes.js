@@ -24,6 +24,7 @@ exports.init = (app) => {
     app.get('/api/v2/agents/team/standup', ctrl.myStandup);
     app.get('/api/v2/agents/routable', ctrl.routableTasks);
     app.get('/api/v2/agents/runnable', ctrl.runnableAgents);
+    app.get('/api/v2/agents/connected', projectManagerCtrl.getConnectedAgents);
     app.get('/api/v2/agents/chat/usable', chatCtrl.usableAgents);
     app.post('/api/v2/agents/chat/direct', chatCtrl.openDirect);
     app.get('/api/v2/agents/pipeline', ctrl.pipelineTasks);
