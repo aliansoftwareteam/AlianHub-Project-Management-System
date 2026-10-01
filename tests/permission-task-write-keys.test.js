@@ -198,7 +198,7 @@ describe('every body the web app sends resolves to a project and a key', () => {
             'updateAttachments', 'updateTaskCustomField', 'updateMarkAsFavourite', 'updateLastMessageTime', 'updateQueueList', 'updateArchiveDelete',
             'convertToSubTask', 'convertToTask', 'convertToList', 'moveTask', 'mergeTask', 'duplicateTask', 'createSubTaskWithAi']
             .forEach((action) => expect(covered).toContain(`PATCH /api/v2/tasks ${action}`));
-        ['bulkUpdateStatus', 'bulkUpdatePriority', 'bulkUpdateAssignee', 'bulkUpdateDueDate', 'bulkUpdateTags', 'bulkArchive', 'bulkDelete', 'bulkTrash',
+        ['bulkUpdateStatus', 'bulkUpdatePriority', 'bulkUpdateAssignee', 'bulkUpdateDueDate', 'bulkUpdateDates', 'bulkUpdateTags', 'bulkArchive', 'bulkDelete', 'bulkTrash',
             'bulkMove', 'bulkConvertToSubTask', 'bulkConvertToTask'].forEach((action) => expect(covered).toContain(`POST /api/v2/tasks/bulk ${action}`));
         ['add', 'remove', 'list'].forEach((action) => expect(covered).toContain(`POST /api/v2/tasks/relations ${action}`));
         ['POST /api/v1/taskIndex', 'POST /api/v1/updateTaskIndexOnload'].forEach((route) => expect(covered).toContain(route));
