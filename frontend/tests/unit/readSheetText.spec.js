@@ -19,6 +19,12 @@ describe('reading an export file in the import dialog', () => {
         expect(row['Task Name']).toBe('Größe prüfen – 日本語 ✓');
     });
 
+    it('still reads a CSV saved in Latin-1, as a spreadsheet program on Windows saves it', async () => {
+        const latin1 = Uint8Array.from('Task Name\nGröße prüfen\n', (letter) => letter.charCodeAt(0));
+        const [row] = await readSheet({ arrayBuffer: async () => latin1.buffer });
+        expect(row['Task Name']).toBe('Größe prüfen');
+    });
+
     it('keeps every cell as text, so a date in milliseconds stays whole', async () => {
         const [row] = await readSheet(fileOf(CSV));
         expect(row['Due Date']).toBe('1764547200000');
