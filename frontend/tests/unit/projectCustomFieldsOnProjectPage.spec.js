@@ -20,8 +20,8 @@ import { useProjectCustomFields } from '@/views/Projects/composables/projectCust
 import { customGroupOptions } from '@/views/Projects/composables/customFieldQuery';
 
 const DEFS = [
-    { _id: 'f-stage', fieldTitle: 'Stage', fieldType: 'dropdown', type: 'task', isDelete: true, global: true },
-    { _id: 'f-note', fieldTitle: 'Note', fieldType: 'text', type: 'task', isDelete: true, global: true }
+    { _id: '6f00000000000000000000a1', fieldTitle: 'Stage', fieldType: 'dropdown', type: 'task', isDelete: true, global: true },
+    { _id: '6f00000000000000000000a2', fieldTitle: 'Note', fieldType: 'text', type: 'task', isDelete: true, global: true }
 ];
 
 const store = () => createStore({
@@ -51,7 +51,7 @@ const defsFor = (project) => {
 describe('custom fields on the project page', () => {
     it('are found for a project with the Custom Fields app, without an injected project', () => {
         const defs = defsFor({ _id: 'p1', apps: [{ key: 'CustomFields' }] });
-        expect(defs.map((def) => def._id)).toEqual(['f-stage', 'f-note']);
+        expect(defs.map((def) => def._id)).toEqual(['6f00000000000000000000a1', '6f00000000000000000000a2']);
         expect(customGroupOptions(defs).map((option) => option.title)).toEqual(['Stage']);
     });
 
