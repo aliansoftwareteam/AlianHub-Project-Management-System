@@ -113,7 +113,7 @@
             </div>
         </section>
 
-        <section class="ah-card">
+        <section ref="lookSection" class="ah-card" tabindex="-1" data-test="look">
             <div class="ah-card__body ms__theme">
                 <div>
                     <h2 class="ah-h3">{{ $t('Settings.theme') }}</h2>
@@ -267,6 +267,7 @@
 <script setup>
 import { ref, inject, computed, onMounted, reactive } from "vue";
 import { useStore } from "vuex";
+import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import * as env from "@/config/env";
@@ -296,6 +297,8 @@ defineOptions({ name: "MySettingsView" });
 
 const { t } = useI18n();
 const $toast = useToast();
+const openAtSection = useRoute()?.query?.section;
+const lookSection = ref(null);
 const { getters, commit } = useStore();
 const { getUser } = useGetterFunctions();
 const { selectedLanguageCode } = languageTranslateHelper();
@@ -557,6 +560,10 @@ onMounted(() => {
     init();
     loadSessions();
     agentPrefs.load();
+    if (openAtSection === "look" && lookSection.value) {
+        lookSection.value.scrollIntoView({ block: "start" });
+        lookSection.value.focus({ preventScroll: true });
+    }
 });
 </script>
 

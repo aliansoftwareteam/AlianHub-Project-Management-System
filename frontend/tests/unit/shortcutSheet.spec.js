@@ -20,7 +20,7 @@ vi.mock('@/components/organisms/Shell/navItems', () => ({
 vi.mock('@/components/organisms/Shell/inboxUnread', () => ({ useInboxUnread: () => ({ unread: ref(0), badge: ref('') }) }));
 vi.mock('@/composable/index.js', () => ({ useGetterFunctions: () => ({ getUser: () => ({ Employee_Name: 'Asha', Employee_Email: 'asha@example.com' }) }) }));
 vi.mock('@/composable/useAppVersion', () => ({ useAppVersion: () => ({ version: ref('1.0.0') }) }));
-vi.mock('@/services', () => ({ useAuth: () => ({ logOut: vi.fn() }), apiRequestWithoutCompnay: vi.fn() }));
+vi.mock('@/services', () => ({ useAuth: () => ({ logOut: vi.fn() }), apiRequestWithoutCompnay: vi.fn(() => Promise.resolve({ data: { status: true } })) }));
 vi.mock('@/components/atom/UserProfile/UserProfile.vue', () => ({ default: { name: 'UserProfile', template: '<span class="user-profile-stub"></span>' } }));
 
 import { SHORTCUTS, closeShortcutSheet, setSingleKeyShortcuts, shortcutSheet } from '@/composable/shortcuts';

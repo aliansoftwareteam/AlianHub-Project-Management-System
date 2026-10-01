@@ -223,10 +223,12 @@
 .hc-setup__cta:hover { background: var(--brand-deep); }
 .hc-setup__dismiss { min-height: var(--hit-min); border: 0; background: transparent; padding: 0 var(--sp-2, 4px); font: 400 var(--fs-sm, 12px)/1 var(--font-ui); color: var(--ink-2); cursor: pointer; }
 .hc-setup__dismiss:hover { color: var(--ink); }
+.hc-setup__alt { min-height: var(--hit-min); border: 0; background: transparent; padding: 0 var(--sp-2, 4px); font: 500 var(--fs-sm, 12px)/var(--lh-snug, 1.3) var(--font-ui); color: var(--ink); text-decoration: underline; text-align: left; cursor: pointer; }
+.hc-setup__alt:hover { color: var(--brand); }
 .hc-setup__steps { flex: 1 1 100%; list-style: none; margin: 0; padding: var(--sp-4, 10px) 0 0; border-top: 1px solid var(--home-agent-border); display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 var(--sp-7, 16px); }
 .hc-setup__step { display: flex; align-items: center; gap: var(--sp-3, 8px); min-width: 0; min-height: var(--hit-min); font: 400 var(--fs-md, 12.5px)/var(--lh-snug, 1.3) var(--font-ui); color: var(--ink); }
 .hc-setup__step.is-done { color: var(--ink-2); }
-.hc-setup__step strong { font-weight: 600; }
+.hc-setup__step.is-active button { font-weight: 600; }
 .hc-setup__mark { flex: none; width: 14px; height: 14px; display: inline-grid; place-items: center; color: var(--ok-ink); }
 .hc-setup__mark--todo { box-sizing: border-box; border: 1.5px solid var(--border); border-radius: 50%; }
 .hc-setup__step.is-active .hc-setup__mark--todo { border-color: var(--agent); }
@@ -234,6 +236,9 @@
 .hc-setup__step button { min-height: var(--hit-min); border: 0; background: transparent; padding: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
 .hc-setup__step button:hover { color: var(--brand); }
 .hc-setup__note { color: var(--ink-2); font-weight: 400; }
+.hc-setup__sample { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sp-4, 10px); margin: 0; padding-top: var(--sp-3, 8px); border-top: 1px solid var(--home-agent-border); font: 400 var(--fs-sm, 12px)/var(--lh-body, 1.5) var(--font-ui); color: var(--ink-2); }
+.hc-setup__sample button { min-height: var(--hit-min); border: 0; background: transparent; padding: 0; font: 500 var(--fs-sm, 12px)/var(--lh-snug, 1.3) var(--font-ui); color: var(--ink); text-decoration: underline; cursor: pointer; }
+.hc-setup__sample button:hover { color: var(--brand); }
 
 /* ---------- planner panel ---------- */
 .hp-panel { width: var(--panel-w); flex: none; background: var(--surface); border-left: 1px solid var(--hairline); padding: var(--page-pad-y, 16px) calc(var(--card-pad-x, 16px) + 2px); display: flex; flex-direction: column; gap: 12px; min-height: 0; box-sizing: border-box; overflow: hidden; }
@@ -278,7 +283,10 @@
     .hc-setup__body { flex: 1 1 calc(100% - 50px); order: 2; min-width: 0; }
     .hc-setup__cta { order: 3; flex: 1 1 auto; min-height: 44px; }
     .hc-setup__dismiss { order: 4; min-height: 44px; }
+    .hc-setup__alt { order: 5; flex: 1 1 100%; min-height: 44px; }
     .hc-setup__steps { order: 5; }
+    .hc-setup__sample { order: 6; }
+    .hc-setup__sample button { min-height: 44px; }
     .home .ah-tbtn--icon { width: 40px; }
     .hc-add, .hc-connect, .hc-personal__open { min-height: var(--hit-min); }
     .hp-panel__close { padding: 13px; margin: -13px -13px -13px auto; }
