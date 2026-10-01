@@ -8,10 +8,11 @@ vi.mock('@/services', () => ({ apiRequest, apiRequestWithoutCompnay: vi.fn() }))
 vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 'ShellIcon', props: ['name'], render: () => null } }));
 
 import RecentsCard from '@/components/molecules/Home/RecentsCard.vue';
-import { recentRoute, toRecentItem } from '@/components/molecules/Home/recentItems';
+import { recentRoute, toRecentItem, toRecentItems } from '@/components/molecules/Home/recentItems';
 
 const TASK = { _id: 't1', TaskName: 'Fix login', TaskKey: 'AH-12', ProjectID: 'p1', sprintId: 's1', folderObjId: '' };
 const blank = { render: () => null };
+const row = (type, id, title, route) => ({ visitedAt: '2026-09-30T08:00:00Z', type, id, title, projectId: route.projectId || '', projectName: route.projectId ? 'Website' : '', route });
 
 describe('toRecentItem', () => {
     it('reads today\'s task-only shape as a task', () => {
@@ -25,21 +26,46 @@ describe('toRecentItem', () => {
     });
 
     it.each([
-        ['project', { type: 'project', project: { _id: 'p1', ProjectName: 'Website' } }, { id: 'p1', title: 'Website' }],
-        ['doc', { type: 'doc', doc: { _id: 'd1', title: 'Runbook' } }, { id: 'd1', title: 'Runbook' }],
-        ['sprint', { type: 'sprint', sprint: { _id: 's1', name: 'Sprint 4', projectId: 'p1' } }, { id: 's1', title: 'Sprint 4', projectId: 'p1' }],
-        ['project named in entityType with the item under item', { entityType: 'project', item: { id: 'p2', name: 'Ops' } }, { id: 'p2', title: 'Ops' }],
-    ])('reads a %s', (_name, visit, expected) => {
-        expect(toRecentItem(visit)).toMatchObject({ type: visit.type || visit.entityType, ...expected });
+        ['project', row('project', 'p1', 'Website', { projectId: 'p1', sprintId: '', folderId: '' }), { id: 'p1', title: 'Website', projectId: 'p1' }],
+        ['sprint', row('sprint', 's1', 'Sprint 4', { projectId: 'p1', sprintId: 's1', folderId: 'f1' }), { id: 's1', title: 'Sprint 4', projectId: 'p1', folderId: 'f1', projectName: 'Website' }],
+        ['doc', row('doc', 'd1', 'Runbook', { pageId: 'd1', projectId: '' }), { id: 'd1', title: 'Runbook', projectId: '' }],
+    ])('reads a typed %s row', (_name, visit, expected) => {
+        expect(toRecentItem(visit)).toMatchObject({ type: visit.type, visitedAt: visit.visitedAt, ...expected });
+    });
+
+    it('reads a typed task row, keeping the task it carries', () => {
+        const visit = { ...row('task', 't1', 'Fix login', { projectId: 'p1', sprintId: 's1', folderId: '', taskId: 't1' }), task: TASK };
+        expect(toRecentItem(visit)).toMatchObject({ type: 'task', id: 't1', title: 'Fix login', code: 'AH-12', task: TASK });
+    });
+
+    it('builds what the task panel needs from the route when a task row carries no task', () => {
+        const visit = row('task', 't2', 'Ship it', { projectId: 'p1', sprintId: 's1', folderId: 'f1', taskId: 't2' });
+        expect(toRecentItem(visit).task).toEqual({ _id: 't2', ProjectID: 'p1', sprintId: 's1', folderObjId: 'f1' });
     });
 
     it.each([
         ['nothing', null],
         ['a task that is gone', { task: null }],
-        ['a type this card cannot open', { type: 'whiteboard', whiteboard: { _id: 'w1', name: 'Board' } }],
-        ['an item without an id', { type: 'project', project: { ProjectName: 'No id' } }],
+        ['a type this card cannot open', row('whiteboard', 'w1', 'Board', {})],
+        ['a row without an id', row('project', '', 'No id', { projectId: '' })],
     ])('skips %s', (_name, visit) => {
         expect(toRecentItem(visit)).toBeNull();
+    });
+});
+
+describe('toRecentItems', () => {
+    it('hides a project when one of its sprints is in the list, as the palette does', () => {
+        const items = toRecentItems([
+            row('sprint', 's1', 'Sprint 4', { projectId: 'p1', sprintId: 's1', folderId: '' }),
+            row('project', 'p1', 'Website', { projectId: 'p1' }),
+            row('project', 'p2', 'Ops', { projectId: 'p2' }),
+            row('whiteboard', 'w1', 'Board', {}),
+        ]);
+        expect(items.map((item) => `${item.type}:${item.id}`)).toEqual(['sprint:s1', 'project:p2']);
+    });
+
+    it('reads nothing from an answer that is not a list', () => {
+        expect(toRecentItems(undefined)).toEqual([]);
     });
 });
 
@@ -80,11 +106,11 @@ describe('RecentsCard', () => {
     it('lists the recently opened items from the recent visits endpoint', async () => {
         apiRequest.mockResolvedValue({ data: { status: true, data: [
             { visitedAt: '2026-09-30T08:00:00Z', task: TASK },
-            { type: 'project', visitedAt: '2026-09-30T07:00:00Z', project: { _id: 'p1', ProjectName: 'Website' } },
-            { type: 'whiteboard', whiteboard: { _id: 'w1' } },
+            row('project', 'p1', 'Website', { projectId: 'p1', sprintId: '', folderId: '' }),
+            row('whiteboard', 'w1', 'Board', {}),
         ] } });
         const wrapper = await mountCard();
-        expect(apiRequest).toHaveBeenCalledWith('get', '/api/v2/recent-visits');
+        expect(apiRequest).toHaveBeenCalledWith('get', '/api/v2/recent-visits?types=all');
         const rows = wrapper.findAll('[data-test="recent-row"]');
         expect(rows.map((r) => r.text())).toEqual([expect.stringContaining('Fix login'), expect.stringContaining('Website')]);
         expect(wrapper.find('section').attributes('aria-label')).toBe('Home.card_recents');
@@ -93,7 +119,7 @@ describe('RecentsCard', () => {
     it('opens a task in the task panel and a project by its route', async () => {
         apiRequest.mockResolvedValue({ data: { status: true, data: [
             { visitedAt: '2026-09-30T08:00:00Z', task: TASK },
-            { type: 'project', project: { _id: 'p1', ProjectName: 'Website' } },
+            row('project', 'p1', 'Website', { projectId: 'p1', sprintId: '', folderId: '' }),
         ] } });
         const wrapper = await mountCard();
         const rows = wrapper.findAll('[data-test="recent-row"]');
