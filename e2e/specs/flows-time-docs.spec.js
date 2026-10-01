@@ -25,6 +25,8 @@ test.describe('logging time and writing docs', () => {
         await expect(panel.getByRole('list', { name: 'Time entries' }).getByRole('listitem')).toHaveCount(1);
         await expect.poll(async () => (await owner.api.get(`/api/v1/timesheet/task/${task._id}`)).body.data.totalMinutes).toBe(90);
 
+        await panel.getByRole('button', { name: 'Close', exact: true }).click();
+        await expect(panel).toBeHidden();
         await page.goto(`/#/${state.companyId}/timesheet/user`);
         await expect(page.getByRole('heading', { level: 1, name: 'My timesheet' })).toBeVisible();
         await expect(page.getByText(name, { exact: true })).toBeVisible();
@@ -39,6 +41,7 @@ test.describe('logging time and writing docs', () => {
         await page.waitForURL(/\/pages\/[0-9a-f]{24}/);
         const pageId = /\/pages\/([0-9a-f]{24})/.exec(page.url())[1];
 
+        await expect(page.getByText('Type / for blocks')).toBeVisible();
         await page.getByPlaceholder('Untitled').fill(title);
         await expect.poll(async () => JSON.stringify((await owner.api.get(`/api/v2/pages/${pageId}`)).body)).toContain(title);
 

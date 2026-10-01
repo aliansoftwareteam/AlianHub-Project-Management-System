@@ -37,9 +37,9 @@ test.describe('description and files in the task panel', () => {
         const { owner, task, panel, suffix } = await openTaskPanel({ page, state, loginAs, label: 'Attach' });
         const fileName = `notes-${suffix}.txt`;
 
-        await panel.getByRole('tab', { name: /^Files/ }).click();
-        await expect(panel.getByRole('heading', { name: /Attachments\(0\)/ })).toBeVisible();
-        await panel.locator('input[type="file"]').setInputFiles({ name: fileName, mimeType: 'text/plain', buffer: Buffer.from(`hello ${suffix}`) });
+        const chooser = page.waitForEvent('filechooser');
+        await panel.getByRole('group', { name: 'Quick actions' }).getByRole('button', { name: 'Attach', exact: true }).click();
+        await (await chooser).setFiles({ name: fileName, mimeType: 'text/plain', buffer: Buffer.from(`hello ${suffix}`) });
 
         await expect(panel.getByRole('heading', { name: /Attachments\(1\)/ })).toBeVisible();
         await expect.poll(async () => JSON.stringify((await readTask(owner.api, task._id)).attachments || [])).toContain(fileName);
