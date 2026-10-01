@@ -17,10 +17,12 @@ describe('is this tab already running the build a worker holds', () => {
         expect(isPageCurrent([], NEW_BUILD)).toBe(null);
     });
 
-    it('reads only the scripts served by this origin', () => {
+    it('reads only the build\'s scripts: not another origin\'s, not one the server renders', () => {
         const scripts = [
             { src: 'https://hub.example.com/js/app.22222222.js' },
             { src: 'https://accounts.google.com/gsi/client' },
+            { src: 'https://hub.example.com/socket.io/socket.io.js' },
+            { src: 'https://cdn.example.com/js/app.22222222.js' },
             { src: '' },
         ];
         expect(pageScriptPaths(scripts, 'https://hub.example.com')).toEqual(['/js/app.22222222.js']);

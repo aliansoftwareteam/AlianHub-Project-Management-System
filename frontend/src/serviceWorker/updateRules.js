@@ -10,9 +10,13 @@ const urlOf = (value) => {
     }
 };
 
+const BUILD_SCRIPT = /^\/js\//;
+
+/* Only the build's own chunks count: a script the server renders, or one from another origin, is in
+ * no build's list and would make every tab look out of date. */
 export const pageScriptPaths = (scripts, origin) => scripts
     .map((script) => urlOf(script.src))
-    .filter((url) => url && url.origin === origin)
+    .filter((url) => url && url.origin === origin && BUILD_SCRIPT.test(url.pathname))
     .map((url) => url.pathname);
 
 /* true or false, or null when it cannot be told. A tab runs a worker's build when every script it
