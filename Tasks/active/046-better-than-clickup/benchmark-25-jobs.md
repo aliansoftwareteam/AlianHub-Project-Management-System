@@ -2,10 +2,11 @@
 
 Written 2026-10-01. Tracker: AP-441, Track C.
 
-This file holds three things:
+This file holds four things:
 1. The 25 everyday jobs and how they are counted, so two people perform and count them the same way.
 2. A first measured run of AlianHub at build `14.36.0-beta.705`.
 3. ClickUp's side of each job, with the source of every figure.
+4. A second measured run of AlianHub at build `14.36.0-beta.754`, beside the first.
 
 **Read this first.**
 - **ClickUp has not been run hands-on by a person who saves the work.** Its figures come from two sources, marked on every row:
@@ -13,6 +14,7 @@ This file holds three things:
   - "documentation": counted from ClickUp's own help articles, read on 2026-10-01. Not measured.
 - A full ClickUp run by a person is still needed. The sheet for it is at the end of this file.
 - AlianHub was measured at build 705. `beta` was at build 739 when this was written. Four jobs failed or were hard only because the fix was merged after build 705. They are marked.
+- **Run 2 was made on 2026-10-01 at build 754.** It reran 19 jobs, spot-checked 2 and carried 4 forward. Its figures sit beside run 1 in the job table. Only the AlianHub side was rerun.
 - The AlianHub run was driven through the page (clicks sent to named controls), at 1440 by 900. Steps are the ones a person makes with a mouse and keyboard. Two drags (Board, Gantt) were sent as drag events, not made by hand.
 
 ## How a job is counted
@@ -87,35 +89,35 @@ Run on 2026-10-01 in the owner's local app, in the QA Sandbox project.
 
 **Result: 19 jobs done, 5 partly done, 1 blocked.**
 
-| # | Job | Result | Steps | C | D | K | F | N | H | S | Time (s) |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | Create a task | Done | 7 | 6 | 0 | 0 | 1 | 29 | 2 | 2 | 20.8 |
-| 2 | Quick-create | Done | 7 | 4 | 0 | 2 | 1 | 24 | 2 | 3 | 18.7 |
-| 3 | Message to task | Done | 6 | 6 | 0 | 0 | 0 | 0 | 0 | 3 | 13.2 |
-| 4 | Three levels of subtasks | Partly: one level of three | 3 for level one | 1 | 0 | 1 | 1 | 16 | 2 | 0 | — |
-| 5 | Folder, subfolder, list, move | Done, by a hidden path | 20 | 14 | 0 | 3 | 3 | 58 | 6 | 11 | 53.9 |
-| 6 | Duplicate a project | Blocked on build 705 | — | — | — | — | — | — | — | — | — |
-| 7 | Bulk-edit twenty | Done | 8 | 8 | 0 | 0 | 0 | 0 | 0 | 2 | 14.5 |
-| 8 | Group by custom field | Done | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 1 | 5.3 |
-| 9 | Filter and save a view | Done | 10 | 9 | 0 | 0 | 1 | 25 | 2 | 3 | 24.9 |
-| 10 | Everything list | Partly: my tasks only | 1 for my tasks | 1 | 0 | 0 | 0 | 0 | 0 | 1 | — |
-| 11 | Board drag | Done | 2 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 6.4 |
-| 12 | Five custom fields, filled | Done | 59 | 34 | 0 | 9 | 16 | 144 | 18 | 8 | 106.4 |
-| 13 | Totals of a number field | Partly: (b) only | 9 for (b) | 6 | 0 | 1 | 2 | 31 | 2 | 2 | — |
-| 14 | Comment, mention, thread reply | Done | 7 | 2 | 0 | 3 | 2 | 20 | 4 | 1 | 13.3 |
-| 15 | Share a doc | Done | 9 | 7 | 0 | 0 | 2 | 34 | 4 | 3 | 25.6 |
-| 16 | Doc history restore | Partly: only with a version saved first | 10 with a saved version | 8 | 0 | 1 | 1 | 12 | 2 | 3 | — |
-| 17 | Timer and manual time | Done | 6 | 5 | 0 | 0 | 1 | 2 | 2 | 0 | 9.2 |
-| 18 | Timesheet, submit and approve | Done, the approvals page reached by address | 5 | 3 | 0 | 1 | 1 | 9 | 2 | 2 | 11.6 |
-| 19 | Dependency and Gantt shift | Done | 8 | 6 | 1 | 0 | 1 | 5 | 2 | 3 | 17.8 |
-| 20 | Sprint | Done | 16 | 14 | 0 | 1 | 1 | 19 | 2 | 8 | 36.8 |
-| 21 | Automation rule | Done | 11 | 10 | 0 | 0 | 1 | 22 | 2 | 3 | 25.4 |
-| 22 | Dashboard card | Done | 6 | 5 | 0 | 0 | 1 | 16 | 2 | 3 | 17.2 |
-| 23 | Workload view | Done | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 2 | 8.0 |
-| 24 | Search | Done | 7 | 0 | 0 | 5 | 2 | 14 | 0 | 4 | 12.1 |
-| 25 | Invite; private project | Partly: counted to the last button, nothing sent or changed | at least 10 | 9 | 0 | 0 | 1 | 22 | 2 | 5 | — |
+| # | Job | Result | Steps | C | D | K | F | N | H | S | Time (s) | Run 2, build 754, 2026-10-01: steps · seconds · state |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | Create a task | Done | 7 | 6 | 0 | 0 | 1 | 29 | 2 | 2 | 20.8 | 7 · 20.8 s · Done |
+| 2 | Quick-create | Done | 7 | 4 | 0 | 2 | 1 | 24 | 2 | 3 | 18.7 | 5 · 13.9 s · Done |
+| 3 | Message to task | Done | 6 | 6 | 0 | 0 | 0 | 0 | 0 | 3 | 13.2 | 6 · 13.2 s · Done |
+| 4 | Three levels of subtasks | Partly: one level of three | 3 for level one | 1 | 0 | 1 | 1 | 16 | 2 | 0 | — | 7 for two levels · — · Partly: two levels of three |
+| 5 | Folder, subfolder, list, move | Done, by a hidden path | 20 | 14 | 0 | 3 | 3 | 58 | 6 | 11 | 53.9 | 15 · 42.0 s · Done |
+| 6 | Duplicate a project | Blocked on build 705 | — | — | — | — | — | — | — | — | — | 4 to the failing button · — · Blocked: the server refuses the copy |
+| 7 | Bulk-edit twenty | Done | 8 | 8 | 0 | 0 | 0 | 0 | 0 | 2 | 14.5 | 8 · 14.5 s · Done |
+| 8 | Group by custom field | Done | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 1 | 5.3 | 2 · 5.3 s · Done |
+| 9 | Filter and save a view | Done | 10 | 9 | 0 | 0 | 1 | 25 | 2 | 3 | 24.9 | 10 · 24.9 s · Done, carried forward |
+| 10 | Everything list | Partly: my tasks only | 1 for my tasks | 1 | 0 | 0 | 0 | 0 | 0 | 1 | — | 2 · 5.3 s · Done |
+| 11 | Board drag | Done | 2 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 6.4 | 2 · 6.4 s · Done, carried forward |
+| 12 | Five custom fields, filled | Done | 59 | 34 | 0 | 9 | 16 | 144 | 18 | 8 | 106.4 | 37 · 76.8 s · Done |
+| 13 | Totals of a number field | Partly: (b) only | 9 for (b) | 6 | 0 | 1 | 2 | 31 | 2 | 2 | — | 14 with a workaround · — · Partly: (a) done; (b) stays empty until a subtask value is saved again |
+| 14 | Comment, mention, thread reply | Done | 7 | 2 | 0 | 3 | 2 | 20 | 4 | 1 | 13.3 | 7 · 13.3 s · Done, carried forward |
+| 15 | Share a doc | Done | 9 | 7 | 0 | 0 | 2 | 34 | 4 | 3 | 25.6 | 8 · 24.3 s · Done |
+| 16 | Doc history restore | Partly: only with a version saved first | 10 with a saved version | 8 | 0 | 1 | 1 | 12 | 2 | 3 | — | 5 · 13.4 s · Done |
+| 17 | Timer and manual time | Done | 6 | 5 | 0 | 0 | 1 | 2 | 2 | 0 | 9.2 | 6 · 9.2 s · Done |
+| 18 | Timesheet, submit and approve | Done, the approvals page reached by address | 5 | 3 | 0 | 1 | 1 | 9 | 2 | 2 | 11.6 | 4 · 9.3 s · Done |
+| 19 | Dependency and Gantt shift | Done | 8 | 6 | 1 | 0 | 1 | 5 | 2 | 3 | 17.8 | 9 · 19.1 s · Done |
+| 20 | Sprint | Done | 16 | 14 | 0 | 1 | 1 | 19 | 2 | 8 | 36.8 | 15 · 34.1 s · Done |
+| 21 | Automation rule | Done | 11 | 10 | 0 | 0 | 1 | 22 | 2 | 3 | 25.4 | 11 · 25.4 s · Done, carried forward |
+| 22 | Dashboard card | Done | 6 | 5 | 0 | 0 | 1 | 16 | 2 | 3 | 17.2 | 6 · 17.2 s · Done, spot-checked |
+| 23 | Workload view | Done | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 2 | 8.0 | 3 · 8.0 s · Done, spot-checked |
+| 24 | Search | Done | 7 | 0 | 0 | 5 | 2 | 14 | 0 | 4 | 12.1 | 7 · 12.1 s · Done |
+| 25 | Invite; private project | Partly: counted to the last button, nothing sent or changed | at least 10 | 9 | 0 | 0 | 1 | 22 | 2 | 5 | — | at least 10 · — · Partly: counted to the last button |
 
-F is typed fields. A dash under Time means the job was not completed as written.
+F is typed fields. A dash under Time means the job was not completed as written. The columns from Result to Time are run 1. The last column is run 2; its detail is under "Second measured run" below.
 
 ### The path taken, job by job
 
@@ -189,6 +191,134 @@ Wording slips seen on the way: a new list is announced as "Sprint created succes
 | 4 | 15 Share a doc | 9 | 25.6 | Title and body are two clicks and two typed fields; saving is a button |
 | 5 | 21 Automation rule | 11 | 25.4 | Five clicks to change the status and the recipient of the recipe |
 
+## Second measured run: AlianHub, build 754
+
+Run on 2026-10-01 in the owner's local app, in the QA Sandbox project. `/health` reported `14.36.0-beta.754`. Counted with the same rules, at 1440 by 900, driven through the page.
+
+**Result: 21 jobs done, 3 partly done, 1 blocked.** Run 1 was 19, 5 and 1.
+
+- Rerun in full: 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 13, 15, 16, 17, 18, 19, 20, 24, 25.
+- Spot-checked, same count as run 1: 22 and 23.
+- Carried forward from run 1, not rerun: 9, 11, 14, 21.
+
+| # | Job | Run 1 steps | Run 2 steps | C | D | K | F | N | H | S | Run 1 time (s) | Run 2 time (s) | Run 2 state |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | Create a task | 7 | 7 | 6 | 0 | 0 | 1 | 29 | 2 | 2 | 20.8 | 20.8 | Done |
+| 2 | Quick-create | 7 | 5 | 2 | 0 | 2 | 1 | 24 | 0 | 2 | 18.7 | 13.9 | Done |
+| 3 | Message to task | 6 | 6 | 6 | 0 | 0 | 0 | 0 | 0 | 3 | 13.2 | 13.2 | Done |
+| 4 | Three levels of subtasks | 3 for level one | 7 for two levels | 3 | 0 | 2 | 2 | 37 | 4 | 1 | — | — | Partly: two levels of three |
+| 5 | Folder, subfolder, list, move | 20 | 15 | 9 | 0 | 3 | 3 | 58 | 6 | 7 | 53.9 | 42.0 | Done |
+| 6 | Duplicate a project | — | 4 to the failing button | 3 | 0 | 0 | 1 | 23 | 2 | 2 | — | — | Blocked: the server refuses the copy |
+| 7 | Bulk-edit twenty | 8 | 8 | 8 | 0 | 0 | 0 | 0 | 0 | 2 | 14.5 | 14.5 | Done |
+| 8 | Group by custom field | 2 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 1 | 5.3 | 5.3 | Done |
+| 10 | Everything list | 1 for my tasks | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 1 | — | 5.3 | Done |
+| 12 | Five custom fields, filled | 59 | 37 | 27 | 0 | 1 | 9 | 101 | 16 | 4 | 106.4 | 76.8 | Done |
+| 13 | Totals of a number field | 9 for (b) | 14 with a workaround | 12 | 0 | 0 | 2 | 22 | 4 | 6 | — | — | Partly: (a) done in 2; (b) empty until a subtask value is saved again |
+| 15 | Share a doc | 9 | 8 | 6 | 0 | 0 | 2 | 34 | 4 | 3 | 25.6 | 24.3 | Done |
+| 16 | Doc history restore | 10 with a saved version | 5 | 4 | 0 | 0 | 1 | 12 | 2 | 2 | — | 13.4 | Done |
+| 17 | Timer and manual time | 6 | 6 | 5 | 0 | 0 | 1 | 2 | 2 | 0 | 9.2 | 9.2 | Done |
+| 18 | Timesheet, submit and approve | 5 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 2 | 11.6 | 9.3 | Done |
+| 19 | Dependency and Gantt shift | 8 | 9 | 7 | 1 | 0 | 1 | 5 | 2 | 3 | 17.8 | 19.1 | Done |
+| 20 | Sprint | 16 | 15 | 13 | 0 | 1 | 1 | 19 | 2 | 7 | 36.8 | 34.1 | Done |
+| 24 | Search | 7 | 7 | 0 | 0 | 5 | 2 | 14 | 0 | 4 | 12.1 | 12.1 | Done |
+| 25 | Invite; private project | at least 10 | at least 10 | 9 | 0 | 0 | 1 | 22 | 2 | 5 | — | — | Partly: counted to the last button |
+
+C to S are run 2. Jobs 9, 11, 14, 21, 22 and 23 keep their run 1 rows.
+
+### The path taken in run 2
+
+| # | Path in AlianHub at build 754 |
+|---|---|
+| 1 | As run 1. The date is now one click in a small picker. Priority still opens a full-height side panel. |
+| 2 | Press C, type the name, open the list select, pick the list, Enter. The dialog opened on the project used last time. On a first use the project costs two more clicks. |
+| 3 | As run 1: "Make a task", project select, project, list select, list, Create. |
+| 4 | "Add subtask", type, Enter. Click the new subtask, "Add subtask", type, Enter. The third level is not offered. |
+| 5 | "+ New", "New folder", name, Enter. Folder menu in the sidebar, "New subfolder", name, Enter. Subfolder menu, "New list", name, Enter: the list lands inside the subfolder. Tick the task, "Sprint" in the bulk bar, the list. |
+| 6 | More, "Duplicate project", type the name, Duplicate. The dialog answers "The project could not be duplicated." |
+| 7 | As run 1. The selection still clears after the first change. |
+| 8 | "Group by", the field. |
+| 10 | "Everything" in the rail, "Me". |
+| 12 | "+ Custom Field", Text, label, "Save and add another". Back, Number, label, "Save and add another". Back, Dropdown, label, Options, click the option box, Alpha, Enter, Beta, "Save and add another". Back, Date, label, "Save and add another". Back, People, label, "Save field". Then: click Note, type; click Cost, type; Stage, Beta; Review date, tomorrow, Select; Reviewer, me, Close. |
+| 13 | (a) Columns, tick Cost: each group shows a Total row. (b) Open the parent, "+ Custom Field", Rollup, label, "Source field", Cost, Save: the parent shows a dash. Subtasks tab, the subtask, click Cost, type the value again, back to the parent: it shows the sum. |
+| 15 | The project in the Docs sidebar, "New doc", triple-click the title and type, click the body and type (it saves by itself), Share, "Who can see this doc". |
+| 16 | Triple-click the line, type. History: one version, kept before the rewrite, is already selected. "Restore this version", confirm in the app's own dialog. |
+| 17 | As run 1. |
+| 18 | "Time" in the rail, "Submit week", the Approvals tab, Approve. |
+| 19 | Open Design, "Relate", type "Build", click the result, close, Gantt tab, Days, drag the bar, "Shift dependants". |
+| 20 | "+ New", "New list", name, Enter: the new list opens. List menu, "Make it a sprint", tick "Run this list as a sprint", duration, 2 weeks, Save. The source list in the sidebar, tick the first task, Shift-click the fifth, "Sprint", the sprint. |
+| 24 | As run 1. |
+| 25 | (a) More, Members, Invite, click the address box, type, Send (not pressed). (b) More, Settings, Projects, "Private" on the project's card (not pressed). |
+
+### What changed since run 1
+
+| # | Finding at build 754 |
+|---|---|
+| 2 | Two steps fewer: the project is remembered. The list is not. The assignee list still has no entry for the person creating the task. |
+| 4 | A subtask's panel now offers "Add subtask". A sub-subtask's panel does not, and has no Subtasks tab: the limit is two levels under a task. Nothing on the screen says so. |
+| 5 | Five steps fewer. Folder and subfolder menus in the sidebar hold "New subfolder" and "New list". "Move to folder" was not needed. |
+| 6 | The menu entry and the dialog exist. The request fails with a server error. The log names the cause: the project has no currency set, and the copy requires one. |
+| 10 | The Everything page lists tasks from every project (226 at the time) and "Me" narrows it (36, from five projects). |
+| 12 | 22 steps fewer. Only the label is required. The label is focused. "Save and add another" keeps the panel open. Still extra: Back and the type again for each field, the Options tab and a click into the first option box, "Select" on a date value, Close on the people picker. |
+| 13 | (a) now works: a Total row per group for a custom number field. (b) a new rollup shows a dash on the parent until a value under it is saved again. The rollup made in run 1 also showed a dash until then. |
+| 15 | One step fewer: the doc saves by itself. A new doc opens with nothing focused, and its title "Untitled" is real text that has to be selected. |
+| 16 | Works as written. A version is kept by itself before text is rewritten. Restore asks in the app's own dialog. |
+| 17 | Same count. It could only be run after the approved week was reopened: in an approved week the timer runs, and only Stop says the time cannot be added. |
+| 18 | One step fewer. Approvals is a tab on the Time page and an entry under More. "Submit week" was seen but not pressed: reopening the week had put it back to Submitted. The timesheet sat below nine agent proposals on the Approvals page. |
+| 19 | One step more. The Gantt opened on Weeks, where a bar moved by two days went back to its place with no message. On Days the move worked and the preview showed. With the Gantt already on Days the count is 8. |
+| 20 | One step fewer. "Make it a sprint" is in the list menu on the List view. The dialog opens with the switch off. The sprint page has no way to add existing tasks. |
+| 25 | Unchanged. |
+
+### What still costs steps
+
+The five worst jobs at build 754. Jobs that do not complete come first, then the largest gap to ClickUp.
+
+| Rank | Job | Run 2 | ClickUp | The clicks that cost |
+|---|---|---|---|---|
+| 1 | 6 Duplicate a project | Blocked | at least 4 | More, "Duplicate project", name, Duplicate: four steps, then "The project could not be duplicated." Nothing on the screen says why. |
+| 2 | 4 Three levels of subtasks | Partly, 7 for two levels | 9 | The third level cannot be made. Each level also costs one click to open the subtask before "Add subtask". |
+| 3 | 13 Totals of a number field | Partly, 14 | (a) 3 | (b) costs five steps after Save, only to wake the rollup: Subtasks tab, the subtask, click Cost, type the same value, back to the parent. |
+| 4 | 20 Sprint | 15 | at least 8 | Three clicks to turn a list into a sprint (list menu, "Make it a sprint", the switch). Two for the duration. Five to add tasks: the source list, tick, Shift-click, "Sprint", the sprint. |
+| 5 | 3 Message to task | 6 | 2 | Four clicks to pick the place: project select, project, list select, list. Nothing is remembered. |
+
+Next after these: job 12 (37 against at least 34; eight clicks are Back and the type again), job 25 (invite is three levels down and the address box is not focused), job 7 (two clicks to select the tasks again), job 19 (Days, and closing the task panel), job 24 (one arrow key, because a task from another project ranks above the doc).
+
+### The five slowest jobs in run 2
+
+| Rank | Job | Steps | Time (s) | Run 1 time (s) |
+|---|---|---|---|---|
+| 1 | 12 Five custom fields | 37 | 76.8 | 106.4 |
+| 2 | 5 Folder, subfolder, list, move | 15 | 42.0 | 53.9 |
+| 3 | 20 Sprint | 15 | 34.1 | 36.8 |
+| 4 | 21 Automation rule (carried forward) | 11 | 25.4 | 25.4 |
+| 5 | 9 Filter and save a view (carried forward) | 10 | 24.9 | 24.9 |
+
+### Faults met in run 2
+
+| Job | Step | What happened |
+|---|---|---|
+| 6 | Duplicate, the last button | Server error 500. Log: project validation failed, `ProjectCurrency` is required. QA Sandbox has no currency. |
+| 13 | After saving a new rollup field | The parent shows a dash. It shows the sum only after a source value on a subtask is saved again. |
+| 4 | "Add subtask" while the list's "Add task" row is still open behind the panel | The cursor goes to the list's row, not the subtask row. Both inputs share one id. Typing and Enter made a top-level task, twice. The list's row stays open after a task is saved. |
+| 17 | Start timer in an approved week | The timer runs. Stop then says the day is in an approved period. Nothing warns at the start. |
+| 19 | Drag a bar by two days on Weeks | The bar returns to its place. No message. |
+| 20 | Open a new, empty list | The page says a task was created in this project at some point and it cannot tell why the view is empty. |
+| 18 | Approvals, the reopened week | The card read "1h 31m" beside "3h 2m billable" after time was added. |
+| 2 | Assignee select in quick-create | The person creating the task is not in the list. |
+| 24 | Type "launch" in the palette | A task from another project still ranks above the doc. |
+| 12 | Date value | Needs "Select" and stores a time (21:15). The people picker stays open after a pick. |
+
+Wording slips still present: a new list is announced as "Sprint created successfully" and its name box says "Enter sprint name"; message-to-task says "Select a sprint"; the bulk control that moves tasks is labelled "Sprint"; a new folder's name box says "Enter directory name"; "2 tasks across 1 projects"; the two field forms list different task types.
+
+### What run 2 could not measure
+
+- Job 6 past the failing request.
+- Job 25: nothing was sent or changed. The member choice after "Private" was not seen.
+- Job 7: run on 15 tasks, not 20, because run 1 moved five into its sprint. The priority change was made and undone. The assignee change was not applied: the teammate was already on every task and the menu toggles.
+- Job 18: "Submit week" was not pressed (see above).
+- Job 19: the dependency already existed, so "Relate" was opened and not saved again. The drag was sent as mouse events, not made by hand.
+- Jobs 9, 11, 14 and 21 were not rerun.
+- Times are model estimates, as in run 1.
+
 ## ClickUp's side
 
 ClickUp 4.x. The plan of the workspace used for the look-only pass was not shown on the screens visited; its invite dialog says inviting is free, and billing was not opened.
@@ -225,15 +355,17 @@ ClickUp 4.x. The plan of the workspace used for the look-only pass was not shown
 
 ### Side by side (provisional)
 
-| Outcome | Jobs | Count |
-|---|---|---|
-| AlianHub needs the same or fewer steps | 1, 8, 9, 11, 14, 18, 22, 23 | 8 |
-| AlianHub needs more steps | 2, 3, 7, 19, 24, 25 | 6 |
-| Unclear: ClickUp's figure is a lower bound | 5, 12, 15, 17, 20 | 5 |
-| AlianHub did not complete the job at build 705 | 4, 6, 10, 13, 16 | 5 |
-| ClickUp's figure could not be counted | 21 | 1 |
+| Outcome | Run 1, build 705 | Count | Run 2, build 754 | Count |
+|---|---|---|---|---|
+| AlianHub needs the same or fewer steps | 1, 8, 9, 11, 14, 18, 22, 23 | 8 | 1, 2, 5, 8, 9, 10, 11, 14, 16, 18, 22, 23 | 12 |
+| AlianHub needs more steps | 2, 3, 7, 19, 24, 25 | 6 | 3, 7, 19, 24, 25 | 5 |
+| Unclear: ClickUp's figure is a lower bound and AlianHub is above it | 5, 12, 15, 17, 20 | 5 | 12, 15, 17, 20 | 4 |
+| AlianHub did not complete the job | 4, 6, 10, 13, 16 | 5 | 4, 6, 13 | 3 |
+| ClickUp's figure could not be counted | 21 | 1 | 21 | 1 |
 
-The finish line in `task.md` is "the same or fewer steps on at least 22 of 25". At build 705, with ClickUp mostly counted from documentation, the count is 8. Treat it as a first reading, not a verdict.
+The finish line in `task.md` is "the same or fewer steps on at least 22 of 25". At build 705 the count was 8. At build 754 it is 12. ClickUp is still mostly counted from documentation, so treat both as readings, not verdicts.
+
+Notes on run 2: job 2 counts 5 against ClickUp's 5 with the project remembered; job 5 counts 15 against "at least 15"; job 13 is not counted because (b) has no ClickUp figure and needed a workaround.
 
 ### Help articles used
 
@@ -270,7 +402,7 @@ Every article is on `help.clickup.com`. The public address is `https://help.clic
 ## What is still needed
 
 1. **A hands-on ClickUp run that saves the work**, in a throwaway Space, by a person. Use the sheet below.
-2. **An AlianHub rerun on a build at or after 739**, for jobs 4, 5, 6, 10 and 13, whose fixes merged after build 705.
+2. **Done in run 2 (build 754).** Left from it: job 6 fails on the server, job 13 (b) needs a workaround, job 4 stops at two levels. Rerun these three once fixed.
 3. **Two drags made by hand** (jobs 11 and 19) in both products.
 4. **Job 3 from an email**, which was not tried.
 5. **Job 25 carried through** in a workspace where an invitation and a privacy change are allowed.
@@ -326,3 +458,18 @@ All named `[QA bench] …` unless noted. Nothing was deleted.
 - One comment with a reply, two time entries, and one dependency between `Design` and `Build`.
 - One message in the scratch chat channel made by an earlier QA pass.
 - The owner's timesheet for the week of 2026-09-28 is approved.
+
+### Added by run 2
+
+All named `[QA bench2] …`. Nothing was deleted, nothing was sent, no setting was changed.
+
+- Folder `folder` with subfolder `subfolder` and list `inner list` inside it.
+- List `Sprint 9`, a planned sprint, 2026-10-01 to 2026-10-14, with five tasks.
+- Tasks: `Write release note` (in `inner list`, five field values, two time entries), `Call supplier`, `Please fix the login page`, `Child` under `[QA bench] Parent` with `Grandchild` under it, and two stray top-level `Child` tasks (see the faults table). The strays, `Call supplier`, `Please fix the login page` and run 1's `[QA bench] Please fix the login page` are in `Sprint 9`.
+- Custom fields: `Note`, `Cost`, `Stage`, `Review date`, `Reviewer`, `Cost total` (a rollup).
+- Doc `Launch notes`, reading "First draft", with kept versions.
+- Dashboard `Board` (visible to its creator only) with one card.
+- No copy of the project: the duplicate failed.
+- Changed on run 1's items: `[QA bench] Child` had its Cost saved again; `[QA bench] Design` is now 7 to 8 October and `[QA bench] Build` 8 to 9 October; `bulk 06` to `bulk 20` went to Medium and back to High.
+- The owner's timesheet for the week of 2026-09-28 was reopened, gained 1 h 31 min, and is approved again.
+- One question, "launch", was put to the AI from the command palette by mistake. It was answered on screen and not posted.
