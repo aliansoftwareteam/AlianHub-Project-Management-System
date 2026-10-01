@@ -9,6 +9,15 @@ export default [
         component: () => import(/* webpackChunkName: "planner" */ '@/views/Planner/Planner.vue')
     },
     {
+        path: '/:cid/everything',
+        name: 'Everything',
+        meta: {
+            title: 'Everything',
+            requiresAuth: true
+        },
+        component: () => import(/* webpackChunkName: "everything" */ '@/views/Everything/Everything.vue')
+    },
+    {
         path: '/:cid/personal',
         name: 'PersonalList',
         meta: {

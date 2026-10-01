@@ -22,6 +22,8 @@ const scopeForTool = (name) => {
     if (Object.prototype.hasOwnProperty.call(TOOL_SCOPES, name)) return TOOL_SCOPES[name];
     const dataTools = require('./dataTools');
     if (Object.prototype.hasOwnProperty.call(dataTools.SCOPES, name)) return dataTools.SCOPES[name];
+    const manageTools = require('./manageTools');
+    if (Object.prototype.hasOwnProperty.call(manageTools.SCOPES, name)) return manageTools.SCOPES[name];
     const sessionTools = require('./sessionTools');
     return sessionTools.owns(name) ? sessionTools.SCOPES[name] : null;
 };
