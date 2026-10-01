@@ -422,10 +422,11 @@ describe('the other task write routes use the same judgement', () => {
         expect(decisions()).toEqual([]);
     });
 
-    test('a relation needs the task to be visible in both projects', async () => {
+    test('a relation needs the task to be visible in both projects, and the route itself answers for one that is not', async () => {
         setMode('enforce');
         setRule(LOCKED_PROJECT, 'task_list', null);
-        const result = await run(guardOf('POST /api/v2/tasks/relations'), session(MEMBER, { action: 'add', taskId: OPEN_TASK, relatedTaskId: LOCKED_TASK }, '/api/v2/tasks/relations', 'POST'));
-        expect(result).toMatchObject({ code: 403, body: { permission: 'task.task_list' } });
+        const request = () => session(MEMBER, { action: 'add', taskId: OPEN_TASK, relatedTaskId: LOCKED_TASK }, '/api/v2/tasks/relations', 'POST');
+        expect(await run(requireTaskActionPermission(RELATION_ACTIONS), request())).toMatchObject({ code: 403, body: { permission: 'task.task_list' } });
+        expect((await run(guardOf('POST /api/v2/tasks/relations'), request())).passed).toBe(true);
     });
 });

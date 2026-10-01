@@ -35,6 +35,7 @@ export const shellState = reactive({
     reminders: false,
     talkToText: false,
     tour: false,
+    tourAsked: false,
     moreOpen: false,
     profileOpen: false,
     sidebarCollapsed: false,
@@ -119,6 +120,16 @@ export function applyAccent(choice) {
     } else {
         localStorage.setItem(ACCENT_KEY, shellState.accent);
         document.documentElement.setAttribute("data-accent", shellState.accent);
+    }
+}
+
+/* True once this browser holds a choice of theme, contrast, look or accent. */
+export function hasChosenLook() {
+    void [shellState.theme, shellState.contrast, shellState.variant, shellState.accent];
+    try {
+        return [THEME_KEY, CONTRAST_KEY, VARIANT_KEY, ACCENT_KEY].some((key) => localStorage.getItem(key) !== null);
+    } catch {
+        return false;
     }
 }
 

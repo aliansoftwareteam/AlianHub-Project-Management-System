@@ -20,6 +20,11 @@ describe('the user schema keeps the onboarding record', () => {
         expect(usersSchema.path(`homeChecklist.${flag}`).instance).toBe('Boolean');
     });
 
+    it.each(['openedMyWork', 'viewedShortcuts'])('keeps the member step %s', (flag) => {
+        expect(ONBOARDING_FLAGS).toContain(flag);
+        expect(usersSchema.path(`homeChecklist.${flag}`).instance).toBe('Boolean');
+    });
+
     it('declares the tours already offered as a list of names', () => {
         expect(usersSchema.path('homeChecklist.toursOffered')).toBeDefined();
         expect(usersSchema.path('homeChecklist.toursOffered').instance).toBe('Array');
@@ -36,6 +41,16 @@ describe('sanitizeOnboardingPatch', () => {
 
     it('adds an offered tour once', () => {
         expect(sanitizeOnboardingPatch({ tourOffered: 'project' })).toEqual({ ok: true, update: { $addToSet: { 'homeChecklist.toursOffered': 'project' } } });
+    });
+
+    it('records the first-visit tour and the member steps on the caller\'s record', () => {
+        expect(sanitizeOnboardingPatch({ tourOffered: 'first', openedMyWork: true, viewedShortcuts: true })).toEqual({
+            ok: true,
+            update: {
+                $set: { 'homeChecklist.openedMyWork': true, 'homeChecklist.viewedShortcuts': true },
+                $addToSet: { 'homeChecklist.toursOffered': 'first' }
+            }
+        });
     });
 
     it.each([
@@ -76,6 +91,16 @@ describe('PUT /api/v2/users/onboarding', () => {
         expect(query.data[1]).toEqual({ $set: { 'homeChecklist.dismissed': true } });
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json.mock.calls[0][0]).toEqual({ status: true, statusText: 'Onboarding saved', data: { dismissed: true } });
+    });
+
+    it('adds the first-visit tour to the signed-in user\'s offered tours', async () => {
+        MongoDbCrudOpration.mockResolvedValue({ _id: UID, homeChecklist: { toursOffered: ['first'] } });
+        const res = resOf();
+        await updateOwnOnboarding({ uid: UID, body: { tourOffered: 'first' } }, res);
+        const [, query] = MongoDbCrudOpration.mock.calls[0];
+        expect(String(query.data[0]._id)).toBe(UID);
+        expect(query.data[1]).toEqual({ $addToSet: { 'homeChecklist.toursOffered': 'first' } });
+        expect(res.json.mock.calls[0][0].data).toEqual({ toursOffered: ['first'] });
     });
 
     it('answers 400 and writes nothing for a bad patch', async () => {

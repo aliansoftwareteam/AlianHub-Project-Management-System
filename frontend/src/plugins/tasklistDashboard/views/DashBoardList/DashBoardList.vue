@@ -1150,13 +1150,8 @@ function filterSprintsIdQuery () {
 .tasklist-range { gap: 6px; }
 .tasklist-range-label { font-size: 12px; font-weight: 600; color: #3a3f52; white-space: nowrap; }
 .tasklist-range-field {
-    font-size: 12px;
     height: 30px;
-    width: auto;
     min-width: 110px;
-    padding: 2px 8px;
-    border: 1px solid #e5e7eb;
     border-radius: 6px;
-    color: #3a3f52;
 }
 </style>

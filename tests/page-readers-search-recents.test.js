@@ -16,11 +16,13 @@ const { resolveFavourites } = require('../Modules/Users/helpers/favouritesResolv
 const { C, PAGES } = world;
 
 const EVERYONE_REACHES = {
-    owner: ['shared', 'company', 'closed'],
-    admin: ['shared', 'company', 'closed'],
-    inside: ['insidePrivate', 'shared', 'company', 'closed'],
+    owner: ['shared', 'company', 'closed', 'namedEdit'],
+    admin: ['shared', 'company', 'closed', 'namedEdit'],
+    inside: ['insidePrivate', 'shared', 'company', 'closed', 'namedView', 'namedEdit'],
     outside: ['outsidePrivate', 'shared', 'company'],
     guest: ['shared', 'company'],
+    viewer: ['shared', 'company', 'namedView'],
+    editor: ['shared', 'company', 'namedEdit'],
 };
 
 beforeEach(() => {

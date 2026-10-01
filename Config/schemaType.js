@@ -130,6 +130,7 @@ const SCHEMA_TYPE = {
     AUDIT_REDACTIONS: "audit_redactions",
     AUDIT_CHAIN_KEY: "audit_chain_key",
     EGRESS_ALLOWLISTS: "egress_allowlists",
+    CONNECTOR_CONNECTIONS: "connector_connections",
     INSTRUCTION_PATTERNS: "instruction_patterns",
     SECRETS: "secrets",
     OAUTH_CLIENTS: "oauth_clients",

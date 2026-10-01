@@ -3,6 +3,7 @@ name: CI
 on:
   pull_request:
     branches: [beta, main, staging]
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [beta, main, staging]
 
@@ -14,6 +15,8 @@ jobs:
   # A pull request that only touches task notes has nothing for the suites to test. The jobs below
   # are skipped for it, and a skipped job satisfies a required check. Generated and tested documents
   # under docs/ are not on this list: tests read them.
+  # A draft is skipped too: it cannot be merged, and marking it ready runs the suites. Work that is
+  # merged through a combined pull request stays a draft, so the suites run once, on the combined one.
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -26,6 +29,9 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" != "pull_request" ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ "${{ github.event.pull_request.draft }}" = "true" ]; then
+            echo "code=false" >> "$GITHUB_OUTPUT"; exit 0
           fi
           if git diff --name-only HEAD^1 HEAD | grep -qvE '^(Tasks/|\.claude/.*\.md$)'; then
             echo "code=true" >> "$GITHUB_OUTPUT"

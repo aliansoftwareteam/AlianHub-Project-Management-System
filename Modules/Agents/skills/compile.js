@@ -8,7 +8,7 @@ const readers = require('./readers');
 const externalReads = require('./externalReads');
 const { riskOf } = require('./validateSkill');
 const { ground } = require('./grounding');
-const { INPUT_CATALOGUE, PROMPT_PARTIALS, EMIT_ACTIONS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, plain } = require('./catalogues');
+const { INPUT_CATALOGUE, PROMPT_PARTIALS, emitActions, emitRequired, TASK_FIELDS, TEMPLATE_ROOTS, plain } = require('./catalogues');
 const { render, renderString, tagsIn } = require('./skillTemplate');
 const { readField } = require('../../Automations/engine/expression');
 
@@ -51,20 +51,21 @@ const fillIds = (action, params, task) => {
     return out;
 };
 
-const emptyRequired = (action, params) => (EMIT_REQUIRED[action] || []).find((name) => params[name] === undefined || params[name] === null || params[name] === '' || (Array.isArray(params[name]) && !params[name].length));
+const emptyRequired = (action, params) => emitRequired(action).find((name) => params[name] === undefined || params[name] === null || params[name] === '' || (Array.isArray(params[name]) && !params[name].length));
 
 const changeOf = (mapping, ctx, task) => {
     const params = fillIds(mapping.action, render(mapping.params, ctx), task);
     const missing = emptyRequired(mapping.action, params);
     if (missing) return { dropped: { reason: `"${missing}" rendered empty for ${mapping.action}`, text: mapping.label || mapping.action } };
     const entry = registry.get(mapping.action);
+    if (!entry) return { dropped: { reason: `${mapping.action} is not available on this server`, text: mapping.label || mapping.action } };
     const label = (mapping.label ? renderString(mapping.label, ctx) : '').trim() || entry.label;
     return { change: { action: mapping.action, label: label.slice(0, 200), reversible: Boolean(entry.undoable), params } };
 };
 
 const zeroCounts = () => {
     const counts = {};
-    EMIT_ACTIONS.forEach((key) => { const parts = key.split('.'); const last = parts.pop(); parts.reduce((node, k) => { node[k] = node[k] || {}; return node[k]; }, counts)[last] = 0; });
+    emitActions().forEach((key) => { const parts = key.split('.'); const last = parts.pop(); parts.reduce((node, k) => { node[k] = node[k] || {}; return node[k]; }, counts)[last] = 0; });
     return counts;
 };
 

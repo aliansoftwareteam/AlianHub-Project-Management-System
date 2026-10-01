@@ -14,7 +14,7 @@
                     <span class="font-size-14 font-weight-500 ai-color ai-border-bottom">{{ $t('AI.ai_write_description') }}</span>
                 </div>
             </div>
-            <div v-show="contentLoaded" id="editorjs" role="group" :aria-label="$t('Description.description')" :class="{'ml-10px mr-10-px': clientWidth < 767, 'show_hide_class': !isShow}" @click="isShow = true"></div>
+            <div v-show="contentLoaded" id="editorjs" ref="editorHolder" role="group" :aria-label="$t('Description.description')" :class="{'ml-10px mr-10-px': clientWidth < 767, 'show_hide_class': !isShow}" @click="isShow = true"></div>
             <Transition>
                 <span v-if="showMessage" class="saved_message">{{$t('Description.saved')}}</span>
             </Transition>
@@ -216,6 +216,7 @@ const editorTools = {
 const converterTools = () => Object.fromEntries(Object.entries(editorTools).filter(([name]) => name !== 'embed'));
 
 const editor = ref();
+const editorHolder = ref(null);
 
 const $toast = useToast();
 const converter = ref();
@@ -263,6 +264,7 @@ function selectionTools() {
 }
 
 function initEditor() {
+    const holder = editorHolder.value;
     editor.value = new EditorJS({
         holder: 'editorjs',
         tools: {...editorTools, ...selectionTools()},
@@ -286,7 +288,10 @@ function initEditor() {
             }
         }, 500),
         onReady(){
-            document.querySelector('.codex-editor__redactor').style.paddingBottom = '10px';
+            // Stepping to another task can take this editor off the page before it is ready.
+            if(!holder?.isConnected) return;
+            const redactor = holder.querySelector('.codex-editor__redactor');
+            if(redactor) redactor.style.paddingBottom = '10px';
             if(!props.description || (Array.isArray(props.description?.blocks) && !props.description.blocks.length)) {
                 noDescription.value = true;
             } else if (typeof props.description === 'string' && props.description !== '') {

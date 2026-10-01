@@ -35,6 +35,7 @@
                         :company-name="companyName"
                         :title="isOwnerOrAdmin ? '' : $t('Home.member_setup_title')"
                         :steps="checklistSteps"
+                        :sample="isOwnerOrAdmin && Boolean(sampleProject)"
                         @action="onChecklistAction"
                         @dismiss="dismissChecklist"
                     />
@@ -180,16 +181,15 @@ const todayLabel = computed(() => moment().format("ddd MMM D"));
 const projects = computed(() => getters["projectData/projects"]?.data || []);
 const companyName = computed(() => getters["settings/selectedCompany"]?.Cst_CompanyName || "");
 
-const mainTour = inject("$mainTour", null);
 const onboarding = useOnboardingChecklist({
     openCreateProject: () => { createProjectOpen.value = true; },
-    startTour: (which) => mainTour?.value?.startTour?.(which),
     routeVersion: () => route.fullPath
 });
 const { steps: checklistSteps, show: showChecklist, complete: checklistComplete, isOwnerOrAdmin, dismiss: dismissChecklist, sampleProject } = onboarding;
 const surfaceOpen = useBlockingSurface();
 const firstRun = computed(() => projects.value.length <= 1 || !checklistComplete.value);
 const confirmRemoveSample = ref(false);
+watch(() => route.query.filter, (filter) => { if (filter === "assigned" && !isOwnerOrAdmin.value) onboarding.mark("my_work"); }, { immediate: true });
 
 const agendaItems = computed(() => agenda.itemsFor(agendaDay.value, work.mine.value));
 

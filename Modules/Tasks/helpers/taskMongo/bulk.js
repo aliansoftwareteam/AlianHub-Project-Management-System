@@ -26,7 +26,8 @@ const socketEmitter = require('../../../../event/socketEventEmitter');
 const { HandleHistory } = require('../mongo_helper');
 const { HandleBothNotification } = require('../handleNotification');
 const { recordCompletion } = require('./recordCompletion.js');
-const { escapeText, TaskWriteRefusal } = require('../taskWriteFields');
+const { escapeText, TaskWriteRefusal, statusInProject, NOT_A_PROJECT_STATUS } = require('../taskWriteFields');
+const { projectHoldsTag, TAG_NOT_IN_PROJECT } = require('../taskItemHistory');
 const { ancestorsOf, loadSubtree, canNest } = require('../taskTree');
 const {
     taskAssigneeAdd, taskAssigneeRemove, taskAssigneeReplace,
@@ -144,6 +145,22 @@ function makeProjectLoader(companyId) {
     };
 }
 
+/* Asks `judge` once for each project the tasks are in, and answers what it said for a task's project. */
+async function judgedByProject(tasks, judge) {
+    const verdicts = new Map();
+    for (const task of tasks) {
+        const projectId = String(task.ProjectID);
+        if (!verdicts.has(projectId)) verdicts.set(projectId, await judge(projectId));
+    }
+    return (task) => verdicts.get(String(task.ProjectID));
+}
+
+/* The tasks `verdictOf` passes; the rest join `skipped` under `reason`. */
+function keepJudged(found, verdictOf, skipped, reason) {
+    found.filter((task) => !verdictOf(task)).forEach((task) => skipped.push({ taskId: String(task._id), reason }));
+    return found.filter(verdictOf);
+}
+
 // Build the summary response shape returned to the route.
 function summarize({ updated = [], skipped = [], errors = [] }) {
     return {
@@ -212,36 +229,38 @@ module.exports = {
                 if (!companyId) return reject(new Error('companyId required'));
                 if (!newStatus || !newStatus.status) return reject(new Error('newStatus required'));
 
-                const { tasks, skipped } = await loadScopedTasks(companyId, taskIds, { includeArchived: false });
-                if (!tasks.length) {
+                const { tasks: found, skipped } = await loadScopedTasks(companyId, taskIds, { includeArchived: false });
+                if (!found.length) {
                     return resolve(summarize({ updated: [], skipped, errors: [] }));
                 }
                 const loadProject = makeProjectLoader(companyId);
-                const taskObjIds = tasks.map((t) => t._id);
+                const statusOf = await judgedByProject(found, async (projectId) => statusInProject(await loadProject(projectId), newStatus));
+                const tasks = keepJudged(found, statusOf, skipped, 'status-not-in-project');
+                if (!tasks.length) return reject(new TaskWriteRefusal(400, NOT_A_PROJECT_STATUS));
                 const errors = [];
 
                 try {
-                    await MongoDbCrudOpration(companyId, {
-                        type: dbCollections.TASKS,
-                        data: [
-                            { _id: { $in: taskObjIds } },
-                            { $set: { ...newStatus }, $unset: { groupByStatusIndex: 1 } },
-                        ],
-                    }, 'updateMany');
+                    for (const projectId of new Set(tasks.map((t) => String(t.ProjectID)))) {
+                        const inProject = tasks.filter((t) => String(t.ProjectID) === projectId);
+                        await MongoDbCrudOpration(companyId, {
+                            type: dbCollections.TASKS,
+                            data: [
+                                { _id: { $in: inProject.map((t) => t._id) } },
+                                { $set: { ...statusOf(inProject[0]) }, $unset: { groupByStatusIndex: 1 } },
+                            ],
+                        }, 'updateMany');
+                    }
                 } catch (error) {
                     logger.error(`bulkUpdateStatus updateMany error: ${error.message}`);
                     return reject(error);
                 }
 
                 const updated = tasks.map((t) => String(t._id));
-                const newStatusText = newStatus.status.text;
                 for (const task of tasks) {
                     try {
                         const projectData = await loadProject(task.ProjectID);
-                        if (!projectData) {
-                            skipped.push({ taskId: String(task._id), reason: 'project-not-found' });
-                            continue;
-                        }
+                        const stored = statusOf(task);
+                        const newStatusText = stored.status.text;
                         const prevStatusName = task?.status?.text || '';
                         const historyObj = {
                             key: 'Task_Status',
@@ -255,7 +274,7 @@ module.exports = {
                             const notifContext = {
                                 ProjectName: projectData.ProjectName,
                                 taskName: task.TaskName,
-                                ...shownStatus({ statusName: prevStatusName }, newStatus).template,
+                                ...shownStatus({ statusName: prevStatusName }, stored).template,
                             };
                             HandleBothNotification({
                                 type: 'tasks',
@@ -273,16 +292,16 @@ module.exports = {
 
                         // Same provenance record the single-task path writes; without it a
                         // bulk close left no closedBy and the task showed no badge.
-                        recordCompletion({ companyId, taskId: task._id, task, newStatus, userData });
+                        recordCompletion({ companyId, taskId: task._id, task, newStatus: stored, userData });
 
-                        emitTaskUpdate(task, { ...newStatus });
+                        emitTaskUpdate(task, { ...stored });
                     } catch (error) {
                         logger.error(`bulkUpdateStatus task ${task._id}: ${error.message}`);
                         errors.push({ taskId: String(task._id), reason: error.message });
                     }
                 }
 
-                emitBulkSummary('bulkUpdateStatus', { taskIds: updated, newStatus });
+                emitBulkSummary('bulkUpdateStatus', { taskIds: updated, newStatus: statusOf(tasks[0]) });
                 resolve(summarize({ updated, skipped, errors }));
             } catch (error) {
                 logger.error(`bulkUpdateStatus error: ${error.message}`);
@@ -727,10 +746,16 @@ module.exports = {
                 }
                 if (!tagId) return reject(new Error('tagId required'));
 
-                const { tasks, skipped } = await loadScopedTasks(companyId, taskIds, { includeArchived: false });
-                if (!tasks.length) {
+                const { tasks: found, skipped } = await loadScopedTasks(companyId, taskIds, { includeArchived: false });
+                if (!found.length) {
                     return resolve(summarize({ updated: [], skipped, errors: [] }));
                 }
+                // A tag the project no longer has can still be taken off its tasks.
+                const holdsTag = operation === 'add'
+                    ? await judgedByProject(found, (projectId) => projectHoldsTag(companyId, projectId, tagId))
+                    : () => true;
+                const tasks = keepJudged(found, holdsTag, skipped, 'tag-not-in-project');
+                if (!tasks.length) return reject(new TaskWriteRefusal(400, TAG_NOT_IN_PROJECT));
                 const taskObjIds = tasks.map((t) => t._id);
                 const errors = [];
 

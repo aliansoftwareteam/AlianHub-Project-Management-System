@@ -23,6 +23,7 @@
             >{{ expanded ? '▾' : '▸' }}</button>
             <span v-else class="tv2__disclose tv2__disclose--none" aria-hidden="true"></span>
             <button type="button" class="tv2__name" data-cell-primary :title="data.TaskName" @click.stop="$emit('open', data)">{{ data.TaskName }}</button>
+            <TaskHomeMark v-if="!depth" :task="data" :list="viewedList" />
             <span v-if="progress" class="tv2__sub-count">{{ progress.done }}/{{ progress.total }}</span>
         </span>
 
@@ -127,6 +128,7 @@ import ListStatusCircle from "@/views/Projects/ListView/ListStatusCircle.vue";
 import TaskColumnCell from "@/views/Projects/components/columns/TaskColumnCell.vue";
 import { defaultColumns } from "@/views/Projects/composables/viewColumns";
 import { MAX_DEPTH } from "@taskTreeRules";
+import TaskHomeMark from "@/views/Projects/components/TaskHomeMark.vue";
 
 defineOptions({ name: "TableRow" });
 
@@ -150,6 +152,7 @@ const rowRef = ref(null);
 let observer = null;
 
 const edit = inject("listRowEdit", null);
+const viewedList = inject("viewedList", ref(null));
 const rights = computed(() => edit?.rights.value || {});
 const injectedColumns = inject("tableColumns", null);
 const shownColumns = computed(() => injectedColumns?.value || defaultColumns("table"));

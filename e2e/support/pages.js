@@ -21,6 +21,8 @@ async function saveStorageState(browser, state, role) {
     try {
         const page = await context.newPage();
         await signInThroughForm(page, { email: state.users[role].email, password: state.password, companyId: state.companyId });
+        // The first-visit tour sits beside what it describes; a spec that wants it clears this key.
+        await page.evaluate("window.localStorage.setItem('ah.tour.skipped.shell', '1')");
         const file = storageStatePath(role);
         fs.mkdirSync(path.dirname(file), { recursive: true });
         await context.storageState({ path: file });

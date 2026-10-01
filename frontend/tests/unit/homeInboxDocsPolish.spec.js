@@ -390,23 +390,21 @@ describe('the setup checklist', () => {
     ];
     const mountChecklist = () => mount(SetupChecklist, { props: { companyName: 'Acme', steps }, global: { stubs: { ShellIcon: true } } });
 
-    it('shows the progress, the one next step and its action; the rest stays folded', () => {
+    it('shows the progress, the one next step and its action above the open list', () => {
         const wrapper = mountChecklist();
         expect(wrapper.find('.hc-setup__ring').text()).toBe('1/3');
         expect(wrapper.find('.hc-setup__next').text()).toContain('Home.step_invite');
         expect(wrapper.find('.hc-setup__next').text()).not.toContain('Home.step_permissions');
         expect(wrapper.find('.hc-setup__cta').text()).toBe('Home.invite_team');
-        expect(wrapper.find('.hc-setup__steps').exists()).toBe(false);
+        expect(wrapper.find('.hc-setup__steps').exists()).toBe(true);
         expect(wrapper.find('s').exists()).toBe(false);
         const toggle = wrapper.find('button.hc-setup__toggle');
-        expect(toggle.attributes('aria-expanded')).toBe('false');
+        expect(toggle.attributes('aria-expanded')).toBe('true');
         expect(toggle.attributes('aria-controls')).toBe('hc-setup-steps');
     });
 
-    it('opens to the full list, where a done step is marked and a later one can be started', async () => {
+    it('lists every step, where a done step is marked and a later one can be started, and folds away', async () => {
         const wrapper = mountChecklist();
-        await wrapper.find('.hc-setup__toggle').trigger('click');
-        expect(wrapper.find('.hc-setup__toggle').attributes('aria-expanded')).toBe('true');
         const items = wrapper.findAll('#hc-setup-steps .hc-setup__step');
         expect(items).toHaveLength(3);
         expect(items[0].classes()).toContain('is-done');
@@ -414,6 +412,9 @@ describe('the setup checklist', () => {
         expect(wrapper.find('s').exists()).toBe(false);
         await items[2].find('button').trigger('click');
         expect(wrapper.emitted('action')[0]).toEqual(['permissions']);
+        await wrapper.find('.hc-setup__toggle').trigger('click');
+        expect(wrapper.find('.hc-setup__toggle').attributes('aria-expanded')).toBe('false');
+        expect(wrapper.find('.hc-setup__steps').exists()).toBe(false);
     });
 
     it('the action still starts the next step', async () => {

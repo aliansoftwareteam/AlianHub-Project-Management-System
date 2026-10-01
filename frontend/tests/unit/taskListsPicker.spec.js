@@ -92,6 +92,19 @@ describe('the move sidebar as a list picker', () => {
         expect(rows).toEqual([['f1', 's6'], ['s2', '']]);
     });
 
+    it('writes the lists it offers onto a copy, never onto the project it was handed or one it browses to', async () => {
+        const handed = project();
+        const other = { ...project(), sprintsObj: { kept: { id: 'kept' } } };
+        const wrapper = await open(picker({ selectedProjectObject: handed, projectOptions: [other] }));
+
+        await wrapper.vm.$.setupState.changeProject(other);
+        await flushPromises();
+
+        expect(wrapper.findAll('.pick').map((row) => row.attributes('data-id'))).toEqual(['f1', 's2']);
+        expect(handed.sprintsObj).toEqual({});
+        expect(other.sprintsObj).toEqual({ kept: { id: 'kept' } });
+    });
+
     it('hands back the chosen list and closes', async () => {
         const wrapper = await open(picker());
 

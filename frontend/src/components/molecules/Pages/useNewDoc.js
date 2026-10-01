@@ -8,12 +8,14 @@ import * as env from '@/config/env';
 import { isOwnerOrAdmin } from '@/utils/roles';
 import { identitiesOf } from '@/components/molecules/ProjectTree/projectTreeModel';
 import { docRoute } from './docRoute';
+import { roleWritesDocs } from './useDocRights';
 
-/* Mirrors projectAccess().canEdit in Config/contentAccess.js, the rule POST /api/v2/pages
- * applies: a project that is not private belongs to everyone who sees it, a private one to
- * its people and teams, and owners and admins reach everything. A doc with no project is
- * the company's. No role key is consulted, on the server or here. */
+/* Mirrors the rule POST /api/v2/pages applies (canCreatePageIn in Modules/Pages/helpers/pageAccess.js):
+ * a guest starts no doc; for everyone else a project that is not private belongs to everyone who sees
+ * it, a private one to its people and teams, and owners and admins reach everything. A doc with no
+ * project is the company's. No role key is consulted, on the server or here. */
 export function canCreateDocIn(project, { userId, roleType, teams } = {}) {
+    if (!roleWritesDocs(roleType)) return false;
     if (!project || !project._id) return true;
     if (isOwnerOrAdmin(roleType) || project.isPrivateSpace !== true) return true;
     const mine = identitiesOf(userId, teams);

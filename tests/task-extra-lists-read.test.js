@@ -201,21 +201,29 @@ describe('a task in extra lists is counted once, at its home', () => {
     /* Reports, exports, velocity, burndown, portfolio, dashboards, timesheets, automations and the socket
        relay all read a task by ProjectID and sprintId. None of them names the new field, so none can count
        a task under a list it does not live in; a reader that starts to must be added here on purpose.
-       The writers that move or convert a task are here because they take entries away. */
+       The writers that move or convert a task are here because they take entries away; the list rows,
+       the Everything rows and the relay are here because they show a task under a list it was added
+       to, each only to a reader of the task's home (tests/task-find-extra-lists.test.js,
+       tests/socket-extra-list-relay.test.js). */
     test('no other server file reads the field', () => {
         const ROOT = path.join(__dirname, '..');
         const KNOWN = [
             'Modules/Agents/actions.js',
             'Modules/Agents/undo.js',
+            'Modules/Tasks/controller/everything.js',
+            'Modules/Tasks/controller/getTabSyncTasks.js',
+            'Modules/Tasks/helpers/everythingQuery.js',
             'Modules/Tasks/helpers/getTasksData.js',
             'Modules/Tasks/helpers/mongo_helper.js',
             'Modules/Tasks/helpers/taskExtraLists.js',
             'Modules/Tasks/helpers/taskExtraListsRules.js',
             'Modules/Tasks/helpers/taskMongo/extraLists.js',
             'Modules/Tasks/helpers/taskMongo/structural.js',
+            'Modules/Tasks/helpers/taskQueryGuard.js',
             'Modules/Tasks/helpers/taskWriteFields.js',
             'Modules/Tasks/helpers/task_class_Mongo.js',
             'migrations/069-task-extra-lists-index.js',
+            'socket/controller/taskSocket.js',
             'utils/mongo-handler/createSchema.js',
             'utils/mongo-handler/schema.js',
         ];

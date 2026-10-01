@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { ancestorsFor } = require('../Tasks/helpers/taskTree');
+const { cleanDescription } = require('../Tasks/helpers/cleanRichText');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const NAME_MAX = 120;
@@ -122,8 +123,10 @@ const buildTemplate = ({ task, subtasks = [], body = {}, uid }) => {
         defaultForProjects: [],
         sourceTaskId: String(task._id),
         titlePattern: include.title ? (typeof body.titlePattern === 'string' ? body.titlePattern.trim() : String(task.TaskName || '')).slice(0, TITLE_MAX) : '',
-        rawDescription: include.description ? String(task.rawDescription || '') : '',
-        descriptionBlock: include.description && isPlainObject(task.descriptionBlock) ? task.descriptionBlock : {},
+        ...cleanDescription({
+            rawDescription: include.description ? String(task.rawDescription || '') : '',
+            descriptionBlock: include.description && isPlainObject(task.descriptionBlock) ? task.descriptionBlock : {},
+        }),
         TaskType: include.type ? String(task.TaskType || '') : '',
         TaskTypeKey: include.type && Number.isFinite(typeKey) ? typeKey : null,
         Task_Priority: include.priority ? String(task.Task_Priority || '') : '',

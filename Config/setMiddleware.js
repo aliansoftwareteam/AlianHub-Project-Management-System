@@ -371,6 +371,8 @@ const verifyJWTTokenWithCRoute = [
     '/api/v2/provider-keys',
     // The AI switch (Modules/AiSwitch): any member reads the state, only an owner or admin changes it.
     "/api/v2/ai-switch",
+    // Agent connectors (Modules/Connectors): owner or admin only, never an API token; no route returns a token.
+    "/api/v2/connectors",
     // Dashboards (Modules/UserDashboard) read the company from the header, so they get the same live seat check.
     '/api/v1/dashboard',
     '/api/v1/dashboards',

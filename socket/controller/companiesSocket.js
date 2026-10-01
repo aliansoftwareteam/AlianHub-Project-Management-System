@@ -51,8 +51,10 @@ const handleCompaniesChange = (changeData, includeUpdatedFields = false) => {
             ...(includeUpdatedFields && { updatedFields: changeData.updatedFields }),
         };
 
+        const companyId = String(changeData.data.data._id);
         relatedRooms.forEach(data => {
-            if (!data.socket.rooms.has(data.roomName)) return;
+            const identity = data.socket.identity;
+            if (!identity || identity.companyId !== companyId || !data.socket.rooms.has(data.roomName)) return;
             data.namespace.to(data.roomName).emit(eventName, emitData);
         });
     } catch (error) {

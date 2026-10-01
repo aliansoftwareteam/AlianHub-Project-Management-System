@@ -259,3 +259,74 @@ A first visit: scripts ready at 0.29 s, the task query sent at 0.41 s and answer
 **Not changed: the sort in memory above 200 projects.** An index that leads with the sort key, `{ deletedStatusKey, updatedAt, _id, ProjectID }` and its due-date twin, would give the order back. It is not added, for three reasons: the requests it would speed up take 60 ms against 300; the counts read every task either way, so a first page would keep most of its cost; and it is two more indexes to maintain on every task write in every company, one of them on a field that changes with each write. From these two runs a first page costs roughly 15 ms plus 3 ms for each 1,000 tasks and subtasks the person can see when they are spread over more than 200 projects, so the budget is reached somewhere near 90,000, and by then it is the counts that need attention first (an index that covers them, or counts kept as tasks change). That is an estimate from two sizes, not a measurement.
 
 **Not measured:** anything at 50,000 tasks; a person who can open only some projects (the owner opens all, so the access rules add nothing here); the Board and Table modes in the browser; the grouped page with one project; the page after the change above, which needs a frontend build only to show the smaller answer on the wire.
+
+## First-load size
+
+What a browser must download before it can draw anything: the files `index.html` names, which are the entry script (`js/app.*.js`), the initial vendor script (`js/chunk-vendors.*.js`) and their two stylesheets. Everything else is a chunk fetched when a screen asks for it.
+
+**Budget: 2,575,000 bytes**, uncompressed, for those four files together. The number lives in `frontend/firstPaintBudget.js` and nowhere else; `frontend/vue.config.js` hands it to webpack (`performance.maxEntrypointSize`, `hints: 'error'`), so a production build that goes over fails and names the files. It is the measured size plus ten percent. Chunks fetched later are not budgeted.
+
+Measured on 2026-10-01 with one production build before and one after the change, in bytes:
+
+| File | Before | After | After, gzipped |
+| --- | --- | --- | --- |
+| `js/chunk-vendors.*.js` | 3,648,627 | 643,751 | 202,125 |
+| `js/app.*.js` | 2,704,288 | 1,380,079 | 479,998 |
+| `css/chunk-vendors.*.css` | 140,863 | 117,582 | 21,820 |
+| `css/app.*.css` | 595,624 | 198,401 | 37,045 |
+| **First load** | **7,089,402** | **2,339,813** | **740,988** |
+
+Gzipped, the first load was 2,131,233 bytes before. `en.js` is 533 kB of the entry that remains.
+
+The chunks that took the rest, fetched when a screen needs them:
+
+| Chunk | Bytes | What it holds |
+| --- | --- | --- |
+| `charts` | 578,218 | apexcharts |
+| `xlsx` | 431,587 | the spreadsheet reader |
+| `formkit` | 407,545 | FormKit and its Pro inputs |
+| `task-detail` | 286,026 | the task panel; the block editor, attachments and recording sit in shared chunks loaded with it |
+| `custom-fields` | 243,708 | the field components |
+| `grid-layout` | 141,578 | the dashboard grid |
+| `date-picker` | 138,757 | the calendar date picker |
+| `dashboard-cards` | 116,240 | the legacy dashboard's cards |
+| `user-import` | 61,888 | the user import screen |
+
+### What keeps it small
+
+| Rule | Where |
+| --- | --- |
+| One language at a time: English in the entry, every other language a `locale-<code>` chunk | `src/utils/localeLoader.js` |
+| Libraries only some screens draw with are registered by name behind a loader: charts, the calendar date picker, the dashboard grid | `src/config/lazyGlobals.js` |
+| The task panel is a chunk (`task-detail`); its host stays in the shell | `TaskDetailOverlay/lazyPanel.js` |
+| Plugin components are registered behind loaders: fields (`custom-fields`), dashboard cards (`dashboard-cards`), the two import screens | each `src/plugins/*/*Plugin.js` |
+| FormKit is installed on the running app when a field first draws with it | `src/plugins/customFieldView/lazyFormKit.js` |
+| The spreadsheet reader is fetched when a file is picked | `src/utils/loadXlsx.js` |
+| moment ships without its locale files; the app never switches moment's locale | `vue.config.js` |
+| Every route is a dynamic import | `src/router/` |
+
+The task panel, the field components and FormKit are needed within the first minute of nearly every session, so `src/config/warmChunks.js` fetches them once the shell is up and the browser is idle. They no longer hold up the first paint, and opening a task does not wait on the network.
+
+`tests/unit/firstPaintSet.spec.js` walks the plain imports from `src/main.js` and fails when one of those libraries, the task panel, a plugin screen or a second language is reachable again without a dynamic import. That catches the cause without a build; the budget catches the size.
+
+### Left in the first load, and why
+
+| What | Why |
+| --- | --- |
+| `locales/en.js` | the fallback language; every missing key reads from it |
+| The shell: rail, panels, command palette, quick create, call overlay | drawn or listening on every signed-in screen |
+| The tour (`driver.js`) | the shell provides it as a ref that screens call without waiting |
+| `sweetalert2`, `moment`, `axios`, `socket.io-client`, `lodash/isEqual` | used by the store, the request layer or the shell itself |
+| Images under 8 kB stay inlined as data URLs | `WasabiIamgeCompp`, `wasabVideo`, `wasabAudio` and `MainChatAvatar` tell a bundled image from a stored path by its `data:` prefix. The default avatar, the priority icons and the default status icon are drawn only because they are inlined; lowering the limit would turn them into storage lookups |
+
+### Moving a component out of the first load changes where its styles sit
+
+The entry's stylesheet ends with the global sheets (`assets/css/index.css` and what it imports), so in the first load a utility class beats a component's own unscoped rule of the same weight. A chunk's stylesheet is added to the page later, after the global sheets, and there the component's rule wins instead. An element that carries both a utility and a component class which set the same property will change when its component moves.
+
+When these components moved, thirteen such rules were found by comparing each moved component's rules with the global sheets, and each was made independent of the order: the component's declaration was removed where the utility is always present, or scoped with `:where(:not(.utility))`, which adds no weight. The comparison reads the class names written in a template and misses classes built at run time, so a moved screen still deserves a look.
+
+### When the build fails on the budget
+
+Find what entered the first load before raising the number: `firstPaintSet.spec.js` usually names it. Reach a library through `import()` at the place it is used, or register a component with `defineAsyncComponent`. Raise the budget only for something every first paint needs, and write the new measurement here.
+
+To measure: `cd frontend && npx vue-cli-service build --dest /tmp/ah-size`, then add up the sizes of the `src` and `href` files in `/tmp/ah-size/index.html`.
