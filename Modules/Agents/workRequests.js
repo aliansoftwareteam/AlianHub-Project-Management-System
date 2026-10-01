@@ -5,6 +5,7 @@ const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const tools = require('../Automations/engine/tools');
 const permissions = require('./permissions');
 const { asRoute, liveTask, storedProject, whoOf } = require('./taskRequests');
+const { runAs, byline } = require('./actingAgent');
 const { answerOf } = require('./pageRequests');
 const { RELATION_TYPE_LIST } = require('../Tasks/helpers/taskMongo/relationRules');
 const { MAX_MESSAGE_LENGTH } = require('../Pages/helpers/pageComments');
@@ -102,8 +103,11 @@ const relationsOf = async (companyId, uid, taskId) => {
 const actingAs = async (who) => {
     const person = await require('../Sprints/helpers/actingUser').actingUser({ uid: who.uid });
     if (!person) throw refuse('a list change needs a person to make it as');
-    return who.via ? { ...person, Employee_Name: `${person.Employee_Name} (via ${who.via})` } : person;
+    return who.via ? { ...person, Employee_Name: byline(who.via, person.Employee_Name) } : person;
 };
+
+/* A list handler run as `who`: an agent's change carries its mark into the history and the events it writes. */
+const listWrite = (who, handler, request, fallback) => runAs(who.mark, () => dataOf(handler, request, fallback));
 
 /* What the list routes ask before a write: the project open for writing to this person, under the keys the route names. */
 const mayWriteLists = async (companyId, uid, projectId, keys) => {
@@ -139,7 +143,7 @@ const listTarget = async ({ companyId, who, projectId, sprintId }, keys) => {
     return { project, list, projectId: idOf(project._id), sprintId: idOf(list._id) };
 };
 
-const updateList = async ({ companyId, who, at, set, history }, fallback) => dataOf(sprints().updateSprint, {
+const updateList = async ({ companyId, who, at, set, history }, fallback) => listWrite(who, sprints().updateSprint, {
     companyId, uid: who.uid, params: { id: at.sprintId },
     body: {
         type: 'updateSprint', companyId: String(companyId), projectId: at.projectId, folderId: idOf(at.list.folderId) || null,
@@ -153,7 +157,7 @@ const createList = async ({ companyId, who, projectId, name, folderId }) => {
     const inProject = idOf(project._id);
     await mayWriteLists(companyId, who.uid, inProject, [LIST_CREATE]);
     const folder = folderOf(folderId);
-    const created = await dataOf(sprints().addSprint, {
+    const created = await listWrite(who, sprints().addSprint, {
         companyId, uid: who.uid,
         body: { companyId: String(companyId), projectId: inProject, sprintName: listName(name), userData: await actingAs(who), ...(folder ? { folder: { folderId: folder } } : {}) },
     }, 'the list was not created');
@@ -165,7 +169,7 @@ const renameList = async ({ companyId, who, projectId, sprintId, name }) => {
     const wanted = listName(name);
     const previous = at.list.name || '';
     if (previous === wanted) return { ...at, previous, changed: false };
-    await dataOf(sprints().editSprintName, {
+    await listWrite(who, sprints().editSprintName, {
         companyId, uid: who.uid, params: { id: at.sprintId },
         body: { companyId: String(companyId), projectId: at.projectId, sprintName: wanted, userData: await actingAs(who) },
     }, 'the list was not renamed');
@@ -229,8 +233,8 @@ const setExtraList = async ({ companyId, who, taskId, listProjectId, sprintId, o
     return { taskId: id, listProjectId: idOf(list && list.projectId), sprintId: listId };
 };
 
-const extraListChange = (operation) => async ({ companyId, actor, params }) => {
-    const at = await setExtraList({ companyId, who: whoOf(actor), taskId: params.taskId, listProjectId: params.listProjectId, sprintId: params.sprintId, operation });
+const extraListChange = (operation) => async ({ companyId, actor, params, depth }) => {
+    const at = await setExtraList({ companyId, who: whoOf(actor, depth), taskId: params.taskId, listProjectId: params.listProjectId, sprintId: params.sprintId, operation });
     const task = await liveTask(companyId, at.taskId);
     return {
         result: { taskId: at.taskId, projectId: at.listProjectId, sprintId: at.sprintId, [operation === 'add' ? 'added' : 'removed']: true },
@@ -264,16 +268,16 @@ const assignPageComment = ({ companyId, uid, pageId, commentId, assigneeId }) =>
 }, 'the comment was not assigned');
 
 const executors = {
-    async 'task.tags.add'({ companyId, actor, params }) {
-        return setTag({ companyId, who: whoOf(actor), taskId: params.taskId, tag: params.tag, operation: 'add' });
+    async 'task.tags.add'({ companyId, actor, params, depth }) {
+        return setTag({ companyId, who: whoOf(actor, depth), taskId: params.taskId, tag: params.tag, operation: 'add' });
     },
 
-    async 'task.tags.remove'({ companyId, actor, params }) {
-        return setTag({ companyId, who: whoOf(actor), taskId: params.taskId, tag: params.tag, operation: 'remove' });
+    async 'task.tags.remove'({ companyId, actor, params, depth }) {
+        return setTag({ companyId, who: whoOf(actor, depth), taskId: params.taskId, tag: params.tag, operation: 'remove' });
     },
 
-    async 'task.relation.add'({ companyId, actor, params }) {
-        const who = whoOf(actor);
+    async 'task.relation.add'({ companyId, actor, params, depth }) {
+        const who = whoOf(actor, depth);
         const task = await liveTask(companyId, params.taskId);
         const relatedTaskId = await openRelated(companyId, actor, 'task.relation.add', params.relatedTaskId);
         const type = idOf(params.type);
@@ -284,8 +288,8 @@ const executors = {
         };
     },
 
-    async 'task.relation.remove'({ companyId, actor, params }) {
-        const who = whoOf(actor);
+    async 'task.relation.remove'({ companyId, actor, params, depth }) {
+        const who = whoOf(actor, depth);
         const task = await liveTask(companyId, params.taskId);
         const relatedTaskId = await openRelated(companyId, actor, 'task.relation.remove', params.relatedTaskId);
         const link = (Array.isArray(task.relations) ? task.relations : []).find((entry) => idOf(entry && entry.taskId) === relatedTaskId);
@@ -299,13 +303,13 @@ const executors = {
     'task.lists.add': extraListChange('add'),
     'task.lists.remove': extraListChange('remove'),
 
-    async 'list.create'({ companyId, actor, params }) {
-        const made = await createList({ companyId, who: whoOf(actor), projectId: params.projectId, name: params.name, folderId: params.folderId });
+    async 'list.create'({ companyId, actor, params, depth }) {
+        const made = await createList({ companyId, who: whoOf(actor, depth), projectId: params.projectId, name: params.name, folderId: params.folderId });
         return { result: made, undo: { kind: 'list', projectId: made.projectId, sprintId: made.sprintId }, entityType: 'sprint', entityId: made.sprintId, entityName: made.name };
     },
 
-    async 'list.rename'({ companyId, actor, params }) {
-        const out = await renameList({ companyId, who: whoOf(actor), projectId: params.projectId, sprintId: params.sprintId, name: params.name });
+    async 'list.rename'({ companyId, actor, params, depth }) {
+        const out = await renameList({ companyId, who: whoOf(actor, depth), projectId: params.projectId, sprintId: params.sprintId, name: params.name });
         return {
             result: { projectId: out.projectId, sprintId: out.sprintId, name: out.changed ? out.name : out.previous, changed: out.changed },
             undo: out.changed ? { kind: 'listName', projectId: out.projectId, sprintId: out.sprintId, previous: out.previous } : null,
@@ -313,8 +317,8 @@ const executors = {
         };
     },
 
-    async 'list.move'({ companyId, actor, params }) {
-        const out = await moveList({ companyId, who: whoOf(actor), projectId: params.projectId, sprintId: params.sprintId, folderId: params.folderId });
+    async 'list.move'({ companyId, actor, params, depth }) {
+        const out = await moveList({ companyId, who: whoOf(actor, depth), projectId: params.projectId, sprintId: params.sprintId, folderId: params.folderId });
         return {
             result: { projectId: out.projectId, sprintId: out.sprintId, folderId: out.folderId },
             undo: { kind: 'listFolder', projectId: out.projectId, sprintId: out.sprintId, previous: out.previous },

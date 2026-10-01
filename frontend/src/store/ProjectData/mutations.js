@@ -277,6 +277,45 @@ function assigneeCountMoves(tasks, groupBy, updatedFields, taskId) {
     ].filter(([key]) => key);
 }
 
+function groupKeyOf(groupBy, row) {
+    const field = GROUP_FIELDS[groupBy.type]?.[0];
+    if(!field || groupBy.type === 1) return undefined;
+    return returnItemCountDetails([], groupBy, {[field]: row[field]}, row._id).addKey;
+}
+
+function movesHome(updatedFields) {
+    return "sprintId" in (updatedFields || {});
+}
+
+/* A task counts once, in the group of the list it lives in. A server event that changes its home
+   list moves one from the group it left to the group it entered, in every list the store holds,
+   whichever room the event came through. The same event can arrive through two rooms, so a list
+   remembers the tasks it has counted in. */
+function moveHomeCounts(state, payload) {
+    const {pid, op, data, updatedFields, snap} = payload;
+    const project = state.tasks?.[pid];
+    if(!snap || op !== "modified" || !project?.groupBy || !data?._id || data.isParentTask === false || !movesHome(updatedFields)) return;
+    const home = String(data.sprintId);
+    project.sprints.forEach((sprintId) => {
+        const bucket = project[sprintId];
+        const row = locate(bucket, data._id)?.row;
+        const wasHome = Boolean(row) && String(row.sprintId) === sprintId;
+        const entered = bucket.homeEntries || {};
+        if(sprintId !== home) {
+            if(entered[data._id]) delete entered[data._id];
+            if(!wasHome) return;
+            const key = groupKeyOf(project.groupBy, row);
+            if(key) bucket.found[key] = Math.max(0, (bucket.found[key] || 0) - 1);
+        } else {
+            if(wasHome || entered[data._id]) return;
+            const key = groupKeyOf(project.groupBy, data);
+            if(key) bucket.found[key] = (bucket.found[key] || 0) + 1;
+            bucket.homeEntries = {...entered, [data._id]: true};
+        }
+        bucket.countsStale = (bucket.countsStale || 0) + 1;
+    });
+}
+
 function applyTaskChange(state, payload, sprintId) {
     const {pid, op, snap, dragDropcheck, groupBy: payloadGroupBy} = payload;
     const {data, updatedFields} = snap && op === "modified" ? keepOwnEdits(payload) : payload;
@@ -295,7 +334,7 @@ function applyTaskChange(state, payload, sprintId) {
                 if(snap && changesGroupTotals(op, data, payload.updatedFields)) {
                     state.tasks[pid][sprintId].totalsStale = (state.tasks[pid][sprintId].totalsStale || 0) + 1;
                 }
-                if(["modified", "added"]?.includes(op) && data.isParentTask) {
+                if(["modified", "added"]?.includes(op) && data.isParentTask && !(op === "modified" && movesHome(updatedFields))) {
                     const {addKey, removeKey} = returnItemCountDetails(state.tasks[pid][sprintId].tasks, groupBy, updatedFields, data._id);
                     if(addKey) {
                         if(state.tasks[pid][sprintId].found[addKey]) {
@@ -361,6 +400,7 @@ export const mutateUpdateFirebaseTasks = (state, payload) => {
     const {pid, sprintId, op, data} = payload;
     /* Rows of another project's tasks are not kept here: a list reads them on its own, and reads them again when this rises. */
     if(touchesOtherProjects(data, pid, op === "modified" ? payload.updatedFields : null)) state.otherProjectChanges = (state.otherProjectChanges || 0) + 1;
+    moveHomeCounts(state, payload);
     applyTaskChange(state, payload, sprintId);
     if(!data?._id || !["modified", "removed"].includes(op)) return;
     otherHolders(state.tasks[pid], data, pid, sprintId).forEach((holder) => {

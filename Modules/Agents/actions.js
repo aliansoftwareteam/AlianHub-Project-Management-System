@@ -10,6 +10,7 @@ const { SCOPE, read, write } = require('./registryKit');
 const permissions = require('./permissions');
 const audit = require('./agentAudit');
 const { attribution, isAgent } = require('./actor');
+const { shownAs } = require('./actingAgent');
 const stepCredential = require('../Workflows/stepCredential');
 const completionStore = require('../Tasks/helpers/completionStore');
 const { sprintPlacementOf, followSprintMove, moveDescendants } = require('../Tasks/helpers/sprintPlacement');
@@ -93,6 +94,9 @@ const emitTask = (companyId, doc, updatedFields, actor, depth) => {
     });
 };
 
+/* What people read on a task, a time entry or a doc: "Claude, for Priya". The audit log keeps `label`. */
+const nameShown = (actor, a) => (a.actorType === 'agent' ? shownAs(actor) : a.label);
+
 const workEntry = (actor, hours = 0) => {
     const a = attribution(actor);
     return { actorId: a.actorId, actorType: a.actorType, agentId: a.agentId, viaAccount: a.viaAccount || 'workspace', hours };
@@ -107,7 +111,7 @@ const context = (actor, action, depth) => {
     return {
         ruleId: null, ruleName: a.label, runId: actor.runId || null, action: `agent.${action}`, depth: clampDepth(depth),
         userId: String(actor.userId || a.actorId || ''), actingUserId: String(actor.userId || ''), actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null,
-        agentName: a.actorType === 'agent' ? a.label : null,
+        agentName: a.actorType === 'agent' ? shownAs(actor) : null,
         auditedByCaller: true,
     };
 };
@@ -215,7 +219,7 @@ const executors = {
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
             data: {
-                LogDescription: String(params.description || `${a.label} on ${task.TaskKey || task.TaskName}`).slice(0, 500),
+                LogDescription: String(params.description || `${nameShown(actor, a)} on ${task.TaskKey || task.TaskName}`).slice(0, 500),
                 Loggeduser: userId, TicketID: String(task._id), ProjectId: String(task.ProjectID),
                 LogStartTime: start, LogEndTime: start + minutes * 60, LogTimeDuration: minutes, logAddType: 0, trackShots: [],
                 billable: params.billable !== false, actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null, runId: actor.runId || null,
@@ -338,7 +342,7 @@ const executors = {
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
             data: {
-                LogDescription: String(params.description || `${a.label} working on ${task.TaskKey || task.TaskName}`).slice(0, 500),
+                LogDescription: String(params.description || `${nameShown(actor, a)} working on ${task.TaskKey || task.TaskName}`).slice(0, 500),
                 Loggeduser: userId, TicketID: String(task._id), ProjectId: String(task.ProjectID),
                 LogStartTime: now, LogEndTime: now, LogTimeDuration: 0, logAddType: 1, trackShots: [], startTimeTracker: now,
                 billable: true, actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null, runId: actor.runId || null,
@@ -379,7 +383,7 @@ const executors = {
             data: { title, rawText: String(params.text || '').slice(0, 20000), content: cleanPageContent(params.content || contentOfText(params.text)),
                     ProjectID: place.projectId ? oid(place.projectId) : undefined,
                     createdBy: String(actor.userId || a.actorId), linkedTasks: place.linkedTasks, visibility: place.visibility,
-                    createdByAgent: true, agentName: a.label, agentStatus: 'draft', deletedStatusKey: 0 },
+                    createdByAgent: true, agentName: nameShown(actor, a), agentStatus: 'draft', deletedStatusKey: 0 },
         }, 'save');
         emitPageChange(companyId, 'insert', saved);
         return { result: { pageId: String(saved._id) }, undo: { kind: 'page', pageId: String(saved._id) }, entityType: 'page', entityId: saved._id, entityName: title };

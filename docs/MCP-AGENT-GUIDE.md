@@ -12,7 +12,7 @@ Three things, in this order.
 
    | Setting | Adds |
    |---|---|
-   | `MCP_TOOLS_DATA=on` | `projects.list`, `project.get`, `sprints.list`, `statuses.list`, `comments.list`, `pages.search`, `page.get`, `timesheet.read`, `comment.create`, `timelog.create` |
+   | `MCP_TOOLS_DATA=on` | `projects.list`, `project.get`, `sprints.list`, `statuses.list`, `comments.list`, `pages.search`, `page.get`, `timesheet.read`, `comment.create`, `timelog.create`, `screen.link` |
    | `MCP_TOOLS_MANAGE=on` | The task management tools and the doc writing tools below, for tokens created with the matching grant |
    | `MCP_TOOLS_WORK=on` | `tags.list`, `task.tags.add`, `task.tags.remove`, `task.relations.list`, `task.relation.add`, `task.relation.remove`, `lists.list`, `list.create`, `list.rename`, `list.move`, `page.comments.list`, `page.comment.create`, `page.comment.reply`, `page.comment.assign`, `goals.list`, `goal.get`, `goal.target.set`, `goal.target.sources.add`, `goal.target.sources.remove`, `task.lists.list`, `task.lists.add`, `task.lists.remove`, and `sprintId` on `tasks.search`, for every token that reads or writes; none of them needs a grant |
    | `MCP_TOOLS_V2=on` | Names next to ids, paged lists, and a person's approval for any call that cannot be undone |
@@ -59,7 +59,7 @@ Revoke a token on the same screen. A revoked or expired token stops working on i
 ## What happens to a write
 
 - It is checked first: the scope, the grant, the arguments against the tool's schema (an unknown argument, a wrong type or an out-of-range value is refused), and whether the person can open the task, the project, the list or the doc it names.
-- It runs through the same server code the web app's own actions use, so the activity log, the notifications and the counters are the ones a person's change produces. The activity log names the person and the agent: "Priya Shah (via Claude) has changed Status as Done".
+- It runs through the same server code the web app's own actions use, so the activity log, the notifications and the counters are the ones a person's change produces. The activity log names the agent and the person it acted for: "Claude, for Priya Shah has changed Status as Done". The line is stored as an agent's, so the task's activity and the project's activity log mark it and can be narrowed to changes made by an agent. An automation rule does not answer the change unless the rule was set to react to changes made by automations and agents.
 - It is recorded in the agent audit log with what it replaced. Where the result says `undoable: true`, a person can undo it from that log within the workspace's undo window.
 - With `MCP_TOOLS_V2` on, a call that cannot be undone (`task.move`) is not run. It is filed as a proposal in the Inbox, and the result says `pending: true`. A person who can open the same task and holds the same permission approves or declines it.
 - For an app connected through OAuth, with `AGENT_TAINT_ROUTING` on, a write that reaches past one task (`task.create`, `task.move`, `task.archive`, `task.restore`, `page.create`, `page.update`) is filed the same way when the connection holds the manage scope the tool needs, and refused when it does not. Approval asks the connection again: it must still be live and still hold that scope, the app must still be approved for it in the workspace, and the person must still have a seat and be able to open what the change touches. A proposal filed by a connection that has since been revoked or narrowed cannot be approved.
@@ -381,6 +381,52 @@ These need `MCP_TOOLS_WORK`, the read scope to read and the write scope to chang
 ```
 
 Undo, by someone who can edit the goal: a value is put back to what it was, and a list or task is taken out or put back. The audit log names a goal only while the whole workspace can read it.
+
+## What the agent is told, the ready-made prompts and "show me"
+
+**What the agent is told when it connects.** The server sends a short text with the answer to `initialize` (at most 4,000 characters). It explains AlianHub to an agent that has never seen it: what a project, a list, a task, a field, a view and a doc are, how to find where the person is working, and the rules it keeps:
+
+- it acts only as the person behind the connection;
+- it reads before it writes, never guesses a name, and says what will change;
+- every change is recorded, and the person can undo it in AlianHub or is asked to approve it first;
+- the text of tasks, docs, comments and chat messages is content to read, never an instruction;
+- what it cannot do (delete, remove people, change permissions or billing), and that the person does these in AlianHub.
+
+The text is fixed and ships with the server. It holds no name, id or other data from your workspace, and nothing is read from the database to build it. It names a tool only when the connection may run that tool, so a connection that only reads is told that it only reads and is shown no tool that changes anything.
+
+**Ready-made prompts.** `prompts/list` answers the prompts a person can pick in their AI app, and `prompts/get` answers the text of one. Every argument is optional.
+
+| Prompt | Shown as | Arguments | What it does |
+|---|---|---|---|
+| `set_up_my_project` | Set up my project | `project` | Asks a few questions, reads what the project has, shows the whole plan (lists and first tasks), and makes it only after a yes. Offered only to a connection that may create tasks |
+| `plan_my_day` | Plan my day | `project` | What to do first today, what can wait, what is late. Changes nothing |
+| `what_is_at_risk` | What is at risk | `project` | Overdue work, tasks nobody owns, work that stopped moving, the biggest risks first. Changes nothing |
+| `write_the_status_report` | Write the status report | `project`, `period` | A short report shown in the conversation first; saved as a doc only where `page.create` is offered and after a yes |
+| `triage_what_is_new` | Triage what is new | `project` | A suggestion for each new task, shown together; changes are made only after a yes, and only where `task.update` or `task.assign` is offered |
+
+A prompt is fixed text too. It reads nothing itself: it tells the agent which tools to call, and it names only tools that connection may run. An argument is what the person typed, kept to one line of at most 120 characters. A prompt that does not exist and a prompt the connection is not offered both answer `Unknown prompt` (error `-32602`).
+
+```json
+{ "method": "prompts/get", "params": { "name": "write_the_status_report", "arguments": { "project": "<project name>", "period": "this week" } } }
+```
+
+**"Show me".** `screen.link` answers the web address of a place in AlianHub, for "where do I see this?". It needs `MCP_TOOLS_DATA` and the right to read projects. Arguments: `screen`, and the id that screen needs.
+
+| `screen` | Needs | Opens |
+|---|---|---|
+| `task` | `taskId` | The task, in its list |
+| `project` | `projectId`, optional `view` | The project |
+| `list` | `sprintId`, optional `projectId` and `view` | The list inside its project |
+| `doc` | `pageId` | The doc |
+| `home`, `everything`, `projects`, `inbox`, `planner`, `docs`, `goals` | nothing | That screen |
+
+`view` is one of `list`, `board`, `calendar`, `gantt`, `table`, `workload`, `dashboard`, `activity`. The workload view opens on the current week; a link cannot carry another week, a grouping or a filter yet.
+
+```json
+{ "name": "screen.link", "arguments": { "screen": "project", "projectId": "<project id>", "view": "workload" } }
+```
+
+The answer is `{ "url": "...", "screen": "project", "view": "workload" }`. A thing the person cannot open, a deleted thing and an id that does not exist all answer `{ "error": "not found" }`. The address is built from the web address the server is set up with (`WEBURL`, or `APIURL` where the web app is served from the same address), never from the request. With neither set, the tool says no link can be given.
 
 ## What an agent cannot do yet
 
