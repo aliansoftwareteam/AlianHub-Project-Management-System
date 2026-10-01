@@ -1059,19 +1059,19 @@
     }
     .dashboard-range-picker .dp__input {
         font-size: 12px;
-        color: #3a3f52;
-        border: 1px solid #e5e7eb;
+        color: var(--ink);
+        border: 1px solid var(--border);
         border-radius: 6px;
         padding-top: 4px;
         padding-bottom: 4px;
         transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
     .dashboard-range-picker .dp__input:hover {
-        border-color: #c7ccd9;
+        border-color: var(--brand-border);
     }
     .dashboard-range-picker .dp__input:focus {
-        border-color: #2F3990;
-        box-shadow: 0 0 0 2px rgba(47, 57, 144, 0.12);
+        border-color: var(--brand);
+        box-shadow: 0 0 0 2px var(--brand-ring);
     }
     .dashboard-range-hint {
         font-size: 11px;

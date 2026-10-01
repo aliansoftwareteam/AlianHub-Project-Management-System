@@ -51,6 +51,8 @@ exports.updateSecurityPermissions = async (req, res) => {
         };
         const response = await MongoDbCrudOpration(companyId, query, type);
         removeCache(`rules:${companyId}`);
+        // The project list is built from these rules.
+        removeCache(`UserProjectData:${companyId}:`, true);
         return res.status(200).json(response);
     } catch (error) {
         console.error(`Error updating or inserting security & permissions:`, error);

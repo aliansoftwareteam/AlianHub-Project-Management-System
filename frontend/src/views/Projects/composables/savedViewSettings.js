@@ -1,7 +1,7 @@
 import isEqual from 'lodash/isEqual';
-import { cleanViewSettings, DEFAULT_VIEW_SETTINGS } from '@viewSettings';
+import { cleanViewSettings, DEFAULT_VIEW_SETTINGS, VIEW_DENSITIES } from '@viewSettings';
 
-export { cleanViewSettings, DEFAULT_VIEW_SETTINGS };
+export { cleanViewSettings, DEFAULT_VIEW_SETTINGS, VIEW_DENSITIES };
 
 export const FILTERABLE_VIEWS = Object.freeze(['ProjectListView', 'ProjectKanban', 'TableView', 'Calendar']);
 export const SAVED_SETTINGS_VIEWS = Object.freeze([...FILTERABLE_VIEWS, 'Workload']);
