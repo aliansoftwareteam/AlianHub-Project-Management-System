@@ -43,11 +43,26 @@ describe('a target\'s progress', () => {
         expect(targetRatio({ kind: 'boolean' })).toBe(0);
     });
 
+    it('is the share of counted tasks that are done, when it is counted from tasks', () => {
+        const counted = (done, total) => ({ kind: 'tasks', counted: { done, total } });
+        expect(targetRatio(counted(3, 12))).toBeCloseTo(0.25, 10);
+        expect(targetRatio(counted(12, 12))).toBe(1);
+        expect(targetRatio(counted(0, 12))).toBe(0);
+        expect(targetRatio(counted(14, 12))).toBe(1);
+    });
+
+    it('has not started when nothing is counted yet, rather than dividing by no tasks', () => {
+        expect(targetRatio({ kind: 'tasks', counted: { done: 0, total: 0 } })).toBe(0);
+        expect(targetRatio({ kind: 'tasks' })).toBe(0);
+        expect(targetRatio({ kind: 'tasks', counted: { done: 'all', total: 3 } })).toBe(0);
+        expect(targetRatio({ kind: 'tasks', start: 0, target: 10, current: 10 })).toBe(0);
+    });
+
     it.each([
         ['a missing value', { kind: 'number', start: 0, target: 10 }],
         ['a value that is not a number', number(0, 10, 'half')],
         ['an endless value', number(0, Infinity, 5)],
-        ['a kind it does not measure', { kind: 'tasks', start: 0, target: 10, current: 10 }],
+        ['a kind it does not measure', { kind: 'epic', start: 0, target: 10, current: 10 }],
         ['nothing', undefined],
     ])('is none for %s', (_case, target) => {
         expect(targetRatio(target)).toBe(0);

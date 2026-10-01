@@ -2,11 +2,18 @@ const MEASURED_KINDS = Object.freeze(['number', 'currency']);
 
 const clamp = (ratio) => Math.min(1, Math.max(0, ratio));
 
+/* A target counted from tasks is as far as its last count says; with nothing counted it has not started. */
+const countedRatio = (counted) => {
+    const [done, total] = [counted && counted.done, counted && counted.total].map(Number);
+    return Number.isFinite(done) && total > 0 ? clamp(done / total) : 0;
+};
+
 /* How far a target is, from 0 to 1. A range that runs downwards (start above target) is measured the
  * same way, and a range with no width is reached only when the current value is the target. */
 const targetRatio = (target) => {
     if (!target) return 0;
     if (target.kind === 'boolean') return target.done === true ? 1 : 0;
+    if (target.kind === 'tasks') return countedRatio(target.counted);
     if (!MEASURED_KINDS.includes(target.kind)) return 0;
     const [start, end, current] = [target.start, target.target, target.current].map(Number);
     if (![start, end, current].every(Number.isFinite)) return 0;
