@@ -6430,7 +6430,7 @@ export default {
         yes_delete: "Yes, delete it!",
         task_will_become_subtasks_of: "task will become subtasks of",
         Are_you_sure_you_want_to_delete: "Are you sure you want to delete",
-        subtasks_will_become_subtasks_of: "Subtasks will become subtasks of",
+        subtasks_will_become_subtasks_of: "subtasks stay under it and move with it under",
         unlock_board_view: "To Unlock Board View",
         unlock_project_detail_view: "To Unlock Project Detail View",
         unlock_table_view: "To Unlock Table View",

@@ -8850,6 +8850,7 @@
     "call.start_video": "Start a video call",
     "call.stop_share": "Stop sharing",
     "call.unmute": "Unmute",
+    "conformationmsg.subtasks_will_become_subtasks_of": "subtasks stay under it and move with it under",
     "dashboardCard.ach_completed": "Completed",
     "dashboardCard.ach_empty": "No completed tasks in this period.",
     "dashboardCard.ach_on_estimate": "On estimate",

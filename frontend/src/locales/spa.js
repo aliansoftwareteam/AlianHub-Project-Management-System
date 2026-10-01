@@ -6332,7 +6332,7 @@ export default {
         "yes_delete": "¡Sí, elimínalo!",
         "task_will_become_subtasks_of": "la tarea se convertirá en subtareas de",
         "Are_you_sure_you_want_to_delete": "¿Estás seguro de que deseas eliminar",
-        "subtasks_will_become_subtasks_of": "Las subtareas se convertirán en subtareas de",
+        "subtasks_will_become_subtasks_of": "subtasks stay under it and move with it under",
         "unlock_board_view": "Para desbloquear la vista de tablero",
         "unlock_project_detail_view": "Para desbloquear la vista de detalles del proyecto",
         "unlock_table_view": "Para desbloquear la vista de tabla",

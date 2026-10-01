@@ -6332,7 +6332,7 @@ export default {
         "yes_delete": "Да, удалить!",
         "task_will_become_subtasks_of": "задача станет подзадачей",
         "Are_you_sure_you_want_to_delete": "Вы уверены, что хотите удалить?",
-        "subtasks_will_become_subtasks_of": "Подзадачи станут подзадачами",
+        "subtasks_will_become_subtasks_of": "subtasks stay under it and move with it under",
         "unlock_board_view": "Чтобы разблокировать представление доски",
         "unlock_project_detail_view": "Чтобы разблокировать представление деталей проекта",
         "unlock_table_view": "Чтобы разблокировать представление таблицы",

@@ -81,6 +81,36 @@ describe('the three-level cap', () => {
     });
 });
 
+describe('moving a task with its subtree', () => {
+    test('it fits where the whole subtree stays within three levels, and never under itself', () => {
+        const lone = { _id: oid(OTHER_ROOT) };
+        const otherChild = { _id: oid(OTHER_CHILD), ParentTaskId: OTHER_ROOT, ancestors: [OTHER_ROOT] };
+
+        expect(tree.canMoveUnder(lone, [], child)).toEqual({ ok: true });
+        expect(tree.canMoveUnder(lone, [otherChild], root)).toEqual({ ok: true });
+        expect(tree.canMoveUnder(lone, [otherChild], child)).toMatchObject({ ok: false, code: 'SUBTREE_TOO_DEEP' });
+        expect(tree.canMoveUnder(lone, [], grandchild)).toMatchObject({ ok: false, code: 'PARENT_AT_MAX_DEPTH' });
+        expect(tree.canMoveUnder(root, [child, grandchild], grandchild)).toEqual({ ok: false, code: 'PARENT_IS_DESCENDANT', reason: tree.REFUSALS.PARENT_IS_DESCENDANT });
+        expect(tree.canMoveUnder(lone, [], lone)).toMatchObject({ ok: false, code: 'PARENT_IS_DESCENDANT' });
+    });
+
+    test('a stamp is stale once the task it names is no longer above the row', () => {
+        expect(tree.staleStamp({ cascadedBy: ROOT }, [ROOT, CHILD])).toBe(false);
+        expect(tree.staleStamp({ cascadedBy: ROOT }, [CHILD])).toBe(true);
+        expect(tree.staleStamp({ cascadedBy: ROOT }, [])).toBe(true);
+        expect(tree.staleStamp({}, [])).toBe(false);
+    });
+
+    test('the rules the web app shares require nothing, and the server module re-exports them', () => {
+        const source = require('fs').readFileSync(require.resolve('../Modules/Tasks/helpers/taskTreeRules'), 'utf8');
+        const rules = require('../Modules/Tasks/helpers/taskTreeRules');
+
+        expect(source).not.toMatch(/require\(|import /);
+        Object.keys(rules).forEach((name) => expect(tree[name]).toBe(rules[name]));
+        expect(Object.keys(rules.REFUSALS).sort()).toEqual(['PARENT_AT_MAX_DEPTH', 'PARENT_IS_DESCENDANT', 'PARENT_NOT_FOUND', 'SUBTREE_TOO_DEEP']);
+    });
+});
+
 describe('cycles', () => {
     test('a task cannot go under itself or under one of its own descendants', () => {
         expect(tree.wouldCycle(root, root)).toBe(true);

@@ -6332,7 +6332,7 @@ export default {
         "yes_delete": "Oui, supprimez-le !",
         "task_will_become_subtasks_of": "La tâche deviendra des sous-tâches de",
         "Are_you_sure_you_want_to_delete": "Êtes-vous sûr de vouloir supprimer",
-        "subtasks_will_become_subtasks_of": "Les sous-tâches deviendront des sous-tâches de",
+        "subtasks_will_become_subtasks_of": "subtasks stay under it and move with it under",
         "unlock_board_view": "Pour déverrouiller la vue tableau",
         "unlock_project_detail_view": "Pour déverrouiller la vue des détails du projet",
         "unlock_table_view": "Pour déverrouiller la vue en tableau",
