@@ -642,7 +642,7 @@ const WikiTable = defineComponent({
     .hub__stats { display: none; }
     .hub__btn-label { display: none; }
     .hub .ah-btn--sm { min-height: var(--hit-min); }
-    .hub__view-select { height: var(--hit-min); }
+    .hub__view-select { height: var(--hit-min); min-width: 0; flex: 0 1 auto; }
     .hub__wiki-btn { width: var(--hit-min); height: var(--hit-min); padding: 0; }
 }
 </style>

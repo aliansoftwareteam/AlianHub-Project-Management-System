@@ -778,6 +778,7 @@ html, body, #app {
     padding: 8px 10px; border-radius: 7px;
     font: 500 13px/1.2 var(--font-ui); color: var(--ink);
     cursor: pointer; text-decoration: none; border: 0; background: transparent; width: 100%; text-align: left;
+    box-sizing: border-box;
 }
 .ah-pop__item:hover { background: var(--surface-hover); color: var(--ink); text-decoration: none; }
 .ah-pop__item.is-active { background: var(--brand-tint); color: var(--brand); }
@@ -806,6 +807,10 @@ html, body, #app {
 }
 .ah-toolbar__title { margin: 0; font: 600 15px/1.2 var(--font-ui); letter-spacing: -.2px; display: flex; align-items: center; gap: 10px; }
 .ah-toolbar__spacer { flex: 1; }
+/* A page that wraps its toolbar on a phone may load before this file; a fixed height here would win and lay the second row over the page. */
+@media (max-width: 767px) {
+    .ah-toolbar { height: auto; min-height: var(--toolbar-h); }
+}
 
 .ah-empty {
     border: 1px dashed var(--border);
