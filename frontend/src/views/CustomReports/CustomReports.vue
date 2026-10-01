@@ -125,10 +125,17 @@
                         </div>
                     </div>
 
-                    <div v-if="!rows.length" class="rp-empty">
-                        <strong>{{ $t('Reports.no_data_title') }}</strong>
-                        <span>{{ $t('Reports.no_data_body') }}</span>
-                    </div>
+                    <EmptyState
+                        v-if="!rows.length"
+                        illustration="search"
+                        data-test="report-empty"
+                        :heading-level="2"
+                        :title="$t('Reports.no_data_title')"
+                        :message="$t('Reports.no_data_body')"
+                        :action-label="$t('Reports.clear_filters')"
+                        :action-allowed="hasFilters"
+                        @action="clearFilters"
+                    />
 
                     <div v-else-if="cfg.chartType === 'table'" class="rp-table">
                         <div class="rp-thead rp-thead--2">
@@ -167,6 +174,7 @@ import { useStore } from 'vuex';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import ReportsTabs from '@/views/Projects/Reports/ReportsTabs.vue';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { useChartTokens } from '@/utils/chartTokens';
 
 defineOptions({ name: 'CustomReportBuilder' });
@@ -247,6 +255,11 @@ const addFilter = () => {
     runPreview();
 };
 const clearFilter = (key) => { delete cfg.filters[key]; runPreview(); };
+const hasFilters = computed(() => Object.keys(cfg.filters).length > 0);
+const clearFilters = () => {
+    Object.keys(cfg.filters).forEach((key) => delete cfg.filters[key]);
+    runPreview();
+};
 
 const total = computed(() => rows.value.reduce((a, r) => a + (r.value || 0), 0));
 const formatValue = (value) => {

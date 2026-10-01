@@ -46,7 +46,7 @@ const props = defineProps({
     image: { type: String, default: '' },
 });
 
-const { getters } = useStore();
+const store = useStore();
 
 const level = computed(() => Math.min(6, Math.max(1, Math.round(props.headingLevel))));
 const showAction = computed(() => Boolean(props.actionLabel) && props.actionAllowed);
@@ -55,7 +55,7 @@ const showAction = computed(() => Boolean(props.actionLabel) && props.actionAllo
 // settings rather than being hardcoded. No base configured means no link rather than a dead one.
 const resolvedHelpHref = computed(() => {
     if (!props.helpPath) return '';
-    const base = getters['brandSettingTab/brandSettings']?.helpLink;
+    const base = store?.getters['brandSettingTab/brandSettings']?.helpLink;
     if (!base) return '';
     return `${String(base).replace(/\/+$/, '')}/${String(props.helpPath).replace(/^\/+/, '')}`;
 });

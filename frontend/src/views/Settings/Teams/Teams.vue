@@ -15,7 +15,7 @@
                 <span class="ah-label">{{ teams.length }} · {{ $t('Settings.people_count', { n: peopleCount }) }}</span>
             </div>
 
-            <div v-if="!teams.length" class="ah-empty">{{ $t('Settings.teams_empty') }}</div>
+            <EmptyState v-if="!teams.length" class="ah-empty" illustration="people" data-test="teams-empty" :title="$t('Settings.teams_empty_title')" :message="$t('Settings.teams_empty')" />
 
             <div v-else class="tm__grid">
                 <div v-for="row in teams" :key="row._id" class="ah-card tm__card">
@@ -70,6 +70,7 @@ import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import * as env from "@/config/env";
 import { apiRequest } from "@/services";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { useCustomComposable } from "@/composable";
 import Assignee from "@/components/molecules/Assignee/Assignee.vue";
 import UpgradePlan from "@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue";

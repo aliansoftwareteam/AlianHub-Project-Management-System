@@ -102,7 +102,6 @@ div.au__errors ul { margin: 4px 0 0; padding-left: 14px; }
 }
 .au__toggle.is-on .au__knob { transform: translateX(12px); background: var(--on-brand); }
 
-.au__empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 56px 20px; }
 
 @media (max-width: 767px) {
     .au__rule { flex-wrap: wrap; }
