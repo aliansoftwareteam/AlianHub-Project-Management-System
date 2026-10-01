@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const registry = require('./registry');
 const audit = require('./agentAudit');
-const { resolveActor, isAgent } = require('./actor');
+const { resolveActor, isAgent, attribution } = require('./actor');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
@@ -170,6 +170,18 @@ const relationChecks = (req, body) => {
     return { action: name ? RELATION_ROUTE_ACTIONS[name] : 'task.relation.unknown', params: { taskId: idText(body.taskId) } };
 };
 
+/* What a doc an agent drafts may carry, which is what page.draft takes. The company is here because clients
+ * send it on every route; the page handlers take theirs from the header. */
+const DRAFTED_PAGE_FIELDS = new Set(['title', 'projectId', 'linkedTasks', 'contentBlocks', 'createdByAgent', 'agentName', 'companyId', 'CompanyId']);
+
+const pageCreateChecks = (req, body) => {
+    const beyond = Object.keys(body).filter((field) => !DRAFTED_PAGE_FIELDS.has(field));
+    if (Array.isArray(body.linkedTasks) && body.linkedTasks.length > 1) beyond.push('linkedTasks');
+    const params = { projectId: idText(body.projectId) };
+    if (!beyond.length) return { action: 'page.draft', params };
+    return { action: 'page.create', params: { ...params, fields: Object.fromEntries(beyond.map((field) => [field, 1])) } };
+};
+
 /* `checksOf(req, body, companyId)` names the registry action, or actions, the request is; every one must be
  * allowed without a flag. A write is recorded, a read is not. */
 const routeGuard = (checksOf) => withActor(async (req, res, next, actor) => {
@@ -204,7 +216,15 @@ const taskPatchGuard = (taskIdOf) => routeGuard((req, body, companyId) => taskPa
 const taskCreateGuard = routeGuard(taskCreateChecks);
 const relationGuard = routeGuard(relationChecks);
 
-/* For a write route the registry has no action for: `action` names it in the refusal and its audit row. */
+const pageCreateChecked = routeGuard(pageCreateChecks);
+
+/* A doc an agent creates is its draft whatever the body says, so that a person signs it off. */
+const pageCreateGuard = (req, res, next) => pageCreateChecked(req, res, () => {
+    if (isAgent(req.agentActor)) req.body = { ...plain(req.body), createdByAgent: true, agentName: attribution(req.agentActor).label };
+    return next();
+});
+
+/* For a write route the registry has no action for, or only one behind a flag: `action` names it in the refusal and its audit row. */
 const agentsRefused = (action) => routeGuard(() => ({ action, params: {} }));
 
 /* The perimeter: paths no agent token may reach whatever the body says. These
@@ -231,4 +251,4 @@ const agentPerimeter = withActor(async (req, res, next, actor) => {
     return refuse(req, res, actor, { action: hit.action, reason: `Agents cannot perform ${hit.action}`, params: {} });
 });
 
-module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, agentsRefused, agentPerimeter, TASK_PATCH_ACTIONS };
+module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, agentsRefused, agentPerimeter, TASK_PATCH_ACTIONS };

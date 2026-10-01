@@ -33,11 +33,12 @@ jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn()
 const { EventEmitter } = require('events');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const world = require('./fixtures/accessWorld');
-const { updateSprintFun } = require('../Modules/Sprints/controller');
+const { updateSprintFun, editSprintName } = require('../Modules/Sprints/controller');
 
 const { CID, OWNER, ADMIN, INSIDER, OUTSIDER, GUEST, P_OPEN, P_PRIVATE, L_OPEN, L_SECRET, L_PERSONAL, T_OPEN, T_SECRET, T_PRIVATE, T_PERSONAL, settle } = world;
 const { seed, rows, task } = world.create(mockDb);
 
+const ANOTHER_COMPANY = '6f00000000000000000000c2';
 const TAG = 'tag-open-1';
 const TAG_ELSEWHERE = 'tag-private-1';
 const PATCH_TASK = 'PATCH /api/v2/tasks';
@@ -130,6 +131,30 @@ describe('a new name for a list', () => {
 
         expect(answer.body.status).toBe(true);
         expect(list(L_OPEN).name).toBe('Renamed list');
+    });
+
+    it('is stored in the company the request is signed in to, whatever the body carries', async () => {
+        for (const companyId of [undefined, ANOTHER_COMPANY]) {
+            seed();
+            mockDb.crud.mockClear();
+            const answer = await new Promise((resolve) => {
+                const res = { headersSent: false, status: () => res, send: resolve };
+                editSprintName({ uid: OWNER, params: { id: L_OPEN }, headers: { companyid: CID }, body: { type: 'editSprintName', companyId, projectId: P_OPEN, sprintName: 'Renamed list', userData: { id: OWNER, Employee_Name: 'Olive Owner' } } }, res);
+            });
+            await settle();
+
+            expect(answer.status).toBe(true);
+            expect(list(L_OPEN).name).toBe('Renamed list');
+            expect(mockDb.crud.mock.calls.length).toBeGreaterThan(0);
+            expect(mockDb.crud.mock.calls.filter(([company]) => company !== CID)).toEqual([]);
+        }
+    });
+
+    it('is refused on the route when the body names another company', async () => {
+        const answer = await send(PATCH_LIST, OWNER, { type: 'editSprintName', companyId: ANOTHER_COMPANY, projectId: P_OPEN, sprintName: 'Renamed list' }, { id: L_OPEN });
+
+        expect(answer.code).toBe(403);
+        expect(list(L_OPEN).name).toBe('Open list');
     });
 
     it('may be as long as the web lets it be', async () => {

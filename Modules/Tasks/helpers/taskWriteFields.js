@@ -570,15 +570,17 @@ const keepListed = async (req, company, payload, { path, id }) => {
 
 const NOT_A_PROJECT_STATUS = 'The status is not one of this project\'s statuses.';
 
-/* The body chooses a status by its key; its type and name are the ones the task's project stores for that key. */
-const statusAsStored = async (company, task, sent) => {
-    if (!isPlainObject(sent)) return sent;
+/* The body chooses a status by its key; its type and name are the ones the project stores for that key. Null when it has no such key. */
+const statusInProject = (project, sent) => {
     const shown = isPlainObject(sent.status) ? sent.status : {};
     const key = sent.statusKey === undefined ? shown.key : sent.statusKey;
-    const project = await storedProjectOf(company, String(task.ProjectID));
     const stored = ((project && project.taskStatusData) || []).map(flatStatus).filter(Boolean).find((row) => isScalar(key) && key !== null && String(row.key) === String(key));
-    if (!stored) refuse(400, NOT_A_PROJECT_STATUS);
-    return { ...sent, statusKey: stored.key, statusType: stored.type, status: { ...shown, key: stored.key, text: stored.name, type: stored.type } };
+    return stored ? { ...sent, statusKey: stored.key, statusType: stored.type, status: { ...shown, key: stored.key, text: stored.name, type: stored.type } } : null;
+};
+
+const statusAsStored = async (company, task, sent) => {
+    if (!isPlainObject(sent)) return sent;
+    return statusInProject(await storedProjectOf(company, String(task.ProjectID)), sent) || refuse(400, NOT_A_PROJECT_STATUS);
 };
 
 const projectNotFound = () => new TaskWriteRefusal(404, 'Project not found');
@@ -762,6 +764,8 @@ module.exports = {
     TASK_INDEX_ONLOAD_FIELDS,
     TaskWriteRefusal,
     taskNotFound,
+    NOT_A_PROJECT_STATUS,
+    statusInProject,
     escapeText,
     plainIdOf,
     taskFilterOf,
