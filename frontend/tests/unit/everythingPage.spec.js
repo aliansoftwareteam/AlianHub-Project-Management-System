@@ -169,6 +169,8 @@ describe('the list', () => {
         expect(sentNames().at(-1)).toBe('nothing');
         expect(sent().at(-1).filter.search).toBe('nothing is called this');
         expect(test('evr-empty').exists()).toBe(true);
+        expect(test('evr-empty').find('svg').attributes('data-illustration')).toBe('search');
+        expect(test('evr-empty').find('.empty-state__btn').text()).toBe('Everything.clear_filters');
         expect(rows()).toHaveLength(0);
 
         await test('evr-empty').find('button').trigger('click');

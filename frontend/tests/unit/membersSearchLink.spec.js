@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { reactive } from 'vue';
 
-const { apiRequest, rows, routeRef } = vi.hoisted(() => ({ apiRequest: vi.fn(), rows: { list: [] }, routeRef: { current: null } }));
+const { apiRequest, rows, routeRef, perms } = vi.hoisted(() => ({ apiRequest: vi.fn(), rows: { list: [] }, routeRef: { current: null }, perms: { invite: true } }));
 
 vi.mock('@/services', () => ({ apiRequest, apiRequestWithoutCompnay: vi.fn() }));
 vi.mock('vue-router', () => ({ useRoute: () => routeRef.current }));
@@ -20,7 +20,7 @@ vi.mock('vuex', async (importOriginal) => ({
         },
     }),
 }));
-vi.mock('@/composable', () => ({ useCustomComposable: () => ({ checkPermission: () => true }) }));
+vi.mock('@/composable', () => ({ useCustomComposable: () => ({ checkPermission: (key) => (key === 'settings.settings_invite_member' ? perms.invite : true) }) }));
 vi.mock('@/views/Settings/Members/helperMember.js', () => ({ memberData: () => ({ getCompanyUsers: () => rows.list }) }));
 vi.mock('sweetalert2', () => ({ default: { fire: vi.fn() } }));
 
@@ -44,6 +44,7 @@ async function openMembers(query) {
 
 beforeEach(() => {
     rows.list = PEOPLE;
+    perms.invite = true;
     apiRequest.mockResolvedValue({ data: { status: false } });
     toolbar = document.createElement('div');
     toolbar.id = 'top_section';
@@ -74,5 +75,36 @@ describe('Members opened from a person in the command palette', () => {
         await openMembers({ q: ['a', 'b'] });
         expect(searchBox().value).toBe('');
         expect(names()).toEqual(['Asha Rao', 'Ben Ortiz']);
+    });
+});
+
+describe('Members with nobody to list', () => {
+    it('offers to clear a search that matches nobody', async () => {
+        await openMembers({ q: 'nobody@example.com' });
+        const none = wrapper.find('[data-test="members-no-match"]');
+        expect(none.find('svg').attributes('data-illustration')).toBe('search');
+        expect(none.find('.empty-state__btn').text()).toBe('Members.clear_search');
+        await none.find('.empty-state__btn').trigger('click');
+        expect(searchBox().value).toBe('');
+        expect(names()).toHaveLength(2);
+    });
+
+    it('offers the invite to someone who may invite, and opens the invite form', async () => {
+        rows.list = [];
+        await openMembers({});
+        const empty = () => wrapper.find('[data-test="members-empty"]');
+        expect(empty().find('.empty-state__btn').text()).toBe('Members.invite');
+        await empty().find('.empty-state__btn').trigger('click');
+        expect(wrapper.find('.mbv__invite').exists()).toBe(true);
+        expect(empty().find('.empty-state__btn').exists()).toBe(false);
+    });
+
+    it('hides the invite from someone who may not', async () => {
+        perms.invite = false;
+        rows.list = [];
+        await openMembers({});
+        const empty = wrapper.find('[data-test="members-empty"]');
+        expect(empty.text()).toContain('Members.empty_all');
+        expect(empty.find('button').exists()).toBe(false);
     });
 });

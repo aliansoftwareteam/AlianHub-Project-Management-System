@@ -403,6 +403,33 @@ describe('opening a task from the palette', () => {
     });
 });
 
+describe('nothing found, and the key beside a command', () => {
+    afterEach(() => router.hasRoute.mockImplementation(() => true));
+
+    it('offers to clear a search that found nothing', async () => {
+        apiRequest.mockImplementation((type, url) => (type === 'post' && url === '/api/v2/search' ? ok({ tasks: [], projects: [], pages: [], comments: [] }) : ok([])));
+        router.hasRoute.mockImplementation((name) => name !== 'AiAsk');
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper, 'zzzz-no-such-thing');
+        const none = wrapper.find('[data-test="palette-none"]');
+        expect(none.find('svg').attributes('data-illustration')).toBe('search');
+        expect(none.find('h3').text()).toBe('Inbox.search_nothing');
+        expect(none.find('.empty-state__btn').text()).toBe('Inbox.clear_search');
+        await none.find('.empty-state__btn').trigger('click');
+        await flushPromises();
+        expect(wrapper.find('input').element.value).toBe('');
+        expect(wrapper.find('[data-test="palette-none"]').exists()).toBe(false);
+    });
+
+    it('shows the C key at the right edge of the New task command', async () => {
+        serve();
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper, 'Inbox.cmd_new_task');
+        const row = options(wrapper).find((o) => o.attributes('data-kind') === 'command' && o.text().includes('Inbox.cmd_new_task'));
+        expect(row.find('kbd.ah-kbd--hint').text()).toBe('C');
+    });
+});
+
 describe('command ranking', () => {
     it('leads with commands when the query starts a command label or alias', () => {
         expect(commandLeads('new task', ['New task', 'new task'])).toBe(true);

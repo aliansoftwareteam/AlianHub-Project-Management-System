@@ -1477,7 +1477,6 @@ export default {
         hint_close: "close",
         key_tab: "Tab",
         key_esc: "Esc",
-        key_ctrl_k: "Ctrl K",
         key_ctrl_enter: "Ctrl ↵",
         age_now: "just now",
         age_minutes: "{n}m ago",
