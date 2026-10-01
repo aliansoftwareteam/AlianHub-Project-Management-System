@@ -8,6 +8,7 @@ const knowledgeEvents = require('../../Knowledge/ingest/events');
 const { canPostToThread } = require('../../Comments/helpers/threadWriteAccess');
 const { sprintPlacementOf } = require('../../Tasks/helpers/sprintPlacement');
 const { slotUnder } = require('../../Tasks/helpers/taskTree');
+const { cleanDescription, cleanHtml } = require('../../Tasks/helpers/cleanRichText');
 
 // The only way an action is allowed to touch data.
 //
@@ -61,10 +62,11 @@ const recordAutomationAudit = (companyId, context, entry) => {
     });
 };
 
-const emitAutomationUpdate = (doc, updatedFields, depth) => {
+const emitAutomationUpdate = (companyId, doc, updatedFields, depth) => {
     socketEmitter.emit('update', {
         type: 'update',
         module: 'task',
+        companyId,
         data: doc,
         updatedFields,
         actor: { kind: 'automation', userId: null },
@@ -79,6 +81,7 @@ const updateTask = async (companyId, taskId, set, context = {}, unset = null, pu
     const _id = oid(taskId);
     if (!_id) throw new DeterministicError(`invalid task id "${taskId}"`);
     if (!set || !Object.keys(set).length) return { changed: false };
+    cleanDescription(set);
 
     const updated = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS,
@@ -87,7 +90,7 @@ const updateTask = async (companyId, taskId, set, context = {}, unset = null, pu
 
     if (!updated || !updated._id) throw new DeterministicError(`task ${taskId} not found`);
 
-    emitAutomationUpdate(updated, set, context.depth);
+    emitAutomationUpdate(companyId, updated, set, context.depth);
     recordAutomationAudit(companyId, context, {
         action: context.action || 'automation.task.update',
         entityType: 'task',
@@ -265,7 +268,7 @@ const createSubtask = async (companyId, parentTaskId, { title, description = '' 
             _id,
             TaskName: name.slice(0, 200),
             TaskKey: `${parent.TaskKey || 'TASK'}-${Date.now().toString(36).slice(-4)}`,
-            description: String(description || '').slice(0, 4000),
+            description: cleanHtml(String(description || '').slice(0, 4000), 'strict'),
             rawDescription: String(description || '').slice(0, 4000),
             CompanyId: String(companyId),
             sprintArray: {},
@@ -288,7 +291,7 @@ const createSubtask = async (companyId, parentTaskId, { title, description = '' 
         data: [{ _id: oid(parentTaskId) }, { $inc: { subTasks: 1 } }, { returnDocument: 'after' }],
     }, 'findOneAndUpdate').catch(() => {});
 
-    emitAutomationUpdate(saved, { ParentTaskId: String(parentTaskId) }, context.depth);
+    emitAutomationUpdate(companyId, saved, { ParentTaskId: String(parentTaskId) }, context.depth);
     recordAutomationAudit(companyId, context, {
         action: 'automation.task.create_subtask',
         entityType: 'task',
@@ -356,7 +359,7 @@ const createTask = async (companyId, projectId, { title, description = '', sprin
             _id,
             TaskName: name.slice(0, 250),
             TaskKey: '--',
-            description: String(description || '').slice(0, 4000),
+            description: cleanHtml(String(description || '').slice(0, 4000), 'strict'),
             rawDescription: String(description || '').slice(0, 4000),
             CompanyId: String(companyId),
             ProjectID: String(project._id),
@@ -386,7 +389,7 @@ const createTask = async (companyId, projectId, { title, description = '', sprin
     });
     const task = await getTask(companyId, saved._id);
 
-    emitAutomationUpdate(task, { created: true }, context.depth);
+    emitAutomationUpdate(companyId, task, { created: true }, context.depth);
     recordAutomationAudit(companyId, context, {
         action: 'automation.task.create',
         entityType: 'task',

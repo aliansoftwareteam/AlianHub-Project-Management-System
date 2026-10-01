@@ -9,6 +9,7 @@ const planRules = require('./planRules');
 const { attachSplit, loadLiveAgents } = require('./planSplit');
 const { normaliseGuide } = require('./guideController');
 const memory = require('../Agents/memory');
+const { cleanDescription } = require('../Tasks/helpers/cleanRichText');
 
 const EDITORJS_VERSION = '2.30.7';
 const SPRINT_DUE_WEEKDAY_OFFSET = 4;
@@ -51,7 +52,7 @@ const briefDescription = ({ approvedBrief, assumptions }) => {
     const hasSection = /^#{1,6}\s+assumptions\b/im.test(text(approvedBrief));
     const markdown = [text(approvedBrief).trim(), lines.length && !hasSection ? `\n## Assumptions\n${lines.map((l) => `- ${l}`).join('\n')}` : ''].filter(Boolean).join('\n');
     const blocks = markdownToBlocks(markdown);
-    return { description: blocksToText(blocks), descriptionBlock: { time: Date.now(), version: EDITORJS_VERSION, blocks } };
+    return cleanDescription({ description: blocksToText(blocks), descriptionBlock: { time: Date.now(), version: EDITORJS_VERSION, blocks } });
 };
 
 /* Fields written onto the project doc for the new flow; empty for a legacy execute. */

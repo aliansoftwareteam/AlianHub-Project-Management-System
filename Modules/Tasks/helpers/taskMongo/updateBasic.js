@@ -24,6 +24,7 @@ const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
 const completionStore = require('../completionStore.js');
 
 const { recordCompletion } = require('./recordCompletion.js');
+const { importActorOf } = require('../importMark');
 const { escapeText } = require('../taskWriteFields');
 
 const DUE_DATE_NOTICE = 'task_due_date';
@@ -146,7 +147,7 @@ module.exports = {
                             return;
                         }
 
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task', companyId: project.CompanyId });
                         resolve({status: true, statusText: "Due Date updated successfully"});
     
                         if (notification) {
@@ -234,7 +235,7 @@ module.exports = {
                             return;
                         }
 
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task', companyId: project.CompanyId });
                         resolve({status: true, statusText: "Start Date updated successfully"});
     
                         if (notification) {
@@ -302,7 +303,7 @@ module.exports = {
             }
             MongoDbCrudOpration(project.CompanyId, query, "findOneAndUpdate")
             .then((result) => {
-                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {...firebaseObj}, module: 'task' });
+                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {...firebaseObj}, module: 'task', companyId: project.CompanyId });
                 resolve({status: true, statusText: "Start Date And Due Date updated successfully"});
                 if (notification) {
                     HandleBothNotification({
@@ -339,8 +340,10 @@ module.exports = {
 
     /* -------------- UPDATE STATUS FUNCTION FOR TASK -----------------*/
 
-    /* `recordsCompletion` is false for a caller that writes the Done record itself, under the actor it knows. */
-    updateStatus({newStatus, prevStatus, projectData, task, userData, isUpdateTask, recordsCompletion = true}) {
+    /* `recordsCompletion` is false for a caller that writes the Done record itself, under the actor it knows.
+     * `quiet` is set by an import alone, which moves many tasks at once: no one is notified and its events are marked as
+     * an import's. The task routes drop it from a body. */
+    updateStatus({newStatus, prevStatus, projectData, task, userData, isUpdateTask, recordsCompletion = true, quiet = false}) {
         return new Promise((resolve,reject) => {
             try {
                 if (isUpdateTask === false) {
@@ -413,9 +416,10 @@ module.exports = {
                             return;
                         }
 
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: newStatus, module: 'task' });
+                        const eventActor = quiet ? importActorOf(userData) : null;
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: newStatus, module: 'task', companyId: projectData.CompanyId, ...(eventActor ? { actor: eventActor } : {}) });
                         resolve({status: true, statusText: "Status updated successfully"});
-                        if (recordsCompletion) recordCompletion({ companyId: projectData.CompanyId, taskId, task, newStatus, userData });
+                        if (recordsCompletion) recordCompletion({ companyId: projectData.CompanyId, taskId, task, newStatus, userData, eventActor });
 
                         const shown = shownStatus(prevStatus, newStatus);
                         let obj = { 'ProjectName': projectData.ProjectName, 'taskName': result.TaskName, ...shown.template }
@@ -426,7 +430,7 @@ module.exports = {
                             taskId: prevStatus.taskId,
                             sprintId: task.sprintId
                         }
-                        if (notificationObject && Object.keys(notificationObject).length > 0 && prevStatus.updatedTaskName !== prevStatus.name) {
+                        if (!quiet && notificationObject && Object.keys(notificationObject).length > 0 && prevStatus.updatedTaskName !== prevStatus.name) {
                             HandleBothNotification({
                                 type:'tasks',
                                 userData,
@@ -536,7 +540,7 @@ module.exports = {
                             return;
                         }
 
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task', companyId: projectData.CompanyId });
                         resolve({status: true, statusText: "Priority updated successfully"});
                         const shown = shownPriority(priorityObj);
                         let notificationObj = { 'ProjectName' : projectData?.ProjectName, 'taskName' : result.TaskName, ...shown.template };
@@ -602,7 +606,7 @@ module.exports = {
                         return;
                     }
 
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task', companyId: projectData.CompanyId });
                     resolve({status: true, statusText: "Story points updated successfully"});
 
                     const pointsValue = (firebaseObj.points === null || firebaseObj.points === undefined || firebaseObj.points === '') ? '—' : firebaseObj.points;
@@ -650,7 +654,7 @@ module.exports = {
                         return;
                     }
 
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task', companyId: projectData.CompanyId });
                     resolve({status: true, statusText: "Task name updated successfully"});
 
                     const sanitizedOldTaskName = escapeText(obj.previousTaskName);
@@ -728,7 +732,7 @@ module.exports = {
                         return;
                     }
 
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: setObj, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: setObj, module: 'task', companyId: projectData.CompanyId });
                     resolve({status: true, statusText: "Dates updated successfully"});
 
                     const historyObj = {

@@ -17,10 +17,11 @@ const personOf = (actor) => {
     return uid;
 };
 
-/* What a route handler answers when it is called as `uid` with no HTTP around it. */
-const answerOf = (handler, { companyId, uid, params = {}, body = {} }) => new Promise((resolve, reject) => {
+/* What a route handler answers when it is called as `uid` with no HTTP around it. `agentDraft` is what the
+ * agent guard sets on a route: the agent a new doc is the draft of. */
+const answerOf = (handler, { companyId, uid, params = {}, body = {}, agentDraft }) => new Promise((resolve, reject) => {
     const res = { status: () => res, send: (sent) => { resolve(sent); return res; }, json: (sent) => { resolve(sent); return res; } };
-    const req = { uid, aud: String(companyId), headers: { companyid: String(companyId) }, params, query: {}, body };
+    const req = { uid, aud: String(companyId), headers: { companyid: String(companyId) }, params, query: {}, body, ...(agentDraft ? { agentDraft } : {}) };
     Promise.resolve(handler(req, res)).catch(reject);
 });
 
@@ -53,14 +54,13 @@ const restoreVersion = async ({ companyId, uid, pageId, versionId }) => dataOf(r
 const executors = {
     async 'page.create'({ companyId, actor, params }) {
         const uid = personOf(actor);
-        const created = await dataOf(require('../Pages/controller').createPage, { companyId, uid, body: {
+        const agentDraft = { agentName: String(actor.agentName || 'Agent') };
+        const created = await dataOf(require('../Pages/controller').createPage, { companyId, uid, agentDraft, body: {
             title: titleOf(params.title),
             ...(params.projectId ? { projectId: idOf(params.projectId) } : {}),
             ...(params.parentPageId ? { parentPageId: idOf(params.parentPageId) } : {}),
             ...(params.taskId ? { linkedTasks: [idOf(params.taskId)] } : {}),
             ...(params.text !== undefined ? { contentBlocks: blocksOf(params.text) } : {}),
-            createdByAgent: true,
-            agentName: String(actor.agentName || 'Agent'),
         } });
         const pageId = idOf(created._id);
         return { result: { pageId, title: created.title || '', draft: true }, undo: { kind: 'page', pageId }, entityType: 'page', entityId: pageId, entityName: created.title || '' };

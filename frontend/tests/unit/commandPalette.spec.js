@@ -821,3 +821,23 @@ describe('closing on navigation', () => {
         expect(wrapper.emitted('close')).toBeFalsy();
     });
 });
+
+/* Task 047, S-1: the Simple rail tucks these places away, so the palette must offer every one. */
+describe('every place on the rail has a row in the palette', () => {
+    it.each([
+        ['everything', 'Shell.everything', 'Everything'],
+        ['goals', 'Shell.goals', 'Goals'],
+        ['planner', 'Shell.planner', 'Planner'],
+        ['chat', 'Shell.chat', 'chats'],
+        ['docs', 'Shell.docs', 'Pages'],
+        ['dash', 'Shell.dash', 'Dashboards'],
+        ['time', 'Shell.time', 'User Timesheet'],
+    ])('typing "%s" opens the page', async (word, label, routeName) => {
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper, word);
+        const row = options(wrapper).find((o) => o.attributes('data-kind') === 'nav' && o.text().trim().startsWith(label));
+        expect(row, label).toBeTruthy();
+        await row.trigger('click');
+        expect(router.push).toHaveBeenCalledWith(expect.objectContaining({ name: routeName }));
+    });
+});

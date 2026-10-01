@@ -310,6 +310,20 @@
     "group": "limits",
     "description": "Largest file the cloud-storage importer will copy into a project."
   },
+  "CONNECTORS": {
+    "group": "integrations",
+    "description": "Agent connectors to switch on, as a list separated by commas: slack and google_calendar. Default off: no connector route, no connector action in the agent registry and no section on the Integrations screen. With slack named, an owner or admin connects the workspace's Slack app under Integrations > Slack (the bot token and the signing secret go straight into the secrets store under the kind connector and are never shown again) and chooses the channels agents may post to; an agent can then propose a Slack message (slack.message.post), and nothing is sent until an owner or admin approves the exact channel and text in the AI Inbox. Needs SECRETS_STORE with a usable SECRETS_KEY and AGENT_TAINT_ROUTING on: without them the connector stays off, the server says why in one startup log line and the Integrations screen shows the same reason. While AGENT_EGRESS_ALLOWLIST is on and the workspace has a host list, slack.com must be on it. With google_calendar named, each member connects their own Google account on the Connections page: this slice ships the connection only (no calendar is read or written yet). Its access and refresh tokens go to the secrets store, the connection ends when the member disconnects, an owner or admin ends it, or the member is removed, and nobody else can use it. It needs the same two settings plus CONNECTOR_GOOGLE_CLIENT_ID and CONNECTOR_GOOGLE_CLIENT_SECRET, and APIURL, from which the redirect address <APIURL>/api/v1/connector-oauth/google/callback is built; that host list must then also hold oauth2.googleapis.com.",
+    "default": "off"
+  },
+  "CONNECTOR_GOOGLE_CLIENT_ID": {
+    "group": "integrations",
+    "description": "Client id of the Google OAuth client the connectors use (CONNECTORS=google_calendar). A separate client from the sign-in one: never reuse GOOGLE_CLIENT_ID, because the sign-in exchange answers to the browser and connector tokens must never leave the server. Create it in the Google Cloud console as a Web application with the redirect address <APIURL>/api/v1/connector-oauth/google/callback. Not a secret."
+  },
+  "CONNECTOR_GOOGLE_CLIENT_SECRET": {
+    "group": "integrations",
+    "description": "Client secret of that Google OAuth client. Type it into .env yourself; it is sent only to Google's token endpoint and is never logged, stored in the database or shown. Without both this and CONNECTOR_GOOGLE_CLIENT_ID the google_calendar connector stays off and the server says so in one startup log line.",
+    "secret": true
+  },
   "CORS_ORIGINS": {
     "group": "security",
     "description": "Extra origins allowed by CORS, comma-separated (WEBURL and APIURL are always allowed).",
@@ -759,7 +773,7 @@
   },
   "MCP_TOOLS_WORK": {
     "group": "ai",
-    "description": "MCP everyday work tools: \"on\" registers and offers tags.list, task.relations.list, lists.list and page.comments.list (reads), and task.tags.add, task.tags.remove, task.relation.add, task.relation.remove, list.create, list.rename, list.move, page.comment.create, page.comment.reply and page.comment.assign (writes). A read needs the read scope and a write the write scope; none needs a manage grant, so every token that reads or writes gains them. Each answers only what the person behind the token can open in the web app, stays inside the projects a token was narrowed to, and each write runs through the web app's own route handlers as that person, under the permission the route asks for. Nothing here deletes or archives. For an OAuth client under AGENT_TAINT_ROUTING, a write that reaches past one task (a link, a list change, a doc comment) is refused, or filed as a proposal when the token holds tasks:manage (links and lists) or docs:manage (doc comments). Default \"off\" leaves the registry and the MCP tool list as they were.",
+    "description": "MCP everyday work tools: \"on\" registers and offers tags.list, task.relations.list, task.lists.list, lists.list, page.comments.list, goals.list and goal.get (reads), and task.tags.add, task.tags.remove, task.relation.add, task.relation.remove, list.create, list.rename, list.move, page.comment.create, page.comment.reply, page.comment.assign, goal.target.set, goal.target.sources.add, goal.target.sources.remove, task.lists.add and task.lists.remove (writes), and lets tasks.search take a list (sprintId) for every token. A read needs the read scope and a write the write scope; none needs a manage grant, so every token that reads or writes gains them. Each answers only what the person behind the token can open in the web app, stays inside the projects a token was narrowed to, and each write runs through the web app's own route handlers as that person, under the permission the route asks for. Nothing here deletes or archives. For an OAuth client under AGENT_TAINT_ROUTING, a write that reaches past one task (a link, a list change, a task added to or taken out of another list, a doc comment, a change to a goal) is refused, or filed as a proposal when the token holds tasks:manage (links, lists and goals) or docs:manage (doc comments). A goal belongs to no project: a token narrowed to some projects reads a goal only when everything the goal counts is inside them, and changes no goal. A list a task is added to gives nobody access to the task: a search by list answers an added task only to a caller who can open its home list. Default \"off\" leaves the registry and the MCP tool list as they were.",
     "default": "off"
   },
   "MCP_TOOLS_V2": {

@@ -58,14 +58,21 @@
                     <template v-if="mode === 'existing' || source !== 'clickup'">
                         <template v-if="!fixedProject">
                             <label class="wim__label" for="wim-project">{{ $t('WorkspaceImport.project_label') }}</label>
-                            <select id="wim-project" v-model="projectId" class="wim__select" data-test="wim-project">
+                            <select id="wim-project" v-model="projectId" class="ah-input" data-test="wim-project">
                                 <option value="" disabled>{{ $t('WorkspaceImport.project_pick') }}</option>
                                 <option v-for="option in projectOptions" :key="option._id" :value="option._id">{{ option.ProjectName }}</option>
                             </select>
                         </template>
+                        <p v-if="listsLoading && source !== 'clickup'" class="ah-small ah-muted" role="status" data-test="wim-lists-loading">{{ $t('WorkspaceImport.sprint_loading') }}</p>
+                        <p v-if="listsFailed" class="ah-small wim__error" role="alert" data-test="wim-lists-failed">
+                            {{ $t('WorkspaceImport.sprint_load_failed') }}
+                            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="wim-lists-retry" @click="loadLists(projectId)">{{ $t('WorkspaceImport.sprint_retry') }}</button>
+                        </p>
+                        <p v-else-if="listsReady && !listsLoading && !sprintOptions.length" class="ah-small ah-muted wim__note" data-test="wim-lists-none">{{ $t('WorkspaceImport.sprint_none') }}</p>
                         <template v-if="source === 'clickup'">
                             <label class="wim__label" for="wim-sprint">{{ $t('WorkspaceImport.sprint_label') }}</label>
-                            <select id="wim-sprint" v-model="sprintId" class="wim__select" :disabled="!sprintOptions.length" data-test="wim-sprint">
+                            <select id="wim-sprint" v-model="sprintId" class="ah-input" :disabled="listsLoading || !sprintOptions.length" :aria-busy="listsLoading" data-test="wim-sprint">
+                                <option v-if="listsLoading" value="">{{ $t('WorkspaceImport.sprint_loading') }}</option>
                                 <option v-for="option in sprintOptions" :key="option.id" :value="option.id">{{ listLabel(option) }}</option>
                             </select>
                             <label class="wim__check">
@@ -125,6 +132,7 @@
                             <li v-if="preview.matchedAssignees.length">{{ $t('WorkspaceImport.fact_people', { count: preview.matchedAssignees.length }) }}</li>
                             <li v-if="preview.unmatchedAssignees.length" class="wim__warn">{{ $t('WorkspaceImport.fact_unmatched', { names: preview.unmatchedAssignees.join(', ') }) }}</li>
                             <li v-if="preview.skippedRows.length" class="wim__warn">{{ $t('WorkspaceImport.fact_skipped', { count: preview.skippedRows.length }) }}</li>
+                            <li data-test="wim-duplicates-scope">{{ $t('WorkspaceImport.fact_duplicates_scope') }}</li>
                             <li v-if="cannotAddDetails" class="wim__warn" data-test="wim-add-denied-fact">{{ $t('WorkspaceImport.add_missing_denied') }}</li>
                             <li v-for="issue in shownUnreadDates" :key="`${issue.row}-${issue.column}`" class="wim__warn" data-test="wim-unread-date">{{ $t('WorkspaceImport.fact_unread_date', issue) }}</li>
                             <li v-if="unreadDates.length > shownUnreadDates.length" class="wim__warn">{{ $t('WorkspaceImport.fact_unread_dates_more', { count: unreadDates.length - shownUnreadDates.length }) }}</li>
@@ -164,6 +172,12 @@
                             <li v-for="issue in clickUp.unreadDates.value" :key="`${issue.row}-${issue.column}`">{{ $t('WorkspaceImport.fact_unread_date', issue) }}</li>
                         </ul>
                     </template>
+                    <template v-if="clickUp.skippedCells.value.length">
+                        <p class="wim__label" data-test="wim-skipped-cells">{{ $t('WorkspaceImport.summary_skipped_cells', { count: clickUp.skippedCells.value.length }) }}</p>
+                        <ul class="ah-small wim__facts">
+                            <li v-for="(cell, index) in clickUp.skippedCells.value" :key="`${index}-${cell.column}`" data-test="wim-skipped-cell">{{ $t(`WorkspaceImport.skipped_cell_${cell.code}`, cell) }}</li>
+                        </ul>
+                    </template>
                     <p v-if="clickUp.unmatchedAssignees.value.length" class="ah-small wim__warn">{{ $t('WorkspaceImport.summary_unmatched', { names: clickUp.unmatchedAssignees.value.join(', ') }) }}</p>
                     <ul v-if="adjustedSummary.length" class="ah-small wim__facts" data-test="wim-adjusted">
                         <li v-for="line in adjustedSummary" :key="line.reason" class="wim__warn">{{ line.text }} <span v-if="line.names">{{ line.names }}</span></li>
@@ -196,7 +210,8 @@ import ImportSourceModals from "@/components/organisms/ImportDialog/ImportSource
 import ImportCounts from "./ImportCounts.vue";
 import ImportUndo from "./ImportUndo.vue";
 import { useCustomComposable } from "@/composable";
-import { IMPORT_SOURCES, sprintOptionsOf } from "./workspaceImportState";
+import { IMPORT_SOURCES, listsOfTree, sprintOptionsOf } from "./workspaceImportState";
+import { loadProjectTree, treeCache } from "@/components/molecules/ProjectTree/projectTreeData";
 import { useClickUpImport, UPDATE_EXISTING } from "./useClickUpImport";
 import { readSheet } from "./readSheet";
 import { listLabel } from "@/utils/folderTree";
@@ -227,12 +242,20 @@ const fileError = ref("");
 const deniedProject = ref("");
 const handoff = ref(false);
 const handoffSource = ref("");
+const loadedLists = ref({});
+const listsLoading = ref(false);
+const listsFailed = ref(false);
 
 const fixedProject = computed(() => Boolean(props.project?._id));
 const canCreateProjects = computed(() => checkPermission("project.project_create") === true);
 const projectOptions = computed(() => (getters["projectData/projects"]?.data || []).filter((p) => p && p._id && !p.deletedStatusKey));
-const chosenProject = computed(() => (fixedProject.value ? props.project : projectOptions.value.find((p) => String(p._id) === String(projectId.value)) || null));
-const sprintOptions = computed(() => sprintOptionsOf(chosenProject.value));
+const listsReady = computed(() => fixedProject.value || Boolean(loadedLists.value[String(projectId.value)]));
+const chosenProject = computed(() => {
+    if (fixedProject.value) return props.project;
+    const project = projectOptions.value.find((p) => String(p._id) === String(projectId.value));
+    return project ? { ...project, ...loadedLists.value[String(project._id)] } : null;
+});
+const sprintOptions = computed(() => (listsReady.value ? sprintOptionsOf(chosenProject.value) : []));
 const users = computed(() => getters["users/users"] || []);
 const preview = computed(() => clickUp.preview.value);
 const listCount = computed(() => preview.value?.lists?.length || 0);
@@ -253,7 +276,7 @@ const adjustedSummary = computed(() => adjustedLines(clickUp.adjusted.value, t, 
 
 const targetReady = computed(() => {
     if (source.value === "clickup" && mode.value === "new") return canCreateProjects.value;
-    if (!chosenProject.value) return false;
+    if (!chosenProject.value || !listsReady.value) return false;
     return source.value !== "clickup" || Boolean(sprintId.value);
 });
 const canGoBack = computed(() => !clickUp.running.value && ["file", "target", "preview"].includes(step.value) && !(fixedProject.value && step.value === "file"));
@@ -261,6 +284,23 @@ const canGoBack = computed(() => !clickUp.running.value && ["file", "target", "p
 watch(sprintOptions, (options) => {
     if (!options.some((option) => option.id === sprintId.value)) sprintId.value = options[0]?.id || "";
 }, { immediate: true });
+
+/* The store carries a project's lists only once its page has been opened; the tree cache reads them without touching the open project's. */
+async function loadLists(id) {
+    listsFailed.value = false;
+    if (!id || fixedProject.value || loadedLists.value[id]) {
+        listsLoading.value = false;
+        return;
+    }
+    listsLoading.value = true;
+    await loadProjectTree(id);
+    if (projectId.value !== id) return;
+    if (treeCache[id]?.loaded) loadedLists.value = { ...loadedLists.value, [id]: listsOfTree(treeCache[id]) };
+    else listsFailed.value = true;
+    listsLoading.value = false;
+}
+
+watch(projectId, loadLists, { immediate: true });
 
 watch(handoffSource, (value, previous) => {
     if (previous && !value) emit("close");
@@ -372,13 +412,12 @@ function finish() {
 .wim__body { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .wim__how { margin: 0; padding-left: 18px; color: var(--ink-2); display: grid; gap: 4px; }
 .wim__label { font-weight: 600; font-size: var(--text-small, 13px); margin: 0; }
-.wim__file { max-width: 100%; color: var(--ink); }
+.wim__file { max-width: 100%; color: var(--ink); font: 400 var(--fs-md, 13.5px)/1.4 var(--font-ui); }
 .wim__error { color: var(--danger-ink, var(--danger)); margin: 0; }
 .wim__fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
 .wim__radio, .wim__check { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
 .wim__radio span { display: flex; flex-direction: column; gap: 2px; }
-.wim__radio input, .wim__check input { margin-top: 3px; }
-.wim__select { width: 100%; border: 1px solid var(--border); border-radius: var(--r-input, 6px); padding: 7px 8px; background: var(--surface); color: var(--ink); }
+.wim__radio input, .wim__check input { margin-top: 3px; accent-color: var(--brand); }
 .wim__total { margin: 0; font-weight: 600; }
 .wim__table { width: 100%; border-collapse: collapse; font-size: var(--text-small, 13px); }
 .wim__table th, .wim__table td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--hairline, var(--border)); vertical-align: top; }

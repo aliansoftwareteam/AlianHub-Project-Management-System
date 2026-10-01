@@ -242,7 +242,7 @@ describe('page events on the bus', () => {
         const actions = require('../Modules/Agents/actions');
         const permissions = require('../Modules/Agents/permissions');
         jest.spyOn(permissions, 'holderMay').mockResolvedValue({ allowed: true, reason: '' });
-        const actor = { kind: 'agent', agentId: '6f00000000000000000000e1', agentName: 'Scribe', userId: '', viaAccount: 'workspace' };
+        const actor = { kind: 'agent', agentId: '6f00000000000000000000e1', agentName: 'Scribe', userId: MEMBER, viaAccount: 'workspace' };
 
         try {
             const { result } = await actions.perform({ companyId: C, actor, action: 'page.draft', params: { title: 'Weekly summary', text: 'Closed the harbour tickets.\n\n## Next\nStart the lighthouse audit.', projectId: P1 } });

@@ -119,10 +119,9 @@ async function createSampleFolders({ project, userData }) {
 
 async function createSampleDoc({ companyId, projectId, ownerId }) {
     const { savePage } = require('../Modules/Pages/controller');
-    const { contentToEditorData } = require('../Modules/Pages/helpers/pageContent');
-    const { normalizeBlockMentions } = require('../Modules/Pages/helpers/pageMentions');
-    const blocks = normalizeBlockMentions(contentToEditorData({ blocks: DOC_BLOCKS }));
-    return savePage(companyId, ownerId, { title: DOC_TITLE, projectId, blocks });
+    const saved = await savePage(companyId, ownerId, { title: DOC_TITLE, projectId, contentBlocks: DOC_BLOCKS });
+    if (saved.refused) throw new Error(saved.refused);
+    return saved.created;
 }
 
 /* Visibility is left at the Goals module's default, private to the owner. */
@@ -136,9 +135,10 @@ async function createSampleGoal({ companyId, ownerId, sprintId }) {
     }, { sample: true });
 }
 
+/* The owner adds it as anyone would, so the rules, the history and the event are the ones every extra list gets. */
 async function addTaskToSecondList({ project, taskId, list, userData }) {
-    const { placeForSample } = require('../Modules/Tasks/helpers/taskMongo/extraListPlace');
-    return placeForSample({ companyId: String(project.CompanyId), taskId, list, project, userData });
+    const { addToList } = require('../Modules/Tasks/helpers/taskMongo/extraLists');
+    return addToList({ companyId: String(project.CompanyId), taskId, sprintId: String(list._id), userData });
 }
 
 /* Runs after the tasks exist: the second-list task is the first top-level one in the second sprint. */

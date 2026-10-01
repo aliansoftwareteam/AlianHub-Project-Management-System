@@ -151,7 +151,6 @@ import PromptSidebar from "@/components/molecules/PromptSidebar/PromptSidebar.vu
 import { apiRequest, apiRequestWithoutCompnay } from '../../../services';
 import * as env from '@/config/env';
 
-// UTILS
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { canUseAi } from '@/composable/aiAvailability';
 import taskClass from '@/utils/TaskOperations';
@@ -173,7 +172,6 @@ const { getUser } = useGetterFunctions();
 const { checkPermission, makeUniqueId, checkBucketStorage,checkApps,getAppState } = useCustomComposable();
 const { openRecorder } = useClipRecorder();
 
-// props
 const props = defineProps({
     task: {
         type: Object,
@@ -209,10 +207,8 @@ const show = computed(() => ({
     ...(props.sections || {})
 }));
 
-// emit
 const emit = defineEmits(["openSeeAll", 'openDoc']);
 
-//computed
 const fileExtentions = computed(() => {
     return getters['settings/fileExtentions'];
 });
@@ -225,7 +221,6 @@ const currentCompany = computed(() => getters["settings/selectedCompany"]);
 const projectsGetter = computed(() => getters["projectData/onlyActiveProjects"]);
 const showCustomField = computed(() => checkPermission("task.task_custom_field", projectData.value?.isGlobalPermission, {gettersVal: getters}));
 
-// ref
 const ids = ref();
 const tagChipArray = ref();
 const isSpinner = ref(false);
@@ -233,13 +228,12 @@ const submitted = ref(false);
 const componentDetail = ref({});
 const customFieldObject = ref({});
 const isCustomField = ref(false);
-const allProjectsArrayFilter = ref([]);
+const allProjectsArrayFilter = computed(() => (props.isSupport ? [] : projectsGetter.value?.data || []));
 const CustomFieldData = ref(JSON.parse(JSON.stringify(getters["settings/customFields"])));
 const isOpenPromptDeatil = ref(false);
 const selectedPrompt = ref({})
 const isSpinnerAi = ref(false);
 
-// inject
 const userId = inject('$userId');
 
 // Recently-visited tracking — fire-and-forget on every task open.
@@ -259,12 +253,7 @@ watch(() => props.task?._id, recordRecentVisit);
 const companyId = inject('$companyId');
 const projectData = inject("selectedProject");
 
-//getUser
 const user = getUser(userId.value);
-
-onMounted(() => {
-    allProjectsArrayFilter.value = props.isSupport ? [] : JSON.parse(JSON.stringify(projectsGetter.value.data));
-})
 
 const newAttachments = (files) => {
     if(!files.length) {

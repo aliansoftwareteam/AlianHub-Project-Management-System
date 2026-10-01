@@ -53,6 +53,8 @@ const Notification_key = {
   DOC_COMMENT_ASSIGNED:"doc_comment_assigned",
   GOAL_TARGET_REACHED:"goal_target_reached",
   GOAL_REACHED:"goal_reached",
+  DOC_SHARED:"doc_shared",
+  CREDENTIAL_EXPIRING:"credential_expiring",
 }
 const TemplateType = {
  CREATE:'create',
@@ -100,6 +102,7 @@ const DOC_NOTICE_SECTION = Object.freeze({
     Object.freeze({ name: "Doc comments I'm @mentioned in", email: false, browser: true, mobile: true, key: Notification_key.DOC_COMMENT_MENTION }),
     Object.freeze({ name: "Replies to my doc comments", email: false, browser: true, mobile: true, key: Notification_key.DOC_COMMENT_REPLY }),
     Object.freeze({ name: "Doc comments assigned to me", email: false, browser: true, mobile: true, key: Notification_key.DOC_COMMENT_ASSIGNED }),
+    Object.freeze({ name: "Docs shared with me", email: false, browser: true, mobile: true, key: Notification_key.DOC_SHARED }),
   ]),
 });
 

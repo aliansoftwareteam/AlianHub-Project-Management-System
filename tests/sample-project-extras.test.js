@@ -37,6 +37,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { seedSampleTasks, demoTasksForFocus } = require('../utils/sampleTasks');
 const trash = require('../Modules/Trash/controller');
+const socketEmitter = require('../event/socketEventEmitter');
 const goalsRules = require('../Modules/Goals/helpers/goalRules');
 
 const COMPANY = '6f0000000000000000000c01';
@@ -149,6 +150,9 @@ describe('the welcome project after seeding', () => {
         expect(docs[0].createdBy).toBe(OWNER);
         expect(docs[0].content.blocks.blocks.map((b) => b.type)).toEqual(['header', 'paragraph', 'checklist']);
         expect(docs[0].rawText.length).toBeGreaterThan(20);
+        expect(docs[0].content.html).toContain('Working agreement');
+        expect(docs[0].createdByAgent).toBeUndefined();
+        expect(docs[0].agentStatus).toBeUndefined();
     });
 
     test('a goal counts the done tasks of the first sample list, and is private to the owner', () => {
@@ -171,6 +175,12 @@ describe('the welcome project after seeding', () => {
         expect(String(extra[0].extraLists[0].sprintId)).toBe(String(list._id));
         expect(String(extra[0].sprintId)).not.toBe(String(list._id));
         expect(extra[0].ancestors).toEqual([]);
+    });
+
+    test('every task event the seeding sent names the company', () => {
+        const sent = socketEmitter.emit.mock.calls.map(([, payload]) => payload).filter((payload) => payload && payload.module === 'task');
+        expect(sent.length).toBeGreaterThan(0);
+        sent.forEach((payload) => expect(payload.companyId).toBe(COMPANY));
     });
 
     test('every call ran in the one company', () => {

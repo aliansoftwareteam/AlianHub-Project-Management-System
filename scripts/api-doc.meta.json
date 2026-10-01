@@ -576,6 +576,11 @@
                     "description": "Up to 500 project ids. It can only narrow what the caller may read."
                 },
                 {
+                    "name": "filter.sprintIds",
+                    "type": "id[]",
+                    "description": "Up to 100 list ids: tasks that live in one of them or were added to one. A list the caller cannot open is ignored."
+                },
+                {
                     "name": "group",
                     "type": "string",
                     "description": "`none`, `status`, `assignee`, `project`, `priority` or `dueDate`. `none` when left out."
@@ -688,7 +693,7 @@
             "responseFields": [
                 {
                     "name": "rows",
-                    "description": "Up to `limit` tasks. Each carries `_id`, `TaskName`, `TaskKey`, `status`, `statusKey`, `statusType`, `Task_Priority`, `AssigneeUserId`, `DueDate`, `startDate`, `ProjectID`, `sprintId`, `folderObjId`, `TaskType`, `TaskTypeKey`, `tagsArray`, `subTasks`, `ancestors`, `ParentTaskId`, `isParentTask`, `createdAt` and `updatedAt`. No custom field values."
+                    "description": "Up to `limit` tasks. Each carries `_id`, `TaskName`, `TaskKey`, `status`, `statusKey`, `statusType`, `Task_Priority`, `AssigneeUserId`, `DueDate`, `startDate`, `ProjectID`, `sprintId`, `folderObjId`, `TaskType`, `TaskTypeKey`, `tagsArray`, `subTasks`, `ancestors`, `ParentTaskId`, `isParentTask`, `createdAt`, `updatedAt` and `sprintArray` (the list the task lives in, with its `name`). A task that was added to other lists also carries `extraLists`: each entry has `projectId`, `sprintId`, `addedBy` and `addedAt`, and `name` and `projectName` only for a list the caller can open. No custom field values."
                 },
                 {
                     "name": "groups",
@@ -1103,7 +1108,7 @@
                 {
                     "name": "linkedTasks",
                     "type": "id[]",
-                    "description": "Tasks the page is attached to."
+                    "description": "Tasks the page is attached to. Each must be a task the caller can open."
                 },
                 {
                     "name": "isWiki",
@@ -1123,12 +1128,7 @@
                 {
                     "name": "createdByAgent",
                     "type": "boolean",
-                    "description": "Marks the page as drafted by an agent. It starts as a draft that a person approves."
-                },
-                {
-                    "name": "agentName",
-                    "type": "string",
-                    "description": "The agent's name, up to 80 characters."
+                    "description": "Marks the page as a draft that a person approves. A page an agent token creates is always one, under the token's own name."
                 }
             ],
             "request": {
@@ -1274,7 +1274,7 @@
                 {
                     "name": "linkedTasks",
                     "type": "id[]",
-                    "description": "Replaces the tasks the page is attached to."
+                    "description": "Replaces the tasks the page is attached to. A task added here must be one the caller can open."
                 },
                 {
                     "name": "isWiki",
@@ -1290,11 +1290,6 @@
                     "name": "reviewDate",
                     "type": "date",
                     "description": "When the wiki page is next due for review."
-                },
-                {
-                    "name": "agentStatus",
-                    "type": "string",
-                    "description": "`draft` or `approved`, for a page an agent drafted."
                 }
             ],
             "request": {
@@ -2499,6 +2494,7 @@
         "POST /api/v2/timetracker/capture": { "stability": "internal", "summary": "Stores a tracker capture, for the time tracker." },
         "POST /api/v2/timetracker/timelog": { "stability": "internal", "summary": "A time log request, for the time tracker." },
         "GET /api/v2/timetracker/running": { "stability": "internal", "summary": "The caller's open tracker sessions." },
+        "GET /api/v2/timetracker/can-start": { "stability": "internal", "summary": "Whether the caller may start a timer today; refused in an approved timesheet period." },
         "POST /api/v2/timetracker/trim": { "stability": "internal", "summary": "Closes an open tracker session at a given length." },
         "POST /api/v2/timesheet-approval/submit": { "stability": "beta", "summary": "Submits a timesheet period for approval." },
         "GET /api/v2/timesheet-approval/status": { "stability": "beta", "summary": "The approval status of a timesheet period." },
@@ -2580,6 +2576,18 @@
         "GET /api/v2/provider-keys": { "stability": "internal", "summary": "Lists the workspace's AI provider keys, by handle only.", "apiToken":false },
         "PUT /api/v2/provider-keys/:provider": { "stability": "internal", "summary": "Stores a workspace AI provider key.", "apiToken":false },
         "DELETE /api/v2/provider-keys/:provider": { "stability": "internal", "summary": "Removes a workspace AI provider key.", "apiToken":false },
+        "GET /api/v2/connectors/slack": { "stability": "internal", "summary": "Shows the workspace's Slack connector: whether each secret is set and since when, the channel list and, for each allowed channel, whether agents may read it or post to it. Never a secret.", "apiToken":false },
+        "PUT /api/v2/connectors/slack/secrets": { "stability": "internal", "summary": "Stores the Slack bot token or signing secret in the secrets store, after checking the token with Slack.", "apiToken":false },
+        "DELETE /api/v2/connectors/slack/secrets/:key": { "stability": "internal", "summary": "Removes a Slack connector secret.", "apiToken":false },
+        "POST /api/v2/connectors/slack/channels/refresh": { "stability": "internal", "summary": "Reads the Slack channel list again.", "apiToken":false },
+        "PUT /api/v2/connectors/slack/channels": { "stability": "internal", "summary": "Sets, for each allowed Slack channel, whether agents may read it, propose a message to it, or both.", "apiToken":false },
+        "GET /api/v2/connectors/google/mine": { "stability": "internal", "summary": "Shows the signed-in member's own Google connections: the account's email, the granted scopes, the dates and the state. Never a token or its handle.", "apiToken":false },
+        "GET /api/v2/connectors/google/members": { "stability": "internal", "summary": "For an owner or admin: which members hold a Google connection, with its scopes, dates and state. Never the account or a token.", "apiToken":false },
+        "POST /api/v2/connectors/google/:connector/connect": { "stability": "internal", "summary": "Starts the signed-in member's Google connection and answers Google's consent address. The state is single-use, lasts ten minutes and belongs to this session.", "apiToken":false },
+        "POST /api/v2/connectors/google/:connector/complete": { "stability": "internal", "summary": "Completes the connection the same session started: exchanges the code with the PKCE verifier and keeps the tokens in the secrets store.", "apiToken":false },
+        "DELETE /api/v2/connectors/google/:connector": { "stability": "internal", "summary": "Ends the signed-in member's Google connection: revokes the grant with Google and clears the stored tokens.", "apiToken":false },
+        "DELETE /api/v2/connectors/google/:connector/members/:userId": { "stability": "internal", "summary": "For an owner or admin: ends a member's Google connection.", "apiToken":false },
+        "GET /api/v1/connector-oauth/google/callback": { "stability": "internal", "summary": "Google's redirect after consent. Public: it exchanges nothing and returns the browser to the signed-in page, which completes the connection." },
         "GET /api/v2/ai-switch": { "stability": "internal", "summary": "Whether AI is on for the workspace." },
         "PUT /api/v2/ai-switch": { "stability": "internal", "summary": "Turns AI on or off for the workspace.", "apiToken":false },
         "POST /api/v2/reactions": { "stability": "beta", "summary": "Adds or removes a reaction." },
@@ -2600,6 +2608,7 @@
         "GET /api/v2/api-tokens/step-credentials": { "stability": "internal", "summary": "The live step credentials of the workspace." },
         "GET /api/v2/api-tokens/:id/logs": { "stability": "internal", "summary": "The latest calls made with a token." },
         "POST /api/v2/api-tokens/mcp": { "stability": "internal", "summary": "Creates a token for an AI agent." },
+        "POST /api/v2/api-tokens/:id/renew": { "stability": "internal", "summary": "Gives the person's own token a new secret and a new end date." },
         "GET /api/v2/api-tokens": { "stability": "internal", "summary": "Lists the person's tokens." },
         "POST /api/v2/api-tokens": { "stability": "internal", "summary": "Creates a token." },
         "PUT /api/v2/api-tokens/:id": { "stability": "internal", "summary": "Renames a token, or switches it on or off." },
@@ -2611,6 +2620,9 @@
         "PUT /api/v2/pages/:id/comments/:commentId/resolve": { "stability": "beta", "summary": "Resolves a comment thread, or reopens it." },
         "PUT /api/v2/pages/:id/comments/:commentId": { "stability": "beta", "summary": "Changes a comment." },
         "DELETE /api/v2/pages/:id/comments/:commentId": { "stability": "beta", "summary": "Deletes a comment and its replies." },
+        "GET /api/v2/pages/:id/shares": { "stability": "beta", "summary": "Lists the people a page is shared with by name." },
+        "PUT /api/v2/pages/:id/shares/:userId": { "stability": "beta", "summary": "Shares a page with a person as a viewer or an editor, or changes their role." },
+        "DELETE /api/v2/pages/:id/shares/:userId": { "stability": "beta", "summary": "Stops sharing a page with a person." },
         "PUT /api/v2/pages/:id/review": { "stability": "beta", "summary": "Marks a wiki page as reviewed." },
         "PUT /api/v2/pages/:id/approve": { "stability": "beta", "summary": "Signs off a page an agent drafted." },
         "POST /api/v2/pages/:id/images": { "stability": "beta", "summary": "Uploads an image for a page." },

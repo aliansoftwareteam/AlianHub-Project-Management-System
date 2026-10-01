@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
-const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const socketEmitter = require('../../event/socketEventEmitter');
 const registry = require('./registry');
 const actions = require('./actions');
@@ -12,10 +11,10 @@ const findingMemory = require('./engine/findingMemory');
 const persistence = require('../AICore/persistence');
 const logger = require('../../Config/loggerConfig');
 const access = require('./access');
-const { proposalClause } = require('./privateWork');
 const taint = require('./taint');
 const { externalClientActor } = require('./actor');
 const aiFeedback = require('../AI/feedback');
+const slackPost = require('./connectors/slackPost');
 
 // AI Inbox proposals (9b). A proposal says what, why and exactly which registry
 // actions it would run. Approving applies them through perform() — so they are
@@ -34,7 +33,7 @@ const REAPER = Object.freeze({ kind: 'human', userId: 'system', personName: 'Sys
 // descriptor either way, so a longer window costs nothing.
 const UNDO_WINDOW_MS = 15 * 60 * 1000;
 const PRIMARY_AGE_MS = 24 * 60 * 60 * 1000;
-const GATE_OWNER_ADMIN = 'owner_admin';
+const { GATE_OWNER_ADMIN } = access;
 // The canned decline reasons the Inbox offers; only these can grow into a user preference.
 const DECLINE_REASONS = Object.freeze(Object.keys(memory.DECLINE_REASON_TEXT));
 const DECLINE_REASON_MAX = 200;
@@ -140,13 +139,14 @@ const create = async (companyId, { agent, runId, taskId, projectId, what, why, c
     if (typeof what !== 'string' || !what.trim()) throw Object.assign(new Error('what is required: say in one sentence what the proposal does.'), { status: 400 });
     const check = validateChanges(changes);
     if (!check.valid) throw Object.assign(new Error(check.reason), { status: 400 });
+    const prepared = slackPost.hasSlackChange(changes) ? await slackPost.prepareChanges(companyId, changes) : changes;
     const scopedProjectId = projectId || await projectOfTask(companyId, taskId);
     const saved = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_PROPOSALS,
         data: {
             agentId: String(agent._id), agentName: agent.name, runId: runId || null, taskId: taskId || null, projectId: scopedProjectId || null,
             what: what.trim().slice(0, 300), why: String(why || '').slice(0, 2000),
-            changes: changes.map((c) => ({ action: c.action, params: c.params || {}, label: String(c.label || c.action).slice(0, 300), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}) })),
+            changes: prepared.map((c) => ({ action: c.action, params: c.params || {}, label: String(c.label || c.action).slice(0, 300), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}) })),
             status: STATUS.PENDING, gate: gateOf(changes, gate), priority: priority || 'normal', cost: cost || null, auditIds: [],
             ...(marker && marker.reason ? { taint: { sources: Array.isArray(marker.sources) ? marker.sources : [], reason: String(marker.reason).slice(0, 2000) } } : {}),
             ...mcpFields({ source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId }),
@@ -172,11 +172,7 @@ const skillSourcesOfRuns = async (companyId, rows) => {
 /* projectIds, when given, is the caller's visible set, hiddenTaskIds the tasks in it they cannot read,
  * and privateWork what is someone else's alone; the counts follow the same scope. */
 const list = async (companyId, { status, bucket, agentId, limit = 100, projectIds, hiddenTaskIds, privateWork } = {}) => {
-    const scoped = {
-        ...(Array.isArray(projectIds) ? { projectId: { $in: idForms(projectIds.map(String)) } } : {}),
-        ...(Array.isArray(hiddenTaskIds) && hiddenTaskIds.length ? { taskId: { $nin: hiddenTaskIds.map(String) } } : {}),
-        ...(privateWork ? proposalClause(privateWork) : {}),
-    };
+    const scoped = access.proposalScopeClause({ projectIds, hiddenTaskIds, privateWork });
     const match = { ...scoped };
     if (status) match.status = String(status);
     if (agentId) match.agentId = String(agentId);
@@ -239,6 +235,9 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         const check = validateChanges(edited);
         if (!check.valid) return { error: check.reason, status: 400 };
         changes = edited.map((c) => ({ action: c.action, params: c.params || {}, label: c.label || c.action }));
+        if (slackPost.hasSlackChange(changes)) {
+            try { changes = await slackPost.prepareChanges(companyId, changes); } catch (e) { return { error: e.message, status: e.status || 400 }; }
+        }
         status = STATUS.EDITED;
     }
 
@@ -265,7 +264,7 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     for (const c of changes) {
         try {
             // eslint-disable-next-line no-await-in-loop
-            const out = await actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions, depth, ...(marker ? { taint: marker } : {}) });
+            const out = await actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions, depth, approved: true, ...(marker ? { taint: marker } : {}) });
             if (out.auditId) auditIds.push(out.auditId);
             applied.push({ action: c.action, ok: true, result: out.result });
         } catch (e) {
@@ -273,7 +272,8 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         }
     }
     const undoUntil = new Date(Date.now() + UNDO_WINDOW_MS);
-    const updated = await setStatus(companyId, id, { status, changes, undoUntil, auditIds });
+    const delivery = slackPost.deliveryOf(changes, applied);
+    const updated = await setStatus(companyId, id, { status, changes, undoUntil, auditIds, ...(delivery.length ? { delivery } : {}) });
     await audit.recordProposalDecision(companyId, { ...decider, ...runTrace }, { proposalId: id, decision: status, agentName: p.agentName, runId: p.runId, changes: applied, ip });
     const row = typeof p.toObject === 'function' ? p.toObject() : p;
     await quietly(`remember approved changes of ${id}`, () => memory.rememberApprovedChanges({ companyId, projectId: p.projectId, proposal: { ...row, changes, decidedBy: decider.userId }, applied }));

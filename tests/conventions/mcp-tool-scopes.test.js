@@ -34,6 +34,8 @@ describe('every registered MCP tool maps to one scope', () => {
         expect(tools.names()).toContain('timesheet.read');
         expect(tools.names()).toContain('task.move');
         expect(tools.names()).toContain('list.create');
+        expect(tools.names()).toContain('goal.target.set');
+        expect(tools.names()).toContain('task.lists.add');
         expect(tools.names().length).toBeGreaterThan(10);
     });
 

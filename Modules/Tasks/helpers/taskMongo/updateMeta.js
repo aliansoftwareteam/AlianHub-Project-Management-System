@@ -22,7 +22,8 @@ const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
 const { taskNotFound, escapeText, TaskWriteRefusal } = require('../taskWriteFields');
-const { recordCustomFieldValue, recordTaskTag } = require('../taskItemHistory');
+const { cleanDescription } = require('../cleanRichText');
+const { recordCustomFieldValue, recordTaskTag, projectHoldsTag, TAG_NOT_IN_PROJECT } = require('../taskItemHistory');
 const { customFieldDefinitionOf } = require('../../../CustomField/helpers/customFieldText');
 const { fieldAppliesToTask } = require('../../../CustomField/helpers/fieldTaskTypes');
 const { checkedFieldDetail, FieldValueRefused } = require('../../../CustomField/helpers/fieldValueWrite');
@@ -58,6 +59,15 @@ const checklistItemIds = (operation, data, history) => {
     if (operation === 'checklistremove') return Array.isArray(data) ? data : [data];
     return [];
 };
+
+/* A tag the project no longer has can still be taken off a task. */
+const tagMayBeWritten = async (companyId, taskId, tagId, operation, storedTask) => {
+    if (operation !== 'add') return true;
+    const task = storedTask || await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: new mongoose.Types.ObjectId(taskId) }, { ProjectID: 1 }] }, 'findOne');
+    if (!task) throw taskNotFound();
+    return projectHoldsTag(companyId, task.ProjectID, tagId);
+};
+
 module.exports = {
 
     updateTags({companyId, taskId, tagId, operation, userData, storedTask}) {
@@ -93,12 +103,15 @@ module.exports = {
                     ]
                 }
 
-                MongoDbCrudOpration(companyId, obj, "findOneAndUpdate").then((response) => {
+                tagMayBeWritten(companyId, taskId, tagId, operation, storedTask).then((allowed) => {
+                    if (!allowed) throw new TaskWriteRefusal(400, TAG_NOT_IN_PROJECT);
+                    return MongoDbCrudOpration(companyId, obj, "findOneAndUpdate");
+                }).then((response) => {
                     if (!response) {
                         reject(taskNotFound());
                         return;
                     }
-                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: { tagsArray: response.tagsArray }, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: { tagsArray: response.tagsArray }, module: 'task', companyId });
                     resolve({status: true, statusText: `Tag updated successfully`});
                     if (storedTask && userData) {
                         recordTaskTag({ companyId, task: storedTask, tagId, operation, actor: userData })
@@ -134,7 +147,7 @@ module.exports = {
                         reject(taskNotFound());
                         return;
                     }
-                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: {checklistArray: response.checklistArray}, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: {checklistArray: response.checklistArray}, module: 'task', companyId });
                     resolve({ status: true, statusText: "Checklist updated successfully" });
 
                     let historyData = buildHistoryObject(operation, historyObject);
@@ -191,7 +204,7 @@ module.exports = {
                         reject(taskNotFound());
                         return;
                     }
-                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: {attachments: response.attachments}, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: {attachments: response.attachments}, module: 'task', companyId });
                     resolve({status: true, statusText: "Attachment updated successfully"});
 
                     let historyObj = {};
@@ -259,12 +272,11 @@ module.exports = {
     updateDescription({companyId, task, text}) {
         return new Promise((resolve, reject) => {
             try {
-                let description = text.blocks;
                 const schema = SCHEMA_TYPE.TASKS
-                let updateObj = { 
-                    descriptionBlock: description,
+                let updateObj = cleanDescription({
+                    descriptionBlock: text.blocks,
                     rawDescription: text.text
-                }
+                })
                 let obj = {
                     type: schema,
                     data: [
@@ -283,7 +295,7 @@ module.exports = {
                         reject(taskNotFound());
                         return;
                     }
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: updateObj, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: updateObj, module: 'task', companyId });
                     resolve({status: true, statusText: "Description updated successfully"});
                 }).catch(reject);
             } catch (error) {
@@ -310,7 +322,7 @@ module.exports = {
 
                 MongoDbCrudOpration(companyId, query, "findOneAndUpdate")
                 .then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {[`customField.${customFieldId}`]: updateDetail}, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {[`customField.${customFieldId}`]: updateDetail}, module: 'task', companyId });
                     resolve({status: true,data: result, statusText: "Custom Field Update Successfully"});
                     if (result && storedTask && userData) {
                         recordCustomFieldValue({ companyId, task: storedTask, customFieldId, updateDetail, actor: userData, viaAi: filledByAi })
@@ -356,7 +368,7 @@ module.exports = {
 
                 MongoDbCrudOpration(companyId, query, "findOneAndUpdate")
                 .then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: { favouriteTasks: result.favouriteTasks }, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: { favouriteTasks: result.favouriteTasks }, module: 'task', companyId });
                     resolve({status: true,data: result, statusText: "Custom Field Update Successfully"});
                 })
                 .catch((error) => {
@@ -394,7 +406,7 @@ module.exports = {
                 }
 
                 MongoDbCrudOpration(companyId, query, "findOneAndUpdate").then((response) => {
-                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: updatedObj, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: updatedObj, module: 'task', companyId });
                     resolve({ status: true });
                 })
                 .catch((error) => {
@@ -434,7 +446,7 @@ module.exports = {
                         return;
                     }
                     resolve({status: true, statusText: "Checklist added successfully"});
-                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: {checklistArray: checklistArray}, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: {checklistArray: checklistArray}, module: 'task', companyId });
                     const names = escapeText(checklistArray.map(item => item.name).join(", "));
 
                     let historyObj = {
@@ -481,7 +493,7 @@ module.exports = {
                 }
                 MongoDbCrudOpration(projectData.CompanyId, query, "findOneAndUpdate")
                 .then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task', companyId: projectData.CompanyId });
                     updateRemainingTime(projectData.CompanyId,taskData._id);
                     resolve({status: true, statusText: "Task total estimate update successfully"});
                     const updatedDisplayText = convertToDisplayFormat(firebaseObj.totalEstimatedTime);

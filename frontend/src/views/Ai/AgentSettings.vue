@@ -73,6 +73,7 @@
                             </label>
                         </div>
                         <p class="ai-ladder__rule">{{ $t('Ai.low_risk_note') }}</p>
+                        <p class="ai-ladder__rule" data-test="project-stricter">{{ $t('Ai.project_may_be_stricter') }}</p>
 
                         <div class="ai-preview" data-test="l2-preview">
                             <div class="ah-label">{{ $t('Ai.acts_preview_title') }}</div>

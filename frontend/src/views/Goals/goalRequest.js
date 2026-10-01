@@ -84,6 +84,7 @@ const forTaskRequest = (taskId) => ({ method: 'get', path: `${V2_GOALS}/for-task
 const createRequest = (form) => ({ method: 'post', path: V2_GOALS, body: goalFields(form) });
 const updateRequest = (id, changes) => ({ method: 'patch', path: goalPath(id), body: goalFields(changes, { keepEmpty: true }) });
 const archiveRequest = (id) => ({ method: 'post', path: `${goalPath(id)}/archive` });
+const summariseRequest = (id) => ({ method: 'post', path: `${goalPath(id)}/summary`, body: {} });
 const restoreRequest = (id) => ({ method: 'post', path: `${goalPath(id)}/restore` });
 const addTargetRequest = (id, form) => ({ method: 'post', path: `${goalPath(id)}/targets`, body: targetFields(form) });
 const editTargetRequest = (id, stored, form) => ({ method: 'patch', path: targetPath(id, stored.id), body: targetChanges(stored, form) });
@@ -181,7 +182,7 @@ const afterHandover = (goal, { myId, privileged }) => {
 
 module.exports = {
     V2_GOALS, KINDS, VISIBILITIES, SORTS, PERIODS, LIMITS, NUMBER, CURRENCY, BOOLEAN, TASKS, SOURCE_KINDS,
-    kindOf, isMeasured, listRequest, readRequest, forTaskRequest, createRequest, updateRequest, archiveRequest, restoreRequest,
+    kindOf, isMeasured, listRequest, readRequest, forTaskRequest, createRequest, updateRequest, archiveRequest, restoreRequest, summariseRequest,
     addTargetRequest, editTargetRequest, sourcesRequest, removeTargetRequest, valueRequest, valueOf,
     sourcesOf, sourceCount, withoutSources, refusalKey, refusedSources,
     todayOf, periodBucket, groupGoals, isReached, reachedCount, rangeOf, checkGoal, checkTarget, fieldOf, errorKey, afterHandover

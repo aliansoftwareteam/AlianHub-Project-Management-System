@@ -81,6 +81,7 @@
 // PACKAGES
 import {defineProps, nextTick, onMounted, ref, watch, defineEmits} from "vue";
 import { useCustomComposable } from "@/composable";
+import { positionPanel } from "./panelPlacement";
 
 // COMPOSABLES
 const {debounce, makeUniqueId} = useCustomComposable();
@@ -232,22 +233,8 @@ function buttonClick(flag = false) {
             const element = document.getElementById(dyid.value);
             let childNode = document.getElementById(`dd_${dyid.value}`);
 
-            const {top, left} = element.getBoundingClientRect();
-            const {height, width} = childNode.getBoundingClientRect();
-
-            if(document.documentElement.clientWidth < (left + width + 25)) {
-                const offset = document.documentElement.clientWidth - (left + width + 15);
-                childNode.style.left = left + offset + "px";
-            } else {
-                childNode.style.left = left + "px";
-            }
-
-            if(document.documentElement.clientHeight < (top + height + 25)) {
-                const offset = document.documentElement.clientHeight - (top + height + 15);
-                childNode.style.top = top + offset +"px";
-            } else {
-                childNode.style.top = top + 30 +"px";
-            }
+            const rect = element.getBoundingClientRect();
+            positionPanel(childNode, rect, { belowOffset: rect.top + 30 });
         })
     }
 

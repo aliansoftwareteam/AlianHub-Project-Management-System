@@ -1,5 +1,6 @@
 import { reactive } from "vue";
 import { folderPathLabel, isLiveFolder } from "@/utils/folderTree";
+import { peopleOptions } from "@/plugins/customFieldView/fieldTypes/people";
 
 const LAST_PROJECT_KEY = "ah.quickCreate.lastProject";
 const DRAFT_KEY = "ah.quickCreate.draft";
@@ -120,6 +121,17 @@ export function hasPriorityApp(project, company) {
     const apps = (project && project.apps) || [];
     const on = apps.some((app) => app === "Priority" || (app && app.key === "Priority"));
     return Boolean(on && company && company.planFeature && company.planFeature.projectProjectApp);
+}
+
+/* The server refuses an assignee who cannot open the project. peopleOptions mirrors that rule, so the
+ * creator joins the project's own people only where it would offer them, and nobody else is added. */
+export function assigneeIdsFor(project, { me, seat, teams, rules, mayAssignOthers } = {}) {
+    if (!project || !me) return [];
+    if (project.isPersonal || !mayAssignOthers) return [me];
+    const held = (project.AssigneeUserId || []).map(String);
+    if (held.includes(me)) return held;
+    const opens = peopleOptions({ project, seats: [{ ...seat, userId: me }], teams, rules, current: [] }).includes(me);
+    return opens ? [me, ...held] : held;
 }
 
 /* A project's lists as the create dialog offers them: live lists only, and none from a folder that

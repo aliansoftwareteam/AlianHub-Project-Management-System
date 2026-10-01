@@ -20,8 +20,9 @@ exports.updateOwnNavPreferences = async (req, res) => {
         if (!updated) return refuse(res, 404, "User not found");
         removeCache(`UserData:${req.uid}`);
         removeCache("UserAllData:", true);
-        const pinned = JSON.parse(JSON.stringify((updated.navPreferences && updated.navPreferences.pinned) || []));
-        return res.status(200).json({ status: true, statusText: "Navigation saved", data: { pinned } });
+        const stored = JSON.parse(JSON.stringify(updated.navPreferences || {}));
+        const data = { pinned: stored.pinned || [], ...(stored.mode ? { mode: stored.mode } : {}) };
+        return res.status(200).json({ status: true, statusText: "Navigation saved", data });
     } catch (error) {
         logger.error(`updateOwnNavPreferences: ${error.message || error}`);
         return refuse(res, 400, "Navigation not saved");

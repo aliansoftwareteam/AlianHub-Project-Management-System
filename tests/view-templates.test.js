@@ -474,10 +474,10 @@ describe('the live update', () => {
         return emit;
     };
 
-    it('reaches the sockets of that company and no other, and carries no setup', () => {
+    it('reaches the sockets of that company and no other, and carries no setup', async () => {
         const mine = join(C, 's1');
         const theirs = join(OTHER_COMPANY, 's2');
-        relay({ type: 'insert', companyId: C, module: 'viewTemplates', data: { _id: 'x', name: 'Sprint list', viewType: 'ProjectListView', settings: { search: 'secret' } } });
+        await relay({ type: 'insert', companyId: C, module: 'viewTemplates', data: { _id: 'x', name: 'Sprint list', viewType: 'ProjectListView', settings: { search: 'secret' } } });
         expect(mine).toHaveBeenCalledWith(EVENT, { type: 'insert' });
         expect(theirs).not.toHaveBeenCalled();
     });

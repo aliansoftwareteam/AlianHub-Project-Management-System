@@ -12,7 +12,7 @@ const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
 const { canChangeComment } = require('../Comments/helpers/threadWriteAccess');
 const { canSeeSprintById } = require('../Sprints/helpers/sprintVisibility');
 const { followSprintMove, moveDescendants } = require('../Tasks/helpers/sprintPlacement');
-const { pullOfLists } = require('../Tasks/helpers/taskExtraLists');
+const { pullOfLists, opensList } = require('../Tasks/helpers/taskExtraLists');
 const { canUsePage } = require('../Pages/helpers/pageAccess');
 
 // Undo replays the inverse action and logs it as the person who pressed Undo.
@@ -40,7 +40,10 @@ const STATUS_OF = { [REASON.WINDOW_PASSED]: 410, [REASON.NOT_VISIBLE]: 403, [REA
 const AUDITED_REFUSALS = [REASON.WINDOW_PASSED, REASON.NOT_VISIBLE, REASON.TARGET_NOT_VISIBLE];
 
 const LIST_KINDS = Object.freeze(['list', 'listName', 'listFolder']);
+/* A goal belongs to no project: whoever can edit the goal may undo a change to it. */
+const GOAL_KINDS = Object.freeze(['goalValue', 'goalSource']);
 const work = () => require('./workRequests');
+const goalWork = () => require('./goalRequests');
 const undoer = (actor) => require('./taskRequests').whoOf(actor);
 
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
@@ -52,7 +55,7 @@ const setTask = async (companyId, taskId, set, unset, pull) => {
     const updated = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS, data: [{ _id: oid(taskId) }, update, { returnDocument: 'after' }],
     }, 'findOneAndUpdate');
-    if (updated) socketEmitter.emit('update', { type: 'update', module: 'task', data: updated, updatedFields: set, actor: { kind: 'user' }, depth: 1 });
+    if (updated) socketEmitter.emit('update', { type: 'update', module: 'task', companyId, data: updated, updatedFields: set, actor: { kind: 'user' }, depth: 1 });
     return updated;
 };
 
@@ -159,6 +162,10 @@ const inverses = {
         await work().linkTasks({ companyId, who: undoer(actor), taskId: u.taskId, relatedTaskId: u.relatedTaskId, type: u.type });
         return { taskId: u.taskId, linked: u.relatedTaskId };
     },
+    async extraList(companyId, u, actor) {
+        await work().setExtraList({ companyId, who: undoer(actor), taskId: u.taskId, listProjectId: u.listProjectId, sprintId: u.sprintId, operation: u.operation === 'add' ? 'remove' : 'add' });
+        return { taskId: u.taskId, sprintId: u.sprintId, restored: true };
+    },
     async list(companyId, u, actor) {
         await work().withdrawList({ companyId, who: undoer(actor), projectId: u.projectId, sprintId: u.sprintId });
         return { sprintId: u.sprintId, deleted: true };
@@ -178,6 +185,17 @@ const inverses = {
     async pageCommentAssign(companyId, u, actor) {
         await work().assignPageComment({ companyId, uid: String((actor && actor.userId) || ''), pageId: u.pageId, commentId: u.commentId, assigneeId: u.previous });
         return { commentId: u.commentId, restored: u.previous || null };
+    },
+    /* A target's value and what it counts are put back through the goal routes, as the person undoing. */
+    async goalValue(companyId, u, actor) {
+        await goalWork().setValue({ companyId, uid: undoer(actor).uid, goalId: u.goalId, targetId: u.targetId, value: u.previous });
+        return { goalId: u.goalId, targetId: u.targetId, restored: u.previous };
+    },
+    async goalSource(companyId, u, actor) {
+        await goalWork().changeSources({
+            companyId, uid: undoer(actor).uid, goalId: u.goalId, targetId: u.targetId, kind: u.sourceKind, sourceId: u.sourceId, operation: u.operation === 'add' ? 'remove' : 'add',
+        });
+        return { goalId: u.goalId, targetId: u.targetId, restored: true };
     },
     /* Archiving carries the subtasks and the list's counts, so it is put back by the handler that made it, as the person undoing. */
     async archive(companyId, u, actor) {
@@ -235,16 +253,24 @@ const targetVisible = async (companyId, uid, u) => {
     }
     if (u.kind === 'batch') return true;
     if (u.kind === 'page' || u.kind === 'pageVersion') {
-        const page = await findRow(companyId, SCHEMA_TYPE.PAGES, u.pageId, { visibility: 1, createdBy: 1, ProjectID: 1, deletedStatusKey: 1 });
-        return Boolean(page) && Number(page.deletedStatusKey || 0) !== 1 && canUsePage(companyId, page, uid, { edit: true });
+        const page = await findRow(companyId, SCHEMA_TYPE.PAGES, u.pageId, { visibility: 1, createdBy: 1, ProjectID: 1, sharedWith: 1, deletedStatusKey: 1 });
+        /* Undoing a page takes it to the trash, which a person the doc is only shared with may not do; putting
+         * a version back is an edit of its text. */
+        return Boolean(page) && Number(page.deletedStatusKey || 0) !== 1
+            && canUsePage(companyId, page, uid, { edit: true, named: u.kind === 'pageVersion' });
     }
     if (u.kind === 'pageComment' || u.kind === 'pageCommentAssign') {
         const page = await findRow(companyId, SCHEMA_TYPE.PAGES, u.pageId, { visibility: 1, createdBy: 1, ProjectID: 1, deletedStatusKey: 1 });
         return Boolean(page) && Number(page.deletedStatusKey || 0) === 0 && canUsePage(companyId, page, uid);
     }
+    if (GOAL_KINDS.includes(u.kind)) {
+        const goal = await goalWork().goalFor({ companyId, uid, goalId: u.goalId });
+        return Boolean(goal) && goal.canEdit === true;
+    }
     if (LIST_KINDS.includes(u.kind)) return isPrivileged(await getRoleType(companyId, uid)) || canSeeSprintById(companyId, uid, u.sprintId);
     if (u.kind === 'relation' || u.kind === 'relationRemoved') return (await taskReadable(companyId, uid, u.taskId)) && taskReadable(companyId, uid, u.relatedTaskId);
     if (u.kind === 'subtask') return taskReadable(companyId, uid, u.subtaskId);
+    if (u.kind === 'extraList') return (await taskReadable(companyId, uid, u.taskId)) && opensList(companyId, uid, u.sprintId);
     if (!(await taskReadable(companyId, uid, u.taskId))) return false;
     if (u.kind !== 'sprint' || isPrivileged(await getRoleType(companyId, uid))) return true;
     return canSeeSprintById(companyId, uid, u.previous && u.previous.sprintId);
@@ -269,7 +295,8 @@ const undoStateOf = async (companyId, row, actor, ctx = {}) => {
     const undoUntil = undoUntilOf(row, run, full.undoHours);
     const projectId = await projectIdOfRow(companyId, row, run);
     if (!isUndoable(row)) return state(REASON.NOT_UNDOABLE, undoUntil, projectId);
-    if (!projectId || !full.visibleProjectIds.includes(projectId)) return state(REASON.NOT_VISIBLE, undoUntil, projectId);
+    const inAProject = !GOAL_KINDS.includes(row.meta.undo.kind);
+    if (inAProject && (!projectId || !full.visibleProjectIds.includes(projectId))) return state(REASON.NOT_VISIBLE, undoUntil, projectId);
     if (Date.now() >= undoUntil.getTime()) return state(REASON.WINDOW_PASSED, undoUntil, projectId);
     if (!(await targetVisible(companyId, actor.userId, row.meta.undo))) return state(REASON.TARGET_NOT_VISIBLE, undoUntil, projectId);
     return state('', undoUntil, projectId);

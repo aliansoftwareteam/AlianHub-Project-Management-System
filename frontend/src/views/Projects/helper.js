@@ -548,7 +548,7 @@ export function useUpdateTasks(project) {
                     ProjectName: projectData.value.ProjectName,
                     ProjectCode: projectData.value.ProjectCode
                 }
-                taskClass.updateStatus({ newStatus, prevStatus: prevStatusObj, projectData: project, task: task, userData , isUpdateTask : isUpdateTask})
+                taskClass.updateStatus({ newStatus, prevStatus: prevStatusObj, projectData: project, task: task, userData , isUpdateTask : isUpdateTask, announce: true})
                 .then(() => {
                     $toast.success(t(`Toast.Status_changed_successfully`), {position: "top-right"})
                     resolve();
@@ -564,44 +564,45 @@ export function useUpdateTasks(project) {
     }
     const updatePriority = (task, newPriority,assigneeType,isUpdateTask) => {
         return new Promise((resolve, reject) => {
-            (async () => {  
-                try {
-                    const userData = getUserData();
-    
-                    let updateObj = {
-                        Task_Priority : newPriority.value
-                    }
-    
-                    let project = {
-                        '_id': projectData.value._id ? projectData.value._id : "",
-                        'ProjectName' : projectData.value.ProjectName,
-                        "CompanyId": companyId.value,
-                    }
-    
-                    const priority = getPriority(task.Task_Priority)
-                    let priorityObj = {
-                        'statusImage' : await getWasabiImageLink(projectData.value.CompanyId,priority.image),
-                        'priorityName' : priority.value,
-                        'taskId': task._id,
-                        'taskName': task.TaskName,
-                        'userName' : userData.Employee_Name,
-                        'newStatusImage' : await getWasabiImageLink(projectData.value.CompanyId,newPriority.image),
-                        'newPriorityName' : newPriority.value
-                    }
-    
-                    taskClass.updatePriority({firebaseObj: updateObj, projectData: project, taskData: task, priorityObj, userData, isUpdateTask : isUpdateTask})
-                    .then(() => {
-                        $toast.success(t(`Toast.Task_updated_successfully`), {position: "top-right"})
-                        resolve();
-                    })
-                    .catch((error) => {
-                        console.error("ERROR in update priority: ", error);
-                        reject(error);
-                    })
-                } catch (error) {
-                    reject(error);
+            try {
+                const userData = getUserData();
+
+                let updateObj = {
+                    Task_Priority : newPriority.value
                 }
-            })();
+
+                let project = {
+                    '_id': projectData.value._id ? projectData.value._id : "",
+                    'ProjectName' : projectData.value.ProjectName,
+                    "CompanyId": companyId.value,
+                }
+
+                const priority = getPriority(task.Task_Priority)
+                const priorityObj = Promise.all([
+                    getWasabiImageLink(projectData.value.CompanyId,priority.image),
+                    getWasabiImageLink(projectData.value.CompanyId,newPriority.image)
+                ]).then(([statusImage, newStatusImage]) => ({
+                    'statusImage' : statusImage,
+                    'priorityName' : priority.value,
+                    'taskId': task._id,
+                    'taskName': task.TaskName,
+                    'userName' : userData.Employee_Name,
+                    'newStatusImage' : newStatusImage,
+                    'newPriorityName' : newPriority.value
+                }));
+
+                taskClass.updatePriority({firebaseObj: updateObj, projectData: project, taskData: task, priorityObj, userData, isUpdateTask : isUpdateTask, announce: true})
+                .then(() => {
+                    $toast.success(t(`Toast.Task_updated_successfully`), {position: "top-right"})
+                    resolve();
+                })
+                .catch((error) => {
+                    console.error("ERROR in update priority: ", error);
+                    reject(error);
+                })
+            } catch (error) {
+                reject(error);
+            }
         })
     }
     const updateDueDate = (task, newDueDate,assigneeType,isUpdateTask) => {
@@ -663,7 +664,8 @@ export function useUpdateTasks(project) {
                     task: task,
                     obj: notificationObj,
                     userData,
-                    isUpdateTask: isUpdateTask
+                    isUpdateTask: isUpdateTask,
+                    announce: true
                 }
 
                 taskClass.updateDueDate(object).then(() => {
@@ -712,7 +714,8 @@ export function useUpdateTasks(project) {
                     employeeName: employeeName,
                     type: assigneeType ? assigneeType : "replace",
                     userData,
-                    isUpdateTask
+                    isUpdateTask,
+                    announce: true
                 })
                 .then(() => {
                     $toast.success(t(`Toast.Assignee_changed_successfully`), {position: "top-right"})
@@ -833,13 +836,14 @@ export function taskListHelper() {
             }
         })
     }
-    function getGroupCounts({projectId, sprintId, items, projectData, totals = []}) {
+    function getGroupCounts({projectId, sprintId, items, projectData, totals = [], table = false}) {
         if(permit === null && projectData.isGlobalPermission === false) return Promise.resolve();
         return dispatch("projectData/refreshGroupCounts", {
             pid: projectId,
             sprintId,
             items,
             totals,
+            table,
             userId: userId.value,
             showAllTasks: projectData.isGlobalPermission === false ? permit : true
         });

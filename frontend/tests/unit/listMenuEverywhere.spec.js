@@ -31,12 +31,13 @@ import { LIST_MENU, listMenuEntries, sprintState } from '@/views/Projects/compos
 import { resetProjectTreeCache } from '@/components/molecules/ProjectTree/projectTreeData';
 import { resetFavourites } from '@/composable/favourites';
 import { undoToast } from '@/composable/useUndoToast';
-import { loadLinkableGoals, resetLinkableGoals } from '@/views/Goals/goalLinking';
+import { resetLinkableGoals } from '@/views/Goals/goalLinking';
 
 const i18n = config.global.plugins[0];
 i18n.global.setLocaleMessage('en', en);
 
 const MEMBER = 3;
+const GUEST = 0;
 const KEYS = ['project_sprint_create', 'project_sprint_name_edit', 'sprint_type_change', 'sprint_archive', 'sprint_delete', 'sprint_restore'];
 const rulesGranting = (...granted) => ({
     project: Object.fromEntries(KEYS.map((key) => [key, { roles: [{ key: MEMBER, permission: granted.includes(key) }] }]))
@@ -62,11 +63,12 @@ const grouped = (id) => ({ ...docOf(id), id });
 const folderMap = () => Object.fromEntries(FOLDERS.map((folder) => [folder._id, { ...folder, folderId: folder._id }]));
 
 const commits = [];
+let viewerRole = MEMBER;
 const makeStore = () => createStore({
     getters: {
         'projectData/sprints': () => ({ p1: SPRINTS }),
         'projectData/folders': () => ({ p1: FOLDERS }),
-        'settings/companyUserDetail': () => ({ roleType: MEMBER }),
+        'settings/companyUserDetail': () => ({ roleType: viewerRole }),
         'settings/teams': () => []
     },
     mutations: {
@@ -135,7 +137,8 @@ const PLACES = {
             list: grouped(id),
             folders: folderMap(),
             check: (key) => checkPermission(key, handed.isGlobalPermission),
-            archivedView
+            archivedView,
+            goalsOffered: viewerRole !== GUEST && router.hasRoute('Goals')
         }).map((entry) => entry.id);
     }
 };
@@ -156,6 +159,7 @@ beforeEach(async () => {
     resetProjectTreeCache();
     resetFavourites();
     resetLinkableGoals();
+    viewerRole = MEMBER;
     Object.assign(getters, {
         'settings/companyUserDetail': { roleType: MEMBER },
         'settings/rules': rulesGranting(...KEYS),
@@ -391,43 +395,66 @@ describe('what the entries do, from a place that had none of them before', () =>
 
 describe('counting a list toward a goal', () => {
     const GOAL = { _id: 'g1', name: 'Launch the site', canEdit: true, archived: false, targets: [{ id: 't1', name: 'Launch tasks', kind: 'tasks', sources: { sprintIds: [], taskIds: [] } }] };
-    const goalsAre = async (goals) => {
-        apiRequest.mockImplementation((method, url) => Promise.resolve({ data: { status: true, data: url === '/api/v2/goals' ? goals : [] } }));
-        await loadLinkableGoals('company-1');
-    };
+    const goalsAre = (goals) => apiRequest.mockImplementation((method, url) => Promise.resolve({ data: { status: true, data: url === '/api/v2/goals' ? goals : [] } }));
+    const goalReads = () => apiRequest.mock.calls.filter(([, url]) => url === '/api/v2/goals');
     const WITH_ENTRY = ['rename', 'copy-link', 'move', 'count-toward-goal', 'sprint-settings', 'archive', 'delete'];
+    const WITHOUT_ENTRY = WITH_ENTRY.filter((id) => id !== 'count-toward-goal');
 
-    it('is offered in every place to someone who can edit a goal, and to nobody else', async () => {
-        await goalsAre([GOAL]);
+    beforeEach(() => {
+        router.addRoute({ path: '/:cid/goals', name: 'Goals', component: blank });
+        goalsAre([GOAL]);
+    });
+
+    it('is offered in every place to anyone who could own a goal, whatever goals they have', async () => {
+        goalsAre([]);
         expect(await everywhere('plain')).toEqual(inEveryPlace(WITH_ENTRY));
+    });
 
-        resetLinkableGoals();
-        await goalsAre([{ ...GOAL, canEdit: false }]);
-        expect(await everywhere('plain')).toEqual(inEveryPlace(WITH_ENTRY.filter((id) => id !== 'count-toward-goal')));
+    it('is offered nowhere to a guest, and nowhere in a build without the Goals page', async () => {
+        viewerRole = GUEST;
+        expect(await everywhere('plain')).toEqual(inEveryPlace(WITHOUT_ENTRY));
+        expect(goalReads()).toEqual([]);
+
+        viewerRole = MEMBER;
+        router.removeRoute('Goals');
+        expect(await everywhere('plain')).toEqual(inEveryPlace(WITHOUT_ENTRY));
     });
 
     it('is not offered for an archived list, in a closed project, or for a chat channel', async () => {
-        await goalsAre([GOAL]);
         const offered = (seen) => Object.values(seen).some((ids) => ids.includes('count-toward-goal'));
         expect(offered(await everywhere('shelved', project(), true))).toBe(false);
         expect(offered(await everywhere('plain', project({ status: 'close' })))).toBe(false);
         const { checkPermission } = useCustomComposable();
-        const ids = (list) => listMenuEntries({ project: project(), list, folders: [], check: (key) => checkPermission(key, true) }).map((entry) => entry.id);
+        const ids = (list) => listMenuEntries({ project: project(), list, folders: [], check: (key) => checkPermission(key, true), goalsOffered: true }).map((entry) => entry.id);
         expect(ids({ ...grouped('plain'), mainChat: true })).not.toContain('count-toward-goal');
         expect(ids(grouped('plain'))).toContain('count-toward-goal');
     });
 
-    it('is read once for the menus of a page', async () => {
-        await goalsAre([GOAL]);
-        apiRequest.mockClear();
-        show(ListMenu, { project: project(), sprint: grouped('plain') });
-        show(ListMenu, { project: project(), sprint: grouped('planned') });
+    it('asks for no goals when the menus are drawn, and once when the first of them is opened', async () => {
+        const first = show(ListMenu, { project: project(), sprint: grouped('plain') });
+        const second = show(ListMenu, { inTree: true, project: project(), sprint: { id: 'planned', name: 'Sprint 9', folderId: '' }, folders: FOLDERS, sprints: SPRINTS });
+        show(ListMenu, { headless: true, project: project(), sprint: grouped('running') });
         await flushPromises();
-        expect(apiRequest.mock.calls.filter(([, url]) => url === '/api/v2/goals')).toEqual([]);
+        expect(goalReads()).toEqual([]);
+
+        await first.find('.lm__more').trigger('click');
+        await flushPromises();
+        expect(goalReads()).toEqual([['get', '/api/v2/goals']]);
+        await closePopup();
+
+        await second.find('.pt-row__more').trigger('click');
+        await first.find('.lm__more').trigger('click');
+        await flushPromises();
+        expect(goalReads()).toHaveLength(1);
+    });
+
+    it('is drawn by the Calendar tab with the same rule', () => {
+        const calendar = source('components/organisms/SprinstList/SprintsList.vue');
+        expect(calendar).toContain('const { offered: goalsOffered } = useGoalLinking();');
+        expect(calendar).toContain('goalsOffered: goalsOffered.value');
     });
 
     it('opens the picker for that list, which sends the target\'s sources with the list added', async () => {
-        await goalsAre([GOAL]);
         const wrapper = show(ListMenu, { headless: true, project: project(), sprint: grouped('plain') });
         wrapper.vm.run('count-toward-goal');
         await vi.waitFor(() => expect(document.body.querySelector('[data-test="glk"]')).not.toBeNull());

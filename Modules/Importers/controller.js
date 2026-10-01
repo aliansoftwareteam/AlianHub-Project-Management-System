@@ -508,7 +508,8 @@ const createMissingStatuses = async (companyId, project, statusArray, rows, mapp
 
 const lowerName = (value) => String(value === undefined || value === null ? '' : value).trim().toLowerCase();
 
-/* The project statuses a ClickUp file lands on, adding the missing ones when allowed. */
+/* The project statuses a ClickUp file lands on, adding the missing ones when allowed. A status the project still lacks
+ * lands on its first one; `knowsStatus` tells such a status from one the project has. */
 const clickUpStatusContext = async (companyId, project, statusArray, rows, addsStatuses) => {
     const { mapping, missing } = resolveStatuses({ wanted: clickUpStatuses(rows), existing: statusArray });
     let statuses = statusArray;
@@ -524,13 +525,14 @@ const clickUpStatusContext = async (companyId, project, statusArray, rows, addsS
         const mapped = mapping[lowerName(raw)];
         return names.includes(mapped) ? mapped : mapStatusName(raw, names);
     };
-    return { statusArray: statuses, statusFor };
+    return { statusArray: statuses, statusFor, knowsStatus: (raw) => names.includes(mapping[lowerName(raw)]) };
 };
 
 const withoutRow = ({ row, ...entry }) => entry;
 
 /* `existingMode` says what happens to a row whose ClickUp id a task of the project already holds: it is left alone, or
- * its task takes the file's values. Either way no task is created twice. */
+ * its task takes the file's values. Either way no task is created twice. `skippedCells` names each cell of such a row
+ * that was not applied. */
 const runClickUpImport = async (req, { companyId, userId, project, sprint, statusArray, rows, addsDetails, existingMode = SKIP, dayFirst }) => {
     const context = await clickUpStatusContext(companyId, project, statusArray, rows, addsDetails);
     const { tasks, fields, skipped, skippedRows, unreadDates, unnamedAssignees } = transformClickUpRows({ rows, statusFor: context.statusFor, leaderId: userId, dayFirst });
@@ -540,13 +542,13 @@ const runClickUpImport = async (req, { companyId, userId, project, sprint, statu
     const alreadyImported = plan.summary.existing.skipped;
     const read = { skippedRows, unreadDates: unreadDates.map(withoutRow), alreadyImported };
     if (!plan.fresh.length && !plan.updates.length) {
-        return { status: true, statusText: `Every task of this list is already here (${alreadyImported}). Nothing was imported.`, data: { projectId: String(project._id), created: 0, updated: 0, skipped, ...read, unmatchedAssignees: [], summary: plan.summary } };
+        return { status: true, statusText: `Every task of this list is already here (${alreadyImported}). Nothing was imported.`, data: { projectId: String(project._id), created: 0, updated: 0, skipped, ...read, skippedCells: [], unmatchedAssignees: [], summary: plan.summary } };
     }
 
     const job = await startImportJob(companyId, { source: 'clickup', project, sprint, actor, total: plan.fresh.length + plan.updates.length });
     let details;
     try {
-        details = await prepareClickUpDetails(companyId, { plan, project, sprint, statusArray: context.statusArray, jobId: job._id });
+        details = await prepareClickUpDetails(companyId, { plan, project, sprint, statusArray: context.statusArray, knowsStatus: context.knowsStatus, jobId: job._id });
     } catch (error) {
         await failImportJob(companyId, job, error);
         throw error;
@@ -566,7 +568,7 @@ const runClickUpImport = async (req, { companyId, userId, project, sprint, statu
         updates: plan.updates,
         storedParents: plan.storedParents,
     });
-    return out.status ? { ...out, data: { ...out.data, ...read, updated: out.data.summary.existing.updated } } : out;
+    return out.status ? { ...out, data: { ...out.data, ...read, updated: out.data.summary.existing.updated, skippedCells: details.skippedCells } } : out;
 };
 
 const existingModeOf = (options) => (options && options.existing === UPDATE ? UPDATE : SKIP);

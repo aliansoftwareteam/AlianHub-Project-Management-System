@@ -15,6 +15,14 @@ const { readableTaskIds } = require('../taskWritePlacement');
 // inverse type on the related side, so reading either task shows the link
 // without a join. One link per task pair; changing its type is remove + add.
 
+/* The links of a task that `userData` may be shown: the ones to tasks that person can open. Kept off the
+ * exported object, whose every method the task route can dispatch. */
+const openableRelations = async (companyId, userData, task) => {
+    const linked = (task && task.relations) || [];
+    const openable = new Set(await readableTaskIds(companyId, userData && userData.id, linked.map((rel) => String(rel.taskId))));
+    return linked.filter((rel) => openable.has(String(rel.taskId)));
+};
+
 module.exports = {
 
     /* -------------- ADD A RELATION BETWEEN TWO TASKS -----------------*/
@@ -50,8 +58,8 @@ module.exports = {
                     this.pushRelationEntry(companyId, relatedObjId, { taskId: taskObjId, type: inverseType, createdBy, createdAt }),
                 ]);
 
-                socketEmitter.emit('update', { type: "update", data: updatedTask, updatedFields: { relations: updatedTask?.relations || [] }, module: 'task' });
-                socketEmitter.emit('update', { type: "update", data: updatedRelated, updatedFields: { relations: updatedRelated?.relations || [] }, module: 'task' });
+                socketEmitter.emit('update', { type: "update", data: updatedTask, updatedFields: { relations: updatedTask?.relations || [] }, module: 'task', companyId });
+                socketEmitter.emit('update', { type: "update", data: updatedRelated, updatedFields: { relations: updatedRelated?.relations || [] }, module: 'task', companyId });
 
                 this.addRelationHistory({ companyId, task, otherKey: relatedTask.TaskKey, type, userData });
                 this.addRelationHistory({ companyId, task: relatedTask, otherKey: task.TaskKey, type: inverseType, userData });
@@ -62,7 +70,7 @@ module.exports = {
                 resolve({
                     status: true,
                     statusText: `${task.TaskKey} now ${RELATION_LABELS[type]} ${relatedTask.TaskKey}.`,
-                    data: { taskId, relatedTaskId, type, relations: updatedTask?.relations || [] },
+                    data: { taskId, relatedTaskId, type, relations: await openableRelations(companyId, userData, updatedTask) },
                 });
             } catch (error) {
                 logger.error(`ERROR in add task relation: ${error.message}`);
@@ -90,8 +98,9 @@ module.exports = {
                 if (!task) {
                     return reject(new Error('Task not found.'));
                 }
-                const existing = (task.relations || []).some((rel) => String(rel.taskId) === String(relatedTaskId));
-                if (!existing) {
+                const linked = (task.relations || []).some((rel) => String(rel.taskId) === String(relatedTaskId));
+                const [openable] = await readableTaskIds(companyId, userData && userData.id, [String(relatedTaskId)]);
+                if (!linked || !openable) {
                     return reject(new Error('These tasks are not linked.'));
                 }
 
@@ -103,10 +112,10 @@ module.exports = {
                 ]);
 
                 if (updatedTask) {
-                    socketEmitter.emit('update', { type: "update", data: updatedTask, updatedFields: { relations: updatedTask.relations || [] }, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: updatedTask, updatedFields: { relations: updatedTask.relations || [] }, module: 'task', companyId });
                 }
                 if (updatedRelated) {
-                    socketEmitter.emit('update', { type: "update", data: updatedRelated, updatedFields: { relations: updatedRelated.relations || [] }, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: updatedRelated, updatedFields: { relations: updatedRelated.relations || [] }, module: 'task', companyId });
                 }
 
                 this.removeRelationHistory({ companyId, task, otherKey: relatedTask ? relatedTask.TaskKey : 'a deleted task', userData });
@@ -122,7 +131,7 @@ module.exports = {
                 resolve({
                     status: true,
                     statusText: 'Task link removed successfully.',
-                    data: { taskId, relatedTaskId, relations: updatedTask?.relations || [] },
+                    data: { taskId, relatedTaskId, relations: await openableRelations(companyId, userData, updatedTask) },
                 });
             } catch (error) {
                 logger.error(`ERROR in remove task relation: ${error.message}`);
@@ -146,9 +155,7 @@ module.exports = {
                 if (!task) {
                     return reject(new Error('Task not found.'));
                 }
-                const linked = task.relations || [];
-                const openable = new Set(await readableTaskIds(companyId, userData && userData.id, linked.map((rel) => String(rel.taskId))));
-                const relations = linked.filter((rel) => openable.has(String(rel.taskId)));
+                const relations = await openableRelations(companyId, userData, task);
                 if (!relations.length) {
                     return resolve({ status: true, statusText: 'No linked tasks.', data: [] });
                 }

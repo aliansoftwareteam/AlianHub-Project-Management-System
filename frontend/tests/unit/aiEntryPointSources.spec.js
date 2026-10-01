@@ -57,8 +57,8 @@ describe('every AI entry point asks the one availability question', () => {
     });
 
     it('shows Ask about this doc exactly when the doc renders the rail the button focuses', () => {
-        expect(template('views/Pages/PageEditorView.vue')).toMatch(/v-if="canUseAi\(\)"[^>]*@click="doc && doc\.askAi\(\)"/);
-        expect(template('components/molecules/Pages/PageDocument.vue')).toMatch(/<PageComposeRail\s+v-if="mode === 'edit' && canUseAi\(\)"/);
+        expect(template('views/Pages/PageEditorView.vue')).toMatch(/v-if="canUseAi\(\) && !viewOnly"[^>]*@click="doc && doc\.askAi\(\)"/);
+        expect(template('components/molecules/Pages/PageDocument.vue')).toMatch(/<PageComposeRail\s+v-if="mode === 'edit' && canUseAi\(\) && !readOnly"/);
     });
 });
 

@@ -54,3 +54,18 @@ export function totalText(total, value) {
     const symbol = total?.field?.fieldType === 'money' ? total.field.fieldMoneySymbol || '' : '';
     return `${symbol}${round(Number(value) || 0)}`;
 }
+
+const rowsLeft = (rows, count) => Math.max(0, (count === null || count === undefined ? (rows || []).length : Number(count) || 0) - (rows || []).length);
+
+/* The one rule both views follow: a group holding all its tasks adds its own rows, so a total follows an edit at once;
+   a group holding only part of them shows the server's total for all of them, and nothing until it arrives. */
+export function groupTotalsOf({ rows, count, server, totals, allTasks = [], defs = [] }) {
+    return rowsLeft(rows, count) > 0 ? server || null : loadedTotals(rows, totals, { allTasks, defs });
+}
+
+export const isPartialGroup = rowsLeft;
+
+export function totalCellText(totals, groupTotals, columnId) {
+    const summed = (totals || []).find((entry) => entry.id === columnId);
+    return summed ? totalText(summed, groupTotals?.[columnId]) : '';
+}

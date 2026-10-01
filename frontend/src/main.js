@@ -11,12 +11,10 @@ import ToastPlugin from 'vue-toast-notification';
 import 'vue-toast-notification/dist/theme-sugar.css';
 import '@formkit/themes/genesis'
 import '@formkit/pro/genesis'
-import { plugin, defaultConfig } from '@formkit/vue'
-import { createProPlugin, inputs } from '@formkit/pro'
-import { DatePicker } from 'v-calendar';
+import { bindFormKitApp } from '@/plugins/customFieldView/lazyFormKit'
 import 'v-calendar/style.css';
 import { i18n, applyStoredLocale } from '@/locales/main';
-import VueApexCharts from "vue3-apexcharts";
+import { registerLazyGlobals } from '@/config/lazyGlobals';
 import DemoBanner from "@/components/atom/DemoBanner/DemoBanner.vue";
 import { installChunkRecovery } from '@/config/chunkRecovery';
 // Plugins Path
@@ -40,10 +38,6 @@ import oAuthPlugin from './plugins/oauth/oAuthPlugin';
 import "@/assets/css/index.css";
 import "@/assets/css/alerts.css";
 import "@/assets/css/driver.css";
-import { GridLayout, GridItem } from 'grid-layout-plus'
-
-
-const pro = createProPlugin('fk-12603cbaaf0', inputs)
 
 const app = createApp(App).use(store).use(router)
 
@@ -66,15 +60,12 @@ for (let index = 0; index < pluginArray.length; index++) {
 }
 
 app.use(ToastPlugin,{position: 'top-right'});
-app.use(plugin, defaultConfig({ plugins: [pro]}))
+bindFormKitApp(app);
 app.use(i18n);
 // Registered before mount so the root App.vue template can resolve it.
 app.component('DemoBanner', DemoBanner);
 installChunkRecovery(app, router);
-app.component('ApexChart', VueApexCharts);
-app.component('VDatePicker', DatePicker)
-app.component('GridLayout', GridLayout)
-app.component('GridItem', GridItem)
+registerLazyGlobals(app);
 
 const TELEPORT_TARGETS = ['my-sidebar', 'my-modal', 'my-dropdown', 'my-image-slider'];
 

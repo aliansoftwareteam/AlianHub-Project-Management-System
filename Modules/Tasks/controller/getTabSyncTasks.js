@@ -1,7 +1,8 @@
 const { mongoose } = require("mongoose");
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
-const { QueryRefused, validatePipeline, visibilityStage } = require("../helpers/taskQueryGuard");
+const { QueryRefused, validatePipeline, visibilityStage, matchWithExtraListRows } = require("../helpers/taskQueryGuard");
+const { opensList } = require("../helpers/taskExtraLists");
 
 const LEAVE_PROJECT_ID = "6571e7195470e64b1203295c";
 
@@ -18,9 +19,12 @@ const groupConditions = (body) => {
 
 const ownTasksOnly = (body) => !(body.showAllTasks === undefined || body.showAllTasks === true || body.showAllTasks === 2);
 
-const listMatch = (body, conditions, { changedOnly }) => {
+/* `inList` widens the list to the tasks added to it, as the task query does for a caller who can
+ * look at the list. Subtasks are read where their parent lives, so their match is left as it is. */
+const listMatch = (body, conditions, { changedOnly, inList }) => {
     const inParent = Boolean(body.parentId && body.parentId.length);
-    return {
+    const rows = (match) => (inList && !inParent ? matchWithExtraListRows(match, body.sprintId) : match);
+    return rows({
         $and: [
             {
                 ProjectID: new mongoose.Types.ObjectId(body.pid),
@@ -32,20 +36,20 @@ const listMatch = (body, conditions, { changedOnly }) => {
             },
             inParent ? {} : conditions,
         ],
-    };
+    });
 };
 
-const listPipeline = (body, conditions) => {
+const listPipeline = (body, conditions, inList) => {
     const indexName = body.indexName || body.item.indexName;
     return [{
         $facet: {
             result: [
-                { $match: listMatch(body, conditions, { changedOnly: true }) },
+                { $match: listMatch(body, conditions, { changedOnly: true, inList }) },
                 { $sort: { [indexName]: 1, createdAt: 1, _id: 1 } },
                 { $skip: 0 },
             ],
             count: [
-                { $match: listMatch(body, conditions, { changedOnly: false }) },
+                { $match: listMatch(body, conditions, { changedOnly: false, inList }) },
                 { $count: "count" },
             ],
         },
@@ -60,9 +64,9 @@ const tableSort = (body) => {
     return body.item?.indexName ? { [body.item.indexName]: 1 } : { createdAt: 1 };
 };
 
-const tablePipeline = (body, conditions) => [
+const tablePipeline = (body, conditions, inList) => [
     {
-        $match: {
+        $match: (inList ? matchWithExtraListRows : (match) => match)({
             $and: [
                 {
                     ProjectID: new mongoose.Types.ObjectId(body.pid),
@@ -75,7 +79,7 @@ const tablePipeline = (body, conditions) => [
                 body.showAllTasks !== undefined && !body.showAllTasks ? { AssigneeUserId: { $in: [body.userId] } } : {},
                 body.pid === LEAVE_PROJECT_ID ? { AssigneeUserId: { $in: [body.userId] } } : {},
             ],
-        },
+        }, body.sprintId),
     },
     { $sort: tableSort(body) },
 ];
@@ -97,7 +101,8 @@ exports.getTabSyncTasks = async (req, res) => {
         const companyId = req.headers['companyid'];
         const conditions = groupConditions(body);
         const scope = await visibilityStage(companyId, req.uid);
-        const pipeline = body.istableTask === false ? listPipeline(body, conditions) : tablePipeline(body, conditions);
+        const inList = await opensList(companyId, req.uid, String(body.sprintId));
+        const pipeline = body.istableTask === false ? listPipeline(body, conditions, inList) : tablePipeline(body, conditions, inList);
 
         const result = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [[scope, ...pipeline]] }, 'aggregate');
         return res.status(200).json(result);

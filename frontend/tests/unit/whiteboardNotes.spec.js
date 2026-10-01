@@ -128,6 +128,21 @@ describe('making and changing a note', () => {
         expect(upsert).toEqual([{ id: expect.stringMatching(/^[A-Za-z0-9_-]{8,40}$/), type: 'note', text: '', tone: 'amber', x: expect.any(Number), y: expect.any(Number), w: 180, h: 120, z: 3 }]);
     });
 
+    it('drops a new note at the centre of the visible area, not at the top left', async () => {
+        await open();
+        const element = board().element;
+        Object.defineProperty(element, 'clientWidth', { configurable: true, value: 1000 });
+        Object.defineProperty(element, 'clientHeight', { configurable: true, value: 600 });
+        element.scrollLeft = 200;
+        element.scrollTop = 100;
+        await wrapper.find('[data-wb-add-note]').trigger('click');
+        await afterTheDelay();
+        const [made] = bodies()[0].upsert;
+        expect(made.x).toBeGreaterThanOrEqual(200 + (1000 - 180) / 2);
+        expect(made.y).toBeGreaterThanOrEqual(100 + (600 - 120) / 2);
+        expect(made.x).toBeLessThan(200 + 1000 - 180);
+    });
+
     it('adds a plain text the same way, with no tone', async () => {
         await open();
         await wrapper.find('[data-wb-add-text]').trigger('click');

@@ -1,8 +1,11 @@
 <template>
     <tr class="evr__tr" :class="{ 'is-done': done }" v-bind="taskNavAttrs(task)" @click="$emit('open', task)">
         <td class="evr__td evr__td--name" :style="indent">
-            <button type="button" class="evr__name" :title="task.TaskName" @click.stop="$emit('open', task)">{{ task.TaskName }}</button>
-            <span v-if="task.subTasks" class="evr__subs" :title="$t('Everything.subtasks_n', { n: task.subTasks })">{{ task.subTasks }}</span>
+            <span class="evr__td-title">
+                <button type="button" class="evr__name" :title="task.TaskName" @click.stop="$emit('open', task)">{{ task.TaskName }}</button>
+                <span v-if="task.subTasks" class="evr__subs" :title="$t('Everything.subtasks_n', { n: task.subTasks })">{{ task.subTasks }}</span>
+                <slot name="lists"><TaskListChips :task="task" /></slot>
+            </span>
         </td>
         <td class="evr__td">
             <span class="evr__project" :title="project?.ProjectName || null">
@@ -37,6 +40,7 @@ import ListAssigneeCell from "@/views/Projects/ListView/ListAssigneeCell.vue";
 import ListDueCell from "@/views/Projects/ListView/ListDueCell.vue";
 import ListPriorityCell from "@/views/Projects/ListView/ListPriorityCell.vue";
 import { taskNavAttrs } from "@/components/organisms/TaskDetailOverlay/taskNavigation";
+import TaskListChips from "@/views/Projects/components/TaskListChips.vue";
 import { useRowState } from "./useRowState";
 
 defineOptions({ name: "EverythingTableRow" });

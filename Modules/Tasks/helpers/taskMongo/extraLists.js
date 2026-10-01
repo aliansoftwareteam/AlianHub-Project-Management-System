@@ -1,8 +1,12 @@
+const logger = require('../../../../Config/loggerConfig');
+const { SCHEMA_TYPE } = require('../../../../Config/schemaType');
+const { MongoDbCrudOpration } = require('../../../../utils/mongo-handler/mongoQueries');
+const socketEmitter = require('../../../../event/socketEventEmitter');
+const { HandleHistory } = require('../mongo_helper');
 const { TaskWriteRefusal, taskNotFound, plainIdOf, escapeText } = require('../taskWriteFields');
 const extraLists = require('../taskExtraLists');
-const { writeTask, announce, record, place } = require('./extraListPlace');
 
-const { TASK_NOT_FOUND } = extraLists;
+const { TASK_NOT_FOUND, TASK_CHANGED, HISTORY_KEY } = extraLists;
 
 const MAX_TASKS_PER_REQUEST = 500;
 
@@ -25,6 +29,30 @@ const callerOf = (userData) => {
     return uid;
 };
 
+const writeTask = (companyId, { filter, update }) => MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.TASKS, data: [filter, update, { returnDocument: 'after' }],
+}, 'findOneAndUpdate');
+
+/* `left` is the entry a removal took away: the relay sends this change to that list's room too, so the row goes from it. */
+const announce = (companyId, task, left = []) => socketEmitter.emit('update', {
+    type: 'update', data: task, updatedFields: { extraLists: task.extraLists || [] }, module: 'task', companyId, ...(left.length ? { leftLists: left } : {}),
+});
+
+const record = (companyId, task, message, userData) => HandleHistory('task', companyId, task.ProjectID, task._id, { key: HISTORY_KEY, message }, userData)
+    .catch((error) => { logger.error(`ERROR in task extra list history: ${error && error.message}`); });
+
+const place = async (companyId, task, destination, userData) => {
+    const fit = extraLists.canAddToList(task, destination.list._id);
+    if (!fit.ok) return { ...fit, statusCode: 400 };
+    const addition = extraLists.additionOf(task, destination, userData.id);
+    const updated = await writeTask(companyId, addition);
+    if (!updated) return TASK_CHANGED;
+    announce(companyId, updated);
+    const where = extraLists.listPhrase(task, addition.update.$push.extraLists, destination.list, escapeText);
+    record(companyId, task, `<b>${userData.Employee_Name}</b> has added <b>${escapeText(task.TaskName)}</b> to ${where}.`, userData);
+    return { ok: true, task: updated };
+};
+
 module.exports = {
 
     async addToList({ companyId, taskId, sprintId, userData }) {
@@ -43,7 +71,7 @@ module.exports = {
         const { entry, list } = passed(await extraLists.removalFor(companyId, uid, task, requiredId(sprintId, 'sprintId')));
         const updated = await writeTask(companyId, extraLists.removalOf(task, entry.sprintId));
         if (!updated) throw taskNotFound();
-        announce(updated);
+        announce(companyId, updated, [{ projectId: String(entry.projectId), sprintId: String(entry.sprintId) }]);
         const where = extraLists.listPhrase(task, entry, list, escapeText);
         record(companyId, task, `<b>${userData.Employee_Name}</b> has removed <b>${escapeText(task.TaskName)}</b> from ${where}.`, userData);
         return { taskId: String(task._id), extraLists: await extraLists.listsForViewer(companyId, uid, updated) };

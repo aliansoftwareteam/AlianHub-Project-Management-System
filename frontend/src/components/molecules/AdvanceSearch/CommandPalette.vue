@@ -177,7 +177,7 @@ import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import KeyHint from '@/components/atom/KeyHint/KeyHint.vue';
 import { toggleTheme, shellState } from '@/components/organisms/Shell/shellState';
 import { isMacPlatform } from './paletteKeys';
-import { CHIPS, RECORD_CHIPS, chipAllows, commandArgument, commandLeads, foldRecentProjects, projectPath, recentType, relativeAge, taskLocation, taskPath } from './paletteRows';
+import { CHIPS, RECORD_CHIPS, chipAllows, commandArgument, commandLeads, foldRecentProjects, projectPath, recentType, relativeAge, taskPath, taskPlace } from './paletteRows';
 import { openQuickCreate } from '@/components/organisms/QuickCreateTask/quickCreateTask';
 import { routeProjectId, useNewDoc } from '@/components/molecules/Pages/useNewDoc';
 import { docRoute } from '@/components/molecules/Pages/docRoute';
@@ -251,6 +251,8 @@ const timesheetRoute = () => ['User Timesheet', 'project Timesheet', 'Workload T
 
 const NAV = computed(() => [
     { key: 'home', label: t('Shell.home'), icon: 'home', route: 'Home' },
+    { key: 'everything', label: t('Shell.everything'), icon: 'layers', route: 'Everything' },
+    { key: 'goals', label: t('Shell.goals'), icon: 'target', route: 'Goals' },
     { key: 'planner', label: t('Shell.planner'), icon: 'planner', route: 'Planner' },
     { key: 'chat', label: t('Shell.chat'), icon: 'chat', route: 'chats', show: allowed('chat') },
     { key: 'inbox', label: t('Inbox.title'), icon: 'inbox', route: 'inbox' },
@@ -275,7 +277,7 @@ const NAV = computed(() => [
 const { canCreateIn, createIn } = useNewDoc();
 const docProjectId = computed(() => routeProjectId(route));
 const canNewDoc = computed(() => {
-    if (!docProjectId.value) return true;
+    if (!docProjectId.value) return canCreateIn(null);
     const project = (getters['projectData/allProjects']?.data || []).find((p) => String(p._id) === docProjectId.value);
     return Boolean(project) && canCreateIn(project);
 });
@@ -295,7 +297,7 @@ const projectName = (id) => (getters['projectData/projects']?.data || []).find((
 const taskRow = (task, when) => ({
     id: `task:${task._id}`, kind: 'task', swatch: task.status?.color || 'var(--brand)', bold: true,
     code: task.TaskKey && task.TaskKey !== '--' ? task.TaskKey : '', title: task.TaskName,
-    sub: taskLocation(task, projectName(task.ProjectID)), age: relativeAge(when || task.updatedAt, t), to: taskPath(cid.value, task),
+    sub: taskPlace(task, projectName(task.ProjectID), t), age: relativeAge(when || task.updatedAt, t), to: taskPath(cid.value, task),
     task: { companyId: cid.value, projectId: task.ProjectID, sprintId: task.sprintId, folderId: task.folderObjId || '', taskId: task._id },
 });
 const projectRow = (p) => ({ id: `project:${p._id}`, kind: 'project', icon: 'projects', title: p.ProjectName, sub: t('Header.Projects'), age: relativeAge(p.updatedAt, t), to: projectPath(cid.value, p) });

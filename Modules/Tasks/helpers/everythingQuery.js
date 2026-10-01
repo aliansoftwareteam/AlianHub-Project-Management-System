@@ -30,11 +30,11 @@ const PROJECT_ARCHIVED = 2;
 const ROW_FIELDS = Object.freeze({
     TaskName: 1, TaskKey: 1, status: 1, statusKey: 1, statusType: 1, Task_Priority: 1, AssigneeUserId: 1,
     DueDate: 1, startDate: 1, ProjectID: 1, sprintId: 1, folderObjId: 1, TaskType: 1, TaskTypeKey: 1, tagsArray: 1,
-    subTasks: 1, ancestors: 1, ParentTaskId: 1, isParentTask: 1, createdAt: 1, updatedAt: 1,
+    subTasks: 1, ancestors: 1, ParentTaskId: 1, isParentTask: 1, createdAt: 1, updatedAt: 1, extraLists: 1, sprintArray: 1,
 });
 
 const TOP_KEYS = ['filter', 'group', 'sort', 'cursor', 'limit', 'includeSubtasks', 'includeClosedProjects', 'timezone'];
-const FILTER_KEYS = ['status', 'statusType', 'assignee', 'priority', 'dueDate', 'taskType', 'tags', 'search', 'projectIds'];
+const FILTER_KEYS = ['status', 'statusType', 'assignee', 'priority', 'dueDate', 'taskType', 'tags', 'search', 'projectIds', 'sprintIds'];
 const SORT_OPTION_KEYS = ['by', 'dir'];
 const DUE_DATE_KEYS = ['from', 'to', 'none'];
 
@@ -119,6 +119,11 @@ const projectIdsOf = (value) => {
     return ids.length ? [...new Set(ids.map((id) => id.toLowerCase()))] : null;
 };
 
+const sprintIdsOf = (value) => {
+    const ids = listOf(value, 'filter.sprintIds', MAX_LIST, (id) => typeof id === 'string' && OBJECT_ID.test(id), 'list ids');
+    return ids.length ? [...new Set(ids.map((id) => id.toLowerCase()))] : null;
+};
+
 const filterOf = (value) => {
     const filter = value === undefined ? {} : value;
     if (!isPlainObject(filter)) throw new EverythingRefused('filter', 'must be an object');
@@ -133,6 +138,7 @@ const filterOf = (value) => {
         tags: someOf(filter.tags, 'filter.tags', isPlainId, 'tag ids'),
         search: searchOf(filter.search),
         projectIds: projectIdsOf(filter.projectIds),
+        sprintIds: sprintIdsOf(filter.sprintIds),
     };
 };
 
@@ -238,11 +244,17 @@ const filterClauses = (filter) => {
     if (filter.taskType) clauses.push(anyOf([...inList('TaskType', filter.taskType.names), ...inList('TaskTypeKey', filter.taskType.keys)]));
     if (filter.tags) clauses.push({ tagsArray: { $in: filter.tags } });
     if (filter.search) clauses.push({ TaskName: { $regex: escapeRegex(filter.search), $options: 'i' } });
+    if (filter.sprintIds) {
+        const lists = filter.sprintIds.map(objectId);
+        clauses.push({ $or: [{ sprintId: { $in: lists } }, { extraLists: { $elemMatch: { sprintId: { $in: lists } } } }] });
+    }
     return clauses;
 };
 
 /* The scope fields sit at the top level and every filter under $and, so nothing a filter says can
- * take the place of a scope field. `projectIds` is what the caller can open, already narrowed. */
+ * take the place of a scope field. `projectIds` is what the caller can open, already narrowed, and
+ * `filter.sprintIds` holds only lists the caller can open: a task is in a list as its home or as an
+ * extra list, and the scope is judged on its home either way. */
 const buildMatch = (request, { projectIds, hiddenSprintIds = [] }) => {
     const clauses = filterClauses(request.filter);
     return {

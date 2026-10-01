@@ -4,27 +4,18 @@ const {
     findRoomsByPrefix,
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
-const { onJoin, roomFor, isSelf } = require('../roomAccess');
+const { onJoin, roomFor, isSelf, toSeated } = require('../roomAccess');
 
 const handleUserNotificationChange = (changeData) => {
-    if (changeData.module !== 'userIdNotification') return;
-    // A findOneAndUpdate that matched nothing resolves to null. Reading .userId off
-    // it threw here, and broadcasting it would have replaced the client's entire
-    // count store with null — wiping every badge.
-    if (!changeData.data || !changeData.data.userId) return;
-
-    const userIdIdentifier = `userIdNotification_${changeData.data.userId}`;
-    // SOCKET-PERFORMANCE-PLAN #1 (Phase 2): O(1) prefix lookup.
-    const relatedRooms = findRoomsByPrefix(userIdIdentifier);
-    if (!relatedRooms.length) return;
+    if (changeData.module !== 'userIdNotification') return undefined;
+    // A findOneAndUpdate that matched nothing resolves to null, and sending it would replace the client's whole count store.
+    if (!changeData.data || !changeData.data.userId) return undefined;
 
     const emitData = { fullDocument: changeData.data };
 
-    relatedRooms.forEach(data => {
-        // SOCKET-PERFORMANCE-PLAN #5 (Phase 2): see taskSocket.js for context.
-        if (!data.socket.rooms.has(data.roomName)) return;
-        data.namespace.to(data.roomName).emit('userIdNoticationUpdate', emitData);
-    });
+    // The room is named by the user alone, and a person in two companies has one in each.
+    return toSeated(findRoomsByPrefix(`userIdNotification_${changeData.data.userId}`), changeData.companyId,
+        (data) => data.namespace.to(data.roomName).emit('userIdNoticationUpdate', emitData));
 };
 
 exports.userNotificationCountHandler = ({ socket, namespace }) => {
@@ -42,9 +33,5 @@ exports.userNotificationCountHandler = ({ socket, namespace }) => {
     });
 };
 
-// SOCKET-PERFORMANCE-PLAN #2: scoped to the `userIdNotification` module
-// only. Previously this fired for every task/comment/companies update too,
-// even though the early `module` check exited within a few lines — the
-// scan over socketRef.rooms still ran on the wrong path.
 socketEmitter.on('userIdNotification:update', changeData => handleUserNotificationChange(changeData, true));
 socketEmitter.on('userIdNotification:insert', changeData => handleUserNotificationChange(changeData, false));

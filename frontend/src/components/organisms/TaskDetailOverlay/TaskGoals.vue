@@ -67,7 +67,7 @@ watch(() => linkableGoals.linked, () => load(props.taskId));
 .tgl { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .tgl__item { min-width: 0; max-width: 100%; }
 .tgl__chip {
-    display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: var(--hit-min, 24px); padding: 2px 8px;
+    display: inline-flex; align-items: center; gap: 6px; box-sizing: border-box; max-width: 100%; min-height: var(--hit-min, 24px); padding: 2px 8px;
     border: 1px solid var(--border); border-radius: var(--r-chip); background: var(--surface); color: var(--ink);
     font: 500 var(--fs-sm, 12px)/1.3 var(--font-ui); text-decoration: none;
 }

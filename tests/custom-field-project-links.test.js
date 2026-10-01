@@ -331,27 +331,27 @@ describe('the change reaches the open tabs of the company', () => {
         return emit;
     };
 
-    it('as the fact of a change, with no field, project or id, and reaches no other company', () => {
+    it('as the fact of a change, with no field, project or id, and reaches no other company', async () => {
         const mine = join(C, 's1');
         const theirs = join(OTHER_COMPANY, 's2');
 
-        relay({ type: 'update', companyId: C, module: 'customFields', data: { _id: 'f1', fieldTitle: 'Budget', projectId: [alpha, beta] }, projectId: alpha, fieldId: 'f1' });
+        await relay({ type: 'update', companyId: C, module: 'customFields', data: { _id: 'f1', fieldTitle: 'Budget', projectId: [alpha, beta] }, projectId: alpha, fieldId: 'f1' });
 
         expect(mine).toHaveBeenCalledWith(EVENT, { type: 'update' });
         expect(JSON.stringify(mine.mock.calls)).not.toMatch(/[a-f0-9]{24}|Budget|f1/);
         expect(theirs).not.toHaveBeenCalled();
     });
 
-    it('skips a socket that has left the company room, and does nothing without a company', () => {
+    it('skips a socket that has left the company room, and does nothing without a company', async () => {
         const left = join(C, 's3', { inRoom: false });
         const mine = join(C, 's4');
 
-        relay({ type: 'insert', companyId: C, module: 'customFields' });
+        await relay({ type: 'insert', companyId: C, module: 'customFields' });
         expect(left).not.toHaveBeenCalled();
         expect(mine).toHaveBeenCalledTimes(1);
 
-        relay({ type: 'update', module: 'customFields' });
-        relay(undefined);
+        await relay({ type: 'update', module: 'customFields' });
+        await relay(undefined);
         expect(mine).toHaveBeenCalledTimes(1);
     });
 

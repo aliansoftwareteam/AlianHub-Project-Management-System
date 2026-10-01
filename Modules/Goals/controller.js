@@ -8,6 +8,7 @@ const { isNarrowed } = require('../../Config/tokenNarrowing');
 const logger = require('../../Config/loggerConfig');
 const { recordAuditFromReq } = require('../Audit/recorder');
 const { openableTasks } = require('../Tasks/helpers/taskReadAccess');
+const { defaultCurrencyOf } = require('../Company/helpers/companyCurrency');
 const access = require('./helpers/goalAccess');
 const rules = require('./helpers/goalRules');
 const { withProgress } = require('./helpers/goalProgress');
@@ -15,6 +16,7 @@ const { LIVE, ARCHIVED, crud, announce, writeAtRevision } = require('./goalStore
 const sources = require('./goalSources');
 const counts = require('./goalCounts');
 const reached = require('./goalReached');
+const summary = require('./goalSummary');
 
 const { GoalRefused } = rules;
 
@@ -30,6 +32,7 @@ const NARROWED = 'A token limited to some projects cannot read or change goals.'
 const IS_ARCHIVED = 'This goal is archived. Restore it to change it.';
 const BUSY = 'This goal was changed at the same moment. Try again.';
 const FAILED = 'Something went wrong with the goal.';
+const BUDGET_EXHAUSTED = 'ai_budget_exhausted';
 
 const refuse = (res, statusCode, statusText, message, extra = {}) => res.status(statusCode).json({ status: false, statusText, message, ...extra });
 const stop = (statusCode, statusText) => Object.assign(new Error(statusText), { statusCode, stopped: true });
@@ -104,6 +107,7 @@ const present = (goal, caller, now = new Date()) => {
         isOwner: access.isOwner(goal, caller),
         color: goal.color || '',
         progressPct: goal.progressPct || 0,
+        summary: summary.keptView(goal) || undefined,
         targets: (goal.targets || []).map((target) => presentTarget(target, view)),
         archived: goal.deletedStatusKey === ARCHIVED,
         canEdit,
@@ -237,6 +241,16 @@ const requireCurrencies = async (companyId, targets, fieldAt = () => 'currencyCo
     if (unknownAt !== -1) throw new GoalRefused(fieldAt(unknownAt), 'is not a currency of this workspace');
 };
 
+const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+const namesNoCurrency = (target) => isObject(target) && target.kind === rules.CURRENCY && target.currencyCode === undefined;
+
+/* A money target that names no currency is counted in the company's; with none to take, the target is refused as before. */
+const inCompanyCurrency = async (companyId, targets) => {
+    if (!Array.isArray(targets) || !targets.some(namesNoCurrency)) return targets;
+    const { code } = await defaultCurrencyOf(companyId);
+    return code ? targets.map((target) => (namesNoCurrency(target) ? { ...target, currencyCode: code } : target)) : targets;
+};
+
 const requireNoBody = (body) => {
     if (body !== undefined && body !== null && (typeof body !== 'object' || Object.keys(body).length)) throw new GoalRefused('body', 'must be empty');
 };
@@ -313,8 +327,11 @@ exports.goalsForTask = handled('for task', async (req, res, caller) => {
     return res.status(200).json({ status: true, statusText: 'Goals fetched successfully.', data });
 });
 
-/* `stamp` is stored beside the goal's own fields; the welcome project's seeder marks its goal with it. */
-const saveGoal = async (caller, body, stamp = {}) => {
+/* The write of a new goal once the caller has been judged. `stamp` is stored beside the goal's own fields; the welcome project's seeder marks its goal with it. */
+const saveGoal = async (caller, given, stamp = {}) => {
+    const body = isObject(given) && given.targets !== undefined
+        ? { ...given, targets: await inCompanyCurrency(caller.companyId, given.targets) }
+        : given;
     const { targets: newTargets = [], ...fields } = rules.parseGoalBody(body, { creating: true });
     const goal = { description: '', periodStart: '', periodEnd: '', visibility: access.PRIVATE, sharedWith: [], color: '', ...fields, ownerUserId: caller.uid };
     rules.requirePeriodInOrder(goal);
@@ -385,11 +402,29 @@ const archiveState = (where, deletedStatusKey, action, statusText) => handled(wh
     return sent(res, statusText, saved, caller);
 });
 
+/* Whoever can edit the goal may ask for a summary; a goal the caller cannot read answers as a missing one before anything else is said. */
+exports.summariseGoal = handled('summarise', async (req, res, caller) => {
+    requireNoBody(req.body);
+    const goal = await visibleGoal(caller, req.params.id);
+    if (!access.canEdit(goal, caller)) throw stop(403, FORBIDDEN);
+    if (goal.deletedStatusKey !== LIVE) throw stop(409, IS_ARCHIVED);
+    const made = await summary.summariseGoal({ companyId: caller.companyId, uid: caller.uid, goal });
+    if (!made.status) {
+        const reason = made.reason || FAILED;
+        if (made.aiState) return refuse(res, 409, 'AI unavailable', reason, { code: 'ai_unavailable', aiState: made.aiState });
+        if (reason.startsWith(BUDGET_EXHAUSTED)) return refuse(res, 402, 'AI budget spent', reason, { code: BUDGET_EXHAUSTED });
+        return refuse(res, 502, 'Summary failed', reason, { code: 'summary_failed' });
+    }
+    announce('update', caller.companyId);
+    return sent(res, 'Summary saved.', await visibleGoal(caller, req.params.id), caller);
+});
+
 exports.archiveGoal = archiveState('archive', ARCHIVED, 'goal.archive', 'Goal archived.');
 exports.restoreGoal = archiveState('restore', LIVE, 'goal.restore', 'Goal restored.');
 
 exports.addTarget = handled('add target', async (req, res, caller) => {
-    const target = rules.parseNewTarget(req.body);
+    const [body] = await inCompanyCurrency(caller.companyId, [req.body]);
+    const target = rules.parseNewTarget(body);
     const { saved } = await mutate(caller, req.params.id, access.canEdit, async (goal) => {
         if ((goal.targets || []).length >= rules.MAX_TARGETS) throw new GoalRefused('targets', `holds at most ${rules.MAX_TARGETS} targets`);
         await requireCurrencies(caller.companyId, [target]);

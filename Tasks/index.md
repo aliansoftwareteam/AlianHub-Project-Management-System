@@ -52,3 +52,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 044 | Quick gaps from the ClickUp re-check | active | high | — | active/044-clickup-quick-gaps |
 | 045 | Medium gaps from the ClickUp re-check | active | high | 044 | active/045-clickup-medium-gaps |
 | 046 | The plan to be great next to ClickUp | active | high | 045 | active/046-better-than-clickup |
+| 047 | AI-run — a teammate that already knows the software | active | high | 046 | active/047-ai-run |

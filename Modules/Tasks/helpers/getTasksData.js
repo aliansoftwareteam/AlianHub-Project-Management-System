@@ -6,26 +6,30 @@ const { tenantOf, TenantError } = require("../../../Config/tenant");
 const { removeCache } = require("../../../utils/commonFunctions.js");
 const socketEmitter = require("../../../event/socketEventEmitter");
 const logger = require("../../../Config/loggerConfig");
-const { QueryRefused, validatePipeline, visibilityStage } = require("./taskQueryGuard");
+const { QueryRefused, validatePipeline, visibilityStage, withExtraListRows } = require("./taskQueryGuard");
 const { WriteRefused, parseCascade, assertCanCascade, cascadeFilter } = require("./taskWriteGuard");
 const { canReadTask } = require("./taskReadAccess");
-const { extraListsOf, listsForViewer } = require("./taskExtraLists");
+const { extraListsOf, listsForViewer, opensList } = require("./taskExtraLists");
 const { withLinkConditions } = require("../../CustomField/helpers/fieldLinks");
 
 const refuse = (res, statusCode, statusText, message, extra = {}) => res.status(statusCode).json({ status: false, statusText, message, ...extra });
 
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+
 exports.getTaskByQyery = async (req, res) => {
     try {
         const companyId = tenantOf(req);
-        const { findQuery, replaceUndefined = false } = req.body || {};
+        const { findQuery, replaceUndefined = false, inList } = req.body || {};
         if (!findQuery) {
             return refuse(res, 400, "Query is required.", "An error occurred while getting the task.");
         }
+        if (inList !== undefined && !(typeof inList === "string" && OBJECT_ID.test(inList))) throw new QueryRefused("inList", "it must be a list id");
 
         const stages = validatePipeline(findQuery);
         const converted = await withLinkConditions(companyId, req.uid, replaceObjectKey(replaceUndefined ? relapceUndefinedvals(stages) : stages, ["objId", "dbDate"]));
+        const rows = inList && await opensList(companyId, req.uid, inList) ? withExtraListRows(converted, inList) : converted;
         const scope = await visibilityStage(companyId, req.uid);
-        const pipeline = scope ? [scope, ...converted] : converted;
+        const pipeline = scope ? [scope, ...rows] : rows;
 
         const response = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [pipeline] }, "aggregate");
         return res.status(200).json(response);
@@ -40,8 +44,6 @@ exports.getTaskByQyery = async (req, res) => {
         return refuse(res, 500, "An error occurred while getting the task.", error.message || String(error));
     }
 };
-
-const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
 // A task the caller may not see answers exactly like one that does not exist, so the
 // response never confirms that a task id is real.
@@ -120,7 +122,7 @@ exports.updateTask = async (req, res) => {
         const updatedFields = { deletedStatusKey: cascade.to };
         (tasks || []).forEach((task) => {
             const plain = typeof task.toObject === "function" ? task.toObject() : task;
-            socketEmitter.emit("update", { type: "update", data: { ...plain, ...updatedFields }, updatedFields, module: "task" });
+            socketEmitter.emit("update", { type: "update", data: { ...plain, ...updatedFields }, updatedFields, module: "task", companyId });
         });
         removeCache("UserProjectData:", true);
 

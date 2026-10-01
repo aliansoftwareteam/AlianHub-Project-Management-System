@@ -25,7 +25,6 @@ import SprintRenameInput from '@/components/molecules/ProjectTree/SprintRenameIn
 import ProjectTree from '@/components/molecules/ProjectTree/ProjectTree.vue';
 import { resetProjectTreeCache } from '@/components/molecules/ProjectTree/projectTreeData';
 import { resetFavourites } from '@/composable/favourites';
-import { linkableGoals } from '@/views/Goals/goalLinking';
 
 const i18n = config.global.plugins[0];
 i18n.global.setLocaleMessage('en', en);
@@ -91,8 +90,6 @@ beforeEach(() => {
     Object.values(toast).forEach((spy) => spy.mockClear());
     resetProjectTreeCache();
     resetFavourites();
-    /* The menus read the person's goals once; here that read is over, so the requests counted are the menu's own. */
-    Object.assign(linkableGoals, { companyId: 'company-1', status: 'ready', goals: [] });
     Object.assign(getters, {
         'settings/companyUserDetail': { roleType: MEMBER },
         'settings/rules': rulesGranting('project_sprint_name_edit'),
@@ -245,7 +242,7 @@ describe('renaming a list', () => {
 
         const taken = input('d1');
         await type(taken, 'research');
-        expect(toast.error).toHaveBeenCalledWith('Sprint already exists', { position: 'top-right' });
+        expect(toast.error).toHaveBeenCalledWith('List already exists', { position: 'top-right' });
         expect(apiRequest).not.toHaveBeenCalled();
     });
 

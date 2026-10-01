@@ -140,13 +140,15 @@ const planClickUpImport = async (companyId, { actor, project, tasks, columns, un
     const state = { projectId, definitions: await projectFieldDefinitions(companyId, projectId), tags: tagNamesOf(project) };
     const existing = await existingIn(companyId, projectId, tasks, existingMode);
     const plan = planClickUpList({ tasks, columns, unnamedAssignees, state, people, allowed, existing });
-    return { ...plan, projectId, actorId, allowed, people, existing, storedParents: existing.stored };
+    return { ...plan, projectId, actorId, actor, allowed, people, existing, storedParents: existing.stored };
 };
 
 /* Carries the plan out: saves the field definitions and puts the field values and assignees on the rows. `afterCreate`
- * writes what needs the created task ids, updates the tasks that were already here, and answers the final summary. */
-const prepareClickUpDetails = async (companyId, { plan, project, sprint, statusArray, jobId }) => {
-    const { projectId, actorId, allowed, people, existing } = plan;
+ * writes what needs the created task ids, updates the tasks that were already here, and answers the final summary.
+ * `skippedCells` fills as the tasks that were already here are updated: see updateStoredTasks. */
+const prepareClickUpDetails = async (companyId, { plan, project, sprint, statusArray, knowsStatus, jobId }) => {
+    const { projectId, actorId, actor, allowed, people, existing } = plan;
+    const skippedCells = [];
     const planned = [...plan.fresh, ...plan.updates];
 
     await saveFieldPlan(companyId, { fieldPlan: plan.fieldPlan, projectId, actorId, jobId });
@@ -156,7 +158,8 @@ const prepareClickUpDetails = async (companyId, { plan, project, sprint, statusA
     });
 
     const afterCreate = async ({ createdRows, droppedFieldValues = 0 }) => {
-        const again = await updateStoredTasks(companyId, { rows: plan.updates, projectId, statusArray });
+        const again = await updateStoredTasks(companyId, { rows: plan.updates, project, actor, statusArray, knowsStatus });
+        skippedCells.push(...again.skippedCells);
         const links = await saveLinks(companyId, createdRows, actorId);
         const commented = [...createdRows, ...plan.updates];
         const comments = allowed.comments
@@ -172,7 +175,7 @@ const prepareClickUpDetails = async (companyId, { plan, project, sprint, statusA
             existing: { ...plan.summary.existing, updated: again.updated },
         };
     };
-    return { unmatchedPeople: plan.summary.people.unmatched, afterCreate };
+    return { unmatchedPeople: plan.summary.people.unmatched, afterCreate, skippedCells };
 };
 
 /* What importing the whole file would do, list by list as the import runs, with nothing written. Into an existing

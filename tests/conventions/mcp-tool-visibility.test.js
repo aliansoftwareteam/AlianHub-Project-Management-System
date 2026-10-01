@@ -26,7 +26,7 @@ describe('every registered MCP tool goes through the visibility filter', () => {
 
     it('sees the flagged tools too (the scan works)', () => {
         expect(registered().map((t) => t.name)).toContain('performance.read');
-        expect(registered().map((t) => t.name)).toEqual(expect.arrayContaining(['projects.list', 'comment.create', 'subtasks.list', 'task.move', 'task.relation.add', 'page.comment.create']));
+        expect(registered().map((t) => t.name)).toEqual(expect.arrayContaining(['projects.list', 'comment.create', 'subtasks.list', 'task.move', 'task.relation.add', 'page.comment.create', 'goals.list', 'goal.target.sources.add', 'task.lists.list', 'task.lists.add', 'task.lists.remove']));
     });
 
     it('declares filtered or none on every tool', () => {

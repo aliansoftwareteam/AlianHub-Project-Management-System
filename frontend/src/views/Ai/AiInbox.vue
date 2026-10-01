@@ -136,12 +136,15 @@
                     <p class="ai-detail__why">{{ selected.why }}</p>
 
                     <div class="ah-label">{{ changesLabel }}</div>
-                    <div v-for="(change, i) in editable" :key="i" class="ai-change">
-                        <ShellIcon :name="change.reversible ? 'check' : 'alert'" :size="14" :class="change.reversible ? 'ah-muted' : ''" />
-                        <span class="ai-change__label">{{ change.label }}</span>
-                        <span v-if="!change.reversible" class="ah-chip ah-chip--warn">{{ $t('Ai.not_reversible') }}</span>
-                        <button v-if="editing" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="editable.splice(i, 1)">{{ $t('Ai.drop') }}</button>
-                    </div>
+                    <template v-for="(change, i) in editable" :key="i">
+                        <div class="ai-change">
+                            <ShellIcon :name="change.reversible ? 'check' : 'alert'" :size="14" :class="change.reversible ? 'ah-muted' : ''" />
+                            <span class="ai-change__label">{{ change.label }}</span>
+                            <span v-if="!change.reversible" class="ah-chip ah-chip--warn">{{ $t('Ai.not_reversible') }}</span>
+                            <button v-if="editing" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="editable.splice(i, 1)">{{ $t('Ai.drop') }}</button>
+                        </div>
+                        <SlackPostPreview v-if="change.action === SLACK_POST" :change="change" :delivery="slackDeliveryOf(change)" />
+                    </template>
 
                     <div v-if="selected.gate" class="auth__banner auth__banner--warn" style="margin-top:14px">
                         <ShellIcon name="shield" :size="15" />
@@ -197,6 +200,7 @@ import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiFeedback from "@/components/molecules/AiFeedback/AiFeedback.vue";
 import AiSidebar from "./AiSidebar.vue";
 import WorkflowApprovalRow from "./WorkflowApprovalRow.vue";
+import SlackPostPreview from "./SlackPostPreview.vue";
 import WorkflowApprovalDetail from "./WorkflowApprovalDetail.vue";
 import AgentReportDetail from "./AgentReportDetail.vue";
 import { useAgentReports } from "./useAgentReports";
@@ -274,6 +278,9 @@ const decidedLine = computed(() => {
     return t("Ai.decided_line", { status: t(`Ai.status_${p.status || "pending"}`), at: p.decidedAt ? moment(p.decidedAt).fromNow() : "" });
 });
 
+const SLACK_POST = "slack.message.post";
+const slackDeliveryOf = (change) => (selected.value?.delivery || [])[editable.value.filter((c) => c.action === SLACK_POST).indexOf(change)] || null;
+
 const changesLabel = computed(() => {
     const list = editable.value;
     const all = list.length && list.every((c) => c.reversible);
@@ -348,7 +355,7 @@ const afterDecision = async (message) => {
     const id = selected.value._id;
     selected.value = null;
     await Promise.all([reload(), loadSummary().catch(() => {})]);
-    $toast.success(message, { position: "top-right" });
+    if (message) $toast.success(message, { position: "top-right" });
     return id;
 };
 
@@ -359,7 +366,9 @@ const onApprove = async () => {
         const original = selected.value.changes || [];
         const changed = editable.value.length !== original.length;
         const out = await decide(selected.value._id, "approve", changed ? { changes: editable.value } : {});
-        const id = await afterDecision(t("Ai.applied"));
+        const unapplied = (out?.applied || []).filter((a) => !a.ok);
+        const id = await afterDecision(unapplied.length ? "" : t("Ai.applied"));
+        if (unapplied.length) $toast.error(t("Ai.applied_with_failures", { n: unapplied.length, error: unapplied[0].error || "" }), { position: "top-right" });
         if (out?.undoUntil && mayUndo({ decidedBy: out.decidedBy || userId.value })) {
             undo.value = { id, until: new Date(out.undoUntil).getTime() };
             setTimeout(() => { if (undo.value && undo.value.id === id) undo.value = null; }, Math.max(0, new Date(out.undoUntil).getTime() - Date.now()));

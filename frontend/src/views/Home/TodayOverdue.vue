@@ -35,6 +35,7 @@
                         :company-name="companyName"
                         :title="isOwnerOrAdmin ? '' : $t('Home.member_setup_title')"
                         :steps="checklistSteps"
+                        :sample="isOwnerOrAdmin && Boolean(sampleProject)"
                         @action="onChecklistAction"
                         @dismiss="dismissChecklist"
                     />
@@ -180,16 +181,15 @@ const todayLabel = computed(() => moment().format("ddd MMM D"));
 const projects = computed(() => getters["projectData/projects"]?.data || []);
 const companyName = computed(() => getters["settings/selectedCompany"]?.Cst_CompanyName || "");
 
-const mainTour = inject("$mainTour", null);
 const onboarding = useOnboardingChecklist({
     openCreateProject: () => { createProjectOpen.value = true; },
-    startTour: (which) => mainTour?.value?.startTour?.(which),
     routeVersion: () => route.fullPath
 });
 const { steps: checklistSteps, show: showChecklist, complete: checklistComplete, isOwnerOrAdmin, dismiss: dismissChecklist, sampleProject } = onboarding;
 const surfaceOpen = useBlockingSurface();
 const firstRun = computed(() => projects.value.length <= 1 || !checklistComplete.value);
 const confirmRemoveSample = ref(false);
+watch(() => route.query.filter, (filter) => { if (filter === "assigned" && !isOwnerOrAdmin.value) onboarding.mark("my_work"); }, { immediate: true });
 
 const agendaItems = computed(() => agenda.itemsFor(agendaDay.value, work.mine.value));
 
@@ -273,15 +273,20 @@ async function onTimer(task) {
     if (timer.active) {
         const previous = timer.active.taskName;
         try {
-            await stop({ companyId: companyId.value, userId: userId.value });
+            const stopped = await stop({ companyId: companyId.value, userId: userId.value });
             $toast.info(t("Home.timer_switched", { task: previous }), { position: "top-right" });
+            if (stopped && !stopped.logged) $toast.info(t("TaskPanel.timer_too_short"), { position: "top-right" });
         } catch (error) {
             console.error("timer stop failed", error);
             $toast.error(t(timeLogFailureKey(error, "Home.timer_log_failed")), { position: "top-right" });
             return;
         }
     }
-    start(task, work.projectOf(task));
+    try {
+        await start(task, work.projectOf(task));
+    } catch (error) {
+        $toast.error(t(timeLogFailureKey(error, "Time.action_failed")), { position: "top-right" });
+    }
 }
 
 function onSetDate(task) {

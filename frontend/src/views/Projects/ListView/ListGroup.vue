@@ -111,6 +111,8 @@
 <script setup>
 import { computed, inject, nextTick, onBeforeUnmount, provide, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
+import { useToast } from "vue-toast-notification";
 import draggable from "vuedraggable";
 import ListRow from "./ListRow.vue";
 import ListSubtaskRows from "./ListSubtaskRows.vue";
@@ -128,7 +130,7 @@ import { apiRequest } from "@/services";
 import { subtaskCreateAssignees } from "@/utils/assigneeOptions";
 import * as env from "@/config/env";
 import { applyContext, applyTemplate, defaultTemplateOf, listTemplates } from "@/components/molecules/TaskTemplates/taskTemplates";
-import { loadedTotals, totalColumnsOf, totalText } from "@/views/Projects/composables/groupTotals";
+import { groupTotalsOf, totalCellText, totalColumnsOf } from "@/views/Projects/composables/groupTotals";
 import { listColumnClass } from "@/views/Projects/composables/viewColumns";
 import { MANUAL, sortTasks } from "@/views/Projects/composables/viewSort";
 import { groupTakesTask, putFrom } from "@/views/Projects/composables/customFieldQuery";
@@ -144,6 +146,8 @@ const props = defineProps({
 const emit = defineEmits(["toggle", "open", "review-agent"]);
 
 const { getters } = useStore();
+const { t } = useI18n();
+const $toast = useToast();
 const { checkPermission } = useCustomComposable();
 const { getSprintTasks } = taskListHelper();
 const { updateTaskByGroup } = useUpdateTasks();
@@ -163,6 +167,7 @@ const { expandedIds, autoExpandedIds } = useSubtaskExpansion();
 const subtaskFor = ref("");
 
 const sprintId = computed(() => props.sprint?.id || props.sprint?._id);
+provide("viewedList", computed(() => ({ sprintId: sprintId.value, projectId: props.project?._id })));
 const canCreate = computed(() => !showArchived.value
     && !searchedTask.value
     && checkPermission("task.task_create", props.project?.isGlobalPermission) === true
@@ -215,14 +220,16 @@ const left = computed(() => Math.max(0, total.value - rows.value.length));
 /* With every task of the group loaded the rows are added up here, so a total follows an edit at once. A group
  * that holds only part of its tasks shows the server's totals for all of them, and nothing until they arrive. */
 const serverTotals = computed(() => getters["projectData/tasks"]?.[props.project._id]?.[sprintId.value]?.totals?.[`${props.item.searchKey}_${props.item.searchValue}`] || null);
-const groupTotals = computed(() => (left.value > 0
-    ? serverTotals.value
-    : loadedTotals(rows.value, totalColumns.value, { allTasks: rowEdit?.fields?.allTasks.value || [], defs: rowEdit?.fields?.defs.value || [] })));
+const groupTotals = computed(() => groupTotalsOf({
+    rows: rows.value,
+    count: found.value,
+    server: serverTotals.value,
+    totals: totalColumns.value,
+    allTasks: rowEdit?.fields?.allTasks.value || [],
+    defs: rowEdit?.fields?.defs.value || []
+}));
 const groupPoints = computed(() => groupTotals.value?.points || 0);
-const totalOf = (column) => {
-    const summed = totalColumns.value.find((entry) => entry.id === column.id);
-    return summed ? totalText(summed, groupTotals.value?.[column.id]) : "";
-};
+const totalOf = (column) => totalCellText(totalColumns.value, groupTotals.value, column.id);
 watch(() => [left.value > 0, totalColumns.value.map((column) => column.id).join()], ([partial, ids]) => {
     if (partial && ids) listTotals?.refresh();
 }, { immediate: true });
@@ -396,8 +403,12 @@ provide("listGroupTree", {
     open: (task) => emit("open", task)
 });
 
+/* A reorder the List does not keep leaves the rows where they were dragged; they are put back as the store has them. */
 function onDragChange(event) {
-    applyDrag({ event, item: props.item, groupType: props.groupType, rows: rows.value, project: props.project });
+    const kept = applyDrag({ event, item: props.item, groupType: props.groupType, rows: rows.value, project: props.project, listId: sprintId.value });
+    if (kept !== false) return;
+    rows.value = [...groupTasks.value];
+    $toast.info(t("TaskLists.order_kept_at_home"), { position: "top-right" });
 }
 
 watch(creating, (on) => {

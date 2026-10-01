@@ -386,6 +386,11 @@ const schema = {
             type: String,
             required: true,
         },
+        // Only on a change an agent made (Modules/Agents/actingAgent): UserId stays the person, so every
+        // reader that filters by person still finds the row. A person's own change has none of the three.
+        actorType: { type: String, required: false },
+        agentName: { type: String, required: false },
+        actedFor: { type: String, required: false },
         // BUG-046 / #100: createdAt/updatedAt are populated by Mongoose
         // (`timestamps: true` on historySchema). Keep the field
         // declarations so older code paths that still reference the
@@ -446,6 +451,10 @@ const schema = {
         projectIds: { type: Array, default: [], required: false },
         // What the token was created to do beyond its scopes (Modules/Mcp/manageFlag.js); never changed afterwards.
         grants: { type: Array, default: [], required: false },
+        // When the secret in use was issued by a renewal; the lifetime is counted from here.
+        renewedAt: { type: Date, required: false },
+        // Set when the owner was told the token is about to end, so they are told once; a renewal clears it.
+        expiryNoticeAt: { type: Date, required: false },
     },
     // Per-call audit of token-authenticated API requests
     apiActivityLogs: {
@@ -627,6 +636,11 @@ const schema = {
         progressPct: { type: Number, default: 0, required: false },
         reachedAt: { type: Date, default: null, required: false },
         notifiedAt: { type: Date, required: false },
+        aiSummary: {
+            text: { type: String, required: false },
+            basis: { type: String, required: false },
+            madeAt: { type: Date, required: false },
+        },
         targets: {
             type: [{
                 _id: false,
@@ -1218,8 +1232,11 @@ const schema = {
         steps: { type: Array, default: [], required: false },
         // Set once the run took in content from outside the workspace (Modules/Agents/taint.js); absent on a clean run
         tainted: { type: Boolean, required: false },
-        // [{ kind: fetch | email | form | webhook | file | passage | client | instruction, ref, at }] — where it came from, never the content
+        // [{ kind: fetch | email | form | webhook | file | passage | client | instruction | connector, ref, at }] — where it came from, never the content
         taintSources: { type: Array, default: undefined, required: false },
+        // [{ action, connector, channelId, state: applied | failed | refused, messages, chars, truncated, reason, error, at }] — one per
+        // connector read the run tried; the per-run caps are counted from it, and it never holds what was read
+        connectorReads: { type: Array, default: undefined, required: false },
         // 'report' for a scheduled report run (no task); absent on a task run
         kind: { type: String, required: false },
         scheduleId: { type: String, required: false },
@@ -1435,6 +1452,8 @@ const schema = {
         failedReason: { type: String, required: false },
         undoUntil: { type: Date, required: false },
         auditIds: { type: Array, default: [], required: false },
+        // [{ action, ok, channelId, channelName, ts, error, at }] — what the provider answered for each connector change
+        delivery: { type: Array, required: false },
         cost: { type: Object, required: false },
         // a canned Inbox key (too_many_changes | wrong_tone | needs_person | not_now) or free text, ≤ 200 chars
         declineReason: { type: String, required: false },
@@ -1717,6 +1736,21 @@ const schema = {
         // Everyone already told that the doc names them. No default: a doc without the list predates it, and a
         // mongoose array would otherwise read as an empty list and tell everyone it names again.
         mentionsTold: { type: [String], required: false, default: undefined },
+        // People this one doc is shared with by name, whatever its project or privacy; role is 'viewer' or 'editor'.
+        // Modules/Pages/helpers/pageRules.js holds the limit and what a share gives.
+        sharedWith: {
+            type: [{
+                _id: false,
+                userId: { type: String, required: true },
+                role: { type: String, required: true },
+                by: { type: String, required: false },
+                at: { type: Date, required: false },
+            }],
+            required: false,
+            default: undefined,
+        },
+        // Everyone already told the doc was shared with them, so naming a person again tells them nothing twice.
+        sharesTold: { type: [String], required: false, default: undefined },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     // Doc history (Modules/Pages/versions.js). savedBy and savedAt are the writer and the time of the state held, not of
@@ -1925,6 +1959,8 @@ const schema = {
         revokedAt: { type: Date, required: false },
         revokedReason: { type: String, required: false },
         lastUsedAt: { type: Date, required: false },
+        // Set when the person was told the grant is about to end, so they are told once.
+        expiryNoticeAt: { type: Date, required: false },
     },
     // kind is code, access, refresh or consent (an answered consent request). purgeAt drives the TTL index; a code outlives its expiry there so a replay is recognised.
     oauthTokens: {
@@ -1973,6 +2009,44 @@ const schema = {
         updatedAt: { type: Date, required: false },
         // Moves on with every save; a save names the version it read, so two console tabs cannot drop each other's hosts.
         version: { type: Number, required: false },
+    },
+    // One row per workspace and connector, or per person and connector when the connection is a person's own
+    // (Modules/Agents/connectors). Tokens live in `secrets` by handle, never here.
+    connectorConnections: {
+        connector: { type: String, required: true },
+        // The person a personal connection belongs to; absent on a workspace connection.
+        userId: { type: String, required: false },
+        // { bot_token: 'sec_…', signing_secret: 'sec_…' } or { refresh_token: 'sec_…', access_token: 'sec_…' }
+        secretHandles: { type: Object, default: {}, required: false },
+        secretSetAt: { type: Object, default: {}, required: false },
+        team: { type: Object, required: false },
+        // [{ id, name, member }] as the provider listed them when the token was saved or the list refreshed
+        channels: { type: Array, default: [], required: false },
+        channelsFetchedAt: { type: Date, required: false },
+        // [{ id, name, read, post }] the channels an owner or admin chose and what agents may do in each; a row
+        // without the two ticks is from before reading existed and means post only
+        allowedChannels: { type: Array, default: [], required: false },
+        // connected | broken, and for a person's connection also pending | revoked
+        status: { type: String, default: 'connected', required: false },
+        brokenReason: { type: String, required: false },
+        brokenAt: { type: Date, required: false },
+        // What the provider granted, and { email, sub } of the account the person connected
+        scopes: { type: [String], default: undefined, required: false },
+        account: { type: Object, required: false },
+        accessExpiresAt: { type: Date, required: false },
+        connectedAt: { type: Date, required: false },
+        lastUsedAt: { type: Date, required: false },
+        lastRefreshedAt: { type: Date, required: false },
+        // { stateHash, verifier, sessionId, origin } of a connect attempt in progress; cleared when it is used
+        oauth: { type: Object, required: false },
+        disconnectedAt: { type: Date, required: false },
+        // self | admin | member_removed
+        disconnectedBy: { type: String, required: false },
+        lastPostAt: { type: Date, required: false },
+        lastReadAt: { type: Date, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
     },
     // Instance-wide, in the global database: patterns the owner added to the instruction guard on top of
     // the built-in list (Modules/AICore/instructionPatterns.js).
@@ -2243,6 +2317,8 @@ const schema = {
         participants: { type: [String], required: false, default: [] },
         visibility: { type: String, required: false, default: 'project' },
         createdBy: { type: String, required: false, default: '' },
+        // Pages only: the user ids the page is shared with by name.
+        sharedWith: { type: [String], required: false, default: [] },
         // 'human' | 'agent'
         authorKind: { type: String, required: false, default: 'human' },
         // 'member' | 'agent' | 'external', the taint contract of Modules/Agents/taint.js; absent on chunks older than the field reads as not external.
@@ -2548,10 +2624,14 @@ const schema = {
             viewedBoard: { type: Boolean, required: false },
             viewedNotifications: { type: Boolean, required: false },
             importedWork: { type: Boolean, required: false },
+            openedMyWork: { type: Boolean, required: false },
+            viewedShortcuts: { type: Boolean, required: false },
             toursOffered: { type: [String], required: false, default: undefined }
         },
+        // mode has no default on purpose: see newAccountNavPreferences in Modules/Users/helpers/navPreferencesRules.js.
         navPreferences: {
-            pinned: { type: [String], required: false, default: undefined }
+            pinned: { type: [String], required: false, default: undefined },
+            mode: { type: String, required: false }
         },
         accessibilityPreferences: {
             singleKeyShortcuts: { type: Boolean, required: false }
@@ -3469,6 +3549,11 @@ const schema = {
         personalOwner: {
             type: String,
             default: ""
+        },
+        // { done: 'never' | 'approval' | 'yes', connected: 'propose_all' | 'single_task', updatedBy, updatedAt }; absent means the defaults (Modules/Agents/projectPolicy.js).
+        agentPolicy: {
+            type: Object,
+            required: false
         },
         ProjectType: {
             type: String,

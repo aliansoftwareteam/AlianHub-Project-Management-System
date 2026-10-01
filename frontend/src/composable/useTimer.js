@@ -122,7 +122,7 @@ export function useTimer() {
         if (minutes == null) {
             const ranMinutes = Math.max(1, Math.round(elapsed.value / 60));
             const result = await stopTimer();
-            if (result && result.tooShort) return null;
+            if (result && result.tooShort) return { ...cur, minutes: 0, tooShort: true };
             if (result && !result.logged) throw Object.assign(new Error(result.statusText || 'log_failed'), { code: result.code });
             lastStopped.value = { ...cur, minutes: ranMinutes, stoppedAt: Date.now() };
             return lastStopped.value;

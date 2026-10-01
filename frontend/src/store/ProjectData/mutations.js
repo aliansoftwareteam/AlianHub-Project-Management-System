@@ -1,7 +1,8 @@
-import { isOwnTabUpdate } from '@/utils/taskUpdateMarker';
+import { isOwnTabUpdate, ownEditsInFlight } from '@/utils/taskUpdateMarker';
 import { useCustomComposable } from '@/composable/index.js';
 import { isOwnerOrAdmin } from "@/utils/roles";
 import { locate, placeRow, removeRow, treeOf } from "./taskTree";
+import { isStranger, leftList, otherHolders, shownInList, touchesOtherProjects } from "./listMembership";
 const { checkPermission } = useCustomComposable();
 
 export const mutateMongoUpdatedTask = (state, payload) => {
@@ -183,11 +184,11 @@ function returnItemCountDetails(tasks, groupBy, updatedFields = null, taskId) {
 }
 
 const GROUP_FIELDS = { 0: ["statusKey"], 1: ["AssigneeUserId"], 2: ["Task_Priority"], 3: ["DueDate"] };
-const MEMBERSHIP_FIELDS = ["deletedStatusKey", "sprintId", "isParentTask"];
+const MEMBERSHIP_FIELDS = ["deletedStatusKey", "sprintId", "isParentTask", "extraLists"];
 
 /* Whether an event from the server can have changed how many tasks a group holds. The
    arithmetic below only knows the group a task left when the store holds that task, and it
-   covers neither removals nor grouping by assignee or custom field, so the List asks the
+   covers neither removals nor a team assignee or grouping by custom field, so the List asks the
    server for the counts after any of these. Local, optimistic writes are left out: the
    server may not have stored them yet. */
 function changesGroupCounts(groupBy, op, data, updatedFields) {
@@ -220,6 +221,18 @@ export const mutateGroupCounts = (state, payload) => {
     if(totals) state.tasks[pid][sprintId].totals = {...state.tasks[pid][sprintId].totals, ...totals};
 }
 
+export const mutateTableGroupCounts = (state, payload) => {
+    const {pid, sprintId, found, totals} = payload;
+    const held = state.tableGroupCounts[pid]?.[sprintId];
+    state.tableGroupCounts = {
+        ...state.tableGroupCounts,
+        [pid]: {
+            ...state.tableGroupCounts[pid],
+            [sprintId]: {found: {...held?.found, ...found}, totals: totals ? {...held?.totals, ...totals} : held?.totals}
+        }
+    };
+}
+
 // HANDLE TASK
 /* A reorder this tab made comes back from the server with its own marker. The row already
    holds the new place, so an echo that is not newer only confirms the index it carries. */
@@ -234,8 +247,78 @@ function keepsOwnReorder(bucket, data, updatedFields) {
     return true;
 }
 
-export const mutateUpdateFirebaseTasks = (state, payload) => {
-    const {pid, sprintId, op, data, snap, updatedFields,dragDropcheck, groupBy: payloadGroupBy} = payload;
+/* An event from the server while this tab's edit of the same task is unanswered: the fields
+   that edit holds stay as the person left them, and are not counted as a move. */
+function keepOwnEdits({data, updatedFields}) {
+    const held = data ? ownEditsInFlight(data._id) : {};
+    const fields = Object.keys(held);
+    if(!fields.length) return {data, updatedFields};
+    return {
+        data: {...data, ...held},
+        updatedFields: Object.fromEntries(Object.entries(updatedFields || {}).filter(([field]) => !fields.includes(field)))
+    };
+}
+
+/* Grouped by assignee a task sits in the group of each person it names, or in Unassigned. A
+   team is left to the server's count: it puts the task in the group of every member. */
+function assigneeCountMoves(tasks, groupBy, updatedFields, taskId) {
+    const next = updatedFields?.AssigneeUserId;
+    const row = tasks?.find((x) => x._id === taskId);
+    if(groupBy.type !== 1 || !row || !Array.isArray(next)) return [];
+    const previous = row.AssigneeUserId || [];
+    if([...previous, ...next].some((id) => String(id).startsWith("tId_"))) return [];
+    const keyOf = (id) => groupBy.items?.find((x) => (id === null ? x.value === "[]" : Array.isArray(x.value) && x.value[0] === id))?.key;
+    const groupsOf = (ids) => (ids.length ? ids : [null]);
+    const before = groupsOf(previous);
+    const after = groupsOf(next);
+    return [
+        ...after.filter((id) => !before.includes(id)).map((id) => [keyOf(id), 1]),
+        ...before.filter((id) => !after.includes(id)).map((id) => [keyOf(id), -1])
+    ].filter(([key]) => key);
+}
+
+function groupKeyOf(groupBy, row) {
+    const field = GROUP_FIELDS[groupBy.type]?.[0];
+    if(!field || groupBy.type === 1) return undefined;
+    return returnItemCountDetails([], groupBy, {[field]: row[field]}, row._id).addKey;
+}
+
+function movesHome(updatedFields) {
+    return "sprintId" in (updatedFields || {});
+}
+
+/* A task counts once, in the group of the list it lives in. A server event that changes its home
+   list moves one from the group it left to the group it entered, in every list the store holds,
+   whichever room the event came through. The same event can arrive through two rooms, so a list
+   remembers the tasks it has counted in. */
+function moveHomeCounts(state, payload) {
+    const {pid, op, data, updatedFields, snap} = payload;
+    const project = state.tasks?.[pid];
+    if(!snap || op !== "modified" || !project?.groupBy || !data?._id || data.isParentTask === false || !movesHome(updatedFields)) return;
+    const home = String(data.sprintId);
+    project.sprints.forEach((sprintId) => {
+        const bucket = project[sprintId];
+        const row = locate(bucket, data._id)?.row;
+        const wasHome = Boolean(row) && String(row.sprintId) === sprintId;
+        const entered = bucket.homeEntries || {};
+        if(sprintId !== home) {
+            if(entered[data._id]) delete entered[data._id];
+            if(!wasHome) return;
+            const key = groupKeyOf(project.groupBy, row);
+            if(key) bucket.found[key] = Math.max(0, (bucket.found[key] || 0) - 1);
+        } else {
+            if(wasHome || entered[data._id]) return;
+            const key = groupKeyOf(project.groupBy, data);
+            if(key) bucket.found[key] = (bucket.found[key] || 0) + 1;
+            bucket.homeEntries = {...entered, [data._id]: true};
+        }
+        bucket.countsStale = (bucket.countsStale || 0) + 1;
+    });
+}
+
+function applyTaskChange(state, payload, sprintId) {
+    const {pid, op, snap, dragDropcheck, groupBy: payloadGroupBy} = payload;
+    const {data, updatedFields} = snap && op === "modified" ? keepOwnEdits(payload) : payload;
 
     const projectFound = Object.keys(state.tasks).includes(pid);
 
@@ -243,14 +326,15 @@ export const mutateUpdateFirebaseTasks = (state, payload) => {
         const {groupBy} = state.tasks[pid];
         const sprintFound = state.tasks[pid].sprints.includes(sprintId);
         if(sprintFound) {
+            if(data && data._id && isStranger(state.tasks[pid][sprintId], data, pid, sprintId)) return;
             if(groupBy) {
-                if(snap && changesGroupCounts(groupBy, op, data, updatedFields)) {
+                if(snap && changesGroupCounts(groupBy, op, data, payload.updatedFields)) {
                     state.tasks[pid][sprintId].countsStale = (state.tasks[pid][sprintId].countsStale || 0) + 1;
                 }
-                if(snap && changesGroupTotals(op, data, updatedFields)) {
+                if(snap && changesGroupTotals(op, data, payload.updatedFields)) {
                     state.tasks[pid][sprintId].totalsStale = (state.tasks[pid][sprintId].totalsStale || 0) + 1;
                 }
-                if(["modified", "added"]?.includes(op) && data.isParentTask) {
+                if(["modified", "added"]?.includes(op) && data.isParentTask && !(op === "modified" && movesHome(updatedFields))) {
                     const {addKey, removeKey} = returnItemCountDetails(state.tasks[pid][sprintId].tasks, groupBy, updatedFields, data._id);
                     if(addKey) {
                         if(state.tasks[pid][sprintId].found[addKey]) {
@@ -265,6 +349,12 @@ export const mutateUpdateFirebaseTasks = (state, payload) => {
                         } else {
                             state.tasks[pid][sprintId].found[removeKey] = 0
                         }
+                    }
+                    if(op === "modified") {
+                        const found = state.tasks[pid][sprintId].found;
+                        assigneeCountMoves(state.tasks[pid][sprintId].tasks, groupBy, updatedFields, data._id).forEach(([key, step]) => {
+                            found[key] = Math.max(0, (found[key] || 0) + step);
+                        });
                     }
                 } else if(["removed"]?.includes(op)) {
                     const {removeKey} = returnItemCountDetails(state.tasks[pid][sprintId].tasks, groupBy, null, data._id);
@@ -299,11 +389,24 @@ export const mutateUpdateFirebaseTasks = (state, payload) => {
                     parent.subTasks = Math.max(0, (Number(parent.subTasks) || 0) - 1);
                 }
             }
-            if(data !== null && data.sprintId !== sprintId && updatedFields?.sprintId){
+            if(data !== null && leftList(data, pid, sprintId, updatedFields)){
                 removeRow(bucket, data._id);
             }
         }
     }
+}
+
+export const mutateUpdateFirebaseTasks = (state, payload) => {
+    const {pid, sprintId, op, data} = payload;
+    /* Rows of another project's tasks are not kept here: a list reads them on its own, and reads them again when this rises. */
+    if(touchesOtherProjects(data, pid, op === "modified" ? payload.updatedFields : null)) state.otherProjectChanges = (state.otherProjectChanges || 0) + 1;
+    moveHomeCounts(state, payload);
+    applyTaskChange(state, payload, sprintId);
+    if(!data?._id || !["modified", "removed"].includes(op)) return;
+    otherHolders(state.tasks[pid], data, pid, sprintId).forEach((holder) => {
+        if(holder.shown) applyTaskChange(state, payload, holder.sprintId);
+        else removeRow(state.tasks[pid][holder.sprintId], data._id);
+    });
 }
 
 export const mutateUpdateFirebaseTableTasks = (state, payload) => {
@@ -562,9 +665,16 @@ export const emptyTableTasks = (state, payload) => {
 }
 
 export const mutateTypesenseTableTasks = (state, payload) => {
-    const {pid, sprintId, data, nextPage, total = 0 } = payload;
+    const {pid, sprintId, data, nextPage, total = 0, op } = payload;
     const keys = Object.keys(state.tableTasks);
     const projectFound = keys.includes(pid);
+    /* An event, unlike a page the Table asked for, can be about a task this list does not show (any more). */
+    if(op && data && !shownInList(data, pid, sprintId)) {
+        const held = projectFound ? state.tableTasks[pid][sprintId]?.tasks : null;
+        const at = held ? held.findIndex((x) => x._id === data._id) : -1;
+        if(at !== -1) held.splice(at, 1);
+        return;
+    }
     if(projectFound) {
         const sprintFound = state.tableTasks[pid].sprints.includes(sprintId);
         if(sprintFound) {

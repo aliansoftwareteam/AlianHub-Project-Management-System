@@ -3,6 +3,7 @@ import { apiRequest } from '../../services/index'
 import { tableSortStages } from '@/views/Projects/composables/customFieldQuery';
 import { groupCondition, groupCountsQuery, readGroupCounts, readGroupTotals, sprintTaskMatch } from './taskQueries';
 import { ancestorsOf } from '@taskTreeRules';
+import { homeListOf } from './listMembership';
 
 /* A second caller for a page that is already on its way gets the first one's answer. */
 const pagesInFlight = new Map();
@@ -31,7 +32,36 @@ export const setProjects = (state, payload) => {
         }
     });
 };
-export const getTasksFromMongoDB = ({  state,commit,rootState  }, payload) => {
+const SPRINT_COUNTS_SETTLE_MS = 800;
+const sprintCountTimers = new Map();
+const COUNTER_FIELDS = ["sprintId", "deletedStatusKey"];
+
+/* A list's own `tasks` counter is kept by the server and no event carries it. After a change that can
+   move it (a task created, removed, trashed, archived or moved to another list) the counters are read
+   again once the burst of events has passed, whatever number of rooms said so. The server adds a task to
+   the counter after it writes the task, so the read waits instead of racing it. */
+function queueSprintCounts(dispatch, pid, op, data, updatedFields) {
+    const moves = op === "modified" && COUNTER_FIELDS.some((field) => field in (updatedFields || {}));
+    if(!pid || !data?._id || (op === "modified" && !moves)) return;
+    clearTimeout(sprintCountTimers.get(pid));
+    sprintCountTimers.set(pid, setTimeout(() => {
+        sprintCountTimers.delete(pid);
+        dispatch('refreshSprintCounts', {pid});
+    }, SPRINT_COUNTS_SETTLE_MS));
+}
+
+export const refreshSprintCounts = ({state, commit}, payload) => {
+    const {pid} = payload;
+    return apiRequest("get", `/api/v1/${env.GET_SPRINT_OR_PROJECT}/${pid}?collection=sprints`).then((resp) => {
+        (resp?.data || []).forEach((sprint) => {
+            const held = state.sprints?.[pid]?.find((x) => x._id === sprint._id);
+            if(!held || (held.tasks === sprint.tasks && held.archiveTaskCount === sprint.archiveTaskCount)) return;
+            commit('mutateSprints', {op: "modified", data: {...held, tasks: sprint.tasks, archiveTaskCount: sprint.archiveTaskCount}});
+        });
+    }).catch((error) => console.error("ERROR in reading list counters: ", error));
+}
+
+export const getTasksFromMongoDB =({  state,commit,rootState,dispatch  }, payload) => {
     return new Promise((resolve, reject) => {
         try {
             const {pid, sprintId, userId, showAllTasks,groupBy,currentView = 'tasks'} = payload;
@@ -60,19 +90,22 @@ export const getTasksFromMongoDB = ({  state,commit,rootState  }, payload) => {
                     rootState.settings.socketInstance.on('taskInsert', (data) => {
                         const docData = data.fullDocument;
                         commit('mutateUpdateFirebaseTasks', {snap: {}, op: "added", pid, sprintId, data: {...docData}, updatedFields:{...docData}})
-                        commit('mutateTypesenseTableTasks', {snap: {},op: "added", pid, sprintId, data: {...docData}})
+                        commit('mutateTypesenseTableTasks', {snap: {},op: "added", pid, sprintId, data: {...docData}});
+                    queueSprintCounts(dispatch, pid, "added", docData)
                     });
                     rootState.settings.socketInstance.on('taskUpdate', (data) => {
                         const docData = data.fullDocument;
                         commit('mutateUpdateFirebaseTasks', {snap: {}, op: "modified", pid, sprintId, data: {...docData},updatedFields:{...data?.updatedFields},showAllTasks});
                         commit('mutateMongoUpdatedTask', {snap: {}, op: "modified", pid, sprintId, data: {...docData}});
                         commit('mutateTypesenseTableTasks', {snap: {},op: "modified", pid, sprintId, data: {...docData}});
+                    queueSprintCounts(dispatch, pid, "modified", docData, data?.updatedFields);
                     });
                     rootState.settings.socketInstance.on('taskDelete', (data) => {
                         const docData = data.fullDocument;
                         commit('mutateUpdateFirebaseTasks', {snap: {}, op: "removed", pid, sprintId, data: {...docData}})
                         commit('mutateMongoUpdatedTask', {snap: {}, op: "removed", pid, sprintId, data: {...docData}})
-                        commit('mutateTypesenseTableTasks', {snap: {}, op: "removed", pid, sprintId, data: {...docData}})
+                        commit('mutateTypesenseTableTasks', {snap: {}, op: "removed", pid, sprintId, data: {...docData}});
+                    queueSprintCounts(dispatch, pid, "removed", docData)
                     });
                     rootState.settings.socketInstance.on('taskReplace', (data) => {
                         const docData = data.documentKey;
@@ -85,19 +118,22 @@ export const getTasksFromMongoDB = ({  state,commit,rootState  }, payload) => {
                 rootState.settings.socketInstance.on('taskInsert', (data) => {
                     const docData = data.fullDocument;
                     commit('mutateUpdateFirebaseTasks', {snap: {}, op: "added", pid, sprintId, data: {...docData}, updatedFields:{...docData}})
-                    commit('mutateTypesenseTableTasks', {snap: {},op: "added", pid, sprintId, data: {...docData}})
+                    commit('mutateTypesenseTableTasks', {snap: {},op: "added", pid, sprintId, data: {...docData}});
+                    queueSprintCounts(dispatch, pid, "added", docData)
                 });
                 rootState.settings.socketInstance.on('taskUpdate', (data) => {
                     const docData = data.fullDocument;
                     commit('mutateUpdateFirebaseTasks', {snap: {}, op: "modified", pid, sprintId, data: {...docData},updatedFields:{...data?.updatedFields},showAllTasks});
                     commit('mutateMongoUpdatedTask', {snap: {}, op: "modified", pid, sprintId, data: {...docData}});
                     commit('mutateTypesenseTableTasks', {snap: {},op: "modified", pid, sprintId, data: {...docData}});
+                    queueSprintCounts(dispatch, pid, "modified", docData, data?.updatedFields);
                 });
                 rootState.settings.socketInstance.on('taskDelete', (data) => {
                     const docData = data.fullDocument;
                     commit('mutateUpdateFirebaseTasks', {snap: {}, op: "removed", pid, sprintId, data: {...docData}})
                     commit('mutateMongoUpdatedTask', {snap: {}, op: "removed", pid, sprintId, data: {...docData}})
-                    commit('mutateTypesenseTableTasks', {snap: {}, op: "removed", pid, sprintId, data: {...docData}})
+                    commit('mutateTypesenseTableTasks', {snap: {}, op: "removed", pid, sprintId, data: {...docData}});
+                    queueSprintCounts(dispatch, pid, "removed", docData)
                 });
                 rootState.settings.socketInstance.on('taskReplace', (data) => {
                     const docData = data.documentKey;
@@ -151,11 +187,12 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
                 cursor = payload.skip;
             }
 
+            const inParent = Boolean(parentId && parentId.length);
             const queryParams = [
                 {
                     $match: {
-                        ...sprintTaskMatch({ pid, sprintId, showAllTasks, userId: payload.userId }),
-                        ...( parentId && parentId.length ?
+                        ...sprintTaskMatch({ pid, sprintId: inParent ? homeListOf(state, pid, sprintId, parentId) : sprintId, showAllTasks, userId: payload.userId }),
+                        ...( inParent ?
                             { ParentTaskId: parentId }
                         :
                             { isParentTask: true, ...groupCondition(item) }
@@ -186,7 +223,7 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
                 return;
             }
 
-            const page = apiRequest('post',`${env.TASK}/find`,{findQuery: findQuery})
+            const page = apiRequest('post',`${env.TASK}/find`,{findQuery: findQuery, ...(inParent ? {} : { inList: sprintId })})
             .then((resp) => {
                 if(resp.status === 200){
                     const response = resp.data[0];
@@ -249,13 +286,13 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
 /* The server's count for every group of a sprint, and the totals of the columns named, in one request.
    Socket events can only adjust a count for a task the store holds; for any other change the List asks again. */
 export const refreshGroupCounts = ({state, commit}, payload) => {
-    const {pid, sprintId, items = [], showAllTasks, userId, totals = []} = payload;
-    if(!state.tasks?.[pid]?.sprints?.includes(sprintId) || !items.length) return Promise.resolve();
+    const {pid, sprintId, items = [], showAllTasks, userId, totals = [], table = false} = payload;
+    if(!items.length || (!table && !state.tasks?.[pid]?.sprints?.includes(sprintId))) return Promise.resolve();
 
-    return apiRequest('post',`${env.TASK}/find`,{findQuery: groupCountsQuery({ pid, sprintId, items, showAllTasks, userId, totals })})
+    return apiRequest('post',`${env.TASK}/find`,{findQuery: groupCountsQuery({ pid, sprintId, items, showAllTasks, userId, totals }), inList: sprintId})
     .then((resp) => {
         if(resp.status !== 200) return;
-        commit('mutateGroupCounts', {
+        commit(table ? 'mutateTableGroupCounts' : 'mutateGroupCounts', {
             pid, sprintId,
             found: readGroupCounts(items, resp.data?.[0]),
             totals: totals.length ? readGroupTotals(items, resp.data?.[0], totals) : null
@@ -395,7 +432,7 @@ export const setTableTasksFromTypesense = ({ state, commit, rootGetters }, paylo
                     $limit: batchSize,
                 },
             ]
-            apiRequest('post',`${env.TASK}/find`,{findQuery: queryDetail})
+            apiRequest('post',`${env.TASK}/find`,{findQuery: queryDetail, inList: sprintId})
             .then((result) => {
                 if(result && result.status === 200 && result?.data && result?.data.length){
                     result?.data.forEach((task) => {

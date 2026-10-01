@@ -28,11 +28,11 @@ The backend serves the built SPA from `frontend/dist`; `cd frontend && npm run b
 | `cd frontend && npm run lint -- --no-fix` | Vue CLI ESLint |
 | `node scripts/unused-components.js` | `.vue` files nothing imports (must print nothing) |
 | `npm run env:doc:check` | `docs/ENV.md`, `.env.example` and `frontend/.env.example` match what the code reads, and every description is still read. Not run in CI: run `node scripts/env-doc.js` and commit the three files in the docs pull request that follows merges to `beta` |
-| `node scripts/env-doc.js --check` | env variables described and docs regenerated |
+| `node scripts/env-doc.js --check` | every env variable the code reads is described; generated files that are out of date are a warning here and a failure in `npm run env:doc:check` |
 | `npm run api:doc:check` | `docs/API.md` and `docs/api/openapi.json` match the routes and `scripts/api-doc.meta.json`. Not run in CI: run `npm run api:doc` and commit both files in the docs pull request that follows merges to `beta` |
 | `npm run visual` | the screenshot check of the core screens; CI only, see [Screenshot check](#screenshot-check) |
 
-`.github/workflows/ci.yml` runs all of that on every pull request to `beta`, `staging` and `main`, except the screenshot check, which has a workflow of its own. A pull request that only changes files under `Tasks/` or Markdown under `.claude/` skips the suites: nothing they test can have changed. The conventions project is the place for a rule that must hold everywhere: it reads the tree and fails with the offending file, so a new rule needs no per-module wiring.
+`.github/workflows/ci.yml` runs all of that on every pull request to `beta`, `staging` and `main`, except the screenshot check, which has a workflow of its own. A pull request that only changes files under `Tasks/` or Markdown under `.claude/` skips the suites: nothing they test can have changed. A draft pull request skips them too: a draft cannot be merged, and marking it ready for review runs them. Work that goes in through a combined pull request can therefore stay a draft, and the suites run once, on the combined one. The conventions project is the place for a rule that must hold everywhere: it reads the tree and fails with the offending file, so a new rule needs no per-module wiring.
 
 The conventions in place:
 

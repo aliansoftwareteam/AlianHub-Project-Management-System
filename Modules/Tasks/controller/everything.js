@@ -10,6 +10,7 @@ const { visibleProjectIds } = require('../../Agents/scope');
 const { hiddenSprintIds } = require('../../Sprints/helpers/sprintVisibility');
 const { fetchRules } = require('../../settings/securityPermissions/controller');
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
+const { listsForViewerOf, opensList } = require('../helpers/taskExtraLists');
 const {
     EverythingRefused, parseRequest, scopedProjectIds, projectMatch, taskListProjectIds, projectPermissions, rowEditRights, buildMatch, pagePipeline, positionOf,
     groupPipeline, shapeGroups, queryBinding, encodeCursor, decodeCursor,
@@ -105,6 +106,18 @@ const projectCards = async (companyId, uid, { onPage, onlyCounted }, permissionO
     ]);
 };
 
+/* The lists a filter names, less the ones the caller cannot look at; null when it names none. */
+const openLists = async (companyId, uid, sprintIds) => {
+    if (!sprintIds) return null;
+    const opened = await Promise.all(sprintIds.map((id) => opensList(companyId, uid, id)));
+    return sprintIds.filter((id, at) => opened[at]);
+};
+
+const withViewerLists = async (companyId, uid, rows) => {
+    const lists = await listsForViewerOf(companyId, uid, rows);
+    return lists.size ? rows.map((row) => (lists.has(String(row._id)) ? { ...row, extraLists: lists.get(String(row._id)) } : row)) : rows;
+};
+
 const nothingToRead = (request) => ({ rows: [], groups: request.cursor ? null : shapeGroups([], request.group), nextCursor: null, projects: {} });
 
 exports.listEverything = async (req, res) => {
@@ -123,13 +136,16 @@ exports.listEverything = async (req, res) => {
         const binding = queryBinding({ companyId, uid }, request);
         const after = request.cursor ? decodeCursor(request.cursor, binding, cursorKey()) : null;
 
-        const { projectIds, permissionOf } = await readableProjects(companyId, uid, seat.roleType, request);
-        if (!projectIds.length) {
+        const [{ projectIds, permissionOf }, sprintIds] = await Promise.all([
+            readableProjects(companyId, uid, seat.roleType, request),
+            openLists(companyId, uid, request.filter.sprintIds),
+        ]);
+        if (!projectIds.length || (sprintIds && !sprintIds.length)) {
             return res.status(200).json({ status: true, statusText: 'Tasks fetched successfully.', data: nothingToRead(request) });
         }
         const projects = projectIds.map(objectId);
         const hidden = isPrivileged(seat.roleType) ? [] : await hiddenSprintIds(companyId, uid, projects);
-        const match = buildMatch(request, { projectIds: projects, hiddenSprintIds: hidden });
+        const match = buildMatch({ ...request, filter: { ...request.filter, sprintIds } }, { projectIds: projects, hiddenSprintIds: hidden });
 
         const [page, counted] = await Promise.all([
             readPage(companyId, match, request, after),
@@ -143,7 +159,7 @@ exports.listEverything = async (req, res) => {
             status: true,
             statusText: 'Tasks fetched successfully.',
             data: {
-                rows: page.rows,
+                rows: await withViewerLists(companyId, uid, page.rows),
                 groups,
                 nextCursor: page.more ? encodeCursor(positionOf(page.rows[page.rows.length - 1], request.sort), binding, cursorKey()) : null,
                 projects: await projectCards(companyId, uid, { onPage: [...onPage], onlyCounted }, permissionOf),

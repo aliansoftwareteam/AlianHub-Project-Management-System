@@ -198,27 +198,62 @@ describe('a task in extra lists is counted once, at its home', () => {
         expect(res.body.data.tasks.map((row) => [String(row._id), String(row.ProjectID), String(row.sprintId)])).toEqual([[T.TASK, P.HOME, L.HOME]]);
     });
 
+    test.each([
+        ['OWNER', 3],
+        ['ON_BOTH', 2],
+        ['HOME_ONLY', 1],
+    ])('search tells %s how many of its other lists they can open, and nothing of the rest', async (who, count) => {
+        const res = { statusCode: 200 };
+        res.status = (code) => { res.statusCode = code; return res; };
+        res.send = (body) => { res.body = body; return res; };
+
+        await globalSearch({ headers: { companyid: COMPANY }, uid: uidOf[who], body: { query: 'Write the brief' } }, res);
+
+        const [row] = res.body.data.tasks;
+        expect(row.otherLists).toBe(count);
+        expect(row).not.toHaveProperty('extraLists');
+    });
+
+    test('an Everything row names the list it lives in', async () => {
+        const [row] = (await everything('OWNER')).body.data.rows.filter((entry) => String(entry._id) === T.TASK);
+
+        expect(row.sprintArray).toMatchObject({ name: 'List' });
+    });
+
     /* Reports, exports, velocity, burndown, portfolio, dashboards, timesheets, automations and the socket
        relay all read a task by ProjectID and sprintId. None of them names the new field, so none can count
        a task under a list it does not live in; a reader that starts to must be added here on purpose.
-       The writers that move or convert a task are here because they take entries away. */
+       The writers that move or convert a task are here because they take entries away; the list rows,
+       the Everything rows and the relay are here because they show a task under a list it was added
+       to, each only to a reader of the task's home (tests/task-find-extra-lists.test.js,
+       tests/socket-extra-list-relay.test.js); the agent tools are here because they run the web's own
+       handlers as the person and search inside the caller's own clause (tests/mcp-extra-lists.test.js);
+       the welcome project's seeder is here because it calls addToList as the owner and reads nothing. */
     test('no other server file reads the field', () => {
         const ROOT = path.join(__dirname, '..');
         const KNOWN = [
             'Modules/Agents/actions.js',
             'Modules/Agents/undo.js',
+            'Modules/Agents/workRequests.js',
+            'Modules/GlobalSearch/controller.js',
+            'Modules/Mcp/workTools.js',
+            'Modules/Tasks/controller/everything.js',
+            'Modules/Tasks/controller/getTabSyncTasks.js',
+            'Modules/Tasks/helpers/everythingQuery.js',
             'Modules/Tasks/helpers/getTasksData.js',
             'Modules/Tasks/helpers/mongo_helper.js',
             'Modules/Tasks/helpers/taskExtraLists.js',
             'Modules/Tasks/helpers/taskExtraListsRules.js',
-            'Modules/Tasks/helpers/taskMongo/extraListPlace.js',
             'Modules/Tasks/helpers/taskMongo/extraLists.js',
             'Modules/Tasks/helpers/taskMongo/structural.js',
+            'Modules/Tasks/helpers/taskQueryGuard.js',
             'Modules/Tasks/helpers/taskWriteFields.js',
             'Modules/Tasks/helpers/task_class_Mongo.js',
             'migrations/069-task-extra-lists-index.js',
+            'socket/controller/taskSocket.js',
             'utils/mongo-handler/createSchema.js',
             'utils/mongo-handler/schema.js',
+            'utils/sampleExtras.js',
         ];
         const files = [];
         const walk = (dir) => fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).forEach((entry) => {

@@ -232,7 +232,9 @@ step in its own right is `human_approval`.
 ## The API
 
 `/api/v2/workflows`, behind the same flag. Off, every route answers `503` with
-the reason — the feature is not refused, it is not running.
+the reason — the feature is not refused, it is not running. The one exception is
+`GET /approvals`, which Home reads on every visit: off, it answers `200` with an
+empty list and `engineOff: true`.
 
 | Route | What it does |
 |---|---|

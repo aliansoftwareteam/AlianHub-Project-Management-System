@@ -22,7 +22,7 @@
                 </button>
             </div>
 
-            <div class="ibx__filters">
+            <div v-if="tab !== APPROVAL" class="ibx__filters">
                 <div class="ah-label ibx__label">{{ $t('Inbox.filter_label') }}</div>
                 <button
                     v-for="k in KINDS"
@@ -69,7 +69,7 @@
                     @click="markAllRead"
                 >{{ $t('Inbox.mark_all_read') }}</button>
                 <button
-                    v-if="tab !== 'cleared'"
+                    v-if="tab !== 'cleared' && tab !== APPROVAL"
                     type="button"
                     class="ibx__markall"
                     data-action="clear-all"
@@ -87,7 +87,7 @@
                 </div>
 
                 <EmptyState
-                    v-else-if="!rows.length"
+                    v-else-if="!rows.length && !queue.length"
                     class="ibx__zero"
                     illustration="inbox"
                     data-test="inbox-zero"
@@ -100,6 +100,7 @@
                 />
 
                 <template v-else>
+                    <ApprovalQueue v-if="queue.length" :proposals="queue" :stamp="stamp" @decided="onQueueDecided" />
                     <article
                         v-for="(it, i) in rows"
                         :key="rowKey(it)"
@@ -120,10 +121,6 @@
                             <span class="ibx__what">
                                 <template v-if="it.kind === 'approval'">
                                     <strong>{{ actorName(it) || $t('Inbox.someone') }}</strong> {{ $t('Inbox.requested_off', { range: dateRange(it) }) }}
-                                    <span class="ibx__dim"><span class="ibx__dot">· </span>{{ $t('Inbox.needs_your_approval') }}</span>
-                                </template>
-                                <template v-else-if="it.kind === 'proposal'">
-                                    <strong>{{ it.agentName }}</strong> {{ $t('Inbox.wants_to') }} {{ proposalTitle(t, it) }}
                                     <span class="ibx__dim"><span class="ibx__dot">· </span>{{ $t('Inbox.needs_your_approval') }}</span>
                                 </template>
                                 <template v-else-if="it.kind === 'reminder'">
@@ -148,10 +145,6 @@
                             <template v-if="it.kind === 'approval'">
                                 <span v-if="it.ptoType" class="ah-chip ibx__chip">{{ ptoLabel(it.ptoType) }}</span>
                                 <span v-if="it.reason" class="ibx__quote">"{{ it.reason }}"</span>
-                            </template>
-                            <template v-else-if="it.kind === 'proposal'">
-                                <span class="ah-chip ah-chip--agent ibx__chip">{{ $t('Inbox.changes_n', { n: it.changes }) }}</span>
-                                <span v-if="it.why" class="ibx__quote">"{{ it.why }}"</span>
                             </template>
                             <template v-else-if="it.kind === 'mention' || it.kind === 'assigned' || it.key === 'comment_reply'">
                                 <span class="ibx__quote">"<span v-html="render(it)"></span>"</span>
@@ -200,11 +193,6 @@
                                     <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" @click="decide(it, 'approved')">{{ $t('Inbox.approve') }}</button>
                                     <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="decide(it, 'rejected')">{{ $t('Inbox.decline') }}</button>
                                 </template>
-                                <template v-else-if="it.kind === 'proposal'">
-                                    <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" @click="decideProposal(it, 'approve')">{{ $t('Inbox.approve') }}</button>
-                                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="decideProposal(it, 'decline')">{{ $t('Inbox.decline') }}</button>
-                                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="openAiInbox">{{ $t('Inbox.open_ai_inbox') }}</button>
-                                </template>
                                 <template v-else-if="it.kind === 'reminder'">
                                     <button v-if="it.unread" type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" @click="markDone(it)">{{ $t('Inbox.done') }}</button>
                                     <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="openReminders">{{ $t('Inbox.open_reminders') }}</button>
@@ -232,7 +220,7 @@
                                 >{{ $t('Inbox.snooze') }}</button>
                                 <button v-if="tab === 'later'" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="unsnoozeRow(it)">{{ $t('Inbox.unsnooze') }}</button>
                                 <button v-if="canClear(it)" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" @click="clearRow(it)">{{ $t('Inbox.clear') }}</button>
-                                <button v-if="it.kind !== 'approval' && it.kind !== 'reminder' && it.kind !== 'proposal' && !it.agent && it.unread && tab !== 'later'" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" @click="markDone(it)">{{ $t('Inbox.mark_done') }}</button>
+                                <button v-if="it.kind !== 'approval' && it.kind !== 'reminder' && !it.agent && it.unread && tab !== 'later'" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" @click="markDone(it)">{{ $t('Inbox.mark_done') }}</button>
                                 <button v-if="!it.unread && tab === 'done'" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" @click="markUnread(it)">{{ $t('Inbox.mark_unread') }}</button>
                             </template>
                         </div>
@@ -299,7 +287,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { sendProposalDecision } from '@/composable/agentProposals';
-import { proposalTitle } from '@/views/Ai/plainLabels';
+import { decideOne } from './approvalQueue';
 import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
@@ -315,13 +303,16 @@ import { laterStorageKey, migrateLegacyLater } from './laterMigration';
 import { wakeTimer } from './snoozeWake';
 import { loadInboxDensity, saveInboxDensity } from './inboxDensity';
 import ViewDensityControl from '@/views/Projects/components/columns/ViewDensityControl.vue';
+import ApprovalQueue from './ApprovalQueue.vue';
 
 defineOptions({ name: 'InboxPage' });
 
-const TABS = ['primary', 'other', 'later', 'done', 'cleared'];
-const KINDS = ['all', 'mention', 'assigned', 'approval', 'reminder', 'update'];
+const APPROVAL = 'approval';
+const TABS = [APPROVAL, 'primary', 'other', 'later', 'done', 'cleared'];
+const KINDS = ['all', 'mention', 'assigned', 'reminder', 'update'];
 const SNOOZE_MENU = [...SNOOZE_PRESETS, 'custom'];
 const ZERO_SUB = {
+    approval: 'Inbox.zero_sub_approval',
     primary: 'Inbox.zero_sub_primary',
     other: 'Inbox.zero_sub_other',
     later: 'Inbox.zero_sub_later_snooze',
@@ -343,11 +334,14 @@ const { openRoute } = useHelper();
 const companyId = inject('$companyId');
 const userId = inject('$userId');
 
-const tab = ref(TABS.includes(route.query.tab) ? route.query.tab : 'primary');
+// Approvals were a filter on Primary before they had a tab; an old link still lands on them.
+const askedTab = route.query.kind === APPROVAL ? APPROVAL : route.query.tab;
+const tab = ref(TABS.includes(askedTab) ? askedTab : 'primary');
 const kind = ref(KINDS.includes(route.query.kind) ? route.query.kind : 'all');
 const items = ref([]);
 const approvals = ref([]);
-const counts = ref({ primary: 0, other: 0, later: 0 });
+const queue = ref([]);
+const counts = ref({ approval: 0, primary: 0, other: 0, later: 0 });
 const loading = ref(true);
 const busy = ref(false);
 const density = ref(loadInboxDensity());
@@ -373,8 +367,8 @@ const timeZone = computed(() => resolveTimeZone((getUser(userId?.value) || {}).T
 
 const rowKey = (it) => `${it.sourceType}:${it.sourceId}`;
 const itemOf = (it) => ({ sourceType: it.sourceType, sourceId: it.sourceId, duplicateIds: it.duplicateIds || [] });
-const rows = computed(() => (tab.value === 'primary' ? [...approvals.value, ...items.value] : items.value));
-const hasUnread = computed(() => rows.value.some((i) => i.unread && i.kind !== 'approval' && i.kind !== 'proposal'));
+const rows = computed(() => (tab.value === APPROVAL ? approvals.value : items.value));
+const hasUnread = computed(() => rows.value.some((i) => i.unread && i.kind !== 'approval'));
 const tabCount = (name) => Number(counts.value[name] || 0);
 const tabId = (group, name) => `ibx-tab-${group}-${name}`;
 
@@ -394,6 +388,7 @@ const glyphIcon = (it) => {
     if (it.kind === 'mention' || it.changeType === 'doc_mention') return 'at';
     if (it.changeType === 'agent_alert') return 'alert';
     if (it.changeType === 'goal_reached') return 'target';
+    if (it.changeType === 'credential_expiring') return 'key';
     if (it.changeType === 'agent_report') return 'agent';
     if (/milestone/i.test(it.key || '')) return 'alert';
     if (/status/i.test(it.key || '')) return 'refresh';
@@ -434,22 +429,22 @@ const load = async (append = false) => {
     busy.value = true;
     try {
         const skip = append ? nextSkip.value : 0;
-        const q = new URLSearchParams({ tab: tab.value, kind: kind.value, skip: String(skip), sort: 'newest' });
+        const q = new URLSearchParams({ tab: tab.value, kind: tab.value === APPROVAL ? 'all' : kind.value, skip: String(skip), sort: 'newest' });
         const res = await apiRequest('get', `${env.INBOX}?${q.toString()}`);
         if (!res?.data?.status) {
             loadError.value = res?.data?.statusText || t('Inbox.load_failed');
-            if (!append) { items.value = []; approvals.value = []; }
+            if (!append) { items.value = []; approvals.value = []; queue.value = []; }
             return;
         }
         const d = res.data.data || {};
         items.value = append ? [...items.value, ...(d.items || [])] : (d.items || []);
-        if (!append) approvals.value = [...(d.proposals || []), ...(d.approvals || [])];
+        if (!append) { approvals.value = d.approvals || []; queue.value = d.proposals || []; }
         hasMore.value = !!d.hasMore;
         nextSkip.value = d.nextSkip || 0;
         if (!append) cursor.value = 0;
     } catch (e) {
         loadError.value = e?.message || t('Inbox.load_failed');
-        if (!append) { items.value = []; approvals.value = []; }
+        if (!append) { items.value = []; approvals.value = []; queue.value = []; }
     } finally {
         loading.value = false;
         busy.value = false;
@@ -458,7 +453,9 @@ const load = async (append = false) => {
 
 const reload = async () => { await Promise.all([load(false), loadCounts()]); };
 const loadMore = () => load(true);
-const snoozeWake = wakeTimer(() => (busy.value ? loadCounts() : reload()));
+// A reload redraws the list, which would drop a half-made decision in the approval tab; nothing that arrives here changes that tab's rows.
+const refresh = () => (busy.value || tab.value === APPROVAL ? loadCounts() : reload());
+const snoozeWake = wakeTimer(refresh);
 
 // A new arrival moves the per-user counters document; only a rise means a new row.
 const liveCounts = computed(() => {
@@ -472,7 +469,7 @@ watch(liveCounts, (next) => {
     lastCounts = next;
     if (!prev || !next.some((n, i) => Number(n || 0) > Number(prev[i] || 0))) return;
     clearTimeout(liveTimer);
-    liveTimer = setTimeout(() => { if (!busy.value) reload(); }, 400);
+    liveTimer = setTimeout(() => { if (!busy.value) refresh(); }, 400);
 }, { immediate: true });
 
 const syncQuery = () => router.replace({ query: { ...route.query, tab: tab.value, kind: kind.value } }).catch(() => {});
@@ -788,12 +785,16 @@ const open = (it) => {
         router.push({ name: 'PageEditor', params: { cid: companyId?.value, pageId: String(it.changeData.pageId) }, query: { comment: String(it.changeData.commentId || '') } }).catch(() => {});
         return;
     }
-    if (it.changeType === 'doc_mention' && it.changeData?.pageId) {
+    if (['doc_mention', 'doc_shared'].includes(it.changeType) && it.changeData?.pageId) {
         router.push({ name: 'PageEditor', params: { cid: companyId?.value, pageId: String(it.changeData.pageId) } }).catch(() => {});
         return;
     }
     if (it.changeType === 'goal_reached' && it.changeData?.goalId && router.hasRoute('Goal')) {
         router.push({ name: 'Goal', params: { cid: companyId?.value, goalId: String(it.changeData.goalId) } }).catch(() => {});
+        return;
+    }
+    if (it.changeType === 'credential_expiring' && router.hasRoute('AiAccounts')) {
+        router.push({ name: 'AiAccounts', params: { cid: companyId?.value }, query: { tab: it.changeData?.kind === 'connection' ? 'connected' : 'link' } }).catch(() => {});
         return;
     }
     if (alertNotice(it) && router.hasRoute('AiHealth')) {
@@ -814,19 +815,28 @@ const open = (it) => {
     openRoute(it, it.sourceType === 'notification' ? 'notifications' : 'mentions', { gettersVal: getters });
 };
 const openReminders = () => openPanel('reminders');
-const openAiInbox = () => router.push({ name: 'AiInbox', params: { cid: companyId?.value } }).catch(() => {});
-const decideProposal = async (it, verb) => {
+const undoApprovals = async (ids) => {
     busy.value = true;
-    try {
-        const res = await sendProposalDecision(it.proposalId, verb);
-        if (!res?.data?.status) { $toast.error(res?.data?.statusText || t('Inbox.action_failed'), { position: 'top-right' }); return; }
-        removeRow(it);
-        loadCounts();
-    } catch (e) {
-        $toast.error(e?.response?.data?.statusText || e?.message || t('Inbox.action_failed'), { position: 'top-right' });
-    } finally {
-        busy.value = false;
+    const refused = [];
+    for (const id of ids) {
+        // eslint-disable-next-line no-await-in-loop
+        const result = await decideOne(sendProposalDecision, id, 'undo', {}, t('Inbox.action_failed'));
+        if (!result.ok) refused.push(result.error);
     }
+    busy.value = false;
+    if (refused.length) $toast.error(refused[0], { position: 'top-right' });
+    else $toast.success(t('Inbox.queue_undone'), { position: 'top-right' });
+    loadCounts();
+};
+const onQueueDecided = ({ id, verb, undo: canUndo }) => {
+    queue.value = queue.value.filter((p) => p.proposalId !== id);
+    loadCounts();
+    if (verb !== 'approve') { showUndo(t('Inbox.queue_declined')); return; }
+    // Approvals made while the bar is still up share one Undo, so approving several is undone together.
+    const approved = [...(undo.value?.approved || []), id];
+    const undoIds = [...(undo.value?.undoIds || []), ...(canUndo ? [id] : [])];
+    showUndo(t('Inbox.queue_approved', { n: approved.length }, approved.length), undoIds.length ? () => undoApprovals(undoIds) : null);
+    Object.assign(undo.value, { approved, undoIds });
 };
 const reviewInAiInbox = () => router.push({ name: 'AiInbox', params: { cid: companyId?.value } }).catch(() => {});
 
@@ -856,7 +866,7 @@ const onKey = (e) => {
     else if (e.key === 'r') { e.preventDefault(); if (it.kind === 'mention' && canReply(it)) openReply(it); }
     else if (e.key === 'Enter' && e.target?.classList?.contains('ibx__card')) {
         e.preventDefault();
-        if (it.kind !== 'approval' && it.kind !== 'reminder' && it.kind !== 'proposal') open(it);
+        if (it.kind !== 'approval' && it.kind !== 'reminder') open(it);
     }
 };
 
@@ -901,9 +911,10 @@ watch(() => route.query.tab, (next) => {
 onMounted(async () => {
     document.addEventListener('mousedown', onOutside);
     document.addEventListener('keydown', onDocumentKey);
-    if (route.query.tab !== tab.value) syncQuery();
     await migrateLater();
     await loadCounts();
+    if (!TABS.includes(askedTab) && tabCount(APPROVAL) > 0) tab.value = APPROVAL;
+    if (route.query.tab !== tab.value) syncQuery();
     await load(false);
     focusFirstCard();
 });
@@ -947,7 +958,8 @@ onUnmounted(() => {
 .ibx .ibx__toolbar { gap: 4px; padding: 0 var(--page-pad-x, 22px); }
 /* The fallback is Home's, so the three page titles are one size in every look. */
 .ibx__toolbar .ah-toolbar__title { font: var(--fw-title, 600) var(--fs-lg, 14px)/1.2 var(--font-ui); }
-.ibx__tabs { display: flex; gap: 2px; margin-left: 10px; }
+/* Six tabs do not fit a narrow toolbar, so the strip scrolls; the padding keeps a tab's focus ring inside what the scroll clips. */
+.ibx__tabs { display: flex; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; padding: 4px; margin: -4px -4px -4px 6px; }
 .ibx__tab {
     min-height: var(--hit-min);
     padding: 6px 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; border-radius: 0;
@@ -1031,7 +1043,7 @@ onUnmounted(() => {
 }
 @media (max-width: 767px) {
     .ibx .ibx__toolbar { flex-wrap: wrap; height: auto; padding: 8px 12px 0; row-gap: 2px; }
-    .ibx__toolbar .ibx__tabs { order: 5; flex-basis: 100%; margin-left: -4px; overflow-x: auto; scrollbar-width: none; }
+    .ibx__toolbar .ibx__tabs { order: 5; flex-basis: 100%; margin-left: -8px; }
     .ibx__tab { height: 40px; padding: 0 10px; }
     .ibx__keys { display: none; }
     .ibx__list { padding: 10px; }

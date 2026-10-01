@@ -11,17 +11,18 @@
 // person may create a token whose agent closes tasks for them (task.status.change).
 // Nothing else reaches it, and the close is recorded as theirs, made through the
 // agent, and unchecked.
+//
+// Flagged actions sit one group per file in ./registry, so two changes that each add a
+// group never edit the same lines: a new group is a new file there, and nothing here changes.
 
-const performanceFlag = require('./performanceFlag');
-const dataFlag = require('../Mcp/dataFlag');
-const manageFlag = require('../Mcp/manageFlag');
-const workFlag = require('../Mcp/workFlag');
+const { RISK } = require('./registryKit');
+const groups = require('./registryGroups');
+const { CREATE_FIELDS } = require('./registry/manage');
 
 // `permission` names the Security & Permissions catalogue entry
 // (Config/permissionGuard) that governs the same operation for a person.
 // perform() evaluates it for the person behind the agent, so a token never
 // exceeds its holder's role. An action without one cannot be registered.
-const RISK = Object.freeze({ LOW: 'low', MEDIUM: 'medium', HIGH: 'high' });
 const PERMISSION_KEY = /^[a-z_]+\.[a-z_]+$/;
 const DONE_STATUS_TYPE = 'close';
 const DONE_STATUS_TYPES = Object.freeze(['close', 'done', 'default_close']);
@@ -30,13 +31,6 @@ const DONE_STATUS_TYPES = Object.freeze(['close', 'done', 'default_close']);
 const AGENT_STATUS_TYPES = Object.freeze(['default_active', 'active']);
 const AGENT_STATUS_NAMES = Object.freeze(['in progress', 'in review']);
 const AGENT_STATUS_NAME_PATTERN = /progress|review|doing|testing|qa/;
-
-const CREATE_PERMISSIONS = Object.freeze({
-    rawDescription: 'task.task_description', AssigneeUserId: 'task.task_assignee', Task_Priority: 'task.task_priority', DueDate: 'task.task_due_date',
-    startDate: ['task.task_due_date', 'task.task_start_date'], status: 'task.task_status', TaskType: 'task.task_type',
-    totalEstimatedTime: 'task.task_estimated_hours', links: 'task.task_attachments',
-});
-const CREATE_FIELDS = Object.freeze(Object.keys(CREATE_PERMISSIONS));
 
 const ACTIONS = Object.freeze([
     { key: 'tasks.next', label: 'Next assigned task', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
@@ -71,75 +65,7 @@ const ACTIONS = Object.freeze([
 
 // Registered only while their flag is on. ACTIONS stays the unflagged list, so
 // everything that reads it directly is unchanged whatever the flags say.
-const FLAGGED = Object.freeze([
-    {
-        enabled: performanceFlag.enabled,
-        action: Object.freeze({ key: performanceFlag.ACTION, label: 'Read project performance numbers', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_details' }),
-    },
-    ...[
-        { key: 'projects.list', label: 'List projects', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_list' },
-        { key: 'project.get', label: 'Read a project', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_details' },
-        { key: 'sprints.list', label: 'List a project\'s sprints', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_list' },
-        { key: 'statuses.list', label: 'List a project\'s statuses', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
-        { key: 'comments.list', label: 'Read a task\'s comments', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
-        { key: 'pages.search', label: 'Search pages', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_details' },
-        { key: 'page.get', label: 'Read a page', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_details' },
-        { key: 'timesheet.read', label: 'Read time entries', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: { key: 'sheet_settings.user_timesheet', write: false } },
-        { key: 'comment.create', label: 'Comment on a task', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'task.task_comment' },
-        { key: 'timelog.create', label: 'Log time on a task (own time)', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'sheet_settings.user_timesheet' },
-    ].map((action) => ({ enabled: dataFlag.enabled, action: Object.freeze(action) })),
-    // These write through the task routes' own preparation and handlers (Agents/taskRequests.js).
-    ...[
-        { key: 'fields.list', label: 'List a project\'s custom fields', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
-        { key: 'subtasks.list', label: 'List a task\'s subtasks', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
-        { key: 'members.list', label: 'List active members', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
-        { key: 'task.edit', label: 'Edit a task\'s title, description, priority, dates or estimate', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
-          fields: ['TaskName', 'rawDescription', 'Task_Priority', 'DueDate', 'startDate', 'totalEstimatedTime'],
-          permission: { byField: {
-              TaskName: 'task.task_name_edit', rawDescription: 'task.task_description', Task_Priority: 'task.task_priority', DueDate: 'task.task_due_date',
-              startDate: ['task.task_due_date', 'task.task_start_date'], totalEstimatedTime: 'task.task_estimated_hours',
-          } } },
-        { key: 'task.assignees.set', label: 'Set, add or remove a task\'s assignees', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'task.task_assignee' },
-        { key: 'task.field.set', label: 'Set a custom field on a task', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'task.task_custom_field' },
-        { key: 'task.move', label: 'Move a task with its subtasks to another list or project', risk: RISK.HIGH, undoable: false, write: true, cost: 'write',
-          constraint: 'only a top-level task; the destination must be one the person behind the agent can move tasks into', permission: 'task.task_move' },
-        { key: 'task.archive', label: 'Archive a task with its subtasks', risk: RISK.HIGH, undoable: true, write: true, cost: 'write', permission: 'task.task_archive' },
-        { key: 'task.restore', label: 'Restore an archived task', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: { key: 'task.task_list', write: false } },
-        { key: 'task.history', label: 'Read a task\'s activity log', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: { key: 'task.task_activity_log', write: true } },
-        { key: 'task.links.list', label: 'List a task\'s links', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
-        { key: 'task.status.change', label: 'Set any status of the task\'s project, Done included', risk: RISK.HIGH, undoable: true, write: true, cost: 'write',
-          constraint: 'only for a token its person created to manage tasks; the close is recorded as that person\'s, made through the agent, and unchecked', permission: 'task.task_status' },
-        { key: 'task.add', label: 'Create a task with its details', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', fields: CREATE_FIELDS,
-          permission: { key: 'task.task_create', byField: CREATE_PERMISSIONS } },
-        { key: 'subtask.add', label: 'Create a subtask with its details', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', fields: CREATE_FIELDS,
-          permission: { key: 'task.sub_task_create', byField: CREATE_PERMISSIONS } },
-        { key: 'comment.update', label: 'Edit a comment the agent wrote', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'task.task_comment' },
-        { key: 'tasks.batch', label: 'Record a batch of task changes as one group', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
-          constraint: 'changes nothing itself: each change in the batch is its own action, checked and audited on its own', permission: { key: 'task.task_list', write: false } },
-        { key: 'page.create', label: 'Create a doc (a draft until a person approves it)', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
-        { key: 'page.update', label: 'Change a doc\'s title or body', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
-    ].map((action) => ({ enabled: manageFlag.enabled, action: Object.freeze(action) })),
-    // These run the web app's own tag, relation, list and doc comment handlers (Agents/workRequests.js).
-    ...[
-        { key: 'tags.list', label: 'List a project\'s tags', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
-        { key: 'task.tags.add', label: 'Add a tag to a task', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'task.task_tag' },
-        { key: 'task.tags.remove', label: 'Remove a tag from a task', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'task.task_tag' },
-        { key: 'task.relations.list', label: 'List the tasks a task is linked to', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
-        { key: 'task.relation.add', label: 'Link two tasks', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
-          constraint: 'both tasks must be ones the person behind the agent can open', permission: { key: 'task.task_list', write: false } },
-        { key: 'task.relation.remove', label: 'Remove the link between two tasks', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
-          constraint: 'both tasks must be ones the person behind the agent can open', permission: { key: 'task.task_list', write: false } },
-        { key: 'lists.list', label: 'List a project\'s lists and folders', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_list' },
-        { key: 'list.create', label: 'Create a list in a project or folder', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'project.project_sprint_create' },
-        { key: 'list.rename', label: 'Rename a list', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'project.project_sprint_name_edit' },
-        { key: 'list.move', label: 'Move a list into or out of a folder', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
-          permission: { anyOf: ['project.project_sprint_name_edit', 'project.sprint_type_change', 'project.project_sprint_create'] } },
-        { key: 'page.comments.list', label: 'Read a doc\'s comments', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_details' },
-        { key: 'page.comment.create', label: 'Comment on a doc', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
-        { key: 'page.comment.reply', label: 'Reply to a comment on a doc', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
-        { key: 'page.comment.assign', label: 'Assign a doc comment thread', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
-    ].map((action) => ({ enabled: workFlag.enabled, action: Object.freeze(action) })),
-]);
+const FLAGGED = Object.freeze(groups.flatMap((g) => g.entries));
 
 /* A string maps the whole action at its own level (write for writes, read for
  * reads); { key, write } pins the level; { byField } holds each edited field

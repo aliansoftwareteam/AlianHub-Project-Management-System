@@ -46,6 +46,7 @@
                             @keydown.space.self.prevent="!showArchiveVar ? toggleTaskDetail(element) : ''"
                         >
                             <span v-if="taskKey" class="card-key">{{ taskKey }}</span>
+                            <TaskHomeMark v-if="!isSubTask" :task="element" :list="viewedList" />
                             <img v-if="element.deletedStatusKey === 2" :src="inventoryIcon" alt="inventory" class="card-title__state" />
                             <img v-if="element.deletedStatusKey === 1" :src="deleteIcon" alt="delete" class="card-title__state" />
                             {{ element.TaskName }}
@@ -233,6 +234,7 @@
     import TaskMenuSidebars from '@/views/Projects/components/taskMenu/TaskMenuSidebars.vue';
     import TaskMenuPopup from '@/views/Projects/components/taskMenu/TaskMenuPopup.vue';
     import { taskMenuItems } from '@/views/Projects/composables/taskMenu';
+    import TaskHomeMark from '@/views/Projects/components/TaskHomeMark.vue';
     import { taskUrl } from '@/views/Projects/composables/taskLink';
     import { openTemplateDialog } from '@/components/molecules/TaskTemplates/taskTemplates';
     import CalenderCompo from '@/components/atom/CalenderCompo/CalenderCompo.vue';
@@ -295,7 +297,8 @@
     const searchedTask = inject('searchedTask');
     const taskCollapsed = inject("taskCollapsed");
     const boardMenu = inject("boardTaskMenu", null);
-    const menuItems = computed(() => taskMenuItems(element.value, boardMenu?.rights.value, { canNest: depthOf(element.value) < MAX_DEPTH }));
+    const viewedList = computed(() => ({ sprintId: props.itemData?.sprintId, projectId: projectData.value?._id }));
+    const menuItems = computed(() => taskMenuItems(element.value, boardMenu?.rights.value, { canNest: depthOf(element.value) < MAX_DEPTH, listId: viewedList.value.sprintId }));
     const subtaskTree = inject("boardSubtaskTree", null);
     const subtasksOpen = computed(() => Boolean(subtaskTree?.isExpanded(element.value?._id)));
     const subtaskProgress = computed(() => (subtaskTree ? subtaskTree.progressFor(element.value) : null));
@@ -430,7 +433,7 @@
     })
     function updatePriority(val = null) {
         if(!val) return;
-        updateTaskByGroup(element.value, val, 2);
+        updateTaskByGroup(element.value, val, 2).catch((error) => console.error("ERROR in updatePriority: ", error));
     }
     function getUserData() {
         const user = getUser(userId.value);
@@ -472,14 +475,12 @@
             taskData: props.data,
             employeeName: getUser(value.id).Employee_Name,
             type: operation,
-            userData
+            userData,
+            announce: true
         })
         .then(() => {
             if(operation === "assigneRemove"){
-                let taskData = props.data;
-                let index = taskData.AssigneeUserId.findIndex((x) => x === value.id);
-                taskData.AssigneeUserId.splice(index,1);
-                commit("projectData/mutateSearchTask", {op:"modified", data: [taskData]});
+                commit("projectData/mutateSearchTask", {op:"modified", data: [{...props.data, AssigneeUserId: (props.data.AssigneeUserId || []).filter((x) => x !== value.id)}]});
             }
             $toast.success(t(`Toast.Assignee ${type === "add" || type === "replace" ? 'added' : 'removed'} successfully`), {position: "top-right"})
         })
@@ -526,8 +527,7 @@
     const updateDueDate = (event) => {
         try {
             if(!event?.dateVal) return;
-            element.value.DueDate = event?.dateVal;
-            updateTaskByGroup(props.data, {seconds: new Date(event.dateVal).getTime()/1000}, 3);
+            updateTaskByGroup(props.data, {seconds: new Date(event.dateVal).getTime()/1000}, 3).catch((error) => console.error("ERROR in updateDueDate: ", error));
         } catch (error) {
             console.error("ERROR in updateDueDate: ", error);
         }
@@ -610,6 +610,7 @@
             "convert-subtask": viaSidebar,
             "convert-list": viaSidebar,
             move: viaSidebar,
+            "remove-from-list": () => boardMenu.removeFromList(element.value, viewedList.value.sprintId),
             duplicate: viaSidebar,
             "duplicate-subtasks": () => boardMenu.duplicate(element.value, { withSubtasks: true }),
             merge: viaSidebar,

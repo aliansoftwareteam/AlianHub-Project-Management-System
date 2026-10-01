@@ -17,12 +17,12 @@
                     :minDate="limits.minDate"
                     :maxDate="limits.maxDate"
                     :daysWeekDisable="props.detail?.fieldDaysDisable || []"
-                    @update:modelValue="($event) => emit('blurUpdate',$event,props.detail)"
+                    @update:modelValue="($event) => emit('blurUpdate',pickedDateValue(props.detail,$event),props.detail)"
                     :isShowDateAndicon="true"
                     :valueAsText="true"
-                    :hideExtraLayouts="props.detail.fieldTimeFormate ? [] : ['time' ,'minutes' , 'hours' , 'seconds']"
-                    :timeFormate="props.detail.fieldTimeFormate ? props.detail.fieldTimeFormate === 'AM/PM' ? false : true : false"
-                    :showTimeFormate="props.detail.fieldTimeFormate ? true : false"
+                    :hideExtraLayouts="withTime ? [] : ['time' ,'minutes' , 'hours' , 'seconds']"
+                    :timeFormate="withTime && props.detail.fieldTimeFormate !== 'AM/PM'"
+                    :showTimeFormate="withTime"
                     @outsideClick="handleOutside"
                     @handleSubmit="handleSubmit"
                     :isTask="true"
@@ -38,7 +38,7 @@
 
 <script setup>
     import CalenderCompo from '@/components/atom/CalenderCompo/CalenderCompo.vue';
-    import { dateFieldLimits } from '@/plugins/customFieldView/dateFieldLimits';
+    import { dateFieldLimits, holdsTime, pickedDateValue } from '@/plugins/customFieldView/dateFieldLimits';
     import ToolTip from "@/components/molecules/ToolTip/ToolTip.vue";
     import { computed, ref } from 'vue';
     import useCustomFieldImage from '@/composable/customFieldIcon.js';
@@ -54,6 +54,7 @@
         }
     });
     const limits = computed(() => dateFieldLimits(props.detail));
+    const withTime = computed(() => holdsTime(props.detail));
     const emit = defineEmits(['blurUpdate','handleEdit']);
     const editIconImage = require("@/assets/images/editing.png");
     const validationError = ref(false);
