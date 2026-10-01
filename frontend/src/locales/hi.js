@@ -3032,6 +3032,8 @@ export default {
         "add_task_to": "Add task to {group}…",
         "group_empty": "Nothing in this group yet.",
         "select_group": "Select every task in this group",
+        "select_task": "Select {name}",
+        "select_subtask": "Select subtask {name}",
         "selected": "{n} selected",
         "status": "Status",
         "assignee": "Assignee",
