@@ -166,6 +166,21 @@ describe('a burst of agent changes', () => {
         expect(cycles()).toBe(3);
     });
 
+    it('follows the socket when the app replaces it', async () => {
+        watch();
+        await settle();
+        const next = fakeSocket();
+        feed.bindAgentSocket(next);
+
+        changed(3);
+        await vi.advanceTimersByTimeAsync(10000);
+        expect(cycles()).toBe(1);
+
+        next.fire(feed.AGENTS_CHANGED_EVENT, { kind: 'proposal' });
+        await vi.advanceTimersByTimeAsync(10000);
+        expect(cycles()).toBe(2);
+    });
+
     it('hands every caller of refresh the same request', async () => {
         watch();
         await settle();
@@ -196,6 +211,14 @@ describe('the fallback poll', () => {
         await settle();
         await vi.advanceTimersByTimeAsync(30000);
         expect(cycles()).toBe(2);
+    });
+
+    it('does not keep that pace for a person\'s timer alone', async () => {
+        world.team = () => ok({ people: [{ id: 'u1', name: 'Asha', timer: { taskName: 'Write the spec' } }], agents: [] });
+        watch();
+        await settle();
+        await vi.advanceTimersByTimeAsync(119999);
+        expect(cycles()).toBe(1);
     });
 
     it('backs off to every two minutes when nothing runs and nothing waits', async () => {

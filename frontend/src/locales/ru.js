@@ -1601,7 +1601,9 @@ export default {
         "key_esc": "Esc",
         "key_enter": "Enter",
         "key_shift_enter": "Shift + Enter",
-        "key_tab": "Tab"
+        "key_tab": "Tab",
+        "server_busy": "The server is busy. Try again in a moment.",
+        "server_busy_retry_in": "The server is busy. Try again in {n} second. | The server is busy. Try again in {n} seconds."
     },
     "Time": {
         "loading": "Loading…",
