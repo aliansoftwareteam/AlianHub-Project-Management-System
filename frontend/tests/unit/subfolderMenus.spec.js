@@ -73,12 +73,13 @@ afterEach(() => {
 });
 
 describe('New in project', () => {
+    // The doc entry follows the project's own access rule and is covered by newDocEntries.spec.js.
     const entries = async (props) => {
         const wrapper = show(NewInProjectMenu, props);
         const trigger = wrapper.find('button[aria-expanded]');
         if (!trigger.exists()) return [];
         await trigger.trigger('click');
-        return wrapper.findAll('[role="menuitem"]').map((item) => item.text());
+        return wrapper.findAll('[role="menuitem"]').map((item) => item.text()).filter((text) => text !== 'Docs.new_doc');
     };
 
     it('offers a new subfolder on the page of a top-level folder', async () => {

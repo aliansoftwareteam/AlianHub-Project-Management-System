@@ -160,6 +160,7 @@
 <script setup>
 import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import Swal from "sweetalert2";
@@ -187,6 +188,9 @@ const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 const listing = ref([]);
 const tab = ref(0);
 const search = ref("");
+// ⌘K opens a person here with ?q=…; watched, not read once, because Members may already be open.
+const route = useRoute();
+watch(() => (typeof route?.query?.q === "string" ? route.query.q : ""), (term) => { search.value = term; }, { immediate: true });
 const inviteOpen = ref(false);
 const emails = ref([]);
 const emailDraft = ref("");
