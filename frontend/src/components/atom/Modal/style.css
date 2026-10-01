@@ -27,7 +27,7 @@
     color: var(--ink);
     color-scheme: var(--scheme);
     border: 1px solid var(--hairline);
-    border-radius: var(--r-card, 6px);
+    border-radius: var(--r-lg, 6px);
     box-shadow: var(--shadow-modal);
     transform: translate(-50%, -50%);
     left: 50%;

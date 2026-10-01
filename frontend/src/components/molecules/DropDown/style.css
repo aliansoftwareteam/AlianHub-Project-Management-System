@@ -46,6 +46,8 @@
 .dd-tokens .form-control::placeholder { color: var(--ink-2) !important; }
 .dd-tokens .form-control:focus-visible { outline-color: var(--brand); }
 .dd-tokens .btn-primary:not(.bg-transparent) { background: var(--brand); color: var(--on-brand); }
+/* A highlighted option carries .bg-blue.white, whose white is !important. */
+.dd-tokens .drop-down-item.bg-blue.white { background-color: var(--brand-tint); color: var(--brand) !important; }
 /* Colours that hosts and the option component set on what they put in the panel. */
 .dd-tokens .project-mobile-desc, .dd-tokens .project-list-mobiletitle { color: inherit; }
 .dd-tokens :is(.dropDelete, .mobile-deleteIcon, .mobile-delete-status) { color: var(--danger-ink) !important; }
