@@ -12,8 +12,11 @@
 .showProjectDetailRight .activity-log{
     padding: 20px;
 }
+.activity-filter{
+    padding: 10px 10px 0;
+}
 .activity-scroll{
-    max-height: calc(100dvh - 160px);
+    max-height: calc(100dvh - 200px);
     margin-bottom: 0;
     overflow-y: auto;
     padding: 10px;

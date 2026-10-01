@@ -386,6 +386,11 @@ const schema = {
             type: String,
             required: true,
         },
+        // Only on a change an agent made (Modules/Agents/actingAgent): UserId stays the person, so every
+        // reader that filters by person still finds the row. A person's own change has none of the three.
+        actorType: { type: String, required: false },
+        agentName: { type: String, required: false },
+        actedFor: { type: String, required: false },
         // BUG-046 / #100: createdAt/updatedAt are populated by Mongoose
         // (`timestamps: true` on historySchema). Keep the field
         // declarations so older code paths that still reference the
