@@ -7,18 +7,17 @@ const context = {
     ],
     tokenBlockedPrefix: '/api/v2/api-tokens',
     tokenAllowedPaths: ['/api/v2/api-tokens/me'],
-    agentPerimeter: [{ test: (method) => method === 'DELETE', action: 'delete' }],
 };
 
 const route = (key, extra = {}) => {
     const [method, path] = key.split(' ');
-    return { key, method, path, guard: 'company', ownAuth: null, agentPerimeter: true, permissions: [], taskNeeds: null, actions: null, source: 'Modules/Sample/init', ...extra };
+    return { key, method, path, guard: 'company', ownAuth: null, permissions: [], taskNeeds: null, actions: null, source: 'Modules/Sample/init', ...extra };
 };
 
 describe('auth classification', () => {
     it('reads a route behind no guard as public', () => {
         expect(classifyAuth(route('POST /api/v2/auth/login', { guard: null }), {}, context)).toEqual({
-            class: AUTH.PUBLIC, token: false, narrowedToken: false, agentToken: false, scope: null, companyHeader: 'none',
+            class: AUTH.PUBLIC, token: false, narrowedToken: false, scope: null, companyHeader: 'none',
         });
     });
 
@@ -49,19 +48,13 @@ describe('auth classification', () => {
         expect(classifyAuth(route('GET /api/v2/tasks/everything'), {}, context).narrowedToken).toBe(false);
     });
 
-    it('keeps an agent token off the routes the agent perimeter refuses', () => {
-        expect(classifyAuth(route('DELETE /api/v2/pages/:id'), {}, context).agentToken).toBe(false);
-        expect(classifyAuth(route('PUT /api/v2/pages/:id'), {}, context).agentToken).toBe(true);
-        expect(classifyAuth(route('DELETE /api/v2/session/delete', { guard: 'user', agentPerimeter: false }), {}, context).agentToken).toBe(true);
-    });
-
     it('reads the instance guard as session only', () => {
         expect(classifyAuth(route('GET /api/v2/instance/settings', { guard: 'instance-admin' }), {}, context)).toMatchObject({ class: AUTH.INSTANCE_ADMIN, token: false, scope: null });
     });
 
     it('reads a route that checks the token itself as token only', () => {
         expect(classifyAuth(route('GET /api/public-v1/tasks', { guard: null, ownAuth: 'api-token' }), {}, context)).toEqual({
-            class: AUTH.API_TOKEN, token: true, narrowedToken: true, agentToken: true, scope: 'read', companyHeader: 'required',
+            class: AUTH.API_TOKEN, token: true, narrowedToken: true, scope: 'read', companyHeader: 'required',
         });
     });
 });
@@ -173,7 +166,6 @@ describe('one route as markdown', () => {
     it('states who may call it and with what', () => {
         expect(text).toContain('| Auth | Session or API token with the `write` scope |');
         expect(text).toContain('| Token limited to projects | Refused |');
-        expect(text).toContain('| Agent token | Accepted |');
         expect(text).toContain('| Permission | `task.task_create` |');
     });
 

@@ -36,6 +36,11 @@
             "intro": "Read-only views of the workspace's AI agents: who they are, what they are running and what they have proposed. Runs and proposals are narrowed to the projects and tasks the caller can read."
         },
         {
+            "id": "dashboards",
+            "title": "Dashboards",
+            "intro": "The answers of the Ask cards on a dashboard. These two routes sit under `/api/v1`; they are described here because a token can call them."
+        },
+        {
             "id": "webhooks",
             "title": "Webhooks",
             "intro": "Managing the webhooks described under [Webhook deliveries](#webhook-deliveries) above. A webhook belongs to the person who created it: nobody else can list, change or delete it, or read its delivery log."
@@ -1932,6 +1937,150 @@
                 "`counts` sits beside `data` and is counted over everything the caller can read, whatever `status` was asked for."
             ],
             "paging": "Limit only. The newest proposals come first and there is no next page."
+        },
+        "GET /api/v1/ai/ask/card/:dashboardId/:cardUid": {
+            "resource": "dashboards",
+            "stability": "beta",
+            "title": "Read an Ask card's answer",
+            "summary": "Returns the answer kept for the caller on one Ask card of a dashboard.",
+            "description": [
+                "An answer is built from what its asker can open, so each viewer of a dashboard has their own. This never returns anyone else's."
+            ],
+            "pathParams": [
+                {
+                    "name": "dashboardId",
+                    "type": "id",
+                    "description": "The dashboard."
+                },
+                {
+                    "name": "cardUid",
+                    "type": "string",
+                    "description": "The card's uid on that dashboard."
+                }
+            ],
+            "response": {
+                "status": true,
+                "data": {
+                    "stored": {
+                        "question": "What is overdue this week?",
+                        "projectId": "",
+                        "answer": "Two tasks are overdue [WEB-12] [WEB-15].",
+                        "cited": [
+                            {
+                                "kind": "task",
+                                "id": "<task id>",
+                                "ref": "WEB-12",
+                                "title": "Write the release notes",
+                                "project": "Website",
+                                "projectId": "<project id>",
+                                "available": true
+                            }
+                        ],
+                        "askedAt": 1759311000000
+                    },
+                    "stale": false,
+                    "refreshDue": false
+                }
+            },
+            "responseFields": [
+                {
+                    "name": "stored",
+                    "description": "`null` when the caller has no kept answer for the card. `askedAt` is a time in milliseconds. `cited` lists only the sources the caller can still open."
+                },
+                {
+                    "name": "stale",
+                    "description": "The answer is older than the card's refresh setting."
+                },
+                {
+                    "name": "refreshDue",
+                    "description": "The answer is stale and nothing has asked for it again within that time."
+                }
+            ],
+            "errors": {
+                "404": "The card does not exist, is not an Ask card, or the caller cannot open its dashboard. The body carries `code: \"card_not_found\"`."
+            }
+        },
+        "POST /api/v1/ai/ask/card/:dashboardId/:cardUid": {
+            "resource": "dashboards",
+            "stability": "beta",
+            "title": "Ask an Ask card's question",
+            "summary": "Asks a question as the caller and keeps the answer for the caller on that card.",
+            "description": [
+                "The answer is written by the workspace's AI model from the tasks and pages the caller can open, and counts against the workspace's AI budget.",
+                "A kept answer to the same question and project is handed back instead of asking again, unless `fresh` is `true` or the kept answer is past the card's refresh setting."
+            ],
+            "pathParams": [
+                {
+                    "name": "dashboardId",
+                    "type": "id",
+                    "description": "The dashboard."
+                },
+                {
+                    "name": "cardUid",
+                    "type": "string",
+                    "description": "The card's uid on that dashboard."
+                }
+            ],
+            "body": [
+                {
+                    "name": "question",
+                    "type": "string",
+                    "required": true,
+                    "description": "The question. Text past 500 characters is cut off."
+                },
+                {
+                    "name": "projectId",
+                    "type": "id",
+                    "description": "Limits the answer to one project."
+                },
+                {
+                    "name": "fresh",
+                    "type": "boolean",
+                    "description": "`true` asks again even when an answer is kept."
+                }
+            ],
+            "request": {
+                "question": "What is overdue this week?"
+            },
+            "response": {
+                "status": true,
+                "statusText": "OK",
+                "data": {
+                    "configured": true,
+                    "mode": "ask",
+                    "answer": "Two tasks are overdue [WEB-12] [WEB-15].",
+                    "cited": [
+                        {
+                            "kind": "task",
+                            "id": "<task id>",
+                            "ref": "WEB-12",
+                            "title": "Write the release notes",
+                            "project": "Website",
+                            "projectId": "<project id>",
+                            "detail": "Doing · HIGH",
+                            "updatedAt": "2026-10-01T09:30:00.000Z"
+                        }
+                    ],
+                    "sources": [],
+                    "scope": {
+                        "projects": 4,
+                        "privileged": false
+                    },
+                    "usage": {
+                        "tokens": 1250,
+                        "model": "<model name>"
+                    },
+                    "askedAt": 1759311000000
+                }
+            },
+            "responseNotes": [
+                "`sources` lists everything that was searched, in the shape of `cited`; the example leaves it empty. `cited` are the sources the answer refers to.",
+                "When a kept answer is handed back, `data` is `{ configured: true, question, projectId, answer, cited, askedAt, kept: true }`. When no AI model is configured, `data.configured` is `false`, `answer` is empty and nothing is kept."
+            ],
+            "errors": {
+                "400": "No question. The body carries `code: \"question_required\"`.",
+                "404": "The card does not exist, is not an Ask card, or the caller cannot open its dashboard. The body carries `code: \"card_not_found\"`."
+            }
         },
         "GET /api/v2/webhooks/events": {
             "resource": "webhooks",

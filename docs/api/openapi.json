@@ -35,6 +35,10 @@
       "description": "Read-only views of the workspace's AI agents: who they are, what they are running and what they have proposed. Runs and proposals are narrowed to the projects and tasks the caller can read."
     },
     {
+      "name": "Dashboards",
+      "description": "The answers of the Ask cards on a dashboard. These two routes sit under `/api/v1`; they are described here because a token can call them."
+    },
+    {
       "name": "Webhooks",
       "description": "Managing the webhooks described under [Webhook deliveries](#webhook-deliveries) above. A webhook belongs to the person who created it: nobody else can list, change or delete it, or read its delivery log."
     },
@@ -117,6 +121,84 @@
         "x-stability": "stable",
         "x-documented": true,
         "x-token-scope": "read"
+      }
+    },
+    "/api/v1/ai/ask/card/{dashboardId}/{cardUid}": {
+      "get": {
+        "summary": "Returns the answer kept for the caller on one Ask card of a dashboard.",
+        "tags": [
+          "Dashboards"
+        ],
+        "security": [
+          {
+            "apiToken": [],
+            "companyId": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dashboardId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cardUid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The standard response body."
+          }
+        },
+        "x-stability": "beta",
+        "x-documented": true,
+        "x-token-scope": "read"
+      },
+      "post": {
+        "summary": "Asks a question as the caller and keeps the answer for the caller on that card.",
+        "tags": [
+          "Dashboards"
+        ],
+        "security": [
+          {
+            "apiToken": [],
+            "companyId": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dashboardId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cardUid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The standard response body."
+          }
+        },
+        "x-stability": "beta",
+        "x-documented": true,
+        "x-token-scope": "write"
       }
     },
     "/api/v1/project/{id}": {

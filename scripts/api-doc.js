@@ -41,9 +41,9 @@ const samplePathOf = (routePath) => routePath.replace(/:\w+(\([^)]*\))?\??/g, SA
 const scopeOf = (method) => (READ_METHODS.includes(method) ? 'read' : 'write');
 
 function classifyAuth(route, entry = {}, context = {}) {
-    const closed = { token: false, narrowedToken: false, agentToken: false, scope: null };
+    const closed = { token: false, narrowedToken: false, scope: null };
     if (route.ownAuth === 'api-token') {
-        return { class: AUTH.API_TOKEN, token: true, narrowedToken: true, agentToken: true, scope: scopeOf(route.method), companyHeader: 'required' };
+        return { class: AUTH.API_TOKEN, token: true, narrowedToken: true, scope: scopeOf(route.method), companyHeader: 'required' };
     }
     if (!route.guard) return { class: AUTH.PUBLIC, ...closed, companyHeader: 'none' };
     if (route.guard === 'instance-admin') return { class: AUTH.INSTANCE_ADMIN, ...closed, companyHeader: 'none' };
@@ -57,7 +57,6 @@ function classifyAuth(route, entry = {}, context = {}) {
         class: AUTH.SESSION_OR_TOKEN,
         token: true,
         narrowedToken: (context.held || []).some((held) => held.methods.includes(route.method) && held.path.test(sample)),
-        agentToken: !(route.agentPerimeter && (context.agentPerimeter || []).some((rule) => rule.test(route.method, sample))),
         scope: scopeOf(route.method),
         companyHeader,
     };
@@ -186,7 +185,6 @@ const STANDING_ERRORS = Object.freeze({
 function forbiddenText(route, auth) {
     const reasons = [`The token lacks the ${code(auth.scope)} scope, or its person is no longer a member of the workspace.`];
     if (!auth.narrowedToken) reasons.push('A token limited to projects is refused here.');
-    if (!auth.agentToken) reasons.push('An agent token is refused here.');
     if (route.permissions.length || route.taskNeeds || route.actions) reasons.push('The person\'s role lacks the permission the route needs.');
     return reasons.join(' ');
 }
@@ -205,10 +203,7 @@ function renderRoute(route, entry, auth) {
     (entry.description || []).forEach((paragraph) => lines.push(paragraph, ''));
 
     const who = [['Auth', authText(auth)]];
-    if (auth.token) {
-        who.push(['Token limited to projects', auth.narrowedToken ? 'Accepted, and held to its projects' : 'Refused']);
-        who.push(['Agent token', auth.agentToken ? 'Accepted' : 'Refused']);
-    }
+    if (auth.token) who.push(['Token limited to projects', auth.narrowedToken ? 'Accepted, and held to its projects' : 'Refused']);
     const permission = permissionText(route, entry);
     if (permission) who.push(['Permission', permission]);
     lines.push(...table(['', ''], who), '');
@@ -384,7 +379,7 @@ function renderFront(facts, grouped, counts) {
         '',
         '### Agent tokens',
         '',
-        'A token created for an AI agent is an agent token. On top of everything above, an agent token is refused on routes that delete, on the bulk task route, and on billing, member, permission and token management routes. Those refusals are 403 and are recorded in the audit log. Each route below says whether it accepts an agent token.',
+        'A token created for an AI agent is an agent token. On top of everything above, an agent token is refused on every `DELETE` request, on the bulk task route, and on billing, member, permission and token management routes. Those refusals are 403 and are recorded in the audit log.',
         '',
         '### Token lifetime',
         '',
@@ -540,14 +535,12 @@ function collect({ stub = true, intervals = [] } = {}) {
     const jwt = require('../Config/jwt');
     const { HELD_ROUTES } = require('../Config/narrowedTokenRoutes');
     const { tokenAuth } = require('../Modules/ApiTokens/publicApi');
-    const { agentPerimeter, PERIMETER } = require('../Modules/Agents/guard');
     const { TASK_ACTION_FIELDS } = require('../Modules/Tasks/helpers/taskWriteFields');
     const tokenRules = require('../Modules/ApiTokens/helpers/apiTokenRules');
     const rateLimit = require('../Config/globalRateLimit');
     const oauth = require('../Modules/OAuthServer/config');
     const webhookRules = require('../Modules/Webhooks/helpers/webhookRules');
 
-    const perimeterAt = app._router.stack.findIndex((layer) => layer.handle === agentPerimeter);
     const routes = walked.map((route) => ({
         key: route.key,
         method: route.method,
@@ -555,7 +548,6 @@ function collect({ stub = true, intervals = [] } = {}) {
         guard: route.guard,
         source: route.source,
         ownAuth: route.handles.includes(tokenAuth) ? 'api-token' : null,
-        agentPerimeter: perimeterAt !== -1 && route.at > perimeterAt,
         permissions: route.permissions,
         taskNeeds: route.taskWrites && Array.isArray(route.taskWrites.needs) ? route.taskWrites.needs : null,
         actions: isActionTable(route.taskWrites) ? taskActionsOf(route.taskWrites, TASK_ACTION_FIELDS) : null,
@@ -564,7 +556,6 @@ function collect({ stub = true, intervals = [] } = {}) {
         held: HELD_ROUTES,
         tokenBlockedPrefix: jwt.PAT_BLOCKED_PATH_PREFIX,
         tokenAllowedPaths: jwt.PAT_ALLOWED_EXCEPTIONS,
-        agentPerimeter: PERIMETER,
     };
     const facts = {
         rate: { perMinute: rateLimit.DEFAULT_PER_MIN, windowSeconds: rateLimit.WINDOW_MS / 1000, code: rateLimit.BUSY_CODE, text: rateLimit.BUSY_TEXT },
