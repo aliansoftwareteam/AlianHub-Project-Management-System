@@ -185,7 +185,7 @@ const sourcesFor = async ({ companyId, uid, field, is, task }) => {
         return open ? sourcesOf(await linkDocs(companyId, { fieldId, kind: RELATIONSHIP, ids: idOf(open) })) : [];
     }
     if (is !== 'set' && is !== 'empty') throw new QueryRefused(CONDITION, 'it must ask for set, empty, has or mine');
-    const docs = await linkDocs(companyId, { fieldId, kind: RELATIONSHIP });
+    const docs = await linkDocs(companyId, { fieldId, kind: RELATIONSHIP, 'ids.0': { $exists: true } });
     const open = new Set((await openableTasks(companyId, uid, docs.flatMap((doc) => doc.ids))).map(idOf));
     return sourcesOf(docs.filter((doc) => doc.ids.some((id) => open.has(id))));
 };
@@ -200,6 +200,13 @@ const isCondition = (value) => isPlainObject(value) && Object.keys(value).length
  * as the ids of the tasks that qualify. The query then runs under the caller's own visibility like any other. */
 const withLinkConditions = async (companyId, uid, stages) => {
     let conditions = 0;
+    /* A grouped view asks the same question in its rows, its counts and its "no value" group. */
+    const answered = new Map();
+    const sourcesOnce = (condition) => {
+        const asked = JSON.stringify([condition.field, condition.is, condition.task]);
+        if (!answered.has(asked)) answered.set(asked, sourcesFor({ companyId, uid, ...condition }));
+        return answered.get(asked);
+    };
     const walk = async (value) => {
         if (Array.isArray(value)) {
             const items = [];
@@ -210,7 +217,7 @@ const withLinkConditions = async (companyId, uid, stages) => {
         if (isCondition(value)) {
             conditions += 1;
             if (conditions > CONDITIONS_MAX) throw new QueryRefused(CONDITION, `at most ${CONDITIONS_MAX} are accepted`);
-            const ids = (await sourcesFor({ companyId, uid, ...value[CONDITION] })).map(oid);
+            const ids = (await sourcesOnce(value[CONDITION])).map(oid);
             return value[CONDITION].is === 'empty' ? { $nin: ids } : { $in: ids };
         }
         const walked = {};
