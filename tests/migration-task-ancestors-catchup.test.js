@@ -93,6 +93,11 @@ describe(ID, () => {
         expect(JSON.stringify(tasks(C1))).toBe(after);
     });
 
+    test('carries no verify check, so rows saved after it never fail migrate verify', () => {
+        expect(migration.verify).toBeUndefined();
+        expect(first.verify).toBeUndefined();
+    });
+
     test('keeps every tenant to its own database', async () => {
         await seedAfterFirstRun(C1);
         await seedAfterFirstRun(C2);

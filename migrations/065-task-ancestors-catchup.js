@@ -1,6 +1,6 @@
 /* Task 046: migration 064 ran before the create paths stored `ancestors`, so a subtask created in
  * between holds the schema's empty default. Runs 064's plan once more, which writes only the rows
- * whose chain is not the one their parents give; 064's verify() covers both. */
+ * whose chain is not the one their parents give. No verify(), for the reason 064 has none. */
 
 const { convertCompany } = require('./064-task-ancestors');
 
