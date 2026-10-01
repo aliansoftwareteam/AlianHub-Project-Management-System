@@ -170,6 +170,7 @@ describe('a ClickUp file imported into a project', () => {
         expect(comments.map((comment) => comment.type).sort()).toEqual(['link', 'text']);
         comments.forEach((comment) => expect(Object.keys(comment).filter((field) => /media|attachment|url/i.test(field))).toEqual([]));
         expect(comments.find((comment) => comment.type === 'text').message).toBe('Pat: see the file');
+        expect(comments.map((comment) => comment.importedFrom)).toEqual(['clickup', 'clickup']);
     });
 
     it('brings checklists with their done state, on a task and on a subtask', async () => {
@@ -290,6 +291,22 @@ describe('what a ClickUp import may write follows the person importing', () => {
         expect(store(SCHEMA_TYPE.COMMENTS)).toHaveLength(0);
         expect(res.body.data.summary.comments).toEqual({ imported: 0, skipped: 5, reason: 'no_permission', unmatchedAuthors: [] });
         expect(taskNamed('Plan the launch').links).toHaveLength(2);
+    });
+
+    it('keeps a colleague\'s comments under the importing member, with the colleague\'s name in front', async () => {
+        const res = await importRows({ options: { createMissingStatuses: false } }, LEE);
+        expect(res.body.status).toBe(true);
+        expect(commentsOn('Plan the launch').filter((comment) => comment.type === 'text').map((comment) => [comment.message, String(comment.userId)])).toEqual([
+            ['max@member.test: Kick-off is on Monday', LEE],
+            ['Pat Example: Room is booked', LEE],
+        ]);
+        expect(commentsOn('Write the invite').map((comment) => [comment.message, String(comment.userId)])).toEqual([['Max Member: Draft is in the doc', LEE]]);
+        expect(res.body.data.summary.comments.unmatchedAuthors).toEqual(['max@member.test', 'Pat Example', 'Max Member', 'ghost@nowhere.test']);
+    });
+
+    it('keeps the importing member\'s own comments as theirs', async () => {
+        await importRows({ options: { createMissingStatuses: false } }, MEMBER);
+        expect(commentsOn('Write the invite').map((comment) => [comment.message, String(comment.userId)])).toEqual([['Draft is in the doc', MEMBER]]);
     });
 
     it('imports nothing for a member who may not create tasks', async () => {

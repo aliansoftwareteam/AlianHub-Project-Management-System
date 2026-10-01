@@ -8931,7 +8931,7 @@
     "WorkspaceImport.next": "Next",
     "WorkspaceImport.no_projects": "There are no projects to import into yet.",
     "WorkspaceImport.note_as_text": "Brought in as text, because the ClickUp field type has no match here: {names}",
-    "WorkspaceImport.note_authors": "Comments by people who are not in this workspace are kept under your name, with theirs in front: {names}",
+    "WorkspaceImport.note_authors": "Their comments are kept under your name, with theirs in front: {names}",
     "WorkspaceImport.note_fields_skipped": "Custom fields left out: {names}",
     "WorkspaceImport.note_links_done": "{count} attachment(s) were added as links to ClickUp. No file was copied.",
     "WorkspaceImport.note_links_plan": "{count} attachment(s) will be added as links to ClickUp. No file is copied.",

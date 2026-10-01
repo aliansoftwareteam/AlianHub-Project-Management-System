@@ -18,10 +18,10 @@ const emptySummary = () => ({
     people: { unmatched: [], cannotOpen: [] },
 });
 
-const commentsOf = (tasks, { memberIdByEmail }, allowed) => {
+const commentsOf = (tasks, { authorIdByEmail }, allowed) => {
     const comments = tasks.flatMap((task) => task.comments || []);
     if (!allowed) return { imported: 0, skipped: comments.length, reason: comments.length ? NO_PERMISSION : '', unmatchedAuthors: [] };
-    const strangers = comments.filter((comment) => comment.author && !memberIdByEmail.has(comment.email)).map((comment) => comment.author);
+    const strangers = comments.filter((comment) => comment.author && !authorIdByEmail.has(comment.email)).map((comment) => comment.author);
     return { imported: comments.length, skipped: 0, reason: '', unmatchedAuthors: unique(strangers) };
 };
 
@@ -46,8 +46,9 @@ const tagsOf = (tasks, known, allowed) => {
 };
 
 /* `state` is the project as the import finds it: its id, the field definitions it may use and its tag names. `people`
- * maps each email the file names to a member, and to a member who can open the project. `allowed` says whether the
- * person importing may edit fields, comment, and add tags. */
+ * maps each email the file names to a member, to a member who can open the project, and to a member whose comments
+ * this import may keep under their own name. `allowed` says whether the person importing may edit fields, comment,
+ * and add tags. */
 const planClickUpList = ({ tasks, columns, unnamedAssignees = [], state, people, allowed }) => {
     const { levels } = levelRows(tasks);
     const fieldPlan = planFields({

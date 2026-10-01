@@ -221,7 +221,11 @@ describe('what an import of one list will bring in', () => {
                 columns: fields,
                 unnamedAssignees,
                 state: { projectId: PROJECT, definitions: [], tags: ['Launch'] },
-                people: { memberIdByEmail: new Map([['max@member.test', MAX], ['lee@private.test', LEE]]), openIdByEmail: new Map([['max@member.test', MAX]]) },
+                people: {
+                    memberIdByEmail: new Map([['max@member.test', MAX], ['lee@private.test', LEE]]),
+                    openIdByEmail: new Map([['max@member.test', MAX]]),
+                    authorIdByEmail: new Map([['max@member.test', MAX], ['lee@private.test', LEE]]),
+                },
                 allowed: { fields: true, comments: true, tags: true },
                 ...over,
             }),
@@ -253,6 +257,11 @@ describe('what an import of one list will bring in', () => {
         const { tasks, assignees } = planned();
         expect(assignees.get(taskNamed(tasks, 'Plan the launch'))).toEqual([MAX]);
         expect(assignees.get(taskNamed(tasks, 'Proofread'))).toEqual([]);
+    });
+
+    it('names every author whose comments this import keeps under the importing person', () => {
+        const people = { memberIdByEmail: new Map([['max@member.test', MAX]]), openIdByEmail: new Map([['max@member.test', MAX]]), authorIdByEmail: new Map() };
+        expect(planned({ people }).summary.comments.unmatchedAuthors).toEqual(['max@member.test', 'Pat Example', 'Max Member', 'ghost@nowhere.test']);
     });
 
     it('leaves out comments, fields and new tags the person may not add, and says so', () => {

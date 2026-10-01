@@ -6,6 +6,7 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { removeCache } = require('../../../utils/commonFunctions');
 const { canEditProject, canReadProject } = require('../../../Config/projectAccess');
+const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { fieldInsertFrom } = require('../../CustomField/helpers/fieldWrite');
 const { isTaskFieldOf } = require('../../CustomField/helpers/fieldValueInput');
 const { recordFieldCreated } = require('../../CustomField/helpers/customFieldHistory');
@@ -19,6 +20,7 @@ const { planClickUpList, stateAfter, mergeSummaries, fieldsSummary } = require('
 const FIELD_EDIT = [['project.project_custom_field', 'task.task_custom_field']];
 const COMMENT = ['task.task_comment'];
 const EVERYTHING = Object.freeze({ fields: true, comments: true });
+const SOURCE = 'clickup';
 const LINK_KIND = 'link';
 const LINKS_HEADING = 'Attachments in ClickUp:';
 const MAX_COMMENT_LENGTH = 10000;
@@ -49,6 +51,19 @@ const peopleDirectory = async (companyId, projectId, emails) => {
         if (!projectId || (await canReadProject(companyId, id, projectId)).allowed) openIdByEmail.set(email, id);
     }
     return { memberIdByEmail, openIdByEmail };
+};
+
+/* A comment written in the app is always its sender's. An import keeps a member as the author of their own ClickUp
+ * comments only when an owner or admin runs it; anyone else's import keeps each comment under the importing person,
+ * led by the author's name, so a file cannot put words under a colleague's name. */
+const commentAuthors = async (companyId, uid, { memberIdByEmail }) => {
+    if (isPrivileged(await getRoleType(companyId, uid))) return memberIdByEmail;
+    return new Map([...memberIdByEmail].filter(([, id]) => id === String(uid)));
+};
+
+const namedPeopleOf = async (companyId, uid, projectId, emails) => {
+    const people = await peopleDirectory(companyId, projectId, emails);
+    return { ...people, authorIdByEmail: await commentAuthors(companyId, uid, people) };
 };
 
 const emailsNamedIn = (columns, tasks) => [
@@ -121,14 +136,14 @@ const threadOf = (project, sprint, row) => ({
     ...(sprint.folderId ? { folderId: oid(sprint.folderId) } : {}),
 });
 
-/* An author who is a member keeps the comment; anyone else's is stored as the importing person's, led by their name. */
-const commentOf = (comment, { memberIdByEmail, actorId }) => {
-    const authorId = memberIdByEmail.get(comment.email);
+const commentOf = (comment, { authorIdByEmail, actorId }) => {
+    const authorId = authorIdByEmail.get(comment.email);
     const text = authorId || !comment.author ? comment.text : `${comment.author}: ${comment.text}`;
     return {
         message: escapeCommentText(text.slice(0, MAX_COMMENT_LENGTH)),
         userId: authorId || actorId,
         type: 'text',
+        importedFrom: SOURCE,
         ...(comment.at ? { createdAt: new Date(comment.at) } : {}),
     };
 };
@@ -138,6 +153,7 @@ const linksComment = (links, actorId) => ({
     message: escapeCommentText([LINKS_HEADING, ...links.map((link) => (link.label === link.url ? link.url : `${link.label}: ${link.url}`))].join('\n').slice(0, MAX_COMMENT_LENGTH)),
     userId: actorId,
     type: 'link',
+    importedFrom: SOURCE,
 });
 
 /* Imported comments are history, not news: saved without the socket emit, the unread counts, the mention notices and
@@ -150,7 +166,7 @@ const saveComments = async (companyId, { project, sprint, rows, people, actorId 
         const save = (comment) => MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: { ...comment, ...thread } }, 'save');
         for (const comment of row.comments || []) {
             try {
-                await save(commentOf(comment, { memberIdByEmail: people.memberIdByEmail, actorId }));
+                await save(commentOf(comment, { authorIdByEmail: people.authorIdByEmail, actorId }));
                 saved += 1;
             } catch (error) {
                 failed(`comment on task ${row.createdTaskId} not saved`)(error);
@@ -167,7 +183,7 @@ const prepareClickUpDetails = async (companyId, { actor, project, sprint, tasks,
     const projectId = String(project._id);
     const actorId = String(actor.id);
     const allowed = { ...(await detailsAccess(companyId, actorId, projectId)), tags: addsTags };
-    const people = await peopleDirectory(companyId, projectId, emailsNamedIn(columns, tasks));
+    const people = await namedPeopleOf(companyId, actorId, projectId, emailsNamedIn(columns, tasks));
     const state = { projectId, definitions: await projectFieldDefinitions(companyId, projectId), tags: tagNamesOf(project) };
     const plan = planClickUpList({ tasks, columns, unnamedAssignees, state, people, allowed });
 
@@ -199,7 +215,7 @@ const previewClickUpPlan = async (companyId, uid, { rows, lists, project, addsTa
     const allowed = project ? { ...(await detailsAccess(companyId, uid, projectId)), tags: addsTags } : { ...EVERYTHING, tags: true };
     const read = (listRows) => transformClickUpRows({ rows: listRows, statusFor: (name) => name, leaderId: String(uid) });
     const whole = read(rows);
-    const people = await peopleDirectory(companyId, projectId, emailsNamedIn(whole.fields, whole.tasks));
+    const people = await namedPeopleOf(companyId, uid, projectId, emailsNamedIn(whole.fields, whole.tasks));
     const empty = { projectId, definitions: project ? await projectFieldDefinitions(companyId, projectId) : [], tags: tagNamesOf(project) };
 
     let state = empty;

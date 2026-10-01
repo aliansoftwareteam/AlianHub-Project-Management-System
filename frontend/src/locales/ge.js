@@ -685,7 +685,7 @@ export default {
         "note_as_text": "Brought in as text, because the ClickUp field type has no match here: {names}",
         "note_fields_skipped": "Custom fields left out: {names}",
         "note_tags_skipped": "Tags left out: {names}",
-        "note_authors": "Comments by people who are not in this workspace are kept under your name, with theirs in front: {names}",
+        "note_authors": "Their comments are kept under your name, with theirs in front: {names}",
         "note_people_cannot_open": "Cannot open this project, so not assigned: {names}",
         "back": "Back",
         "next": "Next",
