@@ -8,6 +8,7 @@ const logger = require('../../../Config/loggerConfig');
 const socketEmitter = require('../../../event/socketEventEmitter');
 const { removeCache } = require('../../../utils/commonFunctions');
 const R = require('../helpers/weekRules');
+const U = require('../helpers/workloadUnits');
 
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const { acceptedMemberIds } = require('../../../utils/companyMembers');
@@ -31,8 +32,97 @@ const nameMap = async (userIds) => {
     return map;
 };
 
-// POST /api/v1/timesheet/workload-grid  body: { start, end, userIds?, projectIds?, hoursPerDay?, timeZone? }
-// People × days: estimate chips (estimated_time) and logged minutes against capacity (working hours − approved PTO).
+const plannedMinutesByTask = async (companyId, taskIds) => {
+    if (!taskIds.length) return {};
+    const groups = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.ESTIMATES_TIME,
+        data: [[
+            { $match: { TaskId: { $in: idForms(taskIds) } } },
+            { $group: { _id: { taskId: '$TaskId', userId: '$UserId' }, minutes: { $sum: '$EstimatedTime' } } },
+        ]],
+    }, 'aggregate').catch(() => []);
+    const out = {};
+    (groups || []).forEach((g) => {
+        const taskId = String((g._id && g._id.taskId) || '');
+        const uid = String((g._id && g._id.userId) || '');
+        if (!taskId || !uid) return;
+        const perTask = out[taskId] || (out[taskId] = {});
+        perTask[uid] = (perTask[uid] || 0) + (Number(g.minutes) || 0);
+    });
+    return out;
+};
+
+const capacityByUser = async (companyId, userIds) => {
+    const members = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.COMPANY_USERS,
+        data: [{ userId: { $in: userIds }, isDelete: { $ne: true } }, { userId: 1, workloadCapacity: 1 }],
+    }, 'find').catch(() => []);
+    const out = {};
+    (members || []).forEach((m) => { out[String(m.userId)] = U.capacityOf(m.workloadCapacity); });
+    return out;
+};
+
+/* Points and count read open tasks rather than the hour plan, so a task with points and no
+ * hours planned still lands on its due day. */
+const unitGrid = async ({ companyId, unit, userIds, projectIds, days, rangeStart, rangeEnd, estimates, ptoByUser, names }) => {
+    const plannedDays = {};
+    (estimates || []).forEach((e) => {
+        const taskId = String(e.TaskId || '');
+        const uid = String(e.UserId || '');
+        if (!taskId || !uid) return;
+        const perTask = plannedDays[taskId] || (plannedDays[taskId] = {});
+        (perTask[uid] || (perTask[uid] = [])).push(R.isoDay(new Date(e.Date)));
+    });
+    const taskMatch = {
+        deletedStatusKey: { $ne: 1 },
+        statusType: { $ne: 'close' },
+        $or: [
+            { AssigneeUserId: { $in: userIds }, DueDate: { $gte: rangeStart, $lte: rangeEnd } },
+            { _id: { $in: Object.keys(plannedDays).map(oid).filter(Boolean) } },
+        ],
+    };
+    if (projectIds.length) taskMatch.ProjectID = { $in: idForms(projectIds) };
+    const [tasks, capacities] = await Promise.all([
+        MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [taskMatch, { TaskName: 1, ProjectID: 1, sprintId: 1, DueDate: 1, AssigneeUserId: 1, points: 1 }],
+        }, 'find').catch(() => []),
+        capacityByUser(companyId, userIds),
+    ]);
+    const pids = [...new Set((tasks || []).map((t) => String(t.ProjectID || '')).filter(Boolean))].map(oid).filter(Boolean);
+    const [plannedMinutes, projects] = await Promise.all([
+        plannedMinutesByTask(companyId, (tasks || []).map((t) => String(t._id))),
+        pids.length
+            ? MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: { $in: pids } }, { ProjectName: 1, projectIcon: 1 }] }, 'find').catch(() => [])
+            : [],
+    ]);
+    const projectsById = {};
+    (projects || []).forEach((p) => { projectsById[String(p._id)] = p; });
+
+    const { chipsByUser, unpointedByUser, unpointed } = U.unitChips({ unit, tasks: tasks || [], userIds, days, plannedDays, plannedMinutes, projectsById });
+    const users = userIds.map((uid) => {
+        const capacityRule = (capacities[uid] || U.capacityOf())[unit];
+        const grid = U.unitDays({
+            days,
+            perDay: U.perDayAmount(capacityRule),
+            ptoDays: R.ptoDaysIn(ptoByUser[uid] || [], days),
+            chipsByDay: chipsByUser[uid] || {},
+        });
+        return {
+            userId: uid,
+            name: (names[uid] && names[uid].name) || '',
+            avatar: (names[uid] && names[uid].avatar) || '',
+            capacityRule,
+            unpointed: unpointedByUser[uid] || 0,
+            ...grid,
+        };
+    }).sort((a, b) => b.utilizationPct - a.utilizationPct);
+    return { users, unpointed };
+};
+
+// POST /api/v1/timesheet/workload-grid  body: { start, end, userIds?, projectIds?, hoursPerDay?, timeZone?, unit? }
+// People × days against capacity (working time − approved PTO). unit 'hours' (the default) reads estimate chips and
+// logged minutes; 'points' and 'count' read open tasks against the person's capacity in that unit.
 exports.getWorkloadGrid = async (req, res) => {
     try {
         const companyId = sessionTenantOf(req);
@@ -41,6 +131,7 @@ exports.getWorkloadGrid = async (req, res) => {
         const days = R.dayKeys(b.start, b.end);
         if (!days.length) return res.status(400).json({ status: false, statusText: 'end must be on or after start.' });
         const zone = safeZone(b.timeZone);
+        const unit = U.unitOf(b.unit);
         const hoursPerDay = Number(b.hoursPerDay) > 0 ? Number(b.hoursPerDay) : 8;
         const roleType = await getRoleType(companyId, req.uid);
         const privileged = isPrivileged(roleType);
@@ -69,10 +160,19 @@ exports.getWorkloadGrid = async (req, res) => {
 
         const [estimates, logs, ptoRows, names] = await Promise.all([
             MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.ESTIMATES_TIME, data: [estMatch, { UserId: 1, TaskId: 1, ProjectId: 1, Date: 1, EstimatedTime: 1 }] }, 'find').catch(() => []),
-            MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TIMESHEET, data: [logMatch, { Loggeduser: 1, LogStartTime: 1, LogTimeDuration: 1 }] }, 'find').catch(() => []),
+            unit === 'hours'
+                ? MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TIMESHEET, data: [logMatch, { Loggeduser: 1, LogStartTime: 1, LogTimeDuration: 1 }] }, 'find').catch(() => [])
+                : [],
             MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PTO_ENTRIES, data: [{ userId: { $in: userIds }, status: 'approved', deletedStatusKey: { $ne: 1 }, startDate: { $lte: rangeEnd }, endDate: { $gte: rangeStart } }] }, 'find').catch(() => []),
             nameMap(userIds),
         ]);
+        const ptoByUser = {};
+        (ptoRows || []).forEach((p) => { (ptoByUser[String(p.userId)] = ptoByUser[String(p.userId)] || []).push(p); });
+
+        if (unit !== 'hours') {
+            const { users, unpointed } = await unitGrid({ companyId, unit, userIds, projectIds, days, rangeStart, rangeEnd, estimates, ptoByUser, names });
+            return res.json({ status: true, statusText: 'OK', data: { start: b.start, end: b.end, days, unit, unpointed, users } });
+        }
 
         const taskIds = [...new Set((estimates || []).map((e) => String(e.TaskId || '')).filter(Boolean))];
         const tasks = taskIds.length ? await MongoDbCrudOpration(companyId, {
@@ -113,9 +213,6 @@ exports.getWorkloadGrid = async (req, res) => {
             const perUser = loggedByUser[uid] || (loggedByUser[uid] = {});
             perUser[day] = (perUser[day] || 0) + (Number(l.LogTimeDuration) || 0);
         });
-        const ptoByUser = {};
-        (ptoRows || []).forEach((p) => { (ptoByUser[String(p.userId)] = ptoByUser[String(p.userId)] || []).push(p); });
-
         const users = userIds.map((uid) => {
             const grid = R.workloadDays({
                 days, hoursPerDay,
@@ -126,10 +223,42 @@ exports.getWorkloadGrid = async (req, res) => {
             return { userId: uid, name: (names[uid] && names[uid].name) || '', avatar: (names[uid] && names[uid].avatar) || '', hoursPerDay, ...grid };
         }).sort((a, b) => b.utilizationPct - a.utilizationPct);
 
-        return res.json({ status: true, statusText: 'OK', data: { start: b.start, end: b.end, days, hoursPerDay, users } });
+        return res.json({ status: true, statusText: 'OK', data: { start: b.start, end: b.end, days, unit, hoursPerDay, users } });
     } catch (e) {
         if (e instanceof TenantError) return res.status(e.statusCode).json({ status: false, statusText: e.message });
         logger.error(`getWorkloadGrid: ${e.message}`);
+        return res.status(500).json({ status: false, statusText: e.message });
+    }
+};
+
+// PUT /api/v1/timesheet/workload-capacity  body: { points?: { value, per }, count?: { value, per } }
+// The caller's own points and task-count capacity, kept on their membership of the session company.
+exports.saveWorkloadCapacity = async (req, res) => {
+    try {
+        const companyId = sessionTenantOf(req);
+        const problem = U.capacityProblem(req.body);
+        if (problem) return res.status(400).json({ status: false, statusText: problem });
+        const uid = String(req.uid || '');
+        const member = { userId: uid, isDelete: { $ne: true } };
+        const row = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMPANY_USERS, data: [member, { workloadCapacity: 1 }] }, 'findOne');
+        if (!row) return res.status(404).json({ status: false, statusText: 'You are not a member of this workspace.' });
+        const workloadCapacity = U.capacityOf({ ...U.capacityOf(row.workloadCapacity), ...req.body });
+        const updated = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.COMPANY_USERS,
+            data: [member, { $set: { workloadCapacity } }, { returnDocument: 'after' }],
+        }, 'findOneAndUpdate');
+        removeCache(`company_users:${companyId}`);
+        removeCache(`UserAllData:${companyId}`);
+        socketEmitter.emit('update', {
+            type: 'update',
+            data: { data: { _id: String((updated && updated._id) || row._id || ''), userId: uid } },
+            updatedFields: { workloadCapacity },
+            module: 'companyUsers',
+        });
+        return res.json({ status: true, statusText: 'Capacity saved.', data: workloadCapacity });
+    } catch (e) {
+        if (e instanceof TenantError) return res.status(e.statusCode).json({ status: false, statusText: e.message });
+        logger.error(`saveWorkloadCapacity: ${e.message}`);
         return res.status(500).json({ status: false, statusText: e.message });
     }
 };
