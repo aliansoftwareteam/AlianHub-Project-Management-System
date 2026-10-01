@@ -40,7 +40,8 @@
 <script setup>
 import { computed } from "vue";
 import { useStore } from "vuex";
-import { DEFAULT_VARIANT, activeVariant, applyVariant } from "@/components/organisms/Shell/shellState.js";
+import { shellState, applyVariant } from "@/components/organisms/Shell/shellState.js";
+import { DEFAULT_VARIANT, lookOf } from "@/components/organisms/Shell/looks.js";
 import { isOwnerOrAdmin } from "@/utils/roles";
 
 defineOptions({ name: "DesignVariantPicker" });
@@ -54,7 +55,7 @@ const options = [
     { value: "classic", label: "Settings.variant_classic", hint: "Settings.variant_classic_hint" }
 ];
 
-const active = computed(activeVariant);
+const active = computed(() => lookOf(shellState.variant));
 /* Picking the default stores nothing, so this browser keeps following whatever the default is. */
 const pick = (value) => applyVariant(value === DEFAULT_VARIANT ? "" : value);
 
@@ -64,10 +65,7 @@ const canPreview = computed(() => isOwnerOrAdmin(Number(getters["settings/compan
 <style>
 .ms-variant { display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--hairline); }
 .ms-variant__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.ms-variant__cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-@media (max-width: 1100px) {
-    .ms-variant__cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+.ms-variant__cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .ms-variant__card {
     display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 12px;
     border: 1px solid var(--border); border-radius: var(--r-input); background: var(--surface); cursor: pointer;

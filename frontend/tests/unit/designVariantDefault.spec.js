@@ -144,8 +144,19 @@ describe('on a phone', () => {
         expect(tokens.slice(0, compactAt).trimEnd()).toMatch(/@media \(min-width: 768px\) \{$/);
     });
 
-    it.each([['.ah-btn', '36px'], ['.ah-btn--sm', '30px'], ['.ah-btn--lg', '42px'], ['.ah-input', '38px']])('%s keeps its %s height', (selector, height) => {
-        expect(ruleBody(phone, selector)).toMatch(new RegExp(`height:\\s*${height}`));
+    const onPhone = declared(ruleBody(phone, 'body'));
+    const heightOf = (selector) => {
+        const height = /(^|[;\s])height\s*:\s*([^;]+)/.exec(ruleBody(tokens, selector))[2].trim();
+        const px = height.replace(/var\((--[\w-]+), [^)]+\)/g, (_, name) => onPhone[name]);
+        return px.startsWith('calc(') ? px.slice(5, -1).split(' + ').reduce((sum, part) => sum + parseFloat(part), 0) : parseFloat(px);
+    };
+
+    it('every look uses the control heights from before the dense default', () => {
+        expect(onPhone).toMatchObject({ '--control-h-sm': '28px', '--control-h': '30px', '--control-h-lg': '36px' });
+    });
+
+    it.each([['.ah-btn', 36], ['.ah-btn--sm', 30], ['.ah-btn--lg', 42], ['.ah-input', 38]])('%s is %ipx tall, as it was', (selector, height) => {
+        expect(heightOf(selector)).toBe(height);
     });
 });
 

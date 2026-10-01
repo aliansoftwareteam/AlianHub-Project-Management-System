@@ -529,14 +529,10 @@ html, body, #app {
 .ah-field__hint { font: var(--text-small); color: var(--ink-2); }
 .ah-textarea { min-height: 80px; padding: var(--sp-4) var(--sp-5); line-height: 1.5; resize: vertical; }
 
-/* A dense control is sized for a pointer. On a phone the touch floor is 40px and the shared controls
-   keep their full heights whatever the look; the floor sits on body so it beats what a look sets on <html>. */
+/* A dense control is sized for a pointer. On a phone the touch floor is 40px and every look uses the
+   control heights the app had before the dense default; they sit on body so they beat what a look sets on <html>. */
 @media (max-width: 767px) {
-    body { --hit-min: 40px; }
-    .ah-btn { height: 36px; }
-    .ah-btn--sm { height: 30px; }
-    .ah-btn--lg { height: 42px; }
-    .ah-input { height: 38px; }
+    body { --hit-min: 40px; --control-h-sm: 28px; --control-h: 30px; --control-h-lg: 36px; }
 }
 
 .ah-chip {
