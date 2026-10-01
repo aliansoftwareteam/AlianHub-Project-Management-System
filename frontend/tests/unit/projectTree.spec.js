@@ -10,6 +10,7 @@ const { apiRequest, perms } = vi.hoisted(() => ({ apiRequest: vi.fn(), perms: {}
 vi.mock('@/services', () => ({ apiRequest, apiRequestWithoutCompnay: vi.fn() }));
 vi.mock('@/composable', () => ({ useCustomComposable: () => ({ checkPermission: (key) => perms[key] !== false }) }));
 
+import * as env from '@/config/env';
 import ProjectTree from '@/components/molecules/ProjectTree/ProjectTree.vue';
 import ProjectTreePanel from '@/views/Projects/components/ProjectTreePanel.vue';
 import { resetProjectTreeCache } from '@/components/molecules/ProjectTree/projectTreeData';
@@ -61,7 +62,8 @@ const makeStore = (roleType = 3) => createStore({
         'projectData/folders': () => ({}),
         'settings/companyUserDetail': () => ({ roleType }),
         'settings/teams': () => [{ _id: 'team-1', assigneeUsersArray: ['user-1'] }]
-    }
+    },
+    mutations: { 'projectData/mutateFolders': () => {} }
 });
 
 const mounted = [];
@@ -251,15 +253,15 @@ describe('subfolders in the project tree', () => {
         expect(document.activeElement.textContent).toContain('Child folder');
     });
 
-    it('offers a new subfolder and a move on a top-level folder, and only a move on a subfolder', async () => {
+    it('offers every action on a top-level folder, and all but a new subfolder on a subfolder', async () => {
         const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
-        expect(await openMenu(wrapper, 'Empty folder')).toEqual(['Projects.new_subfolder', 'Projects.move_folder']);
-        expect(await openMenu(wrapper, 'Child folder')).toEqual(['Projects.move_folder']);
+        expect(await openMenu(wrapper, 'Empty folder')).toEqual(['Projects.new_subfolder', 'Projects.rename', 'Projects.move_folder', 'Projects.archive', 'Projects.delete']);
+        expect(await openMenu(wrapper, 'Child folder')).toEqual(['Projects.rename', 'Projects.move_folder', 'Projects.archive', 'Projects.delete']);
     });
 
     it('offers no move on a folder that holds subfolders: it has nowhere to go', async () => {
         const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
-        expect(await openMenu(wrapper, 'Parent folder')).toEqual(['Projects.new_subfolder']);
+        expect(await openMenu(wrapper, 'Parent folder')).toEqual(['Projects.new_subfolder', 'Projects.rename', 'Projects.archive', 'Projects.delete']);
     });
 
     it('opens a folder\'s actions from the keyboard and closes them with Escape', async () => {
@@ -284,18 +286,153 @@ describe('subfolders in the project tree', () => {
         expect(menuOf(wrapper, 'Empty folder')).not.toBeNull();
     });
 
-    it('offers nothing to someone who may neither create nor rename folders', async () => {
-        perms['project.project_folder_create'] = false;
-        perms['project.project_folder_name_edit'] = false;
+    const deny = (...keys) => keys.forEach((key) => { perms[`project.${key}`] = false; });
+
+    it('offers nothing to someone who holds no folder permission', async () => {
+        deny('project_folder_create', 'project_folder_name_edit', 'folder_archive', 'folder_delete');
         const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
         expect(menuOf(wrapper, 'Empty folder')).toBeNull();
         expect(menuOf(wrapper, 'Child folder')).toBeNull();
     });
 
-    it('lets someone who may only rename folders move one, not create one', async () => {
-        perms['project.project_folder_create'] = false;
+    it('lets someone who may only rename folders rename and move one', async () => {
+        deny('project_folder_create', 'folder_archive', 'folder_delete');
         const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
-        expect(await openMenu(wrapper, 'Empty folder')).toEqual(['Projects.move_folder']);
-        expect(menuOf(wrapper, 'Parent folder')).toBeNull();
+        expect(await openMenu(wrapper, 'Empty folder')).toEqual(['Projects.rename', 'Projects.move_folder']);
+        expect(await openMenu(wrapper, 'Parent folder')).toEqual(['Projects.rename']);
+    });
+
+    it('lets someone who may only archive folders archive one', async () => {
+        deny('project_folder_create', 'project_folder_name_edit', 'folder_delete');
+        const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+        expect(await openMenu(wrapper, 'Child folder')).toEqual(['Projects.archive']);
+    });
+
+    describe('renaming in the row', () => {
+        const renamed = { _id: 'fe', name: 'Archive box', projectId: 'p3', deletedStatusKey: 0, parentFolderId: null };
+        const startRename = async (wrapper, name) => {
+            await openMenu(wrapper, name);
+            [...rowOf(wrapper, name).querySelectorAll('[role="menuitem"]')].find((item) => item.textContent.trim() === 'Projects.rename').click();
+            await flushPromises();
+            return wrapper.find('input.pt-row__rename');
+        };
+        const patches = () => apiRequest.mock.calls.filter(([method]) => method === 'patch');
+
+        beforeEach(() => {
+            const read = apiRequest.getMockImplementation();
+            apiRequest.mockImplementation((method, url, body) => (method === 'patch'
+                ? Promise.resolve({ data: { status: true, data: renamed } })
+                : read(method, url, body)));
+        });
+
+        it('swaps the row for an input holding the name, focused', async () => {
+            const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+            const input = await startRename(wrapper, 'Empty folder');
+            expect(input.exists()).toBe(true);
+            expect(input.element.value).toBe('Empty folder');
+            expect(document.activeElement).toBe(input.element);
+            expect(itemNamed(wrapper, 'Empty folder')).toBeUndefined();
+            expect(input.attributes('aria-label')).toBe('ProjectTree.rename_folder');
+        });
+
+        it('saves on Enter and gives the row back its focus', async () => {
+            const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+            const input = await startRename(wrapper, 'Empty folder');
+            await input.setValue('  Archive box ');
+            await input.trigger('keydown', { key: 'Enter' });
+            await flushPromises();
+
+            expect(patches()).toEqual([['patch', `${env.FOLDER}/fe`, { type: 'editFolderName', companyId: 'company-1', projectId: 'p3', folderName: 'Archive box' }]]);
+            expect(wrapper.find('input.pt-row__rename').exists()).toBe(false);
+            expect(document.activeElement.getAttribute('data-key')).toBe('folder:fe');
+        });
+
+        it('cancels on Escape without a request', async () => {
+            const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+            const input = await startRename(wrapper, 'Empty folder');
+            await input.setValue('Something else');
+            await input.trigger('keydown', { key: 'Escape' });
+            await flushPromises();
+            expect(patches()).toEqual([]);
+            expect(wrapper.find('input.pt-row__rename').exists()).toBe(false);
+            expect(itemNamed(wrapper, 'Empty folder')).toBeTruthy();
+        });
+
+        it('saves nothing when the name is unchanged, too short, or a sibling\'s', async () => {
+            const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+            const input = await startRename(wrapper, 'Empty folder');
+            for (const name of ['ab', 'parent FOLDER']) {
+                await input.setValue(name);
+                await input.trigger('keydown', { key: 'Enter' });
+                await flushPromises();
+                expect(wrapper.find('input.pt-row__rename').exists()).toBe(true);
+            }
+            await input.setValue('Empty folder');
+            await input.trigger('keydown', { key: 'Enter' });
+            await flushPromises();
+            expect(wrapper.find('input.pt-row__rename').exists()).toBe(false);
+            expect(patches()).toEqual([]);
+        });
+
+        it('lets a subfolder take a name that only a folder at another level has', async () => {
+            const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+            const input = await startRename(wrapper, 'Child folder');
+            await input.setValue('Empty folder');
+            await input.trigger('keydown', { key: 'Enter' });
+            await flushPromises();
+            expect(patches()).toHaveLength(1);
+            expect(patches()[0][1]).toBe(`${env.FOLDER}/fc`);
+        });
+
+        it('keeps the tree\'s arrow keys out of the input', async () => {
+            const { wrapper } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+            const input = await startRename(wrapper, 'Empty folder');
+            await input.trigger('keydown', { key: 'ArrowUp' });
+            await input.trigger('keydown', { key: 'Home' });
+            expect(document.activeElement).toBe(input.element);
+        });
+    });
+
+    describe('archiving the folder in view', () => {
+        const confirm = async () => {
+            await vi.dynamicImportSettled();
+            await flushPromises();
+            document.body.querySelector('[data-action="confirm"]').click();
+            await flushPromises();
+        };
+
+        it('asks first, then leaves the folder\'s page for the project', async () => {
+            const read = apiRequest.getMockImplementation();
+            apiRequest.mockImplementation((method, url, body) => (method === 'patch'
+                ? Promise.resolve({ data: { status: true, data: { ...FOLDERS.p3[0], deletedStatusKey: 2 }, subfolders: [{ _id: 'fc', deletedStatusKey: 6 }] } })
+                : read(method, url, body)));
+            const { wrapper, router } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+            await openMenu(wrapper, 'Parent folder');
+            [...rowOf(wrapper, 'Parent folder').querySelectorAll('[role="menuitem"]')].find((item) => item.textContent.trim() === 'Projects.archive').click();
+            await flushPromises();
+            expect(apiRequest.mock.calls.filter(([method]) => method === 'patch')).toEqual([]);
+            expect(router.currentRoute.value.name).toBe('ProjectFolderSprint');
+
+            await confirm();
+
+            const [, url, body] = apiRequest.mock.calls.find(([method]) => method === 'patch');
+            expect(url).toBe(`${env.FOLDER}/fp`);
+            expect(body).toMatchObject({ type: 'updateFolder', updateObject: { $set: { deletedStatusKey: 2 } } });
+            expect(router.currentRoute.value.name).toBe('Project');
+            expect(router.currentRoute.value.params.id).toBe('p3');
+        });
+
+        it('stays where it is when another folder is archived', async () => {
+            const read = apiRequest.getMockImplementation();
+            apiRequest.mockImplementation((method, url, body) => (method === 'patch'
+                ? Promise.resolve({ data: { status: true, data: { ...FOLDERS.p3[3], deletedStatusKey: 2 }, subfolders: [] } })
+                : read(method, url, body)));
+            const { wrapper, router } = await mountWith(ProjectTree, { projects: NESTED, label: 'Projects' }, { at: NESTED_LIST });
+            await openMenu(wrapper, 'Empty folder');
+            [...rowOf(wrapper, 'Empty folder').querySelectorAll('[role="menuitem"]')].find((item) => item.textContent.trim() === 'Projects.archive').click();
+            await flushPromises();
+            await confirm();
+            expect(router.currentRoute.value.name).toBe('ProjectFolderSprint');
+        });
     });
 });

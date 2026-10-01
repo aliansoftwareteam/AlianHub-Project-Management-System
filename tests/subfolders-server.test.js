@@ -14,11 +14,13 @@ jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), 
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../Modules/notification-count/controller', () => ({ unsetAllCounts: jest.fn(async () => ({})), updateUnReadCommentsCount: jest.fn() }));
 jest.mock('../Modules/Tasks/helpers/handleNotification', () => ({ HandleBothNotification: jest.fn(async () => ({ status: true })) }));
+jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
 
 const mongoose = require('mongoose');
 const { myCache } = require('../Config/config');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { unsetAllCounts } = require('../Modules/notification-count/controller');
+const socketEmitter = require('../event/socketEventEmitter');
 
 const C = 'c00000000000000000000001';
 const ELSEWHERE = 'c00000000000000000000002';
@@ -418,6 +420,131 @@ describe('archive, delete and restore cascade through subfolders', () => {
         await setStatus(tree.parent, 2);
         expect(refused(await move(tree.sub, null))).toMatch(/parent/);
         expect(String(stored(SCHEMA_TYPE.FOLDERS, tree.sub).parentFolderId)).toBe(tree.parent);
+    });
+
+    describe('and the trash restores a deleted folder', () => {
+        const fromTrash = async (id) => {
+            const { updateFolderFun } = require('../Modules/Sprints/controller');
+            const { answer, cascade } = await updateFolderFun({
+                companyId: C,
+                id,
+                updateObject: { $set: { deletedStatusKey: 0 } },
+                folderName: 'Parent',
+                projectData: { id: project, ProjectName: 'Launch' },
+                userData: { id: OWNER, Employee_Name: 'Olivia Owner' },
+                fromTrash: true,
+            });
+            await cascade;
+            await settle();
+            return answer;
+        };
+
+        it('with the subfolders and tasks that went with it; like a list\'s restore, every trashed task in those lists comes back', async () => {
+            await setStatus(tree.parent, 1);
+            const answer = await fromTrash(tree.parent);
+
+            expect(answer).toMatchObject({ status: true, subfolders: [{ _id: tree.sub, deletedStatusKey: 0 }] });
+            expect(statusOf(SCHEMA_TYPE.FOLDERS, tree.parent)).toBe(0);
+            expect(statusOf(SCHEMA_TYPE.FOLDERS, tree.sub)).toBe(0);
+            expect(statusOf(SCHEMA_TYPE.FOLDERS, tree.archivedSub)).toBe(2);
+            expect(taskStatuses()).toEqual({ parent: 0, sub: 0, ...untouched, subDeletedAlone: 0 });
+        });
+
+        it('with what was archived with it before it was deleted', async () => {
+            await setStatus(tree.parent, 2);
+            await setStatus(tree.parent, 1);
+            await fromTrash(tree.parent);
+            expect(statusOf(SCHEMA_TYPE.FOLDERS, tree.sub)).toBe(0);
+            expect(taskStatuses()).toMatchObject({ parent: 0, sub: 0, archivedSub: ARCHIVED_WITH_FOLDER, inArchivedSprint: 4, neighbour: 0 });
+        });
+
+        it('refuses a subfolder while its parent is still in the trash', async () => {
+            await setStatus(tree.parent, 1);
+            await expect(fromTrash(tree.sub)).rejects.toMatchObject({ statusCode: 400, message: expect.stringMatching(/parent/) });
+            expect(statusOf(SCHEMA_TYPE.FOLDERS, tree.sub)).toBe(1);
+        });
+
+        it('writes history that names the signed-in user', async () => {
+            await setStatus(tree.parent, 1);
+            await fromTrash(tree.parent);
+            const lines = rowsOf(SCHEMA_TYPE.HISTORY).map((row) => row.Message);
+            expect(lines[lines.length - 1]).toBe('<b>Olivia Owner</b> has restored <b>Parent</b> folder in <b>Launch</b> project.');
+        });
+    });
+});
+
+describe('renaming a folder', () => {
+    const rename = (id, folderName) => run(PATCH, { id, body: { type: 'editFolderName', projectId: project, folderName } });
+    const taskUnder = (folderId, extra = {}) => String(db().seed(SCHEMA_TYPE.TASKS, {
+        _id: oid(), ProjectID: project, sprintId: oid(), TaskName: 'Task', deletedStatusKey: 0, folderObjId: folderId, sprintArray: { name: 'Sprint 1', folderId, folderName: 'Q3' }, ...extra,
+    })._id);
+    const taskWrites = (company = C) => db(company).calls.filter((call) => call.type === SCHEMA_TYPE.TASKS && call.method === 'updateMany');
+
+    it('renames the copy of its name on every task in it, and on no other task', async () => {
+        const folder = folderIn();
+        const other = folderIn({ name: 'Other' });
+        const mine = taskUnder(folder);
+        const archived = taskUnder(folder, { deletedStatusKey: 2 });
+        const theirs = taskUnder(other);
+        const loose = taskIn(sprintIn());
+
+        const res = await rename(folder, 'Q4');
+
+        expect(res.body).toMatchObject({ status: true, data: { name: 'Q4' } });
+        expect(stored(SCHEMA_TYPE.TASKS, mine).sprintArray).toEqual({ name: 'Sprint 1', folderId: folder, folderName: 'Q4' });
+        expect(stored(SCHEMA_TYPE.TASKS, archived).sprintArray.folderName).toBe('Q4');
+        expect(stored(SCHEMA_TYPE.TASKS, theirs).sprintArray.folderName).toBe('Q3');
+        expect(stored(SCHEMA_TYPE.TASKS, loose)).not.toHaveProperty('sprintArray');
+    });
+
+    it('scopes that write to the company and the folder\'s stored project, and leaves the tasks\' updatedAt alone', async () => {
+        const folder = folderIn();
+        taskUnder(folder);
+        folderIn({}, ELSEWHERE);
+
+        await rename(folder, 'Q4');
+
+        const [write] = taskWrites();
+        expect(taskWrites()).toHaveLength(1);
+        expect(write.companyId).toBe(C);
+        expect(String(write.data[0].ProjectID)).toBe(project);
+        expect(String(write.data[0].folderObjId)).toBe(folder);
+        expect(write.data[1]).toEqual({ $set: { 'sprintArray.folderName': 'Q4' } });
+        expect(write.data[2]).toEqual({ timestamps: false });
+        expect(taskWrites(ELSEWHERE)).toEqual([]);
+    });
+
+    it('writes to no task when the folder is not found', async () => {
+        expect((await rename(oid(), 'Q4')).body).toMatchObject({ status: false, statusText: 'Folder not found' });
+        expect(taskWrites()).toEqual([]);
+    });
+});
+
+describe('folder writes say that the company\'s folders changed', () => {
+    const announced = () => socketEmitter.emit.mock.calls.filter(([, payload]) => payload && payload.module === 'folders');
+
+    it('once per write, naming neither the project nor the folder', async () => {
+        const parent = folderIn();
+        const folder = folderIn({ name: 'Icons' });
+
+        await add({});
+        expect(announced()).toEqual([['insert', { type: 'insert', companyId: C, module: 'folders' }]]);
+
+        socketEmitter.emit.mockClear();
+        await run(PATCH, { id: folder, body: { type: 'editFolderName', projectId: project, folderName: 'Glyphs' } });
+        await move(folder, parent);
+        await setStatus(folder, 2);
+        expect(announced()).toEqual([1, 2, 3].map(() => ['update', { type: 'update', companyId: C, module: 'folders' }]));
+    });
+
+    it('nothing for a write that is refused or finds no folder', async () => {
+        const folder = folderIn();
+        await move(folder, folder);
+        await move(oid(), null);
+        await add({ parentFolderId: 'not-an-id' });
+        await setStatus(oid(), 2);
+        await run(PATCH, { id: oid(), body: { type: 'editFolderName', projectId: project, folderName: 'Q4' } });
+        expect(announced()).toEqual([]);
     });
 });
 
