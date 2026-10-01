@@ -60,7 +60,6 @@ module.exports = {
                         return;
                 }
                 MongoDbCrudOpration(companyId, objSchema, 'findOneAndUpdate').then(async(res)=>{
-                    socketEmitter.emit('update', { type: "update", data: res , updatedFields: {}, module: 'task', companyId });
                     let taskObj;
                     let updateObj = {
                         TaskKey: `${projectCode}-${res.lastTaskId+1}`

@@ -885,7 +885,6 @@ exports.duplicateSubTaskFunction = (companyId, projectData, sprintObj, subtask, 
                 ]
             }
             MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then((response) => {
-                socketEmitter.emit('update', { type: "update", data: response , updatedFields: {taskTypeCounts: response.taskTypeCounts,lastTaskId: response.lastTaskId}, module: 'task', companyId });
                 obj.TaskKey = projectData.ProjectCode + '-' +  response.lastTaskId;
                 exports.HandleTask(companyId, obj, false, null, userData).then(async (taskResult) => {
                     if (copied) copied.set(String(subtask._id), String(taskResult.id));

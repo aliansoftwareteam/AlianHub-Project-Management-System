@@ -3,12 +3,9 @@ const {
     leaveRoom,
     upsertRoom,
     removeRoom,
-    findRoomsByPrefix,
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
-const { onJoin, prefixOfOwnRoom, isCompanyMember, mayReceiveCompany, inOrder } = require('../roomAccess');
-
-const COMPANY_ROOM = 'selected_companies_';
+const { onJoin, prefixOfOwnRoom, isCompanyMember, toCompanyRoom, COMPANY_ROOM } = require('../roomAccess');
 
 exports.companiesSocketHandler = ({ socket, namespace }) => {
     onJoin(socket, 'joinCompaniesRoom',
@@ -36,24 +33,15 @@ function setEventName(type) {
     }
 }
 
-const relayCompanyChange = async (company, rooms, eventName, emitData) => {
-    for (const room of rooms) {
-        // eslint-disable-next-line no-await-in-loop
-        if (!(await mayReceiveCompany(room.socket.identity, company._id))) continue;
-        if (room.socket.rooms.has(room.roomName)) room.namespace.to(room.roomName).emit(eventName, emitData);
-    }
-};
-
 const handleCompaniesChange = (changeData, includeUpdatedFields = false) => {
     const company = changeData && changeData.module === 'companies' && changeData.data && changeData.data.data;
     if (!company || !company._id) return undefined;
-    const rooms = findRoomsByPrefix(`${COMPANY_ROOM}${company._id}`);
-    if (!rooms.length) return undefined;
+    const eventName = setEventName(changeData.type);
     const emitData = {
         fullDocument: company,
         ...(includeUpdatedFields && { updatedFields: changeData.updatedFields }),
     };
-    return inOrder(() => relayCompanyChange(company, rooms, setEventName(changeData.type), emitData));
+    return toCompanyRoom(company._id, (room) => room.namespace.to(room.roomName).emit(eventName, emitData));
 };
 
 socketEmitter.on('companies:update', changeData => handleCompaniesChange(changeData, true));

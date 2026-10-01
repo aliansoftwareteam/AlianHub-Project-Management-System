@@ -249,6 +249,39 @@ const pageCreateGuard = (req, res, next) => pageCreateChecked(req, res, () => {
 /* For a write route the registry has no action for, or only one behind a flag: `action` names it in the refusal and its audit row. */
 const agentsRefused = (action) => routeGuard(() => ({ action, params: {} }));
 
+const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const WORD = /^[a-z][a-z-]*$/;
+const sourcesAlone = (body) => Object.keys(body).length === 1 && body.sources !== undefined;
+
+/* The action each goal write is, by its method and its path below the goal routes, `:id` standing for an id. */
+const GOAL_WRITES = {
+    'POST /': 'goal.create',
+    'PATCH /:id': 'goal.update',
+    'POST /:id/archive': 'goal.archive',
+    'POST /:id/restore': 'goal.restore',
+    'POST /:id/targets': 'goal.target.add',
+    'PATCH /:id/targets/:id': (body) => (sourcesAlone(body) ? ['goal.target.sources.add', 'goal.target.sources.remove'] : 'goal.target.edit'),
+    'DELETE /:id/targets/:id': 'goal.target.remove',
+    'PUT /:id/targets/:id/value': 'goal.target.set',
+};
+
+/* A goal write that is not listed is still judged, under the name of its last word, so a route added later is
+ * closed to an agent token until it is given an action here. */
+const goalChecks = (req, body) => {
+    const segments = String(req.url || '').split('?')[0].split('/').filter(Boolean);
+    const ids = segments.filter((segment) => OBJECT_ID.test(segment));
+    const listed = GOAL_WRITES[`${req.method} /${segments.map((segment) => (OBJECT_ID.test(segment) ? ':id' : segment)).join('/')}`];
+    const last = segments[segments.length - 1] || '';
+    const actions = listed ? [].concat(typeof listed === 'function' ? listed(body) : listed) : [`goal.${WORD.test(last) ? last : 'write'}`];
+    const params = { ...(ids[0] ? { goalId: ids[0] } : {}), ...(ids[1] ? { targetId: ids[1] } : {}) };
+    return actions.map((action) => ({ action, params }));
+};
+
+const goalWriteGuard = routeGuard(goalChecks);
+
+/* Mounted on the goal routes' prefix, so it runs before every handler under it. */
+const goalGuard = (req, res, next) => (READ_METHODS.has(req.method) ? next() : goalWriteGuard(req, res, next));
+
 /* The perimeter: paths no agent token may reach whatever the body says. These
  * correspond to the actions absent from the registry. */
 const PERIMETER = [
@@ -273,4 +306,4 @@ const agentPerimeter = withActor(async (req, res, next, actor) => {
     return refuse(req, res, actor, { action: hit.action, reason: `Agents cannot perform ${hit.action}`, params: {} });
 });
 
-module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, agentsRefused, agentPerimeter, TASK_PATCH_ACTIONS };
+module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, goalGuard, agentsRefused, agentPerimeter, TASK_PATCH_ACTIONS };

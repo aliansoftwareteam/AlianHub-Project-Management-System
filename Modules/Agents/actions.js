@@ -22,7 +22,7 @@ const { isPeriodLocked } = require('../TimesheetApproval/helpers/lockGuard');
 const { canPostToThread } = require('../Comments/helpers/threadWriteAccess');
 const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
 const { canCreatePageIn } = require('../Pages/helpers/pageAccess');
-const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
+const { readableTaskIds, openProject, listOf } = require('../Tasks/helpers/taskWritePlacement');
 const logger = require('../../Config/loggerConfig');
 
 // The single place an agent's action is executed. MCP tools, approved proposals
@@ -174,6 +174,24 @@ const timelogEntry = (params) => {
 const contentOfText = (text) => {
     const blocks = markdownToEditorData(String(text || '').slice(0, 20000));
     return { html: blocksToHtml(blocks), blocks };
+};
+
+const DRAFT_ELSEWHERE = 'a doc drafted for a task is saved in that task\'s project';
+
+/* Where a draft is saved. One written for a task is filed in the task's project, and is its author's alone when the
+ * task's list is private: a project doc is read by everyone on the project, a private list's tasks are not.
+ * null when the task has no project, or the draft names another one. */
+const draftPlaceOf = async (companyId, params) => {
+    const named = params.projectId && oid(params.projectId) ? String(params.projectId) : '';
+    const taskId = params.taskId && oid(params.taskId);
+    if (!taskId) return { projectId: named, visibility: 'project', linkedTasks: [] };
+    const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: taskId }, { ProjectID: 1, sprintId: 1 }] }, 'findOne');
+    const projectId = task && oid(task.ProjectID) ? String(task.ProjectID) : '';
+    if (!projectId || (named && named !== projectId)) return null;
+    const list = oid(task.sprintId)
+        ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: oid(task.sprintId) }, { private: 1 }] }, 'findOne')
+        : null;
+    return { projectId, visibility: list && list.private === true ? 'private' : 'project', linkedTasks: [taskId] };
 };
 
 const executors = {
@@ -354,12 +372,13 @@ const executors = {
         const a = attribution(actor);
         const title = String(params.title || '').trim().slice(0, 200);
         if (!title) throw new tools.DeterministicError('title is required');
-        const linked = (params.taskId && oid(params.taskId)) ? [oid(params.taskId)] : [];
+        const place = await draftPlaceOf(companyId, params);
+        if (!place) throw new tools.DeterministicError(DRAFT_ELSEWHERE);
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
             data: { title, rawText: String(params.text || '').slice(0, 20000), content: cleanPageContent(params.content || contentOfText(params.text)),
-                    ProjectID: params.projectId && oid(params.projectId) ? oid(params.projectId) : undefined,
-                    createdBy: String(actor.userId || a.actorId), linkedTasks: linked, visibility: 'project',
+                    ProjectID: place.projectId ? oid(place.projectId) : undefined,
+                    createdBy: String(actor.userId || a.actorId), linkedTasks: place.linkedTasks, visibility: place.visibility,
                     createdByAgent: true, agentName: a.label, agentStatus: 'draft', deletedStatusKey: 0 },
         }, 'save');
         emitPageChange(companyId, 'insert', saved);
@@ -413,21 +432,40 @@ const threadMay = async (companyId, actor, action, params) => {
     return (await canPostToThread(companyId, actor && actor.userId, tools.commentThreadOf(task))).allowed;
 };
 const THREAD_REFUSAL = 'not_visible: the task\'s comment thread is not one the person behind this agent can open';
+const TASK_REFUSAL = 'not_visible: the task is not one the person behind this agent can open';
+const PROJECT_REFUSAL = 'not_visible: the project is not one the person behind this agent can open';
+const LIST_REFUSAL = 'not_visible: the list is not one the person behind this agent can open in that project';
 
-/* page.draft saves its doc without the create route, so the route's rule is asked here: where the person behind
- * the agent may start a doc, and a task they can open to hang it on. Returns the refusal, or ''. */
+/* These reach their task, project or list through the automation tool layer, which asks nothing about a person, so
+ * the task routes' read rule is asked here. Every other executor runs a route's handler or a check of its own. */
+const TASK_WRITES = new Set(['task.status.set', 'task.link', 'task.assign', 'task.update', 'task.sprint.move', 'subtask.create', 'timelog.create', 'timelog.start', 'timelog.stop']);
+
+const targetRefusal = async (companyId, actor, action, params) => {
+    const uid = String((actor && actor.userId) || '');
+    if (action === 'task.create') {
+        if (!(await openProject(companyId, uid, params.projectId))) return PROJECT_REFUSAL;
+        return !params.sprintId || await listOf(companyId, uid, params.projectId, params.sprintId) ? '' : LIST_REFUSAL;
+    }
+    if (!TASK_WRITES.has(action)) return '';
+    const taskId = String(params.taskId || '');
+    if (!(await readableTaskIds(companyId, uid, [taskId])).includes(taskId)) return TASK_REFUSAL;
+    if (action !== 'task.sprint.move') return '';
+    const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: oid(taskId) }, { ProjectID: 1 }] }, 'findOne');
+    return await listOf(companyId, uid, task.ProjectID, params.sprintId) ? '' : LIST_REFUSAL;
+};
+
+/* page.draft saves its doc without the create route, so the route's rule is asked here: a task the person behind
+ * the agent can open to hang it on, and a place where they may start a doc. Returns the refusal, or ''. */
 const draftRefusal = async (companyId, actor, action, params) => {
     if (action !== 'page.draft') return '';
     const uid = String((actor && actor.userId) || '');
-    const place = await canCreatePageIn(companyId, uid, params.projectId && oid(params.projectId) ? String(params.projectId) : '');
-    if (!place.allowed) {
-        return place.statusCode === 403
-            ? 'permission_denied: the person behind this agent cannot add a doc here'
-            : 'not_visible: the project is not one the person behind this agent can open';
-    }
     const linked = params.taskId && oid(params.taskId) ? [String(params.taskId)] : [];
-    if ((await readableTaskIds(companyId, uid, linked)).length !== linked.length) return 'not_visible: the task is not one the person behind this agent can open';
-    return '';
+    if ((await readableTaskIds(companyId, uid, linked)).length !== linked.length) return TASK_REFUSAL;
+    const place = await draftPlaceOf(companyId, params);
+    if (!place) return `permission_denied: ${DRAFT_ELSEWHERE}`;
+    const start = await canCreatePageIn(companyId, uid, place.projectId);
+    if (start.allowed) return '';
+    return start.statusCode === 403 ? 'permission_denied: the person behind this agent cannot add a doc here' : PROJECT_REFUSAL;
 };
 
 const refusal = async (companyId, actor, { action, params, reason, ip, entityType, entityId, taint }) => {
@@ -457,8 +495,8 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
     const holder = await permissions.holderMay(companyId, actor, action, params);
     if (!holder.allowed) throw await refusal(companyId, actor, { action, params, reason: holder.reason, ip, taint });
     if (!(await threadMay(companyId, actor, action, params))) throw await refusal(companyId, actor, { action, params, reason: THREAD_REFUSAL, ip, taint });
-    const draftRefused = await draftRefusal(companyId, actor, action, params);
-    if (draftRefused) throw await refusal(companyId, actor, { action, params, reason: draftRefused, ip, taint });
+    const closed = await targetRefusal(companyId, actor, action, params) || await draftRefusal(companyId, actor, action, params);
+    if (closed) throw await refusal(companyId, actor, { action, params, reason: closed, ip, taint });
     if (!check.action.write) return { result: null, auditId: null, undo: null };
     const exec = executors[action];
     if (!exec) throw new tools.DeterministicError(`${action} has no executor`);

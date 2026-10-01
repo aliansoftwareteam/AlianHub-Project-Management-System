@@ -48,11 +48,15 @@ exports.commentSocketHandler = ({ socket, namespace }) => {
             typing: !!data.typing,
         };
 
-        findRoomsByPrefix(data.roomPrefix).forEach((entry) => {
-            // The author's other tabs are in the room too; the client drops those by user id.
-            if (!entry.socket || entry.socket === socket || entry.socket.disconnected) return;
-            if (!entry.socket.identity || entry.socket.identity.companyId !== identity.companyId) return;
-            entry.socket.emit('commentTyping', payload);
+        // The author's other tabs are in the room too; the client drops those by user id.
+        const others = findRoomsByPrefix(data.roomPrefix).filter((entry) => entry.socket && entry.socket !== socket);
+        if (!others.length) return;
+        inOrder(async () => {
+            for (const entry of others) {
+                // eslint-disable-next-line no-await-in-loop
+                if (!(await mayReceiveComments(entry.socket.identity, identity, data.roomPrefix))) continue;
+                if (!entry.socket.disconnected && entry.socket.rooms.has(entry.roomName)) entry.socket.emit('commentTyping', payload);
+            }
         });
     });
 };
