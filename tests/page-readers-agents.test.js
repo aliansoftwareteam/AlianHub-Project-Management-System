@@ -11,6 +11,7 @@ const { myCache } = require('../Config/config');
 const audit = require('../Modules/Agents/agentAudit');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { undoStateOf, undoAuditRow, REASON } = require('../Modules/Agents/undo');
+const { READERS } = require('../Modules/Agents/skills/readers');
 
 const { C, PEOPLE, PROJECTS, PAGES } = world;
 
@@ -56,5 +57,19 @@ describe('the page readers agree on who reaches a page: undoing an agent\'s page
         expect(stored().deletedStatusKey).toBe(0);
         expect(await undo('inside')).toMatchObject({ ok: true });
         expect(stored().deletedStatusKey).toBe(1);
+    });
+});
+
+describe('the page readers give the same answer: the doc an agent reads for a task', () => {
+    const OTHER_TASK = 'd000000000000000000000d2';
+    const linked = (doc) => mockDb.seed(SCHEMA_TYPE.PAGES, { createdBy: PEOPLE.owner, ProjectID: PROJECTS.open, deletedStatusKey: 0, linkedTasks: [OTHER_TASK], ...doc });
+    const read = () => READERS.linked_doc(C, { task: { _id: OTHER_TASK } }, { maxChars: 200 });
+
+    it('reads a linked doc that is not private, whether or not the row records its visibility', async () => {
+        linked({ title: 'Atlas kept back', rawText: 'kept back', visibility: 'private' });
+        expect(await read()).toEqual({ skip: 'no document is attached to this task' });
+
+        linked({ title: 'Atlas early', rawText: 'early notes' });
+        expect(await read()).toMatchObject({ title: 'Atlas early', text: 'early notes' });
     });
 });

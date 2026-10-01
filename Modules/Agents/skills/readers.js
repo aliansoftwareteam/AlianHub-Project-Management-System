@@ -205,7 +205,7 @@ const READERS = Object.freeze({
         if (!taskId) return { skip: 'the task has no id' };
         const page = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
-            data: [{ linkedTasks: taskId, visibility: 'project', deletedStatusKey: { $ne: 1 } }, { title: 1, rawText: 1, origin: 1 }, { sort: { updatedAt: -1 } }],
+            data: [{ linkedTasks: taskId, visibility: { $ne: 'private' }, deletedStatusKey: { $ne: 1 } }, { title: 1, rawText: 1, origin: 1 }, { sort: { updatedAt: -1 } }],
         }, 'findOne');
         if (!page) return { skip: 'no document is attached to this task' };
         // A page a member or an agent wrote is the workspace's own; only an inbound origin marks the run.
