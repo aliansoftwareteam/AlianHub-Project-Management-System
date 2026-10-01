@@ -82,6 +82,7 @@ const verifyJWTTokenWithCRoute = [
     "/api/v2/forms",
     "/api/v2/task-templates",
     "/api/v2/view-templates",
+    "/api/v2/whiteboards",
     "/api/v2/assignment-rules",
     "/api/v1/removeCache",
     // Found by walking the Express stack for routes no guard list reached (task 034).
