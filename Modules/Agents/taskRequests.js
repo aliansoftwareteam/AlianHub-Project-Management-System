@@ -285,7 +285,7 @@ const recordAgentStatus = async (companyId, task, from, patch, agent) => {
     const outcome = await completionStore.forStatusChange(companyId, task._id, { toStatus: { statusType: patch.statusType, name: patch.status.text }, fromStatus: from, actor: agent });
     if (!outcome || outcome.error || !outcome.completion) return;
     const saved = await completionStore.save(companyId, task._id, addWork(outcome.completion, agent));
-    if (saved) socketEmitter.emit('update', { type: 'update', data: saved, updatedFields: { completion: saved.completion }, module: 'task' });
+    if (saved) socketEmitter.emit('update', { type: 'update', data: saved, updatedFields: { completion: saved.completion }, module: 'task', companyId });
 };
 
 /* One status change through the task route, to any status the task's project defines. `agent` is the work entry of an agent making it for `who`. */

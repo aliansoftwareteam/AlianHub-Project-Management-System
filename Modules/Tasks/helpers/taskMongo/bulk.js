@@ -74,13 +74,14 @@ const mergeTaskUpdate = (task, fields) => {
 // listener (taskSocket.js:122) fans this out as `taskUpdate` to every
 // client subscribed to that project+sprint room — exactly what single-task
 // findOneAndUpdate does today through the same emitter.
-const emitTaskUpdate = (task, updatedFields) => {
+const emitTaskUpdate = (companyId, task, updatedFields) => {
     try {
         socketEmitter.emit('update', {
             type: 'update',
             data: mergeTaskUpdate(task, updatedFields),
             updatedFields: updatedFields || {},
             module: 'task',
+            companyId,
         });
     } catch (error) {
         logger.error(`emitTaskUpdate failed: ${error.message}`);
@@ -294,7 +295,7 @@ module.exports = {
                         // bulk close left no closedBy and the task showed no badge.
                         recordCompletion({ companyId, taskId: task._id, task, newStatus: stored, userData });
 
-                        emitTaskUpdate(task, { ...stored });
+                        emitTaskUpdate(companyId, task, { ...stored });
                     } catch (error) {
                         logger.error(`bulkUpdateStatus task ${task._id}: ${error.message}`);
                         errors.push({ taskId: String(task._id), reason: error.message });
@@ -378,7 +379,7 @@ module.exports = {
                             }).catch((err) => logger.error(`bulkUpdatePriority notification ${task._id}: ${err.message}`));
                         }
 
-                        emitTaskUpdate(task, { ...firebaseObj });
+                        emitTaskUpdate(companyId, task, { ...firebaseObj });
                     } catch (error) {
                         logger.error(`bulkUpdatePriority task ${task._id}: ${error.message}`);
                         errors.push({ taskId: String(task._id), reason: error.message });
@@ -469,7 +470,7 @@ module.exports = {
                                     { date: newDate },
                                 ],
                             };
-                        emitTaskUpdate(task, dueFields);
+                        emitTaskUpdate(companyId, task, dueFields);
                     } catch (error) {
                         logger.error(`bulkUpdateDueDate task ${task._id}: ${error.message}`);
                         errors.push({ taskId: String(task._id), reason: error.message });
@@ -505,7 +506,7 @@ module.exports = {
         }
 
         tasks.forEach((task) => {
-            emitTaskUpdate(task, fieldsOf(task));
+            emitTaskUpdate(companyId, task, fieldsOf(task));
             const historyObj = {
                 key: 'Project_DueDate',
                 sprintId: task.sprintId,
@@ -717,7 +718,7 @@ module.exports = {
                             const drop = new Set(empIdArr);
                             nextAssignees = currentAssignees.filter((id) => !drop.has(id));
                         }
-                        emitTaskUpdate(task, { AssigneeUserId: nextAssignees });
+                        emitTaskUpdate(companyId, task, { AssigneeUserId: nextAssignees });
                         updated.add(String(task._id));
                     } catch (error) {
                         logger.error(`bulkUpdateAssignee task ${task._id}: ${error.message}`);
@@ -783,7 +784,7 @@ module.exports = {
                     const nextTags = operation === 'add'
                         ? Array.from(new Set([...currentTags, tagIdStr]))
                         : currentTags.filter((id) => id !== tagIdStr);
-                    emitTaskUpdate(task, { tagsArray: nextTags });
+                    emitTaskUpdate(companyId, task, { tagsArray: nextTags });
                 }
                 emitBulkSummary('bulkUpdateTags', { taskIds: updated, tagId, operation });
                 resolve(summarize({ updated, skipped, errors }));
@@ -1352,7 +1353,7 @@ module.exports = {
                             }, 'findOneAndUpdate').then((restored) => {
                                 socketEmitter.emit('update', {
                                     type: 'update', data: restored,
-                                    updatedFields: { deletedStatusKey: wasDeletedStatusKey }, module: 'task',
+                                    updatedFields: { deletedStatusKey: wasDeletedStatusKey }, module: 'task', companyId,
                                 });
                             }).catch((error) => {
                                 logger.error(`bulkConvertToTask restore ${id}: ${error && error.message}`);

@@ -187,22 +187,27 @@ const stillAllowed = (identity, subject, decide) => {
     return allowed;
 };
 
-const sameCompany = (identity, change) => !change.companyId || String(change.companyId) === identity.companyId;
+/* The writer names the company it wrote in. An event that names none is sent to nobody. */
+const sameCompany = (identity, change) => Boolean(identity && change) && String(change.companyId || '') === identity.companyId;
 
-/* Task events carry no company, so the row is judged where the socket lives: a row of another company has no
- * project or chat space behind it there. */
 const mayReceiveTask = (identity, change) => {
     const task = change && change.data;
-    if (!identity || !task || !sameCompany(identity, change)) return false;
+    if (!task || !sameCompany(identity, change)) return false;
     if (task.mainChat === true && !isParticipant(task, identity.uid)) return false;
     const subject = `task:${task.ProjectID}:${task.sprintId}:${task.mainChat === true}`;
     return stillAllowed(identity, subject, () => readsTask(identity, task));
 };
 
 const mayReceiveComments = (identity, change, prefix) => {
-    if (!identity || !change || String(change.companyId || '') !== identity.companyId) return false;
+    if (!sameCompany(identity, change)) return false;
     return stillAllowed(identity, `comments:${prefix}`, () => canOpenComments(identity, prefix));
 };
+
+const mayReceiveList = (identity, change) => sameCompany(identity, change)
+    && stillAllowed(identity, `list:${change.projectId}:${change.sprintId}`, () => canOpenSprintBoard(identity, change.projectId, change.sprintId));
+
+const mayReceiveCompany = (identity, companyId) => Boolean(identity) && identity.companyId === String(companyId || '')
+    && stillAllowed(identity, 'seat', () => isCompanyMember(identity, identity.companyId));
 
 /* A send waits for its verdict, so sends go out one after another: two changes to a row reach a room in the
  * order they were made. */
@@ -225,8 +230,11 @@ module.exports = {
     readablePage,
     isCompanyMember,
     onJoin,
+    sameCompany,
     mayReceiveTask,
     mayReceiveComments,
+    mayReceiveList,
+    mayReceiveCompany,
     inOrder,
     forgetVerdicts: () => verdicts.clear(),
 };

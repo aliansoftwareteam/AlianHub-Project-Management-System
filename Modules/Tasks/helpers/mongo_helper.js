@@ -104,7 +104,7 @@ exports.HandleTask = async (companyId, object, isUpdate, id = null, userData, { 
                 const sanitizedNewTaskName = serviceFun.sanitizeInput(object.TaskName);
                 MongoDbCrudOpration(companyId, objSchema, isUpdate ? 'updateOne' : 'save')
                     .then(async (response) => {
-                        socketEmitter.emit('insert', { type: "insert", data: response , module: 'task'});
+                        socketEmitter.emit('insert', { type: "insert", data: response , module: 'task', companyId});
                         const historyObj = {
                             message: `<b>${userData.Employee_Name}</b> has created new <b>${sanitizedNewTaskName}</b> ${object.TaskType.replace(/_/g, '-')}.`,
                             key: "Task_Created",
@@ -218,7 +218,7 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                 ]
             }
             MongoDbCrudOpration(companyId, deleteObj, "findOneAndUpdate").then((result) => {
-                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task' });
+                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task', companyId });
                 let obj = {
                     isParentTask: false,
                     ParentTaskId: task._id,
@@ -296,7 +296,7 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                     ]
                 }
                 MongoDbCrudOpration(companyId, queryObj, "findOneAndUpdate").then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: hadLists.length ? { ...obj, extraLists: [] } : obj, module: 'task', ...(hadLists.length ? { leftLists: hadLists } : {}) });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: hadLists.length ? { ...obj, extraLists: [] } : obj, module: 'task', companyId, ...(hadLists.length ? { leftLists: hadLists } : {}) });
                     /*When a subtask is converted to another subtask within a parent task, and a subtask is removed, the count of the parent task is reduced.*/
                     if (isMainSubTask === true) {
                         let object = {
@@ -307,7 +307,7 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                             ]
                         }
                         MongoDbCrudOpration(companyId, object, "updateOne").then((mainRes)=>{
-                            socketEmitter.emit('update', { type: "update", data: mainRes , updatedFields: {subTasks: mainRes.subTasks}, module: 'task' });
+                            socketEmitter.emit('update', { type: "update", data: mainRes , updatedFields: {subTasks: mainRes.subTasks}, module: 'task', companyId });
                         })
                     }
                     /*When a task is converted into  asubtask, at that moment, if a subtask is added to the selected task, the count needs to be increased.*/
@@ -320,7 +320,7 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                         ]
                     }
                     MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then((taskres)=>{
-                        socketEmitter.emit('update', { type: "update", data: taskres , updatedFields: {subTasks: taskres.subTasks}, module: 'task' });
+                        socketEmitter.emit('update', { type: "update", data: taskres , updatedFields: {subTasks: taskres.subTasks}, module: 'task', companyId });
                     })
                     // update comment count
                     exports.removeCommentCount(companyId,projectData.id,convertTask.sprintId,convertTask._id,convertTask.ParentTaskId).catch((error) => {
@@ -418,7 +418,7 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                 MongoDbCrudOpration(companyId, deleteObj, "findOneAndUpdate"),
                 extraLists.afterHomeMove(companyId, moveTask, { projectId: projectData.id, sprintId: sprintObj.id }),
             ]).then(([result, extras]) => {
-                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task' });
+                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task', companyId });
                 let obj = {};
                 let unsetObj = {}
                 if (JSON.parse(JSON.stringify(moveTask.ProjectID)) !== JSON.parse(JSON.stringify(projectData.id))) {
@@ -516,7 +516,7 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                 }
                 }
                 MongoDbCrudOpration(companyId, queryObj, "findOneAndUpdate").then((ele) => {
-                    socketEmitter.emit('update', { type: "update", data: ele , updatedFields: extraLists.extraListsOf(moveTask).length ? { ...obj, extraLists: extraLists.extraListsOf(ele) } : obj, module: 'task', ...(extras.dropped.length ? { leftLists: extras.dropped.map(({ entry }) => entry) } : {}) });
+                    socketEmitter.emit('update', { type: "update", data: ele , updatedFields: extraLists.extraListsOf(moveTask).length ? { ...obj, extraLists: extraLists.extraListsOf(ele) } : obj, module: 'task', companyId, ...(extras.dropped.length ? { leftLists: extras.dropped.map(({ entry }) => entry) } : {}) });
                     resolve({ status: true, statusText: "MOVE" });
 
                     updateCommentCollection(companyId, moveTask,sprintObj,projectData,moveTask._id).catch((err) => { logger.error(`${err},ERROR IN ADD COMMENTS IN SUBTASK`); })
@@ -749,7 +749,7 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject, 
                 ]
             }
             MongoDbCrudOpration(companyId,queryObj,"findOneAndUpdate").then((result) => {
-                socketEmitter.emit('update', { type: "update", data: result , updatedFields: obj, module: 'task' });
+                socketEmitter.emit('update', { type: "update", data: result , updatedFields: obj, module: 'task', companyId });
                 resolve({ status: true, statusText: "Sub Task merged Succesfully" });
                 let mergeId = slot.parent._id;
                 let incObj = {
@@ -761,7 +761,7 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject, 
                     ]
                 }
                 MongoDbCrudOpration(companyId,incObj,"findOneAndUpdate").then((res)=>{
-                    socketEmitter.emit('update', { type: "update", data: res , updatedFields: {subTasks: res.subTasks}, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: res , updatedFields: {subTasks: res.subTasks}, module: 'task', companyId });
                 }).catch((err) => {
                     logger.error(`ERROR in ${err}`);
                 })
@@ -885,7 +885,7 @@ exports.duplicateSubTaskFunction = (companyId, projectData, sprintObj, subtask, 
                 ]
             }
             MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then((response) => {
-                socketEmitter.emit('update', { type: "update", data: response , updatedFields: {taskTypeCounts: response.taskTypeCounts,lastTaskId: response.lastTaskId}, module: 'task' });
+                socketEmitter.emit('update', { type: "update", data: response , updatedFields: {taskTypeCounts: response.taskTypeCounts,lastTaskId: response.lastTaskId}, module: 'task', companyId });
                 obj.TaskKey = projectData.ProjectCode + '-' +  response.lastTaskId;
                 exports.HandleTask(companyId, obj, false, null, userData).then(async (taskResult) => {
                     if (copied) copied.set(String(subtask._id), String(taskResult.id));
@@ -918,7 +918,7 @@ exports.duplicateSubTaskFunction = (companyId, projectData, sprintObj, subtask, 
                                     ]
                                 }
                                 MongoDbCrudOpration(companyId, updateObj, "findOneAndUpdate").then((ele)=>{
-                                    socketEmitter.emit('update', { type: "update", data: ele , updatedFields: {attachments : subtask.attachments}, module: 'task' });
+                                    socketEmitter.emit('update', { type: "update", data: ele , updatedFields: {attachments : subtask.attachments}, module: 'task', companyId });
                                 })
                             })
                         }
@@ -1072,7 +1072,8 @@ exports.removeCommentCount = async (companyId,projectId,sprintId,taskId,parentTa
                                         socketEmitter.emit('update', { 
                                             type: "update", 
                                             data: dty, 
-                                            module: 'userIdNotification' 
+                                            module: 'userIdNotification',
+                                            companyId
                                         });
                                         count++;
                                         countFunction(ele[count]);

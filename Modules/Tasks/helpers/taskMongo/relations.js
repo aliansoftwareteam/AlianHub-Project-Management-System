@@ -58,8 +58,8 @@ module.exports = {
                     this.pushRelationEntry(companyId, relatedObjId, { taskId: taskObjId, type: inverseType, createdBy, createdAt }),
                 ]);
 
-                socketEmitter.emit('update', { type: "update", data: updatedTask, updatedFields: { relations: updatedTask?.relations || [] }, module: 'task' });
-                socketEmitter.emit('update', { type: "update", data: updatedRelated, updatedFields: { relations: updatedRelated?.relations || [] }, module: 'task' });
+                socketEmitter.emit('update', { type: "update", data: updatedTask, updatedFields: { relations: updatedTask?.relations || [] }, module: 'task', companyId });
+                socketEmitter.emit('update', { type: "update", data: updatedRelated, updatedFields: { relations: updatedRelated?.relations || [] }, module: 'task', companyId });
 
                 this.addRelationHistory({ companyId, task, otherKey: relatedTask.TaskKey, type, userData });
                 this.addRelationHistory({ companyId, task: relatedTask, otherKey: task.TaskKey, type: inverseType, userData });
@@ -112,10 +112,10 @@ module.exports = {
                 ]);
 
                 if (updatedTask) {
-                    socketEmitter.emit('update', { type: "update", data: updatedTask, updatedFields: { relations: updatedTask.relations || [] }, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: updatedTask, updatedFields: { relations: updatedTask.relations || [] }, module: 'task', companyId });
                 }
                 if (updatedRelated) {
-                    socketEmitter.emit('update', { type: "update", data: updatedRelated, updatedFields: { relations: updatedRelated.relations || [] }, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: updatedRelated, updatedFields: { relations: updatedRelated.relations || [] }, module: 'task', companyId });
                 }
 
                 this.removeRelationHistory({ companyId, task, otherKey: relatedTask ? relatedTask.TaskKey : 'a deleted task', userData });

@@ -146,7 +146,7 @@ module.exports = {
                             return;
                         }
 
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task', companyId: project.CompanyId });
                         resolve({status: true, statusText: "Due Date updated successfully"});
     
                         if (notification) {
@@ -234,7 +234,7 @@ module.exports = {
                             return;
                         }
 
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task', companyId: project.CompanyId });
                         resolve({status: true, statusText: "Start Date updated successfully"});
     
                         if (notification) {
@@ -302,7 +302,7 @@ module.exports = {
             }
             MongoDbCrudOpration(project.CompanyId, query, "findOneAndUpdate")
             .then((result) => {
-                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {...firebaseObj}, module: 'task' });
+                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {...firebaseObj}, module: 'task', companyId: project.CompanyId });
                 resolve({status: true, statusText: "Start Date And Due Date updated successfully"});
                 if (notification) {
                     HandleBothNotification({
@@ -413,7 +413,7 @@ module.exports = {
                             return;
                         }
 
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: newStatus, module: 'task' });
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: newStatus, module: 'task', companyId: projectData.CompanyId });
                         resolve({status: true, statusText: "Status updated successfully"});
                         if (recordsCompletion) recordCompletion({ companyId: projectData.CompanyId, taskId, task, newStatus, userData });
 
@@ -536,7 +536,7 @@ module.exports = {
                             return;
                         }
 
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task', companyId: projectData.CompanyId });
                         resolve({status: true, statusText: "Priority updated successfully"});
                         const shown = shownPriority(priorityObj);
                         let notificationObj = { 'ProjectName' : projectData?.ProjectName, 'taskName' : result.TaskName, ...shown.template };
@@ -602,7 +602,7 @@ module.exports = {
                         return;
                     }
 
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task', companyId: projectData.CompanyId });
                     resolve({status: true, statusText: "Story points updated successfully"});
 
                     const pointsValue = (firebaseObj.points === null || firebaseObj.points === undefined || firebaseObj.points === '') ? '—' : firebaseObj.points;
@@ -650,7 +650,7 @@ module.exports = {
                         return;
                     }
 
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task', companyId: projectData.CompanyId });
                     resolve({status: true, statusText: "Task name updated successfully"});
 
                     const sanitizedOldTaskName = escapeText(obj.previousTaskName);
@@ -728,7 +728,7 @@ module.exports = {
                         return;
                     }
 
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: setObj, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: setObj, module: 'task', companyId: projectData.CompanyId });
                     resolve({status: true, statusText: "Dates updated successfully"});
 
                     const historyObj = {

@@ -53,7 +53,7 @@ const followSprintMove = async (companyId, { taskId, projectId, fromSprintId, to
 const moveDescendants = async (companyId, topId, placement, toSprintId) => {
     const rows = await placeDescendants(companyId, topId, placement);
     for (const row of rows) {
-        socketEmitter.emit('update', { type: 'update', data: { ...row, ...placement.set }, updatedFields: placement.set, module: 'task' });
+        socketEmitter.emit('update', { type: 'update', data: { ...row, ...placement.set }, updatedFields: placement.set, module: 'task', companyId });
         await followSprintMove(companyId, { taskId: row._id, projectId: row.ProjectID, fromSprintId: row.sprintId, toSprintId });
     }
     return rows.length;

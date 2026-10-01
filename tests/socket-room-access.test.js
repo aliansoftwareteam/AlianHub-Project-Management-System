@@ -179,6 +179,7 @@ describe('task detail rooms', () => {
         const update = () => socketEmitter.emit('update', {
             type: 'update',
             module: 'task',
+            companyId: C1,
             data: { _id: ids.task, ProjectID: ids.privateProject, sprintId: ids.openSprint, AssigneeUserId: [MEMBER] },
             updatedFields: { TaskName: 'Plan v2' },
         });
@@ -268,7 +269,7 @@ describe('user rooms', () => {
         const outsider = await connect({ uid: OUTSIDER });
         await join(member, 'joinUserIdNotification', { uid: MEMBER, socketId: member.id });
         await join(outsider, 'joinUserIdNotification', { uid: MEMBER, socketId: outsider.id });
-        const update = () => socketEmitter.emit('update', { type: 'update', module: 'userIdNotification', data: { userId: MEMBER, count: 3 } });
+        const update = () => socketEmitter.emit('update', { type: 'update', module: 'userIdNotification', companyId: C1, data: { userId: MEMBER, count: 3 } });
         const [forMember, forOutsider] = await Promise.all([
             received(member, 'userIdNoticationUpdate', update),
             received(outsider, 'userIdNoticationUpdate', () => {}),
