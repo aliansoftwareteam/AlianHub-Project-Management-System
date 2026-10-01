@@ -94,7 +94,7 @@
                         <ul class="gv__shift-list ah-scroll">
                             <li v-for="row in shiftRows" :key="row.id" class="gv__shift-row">
                                 <span class="gv__shift-name" :title="row.name">{{ row.name }}</span>
-                                <span class="ah-mono gv__shift-days">{{ $t('Views.shift_days', { n: row.days }, row.days) }}</span>
+                                <span class="ah-mono gv__shift-days">{{ $t(shiftDaysKey, { n: row.days }, row.days) }}</span>
                                 <span class="ah-mono gv__shift-range">{{ row.range }}</span>
                             </li>
                         </ul>
@@ -104,11 +104,12 @@
                         <ul class="gv__shift-list ah-scroll">
                             <li v-for="row in conflictRows" :key="row.id" class="gv__shift-row">
                                 <span class="gv__shift-name" :title="row.name">{{ row.name }}</span>
-                                <span class="ah-mono gv__shift-days">{{ $t('Views.shift_needs', { days: $t('Views.shift_days', { n: row.days }, row.days) }) }}</span>
+                                <span class="ah-mono gv__shift-days">{{ $t('Views.shift_needs', { days: $t(shiftDaysKey, { n: row.days }, row.days) }) }}</span>
                             </li>
                         </ul>
                     </template>
                     <p v-if="cycleChain" class="gv__shift-warn">{{ $t('Views.shift_cycle', { chain: cycleChain }) }}</p>
+                    <p v-if="!everyDayWorks" class="gv__shift-note">{{ $t('Views.shift_working_note', { days: workingDayNames }) }}</p>
                     <p class="gv__shift-note">{{ $t('Views.shift_earlier') }}</p>
                     <div class="gv__shift-actions">
                         <button
@@ -141,6 +142,7 @@ import { taskListHelper } from '@/views/Projects/helper.js';
 import { criticalPath } from '@/views/Projects/composables/criticalPath';
 import { fsCollisionLinks } from '@/views/Projects/composables/ganttCollisions';
 import { shiftDependants } from '@/views/Projects/composables/ganttShift';
+import { workingDaysFor, countsEveryDay } from '@workingDays';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { showUndoToast } from '@/composable/useUndoToast';
 import { useToast } from 'vue-toast-notification';
@@ -237,6 +239,14 @@ const criticalIds = computed(() => (showCritical.value ? new Set(critical.value.
 const collisionLinks = computed(() => fsCollisionLinks(scheduled.value.map((task) => ({
     id: String(task._id), startDate: task.startDate, DueDate: task.DueDate, blocks: blocksOf(task),
 }))));
+
+const workingDays = computed(() => workingDaysFor(getters['settings/selectedCompany'], props.projectData));
+const everyDayWorks = computed(() => countsEveryDay(workingDays.value));
+const shiftDaysKey = computed(() => (everyDayWorks.value ? 'Views.shift_days' : 'Views.shift_working_days'));
+const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+const MONDAY_FIRST = [1, 2, 3, 4, 5, 6, 0];
+const workingDayNames = computed(() => MONDAY_FIRST.filter((day) => workingDays.value.includes(day))
+    .map((day) => t(`weekName.${WEEKDAY_KEYS[day]}`)).join(', '));
 
 const shortDate = (value) => new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 const taskLabel = (task) => (task && (task.TaskName || task.TaskKey)) || t('Views.untitled');
@@ -413,7 +423,7 @@ function onTaskDragged(id) {
         scheduled.value.flatMap((row) => blocksOf(row).map((target) => ({ source: String(row._id), target }))),
         String(id),
         to,
-        { canEdit: mayShift },
+        { canEdit: mayShift, workingDays: workingDays.value },
     );
     if (!plan.shifts.length && !plan.conflicts.length && !plan.cycle.length) {
         saveDates(task, to);

@@ -133,6 +133,17 @@
     "description": "longest the router waits for a rate-limit token before taking the next candidate instead",
     "default": "2000"
   },
+  "ATLAS_TOKEN": {
+    "group": "general",
+    "description": "Session token the screenshot atlas (npm run atlas) signs in with; set it on the command line for one run, not in .env.",
+    "secret": true,
+    "required": false
+  },
+  "ATLAS_TOKEN_FILE": {
+    "group": "general",
+    "description": "Path of a file holding the session token for npm run atlas, read when ATLAS_TOKEN is unset.",
+    "required": false
+  },
   "ALIANHUB_DOCKER": {
     "group": "general",
     "description": "Set by the Docker image so defaults suit a container (storage under /app/storage).",

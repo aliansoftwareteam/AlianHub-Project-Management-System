@@ -175,6 +175,13 @@
                     <span class="font-size-13 font-weight-400 black hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_due_date')}}</span>
                 </template>
             </div>
+            <ProjectWorkingDays
+                :key="workingDaysKey"
+                :project="projectData"
+                :company="currentCompany"
+                :editable="canEditDetails"
+                @update="updateWorkingDays"
+            />
         </div>
         <div class="position-re" v-if="checkPermission('project.project_custom_field',projectData?.isGlobalPermission) !== null">
             <!-- App enabled for this project: existing behavior (feature, or blurred feature + upgrade overlay when the plan doesn't include it). -->
@@ -255,6 +262,7 @@ import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import InputText from '@/components/atom/InputText/InputText.vue';
 import SkillsSelect from '@/components/molecules/SkillsSelect/SkillsSelect.vue';
 import ProjectSourceSelect from '@/components/molecules/ProjectSourceSelect/ProjectSourceSelect.vue';
+import ProjectWorkingDays from '@/components/molecules/WorkingDaysPicker/ProjectWorkingDays.vue';
 import { DEFAULT_SOURCE, checkProposalId, cleanProposalId } from '@/utils/projectSource';
 
 const { checkPermission,checkApps,getAppState } = useCustomComposable();
@@ -293,6 +301,7 @@ const showConfirmModal = ref(false);
 const CustomFieldData = ref(JSON.parse(JSON.stringify(getters["settings/customFields"])));
 const proposalIdValue = ref('');
 const proposalIdEditable = ref(false);
+const workingDaysKey = ref(0);
 
 //computed
 const users = computed(() => getters["users/users"]);
@@ -663,6 +672,21 @@ const updateSkills = (slugs) => {
         $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
     })
 }
+
+const updateWorkingDays = (workingDays) => {
+    const object = { updateObject: { workingDays } };
+    /* A refused save remounts the control, which drops the week it was showing ahead of the answer. */
+    const failed = (err) => {
+        if (err) console.error(err, "Error in Project Working Days Update");
+        workingDaysKey.value += 1;
+        $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
+    };
+    apiRequest("put", `${env.PROJECT}/${props.projectData._id}`, object).then((res) => {
+        if (res.status !== 200) return failed();
+        $toast.success(t('Toast.Updated_successfully'), { position: 'top-right' });
+        commit('projectData/projectLocalUpdate', { itemData: { ...props.projectData, ...object.updateObject } });
+    }).catch(failed);
+};
 
 // custom field
 const submitHandler = async (value,detail,id,edit) => {

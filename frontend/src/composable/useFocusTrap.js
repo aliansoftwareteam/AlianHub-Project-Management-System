@@ -45,8 +45,19 @@ export function wrapTab(event, root) {
     return false;
 }
 
+/* A menu item that opens a dialog is unmounted with its menu before the dialog closes,
+ * so the control that owns the menu is kept as the place to hand focus back to. */
+function controlOf(element) {
+    if (!element) return null;
+    return Array.from(document.querySelectorAll("[aria-controls]")).find((control) => {
+        const owned = document.getElementById(control.getAttribute("aria-controls"));
+        return Boolean(owned) && owned.contains(element);
+    }) || null;
+}
+
 export function useFocusTrap(containerRef, activeRef, { returnFocus = true } = {}) {
     let previous = null;
+    let previousControl = null;
     let listening = false;
 
     const onKeydown = (event) => wrapTab(event, unref(containerRef));
@@ -58,6 +69,7 @@ export function useFocusTrap(containerRef, activeRef, { returnFocus = true } = {
 
     const activate = async () => {
         previous = document.activeElement;
+        previousControl = controlOf(previous);
         await nextTick();
         const root = unref(containerRef);
         if (!root) return;
@@ -68,8 +80,9 @@ export function useFocusTrap(containerRef, activeRef, { returnFocus = true } = {
 
     const deactivate = () => {
         stop();
-        const target = previous;
+        const target = previous && previous.isConnected ? previous : previousControl;
         previous = null;
+        previousControl = null;
         if (!returnFocus || !target || !target.isConnected || typeof target.focus !== "function") return;
         const root = unref(containerRef);
         const focusIsLost = !document.activeElement || document.activeElement === document.body || (root && root.contains(document.activeElement));
