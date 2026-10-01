@@ -59,12 +59,16 @@ const FOOTER = { _id: LOOSE_TASK, TaskName: 'Fix the footer', TaskKey: 'WEB-5', 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 let viewer = 'me';
 let tasks = [FOOTER];
+let answered = [];
+/* The server answered one request twice, differently, as the goal changed between: the recording is
+   replayed in its order, each answer given once. */
 const recordedAs = (method, url, body) => Object.keys(fixture).find((name) => {
     const { as, request } = fixture[name];
-    return as === viewer && request.method === method && request.path === url && same(request.body, body);
+    return !answered.includes(name) && as === viewer && request.method === method && request.path === url && same(request.body, body);
 });
 const reply = (name) => {
     const { statusCode, response } = fixture[name];
+    answered.push(name);
     return statusCode === 200 ? Promise.resolve({ data: response }) : Promise.reject({ response: { status: statusCode, data: response } });
 };
 const answer = (method, url, body) => {
@@ -74,7 +78,7 @@ const answer = (method, url, body) => {
     return name ? reply(name) : Promise.reject(new Error(`a request the server never recorded: ${method} ${url} ${JSON.stringify(body)}`));
 };
 const goalCalls = () => apiRequest.mock.calls.filter(([, url]) => url.startsWith(GOALS));
-const sentNames = () => goalCalls().map(([method, url, body]) => recordedAs(method, url, body));
+const sentNames = () => [...answered];
 const once = (name) => apiRequest.mockImplementationOnce(() => reply(name));
 const listOf = (...list) => apiRequest.mockImplementationOnce(() => Promise.resolve({ data: { status: true, statusText: 'Goals fetched successfully.', data: list } }));
 
@@ -113,7 +117,8 @@ const open = async (from, { as = 'me', projects = PROJECTS } = {}) => {
 const at = (name, root = wrapper) => root.find(`[data-test="${name}"]`);
 const all = (name, root = wrapper) => root.findAll(`[data-test="${name}"]`);
 const targetOf = (name) => all('glt').find((target) => target.find('.glt__name').exists() && target.find('.glt__name').text() === name);
-const chipsOf = (root) => all('gsc-chip', root).map((chip) => [chip.find('.gsc__name').text(), chip.find('.gsc__project').text()]);
+const projectOf = (chip) => (chip.find('.gsc__project').exists() ? chip.find('.gsc__project').text() : '');
+const chipsOf = (root) => all('gsc-chip', root).map((chip) => [chip.find('.gsc__name').text(), projectOf(chip)]);
 const chipOf = (name, root = wrapper) => all('gsc-chip', root).find((chip) => chip.find('.gsc__name').text() === name);
 const refusedChips = (root = wrapper) => all('gsc-chip', root).filter((chip) => chip.attributes('data-refused') === 'true').map((chip) => chip.find('.gsc__name').text());
 const errorFor = (field, root = wrapper) => root.find(`[data-error-for="${field}"]`);
@@ -152,6 +157,7 @@ beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 15, 10, 0) });
     viewer = 'me';
     tasks = [FOOTER];
+    answered = [];
     apiRequest.mockReset();
     apiRequest.mockImplementation(answer);
     router.push.mockReset();
@@ -255,7 +261,7 @@ describe('a count the server is still making', () => {
         expect(goalCalls()).toHaveLength(6);
     });
 
-    it('is not asked for for ever, nor after the page is left', async () => {
+    it('is not asked for for ever', async () => {
         fakeTimeouts();
         readsAnswer('tasksReadStale');
         await open();

@@ -67,7 +67,8 @@ const seedTask = (n, ProjectID, sprintId, TaskName, statusType = 'default_active
     _id: task(n), TaskName, ProjectID, sprintId, deletedStatusKey: 0, isParentTask: true, statusType,
 });
 
-/* An open project with two lists, and a private one that only two of the people are on. */
+/* An open project with two lists, and a private one that only two of the people are on. Seeded after
+   the goals' own steps, so the ids the stand-in database hands out in those steps stay as recorded. */
 const seedWork = () => {
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: WEBSITE, ProjectName: 'Website', isPrivateSpace: false, AssigneeUserId: [], deletedStatusKey: 0 });
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: HIRING_PLAN, ProjectName: 'Hiring plan', isPrivateSpace: true, AssigneeUserId: [ME, SAM], deletedStatusKey: 0 });
@@ -84,7 +85,6 @@ const seedWork = () => {
 };
 
 const seed = () => {
-    seedWork();
     Object.entries(ROLES).forEach(([userId, roleType]) => mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, roleType, status: 2, isDelete: false }));
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: GONE, roleType: 3, status: 2, isDelete: true });
     ['USD', 'EUR'].forEach((code) => mockDb.seed(SCHEMA_TYPE.CURRENCY_LIST, { code }));
@@ -185,6 +185,7 @@ const record = async () => {
     await step('handedOver', request.updateRequest(created._id, { ownerUserId: SAM }));
     await step('readHandedOver', request.readRequest(created._id));
 
+    seedWork();
     const tasksForm = (name, sources) => ({ kind: 'tasks', name, weight: '1', sources });
     const delivery = (await step('tasksGoal', request.createRequest({ name: 'Deliver the release' })))._id;
     const linked = await step('tasksAdded', request.addTargetRequest(delivery, tasksForm('Release tasks', { sprintIds: [SPRINT, TEAM_LIST], taskIds: [LOOSE_TASK] })));
