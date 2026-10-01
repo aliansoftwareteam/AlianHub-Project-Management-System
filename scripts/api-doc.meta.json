@@ -2610,6 +2610,7 @@
         "GET /api/v2/api-tokens/step-credentials": { "stability": "internal", "summary": "The live step credentials of the workspace." },
         "GET /api/v2/api-tokens/:id/logs": { "stability": "internal", "summary": "The latest calls made with a token." },
         "POST /api/v2/api-tokens/mcp": { "stability": "internal", "summary": "Creates a token for an AI agent." },
+        "POST /api/v2/api-tokens/:id/renew": { "stability": "internal", "summary": "Gives the person's own token a new secret and a new end date." },
         "GET /api/v2/api-tokens": { "stability": "internal", "summary": "Lists the person's tokens." },
         "POST /api/v2/api-tokens": { "stability": "internal", "summary": "Creates a token." },
         "PUT /api/v2/api-tokens/:id": { "stability": "internal", "summary": "Renames a token, or switches it on or off." },

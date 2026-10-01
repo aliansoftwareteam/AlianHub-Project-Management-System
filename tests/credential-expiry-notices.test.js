@@ -203,7 +203,7 @@ describe('a notice three days before a token ends', () => {
         expect(JSON.stringify(told())).not.toContain(res.body.data.token);
     });
 
-    it('still tells the next owner when one notice fails', async () => {
+    it('still tells the next owner when one notice fails, and tells the first on the next run', async () => {
         seedToken({ name: 'First' });
         seedToken({ name: 'Second', userId: OWNER });
         const real = db().crud;
@@ -215,8 +215,12 @@ describe('a notice three days before a token ends', () => {
 
         await run();
 
-        expect(told()).toHaveLength(1);
+        expect(told().map((row) => row.changeData.name)).toEqual(['Second']);
         expect(logger.error).toHaveBeenCalled();
+
+        await run();
+        await run();
+        expect(told().map((row) => row.changeData.name)).toEqual(['Second', 'First']);
     });
 });
 

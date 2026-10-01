@@ -151,7 +151,7 @@ describe('with STEP_CREDENTIALS off, nothing changes', () => {
             return res.body.policy;
         };
         flag(false);
-        expect(Object.keys(await policy()).sort()).toEqual(['graceDays', 'maxExpiryDays', 'minExpiryDays', 'scopes', 'strict', 'strictSince']);
+        expect(Object.keys(await policy()).sort()).toEqual(['defaultExpiryDays', 'graceDays', 'maxExpiryDays', 'minExpiryDays', 'scopes', 'strict', 'strictSince']);
         flag(true);
         expect((await policy()).stepCredentials).toBe(true);
     });

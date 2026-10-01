@@ -38,6 +38,20 @@ const grants = {
         {},
         { sort: { createdAt: -1 }, limit: 200 },
     ], 'find')) || []).map(plain),
+    endingFor: async (companyId, after, by) => ((await db(SCHEMA_TYPE.OAUTH_GRANTS, [
+        { companyId: String(companyId), revokedAt: null, expiryNoticeAt: null, expiresAt: { $gt: after, $lte: by } },
+        {},
+        { sort: { expiresAt: 1 }, limit: 500 },
+    ], 'find')) || []).map(plain),
+    // Answers the grant only to the caller that set the mark, so a person is told once.
+    markExpiryNotice: async (grantId, companyId, at) => plain(await db(SCHEMA_TYPE.OAUTH_GRANTS, [
+        { grantId: String(grantId), companyId: String(companyId), revokedAt: null, expiryNoticeAt: null },
+        { $set: { expiryNoticeAt: at } },
+    ], 'findOneAndUpdate')),
+    unmarkExpiryNotice: (grantId, companyId, at) => db(SCHEMA_TYPE.OAUTH_GRANTS, [
+        { grantId: String(grantId), companyId: String(companyId), expiryNoticeAt: at },
+        { $unset: { expiryNoticeAt: '' } },
+    ], 'updateOne'),
 };
 
 /* A consent request is answered once: its nonce is recorded under the token hash index, so a second answer to

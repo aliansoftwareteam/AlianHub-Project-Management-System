@@ -23,6 +23,7 @@
                         <button type="button" class="ah-btn ah-btn--link ah-btn--sm" :disabled="busy === grant.grantId" :data-test="`withdraw-${scope}`" @click="withdraw(grant, scope)">{{ $t('ConnectedApps.withdraw') }}</button>
                     </p>
                     <span class="ah-small" data-test="last-used">{{ grant.lastUsedAt ? `${$t('ConnectedApps.last_used')} ${formatWhen(grant.lastUsedAt)}` : $t('ConnectedApps.never_used') }}</span>
+                    <span v-if="formatWhen(grant.expiresAt)" class="ah-small" data-test="grant-ends">{{ $t('ConnectedApps.ends', { d: formatWhen(grant.expiresAt) }) }}</span>
                     <div class="ca__actions">
                         <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" :disabled="busy === grant.grantId" data-test="revoke-grant" @click="revoke(grant)">{{ $t('ConnectedApps.revoke') }}</button>
                     </div>
