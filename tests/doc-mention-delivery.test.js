@@ -114,15 +114,14 @@ describe('the doc mention in the Inbox', () => {
 describe('the notification schemas', () => {
     const Notice = mongoose.models.DocMentionNotice || mongoose.model('DocMentionNotice', notificationsSchema);
     const Settings = mongoose.models.DocMentionSettings || mongoose.model('DocMentionSettings', notificationsSettingsSchema);
+    const withoutId = (notice) => Object.fromEntries(Object.entries(notice).filter(([field]) => field !== '_id'));
 
     it('accept a doc notice that belongs to no project', () => {
-        const { _id, ...notice } = noticeOf({ notificationType: 'push' });
-        expect(new Notice(notice).validateSync()).toBeUndefined();
+        expect(new Notice(withoutId(noticeOf({ notificationType: 'push' }))).validateSync()).toBeUndefined();
     });
 
     it('still require a project on a task notice', () => {
-        const { _id, ...notice } = noticeOf({ type: 'tasks', key: 'task_status', notificationType: 'push' });
-        expect(new Notice(notice).validateSync().errors.projectId).toBeDefined();
+        expect(new Notice(withoutId(noticeOf({ type: 'tasks', key: 'task_status', notificationType: 'push' }))).validateSync().errors.projectId).toBeDefined();
     });
 
     it('keep the docs section of a person\'s settings', () => {

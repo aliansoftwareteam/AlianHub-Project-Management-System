@@ -21,6 +21,7 @@ const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { projectAccess, isCompanyMember } = require('../Config/contentAccess');
 const notices = require('../Modules/notification/prepare-notification-data/controllerV2');
 const socketEmitter = require('../event/socketEventEmitter');
+const { forgetHealedDocNotices } = require('../Modules/notification/docNotices');
 const ctrl = require('../Modules/Pages/controller');
 
 const C = '6f00000000000000000000c1';
@@ -66,6 +67,7 @@ const sentNotices = () => notices.handleSingleNotification.mock.calls.map(([body
 
 beforeEach(() => {
     mockDb = fakeMongo.create();
+    forgetHealedDocNotices();
     notices.handleSingleNotification.mockClear();
     socketEmitter.emit.mockClear();
     [AUTHOR, ANN, BOB].forEach((userId) => mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, status: 2, isDelete: false }));

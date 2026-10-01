@@ -21,7 +21,7 @@ describe('the @ trigger', () => {
         ['Hi @bo', 'bo'],
         ['(@ann', 'ann'],
         ['Ping @Bob Sm', 'Bob Sm'],
-        ['Hi @bo', 'bo'],
+        ['Hi\u00a0@bo', 'bo'],
     ])('opens for %j with the query %j', (before, query) => {
         expect(mentionQueryAt(before)).toBe(query);
     });

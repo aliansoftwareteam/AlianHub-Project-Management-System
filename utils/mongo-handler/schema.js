@@ -3679,9 +3679,10 @@ const schema = {
             type: String,
             required: true,
         },
+        // A company-wide doc belongs to no project, so a doc notice may carry none.
         projectId: {
             type: mongoose.Schema.Types.Mixed,
-            required: true,
+            required: function projectIdRequired() { return this.type !== 'docs'; },
             validate: notEmpty,
             set: objectIdIfHex,
         },
@@ -3835,6 +3836,10 @@ const schema = {
         chat: {
             type: Object,
             required: true
+        },
+        docs: {
+            type: Object,
+            required: false
         },
         userId: {
             type: String,

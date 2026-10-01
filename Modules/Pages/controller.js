@@ -24,6 +24,9 @@ const {
 } = require('./helpers/pageContent');
 const { composePage, isAiConfigured } = require('./helpers/pageAi');
 const { canUsePage } = require('./helpers/pageAccess');
+const { normalizeBlockMentions, normalizeMentionHtml } = require('./helpers/pageMentions');
+const { notifyNewMentions } = require('./helpers/pageMentionNotices');
+const { PageImageError, receiveImage, storePageImage, unlinkQuietly } = require('./helpers/pageImages');
 const { projectAccess, isCompanyAdmin, isCompanyMember, visibleProjectIds } = require('../../Config/contentAccess');
 
 // There is no version history. It was removed rather than fixed: it recorded a snapshot
@@ -86,6 +89,12 @@ const inVisibleProjects = (visibleIds) => ({
     ],
 });
 
+/* Delivery never holds up or fails the save that caused it. */
+const announceMentions = (companyId, page, actorId, before, after) => {
+    notifyNewMentions({ companyId, page, actorId, before, after })
+        .catch((error) => logger.error(`ERROR in doc mention notices: ${error.message}`));
+};
+
 /* A non-deleted (or trashed) page the caller may act on, or null. */
 const findPage = async (companyId, id, uid, { deletedStatusKey = 0, edit = false } = {}) => {
     const page = await MongoDbCrudOpration(companyId, {
@@ -130,7 +139,7 @@ exports.createPage = async (req, res) => {
         if (parentPageId && !(await findPage(companyId, parentPageId, userId))) {
             return fail(res, 'Page not found.', 404);
         }
-        const blocks = contentBlocks !== undefined ? contentToEditorData({ blocks: contentBlocks }) : emptyEditorData();
+        const blocks = contentBlocks !== undefined ? normalizeBlockMentions(contentToEditorData({ blocks: contentBlocks })) : emptyEditorData();
         if (contentBlocks !== undefined && contentTooLarge({ blocks })) {
             return res.send({ status: false, statusText: 'Page content is too large.' });
         }
@@ -164,6 +173,7 @@ exports.createPage = async (req, res) => {
         }
         const created = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PAGES, data: doc }, 'save');
         emitPageChange(companyId, 'insert', created);
+        announceMentions(companyId, created, userId, null, blocks);
         return res.send({ status: true, statusText: 'Page created.', data: created });
     } catch (error) {
         logger.error(`ERROR in create page: ${error.message}`);
@@ -269,10 +279,10 @@ exports.updatePage = async (req, res) => {
         }
         const nextContent = {};
         if (contentBlocks !== undefined) {
-            nextContent.blocks = contentToEditorData({ blocks: contentBlocks });
+            nextContent.blocks = normalizeBlockMentions(contentToEditorData({ blocks: contentBlocks }));
         }
         if (contentHtml !== undefined) {
-            nextContent.html = String(contentHtml);
+            nextContent.html = normalizeMentionHtml(String(contentHtml));
         }
         if ((nextContent.html || nextContent.blocks) && contentTooLarge({
             html: nextContent.html,
@@ -314,6 +324,9 @@ exports.updatePage = async (req, res) => {
         }, 'findOneAndUpdate');
 
         emitPageChange(companyId, 'update', updated);
+        if (update.content) {
+            announceMentions(companyId, updated || existing, userId, contentToEditorData(existing.content), contentToEditorData(update.content));
+        }
         return res.send({ status: true, statusText: 'Page saved.', data: updated });
     } catch (error) {
         logger.error(`ERROR in update page: ${error.message}`);
@@ -484,6 +497,34 @@ exports.deletePage = async (req, res) => {
         return res.send({ status: true, statusText: 'Page deleted.', data: { deleted: doomed.length } });
     } catch (error) {
         logger.error(`ERROR in delete page: ${error.message}`);
+        return fail(res, error.message, error.statusCode);
+    }
+};
+
+/* POST /api/v2/pages/:id/images  multipart: file — an image for the doc, stored in the company's
+ * bucket under the doc; the reply's key goes into the image block and is signed for each reader. */
+exports.uploadImage = async (req, res) => {
+    let file = null;
+    try {
+        const companyId = tenantOf(req);
+        const { id } = req.params;
+        if (!isObjectIdString(id)) {
+            return fail(res, 'A valid page id is required.', 400);
+        }
+        if (!(await findPage(companyId, id, callerId(req), { edit: true }))) {
+            return fail(res, 'Page not found.', 404);
+        }
+        file = await receiveImage(req, res);
+        if (!file) {
+            return fail(res, 'Choose an image to upload.', 400);
+        }
+        const key = await storePageImage({ companyId, pageId: id, file });
+        file = null;
+        return res.send({ status: true, statusText: 'Image uploaded.', data: { key } });
+    } catch (error) {
+        if (file) unlinkQuietly(file.path);
+        if (error instanceof PageImageError) return fail(res, error.message, error.statusCode);
+        logger.error(`ERROR in page image upload: ${error.message}`);
         return fail(res, error.message, error.statusCode);
     }
 };

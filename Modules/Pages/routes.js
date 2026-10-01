@@ -6,6 +6,7 @@ exports.init = (app) => {
     app.put('/api/v2/pages/:id/review', ctrl.markReviewed);
     app.put('/api/v2/pages/:id/approve', ctrl.approvePage);
     app.put('/api/v2/pages/:id/restore', ctrl.restorePage);
+    app.post('/api/v2/pages/:id/images', ctrl.uploadImage);
     app.get('/api/v2/pages/:id', ctrl.getPage);
     app.put('/api/v2/pages/:id', ctrl.updatePage);
     app.delete('/api/v2/pages/:id', ctrl.deletePage);
