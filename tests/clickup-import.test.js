@@ -9,6 +9,7 @@ jest.mock('../Modules/Tasks/helpers/taskWriteFields', () => ({ sessionActor: asy
 jest.mock('../Modules/Importers/helpers/importAccess', () => ({
     importTargetAccess: jest.fn(),
     previewAccess: jest.fn(),
+    canAddDetails: jest.fn(async () => true),
     refuseImport: (res, decision) => res.status(decision.statusCode === 403 ? 403 : 404).send({ status: false, statusText: 'refused' }),
 }));
 jest.mock('../Modules/Tasks/helpers/task_class_Mongo', () => ({ taskMongo: { createMultipleTasks: jest.fn() } }));

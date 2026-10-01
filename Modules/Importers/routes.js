@@ -16,5 +16,6 @@ exports.init = (app) => {
     app.post('/api/v2/imports/clickup/preview', ctrl.previewClickUp);
     app.post('/api/v2/imports/clickup/project', byPeople, requirePermission('project.project_create'), createsTasks, ctrl.importClickUpAsProject);
     app.post('/api/v2/imports/clickup', byPeople, createsTasks, ctrl.importFromClickUp);
+    app.post('/api/v2/imports/:id/undo', ctrl.undoImport);
     app.get('/api/v2/imports', ctrl.listImports);
 }

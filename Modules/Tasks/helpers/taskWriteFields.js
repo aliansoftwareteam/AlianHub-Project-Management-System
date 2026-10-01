@@ -16,9 +16,11 @@ const { loadSubtree } = require('./taskTree');
 const { CANNOT_OPEN_PROJECT, peopleWhoOpen, cannotOpen } = require('../../../Config/projectPeople');
 const { openProject, isChatSpace, listOf, listRef, readableTaskIds, flatStatus, coveredByMapping, moveMappingInto } = require('./taskWritePlacement');
 
+const { IMPORT_MARK_FIELDS } = require('./importMark');
+
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
-const PROTECTED_FIELDS = Object.freeze(['_id', 'CompanyId', 'ProjectID', 'TaskKey', 'createdBy', 'createdAt', 'sprintId', 'sprintArray', 'folderObjId']);
+const PROTECTED_FIELDS = Object.freeze(['_id', 'CompanyId', 'ProjectID', 'TaskKey', 'createdBy', 'createdAt', 'sprintId', 'sprintArray', 'folderObjId', ...IMPORT_MARK_FIELDS]);
 const PLACEMENT_FIELDS = Object.freeze(['ProjectID', 'TaskKey', 'sprintId', 'sprintArray', 'folderObjId']);
 const PROTOTYPE_KEYS = Object.freeze(['__proto__', 'constructor', 'prototype']);
 const INDEX_NAMES = Object.freeze(['groupByStatusIndex', 'groupByPriorityIndex', 'groupByAssigneeIndex', 'groupByDueDateIndex']);
@@ -183,7 +185,7 @@ const DESTINATION_LIST = Object.freeze({ id: ['sprintObj', 'id'], ref: ['sprintO
 const LISTED_TASKS = Object.freeze({ path: ['taskIds'] });
 const CARRIED = Object.freeze(['assignee', 'watcher']);
 
-const CREATE_DATA_FIELDS = Object.freeze(Object.keys(schema.tasks).filter((field) => !['_id', 'createdBy', 'createdAt', 'ancestors', 'cascadedBy', 'extraLists'].includes(field)));
+const CREATE_DATA_FIELDS = Object.freeze(Object.keys(schema.tasks).filter((field) => !['_id', 'createdBy', 'createdAt', 'ancestors', 'cascadedBy', 'extraLists', ...IMPORT_MARK_FIELDS].includes(field)));
 
 const CREATE = spec({
     params: ['data', 'user', 'projectData', 'indexObj', 'setNotif'],

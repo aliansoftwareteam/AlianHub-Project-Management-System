@@ -24,6 +24,8 @@ test.describe('docs hub as the owner', () => {
 });
 
 test.describe('public form', () => {
+    test.use({ expectedConsoleErrors: [/404 .*\/form\/deadbeef/] });
+
     test('renders the published form and accepts a submission', async ({ page, loginAs }) => {
         const owner = await loginAs('owner');
         const project = await createProject(owner.api, { name: `PAG Form ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid });
@@ -48,6 +50,8 @@ test.describe('public form', () => {
 });
 
 test.describe('public share', () => {
+    test.use({ expectedConsoleErrors: [/404 .*\/share\//] });
+
     test('serves a shared sprint board and stops after revoke', async ({ page, loginAs }) => {
         const owner = await loginAs('owner');
         const project = await createProject(owner.api, { name: `PAG Share ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid });

@@ -54,8 +54,9 @@ The Playwright HTML report lands in `e2e/report` (`npx playwright show-report e2
 | `harness.js` | One run = reset database, start one server, create fixtures, write `e2e/.state/run.json`. |
 | `fixtures.js` | Fixture creation and the helpers tests use: `loginAs`, `createProject`, `createTask`, `inviteMember`, `readState`, `storageStatePath`. |
 | `api.js` | `createApiClient`, a small wrapper over the built-in `fetch`. Calls resolve to `{ status, body, headers }` and never throw on 4xx/5xx. |
-| `pages.js` | Shared UI steps: `signInThroughForm`, `settingsNav`. |
-| `test.js` | The Playwright `test` to import in specs, with `state`, `loginAs` and `asRole`. |
+| `pages.js` | Shared UI steps: `signInThroughForm`, `settingsNav`, `skipFirstRun`, `taskPanel`, `listRow`, `chooseFromRowMenu`. |
+| `test.js` | The Playwright `test` to import in specs, with `state`, `loginAs` and `asRole`. It also runs the console guard. |
+| `consoleGuard.js` | The console guard and its allowlist. |
 | `global-setup.js` | Playwright global setup: starts the harness, then signs every role in through the real login form and saves its storage state. |
 
 Jest uses `tests/integration/globalSetup.js` / `globalTeardown.js`, which call the same `startHarness`.
@@ -80,6 +81,18 @@ Everything is created through the real HTTP APIs, in this order:
 | `guest` | 0 | `guest@e2e.alianhub.test` | Most restricted role |
 
 Every account uses the password in `PASSWORD` (`fixtures.js`). The run state (`readState()` / the Playwright `state` fixture) holds `baseURL`, `companyId`, `password`, `users.<role>` (`email`, `userId`, `roleType`), `projects.shared` / `projects.restricted` and `tasks`.
+
+### The console guard
+
+Every spec in `e2e/specs` fails when the page throws an uncaught error or writes a `console.error` (a failed request counts: the browser logs it as one). Three ways to deal with a failure, in this order:
+
+1. Fix the cause.
+2. If the test provokes the error on purpose (a refusal it then asserts), name it where it happens: `test.use({ expectedConsoleErrors: [/403 .*\/api\/v2\/sso\/config/] })`. A pattern is matched against the line the guard prints, which ends with the address of the resource.
+3. If the message is not a defect anywhere in the suite, add it to `ALLOWED` in `e2e/support/consoleGuard.js` with the reason. Keep that list short.
+
+A test that cannot pass yet because of a product bug calls `skipConsoleGuard('<what the page logs>')` (from `e2e/support/test.js`) on its first line: the guard is off for that test only, and the reason shows beside it in the report. When a test fails in CI, the log also holds the accessibility tree of each open page under `[page tree]`, so a locator that found nothing can be diagnosed without downloading the report.
+
+Which flows have a spec is in [E2E-FLOWS.md](E2E-FLOWS.md).
 
 ## Rules for every test
 

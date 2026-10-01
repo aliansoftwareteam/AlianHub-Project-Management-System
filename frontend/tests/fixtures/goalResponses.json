@@ -1675,7 +1675,32 @@
             "dirty": false,
             "updating": false,
             "updatedBy": "",
-            "updatedAt": null
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {
+                "6f0000000000000000000b01": {
+                  "id": "6f0000000000000000000b01",
+                  "name": "Sprint 1",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                },
+                "6f0000000000000000000b03": {
+                  "id": "6f0000000000000000000b03",
+                  "name": "Interviews",
+                  "projectId": "6f0000000000000000000a02",
+                  "projectName": "Hiring plan"
+                }
+              },
+              "taskIds": {
+                "6f0000000000000000000d05": {
+                  "id": "6f0000000000000000000d05",
+                  "name": "Fix the footer",
+                  "key": "",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                }
+              }
+            }
           }
         ],
         "archived": false,
@@ -1749,7 +1774,32 @@
             "dirty": false,
             "updating": false,
             "updatedBy": "",
-            "updatedAt": null
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {
+                "6f0000000000000000000b01": {
+                  "id": "6f0000000000000000000b01",
+                  "name": "Sprint 1",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                },
+                "6f0000000000000000000b03": {
+                  "id": "6f0000000000000000000b03",
+                  "name": "Interviews",
+                  "projectId": "6f0000000000000000000a02",
+                  "projectName": "Hiring plan"
+                }
+              },
+              "taskIds": {
+                "6f0000000000000000000d05": {
+                  "id": "6f0000000000000000000d05",
+                  "name": "Fix the footer",
+                  "key": "",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                }
+              }
+            }
           },
           {
             "id": "6f0000000000000000009004",
@@ -1775,7 +1825,11 @@
             "dirty": false,
             "updating": false,
             "updatedBy": "",
-            "updatedAt": null
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {},
+              "taskIds": {}
+            }
           }
         ],
         "archived": false,
@@ -1918,7 +1972,26 @@
             "dirty": false,
             "updating": false,
             "updatedBy": "",
-            "updatedAt": null
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {
+                "6f0000000000000000000b01": {
+                  "id": "6f0000000000000000000b01",
+                  "name": "Sprint 1",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                }
+              },
+              "taskIds": {
+                "6f0000000000000000000d05": {
+                  "id": "6f0000000000000000000d05",
+                  "name": "Fix the footer",
+                  "key": "",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                }
+              }
+            }
           },
           {
             "id": "6f0000000000000000009004",
@@ -1944,7 +2017,11 @@
             "dirty": false,
             "updating": false,
             "updatedBy": "",
-            "updatedAt": null
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {},
+              "taskIds": {}
+            }
           }
         ],
         "archived": false,
@@ -2011,7 +2088,26 @@
             "dirty": false,
             "updating": false,
             "updatedBy": "",
-            "updatedAt": null
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {
+                "6f0000000000000000000b01": {
+                  "id": "6f0000000000000000000b01",
+                  "name": "Sprint 1",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                }
+              },
+              "taskIds": {
+                "6f0000000000000000000d05": {
+                  "id": "6f0000000000000000000d05",
+                  "name": "Fix the footer",
+                  "key": "",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                }
+              }
+            }
           },
           {
             "id": "6f0000000000000000009004",
@@ -2037,7 +2133,11 @@
             "dirty": false,
             "updating": false,
             "updatedBy": "",
-            "updatedAt": null
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {},
+              "taskIds": {}
+            }
           }
         ],
         "archived": false,
@@ -2141,7 +2241,24 @@
             "dirty": false,
             "updating": false,
             "updatedBy": "",
-            "updatedAt": null
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {
+                "6f0000000000000000000b01": {
+                  "id": "6f0000000000000000000b01",
+                  "name": "Sprint 1",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                },
+                "6f0000000000000000000b02": {
+                  "id": "6f0000000000000000000b02",
+                  "name": "Backlog",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                }
+              },
+              "taskIds": {}
+            }
           },
           {
             "id": "6f0000000000000000009004",
@@ -2167,7 +2284,11 @@
             "dirty": false,
             "updating": false,
             "updatedBy": "",
-            "updatedAt": null
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {},
+              "taskIds": {}
+            }
           }
         ],
         "archived": false,
@@ -2226,7 +2347,24 @@
             "dirty": false,
             "updating": false,
             "updatedBy": "",
-            "updatedAt": null
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {
+                "6f0000000000000000000b01": {
+                  "id": "6f0000000000000000000b01",
+                  "name": "Sprint 1",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                },
+                "6f0000000000000000000b02": {
+                  "id": "6f0000000000000000000b02",
+                  "name": "Backlog",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                }
+              },
+              "taskIds": {}
+            }
           },
           {
             "id": "6f0000000000000000009004",
@@ -2248,7 +2386,11 @@
             "dirty": false,
             "updating": false,
             "updatedBy": "",
-            "updatedAt": null
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {},
+              "taskIds": {}
+            }
           }
         ],
         "archived": false,
@@ -2311,7 +2453,24 @@
             "dirty": false,
             "updating": true,
             "updatedBy": "",
-            "updatedAt": null
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {
+                "6f0000000000000000000b01": {
+                  "id": "6f0000000000000000000b01",
+                  "name": "Sprint 1",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                },
+                "6f0000000000000000000b02": {
+                  "id": "6f0000000000000000000b02",
+                  "name": "Backlog",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                }
+              },
+              "taskIds": {}
+            }
           },
           {
             "id": "6f0000000000000000009004",
@@ -2337,7 +2496,11 @@
             "dirty": false,
             "updating": true,
             "updatedBy": "",
-            "updatedAt": null
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {},
+              "taskIds": {}
+            }
           }
         ],
         "archived": false,
@@ -2402,7 +2565,24 @@
             "dirty": false,
             "updating": false,
             "updatedBy": "",
-            "updatedAt": null
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {
+                "6f0000000000000000000b01": {
+                  "id": "6f0000000000000000000b01",
+                  "name": "Sprint 1",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                },
+                "6f0000000000000000000b02": {
+                  "id": "6f0000000000000000000b02",
+                  "name": "Backlog",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                }
+              },
+              "taskIds": {}
+            }
           },
           {
             "id": "6f0000000000000000009004",
@@ -2428,7 +2608,11 @@
             "dirty": false,
             "updating": false,
             "updatedBy": "",
-            "updatedAt": null
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {},
+              "taskIds": {}
+            }
           }
         ],
         "archived": false,
@@ -2486,7 +2670,18 @@
             "dirty": false,
             "updating": false,
             "updatedBy": "",
-            "updatedAt": null
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {
+                "6f0000000000000000000b01": {
+                  "id": "6f0000000000000000000b01",
+                  "name": "Sprint 1",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                }
+              },
+              "taskIds": {}
+            }
           },
           {
             "id": "6f0000000000000000009004",
@@ -2508,7 +2703,11 @@
             "dirty": false,
             "updating": false,
             "updatedBy": "",
-            "updatedAt": null
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {},
+              "taskIds": {}
+            }
           }
         ],
         "archived": false,
@@ -2578,7 +2777,18 @@
             "dirty": false,
             "updating": false,
             "updatedBy": "",
-            "updatedAt": null
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {
+                "6f0000000000000000000b01": {
+                  "id": "6f0000000000000000000b01",
+                  "name": "Sprint 1",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                }
+              },
+              "taskIds": {}
+            }
           },
           {
             "id": "6f0000000000000000009004",
@@ -2604,7 +2814,433 @@
             "dirty": false,
             "updating": false,
             "updatedBy": "",
-            "updatedAt": null
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {},
+              "taskIds": {}
+            }
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksReadBeforeFailing": {
+    "as": "me",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals/000000000000000000000028"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal fetched successfully.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 17,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 33,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01"
+              ],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 1,
+              "total": 3,
+              "at": "2026-10-01T07:25:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": true,
+            "updatedBy": "",
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {
+                "6f0000000000000000000b01": {
+                  "id": "6f0000000000000000000b01",
+                  "name": "Sprint 1",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                }
+              },
+              "taskIds": {}
+            }
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:22:00.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": true,
+            "updatedBy": "",
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {},
+              "taskIds": {}
+            }
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksReadFailed": {
+    "as": "me",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals/000000000000000000000028"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal fetched successfully.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 17,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 33,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01"
+              ],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 1,
+              "total": 3,
+              "at": "2026-10-01T07:25:00.000Z",
+              "failedAt": "2026-10-01T07:37:00.000Z",
+              "failedCode": "error"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {
+                "6f0000000000000000000b01": {
+                  "id": "6f0000000000000000000b01",
+                  "name": "Sprint 1",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                }
+              },
+              "taskIds": {}
+            }
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:22:00.000Z",
+              "failedAt": "2026-10-01T07:37:00.000Z",
+              "failedCode": "error"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {},
+              "taskIds": {}
+            }
+          }
+        ],
+        "archived": false,
+        "canEdit": true,
+        "canSetValue": true,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksReadFailedReader": {
+    "as": "sam",
+    "request": {
+      "method": "get",
+      "path": "/api/v2/goals/000000000000000000000028"
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Goal fetched successfully.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": false,
+        "color": "",
+        "progressPct": 17,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 33,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01"
+              ],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 1,
+              "total": 3,
+              "at": "2026-10-01T07:25:00.000Z",
+              "failedAt": "2026-10-01T07:37:00.000Z",
+              "failedCode": "error"
+            },
+            "notCounted": 0,
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {
+                "6f0000000000000000000b01": {
+                  "id": "6f0000000000000000000b01",
+                  "name": "Sprint 1",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                }
+              },
+              "taskIds": {}
+            }
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:22:00.000Z",
+              "failedAt": "2026-10-01T07:37:00.000Z",
+              "failedCode": "error"
+            },
+            "notCounted": 0,
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {},
+              "taskIds": {}
+            }
+          }
+        ],
+        "archived": false,
+        "canEdit": false,
+        "canSetValue": false,
+        "createdBy": "6f0000000000000000000001",
+        "createdAt": "2026-10-01T07:00:00.000Z",
+        "updatedAt": null
+      }
+    }
+  },
+  "tasksCountedAgain": {
+    "as": "me",
+    "request": {
+      "method": "patch",
+      "path": "/api/v2/goals/000000000000000000000028/targets/6f0000000000000000009003",
+      "body": {
+        "sources": {
+          "sprintIds": [
+            "6f0000000000000000000b01"
+          ],
+          "taskIds": []
+        }
+      }
+    },
+    "statusCode": 200,
+    "response": {
+      "status": true,
+      "statusText": "Target saved.",
+      "data": {
+        "_id": "000000000000000000000028",
+        "name": "Deliver the release",
+        "description": "",
+        "ownerUserId": "6f0000000000000000000001",
+        "periodStart": "",
+        "periodEnd": "",
+        "visibility": "workspace",
+        "sharedWith": [],
+        "sharedWithMe": false,
+        "isOwner": true,
+        "color": "",
+        "progressPct": 17,
+        "targets": [
+          {
+            "id": "6f0000000000000000009003",
+            "name": "Release tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 33,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [
+                "6f0000000000000000000b01"
+              ],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 1,
+              "total": 3,
+              "at": "2026-10-01T07:38:24.000Z"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": false,
+            "updatedBy": "",
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {
+                "6f0000000000000000000b01": {
+                  "id": "6f0000000000000000000b01",
+                  "name": "Sprint 1",
+                  "projectId": "6f0000000000000000000a01",
+                  "projectName": "Website"
+                }
+              },
+              "taskIds": {}
+            }
+          },
+          {
+            "id": "6f0000000000000000009004",
+            "name": "Stretch tasks",
+            "kind": "tasks",
+            "weight": 1,
+            "progressPct": 0,
+            "reachedAt": null,
+            "sources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "counted": {
+              "done": 0,
+              "total": 0,
+              "at": "2026-10-01T07:22:00.000Z",
+              "failedAt": "2026-10-01T07:37:00.000Z",
+              "failedCode": "error"
+            },
+            "notCounted": 0,
+            "notCountedSources": {
+              "sprintIds": [],
+              "taskIds": []
+            },
+            "dirty": false,
+            "updating": true,
+            "updatedBy": "",
+            "updatedAt": null,
+            "sourceNames": {
+              "sprintIds": {},
+              "taskIds": {}
+            }
           }
         ],
         "archived": false,

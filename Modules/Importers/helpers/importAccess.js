@@ -32,8 +32,11 @@ const importTargetAccess = async (companyId, uid, { projectId, sprintId, addsSta
 
 const previewAccess = (companyId, uid, projectId) => canReadProject(companyId, uid, projectId);
 
+/* Whether the person may add the file's missing statuses and tags to the project, so the dialog can say so before the import. */
+const canAddDetails = async (companyId, uid, projectId) => (await canEditProject(companyId, uid, projectId, [...CREATE_TASKS, DETAILS])).allowed === true;
+
 const refuseImport = (res, decision) => (decision.statusCode === 403
     ? res.status(403).send({ status: false, statusText: 'You do not have permission to import tasks into this project.' })
     : res.status(404).send({ status: false, statusText: 'Project or sprint not found.' }));
 
-module.exports = { importTargetAccess, previewAccess, refuseImport };
+module.exports = { importTargetAccess, previewAccess, canAddDetails, refuseImport };

@@ -321,6 +321,193 @@ describe('when a count is made again', () => {
     });
 });
 
+describe('a count that failed', () => {
+    const failing = (error) => {
+        const original = mockDb.crud.getMockImplementation();
+        mockDb.crud.mockImplementation(async (companyId, query, method) => {
+            if (method === 'aggregate') throw error;
+            return original(companyId, query, method);
+        });
+        return () => mockDb.crud.mockImplementation(original);
+    };
+    const stale = async () => {
+        task(open, openList, { statusType: 'close' });
+        const id = await counting({ sprintIds: [openList] });
+        task(open, openList);
+        after(10 * MINUTE);
+        return id;
+    };
+
+    it('is recorded with when and a reason code, keeps the last numbers, and is no longer said to be on its way', async () => {
+        const id = await stale();
+        const emit = jest.spyOn(socketEmitter, 'emit');
+        const restore = failing(new Error('E11000 could not read customer "Acme"'));
+        expect((await read(id)).targets[0]).toMatchObject({ updating: true });
+        await counts.idle();
+        restore();
+
+        const failedAt = new Date(T0.getTime() + 10 * MINUTE);
+        expect(goalRow(id).targets[0].counted).toMatchObject({ done: 1, total: 1, at: T0, failedAt, failedCode: 'error' });
+        expect(emit).toHaveBeenCalledWith('update', { type: 'update', companyId: C, module: 'goals' });
+        const res = await call(goals.getGoal, AUTHOR, { id });
+        expect(res.body.data.targets[0]).toMatchObject({ updating: false, progressPct: 100, counted: { done: 1, total: 1, at: T0, failedAt, failedCode: 'error' } });
+        expect(JSON.stringify(res.body)).not.toContain('Acme');
+        expect(JSON.stringify(goalRow(id))).not.toContain('Acme');
+        expect(logger.error).toHaveBeenCalledTimes(1);
+        emit.mockRestore();
+    });
+
+    it('names a store that could not be reached apart from any other failure', async () => {
+        const id = await stale();
+        const restore = failing(Object.assign(new Error('timed out'), { name: 'MongoNetworkTimeoutError' }));
+        await read(id);
+        await counts.idle();
+        restore();
+        expect(goalRow(id).targets[0].counted.failedCode).toBe('unavailable');
+    });
+
+    it('is tried again by the first read thirty seconds later, and a count that works clears it', async () => {
+        const id = await stale();
+        const restore = failing(new Error('the database went away'));
+        await read(id);
+        await counts.idle();
+        restore();
+
+        after(30 * SECOND - 1);
+        mockDb.calls.length = 0;
+        expect((await read(id)).targets[0]).toMatchObject({ updating: false });
+        await counts.idle();
+        expect(aggregates()).toHaveLength(0);
+
+        after(1);
+        expect((await read(id)).targets[0]).toMatchObject({ updating: true });
+        await counts.idle();
+        const fresh = (await read(id)).targets[0];
+        expect(fresh).toMatchObject({ updating: false, progressPct: 50, counted: { done: 1, total: 2 } });
+        expect('failedAt' in fresh.counted).toBe(false);
+        expect('failedAt' in goalRow(id).targets[0].counted).toBe(false);
+    });
+
+    it('is cleared when the sources are saved again, which counts at once', async () => {
+        const id = await stale();
+        const restore = failing(new Error('the database went away'));
+        await read(id);
+        await counts.idle();
+        restore();
+        const targetId = goalRow(id).targets[0].id;
+        const res = await call(goals.editTarget, AUTHOR, { id, targetId, body: { sources: { sprintIds: [openList], taskIds: [] } } });
+        expect(res.body.data.targets[0]).toMatchObject({ updating: false, counted: { done: 1, total: 2 } });
+        expect('failedAt' in res.body.data.targets[0].counted).toBe(false);
+    });
+
+    it('marks only the targets that were being counted', async () => {
+        const res = await call(goals.createGoal, AUTHOR, { body: { name: 'Two', targets: [{ name: 'A', kind: 'tasks', sources: { sprintIds: [openList] } }, { name: 'B', kind: 'number', target: 5 }] } });
+        const id = res.body.data._id;
+        after(10 * MINUTE);
+        const restore = failing(new Error('the database went away'));
+        await expect(counts.refresh(C, id)).resolves.toBe(false);
+        restore();
+        const [countedTarget, numberTarget] = goalRow(id).targets;
+        expect(countedTarget.counted.failedCode).toBe('error');
+        expect(numberTarget.counted).toBeUndefined();
+    });
+});
+
+describe('a count that never comes in', () => {
+    const TWO_MINUTES = counts.COUNT_TIMEOUT_MS;
+    const turn = () => new Promise((resolve) => setImmediate(resolve));
+    const stale = async () => {
+        task(open, openList, { statusType: 'close' });
+        const id = await counting({ sprintIds: [openList] });
+        task(open, openList);
+        after(10 * MINUTE);
+        return id;
+    };
+    const during = (answer) => {
+        const original = mockDb.crud.getMockImplementation();
+        mockDb.crud.mockImplementation((companyId, query, method) => answer(query, method) || original(companyId, query, method));
+        return () => mockDb.crud.mockImplementation(original);
+    };
+
+    beforeEach(() => counts.forgetTries());
+
+    it('is given up after two minutes and stored as failed, so the reads stop being told it is on its way', async () => {
+        const id = await stale();
+        const restore = during((query, method) => (method === 'aggregate' ? new Promise(() => {}) : null));
+        expect((await read(id)).targets[0]).toMatchObject({ updating: true });
+        await turn();
+
+        jest.advanceTimersByTime(TWO_MINUTES - 1);
+        await turn();
+        expect((await read(id)).targets[0]).toMatchObject({ updating: true });
+        expect(goalRow(id).targets[0].counted.failedAt).toBeUndefined();
+
+        jest.advanceTimersByTime(1);
+        await counts.idle();
+        restore();
+        const failedAt = new Date(T0.getTime() + 10 * MINUTE + TWO_MINUTES);
+        expect(goalRow(id).targets[0].counted).toMatchObject({ done: 1, total: 1, failedAt, failedCode: 'timeout' });
+        expect((await read(id)).targets[0]).toMatchObject({ updating: false, progressPct: 100, counted: { failedAt, failedCode: 'timeout' } });
+    });
+
+    it('does not hold up the count of the next goal in line', async () => {
+        const first = await stale();
+        const second = await counting({ sprintIds: [openList] }, { name: 'Second' });
+        after(10 * MINUTE);
+        let hung = false;
+        const restore = during((query, method) => {
+            if (hung || method !== 'aggregate') return null;
+            hung = true;
+            return new Promise(() => {});
+        });
+        await call(goals.listGoals, AUTHOR);
+        await turn();
+        jest.advanceTimersByTime(TWO_MINUTES);
+        await counts.idle();
+        restore();
+        const totals = [first, second].map((id) => goalRow(id).targets[0].counted);
+        expect(totals.filter((counted_) => counted_.failedCode === 'timeout')).toHaveLength(1);
+        expect(totals.filter((counted_) => !counted_.failedCode && counted_.total === 2)).toHaveLength(1);
+    });
+
+    it('is said to have failed after two minutes even when the failure cannot be stored, and heals when the store answers', async () => {
+        const id = await stale();
+        const restore = during((query, method) => {
+            if (method === 'aggregate') return Promise.reject(new Error('the database went away'));
+            return query.type === SCHEMA_TYPE.GOALS && method === 'findOneAndUpdate' ? Promise.reject(new Error('read only')) : null;
+        });
+        const started = Date.now();
+        expect((await read(id)).targets[0]).toMatchObject({ updating: true });
+        await counts.idle();
+        expect(goalRow(id).targets[0].counted.failedAt).toBeUndefined();
+
+        after(TWO_MINUTES - 1);
+        expect((await read(id)).targets[0]).toMatchObject({ updating: true });
+        await counts.idle();
+
+        after(1);
+        const told = (await read(id)).targets[0];
+        expect(told).toMatchObject({ updating: false, counted: { done: 1, total: 1, failedAt: new Date(started + TWO_MINUTES), failedCode: 'timeout' } });
+        await counts.idle();
+        expect(goalRow(id).targets[0].counted.failedAt).toBeUndefined();
+
+        restore();
+        await read(id);
+        await counts.idle();
+        const healed = (await read(id)).targets[0];
+        expect(healed).toMatchObject({ updating: false, progressPct: 50, counted: { done: 1, total: 2 } });
+        expect('failedAt' in healed.counted).toBe(false);
+        expect(counts.timedOutAt(C, id, new Date())).toBeNull();
+    });
+
+    it('is never said of a count that is not due', async () => {
+        const id = await counting({ sprintIds: [openList] });
+        expect(counts.timedOutAt(C, id, new Date(Date.now() + 60 * MINUTE))).toBeNull();
+        expect((await read(id)).targets[0]).toMatchObject({ updating: false });
+        expect('failedAt' in (await read(id)).targets[0].counted).toBe(false);
+    });
+});
+
 describe('a task change', () => {
     const envelope = (type, { changedFields = [], sprintId = openList, previous = null, id = nextId('f0'), companyId = C, kind = 'task' } = {}) => ({
         ...domainEventBus.buildEnvelope({ companyId, type, doc: { _id: id, ProjectID: String(open._id), sprintId }, changedFields, previous, actor: { kind: 'user', userId: AUTHOR }, depth: 0 }),
@@ -505,9 +692,15 @@ describe('the stored row', () => {
     it('declares the counted fields where the count writes them', () => {
         const declared = schema.goals.targets.type[0];
         expect(Object.keys(declared.sources)).toEqual(['sprintIds', 'taskIds']);
-        expect(Object.keys(declared.counted)).toEqual(['done', 'total', 'at', 'skipped']);
+        expect(Object.keys(declared.counted)).toEqual(['done', 'total', 'at', 'failedAt', 'failedCode', 'skipped']);
         expect(Object.keys(declared.counted.skipped)).toEqual(['sprintIds', 'taskIds']);
         expect(declared.dirty.type).toBe(Boolean);
+    });
+
+    it('keeps what a failed count leaves on a target', () => {
+        const sent = { id: 't', name: 'T', kind: 'tasks', counted: { done: 1, total: 2, at: T0, failedAt: T0, failedCode: 'error' } };
+        const kept = new Goal({ name: 'N', ownerUserId: AUTHOR, visibility: 'private', targets: [sent] }).toObject().targets[0];
+        expect(kept.counted).toMatchObject({ failedAt: T0, failedCode: 'error' });
     });
 
     it('leaves a target that is not counted from tasks without those fields', () => {

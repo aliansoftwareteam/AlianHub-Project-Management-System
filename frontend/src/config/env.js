@@ -406,6 +406,7 @@ module.exports.IMPORT_CSV_PREVIEW = '/api/v2/imports/csv/preview';
 module.exports.IMPORT_CLICKUP = '/api/v2/imports/clickup';
 module.exports.IMPORT_CLICKUP_PREVIEW = '/api/v2/imports/clickup/preview';
 module.exports.IMPORT_CLICKUP_PROJECT = '/api/v2/imports/clickup/project';
+module.exports.IMPORTS = '/api/v2/imports';
 module.exports.EXPORTS = '/api/v2/exports';
 module.exports.EXPORTS_WORKSPACE = '/api/v2/exports/workspace';
 

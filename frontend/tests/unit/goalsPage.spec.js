@@ -84,9 +84,9 @@ const newStore = ({ roleType = 3, currencies = ['USD', 'EUR', 'GBP'] } = {}) => 
 
 let wrapper;
 let store;
-const open = async ({ as = 'me', roleType = 3, goalId = '', userId = ME } = {}) => {
+const open = async ({ as = 'me', roleType = 3, goalId = '', userId = ME, query = {} } = {}) => {
     viewer = as;
-    route.value = reactive({ name: goalId ? 'Goal' : 'Goals', params: goalId ? { cid: 'company-1', goalId } : { cid: 'company-1' } });
+    route.value = reactive({ name: goalId ? 'Goal' : 'Goals', params: goalId ? { cid: 'company-1', goalId } : { cid: 'company-1' }, query });
     store = newStore({ roleType });
     wrapper = mount(Goals, { global: { plugins: [store], provide: { $userId: ref(userId) } }, attachTo: document.body });
     await flushPromises();
@@ -380,6 +380,21 @@ describe('a new goal', () => {
         await at('gls-create').trigger('submit');
         await flushPromises();
     };
+
+    it('has its form open already for someone Home sent to make one, and never for a guest', async () => {
+        router.replace.mockClear();
+        await open({ query: { new: '1' } });
+        expect(at('gls-create-name').exists()).toBe(true);
+        expect(router.replace).toHaveBeenCalledWith({ name: 'Goals', params: { cid: 'company-1' } });
+        wrapper.unmount();
+
+        await open({ as: 'gil', roleType: 0, userId: GIL, query: { new: '1' } });
+        expect(at('gls-create-name').exists()).toBe(false);
+        wrapper.unmount();
+
+        await open();
+        expect(at('gls-create-name').exists()).toBe(false);
+    });
 
     it('is made from a name and a period, starts private, and opens', async () => {
         await open();
