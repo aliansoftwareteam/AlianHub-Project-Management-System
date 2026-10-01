@@ -166,7 +166,7 @@ const failureList = (failures) => (failures.length
 function galleryHtml({ title = 'Screenshot atlas', shots, failures = [], meta = [] }) {
     const cards = shots.map((shot) => {
         const label = `${shot.screen} · ${shot.theme} · ${shot.size}`;
-        return `<figure class="card" ${itemAttrs(shot)}>${shotButton(src(shot.file), label)}<figcaption><strong>${escapeHtml(shot.screen)}</strong><span>${escapeHtml(shot.theme)} · ${escapeHtml(shot.size)}</span></figcaption>${shot.note ? `<p class="note">${escapeHtml(shot.note)}</p>` : ''}</figure>`;
+        return `<figure class="card" ${itemAttrs(shot)}>${shotButton(src(shot.file), label)}<figcaption><strong>${escapeHtml(shot.screen)}</strong><span>${escapeHtml(shot.theme)} · ${escapeHtml(shot.size)}</span></figcaption>${shot.note ? `<p class="note">${escapeHtml(shot.note)}</p>` : ''}${shot.findings ? `<p class="note">${escapeHtml(shot.findings)}</p>` : ''}</figure>`;
     }).join('\n');
     const body = `${failureList(failures)}${shots.length ? `<div class="grid">\n${cards}\n</div>` : '<p class="empty">No screenshots in this folder.</p>'}`;
     return page({ title, meta: [`${shots.length} screenshots`, ...meta], bar: filterBar(shots), body });

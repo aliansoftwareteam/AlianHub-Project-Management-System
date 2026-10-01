@@ -202,8 +202,8 @@ onMounted(load);
 .sec__body { display: flex; flex-direction: column; gap: 10px; }
 .sec__scroll { overflow-x: auto; }
 .sec__table { width: 100%; border-collapse: collapse; font: var(--text-small); }
-.sec__table th { text-align: left; font: var(--text-label); text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); padding: 4px 8px; border-bottom: 1px solid var(--hairline); white-space: nowrap; }
-.sec__table td { padding: 6px 8px; border-bottom: 1px solid var(--hairline); color: var(--ink); vertical-align: middle; white-space: nowrap; }
+.sec__table th { text-align: left; font: var(--text-label); text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); padding: 4px var(--cell-pad-x, 8px); border-bottom: 1px solid var(--hairline); white-space: nowrap; }
+.sec__table td { padding: var(--table-pad-y, 6px) var(--cell-pad-x, 8px); font-size: var(--row-font, 12.5px); border-bottom: 1px solid var(--hairline); color: var(--ink); vertical-align: middle; white-space: nowrap; }
 .sec__name { font-weight: 600; white-space: normal; min-width: 180px; }
 .is-revoked td { color: var(--ink-2); }
 .sec__chip { margin-left: 6px; }

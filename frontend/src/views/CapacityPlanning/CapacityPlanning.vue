@@ -129,7 +129,8 @@ const liveGaps = computed(() => {
 });
 const topGap = computed(() => liveGaps.value[0] || null);
 const otherGaps = computed(() => liveGaps.value.slice(1, 4));
-const gapNotes = (g) => (g.notes || []).map((n) => (n.kind === 'pto' ? t('Time.gap_pto', { name: n.name, days: n.days }) : t('Time.gap_over', { name: n.name, pct: n.pct }))).join(', ');
+const GAP_NOTE = { pto: 'Time.gap_pto', unavailable: 'Time.gap_unavailable' };
+const gapNotes = (g) => (g.notes || []).map((n) => (GAP_NOTE[n.kind] ? t(GAP_NOTE[n.kind], { name: n.name, days: n.days }) : t('Time.gap_over', { name: n.name, pct: n.pct }))).join(', ');
 const options = computed(() => {
     const g = topGap.value;
     if (!g) return [];

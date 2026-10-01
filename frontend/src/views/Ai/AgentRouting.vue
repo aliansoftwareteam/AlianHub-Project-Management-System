@@ -1,5 +1,5 @@
 <template>
-    <div class="ah-page parity-page">
+    <div class="ah-page parity-page route-page">
         <AiSidebar />
         <div class="parity-page__main">
             <div class="ah-toolbar">
