@@ -5,7 +5,7 @@
 const registry = require('../registry');
 const modelPin = require('../../AICore/modelPin');
 const { tagsIn, structureErrors } = require('./skillTemplate');
-const { SKILL_VERSION, RISKS, INPUT_CATALOGUE, READER_CATALOGUE, PROMPT_PARTIALS, emitActions, emitRequired, TASK_FIELDS, TEMPLATE_ROOTS, MAX_EMIT_EACH, isOffered, offeredReaders } = require('./catalogues');
+const { SKILL_VERSION, RISKS, INPUT_CATALOGUE, READER_CATALOGUE, PROMPT_PARTIALS, emitActions, emitRequired, TASK_FIELDS, TEMPLATE_ROOTS, MAX_EMIT_EACH, isOffered, readsConnector, offeredReaders } = require('./catalogues');
 const externalReads = require('./externalReads');
 const { findSecrets } = require('./secretScan');
 
@@ -87,6 +87,8 @@ const checkReadPath = (value, field, inputs, errors) => {
     return value;
 };
 
+const CHANNEL_REF = /^#?[\p{L}\p{N}][\p{L}\p{N}._-]{0,79}$/u;
+
 const checkParam = (rule, value, field, inputs, errors) => {
     if (rule.type === 'number') {
         if (typeof value === 'number' && Number.isFinite(value) && value >= rule.min && value <= rule.max) return value;
@@ -115,6 +117,10 @@ const checkParam = (rule, value, field, inputs, errors) => {
         if (!rule.values.includes(value)) { errors.push(error(field, 'invalid_params', `must be one of ${rule.values.join(', ')}`)); return null; }
         if (!inputs.has(value)) { errors.push(error(field, 'undeclared_input', `reads input "${value}", which the skill does not declare`)); return null; }
         return value;
+    }
+    if (rule.type === 'channel') {
+        if (typeof value === 'string' && CHANNEL_REF.test(value.trim())) return value.trim();
+        errors.push(error(field, 'invalid_params', 'must be a channel name or id, e.g. releases')); return null;
     }
     if (rule.type === 'path') return checkReadPath(value, field, inputs, errors);
     if (rule.type === 'secret_handle') {
@@ -147,12 +153,16 @@ const validateGather = (input, inputs, errors) => {
     if (input.gather !== undefined && !Array.isArray(input.gather)) errors.push(error('gather', 'invalid', 'must be a list of reader steps'));
     if (steps.length > MAX_STEPS) errors.push(error('gather', 'too_long', `at most ${MAX_STEPS} reader steps`));
     const out = [];
+    let connectorRead = '';
     steps.forEach((step, i) => {
         const at = `gather[${i}]`;
         if (!isPlainObject(step)) { errors.push(error(at, 'invalid', 'must be an object')); return; }
         const reader = asString(step.reader);
         if (!reader) { errors.push(error(`${at}.reader`, 'required', 'required')); return; }
         if (!isOffered(reader)) { errors.push(error(`${at}.reader`, 'unknown_reader', `unknown reader "${reader}" (have: ${offeredReaders().join(', ')})`)); return; }
+        // The run would refuse the fetch (engine/agentFetch.js); saying so here saves the author a failed run.
+        if (connectorRead && externalReads.isExternal(reader)) errors.push(error(`${at}.reader`, 'connector_then_fetch', `"${reader}" fetches from the web after "${connectorRead}" read a connector, which a run refuses; put the web read first`));
+        if (readsConnector(reader)) connectorRead = reader;
         const as = asString(step.as) || reader;
         if (!/^[a-zA-Z][a-zA-Z0-9_]{0,39}$/.test(as)) { errors.push(error(`${at}.as`, 'invalid', 'must be a short name: letters, digits and underscores')); return; }
         out.push({ reader, as, params: validateReaderParams(reader, step.params, at, new Set(inputs), errors) });

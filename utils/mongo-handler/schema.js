@@ -1216,8 +1216,11 @@ const schema = {
         steps: { type: Array, default: [], required: false },
         // Set once the run took in content from outside the workspace (Modules/Agents/taint.js); absent on a clean run
         tainted: { type: Boolean, required: false },
-        // [{ kind: fetch | email | form | webhook | file | passage | client | instruction, ref, at }] — where it came from, never the content
+        // [{ kind: fetch | email | form | webhook | file | passage | client | instruction | connector, ref, at }] — where it came from, never the content
         taintSources: { type: Array, default: undefined, required: false },
+        // [{ action, connector, channelId, state: applied | failed | refused, messages, chars, truncated, reason, error, at }] — one per
+        // connector read the run tried; the per-run caps are counted from it, and it never holds what was read
+        connectorReads: { type: Array, default: undefined, required: false },
         // 'report' for a scheduled report run (no task); absent on a task run
         kind: { type: String, required: false },
         scheduleId: { type: String, required: false },
@@ -1999,13 +2002,15 @@ const schema = {
         // [{ id, name, member }] as the provider listed them when the token was saved or the list refreshed
         channels: { type: Array, default: [], required: false },
         channelsFetchedAt: { type: Date, required: false },
-        // [{ id, name }] the channels an owner or admin chose; a post anywhere else is refused
+        // [{ id, name, read, post }] the channels an owner or admin chose and what agents may do in each; a row
+        // without the two ticks is from before reading existed and means post only
         allowedChannels: { type: Array, default: [], required: false },
         // connected | broken
         status: { type: String, default: 'connected', required: false },
         brokenReason: { type: String, required: false },
         brokenAt: { type: Date, required: false },
         lastPostAt: { type: Date, required: false },
+        lastReadAt: { type: Date, required: false },
         createdBy: { type: String, required: false },
         updatedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },

@@ -19,6 +19,8 @@ const { escapeCommentText } = require('../Comments/helpers/plainText');
 const { isPeriodLocked } = require('../TimesheetApproval/helpers/lockGuard');
 const { canPostToThread } = require('../Comments/helpers/threadWriteAccess');
 const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
+const { canCreatePageIn } = require('../Pages/helpers/pageAccess');
+const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
 const logger = require('../../Config/loggerConfig');
 
 // The single place an agent's action is executed. MCP tools, approved proposals
@@ -117,7 +119,12 @@ const FLAGGED_RATINGS = Object.freeze({
     'goal.target.set': write(SCOPE.WORKSPACE),
     'goal.target.sources.add': write(SCOPE.WORKSPACE),
     'goal.target.sources.remove': write(SCOPE.WORKSPACE),
+    'task.lists.list': read(SCOPE.TASK),
+    // The other list may sit in another project.
+    'task.lists.add': write(SCOPE.PROJECT),
+    'task.lists.remove': write(SCOPE.PROJECT),
     'slack.message.post': write(SCOPE.WORKSPACE, false),
+    'slack.channel.read': read(SCOPE.WORKSPACE),
 });
 
 const ratingTable = () => ({ ...RATINGS, ...Object.fromEntries(Object.entries(FLAGGED_RATINGS).filter(([k]) => registry.has(k))) });
@@ -136,9 +143,9 @@ const manifest = () => {
 
 const clampDepth = (depth) => Math.max(0, Number(depth) || 0);
 
-const emitTask = (doc, updatedFields, actor, depth) => {
+const emitTask = (companyId, doc, updatedFields, actor, depth) => {
     socketEmitter.emit('update', {
-        type: 'update', module: 'task', data: doc, updatedFields,
+        type: 'update', module: 'task', companyId, data: doc, updatedFields,
         actor: { kind: 'agent', userId: actor.userId || null, agentId: actor.agentId || null },
         depth: clampDepth(depth) + 1,
     });
@@ -284,7 +291,7 @@ const executors = {
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS, data: [{ _id: task._id }, { $push: { links: link } }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
-        emitTask(updated, { links: updated.links }, actor, depth);
+        emitTask(companyId, updated, { links: updated.links }, actor, depth);
         return { result: { linkId: String(link._id), kind: link.kind }, undo: { kind: 'link', taskId: String(task._id), linkId: String(link._id) }, entityId: task._id, entityName: task.TaskName };
     },
 
@@ -465,6 +472,22 @@ const threadMay = async (companyId, actor, action, params) => {
 };
 const THREAD_REFUSAL = 'not_visible: the task\'s comment thread is not one the person behind this agent can open';
 
+/* page.draft saves its doc without the create route, so the route's rule is asked here: where the person behind
+ * the agent may start a doc, and a task they can open to hang it on. Returns the refusal, or ''. */
+const draftRefusal = async (companyId, actor, action, params) => {
+    if (action !== 'page.draft') return '';
+    const uid = String((actor && actor.userId) || '');
+    const place = await canCreatePageIn(companyId, uid, params.projectId && oid(params.projectId) ? String(params.projectId) : '');
+    if (!place.allowed) {
+        return place.statusCode === 403
+            ? 'permission_denied: the person behind this agent cannot add a doc here'
+            : 'not_visible: the project is not one the person behind this agent can open';
+    }
+    const linked = params.taskId && oid(params.taskId) ? [String(params.taskId)] : [];
+    if ((await readableTaskIds(companyId, uid, linked)).length !== linked.length) return 'not_visible: the task is not one the person behind this agent can open';
+    return '';
+};
+
 const refusal = async (companyId, actor, { action, params, reason, ip, entityType, entityId, taint }) => {
     const auditId = await audit.recordRefusal(companyId, actor, { action, reason, params, entityType, entityId: entityId || params.taskId, ip, taint });
     return new RefusedError(reason, auditId);
@@ -492,6 +515,8 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
     const holder = await permissions.holderMay(companyId, actor, action, params);
     if (!holder.allowed) throw await refusal(companyId, actor, { action, params, reason: holder.reason, ip, taint });
     if (!(await threadMay(companyId, actor, action, params))) throw await refusal(companyId, actor, { action, params, reason: THREAD_REFUSAL, ip, taint });
+    const draftRefused = await draftRefusal(companyId, actor, action, params);
+    if (draftRefused) throw await refusal(companyId, actor, { action, params, reason: draftRefused, ip, taint });
     if (!check.action.write) return { result: null, auditId: null, undo: null };
     const exec = executors[action];
     if (!exec) throw new tools.DeterministicError(`${action} has no executor`);

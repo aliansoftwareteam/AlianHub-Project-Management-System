@@ -11,7 +11,18 @@ export const livesIn = (row, sprintId) => same(row?.sprintId, sprintId);
 
 export const isAddedTo = (row, sprintId) => extraListsOf(row).some((entry) => same(entry.sprintId, sprintId));
 
+/* The rule a search result is sorted into lists by: the same row matches under its home and under each list it was added to. */
+export const inList = (row, sprintId) => livesIn(row, sprintId) || isAddedTo(row, sprintId);
+
 const inProject = (row, pid) => row.ProjectID === undefined || same(row.ProjectID, pid);
+
+/* Whether a change may have altered the rows some list shows of another project's tasks: the task
+ * lives in another project than the list it reached, it is in a list of another project, or its
+ * lists were just changed. */
+export function touchesOtherProjects(row, pid, updatedFields) {
+    if (!row) return false;
+    return !inProject(row, pid) || Boolean(updatedFields?.extraLists) || extraListsOf(row).some((entry) => !same(entry.projectId, pid));
+}
 
 /* A payload that names no list (a partial update) says nothing either way, and a subtask sits
  * where its parent does: both are shown wherever the store already holds them. */

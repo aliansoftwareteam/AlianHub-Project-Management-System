@@ -78,7 +78,7 @@ exports.changeTaskType = async (req, res) => {
                                         ]
                                     }
                                     MongoDbCrudOpration(companyId,updateObj,"findOneAndUpdate").then((result) => {
-                                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: obj , module: 'task'});
+                                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: obj , module: 'task', companyId});
                                         resolve1()
                                     })
                                     .catch((error) => {
@@ -182,7 +182,7 @@ exports.changeTaskStatus = async (req, res) => {
                                         ]
                                     }
                                     MongoDbCrudOpration(companyId,updateObj,"findOneAndUpdate").then((result) => {
-                                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: obj , module: 'task'});
+                                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: obj , module: 'task', companyId});
                                         resolve();
                                     })
                                     .catch((error) => {

@@ -14,7 +14,7 @@ Three things, in this order.
    |---|---|
    | `MCP_TOOLS_DATA=on` | `projects.list`, `project.get`, `sprints.list`, `statuses.list`, `comments.list`, `pages.search`, `page.get`, `timesheet.read`, `comment.create`, `timelog.create` |
    | `MCP_TOOLS_MANAGE=on` | The task management tools and the doc writing tools below, for tokens created with the matching grant |
-   | `MCP_TOOLS_WORK=on` | `tags.list`, `task.tags.add`, `task.tags.remove`, `task.relations.list`, `task.relation.add`, `task.relation.remove`, `lists.list`, `list.create`, `list.rename`, `list.move`, `page.comments.list`, `page.comment.create`, `page.comment.reply`, `page.comment.assign`, `goals.list`, `goal.get`, `goal.target.set`, `goal.target.sources.add`, `goal.target.sources.remove`, for every token that reads or writes; none of them needs a grant |
+   | `MCP_TOOLS_WORK=on` | `tags.list`, `task.tags.add`, `task.tags.remove`, `task.relations.list`, `task.relation.add`, `task.relation.remove`, `lists.list`, `list.create`, `list.rename`, `list.move`, `page.comments.list`, `page.comment.create`, `page.comment.reply`, `page.comment.assign`, `goals.list`, `goal.get`, `goal.target.set`, `goal.target.sources.add`, `goal.target.sources.remove`, `task.lists.list`, `task.lists.add`, `task.lists.remove`, and `sprintId` on `tasks.search`, for every token that reads or writes; none of them needs a grant |
    | `MCP_TOOLS_V2=on` | Names next to ids, paged lists, and a person's approval for any call that cannot be undone |
 
 2. **What the token was created with.** A token has scopes (read, write) and may have grants:
@@ -34,7 +34,7 @@ An agent connected through OAuth (`MCP_OAUTH`) is held to the scopes its connect
 - **The person ticked it** on the consent screen. Both start unticked, each with a sentence saying what it allows; everything else the app asked for is granted together as before.
 - **An owner or admin approved it for that app by name** under Settings, Agent clients. Approving an app without choosing permissions never includes either one, and an app an admin registered without a list of permissions cannot be given them at all; register it again naming them.
 
-The `MCP_TOOLS_WORK` tools take the plain scopes: `projects:read` for `tags.list`, `lists.list`, `goals.list` and `goal.get`, `tasks:read` for `task.relations.list`, `docs:read` for `page.comments.list`, and `tasks:write` for each of their writes.
+The `MCP_TOOLS_WORK` tools take the plain scopes: `projects:read` for `tags.list`, `lists.list`, `goals.list` and `goal.get`, `tasks:read` for `task.relations.list` and `task.lists.list`, `docs:read` for `page.comments.list`, and `tasks:write` for each of their writes.
 
 An app connected before these scopes existed, and any connection where one of the three is missing, lists and runs exactly what it did before. The write scope never stands in for a manage scope, and a manage scope never stands in for the write scope: closing a task through `task.status.set` takes both `tasks:write` and `tasks:manage`.
 
@@ -63,7 +63,7 @@ Revoke a token on the same screen. A revoked or expired token stops working on i
 - It is recorded in the agent audit log with what it replaced. Where the result says `undoable: true`, a person can undo it from that log within the workspace's undo window.
 - With `MCP_TOOLS_V2` on, a call that cannot be undone (`task.move`) is not run. It is filed as a proposal in the Inbox, and the result says `pending: true`. A person who can open the same task and holds the same permission approves or declines it.
 - For an app connected through OAuth, with `AGENT_TAINT_ROUTING` on, a write that reaches past one task (`task.create`, `task.move`, `task.archive`, `task.restore`, `page.create`, `page.update`) is filed the same way when the connection holds the manage scope the tool needs, and refused when it does not. Approval asks the connection again: it must still be live and still hold that scope, the app must still be approved for it in the workspace, and the person must still have a seat and be able to open what the change touches. A proposal filed by a connection that has since been revoked or narrowed cannot be approved.
-- The `MCP_TOOLS_WORK` writes follow the same rule without needing a manage scope to run. Under `AGENT_TAINT_ROUTING`, a tag stays on one task and runs. A link between tasks, a list change and a doc comment reach past one task: each is refused for a connection without the manage scope, and filed for a person when the connection holds `tasks:manage` (links and lists) or `docs:manage` (doc comments), with approval asking that scope again. A change to a goal reaches everyone the goal is shared with: it is refused without `tasks:manage` and filed with it.
+- The `MCP_TOOLS_WORK` writes follow the same rule without needing a manage scope to run. Under `AGENT_TAINT_ROUTING`, a tag stays on one task and runs. A link between tasks, a list change, adding a task to another list or taking it out, and a doc comment reach past one task: each is refused for a connection without the manage scope, and filed for a person when the connection holds `tasks:manage` (links and lists) or `docs:manage` (doc comments), with approval asking that scope again. A change to a goal reaches everyone the goal is shared with: it is refused without `tasks:manage` and filed with it.
 - A goal belongs to no project. A token kept to some projects reads a goal only when the goal counts tasks and every list and task it counts is in those projects, and it changes no goal.
 - A refusal says why, and is recorded too.
 
@@ -89,6 +89,12 @@ Arguments are JSON. A result is JSON text.
 
 ```json
 { "name": "tasks.search", "arguments": { "projectId": "<project id>", "assigneeId": "<member id>", "dueFrom": "2026-11-01", "dueTo": "2026-11-30" } }
+```
+
+With `MCP_TOOLS_WORK` on, `tasks.search` takes `sprintId` for every token: the tasks that live in that list and the tasks added to it from another list. A task added to the list still carries its home list in `sprintId`. An added task is answered only when you can open its home, and only when you can open the list you named; a token kept to some projects needs both inside them.
+
+```json
+{ "name": "tasks.search", "arguments": { "sprintId": "<list id>" } }
 ```
 
 `task.get`: one task as a brief, with its goal, acceptance criteria, checklist, relations, links and what the comments settled. With `tasks:manage` it also carries the assignees, the subtask count, the tasks above it and each link's id.
@@ -149,6 +155,12 @@ Arguments are JSON. A result is JSON text.
 
 ```json
 { "name": "task.relations.list", "arguments": { "taskId": "<task id>" } }
+```
+
+`task.lists.list`: the lists a task was added to beside its home list, each with its project, name, who added it and when. Only lists you can open are listed, and nothing says whether there are others. Argument: `taskId`.
+
+```json
+{ "name": "task.lists.list", "arguments": { "taskId": "<task id>" } }
 ```
 
 `lists.list`: the live lists of one project, each with the folder and the parent folder it sits in, and the project's live folders and subfolders. A private list is listed only for the people on it, and for owners and admins. Argument: `projectId`.
@@ -242,6 +254,18 @@ These need `MCP_TOOLS_WORK` and the write scope, and no grant. Each asks the per
 { "name": "task.relation.remove", "arguments": { "taskId": "<task id>", "relatedTaskId": "<other task id>" } }
 ```
 
+`task.lists.add`: add a top-level task to another list, in its own project or another one. The task stays in its home list and keeps that project's statuses; its subtasks show under it. Arguments: `taskId`, `projectId` and `sprintId` (the other list and the project it is in, from `lists.list`), and `reason`. You must be able to open the task and the list, and to move tasks in both projects. A Scrum sprint, a backlog and a personal list are refused, and so is a subtask, a task in a personal list and an eleventh list. Adding a task to a list gives nobody access to it: people who cannot open its home list do not see it there.
+
+```json
+{ "name": "task.lists.add", "arguments": { "taskId": "<task id>", "projectId": "<project of the other list>", "sprintId": "<other list id>" } }
+```
+
+`task.lists.remove`: take a task out of a list it was added to. Arguments: `taskId`, `projectId`, `sprintId`, and `reason`. You must be able to open the task and the list, and to move tasks in the task's project or in the list's. The home list is never changed here.
+
+```json
+{ "name": "task.lists.remove", "arguments": { "taskId": "<task id>", "projectId": "<project of the other list>", "sprintId": "<other list id>" } }
+```
+
 `list.create`: a list in a project, at the top level or in one of the project's folders or subfolders. Arguments: `projectId`, `name` (at most 100 characters), `folderId`, and `reason`. It needs the permission to create lists in that project.
 
 ```json
@@ -260,7 +284,7 @@ These need `MCP_TOOLS_WORK` and the write scope, and no grant. Each asks the per
 { "name": "list.move", "arguments": { "projectId": "<project id>", "sprintId": "<list id>", "folderId": null } }
 ```
 
-Undo, from the agent audit log: a tag and a link are put back as they were, a rename and a move are reversed, and a list an agent created is moved to the trash while it is still empty. There is no tool that archives or deletes a list or a folder.
+Undo, from the agent audit log: a tag and a link are put back as they were, a task added to a list is taken out and one taken out is added again, a rename and a move are reversed, and a list an agent created is moved to the trash while it is still empty. There is no tool that archives or deletes a list or a folder.
 
 ### Comments, links and time
 

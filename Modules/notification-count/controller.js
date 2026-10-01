@@ -14,12 +14,12 @@ const { parentCountFields } = require('./unreadParents');
 
 
 /* A null document would blank the client's whole count store, so only a real one is broadcast. */
-const emitCounts = (doc) => {
-    if (doc) socketEmitter.emit('update', { type: "update", data: doc , module: 'userIdNotification' });
+const emitCounts = (companyId, doc) => {
+    if (doc) socketEmitter.emit('update', { type: "update", data: doc , module: 'userIdNotification', companyId });
 };
 
 const unsetSpentCount = async (companyId, filter, field) => {
-    emitCounts(await mongoCm.MongoDbCrudOpration(companyId, {
+    emitCounts(companyId, await mongoCm.MongoDbCrudOpration(companyId, {
         type: dbCollections.USERID,
         data: [{ ...filter, [field]: { $lte: 0 } }, { $unset: { [field]: "" } }, { returnDocument: 'after' }]
     }, "findOneAndUpdate"));
@@ -34,7 +34,7 @@ const changeParentCounts = async (companyId, rows, taskFieldName, sprintFieldNam
         try {
             const by = amountOf(row);
             // eslint-disable-next-line no-await-in-loop
-            emitCounts(await mongoCm.MongoDbCrudOpration(companyId, {
+            emitCounts(companyId, await mongoCm.MongoDbCrudOpration(companyId, {
                 type: dbCollections.USERID,
                 data: [{ _id: row._id }, { $inc: Object.fromEntries(parentFields.map((field) => [field, by])) }, { returnDocument: 'after' }]
             }, "findOneAndUpdate"));
@@ -95,7 +95,7 @@ exports.updateCount = (companyId,userIds, manageQuery, cb) => {
                     // A null document would blank the client's whole count store, so
                     // only broadcast a real one.
                     if (data) {
-                        socketEmitter.emit('update', { type: "update", data: data , module: 'userIdNotification' });
+                        socketEmitter.emit('update', { type: "update", data: data , module: 'userIdNotification', companyId });
                     }
                     count++;
                     countFunction(userIds[count]);
@@ -716,7 +716,8 @@ exports.unsetFieldForMultipleDocuments = (companyId, sprintFieldName, cb) => {
                     socketEmitter.emit('update', { 
                         type: "update", 
                         data: updatedDoc, 
-                        module: 'userIdNotification' 
+                        module: 'userIdNotification',
+                        companyId
                     });
 
                     updatedDocuments.push(updatedDoc);

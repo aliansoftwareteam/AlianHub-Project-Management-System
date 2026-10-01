@@ -1,6 +1,7 @@
 /* A subtask row in the List, through the real store, the real task loader action, the real
    useListRowEdit and the real assigneeOptions helpers: who it can be assigned to, and that its
-   parent stays open while it is edited. Only the HTTP layer and the task writes are mocked. */
+   parent stays open while it is edited. Only the HTTP layer and the task writes are mocked; the
+   assignee write is the real one, since it is what shows the change in the store. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { config, flushPromises, mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
@@ -17,9 +18,14 @@ const { ops, http } = vi.hoisted(() => ({
     http: { subtasks: [] }
 }));
 
-vi.mock('@/utils/TaskOperations', () => ({ default: ops }));
+vi.mock('@/utils/TaskOperations', async (importOriginal) => {
+    const real = (await importOriginal()).default;
+    ops.updateAssignee.mockImplementation((payload) => real.updateAssignee(payload));
+    return { default: ops };
+});
 vi.mock('@/services', () => ({
     apiRequest: vi.fn((method, url, body) => {
+        if (method === 'patch') return Promise.resolve({ status: 200, data: { status: true } });
         const match = body?.findQuery?.[0]?.$match || {};
         if (typeof match.ParentTaskId === 'string') {
             return Promise.resolve({ status: 200, data: [{ result: http.subtasks.map((task) => ({ ...task })), count: [{ count: http.subtasks.length }] }] });

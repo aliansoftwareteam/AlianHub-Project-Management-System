@@ -121,6 +121,41 @@ describe('a file whose tasks are already in the project', () => {
     });
 });
 
+describe('a task counts as already here in one project only', () => {
+    it('says so in the preview, whether or not this project holds any of the file', async () => {
+        const wrapper = await openInProject();
+        await toPreview(wrapper);
+        expect(wrapper.find('[data-test="wim-existing"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="wim-duplicates-scope"]').text()).toBe('WorkspaceImport.fact_duplicates_scope');
+    });
+});
+
+describe('a status the project does not have, on a task that is updated', () => {
+    it('is named when the import finishes: the task kept its status', async () => {
+        answers.preview = previewOf({ alreadyImported: 3 });
+        const wrapper = await openInProject();
+        await toPreview(wrapper);
+        await wrapper.find('[data-test="wim-existing-update"]').setValue(true);
+        await flushPromises();
+
+        answers.imported = { jobId: 'j1', created: 0, updated: 3, skipped: 0, skippedCells: [{ name: 'Plan', column: 'status', value: 'in review', code: 'UNKNOWN_STATUS' }] };
+        await wrapper.find('[data-test="wim-run"]').trigger('click');
+        await flushPromises();
+
+        const cells = wrapper.findAll('[data-test="wim-skipped-cell"]');
+        expect(cells).toHaveLength(1);
+        expect(cells[0].text()).toBe('WorkspaceImport.skipped_cell_UNKNOWN_STATUS');
+    });
+
+    it('says nothing when every cell was applied', async () => {
+        const wrapper = await openInProject();
+        await toPreview(wrapper);
+        await wrapper.find('[data-test="wim-run"]').trigger('click');
+        await flushPromises();
+        expect(wrapper.find('[data-test="wim-skipped-cells"]').exists()).toBe(false);
+    });
+});
+
 describe('what the preview owns up to', () => {
     it('names each date it cannot read, the columns it does not import and the ones it does not know', async () => {
         answers.preview = previewOf({

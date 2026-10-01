@@ -25,9 +25,9 @@ const { taskNotFound, escapeText } = require('../taskWriteFields');
 const shownName = (employeeName) => (Array.isArray(employeeName) ? employeeName.map(escapeText).join(',') : escapeText(employeeName));
 /* An automation passes who made the change and how deep in a chain of events it is, so the event bus can refuse to
  * let a rule wake itself; a person's write carries neither and emits exactly as it always has. */
-const assigneeEvent = (result, updatedFields, eventActor, eventDepth) => (eventActor
-    ? { type: "update", data: result, updatedFields, module: 'task', actor: eventActor, depth: Number(eventDepth) || 0 }
-    : { type: "update", data: result, updatedFields, module: 'task' });
+const assigneeEvent = (companyId, result, updatedFields, eventActor, eventDepth) => (eventActor
+    ? { type: "update", data: result, updatedFields, module: 'task', companyId, actor: eventActor, depth: Number(eventDepth) || 0 }
+    : { type: "update", data: result, updatedFields, module: 'task', companyId });
 module.exports = {
 
     /* -------------- UPDATE ASSIGNEE ADD OR ASSIGNEE REMOVE FUNCTION FOR TASK -----------------*/
@@ -152,7 +152,7 @@ module.exports = {
                                 ]
                             }
                             MongoDbCrudOpration(projectData.CompanyId,object, "findOneAndUpdate").then((result) => {
-                                socketEmitter.emit('update', assigneeEvent(result, mongoUpdateObj, eventActor, eventDepth));
+                                socketEmitter.emit('update', assigneeEvent(projectData.CompanyId, result, mongoUpdateObj, eventActor, eventDepth));
                                 resolve({status: true, statusText: "Assignee updated successfully"});
                                 try {
                                     this.updateWatcher({companyId : projectData.CompanyId, projectId: projectData._id, sprintId: taskData.sprintId, taskId: taskData._id, userId: uid, add: type === "assigneeAdd", type: type,userData:userData,employeeName:sentName})
@@ -283,7 +283,7 @@ module.exports = {
                         ]
                     };
                     MongoDbCrudOpration(projectData.CompanyId, updateObj, "findOneAndUpdate").then((result) => {
-                        socketEmitter.emit('update', { type: "update", data: result, updatedFields: { Task_Leader: newLeaderId }, module: 'task' });
+                        socketEmitter.emit('update', { type: "update", data: result, updatedFields: { Task_Leader: newLeaderId }, module: 'task', companyId: projectData.CompanyId });
                         resolve({status: true, statusText: "Task leader updated successfully"});
 
                         const historyObj = {
@@ -340,7 +340,7 @@ module.exports = {
                         reject(taskNotFound());
                         return;
                     }
-                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'task', companyId });
                     resolve({status: true, statusText: `Watcher updated successfully `});
                     var historyObj = {};
                     if(add === true){
@@ -426,7 +426,7 @@ module.exports = {
 
                     MongoDbCrudOpration(projectData.CompanyId, query, "findOneAndUpdate")
                     .then((result) => {
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: updatedTaskObj, module: 'task' });
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: updatedTaskObj, module: 'task', companyId: projectData.CompanyId });
                         resolve({status: true, statusText: "Tasktype updated successfully"});
 
                         const shown = shownTaskType(prevStatus || {}, newStatus || {});

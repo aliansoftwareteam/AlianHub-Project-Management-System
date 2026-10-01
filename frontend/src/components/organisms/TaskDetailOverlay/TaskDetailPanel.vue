@@ -392,6 +392,8 @@ import AiResultPreview from "@/components/molecules/AiPreview/AiResultPreview.vu
 import { canControlRun } from "@/views/Ai/agentAccess";
 
 import taskClass from "@/utils/TaskOperations";
+import { onInstantEdit } from "@/utils/instantTaskEdit";
+import { ownEditsInFlight } from "@/utils/taskUpdateMarker";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { publicConfig } from "@/config/publicConfig";
@@ -588,10 +590,15 @@ function projectSlice() {
     };
 }
 
+/* The panel shows its own copy of the task, which the store's row does not reach. */
+const stopFollowingEdits = onInstantEdit((taskId, fields) => {
+    if (String(taskId) === String(props.taskId)) task.value = { ...task.value, ...fields };
+});
+
 /* The actor's own socket room does not echo taskUpdate back, so push the change
    through the same mutations the listener uses and the list rows update at once. */
 function reflectOwnUpdate(updatedFields) {
-    task.value = { ...task.value, ...updatedFields };
+    task.value = { ...task.value, ...updatedFields, ...ownEditsInFlight(props.taskId) };
     const payload = { snap: {}, op: "modified", pid: String(task.value.ProjectID || props.projectId), sprintId: String(task.value.sprintId || props.sprintId), data: { ...task.value }, updatedFields };
     commit("projectData/mutateUpdateFirebaseTasks", payload);
     commit("projectData/mutateMongoUpdatedTask", payload);
@@ -605,7 +612,8 @@ function updateTaskName(val) {
         projectData: projectSlice(),
         taskData: task.value,
         obj: { previousTaskName: task.value.TaskName, userName: user.Employee_Name },
-        userData: userData()
+        userData: userData(),
+        announce: true
     }).then(() => {
         reflectOwnUpdate({ TaskName: val });
         $toast.success(t("Toast.Task_name_updated_successfully"), { position: "top-right" });
@@ -655,14 +663,15 @@ function setStatus(next, current, { undoing = false } = {}) {
         },
         projectData: projectSlice(),
         task: task.value,
-        userData: userData()
+        userData: userData(),
+        announce: true
     }).then(() => {
         reflectOwnUpdate({ status: { text: next.name, key: next.key, type: next.type, value: next.value }, statusType: next.type, statusKey: next.key });
         if (undoing) $toast.success(t("TaskPanel.change_undone"), { position: "top-right" });
         else if (current.key) showUndoToast({ message: t("Toast.Status_updated_successfully"), undo: () => setStatus(current, next, { undoing: true }) });
         else $toast.success(t("Toast.Status_updated_successfully"), { position: "top-right" });
-    }).catch(() => {
-        $toast.error(t("Toast.Status_not_updated"), { position: "top-right" });
+    }).catch((error) => {
+        console.error("ERROR in setStatus: ", error);
     }).finally(() => {
         statusPending.value = false;
     });
@@ -878,7 +887,7 @@ function loadTask() {
         response.sprintsObj = sprints;
         response.sprintsfolders = folders;
         projectData.value = response;
-        task.value = response.tasks[0] || {};
+        task.value = { ...(response.tasks[0] || {}), ...ownEditsInFlight(props.taskId) };
         subTasks.value = response.subtasks || [];
         isSpinner.value = false;
         commit("projectData/setTaskDetailData", { isSubTaskData: true, data: subTasks.value });
@@ -898,7 +907,7 @@ watch(taskDetailGetter, (newVal) => {
     if (!newVal) return;
     const { fullDocument, updatedFields, isSubTaskUpdate } = newVal;
     if (fullDocument && Object.keys(fullDocument).length) {
-        if (!isSubTaskUpdate) task.value = { ...task.value, ...fullDocument };
+        if (!isSubTaskUpdate) task.value = { ...task.value, ...fullDocument, ...ownEditsInFlight(props.taskId) };
         loadTask();
     }
     const deleted = updatedFields?.deletedStatusKey === 1 || updatedFields?.deletedStatusKey === 2;
@@ -1120,6 +1129,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+    stopFollowingEdits();
     commit("projectData/setTaskDetailData", {});
     commit("projectData/setTaskdetailPayloadId", {});
     ["taskDetail_taskUpdate", "taskDetail_taskDelete", "taskDetail_taskInsert"].forEach((event) => socket?.value?.off?.(event));

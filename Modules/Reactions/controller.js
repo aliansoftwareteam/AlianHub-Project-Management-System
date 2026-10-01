@@ -55,7 +55,7 @@ exports.toggleReaction = async (req, res) => {
 
         const updatedFields = { reactions: updated?.reactions || [] };
         if (targetType === 'task') {
-            socketEmitter.emit('update', { type: "update", data: updated, updatedFields, module: 'task' });
+            socketEmitter.emit('update', { type: "update", data: updated, updatedFields, module: 'task', companyId });
         } else {
             socketEmitter.emit('update', { type: "update", data: updated, updatedFields, module: isProjectComment ? 'comments_project' : 'comments', companyId });
         }

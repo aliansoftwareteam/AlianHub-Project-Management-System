@@ -16,13 +16,15 @@ defineOptions({ name: "TaskHomeMark" });
 const props = defineProps({
     task: { type: Object, required: true },
     /** The list on screen: { sprintId, projectId }. */
-    list: { type: Object, default: null }
+    list: { type: Object, default: null },
+    /** Where the home project's name is read from; the projects the store holds when left out. */
+    projects: { type: Array, default: null }
 });
 
 const { t } = useI18n();
 const store = useStore();
 
-const mark = computed(() => homeMarkText(homeOf(props.task, props.list, store?.getters?.["projectData/onlyActiveProjects"]?.data), t));
+const mark = computed(() => homeMarkText(homeOf(props.task, props.list, props.projects || store?.getters?.["projectData/onlyActiveProjects"]?.data), t));
 </script>
 
 <style>

@@ -62,10 +62,11 @@ const recordAutomationAudit = (companyId, context, entry) => {
     });
 };
 
-const emitAutomationUpdate = (doc, updatedFields, depth) => {
+const emitAutomationUpdate = (companyId, doc, updatedFields, depth) => {
     socketEmitter.emit('update', {
         type: 'update',
         module: 'task',
+        companyId,
         data: doc,
         updatedFields,
         actor: { kind: 'automation', userId: null },
@@ -89,7 +90,7 @@ const updateTask = async (companyId, taskId, set, context = {}, unset = null, pu
 
     if (!updated || !updated._id) throw new DeterministicError(`task ${taskId} not found`);
 
-    emitAutomationUpdate(updated, set, context.depth);
+    emitAutomationUpdate(companyId, updated, set, context.depth);
     recordAutomationAudit(companyId, context, {
         action: context.action || 'automation.task.update',
         entityType: 'task',
@@ -290,7 +291,7 @@ const createSubtask = async (companyId, parentTaskId, { title, description = '' 
         data: [{ _id: oid(parentTaskId) }, { $inc: { subTasks: 1 } }, { returnDocument: 'after' }],
     }, 'findOneAndUpdate').catch(() => {});
 
-    emitAutomationUpdate(saved, { ParentTaskId: String(parentTaskId) }, context.depth);
+    emitAutomationUpdate(companyId, saved, { ParentTaskId: String(parentTaskId) }, context.depth);
     recordAutomationAudit(companyId, context, {
         action: 'automation.task.create_subtask',
         entityType: 'task',
@@ -388,7 +389,7 @@ const createTask = async (companyId, projectId, { title, description = '', sprin
     });
     const task = await getTask(companyId, saved._id);
 
-    emitAutomationUpdate(task, { created: true }, context.depth);
+    emitAutomationUpdate(companyId, task, { created: true }, context.depth);
     recordAutomationAudit(companyId, context, {
         action: 'automation.task.create',
         entityType: 'task',

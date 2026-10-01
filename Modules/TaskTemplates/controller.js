@@ -220,7 +220,7 @@ const writeFields = async ({ companyId, task, projectId, changes, actor, templat
     const set = cleanDescription(Object.assign({}, ...changes.map((change) => change.patch)));
     const taskId = String(task._id);
     const updated = await crud(companyId, SCHEMA_TYPE.TASKS, [{ _id: oid(taskId) }, { $set: set }, { returnDocument: 'after' }], 'findOneAndUpdate');
-    socketEmitter.emit('update', { type: 'update', data: updated, updatedFields: set, module: 'task' });
+    socketEmitter.emit('update', { type: 'update', data: updated, updatedFields: set, module: 'task', companyId });
     if (Object.prototype.hasOwnProperty.call(set, 'totalEstimatedTime')) {
         Promise.resolve(updateRemainingTime(companyId, taskId)).catch((error) => logger.error(`[taskTemplates] remaining time: ${error && error.message}`));
     }

@@ -61,6 +61,15 @@ export function taskLocation(task, projectName) {
         .join(' / ');
 }
 
+/* The home path, then how many other lists the task is in: the count the search sends, of the lists this person can open. */
+export function taskPlace(task, projectName, t) {
+    const home = taskLocation(task, projectName);
+    const count = Number(task && task.otherLists) || 0;
+    if (count <= 0) return home;
+    const lists = t('Palette.more_lists', { n: count }, count);
+    return home ? t('Palette.place_and_lists', { place: home, lists }) : lists;
+}
+
 export function taskPath(cid, task) {
     const base = `/${cid}/project/${task.ProjectID}`;
     return task.folderObjId ? `${base}/fs/${task.folderObjId}/${task.sprintId}/${task._id}` : `${base}/s/${task.sprintId}/${task._id}`;

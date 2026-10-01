@@ -8,10 +8,11 @@ const { asRoute, liveTask, storedProject, whoOf } = require('./taskRequests');
 const { answerOf } = require('./pageRequests');
 const { RELATION_TYPE_LIST } = require('../Tasks/helpers/taskMongo/relationRules');
 const { MAX_MESSAGE_LENGTH } = require('../Pages/helpers/pageComments');
+const { MAX_EXTRA_LISTS } = require('../Tasks/helpers/taskExtraListsRules');
 
-// Tags, task links, lists and doc comments an agent changes the way a person changes them: through the
-// web app's own handlers, as the person behind the agent, after the checks the routes put in front of
-// those handlers. The handlers are loaded on first use.
+// Tags, task links, lists, the lists a task is added to and doc comments an agent changes the way a person
+// changes them: through the web app's own handlers, as the person behind the agent, after the checks the
+// routes put in front of those handlers. The handlers are loaded on first use.
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const LIST_NAME_MAX = 100;
@@ -203,6 +204,40 @@ const storedRow = (companyId, type, id, filter, fields) => (OBJECT_ID.test(idOf(
     ? MongoDbCrudOpration(companyId, { type, data: [{ _id: oid(id), ...filter }, fields] }, 'findOne')
     : null);
 
+/* The lists a task was added to as the task route answers them to `uid`, each named only where that person can
+ * open it; null where the route answers that there is no such task. */
+const extraListsOf = async (companyId, uid, taskId) => {
+    const answer = await answerOf(require('../Tasks/helpers/getTasksData').getTaskLists, { companyId, uid: idOf(uid), params: { id: idOf(taskId) } });
+    return answer && answer.status === true && answer.data && Array.isArray(answer.data.extraLists) ? answer.data.extraLists : null;
+};
+
+/* Adding and removing are the task route's own, which judges the task at its home and the list on its own. A
+ * project named beside the list must be the one it sits in; that is asked after the task and answered as the
+ * route answers a list that is not there, so it says nothing of a task or a list the person cannot open. The
+ * list's project is `listProjectId` throughout: an action's `projectId` is where it is filed and judged, and
+ * for a task that is its home. */
+const setExtraList = async ({ companyId, who, taskId, listProjectId, sprintId, operation }) => {
+    const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
+    const { LIST_NOT_FOUND: NO_LIST, NOT_IN_LIST } = require('../Tasks/helpers/taskExtraLists');
+    const adding = operation === 'add';
+    const id = idOf(taskId).toLowerCase();
+    const listId = idOf(sprintId).toLowerCase();
+    if (!(await readableTaskIds(companyId, who.uid, [id])).includes(id)) throw refuse(TASK_NOT_FOUND);
+    const list = await storedRow(companyId, SCHEMA_TYPE.SPRINTS, listId, {}, { projectId: 1 });
+    if (idOf(listProjectId) && idOf(list && list.projectId) !== idOf(listProjectId).toLowerCase()) throw refuse((adding ? NO_LIST : NOT_IN_LIST).reason);
+    await asRoute(companyId, who, adding ? 'addToList' : 'removeFromList', { companyId: String(companyId), taskId: id, sprintId: listId });
+    return { taskId: id, listProjectId: idOf(list && list.projectId), sprintId: listId };
+};
+
+const extraListChange = (operation) => async ({ companyId, actor, params }) => {
+    const at = await setExtraList({ companyId, who: whoOf(actor), taskId: params.taskId, listProjectId: params.listProjectId, sprintId: params.sprintId, operation });
+    const task = await liveTask(companyId, at.taskId);
+    return {
+        result: { taskId: at.taskId, projectId: at.listProjectId, sprintId: at.sprintId, [operation === 'add' ? 'added' : 'removed']: true },
+        undo: { kind: 'extraList', ...at, operation }, entityId: task._id, entityName: task.TaskName,
+    };
+};
+
 /* A doc's comments as the comments route answers them to `uid`, or null where that route answers that there is no such doc. */
 const pageCommentsOf = async (companyId, uid, pageId) => {
     const answer = await answerOf(pageComments().listComments, { companyId, uid: idOf(uid), params: { id: idOf(pageId) } });
@@ -261,6 +296,9 @@ const executors = {
         };
     },
 
+    'task.lists.add': extraListChange('add'),
+    'task.lists.remove': extraListChange('remove'),
+
     async 'list.create'({ companyId, actor, params }) {
         const made = await createList({ companyId, who: whoOf(actor), projectId: params.projectId, name: params.name, folderId: params.folderId });
         return { result: made, undo: { kind: 'list', projectId: made.projectId, sprintId: made.sprintId }, entityType: 'sprint', entityId: made.sprintId, entityName: made.name };
@@ -310,5 +348,6 @@ const executors = {
 
 module.exports = {
     executors, tagsOf, setTag, linkTasks, unlinkTasks, relationsOf, renameList, moveList, withdrawList, pageCommentsOf, assignPageComment,
-    RELATION_TYPE_LIST, LIST_NAME_MAX, COMMENT_MAX: MAX_MESSAGE_LENGTH,
+    extraListsOf, setExtraList,
+    RELATION_TYPE_LIST, LIST_NAME_MAX, COMMENT_MAX: MAX_MESSAGE_LENGTH, MAX_EXTRA_LISTS,
 };

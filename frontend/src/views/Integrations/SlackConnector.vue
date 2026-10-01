@@ -45,14 +45,25 @@
             </form>
 
             <div v-if="conn.connected" class="slc__channels" data-test="slack-channels">
-                <div class="slc__label">{{ $t('SlackConnector.channels_title') }}</div>
+                <div class="slc__label">{{ $t('SlackConnector.channels_heading') }}</div>
                 <p class="ah-small slc__state">{{ $t('SlackConnector.channels_lead') }}</p>
+                <p class="ah-small slc__state">{{ $t('SlackConnector.read_lead') }}</p>
                 <p v-if="!conn.channels.length" class="ah-small" data-test="no-channels">{{ $t('SlackConnector.channels_none') }}</p>
-                <label v-for="channel in conn.channels" :key="channel.id" class="slc__channel">
-                    <input v-model="picked" type="checkbox" :value="channel.id" :disabled="busy" />
-                    <span class="ah-mono">#{{ channel.name }}</span>
+                <div v-for="channel in conn.channels" :key="channel.id" class="slc__channel" :data-test="`slack-channel-${channel.id}`">
+                    <span class="ah-mono slc__name">#{{ channel.name }}</span>
+                    <label v-for="use in USES" :key="use" class="slc__tick">
+                        <input
+                            type="checkbox"
+                            :checked="ticked(channel.id, use)"
+                            :disabled="busy"
+                            :aria-label="$t(`SlackConnector.${use}_label`, { name: channel.name })"
+                            :data-test="`tick-${use}`"
+                            @change="tick(channel.id, use, $event.target.checked)"
+                        />
+                        <span>{{ $t(`SlackConnector.${use}`) }}</span>
+                    </label>
                     <span v-if="!channel.member" class="ah-small slc__state">{{ $t('SlackConnector.not_member') }}</span>
-                </label>
+                </div>
                 <div v-if="channelError" class="ah-field__error" data-test="channel-error">{{ channelError }}</div>
                 <div class="slc__actions">
                     <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy || !dirty" data-test="channels-save" @click="saveChannels">{{ $t('SlackConnector.channels_save') }}</button>
@@ -79,6 +90,7 @@ const { getters } = useStore();
 
 const SECRET_KEYS = ['bot_token', 'signing_secret'];
 const BODY_KEY = { bot_token: 'botToken', signing_secret: 'signingSecret' };
+const USES = ['read', 'post'];
 const BASE = `${env.CONNECTORS}/slack`;
 
 const conn = ref(null);
@@ -88,7 +100,7 @@ const editing = ref('');
 const newValue = ref('');
 const formError = ref('');
 const channelError = ref('');
-const picked = ref([]);
+const picked = ref({});
 
 const privileged = computed(() => isOwnerOrAdmin(Number(getters['settings/companyUserDetail']?.roleType)));
 const when = (d) => (d ? new Date(d).toLocaleString() : t('SlackConnector.never'));
@@ -98,14 +110,21 @@ const stateLine = (key) => {
     if (secret.set) return t('SlackConnector.set_on', { when: when(secret.setAt) });
     return secret.revoked ? t('SlackConnector.revoked') : t('SlackConnector.not_set');
 };
-const allowedIds = computed(() => ((conn.value && conn.value.allowedChannels) || []).map((c) => c.id));
-const dirty = computed(() => [...picked.value].sort().join(',') !== [...allowedIds.value].sort().join(','));
+// A channel allowed before reading existed arrives without ticks and means post only.
+const allowed = () => Object.fromEntries(((conn.value && conn.value.allowedChannels) || []).map((c) => [c.id, { read: c.read === true, post: c.post !== false }]));
+const chosen = (ticks) => Object.entries(ticks)
+    .filter(([, use]) => use.read || use.post)
+    .map(([id, use]) => ({ id, read: Boolean(use.read), post: Boolean(use.post) }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+const dirty = computed(() => JSON.stringify(chosen(picked.value)) !== JSON.stringify(chosen(allowed())));
+const ticked = (id, use) => Boolean(picked.value[id] && picked.value[id][use]);
+const tick = (id, use, on) => { picked.value = { ...picked.value, [id]: { read: ticked(id, 'read'), post: ticked(id, 'post'), [use]: on } }; };
 
 const problemOf = (e) => e?.response?.data?.statusText || t('SlackConnector.failed');
 const take = (res) => {
     if (res?.data?.status !== true) throw Object.assign(new Error('refused'), { response: res });
     conn.value = res.data.data;
-    picked.value = allowedIds.value;
+    picked.value = allowed();
 };
 
 const load = async () => {
@@ -147,7 +166,7 @@ const remove = (key) => {
     if (editing.value === key) stopEditing();
     return run(() => apiRequest('delete', `${BASE}/secrets/${key}`));
 };
-const saveChannels = () => run(() => apiRequest('put', `${BASE}/channels`, { channelIds: picked.value }));
+const saveChannels = () => run(() => apiRequest('put', `${BASE}/channels`, { channels: chosen(picked.value) }));
 const refresh = () => run(() => apiRequest('post', `${BASE}/channels/refresh`));
 
 onMounted(load);
@@ -164,5 +183,7 @@ onMounted(load);
 .slc__actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .slc__form { display: flex; flex-direction: column; gap: 6px; max-width: 520px; }
 .slc__channels { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
-.slc__channel { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--ink); min-height: 28px; }
+.slc__channel { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; color: var(--ink); min-height: 28px; padding: 4px 0; border-bottom: 1px solid var(--hairline); }
+.slc__name { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; }
+.slc__tick { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); min-height: 28px; }
 </style>

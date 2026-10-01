@@ -19,10 +19,10 @@ const isObjectId = (value) => OBJECT_ID_PATTERN.test(String(value || ''));
 const fail = (res, code, statusText) => res.status(code).send({ status: false, statusText });
 
 // Never throws — a socket problem must not fail the HTTP request that already succeeded.
-function emitReminderChange(type, data) {
+function emitReminderChange(companyId, type, data) {
     try {
         if (!data || !data.userId) return;
-        socketEmitter.emit(type, { type, data, updatedFields: {}, module: 'generalReminder' });
+        socketEmitter.emit(type, { type, data, updatedFields: {}, module: 'generalReminder', companyId });
     } catch (e) {
         logger.error(`${LOG_PREFIX} socket emit failed: ${e.message}`);
     }
@@ -116,7 +116,7 @@ exports.createReminder = async (req, res) => {
         if (notifyBefore !== DONT_NOTIFY) {
             await queue.enqueue(companyId, doc._id, doc.notifyAt);
         }
-        emitReminderChange('insert', saved && saved.toObject ? saved.toObject() : (saved || doc));
+        emitReminderChange(companyId, 'insert', saved && saved.toObject ? saved.toObject() : (saved || doc));
         res.send({ status: true, statusText: 'Reminder created', data: saved });
     } catch (error) {
         logger.error(`${LOG_PREFIX} create failed: ${error.message}`);
@@ -213,7 +213,7 @@ exports.updateReminder = async (req, res) => {
         } else {
             await queue.dequeue(id);
         }
-        emitReminderChange('update', fresh && fresh.toObject ? fresh.toObject() : fresh);
+        emitReminderChange(companyId, 'update', fresh && fresh.toObject ? fresh.toObject() : fresh);
         res.send({ status: true, statusText: 'Updated', data: fresh });
     } catch (error) {
         logger.error(`${LOG_PREFIX} update failed: ${error.message}`);
@@ -233,7 +233,7 @@ exports.deleteReminder = async (req, res) => {
         const id = String(existing._id);
         await helper.updateReminder(companyId, id, { deletedStatusKey: 1 }, userId);
         await queue.dequeue(id);
-        emitReminderChange('delete', { _id: id, userId: String(userId), deletedStatusKey: 1 });
+        emitReminderChange(companyId, 'delete', { _id: id, userId: String(userId), deletedStatusKey: 1 });
         res.send({ status: true, statusText: 'Deleted' });
     } catch (error) {
         logger.error(`${LOG_PREFIX} delete failed: ${error.message}`);

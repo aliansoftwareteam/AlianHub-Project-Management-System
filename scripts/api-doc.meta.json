@@ -693,7 +693,7 @@
             "responseFields": [
                 {
                     "name": "rows",
-                    "description": "Up to `limit` tasks. Each carries `_id`, `TaskName`, `TaskKey`, `status`, `statusKey`, `statusType`, `Task_Priority`, `AssigneeUserId`, `DueDate`, `startDate`, `ProjectID`, `sprintId`, `folderObjId`, `TaskType`, `TaskTypeKey`, `tagsArray`, `subTasks`, `ancestors`, `ParentTaskId`, `isParentTask`, `createdAt` and `updatedAt`. A task that was added to other lists also carries `extraLists`: each entry has `projectId`, `sprintId`, `addedBy` and `addedAt`, and `name` and `projectName` only for a list the caller can open. No custom field values."
+                    "description": "Up to `limit` tasks. Each carries `_id`, `TaskName`, `TaskKey`, `status`, `statusKey`, `statusType`, `Task_Priority`, `AssigneeUserId`, `DueDate`, `startDate`, `ProjectID`, `sprintId`, `folderObjId`, `TaskType`, `TaskTypeKey`, `tagsArray`, `subTasks`, `ancestors`, `ParentTaskId`, `isParentTask`, `createdAt`, `updatedAt` and `sprintArray` (the list the task lives in, with its `name`). A task that was added to other lists also carries `extraLists`: each entry has `projectId`, `sprintId`, `addedBy` and `addedAt`, and `name` and `projectName` only for a list the caller can open. No custom field values."
                 },
                 {
                     "name": "groups",
@@ -1108,7 +1108,7 @@
                 {
                     "name": "linkedTasks",
                     "type": "id[]",
-                    "description": "Tasks the page is attached to."
+                    "description": "Tasks the page is attached to. Each must be a task the caller can open."
                 },
                 {
                     "name": "isWiki",
@@ -1128,12 +1128,7 @@
                 {
                     "name": "createdByAgent",
                     "type": "boolean",
-                    "description": "Marks the page as drafted by an agent. It starts as a draft that a person approves."
-                },
-                {
-                    "name": "agentName",
-                    "type": "string",
-                    "description": "The agent's name, up to 80 characters."
+                    "description": "Marks the page as a draft that a person approves. A page an agent token creates is always one, under the token's own name."
                 }
             ],
             "request": {
@@ -1279,7 +1274,7 @@
                 {
                     "name": "linkedTasks",
                     "type": "id[]",
-                    "description": "Replaces the tasks the page is attached to."
+                    "description": "Replaces the tasks the page is attached to. A task added here must be one the caller can open."
                 },
                 {
                     "name": "isWiki",
@@ -1295,11 +1290,6 @@
                     "name": "reviewDate",
                     "type": "date",
                     "description": "When the wiki page is next due for review."
-                },
-                {
-                    "name": "agentStatus",
-                    "type": "string",
-                    "description": "`draft` or `approved`, for a page an agent drafted."
                 }
             ],
             "request": {
@@ -2585,11 +2575,11 @@
         "GET /api/v2/provider-keys": { "stability": "internal", "summary": "Lists the workspace's AI provider keys, by handle only.", "apiToken":false },
         "PUT /api/v2/provider-keys/:provider": { "stability": "internal", "summary": "Stores a workspace AI provider key.", "apiToken":false },
         "DELETE /api/v2/provider-keys/:provider": { "stability": "internal", "summary": "Removes a workspace AI provider key.", "apiToken":false },
-        "GET /api/v2/connectors/slack": { "stability": "internal", "summary": "Shows the workspace's Slack connector: whether each secret is set and since when, the channel list and the allowed channels. Never a secret.", "apiToken":false },
+        "GET /api/v2/connectors/slack": { "stability": "internal", "summary": "Shows the workspace's Slack connector: whether each secret is set and since when, the channel list and, for each allowed channel, whether agents may read it or post to it. Never a secret.", "apiToken":false },
         "PUT /api/v2/connectors/slack/secrets": { "stability": "internal", "summary": "Stores the Slack bot token or signing secret in the secrets store, after checking the token with Slack.", "apiToken":false },
         "DELETE /api/v2/connectors/slack/secrets/:key": { "stability": "internal", "summary": "Removes a Slack connector secret.", "apiToken":false },
         "POST /api/v2/connectors/slack/channels/refresh": { "stability": "internal", "summary": "Reads the Slack channel list again.", "apiToken":false },
-        "PUT /api/v2/connectors/slack/channels": { "stability": "internal", "summary": "Sets the Slack channels agents may propose a message to.", "apiToken":false },
+        "PUT /api/v2/connectors/slack/channels": { "stability": "internal", "summary": "Sets, for each allowed Slack channel, whether agents may read it, propose a message to it, or both.", "apiToken":false },
         "GET /api/v2/ai-switch": { "stability": "internal", "summary": "Whether AI is on for the workspace." },
         "PUT /api/v2/ai-switch": { "stability": "internal", "summary": "Turns AI on or off for the workspace.", "apiToken":false },
         "POST /api/v2/reactions": { "stability": "beta", "summary": "Adds or removes a reaction." },

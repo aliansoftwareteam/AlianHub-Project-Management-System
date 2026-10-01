@@ -252,6 +252,7 @@ const transformClickUpRows = ({ rows, statusFor, leaderId, dayFirst }) => {
             _id: id,
             TaskName: cell(row, index, 'name').slice(0, 500),
             status: statusFor(cell(row, index, 'status')),
+            statusCell: cell(row, index, 'status'),
             Task_Priority: mapClickUpPriority(cell(row, index, 'priority')),
             TaskType: 'task',
             TaskTypeKey: 1,

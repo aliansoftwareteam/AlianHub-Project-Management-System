@@ -10,7 +10,7 @@ const {
     findRoomsByPrefix,
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
-const { onJoin, roomFor, isSelf } = require('../roomAccess');
+const { onJoin, roomFor, isSelf, sameCompany } = require('../roomAccess');
 
 const handleReminderChange = (changeData) => {
     if (!changeData || changeData.module !== 'generalReminder') return;
@@ -27,12 +27,10 @@ const handleReminderChange = (changeData) => {
 
     const emitData = { type: changeData.type, fullDocument: doc };
 
+    // The room is named by the user alone, and a person in two companies has one in each.
     targets.forEach((uid) => {
-        // O(1) prefix lookup into the room index.
-        const relatedRooms = findRoomsByPrefix(`generalReminder_${uid}`);
-        relatedRooms.forEach((data) => {
-            // The socket may have left between index write and emit.
-            if (!data.socket.rooms.has(data.roomName)) return;
+        findRoomsByPrefix(`generalReminder_${uid}`).forEach((data) => {
+            if (!sameCompany(data.socket.identity, changeData) || !data.socket.rooms.has(data.roomName)) return;
             data.namespace.to(data.roomName).emit('generalReminderUpdate', emitData);
         });
     });

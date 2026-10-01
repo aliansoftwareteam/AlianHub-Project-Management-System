@@ -9,6 +9,8 @@ vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 
 
 import SlackConnector from '@/views/Integrations/SlackConnector.vue';
 import SlackPostPreview from '@/views/Ai/SlackPostPreview.vue';
+import { taintSourcesLine } from '@/views/Ai/taintText';
+import { skillLabel, skillAbout } from '@/views/Ai/plainLabels';
 import en from '@/locales/en.js';
 
 const i18n = config.global.plugins[0];
@@ -110,18 +112,43 @@ describe('the Slack connector section', () => {
         expect(callsTo('delete')).toEqual([['delete', `${BASE}/secrets/bot_token`]]);
     });
 
-    it('lists Slack\'s channels with the allowed ones ticked, and saves the chosen ids', async () => {
-        const wrapper = await open();
-        const boxes = wrapper.findAll('[data-test="slack-channels"] input[type="checkbox"]');
-        expect(boxes.map((b) => [b.element.value, b.element.checked])).toEqual([[GENERAL.id, false], [RELEASES.id, true]]);
-        expect(wrapper.find('[data-test="slack-channels"]').text()).toContain(t('SlackConnector.not_member'));
+    const ticks = (wrapper, id) => ['read', 'post'].map((use) => wrapper.find(`[data-test="slack-channel-${id}"] [data-test="tick-${use}"]`));
+    const state = (wrapper, id) => ticks(wrapper, id).map((box) => box.element.checked);
+
+    it('shows two ticks for each channel Slack listed, read and post, as the server holds them', async () => {
+        const wrapper = await open({ conn: connection({ allowedChannels: [{ id: RELEASES.id, name: RELEASES.name, read: true, post: false }] }) });
+        expect(state(wrapper, GENERAL.id)).toEqual([false, false]);
+        expect(state(wrapper, RELEASES.id)).toEqual([true, false]);
+        expect(ticks(wrapper, RELEASES.id).map((box) => box.attributes('aria-label'))).toEqual([t('SlackConnector.read_label', { name: 'releases' }), t('SlackConnector.post_label', { name: 'releases' })]);
+        expect(wrapper.find(`[data-test="slack-channel-${GENERAL.id}"]`).text()).toContain(t('SlackConnector.not_member'));
+        expect(wrapper.find('[data-test="slack-channels"]').text()).toContain(t('SlackConnector.read_lead'));
         expect(wrapper.find('[data-test="channels-save"]').attributes('disabled')).toBeDefined();
-        await boxes[0].setValue(true);
+    });
+
+    it('a channel allowed before reading existed shows as post only', async () => {
+        const wrapper = await open();
+        expect(state(wrapper, RELEASES.id)).toEqual([false, true]);
+        expect(wrapper.find('[data-test="channels-save"]').attributes('disabled')).toBeDefined();
+    });
+
+    it('saves each channel with its two ticks, and leaves out a channel with neither', async () => {
+        const wrapper = await open();
+        await ticks(wrapper, RELEASES.id)[0].setValue(true);
+        await ticks(wrapper, GENERAL.id)[0].setValue(true);
+        await ticks(wrapper, GENERAL.id)[0].setValue(false);
+        expect(wrapper.find('[data-test="channels-save"]').attributes('disabled')).toBeUndefined();
         await wrapper.find('[data-test="channels-save"]').trigger('click');
         await flushPromises();
-        const [, url, body] = callsTo('put')[0];
-        expect(url).toBe(`${BASE}/channels`);
-        expect([...body.channelIds].sort()).toEqual([GENERAL.id, RELEASES.id].sort());
+        expect(callsTo('put')).toEqual([['put', `${BASE}/channels`, { channels: [{ id: RELEASES.id, read: true, post: true }] }]]);
+    });
+
+    it('unticking both removes the channel from the list that is saved', async () => {
+        const wrapper = await open();
+        await ticks(wrapper, RELEASES.id)[1].setValue(false);
+        await ticks(wrapper, GENERAL.id)[1].setValue(true);
+        await wrapper.find('[data-test="channels-save"]').trigger('click');
+        await flushPromises();
+        expect(callsTo('put')[0][2]).toEqual({ channels: [{ id: GENERAL.id, read: false, post: true }] });
     });
 
     it('reads the channel list again on request', async () => {
@@ -182,5 +209,14 @@ describe('the Slack message on an approval card', () => {
         const failed = show({ ok: false, error: 'slack: invalid_auth' }).find('[data-test="slack-post-result"]');
         expect(failed.text()).toBe(t('Ai.slack_post_failed', { error: 'slack: invalid_auth' }));
         expect(failed.classes()).toContain('ah-field__error');
+    });
+});
+
+describe('how a run that read Slack is named', () => {
+    it('names the connector among the sources, and the summary skill by what it does', () => {
+        expect(taintSourcesLine(t, [{ kind: 'connector', ref: 'slack:C0RELEASES1' }])).toBe(`${t('Audit.taint_kind_connector')} slack:C0RELEASES1`);
+        const skill = { key: 'slack.summary', name: 'Slack summariser', source: 'code' };
+        expect(skillLabel(t, skill)).toBe(t('Ai.skill_label_slack_summary'));
+        expect(skillAbout(t, skill)).toBe(t('Ai.skill_about_slack_summary'));
     });
 });

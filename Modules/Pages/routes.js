@@ -9,7 +9,7 @@ const sharesByPeople = agentsRefused('page.share');
 
 exports.init = (app) => {
     app.get('/api/v2/pages/ai-status', ctrl.aiStatus);
-    app.post('/api/v2/pages/ai', ctrl.composeWithAi);
+    app.post('/api/v2/pages/ai', agentsRefused('page.ai'), ctrl.composeWithAi);
     app.get('/api/v2/pages/:id/comments/people', comments.listPeople);
     app.get('/api/v2/pages/:id/comments', comments.listComments);
     app.post('/api/v2/pages/:id/comments', commentsByPeople, comments.createComment);

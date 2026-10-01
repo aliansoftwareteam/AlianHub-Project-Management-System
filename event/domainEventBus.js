@@ -25,8 +25,9 @@ const MAX_DEPTH = 3;
 
 // Actor kinds. Events an automation itself caused are marked so rules can ignore
 // them by default — without this, rule A's write wakes rule B, whose write wakes
-// rule A, and one tenant's database absorbs the difference.
-const ACTOR_KINDS = Object.freeze(['user', 'automation', 'agent', 'system']);
+// rule A, and one tenant's database absorbs the difference. An import's writes are
+// marked too: the lists that count tasks still hear of them, and no rule answers them.
+const ACTOR_KINDS = Object.freeze(['user', 'automation', 'agent', 'system', 'import']);
 
 const bus = new EventEmitter();
 bus.setMaxListeners(50);

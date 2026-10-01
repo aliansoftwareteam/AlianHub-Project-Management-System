@@ -12,4 +12,12 @@ const isOn = () => String(process.env.AGENT_EGRESS_ALLOWLIST || '').trim().toLow
 const run = (store, fn) => storage.run(store, fn);
 const get = () => storage.getStore() || null;
 
-module.exports = { ENV_KEY, isOn, run, get };
+/* Set on the store of the run phase a connector was read in, so every later fetch of that phase sees it whatever
+ * code makes it. A phase that starts after the read is handed the name from the run's taint sources instead. */
+const noteConnectorRead = (name) => {
+    const store = storage.getStore();
+    if (store) store.connectorRead = String(name);
+};
+const connectorRead = () => String((storage.getStore() || {}).connectorRead || '');
+
+module.exports = { ENV_KEY, isOn, run, get, noteConnectorRead, connectorRead };

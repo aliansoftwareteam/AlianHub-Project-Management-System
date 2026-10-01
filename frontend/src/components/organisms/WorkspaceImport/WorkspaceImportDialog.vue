@@ -125,6 +125,7 @@
                             <li v-if="preview.matchedAssignees.length">{{ $t('WorkspaceImport.fact_people', { count: preview.matchedAssignees.length }) }}</li>
                             <li v-if="preview.unmatchedAssignees.length" class="wim__warn">{{ $t('WorkspaceImport.fact_unmatched', { names: preview.unmatchedAssignees.join(', ') }) }}</li>
                             <li v-if="preview.skippedRows.length" class="wim__warn">{{ $t('WorkspaceImport.fact_skipped', { count: preview.skippedRows.length }) }}</li>
+                            <li data-test="wim-duplicates-scope">{{ $t('WorkspaceImport.fact_duplicates_scope') }}</li>
                             <li v-if="cannotAddDetails" class="wim__warn" data-test="wim-add-denied-fact">{{ $t('WorkspaceImport.add_missing_denied') }}</li>
                             <li v-for="issue in shownUnreadDates" :key="`${issue.row}-${issue.column}`" class="wim__warn" data-test="wim-unread-date">{{ $t('WorkspaceImport.fact_unread_date', issue) }}</li>
                             <li v-if="unreadDates.length > shownUnreadDates.length" class="wim__warn">{{ $t('WorkspaceImport.fact_unread_dates_more', { count: unreadDates.length - shownUnreadDates.length }) }}</li>
@@ -162,6 +163,12 @@
                         <p class="wim__label">{{ $t('WorkspaceImport.summary_unread_dates', { count: clickUp.unreadDates.value.length }) }}</p>
                         <ul class="ah-small wim__facts">
                             <li v-for="issue in clickUp.unreadDates.value" :key="`${issue.row}-${issue.column}`">{{ $t('WorkspaceImport.fact_unread_date', issue) }}</li>
+                        </ul>
+                    </template>
+                    <template v-if="clickUp.skippedCells.value.length">
+                        <p class="wim__label" data-test="wim-skipped-cells">{{ $t('WorkspaceImport.summary_skipped_cells', { count: clickUp.skippedCells.value.length }) }}</p>
+                        <ul class="ah-small wim__facts">
+                            <li v-for="(cell, index) in clickUp.skippedCells.value" :key="`${index}-${cell.column}`" data-test="wim-skipped-cell">{{ $t(`WorkspaceImport.skipped_cell_${cell.code}`, cell) }}</li>
                         </ul>
                     </template>
                     <p v-if="clickUp.unmatchedAssignees.value.length" class="ah-small wim__warn">{{ $t('WorkspaceImport.summary_unmatched', { names: clickUp.unmatchedAssignees.value.join(', ') }) }}</p>

@@ -334,7 +334,7 @@ exports.moveWorkloadChip = async (req, res) => {
         }, 'findOneAndUpdate');
 
         removeCache(String(b.taskId), true);
-        socketEmitter.emit('update', { type: 'update', data: updated, updatedFields: set, module: 'task' });
+        socketEmitter.emit('update', { type: 'update', data: updated, updatedFields: set, module: 'task', companyId });
         socketEmitter.emit('update', { type: 'update', data: { taskId: String(b.taskId), fromUserId, toUserId, fromDate: b.fromDate, toDate: b.toDate }, module: 'estimatedTime' });
         return res.json({ status: true, statusText: 'Work moved.', data: { taskId: String(b.taskId), updatedFields: set } });
     } catch (e) {
