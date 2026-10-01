@@ -11,7 +11,7 @@ vi.mock('@/store/index', () => ({ default: { commit: () => {}, dispatch: () => P
 
 import { fieldAppliesToTask, shownFieldValues } from '@/views/Projects/composables/projectCustomFields';
 import {
-    customFieldGroups, customFilterCondition, customFilterOptions, customGroupMatches, customSortValue, tableSortStages, valuePath
+    customFieldGroups, customFilterCondition, customFilterOptions, customGroupMatches, customSortValue, groupTakesTask, tableSortStages, valuePath
 } from '@/views/Projects/composables/customFieldQuery';
 import { taskTypeOptions } from '@/plugins/customFieldView/taskTypeOptions';
 import CustomFieldCell from '@/views/Projects/components/columns/CustomFieldCell.vue';
@@ -127,6 +127,15 @@ describe('group, filter and sort by a scoped field', () => {
         expect(customFilterCondition(row(':set', [true]), [tier])).toEqual({ [path]: { $nin: EMPTY }, ...inType });
         expect(customFilterCondition(row(':empty', [true]), [tier])).toEqual({ $or: [{ [path]: { $in: EMPTY } }, otherType] });
         expect(customFilterCondition(row(':!=', ['o1']), [tier])).toEqual({ $or: [{ [path]: { $nin: ['o1'] } }, otherType] });
+    });
+
+    it('a group takes a dropped task only when the field is used for its type', () => {
+        const [gold] = customFieldGroups(tier);
+        expect(groupTakesTask(gold, String(BUG))).toBe(true);
+        expect(groupTakesTask(gold, '1')).toBe(false);
+        expect(groupTakesTask(gold, undefined)).toBe(false);
+        expect(groupTakesTask(customFieldGroups({ ...tier, fieldTaskTypes: [] })[0], '1')).toBe(true);
+        expect(groupTakesTask({ searchKey: 'statusKey', searchValue: 1 }, undefined)).toBe(true);
     });
 
     it('sorts a task of another type as having no value', () => {
