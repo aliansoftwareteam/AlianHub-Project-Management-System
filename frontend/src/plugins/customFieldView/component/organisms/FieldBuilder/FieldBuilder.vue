@@ -214,8 +214,7 @@ import AiFieldPanel from "./AiFieldPanel.vue";
 import FieldTaskTypesPicker from "../../atom/FieldTaskTypesPicker/FieldTaskTypesPicker.vue";
 import { fieldProjectIds, useTaskTypeOptions } from "@/plugins/customFieldView/taskTypeOptions";
 import { fieldTaskTypes } from "@fieldTaskTypes";
-import { typeModuleOf } from "@fieldTypes";
-import { fieldTypeUi } from "@/plugins/customFieldView/fieldTypes";
+import { fieldTypeUi, moduleFieldDraft, moduleFieldSettings, moduleFieldSettingsError } from "@/plugins/customFieldView/fieldTypes";
 import { aiDraftFrom, aiFieldPayload, isAiField, newAiDraft, validateAiDraft } from "@/views/Projects/composables/aiFields";
 
 defineOptions({ name: "FieldBuilder" });
@@ -318,20 +317,6 @@ function detailFor(fieldType) {
     return option ? { cfType: fieldType, cfTitle: option.label, cfDescrption: option.hint, cfIcon: '', cfIconGrey: '' } : {};
 }
 
-/* A stored setting that no longer fits falls back to the type's default, so the field can still be opened and saved. */
-function moduleDraft(field) {
-    const type = typeModuleOf(field.fieldType);
-    const settings = type.settings(field).settings || type.settings({}).settings;
-    return {
-        ...(field._id ? { _id: field._id } : {}),
-        fieldTitle: field.fieldTitle || "",
-        fieldDescription: field.fieldDescription || "",
-        fieldType: field.fieldType,
-        fieldTaskTypes: fieldTaskTypes(field),
-        ...settings
-    };
-}
-
 function startNew(fieldType) {
     if (!canEdit.value) return;
     selectedId.value = "";
@@ -343,7 +328,7 @@ function startNew(fieldType) {
         return;
     }
     if (fieldTypeUi(fieldType)) {
-        draft.value = moduleDraft({ fieldType });
+        draft.value = moduleFieldDraft({ fieldType });
         errors.value = {};
         return;
     }
@@ -378,7 +363,7 @@ function selectField(field) {
         return;
     }
     if (fieldTypeUi(field.fieldType)) {
-        draft.value = moduleDraft(field);
+        draft.value = moduleFieldDraft(field);
         errors.value = {};
         return;
     }
@@ -475,7 +460,7 @@ function validate() {
     if (draft.value.fieldType === "formula" && !String(draft.value.formulaExpression || "").trim()) {
         next.formulaExpression = t("Fields.error_expression_required");
     }
-    if (draftUi.value && typeModuleOf(draft.value.fieldType).settings(draft.value).error) next.settings = t(draftUi.value.settingsError);
+    if (draftUi.value && moduleFieldSettingsError(draft.value)) next.settings = t(moduleFieldSettingsError(draft.value));
     errors.value = next;
     return !Object.keys(next).length;
 }
@@ -492,7 +477,7 @@ async function save() {
             }
         }
         const detail = detailFor(draft.value.fieldType);
-        const typeSettings = draftUi.value ? typeModuleOf(draft.value.fieldType).settings(draft.value).settings : {
+        const typeSettings = draftUi.value ? moduleFieldSettings(draft.value) : {
             fieldValidation: draft.value.fieldValidation,
             formulaExpression: draft.value.fieldType === "formula" ? String(draft.value.formulaExpression).trim() : "",
             rollupSourceFieldId: draft.value.fieldType === "rollup" ? draft.value.rollupSourceFieldId : "",

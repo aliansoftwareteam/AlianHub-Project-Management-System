@@ -11,6 +11,11 @@ jest.mock('../Config/permissionGuard', () => ({
     isPrivileged: (r) => r === 1 || r === 2,
 }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn() }));
+jest.mock('../Modules/PersonalList/ownership', () => ({ ...jest.requireActual('../Modules/PersonalList/ownership'), othersPersonalListIds: jest.fn(async () => []) }));
+jest.mock('../Modules/Agents/privateWork', () => ({
+    ...jest.requireActual('../Modules/Agents/privateWork'),
+    privateWorkOf: jest.fn(async (companyId, uid) => ({ uid: String(uid), personalLists: ['6f0000000000000000000b09'], directSpaces: ['6f0000000000000000000b08'], myChats: ['6f0000000000000000000a08'], myRuns: [] })),
+}));
 
 const { getRoleType, evaluatePermission } = require('../Config/permissionGuard');
 const { visibleProjectIds } = require('../Modules/Agents/scope');
@@ -153,10 +158,83 @@ describe('16c /timesheet query guard', () => {
         expect(mockCrud).not.toHaveBeenCalled();
     });
 
-    it('lets an admin join any collection in the company database', async () => {
+    it('lets an admin join other collections in the company database, as sent', async () => {
         getRoleType.mockResolvedValue(1);
         evaluatePermission.mockResolvedValue(true);
-        const r = await call(aggregateSheet.getTimeSheetByAggregate, lookup({ from: 'users', localField: 'Loggeduser', foreignField: '_id', as: 'u' }));
+        const spec = { from: 'users', localField: 'Loggeduser', foreignField: '_id', as: 'u' };
+        const r = await call(aggregateSheet.getTimeSheetByAggregate, lookup(spec));
         expect(r.code).toBe(200);
+        expect(mockCrud.mock.calls[0][1].data[0].find((stage) => stage.$lookup).$lookup).toEqual(spec);
+    });
+
+    describe('an owner\'s or admin\'s join into tasks or comments', () => {
+        const PERSONAL_LIST = '6f0000000000000000000b09';
+        const DIRECT_SPACE = '6f0000000000000000000b08';
+        const MY_CHAT = '6f0000000000000000000a08';
+        const joinOf = async (body, at = (pipeline) => pipeline.find((stage) => stage.$lookup).$lookup) => {
+            getRoleType.mockResolvedValue(2);
+            evaluatePermission.mockResolvedValue(true);
+            const r = await call(aggregateSheet.getTimeSheetByAggregate, body);
+            expect(r.code).toBe(200);
+            return at(mockCrud.mock.calls[0][1].data[0]);
+        };
+        const reads = (joined, doc) => matches(doc, joined.pipeline[0].$match);
+
+        const TASKS = [
+            [{ ProjectID: P1 }, true],
+            [{ ProjectID: PERSONAL_LIST }, false],
+            [{ ProjectID: new mongoose.Types.ObjectId(PERSONAL_LIST) }, false],
+            [{ ProjectID: DIRECT_SPACE, mainChat: true, AssigneeUserId: [OTHER] }, false],
+            [{ ProjectID: DIRECT_SPACE, mainChat: true, AssigneeUserId: [ME, OTHER] }, true],
+        ];
+        const COMMENTS = [
+            [{ projectId: P1, taskId: 'default' }, true],
+            [{ projectId: PERSONAL_LIST, taskId: 'x' }, false],
+            [{ projectId: DIRECT_SPACE, taskId: '6f0000000000000000000a07' }, false],
+            [{ projectId: DIRECT_SPACE, taskId: MY_CHAT }, true],
+            [{ projectId: new mongoose.Types.ObjectId(DIRECT_SPACE), taskId: new mongoose.Types.ObjectId(MY_CHAT) }, true],
+        ];
+
+        it.each([
+            ['with a pipeline', { from: 'tasks', let: { t: '$TicketID' }, pipeline: [{ $match: { $expr: { $eq: ['$_id', '$$t'] } } }], as: 't' }],
+            ['on a local and a foreign field', { from: 'tasks', localField: 'TicketID', foreignField: '_id', as: 't' }],
+        ])('tasks, %s: the join starts by leaving out other people\'s personal lists and chats', async (label, spec) => {
+            const joined = await joinOf(lookup(spec));
+            TASKS.forEach(([doc, expected]) => expect([doc, reads(joined, doc)]).toEqual([doc, expected]));
+            expect(joined.pipeline.slice(1)).toEqual(spec.pipeline || []);
+            expect(joined).toMatchObject({ from: 'tasks', as: 't', ...(spec.localField ? { localField: 'TicketID', foreignField: '_id' } : { let: spec.let }) });
+        });
+
+        it.each([
+            ['with a pipeline', { from: 'comments', let: { t: '$TicketID' }, pipeline: [{ $match: { type: 'text' } }], as: 'c' }],
+            ['on a local and a foreign field', { from: 'comments', localField: 'TicketID', foreignField: 'taskId', as: 'c' }],
+        ])('comments, %s: the same', async (label, spec) => {
+            const joined = await joinOf(lookup(spec));
+            COMMENTS.forEach(([doc, expected]) => expect([doc, reads(joined, doc)]).toEqual([doc, expected]));
+            expect(joined.pipeline.slice(1)).toEqual(spec.pipeline || []);
+        });
+
+        it('is narrowed wherever it sits: inside another join, and inside a facet', async () => {
+            const nested = { from: 'users', as: 'u', pipeline: [{ $lookup: { from: 'tasks', localField: '_id', foreignField: 'AssigneeUserId', as: 't' } }] };
+            const inner = await joinOf(lookup(nested), (pipeline) => pipeline.find((stage) => stage.$lookup).$lookup.pipeline[0].$lookup);
+            expect(reads(inner, { ProjectID: PERSONAL_LIST })).toBe(false);
+
+            mockCrud.mockClear();
+            const faceted = await joinOf({ queryeta: [{ $facet: { a: [{ $lookup: { from: 'comments', localField: 'TicketID', foreignField: 'taskId', as: 'c' } }] } }] },
+                (pipeline) => pipeline.find((stage) => stage.$facet).$facet.a[0].$lookup);
+            expect(reads(faceted, { projectId: PERSONAL_LIST })).toBe(false);
+        });
+
+        it.each([
+            ['a pipeline that is not a list of stages', { from: 'tasks', pipeline: { $match: {} }, as: 't' }],
+            ['a collection that is not named by a string', { from: { db: 'x', coll: 'tasks' }, pipeline: [], as: 't' }],
+        ])('is refused with 400 when it is %s', async (label, spec) => {
+            getRoleType.mockResolvedValue(1);
+            evaluatePermission.mockResolvedValue(true);
+            const r = await call(aggregateSheet.getTimeSheetByAggregate, lookup(spec));
+            expect(r.code).toBe(400);
+            expect(r.body.message).toMatch(/join/i);
+            expect(mockCrud).not.toHaveBeenCalled();
+        });
     });
 });

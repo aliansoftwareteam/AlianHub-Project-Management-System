@@ -139,7 +139,7 @@ describe('PAG-03 import history belongs to the session user', () => {
         const res = fakeRes();
         await importers.listImports(fakeReq({ uid: ALICE }), res);
         expect(res.body).toEqual({ status: true, statusText: expect.any(String), data: [{ source: 'csv' }] });
-        expect(MongoDbCrudOpration.mock.calls[0][1].data[0]).toEqual({ userId: ALICE });
+        expect(MongoDbCrudOpration.mock.calls[0][1].data[0]).toEqual({ userId: ALICE, source: { $ne: 'duplicate' } });
     });
 });
 

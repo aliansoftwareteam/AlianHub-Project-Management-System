@@ -1,17 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { config, flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { defineComponent, ref } from 'vue';
 
-const { push, projects, routeParams, routeQuery, toast, setSprints, setFolders } = await vi.hoisted(async () => ({
+const { push, projects, routeParams, routeQuery, toast, setSprints, setFolders, refreshFolders } = await vi.hoisted(async () => ({
     push: vi.fn(),
     projects: (await import('vue')).ref([]),
     routeParams: { id: '' },
     routeQuery: { tab: 'ProjectListView' },
     toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() },
     setSprints: vi.fn(() => Promise.resolve([])),
-    setFolders: vi.fn(() => Promise.resolve([]))
+    setFolders: vi.fn(() => Promise.resolve([])),
+    refreshFolders: vi.fn(() => Promise.resolve())
 }));
+
+vi.mock('@/views/Projects/folderActions', () => ({ refreshFolders, FOLDERS_CHANGED_EVENT: 'foldersChanged' }));
 
 vi.mock('vue-router', () => ({
     useRouter: () => ({ push }),
@@ -145,5 +148,61 @@ describe('useProjectTree', () => {
 
         expect(project.sprintsObj).toEqual({});
         expect(project.sprintsfolders.f9.sprintsObj.s10).toMatchObject({ _id: 's10', id: 's10', folderName: 'Folder' });
+    });
+
+    it('reads the open project\'s folders again when the company\'s folders change, and stops listening when it leaves', async () => {
+        projects.value = [alpha, beta];
+        routeParams.id = 'p1';
+        mountTree();
+        await flushPromises();
+        const socket = config.global.provide.$socket.value;
+        const [, onChanged] = socket.on.mock.calls.find(([event]) => event === 'foldersChanged');
+
+        onChanged({ type: 'update' });
+        expect(refreshFolders).toHaveBeenCalledTimes(1);
+        expect(refreshFolders.mock.calls[0][1]).toBe('p1');
+
+        mounted.pop().unmount();
+        expect(socket.off).toHaveBeenCalledWith('foldersChanged', onChanged);
+    });
+
+    it('drops a folder it folded in earlier once the list no longer returns it, and nothing it did not add', async () => {
+        const project = {
+            _id: 'p6', ProjectName: 'Zeta', isGlobalPermission: true, ProjectRequiredComponent: [{ keyName: 'ProjectListView' }],
+            sprintsfolders: { embedded: { folderId: 'embedded', name: 'Embedded', sprintsObj: {} } }
+        };
+        const folder = (id) => ({ _id: id, name: id, projectId: 'p6', deletedStatusKey: 0, parentFolderId: null });
+        setFolders.mockResolvedValueOnce([folder('f20'), folder('f21')]);
+        projects.value = [project];
+        routeParams.id = 'p6';
+        const { wrapper } = mountTree();
+        await flushPromises();
+        expect(Object.keys(project.sprintsfolders).sort()).toEqual(['embedded', 'f20', 'f21']);
+
+        setFolders.mockResolvedValueOnce([folder('f20')]);
+        await wrapper.vm.loadSprintFolderData('p6', true);
+        expect(Object.keys(project.sprintsfolders).sort()).toEqual(['embedded', 'f20']);
+    });
+
+    it('keeps the map flat and gives every folder its parent, null at the top level', async () => {
+        const project = { _id: 'p5', ProjectName: 'Epsilon', isGlobalPermission: true, ProjectRequiredComponent: [{ keyName: 'ProjectListView' }] };
+        setSprints.mockResolvedValueOnce([{ _id: 's11', name: 'Nested', projectId: 'p5', folderId: 'f11', deletedStatusKey: 0 }]);
+        setFolders.mockResolvedValueOnce([
+            { _id: 'f10', name: 'Parent', projectId: 'p5', deletedStatusKey: 0, parentFolderId: null },
+            { _id: 'f11', name: 'Sub', projectId: 'p5', deletedStatusKey: 0, parentFolderId: 'f10' },
+            { _id: 'f12', name: 'Before subfolders', projectId: 'p5', deletedStatusKey: 0 }
+        ]);
+
+        projects.value = [project];
+        routeParams.id = 'p5';
+        mountTree();
+        await flushPromises();
+
+        expect(Object.keys(project.sprintsfolders).sort()).toEqual(['f10', 'f11', 'f12']);
+        expect(project.sprintsfolders.f10.parentFolderId).toBeNull();
+        expect(project.sprintsfolders.f11.parentFolderId).toBe('f10');
+        expect(project.sprintsfolders.f12.parentFolderId).toBeNull();
+        expect(project.sprintsfolders.f10.sprintsObj).toEqual({});
+        expect(project.sprintsfolders.f11.sprintsObj.s11).toMatchObject({ id: 's11', folderName: 'Sub' });
     });
 });

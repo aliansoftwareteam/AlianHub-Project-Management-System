@@ -2,12 +2,12 @@
     <div class="d-flex justify-content-between w-100 save-filter-wrapper">
         <div class="save-filter-section d-flex align-items-center cursor-pointer" v-if="from === ''">
             <span class="text">
-                <DropDown v-if="!isEdit" mode="dialog" head-dismisses :aria-label="$t('Filters.save_this_filters')" :bodyClass="{'save-thisfilters-dropdown' : true}" z-index="999">
+                <DropDown v-if="!isEdit" mode="dialog" themed head-dismisses :aria-label="$t('Filters.save_this_filters')" :bodyClass="{'save-thisfilters-dropdown' : true}" z-index="999">
                     <template #head>
                         <div class="d-flex align-items-center justify-content-between mobile__field-actions" v-if="clientWidth <=767">
-                            <a href="#" class="mr-10px" @click.stop.prevent="$refs.saveFilterRef.click(), inputName='', isInvalid=false" :class="{'font-size-16' : clientWidth <=767 }" :style="{color : clientWidth <=767 ? '#646464' : '#2F3990'}">{{$t('Projects.cancel')}}</a>
-                            <span :class="{'font-size-20 font-weight-500' : clientWidth <=767 }" :style="{color : clientWidth <=767 ? '#090A0A' : ''}">{{$t('Filters.save_this_filters')}}</span>
-                            <button class="btn-primary p-0 bg-transparent" type="button" @click.stop.prevent="$emit('save', inputName), resetField()" :class="{ 'font-size-18 font-weight-700' : clientWidth <= 767}" :style="{color : clientWidth <=767 ? '#2F3990' : ''}" >{{$t('Projects.save')}}</button>
+                            <a href="#" class="mr-10px tf-muted" @click.stop.prevent="$refs.saveFilterRef.click(), inputName='', isInvalid=false" :class="{'font-size-16' : clientWidth <=767 }">{{$t('Projects.cancel')}}</a>
+                            <span :class="{'font-size-20 font-weight-500' : clientWidth <=767 }">{{$t('Filters.save_this_filters')}}</span>
+                            <button class="btn-primary p-0 bg-transparent tf-link" type="button" @click.stop.prevent="$emit('save', inputName), resetField()" :class="{ 'font-size-18 font-weight-700' : clientWidth <= 767}">{{$t('Projects.save')}}</button>
                         </div>
                     </template>
                     <template #button>
@@ -30,7 +30,7 @@
                                     @enter="$emit('save', inputName), resetField()"
                                 />
                                 <div class="d-flex align-items-center justify-content-end m10px-0px" v-if="clientWidth > 767">
-                                    <a href="#" class="mr-10px blue" @click.stop.prevent="$refs.saveFilterRef.click(), inputName='', isInvalid=false">{{$t('Projects.cancel')}}</a>
+                                    <a href="#" class="mr-10px tf-link" @click.stop.prevent="$refs.saveFilterRef.click(), inputName='', isInvalid=false">{{$t('Projects.cancel')}}</a>
                                     <button class="btn-primary save__btn" type="button" @click.stop.prevent="$emit('save', inputName), resetField()" :class="{'font-size-12': clientWidth > 767}">{{$t('Projects.save')}}</button>
                                 </div>
                             </div>
@@ -40,12 +40,12 @@
                 <span v-if="isEdit" @click="$emit('update', $event)">{{$t('Filters.update_filter')}}</span>
             </span>
             <span class="drop-icon">
-                <DropDown mode="listbox" head-dismisses :bodyClass="{'update-searchfilter-dropdown' : true}" z-index="999">
+                <DropDown mode="listbox" themed head-dismisses :bodyClass="{'update-searchfilter-dropdown' : true}" z-index="999">
                     <template #head>
                         <div class="d-flex align-items-center justify-content-between mobile__field-actions" v-if="clientWidth <=767" >
-                            <a href="#" class="mr-10px blue" @click.stop.prevent="$refs.saveFilterRef.click(), inputName='', isInvalid=false" :class="{'font-size-16' : clientWidth <=767 }" :style="{color : clientWidth <=767 ? '#646464' : '#2F3990'}">{{$t('Projects.cancel')}}</a>
-                            <h3 :class="{'font-size-20 font-weight-500' : clientWidth <=767 }" :style="{color : clientWidth <=767 ? '#090A0A' : ''}">{{$t('Filters.my_filter')}}</h3>
-                            <button class="btn-primary p-0 bg-transparent" type="button" @click.stop.prevent="$emit('save', inputName), resetField()" :class="{ 'font-size-18 font-weight-700' : clientWidth <= 767}" :style="{color : clientWidth <=767 ? '#2F3990' : ''}" >{{ $t('Projects.save') }}</button>
+                            <a href="#" class="mr-10px tf-muted" @click.stop.prevent="$refs.saveFilterRef.click(), inputName='', isInvalid=false" :class="{'font-size-16' : clientWidth <=767 }">{{$t('Projects.cancel')}}</a>
+                            <h3 :class="{'font-size-20 font-weight-500' : clientWidth <=767 }">{{$t('Filters.my_filter')}}</h3>
+                            <button class="btn-primary p-0 bg-transparent tf-link" type="button" @click.stop.prevent="$emit('save', inputName), resetField()" :class="{ 'font-size-18 font-weight-700' : clientWidth <= 767}">{{ $t('Projects.save') }}</button>
                         </div>
                     </template>
                     <template #button>
@@ -71,9 +71,7 @@
                         <div :style="{width : clientWidth <=767 ? '100%' : ' 225px'}" class="saved-filters">
                             <div class="saved-filterdropdownlist-wrapper">
                                 <DropDownOption v-for="(item, index) in filteredOptions" :key="index" class="dropdown-item justify-content-between saved-filters-dropdown" :class="{'edit-input-mobile' : clientWidth <=767 && item.isEdit }" @click="!item.isEdit && $emit('apply', {item: item, type: 'saved'})">
-                                    <span class="saved-serach-title text-capitalize w-100 font-size-14" v-if="!item.isEdit"
-                                    :style="{color : clientWidth > 767 ? '#818181' : '#3B3B3B' }"
-                                    >{{ $t(`${ item.name }`)}}</span>
+                                    <span class="saved-serach-title text-capitalize w-100 font-size-14 tf-muted" v-if="!item.isEdit">{{ $t(`${ item.name }`)}}</span>
                                     <InputText v-if="item.isEdit" type="text" @enter="updateFilter(item)" v-model.trim="filterName" :isDirectFocus="true" autocomplete="off" :class="[{'border-red': isInvalid}]" :style="{maxWidth: clientWidth >767 ? '80%':'100%'}"/>
                                     <div v-if="item.isEdit" class="edit-delete-erapper">
                                         <img src="@/assets/images/svg/greencheck2.svg" alt="Edit" class="m0px-10px greencheck__img"  @click.stop="updateFilter(item)">
@@ -84,7 +82,7 @@
                                         <img src="@/assets/images/svg/deletered.svg" alt="Delete" @click.stop="$emit('delete', item)">
                                     </div>
                                 </DropDownOption>
-                                <div v-if="!filteredOptions.length" class="gray81 m11px-0px">{{$t('Filters.no_data_found')}}</div>
+                                <div v-if="!filteredOptions.length" class="tf-muted m11px-0px">{{$t('Filters.no_data_found')}}</div>
                             </div>
                          </div>
                     </template>
@@ -199,7 +197,7 @@ const resetField = () => {
 }
 .hr__bottom{
     margin: 10px 0px 11px 0;
-    border-bottom: 1px solid #f2f2f2;
+    border-bottom: 1px solid var(--hairline);
 }
 .save__btn
 {

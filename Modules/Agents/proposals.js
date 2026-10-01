@@ -12,6 +12,7 @@ const findingMemory = require('./engine/findingMemory');
 const persistence = require('../AICore/persistence');
 const logger = require('../../Config/loggerConfig');
 const access = require('./access');
+const { proposalClause } = require('./privateWork');
 const taint = require('./taint');
 const aiFeedback = require('../AI/feedback');
 
@@ -159,12 +160,13 @@ const skillSourcesOfRuns = async (companyId, rows) => {
     return new Map((found || []).filter((r) => r.skillSource).map((r) => [String(r._id), r.skillSource]));
 };
 
-/* projectIds, when given, is the caller's visible set, and hiddenTaskIds the tasks in it they
- * cannot read; the counts follow the same scope. */
-const list = async (companyId, { status, bucket, agentId, limit = 100, projectIds, hiddenTaskIds } = {}) => {
+/* projectIds, when given, is the caller's visible set, hiddenTaskIds the tasks in it they cannot read,
+ * and privateWork what is someone else's alone; the counts follow the same scope. */
+const list = async (companyId, { status, bucket, agentId, limit = 100, projectIds, hiddenTaskIds, privateWork } = {}) => {
     const scoped = {
         ...(Array.isArray(projectIds) ? { projectId: { $in: idForms(projectIds.map(String)) } } : {}),
         ...(Array.isArray(hiddenTaskIds) && hiddenTaskIds.length ? { taskId: { $nin: hiddenTaskIds.map(String) } } : {}),
+        ...(privateWork ? proposalClause(privateWork) : {}),
     };
     const match = { ...scoped };
     if (status) match.status = String(status);

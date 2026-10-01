@@ -51,6 +51,18 @@ const schema = {
             type: String,
             required: false,
         },
+        // The chain of parents above the task, root first; empty or missing on a top-level task.
+        // Derived from ParentTaskId by Modules/Tasks/helpers/taskTree.js, never taken from a client.
+        'ancestors': {
+            type: [String],
+            required: false,
+        },
+        // The task whose archive or delete carried this row with it; a restore of that task brings
+        // back the rows that name it. Written only by the cascade in Modules/Tasks/helpers/taskTree.js.
+        'cascadedBy': {
+            type: String,
+            required: false,
+        },
         'ProjectID': {
             type: mongoose.Schema.Types.ObjectId,
             required: true,
@@ -1545,14 +1557,28 @@ const schema = {
         approvedBy: { type: String, required: false },
         // Same contract as tasks.origin, for a page an inbound path creates; a member's or an agent's page has none
         origin: { type: Object, required: false },
+        // Who last changed the title or the body, and when. updatedBy moves on a property change too, so it cannot
+        // say who wrote the state a version keeps.
+        editedBy: { type: String, required: false },
+        editedAt: { type: Date, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Doc history (Modules/Pages/versions.js). savedBy and savedAt are the writer and the time of the state held, not of
+    // the row. A row with no reason is from the removed history: no savedAt (createdAt stands in) and no visibility.
     pageVersions: {
         pageId: { type: mongoose.Schema.Types.ObjectId, required: true },
         title: { type: String, required: false },
         content: { type: Object, required: false },
         rawText: { type: String, required: false },
         savedBy: { type: String, required: false },
+        savedAt: { type: Date, required: false },
+        name: { type: String, required: false },
+        // 'author' | 'interval' | 'restore' | 'manual'
+        reason: { type: String, required: false },
+        // The doc's visibility while this state was live; a 'private' version is its author's alone for good.
+        visibility: { type: String, required: false },
+        hash: { type: String, required: false },
+        size: { type: Number, required: false },
     },
     // Comments on a doc (Modules/Pages/comments.js). A reply carries its thread's first comment as parentId and that
     // comment's blockId; a blockId the doc no longer has is read as a doc-level comment.
@@ -3930,6 +3956,8 @@ const schema = {
             type: String,
             required: true
         },
+        // The first message of the thread the comment is a reply in, so a mention there opens that thread.
+        comment_parentId: { type: String, required: false },
         comment_mediaOriginalName: {
             type: String,
             required: false

@@ -154,7 +154,7 @@ const PROJECT = [['project', '_id']];
 const PROJECT_ID = [['projectId']];
 const DESTINATION = ['projectData', 'id'];
 
-const CREATE_DATA_FIELDS = Object.freeze(Object.keys(schema.tasks).filter((field) => !['_id', 'createdBy', 'createdAt'].includes(field)));
+const CREATE_DATA_FIELDS = Object.freeze(Object.keys(schema.tasks).filter((field) => !['_id', 'createdBy', 'createdAt', 'ancestors', 'cascadedBy'].includes(field)));
 
 const CREATE = spec({
     params: ['data', 'user', 'projectData', 'indexObj', 'setNotif'],

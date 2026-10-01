@@ -146,7 +146,7 @@
 <script setup>
 // PACKAGES
 import { ref, defineProps, defineEmits, nextTick, inject, watch,
-    onMounted, computed, provide
+    onMounted, onBeforeUnmount, computed, provide
 } from 'vue';
 import { useStore } from 'vuex';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
@@ -178,6 +178,7 @@ import { isAiField, loadedViewTasks } from '@/views/Projects/composables/aiField
 import ListSortControl from './ListSortControl.vue';
 import ConvertToSubTaskSidebar from '@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue';
 import { useListRowMenu } from './useListRowMenu.js';
+import { SUBTASK_EXPANSION, createSubtaskExpansion } from './subtaskExpansion.js';
 import TaskMenuSidebars from '@/views/Projects/components/taskMenu/TaskMenuSidebars.vue';
 import { sortChoices, useListSort } from '@/views/Projects/composables/viewSort';
 import { columnCatalogue, gridTracks, listColumnClass, listColumnsAt, useViewColumns } from '@/views/Projects/composables/viewColumns';
@@ -196,6 +197,7 @@ const clearTaskFilters = inject("clearTaskFilters", () => {});
 const {
     groupBy,
     getSprintTasks,
+    getGroupCounts,
     getMongoDBUpdate
 } = taskListHelper();
 const { checkApps, checkPermission } = useCustomComposable();
@@ -207,6 +209,8 @@ provide('listRowEdit', rowEdit);
 const aiColumnTasks = computed(() => loadedViewTasks(getters, project.value?._id, { searched: Boolean(searchedTask?.value) }));
 const rowMenu = useListRowMenu(project, showArchived);
 provide('listRowMenu', rowMenu);
+const subtaskExpansion = createSubtaskExpansion();
+provide(SUBTASK_EXPANSION, subtaskExpansion);
 const sortState = useListSort();
 const { density, setDensity } = useViewSettings();
 provide('listSort', sortState.sort);
@@ -279,6 +283,8 @@ setActiveView('list');
 watch(() => project.value?._id, (newId) => {
     creatingFirstTask.value = false;
     openedEmptyGroups.value.clear();
+    subtaskExpansion.expandedIds.value = [];
+    subtaskExpansion.autoExpandedIds.value = [];
     if (newId) {
         setActiveProject(String(newId));
         agents.load(newId);
@@ -352,32 +358,72 @@ function reviewAgent() {
     if (router.hasRoute('AiInbox')) router.push({ name: 'AiInbox', params: { cid: companyId.value } }).catch(() => {});
 }
 
-const timer = ref(null);
-function debouncer(timeout = 1000) {
-    return new Promise((resolve) => {
-        if(timer.value) {
-            clearTimeout(timer.value);
-        }
-        timer.value = setTimeout(() => {
-            resolve();
-        }, timeout);
-    })
-}
+const INIT_SETTLE_MS = 150;
+let initTimer = null;
+let initStarted = false;
+let refetchWanted = false;
+let fetchedFor = '';
 
+/* The first call, and the first one that has sprints to fetch, load at once. The page then
+ * calls again several times while the sprint list and the props settle, so later calls wait
+ * for the last of a burst, and a fetch is skipped when the same project, grouping and sprints
+ * were fetched already. */
 function init (group,refetch,projects,sprints,groupedTasksData,isBoard,isInitial) {
     if(isInitial == true){
         isLoading.value = true;
     }
-    debouncer(1000).then(() => {
-        groupBy(group,refetch,projects,sprints,groupedTasksData,isBoard,'list',false,true,(resp)=>{
+    refetchWanted = refetchWanted || refetch === true;
+    const run = () => {
+        const signature = JSON.stringify([projects?._id, group, (sprints || []).map((sprint) => sprint?.id)]);
+        const fetch = refetchWanted && signature !== fetchedFor;
+        refetchWanted = false;
+        if(fetch && sprints?.length) fetchedFor = signature;
+        const heldBefore = Boolean(getters['projectData/tasks']?.[projects?._id]);
+        groupBy(group,fetch,projects,sprints,groupedTasksData,isBoard,'list',false,true,(resp)=>{
             groupedTasks.value = resp;
             if(!props.sprintLoading){
                 isLoading.value = false;
             }
             adjustListViewHeight();
-        });
-    })
+            /* Groups the store already held are not fetched again, so their counts are. */
+            if(fetch && heldBefore) refreshGroupCounts();
+        }, { firstPageOnly: true });
+    };
+    clearTimeout(initTimer);
+    const atOnce = !initStarted || (refetchWanted && !fetchedFor);
+    initStarted = true;
+    if(atOnce) {
+        run();
+        return;
+    }
+    initTimer = setTimeout(run, INIT_SETTLE_MS);
 }
+
+const COUNT_SETTLE_MS = 400;
+let countTimer = null;
+const openSprint = computed(() => groupedTasks.value.find((sprint) => sprint?.isExpanded));
+
+function refreshGroupCounts() {
+    const sprint = openSprint.value;
+    if(!sprint || !project.value?._id) return;
+    getGroupCounts({ projectId: project.value._id, sprintId: sprint.id, items: sprint.items || [], projectData: project.value })
+        .catch((error) => console.error("ERROR in list group counts: ", error));
+}
+
+/* The store raises the marker when a change from the server may have moved a task it cannot
+ * place. Only a rise while the same sprint is open counts: opening a sprint reads an old one. */
+watch(() => [
+    `${project.value?._id}|${openSprint.value?.id}`,
+    getters['projectData/tasks']?.[project.value?._id]?.[openSprint.value?.id]?.countsStale || 0
+], ([sprintKey, stale], [previousKey, previousStale]) => {
+    if(sprintKey !== previousKey || stale <= previousStale) return;
+    clearTimeout(countTimer);
+    countTimer = setTimeout(refreshGroupCounts, COUNT_SETTLE_MS);
+});
+onBeforeUnmount(() => {
+    clearTimeout(initTimer);
+    clearTimeout(countTimer);
+});
 
 watch(clientWidth, () => {
     adjustListViewHeight();

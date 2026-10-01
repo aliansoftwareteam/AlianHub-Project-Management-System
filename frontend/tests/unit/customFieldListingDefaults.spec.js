@@ -32,7 +32,7 @@ vi.mock('@vuepic/vue-datepicker', async () => {
 });
 vi.mock('@formkit/vue', async () => {
     const vue = await import('vue');
-    return { FormKit: vue.defineComponent({ name: 'FormKit', setup: (_, { slots }) => () => vue.h('div', { class: 'formkit-stub' }, slots.prefix ? slots.prefix() : []) }) };
+    return { FormKit: vue.defineComponent({ name: 'FormKit', props: ['mask'], setup: (_, { slots }) => () => vue.h('div', { class: 'formkit-stub' }, slots.prefix ? slots.prefix() : []) }) };
 });
 
 import { dateFieldLimits } from '@/plugins/customFieldView/dateFieldLimits';
@@ -52,8 +52,9 @@ config.global.mocks = {};
 const bare = (fieldType, more = {}) => ({ _id: `f-${fieldType}`, fieldType, fieldTitle: `A ${fieldType}`, type: 'task', global: true, isDelete: true, ...more });
 const DUE = bare('date', { _id: 'f-due', fieldTitle: 'Due' });
 
-const store = (fields = []) => createStore({
+const store = (fields = [], company = {}) => createStore({
     getters: {
+        'settings/selectedCompany': () => company,
         'settings/companyDateFormat': () => ({ dateFormat: 'DD/MM/YYYY' }),
         'settings/finalCustomFields': () => fields,
         'projectData/tasks': () => ({}),
@@ -64,11 +65,11 @@ const store = (fields = []) => createStore({
 const mounted = [];
 afterEach(() => { while (mounted.length) mounted.pop().unmount(); });
 
-const show = (component, detail, more = {}) => {
+const show = (component, detail, more = {}, company = {}) => {
     const failed = vi.fn();
     const wrapper = mount(component, {
         props: { detail },
-        global: { plugins: [store()], provide: { $clientWidth: ref(1280), $defaultUserAvatar: '' }, config: { errorHandler: failed }, stubs: { ToolTip: true, Sidebar: true, ...more } }
+        global: { plugins: [store([], company)], provide: { $clientWidth: ref(1280), $defaultUserAvatar: '' }, config: { errorHandler: failed }, stubs: { ToolTip: true, Sidebar: true, ...more } }
     });
     mounted.push(wrapper);
     return { wrapper, failed };
@@ -158,12 +159,51 @@ describe('the other field types without their optional settings', () => {
         expect(failed).not.toHaveBeenCalled();
     });
 
-    it('a phone field with no country renders its code', async () => {
-        const DropDown = { template: '<div><slot name="button" /><slot name="options" /></div>' };
-        const { wrapper, failed } = show(PhoneComponentListing, bare('phone', { fieldPattern: '###', fieldCode: '+91', fieldCountryCode: '+1' }), { DropDown, DropDownOption: true });
+    const DropDown = { template: '<div><slot name="button" /><slot name="options" /></div>' };
+    const phone = async (detail, company) => {
+        const shown = show(PhoneComponentListing, detail, { DropDown, DropDownOption: true }, company);
         await new Promise((resolve) => setTimeout(resolve));
         await flushPromises();
+        return shown;
+    };
+
+    it('a phone field with no country renders its code', async () => {
+        const { wrapper, failed } = await phone(bare('phone', { fieldPattern: '###', fieldCode: '+91', fieldCountryCode: '+1' }));
         expect(failed).not.toHaveBeenCalled();
         expect(wrapper.text()).toContain('+91');
+    });
+
+    it.each([[{ Cst_countryCode: 'IN' }], [{ Cst_Country: 'India' }]])('a phone field with no country takes the company\'s, %j', async (company) => {
+        const { wrapper, failed } = await phone(bare('phone'), company);
+        expect(failed).not.toHaveBeenCalled();
+        expect(wrapper.findComponent({ name: 'FormKit' }).props('mask')).toBe('##### #####');
+        expect(wrapper.text()).toContain('+91');
+        expect(wrapper.find('.vti__flag.in').exists()).toBe(true);
+    });
+
+    it('a phone field keeps its own country over the company\'s', async () => {
+        const france = { code: 'FR', dialCode: '+33', maskWithDialCode: '# ## ## ## ##' };
+        const { wrapper } = await phone(bare('phone', { fieldCountryObject: france, fieldCountryCode: '+33' }), { Cst_countryCode: 'IN' });
+        expect(wrapper.findComponent({ name: 'FormKit' }).props('mask')).toBe('# ## ## ## ##');
+        expect(wrapper.text()).toContain('+33');
+    });
+
+    it('a phone field with no country anywhere is a plain digits input whose value can be saved', async () => {
+        const detail = bare('phone');
+        const { wrapper, failed } = await phone(detail);
+        expect(wrapper.findComponent({ name: 'FormKit' }).exists()).toBe(false);
+
+        const input = wrapper.get('input[type="tel"]');
+        input.element.value = '98-76 5a';
+        await input.trigger('input');
+        expect(input.element.value).toBe('98765');
+        expect(wrapper.emitted('inputUpdate').at(-1)).toEqual(['98765']);
+
+        await input.trigger('blur');
+        const [value, saved, id] = wrapper.emitted('blurUpdate').at(-1);
+        expect(value).toBe('98765');
+        expect(saved).toMatchObject({ _id: 'f-phone', fieldCountryObject: {} });
+        expect(input.attributes('id')).toBe(id);
+        expect(failed).not.toHaveBeenCalled();
     });
 });

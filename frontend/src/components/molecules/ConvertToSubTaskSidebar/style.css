@@ -1,16 +1,29 @@
-.input__Search{
+.input__Search {
     margin: 10px 0 8px 0;
+    box-sizing: border-box;
 }
  .input__Search::placeholder {
     font-size: 16px !important;
-    color: #949DA8 !important;
+    color: var(--ink-2) !important;
 }
 .Project-name-sidebar{
     padding-left: 10px;
 }
-.converted__sidebar .sidebar-body {
-    background-color: #F4F5F7 !important;
+.cts-card,
+.create__component--wrapper { background: var(--surface); }
+.cts-browse {
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: var(--brand);
+    font-family: inherit;
+    font-weight: 500;
+    text-decoration: underline;
+    white-space: nowrap;
+    cursor: pointer;
 }
+.cts-browse:focus-visible { outline: none; box-shadow: var(--focus); }
 .inital-box{
     margin-left: 0 !important;
     width: 20px !important;
@@ -22,13 +35,7 @@
     font-style: normal;
     font-weight: 400;
     line-height: 19.24px;
-    color: #FFF;
-}
-.mainConverToSubTask
-.browse__project-wrapper .Project-name-sidebar {
-    padding-left: 15px;
-    color: #525255;
-    line-height: 20.72px;
+    color: var(--rail-ink-strong);
 }
  .browse__project-wrapper {
     padding: 8px 10px;
@@ -37,10 +44,10 @@
     cursor: pointer;
 }
  .browse__project-wrapper:hover{
-    background: #F0F0F0;
+    background: var(--fill);
 }
 .duplicate__component-with--convertlist {
-    border: 1px solid rgb(207, 207, 207);
+    border: 1px solid var(--border);
     padding: 20px;
     border-radius: 8px;
     margin-top: 12px;
@@ -74,7 +81,7 @@
     .duplicate__component-with--convertlist .duplicate_component_only {max-height: 230px !important;}
 }
 @media(max-width: 767px){
-    .input__Search {margin: 15px 0 10px 0;height: 50px !important;border-radius: 6px !important;border: 1px solid #E0E0E0 !important;background: #F0F0F0 !important;}
+    .input__Search {margin: 15px 0 10px 0;height: 50px !important;border-radius: 6px !important;border: 1px solid var(--border) !important;background: var(--fill) !important;}
     .browse__project-wrapper:hover{background: transparent;}
     .browse__project-wrapper{height: 50px;}
     .duplicatetask__converttask--wrapper {padding: 0px;overflow: auto;height: 100%;}
@@ -83,7 +90,6 @@
     .duplicatetask__converttask--wrapper .convert__projecttask-wrapper {max-height: none!important;}
     .duplicate__component-with--convertlist .duplicate_component_only {max-height: 180px !important;}
     .duplicatetask__converttask--wrapper .allcheckbox__component-wrapper{max-height: 120px;}
-    .converted__sidebar .sidebar-body {background-color: #fff !important;}
 }
 .convert__depth-note {
     margin: 12px 0 0;

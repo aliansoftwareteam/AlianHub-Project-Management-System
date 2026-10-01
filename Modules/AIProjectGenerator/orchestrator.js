@@ -47,6 +47,7 @@ const { HandleHistory } = require('../Tasks/helpers/helper');
 const { HandleBothNotification } = require('../Tasks/helpers/handleNotification');
 const { checkProjectPlan, removeProjectCount } = require('../createProject/controller');
 const { estimateAndPersist: estimateTaskTimeWithAI } = require('../EstimatedTime/aiTaskEstimator');
+const { storableFieldValues } = require('../CustomField/helpers/fieldValueWrite');
 const planRules = require('./planRules');
 const sseEmitter = require('./sseEmitter');
 const executeAgents = require('./executeAgents');
@@ -723,6 +724,7 @@ function buildTaskDoc({ task, projectDoc, sprintDoc, statusByName, taskTypeByKey
         TaskType: taskType ? (taskType.value || taskType.name || 'task') : 'task',
         TaskTypeKey: taskType ? taskType.key : 0,
         ParentTaskId: parentTaskId ? String(parentTaskId) : '',
+        ancestors: parentTaskId ? [String(parentTaskId)] : [],
         // Taken straight from the plan and capped, so a task that was split
         // shows its slice immediately rather than waiting on the background
         // estimator — which never runs for sub-tasks at all.
@@ -815,6 +817,11 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
         }
     }
     const docs = [...parentDocs, ...subtaskDocs];
+
+    const fieldDefinitions = new Map();
+    for (const doc of docs) {
+        doc.customField = (await storableFieldValues({ companyId, task: doc, definitions: fieldDefinitions })).customField;
+    }
 
     const typeIncrements = {};
     for (const d of docs) {

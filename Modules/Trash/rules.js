@@ -10,6 +10,11 @@ const KINDS = {
         fields: 'ProjectName ProjectCode updatedAt',
         row: (doc) => ({ title: doc.ProjectName, code: doc.ProjectCode, projectId: String(doc._id) })
     },
+    folders: {
+        type: SCHEMA_TYPE.FOLDERS,
+        fields: 'name projectId parentFolderId updatedAt',
+        row: (doc) => ({ title: doc.name, code: '', projectId: doc.projectId ? String(doc.projectId) : '' })
+    },
     lists: {
         type: SCHEMA_TYPE.SPRINTS,
         fields: 'name projectId private AssigneeUserId updatedAt',
@@ -17,7 +22,7 @@ const KINDS = {
     },
     tasks: {
         type: SCHEMA_TYPE.TASKS,
-        fields: 'TaskName TaskKey ProjectID sprintId updatedAt',
+        fields: 'TaskName TaskKey ProjectID sprintId mainChat AssigneeUserId updatedAt',
         row: (doc) => ({ title: doc.TaskName, code: doc.TaskKey, projectId: doc.ProjectID ? String(doc.ProjectID) : '' })
     },
     docs: {
@@ -45,7 +50,8 @@ const toRow = (kind, doc) => ({
 
 /* Restoring a container brings back the tasks it took with it. A trashed
    project set its tasks to 1 and an archived one to 7; a trashed list set
-   its tasks to 1 (the sprint write itself already restores the 4s). */
+   its tasks to 1 (the sprint write itself already restores the 4s). A folder's
+   own write restores its subfolders and tasks, so it names no filter here. */
 const childRestoreFilter = (kind, id, ObjectId) => {
     if (kind === 'projects') return { ProjectID: new ObjectId(id), deletedStatusKey: { $in: [TRASHED, 7] } };
     if (kind === 'lists') return { sprintId: new ObjectId(id), deletedStatusKey: TRASHED };

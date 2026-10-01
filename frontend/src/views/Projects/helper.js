@@ -11,8 +11,14 @@ import { apiRequest } from '../../services';
 import { isOwnerOrAdmin } from "@/utils/roles";
 import { isFavourite } from "@/composable/favourites";
 import { assigneeCondition, assigneeGroups, dueDateBuckets, dueDateCondition, restoreGroupState, sprintToLoad } from "./taskGroups";
-import { customFieldGroups, customFieldIdOf, customGroupUpdate } from "./composables/customFieldQuery";
+import { customFieldGroups, customFieldIdOf, customGroupUpdate, needsProjectRange, numberRangeStages, rangeFromRows } from "./composables/customFieldQuery";
 import { activeMemberIds } from "@/plugins/customFieldView/fieldTypes/people";
+import { flatTasks } from "./composables/projectCustomFields";
+
+/* The bands of a number group are cut from the project's own values; if the range cannot be read, the loaded tasks stand in. */
+const projectNumberRange = (def, projectId) => apiRequest("post", `${env.TASK}/find`, { findQuery: numberRangeStages(def, projectId) })
+    .then((result) => rangeFromRows(result?.data))
+    .catch(() => null);
 
 const projectsList = ref([]);
 const filterdProjects = ref([]);
@@ -774,7 +780,7 @@ export function taskListHelper() {
     const priorities = computed(() => getters["settings/companyPriority"])
     const project = inject('selectedProject');
     const permit = checkPermission("task.show_tasks",project?.value?.isGlobalPermission);
-    function getSprintTasks({projectId, sprintId, item, fetchNew = false, projectData ,indexName,parentId = '',groupType,resetTable}) {
+    function getSprintTasks({projectId, sprintId, item, fetchNew = false, projectData ,indexName,parentId = '',groupType,resetTable,skip,firstPageOnly = false}) {
         return new Promise((resolve, reject) => {
             try {
                 if(permit === null && projectData.isGlobalPermission === false) {
@@ -810,7 +816,9 @@ export function taskListHelper() {
                         userId: userId.value,
                         showAllTasks: projectData.isGlobalPermission === false ? permit : true,
                         indexName: indexName,
-                        parentId : parentId
+                        parentId : parentId,
+                        skip,
+                        firstPageOnly
                     })
                     .then(() => {
                         resolve();
@@ -824,6 +832,16 @@ export function taskListHelper() {
                 console.error("ERROR: ", error);
             }
         })
+    }
+    function getGroupCounts({projectId, sprintId, items, projectData}) {
+        if(permit === null && projectData.isGlobalPermission === false) return Promise.resolve();
+        return dispatch("projectData/refreshGroupCounts", {
+            pid: projectId,
+            sprintId,
+            items,
+            userId: userId.value,
+            showAllTasks: projectData.isGlobalPermission === false ? permit : true
+        });
     }
     // FIREBASE
     function getMongoDBUpdate({projectId, sprintId,projectData, groupBy: groupByValue, currentView})
@@ -845,7 +863,7 @@ export function taskListHelper() {
         })
     }
 
-    async function groupBy(type, refetch = false,project,sprintData,groupedTasks,isBoard,lView='list',resetTable=false,fetchTask = true,cb) {
+    async function groupBy(type, refetch = false,project,sprintData,groupedTasks,isBoard,lView='list',resetTable=false,fetchTask = true,cb,{firstPageOnly = false} = {}) {
         try {
             if(!project || !Object.keys(project).length) {
                 cb([])
@@ -944,7 +962,11 @@ export function taskListHelper() {
                 const people = def?.fieldType === "people"
                     ? activeMemberIds(getters["settings/companyUsers"]).map((id) => ({ id, name: getUser(id).Employee_Name }))
                     : [];
-                arr = customFieldGroups(def, { t, people });
+                const range = needsProjectRange(def) ? await projectNumberRange(def, project._id) : null;
+                const loaded = needsProjectRange(def) && !range
+                    ? flatTasks([getters["projectData/tasks"], getters["projectData/tableTasks"]], project._id)
+                    : [];
+                arr = customFieldGroups(def, { t, people, range, tasks: loaded });
 
                 sprints.forEach((sprint, index) => {
                     sprint.isExpanded = false;
@@ -984,7 +1006,7 @@ export function taskListHelper() {
                     let promises = [];
                     openSprint.items.forEach((item) => {
                         promises.push(
-                            getSprintTasks({projectId: project._id, sprintId:openSprint?.id ? openSprint?.id : openSprint?._id, item, fetchNew: lView == 'table' ? refetch : true,projectData: project, indexName: item.indexName, groupType: lView,resetTable:resetTable})
+                            getSprintTasks({projectId: project._id, sprintId:openSprint?.id ? openSprint?.id : openSprint?._id, item, fetchNew: lView == 'table' ? refetch : true,projectData: project, indexName: item.indexName, groupType: lView,resetTable:resetTable, firstPageOnly})
                         )
                     })
                     Promise.allSettled(promises)
@@ -1075,6 +1097,7 @@ export function taskListHelper() {
         groupBy,
         checkCase,
         getSprintTasks,
+        getGroupCounts,
         getMongoDBUpdate,
         searchMongoDBTasks
     }

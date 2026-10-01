@@ -48,7 +48,7 @@
                     </template>
                     <template #button="{ triggerAttrs }">
                         <button type="button" class="cursor-pointer dot-btn border-0" :aria-label="$t('Projects.more_features')" :title="$t('Projects.more_features')" v-bind="triggerAttrs">
-                            <img :src="clientWidth > 767 ? horizontalDots : horizontalDotsMobile" id="projectoptions_driver" alt="" aria-hidden="true"/>
+                            <ShellIcon id="projectoptions_driver" name="more" :size="clientWidth > 767 ? 20 : 24" />
                         </button>
                     </template>
                     <template #options>
@@ -129,6 +129,12 @@
                                     <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.color_avatar') }}</span>
                                 </div>
                             </DropDownOption>
+                            <DropDownOption v-if="canDuplicate" data-test="duplicate-project" @click="duplicating = true">
+                                <div class="pab-duplicate" :class="{ 'pab-duplicate--phone': clientWidth <= 767 }">
+                                    <ShellIcon name="copy" :size="clientWidth <= 767 ? 18 : 15" />
+                                    <span>{{ $t('Projects.duplicate_project') }}</span>
+                                </div>
+                            </DropDownOption>
                             <DropDownOption @click="$emit('archiveProject', 0)" v-if="checkPermission('project.project_close',projectData.isGlobalPermission) === true">
                                 <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
                                     <div class="d-flex align-items-center">
@@ -150,11 +156,12 @@
                 </DropDown>
             </li>
         </ul>
+        <DuplicateProjectDialog v-if="duplicating" :project="projectData" @close="duplicating = false" />
     </div>
 </template>
 
 <script setup>
-import { computed, defineProps, defineEmits } from 'vue';
+import { computed, defineProps, defineEmits, ref } from 'vue';
 import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
@@ -162,6 +169,7 @@ import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
 import Assignee from '@/components/molecules/Assignee/Assignee.vue';
 import WasabiImage from '@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue';
+import DuplicateProjectDialog from '@/components/molecules/DuplicateProjectDialog/DuplicateProjectDialog.vue';
 import { useCustomComposable } from '@/composable';
 
 const { checkPermission } = useCustomComposable();
@@ -174,6 +182,10 @@ const props = defineProps({
 });
 
 const watcherCount = computed(() => Object.keys(props.projectData?.watchers || {}).length);
+
+/* The server judges a duplicate on the company's rules, as it does a create, so the project's own rules are not read here. */
+const canDuplicate = computed(() => props.projectData?.isPersonal !== true && checkPermission('project.project_create') === true);
+const duplicating = ref(false);
 
 const { getters } = useStore();
 const route = useRoute();
@@ -193,11 +205,14 @@ const audio = require('@/assets/images/svg/Voice_Record.svg');
 const audioLinkMobile = require('@/assets/images/svg/AudioLink.svg');
 const fileLink = require('@/assets/images/svg/Files_links.svg');
 const eyeIcon = require('@/assets/images/svg/PriorityIcon/watchProjectEye.svg');
-const horizontalDots = require('@/assets/images/svg/horizontalDots.svg');
-const horizontalDotsMobile = require('@/assets/images/svg/threedot_mobile_list.svg');
 const lockIcon = require('@/assets/images/lock.png');
 const listIcon = require('@/assets/images/svg/edit_rename_icon.svg');
 const colorPalletIcon = require('@/assets/images/svg/palette.svg');
 const cancelIcon = require('@/assets/images/svg/cancel.svg');
 const deleteIcon = require('@/assets/images/svg/Delete_Icon.svg');
 </script>
+
+<style scoped>
+.pab-duplicate { display: flex; align-items: center; gap: 20px; font-size: 12px; font-weight: 400; color: var(--ink-2); }
+.pab-duplicate--phone { height: 50px; font-size: 16px; color: var(--ink); }
+</style>

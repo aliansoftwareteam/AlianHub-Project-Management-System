@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { canEditProject, DELETE_OR_CLOSE } = require('../../Config/projectAccess');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const { canSeeSprintById } = require('../Sprints/helpers/sprintVisibility');
+const { readsCompanyWide } = require('../Tasks/helpers/taskQueryGuard');
 const logger = require('../../Config/loggerConfig');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -20,6 +21,13 @@ const RESTORABLE = {
         permission: DELETE_OR_CLOSE,
         locate: async (companyId, id) => ({ projectId: id }),
     },
+    folders: {
+        permission: ['project.folder_restore', 'project.folder_delete'],
+        locate: async (companyId, id) => {
+            const folder = await storedRecord(companyId, SCHEMA_TYPE.FOLDERS, id, { projectId: 1 });
+            return folder && { projectId: folder.projectId };
+        },
+    },
     lists: {
         permission: ['project.sprint_restore', 'project.sprint_delete'],
         locate: async (companyId, id) => {
@@ -30,11 +38,13 @@ const RESTORABLE = {
     tasks: {
         permission: ['task.task_delete'],
         locate: async (companyId, id) => {
-            const task = await storedRecord(companyId, SCHEMA_TYPE.TASKS, id, { ProjectID: 1, sprintId: 1 });
-            return task && { projectId: task.ProjectID, sprintId: task.sprintId };
+            const task = await storedRecord(companyId, SCHEMA_TYPE.TASKS, id, { ProjectID: 1, sprintId: 1, mainChat: 1, AssigneeUserId: 1 });
+            return task && { projectId: task.ProjectID, sprintId: task.sprintId, task };
         },
     },
 };
+
+const CHAT_KINDS = ['lists', 'tasks'];
 
 const notFound = (res) => res.status(404).json({ status: false, statusText: 'Not found.', error: 'Not Found' });
 
@@ -54,13 +64,14 @@ const requireRestoreAccess = async (req, res, next) => {
         if (!restorable || !OBJECT_ID.test(String(id || ''))) return next();
         const place = await restorable.locate(companyId, String(id));
         if (!place) return next();
+        if (place.task && !readsCompanyWide(place.task, String(req.uid || ''), [])) return notFound(res);
 
         const privileged = isPrivileged(await getRoleType(companyId, String(req.uid || '')));
         const decision = place.projectId
             ? await canEditProject(companyId, req.uid, String(place.projectId), [restorable.permission])
             : NO_PROJECT;
         // Chat channels share the sprint and task collections, and their container is not a project.
-        if (decision.missing && kind !== 'projects' && privileged) return next();
+        if (decision.missing && CHAT_KINDS.includes(kind) && privileged) return next();
         if (!decision.allowed) return refuse(res, decision);
         if (!privileged && !(await canSeeSprintById(companyId, req.uid, place.sprintId))) return notFound(res);
         return next();

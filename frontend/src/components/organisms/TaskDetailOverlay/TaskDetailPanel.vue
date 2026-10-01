@@ -17,6 +17,10 @@
                     <template v-else>
                         <button type="button" class="ah-detail__crumb-link" @click="open('project')">{{ projectData.ProjectName }}</button>
                         <template v-if="task.folderObjId && folderName">
+                            <template v-if="parentFolder">
+                                <span class="ah-detail__crumb-sep">›</span>
+                                <button type="button" class="ah-detail__crumb-link" @click="open('parentFolder')">{{ parentFolder.name }}</button>
+                            </template>
                             <span class="ah-detail__crumb-sep">›</span>
                             <button type="button" class="ah-detail__crumb-link" @click="open('folder')">{{ folderName }}</button>
                         </template>
@@ -519,6 +523,12 @@ const sprintData = computed(() => {
 });
 const sprintName = computed(() => task.value?.sprintArray?.name || sprintData.value?.name || task.value?.sprintName || "");
 const folderName = computed(() => task.value?.sprintArray?.folderName || sprintData.value?.folderName || task.value?.folderName || "");
+/* The task read answers the task's own folder only; its parent is named when the open project's folders are in the store. */
+const parentFolder = computed(() => {
+    const parentId = projectData.value?.sprintsfolders?.[task.value?.folderObjId]?.parentFolderId;
+    if (!parentId) return null;
+    return ((getters["projectData/folders"] || {})[props.projectId] || []).find((folder) => String(folder._id) === String(parentId)) || null;
+});
 
 const subtaskCompletion = computed(() => {
     const valid = subTasks.value.filter((s) => s && (s.deletedStatusKey === 0 || s.deletedStatusKey === undefined));
@@ -704,6 +714,12 @@ function open(val) {
                 ? { name: "ProjectFolderSprint", params: { ...base, sprintId: props.sprintId, folderId: task.value.folderObjId }, query }
                 : { name: "ProjectSprint", params: { ...base, sprintId: props.sprintId }, query });
             break;
+        case "parentFolder":
+            if (parentFolder.value) {
+                emit("close");
+                router.push({ name: "ProjectFolder", params: { ...base, folderId: parentFolder.value._id }, query });
+            }
+            break;
         case "folder":
             if (task.value.folderObjId) {
                 emit("close");
@@ -833,7 +849,7 @@ function indexSprintsAndFolders(id, sprintsResult, foldersResult) {
     const folders = {};
     (foldersResult || []).forEach((folder) => {
         if (folder.projectId !== id) return;
-        folders[folder._id] = { folderId: folder._id, name: folder.name, sprintsObj: {}, deletedStatusKey: folder.deletedStatusKey, legacyId: folder?.legacyId || "", id: folder._id, _id: folder._id };
+        folders[folder._id] = { folderId: folder._id, name: folder.name, sprintsObj: {}, deletedStatusKey: folder.deletedStatusKey, legacyId: folder?.legacyId || "", id: folder._id, _id: folder._id, parentFolderId: folder.parentFolderId || null };
     });
     (sprintsResult || []).forEach((sprint) => {
         if (sprint.projectId !== id) return;

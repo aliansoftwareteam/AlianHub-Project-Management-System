@@ -8,6 +8,7 @@ const {
 const socketEmitter = require('../../event/socketEventEmitter');
 const logger = require('../../Config/loggerConfig');
 const { onJoin, roomFor, prefixOfOwnRoom, canOpenComments, pageCommentRoomOf, readablePage } = require('../roomAccess');
+const { THREAD_MODULE } = require('../../Modules/Comments/helpers/chatThreads');
 
 exports.commentSocketHandler = ({ socket, namespace }) => {
     onJoin(socket, 'joinCommentRoom',
@@ -68,7 +69,7 @@ const handleCommentChange = (changeData, includeUpdatedFields = false) => {
     // Both modules share the same emit shape; the only difference is the
     // prefix used to find subscribed rooms.
     let prefix;
-    if (changeData.module === 'comments') {
+    if (changeData.module === 'comments' || changeData.module === THREAD_MODULE) {
         const { projectId, sprintId, taskId } = changeData.data;
         prefix = `comments_${projectId}_${sprintId}_${taskId}`;
     } else if (changeData.module === 'comments_project') {
@@ -131,5 +132,6 @@ socketEmitter.on('pageComments:insert', relayOrLog);
 socketEmitter.on('pageComments:update', relayOrLog);
 socketEmitter.on('comments:update', changeData => handleCommentChange(changeData, true));
 socketEmitter.on('comments:insert', changeData => handleCommentChange(changeData, false));
+socketEmitter.on(`${THREAD_MODULE}:update`, changeData => handleCommentChange(changeData, true));
 socketEmitter.on('comments_project:update', changeData => handleCommentChange(changeData, true));
 socketEmitter.on('comments_project:insert', changeData => handleCommentChange(changeData, false));

@@ -1,6 +1,16 @@
 <template>
     <div class="lv2__group" role="rowgroup">
-        <div role="row" class="lv2__aria-row"><div role="rowheader" class="lv2__aria-row">
+        <div role="row" class="lv2__aria-row"><div role="rowheader" class="lv2__group-bar">
+        <label v-if="canSelect && rows.length" class="lv2__group-select" :title="left ? $t('List.select_group_loaded', { n: rows.length, total }) : null">
+            <input
+                type="checkbox"
+                class="ah-check lv2__group-check"
+                :checked="groupSelection === 'all'"
+                :indeterminate.prop="groupSelection === 'some'"
+                :aria-label="left ? $t('List.select_group_loaded', { n: rows.length, total }) : $t('List.select_group')"
+                @change="selection.toggleGroup(rowIds)"
+            />
+        </label>
         <button type="button" class="lv2__group-head" :aria-expanded="!!item.isExpanded" @click="$emit('toggle')">
             <span class="lv2__caret" :class="{ 'lv2__caret--open': item.isExpanded }" aria-hidden="true">▸</span>
             <span class="lv2__swatch" :style="{ background: swatch }"></span>
@@ -45,6 +55,7 @@
                                 :key="sub._id"
                                 :data="sub"
                                 is-sub
+                                :parent="task"
                                 :selected="selection.isSelected(sub._id)"
                                 :can-select="canSelect"
                                 @open="$emit('open', sub)"
@@ -66,6 +77,13 @@
 
             <div v-if="!rows.length" role="row" class="lv2__aria-row"><div role="cell" class="lv2__aria-row">
                 <p class="lv2__empty-group">{{ $t('List.group_empty') }}</p>
+            </div></div>
+
+            <div v-if="hasMore" role="row" class="lv2__aria-row"><div ref="groupEnd" role="cell" class="lv2__more">
+                <button type="button" class="lv2__more-btn" :disabled="loadingMore" @click="loadMore">
+                    {{ loadingMore ? $t('List.loading_more') : $t('List.load_more', { n: left }) }}
+                </button>
+                <span v-if="listSort.key !== 'manual'" class="lv2__more-hint">{{ $t('List.load_more_sorted', { n: rows.length }) }}</span>
             </div></div>
 
             <div v-if="creating" role="row" class="lv2__aria-row"><div role="cell" class="lv2__create">
@@ -96,7 +114,7 @@
 </template>
 
 <script setup>
-import { computed, inject, ref, watch } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import draggable from "vuedraggable";
 import ListRow from "./ListRow.vue";
@@ -106,8 +124,9 @@ import { taskListHelper, useUpdateTasks } from "@/views/Projects/helper.js";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
 import { useListDragDrop } from "./useListDragDrop.js";
 import { useProjectAgentActivity } from "./useProjectAgentActivity.js";
+import { useSubtaskExpansion } from "./subtaskExpansion.js";
 import { hasSubtasks, indexProgress, pendingExpandIds, progressQuery, progressSignature } from "./subtaskProgress";
-import { groupLabel, groupRows, listSourceTasks, searchExpandIds } from "./listFilter";
+import { groupLabel, groupRows, listSourceTasks, pagedPast, searchExpandIds } from "./listFilter";
 import { apiRequest } from "@/services";
 import { subtaskCreateAssignees } from "@/utils/assigneeOptions";
 import * as env from "@/config/env";
@@ -142,7 +161,7 @@ const listSortContext = inject("listSortContext", ref({}));
 const creating = ref(false);
 const templates = ref([]);
 const templateId = ref("");
-const expandedIds = ref([]);
+const { expandedIds, autoExpandedIds } = useSubtaskExpansion();
 const subtaskFor = ref("");
 
 const sprintId = computed(() => props.sprint?.id || props.sprint?._id);
@@ -186,6 +205,60 @@ const headMeta = computed(() => {
     const count = found.value === null ? rows.value.length : found.value;
     return estimateHours.value ? `${count} · ${estimateHours.value}H` : String(count);
 });
+
+/* The header counts every task the server has in the group; `rows` are the ones loaded so far.
+ * Under a filter the whole result is loaded at once, so nothing is left. */
+const total = computed(() => (found.value === null ? rows.value.length : Number(found.value) || 0));
+const left = computed(() => Math.max(0, total.value - rows.value.length));
+
+const rowIds = computed(() => rows.value.map((task) => String(task._id)));
+const groupSelection = computed(() => selection.groupState(rowIds.value));
+
+const frontier = computed(() => getters["projectData/tasks"]?.[props.project._id]?.[sprintId.value]?.frontier?.[`${props.item.searchKey}_${props.item.searchValue}`] || null);
+const loadingMore = ref(false);
+const stalledAt = ref("");
+const loadState = computed(() => `${total.value}:${rows.value.length}`);
+const hasMore = computed(() => left.value > 0 && stalledAt.value !== loadState.value);
+
+async function loadMore() {
+    if (loadingMore.value || !hasMore.value) return;
+    loadingMore.value = true;
+    const before = loadState.value;
+    try {
+        await getSprintTasks({
+            projectId: props.project._id,
+            sprintId: sprintId.value,
+            item: props.item,
+            fetchNew: true,
+            projectData: props.project,
+            skip: pagedPast(rows.value, frontier.value, props.item.indexName) ?? undefined
+        });
+    } catch (error) {
+        console.error("ERROR in list load more: ", error);
+    }
+    await nextTick();
+    /* A page that brought nothing new: stop asking until the group changes. */
+    if (loadState.value === before) stalledAt.value = before;
+    loadingMore.value = false;
+    await nextTick();
+    observeGroupEnd();
+}
+
+/* Observing again after each page reports the end once more if it is still in view, so a
+ * short group keeps loading until its end leaves the screen. */
+const groupEnd = ref(null);
+let endObserver = null;
+function observeGroupEnd() {
+    endObserver?.disconnect();
+    endObserver = null;
+    if (!groupEnd.value || typeof IntersectionObserver === "undefined") return;
+    endObserver = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) loadMore();
+    }, { root: document.getElementById("list_scroll"), rootMargin: "200px 0px" });
+    endObserver.observe(groupEnd.value);
+}
+watch(groupEnd, observeGroupEnd, { flush: "post" });
+onBeforeUnmount(() => endObserver?.disconnect());
 
 /* WIP limits are per status and optional: the chip only exists once a status
  * carries a limit, never as a guessed number. */
@@ -236,23 +309,29 @@ function toggleSubtasks(task) {
 /* The toolbar's expand / collapse control drives every row at once, and has to keep doing
  * so for rows that arrive later -- a group opened after the toggle was flipped loads its
  * tasks only then. */
-const autoExpandedIds = ref([]);
-watch([taskCollapsed, rows], () => {
+function expandArrivedRows() {
     if (searchedTask.value) {
         expandedIds.value = [...new Set([...expandedIds.value, ...searchExpandIds(rows.value)])];
         return;
     }
-    if (taskCollapsed.value) {
-        expandedIds.value = [];
-        autoExpandedIds.value = [];
-        return;
-    }
+    if (taskCollapsed.value) return;
     const pending = pendingExpandIds(rows.value, autoExpandedIds.value);
     if (!pending.length) return;
     autoExpandedIds.value = [...autoExpandedIds.value, ...pending];
     expandedIds.value = [...new Set([...expandedIds.value, ...pending])];
     rows.value.filter((task) => pending.includes(String(task._id))).forEach(loadSubtasks);
-}, { immediate: true });
+}
+/* Rows are replaced on every change to a task or a subtask in the group, so only the
+ * toolbar switch itself may close what the user opened by hand. */
+watch(rows, expandArrivedRows, { immediate: true });
+watch(taskCollapsed, (collapsed) => {
+    if (collapsed && !searchedTask.value) {
+        expandedIds.value = [];
+        autoExpandedIds.value = [];
+        return;
+    }
+    expandArrivedRows();
+});
 
 /* A searched parent carries only its matching subtasks; when none matched, expanding it
    shows the full set loaded into the sprint's own copy of the task. */

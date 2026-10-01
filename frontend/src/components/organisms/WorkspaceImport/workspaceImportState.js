@@ -1,4 +1,5 @@
 import { reactive } from "vue";
+import { folderPathLabel } from "@/utils/folderTree";
 
 export const IMPORT_SOURCES = [
     { key: "clickup", mark: "C", tint: "#7b68ee" },
@@ -21,7 +22,7 @@ export function sprintOptionsOf(project) {
     });
     Object.values(project?.sprintsfolders || {}).forEach((folder) => {
         Object.values(folder?.sprintsObj || {}).forEach((sprint) => {
-            if (sprint?.id) options.push({ ...sprint, _id: sprint.id, name: sprint.name || "", folderId: folder.folderId, folderName: folder.folderName || "" });
+            if (sprint?.id) options.push({ ...sprint, _id: sprint.id, name: sprint.name || "", folderId: folder.folderId, folderName: folder.folderName || "", folderPath: folderPathLabel(project.sprintsfolders, folder) });
         });
     });
     return options;

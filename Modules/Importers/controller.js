@@ -64,9 +64,10 @@ exports.listImports = async (req, res) => {
         if (req.query && req.query.uid && String(req.query.uid) !== userId) {
             return res.status(403).send({ status: false, statusText: 'You can only list your own imports.' });
         }
+        // The task copy of a duplicated project keeps its progress in this collection too (Modules/ProjectDuplicate).
         const jobs = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.IMPORT_JOBS,
-            data: [{ userId }, 'source status total processed created errorList createdAt', { sort: { createdAt: -1 }, limit: 20 }],
+            data: [{ userId, source: { $ne: 'duplicate' } }, 'source status total processed created errorList createdAt', { sort: { createdAt: -1 }, limit: 20 }],
         }, 'find');
         return res.send({ status: true, statusText: 'Imports fetched.', data: jobs || [] });
     } catch (error) {
@@ -281,7 +282,7 @@ const finishImport = async (companyId, { source, project, sprint, actor, statusA
             data: [{ _id: job._id }, { $set: { status: 'done', processed: tasks.length, created: createdCount } }],
         }, 'updateOne');
         const detail = report ? { skippedRows: report.skippedRows, unmatchedAssignees: [...unmatchedEmails, ...report.unnamedAssignees] } : {};
-        return { status: true, statusText: `Imported ${createdCount} tasks from ${source} (${skipped} skipped).`, data: { jobId: job._id, projectId: String(project._id), created: createdCount, skipped, ...detail } };
+        return { status: true, statusText: `Imported ${createdCount} tasks from ${source} (${skipped} skipped).`, data: { jobId: job._id, projectId: String(project._id), created: createdCount, skipped, ...detail, ...(result?.droppedFieldValues ? { droppedFieldValues: result.droppedFieldValues } : {}) } };
     } catch (creationError) {
         logger.error(`[importers] ${source} job ${job._id} failed: ${creationError.message}`);
         await MongoDbCrudOpration(companyId, {

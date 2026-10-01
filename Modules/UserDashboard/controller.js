@@ -21,7 +21,8 @@ const {
 const { ROLE_GUEST, isPrivileged } = require('../../Config/roleTypes');
 const { ACTIVE_SEAT } = require('../../Config/seatStatus');
 const { arrangeRules, rolePermission, PRIVATE_PROJECTS, seesEveryPrivateProject } = require('../../Config/rulePermissions');
-const { ownOrNotPersonal } = require('../PersonalList/ownership');
+const { ownOrNotPersonal, othersPersonalListIds } = require('../PersonalList/ownership');
+const { companyWideMatch } = require('../Tasks/helpers/taskQueryGuard');
 
 // Parse a client-built advanced-filter match from the request body.
 function bodyTaskMatch(body) {
@@ -74,6 +75,22 @@ async function resolveCallerRoleType(companyId, uid) {
     }
 }
 exports.resolveCallerRoleType = resolveCallerRoleType;
+
+/* What a company-wide card leaves out for an owner or admin: someone else's personal list, and a chat
+ * they are not in. Everyone else's cards read their own work, and for them both are empty. `time` sits
+ * under $and so a card's own ProjectId filter cannot replace it. */
+const companyWideCardScope = async (companyId, uid, isManagement) => {
+    const personalLists = isManagement ? await othersPersonalListIds(companyId, uid) : [];
+    return {
+        tasks: isManagement ? companyWideMatch(uid, personalLists) : {},
+        time: personalLists.length ? { $and: [{ ProjectId: { $nin: idForms(personalLists) } }] } : {},
+    };
+};
+
+/* The tasks a card counts: company-wide for an owner or admin; for everyone else, the tasks assigned to them. */
+const cardTaskScope = async (companyId, uid, isManagement) => (isManagement
+    ? (await companyWideCardScope(companyId, uid, true)).tasks
+    : { AssigneeUserId: uid });
 
 const noProject = () => ({ filter: { _id: { $in: [] } }, companyWide: false });
 
@@ -390,6 +407,7 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
         // see every company employee the filter selects. Only genuine
         // non-admins (roleType not in [1, 2]) are restricted to
         // themselves. null = no restriction.
+        const cardScope = await companyWideCardScope(companyId, cfg.callerUserId, isPrivileged(cfg.callerRoleType));
         let visibleUserIds = null;
         if (isPrivileged(cfg.callerRoleType)) {
             // Admin / Owner / Manager tier — no user-level restriction.
@@ -452,7 +470,7 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
         // 1. Planned hours in range (per user, per task) from estimated_time.
         const plannedByUserTask = {};  // `${uid}|${tid}` → planned minutes in range
         {
-            const estFilter = { UserId: { $in: employeeIdStrs } };
+            const estFilter = { UserId: { $in: employeeIdStrs }, ...cardScope.time };
             if (cfg.dateFrom || cfg.dateTo) {
                 estFilter.Date = {};
                 if (cfg.dateFrom) estFilter.Date.$gte = cfg.dateFrom;
@@ -472,7 +490,7 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
         const loggedByUserTask = {};   // `${uid}|${tid}` → logged minutes in range
         const lastLogByUserTask = {};  // `${uid}|${tid}` → { desc, start } latest work comment
         {
-            const tsFilter = { Loggeduser: { $in: employeeIdStrs } };
+            const tsFilter = { Loggeduser: { $in: employeeIdStrs }, ...cardScope.time };
             if (dateFromSec != null || dateToSec != null) {
                 tsFilter.LogStartTime = {};
                 if (dateFromSec != null) tsFilter.LogStartTime.$gte = dateFromSec;
@@ -527,6 +545,7 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
             const activeFilter = {
                 Loggeduser: { $in: employeeIdStrs },
                 startTimeTracker: { $gte: nowSec - RUNNING_WINDOW_SEC },
+                ...cardScope.time,
             };
             const activeLogs = await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TIMESHEET,
@@ -570,7 +589,7 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
             const validIds = Array.from(unionTaskIds)
                 .filter((id) => mongoose.Types.ObjectId.isValid(id))
                 .map((id) => new mongoose.Types.ObjectId(id));
-            const taskFilter = { _id: { $in: validIds }, deletedStatusKey: 0 };
+            const taskFilter = { _id: { $in: validIds }, deletedStatusKey: 0, ...cardScope.tasks };
             const empProjClause = projectScopeClause(cfg.projectMode, cfg.projectIds);
             if (empProjClause) {
                 taskFilter.ProjectID = empProjClause;
@@ -587,19 +606,7 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
                     { aiTaskCategoryManual: { $exists: false }, aiTaskCategory: cfg.taskType },
                 ];
             }
-            // Merge the advanced filter match. Fold into $and so it can't
-            // clobber the taskType $or above (buildFilterQuery may also emit $or).
-            if (cfg.taskMatch) {
-                const extra = cfg.taskMatch;
-                const andParts = [];
-                if (taskFilter.$or) { andParts.push({ $or: taskFilter.$or }); delete taskFilter.$or; }
-                if (Array.isArray(extra.$and)) andParts.push(...extra.$and);
-                if (Array.isArray(extra.$or)) andParts.push({ $or: extra.$or });
-                Object.keys(extra).forEach((k) => {
-                    if (k !== "$and" && k !== "$or") taskFilter[k] = extra[k];
-                });
-                if (andParts.length) taskFilter.$and = (taskFilter.$and || []).concat(andParts);
-            }
+            applyTaskMatch(taskFilter, cfg.taskMatch);
             const tasks = await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TASKS,
                 data: [
@@ -835,6 +842,7 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         const includeProjects = req.body && req.body.includeProjects === true;
 
         const { filter: projFilter, companyWide } = await resolveProjectVisibility(companyId, req.uid);
+        const cardScope = await companyWideCardScope(companyId, String(req.uid || ''), companyWide);
 
         // Project scoping from the card selector: all / include ($in) / exclude ($nin).
         const projectMode = req.body?.projectMode || 'all';
@@ -874,7 +882,7 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         const timelogs = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
             data: [
-                { LogStartTime: { $gte: fromSec, $lte: toSec }, ...(tsProjClause ? { ProjectId: tsProjClause } : {}) },
+                { LogStartTime: { $gte: fromSec, $lte: toSec }, ...(tsProjClause ? { ProjectId: tsProjClause } : {}), ...cardScope.time },
                 { ProjectId: 1 },
             ],
         }, "find").catch(() => []);
@@ -1199,6 +1207,7 @@ exports.getTeamTaskTypeBreakdown = async (req, res) => {
         if (Array.isArray(visibleUserIds) && !visibleUserIds.length) {
             return res.status(200).json({ status: true, data: { dimension, teams: [] } });
         }
+        const cardScope = await companyWideCardScope(companyId, payload.callerUserId, isPrivileged(payload.callerRoleType));
         const projectIds = Array.isArray(payload.projectIds) ? payload.projectIds
             : Array.isArray(payload.projectId) ? payload.projectId : [];
         const statusKeys = Array.isArray(payload.statusKeys) ? payload.statusKeys
@@ -1226,7 +1235,7 @@ exports.getTeamTaskTypeBreakdown = async (req, res) => {
             // Timesheet-level split (billable lives on the timesheet, not the
             // task). Applies project + user filters; status/advanced filters
             // don't apply here (no task join).
-            const tsFilter = { LogStartTime: { $gte: fromSec, $lte: toSec } };
+            const tsFilter = { LogStartTime: { $gte: fromSec, $lte: toSec }, ...cardScope.time };
             if (Array.isArray(visibleUserIds)) tsFilter.Loggeduser = { $in: visibleUserIds.map(String) };
             if (projectIds.length) tsFilter.ProjectId = { $in: idForms(projectIds.map(String)) };
             const tlogs = await MongoDbCrudOpration(companyId, {
@@ -1240,7 +1249,7 @@ exports.getTeamTaskTypeBreakdown = async (req, res) => {
             });
         } else {
             const { loggedByUserTask, taskMap } = await getLoggedAndTasksInRange(companyId, {
-                fromSec, toSec, projectIds, projectMode: payload.projectMode || 'all', statusKeys, visibleUserIds, taskMatch,
+                fromSec, toSec, projectIds, projectMode: payload.projectMode || 'all', statusKeys, visibleUserIds, taskMatch, cardScope,
             });
 
             let sprintTypeMap = {};
@@ -1343,6 +1352,7 @@ exports.getTeamLoggedVsEta = async (req, res) => {
         if (Array.isArray(visibleUserIds) && !visibleUserIds.length) {
             return res.status(200).json({ status: true, data: { teams: [] } });
         }
+        const cardScope = await companyWideCardScope(companyId, payload.callerUserId, isPrivileged(payload.callerRoleType));
 
         const { loggedByUserTask, taskMap, userIds } = await getLoggedAndTasksInRange(companyId, {
             fromSec, toSec,
@@ -1353,6 +1363,7 @@ exports.getTeamLoggedVsEta = async (req, res) => {
                 : Array.isArray(payload.statusKey) ? payload.statusKey : [],
             visibleUserIds,
             taskMatch: (payload.taskMatch && typeof payload.taskMatch === "object") ? payload.taskMatch : null,
+            cardScope,
         });
 
         const [{ map: userTeamMap }, nameMap] = await Promise.all([
@@ -1489,7 +1500,8 @@ exports.getProjectProgressMetric = async (req, res) => {
         const callerUserId = String(payload.callerUserId || "");
         const callerRoleType = Number(payload.callerRoleType ?? ROLE_GUEST);
         const restrictToSelf = !isPrivileged(callerRoleType);
-        const userScope = () => (restrictToSelf && callerUserId ? { Loggeduser: callerUserId } : {});
+        const cardScope = await companyWideCardScope(companyId, callerUserId, !restrictToSelf);
+        const userScope = () => ({ ...(restrictToSelf && callerUserId ? { Loggeduser: callerUserId } : {}), ...cardScope.time });
         const objIds = (arr) => [...new Set((arr || []).filter(Boolean).map(String))]
             .filter((id) => mongoose.Types.ObjectId.isValid(id))
             .map((id) => new mongoose.Types.ObjectId(id));
@@ -1576,7 +1588,7 @@ exports.getProjectProgressMetric = async (req, res) => {
             let running = [];
             if (taskIds.length) {
                 const tasks = await MongoDbCrudOpration(companyId, {
-                    type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: taskIds }, deletedStatusKey: 0 }, { ProjectID: 1 }],
+                    type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: taskIds }, deletedStatusKey: 0, ...cardScope.tasks }, { ProjectID: 1 }],
                 }, "find").catch(() => []);
                 const pids = objIds((tasks || []).map((t) => t.ProjectID));
                 if (pids.length) {
@@ -1634,6 +1646,7 @@ exports.getProjectProgressMetric = async (req, res) => {
                         {
                             Loggeduser: { $in: [...new Set(pairs.map((p) => p.userId))] },
                             LogStartTime: { $gte: Math.floor(dayStart.getTime() / 1000), $lte: nowSec },
+                            ...cardScope.time,
                         },
                         { Loggeduser: 1, TicketID: 1, LogTimeDuration: 1 },
                     ],
@@ -1654,7 +1667,7 @@ exports.getProjectProgressMetric = async (req, res) => {
             const taskIds = objIds(pairs.map((p) => p.taskId));
             if (taskIds.length) {
                 const tasks = await MongoDbCrudOpration(companyId, {
-                    type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: taskIds }, deletedStatusKey: 0 }, { TaskName: 1, TaskKey: 1, ProjectID: 1, sprintArray: 1 }],
+                    type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: taskIds }, deletedStatusKey: 0, ...cardScope.tasks }, { TaskName: 1, TaskKey: 1, ProjectID: 1, sprintArray: 1 }],
                 }, "find").catch(() => []);
                 (tasks || []).forEach((t) => { taskMap[String(t._id)] = t; });
                 const pids = objIds(Object.values(taskMap).map((t) => t.ProjectID));
@@ -1750,7 +1763,7 @@ exports.getProjectProgressMetric = async (req, res) => {
             const taskMap = {};
             const tIds = objIds([...taskIdSet]);
             if (tIds.length) {
-                const taskFilter = { _id: { $in: tIds }, deletedStatusKey: 0 };
+                const taskFilter = { _id: { $in: tIds }, deletedStatusKey: 0, ...cardScope.tasks };
                 const pmClause = projectScopeClause(projectMode, projectIds);
                 if (pmClause) taskFilter.ProjectID = pmClause;
                 if (includeSubtasks === false) taskFilter.isParentTask = true;
@@ -2544,6 +2557,7 @@ exports.getTasksByStatus = async (req, res) => {
         }));
 
         const scope = isManagement ? "company" : "self";
+        const callerTasks = await cardTaskScope(companyId, uid, isManagement);
         if (!windowTaskIds.length) {
             return res.status(200).json({
                 status: true,
@@ -2561,7 +2575,7 @@ exports.getTasksByStatus = async (req, res) => {
             ...(projClause ? { ProjectID: projClause } : {}),
             // A member sees their own work only: assigned to them, not merely led or
             // created by them - the same line getMyAchievements draws.
-            ...(isManagement ? {} : { AssigneeUserId: uid }),
+            ...callerTasks,
         }, bodyTaskMatch(body));
 
         const baseFilter = taskScope(true);

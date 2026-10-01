@@ -79,6 +79,7 @@ const recordMentions = (companyId, comment, thread, notice, mentionIds) => {
             folderId: folderOf(comment),
             type: thread.taskId ? 'task' : 'project',
             mainChat: notice.type === 'chat',
+            ...(comment.parentId ? { comment_parentId: String(comment.parentId) } : {}),
         },
     }, 'save');
 };

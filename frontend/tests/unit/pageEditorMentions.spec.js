@@ -42,9 +42,11 @@ vi.mock('@/composable', () => ({
     useCustomComposable: () => ({ checkPermission: () => true, checkBucketStorage: () => true, getWasabiImageLink: async () => '' }),
 }));
 vi.mock('@/services', () => ({
-    apiRequest: vi.fn(async (method, url) => {
+    apiRequest: vi.fn(async (method, url, body) => {
         if (String(url).includes('/pages?scope=all')) return { data: { status: true, data: [{ _id: '64b7f0c2a1b2c3d4e5f60d01', title: 'Annual plan' }] } };
-        if (String(url).includes('/task/find')) return { data: [] };
+        if (String(url).includes('/task/find')) {
+            return { data: JSON.stringify(body).includes('QAS') ? [{ _id: '64b7f0c2a1b2c3d4e5f60e01', TaskKey: 'QAS-15', TaskName: '[QA 046] parent' }] : [] };
+        }
         return { data: {} };
     }),
 }));
@@ -107,6 +109,17 @@ describe('typing @ in a doc', () => {
         await flushPromises();
         expect(document.querySelector('.dmp')).toBeNull();
         expect(paragraph.querySelector('.mention')).toBeNull();
+        wrapper.unmount();
+    });
+
+    it('shows a task key once in its row, and keeps it in the mention', async () => {
+        const { wrapper, paragraph } = await editorWithText('See @QAS');
+        const row = document.querySelector('.dmp__row');
+        expect(row.querySelector('.dmp__key').textContent.trim()).toBe('QAS-15');
+        expect(row.querySelector('.dmp__name').textContent.trim()).toBe('[QA 046] parent');
+        expect(row.textContent.match(/QAS-15/g)).toHaveLength(1);
+        press(paragraph, 'Enter');
+        expect(paragraph.querySelector('.mention').textContent).toBe('@QAS-15 [QA 046] parent');
         wrapper.unmount();
     });
 

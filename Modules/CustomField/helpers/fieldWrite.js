@@ -2,6 +2,7 @@ const { evaluatePermission, isWritable } = require('../../../Config/permissionGu
 const logger = require('../../../Config/loggerConfig');
 const { normaliseAiConfig, AiConfigError } = require('../aiFields/config');
 const { cleanTaskTypeList, MAX_TASK_TYPES } = require('./fieldTaskTypes');
+const { cleanPastFuture, PAST, FUTURE } = require('./datePastFuture');
 const { MODULE_FIELD_TYPES, typeModuleOf } = require('../fieldTypes');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -34,6 +35,12 @@ const checkedTaskTypes = (value) => {
     return keys;
 };
 
+const checkedPastFuture = (value) => {
+    const allowed = cleanPastFuture(value);
+    if (!allowed) throw new FieldWriteError(`fieldPastFuture must be a list of ${PAST} and ${FUTURE}.`);
+    return allowed;
+};
+
 /* A new field takes its type's settings with their defaults. An update names its type only when it changes it, so a setting sent
    on its own is checked by the type that owns it. */
 const checkedTypeSettings = (updateObject) => {
@@ -58,6 +65,7 @@ const checkProperties = (updateObject, { insert }) => {
     if ('projectId' in updateObject && !isIdList(updateObject.projectId)) throw new FieldWriteError('projectId must be a list of project ids.');
     if ('fieldAi' in updateObject) updateObject.fieldAi = checkedAiConfig(updateObject);
     if ('fieldTaskTypes' in updateObject) updateObject.fieldTaskTypes = checkedTaskTypes(updateObject.fieldTaskTypes);
+    if ('fieldPastFuture' in updateObject) updateObject.fieldPastFuture = checkedPastFuture(updateObject.fieldPastFuture);
     return Object.assign(updateObject, checkedTypeSettings(updateObject));
 };
 

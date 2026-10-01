@@ -24,6 +24,13 @@ export function mentionElement({ type, id, label }) {
     return node;
 }
 
+/* `label` is the text the mention keeps in the doc; the picker shows `meta` and `name` side by side. */
+export function taskMentionItem(task) {
+    const key = task.TaskKey || '';
+    const name = task.TaskName || '';
+    return { type: 'task', id: String(task._id), label: [key, name].filter(Boolean).join(' '), meta: key, name };
+}
+
 export function mentionOf(node) {
     if (!node || !node.dataset) return null;
     const { mention: type, id } = node.dataset;

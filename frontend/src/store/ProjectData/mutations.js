@@ -181,6 +181,37 @@ function returnItemCountDetails(tasks, groupBy, updatedFields = null, taskId) {
     return obj;
 }
 
+const GROUP_FIELDS = { 0: ["statusKey"], 1: ["AssigneeUserId"], 2: ["Task_Priority"], 3: ["DueDate"] };
+const MEMBERSHIP_FIELDS = ["deletedStatusKey", "sprintId", "isParentTask"];
+
+/* Whether an event from the server can have changed how many tasks a group holds. The
+   arithmetic below only knows the group a task left when the store holds that task, and it
+   covers neither removals nor grouping by assignee or custom field, so the List asks the
+   server for the counts after any of these. Local, optimistic writes are left out: the
+   server may not have stored them yet. */
+function changesGroupCounts(groupBy, op, data, updatedFields) {
+    if(data?.isParentTask === false && !("isParentTask" in (updatedFields || {}))) return false;
+    if(op === "removed" || op === "added") return true;
+    if(op !== "modified") return false;
+    const fields = Object.keys(updatedFields || {});
+    if(!fields.length) return true;
+    const grouping = GROUP_FIELDS[groupBy.type];
+    return fields.some((field) => MEMBERSHIP_FIELDS.includes(field) || (grouping ? grouping.includes(field) : field.startsWith("customField")));
+}
+
+/* The sort key of the last row a page brought for a group: where its next page starts. */
+export const mutatePageFrontier = (state, payload) => {
+    const {pid, sprintId, key, row} = payload;
+    if(!state.tasks?.[pid]?.sprints?.includes(sprintId)) return;
+    state.tasks[pid][sprintId].frontier = {...state.tasks[pid][sprintId].frontier, [key]: row};
+}
+
+export const mutateGroupCounts = (state, payload) => {
+    const {pid, sprintId, found} = payload;
+    if(!state.tasks?.[pid]?.sprints?.includes(sprintId)) return;
+    state.tasks[pid][sprintId].found = {...state.tasks[pid][sprintId].found, ...found};
+}
+
 // HANDLE TASK
 /* A task has just been attached to `taskIndex` as a subtask. Raise that parent's
    subtask count by one.
@@ -215,6 +246,9 @@ export const mutateUpdateFirebaseTasks = (state, payload) => {
         const sprintFound = state.tasks[pid].sprints.includes(sprintId);
         if(sprintFound) {
             if(groupBy) {
+                if(snap && changesGroupCounts(groupBy, op, data, updatedFields)) {
+                    state.tasks[pid][sprintId].countsStale = (state.tasks[pid][sprintId].countsStale || 0) + 1;
+                }
                 if(["modified", "added"]?.includes(op) && data.isParentTask) {
                     const {addKey, removeKey} = returnItemCountDetails(state.tasks[pid][sprintId].tasks, groupBy, updatedFields, data._id);
                     if(addKey) {
@@ -941,6 +975,11 @@ export const mutateFolders = (state,payload) => {
         }
     }
 }
+
+export const replaceFolders = (state, { projectId, folders }) => {
+    state.folders = { ...state.folders, [projectId]: folders };
+}
+
 export const mutateSearchedProjects = (state,payload) => {
     let searchedProjects = [];
     let searchData = payload.data;
@@ -963,6 +1002,7 @@ export const mutateSearchedProjects = (state,payload) => {
                                 legacyId : folder?.legacyId ? folder?.legacyId : '',
                                 id: folder._id,
                                 _id: folder._id,
+                                parentFolderId: folder.parentFolderId || null,
                                 isExpanded: true
                             };
                         }

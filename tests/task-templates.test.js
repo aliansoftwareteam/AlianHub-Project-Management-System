@@ -234,6 +234,34 @@ describe('applying a template to a task', () => {
         expect(mockHistory).toHaveBeenCalledWith('task', C, ALPHA, TARGET, expect.objectContaining({ sprintId: 's1' }), expect.objectContaining({ id: MEMBER }));
     });
 
+    it('leaves out a template value that does not fit its field, and keeps the rest and the task\'s own values', async () => {
+        const LINK = 'f00000000000000000000001';
+        const SCORE = 'f00000000000000000000002';
+        const REVIEWERS = 'f00000000000000000000003';
+        [[LINK, 'url'], [SCORE, 'rating'], [REVIEWERS, 'people']].forEach(([_id, fieldType]) => {
+            mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id, fieldTitle: fieldType, fieldType, type: 'task', global: true, isDelete: true });
+        });
+        stored(SCHEMA_TYPE.TASKS, TARGET).customField = { own: { fieldValue: 'kept' } };
+        const template = seedTemplate({
+            customField: {
+                cf1: 'x',
+                [LINK]: { _id: LINK, fieldValue: 'javascript:alert(1)' },
+                [SCORE]: { _id: SCORE, fieldValue: 4 },
+                [REVIEWERS]: { _id: REVIEWERS, fieldValue: [MEMBER, OUTSIDER] },
+            },
+        });
+        const res = await apply(MEMBER, template._id, { taskId: TARGET, applyDate: '2026-10-01', tzOffsetMinutes: 0 });
+        expect(res.statusCode).toBe(200);
+        expect(stored(SCHEMA_TYPE.TASKS, TARGET).customField).toEqual({
+            own: { fieldValue: 'kept' },
+            cf1: 'x',
+            [SCORE]: { _id: SCORE, fieldValue: 4 },
+            [REVIEWERS]: { _id: REVIEWERS, fieldValue: [MEMBER] },
+        });
+        expect(res.body.data.applied).toContain('customFields');
+        expect(res.body.data.droppedFieldValues).toBe(2);
+    });
+
     it('counts the apply day in the caller\'s own time zone', async () => {
         const template = seedTemplate();
         await apply(MEMBER, template._id, { taskId: TARGET, applyDate: '2026-10-01', tzOffsetMinutes: -330 });
@@ -254,6 +282,26 @@ describe('applying a template to a task', () => {
         expect(user).toMatchObject({ id: MEMBER, Employee_Name: 'User 3', companyOwnerId: OWNER });
         expect(projectData).toMatchObject({ _id: ALPHA, CompanyId: C, ProjectCode: 'P1', ProjectName: 'Project 1' });
         expect(indexObj).toMatchObject({ indexName: 'groupByStatusIndex', searchKey: 'statusKey' });
+    });
+
+    it('hands the create path the chain of the task the subtasks go under', async () => {
+        Object.assign(stored(SCHEMA_TYPE.TASKS, TARGET), { isParentTask: false, ParentTaskId: SOURCE, ancestors: [SOURCE] });
+        const template = seedTemplate();
+        const res = await apply(MEMBER, template._id, { taskId: TARGET, applyDate: '2026-10-01' });
+        expect(res.body.data.subtasksCreated).toBe(1);
+        expect(mockTaskMongo.create.mock.calls[0][0].data).toMatchObject({ ParentTaskId: TARGET, ancestors: [SOURCE, TARGET] });
+    });
+
+    it('skips the subtasks on a level-three task, which can take none, and says so', async () => {
+        const middle = 'd00000000000000000000011';
+        Object.assign(stored(SCHEMA_TYPE.TASKS, TARGET), { isParentTask: false, ParentTaskId: middle, ancestors: [SOURCE, middle] });
+        const template = seedTemplate();
+        const res = await apply(MEMBER, template._id, { taskId: TARGET, applyDate: '2026-10-01' });
+        expect(res.statusCode).toBe(200);
+        expect(mockTaskMongo.create).not.toHaveBeenCalled();
+        expect(res.body.data.skipped).toContain('subtasks');
+        expect(res.body.data.applied).not.toContain('subtasks');
+        expect(res.body.data.applied).toContain('checklist');
     });
 
     it('appends the checklist through the checklist path, keeping its nesting', async () => {

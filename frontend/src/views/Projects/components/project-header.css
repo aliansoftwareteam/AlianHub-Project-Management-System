@@ -6,11 +6,14 @@
     flex: none;
 }
 
+/* The bar wraps rather than squeezes: a flex line breaks between whole items, so once the
+   project name has given all it can the actions drop to a second row, and nothing overlaps. */
 .ph2__bar {
     min-height: var(--toolbar-h);
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 12px;
+    gap: 0 12px;
     padding: 0 20px;
     font: var(--text-small);
     color: var(--ink);
@@ -23,12 +26,14 @@
     flex: none;
 }
 
-.ph2__crumb {
+.ph2__crumb,
+.ph2__folder-crumb {
     display: flex;
     align-items: center;
     gap: 8px;
     min-width: 0;
 }
+.ph2__folder { max-width: 18ch; overflow: hidden; text-overflow: ellipsis; color: var(--ink-2); }
 
 .ph2__project {
     font: 600 14px/1.2 var(--font-ui);
@@ -51,6 +56,9 @@
     letter-spacing: -.2px;
     cursor: pointer;
 }
+/* A line is filled from each item's basis, so the name is counted at 120 px and then grows
+   back to its own width where there is room: it is the first thing to give way. */
+.ph2__project, .ph2__switch { flex: 1 1 120px; max-width: max-content; }
 /* While the inline rename input is open it carries the name; the switcher next
    to it would be a second copy of the same string. */
 .ph2:has(.project-titlerename-input) .ph2__switch,
@@ -145,7 +153,6 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
 /* The existing ViewsList row, when Projects.vue passes it through the `views`
    slot: strip its legacy chrome so it reads as the mock's underline tabs. */
 .ph2__viewrow .wrapper { height: auto; border-radius: 0; align-items: stretch; }
-.ph2__viewrow .wrapper.bg-light-gray { background: none; }
 .ph2__viewrow .view-list {
     border: 0 !important;
     padding: 6px 10px;
@@ -153,9 +160,9 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
     align-items: center;
     border-bottom: 2px solid transparent;
 }
-.ph2__viewrow .wrapper.bg-light-gray .view-list { border-bottom: 2px solid var(--brand) !important; }
-.ph2__viewrow .wrapper.bg-light-gray .view-list .gray81 { color: var(--ink); font-weight: 600; }
-.ph2__viewrow .view-list .gray81 { color: var(--ink-2); font-size: 12.5px; }
+.ph2__viewrow .wrapper.is-active .view-list { border-bottom: 2px solid var(--brand) !important; }
+.ph2__viewrow .wrapper.is-active .view-list .view-list__name { color: var(--ink); font-weight: 600; }
+.ph2__viewrow .view-list .view-list__name { color: var(--ink-2); font-size: 12.5px; }
 
 .ph2__viewrow .view-list:focus-visible,
 .ph2__viewrow .ph2__tab:focus-visible {
@@ -167,15 +174,22 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
 .ph2__actions {
     margin-left: auto;
     display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     align-items: center;
     gap: 6px;
-    flex: none;
+    flex: 0 1 auto;
+    min-width: 0;
 }
+/* The vertical margins space the two rows of a wrapped bar; on one row they fit inside --toolbar-h. */
+.ph2__tree, .ph2__actions { margin-block: 4px; }
 
 .ph2 .ah-btn--ghost { padding: 0 6px; line-height: 0; }
 .ph2 .ah-btn--ghost img { vertical-align: middle; }
 .ph2 .open__watcher { padding: 0; background: var(--surface); color: var(--ink-2); border-color: var(--border); }
 .ph2 .open__watcher:hover { background: var(--surface-hover); }
+.ph2 .dot-btn { display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2); }
+.ph2 .dot-btn:hover { color: var(--ink); }
 
 .ph2 .sprint-watcher-count {
     background-color: var(--fill);
@@ -202,9 +216,10 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
     border-radius: 8px;
     font-size: 11.5px;
     white-space: nowrap;
+    min-width: 0;
 }
-.ph2__agents-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--rail-ok); }
-.ph2__agents-label { font-weight: 600; }
+.ph2__agents-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--rail-ok); flex: none; }
+.ph2__agents-label { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ph2__agents-meta { font: var(--text-data); color: var(--rail-ink-2); }
 
 @media (max-width: 1279px) {
@@ -213,16 +228,17 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
 
 @media (max-width: 767px) {
     .ph2__bar {
-        flex-wrap: wrap;
         padding: 8px 14px;
         row-gap: 6px;
         min-height: 0;
     }
     .ph2__viewrow { display: none; }
-    .ph2__actions { margin-left: auto; }
+    .ph2__tree, .ph2__actions { margin-block: 0; }
     .ph2__project { max-width: 46vw; }
+    .ph2__folder { max-width: 12ch; }
     /* 32 px touch targets; the negative margins keep the bar's rows as tall as before. */
     .ph2__switch { min-height: 32px; margin-block: -7px; }
+    .ph2__project, .ph2__switch { flex: 0 1 auto; }
     .ph2 .dot-btn { min-width: 32px; min-height: 32px; margin: -9px -4px; justify-content: center; }
 }
 
@@ -231,8 +247,8 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
 .ph2__title-slot {
     display: flex;
     align-items: center;
-    min-width: 0;
-    flex: 0 1 auto;
+    max-width: 100%;
+    flex: none;
     gap: 2px;
 }
 .ph2__title-slot .list-view-header-title {
@@ -249,7 +265,7 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
     width: 20px;
     height: 20px;
     border-radius: 5px;
-    color: #fff;
+    color: var(--rail-ink-strong);
     font: 600 11px/1 var(--font-ui);
     flex: none;
 }
