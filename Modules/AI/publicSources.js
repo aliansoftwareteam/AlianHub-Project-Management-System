@@ -25,19 +25,24 @@ const textMatch = (terms, fields) => (terms.length
     ? { $or: fields.map((f) => ({ [f]: { $regex: terms.map(escapeRegex).join('|'), $options: 'i' } })) }
     : {});
 
+/* Who may read a channel is looked for among the workspace's live seats, one more than the cap at most. */
+const channelCandidates = async (companyId) => {
+    const seats = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.COMPANY_USERS, data: [{ ...ACTIVE_SEAT }, { userId: 1 }, { limit: READER_CAP + 1 }],
+    }, 'find');
+    return [...new Set((seats || []).map((seat) => String(seat.userId)).filter(isId))];
+};
+
+/* Whether a channel here has more possible readers than their shared sources are worked out for: nothing counts as
+ * shared in one, so an answer with sources cannot be posted to it. A direct message never does. */
+const tooManyChannelReaders = async (companyId) => (await channelCandidates(companyId)).length > READER_CAP;
+
 /* A direct message is read by its participants; a channel by whoever the thread rule lets in, looked for among the
  * workspace's live seats. null when there are too many to check. */
 const threadReaders = async (companyId, thread, conversation) => {
-    let candidates;
-    if (conversation && Array.isArray(conversation.AssigneeUserId)) {
-        candidates = conversation.AssigneeUserId.map(String);
-    } else {
-        const seats = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.COMPANY_USERS, data: [{ ...ACTIVE_SEAT }, { userId: 1 }, { limit: READER_CAP + 1 }],
-        }, 'find');
-        candidates = (seats || []).map((seat) => String(seat.userId));
-    }
-    candidates = [...new Set(candidates.filter(isId))];
+    const candidates = conversation && Array.isArray(conversation.AssigneeUserId)
+        ? [...new Set(conversation.AssigneeUserId.map(String).filter(isId))]
+        : await channelCandidates(companyId);
     if (candidates.length > READER_CAP) return null;
     const decisions = await Promise.all(candidates.map((uid) => commentThreadAccess(companyId, uid, thread).catch(() => ({ allowed: false }))));
     return candidates.filter((uid, index) => decisions[index].allowed);
@@ -135,4 +140,4 @@ const allShared = async (companyId, { thread, conversation, used }) => {
     return keys.every(([kind, id]) => shared.has(`${kind}:${id}`));
 };
 
-module.exports = { READER_CAP, threadReaders, sharedProjects, publicSources, sharedAmong, allShared };
+module.exports = { READER_CAP, threadReaders, tooManyChannelReaders, sharedProjects, publicSources, sharedAmong, allShared };

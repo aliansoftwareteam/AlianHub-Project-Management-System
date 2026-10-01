@@ -4791,6 +4791,7 @@ export default {
         post_only_shared: "Post only what everyone can open",
         post_nothing_shared: "Nothing in this answer can be opened by everyone there, so it cannot be posted.",
         post_expired: "This answer can no longer be posted. Ask again, then post the new answer.",
+        post_too_many_readers: "More than {n} people can read this channel, so what they can all open is not worked out and an answer with sources cannot be posted here. Pick a smaller channel or a direct message.",
         post_failed: "Could not post the answer.",
         cite_unavailable: "Not available to open",
         history_title: "Your threads",

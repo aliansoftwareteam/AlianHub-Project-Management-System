@@ -10,7 +10,7 @@ const { canPostToThread } = require('../Comments/helpers/threadWriteAccess');
 const { refuseThread } = require('../Comments/helpers/threadAccess');
 const { callerOf } = require('./askThreads');
 const aiMention = require('./aiMention');
-const { sharedAmong } = require('./publicSources');
+const { READER_CAP, sharedAmong, tooManyChannelReaders } = require('./publicSources');
 const { ASK_ANSWER, citedKey, sharedSourcesOf } = require('./shareToken');
 
 /* An Ask answer is built from what its asker can open. Posting it into a conversation puts it in front of everyone
@@ -76,7 +76,16 @@ const post = async (req, res) => {
         if (!access.allowed) return refuseThread(res, access);
 
         const direct = isId(thread.taskId) ? await findOne(companyId, SCHEMA_TYPE.TASKS, [{ _id: oid(thread.taskId) }, { AssigneeUserId: 1, mainChat: 1 }]) : null;
-        const shared = await sharedAmong(companyId, { thread, conversation: direct && direct.mainChat === true ? direct : null, used });
+        const conversation = direct && direct.mainChat === true ? direct : null;
+        if (!conversation && used.length && await tooManyChannelReaders(companyId)) {
+            return res.status(200).json({
+                status: false,
+                code: 'too_many_readers',
+                statusText: `More than ${READER_CAP} people can read that channel, so an answer with sources cannot be posted there.`,
+                data: { readerCap: READER_CAP },
+            });
+        }
+        const shared = await sharedAmong(companyId, { thread, conversation, used });
         const cites = citedKey(cited).map(([kind, id, ref, projectId]) => ({ kind, id, ref, projectId }));
         const unshared = used.filter(([kind, id]) => !shared.has(`${kind}:${id}`)).length;
         const trimmed = unshared ? onlyShared(answer, cites, shared) : { text: answer, cited: cites };
@@ -127,8 +136,10 @@ const targets = async (req, res) => {
             { name: 1, projectId: 1 },
             { limit: MAX_CHANNELS },
         ])) || [] : [];
+        const crowded = sprints.length ? await tooManyChannelReaders(companyId) : false;
         const channels = await postable(companyId, uid, sprints.map((sprint) => ({
             projectId: String(sprint.projectId), sprintId: String(sprint._id), taskId: CHANNEL_THREAD, name: sprint.name || '', space: spaceName[String(sprint.projectId)] || '',
+            ...(crowded ? { tooManyReaders: true } : {}),
         })));
 
         const chats = directSpaces.length ? (await find(companyId, SCHEMA_TYPE.TASKS, [
@@ -150,7 +161,7 @@ const targets = async (req, res) => {
             .map((chat) => ({ projectId: String(chat.ProjectID), sprintId: String(chat.sprintId), taskId: String(chat._id), name: nameOf[peerOf(chat)] })));
 
         const byName = (a, b) => a.name.localeCompare(b.name);
-        return res.status(200).json({ status: true, statusText: 'OK', data: { channels: channels.sort(byName), directs: directs.sort(byName) } });
+        return res.status(200).json({ status: true, statusText: 'OK', data: { channels: channels.sort(byName), directs: directs.sort(byName), readerCap: READER_CAP } });
     } catch (error) {
         logger.error(`ask post targets: ${error && error.message ? error.message : error}`);
         return refuse(res, 500, 'failed', 'Could not list your conversations.');

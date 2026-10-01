@@ -8,6 +8,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { memberProfiles } = require('../../utils/companyMembers');
 const { taskIdMatch } = require('../Comments/helpers/taskIdMatch');
 const values = require('./taskAiValues');
+const { withTimeout } = require('./withTimeout');
 
 const { FEATURES } = require('../AICore/features');
 const { STATE, isAiOff } = require('../AICore/aiSwitch');
@@ -125,17 +126,14 @@ function parseSummary(content) {
 
 async function askModel(userMessage, spend) {
     const provider = providerFactory.getProvider();
-    const result = await Promise.race([
-        provider.chat({
-            systemPrompt: SYSTEM_PROMPT,
-            messages: [{ role: 'user', content: userMessage }],
-            jsonMode: true,
-            temperature: 0.3,
-            maxTokens: 600,
-            spend,
-        }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('AI summary request timed out')), REQUEST_TIMEOUT_MS)),
-    ]);
+    const result = await withTimeout(provider.chat({
+        systemPrompt: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: userMessage }],
+        jsonMode: true,
+        temperature: 0.3,
+        maxTokens: 600,
+        spend,
+    }), REQUEST_TIMEOUT_MS, 'AI summary request timed out');
     return parseSummary(result && result.content);
 }
 
@@ -179,7 +177,7 @@ async function summarizeTask({ companyId, uid, taskId, force = false, keptOnly =
         if (keptOnly) return { status: true, data: { summary: '', commentCount: total, updatedAt: '', cached: false, pending: true } };
 
         const names = await resolveNames(companyId, comments.map((c) => c.userId));
-        const summary = await askModel(buildThread({ task, comments, names }), { feature: FEATURES.TASK_SUMMARY, companyId });
+        const summary = await askModel(buildThread({ task, comments, names }), { feature: FEATURES.TASK_SUMMARY, companyId, userId: uid });
         if (!summary) return { status: false, reason: 'no summary returned' };
 
         const made = await values.keep(companyId, { taskId, kind: values.SUMMARY, value: summary, basis: total, madeBy: uid });

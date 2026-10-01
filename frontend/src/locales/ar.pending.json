@@ -1765,6 +1765,7 @@
     "Ask.post_posting": "Posting…",
     "Ask.post_title": "Post this answer to chat",
     "Ask.post_to_chat": "Post to chat",
+    "Ask.post_too_many_readers": "More than {n} people can read this channel, so what they can all open is not worked out and an answer with sources cannot be posted here. Pick a smaller channel or a direct message.",
     "Ask.post_where": "Post in",
     "Ask.reason_call_participant": "You can see this because you took part in the call.",
     "Ask.reason_company_page": "Company-wide page, visible to everyone in the workspace.",

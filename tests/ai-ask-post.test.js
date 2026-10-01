@@ -252,7 +252,7 @@ describe('the conversations an answer can be posted to', () => {
     it('leaves out a channel in the trash and a direct message with someone who has left', async () => {
         mockDb.store[SCHEMA_TYPE.SPRINTS].find((s) => s._id === CHANNEL).deletedStatusKey = 1;
         mockDb.store[SCHEMA_TYPE.COMPANY_USERS].find((seat) => seat.userId === BOB).status = 3;
-        expect((await targets(ALICE)).body.data).toEqual({ channels: [], directs: [] });
+        expect((await targets(ALICE)).body.data).toEqual({ channels: [], directs: [], readerCap: 50 });
     });
 
     it('refuses a token limited to some projects', async () => {

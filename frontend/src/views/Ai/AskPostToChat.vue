@@ -30,7 +30,7 @@
                     <p v-else-if="!targets.length" class="ah-empty" data-test="post-none">{{ $t(loadFailed ? 'Ask.post_load_failed' : 'Ask.post_none') }}</p>
                     <label v-else class="ah-field">
                         <span class="ah-label">{{ $t('Ask.post_where') }}</span>
-                        <select ref="picker" v-model="chosen" class="ah-input" data-test="post-target" :disabled="busy" @change="held = null">
+                        <select ref="picker" v-model="chosen" class="ah-input" data-test="post-target" :disabled="busy" @change="held = null; refused = ''">
                             <optgroup v-if="channels.length" :label="$t('Ask.post_channels')">
                                 <option v-for="target in channels" :key="target.key" :value="target.key">{{ target.label }}</option>
                             </optgroup>
@@ -40,7 +40,8 @@
                         </select>
                     </label>
 
-                    <div v-if="held" class="ask-post__held" role="alert" data-test="post-held">
+                    <p v-if="tooMany" class="ask-post__held" role="alert" data-test="post-too-many">{{ $t('Ask.post_too_many_readers', { n: readerCap }) }}</p>
+                    <div v-else-if="held" class="ask-post__held" role="alert" data-test="post-held">
                         <p>{{ $t('Ask.post_held', { n: held.unshared, name: target.label }) }}</p>
                         <p v-if="held.unsharedCited.length" class="ah-small">{{ $t('Ask.post_held_cited', { refs: held.unsharedCited.join(', ') }) }}</p>
                         <p class="ah-small">{{ $t(held.postable ? 'Ask.post_held_choice' : 'Ask.post_nothing_shared') }}</p>
@@ -54,7 +55,7 @@
                     <button v-if="held && held.postable" type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="post-only-shared" :disabled="busy" @click="send(true)">
                         {{ busy ? $t('Ask.post_posting') : $t('Ask.post_only_shared') }}
                     </button>
-                    <button v-else-if="!held" type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="post-send" :disabled="!target || busy" @click="send(false)">
+                    <button v-else-if="!held" type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="post-send" :disabled="!target || busy || tooMany" @click="send(false)">
                         {{ busy ? $t('Ask.post_posting') : $t('Ask.post_action') }}
                     </button>
                 </div>
@@ -94,10 +95,14 @@ const chosen = ref("");
 const busy = ref(false);
 const held = ref(null);
 const error = ref("");
+const readerCap = ref(0);
+const refused = ref("");
 
 const keyOf = (row) => `${row.projectId}:${row.sprintId}:${row.taskId}`;
 const targets = computed(() => [...channels.value, ...directs.value]);
 const target = computed(() => targets.value.find((row) => row.key === chosen.value) || null);
+/* Nothing counts as shared among that many readers, so the dialog says it before the person tries. */
+const tooMany = computed(() => Boolean(target.value) && (target.value.tooManyReaders === true || refused.value === target.value.key));
 
 const ERROR_KEYS = { share_refused: "Ask.post_expired", nothing_shared: "Ask.post_nothing_shared" };
 
@@ -106,6 +111,7 @@ const load = async () => {
         const res = await apiRequest("get", env.AI_ASK_POST_TARGETS);
         const data = res?.data?.status ? res.data.data || {} : null;
         loadFailed.value = !data;
+        readerCap.value = Number(data && data.readerCap) || 0;
         channels.value = ((data && data.channels) || []).map((row) => ({ ...row, key: keyOf(row), label: row.space ? `#${row.name} · ${row.space}` : `#${row.name}` }));
         directs.value = ((data && data.directs) || []).map((row) => ({ ...row, key: keyOf(row), label: row.name }));
     } catch {
@@ -119,7 +125,7 @@ const load = async () => {
 };
 
 const send = async (onlyShared) => {
-    if (!target.value || busy.value) return;
+    if (!target.value || busy.value || tooMany.value) return;
     busy.value = true;
     error.value = "";
     try {
@@ -137,6 +143,11 @@ const send = async (onlyShared) => {
             $toast.success(t("Ask.post_done", { name: label }), { position: "top-right" });
             emit("posted", { ...target.value, id: body.data && body.data.id });
             emit("close");
+            return;
+        }
+        if (body.code === "too_many_readers") {
+            readerCap.value = Number(body.data && body.data.readerCap) || readerCap.value;
+            refused.value = target.value.key;
             return;
         }
         if (body.code === "not_shared" && body.data) {
@@ -160,5 +171,5 @@ onMounted(load);
 <style>
 @import "./style.css";
 .ask-post__held { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: var(--r-input); background: var(--warn-bg); color: var(--warn-ink); font: var(--text-small); }
-.ask-post__held p { margin: 0; }
+.ask-post__held p, p.ask-post__held { margin: 0; }
 </style>
