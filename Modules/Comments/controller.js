@@ -96,8 +96,12 @@ exports.save = async (req, res) => {
             ? await require("../AI/aiMention").acceptFromComment(req, companyId, response)
                 .catch((err) => { logger.error(`[ai-mention] not accepted: ${err.message}`); return null; })
             : null;
+        const agents = response && response._id
+            ? await Promise.resolve().then(() => require("../Agents/chatAgents").fromChatMessage(req, companyId, response))
+                .catch((err) => { logger.error(`[agent-chat] not started: ${err.message}`); return null; })
+            : null;
         if (response) {
-            return res.status(200).json({ status: true, data: response || {}, ...(ai ? { ai } : {}) });
+            return res.status(200).json({ status: true, data: response || {}, ...(ai ? { ai } : {}), ...(agents ? { agents: agents.agents } : {}) });
         } else {
             return res.status(404).json({ status: false });
         }

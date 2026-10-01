@@ -20,13 +20,15 @@ const asObjectIds = (ids) => ids
 /* A task comment is visible where its task is, whatever project id the comment row carries. */
 const onVisibleTasks = async (companyId, comments, projectIds, sprintClause) => {
     const taskIds = asObjectIds([...new Set(comments.map((comment) => comment.taskId).filter(Boolean).map(String))]);
-    if (!taskIds.length) return comments.filter((comment) => !comment.taskId);
+    if (!taskIds.length) return comments.filter((comment) => !comment.taskId).map((comment) => ({ comment, task: null }));
     const tasks = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS,
-        data: [{ _id: { $in: taskIds }, ProjectID: { $in: projectIds }, ...sprintClause }, '_id'],
+        data: [{ _id: { $in: taskIds }, ProjectID: { $in: projectIds }, ...sprintClause }, 'TaskKey TaskName folderObjId'],
     }, 'find');
-    const visible = new Set((tasks || []).map((task) => String(task._id)));
-    return comments.filter((comment) => !comment.taskId || visible.has(String(comment.taskId)));
+    const visible = new Map((tasks || []).map((task) => [String(task._id), task]));
+    return comments
+        .filter((comment) => !comment.taskId || visible.has(String(comment.taskId)))
+        .map((comment) => ({ comment, task: comment.taskId ? visible.get(String(comment.taskId)) : null }));
 };
 
 const toTaskRow = (task) => {
@@ -150,12 +152,15 @@ exports.globalSearch = async (req, res) => {
             data: {
                 tasks: (tasks || []).map(toTaskRow),
                 projects: projectResults,
-                comments: visibleComments.map((comment) => ({
+                comments: visibleComments.map(({ comment, task }) => ({
                     _id: comment._id,
                     message: truncate(comment.message),
                     taskId: comment.taskId,
                     projectId: comment.projectId,
                     sprintId: comment.sprintId,
+                    folderObjId: task ? task.folderObjId : undefined,
+                    taskKey: task ? task.TaskKey : undefined,
+                    taskName: task ? task.TaskName : undefined,
                 })),
                 pages: (pages || []).map((page) => ({
                     _id: page._id,

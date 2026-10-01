@@ -89,6 +89,26 @@
                         <span class="ah-small">{{ $t('Settings.capacity_unit') }}</span>
                     </div>
                 </div>
+                <div class="ms__wh-row ms__wh-row--units" role="group" aria-labelledby="ms-unit-cap-label">
+                    <span class="ms__wh-label" id="ms-unit-cap-label">{{ $t('Settings.workload_capacity') }}</span>
+                    <div v-for="u in CAPACITY_UNITS" :key="u" class="ms__cap" role="group" :aria-label="u === 'points' ? $t('Settings.capacity_points') : $t('Settings.capacity_count')">
+                        <input
+                            :id="`ms-cap-${u}`"
+                            class="ah-input ms__cap-input"
+                            type="number"
+                            min="0"
+                            max="1000"
+                            step="1"
+                            v-model.number="unitCapacity[u].value"
+                        />
+                        <label class="ah-small" :for="`ms-cap-${u}`">{{ u === 'points' ? $t('Settings.capacity_points') : $t('Settings.capacity_count') }}</label>
+                        <select class="ah-input ms__cap-per" v-model="unitCapacity[u].per" :aria-label="$t('Settings.capacity_period')">
+                            <option value="day">{{ $t('Settings.capacity_per_day') }}</option>
+                            <option value="week">{{ $t('Settings.capacity_per_week') }}</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="ah-small ms__unit-hint">{{ $t('Settings.workload_capacity_hint') }}</div>
                 <div v-if="errors.workingHours" class="ah-field__error">{{ errors.workingHours }}</div>
             </div>
         </section>
@@ -251,7 +271,8 @@ import * as env from "@/config/env";
 import timeZoneOption from "./timezoneArray.js";
 import languageOptions from "@/utils/languagesName.json";
 import { useGetterFunctions, languageTranslateHelper } from "@/composable";
-import { apiRequestWithoutCompnay } from "@/services";
+import { apiRequest, apiRequestWithoutCompnay } from "@/services";
+import { unitCapacity as cleanUnitCapacity } from "@/views/Projects/WorkloadView/workloadUnits";
 import { storageQueryBuilder, generateFileName } from "@/utils/storageQueryBuild.js";
 import { shellState, applyTheme, applyContrast } from "@/components/organisms/Shell/shellState.js";
 import { openShortcutSheet, shortcutPrefs } from "@/composable/shortcuts";
@@ -276,6 +297,8 @@ const { selectedLanguageCode, changeLanguage } = languageTranslateHelper();
 const userId = inject("$userId");
 
 const DEFAULT_HOURS = { days: [1, 2, 3, 4, 5], start: "09:30", end: "18:00", capacity: 8 };
+const CAPACITY_UNITS = ["points", "count"];
+const MAX_UNIT_CAPACITY = 1000;
 
 const isSpinner = ref(false);
 const savedAt = ref(0);
@@ -286,6 +309,7 @@ const timezoneArray = ref(timeZoneOption);
 const errors = ref({ firstName: "", lastName: "", workingHours: "" });
 const formData = ref({ firstName: "", lastName: "", email: "", Employee_profileImage: "", Employee_profileImageURL: "", Time_Zone: "Asia/Kolkata", Time_Format: "12" });
 const workingHours = ref({ ...DEFAULT_HOURS, days: [...DEFAULT_HOURS.days] });
+const unitCapacity = ref(cleanUnitCapacity());
 const sessions = ref([]);
 const sessionsLoading = ref(false);
 const sessionsError = ref("");
@@ -361,11 +385,24 @@ function init() {
         end: wh.end || DEFAULT_HOURS.end,
         capacity: Number.isFinite(Number(wh.capacity)) ? Number(wh.capacity) : DEFAULT_HOURS.capacity
     };
+    unitCapacity.value = cleanUnitCapacity(companyUser.value.workloadCapacity);
 }
 
 function toggleDay(value) {
     const i = workingHours.value.days.indexOf(value);
     if (i === -1) workingHours.value.days.push(value); else workingHours.value.days.splice(i, 1);
+}
+
+const validCapacity = (value) => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= MAX_UNIT_CAPACITY;
+
+async function saveUnitCapacity() {
+    const next = cleanUnitCapacity(unitCapacity.value);
+    if (JSON.stringify(next) === JSON.stringify(cleanUnitCapacity(companyUser.value.workloadCapacity))) return;
+    const response = await apiRequest("put", env.WORKLOAD_CAPACITY, next);
+    if (!response?.data?.status) throw new Error(response?.data?.statusText || t("Toast.something_went_wrong"));
+    if (companyUser.value._id) {
+        commit("settings/mutateCompanyUsers", { data: { ...companyUser.value, workloadCapacity: response.data.data, isCurrentUser: true }, op: "modified" });
+    }
 }
 
 function validate() {
@@ -374,6 +411,7 @@ function validate() {
     if (!formData.value.lastName) errors.value.lastName = t("Settings.required_field");
     if (!workingHours.value.start || !workingHours.value.end || workingHours.value.end <= workingHours.value.start) errors.value.workingHours = t("Settings.hours_invalid");
     else if (!workingHours.value.days.length) errors.value.workingHours = t("Settings.days_required");
+    else if (CAPACITY_UNITS.some((u) => !validCapacity(unitCapacity.value[u].value))) errors.value.workingHours = t("Settings.capacity_invalid");
     return !errors.value.firstName && !errors.value.lastName && !errors.value.workingHours;
 }
 
@@ -428,6 +466,7 @@ async function saveChanges() {
         };
         const response = await apiRequestWithoutCompnay("put", env.USER_UPATE, { userId: userId.value, updateObject: { $set }, newObj: { returnDocument: "after" } });
         if (response?.data?.data) commit("users/mutateUsers", { data: response.data.data, op: "modified" });
+        await saveUnitCapacity();
         savedAt.value = Date.now();
         $toast.success(t("Toast.Profile_updated_successfully"), { position: "top-right" });
     } catch (error) {

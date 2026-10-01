@@ -60,7 +60,7 @@
                         <span class="pd__k">{{ $t('Docs.project') }}</span>
                         <span class="ah-chip">{{ projectName }}</span>
                     </span>
-                    <button type="button" class="pd__prop pd__prop--btn" :title="isPrivate ? $t('Projects.doc_private_hint') : $t('Projects.doc_shared_hint')" @click="togglePrivate">
+                    <button type="button" class="pd__prop pd__prop--btn" :disabled="privateLocked" :title="privateHint" @click="togglePrivate">
                         <span class="pd__k">{{ $t('Docs.visibility') }}</span>
                         <span class="ah-chip" :class="{ 'ah-chip--warn': isPrivate }">
                             <ShellIcon :name="isPrivate ? 'lock' : 'members'" :size="11" />{{ isPrivate ? $t('Docs.private') : $t('Docs.shared') }}
@@ -146,7 +146,7 @@
                                 <div class="pd__share-label">{{ isPrivate ? $t('Docs.private') : $t('Docs.shared') }}</div>
                                 <div class="ah-small">{{ isPrivate ? $t('Projects.doc_private_hint') : $t('Projects.doc_shared_hint') }}</div>
                             </div>
-                            <button type="button" class="pd__switch" :class="{ 'is-on': !isPrivate }" @click="togglePrivate"><i></i></button>
+                            <button type="button" class="pd__switch" :class="{ 'is-on': !isPrivate }" :disabled="privateLocked" :title="privateLocked ? privateHint : null" @click="togglePrivate"><i></i></button>
                         </div>
                         <div class="pd__share-row">
                             <ShellIcon name="globe" :size="16" class="pd__share-ico" />
@@ -179,7 +179,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, inject, onBeforeUnmount, onMounted, ref, unref, watch } from 'vue';
 import { canUseAi } from "@/composable/aiAvailability";
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
@@ -205,6 +205,7 @@ const { t } = useI18n();
 const $toast = useToast();
 const store = useStore();
 const { getUser } = useGetterFunctions();
+const userId = inject('$userId', '');
 
 const props = defineProps({
     pageId: { type: String, default: '' },
@@ -250,6 +251,12 @@ const isWiki = computed(() => Boolean(page.value && page.value.isWiki));
 const reviewStateValue = computed(() => (page.value && page.value.reviewState) || 'none');
 const needsAttention = computed(() => isWiki.value && (reviewStateValue.value === 'due' || reviewStateValue.value === 'stale'));
 const isPublic = computed(() => !!share.value && share.value.enabled !== false);
+// The server lets only the author make a doc private: nobody else could read it afterwards.
+const privateLocked = computed(() => !isPrivate.value && String((page.value && page.value.createdBy) || '') !== String(unref(userId) || ''));
+const privateHint = computed(() => {
+    if (privateLocked.value) return t('Projects.doc_private_author_only');
+    return isPrivate.value ? t('Projects.doc_private_hint') : t('Projects.doc_shared_hint');
+});
 const shareUrl = computed(() => (share.value ? `${window.location.origin}/share/${share.value.token}` : ''));
 
 // Saving is deliberate: Save button or Ctrl/Cmd+S, never an autosave.
@@ -449,6 +456,7 @@ function unlinkTask(id) {
 }
 
 function togglePrivate() {
+    if (privateLocked.value) return;
     isPrivate.value = !isPrivate.value;
     persistMeta({ visibility: isPrivate.value ? 'private' : 'project' });
     // Going private takes the doc off the web too.
@@ -649,6 +657,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 .pd__props { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2); }
 .pd__prop { display: inline-flex; align-items: center; gap: 6px; }
 .pd__prop--btn { border: 0; background: transparent; padding: 0; cursor: pointer; font: inherit; color: inherit; }
+.pd__prop--btn:disabled { opacity: .6; cursor: not-allowed; }
 .pd__prop--wrap { flex-wrap: wrap; }
 .pd__prop--muted { margin-left: auto; }
 .pd__k { color: var(--ink-label); }

@@ -1,7 +1,7 @@
 <template>
-    <span class="aim" :class="{ 'aim--text': showText }">
-        <span class="aim__mark" data-ai-mark :title="tooltip">
-            <span aria-hidden="true">✦</span>
+    <span class="aim" :class="{ 'aim--text': showText, 'aim--failed': failure }">
+        <span class="aim__mark" data-ai-mark :data-ai-failed="failure ? '' : null" :title="tooltip">
+            <span aria-hidden="true">{{ failure ? '!' : '✦' }}</span>
             <span :class="showText ? 'aim__text' : 'ah-sr-only'">{{ tooltip }}</span>
         </span>
         <button
@@ -9,8 +9,8 @@
             type="button"
             class="aim__fill"
             data-ai-fill
-            :aria-label="$t('AiFields.fill_with_ai')"
-            :title="$t('AiFields.fill_with_ai')"
+            :aria-label="fillLabel"
+            :title="fillLabel"
             @click.stop="fill"
         >
             <ShellIcon name="ai" :size="12" aria-hidden="true" />
@@ -25,7 +25,7 @@ import moment from "moment";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { canUseAi } from "@/composable/aiAvailability";
 import { openAiFill } from "@/composable/aiFieldFill";
-import { aiFillOf } from "@/views/Projects/composables/aiFields";
+import { aiFillFailure, aiFillOf } from "@/views/Projects/composables/aiFields";
 
 defineOptions({ name: "AiFieldMark" });
 
@@ -42,7 +42,14 @@ const project = inject("selectedProject", null);
 
 const aiOn = computed(() => canUseAi(project?.value ? { project: project.value } : {}));
 
+const failure = computed(() => aiFillFailure(props.task, props.def));
+const fillLabel = computed(() => t(failure.value ? "AiFields.retry_fill" : "AiFields.fill_with_ai"));
+
 const tooltip = computed(() => {
+    if (failure.value) {
+        const failedAt = moment(failure.value.at);
+        return t("AiFields.fill_failed_on", { date: failedAt.isValid() ? failedAt.format(dateFormat.value) : "" });
+    }
     const last = aiFillOf(props.task, props.def);
     const at = last?.at ? moment(last.at) : null;
     if (!at || !at.isValid()) return t("AiFields.ai_field_hint");
@@ -66,6 +73,8 @@ function fill() {
 .aim__fill:hover { background: var(--surface-hover); color: var(--brand); }
 .aim__fill:focus-visible { opacity: 1; outline: none; box-shadow: var(--focus); }
 [role="row"]:hover .aim__fill, [role="row"]:focus-within .aim__fill, .aim:hover .aim__fill, .aim--text .aim__fill { opacity: 1; }
+.aim--failed .aim__mark, .aim--failed .aim__text { color: var(--danger); font-weight: 600; }
+.aim--failed .aim__fill { opacity: 1; color: var(--danger); }
 .aim--text { gap: 6px; }
 .aim__text { margin-left: 4px; color: var(--ink-2); font-size: 11.5px; }
 @media (max-width: 767px) {

@@ -116,11 +116,11 @@ import moment from "moment";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import taskClass from "@/utils/TaskOperations";
-import { useCustomComposable, useGetterFunctions } from "@/composable";
+import { useGetterFunctions } from "@/composable";
 import { taskPlanPermission } from "@/composable/commonFunction";
 import { useFocusTrap } from "@/composable/useFocusTrap";
 import { bindShortcut } from "@/composable/shortcuts";
-import { mutateArrangeProjectRules } from "@/store/Settings/mutations";
+import { useOtherProjectRules } from "@/composable/otherProjectRules";
 import { usePersonalList } from "@/components/molecules/Home/usePersonalList";
 import { openTask } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 import { isMacPlatform } from "@/components/molecules/AdvanceSearch/paletteKeys";
@@ -150,7 +150,7 @@ const DONE_MS = 6000;
 const { t } = useI18n();
 const route = useRoute();
 const { getters, commit } = useStore();
-const { checkPermission } = useCustomComposable();
+const { check, loadAll: loadProjectRules } = useOtherProjectRules();
 const { getUser } = useGetterFunctions();
 const { checkTaskPerSprintPermisssion } = taskPlanPermission();
 const companyId = inject("$companyId");
@@ -179,7 +179,6 @@ const personalSprint = ref(null);
 const templates = ref([]);
 const templateId = ref("");
 const prefilled = reactive({ name: "", due: "", priority: "" });
-const projectRules = reactive({});
 
 let prepared = Promise.resolve();
 let listsLoaded = Promise.resolve();
@@ -191,32 +190,6 @@ const modEnter = isMacPlatform() ? "⌘↵" : t("QuickCreate.key_ctrl_enter");
 const me = computed(() => String(userId?.value || ""));
 const cid = computed(() => String(companyId?.value || ""));
 const allProjects = computed(() => getters["projectData/allProjects"]?.data || []);
-
-const storeRulesFor = (pid) => (getters["settings/projectRawRules"] || []).some((r) => String(r.projectId) === String(pid));
-
-/* Project-specific permissions live in one store slot that belongs to the project on screen,
- * so any other project's rules are read into a local copy instead of replacing that slot. */
-function check(path, project) {
-    if (project.isGlobalPermission !== false) return checkPermission(path, true);
-    if (storeRulesFor(project._id)) return checkPermission(path, false);
-    const rules = projectRules[project._id];
-    if (!rules) return null;
-    return checkPermission(path, false, {
-        gettersVal: { "settings/companyUserDetail": getters["settings/companyUserDetail"], "settings/projectRules": rules, "settings/rules": getters["settings/rules"] }
-    });
-}
-
-function loadProjectRules(project) {
-    const pid = String(project._id);
-    if (projectRules[pid] || storeRulesFor(pid)) return Promise.resolve();
-    return apiRequest("get", `${env.PROJECTRULES}/${pid}`)
-        .then((res) => {
-            const scratch = {};
-            mutateArrangeProjectRules(scratch, { op: "added", data: Array.isArray(res?.data) ? res.data : [], projectId: pid });
-            projectRules[pid] = scratch.projectRules || {};
-        })
-        .catch((e) => console.error("ERROR in quick create project rules: ", e));
-}
 
 const options = computed(() => creatableProjects(allProjects.value, check));
 const project = computed(() => options.value.find((p) => String(p._id) === String(projectId.value)) || null);
@@ -251,8 +224,7 @@ function prepare() {
     const personal = personalList.ensure()
         .then((res) => { personalSprint.value = res?.sprint || null; })
         .catch((e) => console.error("ERROR in quick create personal list: ", e));
-    const rules = allProjects.value.filter((p) => p.isGlobalPermission === false).map(loadProjectRules);
-    return Promise.all([personal, ...rules]).finally(() => {
+    return Promise.all([personal, loadProjectRules(allProjects.value)]).finally(() => {
         preparing.value = false;
         if (!quickCreate.open) return;
         projectId.value = pickDefaultProject({

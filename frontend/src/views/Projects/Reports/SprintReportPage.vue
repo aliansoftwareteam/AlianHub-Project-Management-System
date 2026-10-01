@@ -103,6 +103,7 @@ import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import ReportsTabs from './ReportsTabs.vue';
 import ProvenanceRollup from '@/components/molecules/Provenance/ProvenanceRollup.vue';
+import { burndownSeries as chartSeries, burndownOptions as chartOptions, fetchBurndown, fetchSprints } from './composables/agileReports';
 
 defineOptions({ name: 'SprintReportPage' });
 
@@ -220,10 +221,7 @@ const focusList = computed(() => {
 
 const burndownDays = computed(() => ((burndown.value && burndown.value.days) || []).filter((d) => d));
 
-const burndownSeries = computed(() => [
-    { name: t('Reports.remaining'), data: burndownDays.value.map((d) => (d.remainingPoints === null ? null : Number(d.remainingPoints) || 0)) },
-    { name: t('Reports.ideal'), data: burndownDays.value.map((d) => Number(d.idealPoints) || 0) },
-]);
+const burndownSeries = computed(() => chartSeries(burndownDays.value, { remaining: t('Reports.remaining'), ideal: t('Reports.ideal') }));
 
 const scopeMarkers = computed(() => {
     const byDay = {};
@@ -245,21 +243,7 @@ const scopeMarkers = computed(() => {
         }));
 });
 
-const burndownOptions = computed(() => ({
-    chart: { id: 'sprint-burndown', toolbar: { show: false }, animations: { enabled: false }, fontFamily: 'Inter Tight, sans-serif' },
-    // Remaining is the data series and stays literal. The ideal line is a reference
-    // rule, not data, so reportsV2.css strokes it from a token — a literal black tint
-    // vanished on a dark card.
-    colors: ['#2F3990', 'transparent'],
-    stroke: { width: [2.5, 1.5], dashArray: [0, 5], curve: 'straight' },
-    dataLabels: { enabled: false },
-    markers: { size: 0 },
-    xaxis: { categories: burndownDays.value.map((d) => d.date), labels: { rotate: -45, hideOverlappingLabels: true, style: { fontSize: '10px' } }, tooltip: { enabled: false } },
-    yaxis: { min: 0, labels: { style: { fontSize: '10px' } } },
-    legend: { position: 'top', horizontalAlign: 'right', fontSize: '11px' },
-    annotations: { xaxis: scopeMarkers.value },
-    tooltip: { shared: true },
-}));
+const burndownOptions = computed(() => chartOptions(burndownDays.value, { markers: scopeMarkers.value }));
 
 const scopeGrowthPct = computed(() => {
     const committed = pts(report.value && report.value.committed);
@@ -320,8 +304,7 @@ const loadSprints = async () => {
     sprintId.value = '';
     if (!projectId.value) return;
     try {
-        const res = await apiRequest('get', `/api/v1/${env.GET_SPRINT_OR_PROJECT}/${projectId.value}?collection=sprints`);
-        sprints.value = res?.data?.data || res?.data || [];
+        sprints.value = await fetchSprints(projectId.value);
     } catch (e) { sprints.value = []; }
     if (sprintOptions.value.length) sprintId.value = sprintOptions.value[0]._id;
 };
@@ -338,13 +321,13 @@ const loadReport = async () => {
     const [rep, ins, burn, hrs] = await Promise.allSettled([
         apiRequest('get', `/api/v2/sprints/report?sprintId=${id}`),
         apiRequest('get', `${env.AGILE_SPRINT_INSIGHTS}?sprintId=${id}`),
-        apiRequest('get', `${env.AGILE_BURNDOWN}?sprintId=${id}`),
+        fetchBurndown(sprintId.value),
         apiRequest('post', env.SPRINT_HOURS, { sprintId: sprintId.value }),
     ]);
     if (rep.status === 'fulfilled' && rep.value?.data?.status) report.value = rep.value.data.data;
     else error.value = (rep.status === 'fulfilled' && rep.value?.data?.statusText) || t('Reports.load_failed');
     if (ins.status === 'fulfilled' && ins.value?.data?.status) insights.value = ins.value.data.data;
-    if (burn.status === 'fulfilled' && burn.value?.data?.status) burndown.value = burn.value.data.data;
+    if (burn.status === 'fulfilled') burndown.value = burn.value;
     if (hrs.status === 'fulfilled' && hrs.value?.data?.status) hours.value = hrs.value.data.data;
     loading.value = false;
 };

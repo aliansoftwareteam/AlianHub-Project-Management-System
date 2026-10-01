@@ -51,6 +51,7 @@
                             class="mc-comp-input-wrap"
                             :reply="{}"
                             :userIds="userIds"
+                            :agents="agents"
                             :sendMessageAllowed="!disabled"
                             :loadingChat="false"
                             aiMention
@@ -147,6 +148,7 @@ const props = defineProps({
     disabled: { type: Boolean, default: false },
     disabledReason: { type: String, default: '' },
     userIds: { type: Array, default: () => [] },
+    agents: { type: Array, default: () => [] },
     conversationKey: { type: String, default: '' },
     placeholder: { type: String, default: '' },
 });

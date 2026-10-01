@@ -84,6 +84,11 @@
 .cs-hash { color: inherit; opacity: .75; width: 9px; text-align: center; flex: none; }
 .cs-row-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cs-row-dnd { font-weight: 400; color: var(--ink-2); }
+.cs-agent { flex: none; width: 16px; height: 16px; font-size: 9px; }
+.cs-agent-tag {
+    flex: none; font: 600 9px/1 var(--font-mono); padding: 2px 5px; border-radius: 4px;
+    background: var(--brand-tint); color: var(--brand); letter-spacing: .04em;
+}
 .cs-lock { color: var(--ink-2); flex: none; }
 .cs-count { font: 700 11px/1 var(--font-mono); color: var(--ink); flex: none; }
 .cs-row.is-active .cs-count { color: var(--brand); }
