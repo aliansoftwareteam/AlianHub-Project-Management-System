@@ -933,7 +933,7 @@ exports.duplicateSubTaskFunction = (companyId, projectData, sprintObj, subtask, 
                             exports.addHistoryCollection(companyId, projectData, subtask, taskResult, sprintObj).catch((err) => { logger.error(`${err},ERROR IN ADD HISTORY IN SUBTASK`); })
                         }
                         if (duplicateData.includes('Comments')) {
-                            addCommentCollection(companyId, projectData, subtask, taskResult, sprintObj)
+                            addCommentCollection(companyId, projectData, subtask, taskResult, sprintObj, userData)
                             .catch((err) => { logger.error(`${err},ERROR IN ADD COMMENTS IN SUBTASK`); })
                         }
                     } catch (error) {

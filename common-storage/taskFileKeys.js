@@ -77,7 +77,23 @@ const mayAttachKey = async (companyId, task, key, actorId) => {
     return Boolean(clip) && clip.companyId === asText(companyId).toLowerCase() && clip.userId === asText(actorId).toLowerCase();
 };
 
+const TRACKSHOT = /^Project\/([a-f0-9]{24})\/Sprint\/[a-f0-9]{24}\/TimeLog\/([a-f0-9]{24})\/([^/]+)$/i;
+
+/* The desktop tracker stores a capture under the id of the timesheet row it belongs to. */
+const trackshotKey = (key) => {
+    const match = TRACKSHOT.exec(asText(key));
+    if (!match || ['.', '..'].includes(match[3])) return null;
+    return { projectId: match[1].toLowerCase(), timeSheetId: match[2].toLowerCase() };
+};
+
+const isRowTrackshotKey = (rowId, key) => {
+    const named = trackshotKey(key);
+    return Boolean(named) && named.timeSheetId === asText(rowId).toLowerCase();
+};
+
 module.exports = {
+    trackshotKey,
+    isRowTrackshotKey,
     mayAttachKey,
     isTaskStoredFile,
     clipKey,

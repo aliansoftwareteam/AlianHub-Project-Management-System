@@ -384,7 +384,7 @@ module.exports = {
                                         })
                                     }
                                     if(duplicateData.includes('Comments')){
-                                        addCommentCollection(companyId, projectData,selectedTask,taskResult,sprintObj)
+                                        addCommentCollection(companyId, projectData,selectedTask,taskResult,sprintObj,userData)
                                         .catch((error) => {
                                             logger.error(`ERROR IN ADD COMMENTS:${error}`)
                                         })
