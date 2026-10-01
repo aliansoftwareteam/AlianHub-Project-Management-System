@@ -12,6 +12,7 @@ const { isTaskFieldOf } = require('../../CustomField/helpers/fieldValueInput');
 const { recordFieldCreated } = require('../../CustomField/helpers/customFieldHistory');
 const { escapeCommentText } = require('../../Comments/helpers/plainText');
 const { findCompanyMembers } = require('./companyMembers');
+const { MAX_COMMENT_LENGTH, saveImportedComments } = require('./importComments');
 const { transformClickUpRows } = require('./clickupRules');
 const { fieldDefinitionFrom, namedPeople } = require('./clickupFields');
 const { planClickUpList, stateAfter, mergeSummaries, fieldsSummary } = require('./clickupPlan');
@@ -23,7 +24,6 @@ const EVERYTHING = Object.freeze({ fields: true, comments: true });
 const SOURCE = 'clickup';
 const LINK_KIND = 'link';
 const LINKS_HEADING = 'Attachments in ClickUp:';
-const MAX_COMMENT_LENGTH = 10000;
 
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
 const lower = (value) => String(value === undefined || value === null ? '' : value).trim().toLowerCase();
@@ -128,54 +128,22 @@ const saveLinks = async (companyId, rows, actorId) => {
     return saved;
 };
 
-const threadOf = (project, sprint, row) => ({
-    projectId: oid(project._id),
-    taskId: oid(row.createdTaskId),
-    sprintId: oid(sprint.id),
-    project: false,
-    ...(sprint.folderId ? { folderId: oid(sprint.folderId) } : {}),
-});
-
-const commentOf = (comment, { authorIdByEmail, actorId }) => {
-    const authorId = authorIdByEmail.get(comment.email);
-    const text = authorId || !comment.author ? comment.text : `${comment.author}: ${comment.text}`;
-    return {
-        message: escapeCommentText(text.slice(0, MAX_COMMENT_LENGTH)),
-        userId: authorId || actorId,
-        type: 'text',
-        importedFrom: SOURCE,
-        ...(comment.at ? { createdAt: new Date(comment.at) } : {}),
-    };
-};
-
 /* The task panel shows a link that a comment carries; the links stored on the task are not drawn there. */
 const linksComment = (links, actorId) => ({
     message: escapeCommentText([LINKS_HEADING, ...links.map((link) => (link.label === link.url ? link.url : `${link.label}: ${link.url}`))].join('\n').slice(0, MAX_COMMENT_LENGTH)),
     userId: actorId,
     type: 'link',
-    importedFrom: SOURCE,
 });
 
-/* Imported comments are history, not news: saved without the socket emit, the unread counts, the mention notices and
- * the agent starts a comment written in the app sets off. A comment carries text alone, never a file. */
-const saveComments = async (companyId, { project, sprint, rows, people, actorId }) => {
-    let saved = 0;
-    for (const row of rows) {
-        if (!row.createdTaskId) continue;
-        const thread = threadOf(project, sprint, row);
-        const save = (comment) => MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: { ...comment, ...thread } }, 'save');
-        for (const comment of row.comments || []) {
-            try {
-                await save(commentOf(comment, { authorIdByEmail: people.authorIdByEmail, actorId }));
-                saved += 1;
-            } catch (error) {
-                failed(`comment on task ${row.createdTaskId} not saved`)(error);
-            }
-        }
-        if (Array.isArray(row.links) && row.links.length) await save(linksComment(row.links, actorId)).catch(failed(`links comment on task ${row.createdTaskId} not saved`));
-    }
-    return saved;
-};
+const saveComments = (companyId, { project, sprint, rows, people, actorId }) => saveImportedComments(companyId, {
+    source: SOURCE,
+    project,
+    sprint,
+    rows,
+    actorId,
+    authorIdByEmail: people.authorIdByEmail,
+    extraFor: (row) => (Array.isArray(row.links) && row.links.length ? [linksComment(row.links, actorId)] : []),
+});
 
 /* Plans the import of one list against the project as it is, saves the field definitions, and puts the field values
  * and assignees on the tasks. `afterCreate` writes what needs the created task ids and answers the final summary. */
