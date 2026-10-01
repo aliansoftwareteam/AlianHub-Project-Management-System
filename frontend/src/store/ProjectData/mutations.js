@@ -997,6 +997,7 @@ export const mutateSearchedProjects = (state,payload) => {
                                 legacyId : folder?.legacyId ? folder?.legacyId : '',
                                 id: folder._id,
                                 _id: folder._id,
+                                parentFolderId: folder.parentFolderId || null,
                                 isExpanded: true
                             };
                         }

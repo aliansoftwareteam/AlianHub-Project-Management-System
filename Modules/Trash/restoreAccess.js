@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { canEditProject, DELETE_OR_CLOSE } = require('../../Config/projectAccess');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const { canSeeSprintById } = require('../Sprints/helpers/sprintVisibility');
+const { readsCompanyWide } = require('../Tasks/helpers/taskQueryGuard');
 const logger = require('../../Config/loggerConfig');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -30,8 +31,8 @@ const RESTORABLE = {
     tasks: {
         permission: ['task.task_delete'],
         locate: async (companyId, id) => {
-            const task = await storedRecord(companyId, SCHEMA_TYPE.TASKS, id, { ProjectID: 1, sprintId: 1 });
-            return task && { projectId: task.ProjectID, sprintId: task.sprintId };
+            const task = await storedRecord(companyId, SCHEMA_TYPE.TASKS, id, { ProjectID: 1, sprintId: 1, mainChat: 1, AssigneeUserId: 1 });
+            return task && { projectId: task.ProjectID, sprintId: task.sprintId, task };
         },
     },
 };
@@ -54,6 +55,7 @@ const requireRestoreAccess = async (req, res, next) => {
         if (!restorable || !OBJECT_ID.test(String(id || ''))) return next();
         const place = await restorable.locate(companyId, String(id));
         if (!place) return next();
+        if (place.task && !readsCompanyWide(place.task, String(req.uid || ''), [])) return notFound(res);
 
         const privileged = isPrivileged(await getRoleType(companyId, String(req.uid || '')));
         const decision = place.projectId

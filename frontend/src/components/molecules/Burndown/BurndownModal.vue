@@ -9,7 +9,7 @@
                 <span class="font-size-13 font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
                 <select v-model="selectedSprintId" class="burndown__select font-size-13">
                     <option v-for="sprint in sprintOptions" :key="'bd-'+sprint.id" :value="sprint.id">
-                        {{ sprint.folderName ? sprint.folderName + ' / ' : '' }}{{ sprint.name }}
+                        {{ listLabel(sprint) }}
                     </option>
                 </select>
             </div>
@@ -29,6 +29,7 @@
 <script setup>
 // PACKAGES
 import { computed, defineProps, ref, watch } from "vue";
+import { folderPathLabel, listLabel } from "@/utils/folderTree";
 
 // UTILS
 import { apiRequest } from '@/services';
@@ -59,7 +60,7 @@ const sprintOptions = computed(() => {
     });
     Object.values(props.projectData?.sprintsfolders || {}).forEach((folder) => {
         Object.values(folder?.sprintsObj || {}).forEach((sprint) => {
-            if (sprint?.id) options.push({ id: sprint.id, name: sprint.name || 'Sprint', folderName: folder.folderName || '' });
+            if (sprint?.id) options.push({ id: sprint.id, name: sprint.name || 'Sprint', folderName: folder.folderName || '', folderPath: folderPathLabel(props.projectData?.sprintsfolders, folder) });
         });
     });
     return options;

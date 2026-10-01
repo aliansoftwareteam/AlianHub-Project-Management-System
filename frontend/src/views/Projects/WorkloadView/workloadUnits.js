@@ -1,3 +1,5 @@
+import { checkWorkingDays, workingDaysFor } from '@workingDays';
+
 export const WORKLOAD_UNITS = Object.freeze(['hours', 'points', 'count']);
 export const CAPACITY_PERIODS = Object.freeze(['day', 'week']);
 export const DEFAULT_UNIT_CAPACITY = Object.freeze({
@@ -31,3 +33,14 @@ export const cellLoad = (unit, mode, day) => {
 export const plannedLoad = (unit, day) => Number(unit === 'hours' ? day.estimated : day.load) || 0;
 
 export const chipSize = (unit, chip) => Number(unit === 'hours' ? chip.minutes : chip.amount) || 0;
+
+/* The week the grid was counted in: the one the server answered with, else the project's or the company's. */
+export const gridWeek = (answered, company, project) => workingDaysFor(company, checkWorkingDays(answered).ok ? { workingDays: answered } : project);
+
+const weekdayOf = (day) => {
+    const [year, month, date] = String(day).split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, date)).getUTCDay();
+};
+
+/* Days off are dropped from the grid: an empty column costs width and says nothing. */
+export const workingDaysOnly = (days, week) => (days || []).filter((day) => week.includes(weekdayOf(day)));
