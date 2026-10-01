@@ -616,6 +616,7 @@ export default {
         "clickup_how_1": "In ClickUp, open the Space, Folder or List you want to move.",
         "clickup_how_2": "Choose Export view and pick CSV or Excel, with all columns and subtasks included.",
         "clickup_how_3": "Upload the file here. Nothing is written until you confirm.",
+        "clickup_how_4": "A view export carries custom fields. The workspace export, under Settings and Imports / Exports, carries comments and checklists. Either file works here.",
         "file_label": "ClickUp export (CSV or Excel)",
         "reading": "Reading the file…",
         "file_empty": "The file has no rows.",

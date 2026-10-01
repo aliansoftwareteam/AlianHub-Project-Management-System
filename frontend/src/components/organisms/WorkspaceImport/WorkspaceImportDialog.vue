@@ -28,6 +28,7 @@
                         <li>{{ $t('WorkspaceImport.clickup_how_1') }}</li>
                         <li>{{ $t('WorkspaceImport.clickup_how_2') }}</li>
                         <li>{{ $t('WorkspaceImport.clickup_how_3') }}</li>
+                        <li>{{ $t('WorkspaceImport.clickup_how_4') }}</li>
                     </ol>
                     <label class="wim__label" for="wim-file">{{ $t('WorkspaceImport.file_label') }}</label>
                     <input id="wim-file" type="file" accept=".csv,.xlsx,.xls" class="wim__file" data-test="wim-file" @change="onFile" />
