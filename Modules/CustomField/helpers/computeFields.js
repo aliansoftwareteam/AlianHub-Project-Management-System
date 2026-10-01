@@ -5,6 +5,7 @@
 'use strict';
 
 const { evaluateFormula, aggregate, computeFormulaValues } = require('./formula');
+const { fieldAppliesToTask } = require('./fieldTaskTypes');
 
 const COMPUTED_TYPES = ['formula', 'rollup'];
 
@@ -45,15 +46,42 @@ function builtinScope(task, subtasks) {
     return scope;
 }
 
+/* The rows under a task on every level, each once. ParentTaskId is followed rather than the
+ * stored chain, so a row written before chains existed is found and a stale chain adds nothing. */
+function descendantsOf(task, rows) {
+    const byParent = new Map();
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+        if (!row || !row.ParentTaskId) return;
+        const parent = String(row.ParentTaskId);
+        byParent.set(parent, [...(byParent.get(parent) || []), row]);
+    });
+    const seen = new Set([String(task && task._id)]);
+    const found = [];
+    let level = [...seen];
+    while (level.length) {
+        const below = level.flatMap((id) => byParent.get(id) || []);
+        level = [];
+        below.forEach((row) => {
+            const id = String(row._id);
+            if (seen.has(id)) return;
+            seen.add(id);
+            found.push(row);
+            level.push(id);
+        });
+    }
+    return found;
+}
+
 /* definitions: the company's custom-field rows (customFields collection).
  * task: the task document being computed.
- * children: the tasks a rollup aggregates over (subtasks, or the sprint's tasks).
+ * children: the tasks a rollup aggregates over (every level of subtasks, or the sprint's tasks).
+ * subtasks: the rows `subtask_count` counts; the direct subtasks, where the caller tells them apart.
  * Returns { values: { [fieldId]: number|null }, errors: { [fieldId]: message } }. */
-function computeTaskFields({ definitions, task, children }) {
+function computeTaskFields({ definitions, task, children, subtasks }) {
     const defs = (Array.isArray(definitions) ? definitions : []).filter((definition) => definition && definition._id);
     const kids = Array.isArray(children) ? children : [];
 
-    const scope = builtinScope(task, kids);
+    const scope = builtinScope(task, Array.isArray(subtasks) ? subtasks : kids);
     defs.forEach((definition) => {
         if (COMPUTED_TYPES.includes(definition.fieldType)) return;
         const value = numeric(valueOf(task, definition._id));
@@ -66,7 +94,9 @@ function computeTaskFields({ definitions, task, children }) {
 
     defs.filter((definition) => definition.fieldType === 'rollup').forEach((definition) => {
         const sourceId = definition.rollupSourceFieldId;
-        const raw = sourceId ? kids.map((child) => valueOf(child, sourceId)).filter((entry) => entry !== undefined && entry !== null && entry !== '') : kids;
+        const source = sourceId ? defs.find((candidate) => String(candidate._id) === String(sourceId)) : null;
+        const holders = source ? kids.filter((child) => fieldAppliesToTask(source, child)) : kids;
+        const raw = sourceId ? holders.map((child) => valueOf(child, sourceId)).filter((entry) => entry !== undefined && entry !== null && entry !== '') : kids;
         const outcome = aggregate(definition.rollupFunction, raw);
         values[String(definition._id)] = outcome.value;
         if (outcome.value !== null) aliasesOf(definition).forEach((alias) => { scope[alias] = outcome.value; });
@@ -120,4 +150,4 @@ function validateFormulaDefinition({ definitions, fieldId, fieldTitle, expressio
     return { valid: true, reason: '', code: '' };
 }
 
-module.exports = { COMPUTED_TYPES, slug, numeric, aliasesOf, builtinScope, computeTaskFields, validateFormulaDefinition };
+module.exports = { COMPUTED_TYPES, slug, numeric, aliasesOf, builtinScope, descendantsOf, computeTaskFields, validateFormulaDefinition };

@@ -132,6 +132,9 @@
                         </ul>
                     </template>
                     <p v-if="clickUp.unmatchedAssignees.value.length" class="ah-small wim__warn">{{ $t('WorkspaceImport.summary_unmatched', { names: clickUp.unmatchedAssignees.value.join(', ') }) }}</p>
+                    <ul v-if="adjustedSummary.length" class="ah-small wim__facts" data-test="wim-adjusted">
+                        <li v-for="line in adjustedSummary" :key="line.reason" class="wim__warn">{{ line.text }} <span v-if="line.names">{{ line.names }}</span></li>
+                    </ul>
                 </div>
 
                 <div class="wim__foot">
@@ -161,6 +164,7 @@ import { IMPORT_SOURCES, sprintOptionsOf } from "./workspaceImportState";
 import { useClickUpImport } from "./useClickUpImport";
 import { readSheet } from "./readSheet";
 import { listLabel } from "@/utils/folderTree";
+import { adjustedLines } from "@/plugins/importTasks/importTree";
 
 defineOptions({ name: "WorkspaceImportDialog" });
 
@@ -195,6 +199,7 @@ const sprintOptions = computed(() => sprintOptionsOf(chosenProject.value));
 const users = computed(() => getters["users/users"] || []);
 const preview = computed(() => clickUp.preview.value);
 const listCount = computed(() => preview.value?.lists?.length || 0);
+const adjustedSummary = computed(() => adjustedLines(clickUp.adjusted.value, t, "WorkspaceImport.summary"));
 
 const targetReady = computed(() => {
     if (source.value === "clickup" && mode.value === "new") return canCreateProjects.value;

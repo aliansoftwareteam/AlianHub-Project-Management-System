@@ -12,6 +12,11 @@ const { TASK_INDEX_FIELDS, TASK_INDEX_ONLOAD_FIELDS, prepareOrRefuse, taskFilter
 
 const projectQueues = {};
 const processingProjects = new Set();
+/* A due date group is a window of days around the viewer's today: it moves every day and its bounds are not
+   sent, so no stored value names it and a second count never equals a stored date. A task repaired under one
+   goes after every task of its project that has a due date position, the end of whichever window shows it. */
+const groupMembers = (item) => (item.searchKey === 'DueDate' ? [] : [{ [item.searchKey]: item.searchValue }]);
+
 const REQUIRED_FIELDS = ['isFirst', 'isFirstWithRecord', 'taskId', 'projectId', 'sprintId', 'relevantIndex', 'indexName', 'relevantKey', 'searchKey', 'taskKey', 'updateData'];
 /**
  * Update TaskIndex Of Task For Drag And Drop
@@ -238,7 +243,7 @@ exports.updateTaskIndexWhenLoad = async (req,res) => {
                                 $match: {
                                     $and: [
                                         {[req.body.taskUpdate.item.indexName]: {$exists: true}},
-                                        { [req.body.taskUpdate.item.searchKey]: req.body.taskUpdate.item.searchValue },
+                                        ...groupMembers(req.body.taskUpdate.item),
                                         { "ProjectID": new mongoose.Types.ObjectId(rep.ProjectID) },
                                         // { "sprintId": rep.sprintId },
                                         { "TaskKey": { $ne: rep.TaskKey } },

@@ -1,15 +1,15 @@
 <template>
     <div>
-        <Sidebar :title="$t('Channel.create_channel')" :visible="visible" @update:visible="inProgress ? '' : $emit('update:visible', $event), resetValues()" width="610px;">
+        <Sidebar themed :title="$t('Channel.create_channel')" :visible="visible" @update:visible="inProgress ? '' : $emit('update:visible', $event), resetValues()" width="610px;">
             <template #body>
                 <div v-if="!allowPublicChannels && !allowPrivateChannels" class="plan-upgrade-massage">
                     <h4>{{$t('Channel.msg1')}}.</h4>
                 </div>
-                <div class="bg-light-gray h-100 p-10px" v-else>
+                <div class="cch h-100 p-10px" v-else>
                     <div class="position-ab d-flex align-items-center justify-content-center z-index-7 w-100 h-100 bg-dark-gray3" v-if="inProgress">
                         <Spinner :isSpinner="true"/>
                     </div>
-                    <div class="bg-white border-radius-8-px p-15px webkit-avilable">
+                    <div class="cch__card border-radius-8-px p-15px webkit-avilable">
                         <!-- CHANNEL NAME -->
                         <div class="d-flex align-items-center">
                             <label class="text-nowrap mr-10px">{{$t('Channel.channel_name')}}<span class="red">*</span></label>
@@ -27,18 +27,18 @@
 
                         <!-- ICONS -->
                         <div>
-                            <div class="d-flex white mt-2 justify-content-between">
-                                <div class="border position-re border-radius-10-px bg-light-gray d-flex align-items-center justify-content-center mr-10px icons__wrapper-div">
+                            <div class="d-flex mt-2 justify-content-between">
+                                <div class="position-re border-radius-10-px d-flex align-items-center justify-content-center mr-10px icons__wrapper-div">
                                     <img v-if="icon && Object.keys(icon).length || uploadFileName" class="position-ab create__channel-remove" @click="icon={},uploadFileName=''" :src="deletered">
                                     <img v-if="icon?.url" :src="icon?.url" alt="icon" class="border-radius-10-px w-100 h-100 icon__img">
-                                    <FontAwesomeIcon v-if="icon?.iconName" :icon="icon" size="xl" class="gray81"/>
+                                    <FontAwesomeIcon v-if="icon?.iconName" :icon="icon" size="xl" class="cch__icon"/>
                                 </div>
                                 <div class="w-80">
-                                    <span class="black font-weight-bold">{{$t('Channel.icons')}}</span>
-                                    <div class="d-flex flex-wrap white overflow-y-scroll style-scroll" style="height: 150px;" >
+                                    <span class="font-weight-bold">{{$t('Channel.icons')}}</span>
+                                    <div class="d-flex flex-wrap overflow-y-scroll style-scroll" style="height: 150px;" >
                                     <div v-for="(item,index) in icons" :key="index" class="m-6px" :class="(icon && item?.iconName === icon?.iconName) ? ['icon_bg border-radius-5-px'] : null">
                                             <div class="d-flex justify-content-center align-items-center icon_wrapper" @click="setIcon(item)">
-                                                <FontAwesomeIcon :icon="item" size="lg" class="gray81"/>
+                                                <FontAwesomeIcon :icon="item" size="lg" class="cch__icon"/>
                                             </div>
                                         </div>
                                     </div>
@@ -432,15 +432,20 @@ async function createChannelFun() {
     bottom: -14px; 
     left: 0px;
 }
+.cch { background: var(--canvas); color: var(--ink); }
+.cch__card { background: var(--surface); }
+.cch__icon { color: var(--ink-2); }
 .icons__wrapper-div{
-    width: 62px; 
+    width: 62px;
     height: 62px;
+    border: 1px solid var(--border);
+    background: var(--fill);
 }
 .icon__img{
     object-fit: cover;
 }
 .icon_bg {
-    background-color: #ebecf4;
+    background-color: var(--brand-tint);
 }
 .icon_wrapper{
     height: 40px;
@@ -455,15 +460,15 @@ async function createChannelFun() {
 .create__channel-remove {
     right: -6px;
     top: -10px;
-    background-color: #ffd6d6;
+    background-color: var(--danger-bg);
     padding: 5px;
     border-radius: 5px;
     cursor: pointer;
 }
 .upgrade-btn-txt{
     margin: 0 auto;
-    background-color: #28C76F;
-    color: #fff;
+    background-color: var(--ok-bg);
+    color: var(--ok-ink);
     padding: 3px 14px;
     border-radius: 4px;
     width: 175px;
@@ -473,9 +478,9 @@ async function createChannelFun() {
     border-radius: 5px;
     margin-top: 20px;
     padding: 15px;
-    background-color: #FFF4D4;
+    background-color: var(--warn-bg);
 }
 .msg-color{
-    color: #996C00;
+    color: var(--warn-ink);
 }
 </style>

@@ -3,6 +3,7 @@
         type="form"
         :form-class="submitted ? 'hide' : 'show'"
         @submit="handleSubmit"
+        @submit-invalid="showFirstError"
         :actions="false"
         ref="myForm"
     >
@@ -25,8 +26,7 @@
 </template>
 
 <script setup>
-    //import
-    import { computed, inject, ref, unref, watch } from "vue";
+    import { computed, inject, nextTick, ref, unref, watch } from "vue";
     import {FormKit} from '@formkit/vue';
     import TextComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/textComponents.vue";
     import CheckboxCustomField from "../../../atom/customFieldSidebar/customFieldSidebarComponent/checkboxCustomFields.vue";
@@ -45,11 +45,9 @@
     import { useI18n } from "vue-i18n";
     const { t } = useI18n();
 
-    //emit
     const emit = defineEmits(['handleFunction','tabIndexUpdate','closeSidebar']);
     const $toast = useToast();
 
-    //props
     const props = defineProps({
         tabIndex:{
             type: Number,
@@ -69,7 +67,6 @@
         }
     });
 
-    // ref
     const myForm = ref();
     const submitted = ref(false);
     const childRef = ref();
@@ -91,8 +88,6 @@
         return { ...val, fieldTaskTypes: [...taskTypes.value] };
     };
 
-    //function
-    // save function
     const handleSubmit = async (object) => {
         if(props.componentDetail.cfType == "text" || props.componentDetail.cfType == "textarea" || props.componentDetail.cfType == "number") {
             if(object.fieldEntryLimits.length && object.fieldMinimum === '' && object.fieldMaximum === ''){
@@ -110,18 +105,29 @@
         submitted.value = true;
     };
 
-    // cancel function
     const handleTabCheck = () => {
        emit('closeSidebar',false)
     };
 
-    // tab validation check
-    const handleTab = () => {            
+    const handleTab = () => {
         const node = myForm.value.node;
         childRef.value.handleTabComp(node);
     };
 
-    //component
+    /* A field in error can sit on a tab that is not shown, where its message cannot be seen. */
+    const showFirstError = async (form) => {
+        let invalid = null;
+        form.walk((child) => {
+            if (!invalid && child.type === 'input' && child.context?.state.valid === false) invalid = child;
+        });
+        const holder = invalid && document.getElementById(invalid.props.id);
+        if (!holder) return;
+        const tab = Number(holder.closest('[data-field-tab]')?.dataset.fieldTab);
+        if (tab) emit('tabIndexUpdate', tab);
+        await nextTick();
+        (holder.matches('input, textarea, select') ? holder : holder.querySelector('input, textarea, select'))?.focus();
+    };
+
     const getView = (val) => {
         switch(val) {
             case 'text':

@@ -5,6 +5,7 @@
  */
 
 const { indexRepairBody, indexRepairRows, plainGroupValue } = require('../../frontend/src/views/Projects/composables/taskGroupIndex');
+const { placedSprint, moveTaskRequest, duplicateTaskRequest, convertToTaskRequest, convertToListRequest } = require('../../frontend/src/views/Projects/composables/taskPlacement');
 
 const USER = { Employee_Name: 'Max Member', id: '6f0000000000000000000003', companyOwnerId: '6f0000000000000000000001' };
 const CID = '6f00000000000000000000c1';
@@ -12,6 +13,20 @@ const STATUS = { status: { key: 2, value: '', text: 'Doing', type: 'active' }, s
 /* The list a move, copy or conversion names is stored as the server reads it, so only what that keeps is listed here. */
 const sprintObj = { id: 's2', name: 'Sprint 2' };
 const projectSlice = (projectId) => ({ _id: projectId, CompanyId: CID, lastTaskId: 4, ProjectName: 'Parity', ProjectCode: 'PAR' });
+
+/*
+ * What the move, duplicate and convert pickers hold when a request is built: the list as GET sprints answers it with the
+ * flag the picker sets on the chosen one, the folder as the project store keeps it, and the task and projects on screen.
+ * The bodies are built by the functions the components send them with, which keep the few values the routes read.
+ */
+const FOLDER = '6f0000000000000000000f01';
+const PICKED_LIST = { _id: 's2', id: 's2', name: 'Sprint 2', projectId: '6f0000000000000000000a01', tasks: 3, archiveTaskCount: 0, private: false, deletedStatusKey: 0, AssigneeUserId: [USER.id], watchers: { [USER.id]: 'all' }, favouriteTasks: [{ userId: USER.id }], legacyId: '', isScrum: false, isBacklog: false, goal: '', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-02T00:00:00.000Z', isDuplicateSprint: true };
+const PICKED_FOLDER_LIST = { ...PICKED_LIST, folderId: FOLDER, folderName: 'Design' };
+const PICKED_FOLDER = { folderId: FOLDER, id: FOLDER, _id: FOLDER, name: 'Design', deletedStatusKey: 0, parentFolderId: null, depth: 0, path: 'Design', sprintsObj: { s2: PICKED_FOLDER_LIST } };
+const shownProject = (projectId) => ({ _id: projectId, CompanyId: CID, ProjectCode: 'PAR', ProjectName: 'Parity', isGlobalPermission: true, taskTypeCounts: [], taskStatusData: [], sprintsObj: { s2: PICKED_LIST }, sprintsfolders: {} });
+const shownTask = (taskId, extra = {}) => ({ _id: taskId, TaskName: 'Task 01', TaskKey: 'PAR-1', sprintId: 's1', folderObjId: '', sprintArray: { id: 's1', name: 'Sprint 1' }, ParentTaskId: '', AssigneeUserId: [], watchers: [], ...extra });
+const movedTo = (sprint) => ({ taskId, projectId, destinationProjectId }) => ({ action: 'moveTask', ...moveTaskRequest({ companyId: CID, destination: shownProject(destinationProjectId), sprint, task: shownTask(taskId), source: shownProject(projectId), isSubTask: false, assignee: [], watcher: [], userData: USER }) });
+const convertedToListIn = (folder) => ({ taskId, destinationProjectId }) => ({ action: 'convertToList', ...convertToListRequest({ companyId: CID, project: shownProject(destinationProjectId), task: shownTask(taskId), folder, isSubTask: false, userData: USER }) });
 
 const PATCH = 'PATCH /api/v2/tasks';
 const BULK = 'POST /api/v2/tasks/bulk';
@@ -70,11 +85,13 @@ const WEB_APP_BODIES = [
     { route: PATCH, action: 'updateArchiveDelete', source: 'TaskQuickMenu.vue archive a subtask', keys: ['task.task_archive'], body: ({ taskId, otherTaskId, projectId }) => ({ action: 'updateArchiveDelete', companyId: CID, projectData: projectSlice(projectId), sprintId: 's1', task: { _id: taskId, ProjectID: projectId, ParentTaskId: otherTaskId, sprintId: 's1', deletedStatusKey: 0 }, userData: USER, deletedStatusKey: 2 }) },
     { route: PATCH, action: 'updateArchiveDelete', source: 'TaskQuickMenu.vue restore', keys: ['task.task_list'], body: ({ taskId, projectId }) => ({ action: 'updateArchiveDelete', companyId: CID, projectData: projectSlice(projectId), sprintId: 's1', task: { _id: taskId, ProjectID: projectId, sprintId: 's1', deletedStatusKey: 2 }, userData: USER, deletedStatusKey: 0 }) },
     { route: PATCH, action: 'convertToSubTask', source: 'TaskInSidebar.vue', keys: ['task.task_convert_to_subtask', 'task.sub_task_create'], destination: ['task.sub_task_create'], body: ({ taskId, otherTaskId, projectId, destinationProjectId }) => ({ action: 'convertToSubTask', companyId: CID, projectData: { id: destinationProjectId, ProjectName: 'Parity' }, sprintId: 's1', selectedTaskId: taskId, taskId: otherTaskId, oldProject: { id: projectId, taskTypeCounts: [], taskStatusData: [], ProjectName: 'Parity' }, isSubTask: false, userData: USER }) },
-    { route: PATCH, action: 'convertToTask', source: 'ConvertToSubTaskSidebar.vue and ItemList.vue', keys: ['task.convert_to_task', 'task.task_create'], destination: ['task.task_create'], body: ({ taskId, otherTaskId, projectId, destinationProjectId }) => ({ action: 'convertToTask', companyId: CID, projectData: { id: destinationProjectId }, taskId, parentTaskId: otherTaskId, sprintObj, oldSprintObj: { id: 's1', folderId: null }, oldProject: { id: projectId, taskTypeCounts: [], taskStatusData: [] } }) },
-    { route: PATCH, action: 'convertToList', source: 'ConvertToList.vue', keys: ['task.task_convert_to_list', 'project.project_sprint_create'], destination: ['project.project_sprint_create'], body: ({ taskId, destinationProjectId }) => ({ action: 'convertToList', companyId: CID, projectData: { id: destinationProjectId, ProjectName: 'Parity' }, taskId, userData: USER, folderData: null, sprintObj: { id: 's1', folderId: null }, isSubTask: false }) },
-    { route: PATCH, action: 'moveTask', source: 'ConvertToSubTaskSidebar.vue move', keys: ['task.task_move'], destination: ['task.task_move'], body: ({ taskId, projectId, destinationProjectId }) => ({ action: 'moveTask', companyId: CID, projectData: { id: destinationProjectId, ProjectCode: 'PAR', ProjectName: 'Parity' }, sprintObj, moveTaskId: taskId, oldSprintObj: { id: 's1', folderId: null, name: 'Sprint 1', folderName: '' }, oldProject: { id: projectId, taskTypeCounts: [] }, isSubTask: false, assignee: [], watcher: [], userData: USER }) },
+    { route: PATCH, action: 'convertToTask', source: 'ConvertToSubTaskSidebar.vue and ItemList.vue', keys: ['task.convert_to_task', 'task.task_create'], destination: ['task.task_create'], body: ({ taskId, otherTaskId, projectId, destinationProjectId }) => ({ action: 'convertToTask', ...convertToTaskRequest({ companyId: CID, destination: shownProject(destinationProjectId), sprint: PICKED_LIST, task: shownTask(taskId, { ParentTaskId: otherTaskId }), oldSprint: { id: 's1', folderId: null }, source: shownProject(projectId) }) }) },
+    { route: PATCH, action: 'convertToList', source: 'ConvertToList.vue', keys: ['task.task_convert_to_list', 'project.project_sprint_create'], destination: ['project.project_sprint_create'], body: convertedToListIn({}) },
+    { route: PATCH, action: 'convertToList', source: 'ConvertToList.vue into a picked folder', keys: ['task.task_convert_to_list', 'project.project_sprint_create'], destination: ['project.project_sprint_create'], body: convertedToListIn(PICKED_FOLDER) },
+    { route: PATCH, action: 'moveTask', source: 'ConvertToSubTaskSidebar.vue move', keys: ['task.task_move'], destination: ['task.task_move'], body: movedTo(PICKED_LIST) },
+    { route: PATCH, action: 'moveTask', source: 'ConvertToSubTaskSidebar.vue move into a folder list', keys: ['task.task_move'], destination: ['task.task_move'], body: movedTo(PICKED_FOLDER_LIST) },
     { route: PATCH, action: 'mergeTask', source: 'TaskInSidebar.vue', keys: ['task.task_merge'], destination: ['task.task_merge'], body: ({ taskId, otherTaskId, projectId, destinationProjectId }) => ({ action: 'mergeTask', companyId: CID, projectData: { id: destinationProjectId, ProjectName: 'Parity' }, taskId, mergeTaskId: otherTaskId, oldProject: { id: projectId, taskTypeCounts: [], taskStatusData: [], ProjectName: 'Parity' }, isSubTask: false, userData: USER }) },
-    { route: PATCH, action: 'duplicateTask', source: 'ConvertToSubTaskSidebar.vue duplicate', keys: ['task.task_duplicate'], destination: ['task.task_duplicate'], body: ({ taskId, projectId, destinationProjectId }) => ({ action: 'duplicateTask', companyId: CID, projectData: { id: destinationProjectId, ProjectCode: 'PAR', ProjectName: 'Parity' }, sprintObj, selectedTaskId: taskId, oldProject: { id: projectId, taskTypeCounts: [], taskStatusData: [], ProjectName: 'Parity' }, userData: USER, isSubTask: false, duplicateData: [], assignee: [], watcher: [], taskName: 'Copy', oldSprintObj: { id: 's1' } }) },
+    { route: PATCH, action: 'duplicateTask', source: 'ConvertToSubTaskSidebar.vue duplicate', keys: ['task.task_duplicate'], destination: ['task.task_duplicate'], body: ({ taskId, projectId, destinationProjectId }) => ({ action: 'duplicateTask', ...duplicateTaskRequest({ companyId: CID, destination: shownProject(destinationProjectId), sprint: PICKED_LIST, task: shownTask(taskId), source: shownProject(projectId), isSubTask: false, duplicateData: [], assignee: [], watcher: [], taskName: 'Copy', userData: USER }) }) },
     { route: PATCH, action: 'createSubTaskWithAi', source: 'SubTasks.vue AI subtasks', keys: ['task.sub_task_create'], body: ({ otherTaskId, projectId }) => ({ action: 'createSubTaskWithAi', companyId: CID, userId: USER.id, subTitles: [{ title: 'Step' }], sprintObj, projectData: projectSlice(projectId), userData: USER, parentTask: { id: otherTaskId, ProjectID: projectId }, type: 'subTask' }) },
     { route: PATCH, action: 'createSubTaskWithAi', source: 'SprintsList.vue AI tasks', keys: ['task.task_create'], body: ({ projectId }) => ({ action: 'createSubTaskWithAi', companyId: CID, userId: USER.id, subTitles: [{ title: 'Step' }], sprintObj, projectData: projectSlice(projectId), userData: USER, parentTask: { ProjectID: projectId }, type: 'task' }) },
 
@@ -87,9 +104,9 @@ const WEB_APP_BODIES = [
     { route: BULK, action: 'bulkArchive', source: 'ListBulkBar.vue', keys: ['task.task_archive'], body: bulk('bulkArchive', {}) },
     { route: BULK, action: 'bulkDelete', source: 'API only; the web app trashes with bulkTrash', keys: ['task.task_delete'], body: bulk('bulkDelete', {}) },
     { route: BULK, action: 'bulkTrash', source: 'ListBulkBar.vue', keys: ['task.task_delete'], body: bulk('bulkTrash', {}) },
-    { route: BULK, action: 'bulkMove', source: 'ListBulkBar.vue', keys: ['task.task_move|task.task_status'], destination: ['task.task_move|task.task_status'], body: ({ destinationProjectId, ...ids }) => bulk('bulkMove', { projectData: { id: destinationProjectId, ProjectCode: 'PAR', ProjectName: 'Parity' }, sprintObj })(ids) },
+    { route: BULK, action: 'bulkMove', source: 'ListBulkBar.vue', keys: ['task.task_move|task.task_status'], destination: ['task.task_move|task.task_status'], body: ({ destinationProjectId, ...ids }) => bulk('bulkMove', { projectData: { id: destinationProjectId, ProjectCode: 'PAR', ProjectName: 'Parity' }, sprintObj: placedSprint(PICKED_LIST) })(ids) },
     { route: BULK, action: 'bulkConvertToSubTask', source: 'ListBulkBar.vue', keys: ['task.task_convert_to_subtask', 'task.sub_task_create'], body: ({ taskId, otherTaskId }) => ({ action: 'bulkConvertToSubTask', taskIds: [taskId], userData: USER, parentTaskId: otherTaskId }) },
-    { route: BULK, action: 'bulkConvertToTask', source: 'ListBulkBar.vue', keys: ['task.convert_to_task', 'task.task_create'], destination: ['task.task_create'], body: ({ destinationProjectId, ...ids }) => bulk('bulkConvertToTask', { projectData: { id: destinationProjectId, ProjectCode: 'PAR', ProjectName: 'Parity' }, sprintObj })(ids) },
+    { route: BULK, action: 'bulkConvertToTask', source: 'ListBulkBar.vue', keys: ['task.convert_to_task', 'task.task_create'], destination: ['task.task_create'], body: ({ destinationProjectId, ...ids }) => bulk('bulkConvertToTask', { projectData: { id: destinationProjectId, ProjectCode: 'PAR', ProjectName: 'Parity' }, sprintObj: placedSprint(PICKED_LIST) })(ids) },
 
     { route: RELATIONS, action: 'add', source: 'LinkedTasks.vue and GanttView.vue', keys: ['task.task_list'], body: ({ taskId, otherTaskId }) => ({ action: 'add', taskId, relatedTaskId: otherTaskId, type: 'blocks', userData: USER }) },
     { route: RELATIONS, action: 'remove', source: 'LinkedTasks.vue and GanttView.vue', keys: ['task.task_list'], body: ({ taskId, otherTaskId }) => ({ action: 'remove', taskId, relatedTaskId: otherTaskId, userData: USER }) },
@@ -167,3 +184,4 @@ module.exports.GROUP_DRAGS = GROUP_DRAGS;
 module.exports.CALENDAR_DRAG = CALENDAR_DRAG;
 module.exports.VIEW_GROUPS = VIEW_GROUPS;
 module.exports.onLoadIndex = onLoadIndex;
+module.exports.PLACEMENT = { PICKED_LIST, PICKED_FOLDER_LIST, PICKED_FOLDER, movedTo, convertedToListIn };

@@ -1,6 +1,6 @@
 <template>
     <div>
-        <div v-show="tabIndexCheck === 1">
+        <div v-show="tabIndexCheck === 1" data-field-tab="1">
             <CustomFieldInputComponent
                 :label="$t('PlaceHolder.field_label')"
                 :type="'text'"
@@ -59,7 +59,7 @@
                 </template>
             </DropDown>
         </div>
-        <div v-show="tabIndexCheck === 2">
+        <div v-show="tabIndexCheck === 2" data-field-tab="2">
             <div class="formkit__form-wrapper">
                 <span class="formkit-help pb-15px d-block" v-if="props.customFieldObject?.fieldCountrySelect">
                     <strong class="black">{{$t('general.note')}} :</strong> {{$t('general.settings_change_no_effect')}}

@@ -3,7 +3,8 @@
 .lv2 {
     --lv2-cols: 28px minmax(0, 1fr) minmax(0, .45fr) 56px 64px 72px 48px 80px 88px;
     --lv2-grip-w: 12px;
-    --lv2-disclose-w: 10px;
+    /* Wide enough that its centre stays 12px from the status circle at the tightest spacing step. */
+    --lv2-disclose-w: 12px;
     --lv2-depth: 1;
     --lv2-check: 15px;
     --lv2-check-room: calc((var(--hit-min) + 2px - var(--lv2-check)) / 2);

@@ -36,7 +36,7 @@
                         <div v-if="isCreteTask" class="create__task-title form-group d-flex align-items-center border-bottom-mobiledrop">
                             <InputText
                                 v-model="taskData.value"
-                                class="form-control login-input text-capitalize"
+                                class="form-control login-input"
                                 :placeHolder="$t('PlaceHolder.Enter_Task_Name')"
                                 :maxLength="250"
                                 :minLength="3"
@@ -84,7 +84,8 @@
                                 </template>
                                 <div v-else>{{$t('ProjectSlider.no_result_found')}}</div>
                             </template>
-                            <div v-if="isShowProjectList === false">
+                            <p v-if="isShowProjectList === false && parentBlocked" class="convert__depth-note">{{ $t('ProjectDetails.convert_subtree_too_deep') }}</p>
+                            <div v-else-if="isShowProjectList === false && !parentRulePending">
                                 <InputText :placeHolder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" v-model="taskSearch" class="input__Search"/>
                                 <div class="overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar"  :class="[{'duplicatetask__project--sprintList':props.isDuplicate === true}]" :style="[{maxHeight : clientWidth > 767 ? 'calc(100vh - 241px)' : 'calc(100vh - 275px)'}]">
                                     <template v-if="filterFoldersSprints && Object.keys(filterFoldersSprints).length">
@@ -102,6 +103,7 @@
                                             @taskSelect="(e) => taskSelctFun(e)"
                                             @expand="selecteFolderIndex = index,sprintClick(subItem)"
                                             :item="item"
+                                            :parentRule="parentRule"
                                         />
                                     </template>
                                     <template v-if="filterSprints && filterSprints.length">
@@ -120,6 +122,7 @@
                                             @taskSelect="(e) => taskSelctFun(e)"
                                             @expand="selectedIndex = index,sprintClick(subItem)"
                                             :item="item"
+                                            :parentRule="parentRule"
                                         />
                                     </template>
                                 </div>
@@ -161,6 +164,8 @@
     import { useToast } from "vue-toast-notification"
     import ConfirmationsInTask from "@/components/atom/ConfirmationsInTask/ConfirmationsInTask.vue"
     import {useHelperFun} from "./helper"
+    import { useParentRule } from "./parentRule";
+    import { canBeParentOf, parentCandidateMatch } from "@/views/Projects/composables/taskDepth";
     import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
     import DuplicateCompo from '@/components/atom/DuplicateCompo/DuplicateCompo.vue';
     import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
@@ -171,6 +176,7 @@
     import { apiRequest } from '../../../services';
     import { nestedFolders } from '@/utils/folderTree';
     import * as env from '@/config/env';
+    import { convertToTaskRequest, duplicateTaskRequest, moveTaskRequest } from '@/views/Projects/composables/taskPlacement';
     const { t } = useI18n();
     const props = defineProps({
         closeSideBar: {
@@ -294,6 +300,10 @@
         error: "",
     });
     const { checkTaskPerSprintPermisssion } = taskPlanPermission();
+    const { rule: parentRule, pending: parentRulePending, blocked: parentBlocked, load: loadParentRule } = useParentRule(
+        () => props.task,
+        () => (props.isOpenSubTask || props.openMoveSubTask) && !props.isBulkConvert
+    );
 
     const projectDatas = computed(() => {
         if(props.fromWhich !== undefined && props.fromWhich == 'dashboard') {
@@ -334,6 +344,7 @@
 
     onMounted(() => {
         task.value = props.task;
+        loadParentRule();
         getSprintFolderData(selectedProjectData.value._id).then(() => {
             sprints.value = JSON.parse(JSON.stringify(Object.values(selectedProjectData.value.sprintsObj || {}).filter((x)=>x.deletedStatusKey === undefined || x.deletedStatusKey === 0)|| {}))
             sprintFolders.value = JSON.parse(JSON.stringify(nestedFolders(selectedProjectData.value.sprintsfolders)));
@@ -384,7 +395,7 @@
             findQuery = [
                 {
                     "$match": {
-                        isParentTask : true,
+                        ...((parentRule.value && parentCandidateMatch(parentRule.value.task, parentRule.value.height)) || { isParentTask : true }),
                         deletedStatusKey : 0,
                         objId: {
                             ProjectID: selectedProjectData.value?._id
@@ -412,7 +423,9 @@
         }
         apiRequest('post',`${env.TASK}/find`,{findQuery: findQuery}).then((resp) => {
             if(resp.status === 200){
-                const result = resp.data;
+                const result = parentRule.value
+                    ? resp.data.filter((row) => canBeParentOf(row, parentRule.value.task, parentRule.value.height))
+                    : resp.data;
                 let array = []
                 result.filter((x) => {
                     array.push(x);
@@ -593,32 +606,17 @@
             companyOwnerId: user.companyOwnerId,
         }
         isSpinner.value = true;
-        taskClass.moveTask({
+        taskClass.moveTask(moveTaskRequest({
             companyId: companyId.value,
-            projectData: {
-                id : selectedProjectData.value._id,
-                ProjectCode : selectedProjectData.value.ProjectCode,
-                ProjectName : selectedProjectData.value.ProjectName
-            },
-            sprintObj: selectedSprintData.value,
-            moveTaskId : task.value._id,
-            oldSprintObj : {
-                id : task.value.sprintId,
-                folderId : task.value.folderObjId || null,
-                name : task.value.sprintArray?.name,
-                folderName : task.value.sprintArray?.folderName || ''
-            },
-            oldProject : {
-                id : projectData.value._id,
-                taskTypeCounts : projectData.value.taskTypeCounts,
-                taskStatusData : projectData.value.taskStatusData,
-                ProjectName : projectData.value.ProjectName
-            },
+            destination: selectedProjectData.value,
+            sprint: selectedSprintData.value,
+            task: task.value,
+            source: projectData.value,
             isSubTask : selectedTaskSubTask.value.length > 1 ? true : false,
             assignee : selectedAssigneeId.value,
             watcher : selectedWatcherId.value,
             userData : userData
-        }).then((result) => {
+        })).then((result) => {
             if(result.status === true){
                 isSpinner.value = false;
                 if(route.params?.taskId){
@@ -699,33 +697,19 @@
             Employee_Name: user.Employee_Name,
             companyOwnerId: user.companyOwnerId,
         }
-        taskClass.duplicateTask({
+        taskClass.duplicateTask(duplicateTaskRequest({
             companyId: companyId.value,
-            projectData: {
-                id : selectedProjectData.value._id,
-                ProjectCode : selectedProjectData.value.ProjectCode,
-                ProjectName : selectedProjectData.value.ProjectName
-            },
-            sprintObj: selectedSprintData.value,
-            selectedTaskId : task.value._id,
-            oldProject : {
-                id : projectData.value._id,
-                taskTypeCounts : projectData.value.taskTypeCounts,
-                taskStatusData : projectData.value.taskStatusData,
-                ProjectName : projectData.value.ProjectName
-            },
+            destination: selectedProjectData.value,
+            sprint: selectedSprintData.value,
+            task: task.value,
+            source: projectData.value,
             userData : userData,
             isSubTask : duplicateSubTask.value.length > 0 ?  true : false,
             duplicateData:selectedDuplicatedItems.value,
             assignee : selectedAssigneeId.value,
             watcher : selectedWatcherId.value,
             taskName:duplicateTaskName.value ? duplicateTaskName.value : '',
-            oldSprintObj : {
-                folderId : task.value.folderObjId || null,
-                name : task.value.sprintArray?.name,
-                folderName : task.value.sprintArray?.folderName || ''
-            },
-        }).then((result) => {
+        })).then((result) => {
             if(result.data.status === true){
                 let sprintCount = (task.value.subTasks || 0) + 1;
                 const sprint = {...selectedSprintData.value,tasks: selectedSprintData.value.tasks + sprintCount};
@@ -821,24 +805,14 @@
         }
         closeSidebar();
         isSpinner.value = true;
-        taskClass.convertToTask({
+        taskClass.convertToTask(convertToTaskRequest({
             companyId: companyId.value,
-            projectData: {
-                id:selectedProjectData.value._id
-            },
-            taskId : task.value._id,
-            parentTaskId:task.value.ParentTaskId,
-            sprintObj: selectedSprintData.value,
-            oldSprintObj :{
-                id:task.value.sprintId,
-                folderId:task.value.folderObjId || null
-            },
-            oldProject: {
-                id :projectData.value._id,
-                taskTypeCounts : projectData.value.taskTypeCounts,
-                taskStatusData : projectData.value.taskStatusData
-            }
-        }).then((result) => {
+            destination: selectedProjectData.value,
+            sprint: selectedSprintData.value,
+            task: task.value,
+            oldSprint: { id: task.value.sprintId, folderId: task.value.folderObjId || null },
+            source: projectData.value
+        })).then((result) => {
             if(result.status === true){
                 isSpinner.value = false;
                 if(selectedSprintData.value._id !== task.value.sprintId) {

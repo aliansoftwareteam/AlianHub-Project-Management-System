@@ -97,6 +97,7 @@ import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { taskPlanPermission } from "@/composable/commonFunction";
 import taskClass from "@/utils/TaskOperations"
 import { closeTopEscapeLayer, escapeLayerMark } from "@/composable/useEscapeLayer";
+import { treeRefusalReason } from "@/views/Projects/composables/taskDepth";
 const projectRef = inject("selectedProject");
 import { useValidation } from "@/composable/Validation";
 import { useToast } from "vue-toast-notification";
@@ -418,6 +419,10 @@ function saveTask() {
                     })
                     .catch((error) => {
                         console.error("ERROR in create task: ", error);
+                        const reason = treeRefusalReason(error);
+                        if (!reason) return;
+                        if (!taskName.value.value) taskName.value.value = name;
+                        $toast.error(reason, {position: "top-right"});
                     })
                 }else{
                     $toast.error(t('Toast.create_task_plan_limit_message').replace('TASK_SPRINT', props.sprint.name), {position: "top-right"});
