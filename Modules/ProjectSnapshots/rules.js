@@ -6,6 +6,7 @@ const MAX_DESCRIPTION = 2000;
 const MAX_CODE = 10;
 const TASKS_PER_ROW = 25;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const LATEST_START = Date.UTC(2200, 0, 1);
 const TEMPLATE = 'template';
 const TASKS = 'tasks';
 const TEAM_PREFIX = 'tId_';
@@ -48,13 +49,13 @@ const codeOf = (body) => {
 
 const startOf = (body) => {
     const start = typeof body.startDate === 'string' ? new Date(body.startDate).getTime() : NaN;
-    return Number.isFinite(start) ? { ok: true, start } : refusal('startDate must be a date.');
+    return start >= 0 && start <= LATEST_START ? { ok: true, start } : refusal('startDate must be a date.');
 };
 
 /* Every part that is sent must pass; the first refusal is the answer. `required` parts must be sent. */
 const parse = (body, parts, required, what) => {
     if (!isPlainObject(body)) return refusal(`${what} takes an object.`);
-    const unknown = Object.keys(body).find((key) => !(key in parts));
+    const unknown = Object.keys(body).find((key) => !Object.prototype.hasOwnProperty.call(parts, key));
     if (unknown) return refusal(`${unknown} is not something ${what} takes.`);
     const sent = Object.keys(parts).filter((key) => required.includes(key) || body[key] !== undefined);
     const read = sent.map((key) => parts[key](body, key));
@@ -114,7 +115,8 @@ const untick = (value) => {
     return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, key === 'isChecked' ? false : untick(item)]));
 };
 
-/* A field value stays when its field still means something in the project: a company-wide field, or one linked to it. */
+/* A field value stays when its field still means something in the project: a company-wide field, or one linked to it. People
+   named by a field of a task come along only with the assignees; the ones on the project's own fields never do. */
 const fieldValues = (customField, { definitions, linked, withPeople }) => Object.fromEntries(
     Object.entries(isPlainObject(customField) ? customField : {}).filter(([fieldId]) => {
         const definition = definitions.get(fieldId);
@@ -156,7 +158,7 @@ const frozenStructure = (bundle, { name, caller, companyId, include, anchor, fie
         ...projectRow,
         _id: projectId,
         projectIcon: colourIcon(projectRow.projectIcon),
-        customField: fieldValues(projectRow.customField, { ...fields, withPeople: include.assignees }),
+        customField: fieldValues(projectRow.customField, { ...fields, withPeople: false }),
         AssigneeUserId: include.assignees ? (bundle.source.AssigneeUserId || []).map(String) : [],
     }, copy.PROJECT_DATES, anchor);
 
@@ -221,7 +223,7 @@ const thawedBundle = (snapshot, { caller, include, start, isPrivate, gone, statu
                 isPrivateSpace,
                 taskStatusData: statuses,
                 projectIcon: snapshot.project.projectIcon || PLAIN_ICON,
-                customField: fieldValues(snapshot.project.customField, { ...fields, withPeople: include.assignees }),
+                customField: fieldValues(snapshot.project.customField, { ...fields, withPeople: false }),
                 AssigneeUserId: [...new Set([...here(members), caller])],
             }, start),
             ...(start === null ? {} : { StartDate: new Date(start) }),

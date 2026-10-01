@@ -284,6 +284,19 @@ describe('saving a project as a template', () => {
         expect(headOf(full).snapshot.people.sort()).toEqual([OWNER, MEMBER].sort());
     });
 
+    it('keeps the people a field of a task names only with the assignees, and the files a field holds never', async () => {
+        const reviewers = String(seed(SCHEMA_TYPE.CUSTOM_FIELDS, { fieldTitle: 'Reviewers', fieldType: 'people', global: false, isDelete: true, projectId: [launch.id] })._id);
+        const brief = String(seed(SCHEMA_TYPE.CUSTOM_FIELDS, { fieldTitle: 'Brief', fieldType: 'files', global: false, isDelete: true, projectId: [launch.id] })._id);
+        const gone = oid();
+        seedTask(launch, launch.backlog, {
+            TaskName: 'Reviewed',
+            customField: { [reviewers]: { fieldValue: [MEMBER], _id: reviewers }, [brief]: { fieldValue: [{ url: 'wasabi://launch/brief.pdf' }], _id: brief }, [gone]: { fieldValue: 'stale' } },
+        });
+        expect(storedTasks(await saved({ include: WITH_TASKS }))[0].customField).toEqual({});
+        const full = await saved({ name: 'Full', include: { ...WITH_TASKS, assignees: true } });
+        expect(storedTasks(full)[0].customField).toEqual({ [reviewers]: { fieldValue: [MEMBER], _id: reviewers } });
+    });
+
     it('keeps the automations only when asked', async () => {
         seedRule(launch);
         expect(headOf(await saved()).snapshot.rules).toEqual([]);
@@ -694,6 +707,7 @@ describe('the request to use a template', () => {
 
     it('takes a start that is a date, a key of letters and digits, and privacy as a boolean', async () => {
         expect(await bad({ name: 'Autumn launch', include: EVERYTHING, startDate: 'soon' })).toMatch(/startDate/);
+        expect(await bad({ name: 'Autumn launch', include: EVERYTHING, startDate: '+275760-09-13T00:00:00.000Z' })).toMatch(/startDate/);
         expect(await bad({ name: 'Autumn launch', include: EVERYTHING, code: 'A-1' })).toMatch(/code/);
         expect(await bad({ name: 'Autumn launch', include: EVERYTHING, code: 'ABCDEFGHIJK' })).toMatch(/code/);
         expect(await bad({ name: 'Autumn launch', include: EVERYTHING, isPrivate: 'yes' })).toMatch(/isPrivate/);
@@ -701,6 +715,7 @@ describe('the request to use a template', () => {
 
     it('refuses a key it does not know', async () => {
         expect(await bad({ name: 'Autumn launch', include: EVERYTHING, projectCreatedBy: MEMBER })).toMatch(/projectCreatedBy/);
+        expect(await bad({ name: 'Autumn launch', include: EVERYTHING, constructor: 1 })).toMatch(/constructor/);
         expect(await bad({ name: 'Autumn launch', include: { ...EVERYTHING, comments: true } })).toMatch(/include\.comments/);
     });
 
