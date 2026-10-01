@@ -337,6 +337,7 @@ import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption
 const {isCustomFields} = customField();
 import * as env from '@/config/env';
 import { indexRepairBody, indexRepairRows, plainGroupValue } from "@/views/Projects/composables/taskGroupIndex";
+import { childrenWereRead } from "@/store/ProjectData/taskTree";
 import { convertToTaskRequest } from "@/views/Projects/composables/taskPlacement";
 import { useI18n } from "vue-i18n";
 import { apiRequest } from "../../../services";
@@ -701,9 +702,8 @@ function toggleTask(task,e) {
         subObserver[task._id] = null;
     }
 
-    if(task.isExpanded === true && (!task.subtaskArray || task.subtaskArray.length < 25)) {
-        let fetchNew = currentProjectTasks.value?.[props.projectId]?.[props.sprintId].index[`${task._id}_${props.item.searchKey}_${props.item.searchValue}`] === undefined;
-        fetchSubTask(task, fetchNew);
+    if(task.isExpanded === true) {
+        fetchSubTask(task, !childrenWereRead(currentProjectTasks.value?.[props.projectId]?.[props.sprintId], task._id, props.item));
     }
 }
 
@@ -1043,7 +1043,7 @@ function fetchSubTask(task, fetchNew = false) {
         userId: userId.value,
         fetchNew: fetchNew,
         projectData: projectData.value,
-        parentId: task.isParentTask ? task._id : ""
+        parentId: String(task._id)
     })
 }
 

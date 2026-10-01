@@ -4,7 +4,7 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { canSeeSprint, sprintIdentities } = require('./sprintVisibility');
 const { ListWriteError } = require('./listWriteError');
-const { folderCascade, refuseRestoreUnderHiddenParent, subfoldersFollowing } = require('./folderTree');
+const { folderCascade, folderForList, refuseRestoreUnderHiddenParent, subfoldersFollowing } = require('./folderTree');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const SPRINT_STATUSES = [0, 1, 2, 5];
@@ -84,8 +84,8 @@ const mayOpenSprint = async (companyId, uid, sprint) => canSeeSprint(sprint, awa
 
 /*
  * Builds the write for PATCH /api/v1/sprint/:id type updateSprint from the stored sprint: a private
- * sprint answers 404 to anyone it is not shared with, a move lands only in a folder of the sprint's
- * own project, and the project the cascades run in is the stored one.
+ * sprint answers 404 to anyone it is not shared with, a move lands only in a live folder of the
+ * sprint's own project, and the project the cascades run in is the stored one.
  */
 const prepareSprintUpdate = async (companyId, uid, sprintId, updateObject) => {
     const update = sprintUpdateFrom(updateObject);
@@ -95,8 +95,7 @@ const prepareSprintUpdate = async (companyId, uid, sprintId, updateObject) => {
     if (!(await mayOpenSprint(companyId, uid, sprint))) throw new ListWriteError('Sprint not found.', 404);
     const set = update.$set || {};
     if (set.folderId) {
-        const folder = await findOne(companyId, SCHEMA_TYPE.FOLDERS, { _id: oid(set.folderId), projectId: sprint.projectId }, { name: 1 });
-        if (!folder) throw new ListWriteError('That folder is not in this sprint\'s project.');
+        const folder = await folderForList(companyId, sprint.projectId, set.folderId);
         Object.assign(set, { folderId: oid(set.folderId), folderName: folder.name || '' });
     } else if ('folderId' in set) {
         Object.assign(set, { folderId: null, folderName: '' });

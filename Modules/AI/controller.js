@@ -569,8 +569,8 @@ exports.summarizeTask = async (req, res) => {
         if (!companyId) {
             return res.status(400).send({ status: false, statusText: 'companyId header required' });
         }
-        const { taskId = '', force = false } = req.body || {};
-        const result = await summarizeTask({ companyId, uid: req.uid, taskId: String(taskId), force: force === true });
+        const { taskId = '', force = false, keptOnly = false } = req.body || {};
+        const result = await summarizeTask({ companyId, uid: req.uid, taskId: String(taskId), force: force === true, keptOnly: keptOnly === true });
         if (result.notFound) return res.status(404).send({ status: false, statusText: result.reason });
         if (!result.status) {
             return res.send({ status: false, statusText: result.reason || 'Could not summarise this task.', ...(result.aiState ? { aiState: result.aiState } : {}) });

@@ -145,6 +145,12 @@ export function useMainChatConversation(options) {
         return { ...doc, sent: doc.userId === userId.value };
     }
 
+    /* The comments API answers a send with the new id alone, so a row it settles keeps the time it already shows:
+     * the stored one when the socket echo came first, the time it was sent otherwise. */
+    function decorateSent(doc, shown) {
+        return { ...decorate(doc), createdAt: doc.createdAt || (shown && shown.createdAt) };
+    }
+
     /* ------------------------------------------------------------------ *
      * history
      * ------------------------------------------------------------------ */
@@ -650,12 +656,12 @@ export function useMainChatConversation(options) {
         if (existingAt > -1 && existingAt !== pendingAt) {
             if (pendingAt > -1) messages.value.splice(pendingAt, 1);
             const at = messages.value.findIndex((m) => idOf(m) === idOf(doc));
-            if (at > -1) messages.value[at] = decorate(doc);
+            if (at > -1) messages.value[at] = decorateSent(doc, messages.value[at]);
             return;
         }
 
         if (pendingAt === -1) return;
-        messages.value[pendingAt] = { ...decorate(doc), tempId: undefined, isSending: false, failed: false };
+        messages.value[pendingAt] = { ...decorateSent(doc, messages.value[pendingAt]), tempId: undefined, isSending: false, failed: false };
     }
 
     function markFailed(tempId) {
