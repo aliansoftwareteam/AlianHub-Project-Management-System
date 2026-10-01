@@ -548,6 +548,12 @@ describe('the Docs hub', () => {
         expect(value(HUB, '.hub__blank', 'border')).toBe('1.5px dashed var(--brand-border)');
     });
 
+    it('on a phone the toolbar is taller than its buttons, as on Home', () => {
+        const home = declaration(ruleBody(phoneOf(styleOf(HOME_VIEW)), '.home .ah-toolbar'), 'min-height');
+        expect(declaration(ruleBody(phoneOf(styleOf(HUB)), '.ah-page.hub .ah-toolbar'), 'min-height')).toBe(home);
+        expect(parseFloat(compute(home, PHONE))).toBeGreaterThan(parseFloat(PHONE['--hit-min']));
+    });
+
     it('the side lists of the hub and the Inbox are one pattern', () => {
         ['padding', 'gap', 'font-size'].forEach((property) => {
             expect(value(HUB, '.hub__side', property), property).toBe(value(INBOX, '.ibx__side', property));

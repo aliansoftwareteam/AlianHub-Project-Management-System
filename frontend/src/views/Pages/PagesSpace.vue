@@ -631,6 +631,8 @@ const WikiTable = defineComponent({
     .hub__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 767px) {
+    /* The dense toolbar is as tall as a phone button: the row grows so the buttons do not touch its edges. */
+    .ah-page.hub .ah-toolbar { height: auto; min-height: calc(var(--hit-min) + 2 * var(--sp-3, 6px)); }
     .hub__content { padding: 14px 16px 32px; }
     .hub__grid { grid-template-columns: 1fr; }
     .hub__wiki-head { display: none; }
