@@ -7,7 +7,7 @@ module.exports = Object.freeze({
     key: 'fields.fill',
     name: 'Field Filler',
     description: 'Reads the task and the AI fields of its project, and proposes filling the ones that are empty or out of date.',
-    inputs: [],
+    inputs: ['brief'],
     gather: [
         { reader: 'task', as: 'task', params: { maxChars: 3000 } },
         { reader: 'task.ai_fields', as: 'fields', params: { limit: MAX_FIELDS } },
