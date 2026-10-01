@@ -185,7 +185,10 @@
     .evr__status { max-width: 130px; }
     .evr__meta { display: flex; grid-column: 1 / -1; align-items: center; gap: 12px; min-width: 0; }
     .evr__project { flex: 0 1 auto; }
-    .evr__toolbar-end { gap: 6px; }
+    .ah-toolbar.evr__toolbar { padding: 0 12px; gap: 8px; }
+    .evr__total { display: none; }
+    .evr__toolbar-end { gap: 6px; min-width: 0; }
+    .evr__toolbar-end .evr__chip-n { max-width: 64px; }
     .evr__chip-anchor > .evr__views-pop { inset-inline: 12px; }
     .evr__board { scroll-snap-type: x mandatory; }
     .evr__col { flex-basis: calc(100vw - 48px); }
