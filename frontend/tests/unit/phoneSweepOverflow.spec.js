@@ -112,6 +112,13 @@ describe('Project billing on a phone', () => {
         expect(ruleBody(css, '.billing__tabs')).toMatch(/order:\s*1/);
     });
 
+    test('a long project name shortens beside the settings button, and says the whole of it on hover', () => {
+        expect(ruleBody(css, '.billing__title')).toMatch(/text-overflow:\s*ellipsis/);
+        expect(ruleBody(css, '.billing__title')).toMatch(/min-width:\s*0/);
+        expect(ruleBody(css, '.billing__bar .ah-toolbar__spacer')).toMatch(/display:\s*none/);
+        expect(read('views/Billing/Billing.vue')).toMatch(/<h1 class="billing__title" :title="heading">\{\{ heading \}\}<\/h1>/);
+    });
+
     test('the contract and its totals share one scroll', () => {
         expect(ruleBody(css, '.billing__body')).toMatch(/overflow-y:\s*auto/);
         expect(ruleBody(css, '.billing__body .billing__main')).toMatch(/overflow:\s*visible/);
