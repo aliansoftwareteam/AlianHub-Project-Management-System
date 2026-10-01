@@ -31,6 +31,7 @@ vi.mock('@/components/molecules/Home/StandupCard.vue', () => stub('StandupCard')
 vi.mock('@/components/molecules/Home/StatusChip.vue', () => stub('StatusChip'));
 vi.mock('@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue', () => stub('ConfirmationSidebar'));
 vi.mock('@/components/molecules/Home/RecentsCard.vue', () => stub('RecentsCard'));
+vi.mock('@/components/molecules/Home/GoalsCard.vue', () => stub('GoalsCard'));
 vi.mock('@/components/molecules/Home/HomeCatalogCard.vue', () => stub('HomeCatalogCard'));
 vi.mock('@/components/molecules/Home/homeCards', () => ({ homeCards: { layout: [] }, setHomeCardShown: vi.fn(), syncHomeCards: vi.fn() }));
 vi.mock('@/composable/blockingSurface', () => ({ useBlockingSurface: () => ref(false) }));
@@ -55,6 +56,7 @@ vi.mock('@/components/molecules/Home/useMyWork', () => ({
 }));
 
 import TodayOverdue from '@/views/Home/TodayOverdue.vue';
+import { homeCards, setHomeCardShown } from '@/components/molecules/Home/homeCards';
 import { bindRouter, closeTask, overlayState, stepTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 
 const task = (id, extra = {}) => ({ _id: id, TaskName: `Task ${id}`, ProjectID: 'p1', sprintId: 's1', ...extra });
@@ -114,5 +116,31 @@ describe('Home opens a task in the side panel', () => {
         await flushPromises();
 
         expect(fetchOpen).toHaveBeenCalled();
+    });
+});
+
+describe('Home shows the Goals card', () => {
+    const goalsCard = () => wrapper.findComponent({ name: 'GoalsCard' });
+    const remount = (layout) => {
+        wrapper.unmount();
+        homeCards.layout = layout;
+        wrapper = mount(TodayOverdue, { attachTo: document.body });
+    };
+    afterEach(() => { homeCards.layout = []; });
+
+    it('only on a Home whose layout holds it', () => {
+        expect(goalsCard().exists()).toBe(false);
+        remount(['recents']);
+        expect(goalsCard().exists()).toBe(false);
+        remount(['recents', 'goals']);
+        expect(goalsCard().exists()).toBe(true);
+        expect(wrapper.findComponent({ name: 'HomeCatalogCard' }).exists()).toBe(false);
+    });
+
+    it('and takes it off Home when the card asks to be hidden', async () => {
+        remount(['goals']);
+        goalsCard().vm.$emit('hide');
+        await flushPromises();
+        expect(setHomeCardShown).toHaveBeenCalledWith('goals', false);
     });
 });

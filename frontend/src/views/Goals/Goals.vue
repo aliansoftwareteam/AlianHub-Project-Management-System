@@ -179,6 +179,11 @@ watch(() => [goals.value, open.value.goal], awaitCounts, { immediate: true });
 onMounted(() => {
     document.addEventListener("visibilitychange", onVisible);
     store.dispatch("goals/load", { quiet: true });
+    /* Home's Goals card sends someone with no goal here to make one; the mark is used once. */
+    if (route.query?.new && canCreate.value) {
+        creating.value = true;
+        router.replace({ name: "Goals", params: { cid: companyId.value } });
+    }
 });
 onUnmounted(() => {
     leaving = true;

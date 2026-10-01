@@ -73,6 +73,7 @@
                                 <AssignedCommentsCard v-else-if="id === 'assigned_comments'" @open="openTask" @hide="hideCard(id)" />
                                 <StandupCard v-else-if="id === 'standup'" @hide="hideCard(id)" />
                                 <RecentsCard v-else-if="id === 'recents'" @open="openTask" @hide="hideCard(id)" />
+                                <GoalsCard v-else-if="id === 'goals'" @hide="hideCard(id)" />
                                 <HomeCatalogCard v-else :card-key="id" @remove="hideCard(id)" />
                             </template>
                             <section v-if="firstRun && !timer.active" class="hc-card">
@@ -131,6 +132,7 @@ import HomeCardsMenu from "@/components/molecules/Home/HomeCardsMenu.vue";
 import WaitingOnYouCard from "@/components/molecules/Home/WaitingOnYouCard.vue";
 import StandupCard from "@/components/molecules/Home/StandupCard.vue";
 import RecentsCard from "@/components/molecules/Home/RecentsCard.vue";
+import GoalsCard from "@/components/molecules/Home/GoalsCard.vue";
 import HomeCatalogCard from "@/components/molecules/Home/HomeCatalogCard.vue";
 import { homeCards, setHomeCardShown, syncHomeCards } from "@/components/molecules/Home/homeCards";
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue";
