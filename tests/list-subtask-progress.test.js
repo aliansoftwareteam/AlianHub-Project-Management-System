@@ -159,10 +159,19 @@ describe('the List view is wired to all of this', () => {
     const group = read('frontend/src/views/Projects/ListView/ListGroup.vue');
     const row = read('frontend/src/views/Projects/ListView/ListRow.vue');
 
-    test('the expand toggle watches rows as well, and runs immediately', () => {
-        const watcher = group.match(/watch\(\[taskCollapsed, rows\][\s\S]*?\{ immediate: true \}\);/);
-        expect(watcher).not.toBeNull();
-        expect(watcher[0]).toContain('pendingExpandIds(rows.value, autoExpandedIds.value)');
+    test('the expand toggle is applied to rows as they arrive, and runs immediately', () => {
+        const apply = group.match(/function expandArrivedRows\(\) \{[\s\S]*?\n\}/);
+        expect(apply).not.toBeNull();
+        expect(apply[0]).toContain('pendingExpandIds(rows.value, autoExpandedIds.value)');
+        expect(group).toMatch(/watch\(rows, expandArrivedRows, \{ immediate: true \}\);/);
+    });
+
+    /* Rows are replaced on every change to a task in the group; collapsing there closed a parent after each edit of a subtask. */
+    test('only the toolbar switch collapses the rows, never a change to the rows', () => {
+        expect(group).not.toMatch(/watch\(\[taskCollapsed, rows\]/);
+        const collapse = group.match(/watch\(taskCollapsed, \(collapsed\) => \{[\s\S]*?\n\}\);/);
+        expect(collapse).not.toBeNull();
+        expect(collapse[0]).toContain('expandedIds.value = [];');
     });
 
     test('each group loads the progress aggregate and hands it to its rows', () => {

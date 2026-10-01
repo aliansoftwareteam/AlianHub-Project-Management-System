@@ -5,7 +5,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const { replaceObjectKey } = require("../Auth/helper");
 const { estimateAndPersist: estimateTaskTimeWithAI, proposeEstimate, _internal: aiEstimatorInternal } = require("./aiTaskEstimator");
 const { updateRemainingTime } = require("../LogTime/controllerV2/helpers");
-const { resolveSheetScope, SHEET_PERMISSION, scopedEstimateMatch } = require("../TimeSheet/helpers/timeScope");
+const { resolveSheetScope, SHEET_PERMISSION, scopedEstimateMatch, opensProject } = require("../TimeSheet/helpers/timeScope");
 const { scopeEstimatePipeline, TimesheetQueryRefused } = require("../TimeSheet/helpers/timesheetQueryScope");
 const { buildEstimateWrite, EstimateWriteRefused } = require("./helpers/estimateWriteScope");
 const { previousPlanOf, recordPlanChange } = require("./helpers/planHistory");
@@ -23,7 +23,7 @@ exports.getEstimatedTime = async(req,res) => {
         const TaskId = req.params.tid;
 
         const scope = await resolveSheetScope(companyId, req.uid, ESTIMATE_SCOPE_PERMISSIONS);
-        if (scope.visible && !scope.visible.includes(String(projectId))) {
+        if (!opensProject(scope, projectId)) {
             return res.status(200).json([]);
         }
 

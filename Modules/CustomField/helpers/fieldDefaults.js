@@ -1,6 +1,8 @@
+const { PAST, FUTURE } = require('./datePastFuture');
+
 /* The task panel and the List read these settings on every render, and only the field form in the web app sends them. */
 const TYPE_DEFAULTS = new Map([
-    ['date', () => ({ fieldPastFuture: ['Past', 'Future'], fieldDaysDisable: [] })],
+    ['date', () => ({ fieldPastFuture: [PAST, FUTURE], fieldDaysDisable: [] })],
     ['dropdown', () => ({ fieldOptions: [] })],
 ]);
 

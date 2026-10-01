@@ -291,7 +291,10 @@
   .list-head-left {max-width: 100%;}
   .list-head-leftrightwrappper {max-width: 70%;width: 70%;}
   .list-view-header-title {padding-right: 10px;margin-left: 0 !important;overflow: hidden;color: var(--ink);text-overflow: ellipsis;font-size: 18px;font-weight: 500;padding-bottom: 5px;}
-  .assigneelist-audiofile-dropdown {min-width: auto;left: 50% !important;right: auto !important;}
+  /* The rows and the title of this sheet already follow the theme. The sheet behind them and the legacy grey labels did not, so in the dark theme the title was white on white and the labels dark on dark. */
+  .assigneelist-audiofile-dropdown {min-width: auto;left: 50% !important;right: auto !important;background: var(--surface) !important;border-color: var(--hairline) !important;}
+  .assigneelist-audiofile-dropdown .drop-down-item {color: var(--ink-2);}
+  .assigneelist-audiofile-dropdown .drop-down-item .gray4b {color: var(--ink);}
   .assigneelist-audiofile-dropdown .search-project-filter {height: 100% !important;min-width: 100% !important;width: 100% !important;padding: 0 20px !important;}
   .mobiledropdown-projecttitleimage-wrapper {display: flex;align-items: center;}
   .mobiledropdown-projecttitleimage-wrapper .mobile-projectlist-icon,  .mobiledropdown-projecttitleimage-wrapper .project-firtsleeter-box {width: 30px !important;height: 30px !important;border-radius: 5px;font-size: 16px;font-weight: 400;line-height: 19.24px;min-width: 30px !important;max-width: 30px !important;}

@@ -2,6 +2,7 @@ const { IANAZone } = require('luxon');
 const { getRoleType, isPrivileged, evaluatePermission } = require('../../../Config/permissionGuard');
 const { visibleProjectIds } = require('../../Agents/scope');
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
+const { othersPersonalListIds } = require('../../PersonalList/ownership');
 
 const SCOPE_COMPANY = 'company';
 const SCOPE_SELF = 'self';
@@ -17,7 +18,8 @@ const SHEET_PERMISSION = Object.freeze({
 });
 
 /* Owners and admins read company-wide time and money; everyone else reads their own
- * time, or the projects they can open. The role comes from req.uid, never the body. */
+ * time, or the projects they can open. The role comes from req.uid, never the body.
+ * Company-wide stops at a personal list that is someone else's: `hidden` holds those. */
 const resolveTimeScope = async (companyId, uid) => {
     const roleType = await getRoleType(companyId, uid);
     const companyWide = isPrivileged(roleType);
@@ -27,8 +29,20 @@ const resolveTimeScope = async (companyId, uid) => {
         companyWide,
         canSeeMoney: companyWide,
         label: companyWide ? SCOPE_COMPANY : SCOPE_SELF,
+        hidden: companyWide ? await othersPersonalListIds(companyId, String(uid)) : [],
     };
 };
+
+const hiddenFrom = (scope) => (scope && scope.hidden) || [];
+
+/* For a read that names no project: a clause on the row's project field. */
+const withoutHidden = (scope, field = 'ProjectId') => (hiddenFrom(scope).length ? { [field]: { $nin: idForms(hiddenFrom(scope)) } } : {});
+
+/* For a read that names projects: the ones the scope leaves in. */
+const openProjects = (scope, projectIds) => projectIds.map(String)
+    .filter((id) => !hiddenFrom(scope).includes(id) && (!scope.visible || scope.visible.includes(id)));
+
+const opensProject = (scope, projectId) => openProjects(scope, [projectId]).length === 1;
 
 /* null means every project. */
 const visibleProjectsFor = async (companyId, scope) => {
@@ -64,10 +78,11 @@ const scopedTimeMatch = (scope, { userIds = null, projectIds = null } = {}) => {
     if (!scope.everyone) match.Loggeduser = scope.uid;
     else if (userIds) match.Loggeduser = { $in: userIds.map(String) };
     if (projectIds) {
-        const wanted = projectIds.map(String);
-        match.ProjectId = { $in: idForms(scope.visible ? wanted.filter((id) => scope.visible.includes(id)) : wanted) };
+        match.ProjectId = { $in: idForms(openProjects(scope, projectIds)) };
     } else if (scope.visible && (scope.everyone || scope.roleType === null)) {
         match.ProjectId = { $in: idForms(scope.visible) };
+    } else {
+        Object.assign(match, withoutHidden(scope));
     }
     return match;
 };
@@ -78,6 +93,7 @@ const scopedEstimateMatch = (scope) => {
     const match = {};
     if (!scope.everyone) match.$or = [{ UserId: scope.uid }, { UserId: { $exists: false }, userId: scope.uid }];
     if (scope.visible && (scope.everyone || scope.roleType === null)) match.ProjectId = { $in: idForms(scope.visible) };
+    else Object.assign(match, withoutHidden(scope));
     return match;
 };
 
@@ -93,6 +109,9 @@ module.exports = {
     resolveSheetScope,
     scopedTimeMatch,
     scopedEstimateMatch,
+    withoutHidden,
+    openProjects,
+    opensProject,
     safeTimeZone,
     asList,
     filtersOfType,

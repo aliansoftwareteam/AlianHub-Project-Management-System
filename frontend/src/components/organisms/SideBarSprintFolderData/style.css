@@ -27,6 +27,8 @@
     cursor: pointer;
 }
 .sbf__caret img { width: 6px; transition: transform var(--t-state) var(--ease); }
+/* The caret is a black image. */
+:root[data-theme="dark"] .sbf__caret img { filter: invert(1); }
 .sbf__caret--empty { cursor: default; }
 .sbf__icon { width: 15px; flex: none; }
 .sbf__name {

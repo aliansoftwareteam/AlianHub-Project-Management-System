@@ -51,31 +51,17 @@
                             {{ element.TaskName }}
                         </div>
                     </div>
-                    <Transition>
-                        <div class="option-list" id="modelListComponent">
-                            <DropDown mode="menu" :title="element.TaskName" v-if="showArchiveVar ? element.deletedStatusKey === 2 : element.deletedStatusKey === 0">
-                                <template #button="{ triggerAttrs }">
-                                    <button
-                                        type="button"
-                                        class="option-list__trigger"
-                                        v-bind="triggerAttrs"
-                                        :title="$t('Projects.task_actions')"
-                                        :aria-label="$t('Projects.task_actions')"
-                                    >
-                                        <img :src="horizontalDots" alt="" aria-hidden="true">
-                                    </button>
-                                </template>
-                                <template #options>
-                                    <template v-for="item in menuItems" :key="item.id">
-                                        <div v-if="item.separated" class="card-menu__sep" role="separator"></div>
-                                        <DropDownOption :data-item="item.id" @click="runMenu(item.id)">
-                                            <span :class="{ 'card-menu__danger': item.danger }">{{ $t(item.labelKey) }}</span>
-                                        </DropDownOption>
-                                    </template>
-                                </template>
-                            </DropDown>
-                        </div>
-                    </Transition>
+                    <div v-show="!renaming" class="option-list" id="modelListComponent">
+                        <TaskMenuPopup
+                            v-if="showArchiveVar ? element.deletedStatusKey === 2 : element.deletedStatusKey === 0"
+                            :items="menuItems"
+                            :label="$t('Projects.task_actions')"
+                            trigger-class="option-list__trigger"
+                            @choose="runMenu"
+                        >
+                            <img :src="horizontalDots" alt="" aria-hidden="true">
+                        </TaskMenuPopup>
+                    </div>
                 </div>
                 <div
                     v-if="!showArchiveVar && taskTags.length && checkApps('tags') && checkPermission('task.task_tag',projectData?.isGlobalPermission) !== null"
@@ -114,7 +100,6 @@
                     <ProvenanceBadge v-if="showSplitBadge" :task="element" />
                 </div>
                 <div class="d-flex justify-content-between mt-10px" :class="{'ml-5px': element.AssigneeUserId.length > 0}">
-                    <!-- Assignee -->
                     <div class="card-assignee" :class="{ 'card-assignee--agent': !!agentRun }" v-if="checkPermission('task.task_assignee',projectData?.isGlobalPermission) !== null && (groupValue !== 1 || isSubTask)">
                         <span v-if="agentRun" class="card-assignee__agent" :title="agentRun.agentName" aria-hidden="true">◉</span>
                         <Assignee
@@ -136,18 +121,30 @@
                             :class="(myCounts || myParentCounts) > 0 ? 'mr-5px' : ''"
                             :style="`border-radius: ${element?.DueDate ? '5px' : '50%'}; padding: ${element?.DueDate ? '3px 6px' : '6px'};`"
                         >
-                            <img class="mr-5px" v-if="element?.DueDate" src="@/assets/images/svg/component-inactive-icons/comp_calender_inactive.svg" />
-                            <DueDateCompo
+                            <img class="mr-5px" v-if="element?.DueDate" :src="calendarIcon" alt="" />
+                            <CalenderCompo
                                 v-if="canEditDueDate"
-                                id="due-date-task"
                                 class="d-flex align-items-center"
-                                :displyDate="dueDate? new Date(dueDate) : ''"
-                                :disabledDates="element.dueDateDeadLine"
-                                @SelectedDate="($event) => updateDueDate($event)"
-                                :isWithoutBorderImage="true"
-                                :buttonLabel="dueDateText ? $t('List.cell_change', { field: $t('List.due_date'), value: dueDateText }) : $t('List.cell_set', { field: $t('List.due_date') })"
-                            />
-                            <span v-else>{{ element.DueDate ? convertDateFormat(element.DueDate, '', { showDayName: false }) : '' }}</span>
+                                :modelValue="duePickerValue"
+                                :hideExtraLayouts="['time', 'minutes', 'hours', 'seconds']"
+                                menuClass="calender-menu-class-duedate"
+                                @click.stop
+                                @update:modelValue="(dateVal) => updateDueDate({ dateVal })"
+                            >
+                                <template #trigger>
+                                    <button
+                                        type="button"
+                                        class="d-flex calendar-trigger calendar-trigger--button"
+                                        aria-haspopup="dialog"
+                                        :aria-label="dueDateText ? $t('List.cell_change', { field: $t('List.due_date'), value: dueDateText }) : $t('List.cell_set', { field: $t('List.due_date') })"
+                                        :title="dueDateFull || null"
+                                    >
+                                        <template v-if="dueDateText">{{ dueDateText }}</template>
+                                        <img v-else :src="calendarIcon" alt="">
+                                    </button>
+                                </template>
+                            </CalenderCompo>
+                            <span v-else :title="dueDateFull">{{ dueDateText }}</span>
                         </span>
                         <span class="priority__compo"
                             v-if="(groupValue !== 2 || isSubTask) && checkPermission('task.task_priority',projectData?.isGlobalPermission) !== null && checkApps('Priority')"
@@ -225,14 +222,14 @@
     import { useTaskSelection } from "@/composable/useTaskSelection.js";
     import CreateTagPopup from "@/components/molecules/TagList/CreateTagPopup.vue";
     import { taskTagChips } from "@/components/molecules/TagList/helper.js";
-    import DropDown from '@/components/molecules/DropDown/DropDown.vue'
-    import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
     import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
     import TaskMenuSidebars from '@/views/Projects/components/taskMenu/TaskMenuSidebars.vue';
+    import TaskMenuPopup from '@/views/Projects/components/taskMenu/TaskMenuPopup.vue';
     import { taskMenuItems } from '@/views/Projects/composables/taskMenu';
     import { taskUrl } from '@/views/Projects/composables/taskLink';
     import { openTemplateDialog } from '@/components/molecules/TaskTemplates/taskTemplates';
-    import DueDateCompo from '@/components/molecules/DueDateCompo/DueDateCompo.vue';
+    import CalenderCompo from '@/components/atom/CalenderCompo/CalenderCompo.vue';
+    import { dueLabel } from '@/components/molecules/Home/homeFormat';
     import { useI18n } from "vue-i18n";
     import { proposalTitle, skillLabel } from "@/views/Ai/plainLabels";
     import { useTimer } from "@/components/molecules/Home/useTimer";
@@ -280,6 +277,7 @@
     const showSidebar = ref(false);
     const archive = ref(false);
     const horizontalDots = require("@/assets/images/svg/horizontalDots.svg");
+    const calendarIcon = require("@/assets/images/svg/component-inactive-icons/comp_calender_inactive.svg");
     const inventoryIcon = require("@/assets/images/inventory_2.png");
     const deleteIcon = require("@/assets/images/DeleteIcon.png");
     const route = useRoute()
@@ -292,8 +290,9 @@
     const renameDraft = ref("");
     const renameInput = ref(null);
     const titleEl = ref(null);
-    const dueDate = computed(() => element.value.DueDate)
-    const dueDateText = computed(() => (element.value.DueDate ? convertDateFormat(element.value.DueDate, '', { showDayName: false }) : ''))
+    const duePickerValue = computed(() => (element.value.DueDate ? new Date(element.value.DueDate) : ''))
+    const dueDateText = computed(() => dueLabel(element.value.DueDate, t))
+    const dueDateFull = computed(() => (element.value.DueDate ? convertDateFormat(element.value.DueDate, '', { showDayName: false }) : ''))
     const assigneeNames = computed(() => (element.value.AssigneeUserId || [])
         .map((id) => (String(id).startsWith('tId_') ? getTeam(String(id).slice(4))?.name : getUser(id)?.Employee_Name))
         .filter(Boolean)
