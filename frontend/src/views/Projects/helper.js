@@ -11,8 +11,14 @@ import { apiRequest } from '../../services';
 import { isOwnerOrAdmin } from "@/utils/roles";
 import { isFavourite } from "@/composable/favourites";
 import { assigneeCondition, assigneeGroups, dueDateBuckets, dueDateCondition, restoreGroupState, sprintToLoad } from "./taskGroups";
-import { customFieldGroups, customFieldIdOf, customGroupUpdate } from "./composables/customFieldQuery";
+import { customFieldGroups, customFieldIdOf, customGroupUpdate, needsProjectRange, numberRangeStages, rangeFromRows } from "./composables/customFieldQuery";
 import { activeMemberIds } from "@/plugins/customFieldView/fieldTypes/people";
+import { flatTasks } from "./composables/projectCustomFields";
+
+/* The bands of a number group are cut from the project's own values; if the range cannot be read, the loaded tasks stand in. */
+const projectNumberRange = (def, projectId) => apiRequest("post", `${env.TASK}/find`, { findQuery: numberRangeStages(def, projectId) })
+    .then((result) => rangeFromRows(result?.data))
+    .catch(() => null);
 
 const projectsList = ref([]);
 const filterdProjects = ref([]);
@@ -956,7 +962,11 @@ export function taskListHelper() {
                 const people = def?.fieldType === "people"
                     ? activeMemberIds(getters["settings/companyUsers"]).map((id) => ({ id, name: getUser(id).Employee_Name }))
                     : [];
-                arr = customFieldGroups(def, { t, people });
+                const range = needsProjectRange(def) ? await projectNumberRange(def, project._id) : null;
+                const loaded = needsProjectRange(def) && !range
+                    ? flatTasks([getters["projectData/tasks"], getters["projectData/tableTasks"]], project._id)
+                    : [];
+                arr = customFieldGroups(def, { t, people, range, tasks: loaded });
 
                 sprints.forEach((sprint, index) => {
                     sprint.isExpanded = false;

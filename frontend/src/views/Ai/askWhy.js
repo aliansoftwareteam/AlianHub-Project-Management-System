@@ -1,3 +1,5 @@
+import { docRoute } from "@/components/molecules/Pages/docRoute";
+
 export const KIND_KEYS = Object.freeze({
     task: "Ask.kind_task",
     page: "Ask.kind_page",
@@ -52,7 +54,7 @@ export const hasPermissionDetail = (sources) => (sources || []).some((source) =>
 export const sourceLink = (source, companyId) => {
     if (!source || !source.id) return null;
     if (source.kind === "task") return { query: { task: String(source.id) } };
-    if (source.kind === "page") return { name: "PageEditor", params: { cid: companyId, pageId: String(source.id) } };
+    if (source.kind === "page") return docRoute(companyId, source.id);
     return null;
 };
 

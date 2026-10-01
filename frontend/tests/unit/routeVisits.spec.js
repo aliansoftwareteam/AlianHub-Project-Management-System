@@ -25,9 +25,9 @@ describe('which visits a route records', () => {
         ]);
     });
 
-    it('records a doc opened in the editor or in the docs space', () => {
+    it('records a doc opened in the editor, and nothing for the Docs hub, which shows no doc', () => {
         expect(visitsForRoute(at('PageEditor', { pageId: D }))).toEqual([{ entityType: 'doc', entityId: D }]);
-        expect(visitsForRoute(at('Pages', {}, { page: D }))).toEqual([{ entityType: 'doc', entityId: D }]);
+        expect(visitsForRoute(at('Pages', {}, { page: D }))).toEqual([]);
         expect(visitsForRoute(at('Pages'))).toEqual([]);
     });
 

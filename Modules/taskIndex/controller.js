@@ -211,7 +211,7 @@ exports.updateTaskIndexWhenLoad = async (req,res) => {
                         data: [taskObj]
                     }
                     MongoDbCrudOpration(companyId, objSh, 'aggregate').then((resp)=>{
-                        if (resp && resp[0].results && resp[0].results.length) {
+                        if (resp?.[0]?.results?.length) {
                             exports.updateIndex(req.body.taskUpdate,companyId,rep,resp[0].results[0]).then((response)=>{
                                 res.send(response)
                             }).catch((error)=>{

@@ -79,6 +79,18 @@ describe('choosing what an AI field outputs', () => {
         await wrapper.setProps({ modelValue: draftFor('rating') });
         expect(wrapper.find('#ai-field-min').exists()).toBe(false);
         expect(wrapper.find('#ai-field-date-rule').exists()).toBe(false);
+        await wrapper.get('[data-rating-max]').setValue('8');
+        expect(wrapper.emitted('update:modelValue').at(-1)[0]).toEqual(expect.objectContaining({ output: 'rating', fieldRatingMax: '8' }));
+
+        await wrapper.setProps({ modelValue: aiDraftFrom(ratingField) });
+        expect(wrapper.find('[data-rating-max]').exists()).toBe(false);
+    });
+
+    it('checks the maximum of a new rating', () => {
+        const t = (key) => key;
+        expect(validateAiDraft(draftFor('rating', { fieldRatingMax: '12' }), t).settings).toBe('FieldTypes.rating_max_error');
+        expect(validateAiDraft(draftFor('rating', { fieldRatingMax: '7' }), t)).toEqual({});
+        expect(validateAiDraft({ ...aiDraftFrom(ratingField), fieldRatingMax: '12' }, t)).toEqual({});
     });
 
     it('checks the range and decimals of a number', () => {
@@ -99,8 +111,10 @@ describe('choosing what an AI field outputs', () => {
         expect(open.fieldAi).toEqual(expect.objectContaining({ min: null, max: null, decimals: null, outOfRange: 'clamp' }));
 
         const rating = aiFieldPayload(draftFor('rating'));
-        expect(rating).toEqual(expect.objectContaining({ fieldType: 'number', fieldMinimum: '1', fieldMaximum: '5' }));
+        expect(rating).toEqual(expect.objectContaining({ fieldType: 'rating', fieldRatingMax: 5 }));
+        expect(rating).not.toHaveProperty('fieldMaximum');
         expect(rating.fieldAi.output).toBe('rating');
+        expect(aiFieldPayload(draftFor('rating', { fieldRatingMax: '8' })).fieldRatingMax).toBe(8);
 
         const labels = aiFieldPayload(draftFor('labels', { options: [{ id: 'o1', label: 'Backend' }] }));
         expect(labels.fieldType).toBe('dropdown');
@@ -118,6 +132,13 @@ describe('choosing what an AI field outputs', () => {
         expect(aiDraftFrom(numberField)).toEqual(expect.objectContaining({ output: 'number', template: 'custom', min: '0', max: '40', decimals: '1', outOfRange: 'reject' }));
         expect(aiDraftFrom(dateField)).toEqual(expect.objectContaining({ output: 'date', dateRule: 'after_start' }));
         expect(aiDraftFrom(ratingField).output).toBe('rating');
+    });
+
+    it('keeps a rating saved on a number field as a number field, with no migration', () => {
+        const saved = aiFieldPayload(aiDraftFrom(ratingField));
+        expect(saved).toEqual(expect.objectContaining({ fieldType: 'number', fieldMinimum: '1', fieldMaximum: '5' }));
+        expect(saved).not.toHaveProperty('fieldRatingMax');
+        expect(saved.fieldAi.output).toBe('rating');
     });
 });
 
