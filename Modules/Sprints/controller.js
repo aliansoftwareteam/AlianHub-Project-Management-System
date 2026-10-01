@@ -572,6 +572,7 @@ exports.updateSprintFun = (req) => {
 
 /* Other tabs learn only that the company's folders changed, and read them again: see socket/controller/folderSocket.js. */
 const announceFolders = (type, companyId) => socketEmitter.emit(type, { type, companyId, module: 'folders' });
+exports.announceFolders = announceFolders;
 
 const recordFolderHistory = (companyId, projectId, message, userData) => HandleHistoryref
     .HandleHistory('project', companyId, projectId, null, { message, key: 'Create_Folder' }, userData)
@@ -579,23 +580,27 @@ const recordFolderHistory = (companyId, projectId, message, userData) => HandleH
         logger.error("ERROR in handle history", error.message);
     });
 
+exports.addFolderFun = async ({ companyId, projectId, folderName, parentFolderId }) => {
+    const parent = await parentForNewFolder(companyId, projectId, parentFolderId);
+    const doc = await MongoQ.MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.FOLDERS,
+        data: {
+            name: folderName,
+            projectId : new mongoose.Types.ObjectId(projectId),
+            deletedStatusKey : 0,
+            ...(parent ? { parentFolderId: parent._id } : {}),
+        },
+    }, "save");
+    announceFolders('insert', companyId);
+    return { doc, parent };
+};
+
 exports.addFolder = async (req, res) => {
     try {
         const {projectId, folderName, userData, mainChat = false} = req.body;
         const companyId = String(req.headers['companyid'] || '');
-        const parent = await parentForNewFolder(companyId, projectId, req.body.parentFolderId);
-
-        const doc = await MongoQ.MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.FOLDERS,
-            data: {
-                name: folderName,
-                projectId : new mongoose.Types.ObjectId(projectId),
-                deletedStatusKey : 0,
-                ...(parent ? { parentFolderId: parent._id } : {}),
-            },
-        }, "save");
+        const { doc, parent } = await exports.addFolderFun({ companyId, projectId, folderName, parentFolderId: req.body.parentFolderId });
         res.send({status: true, statusText: "Folder added successfully",data:doc});
-        announceFolders('insert', companyId);
         if(mainChat) return;
 
         notifyFolderCreated({ companyId, projectId, folderName, actorId: req.uid })

@@ -124,7 +124,10 @@ describe('sample tasks', () => {
         const kids = docs.filter((d) => d.isParentTask === false);
 
         expect(kids.length).toBeGreaterThan(0);
-        kids.forEach((kid) => expect(kid.ancestors).toEqual([kid.ParentTaskId]));
+        kids.forEach((kid) => {
+            const parent = docs.find((d) => String(d._id) === kid.ParentTaskId);
+            expect(kid.ancestors).toEqual([...parent.ancestors, kid.ParentTaskId]);
+        });
         docs.filter((d) => d.isParentTask).forEach((doc) => expect(doc.ancestors).toEqual([]));
     });
 });
