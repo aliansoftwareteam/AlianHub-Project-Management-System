@@ -54,7 +54,12 @@ const seedPerson = (uid, email, over = {}) => {
     });
 };
 
-const importBoard = async () => {
+const TWO_COMMENTS = [
+    { type: 'commentCard', data: { card: { id: 'c1' }, text: 'first' }, memberCreator: { fullName: 'Trello Tom' } },
+    { type: 'commentCard', data: { card: { id: 'c1' }, text: 'second' }, memberCreator: { fullName: 'Trello Tom' } },
+];
+
+const importBoard = async (actions = TWO_COMMENTS) => {
     const res = { code: 200 };
     res.status = (code) => { res.code = code; return res; };
     res.send = (body) => { res.body = body; return res; };
@@ -72,10 +77,7 @@ const importBoard = async () => {
                     { id: 'c1', name: 'Discussed card', idList: 'l1', closed: false, idMembers: ['m1', 'm2'] },
                     { id: 'c2', name: 'Quiet card', idList: 'l1', closed: false, idMembers: ['m1'] },
                 ],
-                actions: [
-                    { type: 'commentCard', data: { card: { id: 'c1' }, text: 'first' }, memberCreator: { fullName: 'Trello Tom' } },
-                    { type: 'commentCard', data: { card: { id: 'c1' }, text: 'second' }, memberCreator: { fullName: 'Trello Tom' } },
-                ],
+                actions,
             },
         },
     }, res);
@@ -123,5 +125,25 @@ describe('comments carried in by an import', () => {
 
         const quiet = `task_${PROJECT}_${SPRINT}_${String(taskNamed('Quiet card')._id)}_comments`;
         expect(counterOf(MEMBER)[quiet]).toBeUndefined();
+    });
+});
+
+describe('what an imported comment carries', () => {
+    const storedKey = `Project/${PROJECT}/${SPRINT}/6f0000000000000000000b99/Comments/secret.png`;
+    const commentWithFile = {
+        type: 'commentCard',
+        mediaURL: storedKey,
+        data: { card: { id: 'c1' }, text: 'see the file', mediaURL: storedKey, mediaName: 'secret.png', type: 'image', attachment: { url: storedKey } },
+        memberCreator: { fullName: 'Trello Tom' },
+    };
+
+    it('is text alone: no file, whatever the import file names', async () => {
+        const res = await importBoard([commentWithFile]);
+        expect(res.body.status).toBe(true);
+
+        const comments = companyDb().store[SCHEMA_TYPE.COMMENTS] || [];
+        expect(comments).toHaveLength(1);
+        expect(comments[0]).toMatchObject({ type: 'text', message: 'Trello Tom: see the file' });
+        expect(Object.keys(comments[0]).filter((field) => /media|attachment|url/i.test(field))).toEqual([]);
     });
 });
