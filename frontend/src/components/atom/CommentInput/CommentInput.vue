@@ -14,7 +14,7 @@
                         @mouseover="selectedUserIndex = index"
                         @click="addMention(data)"
                     >
-                        <UserProfile
+                        <UserProfile decorative
                             :showDot="false"
                             class="user__profile cursor-pointer mr-10px"
                             :data="{
@@ -73,7 +73,7 @@
         <div class="d-flex flex-column w-100">
             <div v-if="reply && Object.keys(reply).length" class="d-flex align-items-center justify-content-between overflow-y-auto bg-white style-scroll border-top-radius-5-px reply-box bg-gainsboro">
                 <div class="d-flex align-items-center emp__profile-wrapper">
-                    <UserProfile
+                    <UserProfile decorative
                         :showDot="false"
                         class="profile-image mr-5px emplyoee__profile-img"
                         :data="{

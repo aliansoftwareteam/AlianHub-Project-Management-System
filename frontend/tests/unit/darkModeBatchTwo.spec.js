@@ -128,7 +128,8 @@ describe('the project details page paints from tokens', () => {
     });
 
     test('the page body is the canvas of the theme, not the fixed light grey', () => {
-        expect(template('views/Projects/Projects.vue')).toMatch(/activeTab === 'ProjectDetail' \? 'list-view-body--detail' : 'bg-light-gray'/);
+        expect(template('views/Projects/Projects.vue')).toMatch(/TOKEN_BODY_TABS\.includes\(activeTab\) \? 'list-view-body--detail' : 'bg-light-gray'/);
+        expect(read('views/Projects/Projects.vue')).toMatch(/const TOKEN_BODY_TABS = \['ProjectDetail'/);
         const body = ruleBody(read('views/Projects/style.css'), '.list-view-body--detail');
         expect(body).toMatch(/background:\s*var\(--canvas\)/);
         expect(body).toMatch(/color:\s*var\(--ink\)/);
@@ -141,9 +142,9 @@ describe('the project details page paints from tokens', () => {
     });
 
     test('the shared blocks inside the page take theme ink for their legacy colour classes', () => {
-        const css = read('views/Projects/ProjectDetail/theme.css');
-        expect(css).toMatch(/\.project__detail-component :is\([^)]*\.black[^)]*\)[^{]*\{[^}]*color:\s*var\(--ink\)/);
-        expect(css).toMatch(/\.project__detail-component \.blue[^{]*\{[^}]*color:\s*var\(--brand\)/);
+        const css = read('views/Projects/style.css');
+        expect(css).toMatch(/\.list-view-body--detail :is\([^)]*\.black[^)]*\)[^{]*\{[^}]*color:\s*var\(--ink\)/);
+        expect(css).toMatch(/\.list-view-body--detail \.blue[^{]*\{[^}]*color:\s*var\(--brand\)/);
         expect(read('views/Projects/ProjectDetail/ProjectDetail.vue')).toMatch(/<style src="\.\/theme\.css"><\/style>/);
     });
 

@@ -1,8 +1,11 @@
 .calendar_wrapper {
     width: 281px;
     height: 165px;
-    background: #FFFFFF;
-    box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+    color: var(--ink);
+    color-scheme: var(--scheme);
+    box-shadow: var(--shadow-pop);
     border-radius: 8px;
     position: absolute;
     bottom: 100%;
@@ -17,7 +20,7 @@
 .calendar_year_wrapper{
     justify-content: space-between;
     padding: 11.9px 16px;
-    border-bottom: 1px solid #E0E0E0;
+    border-bottom: 1px solid var(--hairline);
 }
 .calendar_wrapper .common_class {
     max-width: 25%;
@@ -36,7 +39,7 @@
     font-style: normal;
     font-weight: 400;
     font-size: 12px;
-    color: #818181;
+    color: var(--ink-2);
 }
 .isDisable {
     pointer-events: none;
@@ -47,14 +50,15 @@
 .customcalendar{
     width: 281px;
     height: 230px;
-    background-color: white;
-    box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.15);
+    background-color: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow-pop);
     border-radius: 8px;
     position: absolute;
 }
 .monthyearcalendar{
     height: 44px;
-    border-bottom: 1px solid #E0E0E0;
+    border-bottom: 1px solid var(--hairline);
     justify-content: space-between;
     padding: 0px 16px;
 }
@@ -81,11 +85,11 @@
 .monthandrange::-webkit-scrollbar {
     width: 5px;
     height: 5px;
-    background: #CFCFCF;
+    background: var(--fill);
     border-radius: 6px;
 }
 .monthandrange::-webkit-scrollbar-thumb {
-    background: #2f3990;
+    background: var(--brand);
     border-radius: 6px;
   }
 .hovermonthandrange{
@@ -93,7 +97,7 @@
     margin: 3px 0px;
 }
 .hovermonthandrange:hover{
-    background: #F0F0F0;
+    background: var(--surface-hover);
     border-radius: 4px;
 }
 .hourlyCalendarModelWrapper{
@@ -101,37 +105,38 @@
     max-width: 100%;
     width: 100%;
     margin-left: 0px;
-    border: 1px solid #E0E0E0;
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 0px 10px;
     font-size: 16px;
     font-family: var(--font-ui);
     font-weight: 400;
-    color: #949DA8;
+    color: var(--ink-2);
     font-size: 12px;
     display: flex;
     justify-content: flex-start;
     align-items: center;
-    background: white;
+    background: var(--surface);
 }
 span.addActiveClassForCurrentDate {
     display: block;
-    background-color: #8591f9;
+    background-color: var(--brand-tint);
     border-radius: 4px;
-    color: white;
+    color: var(--brand);
 }
 span.addActiveClass {
     display: block;
-    background-color: #2F3990;
+    background-color: var(--brand);
     border-radius: 4px;
-    color: white;
+    color: var(--on-brand);
 }
 .drop_down_month_year{
     position: absolute;
     top: 25px;
-    background: white;
-    box-shadow: 0 5px 25px 0 rgb(0 0 0 / 10%);
-    border: 1px solid rgba(0,0,0,0.1);
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow-pop);
+    border: 1px solid var(--border);
     padding: 5px;
     width: 100%;
     max-height: 95px;
@@ -155,3 +160,5 @@ span.addActiveClass {
     cursor: not-allowed;
     pointer-events: none !important;
 }
+/* The year arrows are a dark image. */
+:root[data-theme="dark"] .calendar_year_wrapper > img { filter: invert(1); }

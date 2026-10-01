@@ -12,7 +12,7 @@
             :validations="'required:trim|length:10'" :bindValue="props.customFieldObject?.fieldDescription ? props.customFieldObject.fieldDescription : fieldDescription"
             :validationVisibility="'blur'" :className="'custom__field-required'" :name="'fieldDescription'"
         />
-        <DropDown mode="listbox" :zIndex="10" v-if="isType">
+        <DropDown themed mode="listbox" :zIndex="10" v-if="isType">
             <template #button>
                 <div class="formkit__form-wrapper" :ref="customFieldTypeUniqueId">
                     <div class="custom__field-required">

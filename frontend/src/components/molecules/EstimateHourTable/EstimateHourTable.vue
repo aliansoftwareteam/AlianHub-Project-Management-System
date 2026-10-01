@@ -48,7 +48,7 @@
                     <td class="full-width total__users" :title="user.Employee_Name">
                         <div class="d-flex align-items-center">
                             <!-- <img :src="user.userProfile" class="table-user-w30" /> -->
-                            <UserProfile 
+                            <UserProfile decorative 
                                 :data="{
                                     id: user.id,
                                     title: user.Employee_Name,

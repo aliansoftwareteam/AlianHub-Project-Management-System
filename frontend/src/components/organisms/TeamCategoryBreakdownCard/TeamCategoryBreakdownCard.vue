@@ -147,7 +147,7 @@ onMounted(load);
 .tcb-caret.open { transform: rotate(90deg); }
 .tcb-types { padding: 2px 0 6px 20px; }
 .tcb-type-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: pointer; }
-.tcb-type-name { width: 26%; font-size: 12px; color: #3a3f52; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: capitalize; }
+.tcb-type-name { width: 26%; font-size: 12px; color: #3a3f52; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tcb-track { flex: 1; height: 11px; background: #eef0f6; border-radius: 4px; overflow: hidden; }
 .tcb-fill { height: 100%; background: #0d9488; }
 .tcb-type-val { width: 54px; text-align: right; font-size: 11px; color: #3a3f52; }
