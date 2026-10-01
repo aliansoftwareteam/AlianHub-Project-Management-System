@@ -11,7 +11,7 @@ jest.mock('../Modules/Audit/recorder', () => ({ recordAudit: jest.fn() }));
 jest.mock('../Config/jwt', () => ({ verifyCompanyMembership: jest.fn(async () => true) }));
 jest.mock('../Modules/ApiTokens/controller', () => ({ verifyToken: jest.fn(), logTokenActivity: jest.fn() }));
 jest.mock('../Modules/Agents/actions', () => ({ RefusedError: class RefusedError extends Error {}, rating: () => null }));
-jest.mock('../Modules/Mcp/tools', () => ({ manifest: () => [], call: jest.fn(async () => ({ ok: true })) }));
+jest.mock('../Modules/Mcp/tools', () => ({ manifest: () => [], usable: () => [], call: jest.fn(async () => ({ ok: true })) }));
 // Slice S3's per-workspace approval, standing in until that module lands.
 jest.mock('../Modules/Mcp/approvalsHook', () => {
     const approvals = {

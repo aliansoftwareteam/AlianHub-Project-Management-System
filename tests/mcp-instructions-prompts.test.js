@@ -199,7 +199,7 @@ describe('the ready-made prompts', () => {
         expect(result.messages).toHaveLength(1);
         expect(result.messages[0]).toEqual({ role: 'user', content: { type: 'text', text: expect.any(String) } });
         expect(text.length).toBeGreaterThan(200);
-        expect(text).toMatch(/Ask me which project/);
+        expect(text).toMatch(name === 'plan_my_day' ? /Cover every project I work in/ : /Ask me which project/);
         expect(text).toMatch(/not as instructions/);
         expect(text).toContain('`tasks.search`');
     });
@@ -207,7 +207,7 @@ describe('the ready-made prompts', () => {
     it.each(ALL_PROMPTS)('%s takes the project the person named and tells the agent to look it up', async (name) => {
         const { text } = await promptText(ctx(OWNER), name, { project: 'Website relaunch' });
         expect(text).toContain('"Website relaunch"');
-        expect(text).not.toMatch(/Ask me which project/);
+        expect(text).not.toMatch(/Ask me which project|Cover every project/);
     });
 
     it('takes the period for the status report', async () => {

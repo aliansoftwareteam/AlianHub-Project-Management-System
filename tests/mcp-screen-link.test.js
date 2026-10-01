@@ -60,6 +60,7 @@ const link = (caller, args) => rpc(caller, TOOL, args);
 
 beforeEach(() => {
     seed();
+    delete process.env.MCP_TOOLS_WORK;
     process.env.MCP_TOOLS_DATA = 'on';
     process.env.WEBURL = `${BASE}/`;
     delete process.env.APIURL;
