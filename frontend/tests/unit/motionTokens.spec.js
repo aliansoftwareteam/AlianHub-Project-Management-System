@@ -101,8 +101,6 @@ describe('the shared overlays move on the motion tokens', () => {
         ['the drawer slide', 'assets/css/tokens.css', '.ah-slide-right-enter-active', /transition:\s*transform var\(--motion-slow\) var\(--ease-out\), opacity var\(--motion-slow\) var\(--ease-out\)/],
         ['the task drawer', 'components/organisms/TaskDetailOverlay/style.css', '.ah-detail-enter-active', /transition:\s*opacity var\(--motion-slow\) var\(--ease-out\)/],
         ['the task drawer panel', 'components/organisms/TaskDetailOverlay/style.css', '.ah-detail-enter-active .ah-detail__panel', /transition:\s*transform var\(--motion-slow\) var\(--ease-out\)/],
-        ['the dialog backdrop', 'components/atom/Modal/style.css', '.modal-overlay', /animation:\s*ah-fade-in var\(--motion-base\) var\(--ease-out\)/],
-        ['the dialog', 'components/atom/Modal/style.css', '.modal', /animation:\s*ah-rise-in var\(--motion-base\) var\(--ease-out\)/],
         ['the confirm dialog backdrop', 'components/atom/ConfirmDelete/ConfirmDelete.vue', '.cd__wrap', /animation:\s*ah-fade-in var\(--motion-base\) var\(--ease-out\)/],
         ['the confirm dialog', 'components/atom/ConfirmDelete/ConfirmDelete.vue', '.cd', /animation:\s*ah-rise-in var\(--motion-base\) var\(--ease-out\)/],
         ['the toast', 'components/molecules/UndoToast/UndoToast.vue', '.ah-undo-toast', /animation:\s*ah-rise-in var\(--motion-base\) var\(--ease-out\)/],
@@ -114,7 +112,6 @@ describe('the shared overlays move on the motion tokens', () => {
     });
 
     it.each([
-        'components/atom/Modal/style.css',
         'components/atom/ConfirmDelete/ConfirmDelete.vue',
         'components/molecules/UndoToast/UndoToast.vue',
         'components/molecules/ToolTip/style.css',

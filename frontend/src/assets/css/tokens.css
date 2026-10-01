@@ -275,15 +275,15 @@
     --brand-tint: rgba(123, 50, 200, .10);
     --brand-ring: rgba(123, 50, 200, .12);
     --brand-border: rgba(123, 50, 200, .35);
-    --rail-brand: #d3a1ff;
+    --rail-brand: #dc8cff;
 }
 :root[data-theme="dark"][data-accent="purple"]:not(.ah-high-contrast),
 :root[data-theme="dark"] [data-accent-swatch="purple"] {
-    --brand: #d3a1ff;
-    --brand-deep: #c08cf0;
-    --brand-tint: rgba(211, 161, 255, .16);
-    --brand-ring: rgba(211, 161, 255, .22);
-    --brand-border: rgba(211, 161, 255, .35);
+    --brand: #dc8cff;
+    --brand-deep: #c877ee;
+    --brand-tint: rgba(220, 140, 255, .16);
+    --brand-ring: rgba(220, 140, 255, .22);
+    --brand-border: rgba(220, 140, 255, .35);
 }
 
 :root[data-accent="teal"]:not(.ah-high-contrast),
@@ -612,7 +612,7 @@ html, body, #app {
 .ah-btn--secondary { background: var(--surface); border-color: var(--border); }
 .ah-btn--secondary:hover:not(:disabled) { background: var(--surface-hover); }
 .ah-btn--outline { border-color: var(--brand); color: var(--brand); background: var(--brand-tint); }
-.ah-btn--outline:hover:not(:disabled) { background: color-mix(in srgb, var(--brand) 16%, transparent); }
+.ah-btn--outline:hover:not(:disabled) { background: rgba(47, 57, 144, .16); }
 .ah-btn--ghost { color: var(--ink-2); }
 .ah-btn--ghost:hover:not(:disabled) { background: var(--surface-hover); color: var(--ink); }
 .ah-btn--danger { background: var(--danger); color: #fff; }
