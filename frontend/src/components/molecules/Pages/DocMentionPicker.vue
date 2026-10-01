@@ -27,7 +27,7 @@
                 </span>
                 <span v-else-if="item.type === 'task'" class="ah-chip ah-chip--mono dmp__key">{{ item.meta }}</span>
                 <span v-else class="dmp__glyph" aria-hidden="true"><ShellIcon name="docs" :size="12" /></span>
-                <span class="dmp__name">{{ item.label }}</span>
+                <span class="dmp__name">{{ item.name ?? item.label }}</span>
             </button>
         </template>
         <div v-if="!flat.length" class="dmp__empty" role="status">{{ loading ? $t('Docs.mention_searching') : $t('Docs.mention_no_results') }}</div>

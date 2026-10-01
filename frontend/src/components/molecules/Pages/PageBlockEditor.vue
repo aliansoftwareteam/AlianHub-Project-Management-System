@@ -49,7 +49,7 @@ import { createSelectionTools } from '@/components/molecules/AiSelection/selecti
 import { listsOfProject } from '@/utils/aiTargets';
 import { createBlockTools, TASK_LIST_LIMIT } from './blockTools';
 import { initials } from './docsFormat';
-import { decorateMentions, mentionElement, mentionQueryAt } from './docMentions';
+import { decorateMentions, mentionElement, mentionQueryAt, taskMentionItem } from './docMentions';
 import { useMentionLinks } from './useMentionLinks';
 
 const { contentToEditorData, blocksToHtml, emptyEditorData } = pageContent.default || pageContent;
@@ -176,8 +176,7 @@ const mentionSources = {
             .map((page) => ({ type: 'doc', id: String(page._id), label: page.title || t('Docs.untitled') }));
     },
     async tasks(query) {
-        return (await toolContext.searchTasks(query, ''))
-            .map((task) => ({ type: 'task', id: String(task._id), label: [task.TaskKey, task.TaskName].filter(Boolean).join(' '), meta: task.TaskKey || '' }));
+        return (await toolContext.searchTasks(query, '')).map(taskMentionItem);
     },
 };
 

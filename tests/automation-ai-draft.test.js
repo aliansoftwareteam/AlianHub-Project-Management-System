@@ -307,6 +307,42 @@ describe('the assign action takes people as a list', () => {
     });
 });
 
+describe('the due date and subtask triggers and the notify action are offered to the model', () => {
+    it('lists them in the registry the model may use', () => {
+        const schema = aiDraft.draftSchema();
+        expect(schema.triggers.map((t) => t.key)).toEqual(expect.arrayContaining(['task.due_date_passed', 'task.subtasks_all_done']));
+        const notify = schema.actions.find((a) => a.key === 'notify');
+        expect(Object.keys(notify.config)).toEqual(['recipients', 'message', 'includeActor']);
+        expect(notify.config.recipients).toMatchObject({ required: true, list: true, alsoAccepts: ['task_assignees', 'task_creator', 'task_watchers'] });
+    });
+
+    it('drafts a rule that tells the assignees and a named person when a due date passes', async () => {
+        modelSays(draftOf({
+            trigger: 'task.due_date_passed', conditions: [],
+            actions: [{ action: 'notify', config: { recipients: ['task_assignees', 'Priya'], message: 'This is overdue' } }],
+        }));
+        const res = await call({ body: { sentence: 'When a task is overdue, tell the assignees and Priya' } });
+        expect(res.body.data.rejected).toEqual([]);
+        expect(res.body.data.rule.trigger).toEqual({ type: 'event', event: 'task.due_date_passed' });
+        expect(res.body.data.rule.steps[0].config).toEqual({ recipients: ['task_assignees', PRIYA], message: 'This is overdue' });
+        expect(res.body.data.sentence).toBe('When a task due date passes, send "This is overdue" to the assignees and Priya Shah.');
+    });
+
+    it('drafts a rule on the subtasks trigger', async () => {
+        modelSays(draftOf({ trigger: 'task.subtasks_all_done', conditions: [], actions: [{ action: 'set_priority', config: { priority: 'LOW' } }] }));
+        const res = await call({ body: { sentence: 'When every subtask is finished, lower the priority' } });
+        expect(res.body.data.rejected).toEqual([]);
+        expect(res.body.data.rule.trigger.event).toBe('task.subtasks_all_done');
+    });
+
+    it('rejects a notify draft that names someone outside the caller\'s projects', async () => {
+        modelSays(draftOf({ actions: [{ action: 'notify', config: { recipients: ['Sam Secret'], message: 'Hi' } }] }));
+        const res = await call({ body: { sentence: 'When a task becomes urgent, tell Sam' } });
+        expect(res.body.data.rule).toBeNull();
+        expect(res.body.data.rejected.join(' ')).toContain('Sam Secret');
+    });
+});
+
 describe('who may draft, and when AI is off', () => {
     it('refuses a member without calling the model', async () => {
         modelSays(draftOf());

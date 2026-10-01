@@ -47,6 +47,7 @@ COPY Modules/Project/helpers/viewSettings.js /app/Modules/Project/helpers/viewSe
 COPY Modules/CustomField/helpers/fieldTaskTypes.js /app/Modules/CustomField/helpers/fieldTaskTypes.js
 COPY Modules/CustomField/fieldTypes /app/Modules/CustomField/fieldTypes
 COPY Modules/Automations/templates.js /app/Modules/Automations/templates.js
+COPY Modules/Company/helpers/workingDays.js /app/Modules/Company/helpers/workingDays.js
 
 # Build the SPA bundle. webpack needs more than Node's default ~2 GB heap for
 # this bundle (same setting as ci.yml).
