@@ -333,8 +333,7 @@ const executors = {
         if (idOf(task.sprintId) === idOf(destination.sprint._id)) throw refuse('the task is already in that list');
 
         const { loadSubtree } = require('../Tasks/helpers/taskTree');
-        const below = async () => loadSubtree(companyId, task._id, { filter: { deletedStatusKey: { $nin: [TRASHED] } } });
-        const subtree = await below();
+        const subtree = await loadSubtree(companyId, task._id, { filter: { deletedStatusKey: { $nin: [TRASHED] } } });
         const source = await storedProject(companyId, task.ProjectID);
         const sameProject = idOf(source._id) === destinationId;
         const mapping = sameProject ? { taskStatusData: source.taskStatusData || [], taskTypeCounts: source.taskTypeCounts || [] } : mappedForMove(source, destination.project);
@@ -351,9 +350,6 @@ const executors = {
             watcher: await carried(task.watchers),
         };
         await asRoute(companyId, uid, 'moveTask', { ...body, moveTaskId: idOf(task._id), isSubTask: subtree.length > 0 });
-        // The handler carries the direct subtasks; a deeper row it left on the old list follows through the same handler.
-        const leftBehind = (await below()).filter((row) => idOf(row.sprintId) !== idOf(destination.sprint._id));
-        for (const row of leftBehind) await asRoute(companyId, uid, 'moveTask', { ...body, moveTaskId: idOf(row._id), isSubTask: false });
 
         return { result: { projectId: destinationId, sprintId: idOf(destination.sprint._id), moved: 1 + subtree.length }, undo: null, entityId: task._id, entityName: task.TaskName };
     },

@@ -460,7 +460,7 @@ describe('task.move', () => {
             expect(stored(task._id)).toMatchObject({ deletedStatusKey: 0, statusKey: 2, sprintArray: { id: S_NEXT, name: 'Sprint 2' } });
             expect([String(stored(task._id).sprintId), String(stored(task._id).ProjectID)]).toEqual([S_NEXT, P_OPEN]);
         });
-        expect(stored(fx.top._id).AssigneeUserId).toEqual([MEMBER]);
+        expect([fx.top, fx.child, fx.grandchild].map((task) => stored(task._id).AssigneeUserId)).toEqual([[MEMBER], [MEMBER], [MEMBER]]);
         expect(audits('task.move')).toHaveLength(1);
         expect(audits('task.move')[0].meta).toMatchObject({ state: 'applied', undoable: false, undo: null });
     });

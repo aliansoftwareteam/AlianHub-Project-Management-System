@@ -124,7 +124,7 @@ These need `tasks:manage`.
 { "name": "task.field.set", "arguments": { "taskId": "<task id>", "fieldId": "<field id>", "value": "API" } }
 ```
 
-`task.move`: a top-level task, with all its subtasks, to another list in its own project or in another project you may move tasks into. In another project the task takes the status and task type of the same name there, and keeps the assignees who can open that project. A subtask cannot be moved on its own.
+`task.move`: a top-level task, with all its subtasks, to another list in its own project or in another project you may move tasks into. In another project the task takes the status and task type of the same name there, and keeps the assignees who can open that project. Its subtasks take the task's assignees, as they do when a person moves a task in the web app. A subtask cannot be moved on its own.
 
 ```json
 { "name": "task.move", "arguments": { "taskId": "<task id>", "projectId": "<project id>", "sprintId": "<list id>" } }

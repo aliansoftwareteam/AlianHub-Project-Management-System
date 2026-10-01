@@ -205,7 +205,7 @@ const TOOLS = [
         grant: GRANT,
         strict: true,
         target: (args) => ({ taskId: str(args.taskId, 40), projectId: str(args.projectId, 40), sprintId: str(args.sprintId, 40) }),
-        description: 'Move a top-level task, with its subtasks, to another list: in its own project or in another project you can move tasks into. In another project it takes the status and task type of the same name there, and keeps the assignees who can open that project. A subtask moves with its parent.',
+        description: 'Move a top-level task, with its subtasks, to another list: in its own project or in another project you can move tasks into. In another project it takes the status and task type of the same name there, and keeps the assignees who can open that project; its subtasks take the same assignees, as in the web app\'s move. A subtask moves with its parent.',
         input: input({ taskId: ID, projectId: { ...ID, description: 'The project of the list to move to' }, sprintId: { ...ID, description: 'The list to move to (see sprints.list)' }, ...REASON }, ['taskId', 'projectId', 'sprintId']),
         params: (args) => ({ taskId: str(args.taskId, 40), projectId: str(args.projectId, 40), sprintId: str(args.sprintId, 40) }),
     },
