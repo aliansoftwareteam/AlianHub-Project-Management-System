@@ -195,7 +195,7 @@ describe('paths the server answers itself', () => {
         const { RESERVED } = require('../Config/spaFallback');
         for (const sample of ['/api/x', '/mcp', '/mcp/x', '/scim/x', '/socket.io/x', '/health', '/version']) {
             expect(RESERVED.test(sample)).toBe(true);
-            expect(rules.routeFor({ method: 'GET', url: `https://hub.example.com${sample}`, mode: 'navigate', headers: {} }, { origin: 'https://hub.example.com', precached: new Set() })).toBe(rules.ROUTE.NETWORK);
+            expect(rules.routeFor({ method: 'GET', url: `https://hub.example.com${sample}`, mode: 'navigate', headers: {} }, { origin: 'https://hub.example.com', precached: new Set(), lazy: new Set() })).toBe(rules.ROUTE.NETWORK);
         }
     });
 });

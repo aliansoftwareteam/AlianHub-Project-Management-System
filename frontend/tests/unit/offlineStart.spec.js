@@ -156,6 +156,13 @@ describe('the screen a signed-in person gets when the app opens with no connecti
         expect(apiRequestWithoutSecure).not.toHaveBeenCalled();
     });
 
+    it('takes the place of the whole page in App.vue when the first page of a visit could not be loaded', () => {
+        const app = source('App.vue');
+        const whole = app.indexOf('<OfflineStart v-else-if="pageUnavailable"');
+        expect(whole).toBeGreaterThan(app.indexOf('<MaintenanceCard v-if="maintenanceBlocksPage"/>'));
+        expect(whole).toBeLessThan(app.indexOf('<template v-else-if="$route.meta.requiresAuth">'));
+    });
+
     it('takes the place of the spinner in App.vue while the app is away', () => {
         const app = source('App.vue');
         const offline = app.indexOf('<OfflineStart v-else-if="away"');

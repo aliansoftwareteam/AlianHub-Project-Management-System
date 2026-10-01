@@ -12,9 +12,11 @@ const ORIGIN = 'https://hub.example.com';
 const SOURCES = ['rules.js', 'worker.js'].map((file) => fs.readFileSync(path.resolve(__dirname, '../../src/serviceWorker', file), 'utf8'));
 const SHELL = {
     version: 'build-2',
-    hashed: ['/css/app.6c5db38f.css', '/js/1057.1f479109.js', '/js/app.22222222.js', '/js/chunk-vendors.f6a982e8.js'],
+    hashed: ['/css/app.6c5db38f.css', '/js/app.22222222.js', '/js/chunk-vendors.f6a982e8.js', '/js/login.c9387891.js'],
     plain: ['/icons/icon-192.png', '/index.html', '/manifest.webmanifest'],
+    lazy: ['/css/gantt.0a1b2c3d.css', '/img/default_user.0a1b2c3d.png', '/js/1057.1f479109.js'],
 };
+const PRECACHED = [...SHELL.hashed, ...SHELL.plain];
 const TYPES = { js: 'text/javascript', css: 'text/css', html: 'text/html; charset=utf-8', png: 'image/png', webmanifest: 'application/manifest+json' };
 
 const pathOf = (key) => new URL(typeof key === 'string' ? key : key.url, ORIGIN).pathname;
@@ -43,6 +45,8 @@ const cacheStorage = (initial = {}) => {
             return {
                 match: async (key) => store.get(pathOf(key)),
                 put: async (key, value) => { store.set(pathOf(key), value); },
+                keys: async () => [...store.keys()].map((path) => ({ url: `${ORIGIN}${path}` })),
+                delete: async (key) => store.delete(pathOf(key)),
             };
         },
     };
@@ -94,12 +98,12 @@ const boot = ({ caches = cacheStorage(), fetch = async (request) => served(pathO
 const heldPaths = (caches) => [...caches.stores.values()].flatMap((store) => [...store.keys()]);
 
 describe('installing', () => {
-    it('holds every file of the build under the build\'s own cache, a few requests at a time', async () => {
+    it('holds the files a first paint needs under the build\'s own cache, a few requests at a time, and none of the rest', async () => {
         const worker = boot();
         await worker.dispatch('install');
 
         expect([...worker.caches.stores.keys()]).toEqual(['ah-shell-build-2']);
-        expect(heldPaths(worker.caches).sort()).toEqual([...SHELL.hashed, ...SHELL.plain].sort());
+        expect(heldPaths(worker.caches).sort()).toEqual([...PRECACHED].sort());
         expect(worker.mostInFlight()).toBeLessThanOrEqual(4);
     });
 
@@ -115,6 +119,15 @@ describe('installing', () => {
         expect(worker.fetched).toContain('/index.html');
         expect(caches.stores.get('ah-shell-build-2').get('/js/chunk-vendors.f6a982e8.js').body).toBe('held:vendors');
         expect(caches.stores.get('ah-shell-build-2').get('/index.html').body).toBe('network:/index.html');
+    });
+
+    it('takes a first-paint file that an earlier build fetched on first use from where that was kept', async () => {
+        const caches = cacheStorage({ 'ah-runtime-v1': { '/js/login.c9387891.js': response('kept:login') } });
+        const worker = boot({ caches });
+        await worker.dispatch('install');
+
+        expect(worker.fetched).not.toContain('/js/login.c9387891.js');
+        expect(caches.stores.get('ah-shell-build-2').get('/js/login.c9387891.js').body).toBe('kept:login');
     });
 
     it.each([
@@ -147,16 +160,28 @@ describe('taking over', () => {
         expect(worker.scope.skipWaitingCalls).toBe(1);
     });
 
-    it('removes every cache but its build and the build images, among them the cache of the worker shipped before this one', async () => {
+    it('removes every cache but its build and the files kept on first use, among them the cache of the worker shipped before this one', async () => {
         const caches = cacheStorage({
             'ah-shell-build-1': { '/index.html': response('old') },
-            'ah-runtime-v1': { '/img/a.0a1b2c3d.png': response('image') },
+            'ah-runtime-v1': { '/img/default_user.0a1b2c3d.png': response('image') },
             'alianhub-pwa-v1': { '/share/abc': response('a shared page') },
         });
         const worker = boot({ caches });
         await worker.dispatch('install');
         await worker.dispatch('activate');
         expect([...caches.stores.keys()].sort()).toEqual(['ah-runtime-v1', 'ah-shell-build-2']);
+    });
+
+    it('keeps the files kept on first use whose names are still in this build, and drops the rest', async () => {
+        const caches = cacheStorage({ 'ah-runtime-v1': {
+            '/js/1057.1f479109.js': response('same name in both builds'),
+            '/js/2222.aaaaaaaa.js': response('gone from this build'),
+            '/img/old.bbbbbbbb.png': response('gone from this build'),
+        } });
+        const worker = boot({ caches });
+        await worker.dispatch('install');
+        await worker.dispatch('activate');
+        expect([...caches.stores.get('ah-runtime-v1').keys()]).toEqual(['/js/1057.1f479109.js']);
     });
 
     it('fills its cache again if another worker emptied it while it was installing', async () => {
@@ -166,14 +191,14 @@ describe('taking over', () => {
 
         await worker.dispatch('activate');
 
-        expect(heldPaths(worker.caches).sort()).toEqual([...SHELL.hashed, ...SHELL.plain].sort());
+        expect(heldPaths(worker.caches).sort()).toEqual([...PRECACHED].sort());
     });
 
     it('tells a tab which build it holds', async () => {
         const worker = boot();
         const replies = [];
         await worker.dispatch('message', { data: { type: MESSAGE.DESCRIBE }, ports: [{ postMessage: (reply) => replies.push(reply) }] });
-        expect(replies).toEqual([{ version: 'build-2', assets: [...SHELL.hashed, ...SHELL.plain] }]);
+        expect(replies).toEqual([{ version: 'build-2', assets: [...PRECACHED, ...SHELL.lazy] }]);
     });
 });
 
@@ -235,17 +260,34 @@ describe('answering requests', () => {
         expect(worker.fetched).toEqual([]);
     });
 
-    it('keeps a build image the first time it is asked for, and only a good answer', async () => {
-        const worker = boot({ fetch: async (request) => (pathOf(request).includes('missing') ? response('', { status: 404 }) : served(pathOf(request))) });
-        const image = { mode: 'no-cors', destination: 'image' };
-
-        await (await worker.ask('/img/default_user.0a1b2c3d.png', image)).response;
-        await (await worker.ask('/img/missing.0a1b2c3d.png', image)).response;
+    it('keeps another script, style or image of the build the first time it is asked for, and answers from that afterwards', async () => {
+        const worker = boot();
+        await worker.dispatch('install');
         worker.fetched.length = 0;
-        await (await worker.ask('/img/default_user.0a1b2c3d.png', image)).response;
 
-        expect([...worker.caches.stores.get('ah-runtime-v1').keys()]).toEqual(['/img/default_user.0a1b2c3d.png']);
-        expect(worker.fetched).toEqual([]);
+        for (const [url, extra] of [['/js/1057.1f479109.js', { destination: 'script' }], ['/css/gantt.0a1b2c3d.css', { destination: 'style' }], ['/img/default_user.0a1b2c3d.png', { mode: 'no-cors', destination: 'image' }]]) {
+            expect((await (await worker.ask(url, extra)).response).body).toBe(`network:${url}`);
+            expect((await (await worker.ask(url, extra)).response).body).toBe(`network:${url}`);
+        }
+
+        expect(worker.fetched).toEqual(['/js/1057.1f479109.js', '/css/gantt.0a1b2c3d.css', '/img/default_user.0a1b2c3d.png']);
+        expect([...worker.caches.stores.get('ah-runtime-v1').keys()].sort()).toEqual([...SHELL.lazy]);
+    });
+
+    it('does not keep such a file when it comes back as an error or as something else', async () => {
+        const wrong = { '/js/1057.1f479109.js': response('<html>sign in</html>', { contentType: 'text/html' }), '/img/default_user.0a1b2c3d.png': response('', { status: 404 }) };
+        const worker = boot({ fetch: async (request) => wrong[pathOf(request)] || served(pathOf(request)) });
+
+        await (await worker.ask('/js/1057.1f479109.js', { destination: 'script' })).response;
+        await (await worker.ask('/img/default_user.0a1b2c3d.png', { mode: 'no-cors', destination: 'image' })).response;
+
+        expect([...(worker.caches.stores.get('ah-runtime-v1') || new Map()).keys()]).toEqual([]);
+    });
+
+    it('does not answer for a hashed file that is not in this build\'s lists', async () => {
+        const worker = boot();
+        expect((await worker.ask('/js/1057.deadbeef.js', { destination: 'script' })).answered).toBe(false);
+        expect((await worker.ask('/img/other.0a1b2c3d.png', { mode: 'no-cors', destination: 'image' })).answered).toBe(false);
     });
 });
 
@@ -266,12 +308,12 @@ describe('when the person signs out or changes workspace', () => {
 });
 
 describe('what it ends up holding', () => {
-    it('is the files of the build and build images, whatever was asked for', async () => {
+    it('is files of this build and nothing else, whatever was asked for', async () => {
         const worker = boot();
         await worker.dispatch('install');
         await worker.dispatch('activate');
         const asked = ['/', '/api/v2/tasks', '/api/v1/getlogo?key=favicon', '/api/v1/download/1/a.png', '/socket.io/?EIO=4', '/share/abc', '/js/app.22222222.js',
-            '/img/default_user.0a1b2c3d.png', '/storage/company/a.0a1b2c3d.png', '/logo.png'];
+            '/js/1057.1f479109.js', '/js/1057.deadbeef.js', '/img/default_user.0a1b2c3d.png', '/storage/company/a.0a1b2c3d.png', '/logo.png'];
         for (const url of asked) {
             for (const extra of [{}, { mode: 'navigate', destination: 'document' }, { mode: 'no-cors', destination: 'image' }]) {
                 const { response: answer } = await worker.ask(url, extra);
@@ -279,6 +321,6 @@ describe('what it ends up holding', () => {
             }
         }
 
-        expect(heldPaths(worker.caches).sort()).toEqual([...SHELL.hashed, ...SHELL.plain, '/img/default_user.0a1b2c3d.png'].sort());
+        expect(heldPaths(worker.caches).sort()).toEqual([...PRECACHED, '/img/default_user.0a1b2c3d.png', '/js/1057.1f479109.js'].sort());
     });
 });

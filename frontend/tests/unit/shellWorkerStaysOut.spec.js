@@ -5,8 +5,9 @@ const { ROUTE, routeFor, reasonToStayOut } = rules;
 
 const ORIGIN = 'https://hub.example.com';
 const precached = new Set(['/index.html', '/js/app.19d59917.js']);
+const lazy = new Set(['/js/1057.1f479109.js', '/img/photo.0a1b2c3d.png']);
 const request = (url, extra = {}) => ({ method: 'GET', url: url.startsWith('http') ? url : `${ORIGIN}${url}`, mode: 'cors', destination: '', headers: {}, ...extra });
-const route = (url, extra) => routeFor(request(url, extra), { origin: ORIGIN, precached });
+const route = (url, extra) => routeFor(request(url, extra), { origin: ORIGIN, precached, lazy });
 const asPage = { mode: 'navigate', destination: 'document' };
 const asImage = { mode: 'no-cors', destination: 'image' };
 
@@ -96,6 +97,13 @@ describe('requests the worker leaves to the network', () => {
     it('any address with a query, secret or not', () => {
         expect(route('/?utm_source=mail', asPage)).toBe(ROUTE.NETWORK);
         expect(route('/js/app.19d59917.js?v=2')).toBe(ROUTE.NETWORK);
+        expect(route('/js/1057.1f479109.js?v=2')).toBe(ROUTE.NETWORK);
+    });
+
+    it('a file kept on first use, when it is asked for with credentials or a secret', () => {
+        expect(route('/js/1057.1f479109.js', { headers: { authorization: 'Bearer abc' } })).toBe(ROUTE.NETWORK);
+        expect(route('/img/photo.0a1b2c3d.png?token=abc', asImage)).toBe(ROUTE.NETWORK);
+        expect(route('/js/1057.1f479109.js', { method: 'POST' })).toBe(ROUTE.NETWORK);
     });
 
     it.each(['POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'])('a %s request', (method) => {
@@ -115,6 +123,6 @@ describe('requests the worker leaves to the network', () => {
     });
 
     it('an address it cannot read', () => {
-        expect(routeFor({ method: 'GET', url: 'not a url', mode: 'navigate', headers: {} }, { origin: ORIGIN, precached })).toBe(ROUTE.NETWORK);
+        expect(routeFor({ method: 'GET', url: 'not a url', mode: 'navigate', headers: {} }, { origin: ORIGIN, precached, lazy })).toBe(ROUTE.NETWORK);
     });
 });
