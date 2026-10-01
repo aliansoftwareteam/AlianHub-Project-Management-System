@@ -15,7 +15,7 @@
                     :class="[{ 'temp_save_dot': tempVal.isShowSave }, isMobile ? 'templated-name-mobile' : 'templated-name-desktop']"
                     :style="isSelected(tempVal) ? 'color: #3845B3 !important; font-weight: 500' : ''"
                     :title="tempVal.TemplateName" @click="selectTemplate(tempVal)"
-                    class="templated_name text-ellipsis text-capitalize"> {{ tempVal.TemplateName }} </span>
+                    class="templated_name text-ellipsis"> {{ tempVal.TemplateName }} </span>
                 <input v-else type="text" class="statusInputText form-control edit-input statuseditInput" :maxlength="50" v-model.trim="editName" @keypress.enter="confirmRename(tempVal, index)" @input="errTempMsg = ''"/>
                 <span class="position-ab" v-if="editingIndex === index" :style="[{ paddingTop: isMobile ? '1px' : '8px', right: '20px' }]">
                     <img :src="saveIcon" class="cursor-pointer" @click="confirmRename(tempVal, index)">
@@ -57,7 +57,7 @@
             <button type="button" class="tsf-back-btn d-flex align-items-center" @click="step = 'templates'" :aria-label="$t('Templates.back_to_templates')">
                 <svg width="9" height="15" viewBox="0 0 9 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.5 1.5 L2 7.5 L7.5 13.5" stroke="#3845B3" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
-            <span class="tsf-active-template text-ellipsis text-capitalize" :title="modelValue && modelValue.TemplateName">{{ modelValue && modelValue.TemplateName }}</span>
+            <span class="tsf-active-template text-ellipsis" :title="modelValue && modelValue.TemplateName">{{ modelValue && modelValue.TemplateName }}</span>
             <button v-if="activeDirty" type="button" class="tsf-save-template" :class="{ 'pointer-event-none': isSaving }" @click="saveActive()">{{ $t('Templates.save_template') }}</button>
         </div>
         <slot name="list" />
