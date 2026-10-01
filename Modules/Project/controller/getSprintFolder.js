@@ -37,24 +37,17 @@ exports.getDefaultSprintData = async (uid, query, companyId, projectId, roleType
 };
 
 
+/* Every entry names its parent, null at the top level, so a client can nest the flat list. */
+const withParentFolder = (folder) => ({ ...folder, parentFolderId: folder.parentFolderId || null });
+
 exports.getDefaultFolderData = (uid,query,companyId,projectId) => {
     return new Promise((resolve, reject) => {
         try {
-            const defaultPrivate = {
-                projectId : new mongoose.Types.ObjectId(projectId),
-                deletedStatusKey: { $nin: [1] },
-            };
-            const defaultPublic = {
-                projectId : new mongoose.Types.ObjectId(projectId),
-                deletedStatusKey: { $nin: [1] },
-            };
             const queryArray = [
                 {
                     $match: {
-                        $or: [
-                            defaultPrivate,
-                            defaultPublic
-                        ]
+                        projectId : new mongoose.Types.ObjectId(projectId),
+                        deletedStatusKey: { $nin: [1] },
                     }
                 }
             ];
@@ -77,7 +70,7 @@ exports.getDefaultFolderData = (uid,query,companyId,projectId) => {
                 data: [queryArray]
             }
             MongoDbCrudOpration(companyId, mongoObj, 'aggregate').then((res)=>{
-                resolve(res);
+                resolve((res || []).map(withParentFolder));
             }).catch((error)=>{
                 reject(error);
             })
