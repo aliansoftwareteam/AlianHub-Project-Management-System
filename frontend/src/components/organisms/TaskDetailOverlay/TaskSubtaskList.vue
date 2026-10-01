@@ -32,8 +32,7 @@
                     :aria-label="$t('TaskPanel.subtask_children', childProgress[sub._id])"
                 >{{ childProgress[sub._id].done }}/{{ childProgress[sub._id].total }}</span>
                 <span v-if="assignee(sub)" class="ah-avatar ah-avatar--sm" :title="assignee(sub).Employee_Name">
-                    <img v-if="assignee(sub).Employee_profileImageURL" :src="assignee(sub).Employee_profileImageURL" :alt="assignee(sub).Employee_Name" />
-                    <template v-else>{{ initials(assignee(sub).Employee_Name) }}</template>
+                    <AvatarImage :src="assignee(sub).Employee_profileImageURL" :alt="assignee(sub).Employee_Name">{{ initials(assignee(sub).Employee_Name) }}</AvatarImage>
                 </span>
                 <span class="ah-subtasks__hours ah-mono">{{ hours(sub.totalEstimatedTime) }}</span>
             </div>
@@ -69,6 +68,7 @@ import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
 import Skelaton from "@/components/atom/Skelaton/Skelaton.vue";
 import CreateTask from "@/components/atom/CreateTask/CreateTask.vue";
+import AvatarImage from "@/components/atom/AvatarImage/AvatarImage.vue";
 import taskClass from "@/utils/TaskOperations";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { subtaskCreateAssignees } from "@/utils/assigneeOptions";

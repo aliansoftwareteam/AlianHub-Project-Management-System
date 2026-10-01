@@ -13,6 +13,7 @@ vi.mock('@/config/env', () => ({
 }));
 vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 'ShellIcon', render: () => null } }));
 
+import '@/store';
 import AvatarImage from '@/components/atom/AvatarImage/AvatarImage.vue';
 import ListAssigneeCell from '@/views/Projects/ListView/ListAssigneeCell.vue';
 import { clearSignedProfileUrls } from '@/composable/useSignedProfileUrl';
