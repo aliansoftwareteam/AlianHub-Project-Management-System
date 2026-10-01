@@ -139,7 +139,10 @@
             <p class="afp__hint">{{ $t(`AiFields.out_of_range_${modelValue.outOfRange === 'reject' ? 'reject' : 'clamp'}_hint`) }}</p>
         </fieldset>
 
-        <p v-if="modelValue.output === 'rating'" class="afp__hint">{{ $t('AiFields.rating_hint', { max: modelValue.ratingMax || RATING_MAX }) }}</p>
+        <template v-if="modelValue.output === 'rating'">
+            <RatingFieldSettings v-if="!modelValue.ratingOnNumber" :modelValue="modelValue" :error="errors.settings" @update:modelValue="emit('update:modelValue', $event)" />
+            <p class="afp__hint">{{ $t('AiFields.rating_hint', { max: ratingMax }) }}</p>
+        </template>
 
         <div v-if="modelValue.output === 'date'" class="ah-field">
             <label class="ah-field__label" for="ai-field-date-rule">{{ $t('AiFields.date_rule') }}</label>
@@ -190,6 +193,8 @@
 <script setup>
 import { computed } from "vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import RatingFieldSettings from "@/plugins/customFieldView/fieldTypes/RatingFieldSettings.vue";
+import { maxOf as ratingMaxOf } from "@fieldTypes/rating";
 import { AI_OUTPUTS, AI_READ_PARTS, DATE_RULES, OPTION_OUTPUTS, RATING_MAX, templatesFor } from "@/views/Projects/composables/aiFields";
 
 defineOptions({ name: "AiFieldPanel" });
@@ -203,6 +208,7 @@ const emit = defineEmits(["update:modelValue"]);
 const uid = "ai-field-panel";
 const OUT_OF_RANGE = ["clamp", "reject"];
 const templates = computed(() => templatesFor(props.modelValue.output));
+const ratingMax = computed(() => (props.modelValue.ratingOnNumber ? RATING_MAX : ratingMaxOf(props.modelValue)));
 
 const set = (patch) => emit("update:modelValue", { ...props.modelValue, ...patch });
 

@@ -190,9 +190,6 @@
     font: 500 13px/1.35 var(--font-ui);
 }
 .kanban-board .kanban-card .card-rename:focus-visible { outline: none; box-shadow: var(--focus); }
-/* The card menu's panel is teleported out of the board, so these cannot be scoped to it. */
-.card-menu__sep { height: 1px; margin: 3px 0; background: var(--hairline); }
-.card-menu__danger { color: var(--danger); }
 
 /* Blocked columns tint their cards' border, as in the mock. */
 .kanban-board .kanban-column--danger .kanban-card { border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
@@ -328,6 +325,7 @@
     cursor: pointer;
     line-height: 0;
 }
+.kanban-card .option-list__trigger:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
 
 .kanban-board .sub-task-count {
     font-size: 10px;
@@ -362,6 +360,7 @@
 .kanban-board .date-picker {
     border: 1px solid var(--hairline);
 }
+.kanban-board .date-picker .calendar-trigger { align-items: center; cursor: pointer; white-space: nowrap; }
 
 .kanban-board .task-count-section {
     border: 1px solid var(--hairline);

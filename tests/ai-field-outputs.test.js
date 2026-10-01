@@ -247,6 +247,38 @@ describe('a rating output', () => {
     });
 });
 
+describe('a rating output on a rating field', () => {
+    const ratingField = (max) => seedField('rating', { output: 'rating' }, { fieldRatingMax: max });
+
+    it('asks for a whole number up to the field\'s own maximum and proposes the number itself', async () => {
+        const field = ratingField(10);
+        modelAnswers(8);
+        expect(await previewOne(field, seedTask())).toEqual(expect.objectContaining({ fieldValue: 8, text: '8', empty: false }));
+        expect(systemSent()).toContain('whole number from 1 to 10');
+    });
+
+    it('never stores a rating above the field\'s maximum', async () => {
+        const field = ratingField(5);
+        modelAnswers(6);
+        expect(await previewOne(field, seedTask())).toEqual(expect.objectContaining({ proposalId: null, invalid: true, reason: 'out_of_range' }));
+    });
+
+    it('is what a new AI rating field is saved as, with its maximum checked', () => {
+        const { fieldInsertFrom, FieldWriteError } = require('../Modules/CustomField/helpers/fieldWrite');
+        const fieldAi = { enabled: true, output: 'rating', template: 'custom', prompt: 'How risky is this?' };
+        const saved = fieldInsertFrom({ fieldTitle: 'Risk', fieldType: 'rating', fieldRatingMax: 7, fieldAi });
+        expect(saved).toMatchObject({ fieldType: 'rating', fieldRatingMax: 7, fieldAi: { enabled: true, output: 'rating' } });
+        expect(() => fieldInsertFrom({ fieldTitle: 'Risk', fieldType: 'rating', fieldRatingMax: 20, fieldAi })).toThrow(FieldWriteError);
+    });
+
+    it('leaves a rating output stored on a number field working as it did', async () => {
+        const field = seedField('number', { output: 'rating' });
+        modelAnswers(5);
+        expect(await previewOne(field, seedTask())).toEqual(expect.objectContaining({ fieldValue: '5', text: '5' }));
+        expect(config.aiConfigOf(field)).toEqual(expect.objectContaining({ output: 'rating' }));
+    });
+});
+
 describe('a labels output', () => {
     const labelsField = () => seedField('dropdown', { output: 'labels', template: 'labels', prompt: '' }, { fieldOptions: OPTIONS });
 

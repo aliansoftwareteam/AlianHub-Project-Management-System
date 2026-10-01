@@ -1,5 +1,5 @@
 <template>
-    <div v-if="canTask || canList || canFolder" class="nip">
+    <div v-if="canTask || canList || canFolder || canDoc" class="nip">
         <button
             type="button"
             class="ah-btn ah-btn--secondary ah-btn--sm"
@@ -19,6 +19,9 @@
             </button>
             <button v-if="canFolder && folderInView" type="button" class="ah-pop__item" role="menuitem" @click="start('subfolder')">
                 <ShellIcon name="file" :size="14" />{{ $t('Projects.new_subfolder') }}
+            </button>
+            <button v-if="canDoc" type="button" class="ah-pop__item" role="menuitem" @click="newDoc">
+                <ShellIcon name="docs" :size="14" />{{ $t('Docs.new_doc') }}
             </button>
         </div>
 
@@ -49,6 +52,7 @@ import { useCustomComposable } from '@/composable';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import SprintFolderInput from '@/components/atom/SprintFolderInput/SprintFolderInput.vue';
 import { openQuickCreate } from '@/components/organisms/QuickCreateTask/quickCreateTask';
+import { useNewDoc } from '@/components/molecules/Pages/useNewDoc';
 import { canHoldSubfolders } from '@/utils/folderTree';
 
 const props = defineProps({
@@ -68,6 +72,8 @@ const canList = computed(() => checkPermission('project.project_sprint_create', 
 const canTask = computed(() => checkPermission('task.task_create', props.projectData?.isGlobalPermission) === true
     && checkPermission('task.task_list', props.projectData?.isGlobalPermission) === true);
 const canFolder = computed(() => checkPermission('project.project_folder_create', props.projectData?.isGlobalPermission) === true);
+const { canCreateIn, createIn } = useNewDoc();
+const canDoc = computed(() => Boolean(props.projectData?._id) && canCreateIn(props.projectData));
 
 /* Folders nest one level, so only a live top-level folder in view takes a subfolder. */
 const folderInView = computed(() => {
@@ -89,6 +95,11 @@ const subItems = computed(() => [
 const newTask = () => {
     open.value = false;
     openQuickCreate({ projectId: props.projectData?._id, sprintId: route.params.sprintId });
+};
+
+const newDoc = () => {
+    open.value = false;
+    createIn(props.projectData._id);
 };
 
 const start = (kind) => {

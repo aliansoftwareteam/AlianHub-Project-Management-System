@@ -31,9 +31,6 @@
     height: calc(100% - 47px);
     overflow-y: auto;
 }
-.converted__sidebar .sidebar-body {
-    background-color: #F4F5F7 !important;
-}
 .sidebar-options {
     /* height: calc(100% - 52px); */
 }
@@ -66,7 +63,6 @@
     .sidebar-content {width: 100vw !important;}
     /* .back-drop {display: none;} */
     .listsidebar-search {padding: 15.5px 10px;}
-    .converted__sidebar .sidebar-body {background-color: #fff !important;}
 }
 .sidebar-close { display: inline-flex; align-items: center; padding: 0; border: 0; background: none; cursor: pointer; }
 .sidebar-content:focus { outline: none; }
