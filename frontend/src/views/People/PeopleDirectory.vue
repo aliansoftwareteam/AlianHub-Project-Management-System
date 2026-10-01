@@ -554,8 +554,11 @@ onMounted(() => {
     .pd__grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 767px) {
+    .pd.ah-page .pd__bar { flex-wrap: wrap; height: auto; min-height: var(--toolbar-h); padding: 8px 12px; row-gap: 8px; }
+    .pd__count { white-space: nowrap; }
+    .pd__bar .ah-tab { white-space: nowrap; }
     .pd__body { padding: 14px 12px; }
-    .pd__search { width: 100%; }
+    .pd__search { order: 1; flex: 1 1 100%; }
     .pd__search-input { width: 100%; }
 }
 </style>

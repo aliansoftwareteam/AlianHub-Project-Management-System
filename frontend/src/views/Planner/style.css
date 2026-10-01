@@ -155,6 +155,7 @@
 }
 
 .planner__card {
+    flex: none;
     margin: 0 var(--sp-6) var(--sp-3);
     padding: calc(var(--sp-3) + 1px) calc(var(--sp-4) + 1px);
     border: 1px solid var(--hairline);
