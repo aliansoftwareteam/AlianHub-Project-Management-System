@@ -12,7 +12,9 @@
                         {{ sprint.folderName ? sprint.folderName + ' / ' : '' }}{{ sprint.name }}
                     </option>
                 </select>
+                <button v-if="selectedSprintId" type="button" class="pshare__who font-size-13 blue ml-10px" @click="showWhoCanSee = true">{{ $t('WhoCanSee.menu_sprint') }}</button>
             </div>
+            <WhoCanSeeModal v-if="showWhoCanSee" v-model="showWhoCanSee" kind="sprint" :itemId="selectedSprintId" :title="selectedSprintName" />
 
             <template v-if="share">
                 <div class="pshare__linkrow d-flex align-items-center">
@@ -70,6 +72,7 @@ import { useI18n } from "vue-i18n";
 // UTILS
 import { apiRequest } from '@/services';
 import { useGetterFunctions } from "@/composable";
+import WhoCanSeeModal from '@/components/molecules/WhoCanSee/WhoCanSeeModal.vue';
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -95,6 +98,7 @@ const intakeItems = ref([]);
 const isSaving = ref(false);
 const newExpiry = ref('');
 const newPassword = ref('');
+const showWhoCanSee = ref(false);
 
 const sprintOptions = computed(() => {
     const options = [];
@@ -108,6 +112,8 @@ const sprintOptions = computed(() => {
     });
     return options;
 });
+
+const selectedSprintName = computed(() => sprintOptions.value.find((sprint) => sprint.id === selectedSprintId.value)?.name || '');
 
 const shareUrl = computed(() => share.value ? `${window.location.origin}/share/${share.value.token}` : '');
 
@@ -228,7 +234,8 @@ function formatDate(d) {
 .pshare__head { margin-bottom: 12px; }
 .pshare__close { color: #9a9a9a; }
 .pshare__close:hover { color: #e84a4a; }
-.pshare__controls { margin-bottom: 12px; }
+.pshare__controls { margin-bottom: 12px; flex-wrap: wrap; row-gap: 6px; }
+.pshare__who { background: none; border: 0; padding: 0; cursor: pointer; }
 .pshare__select {
     border: 1px solid #e0e0e0;
     border-radius: 6px;

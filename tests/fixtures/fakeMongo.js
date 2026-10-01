@@ -1,5 +1,5 @@
 // A tiny in-memory stand-in for MongoDbCrudOpration: enough of the query
-// language for the agent modules (equality including null as missing, array-element equality, a word-match $text, $nor, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type/$size/$elemMatch, $set/$inc/$push/$addToSet/$pull,
+// language for the agent modules (equality including null as missing, array-element equality, a word-match $text, $nor, $in/$nin (any element of a stored array)/$ne/$gt(e)/$lt(e)/$exists/$type/$size/$elemMatch, $set/$inc/$push/$addToSet/$pull,
 // conditional findOneAndUpdate answering the old document unless asked for the new one (null after an upsert insert, as
 // the driver does), updateOne and findOneAndUpdate with upsert and $setOnInsert and a unique _id, findOneAndDelete, deleteOne, deleteMany,
 // bulkWrite of insertOne/updateOne/updateMany, sort/skip/limit on find, sort on findOneAndUpdate, $type 'date'/'string'/'objectId' on the stored value, $match/$unwind (a top-level array)/$project (inclusion or exclusion)/$addFields ($toString, $ifNull, $size, $strLenBytes)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
@@ -49,8 +49,8 @@ const matches = (doc, filter = {}, textFields) => Object.entries(filter).every((
     if (cond && typeof cond === 'object' && !(cond instanceof Date) && !Array.isArray(cond) && Object.keys(cond).some((k) => k.startsWith('$'))) {
         return Object.entries(cond).every(([op, arg]) => {
             const want = arg instanceof Date ? arg.getTime() : hex(arg);
-            if (op === '$in') return arg.map(String).includes(String(value));
-            if (op === '$nin') return !arg.map(String).includes(String(value));
+            if (op === '$in') return (Array.isArray(value) ? value.map(hex) : [value]).some((v) => arg.map(String).includes(String(v)));
+            if (op === '$nin') return !(Array.isArray(value) ? value.map(hex) : [value]).some((v) => arg.map(String).includes(String(v)));
             if (op === '$ne') return Array.isArray(value) ? !value.map(hex).includes(want) : value !== want;
             if (op === '$gte') return value >= want;
             if (op === '$gt') return value > want;

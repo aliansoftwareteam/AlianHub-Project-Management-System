@@ -5,6 +5,7 @@ jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), 
 jest.mock('../Modules/PublicShares/helpers/shareAccess', () => ({
     canManageShare: async () => ({ ok: true, statusCode: 200 }),
     shareStillAuthorised: async () => true,
+    shareIsLive: async (companyId, share) => Boolean(share) && share.enabled !== false,
 }));
 
 const bcrypt = require('bcrypt');
