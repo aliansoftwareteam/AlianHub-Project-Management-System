@@ -202,7 +202,7 @@ const groups = computed(() => {
 .pm__scroll { overflow-x: auto; overscroll-behavior-x: contain; }
 /* 86px per role column (78px track + 8px gap); 136px is the 96px agents track, its gap and the row's side padding. */
 .pm__table { min-width: calc(var(--pm-perm-min) + var(--pm-role-cols) * 86px + 136px); }
-.pm__row { display: grid; gap: 8px; padding: 8px 16px; align-items: center; border-bottom: 1px solid var(--hairline); background: var(--pm-tint); transition: background var(--t-state) var(--ease); }
+.pm__row { display: grid; gap: 8px; padding: var(--table-pad-y, 8px) 16px; align-items: center; border-bottom: 1px solid var(--hairline); background: var(--pm-tint); transition: background var(--t-state) var(--ease); }
 .pm__row--head { padding: 10px 16px; }
 .pm__row:last-child { border-bottom: 0; }
 .pm__row--danger { --pm-tint: var(--danger-bg); }
@@ -213,7 +213,7 @@ const groups = computed(() => {
 /* Sticky over the row's left padding, and the row tint is layered on --surface because the dark tints are translucent. */
 .pm__perm { position: sticky; left: 0; z-index: 1; align-self: stretch; justify-content: center; margin-left: -16px; padding-left: 16px; background: linear-gradient(var(--pm-tint), var(--pm-tint)), var(--surface); display: flex; flex-direction: column; min-width: 0; text-align: left; }
 .pm__group .pm__perm { background: var(--surface-2); }
-.pm__perm-name { font-weight: 500; }
+.pm__perm-name { font-weight: 500; font-size: var(--row-font, 12.5px); }
 .pm__perm-desc { line-height: 1.4; }
 .pm__cell { display: flex; justify-content: center; align-items: center; text-align: center; }
 .pm__cell--agents { color: var(--brand); }

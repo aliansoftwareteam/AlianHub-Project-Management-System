@@ -75,8 +75,8 @@ watch(() => route.name, revealActiveTab);
 .in-kv dt { color: var(--ink-2); margin: 0; }
 .in-kv dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
 .in-table { width: 100%; border-collapse: collapse; font: var(--text-small); }
-.in-table th { text-align: left; color: var(--ink-2); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--hairline); }
-.in-table td { padding: 8px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+.in-table th { text-align: left; color: var(--ink-2); font-weight: 600; padding: 6px var(--cell-pad-x, 8px); border-bottom: 1px solid var(--hairline); }
+.in-table td { padding: var(--table-pad-y, 8px) var(--cell-pad-x, 8px); border-bottom: 1px solid var(--hairline); vertical-align: top; font-size: var(--row-font, 12.5px); }
 .in-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .in-banner { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 8px; font: var(--text-small); }
 .in-banner--warn { background: var(--warn-bg); color: var(--warn-ink); }

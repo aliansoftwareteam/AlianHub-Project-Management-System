@@ -201,11 +201,12 @@ onUnmounted(() => document.removeEventListener("click", onDocumentClick));
 @media (max-width: 991px) {
     .hcm__label { display: none; }
     .hcm__icon { display: inline-flex; }
-    .hcm__toggle { width: 44px; justify-content: center; padding: 0; }
+    .hcm__toggle { width: var(--control-h, 44px); justify-content: center; padding: 0; }
 }
 @media (max-width: 767px) {
     .hcm > .hcm__pop { position: fixed; left: 12px; right: 12px; top: 64px; min-width: 0; max-width: none; max-height: calc(100vh - 88px); overflow-y: auto; }
     .hcm__tool { width: 44px; height: 44px; }
     .hcm__row { align-items: center; }
+    .hcm__toggle { width: var(--hit-min); }
 }
 </style>

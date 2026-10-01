@@ -63,27 +63,29 @@
                 <div v-if="!loading && !loadError" class="ah-card ai-agent">
                     <div class="ah-label">{{ $t('Ai.available_actions') }}</div>
                     <p class="ai-lead sk-lib__note">{{ $t('Ai.available_actions_note') }}</p>
-                    <table class="ai-table">
-                        <thead>
-                            <tr>
-                                <th>{{ $t('Ai.action') }}</th>
-                                <th>{{ $t('Ai.what_it_does') }}</th>
-                                <th>{{ $t('Ai.risk') }}</th>
-                                <th>{{ $t('Ai.undoable') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="action in actions" :key="action.key">
-                                <td class="ah-mono">{{ action.key }}</td>
-                                <td>
-                                    {{ action.label }}
-                                    <div v-if="action.constraint" class="ah-small">{{ action.constraint }}</div>
-                                </td>
-                                <td><span class="ah-chip" :class="riskChip(action.risk)">{{ action.risk }}</span></td>
-                                <td><span class="ah-chip" :class="action.undoable ? 'ah-chip--ok' : ''">{{ action.undoable ? $t('Ai.yes') : $t('Ai.no') }}</span></td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="sk-lib__scroll">
+                        <table class="ai-table">
+                            <thead>
+                                <tr>
+                                    <th>{{ $t('Ai.action') }}</th>
+                                    <th>{{ $t('Ai.what_it_does') }}</th>
+                                    <th>{{ $t('Ai.risk') }}</th>
+                                    <th>{{ $t('Ai.undoable') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="action in actions" :key="action.key">
+                                    <td class="ah-mono">{{ action.key }}</td>
+                                    <td>
+                                        {{ action.label }}
+                                        <div v-if="action.constraint" class="ah-small">{{ action.constraint }}</div>
+                                    </td>
+                                    <td><span class="ah-chip" :class="riskChip(action.risk)">{{ action.risk }}</span></td>
+                                    <td><span class="ah-chip" :class="action.undoable ? 'ah-chip--ok' : ''">{{ action.undoable ? $t('Ai.yes') : $t('Ai.no') }}</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <div v-if="!loading && !loadError" class="ah-card ai-agent">
@@ -233,10 +235,11 @@ onMounted(load);
 .sk-lib__card--off { opacity: .68; }
 .sk-lib__needs { margin: 8px 0 0; }
 .sk-lib__note { margin: 6px 0 10px; }
+.sk-lib__scroll { overflow-x: auto; }
 .sk-lib__confirm { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--hairline); }
 .ai-table { width: 100%; border-collapse: collapse; margin-top: 10px; font: var(--text-small); }
-.ai-table th { text-align: left; font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); padding: 6px 10px; border-bottom: 1px solid var(--hairline); }
-.ai-table td { padding: 9px 10px; border-bottom: 1px solid var(--hairline); vertical-align: top; color: var(--ink); }
+.ai-table th { text-align: left; font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); padding: 6px var(--cell-pad-x, 10px); border-bottom: 1px solid var(--hairline); }
+.ai-table td { padding: var(--table-pad-y, 9px) var(--cell-pad-x, 10px); font-size: var(--row-font, 12.5px); border-bottom: 1px solid var(--hairline); vertical-align: top; color: var(--ink); }
 .ai-table tr:last-child td { border-bottom: 0; }
 .ai-code { font: 400 12px/1.6 var(--font-mono); background: var(--rail); color: #fff; padding: 12px 14px; border-radius: var(--r-input); overflow-x: auto; margin: 0 0 10px; }
 </style>

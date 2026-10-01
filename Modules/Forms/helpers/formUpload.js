@@ -229,9 +229,15 @@ const storeSubmissionFiles = async ({ companyId, form, questions, incoming }) =>
     return { files, errors, cleanup };
 };
 
+/* For a post that is answered without being read as a submission. */
+const discardFiles = (incoming) => {
+    for (const file of incoming || []) unlinkQuietly(file && file.path);
+};
+
 module.exports = {
     parse,
     storeSubmissionFiles,
+    discardFiles,
     messageFor,
     REPICK,
     ACCEPT_ATTR,

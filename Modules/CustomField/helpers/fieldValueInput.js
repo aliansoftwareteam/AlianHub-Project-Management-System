@@ -60,7 +60,10 @@ const EMPTY = Object.freeze({ dropdown: [], checkbox: false });
 const storedValueOf = (definition, value, context = {}) => {
     const type = String((definition && definition.fieldType) || '');
     if (COMPUTED.includes(type)) return { error: 'is computed and cannot be set' };
-    if (typeModuleOf(type)) return { value: value === undefined ? null : value };
+    const module = typeModuleOf(type);
+    if (module && module.castOnly) return { error: 'holds votes, which people cast in the app' };
+    if (module && module.sideStored) return { error: 'holds linked tasks, which are linked in the app' };
+    if (module) return { value: value === undefined ? null : value };
     const read = BY_TYPE[type];
     if (!read) return { error: `is a ${type || 'field'} field, which cannot be set here yet` };
     if (isBlank(value)) return { value: Object.hasOwn(EMPTY, type) ? EMPTY[type] : '' };
