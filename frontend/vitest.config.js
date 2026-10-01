@@ -30,7 +30,8 @@ export default defineConfig({
             '@fieldTaskTypes': path.resolve(__dirname, '../Modules/CustomField/helpers/fieldTaskTypes.js'),
             '@fieldTypes': path.resolve(__dirname, '../Modules/CustomField/fieldTypes'),
             '@automationTemplates': path.resolve(__dirname, '../Modules/Automations/templates.js'),
-            '@workingDays': path.resolve(__dirname, '../Modules/Company/helpers/workingDays.js')
+            '@workingDays': path.resolve(__dirname, '../Modules/Company/helpers/workingDays.js'),
+            '@taskTreeRules': path.resolve(__dirname, '../Modules/Tasks/helpers/taskTreeRules.js')
         }
     },
     test: {

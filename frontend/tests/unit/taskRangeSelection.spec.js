@@ -81,6 +81,38 @@ describe('shift-click range selection', () => {
         expect(selected()).toEqual(['a', 'b', 'b1', 'b2', 'c']);
     });
 
+    it('in a view where each row stands alone, a range leaves the subtasks of its rows out', () => {
+        const parent = task('b', { subtaskArray: [{ _id: 'b1', isParentTask: false }] });
+        makeStore([task('a'), parent, task('c')]);
+        selection = useTaskSelection();
+        selection.toggleAndCascade(task('a'), click(), ['a', 'b', 'c'], { rowsAlone: true });
+        selection.toggleAndCascade(task('c'), click(true), ['a', 'b', 'c'], { rowsAlone: true });
+        expect(selected()).toEqual(['a', 'b', 'c']);
+    });
+
+    it('in such a view a click on a parent, a subtask or a sub-subtask selects that row only', () => {
+        const leaf = { _id: 'b11', isParentTask: false, ParentTaskId: 'b1', ancestors: ['b', 'b1'] };
+        const middle = { _id: 'b1', isParentTask: false, ParentTaskId: 'b', ancestors: ['b'], subtaskArray: [leaf] };
+        const parent = task('b', { subtaskArray: [middle] });
+        makeStore([parent]);
+        selection = useTaskSelection();
+        selection.toggleAndCascade(parent, click(), [], { rowsAlone: true });
+        expect(selected()).toEqual(['b']);
+        selection.toggleAndCascade(leaf, click(), [], { rowsAlone: true });
+        expect(selected()).toEqual(['b', 'b11']);
+        selection.toggleAndCascade(parent, click(), [], { rowsAlone: true });
+        expect(selected()).toEqual(['b11']);
+    });
+
+    it('finds the parent of a sub-subtask, so a cascading view can still tick the parent of the last sibling', () => {
+        const leaf = { _id: 'b11', isParentTask: false, ParentTaskId: 'b1', ancestors: ['b', 'b1'] };
+        const middle = { _id: 'b1', isParentTask: false, ParentTaskId: 'b', ancestors: ['b'], subtaskArray: [leaf] };
+        makeStore([task('b', { subtaskArray: [middle] })]);
+        selection = useTaskSelection();
+        selection.toggleAndCascade(leaf, click(), []);
+        expect(selected()).toEqual(['b1', 'b11']);
+    });
+
     it('keeps the clicked checkbox checked when a range includes an already selected row', () => {
         const visible = ['a', 'b', 'c'];
         selection.toggleAndCascade(task('c'), click(), visible);
