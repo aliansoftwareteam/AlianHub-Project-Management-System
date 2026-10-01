@@ -2,7 +2,7 @@
 
 **Feature:** task 046 A5 / C2 — the web app installs and its shell opens offline (replaces the SEC-03 worker withdrawn in June 2026)
 **Files:** `frontend/public/manifest.webmanifest`, `frontend/src/serviceWorker/` (`rules.js`, `worker.js`, `registration.js`), `frontend/shellWorkerPlugin.js`, `Config/appShellWorker.js`
-**Note:** needs a production build (`cd frontend && npm run build`) served by the backend; the dev server has no worker. Unit and server tests cover the route table and the worker's logic; `e2e/specs/app-shell.spec.js` covers PWA-04 and PWA-05 in Chromium. The rest is by hand.
+**Note:** needs a production build (`cd frontend && npm run build`) served by the backend; the dev server has no worker. Unit and server tests cover the route table and the worker's logic; `e2e/specs/app-shell.spec.js` covers PWA-04 and PWA-05 against the real build in Chromium, and `e2e/specs/app-shell-worker.spec.js` covers the worker's side of PWA-02, 06, 07, 08, 09, 10 and 11 against a stand-in page. Everything is still worth one pass by hand on a real build.
 **Legend:** ✅ Pass · ❌ Fail · ⬜ Not run
 
 | ID | Title | Precondition | Steps | Expected | Actual | Status |

@@ -171,7 +171,7 @@ The web app can be installed (`frontend/public/manifest.webmanifest`, icons draw
 
 **Push.** The Firebase push worker keeps its own scope (`/firebase-cloud-messaging-push-scope`); a scope holds one worker, and `/` is the shell's.
 
-The end-to-end suite blocks service workers (`e2e/playwright.config.js`), because every test opens a fresh browser that would download the whole bundle again; `e2e/specs/app-shell.spec.js` turns them on for itself.
+The end-to-end suite blocks service workers (`e2e/playwright.config.js`), because every test opens a fresh browser that would download the whole bundle again; `e2e/specs/app-shell.spec.js` turns them on for itself, and `e2e/specs/app-shell-worker.spec.js` runs the worker's whole life (install, offline, sign-out message, a second and third build, withdrawal) against a page of a few lines, with no app build.
 
 ## Where things are
 
