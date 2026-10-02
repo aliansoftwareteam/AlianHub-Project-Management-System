@@ -332,6 +332,8 @@ A quick tour of AlianHub. [Try the live demo](https://demo.alianhub.com) to expl
 
 📘 **Full user guide & API reference:** [help.alianhub.com](https://help.alianhub.com)
 
+New to project tools? [docs/guide/first-hour/](docs/guide/first-hour/README.md) walks through your first hour, one short page at a time.
+
 Coming from ClickUp? [docs/MOVING-FROM-CLICKUP.md](docs/MOVING-FROM-CLICKUP.md) says what to export, what comes across and what does not.
 
 For development:
