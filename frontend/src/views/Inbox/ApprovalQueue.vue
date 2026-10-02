@@ -57,7 +57,7 @@
                     />
                     <span class="ah-avatar ah-avatar--agent" aria-hidden="true"><ShellIcon name="agent" :size="12" /></span>
                     <span class="aq__what"><strong>{{ whoOf(p) }}</strong> {{ t('Inbox.wants_to') }} {{ titleOf(p) }}</span>
-                    <span v-if="p.locked" class="ah-chip ah-chip--warn" data-test="queue-locked">{{ t('Inbox.queue_locked') }}</span>
+                    <span v-if="p.locked" class="ah-chip ah-chip--warn" data-test="queue-locked">{{ t(lockedByRights(p) ? 'Inbox.queue_locked_rights' : 'Inbox.queue_locked') }}</span>
                     <span v-if="p.tainted" class="ah-chip ah-chip--warn">{{ t('Audit.tainted') }}</span>
                     <time v-if="stamp(p.createdAt)" class="aq__when" :title="p.createdAt">{{ stamp(p.createdAt) }}</time>
                 </div>
@@ -93,8 +93,8 @@
 
                 <p v-if="errors[p.proposalId]" class="ah-field__error aq__error" role="alert" data-test="queue-row-error">{{ errors[p.proposalId] }}</p>
 
-                <p v-if="p.locked" class="aq__locked-note">{{ t('Ai.gate_locked') }}</p>
-                <div v-else-if="declining === p.proposalId" class="aq__decline">
+                <p v-if="p.locked" class="aq__locked-note" data-test="queue-locked-note">{{ t(lockedByRights(p) ? 'Ai.rights_locked' : 'Ai.gate_locked') }}</p>
+                <div v-if="declining === p.proposalId && mayDecline(p)" class="aq__decline">
                     <div class="aq__label">{{ t('Ai.decline_reason_title') }}</div>
                     <div class="aq__chips" role="group" :aria-label="t('Ai.decline_reason_title')">
                         <button
@@ -123,6 +123,17 @@
                         <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" data-test="queue-decline-cancel" @click="declining = ''">{{ t('Ai.cancel') }}</button>
                         <button type="button" class="aq__skip" :disabled="busy" data-test="queue-decline-skip" @click="decline(p, '')">{{ t('Ai.decline_no_reason') }}</button>
                     </div>
+                </div>
+                <div v-else-if="p.locked" class="aq__actions">
+                    <button
+                        v-if="mayDecline(p)"
+                        type="button"
+                        class="ah-btn ah-btn--secondary ah-btn--sm"
+                        :disabled="busy || reviewing"
+                        data-test="queue-decline"
+                        :aria-label="t('Inbox.queue_decline_named', { what: titleOf(p) })"
+                        @click="openDecline(p)"
+                    >{{ t('Inbox.decline') }}</button>
                 </div>
                 <div
                     v-else-if="alwaysFor === p.proposalId"
@@ -274,6 +285,9 @@ const whoOf = (p) => {
     return person ? t('Inbox.queue_for', { agent: p.agentName, person }) : p.agentName;
 };
 
+const lockedByRights = (p) => p.lockedWhy === 'own_rights';
+// A row that is not the reader's to approve can still be theirs to decline: one their own agent asked for.
+const mayDecline = (p) => !p.locked || p.mayDecline === true;
 const selectable = computed(() => props.proposals.filter((p) => !p.locked));
 const pickedIds = computed(() => selectable.value.map((p) => p.proposalId).filter((id) => picked.value.includes(id)));
 const allPicked = computed(() => selectable.value.length > 0 && pickedIds.value.length === selectable.value.length);

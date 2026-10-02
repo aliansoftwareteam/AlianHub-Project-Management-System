@@ -476,6 +476,15 @@ const draftRefusal = async (companyId, actor, action, params) => {
     return start.statusCode === 403 ? 'permission_denied: the person behind this agent cannot add a doc here' : PROJECT_REFUSAL;
 };
 
+/* Why the person behind `actor` may not make this change themselves, or '' when they may: the right, the thread,
+ * the task, project or list, and the place of a doc. An approval asks it of the approver before anything is claimed. */
+const personRefusal = async (companyId, actor, action, params = {}) => {
+    const holder = await permissions.holderMay(companyId, actor, action, params);
+    if (!holder.allowed) return holder.reason;
+    if (!(await threadMay(companyId, actor, action, params))) return THREAD_REFUSAL;
+    return await targetRefusal(companyId, actor, action, params) || draftRefusal(companyId, actor, action, params);
+};
+
 const refusal = async (companyId, actor, { action, params, reason, ip, entityType, entityId, taint }) => {
     const auditId = await audit.recordRefusal(companyId, actor, { action, reason, params, entityType, entityId: entityId || params.taskId, ip, taint });
     return new RefusedError(reason, auditId);
@@ -505,10 +514,7 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
     if (decision && decision.decision === 'refuse') throw await refusal(companyId, actor, { action, params, reason: decision.reason, ip, taint });
     const check = registry.evaluate(action, params, { allowedActions });
     if (!check.allowed) throw await refusal(companyId, actor, { action, params, reason: check.reason, ip, taint });
-    const holder = await permissions.holderMay(companyId, actor, action, params);
-    if (!holder.allowed) throw await refusal(companyId, actor, { action, params, reason: holder.reason, ip, taint });
-    if (!(await threadMay(companyId, actor, action, params))) throw await refusal(companyId, actor, { action, params, reason: THREAD_REFUSAL, ip, taint });
-    const closed = await targetRefusal(companyId, actor, action, params) || await draftRefusal(companyId, actor, action, params);
+    const closed = await personRefusal(companyId, actor, action, params);
     if (closed) throw await refusal(companyId, actor, { action, params, reason: closed, ip, taint });
     const rule = await projectPolicy.ask({ companyId, actor, action, params, approved, taint, standing: true, applying: true });
     if (rule.decision !== projectPolicy.DECISION.ACT) {
@@ -562,4 +568,4 @@ const authorizeRead = async ({ companyId, actor, action, params = {}, ip = '', a
     return true;
 };
 
-module.exports = { perform, authorizeRead, refusal, RefusedError, executors, workEntry, SCOPE, RATING_KEYS, RATINGS, rating, ratings, unrated, isCompleteRating, manifest };
+module.exports = { perform, authorizeRead, personRefusal, refusal, RefusedError, executors, workEntry, SCOPE, RATING_KEYS, RATINGS, rating, ratings, unrated, isCompleteRating, manifest };

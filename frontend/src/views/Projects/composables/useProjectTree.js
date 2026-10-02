@@ -1,10 +1,9 @@
-import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, inject, onMounted, ref, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';
 import { useToast } from 'vue-toast-notification';
 import { i18n } from '@/locales/main';
 import { useProjectsHelper } from '../helper';
-import { FOLDERS_CHANGED_EVENT, refreshFolders } from '../folderActions';
 
 const byId = (list, id) => (list || []).find((item) => String(item._id) === String(id));
 
@@ -32,7 +31,6 @@ export function useProjectTree(projectData) {
     const companyId = inject('$companyId');
     const { projects } = useProjectsHelper();
 
-    const socket = inject('$socket', ref(null));
     const foldedFolderIds = new Map();
 
     const sprintLoading = ref(false);
@@ -122,25 +120,6 @@ export function useProjectTree(projectData) {
     watch(() => getters['projectData/sprints'], () => { if (projectData.value?._id) loadSprintFolderData(projectData.value._id, true); });
     watch(() => getters['projectData/folders'], () => { if (projectData.value?._id) loadSprintFolderData(projectData.value._id, true); });
     onMounted(resolveRouteProject);
-
-    /* The event says only that a folder changed somewhere in the company, so the open project's are read again. */
-    let boundSocket = null;
-    const onFoldersChanged = () => { if (projectData.value?._id) refreshFolders({ commit, getters }, projectData.value._id); };
-    function unbindSocket() {
-        boundSocket?.off?.(FOLDERS_CHANGED_EVENT, onFoldersChanged);
-        boundSocket = null;
-    }
-    function bindSocket() {
-        const live = socket?.value;
-        if (live === boundSocket) return;
-        unbindSocket();
-        if (!live?.on) return;
-        boundSocket = live;
-        live.on(FOLDERS_CHANGED_EVENT, onFoldersChanged);
-    }
-    onMounted(bindSocket);
-    watch(() => socket?.value, bindSocket);
-    onBeforeUnmount(unbindSocket);
 
     return { sprintLoading, loadSprintFolderData, selectProject, resolveRouteProject };
 }

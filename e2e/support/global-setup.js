@@ -4,7 +4,7 @@ const { ROLE_NAMES } = require('./fixtures');
 const { saveStorageState } = require('./pages');
 
 module.exports = async () => {
-    const harness = await startHarness({ name: 'e2e' });
+    const harness = await startHarness({ name: 'e2e', env: { MCP_TOOLS_WORK: 'on' } });
     const browser = await chromium.launch();
     try {
         for (const role of ROLE_NAMES) await saveStorageState(browser, harness.state, role);

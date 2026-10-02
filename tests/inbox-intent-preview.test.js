@@ -83,11 +83,12 @@ describe('a waiting task create carries its preview', () => {
         expect(lineOf(preview, 'description').text).toBe('<script>alert(2)</script>');
     });
 
-    it('leaves a change of another kind as it was', async () => {
+    it('gives a change of another kind no preview of its own: the row\'s one card says what it sets', async () => {
         propose('comment', [{ action: 'task.comment', params: { taskId: T_OPEN, body: 'Ship it' }, label: 'Comment', reversible: true }], { taskId: T_OPEN });
         const row = await rowOf(OWNER, 'comment');
-        expect(row.changes).toEqual([{ action: 'task.comment', params: { taskId: T_OPEN, body: 'Ship it' }, label: 'Comment', reversible: true }]);
-        expect(Object.keys(row.changes[0])).not.toContain('preview');
+        expect(row.changes).toEqual([{ action: 'task.comment', label: 'Comment', reversible: true }]);
+        expect(row.batch).toMatchObject({ kind: 'batch', tasks: 1, changes: 1 });
+        expect(row.batch.lines.find((line) => line.kind === 'batchItem')).toMatchObject({ what: 'comment', value: 'Ship it', more: false });
     });
 });
 

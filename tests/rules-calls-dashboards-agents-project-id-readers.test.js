@@ -43,7 +43,8 @@ const ROWS = {
     [SCHEMA_TYPE.CALLS]: threeRows({ participants: [ME], deletedStatusKey: 0 }),
     [SCHEMA_TYPE.USERDASHBOARD]: threeRows({ visibility: 'project', ownerId: 'someone else', isDeleted: false }),
     [SCHEMA_TYPE.AGENT_RUNS]: threeRows({ agentId: 'a1', status: 'running', taskId: 't1', episode: { skill: 'qa' } }),
-    [SCHEMA_TYPE.AGENT_PROPOSALS]: threeRows({ agentId: 'a1', status: 'pending', taskId: 't1', gate: 'deploy', changes: [] }),
+    // Each reaches into the other project, so the read that takes such rows off a count finds them in either form too.
+    [SCHEMA_TYPE.AGENT_PROPOSALS]: threeRows({ agentId: 'a1', status: 'pending', taskId: 't1', gate: 'deploy', changes: [{ action: 'task.move', params: { taskId: 't1', projectId: OTHER_PROJECT } }] }),
 };
 
 const found = (type, filter) => (ROWS[type] || []).filter(matchesLikeMongo(filter));
@@ -105,10 +106,17 @@ describe('project rules are found by either form of their project id', () => {
         expectEveryReadFindsBoth(SCHEMA_TYPE.PROJECT_RULES);
     });
 
-    test.each([['row-text'], ['row-oid']])('editing rule %s (projectRules updateProjectRules)', async (id) => {
-        const r = await call(projectRules.updateProjectRules, { body: { id, key: '$set', projectId: PROJECT, updateObject: { roles: [] } } });
-        expect(r.code).toBe(200);
-        expect(r.body._id).toBe(id);
+    const RULE_ID_OF = { 'text form': '6f00000000000000000000a1', 'ObjectId form': '6f00000000000000000000a2' };
+    test.each(Object.entries(RULE_ID_OF))('editing the rule stored in %s (projectRules updateProjectRules)', async (name, id) => {
+        const stored = ROWS[SCHEMA_TYPE.PROJECT_RULES];
+        ROWS[SCHEMA_TYPE.PROJECT_RULES] = stored.map((row) => ({ ...row, _id: RULE_ID_OF[row.name] || row._id }));
+        try {
+            const r = await call(projectRules.updateProjectRules, { body: { id, key: '$set', projectId: PROJECT, updateObject: { roles: [] } } });
+            expect(r.code).toBe(200);
+            expect(r.body.name).toBe(name);
+        } finally {
+            ROWS[SCHEMA_TYPE.PROJECT_RULES] = stored;
+        }
     });
 
     test('the permission evaluator reads a project\'s own rules stored in either form (permissionGuard evaluatePermission)', async () => {

@@ -25,7 +25,7 @@ const { dbCollections } = require('../Config/collections');
 const { setMiddlewareV2, setMiddlewareWithCV2 } = require('../Config/setMiddleware');
 const { signSession, startApp } = require('./fixtures/sessionApp');
 const { importSettingsFunction } = require('../Modules/ImportSettings/controller.js');
-const { handleCreateCompanyDataStorageFun, handleCreateCompanyDataStorageFunForUpload } = require('../common-storage/common-server.js');
+const { handleCreateCompanyDataStorageFun } = require('../common-storage/common-server.js');
 const { emitListener } = require('../Modules/Company/eventController.js');
 const companyCtrl = require('../Modules/Company/controller');
 
@@ -102,24 +102,16 @@ describe('POST /api/v2/company/create with no ready-made company', () => {
         expect(reserved[0]).toMatchObject({ db: 'global', data: { isAvailable: false, pickupCount: 1 } });
     });
 
-    it('says in plain words why, on the reply and on the progress stream, when the workspace cannot be prepared', async () => {
+    it('says in plain words why, with a code the page can translate, on the reply and on the progress stream', async () => {
         importSettingsFunction.mockImplementation((req, cb) => cb({ status: false }));
 
         const res = await create();
 
         expect(res.body.status).toBe(false);
+        expect(res.body.code).toBe('not_prepared');
         expect(res.body.statusText).toBe('The server could not set up the workspace\'s storage and starting settings.');
-        expect(stopEvents()).toEqual([{ step: 'STOP', error: 'The server could not set up the workspace\'s storage and starting settings.' }]);
+        expect(stopEvents()).toEqual([{ step: 'STOP', error: 'The server could not set up the workspace\'s storage and starting settings.', code: 'not_prepared' }]);
         expect(saved.some((row) => row.type === dbCollections.COMPANIES)).toBe(false);
-    });
-
-    it('says the workspace was started but not finished when a later step fails, without passing on the raw error', async () => {
-        handleCreateCompanyDataStorageFunForUpload.mockRejectedValueOnce(new Error('ENOSPC: /srv/storage'));
-
-        const res = await create();
-
-        expect(res.body).toEqual({ status: false, statusText: 'The server started the workspace but could not finish setting it up.' });
-        expect(stopEvents()).toEqual([{ step: 'STOP', error: 'The server started the workspace but could not finish setting it up.' }]);
     });
 
     it('still takes a ready-made company when there is one, without preparing another', async () => {

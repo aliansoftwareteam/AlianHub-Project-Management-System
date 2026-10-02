@@ -364,6 +364,46 @@ describe('undo', () => {
     });
 });
 
+describe('undo over its route', () => {
+    const UNDO = '/api/v1/ai/notes-to-tasks/undo';
+    const handlers = [];
+    beforeAll(() => {
+        const mount = (path, ...mounted) => { if (path === UNDO) handlers.push(...mounted.flat()); };
+        require('../Modules/AI/routes').init({ get: mount, post: mount, put: mount, patch: mount, delete: mount, use: mount });
+    });
+
+    const token = (kind) => ({ _id: '6f0000000000000000000101', userId: ALICE, name: 'Claude', scopes: ['read', 'write'], ...(kind ? { kind } : {}) });
+    const send = async (caller, body) => {
+        const res = respond();
+        const req = { headers: { companyid: COMPANY }, aud: COMPANY, uid: ALICE, method: 'POST', originalUrl: UNDO, url: UNDO, ip: '1.1.1.1', body, ...caller };
+        for (const handler of handlers) {
+            let passed = false;
+            // eslint-disable-next-line no-await-in-loop
+            await handler(req, res, () => { passed = true; });
+            if (!passed) break;
+        }
+        return { status: statusOf(res), body: bodyOf(res) };
+    };
+
+    /* [who, the request's identity, whether the tasks go to the trash] */
+    test.each([
+        ['a person signed in', {}, true],
+        ['a person\'s own API token', { apiToken: token() }, true],
+        ['an agent\'s token', { apiToken: token('agent') }, false],
+    ])('%s', async (_who, caller, removes) => {
+        const { body: made } = await createTasks(ALICE, { kind: 'page', id: PAGE, items: [{ key: 'a', title: 'Send the deck', ownerId: '', due: '' }] });
+        const taskId = made.data.created[0].taskId;
+        db().seed(SCHEMA_TYPE.TASKS, { _id: oid(taskId), TaskName: 'Send the deck', ProjectID: oid(PROJECT_A), Task_Leader: ALICE, deletedStatusKey: 0 });
+
+        const out = await send(caller, { kind: 'page', id: PAGE, taskIds: [taskId] });
+
+        expect(out.status).toBe(removes ? 200 : 403);
+        expect(out.body.status).toBe(removes);
+        expect(mockArchive).toHaveBeenCalledTimes(removes ? 1 : 0);
+        expect((await stored(SCHEMA_TYPE.PAGES, PAGE)).linkedTasks).toHaveLength(removes ? 0 : 1);
+    });
+});
+
 describe('parseDue', () => {
     test('reads ISO dates and the relative words the model may still return', () => {
         const today = new Date('2026-09-28T09:00:00Z');

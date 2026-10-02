@@ -43,7 +43,9 @@ jest.mock('../Modules/Comments/helpers/threadAccess', () => ({
 jest.mock('../Modules/Agents/scope', () => ({
     visibleProjects: jest.fn(async () => [{ _id: '6f0000000000000000000701', ProjectName: 'Web' }]),
 }));
-jest.mock('../Modules/Agents/actor', () => ({ resolveActor: jest.fn(async (req) => ({ userId: req.uid, runId: req.agentRun ? 'run-1' : null })) }));
+jest.mock('../Modules/Agents/actor', () => ({
+    resolveActor: jest.fn(async (req) => ({ userId: req.uid, runId: req.agentRun ? 'run-1' : null, kind: req.agentRun || (req.apiToken && req.apiToken.kind === 'agent') ? 'agent' : 'human' })),
+}));
 jest.mock('../Modules/Agents/triggers', () => ({ fromComment: jest.fn(async () => []) }));
 jest.mock('../Modules/AICore/llmProvider', () => ({
     isAnyProviderConfigured: () => mockState.configured,
@@ -217,6 +219,18 @@ describe('@ai in a task comment', () => {
         expect(r.body.ai).toBeUndefined();
         expect(mockChat).not.toHaveBeenCalled();
         expect(aiRows()).toHaveLength(0);
+    });
+
+    it('is not answered for a comment a token created for an agent posts, and is for one a personal token posts', async () => {
+        const byAgent = await ask(mockIds.member, 'what is left?', { extra: { apiToken: { _id: 'token-1', kind: 'agent' } } });
+        expect(byAgent.code).toBe(200);
+        expect(byAgent.body.ai).toBeUndefined();
+        expect(mockChat).not.toHaveBeenCalled();
+        expect(aiRows()).toHaveLength(0);
+
+        await ask(mockIds.member, 'what is left?', { extra: { apiToken: { _id: 'token-2' } } });
+        expect(mockChat).toHaveBeenCalledTimes(1);
+        expect(aiRows()).toHaveLength(1);
     });
 
     it('re-checks the asker\'s access before answering', async () => {

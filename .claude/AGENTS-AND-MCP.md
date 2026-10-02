@@ -24,7 +24,7 @@ Every agent change takes the same road. There is no second road.
    - `propose`: the change waits for a person.
    - `refuse`: the change does not happen.
 
-   `ask()` only holds an agent back. It never grants what the registry, the person's permissions or the never-list refuse. A project where agents are paused refuses every agent write (`Modules/Agents/projectLimits.js`).
+   `ask()` only holds an agent back. It never grants what the registry, the person's permissions or the never-list refuse. A project where agents are paused refuses every agent write that reaches it (`Modules/Agents/projectLimits.js`), and "Pause all agents" refuses every connected agent's write in the workspace until an owner or admin resumes them (`connectedPaused` in `Modules/Agents/accounts.js`). A connected agent's change that cannot be undone, or that takes subtasks with it, always waits for a person.
 7. **Act or propose.** In `tools.call`, a held change is filed with `propose()` (`Modules/Mcp/propose.js`). A change that may act goes to `perform()` (`Modules/Agents/actions.js`). `perform()` asks again before it runs anything, so a caller that skips step 6 still meets it.
 8. **Refuse.** A refusal is thrown as `RefusedError`, written to the audit log, and sent back to the agent as `refused: true` with a reason.
 9. **Execute.** `perform()` checks the registry, the permissions of the person behind the agent (`Modules/Agents/permissions.js`), the target, and `ask()`. Then it looks up `executors[action]`, opens an audit row, runs the executor, and marks the row applied with its undo.
@@ -178,7 +178,7 @@ All are off by default. Each is read on every call, so a flag that is off leaves
 | `MCP_TOOLS_DATA` | `Modules/Mcp/dataFlag.js` | Read tools for projects, lists, docs, time; `comment.create`, `timelog.create` |
 | `MCP_TOOLS_MANAGE` | `Modules/Mcp/manageFlag.js` | Task and doc management tools, for tokens with `tasks:manage` or `docs:manage` |
 | `MCP_TOOLS_WORK` | `Modules/Mcp/workFlag.js` | Tags, relations, lists, doc comments, goals, setup, project create, automation, queue |
-| `MCP_TOOLS_V2` | `Modules/Mcp/v2Flag.js` | Names beside ids, paged lists, annotations, approval for calls that cannot be undone |
+| `MCP_TOOLS_V2` | `Modules/Mcp/v2Flag.js` | Names beside ids, paged lists, annotations, approval for a write that reaches the whole workspace (a goal's target) |
 | `AGENT_PERFORMANCE_READ` | `Modules/Agents/performanceFlag.js` | `performance.read` |
 | `CONNECTORS` | `Modules/Agents/connectors/flag.js` | Slack and Google Calendar connectors |
 | `AGENT_TAINT_ROUTING` | `Modules/Agents/taint.js` | Risky writes after outside content wait for a person |

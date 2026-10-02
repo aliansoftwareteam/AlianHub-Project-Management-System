@@ -1,6 +1,10 @@
 const ctrl = require('./controller');
 const sessionCtr = require('./session');
 const { limitAccountMailRequests } = require('./helpers/accountMail');
+const { agentsRefused } = require('../Agents/guard');
+
+/* How a person signs in is theirs alone to change. */
+const securedByThePerson = agentsRefused('account.security');
 
 exports.init = (app) => {
 
@@ -73,9 +77,9 @@ exports.init = (app) => {
     // and exchanges a tempToken + code for a real session, rate-limited like
     // login via manageAttempt.
     app.get("/api/v2/auth/2fa/status", ctrl.twoFaStatus)
-    app.post("/api/v2/auth/2fa/setup", ctrl.twoFaSetup)
-    app.post("/api/v2/auth/2fa/verify", ctrl.twoFaVerify)
-    app.post("/api/v2/auth/2fa/disable", ctrl.twoFaDisable)
+    app.post("/api/v2/auth/2fa/setup", securedByThePerson, ctrl.twoFaSetup)
+    app.post("/api/v2/auth/2fa/verify", securedByThePerson, ctrl.twoFaVerify)
+    app.post("/api/v2/auth/2fa/disable", securedByThePerson, ctrl.twoFaDisable)
     app.post("/api/v2/auth/2fa/validate", ctrl.twoFaValidate, ctrl.manageAttempt)
 
     // Passwordless login link (public, pre-auth). Enable/disable with MAGIC_LINK_ENABLED.
@@ -125,7 +129,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true, message:message
      */
-    app.patch("/api/v2/auth/:id/change-password", ctrl.changePassword);
+    app.patch("/api/v2/auth/:id/change-password", securedByThePerson, ctrl.changePassword);
 
 
     /**
