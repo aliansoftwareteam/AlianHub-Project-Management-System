@@ -5,6 +5,10 @@ export default {
         sprint_settings: "Sprint settings",
         make_it_a_sprint: "Make it a sprint",
         make_it_a_plain_list: "Make it a plain list",
+        preview_kind: "Sprint",
+        preview_wants: "run “{title}” as a sprint",
+        preview_days: "Runs",
+        preview_days_now: "Runs now",
         run_as_sprint: "Run this list as a sprint",
         run_as_sprint_hint: "Gives it a start, an end and a goal, so it can be started, completed and reported on. Leave this off to keep it a plain list.",
         goal: "Sprint goal",
@@ -75,7 +79,6 @@ export default {
             "The first name field may only contain alphabetic characters as well as spaces",
         validCharacterslast:
             "The last name field may only contain alphabetic characters as well as spaces",
-        minMust: "must be at least 3 characters",
         must_be_a_valid_email: "Must be a valid email",
         currentPassword:
             "current password must be at least 8 characters long, and contain at least 1 alphabet,1 uppercase, 1 numeric, and 1 special character",
@@ -85,14 +88,10 @@ export default {
             "The current password field must be at least 8 characters",
         newPasswordValid:
             "The new password field must be at least 8 characters",
-        please_wait_before_resending_email:
-            "Please check your email. If you haven't received it, you can resend the verification email after 1 minute.",
     },
     companyErrorMessage: {
         phoneNumberValid:
             "The phone number field must be at least 10 characters",
-        Something_went_wrong_Please_contact_to_admin:
-            "Something went wrong. Please contact to admin",
     },
     errorPage: {
         project_name: "Project name",
@@ -1100,91 +1099,6 @@ export default {
         previous_day: "Previous day",
         next_day: "Next day",
     },
-    Portfolio: {
-        new: "New portfolio",
-        none: "No portfolios yet.",
-        pick: "Select a portfolio to see its rollup.",
-        projects: "Projects",
-        progress: "Progress",
-        on_track: "On track",
-        at_risk: "At risk",
-        off_track: "Off track",
-        overdue: "overdue",
-        edit: "Edit",
-        delete: "Delete",
-        done: "done",
-        milestones: "milestones",
-        past_due: "past due",
-        no_projects: "This portfolio has no accessible projects.",
-        h_on_track: "On track",
-        h_at_risk: "At risk",
-        h_off_track: "Off track",
-        name_ph: "Portfolio name",
-        saving: "Saving…",
-        save: "Save",
-        cancel: "Cancel",
-        no_company_projects: "No projects available.",
-    },
-    CustomReport: {
-        group_by: "Group by",
-        measure: "Measure",
-        chart: "Chart",
-        project: "Project filter",
-        all_projects: "All projects",
-        d_status: "Status",
-        d_project: "Project",
-        d_sprint: "List",
-        m_count: "Task count",
-        m_points: "Story points",
-        c_bar: "Bar",
-        c_pie: "Pie (share)",
-        c_table: "Table",
-        save: "Save report",
-        name_ph: "Report name",
-        saving: "Saving…",
-        saved_list: "Saved reports",
-        none_saved: "No saved reports yet.",
-        delete: "Delete",
-        duplicate: "Duplicate",
-        start_from_template: "Start from a template",
-        choose_template: "Choose a template…",
-        schedules: "Scheduled emails",
-        pick_report: "Pick a saved report…",
-        daily: "Daily",
-        weekly: "Weekly",
-        monthly: "Monthly",
-        recipients_ph: "Recipient emails (comma-separated)",
-        schedule_it: "Schedule",
-        no_schedules: "No scheduled deliveries yet.",
-        recipients_short: "recipient(s)",
-        send_now: "Send now",
-        share: "Share",
-        copy: "Copy",
-        revoke: "Revoke",
-        generating: "Generating link…",
-        no_data: "No data for this configuration.",
-        total: "Total",
-        export_csv: "Export CSV",
-        export_excel: "Export Excel",
-    },
-    VarianceReport: {
-        select_project: "Select a project…",
-        pick: "Select a project to see its estimate-vs-actual variance.",
-        estimated: "Estimated",
-        actual: "Actual",
-        variance: "Variance",
-        over: "Over",
-        under: "Under",
-        task: "Task",
-        status: "Status",
-        no_tasks: "No tasks in this project.",
-        s_over: "Over",
-        s_under: "Under",
-        s_on_track: "On track",
-        s_no_estimate: "No estimate",
-        export_csv: "Export CSV",
-        export_excel: "Export Excel",
-    },
     Automations: {
         title: "Automations",
         home: "Home",
@@ -1530,23 +1444,6 @@ export default {
         apps_note: "The embedded site must allow being framed (some set X-Frame-Options / frame-ancestors to block it).",
         apps_none: "No embedded apps yet. Add one above.",
     },
-    Capacity: {
-        apply: "Apply",
-        hours_per_day: "Working hours per day",
-        members: "Members",
-        member: "Member",
-        capacity: "Capacity (h)",
-        pto: "PTO (h)",
-        allocated: "Allocated (h)",
-        utilization: "Utilization",
-        over: "Over-allocated",
-        status: "Status",
-        no_members: "No team members found.",
-        loading: "Loading…",
-        s_under: "Under",
-        s_full: "Full",
-        s_over: "Over",
-    },
     Palette: {
         title: "Command palette",
         more_lists: "+{n} list | +{n} lists",
@@ -1612,15 +1509,10 @@ export default {
         switch_workspace: "Switch workspace",
         theme_light: "Light theme",
         theme_dark: "Dark theme",
-        status_available: "Available",
         status_dnd: "Do not disturb",
         my_profile: "My profile",
-        billing: "Billing",
         logout: "Log out",
-        version: "Version",
         agents_running: "{n} running",
-        legacy_nav: "Use the old top bar",
-        new_nav: "Try the new navigation",
         skip_to_content: "Skip to content",
         palette_esc: "ESC",
         primary_nav: "Primary",
@@ -2502,6 +2394,63 @@ export default {
         undone_some: "{done} of {n} changes were undone.",
         undo_failed: "That could not be undone.",
     },
+    AgentActions: {
+        folder_create: "Make a folder",
+        list_sprint_set: "Give a list start and end dates",
+        task_comment: "Add a comment",
+        task_status_set: "Change the status",
+        task_link: "Attach a link",
+        task_assign: "Change who it is assigned to",
+        task_update: "Edit the task",
+        aifield_fill: "Fill in an AI field",
+        task_sprint_move: "Move to another list",
+        subtask_create: "Add a subtask",
+        task_create: "Create a task",
+        timelog_start: "Start a timer",
+        timelog_stop: "Stop a timer",
+        page_draft: "Draft a doc",
+        chat_post: "Post a message in chat",
+        reminder_create: "Set a reminder",
+        deploy_staging: "Deploy to the test site",
+        comment_create: "Add a comment",
+        timelog_create: "Log time",
+        task_edit: "Edit the task",
+        task_assignees_set: "Change who it is assigned to",
+        task_field_set: "Set a custom field",
+        task_move: "Move to another list",
+        task_archive: "Archive the task",
+        task_restore: "Restore the task",
+        task_status_change: "Change the status",
+        task_add: "Create a task",
+        subtask_add: "Add a subtask",
+        comment_update: "Edit a comment",
+        tasks_batch: "Make several changes together",
+        page_create: "Create a doc",
+        page_update: "Edit a doc",
+        task_tags_add: "Add a tag",
+        task_tags_remove: "Remove a tag",
+        task_relation_add: "Link two tasks",
+        task_relation_remove: "Unlink two tasks",
+        list_create: "Create a list",
+        list_rename: "Rename a list",
+        list_move: "Move a list",
+        page_comment_create: "Comment on a doc",
+        page_comment_reply: "Reply to a comment on a doc",
+        page_comment_assign: "Assign a comment on a doc",
+        goal_target_set: "Update a goal's progress",
+        goal_target_sources_add: "Count work toward a goal",
+        goal_target_sources_remove: "Stop counting work toward a goal",
+        task_lists_add: "Add to another list",
+        task_lists_remove: "Take out of a list",
+        slack_message_post: "Post a Slack message",
+        automation_create: "Add an automation",
+        project_create: "Create a project",
+        project_setup: "Set up a project",
+        queue_claim: "Take an item from the work queue",
+        queue_release: "Give back an item from the work queue",
+        fields_create: "Add custom fields",
+        view_create: "Add a saved view",
+    },
     TaskPanel: {
         dialog_label: "Task detail",
         action_items: "Action items ({n})",
@@ -2509,7 +2458,6 @@ export default {
         open_in_desktop_tracker: "Open in desktop tracker",
         change_undone: "Change undone",
         tracker_start: "Start Tracker",
-        tracker_start_hint: "Start this task in the AlianHub desktop tracker",
         tracker_start_accept: "Start tracking",
         tracker_working_on: "What are you working on?",
         tracker_comment_ph: "Add a comment for this session…",
@@ -2521,10 +2469,8 @@ export default {
         story_points: "Story Points",
         story_points_updated: "Story points updated",
         story_points_not_updated: "Story points not updated",
-        ai_estimate_generate: "Generate estimate using AI",
         ai_estimate_generating: "Generating estimate…",
         ai_estimate_generating_label: "Generating estimate",
-        ai_estimate_done: "Estimate generated",
         ai_estimate_failed: "Could not generate estimate",
         ai_estimate_suggest: "Suggest",
         ai_estimate_suggest_hint: "Suggest an estimate with AI",
@@ -2573,7 +2519,6 @@ export default {
         sprint: "List",
         type: "Type",
         tags: "Tags",
-        logged: "Logged",
         tracking: "TRACKING",
         start_timer: "Start timer",
         pause: "Pause",
@@ -2646,6 +2591,8 @@ export default {
         time_failed: "Could not save the time.",
         time_delete_failed: "Could not delete the time entry.",
         time_duration_required: "Enter a date and a duration above zero.",
+        time_whole_numbers: "Enter whole hours from 0 to 23 and whole minutes from 0 to 59.",
+        time_start_required: "Enter a start time.",
         time_past_midnight: "The entry has to end by midnight — pick an earlier start.",
         time_entries: "Time entries",
         time_no_entries: "No time logged yet",
@@ -3032,6 +2979,7 @@ export default {
         skill_label_prd_draft: "Draft a PRD from a brief",
         skill_label_wiki_upkeep: "Find pages that have gone stale",
         skill_label_slack_summary: "Summarise a Slack channel",
+        action_label_task_sprint_move: "Move a task to another list",
         skill_about_slack_summary: "Reads the last day of one allowed Slack channel and proposes a one-paragraph summary to post back to it.",
         skill_about_brief_parse: "Reads a task brief and proposes subtasks with estimates, plus the open questions.",
         skill_about_project_plan: "Reads a task brief and proposes the plan as subtasks with estimates.",
@@ -3757,7 +3705,7 @@ export default {
         risk_factor_blocked: "Blocked, and quiet for {days} days",
         risk_factor_burn: "{pct}% over its estimate",
         risk_factor_silence: "No activity for {days} days",
-        risk_factor_subtasks: "Only {done} of {total} subtasks done",
+        risk_factor_subtasks: "Only {done} of {total} subtask done | Only {done} of {total} subtasks done",
         due_group_overdue: "Overdue",
         due_group_today: "Today",
         due_group_tomorrow: "Tomorrow",
@@ -3825,7 +3773,6 @@ export default {
         checked: "Checked",
         unchecked: "Not checked",
         date_past: "Past",
-        custom_fields: "Custom fields"
     },
     ViewColumns: {
         title: "Columns",
@@ -4043,6 +3990,11 @@ export default {
         tab_milestones: "Milestones",
         tab_variance: "Variance",
         tab_custom: "Custom",
+        template_name_tasks_by_status: "Tasks by status",
+        template_name_tasks_by_project: "Tasks by project",
+        template_name_tasks_by_sprint: "Tasks by list",
+        template_name_points_by_sprint: "Story points by list",
+        template_name_points_by_project: "Story points by project",
 
         project: "Project",
         sprint: "Sprint",
@@ -4192,7 +4144,7 @@ export default {
         status_type_close: "Closed",
         status_type_default_active: "To do",
         dim_project: "Project",
-        dim_sprint: "Sprint",
+        dim_sprint: "List",
         dim_person: "Person",
         dim_month: "Month",
         measure: "Measure",
@@ -4279,7 +4231,7 @@ export default {
         tab_mine: "Mine",
         tab_shared: "Shared with me",
         new_dashboard: "+ Dashboard",
-        n_cards: "{n} CARDS",
+        n_cards: "{n} CARD | {n} CARDS",
         more: "More",
         open: "Open",
         duplicate: "Duplicate",
@@ -4840,7 +4792,7 @@ export default {
         assignable: "assignable",
         n_projects: "{n} project | {n} projects",
         no_project_scope: "No project scope",
-        n_skills: "{n} skills",
+        n_skills: "{n} skill | {n} skills",
         n_actions: "{n} actions",
         read_only: "read only",
         no_members: "Nobody here yet.",
@@ -6022,14 +5974,9 @@ export default {
         no_archived: "No Archived Data Found",
         you_dont: "You don't have any projects",
         archived_list: "Archived List",
-        projects: "Projects",
         project_name: "Project Name",
-        folder_name: "Folder Name",
-        sprint_name: "List Name",
         show_archive: "Show Archive",
         hide_archive: "Hide Archive",
-        try_using_diff: "Try using different keywords",
-        no_project_found: "No projects found",
         no_result_found: "No Results found",
         select_project_status: "Select Project Status",
         no_activity_log_found: "No activity log found",
@@ -6552,8 +6499,6 @@ export default {
         task: "Task",
         ai_assist: "AI Assist",
         review: "review",
-        agents_working: "{n} agent working | {n} agents working",
-        agents_chip_title: "Agents running on this project — elapsed time and spend so far",
         switch_project: "Switch project",
         views_tablist: "Project views",
         wip_chip: "WIP {n}/{limit}",
@@ -6738,11 +6683,7 @@ export default {
         col_title: "Title",
     },
     Watcher: {
-        ignore: "Ignore",
-        participating_mentions: "Participating and {'@'}mentions",
         list_of_watcher: "List of Watcher",
-        all_activity: "All Activity",
-        watchers_list: "Watchers list",
         owner: "Owner",
     },
     ViewList: {
@@ -6907,11 +6848,6 @@ export default {
         more_tags: "{count} more: {names}",
     },
     Embeded: {
-        Anything: "Anything",
-        Sheets: "Google Sheets",
-        Docs: "Google Docs",
-        Youtube: "Youtube",
-        Figma: "Figma",
         The_name_is_required: "The name is required",
         The_name_should_be_at_least_3_characters_long:
             "The name should be at least 3 characters long",
@@ -7024,7 +6960,6 @@ export default {
         no_audio: "No audio captured. Please try again.",
         unsupported: "Recording isn't supported in this browser.",
         select_project_first: "Select a project first.",
-        no_records: "No records found",
     },
     // Main Chat module (components/organisms/MainChat). Kept in its own namespace
     // so the chat UI owns its strings instead of borrowing from Comments.
@@ -7315,16 +7250,10 @@ export default {
         start: "Start",
         stop: "Stop",
         re_record: "Re-record",
-        attach: "Attach",
-        cancel: "Cancel",
-        recording: "Recording...",
         permission_denied: "Could not access your camera, microphone or screen. Please grant permission and try again.",
         unsupported: "Recording is not supported in this browser.",
         screen_https_hint: "Screen recording requires a secure (HTTPS) connection. Voice recording is still available.",
-        minimize: "Minimize",
-        maximize: "Maximize",
         close: "Close",
-        minimize_hint: "You can minimize this — recording keeps running in the background while you work.",
         discard_confirm: "Recording in progress. Discard this clip?",
         save: "Save",
         title_label: "Title",
@@ -7435,7 +7364,6 @@ export default {
     },
     Comment: {
         created_by: "Created by",
-        created_on: "Created on",
         enter_task_name: "Enter task name",
         task_name: "Task name",
     },
@@ -7466,35 +7394,6 @@ export default {
         task_remaining_planning: "Remaining Hours",
         planned: "Planned",
         views_nav: "Timesheet views",
-    },
-    TimesheetApproval: {
-        submit: "Submit timesheet",
-        resubmit: "Resubmit",
-        approvals: "Approvals",
-        pending_title: "Pending approvals",
-        none_pending: "Nothing to review",
-        approve: "Approve",
-        reject: "Reject",
-        reason_placeholder: "Reason for rejection",
-        confirm: "Confirm",
-        cancel: "Cancel",
-        status_submitted: "Awaiting approval",
-        status_approved: "Approved",
-        status_rejected: "Rejected",
-    },
-    Billable: {
-        billable: "Billable",
-        non_billable: "Non-billable",
-    },
-    TimesheetExport: {
-        export_csv: "Export CSV",
-        exporting: "Exporting…",
-    },
-    TimesheetInvoice: {
-        invoice: "Invoice",
-        generating: "Generating…",
-        rate: "$/h",
-        rate_hint: "Default hourly rate applied to time without a configured rate",
     },
     ProjectWorkplace: {
         msg1: "Project can be shared with members. You can add guests to Folders, Lists, and tasks after creating a Project.",
@@ -7620,7 +7519,6 @@ export default {
         no_app_selected: "No Apps Selected",
         default_views: "Default Setting for Views",
         apps: "Apps",
-        add_new_templete: "Add New Template",
         templates: "Templates",
         s: "s",
         template_name: "Template Name",
@@ -7630,7 +7528,6 @@ export default {
         new_template: "New Template",
         remove: "Remove",
         item_actions: "Actions for {name}",
-        enable_apps: "Enable Apps",
         Turn: "Turn",
         all_apps: "all Apps",
         off: "off",
@@ -7647,12 +7544,10 @@ export default {
         ai_label_description: "Description",
         ai_button_text_requested_changes: "Request Changes",
         ai_min_view_msg_text: "At least one view required",
-        ai_min_msg_text: "Minimum 10 characters are required",
         ai_before_desc_placeholder:
             "Enter use case description for generate template",
         ai_after_desc_placeholder:
             "Here you can continue to ask anything for relevant changes",
-        try_with_ai: "Try with AI",
         msg_search_result_found:
             "Here are some suggested templates relevant to your requirements. You can select any one or to create using AI, simply click",
         msg_search_result_not_found:
@@ -8043,17 +7938,17 @@ export default {
         private_projects: "See private projects. Own means only the ones they are a member of.",
         project_create: "Start a new project.",
         project_name_edit: "Rename a project.",
-        project_sprint_create: "Add a new list or sprint inside a project.",
+        project_sprint_create: "Add a new list inside a project.",
         project_folder_create: "Add a folder to group lists together.",
         project_folder_name_edit: "Rename a folder.",
-        project_sprint_name_edit: "Rename a list or sprint.",
+        project_sprint_name_edit: "Rename a list.",
         project_delete: "Delete a whole project and everything in it.",
         folder_archive: "Move a folder out of the way without deleting it.",
         folder_delete: "Delete a folder.",
         folder_restore: "Bring an archived folder back.",
-        sprint_archive: "Move a list or sprint out of the way without deleting it.",
-        sprint_delete: "Delete a list or sprint.",
-        sprint_restore: "Bring an archived list or sprint back.",
+        sprint_archive: "Move a list out of the way without deleting it.",
+        sprint_delete: "Delete a list.",
+        sprint_restore: "Bring an archived list back.",
         sprint_type_change: "Switch a list between a plain list and a sprint.",
         project_details: "Open the project details panel.",
         project_status_change: "Change whether a project is open, on hold, or finished.",
@@ -8098,7 +7993,7 @@ export default {
         task_convert_to_subtask: "Make a task a subtask of another one.",
         task_duplicate: "Make a copy of a task.",
         task_merge: "Combine two tasks into one.",
-        task_move: "Move a task to another list, sprint or project.",
+        task_move: "Move a task to another list or project.",
         task_archive: "Move a task out of the way without deleting it.",
         task_delete: "Delete a task.",
         task_comment: "Write comments on tasks.",
@@ -8135,21 +8030,6 @@ export default {
         chat_channel: "Create and manage chat channels.",
 
         per_user_generate_limit: "How many AI credits each person in this role may use.",
-    },
-    PermissionMode: {
-        show_all: "Show all permissions",
-        show_common: "Show only the common ones",
-        common_note: "Showing the permissions most teams change. Everything else keeps its current setting.",
-    },
-    FirstRun: {
-        title: "Getting started",
-        subtitle: "{done} of {total} done",
-        dismiss: "Hide this",
-        create_project: "Create your first project",
-        create_task: "Add a task to it",
-        invite_teammate: "Invite a teammate",
-        try_board: "See your tasks on the board",
-        check_notifications: "Choose what you get told about",
     },
     EmptyState: {
         learn_more: "Learn more",
@@ -8599,7 +8479,6 @@ export default {
         task_estimated_hours: "Task Estimated Hours",
     },
     TimeTracker: {
-        TimeTracker: "Time Tracker",
         unlock: "Unlock the Universe with Alianhub Tracker on Your Desktop!",
         smooth: "Smoothly track hours spent by users working on projects or tasks with time tracking.",
         no_builds: "No desktop tracker download is available on this server yet.",
@@ -8636,13 +8515,9 @@ export default {
         "Integrations": "Integrations",
     },
     Sso: {
-        title: "Single Sign-On (SSO)",
-        subtitle: "Let members sign in through your identity provider (Keycloak, Authentik, Azure AD, Okta…).",
         provider: "Provider",
         provider_oidc: "OIDC (OpenID Connect)",
         provider_saml: "SAML 2.0",
-        enabled: "Enabled",
-        disabled: "Disabled",
         discovery_url: "Discovery URL",
         discovery_url_ph: "https://idp/.well-known/openid-configuration",
         client_id: "Client ID",
@@ -8656,10 +8531,6 @@ export default {
         idp_cert_ph: "-----BEGIN CERTIFICATE-----",
         attributes_list: "email · firstName · lastName",
         auto_provision: "Auto-provision new users on first login",
-        urls_hint: "Give these to your IdP, and share the login URL with your team:",
-        login_url: "Login URL",
-        redirect_uri: "Redirect URI",
-        metadata: "SP metadata",
         saving: "Saving…",
     },
     Scim: {
@@ -8855,11 +8726,6 @@ export default {
         none_title: "No shortcut matches",
         none_msg: "Try the name of an action, or a single key.",
         clear_search: "Clear search"
-    },
-    Offline: {
-        offline_msg: "You're offline — changes are saved and will sync when you reconnect.",
-        syncing: "Syncing {n} change(s)…",
-        pending: "{n} change(s) waiting to sync",
     },
     Pto: {
         add_title: "Request time off",
@@ -9224,6 +9090,13 @@ export default {
         wants_setup: "set up the project “{title}”",
         new_project: "New project",
         wants_project: "create the project “{title}”",
+        new_folder: "New folder",
+        wants_folder: "create the folder “{title}”",
+        line_inside: "Inside",
+        line_subfolder: "Subfolder",
+        line_moved_lists: "Lists moved in",
+        lists_not_shown: "{n} list you cannot open | {n} lists you cannot open",
+        lists_and_hidden: "{names}, and {hidden}",
         line_members: "On it",
         members_only_approver: "Only the person who approves it, at first. It starts private; add people in the project afterwards.",
         batch_kind: "Several tasks",
@@ -9928,171 +9801,8 @@ export default {
     },
     Tour: {
         Tag_name_required: "Tag name is required.",
-        help_and_docs_text: "Guides, walkthroughs and answers live here. Open it any time from this icon — you do not have to remember where anything is.",
         tour_completed: "Tour Completed",
-        do_you_have_any:
-            "Do you have any queries? We encourage you to explore our comprehensive video tutorials of BRAND_NAME to get started and make the most of your experience.",
         watch_video: "Watch Video",
-        have_brief_tour_alianhub: "Have a brief tour of BRAND_NAME?",
-        have_brief_tour_alianhub_view: "Have a brief tour of BRAND_NAME views?",
-        have_brief_tour_alianhub_left_side:
-            "Have a brief tour of Project listing?",
-        look_how_to_create:
-            "Look how to create project, manage tasks, view Time Sheet reports, enter a chat, view mentions and notifications, and more.",
-        lets_start: "Let’s Start",
-        no_thanks: "No Thanks",
-        have_brief_task: "Have a brief tour of Task?",
-        have_brief_tour_project: "Have a brief tour of project?",
-        look_how_to_create_task:
-            "Look how to create Task, manage Task , view task according to status group and more.",
-        look_how_to_create_project:
-            "Look how to create Project, manage Project , view task according to status group and more.",
-        project_creation_description:
-            "Projects can be effortlessly created, assigned, and tracked, with clear visibility of responsibilities for team members. This promotes better organization, leading to enhanced efficiency and productivity. Click here to start a new project.",
-        enter_project_name: "Please enter a brief name for your project.",
-        enter_project_key: "Please enter a brief key for your project.",
-        add_project_category: "Please add a category for your project.",
-        enter_project_duedate: "Please enter a due date for your project.",
-        add_project_lead_assignee: "Please add lead assignee for your project.",
-        create_project_from_template:
-            "This option enables you to quickly create a new project using an existing template, which comes with preconfigured data and settings, allowing you to replicate the same project setup easily.",
-        customize_project_section:
-            "This option allows you to fully personalize your project by setting up various elements like statuses, types, apps, and more, tailored to meet your specific needs.",
-        task_type_templates_list_text: "Task Type Templates List",
-        task_type_templates_description_text:
-            "This section displays available task type templates. Select the one that suits your needs.",
-        create_new_task_type_template_text: "Create New Task Type Template",
-        create_new_task_type_template_description_text:
-            "Click the + button to add a new task type template, which you can then use for your tasks.",
-        view_template_task_types_text: "View Template Task Types",
-        view_template_task_types_description_text:
-            "Here you can see the task types linked to the selected template. You can modify or add new task types based on your needs.",
-        add_new_task_type_text: "Add New Task Type",
-        add_new_task_type_description_text:
-            "Click on the 'Add Task Type' button to include new task types into the selected template.",
-        save_project_as_template_text: "Save Project as Template",
-        save_project_as_template_description_text:
-            "Click 'Save as Template' to store the current setup for use in future projects.",
-        initiate_new_project_text: "Initiate New Project",
-        initiate_new_project_description_text:
-            "Click here to start a new project.",
-        add_new_task_text: "Add New Task",
-        input_task_name_text: "Input Task Name",
-        choose_task_status_text: "Choose Task Status",
-        assign_task_text: "Assign Task",
-        set_task_deadline_text: "Set Task Deadline",
-        define_task_priority_text: "Define Task Priority",
-        view_task_list_text: "View Task List",
-        task_information_text: "Task Information",
-        quick_task_menu_text: "Quick Task Menu",
-        task_actions_text: "Task Actions",
-        subtask_toggle_text: "Subtask Toggle",
-        task_tour_complete_text: "Task Tour Complete",
-        create_new_task_description_text:
-            "Create a new task by clicking on the '+ New Task' button.",
-        input_task_name_description_text:
-            "Enter the name of the task in the provided input field.",
-        choose_task_status_description_text:
-            "Select the appropriate task type according to your needs.",
-        assign_task_description_text:
-            "Select the person to whom the task will be assigned.",
-        set_task_deadline_description_text: "Pick a due date for the task.",
-        define_task_priority_description_text:
-            "Choose the priority level for the task.",
-        view_task_list_description_text:
-            "This is a list of tasks, displaying their details and grouped by status.",
-        task_information_description_text:
-            "Here are the details for the selected task.",
-        quick_task_menu_description_text:
-            "Clicking the icon will open a dropdown menu with task operation options.",
-        task_actions_description_text:
-            "Select an action from the list of available task operations.",
-        subtask_toggle_description_text:
-            "Here is a toggle to display the list of subtasks.",
-        task_tour_complete_description_text:
-            "The tour has concluded. Start exploring the many possibilities ahead!",
-        search_and_filter_projects_text: "Search and Filter Projects",
-        search_projects_text: "Search Projects",
-        search_options_for_projects_text: "Search Options for Projects",
-        search_projects_by_name_text: "Search Projects by Name",
-        advanced_project_search_text: "Advanced Project Search",
-        filter_projects_by_favorites_text: "Filter Projects by Favorites",
-        project_settings_text: "Project Settings",
-        project_list_text: "Project List",
-        end_of_project_view_tour_text: "End of Project View Tour",
-        search_and_filter_projects_description_text:
-            "Search and filter projects based on your criteria here.",
-        enter_search_keywords_text:
-            "Enter search keywords to find specific projects.",
-        search_filter_dropdown_description_text:
-            "Click the icon to open a dropdown menu with search filters.",
-        toggle_search_options_description_text:
-            "Toggle between options to search by project, list, or folder as you type.",
-        advanced_search_icon_description_text:
-            "Click the icon to perform an advanced search operation.",
-        filter_by_favorites_description_text:
-            "Click the star icon to prioritize your favorite projects at the top of the list.",
-        project_settings_icon_description_text:
-            "Click the settings icon to switch between archived or unarchived project options.",
-        view_project_list_description_text:
-            "Here, you can view your list of projects.",
-        end_of_project_view_tour_description_text: "Tour is now complete.",
-        create_assign_prioritize_monitor_projects_text:
-            "Easily create, assign, prioritize, and monitor projects. Team members can clearly view their tasks, stay organized, and enhance efficiency and productivity. Click here to initiate a New Project.",
-        track_users_time_sheet_reports_text:
-            "Effectively track users' time with various Time Sheet Reports such as User Time Sheet, Project Time Sheet, Workload Time Sheet, and Tracker Timesheet. Click here to explore the Time Sheet Reports.",
-        user_time_sheet_description_text:
-            "The user time sheet allows you to monitor the hours logged by each user according to your user role.",
-        project_time_sheet_description_text:
-            "Track the hours logged for each project in the project time sheet based on your user role.",
-        workload_time_sheet_description_text:
-            "Similar to the User time sheet, the workload time sheet also includes details about the user's workload, total hours, and estimated hours.",
-        tracker_sheet_description_text:
-            "The tracker sheet shows time logged via the time tracker, along with screenshots and the total tracked time.",
-        view_companies_switch_text:
-            "See all the companies you're associated with and effortlessly switch between them by selecting one.",
-        engage_team_real_time_text:
-            "Engage with team members in real-time for quick decision-making. Create channels and share information via attachments, voice messages, and text.",
-        real_time_notifications_text:
-            "Stay updated with real-time notifications about project and task activities, including task assignments, status changes, comments, and deadlines.",
-        address_specific_individuals_text:
-            "Directly address specific individuals within the project management system. View mentions related to tasks, projects, or discussions.",
-        access_personal_information_text:
-            "Access your personal information, along with settings related to companies, projects, users, and security, based on your user role.",
-        project_views_list_text: "Project Views List",
-        add_new_project_view_text: "Add New Project View",
-        manage_project_views_text: "Manage Project Views",
-        project_files_text: "Project Files",
-        project_audio_files_text: "Project Audio Files",
-        add_project_watcher_text: "Add Project Watcher",
-        project_operation_list_text: "Project Operation List",
-        advanced_task_filter_text: "Advanced Task Filter",
-        search_tasks_text: "Search Tasks",
-        search_options_menu_text: "Search Options Menu",
-        search_criteria_text: "Search Criteria",
-        project_views_list_description_text:
-            "A list of available project views.",
-        add_new_project_view_description_text: "Create a new view here.",
-        manage_project_views_description_text:
-            "This is where you can add or pin views to a project. Click 'Add View' to add, or select 'Pin View' to pin a view.",
-        project_files_description_text:
-            "Access all project files and links by clicking the icon.",
-        project_audio_files_description_text:
-            "Click the icon to view all audio files related to the project.",
-        add_project_watcher_description_text:
-            "Manage your project watcher settings.",
-        project_operation_list_description_text:
-            "Perform various project operations from here.",
-        advanced_task_filter_description_text:
-            "Click the icon to perform an advanced search operation.",
-        search_tasks_description_text:
-            "Enter relevant keywords to search for specific tasks.",
-        search_options_menu_description_text:
-            "Click the icon to open a dropdown with different search options.",
-        search_criteria_description_text:
-            "Choose between task name, task key, or description to refine your search as you type.",
-        select_operation_description_text:
-            "Select an operation from the list to perform the desired action on the project.",
     },
     TaskStatus: {
         To_Do: "To Do",
@@ -10750,63 +10460,13 @@ export default {
         read_more: "Read more",
     },
     Company: {
-        fill_company_details: "Fill in your company details",
-        set_up_company: "Set up your Company",
-        creating_company: "Creating Company",
-        company_created:
-            "Your company was created. We have set up the initial steps. Please wait a moment.",
-        good_to_go: "Good To Go",
         select_default_country: "Select the Default Country",
         freelimitreachedstart:
             "You have already created a free company, To create a new company, you need to upgrade",
         freelimitreachedend:
             "to a paid plan first. Once upgraded, you will be all set to add another free company.",
     },
-    Subscription: {
-        subscription_cancelled:
-            "You have cancelled your subscription at the end of the current subscription period",
-        discard_changes:
-            "A user to your subscription will discard these changes, and your current subscription will continue from the next billing cycle.",
-        confirm_terminate_schedule:
-            "Are you sure you want to terminate the schedule subscription cancellation?",
-        confirm_add_user:
-            "Are you sure you want to add user in your subscription?",
-        confirm_remove_user:
-            "Are you sure you want to remove the user from the subscription?",
-        next_invoice_amount: "Your next invoice will be of",
-        credits_applied: "Credits Applied",
-        current_billing_for_upgrade: "Current Billing for Upgrade",
-        plan_upgrade_success:
-            "Congratulations! Your plan upgrade has been scheduled successfully, and the enhancements will take effect after the current term ends. Get ready to experience the upgraded features and benefits in the next phase of your subscription.",
-        subscription_upgrade_from: "Your Subscription Will Upgrade from",
-        total_payable_amount: "Total Payable Amount",
-        update_subscription: "Update Subscription",
-        updated_subscription_price: "Updated Subscription Price",
-        upgrade_subscription: "Upgrade Subscription",
-        confirm_subscription_change:
-            "Are you sure you want to change your subscription from",
-        monthly: "Month",
-        yearly: "Year",
-        remove_scheduled_cancellation_confirmation:
-            "Clicking 'Yes' will remove the scheduled cancellation and your billing cycle will continue.",
-        scheduled_cancellation_notice:
-            "You have a scheduled cancellation of your current subscription on",
-        credit_entitlement_congratulations:
-            "Congratulations! You're entitled to a credit of",
-        credit_note_application:
-            "for your current subscription. This credit note will be effortlessly applied to enhance your subscription, and it will also be automatically deducted from your upcoming invoices, guaranteeing ongoing value and savings for your subscription journey.",
-        invoice_period_coverage: "The invoice covers the period from",
-    },
-    Card: {
-        pay_with: "Pay with",
-        add_new_card: "Add New Card",
-        name_on_card: "Name on Card",
-        card_number: "Card Number",
-        expiry: "Expiry",
-        cvc: "CVC",
-    },
     alertBox: {
-        updateBillingAddress: "You need to update the first billing address",
         valid_csv_title: "No File Uploaded",
         valid_csv_text: "Please upload a valid .csv file in order to proceed.",
         ok: "OK",
@@ -10825,14 +10485,9 @@ export default {
         missing_fields_title: "Missing Required Fields",
         missing_fields_text:
             "The following required fields must be mapped & confirmed before proceeding",
-        warning_title: "Warning",
-        warning_text:
-            "When you proceed, any empty data values in 'Task Priority' & 'Status' will be treated as 'Medium' and 'To Do' respectively.",
         incomplete_mapping_title: "Incomplete Mapping",
         incomplete_mapping_text:
             "Kindly map all the unique values to at least one Alian Hub value in order to Proceed.",
-        invalid_tasks_error:
-            "No valid tasks found. Please ensure required fields are not empty.",
     },
     importTaskButton: {
         import_title: "Import Tasks",
@@ -10856,11 +10511,6 @@ export default {
     },
     headerMapping: {
         title: "Header Mapping",
-        mapping_instructions: "Let's map your headers with Alian Hub Headers",
-        pending_count: "Pending Fields:",
-        confirmed_count: "Confirmed Fields:",
-        ignored_count: "Ignored Fields:",
-        custom_count: "Custom Fields:",
         confirmed_text: "Confirmed",
         ignored_text: "Ignored",
         edit_button: "Edit",
@@ -10876,63 +10526,12 @@ export default {
         confirm_map_button: "Confirm Mapping",
         clear_selection: "Clear the matched field",
     },
-    reviewMaping: {
-        title: "Kindly review your data mapped in our fields. (You can also edit the data values here.)",
-        warning:
-            "You have one or more required fields with missing or invalid values. Kindly review them or else those rows will not be imported.",
-    },
     valueMapping: {
-        user_mapping_title: "User Mapping",
-        user_mapping_instruction:
-            "Map users to Alian Hub users in order to preserve assignees, leaders, and task activity. If you don't map users, the data will NOT still be imported as it cannot be synced to Alian Hub users.",
         user_dropdown_text: "Select a user",
-        status_mapping_title: "Status Mapping",
-        status_mapping_instruction:
-            "To ensure consistency in future workflows, please map your Status values to the existing values in Alian Hub. This will help avoid any discrepancies moving forward.",
         status_dropdown_text: "Select a Status",
-        priority_mapping_title: "Priority Mapping",
-        priority_mapping_instruction:
-            "To ensure consistency in future workflows, please map your Priority values to the existing values in Alian Hub. This will help avoid any discrepancies moving forward.",
-        priority_dropdown_text: "Select a Priority",
-        custom_field_mapping_title: "Custom Field Mapping",
-        custom_field_mapping_instruction:
-            "To ensure consistency in future workflows, please map the type of your Custom Fields to the existing types in Alian Hub. This will help avoid any discrepancies moving forward.",
-        custom_delimiters_quest:
-            "ℹ️ Do you have any delimiters separating the values of this Custom Field?",
-    },
-    importMappingKeywords: {
-        task_id_description: "The ID of the particular task.",
-        task_name_description:
-            "The name of the task, typically a brief summary.",
-        task_description_description: "Detailed information about the task.",
-        task_assignee_description:
-            "The email address of the person assigned to the task.",
-        task_parentId_description:
-            "The ID of the parent task this task is associated with.",
-        task_leaderId_description:
-            "The user ID of the person leading this task.",
-        task_priority_description:
-            "The level of importance assigned to the task.",
-        task_status_description: "The current state or progress of the task.",
-        task_start_date_description: "The date when the task begins.",
-        task_due_date_description:
-            "The date by which the task should be completed.",
     },
     Affiliate: {
-        refer_earn: "Refer & Earn",
-        unlimited: "Unlimited",
-        invite_start_earning_cash_rewards:
-            "Invite your friends and start earning cash rewards.",
-        your_referral_code: "Your Referral Code",
-        invite_spend_message:
-            "For your friend every spends, you’ll receive {percentage}% of that amount as a reward.",
-        inviteText: "Invite Friends by sharing this link",
-        copy: "Copy",
-        refferal_code_label: "Refferal Code",
         refferal_code_placeholder: "Enter Referral Code",
-        invalid_refferal_model_title: "Your refferal code is invalid",
-        invalid_refferal_model_confirm_text: "Yes, Create it!",
-        invalid_refferal_model_text: "Are you sure you want to create company?",
         refferal_code_error: "Refferal code is not valid",
     },
     UsersByCategory: {
@@ -11309,8 +10908,6 @@ export default {
         user_email_description: "Email ID of the user",
         user_role_description:
             "The role or job title assigned to the user within the organization.",
-        user_designation_description:
-            "The official designation or job title of the employee within the company.",
     },
     userSelection: {
         title: "User Selection",
@@ -11319,46 +10916,21 @@ export default {
         description: "Select all the users that you want to import.",
         duplicate_email_error:
             "This Email ID already exists in AlianHub. You cannot import it.",
-        invalid_email: "This Email ID is invalid. Kindly use a valid Email ID.",
         invalid_fields:
             "You have one of more Invalid fields. Kindly check the highlighted fields.",
         user_limit_100: "You can import a maximum of 100 users at once.",
     },
     importUserButton: {
-        import_user_processing: "Your users are being Imported",
         import_users: "Import Users",
-    },
-    timeForecastingReport: {
-        project_name: "Project Name",
-        project_status: "Project Status",
-        start_date: "Start Date",
-        due_date: "Due Date",
-        last_logged_date: "Last Logged Date",
-        budget: "Budget",
-        actual: "Actual",
-        forecast: "Forecast",
-        estimated_hours: "Estimated Hours",
-        logged_hours: "Logged Hours",
-        remaining_hours: "Remaining Hours",
-        overdue_hours: "Overdue Hours",
-        estimated_time_to_complete: "Estimated Time to Completion",
-        estimated_complition_date: "Estimated Completion Date",
-        show_legends: "Show Legends",
-        show_data_labels: "Show Data Labels",
-        report_type: "Report Type",
     },
     Changelog: {
         whats_new: "What's New",
-        subtitle: "Every release and update, straight from the changelog.",
         view_whats_new: "See what's new in this version",
-        current_version: "You're on",
-        latest: "Latest",
         installed: "Installed",
         new_badge: "NEW",
         self_host_badge: "SELF-HOST",
         rss: "RSS",
         compare_changes: "Compare changes",
-        view_on_github: "View on GitHub",
         no_releases: "No release notes available yet.",
         load_failed: "Couldn't load the changelog.",
         retry: "Retry",
@@ -11429,11 +11001,9 @@ export default {
     },
     Notepad: {
         title: "Notepad",
-        hint: "Quick personal notes. Convert any note into a task.",
         add: "New note",
         loading: "Loading your notes…",
         empty: "No notes yet. Create one to get started.",
-        placeholder: "Write a quick note…",
         editor_placeholder: "Write your note…",
         title_placeholder: "Untitled note",
         untitled: "Untitled note",
@@ -11458,7 +11028,6 @@ export default {
         options: "Options",
         delete: "Delete note",
         convert_action: "Convert to task",
-        converted_badge: "Converted",
         convert_title: "Convert note to task",
         task_name: "Task name",
         select_project: "Project",
@@ -12231,6 +11800,7 @@ export default {
         title: "Connect your AI",
         welcome_kicker: "One last step",
         lead: "AlianHub works with the AI app you already use. Connect Claude or ChatGPT once, then ask it to set up and run your projects. It sees and changes only what you can.",
+        sign_checking: "Checking whether your AI app is connected…",
         sign_waiting: "Not connected yet. This line changes by itself when your AI app makes its first call.",
         sign_connected: "Connected. Your AI app was last seen here around {when}.",
         first_title: "Say this to it first",

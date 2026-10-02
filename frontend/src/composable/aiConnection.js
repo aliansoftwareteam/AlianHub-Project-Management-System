@@ -10,6 +10,7 @@ export const CONNECT_STATE = Object.freeze({
 });
 
 const POLL_MS = 4000;
+const FIRST_RETRY_MS = 1000;
 
 const initial = () => ({
     loaded: false,
@@ -30,6 +31,9 @@ export function resetAiConnection() {
     Object.assign(aiConnection, initial());
 }
 
+/* Until the server has answered for this workspace nothing is known, and "not connected" would be a guess. */
+export const aiConnectionKnownFor = (companyId) => aiConnection.loaded && aiConnection.companyId === (companyId || null);
+
 export function connectStateFor(connection = {}, skipped = false) {
     if (connection.connected) return CONNECT_STATE.CONNECTED;
     if (skipped) return CONNECT_STATE.SKIPPED;
@@ -47,14 +51,24 @@ export async function loadAiConnection(companyId) {
 }
 
 /* Asks again every few seconds until the first call from the person's AI app is seen, and only
- * while the tab is in view. Returns the function that stops it. */
+ * while the tab is in view. The first answer is asked for at once wherever the tab is, and again
+ * soon if that read fails, so the page never sits on a guess for a whole wait. Returns the
+ * function that stops it. */
 export function watchAiConnection(companyId) {
     let timer = null;
     let stopped = false;
+    let misses = 0;
+    const known = () => aiConnectionKnownFor(companyId());
     const tick = async () => {
         if (stopped) return;
-        if (document.visibilityState !== "hidden") await loadAiConnection(companyId());
-        if (stopped || aiConnection.connected) return;
+        if (!known() || document.visibilityState !== "hidden") await loadAiConnection(companyId());
+        if (stopped) return;
+        if (!known()) {
+            timer = setTimeout(tick, Math.min(POLL_MS, FIRST_RETRY_MS * 2 ** misses));
+            misses += 1;
+            return;
+        }
+        if (aiConnection.connected) return;
         timer = setTimeout(tick, POLL_MS);
     };
     tick();

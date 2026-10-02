@@ -13,7 +13,7 @@
                             :folders="headerFolders"
                             :agentSummary="agentSummary"
                             :agentsAtWork="agentWorkCountIn(projectData?._id)"
-                            :agentsPaused="projectData?.agentLimits?.paused === true"
+                            :agentsPaused="agentsPaused"
                             @show-agent-work="setAgentWorking(true)"
                             :showAiAssist="canAiAssist"
                             :showAddTask="canAddTask"
@@ -497,6 +497,7 @@ import FavouriteStar from '@/components/atom/FavouriteStar/FavouriteStar.vue';
 import NewInProjectMenu from './components/NewInProjectMenu.vue';
 import ProjectFiltersToolbar from './components/ProjectFiltersToolbar.vue';
 import { agentWorkCountIn } from './composables/agentWork';
+import { useAgentPause } from './composables/agentPause';
 import SavedViewBar from './components/SavedViewBar.vue';
 import { useProjectAgents } from './Kanban/useProjectAgents';
 import AiTaskCreator from '@/components/organisms/AiTaskCreator/AiTaskCreator.vue';
@@ -710,6 +711,7 @@ const { showColorAvatar, savingAvatar, formData, resetFormData, assignAvatarData
 const projectSearch = useProjectSearch(projectData, showArchived, { buildFilterQuery });
 const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, filterRows, searchTask, collapsed, groupBy, userSidebar, clearAllFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter, doneBy, setDoneBy, agentWorking, setAgentWorking } = projectSearch;
 const { sprintLoading, loadSprintFolderData, selectProject } = useProjectTree(projectData);
+const { agentsPaused } = useAgentPause(projectData, socket);
 
 const Uid = ref('embed' + makeUniqueId(6));
 const renameValue = ref('');

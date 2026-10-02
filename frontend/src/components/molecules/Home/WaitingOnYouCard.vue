@@ -29,11 +29,14 @@
 <script setup>
 import { computed, inject, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { aiOff } from "@/composable/aiAvailability";
 import { fetchPendingProposals, sendProposalDecision } from "@/composable/agentProposals";
+import { showProjects } from "@/composable/approvedProjects";
+import { madeProjectIds } from "@/composable/approvedProjectIds";
 import { useWorkflowApprovals } from "@/views/Ai/useWorkflowApprovals";
 import { canDecide as canDecideApproval } from "@/views/Ai/workflowApprovals";
 import { useAgentAccess } from "@/views/Ai/agentAccess";
@@ -47,6 +50,7 @@ const SHOWN = 3;
 const GATE_OWNER_ADMIN = "owner_admin";
 
 const router = useRouter();
+const store = useStore();
 const { t } = useI18n();
 const $toast = useToast();
 const companyId = inject("$companyId");
@@ -87,6 +91,7 @@ async function approve(item) {
         if (item.kind === "proposal") {
             const res = await sendProposalDecision(item.id, "approve");
             if (!res?.data?.status) throw new Error(res?.data?.statusText || t("Inbox.action_failed"));
+            showProjects(store, madeProjectIds(res.data.data));
         } else {
             await workflow.decide(item.source, "approved");
         }
