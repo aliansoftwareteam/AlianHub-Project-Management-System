@@ -24,6 +24,7 @@
             <span v-else class="tv2__disclose tv2__disclose--none" aria-hidden="true"></span>
             <button type="button" class="tv2__name" data-cell-primary :title="data.TaskName" @click.stop="$emit('open', data)">{{ data.TaskName }}</button>
             <TaskHomeMark v-if="!depth" :task="data" :list="viewedList" />
+            <TaskAgentMark :task-id="String(data._id)" />
             <span v-if="progress" class="tv2__sub-count">{{ progress.done }}/{{ progress.total }}</span>
         </span>
 
@@ -129,6 +130,7 @@ import TaskColumnCell from "@/views/Projects/components/columns/TaskColumnCell.v
 import { defaultColumns } from "@/views/Projects/composables/viewColumns";
 import { MAX_DEPTH } from "@taskTreeRules";
 import TaskHomeMark from "@/views/Projects/components/TaskHomeMark.vue";
+import TaskAgentMark from "@/views/Projects/components/TaskAgentMark.vue";
 
 defineOptions({ name: "TableRow" });
 

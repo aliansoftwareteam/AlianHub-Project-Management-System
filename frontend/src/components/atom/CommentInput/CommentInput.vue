@@ -127,7 +127,7 @@ import {defineProps, defineEmits, computed, onMounted, onBeforeUnmount, watch, r
 
 // COMPONENTS
 import UserProfile from "@/components/atom/UserProfile/UserProfile.vue"
-import { agentMentionKey } from "@/utils/agentMention";
+import { agentMentionKey, mentionName } from "@/utils/agentMention";
 import { AI_MENTION_KEY, AI_MENTION_NAME } from "@/utils/aiMention";
 import { canUseAi } from "@/composable/aiAvailability";
 
@@ -240,7 +240,7 @@ const filteredUsers = computed(() => {
 });
 
 const filteredAgents = computed(() => props.agents
-    .map((agent) => ({ name: agent.name, key: agentMentionKey(agent._id) }))
+    .map((agent) => (agent.mentionKey ? { name: mentionName(agent.name), key: agent.mentionKey } : { name: agent.name, key: agentMentionKey(agent._id) }))
     .filter((agent) => agent.name.replaceAll(" ", "").toLowerCase().includes(mentionSearch.value.toLowerCase())));
 
 const aiOption = { name: AI_MENTION_NAME, key: AI_MENTION_KEY };

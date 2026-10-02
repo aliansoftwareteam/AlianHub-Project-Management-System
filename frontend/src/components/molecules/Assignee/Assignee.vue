@@ -289,10 +289,11 @@ const detailedOptions = computed(() => {
             options: props.agents.map((agent) => ({
                 id: `agent_${agent._id}`,
                 value: `agent_${agent._id}`,
-                label: agent.name,
+                label: agent.connected ? t('TaskPanel.my_ai', { name: agent.name }) : agent.name,
                 image: '',
                 type: 'agent',
                 agentId: agent._id,
+                ...(agent.connected ? { connected: true, ownerId: agent.ownerId, shownAs: agent.shownAs } : {}),
                 tag: t('TaskPanel.agent_tag'),
                 teamColor: { color: '#fff', bgColor: 'var(--agent)' }
             }))

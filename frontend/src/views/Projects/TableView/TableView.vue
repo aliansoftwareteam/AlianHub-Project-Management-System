@@ -167,6 +167,7 @@ import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyStat
 import { openTask, useTaskSequenceSource } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { useViewSettings } from '@/views/Projects/composables/viewSettingsContext';
 import { useListRowEdit } from '@/views/Projects/ListView/useListInlineEdit.js';
+import { useProjectAgents } from '@/views/Projects/Kanban/useProjectAgents';
 import { columnCatalogue, gridMinWidth, gridTracks, useViewColumns } from '@/views/Projects/composables/viewColumns';
 import { handleGridKey } from './gridKeyboard';
 import { totalColumnsOf } from '@/views/Projects/composables/groupTotals';
@@ -204,6 +205,8 @@ const viewRoot = ref(null);
 useTaskSequenceSource(viewRoot);
 
 const project = inject('selectedProject');
+const { start: watchAgents } = useProjectAgents();
+watch(() => project.value?._id, (id) => { if (id) watchAgents(id); }, { immediate: true });
 const tagsOn = computed(() => checkApps('tags') && checkPermission('task.task_tag', project.value?.isGlobalPermission) !== null);
 const companyId = inject('$companyId');
 const searchedTask = inject('searchedTask');

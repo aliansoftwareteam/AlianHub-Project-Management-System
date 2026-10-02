@@ -227,6 +227,7 @@ module.exports.AGENT_ALERTS = '/api/v2/agents/alerts';
 module.exports.AGENT_RUNS = '/api/v2/agents/runs';
 module.exports.AGENT_REPORTS = '/api/v2/agents/reports';
 module.exports.AGENTS_RUNNABLE = '/api/v2/agents/runnable';
+module.exports.AGENTS_CONNECTED = '/api/v2/agents/connected';
 module.exports.AGENTS_CHAT_USABLE = '/api/v2/agents/chat/usable';
 module.exports.AGENTS_CHAT_DIRECT = '/api/v2/agents/chat/direct';
 module.exports.AGENT_SESSIONS = '/api/v2/agent-sessions';

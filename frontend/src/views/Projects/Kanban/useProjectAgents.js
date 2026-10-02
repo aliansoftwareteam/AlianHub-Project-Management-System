@@ -34,7 +34,7 @@ export function useProjectAgents() {
         const id = String(projectId || "");
         if (!id || state.projectId === id) return;
         state.projectId = id;
-        if (!release) release = subscribeAgentFeed({ proposals: true });
+        if (!release) release = subscribeAgentFeed({ proposals: true, claims: true });
     };
 
     const stop = () => {

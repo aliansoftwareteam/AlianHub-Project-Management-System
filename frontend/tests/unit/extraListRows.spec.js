@@ -26,6 +26,7 @@ vi.mock('@/services', () => ({
 }));
 vi.mock('vue-toast-notification', () => ({ useToast: () => toast }));
 vi.mock('@/composable/useUndoToast', () => ({ showUndoToast: vi.fn() }));
+import { showUndoToast } from '@/composable/useUndoToast';
 vi.mock('@/views/Projects/helper.js', () => ({
     useUpdateTasks: () => ({ updateTaskByGroup: (...args) => { groupWrites.push(args); return Promise.resolve(); } })
 }));
@@ -337,7 +338,7 @@ describe('the row menu', () => {
         expect(change).toMatchObject({ op: 'modified', pid: PID, sprintId: HERE, updatedFields: { extraLists: [entry(THIRD)] } });
         expect(change.snap).toBeTruthy();
         expect(commit.mock.calls.map(([name]) => name)).toEqual(['tasks', 'table']);
-        expect(toast.success).toHaveBeenCalledWith('Removed from this list.', expect.anything());
+        expect(showUndoToast).toHaveBeenCalledWith(expect.objectContaining({ message: 'Removed from this list.' }));
 
         fromServer(HERE, change.data, change.updatedFields);
         expect(ids(HERE)).toEqual(['t2']);

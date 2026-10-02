@@ -26,6 +26,8 @@ const clientNames = async (rows) => {
     return (row) => byId.get(`${row.companyId}|${row.clientId}`) || fromRows.get(row.clientId) || row.clientId;
 };
 
+exports.clientNames = clientNames;
+
 exports.list = async (req, res) => {
     try {
         if (!personOrRefuse(req, res)) return undefined;
