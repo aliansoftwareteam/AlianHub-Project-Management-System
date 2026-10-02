@@ -42,6 +42,7 @@ import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
+import { useProjectChanged } from "@/views/Projects/liveProjects";
 
 defineOptions({ name: "ProjectAgentLimitsCard" });
 
@@ -104,6 +105,19 @@ async function load(pid) {
 }
 
 watch(() => props.projectId, (pid) => { if (pid) load(pid); }, { immediate: true });
+
+async function follow() {
+    const pid = props.projectId;
+    if (!loaded.value || busy.value) return;
+    try {
+        const data = await request("get", pid, undefined, "AgentLimits.load_failed");
+        if (pid === props.projectId && !busy.value) take(data);
+    } catch (e) {
+        // The card keeps what it shows; the next open reads it again.
+    }
+}
+
+useProjectChanged(() => props.projectId, follow);
 
 async function save(key) {
     busy.value = true;

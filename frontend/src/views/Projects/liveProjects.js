@@ -1,0 +1,134 @@
+import { inject, onBeforeUnmount, unref, watch } from "vue";
+import { useStore } from "vuex";
+import { apiRequest } from "@/services";
+import * as env from "@/config/env";
+
+/* A project was made, saved or trashed, here or by someone else. The signal carries its id alone, and is sent
+ * only to people who may open it. What it holds is read from the project route, which answers this person only,
+ * and goes into the store the sidebar, Home and the project page read. Changes that arrive close together, or
+ * while the page is out of sight, cost one read a project. */
+
+export const PROJECT_CHANGED_EVENT = "projectChanged";
+export const GATHER_MS = 400;
+export const GATHER_MAX_MS = 2000;
+const REMOVED = "removed";
+const TRASHED = 1;
+const NOT_OPEN_TO_THIS_PERSON = [403, 404];
+
+const hidden = () => typeof document !== "undefined" && document.hidden === true;
+
+// The socket and the company are passed in: the shell that provides them cannot inject them.
+export function useLiveProjects(socket, companyId) {
+    const store = useStore();
+
+    let bound = null;
+    let waiting = new Map();
+    let firstAt = 0;
+    let timer = null;
+
+    const company = () => String(unref(companyId) || "");
+    const held = (id) => (store.getters["projectData/allProjects"]?.data || []).find((project) => String(project._id) === id);
+
+    const drop = (id) => {
+        const project = held(id);
+        if (project) store.commit("projectData/mutateProjects", [{ op: "removed", data: { _id: project._id } }]);
+    };
+
+    const keep = (project) => {
+        if (held(String(project._id))) store.commit("projectData/replaceProject", project);
+        else store.commit("projectData/mutateProjects", [{ snap: null, privateSnap: false, op: "added", data: { ...project, id: project._id, isExpanded: false } }]);
+    };
+
+    async function follow(id, kind) {
+        if (kind === REMOVED) {
+            drop(id);
+            return;
+        }
+        const askedIn = company();
+        let project = null;
+        try {
+            const res = await apiRequest("get", `${env.PROJECT}/${id}`, undefined, undefined, { background: true });
+            project = res?.data;
+        } catch (e) {
+            if (askedIn === company() && NOT_OPEN_TO_THIS_PERSON.includes(e?.response?.status)) drop(id);
+            return;
+        }
+        if (askedIn !== company()) return;
+        if (!project?._id || project.deletedStatusKey === TRASHED) drop(id);
+        else keep(project);
+    }
+
+    function read() {
+        timer = null;
+        const changes = [...waiting];
+        waiting = new Map();
+        changes.forEach(([id, kind]) => follow(id, kind));
+    }
+
+    function schedule() {
+        clearTimeout(timer);
+        timer = null;
+        if (hidden()) return;
+        const now = Date.now();
+        timer = setTimeout(read, Math.max(0, Math.min(GATHER_MS, firstAt + GATHER_MAX_MS - now)));
+    }
+
+    const onChanged = (change) => {
+        if (!change?.projectId || String(change.companyId || "") !== company()) return;
+        if (!waiting.size) firstAt = Date.now();
+        waiting.set(String(change.projectId), change.kind);
+        schedule();
+    };
+
+    const onVisibility = () => {
+        if (!waiting.size) return;
+        firstAt = Date.now();
+        schedule();
+    };
+
+    function unbind() {
+        bound?.off?.(PROJECT_CHANGED_EVENT, onChanged);
+        bound = null;
+    }
+
+    function bind() {
+        const live = unref(socket);
+        if (live === bound) return;
+        unbind();
+        if (!live?.on) return;
+        bound = live;
+        live.on(PROJECT_CHANGED_EVENT, onChanged);
+    }
+
+    watch(() => unref(socket), bind, { immediate: true });
+    watch(() => company(), () => { waiting = new Map(); clearTimeout(timer); timer = null; });
+    document.addEventListener("visibilitychange", onVisibility);
+    onBeforeUnmount(() => {
+        unbind();
+        clearTimeout(timer);
+        document.removeEventListener("visibilitychange", onVisibility);
+    });
+}
+
+/* For a card that reads a project's settings through its own route: `follow` runs once a burst of changes to
+ * that project has passed. */
+export function useProjectChanged(projectId, follow) {
+    const socket = inject("$socket", null);
+    let timer = null;
+
+    const onChanged = (change) => {
+        const id = String(projectId() || "");
+        if (!id || String(change?.projectId || "") !== id) return;
+        clearTimeout(timer);
+        timer = setTimeout(follow, GATHER_MS);
+    };
+
+    watch(() => socket?.value, (next, previous) => {
+        previous?.off?.(PROJECT_CHANGED_EVENT, onChanged);
+        next?.on?.(PROJECT_CHANGED_EVENT, onChanged);
+    }, { immediate: true });
+    onBeforeUnmount(() => {
+        clearTimeout(timer);
+        socket?.value?.off?.(PROJECT_CHANGED_EVENT, onChanged);
+    });
+}
