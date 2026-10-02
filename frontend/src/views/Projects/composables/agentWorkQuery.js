@@ -36,4 +36,11 @@ const agentWorkGroups = (work, noAgentName) => {
 
 const inAgentWorkGroup = (task, group) => (group.taskIds || []).includes(String(task?._id)) !== Boolean(group.noAgent);
 
-module.exports = { agentWorkMatch, noAgentWorkMatch, agentWorkGroups, inAgentWorkGroup };
+const namesAgent = (group) => Boolean(group?.agentWork && !group.noAgent);
+
+/* The groups are built from every task an agent holds in the project, and the rows come through this viewer's own
+ * task query (a role may show them only their own tasks, or none). `count` is what that query brought: a group
+ * with nothing in it would only tell them which agent is at work on tasks they are not shown. */
+const drawsGroup = (group, count) => !namesAgent(group) || Number(count) > 0;
+
+module.exports = { agentWorkMatch, noAgentWorkMatch, agentWorkGroups, inAgentWorkGroup, namesAgent, drawsGroup };

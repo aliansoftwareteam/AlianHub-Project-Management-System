@@ -251,8 +251,9 @@ describe('a list grouped by a relationship field, read again when its tab comes 
         mockDb.calls.length = 0;
         const res = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(sent) { this.body = sent; return this; } };
         await getTabSyncTasks({ uid: OWNER, headers: { companyid: CID }, body: { pid: OPEN_PROJECT, sprintId: SPRINT, istableTask: false, tabLeaveTime: 0, userId: OWNER, item: group(is) } }, res);
-        const [pipeline] = mockDb.calls.find((call) => call.type === SCHEMA_TYPE.TASKS && call.method === 'aggregate').data;
-        const [operator, ids] = Object.entries(pipeline.find((stage) => stage.$facet).$facet.count[0].$match.$and[1]._id)[0];
+        const facet = mockDb.calls.filter((call) => call.type === SCHEMA_TYPE.TASKS && call.method === 'aggregate')
+            .flatMap((call) => call.data[0]).find((stage) => stage.$facet).$facet;
+        const [operator, ids] = Object.entries(facet.count[0].$match.$and[1]._id)[0];
         const read = mockDb.calls.filter((call) => call.type === SCHEMA_TYPE.CUSTOM_FIELD_LINKS && call.method === 'find').map((call) => call.data[0]);
         return { code: res.statusCode, operator, ids: Array.isArray(ids) ? ids.map(String) : ids, read };
     };
