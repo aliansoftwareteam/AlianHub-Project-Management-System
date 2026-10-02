@@ -207,7 +207,7 @@ button {
 .submit-btn {
     background-color: var(--brand);
     border: 1px solid var(--brand);
-    color: white;
+    color: var(--on-brand);
 }
 
 .submit-btn:disabled {
@@ -292,7 +292,7 @@ button {
     padding: 1px 8px;
     border-radius: 10px;
     margin-left: 5px;
-    color: white;
+    color: var(--on-brand);
     height: 17px;
     width: fit-content;
 }

@@ -333,7 +333,7 @@
 .driver-popover-next-btn {
     background: var(--brand) !important;
     border-radius: 4px !important;
-    color: white !important;
+    color: var(--on-brand) !important;
     border: none !important;
     height: 30px !important;
     font-family: var(--font-ui) !important;
@@ -341,7 +341,7 @@
 .driver-popover-close-btn {
     background: var(--brand) !important;
     border-radius: 4px !important;
-    color: white !important;
+    color: var(--on-brand) !important;
     border: none !important;
     height: 13px !important;
     width: 12px !important;

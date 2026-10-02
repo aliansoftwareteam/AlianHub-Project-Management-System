@@ -372,6 +372,12 @@ exports.summarizeProject = (req, res, next) => {
 
 ---
 
+## How to add an agent action
+
+An agent action is a registry group file, an executor that runs the web app's own handler as the person, an MCP tool, a preview card, an undo, and tests, all behind a flag that is off by default. The steps and the rules are in [AGENTS-AND-MCP.md](AGENTS-AND-MCP.md).
+
+---
+
 ## Adding Email Notifications
 
 ### Send Email

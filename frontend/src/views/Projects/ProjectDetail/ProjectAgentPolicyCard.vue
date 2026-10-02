@@ -171,5 +171,5 @@ async function save(key) {
 .pap__radio:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .pap__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .pap__name { color: var(--ink); font: 500 12.5px/1.35 var(--font-ui); overflow-wrap: anywhere; }
-.pap__about { color: var(--ink-2); font: 400 12px/1.4 var(--font-ui); overflow-wrap: anywhere; }
+.pap__about { color: var(--ink-label); font: 400 12px/1.4 var(--font-ui); overflow-wrap: anywhere; }
 </style>
