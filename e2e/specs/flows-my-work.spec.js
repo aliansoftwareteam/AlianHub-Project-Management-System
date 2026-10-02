@@ -34,7 +34,7 @@ test.describe('Home and My work', () => {
         await page.reload();
         await expect(box).toBeVisible();
 
-        await box.check();
+        await box.click();
         await expect(page.getByText('Marked as done')).toBeVisible();
         await expect(box).toHaveCount(0);
 
@@ -58,7 +58,7 @@ test.describe('Home and My work', () => {
         const { owner, task, name } = await assignedTask({ state, loginAs, label: 'Tick' });
 
         await page.goto(myWorkUrl(state));
-        await page.getByRole('checkbox', { name, exact: true }).check();
+        await page.getByRole('checkbox', { name, exact: true }).click();
         await expect(page.getByText('Marked as done')).toBeVisible();
 
         await expect.poll(async () => {

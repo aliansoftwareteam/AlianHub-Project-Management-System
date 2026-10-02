@@ -28,14 +28,14 @@ test.describe('commenting on a doc', () => {
         const comment = `Looks right ${suffix}`;
 
         await page.goto(url);
-        await page.getByRole('button', { name: 'Comments', exact: true }).click();
+        await page.getByRole('button', { name: /^Comments/ }).click();
         const panel = commentsPanel(page);
         await panel.getByRole('combobox', { name: /^Add a comment/ }).fill(comment);
         await panel.getByRole('button', { name: 'Comment', exact: true }).click();
         await expect(panel.getByText(comment, { exact: true })).toBeVisible();
 
         await page.reload();
-        await page.getByRole('button', { name: 'Comments', exact: true }).click();
+        await page.getByRole('button', { name: /^Comments/ }).click();
         await expect(commentsPanel(page).getByText(comment, { exact: true })).toBeVisible();
     });
 
@@ -45,7 +45,7 @@ test.describe('commenting on a doc', () => {
         const reply = `Answer ${suffix}`;
 
         await page.goto(url);
-        await page.getByRole('button', { name: 'Comments', exact: true }).click();
+        await page.getByRole('button', { name: /^Comments/ }).click();
         const panel = commentsPanel(page);
         await panel.getByRole('combobox', { name: /^Add a comment/ }).fill(comment);
         await panel.getByRole('button', { name: 'Comment', exact: true }).click();
@@ -72,17 +72,18 @@ test.describe('commenting on a doc', () => {
         const comment = `Remove me ${suffix}`;
 
         await page.goto(url);
-        await page.getByRole('button', { name: 'Comments', exact: true }).click();
+        await page.getByRole('button', { name: /^Comments/ }).click();
         const panel = commentsPanel(page);
         await panel.getByRole('combobox', { name: /^Add a comment/ }).fill(comment);
         await panel.getByRole('button', { name: 'Comment', exact: true }).click();
         await expect(panel.getByText(comment, { exact: true })).toBeVisible();
 
+        page.once('dialog', (dialog) => dialog.accept());
         await panel.getByRole('button', { name: 'Delete', exact: true }).click();
         await expect(panel.getByText(comment, { exact: true })).toBeHidden();
 
         await page.reload();
-        await page.getByRole('button', { name: 'Comments', exact: true }).click();
+        await page.getByRole('button', { name: /^Comments/ }).click();
         await expect(commentsPanel(page).getByText(comment, { exact: true })).toBeHidden();
     });
 });

@@ -9,7 +9,9 @@ async function taskWithField({ state, loginAs, fieldType }) {
     const fieldTitle = `Reference ${suffix}`;
     const field = await owner.api.post('/api/v1/customField', {
         type: 'save',
-        updateObject: { fieldTitle, fieldType, type: 'project', global: false, projectId: [String(project._id)], fieldPlaceholder: '', fieldDescription: '' },
+        updateObject: {
+            fieldTitle, fieldDescription: fieldTitle, fieldType, fieldTaskTypes: [], type: 'task', global: false, isDelete: true, projectId: [String(project._id)], userId: owner.uid, createdAt: new Date(),
+        },
     });
     if (field.status !== 200) throw new Error(`create field failed (${field.status}): ${JSON.stringify(field.body).slice(0, 300)}`);
     const name = `Field task ${suffix}`;

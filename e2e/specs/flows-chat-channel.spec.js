@@ -1,29 +1,46 @@
 const { test, expect, asRole } = require('../support/test');
-const { createProject, listSprints, uniqueSuffix } = require('../support/fixtures');
+const { uniqueSuffix } = require('../support/fixtures');
 const { skipFirstRun } = require('../support/pages');
 
-async function channelUrl({ state, loginAs }) {
-    const owner = await loginAs('owner');
-    const project = await createProject(owner.api, { name: `Chat ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid });
-    const [channel] = await listSprints(owner.api, project._id);
-    return `/#/${state.companyId}/chat/${project._id}/${channel._id || channel.id}`;
+async function openNewChannel(page, state, name) {
+    await page.goto(`/#/${state.companyId}/chat`);
+    // The page opens the first channel by itself once the list is loaded; creating one before that would be undone by it.
+    await expect(page.getByRole('combobox', { name: 'Type here' }).or(page.getByRole('heading', { name: /^Welcome to/ }))).toBeVisible();
+    await page.getByRole('button', { name: 'New channel' }).first().click();
+    const sidebar = page.getByPlaceholder('Enter Channel Name');
+    await sidebar.fill(name);
+    await page.getByRole('button', { name: 'Create Channel', exact: true }).click();
+    await page.waitForURL(/\/chat\/[0-9a-f]{24}\/[0-9a-f]{24}/);
 }
 
-async function send(page, text) {
-    const composer = page.getByRole('combobox', { name: 'Type here' });
-    await composer.fill(text);
-    await page.getByRole('button', { name: 'Send', exact: true }).click();
+/* The panel mounts again once the new channel is open, so a fill can land on the one that goes away. */
+async function send(scope, text) {
+    await expect(async () => {
+        await scope.getByRole('combobox', { name: 'Type here' }).fill(text);
+        await scope.getByRole('button', { name: 'Send', exact: true }).click({ timeout: 2000 });
+    }).toPass();
 }
 
 test.describe('chat in a channel', () => {
     test.use(asRole('owner'));
     test.beforeEach(async ({ page }) => skipFirstRun(page));
 
-    test('a message sent in a channel is shown and is still there after a reload', async ({ page, state, loginAs }) => {
-        const url = await channelUrl({ state, loginAs });
-        const message = `Hello channel ${uniqueSuffix()}`;
+    test('a new channel is listed and opens', async ({ page, state }) => {
+        const name = `channel-${uniqueSuffix()}`;
 
-        await page.goto(url);
+        await openNewChannel(page, state, name);
+        await expect(page.getByRole('button', { name: new RegExp(name) })).toBeVisible();
+        await expect(page.getByRole('combobox', { name: 'Type here' })).toBeVisible();
+
+        await page.reload();
+        await expect(page.getByRole('button', { name: new RegExp(name) })).toBeVisible();
+    });
+
+    test('a message sent in a channel is shown and is still there after a reload', async ({ page, state }) => {
+        const suffix = uniqueSuffix();
+        const message = `Hello channel ${suffix}`;
+
+        await openNewChannel(page, state, `hello-${suffix}`);
         await send(page, message);
         await expect(page.getByText(message, { exact: true })).toBeVisible();
 
@@ -31,24 +48,21 @@ test.describe('chat in a channel', () => {
         await expect(page.getByText(message, { exact: true })).toBeVisible();
     });
 
-    test('a reply in a thread is posted under its message', async ({ page, state, loginAs }) => {
-        const url = await channelUrl({ state, loginAs });
+    test('a reply in a thread is posted under its message', async ({ page, state }) => {
         const suffix = uniqueSuffix();
         const message = `Question ${suffix}`;
         const reply = `Answer ${suffix}`;
 
-        await page.goto(url);
+        await openNewChannel(page, state, `thread-${suffix}`);
         await send(page, message);
         const posted = page.getByText(message, { exact: true });
         await expect(posted).toBeVisible();
 
         await posted.hover();
-        await page.getByRole('button', { name: 'More', exact: true }).last().click();
+        await page.getByRole('main').getByRole('button', { name: 'More actions', exact: true }).click();
         await page.getByRole('menuitem', { name: 'Reply in thread' }).click();
         const thread = page.getByRole('complementary', { name: 'Thread' });
-        const threadComposer = thread.getByRole('combobox', { name: 'Type here' });
-        await threadComposer.fill(reply);
-        await thread.getByRole('button', { name: 'Send', exact: true }).click();
+        await send(thread, reply);
 
         await expect(thread.getByText(reply, { exact: true })).toBeVisible();
         await expect(page.getByRole('button', { name: 'Open the thread, 1 reply' })).toBeVisible();

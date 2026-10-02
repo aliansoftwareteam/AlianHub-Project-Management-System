@@ -17,7 +17,7 @@ async function listWithTasks({ state, loginAs, names }) {
 const taskRows = (page, suffix) => page.getByRole('row').filter({ hasText: suffix });
 
 async function sortBy(page, key, direction) {
-    await page.getByRole('button', { name: 'Sort', exact: true }).click();
+    await page.getByRole('button', { name: /^(Sort|.+ [↑↓])$/ }).click();
     const panel = page.getByRole('dialog', { name: 'Sort tasks by' });
     await panel.getByRole('radio', { name: key, exact: true }).check();
     if (direction) await panel.getByRole('radio', { name: direction, exact: true }).check();
