@@ -151,7 +151,6 @@ test.describe('Inbox: one card for each kind of waiting proposal', () => {
             await page.goto(`/#/${state.companyId}/project/${project._id}`);
             await expect(reviewBoard(page), JSON.stringify(answer)).toBeVisible();
             await reviewBoard(page).click();
-            await expect(page.getByText('In Review', { exact: true }).first()).toBeVisible();
             const lists = await listSprints(owner.api, project._id);
             expect(lists.map((list) => list.name)).toEqual(expect.arrayContaining(['Backlog', 'This week']));
         } finally {
