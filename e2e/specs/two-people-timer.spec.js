@@ -13,7 +13,7 @@ test.describe('a timer and a week the owner approved', () => {
 
     test('Stop keeps the timer running while the week is approved, and logs the time once it is reopened', async ({ page, state, loginAs }) => {
         const { owner, member, email, api, suffix } = await newMember({ state, loginAs, firstName: 'Tess' });
-        const project = await createProject(owner.api, { name: `TWO TIMER ${suffix}`, assigneeIds: [owner.uid, member.userId], createdBy: owner.uid });
+        const project = await createProject(owner.api, { name: `TWO TIMER ${suffix}`, assigneeIds: [owner.uid, member.userId], createdBy: owner.uid, apps: ['TimeTracking'] });
         const taskName = `Timed task ${suffix}`;
         const task = await createTask(owner.api, { project, name: taskName, user: state.users.owner, companyOwnerId: owner.uid, assigneeIds: [member.userId] });
         let approval;
@@ -23,7 +23,7 @@ test.describe('a timer and a week the owner approved', () => {
             await page.goto(`/#/${state.companyId}/project/${project._id}/s/${task.sprintId}?task=${task._id}`);
             const panel = taskPanel(page);
             await expect(panel.getByRole('heading', { level: 2, name: taskName })).toBeVisible();
-            await panel.getByRole('button', { name: /^Start timer/ }).first().click();
+            await panel.getByRole('button', { name: 'Start timer' }).click();
 
             // A timer under a minute is discarded on Stop, so the stored one starts three minutes ago.
             const key = `ah.timer.${member.userId}`;
