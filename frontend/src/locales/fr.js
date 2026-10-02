@@ -745,6 +745,8 @@ export default {
         "back": "Back",
         "next": "Next",
         "run": "Import {count} task(s)",
+        "run_update": "Update {count} task(s)",
+        "run_and_update": "Import {created} and update {updated} task(s)",
         "finish": "Done"
     },
     "ImportExport": {
@@ -867,6 +869,7 @@ export default {
         "card_waiting_hint": "Agent proposals and workflow approvals you can decide.",
         "waiting_approve_named": "Approve: {what}",
         "waiting_open_named": "Open in the AI Inbox: {what}",
+        "waiting_open_inbox": "Open in the Inbox",
         "waiting_untitled": "A proposed change",
         "waiting_approved": "Approved.",
         "next_label": "What next",
@@ -9855,6 +9858,8 @@ export default {
         "disabled_toast": "Daily reminder disabled"
     },
     "Toast": {
+        "offline_change_not_saved": "A change you made while offline was not saved.",
+        "offline_change_not_saved_reason": "A change you made while offline was not saved: {reason}",
         "Assignee_not_updated": "Assignee not updated",
         "Skill_added_successfully": "Skill added successfully",
         "Skill_deactivated_successfully": "Skill deactivated successfully",

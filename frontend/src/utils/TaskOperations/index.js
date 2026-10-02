@@ -11,7 +11,7 @@ const actorOf = (userData) => ({
 });
 
 const patchTask = (body, statusText) => apiRequest("patch", env.V2_TASKS, body).then((response) => {
-    if (response.data.status) return {status: true, statusText};
+    if (response.data.status) return {status: true, statusText, ...(response.data.queuedOffline ? {queueId: response.data.queueId} : {})};
     throw {status: false, error: response.data.error, statusText: response.data.statusText};
 }, (error) => {
     throw {status: false, error};

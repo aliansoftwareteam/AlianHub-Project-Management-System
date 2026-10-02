@@ -366,5 +366,5 @@ const dropClaimsIn = async (companyId, projectId) => {
 };
 
 module.exports = {
-    CLAIM_MINUTES, QUEUE_RULES, LEFT, REFUSAL, LISTED_MAX, connectionOf, liveClaim, itemsFor, itemFor, executors, inverses, claimsOf, heldTasks, aboutTask, handOver, pickableOn, handOverFromComment, takeBack, closeFinished, dropClaimsIn,
+    CLAIM_MINUTES, QUEUE_RULES, LEFT, REFUSAL, LISTED_MAX, announce, connectionOf, liveClaim, itemsFor, itemFor, executors, inverses, claimsOf, heldTasks, aboutTask, handOver, pickableOn, handOverFromComment, takeBack, closeFinished, dropClaimsIn,
 };

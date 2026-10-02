@@ -189,7 +189,7 @@
                     <button v-if="canGoBack" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="wim-back" @click="back">{{ $t('WorkspaceImport.back') }}</button>
                     <span class="wim__spacer"></span>
                     <button v-if="step === 'target'" type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="!targetReady" data-test="wim-next" @click="confirmTarget">{{ $t('WorkspaceImport.next') }}</button>
-                    <button v-if="step === 'preview'" type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="!toImport" data-test="wim-run" @click="startRun">{{ $t('WorkspaceImport.run', { count: toImport }) }}</button>
+                    <button v-if="step === 'preview'" type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="!toImport" data-test="wim-run" @click="startRun">{{ runLabel }}</button>
                     <button v-if="step === 'done'" type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="wim-finish" @click="finish">{{ $t('WorkspaceImport.finish') }}</button>
                 </div>
             </div>
@@ -271,6 +271,13 @@ const toImport = computed(() => {
     if (!preview.value) return 0;
     const leftAlone = clickUp.existingMode.value === UPDATE_EXISTING ? 0 : (preview.value.alreadyImported || 0);
     return Math.max(0, preview.value.importable - leftAlone);
+});
+const toUpdate = computed(() => (clickUp.existingMode.value === UPDATE_EXISTING ? Math.min(preview.value?.alreadyImported || 0, toImport.value) : 0));
+const runLabel = computed(() => {
+    const created = toImport.value - toUpdate.value;
+    if (!toUpdate.value) return t("WorkspaceImport.run", { count: toImport.value });
+    if (!created) return t("WorkspaceImport.run_update", { count: toUpdate.value });
+    return t("WorkspaceImport.run_and_update", { created, updated: toUpdate.value });
 });
 const adjustedSummary = computed(() => adjustedLines(clickUp.adjusted.value, t, "WorkspaceImport.summary"));
 
