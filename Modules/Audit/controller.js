@@ -215,7 +215,7 @@ const auditCsvLine = (r, withIntegrity) => {
     return csvRow([
         r.createdAt ? new Date(r.createdAt).toISOString() : '', m.actorType || 'human',
         outside ? outsideActors.csvLabel(outside) : r.actorName || '', outside ? outside.clientName || outside.clientId : m.agentName || '', m.runId || '',
-        m.action || r.action, labelOf(r), r.entityName || r.entityId || '', m.reason || '', (m.cost && m.cost.usd) || '', m.undoneAt ? new Date(m.undoneAt).toISOString() : '',
+        m.action || r.action, labelOf(r), r.entityName || r.entityLabel || r.entityId || '', m.reason || '', (m.cost && m.cost.usd) || '', m.undoneAt ? new Date(m.undoneAt).toISOString() : '',
         ...(withIntegrity ? [integrityCell(r.integrity)] : []),
     ]);
 };
@@ -245,7 +245,7 @@ exports.exportAuditCsv = async (req, res) => {
         let pending = [];
         const flush = async () => {
             if (!pending.length) return;
-            const named = await outsideActors.nameRows(companyId, pending);
+            const named = await entityNames.nameRows(companyId, req.uid, await outsideActors.nameRows(companyId, pending));
             pending = [];
             res.write(`\n${named.map((row) => auditCsvLine(row, withIntegrity)).join('\n')}`);
         };

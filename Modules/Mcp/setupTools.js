@@ -11,6 +11,7 @@ const projects = require('../Agents/projectCreate');
 const copies = require('../Agents/projectDuplicate');
 const lists = require('../Agents/listSetup');
 const planWork = require('../Agents/planWork');
+const planFiling = require('../Agents/planFiling');
 const { TITLE_MAX } = require('../Agents/taskRequests');
 const { DRAFT: RULE_DRAFT } = require('./automationTools');
 const { LIST_NAME_MAX } = require('../Agents/workRequests');
@@ -135,7 +136,7 @@ const viewToStartFrom = async (ctx, args, vis) => {
     return { args: { ...args, kind } };
 };
 
-const REFUSED = `${DENIED}: the person behind this token may not make these parts of the plan by hand`;
+const REFUSED = planFiling.REFUSED.parts;
 const NAMES = (max, nameMax, description) => ({ type: 'array', minItems: 1, maxItems: max, items: { type: 'string', minLength: 1, maxLength: RAW_TEXT_MAX }, description: `${description}, each at most ${nameMax} characters` });
 
 const PLAN_VIEW = Object.freeze({
@@ -168,24 +169,18 @@ const PLAN_TASK = Object.freeze({
     required: ['name'],
 });
 
-/* A plan is refused at once where its person may not make one of its parts by hand, or could not ask for one of its
- * automations or first tasks in a call of its own, and answered at once where a view has nothing to start from or a
- * rule or a task names what is in neither the plan nor the project. So nobody is asked to approve a part that cannot
- * be made. A project the caller cannot open is left to the target check. */
+/* A plan is refused or answered at once where it could not be made (Agents/planFiling.js), so nobody is asked to
+ * approve a part that cannot be made. A project the caller cannot open is left to the target check. */
 const planToFile = async (ctx, args, vis) => {
     const project = await loadProject(ctx, vis, args.projectId);
     if (!project) return { args };
     const projectId = String(project._id);
-    const plan = plans.setupPlanOf(args);
-    const refuse = async (reason) => { throw await actions.refusal(ctx.companyId, ctx.actor, { action: 'project.setup', params: { projectId }, reason, ip: ctx.ip, taint: ctx.taint, entityType: 'project', entityId: projectId }); };
-    const refused = await plans.refusedParts(ctx.companyId, ctx.userId, projectId, plan);
-    if (refused.length) await refuse(`${REFUSED}: ${refused.map((entry) => `${entry.part} (${entry.reason})`).join('; ')}`);
-    const kind = (plan.views || []).map((view) => view.kind).find((wanted) => !setup.sourceView(project, wanted));
-    if (kind) return { answer: { ok: false, error: setup.noSource(kind) } };
-    const stopped = await planWork.filingProblem({
-        companyId: ctx.companyId, actor: ctx.actor, uid: String(ctx.userId), allowedActions: ctx.allowedActions, mayManage: manageFlag.enabled() && manageFlag.mayUse(ctx, GRANT), project, plan,
+    const stopped = await planFiling.setupStopped({
+        companyId: ctx.companyId, actor: ctx.actor, uid: ctx.userId, allowedActions: ctx.allowedActions, mayManage: manageFlag.enabled() && manageFlag.mayUse(ctx, GRANT), project, params: args,
     });
-    if (stopped && stopped.refused) await refuse(stopped.refused);
+    if (stopped && stopped.refused) {
+        throw await actions.refusal(ctx.companyId, ctx.actor, { action: 'project.setup', params: { projectId }, reason: stopped.refused, ip: ctx.ip, taint: ctx.taint, entityType: 'project', entityId: projectId });
+    }
     return stopped ? { answer: { ok: false, error: stopped.error } } : { args };
 };
 
@@ -207,16 +202,15 @@ const NEW_PROJECT_VIEW = Object.freeze({
     required: ['name'],
 });
 
-const CANNOT_CREATE = `${DENIED}: the person behind this token may not create a project by hand`;
+const CANNOT_CREATE = planFiling.REFUSED.project;
 
 /* A project is refused at once where its person may not create one by hand, or may not make a part of its plan, so
  * nobody is asked to approve what could not be made. */
 const projectToFile = async (ctx, args) => {
-    const draft = projects.draftOf(args);
-    const refused = await projects.refusedFor(ctx.companyId, ctx.userId, draft);
-    const reason = (refused.project && `${CANNOT_CREATE} (${refused.project})`)
-        || (refused.parts.length && `${REFUSED}: ${refused.parts.map((entry) => `${entry.part} (${entry.reason})`).join('; ')}`);
-    if (reason) throw await actions.refusal(ctx.companyId, ctx.actor, { action: projects.ACTION, params: { name: draft.name }, reason, ip: ctx.ip, taint: ctx.taint, entityType: 'project' });
+    const stopped = await planFiling.projectStopped({ companyId: ctx.companyId, uid: ctx.userId, params: args });
+    if (stopped) {
+        throw await actions.refusal(ctx.companyId, ctx.actor, { action: projects.ACTION, params: { name: projects.draftOf(args).name }, reason: stopped.refused, ip: ctx.ip, taint: ctx.taint, entityType: 'project' });
+    }
     return { args };
 };
 
@@ -338,7 +332,7 @@ const TOOLS = [
         }, ['projectId']),
         check: (args) => plans.setupProblem(args),
         prepare: planToFile,
-        params: (args) => ({ projectId: str(args.projectId, 40), ...plans.setupPlanOf(args) }),
+        params: (args) => planFiling.storedParams('project.setup', args),
     },
     {
         name: projects.ACTION,
@@ -363,7 +357,7 @@ const TOOLS = [
         }, ['name']),
         check: (args) => projects.problemIn(args),
         prepare: projectToFile,
-        params: (args) => projects.draftOf(args),
+        params: (args) => planFiling.storedParams(projects.ACTION, args),
     },
     {
         name: copies.ACTION,

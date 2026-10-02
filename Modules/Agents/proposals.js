@@ -16,6 +16,8 @@ const taint = require('./taint');
 const { externalClientActor } = require('./actor');
 const aiFeedback = require('../AI/feedback');
 const slackPost = require('./connectors/slackPost');
+const planFiling = require('./planFiling');
+const planLocks = require('./planLocks');
 
 // AI Inbox proposals (9b). A proposal says what, why and exactly which registry
 // actions it would run. Approving applies them through perform() — so they are
@@ -97,12 +99,14 @@ const emit = (companyId, proposal) => {
 };
 
 /* Validate the change list: every entry must be a registry action and pass the
- * same evaluation it will face when applied. */
+ * same evaluation it will face when applied, and a plan must be one its executor takes. */
 const validateChanges = (changes) => {
     if (!Array.isArray(changes) || !changes.length) return { valid: false, reason: 'A proposal needs at least one change.' };
     for (const c of changes) {
         const check = registry.evaluate(c && c.action, { ...(c && c.params), __proposal: true });
         if (!check.allowed) return { valid: false, reason: check.reason };
+        const problem = planFiling.problemIn(c.action, c.params);
+        if (problem) return { valid: false, reason: problem };
     }
     return { valid: true, reason: '' };
 };
@@ -155,7 +159,7 @@ const create = async (companyId, { agent, runId, taskId, taskIds, projectId, wha
             agentId: String(agent._id), agentName: agent.name, runId: runId || null, taskId: taskId || null, projectId: scopedProjectId || null,
             ...(Array.isArray(taskIds) && taskIds.length ? { taskIds: taskIds.map(String) } : {}),
             what: what.trim().slice(0, 300), why: String(why || '').slice(0, 2000),
-            changes: prepared.map((c) => ({ action: c.action, params: c.params || {}, label: String(c.label || c.action).slice(0, 300), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}) })),
+            changes: prepared.map((c) => ({ action: c.action, params: planFiling.storedParams(c.action, c.params || {}), label: String(c.label || c.action).slice(0, 300), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}) })),
             status: STATUS.PENDING, gate: gateOf(changes, gate), priority: priority || 'normal', cost: cost || null, auditIds: [],
             ...(marker && marker.reason ? { taint: { sources: Array.isArray(marker.sources) ? marker.sources : [], reason: String(marker.reason).slice(0, 2000) } } : {}),
             ...mcpFields({ source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId }),
@@ -286,18 +290,20 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     if (p.gate === GATE_OWNER_ADMIN && !isPrivileged) return needsAdmin;
 
     let changes = kept ? kept.changes : p.changes;
-    let status = kept ? STATUS.EDITED : STATUS.APPROVED;
+    let status = kept && kept.leftOut ? STATUS.EDITED : STATUS.APPROVED;
     if (editing) {
         const check = validateChanges(edited);
         if (!check.valid) return { error: check.reason, status: 400 };
         // The gate kept at filing was read from the changes as filed; an edit is held to what it would run.
         if (gateOf(edited, p.gate) === GATE_OWNER_ADMIN && !isPrivileged) return needsAdmin;
-        changes = edited.map((c) => ({ action: c.action, params: c.params || {}, label: c.label || c.action }));
+        changes = edited.map((c) => ({ action: c.action, params: planFiling.storedParams(c.action, c.params || {}), label: c.label || c.action }));
         if (slackPost.hasSlackChange(changes)) {
             try { changes = await slackPost.prepareChanges(companyId, changes); } catch (e) { return { error: e.message, status: e.status || 400 }; }
         }
         status = STATUS.EDITED;
     }
+    const partHeld = await planLocks.approveRefusal(companyId, { userId: decider.userId, privileged: Boolean(isPrivileged) }, changes);
+    if (partHeld) return partHeld;
     // A connected agent's change was asked of the approver above; these run on the approver's own rights.
     if (!fromMcp) {
         const lacking = await approverRights.approveRefusal(companyId, { userId: decider.userId, privileged: Boolean(isPrivileged) }, p, changes);
@@ -382,7 +388,7 @@ const fileApplied = async (companyId, { rule, action, params, auditId, why }) =>
         type: SCHEMA_TYPE.AGENT_PROPOSALS,
         data: {
             agentId: String(rule.agentId || ''), agentName: rule.agentName, runId: null, taskId: asAsked.taskId ? String(asAsked.taskId) : null, projectId: rule.projectId,
-            what: label, why: String(why || '').slice(0, 2000), changes: [{ action, params: asAsked, label, reversible: true, rating: actions.rating(action) }],
+            what: label, why: String(why || '').slice(0, 2000), changes: [{ action, params: planFiling.storedParams(action, asAsked), label, reversible: true, rating: actions.rating(action) }],
             status: STATUS.APPROVED, gate: null, priority: 'normal', decidedBy: String(rule.madeBy), decidedAt: new Date(), undoUntil: new Date(Date.now() + UNDO_WINDOW_MS),
             auditIds: [String(auditId)], source: SOURCE_MCP, requestedBy: String(rule.requestedBy), standingApprovalId: String(rule._id),
             ...(rule.oauthGrantId ? { oauthClientId: rule.oauthClientId, oauthGrantId: rule.oauthGrantId } : { tokenId: rule.tokenId }),

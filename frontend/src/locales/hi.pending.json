@@ -5908,6 +5908,7 @@
     "IntentPreview.pick_also_kept": "{names} is kept too: “{name}” needs it. | {names} are kept too: “{name}” needs them.",
     "IntentPreview.pick_also_out": "{names} is left out too: it needs “{name}”. | {names} are left out too: they need “{name}”.",
     "IntentPreview.pick_hint": "Untick anything you do not want. Only what is ticked is made.",
+    "IntentPreview.pick_locked": "An owner or admin approves this part",
     "IntentPreview.place_in_list": "{list}, in {project}",
     "IntentPreview.priority_high": "High",
     "IntentPreview.priority_low": "Low",

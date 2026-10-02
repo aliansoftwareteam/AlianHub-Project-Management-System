@@ -623,7 +623,7 @@ exports.listProposals = async (req, res) => {
 
 const NAMED_NOT_FOUND = 'A task, project, list, doc or run this proposal names was not found.';
 
-/* POST /api/v2/agents/proposals — only an agent files one, only in its own name, and only about what its person can open */
+/* POST /api/v2/agents/proposals — only an agent files one, only in its own name, only about what its person can open, and a plan only as a connected agent could file it */
 exports.createProposal = async (req, res) => {
     try {
         const companyId = companyOf(req);
@@ -642,6 +642,9 @@ exports.createProposal = async (req, res) => {
         if (!open) return fail(res, NAMED_NOT_FOUND, 404);
         const refused = await proposalFiling.refusedChange(companyId, actor, b);
         if (refused) return refuse(req, res, actor, { ...refused, entityId: refused.params.taskId });
+        const stopped = await proposalFiling.stoppedPlan(companyId, actor, agent, b);
+        if (stopped && stopped.error) return fail(res, stopped.error, 400);
+        if (stopped) return refuse(req, res, actor, { ...stopped, entityId: stopped.params.projectId });
         const saved = await proposals.create(companyId, { agent, runId, taskId: b.taskId, projectId: b.projectId, what: b.what, why: b.why, changes: b.changes, gate: proposalFiling.gateAsked(b.gate), priority: b.priority, cost: b.cost });
         return res.send({ status: true, statusText: 'Proposal filed.', data: saved });
     } catch (e) { logger.error(`createProposal: ${e.message}`); return fail(res, e.message, e.status || 500); }

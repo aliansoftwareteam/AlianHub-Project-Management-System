@@ -54,12 +54,14 @@ const UNREAD = Object.freeze({ locked: true, lockedWhy: WHY.OWN_RIGHTS, mayDecli
 
 /* What a list shows of a waiting proposal for the person reading it. An owner or an admin holds every right, so
  * nothing is read for them: what can still stop their approval is a task or a list that is gone, which the approve
- * route answers. */
+ * route answers. A plan is theirs to approve while it holds a part they may approve (./planLocks.js). */
 const standingOf = async (companyId, caller, proposal) => {
     if (!access.decidesProposals(caller)) return { locked: true, lockedWhy: WHY.SEAT, mayDecline: false };
     if (caller.privileged) return OPEN;
     const uid = String(caller.actor.userId);
-    const refusal = await approveRefusal(companyId, { userId: uid, privileged: false }, proposal);
+    const person = { userId: uid, privileged: false };
+    const open = await require('./planLocks').withoutLocked(companyId, person, proposal.changes);
+    const refusal = open ? await approveRefusal(companyId, person, proposal, open) : held(REFUSAL.OWNER_ADMIN, WHY.OWNER_ADMIN);
     if (!refusal) return OPEN;
     return { locked: true, lockedWhy: refusal.why, mayDecline: await access.isOwnProposal(companyId, uid, proposal) };
 };

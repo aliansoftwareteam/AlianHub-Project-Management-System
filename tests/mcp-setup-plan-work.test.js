@@ -124,7 +124,9 @@ const filed = async (args = PLAN, caller = as(OWNER)) => {
 const partOf = (out, name) => out.applied[0].result.parts.find((part) => part.part === name);
 const previewOf = async (id, uid = OWNER) => (await intentPreview.forProposals(CID, uid, [proposal(id)])).get(id)[0];
 
-beforeEach(() => {
+const WARM_UP_MS = 60000;
+
+const startOver = () => {
     seed();
     process.env.MCP_TOOLS_MANAGE = 'on';
     const projectRules = rows(SCHEMA_TYPE.RULES).find((rule) => rule.isParent && rule.key === 'project');
@@ -142,7 +144,17 @@ beforeEach(() => {
     }));
     jest.spyOn(memory, 'rememberApprovedChanges').mockResolvedValue([]);
     matcher.invalidateAll();
-});
+};
+
+/* An approved plan runs the web app's own routes, which are loaded on first use. One plan is approved here, with
+   time to spare, so that loading is not counted against the first test that approves one. */
+beforeAll(async () => {
+    startOver();
+    await approve(await filed());
+    await settle();
+    jest.restoreAllMocks();
+}, WARM_UP_MS);
+beforeEach(startOver);
 afterEach(async () => { await settle(); jest.restoreAllMocks(); });
 afterAll(() => { FLAGS.forEach((flag) => { delete process.env[flag]; }); });
 
@@ -295,21 +307,33 @@ describe('approving makes each automation and each task as its own action, after
 
     it('makes an automation only for an owner or an admin who approves, and the rest for anyone who may', async () => {
         const id = await filed();
-        const out = await approve(id, INSIDER);
+        expect(await approve(id, INSIDER)).toMatchObject({ status: 403, error: expect.stringMatching(/owner or admin approves a part of this plan/) });
+        expect(proposal(id).status).toBe('pending');
+        const out = await approve(id, INSIDER, { 0: { statuses: [0], lists: [0], fields: [0], views: [0], rules: [], tasks: [0, 1, 2] } });
         expect(out.error).toBeUndefined();
-        expect(partOf(out, 'rules')).toMatchObject({ ok: false, items: [{ made: false, error: expect.stringMatching(/owner or an admin/) }] });
-        expect(out.applied[0].result.notMade).toEqual([{ part: 'rules', name: 'automation number 1', error: expect.stringMatching(/owner or an admin/) }]);
+        expect(out.applied[0].result.parts.map((part) => part.part)).toEqual(['statuses', 'lists', 'fields', 'views', 'tasks']);
+        expect(out.applied[0].result.notMade).toEqual([]);
         expect(liveRules()).toHaveLength(0);
         expect(partOf(out, 'tasks').ok).toBe(true);
         expect(taskNamed('Write the brief')).toBeTruthy();
     });
 
+    it('makes no automation for someone who stopped being an owner or an admin while the plan was being approved', async () => {
+        const id = await filed();
+        const out = await proposals.approve(CID, id, { decider: human(INSIDER), isPrivileged: true, ip: '' });
+        expect(partOf(out, 'rules')).toMatchObject({ ok: false, items: [{ made: false, error: expect.stringMatching(/owner or an admin/) }] });
+        expect(out.applied[0].result.notMade).toEqual([{ part: 'rules', name: 'automation number 1', error: expect.stringMatching(/owner or an admin/) }]);
+        expect(liveRules()).toHaveLength(0);
+    });
+
     it('makes no task for an approver who may not create one', async () => {
         ['project_custom_field', 'view_list', 'project_details', 'project_sprint_create'].forEach((key) => setRule(key, true, [3, 0]));
         const id = await filed(tasksOnly([TASKS[2]]), as(INSIDER));
-        const out = await approve(id, GUEST);
+        expect(await approve(id, GUEST)).toMatchObject({ status: 403, error: expect.stringMatching(/owner or admin approves a part of this plan/) });
+        expect(proposal(id).status).toBe('pending');
+        const out = await approve(id, GUEST, { 0: { lists: [0], statuses: [0], tasks: [] } });
         expect(partOf(out, 'lists').ok).toBe(true);
-        expect(partOf(out, 'tasks')).toMatchObject({ ok: false, items: [{ name: 'Collect the logins', made: false, error: expect.stringMatching(/approver may not/) }] });
+        expect(out.applied[0].result.parts.map((part) => part.part)).toEqual(['statuses', 'lists']);
         expect(taskNamed('Collect the logins')).toBeUndefined();
     });
 

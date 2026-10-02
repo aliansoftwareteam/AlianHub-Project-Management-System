@@ -9373,6 +9373,7 @@ export default {
         "pick_hint": "Untick anything you do not want. Only what is ticked is made.",
         "pick_also_out": "{names} is left out too: it needs “{name}”. | {names} are left out too: they need “{name}”.",
         "pick_also_kept": "{names} is kept too: “{name}” needs it. | {names} are kept too: “{name}” needs them.",
+        "pick_locked": "An owner or admin approves this part",
         "line_rule": "Automation",
         "rule_starts_off": "{rule} (starts switched off)",
         "rule_problem": "Cannot be made as written: {problem}",
