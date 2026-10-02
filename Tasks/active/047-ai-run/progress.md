@@ -1,6 +1,6 @@
 # Progress: 047, AI-run
 
-State at build 772 (`14.36.0-beta.772`), 2026-10-02 11:15 IST. Tracker: AP-441.
+State at build 803 (`14.36.0-beta.803`), 2026-10-02 19:00 IST. Tracker: AP-441.
 
 How to read a line: `[x]` is merged into `beta`, with its PR and build number. "Inside build 762" means the PR reached `beta` inside a combined PR:
 
@@ -11,6 +11,11 @@ How to read a line: `[x]` is merged into `beta`, with its PR and build number. "
 | 765 | #1401 | 770 | #1417, the eleventh |
 | 766 | #1405 | 771 | #1428, the twelfth |
 | | | 772 | #1434, the thirteenth |
+| 774 | #1435, the fourteenth | 788 | #1470, the eighteenth |
+| 777 | #1449, the fifteenth | 790 | #1484, the nineteenth |
+| 781 | #1463, the sixteenth | 794 | #1488, the twentieth |
+| 786 | #1457, the seventeenth | 802 | #1500, the twenty-first |
+| | | 803 | #1509, the twenty-second |
 
 Build 763 is #1394 alone. Build 768 is the docs PR #1411. "In review (#n)" has an open PR. "Needs the owner" waits for a step only the owner can take.
 
@@ -43,7 +48,9 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 - [x] The setup tools the benchmark sheet found missing: a due-date filter on a view, links that open a saved view or "mine", fields with their first values in one approval (#1425, inside build 772)
 - [x] The read tools the sheet found missing: who the person is, chat channels and messages, a task's field values, working days, what became of a proposal (#1429, inside build 772)
 - [x] #1431 (inside build 772): "reads answer the same for a thing that is not there"
-- [ ] Folders, subfolders and a list made a sprint over MCP. Not started; #1425 left them
+- [x] Folders, subfolders and a list made a sprint over MCP, each by proposal (#1450, inside build 781)
+- [x] Rollup and formula fields, fresh computed values, and a dashboard card by proposal (#1465, inside build 790)
+- [x] A copy of a project by proposal: `project.duplicate` (#1467, inside build 788)
 
 **Step 3: measure**
 - [ ] AI-1 First measured run over MCP (needs the owner: flags on locally, a connection with the manage grant)
@@ -66,7 +73,9 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 **Step 6: the teammate**
 - [x] S-2 A connected agent sets up an existing project from one plan: `project.setup` (#1420, inside build 771)
 - [x] S-2 A connected agent proposes a new project with its setup: `project.create` (#1433, inside build 772)
-- [ ] S-2 What the plan still lacks: parts unticked one by one, rules and first tasks inside the plan, the browser test of the whole flow
+- [x] S-2 The person picks the parts of a plan, a plan can hold rules and first tasks, and the browser test of the whole flow (#1496, inside build 802). The card after a first look in a browser (#1508, inside build 803)
+- [ ] S-2 A plan filed on the web route is stored, checked and shown as one filed over MCP, and a part only an owner or admin approves is shown locked. In review (#1515)
+- [x] A project made or changed shows without a reload (#1466, inside build 790). Lists and folders follow live (#1482, inside build 794)
 - [x] T-2 The connected AI as a named member (#1410, inside build 769)
 - [x] T-4 Agent work visible in List, Table and Board, with a filter (#1409, inside build 769). "Group by who is working" is not built
 - [x] T-5 Several agents at once (#1414, inside build 770)
@@ -83,13 +92,24 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 - [x] S-3 Batch 1 (#1407, inside build 767): 51 keys reworded. The baseline went from 132 to 81
 - [x] S-3 Batch 2 (#1415, inside build 770): 48 keys reworded, and 14 count strings read "1 task". The baseline went to 33
 - [x] S-3 Server replies (#1426, inside build 772): 22 reply texts say "list" where they said sprint
-- [ ] S-3 What is left: 30 keys in the baseline (#1432 took three more out), `Views.replan_chain*`, and the same words in what the MCP server tells the agent
+- [x] S-3 60 more strings in plainer words (#1478, inside build 803)
+- [x] S-5 Empty screens say what they are for and offer the next step (#1444, inside build 777)
+- [x] S-3 Plain words in what the MCP server tells a connected agent: tool texts, refusal reasons and labels (#1468, inside build 803)
+- [x] S-3 The audit log and the skill library in words, with a test that fails when a new event has none (#1497, inside build 802)
+- [ ] S-3 What is left: the keys still in the plain-words baseline, and `Views.replan_chain*`
 
 **Follow-ups the slices named**
 - [x] #1421 (inside build 771): a control for the workspace's "a person checks before Done" switch, one sentence in the MCP instructions about a close that waits, and the spec for Undo after a create is approved
 - [x] #1424 (inside build 771): "the workspace's agent settings save the same way as a project's"
 - [x] #1418 (inside build 771): hand-check sweep 3. Home's approval link opens the Inbox tab, "Hand to an agent" follows its switch, the "Not connected yet" line has its icon
 - [x] #1432 (inside build 772): hand-check sweep 7. The Members row names the person's own AI as the picker does, and two agents with one name are told apart
+
+**Proof and hand checks, 2026-10-02**
+- [x] The ninth hand check, build 782: the eighth's six defects are fixed; nine new ones, answered by #1497 and #1498 (inside build 802)
+- [x] The tenth hand check, builds 792 to 802: thirteen defects. In review: #1517 (the task panel follows its own writes, search takes text as text, confirms say what happens) and #1519 (computed fields stay fresh, a field can be archived or deleted, dark mode)
+- [x] Browser tests for the AI-run screens, core flows, two people, narrow and dark, accessibility (#1416, #1438, #1439, #1440, #1448, #1451, #1473, #1489)
+- [x] Three independent reads of the combined access rules (batches 20, 21 with 22, and 23). What they found is fixed in #1511 (in review), #1515 (in review) and `fix/batch-23-review`
+- [x] A user guide for working with your own AI app: `docs/guide/agents/` (#1490, build 799)
 
 **Later, optional (with a server key)**
 - [ ] The Ask box that plans with a model (AI-2, AI-3, T-3)
@@ -99,15 +119,13 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 ## What is left
 
 **Can be done without the owner**
-- Merge the open PRs: #1435 (the fourteenth batch: #1361 and #1210), #1416 (browser tests of the AI-run screens) and #1436 ("a project's agent settings and a proposal's decision each have one road").
-- Hand checks of builds 770 to 772 on the local build. None is recorded. Build 769 was swept; what it found is answered in #1432, which has not been seen on a build.
-- Revise the benchmark sheet's table against build 772. Its "Tools today" and "Approvals" cells were written at #1412. Rewrite job 4.
-- Over MCP: folders and subfolders, and a list made a sprint with dates (benchmark gaps 7 and 8).
-- S-2: parts unticked one by one; rules and first tasks in the plan; a new project shown in the sidebar without a reload (#1433).
+- Merge batch 23 (`chore/integrate-batch-23`: #1510, #1511, #1513, #1515, #1516, #1517, #1519, #1520) after the fixes to its review, and the side batch (`chore/integrate-batch-22b`: #1504, #1505, #1507, #1512, #1514, #1518). Then #1521.
+- A hand check of build 803 and of batch 23 on the local build.
+- Revise the benchmark sheet's table against build 803: folders, a sprint, a rollup field, a dashboard card and a copy of a project now have tools.
 - T-4: group by who is working. T-2: "@" for a connected AI in chat.
-- S-3: the 30 keys left, and the words in the MCP texts.
-- Small things the slices left: "Always do this" is on the Inbox tab only (#1406); `queue.list` in a paused project does not say why (#1414); a kept timer has no "discard" (#1422); a change an agent token makes through the web app's own routes is not announced (#1430).
-- The benchmark gaps still open that have no slice: a rollup field, a dashboard card, a reply in a task's comment thread, a doc's versions, a timesheet's submit and approve, duplicating a project.
+- S-2: a status or a field the approver's role may not make is still answered "not made" after the approval; the AI Inbox has no part ticks.
+- After a plan is approved, the list view can show the old status groups until a reload; a live Inbox refresh blanks the list. In progress (`fix/stale-views-after-live-changes`).
+- The benchmark gaps still open that have no slice: a reply in a task's comment thread, a doc's versions, a timesheet's submit and approve.
 
 **Needs the owner**
 - Turn on `MCP_OAUTH`, `MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE` and `MCP_TOOLS_WORK` in the local `.env`, and connect their Claude with the manage grant. AI-4a, AI-4e and AI-1 wait for this. So do the hand checks, with a real connection, of #1387, #1390, #1398, #1402, #1404, #1406, #1409, #1410, #1414, #1420, #1423, #1425, #1427, #1429, #1430 and #1433.
@@ -117,6 +135,7 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 - Row 15: which fifteen jobs count. The sheet's own pick stands until the owner says.
 - Whether the three `MCP_TOOLS_*` flags and `MCP_OAUTH` are on by default on a new install. It changes a security default and needs an access review first. Not planned as done.
 - Whether AlianHub's own AI is measured with a server key, at a cap of $10. Recommended: not now.
+- Raised on 2026-10-02: whether a live instance needs today's fixes deployed; #1504's migration on the local database (a dry run first); `STORAGE_DOWNLOAD_SCOPE` and `PERMISSION_ENFORCEMENT_MODE` by default; whether a personal API token may read and write chat as its person.
 
 ## Decisions taken on 2026-10-01/02
 
@@ -192,9 +211,28 @@ One line per choice a slice made that the owner may want to reverse. The PR body
 - #1432: a person's own AI is offered in the assignee list only where the project manager is on; the Members page now says so. "Sprint Planning" stays: it is a task type of two built-in templates.
 - #1433: the project is made as the approver, who must be allowed to create projects. A token kept to some projects cannot ask for one. The new project shows in the sidebar after a reload.
 
+### Choices to review, builds 773 to 803
+
+Each is reversible. The PR is named so the choice can be found.
+- A third level of subtasks stays refused. A copy of a project and a project an agent proposes are private to the person who approves (#1467, #1433).
+- Chat is read by a connected agent only with its own permission, `chat:read`, never by default (#1469).
+- Quick create starts in the project the person last had open, before the one last used (#1413).
+- A decision on a proposal, and every agent setting, needs a signed-in person; a guest never decides (#1455, #1453).
+- A connected agent's move of a task always waits; so does archiving or restoring a task with subtasks (#1476).
+- "Pause all agents" also holds connected agents until an owner or admin resumes them (#1476).
+- An agent can no longer file time off, save call notes, edit the person's AI memory, mark time billable or move workload; tags on a project are refused too (#1477, #1493).
+- An agent may set a task reminder for its own person: a workspace agent at once, a connected agent by proposal (#1493).
+- An owner or admin no longer joins people or comments into timesheet queries (#1486).
+- A rule in a setup plan starts switched off; first tasks need the manage tools on (#1496).
+- A personal API token can no longer change two-step sign-in, a password or sessions, or file time off for someone else (#1501).
+- A webhook made by a person who has left delivers nothing; an email inbox is changed only by its maker, an owner or an admin (#1501).
+- "Convert to list" makes the list before it hides the task, so a task is never lost when the list cannot be made (#1503).
+- The report tab still says "Sprint": it opens the Scrum sprint report (#1497).
+- A list emptied by deleting its tasks reads like a new list (#1498).
+
 ## Last step
 
-Batches 9 to 13 carried twenty-four more PRs into `beta` between 08:47 and 11:02 IST on 2026-10-02 (builds 767 and 769 to 772). The local server answers build 772. Open: #1435, #1416 and #1436. This docs PR ticks the lines above, regenerates the beta log and the API reference, and rewrites the handoff.
+Batches 14 to 22 and twenty-two single PRs reached `beta` on 2026-10-02 between 11:30 and 18:41 IST (builds 773 to 803). The local server answers build 803. The browser tests of `beta` were red from 14:08 to 18:41; batch 22 carried the fixes. Batch 23 and a side batch are assembled and not yet pull requests. This docs PR ticks the lines above, regenerates the beta log and the API reference, and rewrites the handoff.
 
 ## Blockers
 
@@ -228,3 +266,14 @@ Batches 9 to 13 carried twenty-four more PRs into `beta` between 08:47 and 11:02
 - 11:02: #1434 merged (build 772) with the batch rule, the tools the benchmark sheet asked for, the notice of an agent's change, `project.create` and three more PRs.
 - Three slices each added a sentence to what a connecting agent is told. The text was reworded to fit its 4,000 characters, with no rule dropped (#1428).
 - 11:15: the local server answers build 772. No hand check of builds 770 to 772 is recorded.
+- 11:30 to 13:07: #1416, the fourteenth to sixteenth batches, #1436, #1442, #1469 and the seventeenth and eighteenth batches merged (builds 773 to 788). The GitHub organisation moved to the Team plan, so CI runs 60 jobs at once.
+- The ninth hand check (build 782) passed the eighth's six defects and listed nine new ones.
+- 13:15 to 13:33: the nineteenth batch, the CI shards (#1479: the `e2e` check went from about 16 minutes to about 9), #1472, the twentieth batch and #1480 merged (builds 789 to 795).
+- A fresh agent read the twentieth batch's combined access rules and found nine gaps where two fixes meet, none a step back. The batch had merged on green checks ten minutes before the report.
+- 13:57 to 14:08: five test and docs PRs and the twenty-first batch merged (builds 796 to 802). The setup plan's browser test ran green on its first run.
+- 14:08: the browser tests of `beta` went red. Three test PRs and the twenty-first batch had each run their checks before the others landed. The merge queue was stopped and now merges only on checks that began after the last merge.
+- The tenth hand check (builds 792 to 802) listed thirteen defects, the largest being a checklist that is stored on each press but not shown until a reload. It is older than this week: the task panel learned of its own checklist write only from the live event.
+- About 14:48 the local machine reached a load of 70 on 8 cores, from agents running tests at once. Agents now check the load before each run and use one or two workers.
+- About 15:25 the usage limit stopped every agent; it reset at 17:00 and each was resumed from its worktree.
+- A second read (batches 21 and 22) found ten gaps, four of them in the setup plan when it is filed on the web route. A third read (batch 23) found eight, three of them new with the refresh of computed fields; it reported before the batch had a pull request.
+- 18:41: the twenty-second batch merged (build 803) with the fixes that made the browser tests pass. Five of the failures were real, small faults that show only on a slow machine.
