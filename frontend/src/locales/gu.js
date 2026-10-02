@@ -6581,6 +6581,8 @@ export default {
         "list_restored": "{list} restored",
         "archived_lists": "Archived lists",
         "restore_list": "Restore {list}",
+        "archived_list_tasks": "{n} task | {n} tasks",
+        "archived_list_tasks_hint": "Tasks in this list that you can open",
         "search_failed_title": "The search did not work",
         "search_failed_msg": "No tasks are shown because the search could not be run. Check your connection and try again.",
         "search_try_again": "Try again",

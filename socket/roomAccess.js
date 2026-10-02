@@ -177,6 +177,10 @@ const answeredInTime = AsyncResource.bind((decide) => new Promise((resolve) => {
     });
 }));
 
+/* The same for a relay that keeps no answer: what the person looking may read is decided outside the request that
+ * made the change. */
+const forTheViewer = AsyncResource.bind((decide) => decide());
+
 /* A room outlives the access it was joined on: the person leaves the project, loses their seat, the list turns
  * private. So every send asks again, as the socket's own user in the socket's own company, and keeps the answer
  * for a few seconds so that a burst of events costs one read. */
@@ -287,6 +291,7 @@ module.exports = {
     forgetProjectVerdicts,
     mayReceiveCompany,
     readsWholeCompany,
+    forTheViewer,
     toSeated,
     toCompanyRoom,
     COMPANY_ROOM,

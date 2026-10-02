@@ -77,8 +77,8 @@
                         </span>
                     </div>
 
-                    <section v-for="sprint in groupedTasks" :key="sprint?.id" class="lv2__sprint" role="presentation" :id="`sprint_${sprint?.id}`">
-                        <div v-if="groupedTasks.length > 1 || !sprint.isExpanded" role="row" class="lv2__aria-row"><div role="cell" class="lv2__sprint-bar">
+                    <section v-for="sprint in shownSprints" :key="sprint?.id" class="lv2__sprint" role="presentation" :id="`sprint_${sprint?.id}`">
+                        <div v-if="shownSprints.length > 1 || !sprint.isExpanded" role="row" class="lv2__aria-row"><div role="cell" class="lv2__sprint-bar">
                         <button type="button" class="lv2__sprint-head" :aria-expanded="!!sprint.isExpanded" @click="toggleSprints(sprint?.id)">
                             <span class="lv2__caret lv2__caret--sprint" aria-hidden="true">{{ sprint.isExpanded ? '▼' : '►' }}</span>
                             <span class="lv2__sprint-name">{{ sprint.name }}</span>
@@ -88,7 +88,7 @@
                         </div></div>
 
                         <template v-if="sprint.isExpanded">
-                            <template v-for="item in (sprint.items || [])" :key="item.key">
+                            <template v-for="item in drawnGroups(sprint)" :key="item.key">
                                 <ListGroup
                                     v-if="isGroupOpen(sprint, item)"
                                     :item="item"
@@ -179,7 +179,7 @@ import { useCustomComposable } from '@/composable';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { useProjectAgentActivity } from './useProjectAgentActivity.js';
 import * as listGroups from './listGroups.js';
-import { groupCountsFor, groupLabel, listSourceTasks } from './listFilter.js';
+import { archiveViewLists, groupCountsFor, groupLabel, listSourceTasks } from './listFilter.js';
 import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyState.js';
 import { openTask, useTaskSequenceSource } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { useListRowEdit } from './useListInlineEdit.js';
@@ -200,6 +200,7 @@ import { totalColumnsOf } from '@/views/Projects/composables/groupTotals';
 import OtherProjectRows from '@/views/Projects/components/OtherProjectRows.vue';
 import { useOtherProjectRows } from '@/views/Projects/composables/otherProjectRows';
 import { useGroupSource } from '@/views/Projects/composables/groupSource';
+import { drawsGroup } from '@/views/Projects/composables/agentWorkQuery';
 
 // UTILS
 const {getters} = useStore();
@@ -334,8 +335,14 @@ function sprintCount(sprint) {
     return searchedTask.value ? searchedRows(sprint).length : (sprint.tasks || 0);
 }
 
+const shownSprints = computed(() => archiveViewLists(groupedTasks.value, { archiveView: Boolean(showArchived.value), rowsOf: sprintCount }));
+
 function groupCount(sprint, item) {
     return listGroups.groupCount(groupCounts(sprint), item);
+}
+
+function drawnGroups(sprint) {
+    return (sprint.items || []).filter((item) => drawsGroup(item, groupCount(sprint, item)));
 }
 
 function isGroupOpen(sprint, item) {

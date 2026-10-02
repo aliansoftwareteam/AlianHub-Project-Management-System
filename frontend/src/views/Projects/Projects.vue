@@ -237,7 +237,7 @@
                                 <span>{{ $t('importTaskButton.import_processing') }}</span>
                             </div>
                         </div>
-                        <div :class="['list-view-body', TOKEN_BODY_TABS.includes(activeTab) ? 'list-view-body--detail' : 'bg-light-gray', (clientWidth <= 767 && activeTab === 'ProjectDetail') ? 'overflow-auto' : '',
+                        <div :class="['list-view-body', bodyOnTokens ? 'list-view-body--detail' : 'bg-light-gray', (clientWidth <= 767 && activeTab === 'ProjectDetail') ? 'overflow-auto' : '',
                                 {
                                 'd-flex': activeTab !== 'ProjectListView' &&
                                             activeTab !== 'Calendar' &&
@@ -519,7 +519,7 @@ import FolderGoneState from './components/FolderGoneState.vue';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { useProjectCalendar } from './composables/useProjectCalendar';
 import { useProjectRules } from './composables/useProjectRules';
-import { archivedListsOf, folderIsGone, folderSprintList, folderWithoutLists, headerLocation, movedListRoute, projectSprintList } from './folderSprints';
+import { archivedListsIn, folderIsGone, folderSprintList, folderWithoutLists, headerLocation, movedListRoute, projectSprintList } from './folderSprints';
 import { folderPathLabel, isLiveFolder } from '@/utils/folderTree';
 import { useProjectNameEdit } from './composables/useProjectNameEdit';
 import { useProjectAssignee } from './composables/useProjectAssignee';
@@ -1098,13 +1098,15 @@ const headerFolders = computed(() => headerPlace.value.folders);
 /* The task views can only say that no task shows; on the page of a folder that holds no list, the missing thing is a list. */
 const TASK_VIEWS = ['ProjectListView', 'ProjectKanban', 'TableView'];
 const newInProject = ref(null);
-const archivedLists = computed(() => archivedListsOf(projectData.value)
+const archivedLists = computed(() => archivedListsIn(getters['projectData/projects']?.data, projectData.value?._id)
     .filter((list) => isOwnerOrAdmin(companyUserDetail.value?.roleType) || !list.private || list.AssigneeUserId?.includes(userId.value)));
 const folderGone = computed(() => !sprintLoading.value && folderIsGone(getters['projectData/folders']?.[projectData.value?._id], route.params?.folderId));
 const openProjectOfGoneFolder = () => router.replace({ name: 'Project', params: { cid: route.params?.cid, id: projectData.value?._id }, query: { tab: route.query?.tab } });
 const folderWithNoLists = computed(() => (route.params?.folderId && !route.params?.sprintId && !showArchived.value && !sprintLoading.value && TASK_VIEWS.includes(activeTab.value)
     ? folderWithoutLists(projectData.value?.sprintsfolders, route.params.folderId)
     : null));
+/* An empty state is drawn in theme ink, and it replaces the view: a legacy view still needs the light body. */
+const bodyOnTokens = computed(() => TOKEN_BODY_TABS.includes(activeTab.value) || Boolean(folderGone.value || folderWithNoLists.value || searchFailed.value));
 const canAiAssist = computed(() => canUseAi({ project: projectData.value, permitted: checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true }));
 // Only shown where a view actually answers the request (the board injects
 // `addTaskRequest`); other views opt in by injecting it too.

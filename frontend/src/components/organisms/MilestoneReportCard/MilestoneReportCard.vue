@@ -367,7 +367,7 @@ onMounted(load);
 .mrc-bars { display: flex; flex-direction: column; gap: 6px; }
 .mrc-bar-row { display: flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; padding: 2px 4px; margin: 0 -4px; border-radius: 6px; transition: background .12s ease, opacity .12s ease; }
 .mrc-bar-row:hover { background: var(--surface-2); }
-.mrc-bar-row--active { background: #eaf5f2; }
+.mrc-bar-row--active { background: var(--ok-bg); }
 .mrc-bar-row--dim { opacity: .5; }
 .mrc-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
 .mrc-status-label { width: 30%; font-size: 12px; color: var(--ink-label); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

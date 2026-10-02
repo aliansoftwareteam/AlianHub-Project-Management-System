@@ -19,7 +19,7 @@
 .fb__count { font: var(--text-data); color: var(--ink-2); text-transform: uppercase; }
 .fb__head-actions { margin-inline-start: auto; display: flex; gap: 8px; }
 
-.fb__table { display: flex; flex-direction: column; }
+.fb__table { display: flex; flex-direction: column; container-type: inline-size; }
 /* A row is a button, so its actions sit beside it: a button cannot hold another. */
 .fb__line {
     display: grid;
@@ -35,7 +35,7 @@
 .fb__line-end { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; padding-inline-end: 8px; }
 .fb__row {
     display: grid;
-    grid-template-columns: 24px minmax(0, 1fr) 110px minmax(0, 1fr) 90px;
+    grid-template-columns: 24px minmax(0, 1fr) 110px 220px 90px;
     gap: 10px;
     padding: 10px 14px;
     align-items: center;
@@ -173,6 +173,12 @@
     .ah-page.fb { grid-template-columns: minmax(0, 1fr); }
     .fb__main { border-inline-end: none; }
     .fb__panel { position: static; border-top: 1px solid var(--hairline); }
+}
+/* Beside the editor the table is some 560px wide at 1280: the name keeps the free width and where the field is shown goes under it. */
+@container (max-width: 859px) {
+    .fb__row { grid-template-columns: 24px minmax(0, 1fr) 110px 90px; row-gap: 2px; }
+    .fb__row > .fb__shown { grid-column: 2 / -1; grid-row: 2; }
+    .fb__row-head > :nth-child(4) { display: none; }
 }
 @media (max-width: 767px) {
     .fb__main { padding: 16px; }

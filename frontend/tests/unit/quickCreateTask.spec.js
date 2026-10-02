@@ -378,6 +378,36 @@ describe('QuickCreateTask', () => {
         expect(title(wrapper).attributes('aria-invalid')).toBe('true');
     });
 
+    it('says what is wrong with the name right under the name, and ties the two together', async () => {
+        const wrapper = await mountDialog();
+        await open(wrapper);
+        await title(wrapper).setValue('ab');
+        await enter(wrapper);
+        await flushPromises();
+        const message = title(wrapper).element.nextElementSibling;
+        expect(message.textContent).toBe('QuickCreate.name_too_short');
+        expect(message.getAttribute('role')).toBe('alert');
+        expect(title(wrapper).attributes('aria-describedby')).toBe(message.id);
+        expect(document.body.querySelectorAll('.qct__error')).toHaveLength(1);
+
+        await title(wrapper).setValue('abc');
+        expect(document.body.querySelectorAll('.qct__error')).toHaveLength(0);
+        expect(title(wrapper).attributes('aria-describedby')).toBeUndefined();
+    });
+
+    it('keeps a failure that is not about the name at the foot of the form', async () => {
+        create.mockResolvedValue({ status: false });
+        const wrapper = await mountDialog();
+        await open(wrapper);
+        await title(wrapper).setValue('A fine name');
+        await enter(wrapper);
+        await flushPromises();
+        const message = document.body.querySelector('.qct__error');
+        expect(message.nextElementSibling.classList.contains('qct__foot')).toBe(true);
+        expect(title(wrapper).attributes('aria-invalid')).toBe('false');
+        expect(title(wrapper).attributes('aria-describedby')).toBeUndefined();
+    });
+
     it('closes on Escape and keeps a typed title as a draft for the session', async () => {
         const wrapper = await mountDialog();
         await open(wrapper);

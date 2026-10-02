@@ -1,5 +1,7 @@
 const { AsyncResource } = require('async_hooks');
 const socketEmitter = require('../../../event/socketEventEmitter');
+const { originOf } = require('../../../event/domainEventBus');
+const writerLimits = require('../../../event/writerLimits');
 const logger = require('../../../Config/loggerConfig');
 const { myCache } = require('../../../Config/config');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
@@ -44,7 +46,7 @@ async function usesAutoRefill(companyId) {
     return uses;
 }
 
-async function refillTask({ companyId, taskId, changed }) {
+async function refillTask({ companyId, taskId, changed, origin = null }) {
     if (!(await usesAutoRefill(companyId))) return;
     const task = await loadTask(companyId, taskId).catch(() => null);
     const fills = (task && task.aiFieldFills) || {};
@@ -59,7 +61,7 @@ async function refillTask({ companyId, taskId, changed }) {
         const { definition, config } = loaded;
         if (!config.autoRefill || !config.reads.some((part) => changed.has(part))) continue;
         try {
-            await fill.fillTask({ companyId, uid: last.by, definition, config, taskId, trigger: fill.TRIGGER.AUTO, unlessHash: last.hash || null });
+            await fill.fillTask({ companyId, uid: last.by, definition, config, taskId, trigger: fill.TRIGGER.AUTO, unlessHash: last.hash || null, origin });
         } catch (error) {
             logger.warn(`[ai-fields] auto-refill of ${fieldId} on task ${taskId} skipped: ${error.message}`);
         }
@@ -81,12 +83,27 @@ function run(key) {
  * where no request is running, it runs under no token's project list, no agent's mark and no request. */
 const runOutsideAnyRequest = AsyncResource.bind(run);
 
+/* The refill runs outside the request, so whose edit it follows is read here, as the edit is made, and kept with the
+ * wait: an agent's edit and its depth in a chain, which the refill's own event then states, so a rule that did not ask
+ * for automated changes is not woken by it. A person's edit names nobody, and the refill's event names nobody. The
+ * project list of a token that made the edit is kept the same way (event/writerLimits). */
+const agentOrigin = (payload) => {
+    const { actor, depth } = originOf(payload);
+    const narrowing = writerLimits.ofThisRequest();
+    if (actor.kind !== 'agent') return narrowing ? { narrowing } : null;
+    return { actor, depth, ...(narrowing ? { narrowing } : {}) };
+};
+
+const depthOf = (origin) => (origin && origin.actor ? origin.depth : -1);
+const deeper = (kept, origin) => (origin && (!kept || depthOf(origin) >= depthOf(kept)) ? origin : kept || null);
+
 /* Edits come in bursts (typing in the description saves many times), so one refill runs after the last. */
-function schedule(companyId, taskId, parts) {
+function schedule(companyId, taskId, parts, origin) {
     if (!OBJECT_ID.test(String(companyId || '')) || !OBJECT_ID.test(String(taskId || '')) || !parts.length) return;
     const key = `${companyId}:${taskId}`;
     const entry = pending.get(key) || { companyId: String(companyId), taskId: String(taskId), changed: new Set() };
     parts.forEach((part) => entry.changed.add(part));
+    entry.origin = deeper(entry.origin, origin);
     clearTimeout(entry.timer);
     entry.timer = setTimeout(() => runOutsideAnyRequest(key), debounceMs);
     if (entry.timer && typeof entry.timer.unref === 'function') entry.timer.unref();
@@ -100,18 +117,19 @@ function onTaskUpdate(payload) {
     if (!doc || !doc._id) return;
     const companyId = doc.CompanyId;
     const updated = Object.keys((payload && payload.updatedFields) || {});
-    schedule(companyId, doc._id, changedParts(payload.updatedFields));
-    if (doc.ParentTaskId && updated.some((name) => SUBTASK_FIELDS.includes(name))) schedule(companyId, doc.ParentTaskId, ['subtasks']);
+    const origin = agentOrigin(payload);
+    schedule(companyId, doc._id, changedParts(payload.updatedFields), origin);
+    if (doc.ParentTaskId && updated.some((name) => SUBTASK_FIELDS.includes(name))) schedule(companyId, doc.ParentTaskId, ['subtasks'], origin);
 }
 
 function onTaskInsert(payload) {
     const doc = payload && payload.data;
-    if (doc && doc.ParentTaskId) schedule(doc.CompanyId, doc.ParentTaskId, ['subtasks']);
+    if (doc && doc.ParentTaskId) schedule(doc.CompanyId, doc.ParentTaskId, ['subtasks'], agentOrigin(payload));
 }
 
 function onCommentInsert(payload) {
     const doc = payload && payload.data;
-    if (doc && payload.companyId) schedule(payload.companyId, doc.taskId, ['comments']);
+    if (doc && payload.companyId) schedule(payload.companyId, doc.taskId, ['comments'], agentOrigin(payload));
 }
 
 function start({ debounceMs: given } = {}) {

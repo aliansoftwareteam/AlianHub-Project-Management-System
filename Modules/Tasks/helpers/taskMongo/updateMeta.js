@@ -32,6 +32,14 @@ const FIELD_NOT_FOR_TASK_TYPE = 'This custom field is not used for this task typ
 const FIELD_NOT_FOUND = 'This custom field does not exist.';
 
 /* The value as it is stored, or a refusal: the field is not for this task's type, or the value does not fit the field's type. */
+/* A write made after someone else's change (an AI field filled again) names who that change was by, how deep in a
+ * chain it was and the project list of a token that made it, so the event bus counts it as theirs; a person's write
+ * names none of them and emits as it always has. */
+const originOnEvent = (eventOrigin) => ({
+    ...(eventOrigin && eventOrigin.actor ? { actor: eventOrigin.actor, depth: Number(eventOrigin.depth) || 0 } : {}),
+    ...(eventOrigin && eventOrigin.narrowing ? { narrowing: eventOrigin.narrowing } : {}),
+});
+
 const fieldDetailToStore = async ({ companyId, taskId, customFieldId, storedTask, updateDetail, actorId }) => {
     const definition = await customFieldDefinitionOf(companyId, customFieldId);
     if (!definition) throw new TaskWriteRefusal(400, FIELD_NOT_FOUND);
@@ -305,7 +313,7 @@ module.exports = {
         })
     },
 
-    async updateTaskCustomField({companyId,taskId,updateDetail: sentDetail,customFieldId,userData,storedTask,filledByAi = false}) {
+    async updateTaskCustomField({companyId,taskId,updateDetail: sentDetail,customFieldId,userData,storedTask,filledByAi = false,eventOrigin = null}) {
         const updateDetail = await fieldDetailToStore({ companyId, taskId, customFieldId, storedTask, updateDetail: sentDetail, actorId: userData && userData.id });
         return new Promise((resolve,reject) => {
             try {
@@ -322,7 +330,7 @@ module.exports = {
 
                 MongoDbCrudOpration(companyId, query, "findOneAndUpdate")
                 .then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {[`customField.${customFieldId}`]: updateDetail}, module: 'task', companyId });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {[`customField.${customFieldId}`]: updateDetail}, module: 'task', companyId, ...originOnEvent(eventOrigin) });
                     resolve({status: true,data: result, statusText: "Custom Field Update Successfully"});
                     if (result && storedTask && userData) {
                         recordCustomFieldValue({ companyId, task: storedTask, customFieldId, updateDetail, actor: userData, viaAi: filledByAi })

@@ -122,7 +122,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
@@ -215,11 +215,15 @@ const query = (extra = {}) => {
     return Object.entries(q).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
 };
 
+let asked = 0;
 const load = async ({ append = false } = {}) => {
+    asked += 1;
+    const mine = asked;
     busy.value = true;
     error.value = "";
     try {
         const res = await apiRequest("get", `${env.AUDIT_LOGS}?${query()}`);
+        if (mine !== asked) return;
         if (!res?.data?.status) {
             error.value = res?.data?.statusText || t("Audit.failed");
             return;
@@ -231,13 +235,26 @@ const load = async ({ append = false } = {}) => {
         totalPages.value = meta.totalPages || 1;
         total.value = meta.total || rows.value.length;
     } catch (e) {
-        error.value = e?.response?.data?.statusText || e.message;
+        if (mine === asked) error.value = e?.response?.data?.statusText || e.message;
     } finally {
-        busy.value = false;
+        if (mine === asked) busy.value = false;
     }
 };
 
-const reload = () => { page.value = 1; load(); };
+const SEARCH_WAIT_MS = 300;
+let searchTimer = null;
+let searchedFor = "";
+const reload = () => {
+    clearTimeout(searchTimer);
+    searchedFor = search.value;
+    page.value = 1;
+    load();
+};
+watch(search, () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { if (search.value !== searchedFor) reload(); }, SEARCH_WAIT_MS);
+});
+onBeforeUnmount(() => clearTimeout(searchTimer));
 const setScope = (key) => { scope.value = key; reload(); };
 const clearProject = () => { projectFilter.value = null; reload(); };
 const clearFilters = () => {

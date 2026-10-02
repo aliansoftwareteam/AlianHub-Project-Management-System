@@ -7,7 +7,7 @@ const {
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
 const logger = require('../../Config/loggerConfig');
-const { onJoin, roomFor, prefixOfOwnRoom, canOpenComments, pageCommentRoomOf, readablePage, mayReceiveComments, inOrder } = require('../roomAccess');
+const { onJoin, roomFor, prefixOfOwnRoom, canOpenComments, pageCommentRoomOf, readablePage, mayReceiveComments, forTheViewer, inOrder } = require('../roomAccess');
 const { THREAD_MODULE } = require('../../Modules/Comments/helpers/chatThreads');
 
 exports.commentSocketHandler = ({ socket, namespace }) => {
@@ -114,7 +114,7 @@ exports.relayPageComment = async (changeData) => {
         if (!identity || identity.companyId !== companyId || !entry.socket.rooms.has(entry.roomName)) continue;
         if (!decisions.has(identity.uid)) {
             // eslint-disable-next-line no-await-in-loop
-            decisions.set(identity.uid, Boolean(await readablePage(identity, comment.pageId).catch(() => null)));
+            decisions.set(identity.uid, Boolean(await forTheViewer(() => readablePage(identity, comment.pageId)).catch(() => null)));
         }
         if (decisions.get(identity.uid)) entry.namespace.to(entry.roomName).emit(eventName, { fullDocument: comment });
     }

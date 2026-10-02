@@ -447,7 +447,7 @@ a.mc-agent-change-label { color: var(--brand); }
     .mc-msg.is-me .mc-msg-meta { display: none; }
     .mc-msg.is-me .mc-msg-stack { align-items: flex-end; }
     .mc-msg.is-me .mc-msg-body { padding: calc(var(--sp-3) + 1px) var(--sp-5); background: var(--brand); color: var(--on-brand); border-radius: var(--r-card) var(--r-card) 2px var(--r-card); max-width: 260px; }
-    .mc-msg.is-me .mc-msg-body a { color: var(--on-brand); }
+    .mc-msg.is-me .mc-msg-body :is(a, .mc-mention, .mention) { color: var(--on-brand); }
     .mc-msg.is-me .mc-msg-tools { right: auto; left: var(--sp-3); }
     .mc-msg-acts { display: flex; }
     .mc-msg.is-me .mc-msg-acts { display: none; }

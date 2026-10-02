@@ -6,9 +6,9 @@
                 <span class="cursor-pointer export-tasks-dropdown-font-size-16 export-tasks__close" @click="$emit('update:modelValue', false)">&#10005;</span>
             </div>
             <div class="export-tasks-dropdown-font-size-12 export-tasks-dropdown-gray81 export-tasks__hint">{{ $t('Projects.export_hint') }}</div>
-            <div class="d-flex">
-                <button class="btn-primary export-tasks-dropdown-font-size-13 mr-10px" :disabled="isBusy" @click="startExport('csv')">{{ $t('Projects.export_csv') }}</button>
-                <button class="btn-primary export-tasks-dropdown-font-size-13" :disabled="isBusy" @click="startExport('xlsx')">{{ $t('Projects.export_xlsx') }}</button>
+            <div class="export-tasks__actions">
+                <button type="button" class="ah-btn ah-btn--primary" :disabled="isBusy" @click="startExport('csv')">{{ $t('Projects.export_csv') }}</button>
+                <button type="button" class="ah-btn ah-btn--primary" :disabled="isBusy" @click="startExport('xlsx')">{{ $t('Projects.export_xlsx') }}</button>
             </div>
         </div>
     </div>
@@ -109,9 +109,6 @@ function downloadJob(job) {
 .export-tasks-dropdown-font-size-12 {
     font-size: 12px;
 }
-.export-tasks-dropdown-font-size-13 {
-    font-size: 13px;
-}
 .export-tasks-dropdown-font-size-16 {
     font-size: 16px;
 }
@@ -127,21 +124,24 @@ function downloadJob(job) {
 .export-tasks__overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.35);
+    background: var(--scrim);
     z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .export-tasks__card {
-    background: #fff;
+    background: var(--surface);
+    color: var(--ink);
+    color-scheme: var(--scheme);
     border-radius: 10px;
     width: min(360px, 92vw);
     padding: 16px 20px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+    box-shadow: var(--shadow-modal);
 }
 .export-tasks__head { margin-bottom: 8px; }
-.export-tasks__close { color: #9a9a9a; }
-.export-tasks__close:hover { color: #e84a4a; }
+.export-tasks__close { color: var(--ink-2); }
+.export-tasks__close:hover { color: var(--danger); }
 .export-tasks__hint { margin-bottom: 14px; }
+.export-tasks__actions { display: flex; gap: var(--sp-4); }
 </style>
