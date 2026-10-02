@@ -5466,6 +5466,9 @@ export default {
         "token_grant_docs": "Let this agent write docs",
         "token_grant_docs_effect": "It can create docs and change the ones you can edit. A doc it creates is marked as its draft, and every change keeps the version it replaced.",
         "token_grant_docs_short": "writes docs",
+        "token_grant_chat": "Let this agent read chat",
+        "token_grant_chat_effect": "It can read messages in channels you are in. It never reads your direct messages. Without this it reads no chat at all.",
+        "token_grant_chat_short": "reads chat",
         "strict_note": "Every new token needs an expiry and at least one scope. A token without an expiry keeps working for {n} days from when this rule was turned on, or from when the token was made if that is later. Replace it before then.",
         "grace_works_until": "no expiry · works until {d}",
         "grace_stopped_on": "no expiry · stopped on {d}",
@@ -12615,6 +12618,8 @@ export default {
         "scope_docs_manage": "Create docs and change the ones you can edit",
         "scope_name_tasks_manage": "Manage tasks",
         "scope_name_docs_manage": "Write docs",
+        "scope_chat_read": "Read messages in channels you are in",
+        "scope_name_chat_read": "Read chat",
         "manage_lead": "It also asks for more. Tick only what you want it to do:",
         "manage_not_approved": "An owner or admin has not approved this for the workspace you chose."
     },

@@ -21,6 +21,7 @@ const sessionTools = require('./sessionTools');
 const dataTools = require('./dataTools');
 const screenTools = require('./screenTools');
 const intentTools = require('./intentTools');
+const contextTools = require('./contextTools');
 const manageFlag = require('./manageFlag');
 const manageTools = require('./manageTools');
 const workTools = require('./workTools');
@@ -266,12 +267,13 @@ const FLAGGED_TOOLS = [
 const SEARCH_BY_LIST = 'Search tasks you can see by text, status, project or list. A list answers the tasks that live in it and the tasks added to it.';
 const SEARCH_FOR_PLANNING = 'Search tasks you can see by text, status, project, list, assignee or due date. Each task carries its assignees, dates, estimate, subtask count and the tasks above it.';
 
-const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...dataTools.offered(), ...screenTools.offered(), ...intentTools.offered(), ...manageTools.offered(), ...workTools.offered(), ...sessionTools.offered()];
+const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...dataTools.offered(), ...screenTools.offered(), ...intentTools.offered(), ...contextTools.offered(), ...manageTools.offered(), ...workTools.offered(), ...sessionTools.offered()];
 
-const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...dataTools.TOOLS, ...screenTools.TOOLS, ...intentTools.TOOLS, ...manageTools.TOOLS, ...Object.values(manageTools.VARIANTS), ...workTools.TOOLS, ...sessionTools.TOOLS];
+const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...dataTools.TOOLS, ...screenTools.TOOLS, ...intentTools.TOOLS, ...contextTools.TOOLS, ...manageTools.TOOLS, ...Object.values(manageTools.VARIANTS), ...workTools.TOOLS, ...sessionTools.TOOLS];
 
-/* A tool that needs a grant is one only a caller holding that grant lists or runs. */
-const holdsGrantFor = (ctx, tool) => !tool.grant || manageFlag.mayUse(ctx, tool.grant);
+/* A tool that needs a grant, or a scope a person gives only by name, is one only a caller holding it lists or runs. */
+const holdsOptIn = (ctx, tool) => !tool.optIn || scopes.grantedScopes(ctx && ctx.token).includes(tool.optIn);
+const holdsGrantFor = (ctx, tool) => (!tool.grant || manageFlag.mayUse(ctx, tool.grant)) && holdsOptIn(ctx, tool);
 
 /* For a caller whose token was created to manage tasks, an existing tool is its fuller form; for everyone else it is as it was. */
 const formFor = (ctx, tool) => {
@@ -322,6 +324,7 @@ const refuseBadArguments = (tool, args) => {
 };
 
 const scopeRefusal = (ctx, tool, write) => {
+    if (!holdsOptIn(ctx, tool)) return `This token lacks the ${tool.optIn} scope.`;
     if (tool.grant && !manageFlag.holdsGrant(ctx.token, tool.grant)) return `This token does not hold the ${tool.grant} grant, which ${tool.name} needs.`;
     if (tool.grant && !manageFlag.mayUse(ctx, tool.grant)) return 'This token is read-only.';
     if (ctx.token && ctx.token.oauth) {
@@ -396,11 +399,14 @@ const call = async (ctx, name, args = {}) => {
         const refused = scopeRefusal(ctx, tool, false);
         if (refused) throw Object.assign(new Error(refused), { code: -32004 });
         refuseBadArguments(tool, args);
+        let vis;
+        const seen = async () => { vis = vis || await visibility.forCaller(ctx); return vis; };
+        const params = tool.readParams ? tool.readParams(args) : { taskId: args.taskId };
         if (!tool.authorizesPerProject) await actions.authorizeRead({
-            companyId: ctx.companyId, actor: ctx.actor, action: tool.action,
-            params: tool.readParams ? tool.readParams(args) : { taskId: args.taskId }, ip: ctx.ip, allowedActions: ctx.allowedActions,
+            companyId: ctx.companyId, actor: ctx.actor, action: tool.action, params, ip: ctx.ip, allowedActions: ctx.allowedActions,
+            opens: filtered ? async () => visibility.opensNamed(ctx.companyId, await seen(), params) : null,
         });
-        return tool.run(ctx, args, filtered ? await visibility.forCaller(ctx) : undefined);
+        return tool.run(ctx, args, filtered ? await seen() : undefined);
     }
 
     admitWrite(ctx, tool, args);

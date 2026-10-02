@@ -29,8 +29,9 @@ beforeEach(() => {
     Object.keys(mockDb.store).forEach((type) => { mockDb.store[type].length = 0; });
     delete process.env.API_TOKEN_STRICT;
     process.env.MCP_TOOLS_MANAGE = 'on';
+    delete process.env.MCP_TOOLS_DATA;
 });
-afterAll(() => { delete process.env.MCP_TOOLS_MANAGE; });
+afterAll(() => { delete process.env.MCP_TOOLS_MANAGE; delete process.env.MCP_TOOLS_DATA; });
 
 describe('creating an agent token', () => {
     it('stores no grant unless it is asked for, so the token lists none of the write tools', async () => {
@@ -148,5 +149,56 @@ describe('who holds a grant', () => {
         expect(managesTasks(ctx(outside(['tasks:read', GRANT]), false))).toBe(true);
         process.env.MCP_TOOLS_MANAGE = 'off';
         expect(managesTasks(ctx(outside(['tasks:read', GRANT]), false))).toBe(false);
+    });
+});
+
+describe('a token created to read chat', () => {
+    const CHAT = 'chat:read';
+    const CHAT_TOOLS = ['chat.channels.list', 'chat.messages.list'];
+    const policy = async () => (await call(ctrl.listTokens)).body.policy;
+
+    beforeEach(() => { process.env.MCP_TOOLS_DATA = 'on'; });
+
+    it('reads no chat unless the grant is asked for by name, whatever else the token holds', async () => {
+        const plain = await mint({});
+        const manager = await mint({ grants: [GRANT, DOCS_GRANT] });
+        [plain, manager].forEach((res) => {
+            expect(res.body.status).toBe(true);
+            expect(res.body.data.tools).toEqual(expect.arrayContaining(['projects.list', 'comments.list']));
+            expect(res.body.data.tools.filter((name) => CHAT_TOOLS.includes(name))).toEqual([]);
+        });
+        tokens().forEach((token) => expect(grantedScopes(token)).not.toContain(CHAT));
+    });
+
+    it('stores the grant when asked, lists both chat tools, and holds the chat scope', async () => {
+        const res = await mint({ grants: [CHAT] });
+        expect(res.body.status).toBe(true);
+        expect(tokens()[0].grants).toEqual([CHAT]);
+        expect(res.body.data.tools).toEqual(expect.arrayContaining(CHAT_TOOLS));
+        expect(grantedScopes(tokens()[0])).toContain(CHAT);
+        expect(grantedScopes(tokens()[0])).not.toContain(GRANT);
+    });
+
+    it('is not held by a token that only carries the name in its scope list', () => {
+        expect(grantedScopes({ _id: 't1', userId: USER_ID, scopes: ['read', 'write', CHAT] })).not.toContain(CHAT);
+        expect(grantedScopes({ _id: 't1', userId: USER_ID, scopes: [] })).not.toContain(CHAT);
+    });
+
+    it('is given to a token that only reads, and refused to one that cannot read', async () => {
+        process.env.API_TOKEN_STRICT = 'true';
+        expect((await mint({ grants: [CHAT], scopes: ['read'], expiresInDays: 7 })).body.status).toBe(true);
+        expect(tokens()[0]).toMatchObject({ grants: [CHAT], scopes: ['read'] });
+        expect((await mint({ grants: [CHAT], scopes: ['write'], expiresInDays: 7 })).body).toMatchObject({ status: false, statusText: expect.stringMatching(/read scope/) });
+        expect(tokens()).toHaveLength(1);
+    });
+
+    it('is refused while the read tools are switched off, and offered by the token form only while they are on', async () => {
+        expect((await policy()).grants).toEqual([GRANT, DOCS_GRANT, CHAT]);
+        process.env.MCP_TOOLS_MANAGE = 'off';
+        expect((await policy()).grants).toEqual([CHAT]);
+        delete process.env.MCP_TOOLS_DATA;
+        expect(await policy()).not.toHaveProperty('grants');
+        expect((await mint({ grants: [CHAT] })).body).toMatchObject({ status: false, statusText: expect.stringMatching(/MCP_TOOLS_DATA/) });
+        expect(tokens()).toHaveLength(0);
     });
 });
