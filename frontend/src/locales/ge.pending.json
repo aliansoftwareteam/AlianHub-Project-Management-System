@@ -527,6 +527,8 @@
     "AgentWork.at_work_open": "Show the tasks agents are working on now",
     "AgentWork.filter": "Agent working",
     "AgentWork.filter_hint": "Show only the tasks an agent is working on now",
+    "AgentWork.group": "Who is working",
+    "AgentWork.group_none": "No agent",
     "AgentWork.mark_label": "{name} is working on this, since {time}",
     "AgentWork.mark_label_no_time": "{name} is working on this",
     "AgentWork.paused": "Agents paused",

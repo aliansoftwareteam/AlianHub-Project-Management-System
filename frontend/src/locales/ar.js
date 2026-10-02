@@ -12139,6 +12139,8 @@ export default {
         "mark_label_no_time": "{name} is working on this",
         "filter": "Agent working",
         "filter_hint": "Show only the tasks an agent is working on now",
+        "group": "Who is working",
+        "group_none": "No agent",
         "at_work": "{n} agent at work | {n} agents at work",
         "at_work_open": "Show the tasks agents are working on now",
         "paused": "Agents paused"
