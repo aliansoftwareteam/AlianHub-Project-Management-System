@@ -126,6 +126,40 @@ describe('a waiting plan in the AI Inbox', () => {
     });
 });
 
+describe('a plan that is finished', () => {
+    const finished = (over = {}) => proposal({ status: 'approved', locked: undefined, decidedAt: new Date().toISOString(), changes: [setup()], ...over });
+    const openDone = async (row) => {
+        apiRequest.mockImplementation((type, url) => Promise.resolve({ data: { status: true, data: url.includes('/proposals') ? [row] : {}, counts: {} } }));
+        wrapper = mount(AiInbox, { attachTo: document.body, global: { plugins: [storeFor(MEMBER), i18n()] } });
+        await flushPromises();
+        await wrapper.findAll('.ah-tab')[3].trigger('click');
+        await flushPromises();
+        await wrapper.find('.ai-item').trigger('click');
+    };
+
+    it('says what was not made and why, and offers nothing to do about it', async () => {
+        await openDone(finished({ notMade: [{ part: 'tasks', name: 'Second brief', error: 'The list "Nowhere" was not found in this project.' }, { part: '', name: '', error: 'The project is gone.' }] }));
+        expect(wrapper.find('[data-test="not-made"]').exists()).toBe(true);
+        expect(wrapper.findAll('[data-test="not-made-line"]').map((el) => el.text())).toEqual(['Second brief: The list "Nowhere" was not found in this project.', 'The project is gone.']);
+        expect(wrapper.findAll('.ai-actions .ah-btn')).toHaveLength(0);
+    });
+
+    it('says nothing of the kind where everything was made', async () => {
+        await openDone(finished());
+        expect(wrapper.find('[data-test="not-made"]').exists()).toBe(false);
+    });
+});
+
+describe('a plan nobody can approve', () => {
+    it('says that nothing in it can be made through it, with no Approve', async () => {
+        await open(proposal({ locked: true, lockedWhy: 'not_this_plan', mayDecline: true }));
+        expect(wrapper.find('[data-test="plan-locked"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="rights-locked"]').exists()).toBe(false);
+        expect(wrapper.findAll('.ai-actions .ah-btn--primary')).toHaveLength(0);
+        expect(wrapper.find('[data-test="decline"]').exists()).toBe(true);
+    });
+});
+
 describe('parts of a plan that were not made the first time', () => {
     const again = (over = {}) => proposal({ retryBy: 'user-1', retryWhy: 'The server was busy.', changes: [setup(plan({ lines: [{ kind: 'newLists', names: ['Backlog'], picks: ['lists:0'] }], needs: {} }))], ...over });
 

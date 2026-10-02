@@ -177,6 +177,16 @@
                         <span>{{ $t('Inbox.queue_retry_locked') }}</span>
                     </div>
 
+                    <div v-if="lockedForPlan" class="auth__banner auth__banner--warn ai-locked" data-test="plan-locked">
+                        <ShellIcon name="shield" :size="15" />
+                        <span>{{ $t('Inbox.queue_plan_locked') }}</span>
+                    </div>
+
+                    <div v-if="notMade.length" class="ai-notmade" data-test="not-made">
+                        <div class="ah-label">{{ $t('Ai.not_made_title') }}</div>
+                        <p v-for="(line, i) in notMade" :key="i" class="ah-small ai-notmade__line" data-test="not-made-line">{{ line }}</p>
+                    </div>
+
                     <div v-if="selected.taint" class="auth__banner auth__banner--warn" style="margin-top:14px" data-test="taint-reason">
                         <ShellIcon name="alert" :size="15" />
                         <span>{{ $t('Audit.tainted_reason') }} <span class="ah-small" data-test="taint-sources">{{ taintLine(selected.taint) }}</span></span>
@@ -256,6 +266,7 @@ defineOptions({ name: "AiInboxPage" });
 const GATE_OWNER_ADMIN = "owner_admin";
 const LOCKED_BY_RIGHTS = "own_rights";
 const LOCKED_FOR_RETRY = "first_approver";
+const LOCKED_FOR_PLAN = "not_this_plan";
 
 const { t, te } = useI18n();
 const store = useStore();
@@ -313,6 +324,15 @@ const canDecide = computed(() => {
 const canDecline = computed(() => canDecide.value || selected.value?.mayDecline === true);
 const lockedByRights = computed(() => selected.value?.status === "pending" && selected.value?.lockedWhy === LOCKED_BY_RIGHTS);
 const lockedForRetry = computed(() => selected.value?.status === "pending" && selected.value?.lockedWhy === LOCKED_FOR_RETRY);
+const lockedForPlan = computed(() => selected.value?.status === "pending" && selected.value?.lockedWhy === LOCKED_FOR_PLAN);
+// What a finished proposal did not make, each with the reason the server kept.
+const notMade = computed(() => {
+    const p = selected.value;
+    if (!p || p.status === "pending" || !Array.isArray(p.notMade)) return [];
+    return p.notMade
+        .filter((entry) => entry && typeof entry.error === "string" && entry.error)
+        .map((entry) => (typeof entry.name === "string" && entry.name ? t("Ai.not_made_line", { name: entry.name, why: plain(entry.error) }) : plain(entry.error)));
+});
 const retryNote = computed(() => {
     const p = selected.value;
     return p?.status === "pending" && p.retryBy && canDecide.value ? t("Inbox.queue_retry_note", { why: p.retryWhy || t("Time.why_no_reason") }) : "";
@@ -523,4 +543,6 @@ onMounted(() => Promise.all([reload(), loadApprovals(), route?.query?.report ? o
 .ai-change--card { align-items: flex-start; flex-wrap: wrap; }
 .ai-change__card { flex: 1 1 16ch; min-width: 0; }
 .ai-retry { margin: 0 0 7px; }
+.ai-notmade { margin-top: 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ai-notmade__line { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
 </style>

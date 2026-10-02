@@ -69,12 +69,14 @@ const readQueue = async (companyId, userId) => {
         data: [{ status: 'pending', ...access.proposalScopeClause(scope) }, {}, { sort: { createdAt: -1 }, limit: QUEUE_LIMIT }],
     }, 'find');
     const listed = (rows || []).map(plain).filter(access.staysInside(scope.projectIds));
+    // The rights behind a waiting plan are read once for this request, for its standing and for its card.
+    const locks = new Map();
     // The queue is still worth showing without its cards.
-    const cards = (build) => build(companyId, userId, listed, { bareChanges: true }).catch((error) => {
+    const cards = (build) => build(companyId, userId, listed, { bareChanges: true, locks }).catch((error) => {
         logger.error(`[inbox] proposal previews: ${error.message}`);
         return new Map();
     });
-    const [previews, batches, standings] = await Promise.all([cards(intentPreview.forProposals), cards(intentPreview.forBatches), approverRights.standingsOf(companyId, caller, listed)]);
+    const [previews, batches, standings] = await Promise.all([cards(intentPreview.forProposals), cards(intentPreview.forBatches), approverRights.standingsOf(companyId, caller, listed, locks)]);
     const row = toRow(previews, batches);
     return listed.map((proposal, at) => row(proposal, standings[at]));
 };
