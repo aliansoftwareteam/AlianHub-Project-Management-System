@@ -192,18 +192,20 @@ After the run, fill the Verdict column above, write the number into the AI row o
 
 Each line is a job where a tool is missing or a rule would stop the agent. A coordinator can turn each into a slice.
 
+Marked on 2026-10-02 at build 772: "Closed" names the pull request that closed a gap, and "Partly closed" says what is still missing. A line with no mark is still open. The table of the 25 jobs above is as written at #1412. For a closed gap, the job's "Tools today" and "Approvals" cells are out of date until the sheet is revised.
+
 **Tools that are missing**
 
-1. **Job 3.** No tool reads the messages of a chat channel. `task.from_message` needs a message id and the agent has no way to find one.
-2. **Job 1, and every "for me" or "mine".** No tool tells the agent who its person is. `members.list` finds a person by name only.
-3. **Job 9.** `view.create` cannot filter on the due date. It filters on status, priority, people and text.
-4. **Jobs 8 and 10.** `screen.link` cannot carry a grouping, a filter or "Me". A view that is only looked at has to be saved, which changes the project for everyone.
-5. **Job 12.** Fields and their first values are not one proposal. The values wait for the approval, and no tool tells the agent that a proposal was approved.
-6. **Job 13.** `fields.create` has no rollup type. No tool reads the field values of a task, so the agent cannot add them up either.
+1. **Job 3.** No tool reads the messages of a chat channel. `task.from_message` needs a message id and the agent has no way to find one. **Closed by #1429:** `chat.channels.list` and `chat.messages.list` answer the message ids. Reading chat is a permission of its own, so the connection must be given it.
+2. **Job 1, and every "for me" or "mine".** No tool tells the agent who its person is. `members.list` finds a person by name only. **Closed by #1429:** `person.me`.
+3. **Job 9.** `view.create` cannot filter on the due date. It filters on status, priority, people and text. **Closed by #1425:** `due`, or `dueFrom` and `dueTo`.
+4. **Jobs 8 and 10.** `screen.link` cannot carry a grouping, a filter or "Me". A view that is only looked at has to be saved, which changes the project for everyone. **Partly closed by #1425:** the everything screen opens on "Me". A project or a list opens on a saved view that already shows it that way. With no such view the plain link comes back with a note, so a grouping nobody saved still needs `view.create`.
+5. **Job 12.** Fields and their first values are not one proposal. The values wait for the approval, and no tool tells the agent that a proposal was approved. **Closed by #1425 and #1429:** `fields.create` carries the first values in the same approval, and `proposal.get` says what became of a proposal.
+6. **Job 13.** `fields.create` has no rollup type. No tool reads the field values of a task, so the agent cannot add them up either. **Partly closed by #1429:** `task.fields.list` reads a task's field values. There is still no rollup type.
 7. **Job 5.** No tool makes a folder or a subfolder. `list.create` and `list.move` only use folders that exist.
 8. **Job 20.** No tool turns a list into a sprint or sets its dates.
-9. **Job 19.** No tool reads the workspace's working days. To check: whether `task.update` moves the tasks that wait on the one it moved.
-10. **Job 21.** No tool reads the rule catalogue or makes a rule (AI-3, automations, not started).
+9. **Job 19.** No tool reads the workspace's working days. To check: whether `task.update` moves the tasks that wait on the one it moved. **Closed by #1429:** `workdays.get`. The check on `task.update` is still to do.
+10. **Job 21.** No tool reads the rule catalogue or makes a rule (AI-3, automations, not started). **Closed by #1423:** `automation.catalogue` and `automation.create`. The rule is always a proposal, and only an owner's or an admin's agent may ask for one.
 11. **Job 22.** No tool makes a dashboard or a card.
 12. **Job 14.** No tool replies in a task's comment thread.
 13. **Job 16.** No tool lists or restores a doc's versions.
@@ -212,13 +214,15 @@ Each line is a job where a tool is missing or a rule would stop the agent. A coo
 16. **Job 6.** No tool duplicates a project.
 17. **Job 25.** No tool invites a person or changes who can open a project.
 
+New since this sheet and tied to no job above: `project.setup` (#1420) sets up a project that exists from one plan, and `project.create` (#1433) proposes a new project with its setup. Job 6 is still open: neither duplicates a project.
+
 **Rules that would refuse, or that do less than the plan says**
 
-18. **Job 4.** The task tree stops at task, subtask, sub-subtask. The job asks for one level more, so the third `subtask.create` is refused. Either the job is rewritten or the rule changes.
-19. **Job 7.** Twenty tasks change with no preview and no approval, because a batch is 25 single-task changes and each is applied at once. Decision 6 in `task.md` says anything wider than one task waits.
+18. **Job 4.** The task tree stops at task, subtask, sub-subtask. The job asks for one level more, so the third `subtask.create` is refused. Either the job is rewritten or the rule changes. **Decided on 2026-10-02:** the rule stays and the job is rewritten. The new sentence is not written yet.
+19. **Job 7.** Twenty tasks change with no preview and no approval, because a batch is 25 single-task changes and each is applied at once. Decision 6 in `task.md` says anything wider than one task waits. **Closed by #1427:** a batch that names more than one task runs nothing and waits as one proposal. To check: job 7 is 40 changes and a batch takes 25, so it may end in two proposals, which is one approval too many.
 20. **Job 8.** A saved view shows to everyone on the project. The pass rule fails a run that changes something the sentence did not ask for. To settle: whether "show me" may save a view.
 21. **Job 17.** In the web app a timer under one minute logs nothing. To check: whether `timelog.stop` leaves an entry. `timelog.create` reads the day in UTC, which is not always the person's "today".
-22. **Jobs 5 and 20.** `task.move` cannot be undone. With `MCP_TOOLS_V2` on, each move is its own proposal, so five moves ask for five approvals.
+22. **Jobs 5 and 20.** `task.move` cannot be undone. With `MCP_TOOLS_V2` on, each move is its own proposal, so five moves ask for five approvals. **Changed by #1427:** the five moves of job 20, sent as one batch, wait as one proposal. To check with `MCP_TOOLS_V2` on.
 23. **Job 15.** A doc an agent creates is a draft until a person approves it. To check: where that approval is given and whether it counts toward "one approval".
 24. **Under "Propose everything".** A connected app's comments, links and timers are refused, not queued (`progress.md`, #1394). Jobs 14 and 17 cannot pass in a project on that setting.
 
@@ -226,4 +230,4 @@ Each line is a job where a tool is missing or a rule would stop the agent. A coo
 
 25. How Claude reaches a local build, and how the app gets approved (see "Connect Claude" above).
 26. Whether the Claude app's own "allow this tool" prompts count as approvals. If each one counts, any job with more than one tool call fails.
-27. Which fifteen: this sheet's, or the list in `task.md` (the owner's open decision 15).
+27. Which fifteen: this sheet's, or the list in `task.md` (the owner's open decision 15). Until the owner decides, this sheet's pick stands.
