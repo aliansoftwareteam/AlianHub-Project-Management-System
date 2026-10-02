@@ -43,7 +43,7 @@ jest.mock('../common-storage/common-server.js', () => mockStub());
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { SEAT_ACTIVE } = require('../Config/seatStatus');
-const { canEditProject } = require('../Config/projectAccess');
+const { canEditProject, canReadProject } = require('../Config/projectAccess');
 const { taskMongo } = require('../Modules/Tasks/helpers/task_class_Mongo');
 const { sprintPlacementOf } = require('../Modules/Tasks/helpers/sprintPlacement');
 const { driverWrites, sprintArraysIn, isObjectId } = require('./fixtures/realTaskStore');
@@ -84,6 +84,7 @@ beforeEach(() => {
     db.seed(SCHEMA_TYPE.SPRINTS, sprintRow(PRIVATE_SPRINT, { private: true, AssigneeUserId: ['6f00000000000000000000a7'] }));
     mockDbFor(OTHER_COMPANY).seed(SCHEMA_TYPE.SPRINTS, { ...sprintRow(FOREIGN_SPRINT), CompanyId: OTHER_COMPANY });
     canEditProject.mockResolvedValue({ allowed: true });
+    canReadProject.mockResolvedValue({ allowed: true });
     jest.spyOn(taskMongo, 'create').mockImplementation(async ({ data }) => {
         created.push(data);
         return { status: true, id: new mongoose.Types.ObjectId().toHexString() };

@@ -67,14 +67,18 @@ beforeEach(() => {
 });
 afterAll(() => { delete process.env.PERMISSION_ENFORCEMENT_MODE; });
 
+const PEOPLE = [
+    ['an owner', OWNER],
+    ['an admin', ADMIN],
+    ['a member on the private work', INSIDER],
+    ['a member outside it', OUTSIDER],
+    ['a guest', GUEST],
+];
+
 describe('computing the formula and rollup fields of tasks', () => {
-    it.each([
-        ['an owner', OWNER],
-        ['an admin', ADMIN],
-        ['a member on the private work', INSIDER],
-        ['a member outside it', OUTSIDER],
-        ['a guest', GUEST],
-    ])('for %s computes, stores and answers the tasks that person can open, and no other', async (label, uid) => {
+    it.each(['off', 'enforce'].flatMap((mode) => PEOPLE.map(([label, uid]) => [label, mode, uid])))('for %s, with permission enforcement %s, computes, stores and answers the tasks that person can open, and no other', async (label, mode, uid) => {
+        process.env.PERMISSION_ENFORCEMENT_MODE = mode;
+
         const answer = await compute(uid, EVERY_TASK);
 
         expect(answer.body.status).toBe(true);
