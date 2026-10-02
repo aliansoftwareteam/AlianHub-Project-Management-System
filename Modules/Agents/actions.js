@@ -11,6 +11,7 @@ const permissions = require('./permissions');
 const projectPolicy = require('./projectPolicy');
 const taskReads = require('./taskReads');
 const audit = require('./agentAudit');
+const changeNotice = require('./changeNotice');
 const { attribution, isAgent } = require('./actor');
 const { shownAs } = require('./actingAgent');
 const stepCredential = require('../Workflows/stepCredential');
@@ -542,6 +543,7 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
             await require('./standingApprovals').recordUse(companyId, standing, { action, params, auditId, reason })
                 .catch((e) => logger.error(`[standing-approval] ${standing.id} applied ${action} (audit ${auditId}) but its use was not recorded: ${e.message}`));
         }
+        if (!approved) changeNotice.announce(companyId, actor, auditId);
         return { result: out.result, auditId, undo: out.undo, task: out.task || null, ...(standing ? { standing } : {}) };
     } finally {
         await turn.end(changed);

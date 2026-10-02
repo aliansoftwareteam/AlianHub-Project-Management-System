@@ -81,6 +81,7 @@ describe('who is told that a connected agent changed something', () => {
         const out = await comment(outside(MEMBER, [...PLAIN_SCOPES, TASKS_GRANT]), fx.top._id);
         expect(out).toMatchObject({ ok: true });
         expect(signals().map((event) => event.data)).toEqual([{ kind: 'change', userId: MEMBER, auditId: out.auditId }]);
+        expect((await changeNotice.describe(CID, MEMBER, [out.auditId])).changes).toMatchObject([{ auditId: out.auditId, agentName: 'Outside agent', name: 'Task OPN-1' }]);
     });
 
     it('nobody for a read', async () => {

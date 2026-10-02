@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { config, flushPromises, mount } from '@vue/test-utils';
 
-const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }));
+const { apiRequest, route } = vi.hoisted(() => ({ apiRequest: vi.fn(), route: { query: {} } }));
 
 vi.mock('@/services', () => ({ apiRequest }));
 vi.mock('@/composable', () => ({ useGetterFunctions: () => ({ getUser: () => null }) }));
-vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }) }));
+vi.mock('vue-router', () => ({ useRoute: () => route }));
 vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 'ShellIcon', render: () => null } }));
 
 import AuditLog from '@/views/Settings/Audit/AuditLog.vue';
@@ -36,6 +36,25 @@ const open = async (rows) => {
 
 beforeEach(() => {
     apiRequest.mockReset();
+    route.query = {};
+});
+
+describe('the audit log opened from a link', () => {
+    const firstRead = () => apiRequest.mock.calls[0][1];
+
+    it('opens on the tab the link names', async () => {
+        route.query = { scope: 'agent' };
+        const wrapper = await open([]);
+        expect(firstRead()).toContain('actorType=agent');
+        wrapper.unmount();
+    });
+
+    it('opens on everything when the link names no tab it has', async () => {
+        route.query = { scope: 'nonsense' };
+        const wrapper = await open([]);
+        expect(firstRead()).not.toContain('actorType');
+        wrapper.unmount();
+    });
 });
 
 describe('an outside client in the audit log', () => {

@@ -262,6 +262,21 @@ describe('several changes close together', () => {
         expect(notice().text()).toContain('Claude changed Ship it: Comment on a task');
     });
 
+    it('wait while the page is out of sight, and are told together when the person comes back', async () => {
+        const showTab = (visible) => {
+            Object.defineProperty(document, 'hidden', { configurable: true, get: () => !visible });
+            document.dispatchEvent(new Event('visibilitychange'));
+        };
+        showTab(false);
+        burst(3).forEach((id) => { world.changes[id] = change(id); applied(id); });
+        await vi.advanceTimersByTimeAsync(GATHER_MAX_MS * 4);
+        expect(apiRequest).not.toHaveBeenCalled();
+        showTab(true);
+        await gathered();
+        expect(reads()).toEqual([burst(3)]);
+        expect(notice().text()).toContain('Claude made 3 changes');
+    });
+
     it('do not name one agent for the changes of two', async () => {
         world.changes.a1 = change('a1');
         world.changes.a2 = change('a2', { agentName: 'ChatGPT' });
