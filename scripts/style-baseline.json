@@ -353,7 +353,7 @@
     "frontend/src/views/Projects/FormsView/style.css": { "colours": 2, "legacyClasses": 0 },
     "frontend/src/views/Projects/Kanban/KanbanBoard.vue": { "colours": 0, "legacyClasses": 1 },
     "frontend/src/views/Projects/ListView/ListView.vue": { "colours": 0, "legacyClasses": 1 },
-    "frontend/src/views/Projects/Projects.vue": { "colours": 0, "legacyClasses": 29 },
+    "frontend/src/views/Projects/Projects.vue": { "colours": 0, "legacyClasses": 28 },
     "frontend/src/views/Projects/ProjectsListing/ProjectsListPage.vue": { "colours": 1, "legacyClasses": 0 },
     "frontend/src/views/Projects/components/NewInProjectMenu.vue": { "colours": 1, "legacyClasses": 0 },
     "frontend/src/views/Projects/components/ProjectActionsBar.vue": { "colours": 0, "legacyClasses": 37 },
