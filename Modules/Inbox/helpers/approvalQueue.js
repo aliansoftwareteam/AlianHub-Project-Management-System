@@ -89,7 +89,7 @@ const readQueue = async (companyId, userId) => {
     }, 'find');
     const listed = (rows || []).map(plain).filter(staysInside(scope.projectIds));
     // The queue is still worth showing without its cards.
-    const cards = (build) => build(companyId, userId, listed).catch((error) => {
+    const cards = (build) => build(companyId, userId, listed, { bareChanges: true }).catch((error) => {
         logger.error(`[inbox] proposal previews: ${error.message}`);
         return new Map();
     });

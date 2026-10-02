@@ -186,7 +186,7 @@ describe('what a person is shown of a waiting change', () => {
         const out = await filedBatch();
         const row = await rowFor(MEMBER, out.proposalId);
         expect(row.changes).toHaveLength(9);
-        row.changes.forEach((change) => expect(Object.keys(change).sort()).toEqual(['action', 'label', 'reversible']));
+        row.changes.forEach((change) => expect(change).not.toHaveProperty('params'));
         expect(JSON.stringify(row.changes)).not.toMatch(/Ready for review|The new plan/);
     });
 

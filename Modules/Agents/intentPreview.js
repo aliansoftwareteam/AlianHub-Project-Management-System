@@ -348,10 +348,10 @@ const CHANGED = Object.freeze({
     'task.lists.add': inList('list_add'), 'task.lists.remove': inList('list_remove'),
 });
 
-/* A connected agent files one change for a call of its own, so several changes are a batch. One change that has
- * no card of its own, a move or an edit, is read the same way, so the person still sees what it sets. */
-const isBatch = (proposal) => Boolean(proposal) && proposal.source === SOURCE_MCP
-    && (changesOf(proposal).length > 1 || (changesOf(proposal).length === 1 && !builderOf(changesOf(proposal)[0])));
+/* A connected agent files one change for a call of its own, so several changes are a batch. */
+const isBatch = (proposal) => Boolean(proposal) && proposal.source === SOURCE_MCP && changesOf(proposal).length > 1;
+/* One change a connected agent filed that has no card of its own: a move, an edit, a comment. */
+const isBareChange = (proposal) => Boolean(proposal) && proposal.source === SOURCE_MCP && changesOf(proposal).length === 1 && !builderOf(changesOf(proposal)[0]);
 
 const changedBy = (change, context) => {
     const params = paramsOf(change);
@@ -406,9 +406,10 @@ const setFieldNames = async (companyId, changes, tasks) => {
 
 /* For each batch among the proposals, by proposal id: its one card. A task is named, and can be opened from the
  * card, only when the viewer can read it; the rest are a count. A person, a place and a field are named as the
- * viewer may see them (../Mcp/names.js), and a text is the proposal's own. */
-const forBatches = async (companyId, uid, proposals) => {
-    const batches = (Array.isArray(proposals) ? proposals : []).filter(isBatch);
+ * viewer may see them (../Mcp/names.js), and a text is the proposal's own. With `bareChanges`, a screen that shows
+ * a change through its card alone gets the same card for one change that has none of its own. */
+const forBatches = async (companyId, uid, proposals, { bareChanges = false } = {}) => {
+    const batches = (Array.isArray(proposals) ? proposals : []).filter((proposal) => isBatch(proposal) || (bareChanges && isBareChange(proposal)));
     if (!batches.length) return new Map();
     const all = batches.flatMap(changesOf);
     const readable = await readableTaskIds(companyId, uid, taskIdsOf(all));
