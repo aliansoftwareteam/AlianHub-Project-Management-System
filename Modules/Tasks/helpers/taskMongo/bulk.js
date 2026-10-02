@@ -29,6 +29,7 @@ const { recordCompletion } = require('./recordCompletion.js');
 const { escapeText, TaskWriteRefusal, statusInProject, NOT_A_PROJECT_STATUS } = require('../taskWriteFields');
 const { projectHoldsTag, TAG_NOT_IN_PROJECT } = require('../taskItemHistory');
 const { ancestorsOf, loadSubtree, canNest } = require('../taskTree');
+const { listLeftBy, conversionRules } = require('../taskWritePlacement');
 const {
     taskAssigneeAdd, taskAssigneeRemove, taskAssigneeReplace,
     taskStatusChange, taskPriorityChange, shownStatus, shownPriority,
@@ -1378,8 +1379,10 @@ module.exports = {
     },
 
     // ---------------------- DUPLICATE ----------------------
-    // payload: { companyId, userData, taskIds, sprintObj, oldProject, projectData, isSubTask, duplicateData, assignee, watcher, taskName, oldSprintObj }
-    bulkDuplicate({ companyId, userData, taskIds, sprintObj, oldProject, projectData, isSubTask = false, duplicateData = [], assignee = [], watcher = [], taskName = '', oldSprintObj }) {
+    // payload: { companyId, userData, taskIds, sprintObj, oldProject, projectData, isSubTask, duplicateData, assignee, watcher, taskName }
+    //   oldProject only chooses what a status or task type becomes in the project the copies land in. The
+    //   project and the list each task leaves are read from the task, as the tasks may sit in several.
+    bulkDuplicate({ companyId, userData, taskIds, sprintObj, oldProject, projectData, isSubTask = false, duplicateData = [], assignee = [], watcher = [], taskName = '' }) {
         return new Promise(async (resolve, reject) => {
             try {
                 if (!companyId) return reject(new Error('companyId required'));
@@ -1391,21 +1394,31 @@ module.exports = {
                 const newTaskIds = [];
                 const errors = [];
 
+                const loadProject = makeProjectLoader(companyId);
+                const destProject = await loadProject(projectData.id);
+                if (!destProject) return reject(new Error('destination project not found'));
+
                 for (const task of tasks) {
                     try {
+                        const copiedRows = [task, ...(isSubTask ? await loadSubtree(companyId, task._id, { filter: { deletedStatusKey: { $nin: [1] } } }) : [])];
+                        const rules = conversionRules(await loadProject(task.ProjectID), destProject, oldProject, copiedRows);
+                        if (!rules) {
+                            skipped.push({ taskId: String(task._id), reason: 'no-status-or-type-in-destination' });
+                            continue;
+                        }
                         const result = await this.duplicateTask({
                             companyId,
                             projectData,
                             sprintObj,
                             selectedTaskId: task._id,
-                            oldProject,
+                            oldProject: { ...rules, id: String(task.ProjectID) },
                             userData,
                             isSubTask,
                             duplicateData,
                             assignee,
                             watcher,
                             taskName,
-                            oldSprintObj,
+                            oldSprintObj: listLeftBy(task),
                         });
                         updated.push(String(task._id));
                         if (result?.taskId) newTaskIds.push(String(result.taskId));
