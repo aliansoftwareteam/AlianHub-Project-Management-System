@@ -557,11 +557,12 @@ const replanLines = computed(() => {
     const chain = path.map((id) => findTask(id)).filter(Boolean);
     const last = chain[chain.length - 1];
     const end = last ? new Date(last.DueDate) : null;
+    const span = critical.value.durationDays;
     const lines = [t(everyDayWorks.value ? 'Views.replan_chain' : 'Views.replan_chain_working', {
         n: chain.length,
-        days: critical.value.durationDays,
+        days: t(everyDayWorks.value ? 'Views.days_count' : 'Views.working_days_count', { n: span }, span),
         date: end ? end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '',
-    })];
+    }, chain.length)];
     const now = Date.now();
     const late = chain.find((task) => new Date(task.DueDate).getTime() < now && (task.status?.type || task.statusType) !== 'close');
     if (late) lines.push(t('Views.replan_late', { task: late.TaskName || late.TaskKey }));

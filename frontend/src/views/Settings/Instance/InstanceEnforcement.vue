@@ -60,7 +60,7 @@
                                 <td><span class="ah-chip" :class="MODE_CHIP[w.effectiveMode]" :data-test="`effective-${w.companyId}`">{{ $t(`Enforcement.mode_${w.effectiveMode}`) }}</span></td>
                                 <td>{{ w.rows30d }}</td>
                                 <td>{{ formatWhen(w.lastRowAt) }}</td>
-                                <td>{{ w.daysSinceFirstReportRow === null ? '—' : $t('Enforcement.days', { n: w.daysSinceFirstReportRow }) }}</td>
+                                <td>{{ w.daysSinceFirstReportRow === null ? '—' : $t('Enforcement.days', { n: w.daysSinceFirstReportRow }, w.daysSinceFirstReportRow) }}</td>
                                 <td><span class="ah-chip" :class="readinessChip(w)" :data-test="`readiness-${w.companyId}`">{{ readinessText(w) }}</span></td>
                                 <td>
                                     <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :data-test="`rows-${w.companyId}`" @click="open(w.companyId, w.name || w.companyId)">{{ $t('Enforcement.show_rows') }}</button>
@@ -96,7 +96,7 @@
                     </select>
                     <label class="ah-small" for="enforcement-days">{{ $t('Enforcement.filter_days') }}</label>
                     <select id="enforcement-days" class="ah-input en-select" :value="String(filters.days)" @change="applyFilter('days', Number($event.target.value))">
-                        <option v-for="d in DAY_OPTIONS" :key="d" :value="String(d)">{{ $t('Enforcement.days', { n: d }) }}</option>
+                        <option v-for="d in DAY_OPTIONS" :key="d" :value="String(d)">{{ $t('Enforcement.days', { n: d }, d) }}</option>
                     </select>
                     <label class="ah-small" for="enforcement-key">{{ $t('Enforcement.filter_key') }}</label>
                     <input id="enforcement-key" v-model.trim="filters.key" type="text" class="ah-input en-select" data-test="key-filter" :placeholder="$t('Enforcement.key_placeholder')" />

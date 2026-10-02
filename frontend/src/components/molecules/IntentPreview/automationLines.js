@@ -15,7 +15,7 @@ export const AUTOMATION_LINE_KINDS = {
     ruleState: (t, line) => ({ label: t('AutomationPreview.line_state'), text: t(line.on === true ? 'AutomationPreview.state_on' : 'AutomationPreview.state_off') }),
     ruleRuns: (t, line) => {
         const count = countOf(line.count);
-        return { label: t('AutomationPreview.line_runs', { days: countOf(line.days) }), text: count ? t('AutomationPreview.runs', { n: count }, count) : t('AutomationPreview.runs_none') };
+        return { label: t('AutomationPreview.line_runs', { days: countOf(line.days) }, countOf(line.days)), text: count ? t('AutomationPreview.runs', { n: count }, count) : t('AutomationPreview.runs_none') };
     },
     ruleExamples: (t, line) => {
         const tasks = (Array.isArray(line.tasks) ? line.tasks : []).map(textOf).filter(Boolean);
