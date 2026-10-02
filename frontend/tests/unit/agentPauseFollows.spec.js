@@ -141,6 +141,19 @@ describe('in every other open browser', () => {
         expect(readsOf('p2')).toBe(1);
     });
 
+    it('believes the latest read when a pause and a resume follow each other and the first answer lands last', async () => {
+        const landings = [];
+        apiRequest.mockImplementation(() => new Promise((resolve) => { landings.push(resolve); }));
+        const socket = liveSocket();
+        const header = mountHeader(ref({ _id: 'p1', agentLimits: { paused: false } }), ref(socket));
+        socket.tell('agentsChanged', { kind: 'limits' });
+        socket.tell('agentsChanged', { kind: 'limits' });
+        landings[1]({ data: { status: true, data: answer({ paused: false }) } });
+        landings[0]({ data: { status: true, data: answer({ paused: true }) } });
+        await flushPromises();
+        expect(shown(header)).toBe('false');
+    });
+
     it('keeps what it shows when the read fails, and stops listening when the page closes', async () => {
         apiRequest.mockImplementation(() => Promise.reject(new Error('offline')));
         const socket = liveSocket();
