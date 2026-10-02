@@ -297,7 +297,7 @@ const trimSession = async (s) => {
         emit('logged', { message: success.value });
         loadToday();
     } catch (e) {
-        sessionErrors.value = { ...sessionErrors.value, [s.key]: t('Time.trim_failed') };
+        sessionErrors.value = { ...sessionErrors.value, [s.key]: t(timeLogFailureKey(e, 'Time.trim_failed')) };
     } finally {
         busy.value = '';
     }

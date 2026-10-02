@@ -9284,6 +9284,8 @@
     "Time.takeaway_none": "✦ Nothing ran over its estimate in this window.",
     "Time.task": "Task",
     "Time.task_required": "Pick a task first.",
+    "Time.timer_kept_log_failed": "Couldn't log the time. Your timer was not stopped, so nothing is lost — try again.",
+    "Time.timer_kept_period_locked": "This day is in an approved week, so the time can't be logged yet. Your timer was not stopped and nothing is lost. Ask an approver to reopen the week, then stop it again.",
     "Time.timer_running": "Timer running",
     "Time.timer_stopped_prev": "Stopped {task} ({h}) to start this one.",
     "Time.today": "today",
