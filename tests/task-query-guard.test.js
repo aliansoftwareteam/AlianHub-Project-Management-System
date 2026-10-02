@@ -181,7 +181,7 @@ describe('TSK-01 — tasks are bound to the projects the caller can see', () => 
         expect(names(res)).toEqual(['mine']);
         expect(visibleProjectIds).toHaveBeenCalledWith(C, ME);
         const [pipeline] = mockRawCalls.find((c) => c.method === 'aggregate').query.data;
-        expect(pipeline[0]).toEqual({ $match: { ProjectID: { $in: [expect.objectContaining({ _bsontype: 'ObjectId' })] } } });
+        expect(pipeline[0]).toEqual({ $match: { ProjectID: { $in: [expect.objectContaining({ _bsontype: 'ObjectId' })] }, $nor: [{ mainChat: true, AssigneeUserId: { $ne: ME } }] } });
         expect(String(pipeline[0].$match.ProjectID.$in[0])).toBe(MY_PROJECT);
     });
 

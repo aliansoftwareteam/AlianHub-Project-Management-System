@@ -80,9 +80,13 @@ const viewerScope = async (companyId, viewer, isLogs) => {
     return { ProjectID: { $in: asObjectIds(projects) }, ...(await hiddenSprintFilter(companyId, uid, projects)) };
 };
 
+/* A conversation is stored among the tasks and is no work to report on. */
+const NOT_A_CONVERSATION = { mainChat: { $ne: true } };
+
 const runConfig = async (companyId, cfg, viewer) => {
     const isLogs = cfg.source === 'timelogs';
-    const scope = await viewerScope(companyId, viewer, isLogs);
+    const viewed = await viewerScope(companyId, viewer, isLogs);
+    const scope = isLogs ? viewed : { ...viewed, ...NOT_A_CONVERSATION };
     const pipeline = [...(scope ? [{ $match: scope }] : []), ...R.buildPipeline(cfg)];
     let raw = await MongoDbCrudOpration(companyId, {
         type: isLogs ? SCHEMA_TYPE.TIMESHEET : SCHEMA_TYPE.TASKS, data: [pipeline],

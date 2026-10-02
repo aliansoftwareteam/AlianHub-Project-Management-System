@@ -76,7 +76,7 @@ const velocityFor = async (companyId, uid, projectId, { limit = 10, closedFrom =
     const tasks = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS,
         data: [
-            { sprintId: { $in: sprintIds }, deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true },
+            { sprintId: { $in: sprintIds }, deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true, mainChat: { $ne: true } },
             '_id sprintId points statusType completion',
         ],
     }, 'find');

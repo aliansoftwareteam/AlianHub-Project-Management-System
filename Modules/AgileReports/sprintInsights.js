@@ -11,7 +11,7 @@ const logger = require('../../Config/loggerConfig');
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
 const BLOCKED_TYPE = 'onhold';
 const DONE_TYPE = 'close';
-const SCOPE_FILTER = { deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true };
+const SCOPE_FILTER = { deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true, mainChat: { $ne: true } };
 
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 const daysSince = (date, nowMs) => {

@@ -128,7 +128,7 @@ describe('16c /timesheet query guard', () => {
         const r = await call(aggregateSheet.getTimeSheetByAggregate, lookup(tasksLookup));
         expect(r.code).toBe(200);
         const joined = mockCrud.mock.calls[0][1].data[0].find((stage) => stage.$lookup).$lookup;
-        expect(joined.pipeline[0]).toEqual({ $match: { ProjectID: { $in: [new mongoose.Types.ObjectId(P1), P1] } } });
+        expect(joined.pipeline[0]).toEqual({ $match: { ProjectID: { $in: [new mongoose.Types.ObjectId(P1), P1] }, $nor: [{ mainChat: true, AssigneeUserId: { $ne: ME } }] } });
         expect(joined.pipeline.slice(1)).toEqual(tasksLookup.pipeline);
     });
 

@@ -284,6 +284,17 @@ const projectAsked = (checksOf) => routeGuard(checksOf, evaluateTaken);
  * its audit row. `refusesAs` is read by the perimeter, which answers before a route is chosen. */
 const agentsRefused = (action) => Object.assign(routeGuard(() => ({ action, params: {} })), { refusesAs: action });
 
+/* The reminder an agent sets is the registry's: on a task its person can open, in that task's project. Any other,
+ * one with no task or with a task that is hidden or missing alike, is a person's to set. */
+const reminderChecks = async (req, body, companyId) => {
+    const taskId = idText(body.taskId);
+    const home = taskId ? await projectOfTask(companyId, req.uid, taskId) : '';
+    const inItsProject = body.projectId === undefined || idText(body.projectId) === home;
+    return home && inItsProject ? { action: 'reminder.create', params: { taskId } } : { action: 'reminder.manage', params: {} };
+};
+
+const reminderCreateGuard = routeGuard(reminderChecks);
+
 /* What the project update takes from an agent, as its person may: what the project is called and says, when it is
  * due, where the work came from, what is attached to it, and the person's own marks on it. */
 const AGENT_PROJECT_FIELDS = new Set([
@@ -411,4 +422,4 @@ const agentPerimeter = withActor(async (req, res, next, actor) => {
     return refusedAs(hit.action);
 });
 
-module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, goalGuard, projectUpdateGuard, agentsRefused, projectAsked, chatGuard, agentPerimeter, TASK_PATCH_ACTIONS, PROJECT_TAGS_EDIT };
+module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, goalGuard, projectUpdateGuard, agentsRefused, projectAsked, reminderCreateGuard, chatGuard, agentPerimeter, TASK_PATCH_ACTIONS, PROJECT_TAGS_EDIT };

@@ -176,6 +176,7 @@ exports.getIcs = async (req, res) => {
         const match = {
             DueDate: { $ne: null },
             deletedStatusKey: 0,
+            mainChat: { $ne: true },
             ProjectID: { $in: projectIds.map(oid).filter(Boolean) },
             ...(await hiddenSprintFilter(feed.companyId, feed.userId, projectIds)),
         };

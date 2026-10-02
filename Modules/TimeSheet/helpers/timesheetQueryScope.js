@@ -4,6 +4,7 @@ const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const { dbCollections } = require('../../../Config/collections');
 const { privateWorkOf } = require('../../Agents/privateWork');
 const { FORBIDDEN_OPERATORS, isPlainObject } = require('../../Company/helpers/callerQueryRules');
+const { withoutConversationsOfOthers } = require('../../Comments/helpers/conversationReaders');
 
 const REFUSED_OPERATORS = Object.freeze(FORBIDDEN_OPERATORS.filter((operator) => operator !== '$lookup'));
 
@@ -17,8 +18,11 @@ class TimesheetQueryRefused extends Error {
     }
 }
 
-/* Tasks, folders and sprints store the project as an ObjectId, and an aggregate never casts. */
-const inVisibleProjects = (field, scope) => ({ $match: { [field]: { $in: [...toObjectIds(scope.visible), ...scope.visible] } } });
+/* Tasks, folders and sprints store the project as an ObjectId, and an aggregate never casts. A join into tasks
+ * also leaves out a conversation the caller is not in, which is stored among them. */
+const inVisibleProjects = (from, field, scope) => ({
+    $match: { [field]: { $in: [...toObjectIds(scope.visible), ...scope.visible] }, ...(from === dbCollections.TASKS ? withoutConversationsOfOthers(scope.uid) : {}) },
+});
 
 const matchStages = (match) => (Object.keys(match).length ? [{ $match: match }] : []);
 
@@ -46,7 +50,7 @@ const scopeLookup = (spec, scope, joinable) => {
         throw new TimesheetQueryRefused(`A join into ${from} takes its pipeline as a list of stages.`);
     }
     const { pipeline = [], ...rest } = spec;
-    const leading = scope.companyWide ? companyWideExclusion(from, projectField, scope) : [inVisibleProjects(projectField, scope)];
+    const leading = scope.companyWide ? companyWideExclusion(from, projectField, scope) : [inVisibleProjects(from, projectField, scope)];
     return {
         ...walk(rest, scope, joinable),
         pipeline: [...leading, ...walk(pipeline, scope, PROJECT_FIELD_OF_JOINABLE_INSIDE_TASKS)],

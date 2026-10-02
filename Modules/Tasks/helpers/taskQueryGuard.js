@@ -4,10 +4,10 @@ const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard')
 const { visibleProjectIds } = require('../../Agents/scope');
 const { hiddenSprintIds } = require('../../Sprints/helpers/sprintVisibility');
 const { narrowingFor } = require('../../../Config/tokenNarrowing');
-const { agentOf } = require('../../../Config/agentRequest');
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const { othersPersonalListIds } = require('../../PersonalList/ownership');
 const { taskListProjectIds } = require('./taskListProjects');
+const { inConversation, conversationsOfOthers, withoutConversationsOfOthers } = require('../../Comments/helpers/conversationReaders');
 const { FORBIDDEN_OPERATORS: CALLER_FORBIDDEN_OPERATORS, TOO_DEEP, isPlainObject, forbiddenOperatorIn } = require('../../Company/helpers/callerQueryRules');
 
 const MAX_LIMIT = 1000;
@@ -135,23 +135,24 @@ const matchWithExtraListRows = (match, sprintId) => {
 /* Company-wide, short of what belongs to the people in it: someone else's personal list, and a chat
  * the caller is not in. `personalLists` are the ids othersPersonalListIds gives for the caller. Kept
  * under $nor so a caller that spreads the match into its own filter and then names a ProjectID keeps
- * both exclusions. An agent's request reads no chat row at all. */
+ * both exclusions. */
 const companyWideMatch = (uid, personalLists) => ({
     $nor: [
         ...(personalLists.length ? [{ ProjectID: { $in: idForms(personalLists) } }] : []),
-        { mainChat: true, ...(agentOf(uid) ? {} : { AssigneeUserId: { $ne: String(uid) } }) },
+        conversationsOfOthers(uid),
     ],
 });
 
 /* The same rule for a task already read, which must carry ProjectID, mainChat and AssigneeUserId. */
 const readsCompanyWide = (task, uid, personalLists) => !personalLists.map(String).includes(String(task.ProjectID))
-    && (task.mainChat !== true || (!agentOf(uid) && [].concat(task.AssigneeUserId || []).map(String).includes(String(uid))));
+    && (task.mainChat !== true || inConversation(task, uid));
 
 const companyWideStage = async (companyId, uid) => ({ $match: companyWideMatch(uid, await othersPersonalListIds(companyId, uid)) });
 
 /* Owners and admins keep company-wide task visibility unless a token narrows them to some projects;
  * everyone else sees the projects the sidebar lists for them whose task list their role holds, minus
- * the private sprints they are not shared with. */
+ * the private sprints they are not shared with. A conversation kept in one of those projects stays
+ * with the people in it. */
 const visibilityStage = async (companyId, uid) => {
     const roleType = await getRoleType(companyId, uid);
     const privileged = isPrivileged(roleType);
@@ -159,7 +160,7 @@ const visibilityStage = async (companyId, uid) => {
     const ids = roleType === null ? [] : await (privileged ? visibleProjectIds : taskListProjectIds)(companyId, uid);
     const projects = toObjectIds(ids);
     const hidden = privileged ? [] : await hiddenSprintIds(companyId, uid, projects);
-    return { $match: { ProjectID: { $in: projects }, ...(hidden.length ? { sprintId: { $nin: hidden } } : {}) } };
+    return { $match: { ProjectID: { $in: projects }, ...(hidden.length ? { sprintId: { $nin: hidden } } : {}), ...withoutConversationsOfOthers(uid) } };
 };
 
 module.exports = {

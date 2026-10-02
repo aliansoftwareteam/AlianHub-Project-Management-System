@@ -23,7 +23,7 @@ const { withoutImportFields } = require("./helpers/importFields");
 const { bumpUnreadCounts } = require("./helpers/unreadBumps");
 const { isChatMessage, holdsThreads, replyLookup, withThreadSummary, readable, keptRootIds, announceThread } = require("./helpers/chatThreads");
 const { withoutServerOwnedFields } = require("./helpers/serverOwnedFields");
-const { keptFromAgent } = require("./helpers/agentChatRows");
+const { keptFromCaller } = require("./helpers/conversationRows");
 
 /* A comment an agent run writes never starts agents, so agents cannot start each other.
  * Required on use: the agent modules are only needed by a comment that names an agent. */
@@ -404,7 +404,7 @@ exports.searchComments = async (req, res) => {
         const convertedProjectIds = projectIds.map(id => new mongoose.Types.ObjectId(id));
         const skipValue = parseInt(skip);
         const batchSizeValue = parseInt(batchSize);
-        const keptFromCaller = await keptFromAgent(req.headers['companyid'], req.uid);
+        const chatKeptFromCaller = await keptFromCaller(req.headers['companyid'], req.uid);
 
         const searchResultMatch = {
             $match: {
@@ -412,7 +412,7 @@ exports.searchComments = async (req, res) => {
                     { ...additionalFilter },
                     { projectId: { $in: convertedProjectIds } },
                     { isDeleted: { $ne: true } },
-                    keptFromCaller,
+                    chatKeptFromCaller,
                     ...(searchStr
                         ? [
                             {
