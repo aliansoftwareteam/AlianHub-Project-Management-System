@@ -50,6 +50,7 @@ const FIELD_TYPES = Object.freeze(['text', 'textarea', 'number', 'money', 'date'
 const LAYOUTS = Object.freeze(['list', 'board', 'table', 'calendar', 'workload']);
 const GROUPS = Object.freeze(['status', 'assignee', 'priority', 'due_date']);
 const SORTS = Object.freeze(['due', 'priority', 'created', 'updated', 'name', 'status', 'assignee', 'points', 'estimate']);
+const DUE_SPANS = Object.freeze(['today', 'tomorrow', 'this_week', 'next_week', 'next_7_days', 'this_month', 'overdue']);
 
 const textsOf = (list) => (Array.isArray(list) ? list : []).map(textOf).filter(Boolean);
 
@@ -93,6 +94,14 @@ export const LINE_KINDS = {
         if (!type) return { label: t('IntentPreview.line_field'), text: name };
         return { label: t('IntentPreview.line_field'), text: options ? t('IntentPreview.field_with_options', { name, type, options }) : t('IntentPreview.field_named', { name, type }) };
     },
+    fieldValue: (t, line) => {
+        const [field, task] = [textOf(line.field), textOf(line.task)];
+        if (!field || !task) return null;
+        const flag = typeof line.checked === 'boolean' ? t(line.checked ? 'IntentPreview.value_yes' : 'IntentPreview.value_no') : '';
+        const value = flag || peopleText(t, { names: [line.value], others: line.others }) || t('IntentPreview.value_empty');
+        return { label: t('IntentPreview.line_value'), text: t('IntentPreview.value_on_task', { field, task, value }) };
+    },
+    fieldValuesHidden: (t, line) => (countOf(line.count) ? { label: t('IntentPreview.line_value'), text: t('IntentPreview.values_hidden', { n: countOf(line.count) }, countOf(line.count)) } : null),
     layout: (t, line) => (LAYOUTS.includes(line.value) ? { label: t('IntentPreview.line_layout'), text: t(`IntentPreview.layout_${line.value}`) } : null),
     group: (t, line) => {
         const text = chosenText(t, line, GROUPS, 'group');
@@ -107,6 +116,12 @@ export const LINE_KINDS = {
     priorities: (t, line) => {
         const known = textsOf(line.values).filter((value) => PRIORITIES.includes(value.toLowerCase())).map((value) => t(`IntentPreview.priority_${value.toLowerCase()}`));
         return known.length ? { label: t('IntentPreview.line_priority'), text: known.join(', ') } : null;
+    },
+    dueFilter: (t, line, locale) => {
+        if (DUE_SPANS.includes(line.when)) return { label: t('IntentPreview.line_due'), text: t(`IntentPreview.due_${line.when}`) };
+        const [from, to] = [textOf(line.from), textOf(line.to)];
+        if (!DAY.test(from) || !DAY.test(to)) return null;
+        return { label: t('IntentPreview.line_due'), text: t('IntentPreview.due_range', { from: dateText(locale, from), to: dateText(locale, to) }) };
     },
     search: (t, line) => (textOf(line.text) ? { label: t('IntentPreview.line_search'), text: textOf(line.text) } : null),
     newStatuses: (t, line) => (textsOf(line.names).length ? { label: t('IntentPreview.line_new_statuses'), text: textsOf(line.names).join(', ') } : null),

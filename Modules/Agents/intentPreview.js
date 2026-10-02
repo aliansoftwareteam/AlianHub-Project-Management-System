@@ -65,11 +65,11 @@ const detailLines = (fields) => [
     Array.isArray(fields.links) && fields.links.length > 0 && { kind: 'links', count: fields.links.length },
 ];
 
-const createPreview = (change, { named, parents }) => {
+const createPreview = (change, { named, tasks }) => {
     const create = CREATES[change.action];
     const params = paramsOf(change);
     const fields = create.fields(params);
-    const parent = create.kind === 'subtask' ? parents.get(idOf(params.taskId)) : null;
+    const parent = create.kind === 'subtask' ? tasks.get(idOf(params.taskId)) : null;
     const projectId = create.kind === 'subtask' ? (parent ? parent.projectId : '') : idOf(params.projectId);
     return {
         kind: create.kind,
@@ -95,12 +95,35 @@ const fieldLine = (given) => {
     };
 };
 
-const fieldsPreview = (change, { named }) => {
+const FIELDS = 'fields.create';
+const valuesIn = (change) => (change.action === FIELDS ? listOf(paramsOf(change).values).slice(0, setup.VALUES_MAX).map(objectOf) : []);
+const partsOf = (value) => [].concat(value).filter((part) => typeof part === 'string' || typeof part === 'number');
+const peopleIn = (value) => partsOf(value).map(idOf).filter(Boolean);
+
+/* A first value, on a task of the project the viewer can read; a member is shown by name, and one the viewer may not see is counted. */
+const valueLine = (entry, projectId, { named, tasks }) => {
+    const field = textOf(entry.field, setup.FIELD_NAME_MAX);
+    const task = tasks.get(idOf(entry.taskId));
+    if (!field || !task || task.projectId !== projectId) return null;
+    if (typeof entry.value === 'boolean') return { kind: 'fieldValue', field, task: task.name, checked: entry.value };
+    const parts = partsOf(entry.value);
+    const shown = parts.map((part) => (idOf(part) ? named.person(idOf(part), projectId).name : textOf(part))).filter(Boolean);
+    return { kind: 'fieldValue', field, task: task.name, value: shown.join(', ').slice(0, TEXT_MAX), others: parts.length - shown.length };
+};
+
+const fieldsPreview = (change, context) => {
     const params = paramsOf(change);
-    const place = placeLine(params, named);
+    const place = placeLine(params, context.named);
     if (!place) return null;
     const fields = listOf(params.definitions).slice(0, setup.FIELDS_MAX).map(fieldLine).filter(Boolean);
-    return { kind: 'fields', title: fields.map((field) => field.name).join(', ').slice(0, TEXT_MAX), lines: [place, ...fields] };
+    const asked = valuesIn(change);
+    const values = asked.map((entry) => valueLine(entry, idOf(params.projectId), context)).filter(Boolean);
+    const hidden = asked.length - values.length;
+    return {
+        kind: 'fields',
+        title: fields.map((field) => field.name).join(', ').slice(0, TEXT_MAX),
+        lines: [place, ...fields, ...values, ...(hidden ? [{ kind: 'fieldValuesHidden', count: hidden }] : [])],
+    };
 };
 
 const PLAN = 'project.setup';
@@ -114,6 +137,12 @@ const chosen = (choices, value, fieldName) => {
     if (Object.hasOwn(choices, String(value))) return { by: String(value), field: '' };
     const field = fieldName(idOf(value));
     return field ? { by: '', field } : null;
+};
+
+const dueLine = (look) => {
+    const kept = setup.lookOf({ due: look.due, dueFrom: look.dueFrom, dueTo: look.dueTo });
+    if (kept.dueFrom) return { kind: 'dueFilter', from: kept.dueFrom, to: kept.dueTo };
+    return kept.due ? { kind: 'dueFilter', when: kept.due } : null;
 };
 
 /* What a view shows, line by line; `planned` are fields of the same plan it shows, which have a name and no id yet. */
@@ -132,6 +161,7 @@ const lookLines = (look, projectId, { named, fieldNames }, planned = []) => {
         assigneesLine({ AssigneeUserId: look.assigneeIds }, projectId, named),
         statuses.length > 0 && { kind: 'statuses', names: statuses },
         priorities.length > 0 && { kind: 'priorities', values: priorities },
+        dueLine(look),
         textOf(look.search, setup.LOOK_MAX.search) && { kind: 'search', text: textOf(look.search, setup.LOOK_MAX.search) },
         columns.length + planned.length > 0 && { kind: 'columns', names: shown, others: columns.length + planned.length - shown.length },
     ];
@@ -205,9 +235,10 @@ const fieldNamesFor = async (companyId, views) => {
     }));
 };
 
-/* The parent tasks the viewer can read, by id, each with its name and project. */
-const readableParents = async (companyId, uid, changes) => {
-    const asked = changes.filter((change) => CREATES[change.action].kind === 'subtask').map((change) => idOf(paramsOf(change).taskId)).filter(Boolean);
+/* The tasks waiting changes name that the viewer can read, by id, each with its name and project: the parent of a new subtask, and the task of a first value. */
+const readableTasks = async (companyId, uid, changes) => {
+    const parents = changes.filter((change) => isCreate(change) && CREATES[change.action].kind === 'subtask').map((change) => paramsOf(change).taskId);
+    const asked = [...parents, ...changes.flatMap(valuesIn).map((entry) => entry.taskId)].map(idOf).filter(Boolean);
     const readable = await readableTaskIds(companyId, uid, asked);
     if (!readable.length) return new Map();
     const tasks = await MongoDbCrudOpration(companyId, {
@@ -222,14 +253,14 @@ const forProposals = async (companyId, uid, proposals) => {
     if (!list.flatMap(changesOf).some(builderOf)) return new Map();
     const changes = list.flatMap(changesOf).filter(isCreate);
     const setups = list.flatMap(changesOf).filter(isSetup);
-    const parents = await readableParents(companyId, uid, changes);
+    const tasks = await readableTasks(companyId, uid, [...changes, ...setups]);
     const named = await names.resolver({ companyId, userId: String(uid), projectIds: [] }, {
-        projectIds: [...[...changes, ...setups].map((change) => idOf(paramsOf(change).projectId)), ...[...parents.values()].map((parent) => parent.projectId)].filter(Boolean),
+        projectIds: [...[...changes, ...setups].map((change) => idOf(paramsOf(change).projectId)), ...[...tasks.values()].map((task) => task.projectId)].filter(Boolean),
         sprintIds: changes.map((change) => idOf(paramsOf(change).sprintId)).filter(Boolean),
-        userIds: [...changes.flatMap((change) => peopleOf(CREATES[change.action].fields(paramsOf(change)))), ...setups.flatMap((change) => looksOf(change).flatMap((look) => peopleOf({ AssigneeUserId: look.assigneeIds })))],
+        userIds: [...changes.flatMap((change) => peopleOf(CREATES[change.action].fields(paramsOf(change)))), ...setups.flatMap((change) => looksOf(change).flatMap((look) => peopleOf({ AssigneeUserId: look.assigneeIds }))), ...setups.flatMap(valuesIn).flatMap((entry) => peopleIn(entry.value))],
     });
     const fieldNames = await fieldNamesFor(companyId, setups.filter((change) => named.project(idOf(paramsOf(change).projectId)).name));
-    const built = { named, parents, fieldNames, companyId, uid };
+    const built = { named, tasks, fieldNames, companyId, uid };
     return new Map(await Promise.all(list.map(async (proposal) => [
         String(proposal._id),
         await Promise.all(changesOf(proposal).map((change) => (builderOf(change) ? builderOf(change)(change, built) : null))),
