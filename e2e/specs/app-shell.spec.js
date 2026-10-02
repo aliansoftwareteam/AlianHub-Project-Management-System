@@ -1,8 +1,10 @@
 /* eslint-env browser */
-const { test, expect, asRole } = require('../support/test');
+const { test, expect, asRole, skipConsoleGuard } = require('../support/test');
 
 /* The suite blocks service workers (playwright.config.js); this file is the one place they run. */
 test.use({ serviceWorkers: 'allow' });
+
+const GOES_OFFLINE = 'The test cuts the network on purpose, so the browser logs every request that then fails.';
 
 const workerActive = (page) => page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
 
@@ -17,6 +19,7 @@ const heldPaths = (page) => page.evaluate(async () => {
 
 test.describe('the app shell, signed out', () => {
     test('opens the sign-in page with no network and holds nothing but files of the build', async ({ page, context }) => {
+        skipConsoleGuard(GOES_OFFLINE);
         await page.goto('/#/login');
         await expect(page.locator('#email')).toBeVisible();
         await workerActive(page);
@@ -38,6 +41,7 @@ test.describe('the app shell, signed in', () => {
     test.use(asRole('owner'));
 
     test('opens on an offline screen with no network and comes back by itself', async ({ page, context, state }) => {
+        skipConsoleGuard(GOES_OFFLINE);
         await page.goto(`/#/${state.companyId}`);
         await expect(page.locator('.ah-app')).toBeVisible();
         await workerActive(page);
