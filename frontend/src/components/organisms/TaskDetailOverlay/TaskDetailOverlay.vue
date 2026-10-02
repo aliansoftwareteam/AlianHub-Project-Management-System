@@ -48,7 +48,7 @@ import { initTimer } from "./useTaskTimer";
 import { useFocusTrap } from "@/composable/useFocusTrap";
 import {
     overlayState, isExpanded, bindRouter, openTask, closeTask, expandTask, minimizeTask,
-    restoreTask, dismissMinimized, stepTask, restoreFromSequence, closeOnPageChange, loadMinimizedTray, TASK_QUERY_KEY
+    restoreTask, dismissMinimized, stepTask, restoreFromSequence, closeOnRouteChange, loadMinimizedTray, TASK_QUERY_KEY
 } from "./useTaskOverlay";
 import { trayStorageKey } from "./minimizedTray";
 import { navKeyDirection } from "./taskNavigation";
@@ -176,7 +176,7 @@ watch(isExpanded, (expanded) => {
 });
 watch(() => route.params?.taskId, openFromRoute);
 watch(() => route.query?.[TASK_QUERY_KEY], (value) => { if (value) restoreFromQuery(); });
-watch(() => route.path, closeOnPageChange);
+watch([() => route.path, () => route.query?.[TASK_QUERY_KEY], () => route.params?.taskId], closeOnRouteChange);
 watch(() => [userId.value, companyId.value], loadTray);
 
 onMounted(() => {

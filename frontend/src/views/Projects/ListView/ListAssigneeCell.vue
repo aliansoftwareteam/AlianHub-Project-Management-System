@@ -22,8 +22,7 @@
             >
                 <template v-if="people.length">
                     <span class="ah-avatar" aria-hidden="true">
-                        <img v-if="people[0].Employee_profileImageURL" :src="people[0].Employee_profileImageURL" alt="" />
-                        <template v-else>{{ initial(people[0].Employee_Name) }}</template>
+                        <AvatarImage :src="people[0].Employee_profileImageURL">{{ initial(people[0].Employee_Name) }}</AvatarImage>
                     </span>
                     <span v-if="people.length > 1" class="lv2__cell-more" aria-hidden="true">+{{ people.length - 1 }}</span>
                 </template>
@@ -33,8 +32,7 @@
     </Assignee>
     <span v-else class="lv2__c-assignee-value" role="img" :aria-label="label" :title="names || null">
         <span v-if="people.length" class="ah-avatar">
-            <img v-if="people[0].Employee_profileImageURL" :src="people[0].Employee_profileImageURL" alt="" />
-            <template v-else>{{ initial(people[0].Employee_Name) }}</template>
+            <AvatarImage :src="people[0].Employee_profileImageURL">{{ initial(people[0].Employee_Name) }}</AvatarImage>
         </span>
     </span>
 </template>
@@ -43,6 +41,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import Assignee from "@/components/molecules/Assignee/Assignee.vue";
+import AvatarImage from "@/components/atom/AvatarImage/AvatarImage.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useGetterFunctions } from "@/composable";
 

@@ -8727,6 +8727,7 @@
     "TaskLists.add_confirm": "Add",
     "TaskLists.add_note": "The task stays in {project}. Only people who can open {project} will see it in the other list.",
     "TaskLists.added": "Added to {list}.",
+    "TaskLists.added_back": "Added back to the list.",
     "TaskLists.also_in": "Also in {lists}",
     "TaskLists.another_list": "Another list",
     "TaskLists.another_project": "Another project",
