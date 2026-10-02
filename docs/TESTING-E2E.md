@@ -52,7 +52,7 @@ The Playwright HTML report lands in `e2e/report` (`npx playwright show-report e2
 | `database.js` | Drops the test databases before a run; lists companies for cleanup. |
 | `server.js` | Starts `node index.js` on a free port with a random `JWT_SECRET`, `STORAGE_TYPE=server`, a temp log/backup directory, migrations on, cron off, the automation engine on its inline queue, rate limits off, no AI keys, and mail pointed at a closed port. Waits for `/health` to return 200, and kills the process on teardown. |
 | `harness.js` | One run = reset database, start one server, create fixtures, write `e2e/.state/run.json`. |
-| `fixtures.js` | Fixture creation and the helpers tests use: `loginAs`, `createProject`, `createTask`, `inviteMember`, `readState`, `storageStatePath`. |
+| `fixtures.js` | Fixture creation and the helpers tests use: `loginAs`, `createProject`, `createTask`, `createList`, `createFolder`, `listSprints`, `listFolders`, `inviteMember`, `readState`, `storageStatePath`. |
 | `api.js` | `createApiClient`, a small wrapper over the built-in `fetch`. Calls resolve to `{ status, body, headers }` and never throw on 4xx/5xx. |
 | `pages.js` | Shared UI steps: `signInThroughForm`, `settingsNav`, `skipFirstRun`, `taskPanel`, `listRow`, `chooseFromRowMenu`. |
 | `test.js` | The Playwright `test` to import in specs, with `state`, `loginAs` and `asRole`. It also runs the console guard. |
@@ -91,6 +91,8 @@ Every spec in `e2e/specs` fails when the page throws an uncaught error or writes
 3. If the message is not a defect anywhere in the suite, add it to `ALLOWED` in `e2e/support/consoleGuard.js` with the reason. Keep that list short.
 
 A test that cannot pass yet because of a product bug calls `skipConsoleGuard('<what the page logs>')` (from `e2e/support/test.js`) on its first line: the guard is off for that test only, and the reason shows beside it in the report. When a test fails in CI, the log also holds the accessibility tree of each open page under `[page tree]`, so a locator that found nothing can be diagnosed without downloading the report.
+
+In CI each failing test also becomes one annotation on the `e2e` check run (`e2e/support/summaryReporter.js`): its first error lines and the page it left behind, so a failure can be read without opening the job log.
 
 Which flows have a spec is in [E2E-FLOWS.md](E2E-FLOWS.md).
 

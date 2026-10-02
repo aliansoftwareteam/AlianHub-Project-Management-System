@@ -504,15 +504,16 @@ Each line says which PR fixed it, or that it is open. None of the fixes has been
 What builds 759 to 766 left or could not verify, and what the Supporter session's sweeps found that is still open. Task 047's slices are included, because they share the screens. Access detail is not listed; see the private notes.
 
 ## Defects found by the hand-check sweeps, still open
-- With the network down, an instant edit is not taken back and shows no toast: the offline write queue answers as if it succeeded, and minutes later the rows return to their old value silently (#1372). A refused write is right: it returns in about 300 ms with one toast carrying the server's reason.
-- An import's "update from the file" does not refresh a project page that is already open; the old status stays until a reload. The confirm button still reads "Import N task(s)" when it is updating (#1356).
-- The Add View menu runs off the right edge, further with each view. #1384's clamp places the menu once, before its content has loaded. In review: #1403.
-- One bare avatar request (`/<userId>_<n>_profile.png`) still answers 404 on Home, List, Board, the task panel, chat and Docs. In review: #1389, which also covers the title lost on click-away, panels that outlive their route, and Undo after "Remove from this list". Its avatar change does not reach the People directory, Goals, field values, Workload, Approvals, the mention pickers and three more components.
-- Home's "Open in AI Inbox" link goes to the AI inbox, not to the new "Needs your approval" tab (#1392).
-- "Hand to an agent" stays on a task after the Project manager switch is turned off, until a reload (#1404).
+Marked at build 772: a line that starts "Fixed" has its fix on `beta`. #1418, #1422 and #1432 have not been seen on a build yet.
+- Fixed in #1418 (inside build 771), not seen on a build: with the network down, an instant edit is not taken back and shows no toast: the offline write queue answers as if it succeeded, and minutes later the rows return to their old value silently (#1372). A refused write is right: it returns in about 300 ms with one toast carrying the server's reason.
+- An import's "update from the file" does not refresh a project page that is already open; the old status stays until a reload. #1418 could not reproduce it and left a test as a guard. Fixed in #1418: the confirm button read "Import N task(s)" when it was updating (#1356).
+- Fixed in #1403 (inside build 769) and again in #1432 (inside build 772): the Add View menu runs off the right edge, further with each view. On build 769 it was still off screen at 1024 px; #1432 goes at the cause and has not been seen on a build.
+- Fixed in #1389 (inside build 769) and #1432 (inside build 772): one bare avatar request (`/<userId>_<n>_profile.png`) answered 404 on Home, List, Board, the task panel, chat and Docs. #1389 also covers the title lost on click-away, panels that outlive their route, and Undo after "Remove from this list"; those three were seen by hand on build 769. #1432 moves the remaining avatars to the one component.
+- Fixed in #1418: Home's "Open in AI Inbox" link goes to the AI inbox, not to the new "Needs your approval" tab (#1392).
+- Fixed in #1418: "Hand to an agent" stays on a task after the Project manager switch is turned off, until a reload (#1404).
 - Turning the Project manager switch on filled "What needs attention" at once and filed no proposal; the Inbox row "The system, for <project>" was not seen. It may need the daily run (#1396).
-- A timer that is running when its week gets approved loses its tracked time at Stop (#1377 found it; not fixed).
-- Small: the "Not connected yet" strip on Connect your AI has a blank space where an icon would be (#1397); "Save" is lit on a doc that was just reloaded; the List's add-task row stays open after a task is added; the tour's key hint says "Ctrl+K" on a phone; "DONE BY" and "BUDGET" headers touch at 1440 px with every column on; the Table group header reads "To Do 5 5 pts".
+- Fixed in #1422 (inside build 771): a timer that is running when its week gets approved loses its tracked time at Stop (#1377 found it).
+- Small: fixed in #1418, the "Not connected yet" strip on Connect your AI has a blank space where an icon would be (#1397). Still open: "Save" is lit on a doc that was just reloaded; the List's add-task row stays open after a task is added; the tour's key hint says "Ctrl+K" on a phone; "DONE BY" and "BUDGET" headers touch at 1440 px with every column on; the Table group header reads "To Do 5 5 pts".
 - Read from the code while writing the API reference, not seen in a browser: the save of a project's agent policy sends its live event without the company id, while the project manager's save beside it names it (`Modules/Agents/projectPolicyController.js`). Check that a second open tab sees a policy change without a reload.
 
 ## By hand, not done yet

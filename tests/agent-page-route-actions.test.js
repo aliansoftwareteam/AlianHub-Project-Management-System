@@ -289,6 +289,20 @@ describe('the draft mark of a doc', () => {
 
         expect(stored(DRAFT)).toMatchObject({ agentStatus: 'approved', approvedBy: OWNER });
     });
+
+    it.each([
+        ['a personal token of an owner', personalToken(OWNER)],
+        ['a personal token of a member', personalToken(INSIDER)],
+        ['an agent\'s token', agentToken(OWNER)],
+        ['a connected app\'s token', { uid: OWNER, mcp: true }],
+    ])('is not signed off by %s', async (label, caller) => {
+        seedDraft();
+
+        expect(await send('PUT /api/v2/pages/:id/approve', caller, {}, { id: DRAFT })).toMatchObject({ code: 403, body: { status: false } });
+
+        expect(stored(DRAFT).agentStatus).toBe('draft');
+        expect(stored(DRAFT).approvedBy).toBeUndefined();
+    });
 });
 
 describe('everyone else on the doc routes', () => {

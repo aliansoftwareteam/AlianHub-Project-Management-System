@@ -1,67 +1,95 @@
-# Progress: 047 — AI-run
+# Progress: 047, AI-run
 
-State at build 766 (`14.36.0-beta.766`), 2026-10-02 01:10 IST.
+State at build 772 (`14.36.0-beta.772`), 2026-10-02 11:15 IST. Tracker: AP-441.
 
-How to read a line: `[x]` is merged into `beta`, with its PR and build number. "Inside build 762" means the PR reached `beta` inside the combined PR #1395; 764 is #1399, 765 is #1401, 766 is #1405. "In review (#n)" has an open PR. "Needs the owner" waits for a step only the owner can take.
+How to read a line: `[x]` is merged into `beta`, with its PR and build number. "Inside build 762" means the PR reached `beta` inside a combined PR:
 
-Every merged slice below is behind what it was behind before: `MCP_OAUTH` and the three `MCP_TOOLS_*` flags are off in the local `.env`, so nothing that needs a connected AI has been used by hand yet.
+| Build | Combined PR | Build | Combined PR |
+|---|---|---|---|
+| 762 | #1395 | 767 | #1408, the ninth |
+| 764 | #1399 | 769 | #1412, the tenth |
+| 765 | #1401 | 770 | #1417, the eleventh |
+| 766 | #1405 | 771 | #1428, the twelfth |
+| | | 772 | #1434, the thirteenth |
+
+Build 763 is #1394 alone. Build 768 is the docs PR #1411. "In review (#n)" has an open PR. "Needs the owner" waits for a step only the owner can take.
+
+Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MCP_TOOLS_*` flags are off in the local `.env`, so nothing that needs a connected AI has been used by hand yet.
 
 ## Checklist
 
-**Step 0 — writing only**
+**Step 0: writing only**
 - [x] The plan (`task.md`) and decisions 27 to 30 in task 046 (#1380, inside build 762)
-- [ ] S-6 Newcomer tests written, and a first run on the local build as it is (the run needs a new account: the owner)
-- [ ] AI-1 The benchmark sheet written (`ai-benchmark.md`)
-- [ ] S-3 The plain-words test and its baseline, with the first 51 rewordings: in review (#1407, inside the ninth combined PR, #1408)
+- [x] S-6 The newcomer test script written: `newcomer-test.md` (#1419, inside build 771)
+- [ ] S-6 A first run on the local build as it is (needs a new account: the owner)
+- [x] AI-1 The benchmark sheet written: `ai-benchmark.md` (#1419, inside build 771)
+- [x] S-3 The plain-words test and its baseline, with the first 51 rewordings (#1407, inside build 767)
 - [ ] The owner's answers to the 16 open decisions. Nine were taken as recommended; see "Decisions taken on 2026-10-01/02"
 
-**Step 1 — the road in**
+**Step 1: the road in**
 - [x] Each group of registry entries in its own file, so slices stop colliding (#1383, inside build 762)
 - [ ] AI-4a A real Claude connected over OAuth with the manage grant (needs the owner)
 - [x] AI-4b The agent's name in task history ("Claude, for Priya"), and the loop guard on the newer path (#1387, inside build 762)
 - [x] AI-4d Token default, expiry notice and renew (#1386, inside build 762)
 
-**Step 2 — the agent knows the product**
+**Step 2: the agent knows the product**
 - [x] T-3 MCP instructions, the five ready-made prompts and the "show me" link (#1390, inside build 762)
 - [x] AI-4c The project's policy: Done, and how far a connected agent may go (#1394, build 763)
 - [x] AI-2 Over MCP: where the person is, message to task, and the preview card in the web app (#1398, inside build 764)
 - [x] AI-3 Fields over MCP, with preview and undo (#1402, inside build 766)
 - [x] AI-3 Views over MCP (#1402, inside build 766)
-- [ ] AI-3 Automations over MCP. Not started
+- [x] AI-3 Automations over MCP: an agent proposes one rule for one project, and an owner or admin approves it (#1423, inside build 771)
+- [x] A batch that names more than one task waits as one proposal (#1427, inside build 772)
+- [x] The setup tools the benchmark sheet found missing: a due-date filter on a view, links that open a saved view or "mine", fields with their first values in one approval (#1425, inside build 772)
+- [x] The read tools the sheet found missing: who the person is, chat channels and messages, a task's field values, working days, what became of a proposal (#1429, inside build 772)
+- [x] #1431 (inside build 772): "reads answer the same for a thing that is not there"
+- [ ] Folders, subfolders and a list made a sprint over MCP. Not started; #1425 left them
 
-**Step 3 — measure**
+**Step 3: measure**
 - [ ] AI-1 First measured run over MCP (needs the owner: flags on locally, a connection with the manage grant)
 - [ ] AI-4e The dogfood list repeated on the local build (needs the owner)
 
-**Step 4 — the front door and the simple outside**
+**Step 4: the front door and the simple outside**
 - [x] T-1 Sign-up ends in "Connect your AI", with a sign that the connection works (#1397, inside build 764). The server-key field in the wizard is not built
 - [x] S-1 Simple mode (#1393, inside build 762)
 - [x] S-5 No dead ends (#1391, inside build 762). Ten questions are left in `resources/dead-ends.md`
-- [ ] AI-2 In the web app with no model: quick create, message to task and the palette start where the person is. Not started
+- [x] AI-2 In the web app with no model: quick create, the palette and message to task start where the person is (#1413, inside build 770)
+- [x] AI-2 A change a connected agent applied is shown to its person in the web app, with Undo (#1430, inside build 772)
 
-**Step 5 — the system looks for you**
+**Step 5: the system looks for you**
 - [x] AI-5 The "Needs your approval" tab and row in the Inbox (#1392, inside build 762)
 - [x] AI-6 Findings from rules, and the daily look (#1396, inside build 764)
 - [x] AI-6 The work queue for the connected agent, with claims (#1404, inside build 766)
+- [x] AI-5 "Always do this", and typed decline reasons kept as notes (#1406, inside build 767)
 - [ ] AI-6 Triage of new tasks and estimates. Later: it needs a server key
-- [ ] AI-5 "Always do this", and typed decline reasons kept as notes: in review (#1406, inside #1408)
 
-**Step 6 — the teammate**
-- [ ] S-2 Describe your project: one plan, one preview. Not started; it follows AI-3
-- [ ] T-2 The connected AI as a named member: in review (#1410; on the tenth batch branch, which has no PR yet)
-- [ ] T-4 Agent work visible in List, Table and Board: in review (#1409; on the tenth batch branch)
-- [ ] T-5 Several agents at once. Not started
+**Step 6: the teammate**
+- [x] S-2 A connected agent sets up an existing project from one plan: `project.setup` (#1420, inside build 771)
+- [x] S-2 A connected agent proposes a new project with its setup: `project.create` (#1433, inside build 772)
+- [ ] S-2 What the plan still lacks: parts unticked one by one, rules and first tasks inside the plan, the browser test of the whole flow
+- [x] T-2 The connected AI as a named member (#1410, inside build 769)
+- [x] T-4 Agent work visible in List, Table and Board, with a filter (#1409, inside build 769). "Group by who is working" is not built
+- [x] T-5 Several agents at once (#1414, inside build 770)
 - [x] S-4 Home as "what next" (#1400, inside build 765)
 - [ ] AI-1b The replay test in CI. It needs a passing AI-1 run first
 
-**Step 7 — prove it (needs the owner)**
+**Step 7: prove it (needs the owner)**
 - [ ] AI-1 measured again: 15 delegations and 3 reserves, three runs each
 - [ ] The one-week trial on one project
 - [ ] The newcomer tests run again, on the "connect, then say it" path
 - [ ] The scorecard's AI row and newcomer row filled
 
 **Throughout**
-- [ ] S-3 Plain-words batches. Batch 1 is in review (#1407): 51 keys reworded, 81 left in the baseline. Also left: 57 strings that say "1 tasks", and server replies such as "Sprint not found."
+- [x] S-3 Batch 1 (#1407, inside build 767): 51 keys reworded. The baseline went from 132 to 81
+- [x] S-3 Batch 2 (#1415, inside build 770): 48 keys reworded, and 14 count strings read "1 task". The baseline went to 33
+- [x] S-3 Server replies (#1426, inside build 772): 22 reply texts say "list" where they said sprint
+- [ ] S-3 What is left: 30 keys in the baseline (#1432 took three more out), `Views.replan_chain*`, and the same words in what the MCP server tells the agent
+
+**Follow-ups the slices named**
+- [x] #1421 (inside build 771): a control for the workspace's "a person checks before Done" switch, one sentence in the MCP instructions about a close that waits, and the spec for Undo after a create is approved
+- [x] #1424 (inside build 771): "the workspace's agent settings save the same way as a project's"
+- [x] #1418 (inside build 771): hand-check sweep 3. Home's approval link opens the Inbox tab, "Hand to an agent" follows its switch, the "Not connected yet" line has its icon
+- [x] #1432 (inside build 772): hand-check sweep 7. The Members row names the person's own AI as the picker does, and two agents with one name are told apart
 
 **Later, optional (with a server key)**
 - [ ] The Ask box that plans with a model (AI-2, AI-3, T-3)
@@ -71,19 +99,22 @@ Every merged slice below is behind what it was behind before: `MCP_OAUTH` and th
 ## What is left
 
 **Can be done without the owner**
-- Merge the ninth combined PR (#1408: #1406, #1407), then open the tenth (#1409, #1410) and merge it.
-- T-5, several agents at once: one item per agent, a per-project limit, changed-since-read, pause all.
-- S-2, describe your project.
-- AI-2 in the web app, with no model.
-- AI-3, automations over MCP.
-- S-3, further plain-words batches.
-- The AI-1 benchmark sheet and the S-6 newcomer test sheet, as writing.
-- Small follow-ups the slices named: the undo notice and the e2e spec for intent create (#1398); one sentence in the MCP instructions about a close that waits for approval (#1394); a control in the web app for the workspace's "check before Done" switch, which has only a route today (#1394); "@" for a connected AI in chat (#1410); group by who is working (#1409).
+- Merge the open PRs: #1435 (the fourteenth batch: #1361 and #1210), #1416 (browser tests of the AI-run screens) and #1436 ("a project's agent settings and a proposal's decision each have one road").
+- Hand checks of builds 770 to 772 on the local build. None is recorded. Build 769 was swept; what it found is answered in #1432, which has not been seen on a build.
+- Revise the benchmark sheet's table against build 772. Its "Tools today" and "Approvals" cells were written at #1412. Rewrite job 4.
+- Over MCP: folders and subfolders, and a list made a sprint with dates (benchmark gaps 7 and 8).
+- S-2: parts unticked one by one; rules and first tasks in the plan; a new project shown in the sidebar without a reload (#1433).
+- T-4: group by who is working. T-2: "@" for a connected AI in chat.
+- S-3: the 30 keys left, and the words in the MCP texts.
+- Small things the slices left: "Always do this" is on the Inbox tab only (#1406); `queue.list` in a paused project does not say why (#1414); a kept timer has no "discard" (#1422); a change an agent token makes through the web app's own routes is not announced (#1430).
+- The benchmark gaps still open that have no slice: a rollup field, a dashboard card, a reply in a task's comment thread, a doc's versions, a timesheet's submit and approve, duplicating a project.
 
 **Needs the owner**
-- Turn on `MCP_OAUTH`, `MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE` and `MCP_TOOLS_WORK` in the local `.env`, and connect their Claude with the manage grant. AI-4a, AI-4e and AI-1 wait for this, and so do the hand checks of #1387, #1390, #1398, #1402 and #1404 with a real connection.
+- Turn on `MCP_OAUTH`, `MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE` and `MCP_TOOLS_WORK` in the local `.env`, and connect their Claude with the manage grant. AI-4a, AI-4e and AI-1 wait for this. So do the hand checks, with a real connection, of #1387, #1390, #1398, #1402, #1404, #1406, #1409, #1410, #1414, #1420, #1423, #1425, #1427, #1429, #1430 and #1433.
+- For benchmark job 3, the connection also needs "Read messages in channels you are in" ticked, and an owner or admin approves it for that app.
 - A new account, for the S-6 newcomer run.
 - The one-week trial on AlianHub's own project.
+- Row 15: which fifteen jobs count. The sheet's own pick stands until the owner says.
 - Whether the three `MCP_TOOLS_*` flags and `MCP_OAUTH` are on by default on a new install. It changes a security default and needs an access review first. Not planned as done.
 - Whether AlianHub's own AI is measured with a server key, at a cap of $10. Recommended: not now.
 
@@ -92,18 +123,34 @@ Every merged slice below is behind what it was behind before: `MCP_OAUTH` and th
 The numbers are the rows of "Open decisions for the owner" in `task.md`. The coordinator took each as recommended while the owner was away; each is a setting or a slice, so each can be overruled.
 
 - **5.** An agent does not mark a task Done without a person's approval by default. A project chooses "never", "with approval" or "yes" (#1394).
-- **6.** Over MCP, a change to a single task is applied at once and shown with Undo; anything wider waits. A project may choose "propose everything" (#1394).
-- **8.** "Always do this" exists, within the limits in AI-5, and each rule ends after 90 days (#1406, in review).
-- **9.** A typed decline reason is kept as a note the agent reads, per project (#1406, in review).
-- **11.** Connected agents appear in the member list under the person who connected them, with no seat and no role (#1410, in review).
+- **6.** Over MCP, a change to a single task is applied at once and shown with Undo; anything wider waits. A project may choose "propose everything" (#1394). Since #1427 a batch is held to this too.
+- **8.** "Always do this" exists, within the limits in AI-5, and each rule ends after 90 days (#1406).
+- **9.** A typed decline reason is kept as a note the agent reads, per project (#1406).
+- **11.** Connected agents appear in the member list under the person who connected them, with no seat and no role (#1410).
 - **12.** "Connect your AI" can be skipped at sign-up (#1397).
 - **13.** New accounts start in Simple mode; existing accounts stay on Full (#1393).
-- **14.** An agent never creates a field or a view without a preview: both are proposals a person approves (#1402).
+- **14.** An agent never creates a field, a view or an automation without a preview: each is a proposal a person approves (#1402, #1423).
 - **16.** The project's manager starts at "Suggest": everything it offers is a proposal (#1396).
 - **7** was built as the plan wrote it (30 days by default, a notice three days before, Renew) in #1386. The log does not record it as a decision taken.
 - **Decision 30, confirmed by the owner** in chat on 2026-10-01 at about 22:09 IST: the agent that comes with AlianHub is the person's own Claude or ChatGPT over MCP. A server key is an optional extra.
 - **Connector slices 4 to 6 (calendar) are paused** after slice 3 (#1381). With decision 30 the person's own AI brings its own calendar and mail connectors, so the agent slots went to this task. Reversible: the design is still in `design-connectors.md` of task 046.
 - Still the owner's: rows 1 to 4, and rows 10 and 15, which nobody has answered. #1410 follows row 10's recommendation (a person hands work only to their own AI).
+
+## Decisions taken on 2026-10-02, builds 767 to 772
+
+Each is a default, a setting or a slice, so each can be reversed.
+
+- **Several agents at once (#1414).** A project lets 3 agents work at once by default; an owner or admin sets 1 to 20. One agent holds one item at a time. "Pause all agents" stops agent work in one project. What people do, and a change a person approved, is never paused.
+- **Quick create (#1413).** It starts in the project and list the person last opened. No model is called.
+- **A batch (#1427).** A batch that names more than one task runs nothing and waits as one proposal. A batch on one task is applied at once, as before. A waiting batch stays inside one project.
+- **Reading chat (#1429).** It is a permission of its own. It starts unticked, and a connection made before it never gets it. Direct messages are never read.
+- **Project setup (#1420).** `project.setup` works on a project that exists. It is always one proposal with one preview, and Undo takes the plan back as a whole.
+- **A new project (#1433).** `project.create` makes a private project with only the approver on it. Undo moves it to the Trash and never deletes it. A project that holds a task or a doc by then stays.
+- **Automations (#1423).** An agent only proposes a rule. Only an owner or admin can have one proposed for them, and only an owner or admin approves it. The rule is saved switched off unless the proposal said otherwise.
+- **The workspace's "a person checks before Done" switch (#1421).** It has a control now, under AI, Accounts, Modes. Owners and admins change it; everyone else sees it.
+- **A timer in an approved week (#1422).** The stop is refused, the timer is kept and the person is told why. No time is written into the approved week.
+- **Subtasks.** The third level under a task stays refused. Benchmark job 4 is rewritten; the rule is not changed.
+- **Row 15.** The benchmark sheet's own pick of fifteen jobs stands until the owner decides.
 
 ### Choices to review
 
@@ -125,13 +172,29 @@ One line per choice a slice made that the owner may want to reverse. The PR body
 - #1400: for an account that never arranged Home, "Waiting on you" now sits above the agenda.
 - #1402: undo of a field made by an agent switches the field off only when no task uses it.
 - #1404: a claim lasts 30 minutes; "Hand to an agent" shows only in a project whose manager is on.
-- #1406 (in review): a standing approval covers only a connected agent's change held by "propose everything", never a close or a status change, and ends when the policy tightens or the connection goes; a decline reason is at most 200 characters, 20 kept per agent per project.
-- #1407 (in review): a new string that uses a listed word turns the plain-words test red; reword it, or prune the baseline with `node scripts/plain-words.js --prune`.
-- #1410 (in review): only the caller's own AI can be picked as "My Claude".
+- #1406: a standing approval covers only a connected agent's change held by "propose everything", never a close or a status change. It ends when the policy tightens or the connection goes. A decline reason is at most 200 characters, 20 kept per agent per project.
+- #1407: a new string that uses a listed word turns the plain-words test red; reword it, or prune the baseline with `node scripts/plain-words.js --prune`.
+- #1409: the "Agent working" filter is not saved with a saved view. For an in-product agent the mark names the agent only. At most 200 held tasks are read.
+- #1410: only the caller's own AI can be picked as "My Claude". A hand-over writes one finding and no assignee. An "@" of your own AI in a task comment hands the task over.
+- #1413: the assignee of the last task in that project is filled in. Its due date is reused only when that task was made in the last 30 minutes.
+- #1414: an in-product run fills a place but is not refused by the limit. An agent that never read the task is not held by "changed since you read it".
+- #1415: "Payload URL" became "Webhook URL" and `null` became "not set". 33 keys were left on purpose: setting names in admin messages and the Scrum sprint flow.
+- #1418: an edit made offline is kept and sent later. If the server then refuses it, the row goes back and a toast says why. The automatic re-send stops after 50 failed tries and starts again when the browser is online.
+- #1420: at most 10 statuses, 10 lists, 10 fields and 5 views in one plan. A new status joins the company's list and stays there after Undo. A plan is approved or declined whole.
+- #1421: the switch saves the moment it is changed. The longest MCP instructions text is 3,812 of 4,000 characters, so later slices put their words in tool descriptions.
+- #1422: a kept timer goes on counting. Once the approved week is over, a plain Stop logs the whole time on the first open day.
+- #1423: an agent may propose six steps: set status, set priority, add a comment, create a subtask, assign, notify. Only triggers that start from a task. Undo deletes the rule unless someone edited it. The count of past matches is shown to owners and admins only.
+- #1425: "overdue" means due before today, whatever the status. A link never saves a view: it opens a saved view that already matches, or the plain link with a note. One call carries at most 50 first values.
+- #1426: "Sprint not found" and the Scrum sprint replies keep the word.
+- #1427: "Always do this" is not offered on a batch.
+- #1429: chat answers 20 messages unless asked, at most 50, each cut at 2,000 characters. A token kept to some projects is listed no channel. The model holds no public holidays, so `workdays.get` answers none.
+- #1430: only the person the agent acted for is told. "Show" appears for an owner or admin and opens the audit log.
+- #1432: a person's own AI is offered in the assignee list only where the project manager is on; the Members page now says so. "Sprint Planning" stays: it is a task type of two built-in templates.
+- #1433: the project is made as the approver, who must be allowed to create projects. A token kept to some projects cannot ask for one. The new project shows in the sidebar after a reload.
 
 ## Last step
 
-Batches 5 to 8 carried the first sixteen 047 PRs into `beta` between 23:29 and 00:52 IST. The ninth combined PR (#1408) is in CI; the tenth batch branch holds #1409 and #1410 and has no PR yet. No agent is running.
+Batches 9 to 13 carried twenty-four more PRs into `beta` between 08:47 and 11:02 IST on 2026-10-02 (builds 767 and 769 to 772). The local server answers build 772. Open: #1435, #1416 and #1436. This docs PR ticks the lines above, regenerates the beta log and the API reference, and rewrites the handoff.
 
 ## Blockers
 
@@ -155,5 +218,13 @@ Batches 5 to 8 carried the first sixteen 047 PRs into `beta` between 23:29 and 0
 
 ### 2026-10-02
 - 00:03: #1399 merged (build 764) with AI-6 part 1, T-1 and AI-2 part 1. 00:34: #1401 (build 765) with S-4 and the sample project. 00:52: #1405 (build 766) with AI-3 part 1 and AI-6 part 2.
-- The local server runs build 766. Seen by hand on builds 762 to 766 (the Supporter session; results in task 046's `dogfood-findings.md`): Simple and Full mode, the token form, the "Needs your approval" tab, Connect your AI, the two agent cards on Project Details, the "What next" line, "Hand to an agent" and "Take it back". Not seen: anything that needs a connected AI.
-- 01:02: T-2 (#1410) and T-4 (#1409) reported; both sit on the tenth batch branch.
+- Seen by hand on builds 762 to 766 (the Supporter session; results in task 046's `dogfood-findings.md`): Simple and Full mode, the token form, the "Needs your approval" tab, Connect your AI, the two agent cards on Project Details, the "What next" line, "Hand to an agent" and "Take it back". Not seen: anything that needs a connected AI.
+- 01:02: T-2 (#1410) and T-4 (#1409) reported; both sat on the tenth batch branch.
+- 08:47: #1408 merged (build 767) with AI-5 part 2 and the plain-words test. 08:58: the docs PR #1411 (build 768).
+- 09:39: #1412 merged (build 769) with T-4, T-2 and two fix PRs of task 046 (#1389, #1403).
+- The Supporter session swept build 769 by hand: the "Always do this" card on Project Details, the decline panel in the Inbox tab, the Members row of a connected AI, and #1389's four fixes. It listed five defects. #1432 fixes four. The fifth, "My Claude" missing from the assignee list, is by design: it is offered only where the project manager is on, and the Members page now says so.
+- 10:15: #1417 merged (build 770) with T-5, AI-2 in the web app and plain-words batch 2.
+- 10:48: #1428 merged (build 771) with S-2 on an existing project, AI-3 automations, the sheets for AI-1 and S-6, and four fix or follow-up PRs.
+- 11:02: #1434 merged (build 772) with the batch rule, the tools the benchmark sheet asked for, the notice of an agent's change, `project.create` and three more PRs.
+- Three slices each added a sentence to what a connecting agent is told. The text was reworded to fit its 4,000 characters, with no rule dropped (#1428).
+- 11:15: the local server answers build 772. No hand check of builds 770 to 772 is recorded.
