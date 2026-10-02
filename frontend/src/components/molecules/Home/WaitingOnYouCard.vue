@@ -64,6 +64,7 @@ const top = computed(() => items.value.slice(0, SHOWN));
 const time = (value) => (value ? new Date(value).getTime() || 0 : 0);
 
 /* The server has the last word on every decision; this only keeps off the card what the AI Inbox would lock. */
+const mine = (p) => (typeof p.locked === "boolean" ? !p.locked : p.gate !== GATE_OWNER_ADMIN || canManage.value);
 const whyOf = (p) => (p.finding && findingReasons(t, p.finding).join(" · ")) || p.why || "";
 const fromProposal = (p) => ({ kind: "proposal", id: String(p._id), what: proposalTitle(t, p) || t("Home.waiting_untitled"), who: p.agentName || "", why: whyOf(p), at: time(p.createdAt), source: p });
 const fromApproval = (a) => ({ kind: "approval", id: String(a._id), what: a.title || t("Workflows.approval_untitled"), who: a.run?.name || a.ownerName || "", at: time(a.createdAt || a.deadlineAt), source: a });
@@ -72,7 +73,7 @@ async function load() {
     if (aiOff.value) return;
     const [proposals] = await Promise.allSettled([fetchPendingProposals(), workflow.load()]);
     const decidable = proposals.status === "fulfilled"
-        ? proposals.value.filter((p) => p.status === "pending" && (p.gate !== GATE_OWNER_ADMIN || canManage.value)).map(fromProposal)
+        ? proposals.value.filter((p) => p.status === "pending" && mine(p)).map(fromProposal)
         : [];
     const approvals = workflow.approvals.value.filter(canDecideApproval).map(fromApproval);
     items.value = [...decidable, ...approvals].sort((a, b) => b.at - a.at);

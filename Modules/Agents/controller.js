@@ -7,6 +7,7 @@ const registry = require('./registry');
 const runs = require('./runs');
 const { TYPE_LIST: PROVIDER_ERROR_TYPES } = require('../AICore/providerError');
 const proposals = require('./proposals');
+const approverRights = require('./approverRights');
 const standingApprovals = require('./standingApprovals');
 const accounts = require('./accounts');
 const { isAgent } = require('./actor');
@@ -68,7 +69,7 @@ const idempotencyKeyOf = (req) => {
     return raw;
 };
 
-const { humanActor, callerOf, canManageAgents, canControlRun, canActAsAgent, visibleProjectIdsFor, agentProjectsFor, readScopeOf, canSeeRun, canSeeProposal, decidesProposals, staysInside, REFUSAL } = access;
+const { humanActor, callerOf, canManageAgents, canControlRun, canActAsAgent, visibleProjectIdsFor, agentProjectsFor, readScopeOf, canSeeRun, canSeeProposal, decidesProposals, REFUSAL } = access;
 
 /* A run that is someone else's private work is not there for an owner or admin; a member's standing
  * on a run is decided by the checks each route already makes. */
@@ -593,9 +594,11 @@ exports.listProposals = async (req, res) => {
         const companyId = companyOf(req);
         if (!companyId) return fail(res, 'companyId is required.');
         const q = req.query || {};
-        const readScope = await readScopeOf(companyId, await callerOf(req, companyId));
-        const out = await proposals.list(companyId, { status: q.status === 'all' ? undefined : (q.status || 'pending'), bucket: q.bucket, agentId: q.agentId, limit: q.limit, ...readScope });
-        return res.send({ status: true, statusText: 'Proposals fetched.', data: out.proposals.filter(staysInside(readScope.projectIds)), counts: out.counts });
+        const caller = await callerOf(req, companyId);
+        const readScope = await readScopeOf(companyId, caller);
+        // An agent reads what waits; whether a row is a person's to decide is said to a person.
+        const out = await proposals.list(companyId, { status: q.status === 'all' ? undefined : (q.status || 'pending'), bucket: q.bucket, agentId: q.agentId, limit: q.limit, ...readScope, viewer: caller.human ? caller : null });
+        return res.send({ status: true, statusText: 'Proposals fetched.', data: out.proposals, counts: out.counts });
     } catch (e) { logger.error(`listProposals: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -618,7 +621,8 @@ exports.createProposal = async (req, res) => {
     } catch (e) { logger.error(`createProposal: ${e.message}`); return fail(res, e.message, e.status || 500); }
 };
 
-const decide = (action, fn) => async (req, res) => {
+/* `heldTo`, when given, is asked of the caller and the proposal before the decision is taken; it answers a refusal or null. */
+const decide = (action, fn, heldTo = null) => async (req, res) => {
     try {
         if (!(await personDecides(req, res, action))) return undefined;
         const companyId = companyOf(req);
@@ -629,6 +633,8 @@ const decide = (action, fn) => async (req, res) => {
         const proposal = await proposals.get(companyId, req.params.id);
         if (!proposal || !(await canSeeProposal(companyId, caller, proposal))) return fail(res, 'Proposal not found.', 404);
         if (!decidesProposals(caller)) return fail(res, REFUSAL.DECIDE_MEMBER, 403, refusalOf({ reason: 'not_permitted' }));
+        const held = heldTo ? await heldTo(companyId, caller, proposal) : null;
+        if (held) return fail(res, held.error, held.status, refusalOf(held));
         const out = await fn(companyId, req.params.id, { decider: caller.actor, isPrivileged: caller.privileged, changes: req.body && req.body.changes, reason: req.body && req.body.reason, ip: req.ip || '', always: Boolean(req.body) && req.body.always === true, viaToken: Boolean(req.apiToken) });
         if (out.error) return fail(res, out.error, out.status || 400, refusalOf(out));
         return res.send({ status: true, statusText: 'Done.', data: out });
@@ -638,7 +644,7 @@ const decide = (action, fn) => async (req, res) => {
 const approveOnceOrAlways = (companyId, id, { always, ...decision }) => (always ? standingApprovals.approveAlways(companyId, id, decision) : proposals.approve(companyId, id, decision));
 
 exports.approveProposal = decide('proposal.approve', approveOnceOrAlways);
-exports.declineProposal = decide('proposal.decline', proposals.decline);
+exports.declineProposal = decide('proposal.decline', proposals.decline, approverRights.declineRefusal);
 exports.undoProposal = decide('proposal.undo', proposals.undoApproval);
 
 /* GET / PUT / DELETE /api/v2/agents/account — my personal coding-agent link */

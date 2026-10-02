@@ -214,6 +214,7 @@ import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { isOwnerOrAdmin } from '@/utils/roles';
+import { membersOnly } from './approvalOwners';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import AiSidebar from '@/views/Ai/AiSidebar.vue';
 
@@ -256,7 +257,8 @@ const tryTaskId = ref('');
 const draft = reactive({ name: '', deadlineMinutes: null, budgetUsd: null, steps: [] });
 
 const canManage = computed(() => isOwnerOrAdmin(Number(getters['settings/companyUserDetail']?.roleType)));
-const users = computed(() => getters['users/users'] || []);
+// Every person a step names owns or takes over an approval.
+const users = computed(() => membersOnly(getters['users/users'], getters['settings/companyUsers']));
 const enabledCount = computed(() => workflows.value.filter((workflow) => workflow.enabled).length);
 
 const contractOf = (type) => manifest.stepTypes.find((entry) => entry.key === type) || null;

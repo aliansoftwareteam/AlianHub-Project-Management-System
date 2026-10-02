@@ -12,6 +12,9 @@ jest.mock('../Modules/notification-count/controller', () => ({ updateUnReadComme
 jest.mock('../Config/permissionGuard', () => ({
     getRoleType: jest.fn(async (companyId, uid) => (uid in mockRoles ? mockRoles[uid] : null)),
     isPrivileged: (r) => r === 1 || r === 2,
+    evaluatePermission: jest.fn(async () => 1),
+    isWritable: () => true,
+    isReadable: () => true,
 }));
 jest.mock('../Modules/Agents/scope', () => ({
     visibleProjectIds: jest.fn(async (companyId, uid) => mockVisible[uid] || []),
@@ -53,6 +56,13 @@ beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     Object.assign(mockRoles, { [OWNER]: 1, [ADMIN]: 2, [MEMBER]: 3, [GUEST]: 0 });
     Object.assign(mockVisible, { [OWNER]: [P_OPEN, P_CLOSED], [ADMIN]: [P_OPEN, P_CLOSED], [MEMBER]: [P_OPEN], [GUEST]: [P_OPEN] });
+    const taskRules = mockDb.seed(SCHEMA_TYPE.RULES, { key: 'task', name: 'task', isParent: true, roles: [] });
+    mockDb.seed(SCHEMA_TYPE.RULES, { key: 'task_list', name: 'task_list', isParent: false, parentId: String(taskRules._id), roles: [{ key: 3, permission: true }] });
+    Object.entries(mockRoles).forEach(([userId, roleType]) => mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, roleType, status: 2, isDelete: false }));
+    [[P_OPEN, T_OPEN], [P_CLOSED, T_CLOSED]].forEach(([projectId, taskId]) => {
+        mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: projectId, ProjectName: 'P', isPrivateSpace: false, AssigneeUserId: [], deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: taskId, TaskName: 'Work', ProjectID: projectId, deletedStatusKey: 0 });
+    });
     seedProposal('plain');
     seedProposal('gated', { gate: 'owner_admin' });
     seedProposal('in a closed project', { projectId: P_CLOSED, taskId: T_CLOSED, changes: [comment(T_CLOSED)] });

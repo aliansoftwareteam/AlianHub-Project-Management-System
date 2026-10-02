@@ -74,8 +74,8 @@ beforeEach(() => {
 });
 
 describe('a submission sent through a public link', () => {
-    const waiting = () => {
-        const list = mockDb.seed(SCHEMA_TYPE.SPRINTS, { projectId: PROJECT, name: 'Requests', deletedStatusKey: 0 });
+    const waiting = (projectId = PROJECT) => {
+        const list = mockDb.seed(SCHEMA_TYPE.SPRINTS, { projectId, name: 'Requests', deletedStatusKey: 0 });
         const share = mockDb.seed(SCHEMA_TYPE.PUBLIC_SHARES, { entityType: 'sprint', entityId: list._id, token: 'ab'.repeat(32), enabled: true, allowIntake: true, createdBy: OWNER });
         return mockDb.seed(SCHEMA_TYPE.INTAKE_ITEMS, { publicShareId: share._id, title: 'Please add export', status: 'pending' });
     };
@@ -96,6 +96,22 @@ describe('a submission sent through a public link', () => {
         expect(await send(REVIEW, { uid: GUEST }, { intakeId: String(item._id), action })).toMatchObject({ code: 404, body: { status: false } });
         expect(statusOf(item)).toBe('pending');
     });
+
+    /* [where the form's list sits, how the guest comes to open it] */
+    const OPEN_TO_A_GUEST = [
+        ['a project open to everyone', () => SAMPLE],
+        ['a project the guest was added to', () => { rows(SCHEMA_TYPE.PROJECTS).find((row) => String(row._id) === PROJECT).AssigneeUserId.push(GUEST); return PROJECT; }],
+    ];
+
+    it.each(ANSWERS.flatMap(([action]) => OPEN_TO_A_GUEST.map(([where, project]) => [action, where, project])))(
+        '%s: a guest does not decide it in %s, and a member there does',
+        async (action, _where, project) => {
+            const item = waiting(project());
+            expect(await send(REVIEW, { uid: GUEST }, { intakeId: String(item._id), action })).toMatchObject({ code: 403, body: { status: false } });
+            expect(statusOf(item)).toBe('pending');
+            expect(await send(REVIEW, { uid: MEMBER }, { intakeId: String(item._id), action })).toMatchObject({ code: 200, body: { status: true } });
+        },
+    );
 
     it.each(ANSWERS.flatMap(([action]) => NOT_A_SESSION.map(([who, caller, recorded]) => [action, who, caller, recorded])))(
         '%s: %s does not decide it',

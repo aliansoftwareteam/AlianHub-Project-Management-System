@@ -148,7 +148,12 @@
 
                     <div v-if="selected.gate" class="auth__banner auth__banner--warn" style="margin-top:14px">
                         <ShellIcon name="shield" :size="15" />
-                        <span>{{ canDecide ? $t('Ai.gate_note') : $t('Ai.gate_locked') }}</span>
+                        <span>{{ canDecide || lockedByRights ? $t('Ai.gate_note') : $t('Ai.gate_locked') }}</span>
+                    </div>
+
+                    <div v-if="lockedByRights" class="auth__banner auth__banner--warn ai-locked" data-test="rights-locked">
+                        <ShellIcon name="shield" :size="15" />
+                        <span>{{ $t('Ai.rights_locked') }}</span>
                     </div>
 
                     <div v-if="selected.taint" class="auth__banner auth__banner--warn" style="margin-top:14px" data-test="taint-reason">
@@ -165,7 +170,10 @@
                         </button>
                         <button type="button" class="ah-btn ah-btn--ghost" :disabled="busy" data-test="decline" @click="openDecline">{{ $t('Ai.decline') }}</button>
                     </div>
-                    <div v-else-if="selected.status === 'pending' && canDecide" class="ai-decline" data-test="decline-reason">
+                    <div v-else-if="selected.status === 'pending' && canDecline && !declining" class="ai-actions">
+                        <button type="button" class="ah-btn ah-btn--secondary" :disabled="busy" data-test="decline" @click="openDecline">{{ $t('Ai.decline') }}</button>
+                    </div>
+                    <div v-else-if="selected.status === 'pending' && canDecline" class="ai-decline" data-test="decline-reason">
                         <div class="ah-label">{{ $t('Ai.decline_reason_title') }}</div>
                         <p class="ah-small ai-decline__lead">{{ $t('Ai.decline_reason_lead') }}</p>
                         <div class="ai-decline__chips" role="group" :aria-label="$t('Ai.decline_reason_title')">
@@ -215,6 +223,7 @@ import { useAgentAccess } from "./agentAccess";
 defineOptions({ name: "AiInboxPage" });
 
 const GATE_OWNER_ADMIN = "owner_admin";
+const LOCKED_BY_RIGHTS = "own_rights";
 
 const { t, te } = useI18n();
 const { canManage, userId, mayUndo } = useAgentAccess();
@@ -259,7 +268,14 @@ const pickReason = (key) => {
 };
 const declineReasonValue = computed(() => declineReason.value || declineNote.value.slice(0, 200));
 
-const canDecide = computed(() => !selected.value || selected.value.gate !== GATE_OWNER_ADMIN || canManage.value);
+/* The server says whether a waiting proposal is the reader's to approve; a row without its word falls back to the owner-or-admin rule. */
+const canDecide = computed(() => {
+    const p = selected.value;
+    if (!p) return true;
+    return typeof p.locked === "boolean" ? !p.locked : p.gate !== GATE_OWNER_ADMIN || canManage.value;
+});
+const canDecline = computed(() => canDecide.value || selected.value?.mayDecline === true);
+const lockedByRights = computed(() => selected.value?.status === "pending" && selected.value?.lockedWhy === LOCKED_BY_RIGHTS);
 const taintLine = (marker) => taintSourcesLine(t, taintSourcesOf(marker));
 const selectedSkillSource = computed(() => skillSourceLabel(t, selected.value?.skillSource));
 const sortedProposals = computed(() => sortProposals(proposals.value, sortOrder.value));
@@ -441,4 +457,5 @@ onMounted(() => Promise.all([reload(), loadApprovals(), route?.query?.report ? o
 .ai-decline__actions { margin-top: 4px; align-items: center; }
 .ai-decline__skip { border: 0; background: transparent; color: var(--ink-2); font: var(--text-small); cursor: pointer; text-decoration: underline; padding: 0 4px; }
 .ai-detail__feedback { margin-top: 12px; }
+.ai-locked { margin-top: 14px; }
 </style>
