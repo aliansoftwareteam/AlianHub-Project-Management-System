@@ -18,11 +18,21 @@ class TimesheetQueryRefused extends Error {
     }
 }
 
+const LIST_FIELD_OF_JOINABLE = Object.freeze({ [dbCollections.TASKS]: 'sprintId', [dbCollections.SPRINTS]: '_id' });
+
 /* Tasks, folders and sprints store the project as an ObjectId, and an aggregate never casts. A join into tasks
- * also leaves out a conversation the caller is not in, which is stored among them. */
-const inVisibleProjects = (from, field, scope) => ({
-    $match: { [field]: { $in: [...toObjectIds(scope.visible), ...scope.visible] }, ...(from === dbCollections.TASKS ? withoutConversationsOfOthers(scope.uid) : {}) },
-});
+ * also leaves out a conversation the caller is not in, which is stored among them, and a join into tasks or
+ * lists the private lists they are not on. */
+const inVisibleProjects = (from, field, scope) => {
+    const hiddenLists = scope.hiddenLists || [];
+    return {
+        $match: {
+            [field]: { $in: [...toObjectIds(scope.visible), ...scope.visible] },
+            ...(hiddenLists.length && LIST_FIELD_OF_JOINABLE[from] ? { [LIST_FIELD_OF_JOINABLE[from]]: { $nin: idForms(hiddenLists) } } : {}),
+            ...(from === dbCollections.TASKS ? withoutConversationsOfOthers(scope.uid) : {}),
+        },
+    };
+};
 
 const matchStages = (match) => (Object.keys(match).length ? [{ $match: match }] : []);
 

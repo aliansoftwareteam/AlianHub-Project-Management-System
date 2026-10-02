@@ -7,6 +7,7 @@ const { buildClientView } = require('../helpers/clientProjection');
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const billing = require('./billing');
 const { canPostToThread } = require('../../Comments/helpers/threadWriteAccess');
+const { readableTaskIds } = require('../../Tasks/helpers/taskWritePlacement');
 
 // Client view (handoff 19d). The ONE place the guest payload is assembled.
 //
@@ -63,14 +64,30 @@ const collectUpdates = (ctx) => {
         .slice(0, 12);
 };
 
+/* A sign-off request names a task: to a signed-in person the ones they can open, and on a public link, which
+ * anyone holding it reads, none that sits in a private list. */
+const tasksNamedTo = async (companyId, viewer, taskIds) => {
+    if (!taskIds.length) return [];
+    if (viewer) return readableTaskIds(companyId, String(viewer), taskIds);
+    const tasks = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: taskIds.map((id) => new mongoose.Types.ObjectId(id)) } }, { sprintId: 1 }] }, 'find') || [];
+    const lists = [...new Set(tasks.map((task) => String(task.sprintId || '')).filter(isObjectIdString))];
+    const closed = lists.length
+        ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: { $in: lists.map((id) => new mongoose.Types.ObjectId(id)) }, private: true }, { _id: 1 }] }, 'find') || []
+        : [];
+    const closedIds = new Set(closed.map((list) => String(list._id)));
+    return tasks.filter((task) => !closedIds.has(String(task.sprintId || ''))).map((task) => String(task._id));
+};
+
 /**
  * The guest payload for one project. Exported so the authenticated route and
  * the public /share/:token renderer serve byte-identical data — a second
  * assembly path is a second place for a field to leak.
  */
-const buildClientPayload = async (companyId, projectId) => {
+const buildClientPayload = async (companyId, projectId, viewer) => {
     const ctx = await billing.buildBillingContext(companyId, projectId);
     if (!ctx) return null;
+    const signOffs = collectSignOffs(ctx);
+    const named = new Set(await tasksNamedTo(companyId, viewer, signOffs.map((item) => item.id)));
     return buildClientView({
         project: { name: ctx.project.ProjectName || '' },
         contract: ctx.contract,
@@ -82,7 +99,7 @@ const buildClientPayload = async (companyId, projectId) => {
             signedOff: signedOff(m),
             signedOffDate: m.signOffAt || m.dueDate,
         })),
-        signOffs: collectSignOffs(ctx),
+        signOffs: signOffs.filter((item) => named.has(item.id)),
         updates: collectUpdates(ctx),
         invoices: (ctx.invoices || [])
             .filter((inv) => inv.status === 'sent' || inv.status === 'paid')
@@ -108,7 +125,7 @@ exports.getClientView = async (req, res) => {
         if (!isObjectIdString(projectId)) {
             return res.send({ status: false, statusText: 'A valid projectId is required.' });
         }
-        const data = await buildClientPayload(companyId, projectId);
+        const data = await buildClientPayload(companyId, projectId, actorId(req));
         if (!data) return res.send({ status: false, statusText: 'Project not found.' });
         return res.send({ status: true, statusText: 'OK', data });
     } catch (error) {

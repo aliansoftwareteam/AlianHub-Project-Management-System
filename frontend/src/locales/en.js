@@ -2142,6 +2142,7 @@ export default {
         edit: "Edit",
         task: "Task",
         pick_task: "Pick a task",
+        task_not_open: "A task you cannot open",
         hours: "Hours",
         when: "When",
         tomorrow_blocked: "Only today or earlier.",

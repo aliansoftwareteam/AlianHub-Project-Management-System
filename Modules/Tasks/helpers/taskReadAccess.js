@@ -25,6 +25,25 @@ const canReadTask = async (companyId, uid, task) => {
     return canSeeSprintById(companyId, uid, task.sprintId);
 };
 
+const TASK_READ_FIELDS = Object.freeze({ ProjectID: 1, sprintId: 1, mainChat: 1, AssigneeUserId: 1 });
+
+/* Those of `rows` (read with TASK_READ_FIELDS) the person can open. A conversation is judged row by row; every
+ * other task shares the verdict of its project and list. */
+const readableTasks = async (companyId, uid, rows) => {
+    const verdicts = new Map();
+    const verdictOf = (row) => {
+        if (row.mainChat === true) return canReadTask(companyId, uid, row);
+        const place = `${row.ProjectID}|${row.sprintId}`;
+        if (!verdicts.has(place)) verdicts.set(place, canReadTask(companyId, uid, row));
+        return verdicts.get(place);
+    };
+    const kept = [];
+    for (const row of rows || []) {
+        if (row && row.ProjectID && await verdictOf(row)) kept.push(row);
+    }
+    return kept;
+};
+
 /* Which of `ids` the person can open, read in one query under the rule the task query applies to every read. A chat row is
  * not a task anyone links to or votes on, so it is never among them. `live` leaves out what is deleted or archived. */
 const openableTasks = async (companyId, uid, ids, { projection = {}, live = true } = {}) => {
@@ -42,4 +61,4 @@ const openableTasks = async (companyId, uid, ids, { projection = {}, live = true
     return rows || [];
 };
 
-module.exports = { canReadTask, openableTasks };
+module.exports = { canReadTask, openableTasks, readableTasks, TASK_READ_FIELDS };

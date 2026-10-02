@@ -33,4 +33,11 @@ const changesThreadOrAuthor = (comment, data) => IMMUTABLE_FIELDS.some((key) => 
     Object.prototype.hasOwnProperty.call(data || {}, key) && asText(data[key]) !== asText(comment[key])
 ));
 
-module.exports = { threadOf, canPostToThread, canChangeComment, changesThreadOrAuthor };
+/* A comment is told live in the room of the thread it is stored in, whatever the request said of it: the room of
+ * the project's own comments when it names no list and no task, the room of its list and task otherwise. */
+const liveModuleOf = (comment) => {
+    const { sprintId, taskId } = threadOf(comment);
+    return !sprintId && !isId(taskId) ? 'comments_project' : 'comments';
+};
+
+module.exports = { threadOf, canPostToThread, canChangeComment, changesThreadOrAuthor, liveModuleOf };

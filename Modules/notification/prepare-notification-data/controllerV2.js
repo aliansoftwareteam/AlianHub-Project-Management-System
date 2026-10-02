@@ -15,6 +15,9 @@ const { activeMemberIds } = require('../activeMembers');
 const { reasonFor } = require('../../Inbox/helpers/inboxRules');
 const { wakeOnActivity } = require('../../Inbox/helpers/inboxState');
 const { canReadProject } = require('../../../Config/projectAccess');
+const mongoose = require('mongoose');
+const { commentThreadAccess } = require('../../Comments/helpers/threadAccess');
+const { sanitizeInput } = require('../../serviceFunction');
 
 const REQUEST_TEXT_FIELDS = ['key', 'type', 'message', 'projectId', 'taskId', 'sprintId', 'folderId', 'changeType', 'comments_id'];
 
@@ -22,8 +25,21 @@ const requestFields = (body) => Object.fromEntries(REQUEST_TEXT_FIELDS
     .filter((field) => typeof body[field] === 'string')
     .map((field) => [field, body[field]]));
 
-const readersOf = async (companyId, projectId, userIds) => {
-    const readable = await Promise.all(userIds.map(async (uid) => (await canReadProject(companyId, uid, projectId)).allowed));
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+
+/* The thread a request names, with the list read from the stored task: a row is read later by the place it names. */
+const threadNamedBy = async (companyId, fields) => {
+    const thread = { projectId: fields.projectId, sprintId: fields.sprintId, taskId: fields.taskId };
+    if (!OBJECT_ID.test(String(fields.taskId || ''))) return thread;
+    const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: new mongoose.Types.ObjectId(fields.taskId) }, { sprintId: 1 }] }, 'findOne');
+    return task && task.sprintId ? { ...thread, sprintId: String(task.sprintId) } : thread;
+};
+
+const opensThread = async (companyId, uid, thread) => (await commentThreadAccess(companyId, uid, thread)).allowed === true;
+
+/* Those of `userIds` who can open the project and, where the notice names a list or a task, that thread too. */
+const readersOf = async (companyId, thread, userIds) => {
+    const readable = await Promise.all(userIds.map(async (uid) => (await canReadProject(companyId, uid, thread.projectId)).allowed && opensThread(companyId, uid, thread)));
     return userIds.filter((uid, index) => readable[index]);
 };
 
@@ -31,24 +47,28 @@ const readersOf = async (companyId, projectId, userIds) => {
 
 // The tenant, sender and recipients are pinned here rather than in handleNotificationtFun: every
 // other caller of that is an internal one passing a synthetic { body } it built from trusted data.
-// A request is about a project its sender can open and reaches the members who can open it too;
-// it carries the fields a notice is written from and none of the ones the server fills in.
+// A request is about a project, and a list or task of it, that its sender can open, and reaches the members who can
+// open it too; it carries the fields a notice is written from and none of the ones the server fills in, and its
+// words are kept as text.
 exports.handleNotification = async (req, res) => {
   const companyId = pinSessionTenant(req, res);
   if (!companyId) return;
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     const fields = requestFields(body);
-    if (!(await canReadProject(companyId, req.uid, fields.projectId)).allowed) {
+    const thread = await threadNamedBy(companyId, fields);
+    if (!(await canReadProject(companyId, req.uid, fields.projectId)).allowed || !(await opensThread(companyId, String(req.uid), thread))) {
       return res.status(404).json({ status: false, message: 'Project not found.' });
     }
     const claimed = (Array.isArray(body.assigneeUsers) ? body.assigneeUsers : []).filter((id) => typeof id === 'string');
     const leader = typeof body.task_leader_ID === 'string' ? body.task_leader_ID : '';
     const members = await activeMemberIds(companyId, [...claimed, leader]);
-    const readers = new Set(await readersOf(companyId, fields.projectId, members));
+    const readers = new Set(await readersOf(companyId, thread, members));
     const assigneeUsers = [...new Set(claimed)].filter((id) => readers.has(id));
     req.body = {
       ...fields,
+      ...(thread.sprintId ? { sprintId: thread.sprintId } : {}),
+      ...(typeof fields.message === 'string' ? { message: sanitizeInput(fields.message) } : {}),
       changeData: body.changeData && typeof body.changeData === 'object' && !Array.isArray(body.changeData) ? body.changeData : {},
       companyId,
       userId: String(req.uid),

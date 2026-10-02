@@ -6,9 +6,9 @@ const logger = require('../../Config/loggerConfig');
 const { taskMongo } = require('../Tasks/helpers/task_class_Mongo'); // canonical task create
 const R = require('./helpers/emailInRules');
 const { pinSessionTenant } = require('../../Config/tenant');
-const { canEditProject, keepVisibleProjectIds } = require('../../Config/projectAccess');
+const { canEditProject, canReadProject, keepVisibleProjectIds } = require('../../Config/projectAccess');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
-const { sprintIdentities, canSeeSprint } = require('../Sprints/helpers/sprintVisibility');
+const { sprintIdentities, canSeeSprint, hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const { actingUser } = require('../Sprints/helpers/actingUser');
 const { activeMemberIds } = require('../notification/activeMembers');
 const { peopleWhoOpen, keptOnProject } = require('../../Config/projectPeople');
@@ -158,13 +158,14 @@ exports.createInbox = async (req, res) => {
     } catch (e) { logger.error(`createInbox: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
-/* The filter of an inbox this person may change: their own, or any of the workspace's for an owner or admin. */
+/* The filter of an inbox this person may change: their own, or any of the workspace's for an owner or admin, in a
+ * project they can still open. */
 const manageableInbox = async (companyId, uid, id) => {
     if (!oid(id)) return null;
     const filter = { _id: oid(id), companyId: String(companyId), deletedStatusKey: { $ne: 1 } };
     if (!isPrivileged(await getRoleType(companyId, uid))) filter.createdBy = String(uid);
-    const inbox = await MongoDbCrudOpration(GLOBAL, { type: SCHEMA_TYPE.EMAIL_INBOXES, data: [filter, { _id: 1 }] }, 'findOne');
-    return inbox ? filter : null;
+    const inbox = await MongoDbCrudOpration(GLOBAL, { type: SCHEMA_TYPE.EMAIL_INBOXES, data: [filter, { _id: 1, ProjectID: 1 }] }, 'findOne');
+    return inbox && (await canReadProject(companyId, String(uid), String(inbox.ProjectID))).allowed ? filter : null;
 };
 
 // GET /api/v1/email-in/inboxes?projectId=
@@ -175,10 +176,11 @@ exports.listInboxes = async (req, res) => {
         const q = { companyId: String(companyId), deletedStatusKey: { $ne: 1 } };
         if (req.query && req.query.projectId && oid(req.query.projectId)) q.ProjectID = oid(req.query.projectId);
         const rows = await MongoDbCrudOpration(GLOBAL, { type: SCHEMA_TYPE.EMAIL_INBOXES, data: [q, {}, { sort: { createdAt: -1 } }] }, 'find') || [];
-        /* An inbox's address is the key to adding tasks, so it is shown with its project only. */
+        /* An inbox's address is the key to adding tasks, so it is shown with its project only, and not when it delivers into a private list the person is not on. */
         const openable = new Set(await keepVisibleProjectIds(companyId, req.uid, rows.map((row) => String(row.ProjectID))));
         const privileged = isPrivileged(await getRoleType(companyId, req.uid));
-        const shown = rows.filter((row) => openable.has(String(row.ProjectID)))
+        const closed = new Set(((await hiddenSprintFilter(companyId, req.uid, [...openable])).sprintId || { $nin: [] }).$nin.map(String));
+        const shown = rows.filter((row) => openable.has(String(row.ProjectID)) && !closed.has(String(row.sprintId)))
             .map((row) => ({ ...withAddress(row), canManage: privileged || String(row.createdBy) === String(req.uid) }));
         return res.send({ status: true, data: shown });
     } catch (e) { logger.error(`listInboxes: ${e.message}`); return res.send({ status: false, statusText: e.message }); }

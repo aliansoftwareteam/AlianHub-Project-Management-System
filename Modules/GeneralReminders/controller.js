@@ -67,16 +67,25 @@ async function loadOwnReminder(req, res) {
     return reminder;
 }
 
+/* A reminder mails its files, so a file is one its person uploaded for a reminder (the upload names the folder
+ * Reminders/<company>/<person>/), or one the reminder already holds. A key of anything kept elsewhere is left out. */
+const uploadedBy = (companyId, uid) => {
+    const folder = `Reminders/${companyId}/${uid}/`;
+    return (key) => key.startsWith(folder) && !key.slice(folder.length).includes('/') && !key.includes('..');
+};
+
 // Keep only the attachment fields we understand, so an arbitrary payload can't
 // be persisted wholesale into the document.
-function sanitizeAttachments(list) {
+function sanitizeAttachments(list, { companyId, uid, held = [] }) {
     if (!Array.isArray(list)) return [];
+    const own = uploadedBy(String(companyId), String(uid));
+    const kept = new Set(held.map((a) => String((a && a.url) || '')).filter(Boolean));
     return list.slice(0, 20).map((a) => ({
         name: a && a.name ? String(a.name) : '',
         url: a && a.url ? String(a.url) : '',
         extension: a && a.extension ? String(a.extension) : '',
         size: a && Number.isFinite(Number(a.size)) ? Number(a.size) : 0,
-    })).filter((a) => a.name || a.url);
+    })).filter((a) => a.url && (own(a.url) || kept.has(a.url)));
 }
 
 exports.createReminder = async (req, res) => {
@@ -111,7 +120,7 @@ exports.createReminder = async (req, res) => {
             remindAt: when,
             notifyBefore,
             notifyAt: computeNotifyAt(when, notifyBefore),
-            attachments: sanitizeAttachments(b.attachments),
+            attachments: sanitizeAttachments(b.attachments, { companyId, uid: userId }),
             fired: false,
             isDone: false,
             deletedStatusKey: 0,
@@ -171,7 +180,7 @@ exports.updateReminder = async (req, res) => {
             patch.title = title;
         }
         if (b.description !== undefined) patch.description = String(b.description);
-        if (b.attachments !== undefined) patch.attachments = sanitizeAttachments(b.attachments);
+        if (b.attachments !== undefined) patch.attachments = sanitizeAttachments(b.attachments, { companyId, uid: userId, held: existing.attachments || [] });
         if (b.assignedTo) {
             const refusal = await refusalToRemind(companyId, userId, b.assignedTo);
             if (refusal) return fail(res, refusal.code, refusal.statusText);

@@ -24,6 +24,7 @@ const { arrangeRules, rolePermission, PRIVATE_PROJECTS, seesEveryPrivateProject 
 const { ownOrNotPersonal, othersPersonalListIds } = require('../PersonalList/ownership');
 const { companyWideMatch, toObjectIds } = require('../Tasks/helpers/taskQueryGuard');
 const { taskListProjectIds } = require('../Tasks/helpers/taskListProjects');
+const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const { forgetCards } = require('../AI/askCardStore');
 const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
 
@@ -1915,6 +1916,8 @@ exports.getOnLeaveBoard = async (req, res) => {
         const taskFilter = {
             ProjectID: { $in: projectIds },
             deletedStatusKey: 0,
+            mainChat: { $ne: true },
+            ...(await hiddenSprintFilter(companyId, payload.callerUserId, projectIds)),
             $or: [
                 { startDate: { $gte: dateFrom, $lte: dateTo } },
                 { DueDate: { $gte: dateFrom, $lte: dateTo } },

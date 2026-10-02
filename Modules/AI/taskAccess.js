@@ -1,36 +1,39 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
-const { taskListProjectIds } = require('../Tasks/helpers/taskListProjects');
-const { withoutConversationsOfOthers } = require('../Comments/helpers/conversationReaders');
+const { canReadProject } = require('../../Config/projectAccess');
+const { readableTasks, TASK_READ_FIELDS } = require('../Tasks/helpers/taskReadAccess');
 
-/* The task, when it sits in a project whose tasks `uid` may list and is not a conversation they
- * are not in; null otherwise. Checked before any cache read or model call, so a hidden task costs
- * nothing and says nothing about itself. */
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const NOT_TRASHED = { deletedStatusKey: { $ne: 1 } };
+
+/* A direct message sits in no project, and no assistant feature reads one. */
+const inAProject = async (companyId, uid, tasks) => {
+    const kept = [];
+    for (const task of tasks) {
+        if (task.mainChat !== true || (await canReadProject(companyId, uid, task.ProjectID)).allowed) kept.push(task);
+    }
+    return kept;
+};
+
+const opened = async (companyId, uid, tasks) => inAProject(companyId, uid, await readableTasks(companyId, uid, tasks));
+const oid = (id) => new mongoose.Types.ObjectId(String(id));
+
+/* The task, when it is outside the trash and `uid` can open it by the rule the task routes read by; null otherwise.
+ * Checked before any cache read or model call, so a hidden task costs nothing and says nothing about itself. */
 async function visibleTask({ companyId, uid, taskId, projection }) {
-    if (!uid || !mongoose.Types.ObjectId.isValid(String(taskId || ''))) return null;
-    const task = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.TASKS,
-        data: [{ _id: new mongoose.Types.ObjectId(String(taskId)), deletedStatusKey: { $ne: 1 }, ...withoutConversationsOfOthers(uid) }, { ...projection, ProjectID: 1 }],
-    }, 'findOne');
-    if (!task || !task.ProjectID) return null;
-    const listable = await taskListProjectIds(companyId, String(uid));
-    return listable.map(String).includes(String(task.ProjectID)) ? task : null;
+    if (!uid || !OBJECT_ID.test(String(taskId || ''))) return null;
+    const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: oid(taskId), ...NOT_TRASHED }, { ...projection, ...TASK_READ_FIELDS }] }, 'findOne');
+    const [open] = task ? await opened(companyId, String(uid), [task]) : [];
+    return open || null;
 }
 
-/* The same rule for many tasks at once: those of `taskIds` that sit, outside the trash, in a project whose tasks `uid` may list. */
+/* The same rule for many tasks at once. */
 async function visibleTasks({ companyId, uid, taskIds, projection }) {
-    const ids = [...new Set((taskIds || []).map(String).filter((id) => mongoose.Types.ObjectId.isValid(id) && id.length === 24))];
+    const ids = [...new Set((taskIds || []).map(String).filter((id) => OBJECT_ID.test(id)))];
     if (!uid || !ids.length) return [];
-    const [tasks, listable] = await Promise.all([
-        MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.TASKS,
-            data: [{ _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) }, deletedStatusKey: { $ne: 1 }, ...withoutConversationsOfOthers(uid) }, { ...projection, ProjectID: 1 }],
-        }, 'find'),
-        taskListProjectIds(companyId, String(uid)),
-    ]);
-    const open = new Set((listable || []).map(String));
-    return (tasks || []).filter((task) => task.ProjectID && open.has(String(task.ProjectID)));
+    const tasks = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: ids.map(oid) }, ...NOT_TRASHED }, { ...projection, ...TASK_READ_FIELDS }] }, 'find');
+    return opened(companyId, String(uid), tasks || []);
 }
 
 module.exports = { visibleTask, visibleTasks, TASK_NOT_FOUND: 'task not found' };

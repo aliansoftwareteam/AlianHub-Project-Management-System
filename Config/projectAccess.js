@@ -231,16 +231,24 @@ const PROJECT_FIELD = {
     [SCHEMA_TYPE.EPICS]: 'ProjectID',
     [SCHEMA_TYPE.RECURRING_TASKS]: 'ProjectID',
     [SCHEMA_TYPE.TASKS]: 'ProjectID',
+    [SCHEMA_TYPE.PROJECT_INVOICES]: 'ProjectID',
 };
 
 const idsIn = (value) => asList(value).map((v) => (v && typeof v === 'object' ? (v._id || v.id) : v)).map(String).filter((id) => OBJECT_ID.test(id));
 
+/* Requests whose task record the caller cannot open. requireProjectAccess answers them like a task that is not there. */
+const namesClosedTask = new WeakSet();
+
+/* Required on use: the task rule is built on this file's project rule. */
+const opensTask = (companyId, uid, task) => require('../Modules/Tasks/helpers/taskReadAccess').canReadTask(companyId, uid, task);
+
 /*
  * The project of a sprint, epic or milestone is read from the stored record, so a client
  * cannot pair its own project id with someone else's record. Ids the handler also takes
- * from the request (`direct`) are checked too.
+ * from the request (`direct`) are checked too. A task record is held to the rule a task is
+ * read by, its list included, and a conversation is a task only where `conversations` says so.
  */
-const projectIdsFrom = ({ records = [], direct = () => [] }) => async (req) => {
+const projectIdsFrom = ({ records = [], direct = () => [], conversations = false }) => async (req) => {
     const companyId = String(req.headers['companyid'] || '');
     const ids = [];
     for (const [type, pick] of records) {
@@ -249,9 +257,13 @@ const projectIdsFrom = ({ records = [], direct = () => [] }) => async (req) => {
         const field = PROJECT_FIELD[type];
         const docs = await MongoDbCrudOpration(companyId, {
             type,
-            data: [{ _id: { $in: recordIds.map((id) => new mongoose.Types.ObjectId(id)) } }, { [field]: 1, mainChat: 1 }],
+            data: [{ _id: { $in: recordIds.map((id) => new mongoose.Types.ObjectId(id)) } }, { [field]: 1, sprintId: 1, mainChat: 1, AssigneeUserId: 1 }],
         }, 'find');
-        (docs || []).forEach((doc) => { if (doc[field]) ids.push(String(doc[field])); });
+        for (const doc of docs || []) {
+            if (doc[field]) ids.push(String(doc[field]));
+            if (type !== SCHEMA_TYPE.TASKS) continue;
+            if ((doc.mainChat === true && !conversations) || !(await opensTask(companyId, String(req.uid || ''), doc))) namesClosedTask.add(req);
+        }
     }
     return [...ids, ...idsIn(await direct(req))];
 };
@@ -275,6 +287,7 @@ const requireProjectAccess = ({ mode = WRITE, projectIds, permissions = () => []
             return res.status(403).json({ status: false, statusText: 'You do not have access to this company', error: 'Forbidden' });
         }
         const ids = asList(await projectIds(req)).map(String).filter((id) => OBJECT_ID.test(id));
+        if (namesClosedTask.has(req)) return res.status(404).json({ status: false, statusText: 'Task not found.', error: 'Not Found' });
         if (!ids.length) return next();
         const keys = mode === READ ? [] : await permissions(req);
         for (const id of [...new Set(ids)]) {
