@@ -15,7 +15,7 @@ export const canChoose = (preview) => keysIn(preview).length > 0;
 export const pickNames = (preview) => new Map(linesIn(preview).flatMap((line) => {
     const names = Array.isArray(line.names) ? line.names : [];
     const listed = picksOf(line).map((key, at) => [key, textOf(names[at])]);
-    return typeof line.pick === 'string' ? [...listed, [line.pick, textOf(line.name) || textOf(line.text)]] : listed;
+    return typeof line.pick === 'string' ? [...listed, [line.pick, textOf(line.name) || textOf(line.text) || textOf(line.problem)]] : listed;
 }));
 
 /* Leaving a part out leaves out every part that cannot be made without it; keeping one keeps what it needs. */

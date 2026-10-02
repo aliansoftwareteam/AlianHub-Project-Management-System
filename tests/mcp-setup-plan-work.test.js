@@ -54,6 +54,7 @@ const projects = require('../Modules/Agents/projectCreate');
 const matcher = require('../Modules/Automations/engine/matcher');
 const mongoHelper = require('../Modules/Tasks/helpers/mongo_helper');
 const server = require('../Modules/Mcp/server');
+const prompts = require('../Modules/Mcp/prompts');
 
 mongoHelper.getTotalSprintCount = async () => true;
 
@@ -231,9 +232,10 @@ describe('a plan asks for nothing its agent could not ask for one at a time', ()
     it('refuses first tasks from a person who may not create one, or may not set what a task names', async () => {
         setRule('task_assignee', false, [3]);
         await refusedFor(as(INSIDER), tasksOnly(), /^permission_denied: task\.task_assignee/);
-        await filed(tasksOnly([TASKS[1], TASKS[2]]), as(INSIDER));
         setRule('task_create', false, [3]);
         await refusedFor(as(INSIDER), tasksOnly([TASKS[2]]), /^permission_denied: task\.task_create/);
+        setRule('task_create', true, [3]);
+        await filed(tasksOnly([TASKS[1], TASKS[2]]), as(INSIDER));
     });
 
     it('refuses a first task that closes itself where the project has people close its tasks', async () => {
@@ -249,7 +251,7 @@ describe('a plan asks for nothing its agent could not ask for one at a time', ()
         await answer({ rules: [reviewNotice()] }, /^rules\[0\]: .*In Review/);
         await answer({ tasks: [{ name: 'Brief', list: 'Nowhere' }] }, /^tasks\[0\] \(Brief\): "Nowhere" is not a list of this plan or of the project/);
         await answer({ tasks: [{ name: 'Brief', status: 'Nowhere' }] }, /^tasks\[0\] \(Brief\): "Nowhere" is not a status of this plan or of the project/);
-        await answer({ tasks: [{ name: 'Brief', list: 'Private list' }] }, /tasks\[0\]/);
+        expect(await rpc(as(OUTSIDER), TOOL, { projectId: P_OPEN, tasks: [{ name: 'Brief', list: 'Private list' }] })).toMatchObject({ ok: false, error: expect.stringMatching(/^tasks\[0\] \(Brief\): "Private list" is not a list/) });
         expect(await rpc(as(INSIDER), TOOL, { projectId: P_PRIVATE, tasks: [{ name: 'Brief', assigneeId: OUTSIDER }] })).toMatchObject({ ok: false, error: expect.stringMatching(/^tasks\[0\] \(Brief\): /) });
         expect(waiting()).toHaveLength(0);
         await filed({ projectId: P_OPEN, statuses: ['In Review'], rules: [reviewNotice()] });
@@ -272,10 +274,11 @@ describe('approving makes each automation and each task as its own action, after
         expect(partOf(out, 'rules').items).toEqual([{ name: expect.stringContaining(NOTICE), made: true, ruleId: String(rule._id), auditId: expect.any(String) }]);
 
         const [backlog] = listsNamed('Backlog');
-        expect(taskNamed('Write the brief')).toMatchObject({ ProjectID: P_OPEN, sprintId: String(backlog._id), statusKey: 4, AssigneeUserId: [INSIDER] });
+        expect(String(taskNamed('Write the brief').ProjectID)).toBe(P_OPEN);
+        expect(taskNamed('Write the brief')).toMatchObject({ sprintId: String(backlog._id), statusKey: 4, AssigneeUserId: [INSIDER] });
         expect(new Date(taskNamed('Write the brief').DueDate).toISOString().slice(0, 10)).toBe('2026-11-02');
         expect(taskNamed('Book the kickoff')).toMatchObject({ sprintId: L_OPEN, statusKey: 1, AssigneeUserId: [] });
-        expect(taskNamed('Collect the logins')).toMatchObject({ ProjectID: P_OPEN, statusKey: 1 });
+        expect(taskNamed('Collect the logins')).toMatchObject({ statusKey: 1 });
         expect(partOf(out, 'tasks').items.map((item) => [item.name, item.made])).toEqual([['Write the brief', true], ['Book the kickoff', true], ['Collect the logins', true]]);
     });
 
@@ -408,6 +411,28 @@ describe('undo takes back the tasks and the automations with the rest', () => {
         expect(listsNamed('Backlog')).toHaveLength(0);
         expect(statusNames()).toEqual(['To Do', 'In Progress', 'Done']);
         expect(listsNamed('Open list')).toHaveLength(1);
+    });
+});
+
+describe('the "Set up my project" prompt', () => {
+    const promptText = (caller) => prompts.get(caller, 'set_up_my_project').messages[0].content.text;
+
+    it('puts the automations and the first tasks in the one plan on a connection that may ask for each', () => {
+        expect(promptText(as(OWNER))).toMatch(/Then send the statuses, lists, fields and views, the automations and the first tasks together in one call of `project\.setup`/);
+        expect(promptText(as(OWNER))).toMatch(/can leave any part out before I approve/);
+        expect(promptText(as(OWNER))).not.toMatch(/automations are a part I have to make myself/);
+    });
+
+    it('leaves the first tasks to the calls after the approval on a connection that may not create a task with its details', () => {
+        const plain = promptText(as(OWNER, { token: { grants: [] } }));
+        expect(plain).toMatch(/Then send the statuses, lists, fields and views and the automations together in one call/);
+        expect(plain).toMatch(/Then make the rest of what I approved: .*tasks with `task\.create`/);
+    });
+
+    it('leaves the automations to the person on a connection kept away from them', () => {
+        const kept = promptText(as(OWNER, { allowedActions: ['tasks.search', 'task.add', 'task.assignees.set', 'project.setup'] }));
+        expect(kept).toMatch(/automations are a part I have to make myself/);
+        expect(kept).toMatch(/Then send the statuses, lists, fields and views and the first tasks together in one call/);
     });
 });
 

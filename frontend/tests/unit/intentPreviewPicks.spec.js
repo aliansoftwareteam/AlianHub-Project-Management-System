@@ -125,6 +125,58 @@ describe('the preview card of a plan the person can choose from', () => {
     });
 });
 
+describe('the automations and first tasks of a plan on its card', () => {
+    const withWork = () => ({
+        kind: 'setup',
+        title: 'Website',
+        lines: [
+            { kind: 'newStatuses', names: ['In Review'], picks: ['statuses:0'] },
+            { kind: 'newLists', names: ['Backlog'], picks: ['lists:0'] },
+            { kind: 'planRule', text: 'When a task moves to In Review, notify its assignees', pick: 'rules:0' },
+            { kind: 'planRule', problem: 'I do not know a status called "Nowhere".', pick: 'rules:1' },
+            { kind: 'planRule', text: '', pick: 'rules:2' },
+            { kind: 'planTask', name: 'Write the brief', list: 'Backlog', status: 'In Review', assignee: 'Ian Insider', hidden: 0, due: '2026-11-02', pick: 'tasks:0' },
+            { kind: 'planTask', name: 'Book the kickoff', list: '', status: '', assignee: '', hidden: 1, due: '', pick: 'tasks:1' },
+            { kind: 'planTask', name: '<b>Collect</b> the logins', list: '', status: '', assignee: '', hidden: 0, due: '', pick: 'tasks:2' },
+            { kind: 'planTask', name: '', pick: 'tasks:3' },
+        ],
+        needs: { 'rules:0': ['statuses:0'], 'tasks:0': ['lists:0', 'statuses:0'] },
+    });
+    const mountCard = (props) => {
+        wrapper = mount(IntentPreview, { attachTo: document.body, props: { preview: withWork(), ...props }, global: { plugins: [i18n()], stubs: { ShellIcon: true } } });
+        return wrapper;
+    };
+    const rows = (kind) => wrapper.findAll(`[data-test="intent-line"][data-kind="${kind}"]`).map((el) => [el.find('dt').text(), el.find('dd').text()]);
+
+    it('says each automation in its sentence, switched off, or why it cannot be made', () => {
+        mountCard({});
+        expect(rows('planRule')).toEqual([
+            ['Automation', 'When a task moves to In Review, notify its assignees (starts switched off)'],
+            ['Automation', 'Cannot be made as written: I do not know a status called "Nowhere".'],
+        ]);
+    });
+
+    it('says each first task with its list, status, person and day, and draws a name as text', () => {
+        mountCard({});
+        const tasks = rows('planTask');
+        expect(tasks).toHaveLength(3);
+        expect(tasks[0][0]).toBe('First task');
+        expect(tasks[0][1]).toMatch(/^Write the brief \(list: Backlog, status: In Review, for Ian Insider, due .*2026.*\)$/);
+        expect(tasks[1]).toEqual(['First task', 'Book the kickoff (for 1 person not shown)']);
+        expect(tasks[2]).toEqual(['First task', '<b>Collect</b> the logins']);
+        expect(wrapper.find('b').exists()).toBe(false);
+    });
+
+    it('lets each be left out, and leaves out with a status the automation and the task that name it', async () => {
+        mountCard({ choosable: true });
+        expect(wrapper.findAll('[data-test="intent-pick"]').map((el) => el.attributes('data-pick'))).toEqual(['statuses:0', 'lists:0', 'rules:0', 'rules:1', 'tasks:0', 'tasks:1', 'tasks:2']);
+        await wrapper.find('[data-pick="statuses:0"]').trigger('change');
+        expect(wrapper.emitted('update:leftOut')).toEqual([[['statuses:0', 'rules:0', 'tasks:0']]]);
+        expect(wrapper.find('[data-test="intent-pick-also"]').text()).toBe('When a task moves to In Review, notify its assignees, Write the brief are left out too: they need “In Review”.');
+        expect(chosenParts(withWork(), ['statuses:0', 'rules:0', 'tasks:0'])).toEqual({ statuses: [], lists: [0], rules: [1, 2], tasks: [1, 2, 3] });
+    });
+});
+
 describe('approving a plan from the queue', () => {
     const change = (preview) => ({ action: 'project.setup', params: { projectId: 'p-web' }, label: 'Set up the project', reversible: true, preview });
     const row = (id, over = {}) => ({

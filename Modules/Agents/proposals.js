@@ -207,6 +207,10 @@ const list = async (companyId, { status, bucket, agentId, limit = 100, projectId
     };
 };
 
+/* The audit rows of the parts a change made as actions of their own (./planWork.js), in the order they were made, so undoing the proposal undoes them too. */
+const partAudits = (result) => (Array.isArray(result && result.parts) ? result.parts : [])
+    .flatMap((part) => (Array.isArray(part && part.items) ? part.items : []).map((item) => item && item.auditId).filter(Boolean).map(String));
+
 const get = (companyId, id) => MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ _id: oid(id) }] }, 'findOne');
 
 const setStatus = async (companyId, id, set, { onlyIf } = {}) => {
@@ -238,7 +242,7 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     if (kept && kept.error) return { error: kept.error, status: 400 };
     const fromMcp = p.source === SOURCE_MCP;
     if (fromMcp) {
-        const refusal = await require('../Mcp/approval').refusalFor(companyId, p, { decider, isPrivileged, edited });
+        const refusal = await require('../Mcp/approval').refusalFor(companyId, p, { decider, isPrivileged, edited, ...(kept ? { changes: kept.changes } : {}) });
         if (refusal) return refusal;
     }
     if (p.gate === GATE_OWNER_ADMIN && !isPrivileged) return { error: 'This proposal needs an Owner or Admin.', status: 403 };
@@ -280,7 +284,7 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         try {
             // eslint-disable-next-line no-await-in-loop
             const out = await actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions, depth, approved: true, approvedBy: decider.userId, ...(marker ? { taint: marker } : {}) });
-            if (out.auditId) auditIds.push(out.auditId);
+            if (out.auditId) auditIds.push(out.auditId, ...partAudits(out.result));
             applied.push({ action: c.action, ok: true, result: out.result });
         } catch (e) {
             applied.push({ action: c.action, ok: false, error: e.message });

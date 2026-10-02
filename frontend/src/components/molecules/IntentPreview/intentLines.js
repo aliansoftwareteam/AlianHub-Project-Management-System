@@ -159,6 +159,24 @@ export const LINE_KINDS = {
         if (!name) return null;
         return { label: t('IntentPreview.line_view'), text: LAYOUTS.includes(line.layout) ? t('IntentPreview.view_named', { name, layout: t(`IntentPreview.layout_${line.layout}`) }) : name };
     },
+    /* An automation of a plan, in the sentence the Automations page says it in, or why it is not one that can be made. */
+    planRule: (t, line) => {
+        const problem = textOf(line.problem);
+        if (problem) return { label: t('IntentPreview.line_rule'), text: t('IntentPreview.rule_problem', { problem }) };
+        return textOf(line.text) ? { label: t('IntentPreview.line_rule'), text: t('IntentPreview.rule_starts_off', { rule: textOf(line.text) }) } : null;
+    },
+    planTask: (t, line, locale) => {
+        const name = textOf(line.name);
+        if (!name) return null;
+        const person = textOf(line.assignee) || (countOf(line.hidden) ? t('IntentPreview.people_not_shown', { n: 1 }, 1) : '');
+        const details = [
+            textOf(line.list) && t('IntentPreview.task_in_list', { list: textOf(line.list) }),
+            textOf(line.status) && t('IntentPreview.task_in_status', { status: textOf(line.status) }),
+            person && t('IntentPreview.task_for', { person }),
+            textOf(line.due) && t('IntentPreview.task_due', { date: dateText(locale, line.due) }),
+        ].filter(Boolean);
+        return { label: t('IntentPreview.line_first_task'), text: details.length ? t('IntentPreview.task_with', { name, details: details.join(', ') }) : name };
+    },
     columns: (t, line) => {
         const shown = textsOf(line.names).join(', ');
         const others = countOf(line.others);

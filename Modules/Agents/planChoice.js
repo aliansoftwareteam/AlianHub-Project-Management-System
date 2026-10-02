@@ -29,7 +29,8 @@ const nameOf = (params, part, at) => {
 };
 const placeOf = (params, part, name) => itemsOf(params, part).findIndex((item) => lower(typeof item === 'string' ? item : item && item.name) === lower(name));
 
-/* What each part of a plan cannot be made without, by key: a view the fields of the plan it shows, a rollup the field it reads. */
+/* What each part of a plan cannot be made without, by key: a view the fields of the plan it shows, a rollup the
+ * field it reads, and what the automations and first tasks of a plan name (./planWork.js). */
 const needsOf = (params) => {
     const needs = {};
     const add = (key, part, name) => {
@@ -38,6 +39,7 @@ const needsOf = (params) => {
     };
     itemsOf(params, 'fields').forEach((field, at) => add(keyOf('fields', at), 'fields', field && field.source));
     itemsOf(params, 'views').forEach((view, at) => listOf(view && view.showFields).forEach((name) => add(keyOf('views', at), 'fields', name)));
+    require('./planWork').needsIn(params, add);
     return needs;
 };
 
