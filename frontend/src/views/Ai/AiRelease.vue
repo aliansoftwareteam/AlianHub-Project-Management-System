@@ -222,7 +222,7 @@ const stagingRule = computed(() => {
 const neverLine = computed(() => t("Pipeline.never_line", { keys: (production.value.never || []).filter((k) => /deploy|merge|git/i.test(k)).join(", ") || "—" }));
 
 const checks = computed(() => [
-    { key: "done", state: counts.value.done ? "ok" : "todo", label: t("Pipeline.check_done", { n: counts.value.done }) },
+    { key: "done", state: counts.value.done ? "ok" : "todo", label: t("Pipeline.check_done", { n: counts.value.done }, counts.value.done) },
     { key: "human", state: "ok", label: t("Pipeline.check_human") },
     { key: "staging", state: staging.value.last ? "ok" : "todo", label: staging.value.last ? t("Pipeline.check_staging_ok", { at: moment(staging.value.last.decidedAt).fromNow() }) : t("Pipeline.check_staging_todo") },
     { key: "ci", state: "unknown", label: t("Pipeline.check_ci") }

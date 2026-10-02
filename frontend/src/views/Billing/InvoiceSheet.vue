@@ -39,7 +39,7 @@
                 <div v-if="expanded === line.id" class="billing__trace">
                     <div v-if="!tasksFor(line).length && !logsFor(line).length" class="ah-small">{{ $t('Billing.line_nothing') }}</div>
                     <div v-if="tasksFor(line).length" class="billing__trace-group">
-                        <div class="ah-label">{{ $t('Billing.line_tasks', { count: tasksFor(line).length }) }}</div>
+                        <div class="ah-label">{{ $t('Billing.line_tasks', { count: tasksFor(line).length }, tasksFor(line).length) }}</div>
                         <div v-for="task in tasksFor(line)" :key="task._id" class="billing__trace-row">
                             <span class="ah-mono billing__trace-key">{{ task.key }}</span>
                             <span class="billing__trace-name">{{ task.name }}</span>
