@@ -54,11 +54,18 @@ const hiddenTaskIdsFor = async (companyId, caller, projectIds) => {
     return (tasks || []).map((task) => String(task._id));
 };
 
-/* A run or proposal on a task the caller cannot read is treated as one that does not exist. */
+const namedTaskIds = (record) => [record.taskId, ...(Array.isArray(record.taskIds) ? record.taskIds : [])].map((id) => String(id || '')).filter((id) => OBJECT_ID.test(id));
+
+/* A run or proposal on a task the caller cannot read is treated as one that does not exist. A batch names several tasks. */
 const canSeeTaskOf = async (companyId, caller, record) => {
-    if (caller.privileged || !record || !OBJECT_ID.test(String(record.taskId || ''))) return true;
-    const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: String(record.taskId) }, 'sprintId'] }, 'findOne');
-    return !task || canSeeSprintById(companyId, caller.actor.userId, task.sprintId);
+    if (caller.privileged || !record) return true;
+    for (const taskId of new Set(namedTaskIds(record))) {
+        // eslint-disable-next-line no-await-in-loop
+        const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: taskId }, 'sprintId'] }, 'findOne');
+        // eslint-disable-next-line no-await-in-loop
+        if (task && !(await canSeeSprintById(companyId, caller.actor.userId, task.sprintId))) return false;
+    }
+    return true;
 };
 
 const projectScope = (projectIds) => (projectIds ? { projectId: { $in: projectIds } } : {});
@@ -83,7 +90,7 @@ const inProjectsOrOwn = (projectIds, askedBy) => {
 /* The clause every list of proposals is read through, whichever screen asks. */
 const proposalScopeClause = ({ projectIds, hiddenTaskIds, privateWork: privateScope, askedBy } = {}) => ({
     ...(Array.isArray(projectIds) ? inProjectsOrOwn(projectIds, askedBy) : {}),
-    ...(Array.isArray(hiddenTaskIds) && hiddenTaskIds.length ? { taskId: { $nin: hiddenTaskIds.map(String) } } : {}),
+    ...(Array.isArray(hiddenTaskIds) && hiddenTaskIds.length ? { taskId: { $nin: hiddenTaskIds.map(String) }, taskIds: { $nin: hiddenTaskIds.map(String) } } : {}),
     ...(privateScope ? privateWork.proposalClause(privateScope) : {}),
 });
 

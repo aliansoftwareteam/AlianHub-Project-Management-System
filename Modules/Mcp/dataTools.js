@@ -166,7 +166,7 @@ const TOOLS = [
     {
         name: 'sprints.list',
         action: 'sprints.list',
-        description: 'The sprints of one project. A private sprint is listed only for the people on it, and for owners and admins.',
+        description: 'The lists of one project. A private list is listed only for the people on it, and for owners and admins.',
         input: { type: 'object', properties: { ...PROJECT_ARG, ...LIMIT }, required: ['projectId'] },
         visibility: 'filtered',
         paginated: true,

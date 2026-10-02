@@ -3,7 +3,7 @@ jest.mock('../Config/jwt', () => ({ verifyCompanyMembership: jest.fn(async () =>
 jest.mock('../Modules/ApiTokens/controller', () => ({ verifyToken: jest.fn(), logTokenActivity: jest.fn() }));
 jest.mock('../Modules/Agents/actor', () => ({ resolveActor: jest.fn(async () => ({ kind: 'agent', userId: '6f0000000000000000000001' })) }));
 jest.mock('../Modules/Agents/actions', () => ({ RefusedError: class RefusedError extends Error {} }));
-jest.mock('../Modules/Agents/registry', () => ({ NEVER: [] }));
+jest.mock('../Modules/Agents/registry', () => ({ ...jest.requireActual('../Modules/Agents/registry'), NEVER: [] }));
 jest.mock('../Modules/Mcp/tools', () => ({ manifest: () => [], usable: () => [], call: jest.fn(async () => ({ ok: true })) }));
 
 const express = require('express');

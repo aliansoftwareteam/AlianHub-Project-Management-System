@@ -16,7 +16,7 @@ const v2 = require('./v2Flag');
 const cursor = require('./cursor');
 const names = require('./names');
 const { annotationsFor, isDestructive } = require('./annotations');
-const { propose, outsideMayFile, declinedNotes } = require('./propose');
+const { propose, proposeBatch, fileable, outsideMayFile, declinedNotes } = require('./propose');
 const sessionTools = require('./sessionTools');
 const dataTools = require('./dataTools');
 const screenTools = require('./screenTools');
@@ -312,9 +312,12 @@ const actionsOffered = () => [...offered(), ...Object.values(manageTools.VARIANT
 /* An OAuth token is held to the one scope the tool needs; a personal token keeps its read/write rule. */
 const PAGE_ARGS = Object.freeze({ cursor: { type: 'string', maxLength: 2000 }, limit: { type: 'integer', minimum: 1, maximum: cursor.PAGE_MAX } });
 
+const argumentProblem = (tool, args) => (tool.strict
+    ? argsSchema.problemIn(tool.input, args, tool.paginated ? PAGE_ARGS : {}) || (tool.check ? tool.check(args) : '')
+    : '');
+
 const refuseBadArguments = (tool, args) => {
-    if (!tool.strict) return;
-    const problem = argsSchema.problemIn(tool.input, args, tool.paginated ? PAGE_ARGS : {}) || (tool.check ? tool.check(args) : '');
+    const problem = argumentProblem(tool, args);
     if (problem) throw Object.assign(new Error(`${tool.name}: ${problem}`), { code: -32602 });
 };
 
@@ -346,6 +349,38 @@ const prepare = async (ctx, tool, args, vis) => {
     return tool.prepare(ctx, args, vis);
 };
 
+const admitWrite = (ctx, tool, args) => {
+    const refused = scopeRefusal(ctx, tool, true);
+    if (refused) throw Object.assign(new Error(refused), { code: -32004 });
+    refuseBadArguments(tool, args);
+};
+
+/* A write taken to the point where it either runs or is filed: its params, the project's answer and why it is held,
+ * or the answer its preparation already gave. It throws what a call of the tool throws until then, and changes nothing. */
+const readied = async (ctx, tool, args) => {
+    const filtered = tool.visibility === 'filtered';
+    const vis = filtered ? await visibility.forCaller(ctx) : undefined;
+    const prepared = tool.prepare ? await prepare(ctx, tool, args, vis) : { args };
+    if (prepared.answer) return { answer: prepared.answer };
+    const params = tool.params(prepared.args);
+    if (filtered) {
+        try {
+            await visibility.assertWritable(ctx.companyId, vis, tool.target(prepared.args));
+        } catch (error) {
+            if (!error.notVisible) throw error;
+            throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params, reason: error.message, ip: ctx.ip, taint: ctx.taint });
+        }
+    }
+    const tainted = heldForApproval(ctx, tool.action);
+    // An outside client that holds the tool's manage grant files what is held for a person; without the grant the call is refused, as before.
+    if (tainted && !outsideMayFile(ctx, tool)) {
+        throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params, reason: tainted, ip: ctx.ip, taint: ctx.taint });
+    }
+    // A refusal by the project is left to perform(), which gives the registry's and the holder's refusals first.
+    const rule = await projectPolicy.ask({ companyId: ctx.companyId, actor: ctx.actor, action: tool.action, params, taint: ctx.taint, standing: true });
+    return { params, rule, held: tainted || (rule.decision === projectPolicy.DECISION.PROPOSE ? rule.reason : '') };
+};
+
 /* Run a tool for an MCP caller. Reads are authorised through the registry;
  * writes go through actions.perform, so they are audited and undoable. */
 const call = async (ctx, name, args = {}) => {
@@ -368,30 +403,11 @@ const call = async (ctx, name, args = {}) => {
         return tool.run(ctx, args, filtered ? await visibility.forCaller(ctx) : undefined);
     }
 
-    const refused = scopeRefusal(ctx, tool, true);
-    if (refused) throw Object.assign(new Error(refused), { code: -32004 });
-    refuseBadArguments(tool, args);
+    admitWrite(ctx, tool, args);
     if (tool.batch) return runBatch(ctx, tool, args);
-    const vis = filtered ? await visibility.forCaller(ctx) : undefined;
-    const prepared = tool.prepare ? await prepare(ctx, tool, args, vis) : { args };
-    if (prepared.answer) return prepared.answer;
-    const params = tool.params(prepared.args);
-    if (filtered) {
-        try {
-            await visibility.assertWritable(ctx.companyId, vis, tool.target(prepared.args));
-        } catch (error) {
-            if (!error.notVisible) throw error;
-            throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params, reason: error.message, ip: ctx.ip, taint: ctx.taint });
-        }
-    }
-    const tainted = heldForApproval(ctx, tool.action);
-    // An outside client that holds the tool's manage grant files what is held for a person; without the grant the call is refused, as before.
-    if (tainted && !outsideMayFile(ctx, tool)) {
-        throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params, reason: tainted, ip: ctx.ip, taint: ctx.taint });
-    }
-    // A refusal by the project is left to perform(), which gives the registry's and the holder's refusals first.
-    const rule = await projectPolicy.ask({ companyId: ctx.companyId, actor: ctx.actor, action: tool.action, params, taint: ctx.taint, standing: true });
-    const held = tainted || (rule.decision === projectPolicy.DECISION.PROPOSE ? rule.reason : '');
+    const ready = await readied(ctx, tool, args);
+    if (ready.answer) return ready.answer;
+    const { params, rule, held } = ready;
     if (rule.decision !== projectPolicy.DECISION.REFUSE && (held || (v2.enabled() && isDestructive(actions.rating(tool.action))))) {
         return propose(ctx, tool, params, str(args.reason, 500) || `${tool.name} via MCP`, held);
     }
@@ -408,20 +424,83 @@ const call = async (ctx, name, args = {}) => {
     return { ok: true, auditId: out.auditId, result: out.result || null, undoable: Boolean(out.undo), ...(out.standing ? { standingApprovalId: out.standing.id } : {}) };
 };
 
+const NOT_BATCHABLE = 'is not a write tool a batch can run';
+
+/* The write tool a batch's operation names for this caller, or null. */
+const batchTool = (ctx, operation) => {
+    const name = String(operation.tool);
+    const tool = toolsFor(ctx).find((t) => t.name === name);
+    return !tool || tool.run || tool.batch || sessionTools.owns(name) ? null : tool;
+};
+
+const outcomeOf = (error) => (error instanceof actions.RefusedError
+    ? { ok: false, refused: true, reason: error.message, auditId: error.auditId || null }
+    : { ok: false, error: error.message });
+
 /* One operation of a batch: a write tool this caller has, run exactly as a call of its own, with its outcome instead of a throw. */
 const batchItem = async (ctx, operation) => {
     const name = String(operation.tool);
-    const tool = toolsFor(ctx).find((t) => t.name === name);
-    if (!tool || tool.run || tool.batch || sessionTools.owns(name)) return { ok: false, error: `${name} is not a write tool a batch can run` };
+    if (!batchTool(ctx, operation)) return { ok: false, error: `${name} ${NOT_BATCHABLE}` };
     try {
         return await call(ctx, name, operation.arguments);
     } catch (error) {
-        if (error instanceof actions.RefusedError) return { ok: false, refused: true, reason: error.message, auditId: error.auditId || null };
-        return { ok: false, error: error.message };
+        return outcomeOf(error);
     }
 };
 
-async function runBatch(ctx, tool, args) {
+/* A tool that prepares its arguments names its target only once prepared, so it counts as naming no task. */
+const targetTaskOf = (tool, args) => {
+    if (tool.prepare || !tool.target) return '';
+    try {
+        return String(tool.target(args).taskId || '');
+    } catch (error) {
+        return '';
+    }
+};
+
+/* How many tasks a batch names: one for each task an operation targets, and one for each operation that targets
+ * none, a new task or a doc for one. An operation no call could make names nothing. */
+const tasksNamed = (ctx, operations) => new Set(operations.map((operation, index) => {
+    const tool = batchTool(ctx, operation);
+    if (!tool || scopeRefusal(ctx, tool, true) || argumentProblem(tool, operation.arguments)) return '';
+    const taskId = targetTaskOf(tool, operation.arguments);
+    return taskId ? `task:${taskId.toLowerCase()}` : `operation:${index}`;
+}).filter(Boolean)).size;
+
+/* One operation of a batch that waits: taken as far as a call of its own goes before it would run, then asked what
+ * filing asks. Answers the change to file, or the outcome that keeps it out. Nothing runs here. */
+const batchChange = async (ctx, operation) => {
+    const name = String(operation.tool);
+    const tool = batchTool(ctx, operation);
+    if (!tool) return { outcome: { ok: false, error: `${name} ${NOT_BATCHABLE}` } };
+    try {
+        await require('../Workflows/externalSession').checkToolCall(ctx, tool.name);
+        admitWrite(ctx, tool, operation.arguments);
+        const ready = await readied(ctx, tool, operation.arguments);
+        if (ready.answer) return { outcome: ready.answer };
+        await fileable(ctx, tool, ready.params);
+        if (ready.rule.decision === projectPolicy.DECISION.REFUSE) {
+            throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params: ready.params, reason: ready.rule.reason, ip: ctx.ip, taint: ctx.taint });
+        }
+        return { change: { tool, params: ready.params } };
+    } catch (error) {
+        return { outcome: outcomeOf(error) };
+    }
+};
+
+/* Decision 6 of task 047: over MCP a change to one task may be applied at once, and anything wider waits. A batch
+ * that names more than one task therefore runs nothing: what a call could make of it is filed as one proposal. */
+const fileBatch = async (ctx, tool, args) => {
+    const taken = [];
+    for (const operation of args.operations) taken.push(await batchChange(ctx, operation));
+    const changes = taken.map((entry) => entry.change).filter(Boolean);
+    const filed = changes.length ? await proposeBatch(ctx, changes, str(args.reason, 500) || `${tool.name} via MCP`) : { ok: false };
+    const waiting = filed.pending ? { ok: false, pending: true } : { ok: false, notFiled: true };
+    const items = taken.map((entry, index) => ({ index, tool: String(args.operations[index].tool), ...(entry.change ? waiting : entry.outcome) }));
+    return { ...filed, applied: 0, notApplied: items.length, waiting: filed.pending ? changes.length : 0, auditId: null, undoable: false, items };
+};
+
+const applyBatch = async (ctx, tool, args) => {
     const items = [];
     for (const [index, operation] of args.operations.entries()) {
         items.push({ index, tool: String(operation.tool), ...(await batchItem(ctx, operation)) });
@@ -437,6 +516,10 @@ async function runBatch(ctx, tool, args) {
         ok: items.every((item) => item.ok === true), applied: applied.length, notApplied: items.length - applied.length,
         auditId: group ? group.auditId : null, undoable: Boolean(group && group.undo), items,
     };
+};
+
+function runBatch(ctx, tool, args) {
+    return tasksNamed(ctx, args.operations) > 1 ? fileBatch(ctx, tool, args) : applyBatch(ctx, tool, args);
 }
 
 module.exports = { TOOLS, names: toolNames, manifest, usable, call, registered, actionOf, actionsOffered };

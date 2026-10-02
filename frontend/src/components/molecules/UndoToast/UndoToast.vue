@@ -9,14 +9,17 @@
             @focusin="holdUndoToast"
             @focusout="releaseUndoToast"
         >
-            <span class="ah-undo-toast__text">{{ undoToast.current.message }}</span>
+            <span class="ah-undo-toast__text" :class="{ 'ah-undo-toast__text--wrap': undoToast.current.wrap }">{{ undoToast.current.message }}</span>
             <button
+                v-if="undoToast.current.canUndo"
                 type="button"
                 class="ah-undo-toast__undo"
+                data-test="undo-toast-undo"
                 aria-keyshortcuts="Control+Z Meta+Z"
                 :title="$t('UndoToast.undo_hint')"
                 @click="runUndo"
             >{{ $t('UndoToast.undo') }}</button>
+            <button v-if="undoToast.current.actionLabel" type="button" class="ah-undo-toast__undo" data-test="undo-toast-action" @click="runToastAction">{{ undoToast.current.actionLabel }}</button>
             <button type="button" class="ah-undo-toast__close" :aria-label="$t('UndoToast.dismiss')" @click="dismissUndoToast">×</button>
         </div>
     </div>
@@ -24,7 +27,7 @@
 
 <script setup>
 import { onBeforeUnmount, onMounted } from "vue";
-import { undoToast, runUndo, dismissUndoToast, holdUndoToast, releaseUndoToast } from "@/composable/useUndoToast";
+import { undoToast, runUndo, runToastAction, dismissUndoToast, holdUndoToast, releaseUndoToast } from "@/composable/useUndoToast";
 import { shortcutKey } from "@/composable/shortcuts";
 
 defineOptions({ name: "UndoToast" });
@@ -33,7 +36,7 @@ const EDITABLE = "input, textarea, select, [contenteditable]:not([contenteditabl
 
 // Ctrl/Cmd+Z in a text field is the field's own undo, so the shortcut only applies outside one.
 function onKeydown(event) {
-    if (!undoToast.current || event.defaultPrevented || event.altKey || event.shiftKey) return;
+    if (!undoToast.current?.canUndo || event.defaultPrevented || event.altKey || event.shiftKey) return;
     if (!(event.ctrlKey || event.metaKey) || String(event.key).toLowerCase() !== shortcutKey("undo")) return;
     const target = event.target && event.target.nodeType === 1 ? event.target : null;
     if (target && (target.isContentEditable || target.closest(EDITABLE))) return;
@@ -56,6 +59,7 @@ onBeforeUnmount(() => document.removeEventListener("keydown", onKeydown));
     animation: ah-rise-in var(--motion-base) var(--ease-out);
 }
 .ah-undo-toast__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ah-undo-toast__text--wrap { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; white-space: normal; overflow-wrap: anywhere; }
 .ah-undo-toast__undo {
     flex: none; min-height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent;
     color: var(--rail-brand); font: 600 12.5px/1 var(--font-ui); cursor: pointer;

@@ -10,6 +10,8 @@ import { shellState } from "@/components/organisms/Shell/shellState";
  * timers, which no agent event announces. */
 export const AGENTS_CHANGED_EVENT = "agentsChanged";
 export const POLICY_CHANGE = "policy";
+// Sent to one person about their own connected agent's change (./agentChangeNotice); nothing this feed shows moves with it.
+export const APPLIED_CHANGE = "change";
 const LIVE_POLL_MS = 30000;
 const IDLE_POLL_MS = 120000;
 const BURST_MS = 500;
@@ -136,8 +138,8 @@ export function refreshAgentFeed() {
     return inFlight;
 }
 
-function onAgentsChanged() {
-    if (!subscribers) return;
+function onAgentsChanged(change) {
+    if (!subscribers || change?.kind === APPLIED_CHANGE) return;
     if (inFlight) {
         again = true;
         return;

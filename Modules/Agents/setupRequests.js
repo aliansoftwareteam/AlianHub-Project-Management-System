@@ -1,3 +1,5 @@
+const { isDeepStrictEqual } = require('util');
+const { DateTime } = require('luxon');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
@@ -17,6 +19,11 @@ const FIELD_NAME_MAX = 80;
 const OPTIONS_MAX = 30;
 const OPTION_MAX = 60;
 const NOTE_MAX = 200;
+const VALUES_MAX = 50;
+const VALUE_TEXT_MAX = 4000;
+const VALUE_PARTS_MAX = 50;
+const FIELD_SET = 'task.field.set';
+const NO_TASK = 'that task was not found in this project';
 
 /* The `tab` of each kind of view a project can keep a saved copy of (Modules/ViewTemplates/templateRules.js). */
 const VIEW_KINDS = Object.freeze({ list: 'ProjectListView', board: 'ProjectKanban', table: 'TableView', calendar: 'Calendar', workload: 'Workload' });
@@ -30,6 +37,16 @@ const DIRECTIONS = Object.freeze(['asc', 'desc']);
 const PRIORITIES = Object.freeze(['URGENT', 'HIGH', 'MEDIUM', 'LOW']);
 const SUBTASKS = Object.freeze(['collapsed', 'expanded']);
 const LOOK_MAX = Object.freeze({ assignees: 20, statuses: 20, status: 60, search: 200, columns: 30 });
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const IS = Object.freeze({ value: ':=', name: 'Is' });
+const BEFORE = Object.freeze({ value: ':<', name: 'Less_Than' });
+/* The spans the task filter offers for a due date, each with the comparison its row saves (frontend TaskFilter and buildFilterQuery). */
+const DUE = Object.freeze({
+    today: [IS, 'Today'], tomorrow: [IS, 'Tomorrow'], this_week: [IS, 'This week'], next_week: [IS, 'Next week'],
+    next_7_days: [IS, 'Next 7 days'], this_month: [IS, 'This month'], overdue: [BEFORE, 'Today'],
+});
+const DUE_FIELD = Object.freeze({ value: 'DueDate', name: 'due_date', type: 'date', filterOn: 'DueDate' });
+const DATE_RANGE = 'Date range';
 
 const FIELD_ROUTE = '/api/v1/customField';
 const ROUTES = Object.freeze({
@@ -158,6 +175,79 @@ const createFields = async ({ companyId, who, projectId, definitions }) => {
     return { project, projectId: inProject, fields };
 };
 
+const isPart = (value) => (typeof value === 'string' && value.length <= VALUE_TEXT_MAX) || (typeof value === 'number' && Number.isFinite(value));
+const isValue = (value) => value === null || typeof value === 'boolean' || isPart(value) || (Array.isArray(value) && value.length <= VALUE_PARTS_MAX && value.every(isPart));
+
+const valuesOf = (given) => listOf(given).map((entry) => ({ taskId: idOf(entry.taskId).toLowerCase(), field: lineOf(entry.field, FIELD_NAME_MAX), value: entry.value }));
+
+/* '' when every value names a task and a field and holds what a field can store; otherwise which one does not. */
+const valuesProblem = (given) => {
+    if (given === undefined) return '';
+    const entries = listOf(given);
+    if (!entries.length || entries.length > VALUES_MAX) return `values needs 1 to ${VALUES_MAX} values`;
+    const at = entries.findIndex((entry) => !entry || !isId(entry.taskId) || !lineOf(entry.field, FIELD_NAME_MAX) || !isValue(entry.value));
+    return at < 0 ? '' : `values[${at}] needs a task id, the name of a field, and a value that is text, a number, true or false, a list of those, or null`;
+};
+
+/* What stops the first value that could not be set once the fields exist, or ''. `taskIds` are the tasks of the project the caller may open. */
+const valuesMisfit = async ({ companyId, uid, projectId, definitions, values, taskIds }) => {
+    const { storedValueOf } = require('../CustomField/helpers/fieldValueInput');
+    const held = await fieldsOfProject(companyId, projectId);
+    const drafts = draftsOf(definitions);
+    for (const [at, entry] of valuesOf(values).entries()) {
+        if (!taskIds.includes(entry.taskId)) return `values[${at}]: ${NO_TASK}`;
+        const draft = drafts.find((named) => sameName(named.name, entry.field));
+        const definition = held.find((field) => sameName(field.fieldTitle, entry.field)) || (draft && definitionOf(draft, { projectId, uid }));
+        if (!definition) return `values[${at}] names "${entry.field}", which is not a field of this call or of the project`;
+        const read = storedValueOf(definition, entry.value);
+        if (read.error) return `values[${at}] (${definition.fieldTitle}) ${read.error}`;
+    }
+    return '';
+};
+
+/* One value, set the way task.field.set sets it, on a live task of the project that the person behind the agent
+ * and the approver can both open and both may edit the fields of. A task either cannot open answers as a task that is not there. */
+const setValue = async ({ companyId, actor, depth, approvedBy, projectId, held, entry }) => {
+    const permissions = require('./permissions');
+    const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
+    const definition = held.find((field) => sameName(field.fieldTitle, entry.field));
+    if (!definition) throw refuse(`this project has no field "${entry.field}"`);
+    const task = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS, data: [{ _id: tools.oid(entry.taskId), ProjectID: { $in: idForms(projectId) }, deletedStatusKey: { $ne: 1 } }, { _id: 1 }],
+    }, 'findOne');
+    const people = [actor, ...(approvedBy ? [{ kind: 'human', userId: approvedBy }] : [])];
+    for (const person of people) {
+        if (!task || !(await readableTaskIds(companyId, idOf(person.userId), [entry.taskId])).includes(entry.taskId)) throw refuse(NO_TASK);
+    }
+    for (const person of people) {
+        const may = await permissions.holderMay(companyId, person, FIELD_SET, { taskId: entry.taskId });
+        if (!may.allowed) throw refuse(person === actor ? may.reason : `the approver may not set a field on this task: ${may.reason}`);
+    }
+    const fieldId = idOf(definition._id);
+    const out = await require('./taskRequests').executors[FIELD_SET]({ companyId, actor, params: { taskId: entry.taskId, fieldId, value: entry.value }, depth });
+    if (require('./actor').isAgent(actor)) await require('../Tasks/helpers/completionStore').recordWork(companyId, entry.taskId, require('./actions').workEntry(actor, 0));
+    return { item: { taskId: entry.taskId, field: definition.fieldTitle || entry.field, set: true }, undo: { taskId: entry.taskId, fieldId, previous: out.undo.previous[`customField.${fieldId}`] } };
+};
+
+/* One answer per value: set, or why not. A value that is not set stops no other. */
+const setValues = async ({ values, ...context }) => {
+    const usable = require('./registry').has(FIELD_SET);
+    const held = usable ? await fieldsOfProject(context.companyId, context.projectId) : [];
+    const items = [];
+    const undos = [];
+    for (const entry of values) {
+        try {
+            if (!usable) throw refuse(`${FIELD_SET} is switched off here`);
+            const done = await setValue({ ...context, held, entry });
+            items.push(done.item);
+            undos.push(done.undo);
+        } catch (error) {
+            items.push({ taskId: entry.taskId, field: entry.field, set: false, error: error.message });
+        }
+    }
+    return { items, undos };
+};
+
 const storedField = (companyId, fieldId) => (isId(fieldId)
     ? MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.CUSTOM_FIELDS, data: [{ _id: tools.oid(fieldId) }] }, 'findOne')
     : null);
@@ -197,6 +287,13 @@ const withdrawFields = async ({ companyId, who, projectId, fieldIds }) => {
 const isGroup = (value) => Object.hasOwn(GROUPS, idOf(value)) || isId(value);
 const isSort = (value) => Object.hasOwn(SORTS, idOf(value)) || isId(value);
 const idsOf = (value, max) => unique(listOf(value).filter(isId).map((id) => idOf(id).toLowerCase())).slice(0, max);
+const isDay = (value) => typeof value === 'string' && ISO_DAY.test(value) && DateTime.fromISO(value).isValid;
+const isSpan = (value) => typeof value === 'string' && Object.hasOwn(DUE, value);
+const isRange = (look) => isDay(look.dueFrom) && isDay(look.dueTo) && look.dueFrom <= look.dueTo;
+const dueOf = (look) => {
+    if (isRange(look)) return { dueFrom: look.dueFrom, dueTo: look.dueTo };
+    return isSpan(look.due) ? { due: look.due } : {};
+};
 
 /* What a caller names for a view, kept to what a saved view holds; a part left out is left to the view's own default. */
 const lookOf = (given) => {
@@ -213,10 +310,20 @@ const lookOf = (given) => {
         ...(assigneeIds.length ? { assigneeIds } : {}),
         ...(statuses.length ? { statuses } : {}),
         ...(priorities.length ? { priorities } : {}),
+        ...dueOf(look),
         ...(search ? { search } : {}),
         ...(SUBTASKS.includes(look.subtasks) ? { subtasks: look.subtasks } : {}),
         ...(showFieldIds.length ? { showFieldIds } : {}),
     };
+};
+
+const dueProblem = (look) => {
+    const ranged = look.dueFrom !== undefined || look.dueTo !== undefined;
+    if (look.due !== undefined && ranged) return 'name due or a range of days (dueFrom and dueTo), not both';
+    if (look.due !== undefined && !isSpan(look.due)) return `due must be one of ${Object.keys(DUE).join(', ')}`;
+    if (!ranged) return '';
+    if (!isDay(look.dueFrom) || !isDay(look.dueTo)) return 'a range of days needs dueFrom and dueTo, each a day as YYYY-MM-DD';
+    return look.dueFrom <= look.dueTo ? '' : 'dueFrom is after dueTo';
 };
 
 const lookProblem = (given) => {
@@ -224,7 +331,7 @@ const lookProblem = (given) => {
     if (look.groupBy !== undefined && !isGroup(look.groupBy)) return `groupBy must be one of ${Object.keys(GROUPS).join(', ')}, or the id of a custom field`;
     if (look.sortBy !== undefined && !isSort(look.sortBy)) return `sortBy must be one of ${Object.keys(SORTS).join(', ')}, or the id of a custom field`;
     if (look.sortDirection !== undefined && look.sortBy === undefined) return 'sortDirection needs sortBy';
-    return '';
+    return dueProblem(look);
 };
 
 const viewNameOf = (value) => lineOf(value, VIEW_NAME_MAX);
@@ -243,6 +350,14 @@ const noSource = (kind) => `this project has no ${kind} view to start from; the 
 /* The row the task filter saves for a field whose values are picked from a list. */
 const filterRow = (field, name, values) => ({ name: { value: field, name, type: 'array', filterOn: field }, comparison: { value: ':', name: 'Is' }, values, condition: '&&' });
 
+/* A day is kept with no zone, so each person's browser reads it as that day where they are. */
+const dueRow = (look) => {
+    if (look.dueFrom) return { name: DUE_FIELD, comparison: IS, values: [DATE_RANGE], condition: '&&', date: [look.dueFrom, look.dueTo].map((day) => `${day}T00:00:00`) };
+    if (!look.due) return null;
+    const [comparison, span] = DUE[look.due];
+    return { name: DUE_FIELD, comparison, values: [span], condition: '&&' };
+};
+
 /* The settings a saved view stores for what was named, fitted to the project as a view template is: a status or a
  * custom field the project does not have is left out, and the answer says which part lost something. */
 const settingsFor = async (companyId, project, look) => {
@@ -260,11 +375,33 @@ const settingsFor = async (companyId, project, look) => {
         filters: [
             keys.length ? filterRow('statusKey', 'status', keys) : null,
             listOf(look.priorities).length ? filterRow('Task_Priority', 'priority', look.priorities) : null,
+            dueRow(look),
         ].filter(Boolean),
         columns: { shown: listOf(look.showFieldIds).map((id) => `cf:${id}`) },
     };
     const fitted = await require('../ViewTemplates/templateStore').fitToProject(companyId, project, { settings: raw });
     return { settings: fitted.settings, leftOut: unique([...fitted.leftOut, ...(keys.length < named.length ? ['filters'] : [])]) };
+};
+
+const filterKey = (row) => JSON.stringify([row.name.filterOn, row.comparison.value, row.values.map(String).sort(), row.date]);
+const tasksShownBy = (settings) => ({
+    me: settings.me, assignees: [...settings.assignees].sort(), search: settings.search.trim().toLowerCase(), doneBy: settings.doneBy,
+    filters: settings.filters.map(filterKey).sort(),
+});
+
+/* The project's own saved view of that kind that already shows what was named and nothing narrower: the same
+ * tasks, and the same grouping when one is named. null when there is none, or the project lacks a status or a field named. */
+const savedViewShowing = async (companyId, project, kind, look) => {
+    const { cleanViewSettings } = require('../Project/helpers/viewSettings');
+    const { isCopyable } = require('../Project/controller/viewSettings');
+    const asked = lookOf(look);
+    const wanted = await settingsFor(companyId, project, asked);
+    if (wanted.leftOut.length) return null;
+    const shows = (view) => {
+        const held = cleanViewSettings(view.settings);
+        return (asked.groupBy === undefined || held.groupBy === wanted.settings.groupBy) && isDeepStrictEqual(tasksShownBy(held), tasksShownBy(wanted.settings));
+    };
+    return viewsOf(project).find((view) => view && view.keyName === VIEW_KINDS[kind] && isCopyable(view) && view.viewStatus !== false && view.isPrivate !== true && shows(view)) || null;
 };
 
 const addressOf = (companyId, made) => {
@@ -300,14 +437,20 @@ const withdrawView = async ({ companyId, who, projectId, viewId }) => {
 };
 
 const executors = {
-    async 'fields.create'({ companyId, actor, params, depth }) {
+    async 'fields.create'({ companyId, actor, params, depth, approvedBy }) {
+        const problem = valuesProblem(params.values);
+        if (problem) throw refuse(problem);
         const out = await createFields({ companyId, who: whoOf(actor, depth), projectId: params.projectId, definitions: params.definitions });
+        const values = params.values === undefined ? null : await setValues({ companyId, actor, depth, approvedBy, projectId: out.projectId, values: valuesOf(params.values) });
         const made = out.fields.filter((field) => field.made);
-        const failed = out.fields.filter((field) => field.error);
-        if (!made.length && failed.length) throw refuse(unique(failed.map((field) => `${field.name}: ${field.error}`)).join('; '));
+        const set = values ? values.undos : [];
+        const failed = [...out.fields, ...(values ? values.items : [])].filter((entry) => entry.error).map((entry) => `${entry.name || entry.field}: ${entry.error}`);
+        if (!made.length && !set.length && failed.length) throw refuse(unique(failed).join('; '));
         return {
-            result: { projectId: out.projectId, made: made.length, fields: out.fields },
-            undo: made.length ? { kind: 'fields', projectId: out.projectId, fieldIds: made.map((field) => field.fieldId) } : null,
+            result: { projectId: out.projectId, made: made.length, fields: out.fields, ...(values ? { values: values.items } : {}) },
+            undo: made.length || set.length
+                ? { kind: 'fields', projectId: out.projectId, fieldIds: made.map((field) => field.fieldId), ...(set.length ? { values: set } : {}) }
+                : null,
             entityType: 'project', entityId: out.projectId, entityName: out.project.ProjectName || '',
         };
     },
@@ -324,6 +467,6 @@ const executors = {
 };
 
 module.exports = {
-    executors, answerOf, reasonOf, lineOf, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, lookOf, lookProblem, viewNameOf, sourceView, noSource,
-    FIELD_TYPES, FIELDS_MAX, FIELD_NAME_MAX, OPTIONS_MAX, OPTION_MAX, NOTE_MAX, VIEW_KINDS, VIEW_NAME_MAX, GROUPS, SORTS, DIRECTIONS, PRIORITIES, SUBTASKS, LOOK_MAX,
+    executors, answerOf, reasonOf, lineOf, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, valuesOf, valuesProblem, valuesMisfit, lookOf, lookProblem, viewNameOf, viewIdOf, sourceView, noSource, savedViewShowing,
+    FIELD_TYPES, FIELDS_MAX, FIELD_NAME_MAX, OPTIONS_MAX, OPTION_MAX, NOTE_MAX, VALUES_MAX, FIELD_SET, VIEW_KINDS, VIEW_NAME_MAX, GROUPS, SORTS, DIRECTIONS, PRIORITIES, SUBTASKS, LOOK_MAX, DUE,
 };

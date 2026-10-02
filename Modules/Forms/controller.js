@@ -112,7 +112,7 @@ async function buildSnapshots(companyId, form, req) {
         }],
     }, 'findOne').catch(() => null);
     if (!sprint) {
-        return { ok: false, reason: 'That sprint does not belong to this project. Pick one from this project.' };
+        return { ok: false, reason: 'That list does not belong to this project. Pick one from this project.' };
     }
     const sprintArray = { id: String(sprint._id), name: sprint.name || 'Sprint' };
     if (sprint.folderId) {

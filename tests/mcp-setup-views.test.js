@@ -247,6 +247,56 @@ describe('approving adds the view the project\'s own route would add', () => {
     });
 });
 
+describe('a view filters on the due date with the row the task filter saves', () => {
+    const DUE = { value: 'DueDate', name: 'due_date', type: 'date', filterOn: 'DueDate' };
+    const IS = { value: ':=', name: 'Is' };
+    const BEFORE_IT = { value: ':<', name: 'Less_Than' };
+    const row = (comparison, values, date = '') => ({ name: DUE, comparison, values, condition: '&&', date });
+    const added = async (args) => {
+        const id = await filed(as(INSIDER), { projectId: P_OPEN, name: 'Due', ...args });
+        const out = await approve(id);
+        expect(out.applied[0]).toMatchObject({ ok: true, result: { leftOut: [] } });
+        return viewNamed(P_OPEN, 'Due');
+    };
+
+    it.each([
+        ['today', IS, 'Today'], ['tomorrow', IS, 'Tomorrow'], ['this_week', IS, 'This week'], ['next_week', IS, 'Next week'],
+        ['next_7_days', IS, 'Next 7 days'], ['this_month', IS, 'This month'], ['overdue', BEFORE_IT, 'Today'],
+    ])('due %s', async (due, comparison, value) => {
+        expect((await added({ due })).settings.filters).toEqual([row(comparison, [value])]);
+    });
+
+    it('files what was asked as the look, and stores what the view route stores for the same row by hand', async () => {
+        const settings = { me: true, filters: [row(IS, ['This week'])] };
+        expect((await web('POST /api/v1/project/:id/views', INSIDER, { params: { id: P_OPEN }, body: { sourceViewId: V_LIST, title: 'By hand', settings } })).code).toBe(200);
+        const id = await filed(as(INSIDER), { projectId: P_OPEN, name: 'Mine this week', mine: true, due: 'this_week' });
+        expect(waiting()[0].changes[0].params.look).toEqual({ mine: true, due: 'this_week' });
+        await approve(id);
+        expect(asCopied(viewNamed(P_OPEN, 'Mine this week'))).toEqual(asCopied(viewNamed(P_OPEN, 'By hand')));
+    });
+
+    it('a range of days, each read as a day where the person looking is', async () => {
+        const made = await added({ dueFrom: '2026-10-05', dueTo: '2026-10-09' });
+        expect(made.settings.filters).toEqual([row(IS, ['Date range'], ['2026-10-05T00:00:00', '2026-10-09T00:00:00'])]);
+    });
+
+    it('goes beside a status filter', async () => {
+        const made = await added({ due: 'overdue', statuses: ['in progress'] });
+        expect(made.settings.filters.map((entry) => [entry.name.filterOn, entry.values])).toEqual([['statusKey', [2]], ['DueDate', ['Today']]]);
+    });
+
+    it('refuses a due date a view cannot hold, and files nothing', async () => {
+        const wrong = [
+            { due: 'someday' }, { dueFrom: '2026-10-05' }, { dueTo: '2026-10-05' }, { dueFrom: '2026-10-09', dueTo: '2026-10-05' },
+            { dueFrom: '05/10/2026', dueTo: '2026-10-09' }, { dueFrom: '2026-02-31', dueTo: '2026-03-02' }, { due: 'today', dueFrom: '2026-10-05', dueTo: '2026-10-09' },
+        ];
+        for (const args of wrong) {
+            expect((await rpc(as(OWNER), TOOL, { projectId: P_OPEN, name: 'x', ...args })).rpcError).toMatchObject({ code: -32602 });
+        }
+        expect(waiting()).toHaveLength(0);
+    });
+});
+
 describe('undo removes exactly the view that was added', () => {
     it('takes it out of the project and leaves every other view as it was', async () => {
         const id = await filed(as(INSIDER), { projectId: P_OPEN, name: 'Short lived', kind: 'board' });
