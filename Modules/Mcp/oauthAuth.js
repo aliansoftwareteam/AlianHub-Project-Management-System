@@ -60,7 +60,7 @@ const approvalCeiling = async (companyId, clientId) => {
     } catch (error) {
         return refuseApproval(clientId, `the approval module failed to load (${error.message})`) || null;
     }
-    if (!approvals) return mcpOAuth.SCOPES.filter((scope) => !mcpOAuth.MANAGE_SCOPES.includes(scope));
+    if (!approvals) return mcpOAuth.SCOPES.filter((scope) => !mcpOAuth.OPT_IN_SCOPES.includes(scope));
     if (typeof approvals.approvedScopes !== 'function') return refuseApproval(clientId, 'the approval module has no approvedScopes') || null;
     try {
         const ceiling = await approvals.approvedScopes(companyId, clientId);
