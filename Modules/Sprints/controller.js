@@ -139,7 +139,7 @@ exports.addSprintFun = (req) => {
             }
             if (isPreCompany) {
                 MongoQ.MongoDbCrudOpration(companyId, obj, "save").then((responsee) => {
-                    resolve({ status: true, statusText: "Sprint added successfully",data: responsee});
+                    resolve({ status: true, statusText: "List added successfully",data: responsee});
                 }).catch((error) => {
                     logger.error(`ERROR in add sprint function : ${error.message}`);
                     reject({ status: false, statusText: error });
@@ -151,7 +151,7 @@ exports.addSprintFun = (req) => {
                 exports.updateChannelsCounts(companyId, isPrivate, 'inc').then((result) => {
                     if(result) {
                         MongoQ.MongoDbCrudOpration(companyId, obj, "save").then((responsee) => {
-                            resolve({ status: true, statusText: "Sprint added successfully",data: responsee});
+                            resolve({ status: true, statusText: "List added successfully",data: responsee});
                             if(mainChat) return
                         }).catch((error) => {
                             logger.error(`ERROR in add sprint function : ${error.message}`);
@@ -166,7 +166,7 @@ exports.addSprintFun = (req) => {
                 const hasPermission = await exports.getPerProjectCount(companyId,projectId,dbCollections.SPRINTS);
                 if(hasPermission) {
                     MongoQ.MongoDbCrudOpration(companyId, obj, "save").then(async (responsee) => {
-                        resolve({ status: true, statusText: "Sprint added successfully",data: responsee});
+                        resolve({ status: true, statusText: "List added successfully",data: responsee});
                         if(mainChat) return
 
                         const stored = await storedNames(companyId, { projectId, folderId: folder && folder.folderId });
@@ -335,7 +335,7 @@ exports.deleteChannel = (req, res) => {
     }
 };
 
-const SPRINT_UPDATE_FAILED = 'The sprint could not be updated.';
+const SPRINT_UPDATE_FAILED = 'The list could not be updated.';
 
 const refuseListWrite = (res, error) => {
     if (!(error instanceof ListWriteError)) return false;

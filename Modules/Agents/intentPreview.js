@@ -6,13 +6,17 @@ const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
 const { isTaskFieldOf } = require('../CustomField/helpers/fieldValueInput');
 const setup = require('./setupRequests');
 const plans = require('./projectSetup');
+const projects = require('./projectCreate');
 const automation = require('./automationPreview');
 
 // What a waiting change will make, as the lines its card shows (frontend IntentPreview). It is built for one viewer:
 // a project, list, parent task, person or custom field is named only when that viewer may see it, and everything
 // else on a line is the proposal's own text, handed over as text. Fields, a view and a whole plan are the project's own,
 // so for a viewer who cannot open the project they have no preview at all, and neither has a rule (./automationPreview.js).
+// A project that is not there yet has no project to open: its card is the proposal's own text, for whoever is shown the proposal.
 // A kind of change with no entry in BUILDERS has none.
+// A connected agent's batch is several changes on one card (forBatches): how many tasks, what changes on them, and the
+// first few tasks by name.
 
 const DESCRIPTION_MAX = 280;
 const TEXT_MAX = 250;
@@ -65,11 +69,11 @@ const detailLines = (fields) => [
     Array.isArray(fields.links) && fields.links.length > 0 && { kind: 'links', count: fields.links.length },
 ];
 
-const createPreview = (change, { named, parents }) => {
+const createPreview = (change, { named, tasks }) => {
     const create = CREATES[change.action];
     const params = paramsOf(change);
     const fields = create.fields(params);
-    const parent = create.kind === 'subtask' ? parents.get(idOf(params.taskId)) : null;
+    const parent = create.kind === 'subtask' ? tasks.get(idOf(params.taskId)) : null;
     const projectId = create.kind === 'subtask' ? (parent ? parent.projectId : '') : idOf(params.projectId);
     return {
         kind: create.kind,
@@ -95,18 +99,42 @@ const fieldLine = (given) => {
     };
 };
 
-const fieldsPreview = (change, { named }) => {
+const FIELDS = 'fields.create';
+const valuesIn = (change) => (change.action === FIELDS ? listOf(paramsOf(change).values).slice(0, setup.VALUES_MAX).map(objectOf) : []);
+const partsOf = (value) => [].concat(value).filter((part) => typeof part === 'string' || typeof part === 'number');
+const peopleIn = (value) => partsOf(value).map(idOf).filter(Boolean);
+
+/* A first value, on a task of the project the viewer can read; a member is shown by name, and one the viewer may not see is counted. */
+const valueLine = (entry, projectId, { named, tasks }) => {
+    const field = textOf(entry.field, setup.FIELD_NAME_MAX);
+    const task = tasks.get(idOf(entry.taskId));
+    if (!field || !task || task.projectId !== projectId) return null;
+    if (typeof entry.value === 'boolean') return { kind: 'fieldValue', field, task: task.name, checked: entry.value };
+    const parts = partsOf(entry.value);
+    const shown = parts.map((part) => (idOf(part) ? named.person(idOf(part), projectId).name : textOf(part))).filter(Boolean);
+    return { kind: 'fieldValue', field, task: task.name, value: shown.join(', ').slice(0, TEXT_MAX), others: parts.length - shown.length };
+};
+
+const fieldsPreview = (change, context) => {
     const params = paramsOf(change);
-    const place = placeLine(params, named);
+    const place = placeLine(params, context.named);
     if (!place) return null;
     const fields = listOf(params.definitions).slice(0, setup.FIELDS_MAX).map(fieldLine).filter(Boolean);
-    return { kind: 'fields', title: fields.map((field) => field.name).join(', ').slice(0, TEXT_MAX), lines: [place, ...fields] };
+    const asked = valuesIn(change);
+    const values = asked.map((entry) => valueLine(entry, idOf(params.projectId), context)).filter(Boolean);
+    const hidden = asked.length - values.length;
+    return {
+        kind: 'fields',
+        title: fields.map((field) => field.name).join(', ').slice(0, TEXT_MAX),
+        lines: [place, ...fields, ...values, ...(hidden ? [{ kind: 'fieldValuesHidden', count: hidden }] : [])],
+    };
 };
 
 const PLAN = 'project.setup';
+const PLANS = Object.freeze([PLAN, projects.ACTION]);
 const planViews = (change) => listOf(paramsOf(change).views).slice(0, plans.VIEWS_MAX).map(objectOf);
 /* The looks a waiting change names: a view's own, or one for each view of a plan. */
-const looksOf = (change) => (change.action === PLAN ? planViews(change).map((view) => objectOf(view.look)) : [objectOf(paramsOf(change).look)]);
+const looksOf = (change) => (PLANS.includes(change.action) ? planViews(change).map((view) => objectOf(view.look)) : [objectOf(paramsOf(change).look)]);
 const namedFieldIds = (look) => [look.groupBy, look.sortBy, ...listOf(look.showFieldIds)].map(idOf).filter(Boolean);
 
 /* A built-in choice by its key, a custom field by its name, and nothing for a field the viewer's project does not have. */
@@ -114,6 +142,12 @@ const chosen = (choices, value, fieldName) => {
     if (Object.hasOwn(choices, String(value))) return { by: String(value), field: '' };
     const field = fieldName(idOf(value));
     return field ? { by: '', field } : null;
+};
+
+const dueLine = (look) => {
+    const kept = setup.lookOf({ due: look.due, dueFrom: look.dueFrom, dueTo: look.dueTo });
+    if (kept.dueFrom) return { kind: 'dueFilter', from: kept.dueFrom, to: kept.dueTo };
+    return kept.due ? { kind: 'dueFilter', when: kept.due } : null;
 };
 
 /* What a view shows, line by line; `planned` are fields of the same plan it shows, which have a name and no id yet. */
@@ -132,6 +166,7 @@ const lookLines = (look, projectId, { named, fieldNames }, planned = []) => {
         assigneesLine({ AssigneeUserId: look.assigneeIds }, projectId, named),
         statuses.length > 0 && { kind: 'statuses', names: statuses },
         priorities.length > 0 && { kind: 'priorities', values: priorities },
+        dueLine(look),
         textOf(look.search, setup.LOOK_MAX.search) && { kind: 'search', text: textOf(look.search, setup.LOOK_MAX.search) },
         columns.length + planned.length > 0 && { kind: 'columns', names: shown, others: columns.length + planned.length - shown.length },
     ];
@@ -167,25 +202,36 @@ const planViewLines = (view, projectId, context) => {
     ];
 };
 
-/* A whole plan on one card: the statuses and lists by name, each field with its type, and each view followed by what it shows. */
-const planPreview = (change, context) => {
+/* The parts of a plan: the statuses and lists by name, each field with its type, and each view followed by what it shows. */
+const planLines = (change, context) => {
     const params = paramsOf(change);
-    const place = placeLine(params, context.named);
+    return [
+        namesLine('newStatuses', params.statuses, plans.STATUSES_MAX, plans.STATUS_NAME_MAX),
+        namesLine('newLists', params.lists, plans.LISTS_MAX, TEXT_MAX),
+        ...listOf(params.definitions).slice(0, setup.FIELDS_MAX).map(fieldLine),
+        ...planViews(change).flatMap((view) => planViewLines(view, idOf(params.projectId), context)),
+    ];
+};
+
+const planPreview = (change, context) => {
+    const place = placeLine(paramsOf(change), context.named);
     if (!place) return null;
+    return { kind: 'setup', title: place.project, lines: [place, ...planLines(change, context)].filter(Boolean) };
+};
+
+/* A project that is not there yet: its name, who will be on it, what it is for, and the plan that comes with it. */
+const projectPreview = (change, context) => {
+    const params = paramsOf(change);
+    const title = textOf(params.name, projects.NAME_MAX);
+    if (!title) return null;
     return {
-        kind: 'setup',
-        title: place.project,
-        lines: [
-            place,
-            namesLine('newStatuses', params.statuses, plans.STATUSES_MAX, plans.STATUS_NAME_MAX),
-            namesLine('newLists', params.lists, plans.LISTS_MAX, TEXT_MAX),
-            ...listOf(params.definitions).slice(0, setup.FIELDS_MAX).map(fieldLine),
-            ...planViews(change).flatMap((view) => planViewLines(view, idOf(params.projectId), context)),
-        ].filter(Boolean),
+        kind: 'project',
+        title,
+        lines: [{ kind: 'members', only: 'approver' }, descriptionLine({ rawDescription: params.description }), ...planLines(change, context)].filter(Boolean),
     };
 };
 
-const SETUPS = Object.freeze({ 'fields.create': fieldsPreview, 'view.create': viewPreview, [PLAN]: planPreview, [automation.ACTION]: automation.preview });
+const SETUPS = Object.freeze({ 'fields.create': fieldsPreview, 'view.create': viewPreview, [PLAN]: planPreview, [projects.ACTION]: projectPreview, [automation.ACTION]: automation.preview });
 const BUILDERS = Object.freeze({ ...Object.fromEntries(Object.keys(CREATES).map((action) => [action, createPreview])), ...SETUPS });
 const builderOf = (change) => (change && Object.hasOwn(BUILDERS, change.action) ? BUILDERS[change.action] : null);
 const isSetup = (change) => Boolean(change) && Object.hasOwn(SETUPS, change.action);
@@ -205,9 +251,10 @@ const fieldNamesFor = async (companyId, views) => {
     }));
 };
 
-/* The parent tasks the viewer can read, by id, each with its name and project. */
-const readableParents = async (companyId, uid, changes) => {
-    const asked = changes.filter((change) => CREATES[change.action].kind === 'subtask').map((change) => idOf(paramsOf(change).taskId)).filter(Boolean);
+/* The tasks waiting changes name that the viewer can read, by id, each with its name and project: the parent of a new subtask, and the task of a first value. */
+const readableTasks = async (companyId, uid, changes) => {
+    const parents = changes.filter((change) => isCreate(change) && CREATES[change.action].kind === 'subtask').map((change) => paramsOf(change).taskId);
+    const asked = [...parents, ...changes.flatMap(valuesIn).map((entry) => entry.taskId)].map(idOf).filter(Boolean);
     const readable = await readableTaskIds(companyId, uid, asked);
     if (!readable.length) return new Map();
     const tasks = await MongoDbCrudOpration(companyId, {
@@ -222,18 +269,90 @@ const forProposals = async (companyId, uid, proposals) => {
     if (!list.flatMap(changesOf).some(builderOf)) return new Map();
     const changes = list.flatMap(changesOf).filter(isCreate);
     const setups = list.flatMap(changesOf).filter(isSetup);
-    const parents = await readableParents(companyId, uid, changes);
+    const tasks = await readableTasks(companyId, uid, [...changes, ...setups]);
     const named = await names.resolver({ companyId, userId: String(uid), projectIds: [] }, {
-        projectIds: [...[...changes, ...setups].map((change) => idOf(paramsOf(change).projectId)), ...[...parents.values()].map((parent) => parent.projectId)].filter(Boolean),
+        projectIds: [...[...changes, ...setups].map((change) => idOf(paramsOf(change).projectId)), ...[...tasks.values()].map((task) => task.projectId)].filter(Boolean),
         sprintIds: changes.map((change) => idOf(paramsOf(change).sprintId)).filter(Boolean),
-        userIds: [...changes.flatMap((change) => peopleOf(CREATES[change.action].fields(paramsOf(change)))), ...setups.flatMap((change) => looksOf(change).flatMap((look) => peopleOf({ AssigneeUserId: look.assigneeIds })))],
+        userIds: [...changes.flatMap((change) => peopleOf(CREATES[change.action].fields(paramsOf(change)))), ...setups.flatMap((change) => looksOf(change).flatMap((look) => peopleOf({ AssigneeUserId: look.assigneeIds }))), ...setups.flatMap(valuesIn).flatMap((entry) => peopleIn(entry.value))],
     });
     const fieldNames = await fieldNamesFor(companyId, setups.filter((change) => named.project(idOf(paramsOf(change).projectId)).name));
-    const built = { named, parents, fieldNames, companyId, uid };
+    const built = { named, tasks, fieldNames, companyId, uid };
     return new Map(await Promise.all(list.map(async (proposal) => [
         String(proposal._id),
         await Promise.all(changesOf(proposal).map((change) => (builderOf(change) ? builderOf(change)(change, built) : null))),
     ])));
 };
 
-module.exports = { forProposals, DESCRIPTION_MAX };
+const SOURCE_MCP = 'mcp';
+const BATCH_NAMES = 5;
+const STATUS_CHANGES = Object.freeze(['task.status.set', 'task.status.change']);
+const EDITS = Object.freeze(['task.edit', 'task.update']);
+const EDITED = Object.freeze({
+    TaskName: (value) => ({ what: 'title', value: textOf(value) }),
+    rawDescription: () => ({ what: 'description', value: '' }),
+    Task_Priority: (value) => ({ what: 'priority', value: textOf(value, 10).toUpperCase() }),
+    DueDate: (value) => ({ what: 'due', value: textOf(value, 40) }),
+    startDate: (value) => ({ what: 'start', value: textOf(value, 40) }),
+    totalEstimatedTime: (value) => ({ what: 'estimate', value: Number(value) > 0 ? Math.round(Number(value)) : '' }),
+});
+const OTHER = 'other';
+const CHANGED = Object.freeze({
+    'task.assignees.set': 'assignees', 'task.assign': 'assignees', 'task.field.set': 'field', 'task.move': 'move', 'task.sprint.move': 'move',
+    'task.archive': 'archive', 'task.restore': 'restore', 'task.add': 'task', 'task.create': 'task', 'subtask.add': 'subtask', 'subtask.create': 'subtask',
+    'task.comment': 'comment', 'comment.create': 'comment', 'task.link': 'link',
+});
+
+/* A connected agent files one change for a call of its own, so several changes are a batch. */
+const isBatch = (proposal) => Boolean(proposal) && proposal.source === SOURCE_MCP && changesOf(proposal).length > 1;
+
+/* What one change of a batch changes: a status, each field an edit names, or its kind. The text is the proposal's own. */
+const changedBy = (change) => {
+    const params = paramsOf(change);
+    if (STATUS_CHANGES.includes(change.action)) return [{ what: 'status', value: textOf(objectOf(params.status).name, 60) }];
+    if (EDITS.includes(change.action)) {
+        return Object.entries(detailedFields(params)).map(([field, value]) => (Object.hasOwn(EDITED, field) ? EDITED[field](value) : { what: OTHER, value: '' }));
+    }
+    return [{ what: Object.hasOwn(CHANGED, change.action) ? CHANGED[change.action] : OTHER, value: '' }];
+};
+
+/* One line for each thing a batch changes, with how many tasks it changes that on: the value when every change
+ * sets the same one, `mixed` when they differ. A change that names no task, a new task for one, counts as its own. */
+const changeLinesOf = (changes) => {
+    const groups = new Map();
+    changes.forEach((change, at) => changedBy(change).forEach(({ what, value }) => {
+        const group = groups.get(what) || { on: new Set(), values: new Set() };
+        group.on.add(idOf(paramsOf(change).taskId).toLowerCase() || `change:${at}`);
+        group.values.add(value);
+        groups.set(what, group);
+    }));
+    return [...groups].map(([what, { on, values }]) => ({ kind: 'batchChange', what, count: on.size, value: values.size === 1 ? [...values][0] : '', mixed: values.size > 1 }));
+};
+
+const taskIdsOf = (changes) => [...new Set(changes.map((change) => idOf(paramsOf(change).taskId).toLowerCase()).filter(Boolean))];
+
+/* For each batch among the proposals, by proposal id: its one card. A task is named, and can be opened from the
+ * card, only when the viewer can read it; the rest are a count. */
+const forBatches = async (companyId, uid, proposals) => {
+    const batches = (Array.isArray(proposals) ? proposals : []).filter(isBatch);
+    if (!batches.length) return new Map();
+    const readable = await readableTaskIds(companyId, uid, batches.flatMap((proposal) => taskIdsOf(changesOf(proposal))));
+    const tasks = readable.length ? await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: readable.map(oid) }, deletedStatusKey: { $ne: 1 } }, { TaskName: 1, ProjectID: 1, sprintId: 1, folderObjId: 1 }],
+    }, 'find') : [];
+    const rowOf = new Map((tasks || []).map((task) => [String(task._id).toLowerCase(), {
+        taskId: String(task._id), name: textOf(task.TaskName), projectId: idOf(task.ProjectID), sprintId: idOf(task.sprintId), folderId: idOf(task.folderObjId),
+    }]));
+    return new Map(batches.map((proposal) => {
+        const changes = changesOf(proposal);
+        const ids = taskIdsOf(changes);
+        const shown = ids.map((id) => rowOf.get(id)).filter((row) => row && row.name).slice(0, BATCH_NAMES);
+        return [String(proposal._id), {
+            kind: 'batch',
+            tasks: ids.length,
+            changes: changes.length,
+            lines: [...changeLinesOf(changes), ids.length > 0 && { kind: 'batchTasks', tasks: shown, others: ids.length - shown.length }].filter(Boolean),
+        }];
+    }));
+};
+
+module.exports = { forProposals, forBatches, DESCRIPTION_MAX };

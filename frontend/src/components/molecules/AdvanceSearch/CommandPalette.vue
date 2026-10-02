@@ -82,8 +82,7 @@
                                 @click="run(row)"
                             >
                                 <span v-if="row.avatar" class="ah-avatar ah-avatar--sm pal__avatar">
-                                    <img v-if="row.avatar.image" :src="row.avatar.image" alt="" />
-                                    <template v-else>{{ row.avatar.initial }}</template>
+                                    <AvatarImage :src="row.avatar.image">{{ row.avatar.initial }}</AvatarImage>
                                 </span>
                                 <span v-else-if="row.swatch" class="pal__swatch" :style="{ background: row.swatch }"></span>
                                 <span v-else class="pal__icon" :class="row.iconClass"><ShellIcon :name="row.icon || 'dot'" :size="12" /></span>
@@ -161,6 +160,7 @@
 </template>
 
 <script setup>
+import AvatarImage from '@/components/atom/AvatarImage/AvatarImage.vue';
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';

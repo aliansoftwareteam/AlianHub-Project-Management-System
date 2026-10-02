@@ -156,7 +156,7 @@ const guardWorkingDays = (updateObject, key) => {
     const paths = Object.keys(updateObject).filter((path) => path.split('.')[0] === 'workingDays');
     if (!paths.length) return {};
     if (paths.some((path) => path !== 'workingDays') || (key && key !== '$set')) {
-        return { error: 'Working days must be sent as a full list with $set, or as null to use the company\'s.' };
+        return { error: 'Working days must be sent as a full list, or left empty to use the company\'s.' };
     }
     if (updateObject.workingDays === null) return { touched: true };
     const week = checkWorkingDays(updateObject.workingDays);

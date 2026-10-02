@@ -351,6 +351,7 @@ const executors = {
 
     ...require('./setupRequests').executors,
     ...require('./projectSetup').executors,
+    ...require('./projectCreate').executors,
     ...require('./automationRequests').executors,
 };
 

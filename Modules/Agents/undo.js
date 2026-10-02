@@ -42,8 +42,8 @@ const AUDITED_REFUSALS = [REASON.WINDOW_PASSED, REASON.NOT_VISIBLE, REASON.TARGE
 const LIST_KINDS = Object.freeze(['list', 'listName', 'listFolder']);
 /* A goal belongs to no project: whoever can edit the goal may undo a change to it. */
 const GOAL_KINDS = Object.freeze(['goalValue', 'goalSource']);
-/* A field, a view or a whole setup is the project's own: seeing the project is seeing it, and the route that takes it back asks the rest. */
-const SETUP_KINDS = Object.freeze(['fields', 'view', 'setup']);
+/* A field, a view, a whole setup or the project an agent asked for is the project's own: seeing the project is seeing it, and the route that takes it back asks the rest. */
+const SETUP_KINDS = Object.freeze(['fields', 'view', 'setup', 'project']);
 /* A rule is taken back by the Automations page's own delete, which asks whether the person undoing may. */
 const AUTOMATION_KIND = 'automation';
 const work = () => require('./workRequests');
@@ -62,6 +62,25 @@ const setTask = async (companyId, taskId, set, unset, pull) => {
     }, 'findOneAndUpdate');
     if (updated) socketEmitter.emit('update', { type: 'update', module: 'task', companyId, data: updated, updatedFields: set, actor: { kind: 'user' }, depth: 1 });
     return updated;
+};
+
+/* The first values a set of fields was given, newest first, each put back as undoing one field value puts it back.
+ * One on a task the person undoing cannot open stays, and so does the field that holds it. */
+const putBackValues = async (companyId, values, actor) => {
+    const kept = [];
+    let restored = 0;
+    for (const value of [...values].reverse()) {
+        const key = `customField.${value.fieldId}`;
+        if (!(await taskReadable(companyId, actor.userId, value.taskId))) {
+            const field = await findRow(companyId, SCHEMA_TYPE.CUSTOM_FIELDS, value.fieldId, { fieldTitle: 1 });
+            kept.push({ field: (field && field.fieldTitle) || '', reason: 'it is on a task you cannot open' });
+        } else {
+            const empty = value.previous === null || value.previous === undefined;
+            await setTask(companyId, value.taskId, empty ? {} : { [key]: value.previous }, empty ? { [key]: 1 } : undefined);
+            restored += 1;
+        }
+    }
+    return { restored, kept };
 };
 
 const inverses = {
@@ -211,8 +230,9 @@ const inverses = {
     /* Fields and views are taken back through the field and project routes, as the person undoing. A field that
      * holds a value or is on another project now stays, and the answer names it. */
     async fields(companyId, u, actor) {
+        const values = Array.isArray(u.values) ? await putBackValues(companyId, u.values, actor) : null;
         const out = await setupWork().withdrawFields({ companyId, who: undoer(actor), projectId: u.projectId, fieldIds: u.fieldIds });
-        return { projectId: u.projectId, ...out };
+        return { projectId: u.projectId, ...out, ...(values ? { values } : {}) };
     },
     async view(companyId, u, actor) {
         const out = await setupWork().withdrawView({ companyId, who: undoer(actor), projectId: u.projectId, viewId: u.viewId });
@@ -220,6 +240,7 @@ const inverses = {
     },
     ...require('./manager/workQueue').inverses,
     ...require('./projectSetup').inverses,
+    ...require('./projectCreate').inverses,
     ...require('./automationRequests').inverses,
 };
 

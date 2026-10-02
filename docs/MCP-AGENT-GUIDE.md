@@ -12,9 +12,9 @@ Three things, in this order.
 
    | Setting | Adds |
    |---|---|
-   | `MCP_TOOLS_DATA=on` | `projects.list`, `project.get`, `sprints.list`, `statuses.list`, `comments.list`, `pages.search`, `page.get`, `timesheet.read`, `comment.create`, `timelog.create`, `screen.link`, `person.place` |
+   | `MCP_TOOLS_DATA=on` | `projects.list`, `project.get`, `sprints.list`, `statuses.list`, `comments.list`, `pages.search`, `page.get`, `timesheet.read`, `comment.create`, `timelog.create`, `screen.link`, `person.place`, `person.me`, `workdays.get`, `task.fields.list`, `chat.channels.list`, `chat.messages.list`, `proposal.get` |
    | `MCP_TOOLS_MANAGE=on` | The task management tools and the doc writing tools below, for tokens created with the matching grant |
-   | `MCP_TOOLS_WORK=on` | `tags.list`, `task.tags.add`, `task.tags.remove`, `task.relations.list`, `task.relation.add`, `task.relation.remove`, `lists.list`, `list.create`, `list.rename`, `list.move`, `page.comments.list`, `page.comment.create`, `page.comment.reply`, `page.comment.assign`, `goals.list`, `goal.get`, `goal.target.set`, `goal.target.sources.add`, `goal.target.sources.remove`, `task.lists.list`, `task.lists.add`, `task.lists.remove`, `fields.create`, `view.create`, `automation.catalogue`, `automation.create`, `project.setup`, and `sprintId` on `tasks.search`, for every token that reads or writes; none of them needs a grant |
+   | `MCP_TOOLS_WORK=on` | `tags.list`, `task.tags.add`, `task.tags.remove`, `task.relations.list`, `task.relation.add`, `task.relation.remove`, `lists.list`, `list.create`, `list.rename`, `list.move`, `page.comments.list`, `page.comment.create`, `page.comment.reply`, `page.comment.assign`, `goals.list`, `goal.get`, `goal.target.set`, `goal.target.sources.add`, `goal.target.sources.remove`, `task.lists.list`, `task.lists.add`, `task.lists.remove`, `fields.create`, `view.create`, `automation.catalogue`, `automation.create`, `project.setup`, `project.create`, and `sprintId` on `tasks.search`, for every token that reads or writes; none of them needs a grant |
    | `MCP_TOOLS_V2=on` | Names next to ids, paged lists, and a person's approval for any call that cannot be undone |
 
 2. **What the token was created with.** A token has scopes (read, write) and may have grants:
@@ -23,16 +23,19 @@ Three things, in this order.
    |---|---|
    | `tasks:manage` | `task.update`, `task.assign`, `task.field.set`, `task.move`, `task.archive`, `task.restore`, `tasks.batch`, `comment.update`, the reads `fields.list`, `subtasks.list`, `members.list`, `task.history`, `task.links.list`, and the fuller forms of `tasks.search`, `task.get`, `task.create`, `subtask.create`, `task.comment` and `task.status.set` |
    | `docs:manage` | `page.create`, `page.update` |
+   | `chat:read` | `chat.channels.list`, `chat.messages.list` |
 
-   A token keeps exactly what it was created with. A grant cannot be added to a token later, so a token made before these tools existed lists and runs exactly what it did before; create a new token to use them. The two grants are separate: a token may manage tasks without writing docs, and the reverse.
+   A token keeps exactly what it was created with. A grant cannot be added to a token later, so a token made before these tools existed lists and runs exactly what it did before; create a new token to use them. The grants are separate: a token may manage tasks without writing docs, and the reverse. Reading chat is its own grant too: no scope and no other grant carries it, so a token reads chat only when its person ticked it by name.
 
 3. **What the person may do.** Each call is checked against the person's role and the project's permissions, the projects and private lists they can open, and the token's own project list when it was narrowed to some projects. Another person's personal list and a conversation the person is not in are closed to everyone, owners and admins included.
 
-An agent connected through OAuth (`MCP_OAUTH`) is held to the scopes its connection names. It can hold either grant as the scope of the same name, `tasks:manage` or `docs:manage`, and only when all three of these are true:
+An agent connected through OAuth (`MCP_OAUTH`) is held to the scopes its connection names. It can hold each grant as the scope of the same name, `tasks:manage`, `docs:manage` or `chat:read`, and only when all three of these are true:
 
 - **The app asked for it** when it sent the person to sign in.
-- **The person ticked it** on the consent screen. Both start unticked, each with a sentence saying what it allows; everything else the app asked for is granted together as before.
-- **An owner or admin approved it for that app by name** under Settings, Agent clients. Approving an app without choosing permissions never includes either one, and an app an admin registered without a list of permissions cannot be given them at all; register it again naming them.
+- **The person ticked it** on the consent screen. Each starts unticked, with a sentence saying what it allows (for `chat:read`, "Read messages in channels you are in"); everything else the app asked for is granted together as before.
+- **An owner or admin approved it for that app by name** under Settings, Agent clients. Approving an app without choosing permissions never includes any of them, and an app an admin registered without a list of permissions cannot be given them at all; register it again naming them.
+
+`chat:read` is listed and can be asked for only while `MCP_TOOLS_DATA` is on. It is not one of the scopes an app gets when it asks for none, and `tasks:read` does not include it: an app connected before it existed reads no chat until its person connects it again and ticks it.
 
 The `MCP_TOOLS_WORK` tools take the plain scopes: `projects:read` for `tags.list`, `lists.list`, `goals.list` and `goal.get`, `tasks:read` for `task.relations.list` and `task.lists.list`, `docs:read` for `page.comments.list`, and `tasks:write` for each of their writes.
 
@@ -55,8 +58,8 @@ Sign-up ends on a step called **Connect your AI**, and the same page stays under
 In the web app, open the AI accounts page, choose **My account**, then **New token**.
 
 - Give it a name, and choose the project it is limited to, or all your projects.
-- Tick **Let this agent manage tasks** to create it with `tasks:manage`, and **Let this agent write docs** to create it with `docs:manage`. The boxes are shown only while `MCP_TOOLS_MANAGE` is on. Leave both unticked for an agent that should only read, comment, set an in-progress status and file tasks, and, where `MCP_TOOLS_WORK` is on, tag and link tasks, create, rename and move lists and comment on docs.
-- Where the server requires it, choose an expiry and the read and write scopes. A grant needs the write scope.
+- Tick **Let this agent manage tasks** to create it with `tasks:manage`, and **Let this agent write docs** to create it with `docs:manage`. The boxes are shown only while `MCP_TOOLS_MANAGE` is on. Tick **Let this agent read chat** to create it with `chat:read`; that box is shown only while `MCP_TOOLS_DATA` is on. Leave both unticked for an agent that should only read, comment, set an in-progress status and file tasks, and, where `MCP_TOOLS_WORK` is on, tag and link tasks, create, rename and move lists and comment on docs.
+- Where the server requires it, choose an expiry and the read and write scopes. A manage grant needs the write scope, and reading chat needs the read scope.
 
 The token is shown once. Add it to the agent as a bearer token:
 
@@ -320,7 +323,19 @@ These need `MCP_TOOLS_WORK` and the write scope, and no grant. A field or a view
 { "name": "fields.create", "arguments": { "projectId": "<project id>", "fields": [{ "name": "Budget", "type": "money" }, { "name": "Region", "type": "dropdown", "options": ["North", "South"] }] } }
 ```
 
-`view.create`: add a saved view to one project. Arguments: `projectId`, `name`, `kind` (`list`, `board`, `table`, `calendar` or `workload`; a list when left out), and what the view shows: `groupBy` and `sortBy` (a built-in choice or the id of a custom field), `sortDirection`, `mine`, `assigneeIds`, `statuses` (by name), `priorities`, `search`, `subtasks` and `showFieldIds`. The view starts as a copy of the project's view of that kind, as "duplicate view" does; a project with no view of that kind answers so at once. A status or a field the project does not have is left out, and the result's `leftOut` names the part. The result holds the view's web address when the server has one set.
+The fields and their first values can be one approval: add `values`, up to 50, each with `taskId`, `field` (the name of a field of this call or of one the project already has) and `value` (as `task.field.set` takes it; `null` clears).
+
+```json
+{ "name": "fields.create", "arguments": { "projectId": "<project id>", "fields": [{ "name": "Cost", "type": "number" }], "values": [{ "taskId": "<task id>", "field": "Cost", "value": 120 }] } }
+```
+
+- `values` is for a connection that may use `task.field.set` itself: the tool is on (`MCP_TOOLS_MANAGE`) and the connection holds `tasks:manage`. Any other connection is refused, and nothing is filed.
+- The call is refused at once, and nothing is filed, when a task is not one of that project that the person can open, when a field name is neither in the call nor in the project, when a value is not one the field takes, or when the person may not edit custom fields on a task.
+- The Inbox card lists each value under the fields, on its task by name. A value on a task the person looking cannot open is counted, not named.
+- Approved, the fields are made first, then each value is set as `task.field.set` sets it, and only on a live task of the project that the person behind the token and the approver can both open and may both edit the fields of. A value that is not set does not stop the others: `values` in the result says, for each, `set` or the reason.
+- Undo puts each value back to what the task held, then takes the fields away as above. A value on a task the person undoing cannot open stays, and so does the field that holds it.
+
+`view.create`: add a saved view to one project. Arguments: `projectId`, `name`, `kind` (`list`, `board`, `table`, `calendar` or `workload`; a list when left out), and what the view shows: `groupBy` and `sortBy` (a built-in choice or the id of a custom field), `sortDirection`, `mine`, `assigneeIds`, `statuses` (by name), `priorities`, `search`, `subtasks`, `showFieldIds`, and a due date: `due` (`today`, `tomorrow`, `this_week`, `next_week`, `next_7_days`, `this_month` or `overdue`) or a range of days in `dueFrom` and `dueTo` (`YYYY-MM-DD`). The due date is stored as the row the task filter saves, so a span is counted from the day the view is opened, a day of a range is that day where the person looking is, and `overdue` is "due before today" whatever the status; add `statuses` to leave closed tasks out. The view starts as a copy of the project's view of that kind, as "duplicate view" does; a project with no view of that kind answers so at once. A status or a field the project does not have is left out, and the result's `leftOut` names the part. The result holds the view's web address when the server has one set.
 
 ```json
 { "name": "view.create", "arguments": { "projectId": "<project id>", "name": "My open work", "kind": "board", "groupBy": "priority", "mine": true } }
@@ -339,6 +354,20 @@ What happens to a plan:
 - A status is added as a working stage, before the statuses that close a task. A status the project already has by that name is kept. One the company has in its own status list is taken from there with its colours. One the company does not have is added to that list first, which only an owner or an admin may do: the plan's person and its approver both have to be one, or that status is not made.
 - Lists are created at the top level of the project. A list is not checked against the lists the project has, so read `lists.list` first.
 - Undo takes back what the plan made, newest part first: its views, its fields (as for `fields.create`), its lists while they are empty, and its statuses while no task is in them. Whatever is in use stays, and the undo names it and says why. A status added to the company's list stays in that list, as it does when a person takes a status off a project.
+
+`project.create`: ask for a new project, with or without a plan for it, in one call. Arguments: `name` (3 to 100 characters), `description` (what it is for, up to 2000 characters), any of `statuses`, `lists`, `fields` and `views` as in `project.setup`, and `reason`. A view is a list or a board view, the kinds a new project starts with, and names no person and no field by id. The project and its plan are one proposal and one approval, and the Inbox shows the name, who will be on it and every part on one card. It cannot make an automation or a task.
+
+```json
+{ "name": "project.create", "arguments": { "name": "Website relaunch", "description": "Everything for the new site.", "statuses": ["In Review"], "lists": ["Backlog", "This week"], "fields": [{ "name": "Budget", "type": "money" }], "views": [{ "name": "Review board", "kind": "board", "groupBy": "status", "showFields": ["Budget"] }] } }
+```
+
+What happens to a new project:
+
+- The call makes nothing. It is refused at once when the person behind the token may not create a project by hand, or may not make a part of the plan under the company's permissions, and the answer says which. A token kept to some projects cannot ask for one.
+- Approved, the project is made by the Create project screen's own route, as the person who approved, who must be allowed to create a project by hand. It is a blank project (To Do, In Progress and Done, one list, a list and a board view), private, with only the approver on it. Its key is made from the first letters of its name, with a number added when that key is taken.
+- Then the description and each part of the plan are made as `project.setup` makes them: as the person behind the token, and only where the approver may make that part too. When someone other than that person approved, the person is not on the new project (unless they are an owner or an admin), so no part is made and `notMade` says so; the approver adds them, and `project.setup` does the rest.
+- The proposal is listed for the person whose agent asked and for owners and admins.
+- Undo moves the project to the trash through the project's own route, as the person undoing, who must be allowed to delete it; a person restores it from the trash. A project that holds a task or a doc by then stays: the undo is refused and says why. Nothing is deleted for good.
 
 Undo, from the Inbox or the agent audit log: a view an agent added is removed, and nothing else. Each field it made is switched off, as the field form's own switch does, only while it is still that project's alone and no task holds a value in it. A field that holds a value, or that someone has since put on another project, stays, and the undo names it and says why.
 
@@ -473,7 +502,7 @@ The text is fixed and ships with the server. It holds no name, id or other data 
 
 | Prompt | Shown as | Arguments | What it does |
 |---|---|---|---|
-| `set_up_my_project` | Set up my project | `project` | Asks a few questions, reads what the project has, shows the whole plan, and makes it only after a yes. On a connection that may run `project.setup` the statuses, lists, fields and views go in that one call and wait for the person's approval in AlianHub; elsewhere the agent makes lists and first tasks and leaves the rest to the person. Offered only to a connection that may create tasks |
+| `set_up_my_project` | Set up my project | `project` | Asks a few questions, reads what the project has, shows the whole plan, and makes it only after a yes. On a connection that may run `project.setup` the statuses, lists, fields and views go in that one call and wait for the person's approval in AlianHub; elsewhere the agent makes lists and first tasks and leaves the rest to the person. Where the person has no project for the work yet, a connection that may run `project.create` asks for the project and its setup in one call; elsewhere the person makes the project first. Offered only to a connection that may create tasks |
 | `plan_my_day` | Plan my day | `project` | What to do first today, what can wait, what is late. Changes nothing |
 | `what_is_at_risk` | What is at risk | `project` | Overdue work, tasks nobody owns, work that stopped moving, the biggest risks first. Changes nothing |
 | `write_the_status_report` | Write the status report | `project`, `period` | A short report shown in the conversation first; saved as a doc only where `page.create` is offered and after a yes |
@@ -495,7 +524,13 @@ A prompt is fixed text too. It reads nothing itself: it tells the agent which to
 | `doc` | `pageId` | The doc |
 | `home`, `everything`, `projects`, `inbox`, `planner`, `docs`, `goals` | nothing | That screen |
 
-`view` is one of `list`, `board`, `calendar`, `gantt`, `table`, `workload`, `dashboard`, `activity`. The workload view opens on the current week; a link cannot carry another week, a grouping or a filter yet.
+`view` is one of `list`, `board`, `calendar`, `gantt`, `table`, `workload`, `dashboard`, `activity`. The workload view opens on the current week; a link cannot carry another week.
+
+A link carries no grouping or filter of its own: the project screen reads them from a saved view, and only the everything screen reads "mine" from its address. So:
+
+- `everything` with `mine: true` opens on the person's own tasks. It takes nothing else.
+- A `project` or a `list` takes `groupBy`, `mine`, `statuses`, `priorities` and `due` (or `dueFrom` and `dueTo`), as `view.create` does, with `view` one of `list`, `board`, `table`, `calendar` or `workload` (a list when left out). When the project has a saved view of that kind that shows exactly those tasks, grouped that way when a grouping is named, the link opens it and `savedView` holds its name. When it has none, the plain link comes back with a `note` that says so, and nothing is saved.
+- Any other screen or view refuses these arguments.
 
 ```json
 { "name": "screen.link", "arguments": { "screen": "project", "projectId": "<project id>", "view": "workload" } }
@@ -511,13 +546,46 @@ The answer is `{ "url": "...", "screen": "project", "view": "workload" }`. A thi
 
 The answer is `{ "place": { "kind": "task", "project": { "id", "name" }, "sprint": { "id", "name" }, "task": { "id", "name" }, "openedAt": "...", "minutesAgo": 5 }, "fresh": true, "earlier": [ ... ], "note": "..." }`. `kind` is `task`, `sprint` (a list) or `project`. `fresh` is false when the place is more than 60 minutes old, and `place` is null when there is none; either way the note tells the agent to ask the person where they mean. It reads the visits the web app already records and adds none. A place the person can no longer open, a deleted one, and anything outside a token's project list are left out. It does not know which chat or doc the person has open.
 
+**"Who am I".** `person.me` says who the connection acts for, so "assign it to me" and "due tomorrow" mean something. It needs `MCP_TOOLS_DATA` and the right to read projects, and it takes no argument: it answers only for the person behind the connection.
+
+```json
+{ "name": "person.me", "arguments": {} }
+```
+
+The answer is `{ "userId": "...", "name": "...", "role": "member", "timeZone": "Asia/Kolkata", "today": "2026-10-03", "note": "..." }`. `role` is `owner`, `admin`, `member`, `guest`, or `custom` for a role the workspace made itself. `today` is the day it is in the person's time zone. With no time zone stored, `timeZone` is null, `today` is the day in UTC and the note says so.
+
+**Working days.** `workdays.get` answers the days of the week the workspace works, or the days one project works when `projectId` is given: a project can have a week of its own. It needs `MCP_TOOLS_DATA` and the right to read projects.
+
+The answer is `{ "of": "workspace", "workingDays": ["Monday", ...], "dayNumbers": [1, 2, 3, 4, 5], "daysOff": ["Sunday", "Saturday"], "holidays": null, "note": "..." }`. `of` is `project` when the project has its own week, and `dayNumbers` count from 0 for Sunday. AlianHub keeps no list of public holidays, so `holidays` is always null, and a person's time off is not read here. A project the person cannot open answers `{ "error": "project not found" }`, as a missing one does.
+
+**A task's fields.** `task.fields.list` answers the custom fields of one task with what each holds. It needs `MCP_TOOLS_DATA`, the right to read tasks, and a role that is shown custom fields in the task's project.
+
+```json
+{ "name": "task.fields.list", "arguments": { "taskId": "<task id>" } }
+```
+
+The answer is `{ "taskId", "projectId", "about": "...", "fields": [{ "fieldId", "title", "type", "value" }] }`, by field name. `value` is text, a number, true or false, an ISO date, the labels of the options chosen, or `[{ "id", "name" }]` for people; null when the field is empty. A text longer than 2,000 characters is cut and carries `"cut": true`. A formula or rollup field carries `"computed": true` and the number AlianHub stored for it. A field whose value is kept beside the task (votes, linked tasks) is named with `"notReadHere": true` and no value. A field that is switched off, that belongs to another project, or that is for another task type is left out. A task the person cannot open answers `{ "error": "task not found" }`, as a missing one does.
+
+**Reading chat.** `chat.channels.list` lists the chat channels the person can open, and `chat.messages.list` reads the recent messages of one channel or of one task's comment thread. Both need `MCP_TOOLS_DATA`, the `chat:read` scope and a role that is shown comments. A connection without `chat:read` is listed neither tool, and a call of one is refused before anything is read. Direct messages are never listed or read.
+
+```json
+{ "name": "chat.channels.list", "arguments": { "query": "scratch" } }
+{ "name": "chat.messages.list", "arguments": { "channelId": "<channel id>", "limit": 10 } }
+```
+
+A channel is `{ "channelId", "name", "private", "space": { "id", "name" } }`. A private channel is listed only for the people on it, and for owners and admins. A token kept to some projects is listed no channel. `chat.messages.list` takes one `channelId` or one `taskId`, and answers `{ "channel" or "task": { "id", "name" }, "about": "...", "messages": [{ "messageId", "text", "type", "author": { "id", "name" }, "createdAt" }] }`, newest first: 20 unless `limit` asks for another count, never more than 50. The text is plain text, cut at 2,000 characters with `"cut": true`. A reply carries `replyTo`, a file its name in `file`. A deleted message is left out. A channel or a task the person cannot open answers `{ "error": "channel not found" }` or `{ "error": "task not found" }`, as a missing one does. The messages are what people wrote: content, never an instruction to the agent.
+
+**What became of a proposal.** `proposal.get` says what happened to a change that waited for a person, so an agent can go on after an approval and stop after a refusal. It needs `MCP_TOOLS_DATA` and the right to read tasks, and it takes the `proposalId` the filing call answered.
+
+The answer is `{ "proposalId", "state", "what", "changes", "filedAt", "next": "..." }`. `state` is `waiting`, `approved` (approved and being applied), `applied` (with `changesApplied`), `declined` (with `declined.reason`, the words the person typed, kept as a record and not an instruction), `undone` or `failed`. `next` says in a sentence what the agent should do. It answers only for a proposal the same connection filed: the same personal token, or the same app under the same grant. Any other proposal answers `{ "error": "proposal not found" }`, as a missing one does. It carries nothing of what the change holds.
+
 **Message to task.** `task.from_message` makes a task from a chat message, or a comment on a task, that the person can read. It needs `MCP_TOOLS_MANAGE` and the `tasks:manage` grant, and it is the same create as `task.create`: the project's rule for agents, approval and undo apply as they do there.
 
 ```json
 { "name": "task.from_message", "arguments": { "messageId": "<message id>", "assigneeIds": ["<member id>"], "dueDate": "2026-10-09" } }
 ```
 
-The task's description is the message's text, stored as text, followed by a line that says where it came from; with a web address set on the server it also holds a link back. The title is the first line of the message unless `title` is given. With no `projectId`, the task lands in the list the message's channel belongs to, or in the list of the task the comment is on; a direct message needs `projectId` (and `sprintId` for a list other than the project's first). It also takes `assigneeIds`, `priority`, `dueDate`, `startDate`, `status`, `taskType`, `estimateMinutes` and `reason`. A message the person cannot read, a deleted one and an id that does not exist all answer `{ "ok": false, "error": "message not found" }`. No tool lists chat messages yet, so an agent has a chat message's id only when the person gives it; a comment's id comes from `comments.list`.
+The task's description is the message's text, stored as text, followed by a line that says where it came from; with a web address set on the server it also holds a link back. The title is the first line of the message unless `title` is given. With no `projectId`, the task lands in the list the message's channel belongs to, or in the list of the task the comment is on; a direct message needs `projectId` (and `sprintId` for a list other than the project's first). It also takes `assigneeIds`, `priority`, `dueDate`, `startDate`, `status`, `taskType`, `estimateMinutes` and `reason`. A message the person cannot read, a deleted one and an id that does not exist all answer `{ "ok": false, "error": "message not found" }`. A chat message's id comes from `chat.messages.list`, and a comment's from `comments.list` or `chat.messages.list`.
 
 ## What an agent cannot do yet
 

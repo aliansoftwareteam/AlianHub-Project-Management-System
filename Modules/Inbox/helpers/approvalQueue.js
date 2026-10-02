@@ -35,7 +35,7 @@ const alwaysOf = (caller, proposal) => {
     return offered ? { always: true, alwaysKind: standingApprovals.labelOf(proposal.changes[0].action) } : { always: false };
 };
 
-const toRow = (caller, previews) => (proposal) => ({
+const toRow = (caller, previews, batches = new Map()) => (proposal) => ({
     sourceType: 'proposal',
     sourceId: String(proposal._id),
     proposalId: String(proposal._id),
@@ -51,6 +51,7 @@ const toRow = (caller, previews) => (proposal) => ({
         const preview = (previews.get(String(proposal._id)) || [])[at];
         return { action: change.action, params: change.params || {}, label: change.label || change.action, reversible: Boolean(change.reversible), ...(preview ? { preview } : {}) };
     }),
+    ...(batches.has(String(proposal._id)) ? { batch: batches.get(String(proposal._id)) } : {}),
     cost: proposal.cost || null,
     gate: proposal.gate || null,
     locked: !access.mayDecideProposal(caller, proposal),
@@ -82,11 +83,12 @@ const readQueue = async (companyId, userId) => {
     }, 'find');
     const listed = (rows || []).map(plain).filter(staysInside(scope.projectIds));
     // The queue is still worth showing without its cards.
-    const previews = await intentPreview.forProposals(companyId, userId, listed).catch((error) => {
+    const cards = (build) => build(companyId, userId, listed).catch((error) => {
         logger.error(`[inbox] proposal previews: ${error.message}`);
         return new Map();
     });
-    return Promise.all(listed.map(toRow(caller, previews)).map(heldToOwnRights(companyId, userId)));
+    const [previews, batches] = await Promise.all([cards(intentPreview.forProposals), cards(intentPreview.forBatches)]);
+    return Promise.all(listed.map(toRow(caller, previews, batches)).map(heldToOwnRights(companyId, userId)));
 };
 
 const waitingCount = (rows) => rows.filter((row) => !row.locked).length;

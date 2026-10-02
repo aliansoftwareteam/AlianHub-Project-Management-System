@@ -429,10 +429,9 @@ describe('comments', () => {
 });
 
 describe('tasks.batch', () => {
-    it('runs each operation on its own, reports each, and records the ones that applied as one group a person can undo', async () => {
+    it('on one task, runs each operation on its own, reports each, and records the ones that applied as one group a person can undo', async () => {
         const out = await rpc(ctx(MEMBER), 'tasks.batch', { reason: 'weekly tidy', operations: [
-            { tool: 'task.status.set', arguments: { taskId: fx.top._id, status: 'Done' } },
-            { tool: 'task.update', arguments: { taskId: fx.private._id, title: 'Not mine' } },
+            { tool: 'task.status.set', arguments: { taskId: fx.bug._id, status: 'Done' } },
             { tool: 'task.assign', arguments: { taskId: fx.bug._id, mode: 'add', userIds: [MEMBER] } },
             { tool: 'task.update', arguments: { taskId: fx.bug._id, colour: 'red' } },
             { tool: 'tasks.search', arguments: {} },
@@ -440,44 +439,59 @@ describe('tasks.batch', () => {
             { tool: 'page.create', arguments: { title: 'Notes' } },
             { tool: 'subtask.create', arguments: { taskId: fx.bug._id, title: 'Follow up' } },
         ] });
-        expect(out).toMatchObject({ ok: false, applied: 3, notApplied: 5, undoable: true });
+        expect(out).toMatchObject({ ok: false, applied: 3, notApplied: 4, undoable: true });
         expect(out.items.map((item) => [item.index, item.tool, item.ok])).toEqual([
-            [0, 'task.status.set', true], [1, 'task.update', false], [2, 'task.assign', true], [3, 'task.update', false],
-            [4, 'tasks.search', false], [5, 'tasks.batch', false], [6, 'page.create', false], [7, 'subtask.create', true],
+            [0, 'task.status.set', true], [1, 'task.assign', true], [2, 'task.update', false],
+            [3, 'tasks.search', false], [4, 'tasks.batch', false], [5, 'page.create', false], [6, 'subtask.create', true],
         ]);
-        expect(out.items[1]).toMatchObject({ refused: true, reason: expect.stringMatching(/^not_visible/) });
-        expect(out.items[3].error).toMatch(/colour is not an argument/);
-        expect(out.items[4].error).toMatch(/not a write tool a batch can run/);
-        expect(out.items[6].error).toMatch(/not a write tool a batch can run/);
-        expect(stored(fx.top._id).statusType).toBe('close');
+        expect(out.items[2].error).toMatch(/colour is not an argument/);
+        expect(out.items[3].error).toMatch(/not a write tool a batch can run/);
+        expect(out.items[5].error).toMatch(/not a write tool a batch can run/);
+        expect(stored(fx.bug._id).statusType).toBe('close');
         expect(stored(fx.bug._id).AssigneeUserId).toEqual([OTHER, MEMBER]);
-        expect(stored(fx.private._id).TaskName).toBe('Task PRV-1');
         expect(rows(SCHEMA_TYPE.PAGES).map((row) => row.title)).not.toContain('Notes');
+        expect(proposals.create).not.toHaveBeenCalled();
 
         const [group] = audits('tasks.batch');
-        const applied = [out.items[0].auditId, out.items[2].auditId, out.items[7].auditId];
+        const applied = [out.items[0].auditId, out.items[1].auditId, out.items[6].auditId];
         expect(group).toMatchObject({ action: 'agent.action', meta: { state: 'applied', reason: 'weekly tidy', undo: { kind: 'batch', auditIds: applied }, params: { tools: ['task.status.set', 'task.assign', 'subtask.create'] } } });
         expect(String(group._id)).toBe(String(out.auditId));
 
         const undone = await inverses.batch(CID, group.meta.undo, person(OWNER));
         await settle();
         expect(undone).toMatchObject({ undone: 3 });
-        expect(stored(fx.top._id).statusType).toBe('active');
+        expect(stored(fx.bug._id).statusType).toBe('active');
         expect(stored(fx.bug._id).AssigneeUserId).toEqual([OTHER]);
-        expect(stored(out.items[7].result.subtaskId).deletedStatusKey).toBe(1);
+        expect(stored(out.items[6].result.subtaskId).deletedStatusKey).toBe(1);
     });
 
-    it('records no group when nothing applied, and each item is undone only by someone who can open it', async () => {
+    it('on more than one task, runs nothing and files the operations a call could make as one proposal', async () => {
+        const before = snapshot();
+        const out = await rpc(ctx(MEMBER), 'tasks.batch', { reason: 'weekly tidy', operations: [
+            { tool: 'task.status.set', arguments: { taskId: fx.top._id, status: 'Done' } },
+            { tool: 'task.update', arguments: { taskId: fx.private._id, title: 'Not mine' } },
+            { tool: 'task.assign', arguments: { taskId: fx.bug._id, mode: 'add', userIds: [MEMBER] } },
+        ] });
+        expect(out).toMatchObject({ ok: false, pending: true, proposalId: 'proposal-1', applied: 0, notApplied: 3, waiting: 2, undoable: false });
+        expect(out.items.map((item) => [item.index, item.pending === true])).toEqual([[0, true], [1, false], [2, true]]);
+        expect(out.items[1]).toMatchObject({ refused: true, reason: expect.stringMatching(/^not_visible/) });
+        expect(snapshot()).toBe(before);
+        expect(audits('tasks.batch')).toHaveLength(0);
+        expect(proposals.create).toHaveBeenCalledTimes(1);
+        expect(proposals.create.mock.calls[0][1]).toMatchObject({
+            source: 'mcp', requestedBy: MEMBER, projectId: P_OPEN, taskId: null, taskIds: [String(fx.top._id), String(fx.bug._id)],
+            changes: [{ action: 'task.status.change', params: { taskId: String(fx.top._id) } }, { action: 'task.assignees.set', params: { taskId: String(fx.bug._id) } }],
+        });
+    });
+
+    it('records no group when nothing applied, and each item of a group is undone only by someone who can open it', async () => {
         const none = await rpc(ctx(MEMBER), 'tasks.batch', { operations: [{ tool: 'task.update', arguments: { taskId: fx.private._id, title: 'x' } }] });
         expect(none).toMatchObject({ ok: false, applied: 0, auditId: null, undoable: false });
         expect(audits('tasks.batch')).toHaveLength(0);
 
-        const out = await rpc(ctx(OWNER), 'tasks.batch', { operations: [
-            { tool: 'task.update', arguments: { taskId: fx.private._id, priority: 'HIGH' } },
-            { tool: 'task.update', arguments: { taskId: fx.top._id, priority: 'HIGH' } },
-        ] });
-        expect(out).toMatchObject({ ok: true, applied: 2 });
-        const undone = await inverses.batch(CID, audits('tasks.batch')[0].meta.undo, person(MEMBER));
+        const hidden = await rpc(ctx(OWNER), 'task.update', { taskId: fx.private._id, priority: 'HIGH' });
+        const open = await rpc(ctx(OWNER), 'task.update', { taskId: fx.top._id, priority: 'HIGH' });
+        const undone = await inverses.batch(CID, { kind: 'batch', auditIds: [hidden.auditId, open.auditId] }, person(MEMBER));
         expect(undone.items.map((item) => item.ok)).toEqual([true, false]);
         expect([stored(fx.top._id).Task_Priority, stored(fx.private._id).Task_Priority]).toEqual(['MEDIUM', 'HIGH']);
     });

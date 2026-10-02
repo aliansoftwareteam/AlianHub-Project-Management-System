@@ -358,4 +358,4 @@ const inverses = {
     },
 };
 
-module.exports = { executors, inverses, planOf, planProblem, refusedParts, viewOf, PARTS, STATUSES_MAX, LISTS_MAX, VIEWS_MAX, STATUS_NAME_MAX };
+module.exports = { executors, inverses, planOf, planProblem, refusedParts, viewOf, partsOf, keysOf, carryOut, notMadeIn, PARTS, STATUSES_MAX, LISTS_MAX, VIEWS_MAX, STATUS_NAME_MAX };

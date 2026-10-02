@@ -170,6 +170,7 @@
 .mbv__agent:last-child { border-bottom: 0; }
 .mbv__agent-name { color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
 .mbv__agent-note { min-width: 0; overflow-wrap: anywhere; }
+.mbv__agent-where { flex-basis: 100%; }
 
 .mbv__role-select {
     max-width: 100%;

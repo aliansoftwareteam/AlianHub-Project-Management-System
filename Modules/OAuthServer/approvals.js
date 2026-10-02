@@ -141,13 +141,13 @@ const scopesOf = (value) => {
 };
 
 /* Without scopes named, the ceiling is what was asked for plus reading, or for a pre-registered client, what it
- * was registered with. A manage scope is never part of it: an approval holds one only when the owner or admin
+ * was registered with. An opt-in scope is never part of it: an approval holds one only when the owner or admin
  * deciding named it. */
 const defaultScopes = (client, existing) => {
     const implied = client.kind === 'preregistered'
         ? config.namedScopes(client)
         : [...config.READ_SCOPES, ...((existing && existing.requestedScopes) || [])];
-    return inScopeOrder(implied).filter((scope) => !config.isManageScope(scope));
+    return inScopeOrder(implied).filter((scope) => !config.isOptInScope(scope));
 };
 
 async function approve({ companyId, client, scopes, privateSprints, actor, now = new Date() }) {

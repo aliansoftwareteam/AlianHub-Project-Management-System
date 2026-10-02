@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
@@ -16,6 +19,7 @@ vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 
 import '@/store';
 import AvatarImage from '@/components/atom/AvatarImage/AvatarImage.vue';
 import ListAssigneeCell from '@/views/Projects/ListView/ListAssigneeCell.vue';
+import PeopleFieldValue from '@/plugins/customFieldView/fieldTypes/PeopleFieldValue.vue';
 import { clearSignedProfileUrls } from '@/composable/useSignedProfileUrl';
 
 const STORED = '6a8e1f_52097645091_profile.png';
@@ -108,5 +112,52 @@ describe('the assignee cell in the List view', () => {
         resolveSigned();
         await flushPromises();
         expect(srcs(wrapper)).toEqual([SIGNED]);
+    });
+});
+
+describe('a people field, as a Table cell and in the task panel', () => {
+    const OLIVIA = 'a1a1a1a1a1a1a1a1a1a1a1a1';
+    const store = createStore({
+        getters: {
+            'settings/companyUsers': () => [{ userId: OLIVIA, isDelete: false }],
+            'users/users': () => [{ _id: OLIVIA, Employee_Name: 'Olivia Owner', Employee_profileImageURL: STORED }],
+            'settings/teams': () => [],
+            'settings/rules': () => ({}),
+            'settings/companyOwnerDetail': () => ({ userId: OLIVIA })
+        }
+    });
+    const field = { _id: 'f1', fieldType: 'people', fieldTitle: 'Reviewer' };
+
+    it.each([['compact, in a cell', true], ['in full, in the panel', false]])('requests no bare stored path from the site root (%s)', async (_label, compact) => {
+        const wrapper = mount(PeopleFieldValue, {
+            props: { def: field, value: [OLIVIA], editable: false, compact, label: 'Reviewer' },
+            global: { plugins: [store], provide: { ...provide, $defaultUserAvatar: ref(''), $defaultGhostCustomUserImg: ref('') } }
+        });
+        await flushPromises();
+        expect(srcs(wrapper)).not.toContain(STORED);
+        expect(wrapper.find('.ah-avatar').text()).toBe('O');
+
+        resolveSigned();
+        await flushPromises();
+        expect(srcs(wrapper)).toEqual([SIGNED]);
+    });
+});
+
+describe('every picture of a person', () => {
+    const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src');
+    const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) return walk(full);
+        return /\.(vue|js)$/.test(entry.name) ? [full] : [];
+    });
+    const BARE_IMG = [
+        /class="[^"]*\bah-avatar\b[^"]*"[^>]*>\s*<img\b/,
+        /<img\b[^>]*class="[^"]*\bah-avatar\b/,
+        /ah-avatar[^\n]*h\('img'/
+    ];
+
+    it('goes through AvatarImage, so no avatar holds an img that could take a stored path', () => {
+        const bare = walk(SRC).filter((file) => BARE_IMG.some((pattern) => pattern.test(fs.readFileSync(file, 'utf8'))));
+        expect(bare.map((file) => path.relative(SRC, file))).toEqual([]);
     });
 });

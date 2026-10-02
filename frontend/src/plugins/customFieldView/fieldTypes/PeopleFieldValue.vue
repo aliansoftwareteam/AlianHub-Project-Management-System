@@ -23,8 +23,7 @@
             >
                 <span v-for="person in shown" :key="person.id" class="ftpe__person" data-person>
                     <span class="ah-avatar ah-avatar--sm" aria-hidden="true">
-                        <img v-if="person.image" :src="person.image" alt="" />
-                        <template v-else>{{ person.initial }}</template>
+                        <AvatarImage :src="person.image">{{ person.initial }}</AvatarImage>
                     </span>
                     <span class="ftpe__name">{{ person.name }}</span>
                 </span>
@@ -36,8 +35,7 @@
     <span v-else-if="people.length" class="ftpe ftpe__value" :class="{ 'ftpe--compact': compact }" role="img" :aria-label="readLabel" :title="names">
         <span v-for="person in shown" :key="person.id" class="ftpe__person" data-person>
             <span class="ah-avatar ah-avatar--sm">
-                <img v-if="person.image" :src="person.image" alt="" />
-                <template v-else>{{ person.initial }}</template>
+                <AvatarImage :src="person.image">{{ person.initial }}</AvatarImage>
             </span>
             <span class="ftpe__name">{{ person.name }}</span>
         </span>
@@ -46,6 +44,7 @@
 </template>
 
 <script setup>
+import AvatarImage from "@/components/atom/AvatarImage/AvatarImage.vue";
 import { computed, inject, ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";

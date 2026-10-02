@@ -14,8 +14,7 @@
                 <label class="gpp__person" data-test="glp-person" :data-user="person.id">
                     <input type="checkbox" class="ah-check" :checked="modelValue.includes(person.id)" @change="toggle(person.id, $event.target.checked)" />
                     <span class="ah-avatar" aria-hidden="true">
-                        <img v-if="person.image" :src="person.image" alt="" />
-                        <template v-else>{{ person.initial }}</template>
+                        <AvatarImage :src="person.image">{{ person.initial }}</AvatarImage>
                     </span>
                     <span class="gpp__name">{{ person.name }}</span>
                     <span v-if="person.guest" class="ah-chip ah-chip--sm">{{ $t('Goals.guest') }}</span>
@@ -27,6 +26,7 @@
 </template>
 
 <script setup>
+import AvatarImage from "@/components/atom/AvatarImage/AvatarImage.vue";
 import { computed, ref } from "vue";
 
 defineOptions({ name: "GoalPeoplePicker" });

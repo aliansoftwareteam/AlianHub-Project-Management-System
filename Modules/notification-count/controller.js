@@ -250,7 +250,7 @@ const applyUnreadCount = (companyId, body) => {
                 if (!body.sprintId) {
                     reject({
                         status: false,
-                        statusText: "Sprint id is required"
+                        statusText: "List id is required"
                     });
                     return;
                 }

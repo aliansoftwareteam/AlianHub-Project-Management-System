@@ -261,6 +261,7 @@ module.exports.OAUTH_CONSENT_DETAILS = '/oauth/consent/details';
 module.exports.OAUTH_CONSENT_APPROVAL_REQUEST = '/oauth/consent/approval-request';
 module.exports.OAUTH_CLIENT_APPROVALS = '/api/v2/oauth-client-approvals';
 module.exports.OAUTH_GRANTS = '/api/v2/oauth-grants';
+module.exports.AGENT_CHANGES = '/api/v2/agents/changes';
 module.exports.AGENT_TEAM = '/api/v2/agents/team';
 module.exports.AGENT_TEAM_STANDUP = '/api/v2/agents/team/standup';
 module.exports.AGENT_ROUTABLE = '/api/v2/agents/routable';

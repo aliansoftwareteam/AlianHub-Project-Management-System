@@ -108,6 +108,14 @@ describe('the shared read of live agents', () => {
         });
     });
 
+    it('reads nothing again for a change the person\'s own connected agent applied', async () => {
+        watch();
+        await settle();
+        socket.fire(feed.AGENTS_CHANGED_EVENT, { kind: feed.APPLIED_CHANGE, companyId: 'c1', auditId: 'a1' });
+        await vi.advanceTimersByTimeAsync(10000);
+        expect(cycles()).toBe(1);
+    });
+
     it('stops when the last watcher leaves', async () => {
         const release = watch();
         await settle();

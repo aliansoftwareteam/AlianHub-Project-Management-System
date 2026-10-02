@@ -47,3 +47,11 @@
 .comment-input__ai-hint {
     opacity: 0.75;
 }
+.comment-input__agent-note {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    opacity: 0.75;
+}

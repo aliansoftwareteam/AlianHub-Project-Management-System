@@ -7,6 +7,7 @@ export const DEFAULT_TOKEN_POLICY = { strict: false, scopes: TOKEN_SCOPES, minEx
 export const EXPIRY_OVER_MAX = "API_TOKEN_EXPIRY_OVER_MAX";
 export const TASKS_GRANT = "tasks:manage";
 export const DOCS_GRANT = "docs:manage";
+export const CHAT_GRANT = "chat:read";
 
 const maxDaysOf = (policy) => Number(policy?.maxExpiryDays) || DEFAULT_TOKEN_POLICY.maxExpiryDays;
 
@@ -29,14 +30,16 @@ export const tokenFormProblem = (form, policy) => {
     return null;
 };
 
-/* The server names a grant only while its tools are on, and gives it to a token that may write. */
-const canGrant = (grant, form, policy) => Array.isArray(policy?.grants) && policy.grants.includes(grant)
-    && (!policy.strict || (Array.isArray(form.scopes) && form.scopes.includes("write")));
+/* The server names a grant only while its tools are on, and gives it to a token that holds the scope it builds on. */
+const canGrant = (grant, form, policy, scope = "write") => Array.isArray(policy?.grants) && policy.grants.includes(grant)
+    && (!policy.strict || (Array.isArray(form.scopes) && form.scopes.includes(scope)));
 
 export const canGrantTasks = (form, policy) => canGrant(TASKS_GRANT, form, policy);
 export const canGrantDocs = (form, policy) => canGrant(DOCS_GRANT, form, policy);
+export const canGrantChat = (form, policy) => canGrant(CHAT_GRANT, form, policy, "read");
 
 export const grantsOf = (form, policy) => [
     ...(form.manageTasks && canGrantTasks(form, policy) ? [TASKS_GRANT] : []),
     ...(form.manageDocs && canGrantDocs(form, policy) ? [DOCS_GRANT] : []),
+    ...(form.readChat && canGrantChat(form, policy) ? [CHAT_GRANT] : []),
 ];

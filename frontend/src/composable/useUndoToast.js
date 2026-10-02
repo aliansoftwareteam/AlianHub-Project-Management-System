@@ -5,6 +5,7 @@ export const UNDO_MS = 6000;
 export const undoToast = reactive({ current: null });
 
 let undoFn = null;
+let actionFn = null;
 let timer = null;
 let remaining = 0;
 let startedAt = 0;
@@ -23,11 +24,14 @@ function arm(ms) {
     timer = setTimeout(dismissUndoToast, ms);
 }
 
-/* One offer at a time: a newer change replaces the older offer, as in the Inbox bar. */
-export function showUndoToast({ message, undo, duration = UNDO_MS }) {
+/* One offer at a time: a newer change replaces the older offer, as in the Inbox bar. Undo is offered only
+ * with something to undo; `action` ({ label, run }) is one more thing to do about the change, and `wrap`
+ * lets a message that names its subject take more than one line. */
+export function showUndoToast({ message, undo, action = null, wrap = false, duration = UNDO_MS }) {
     seq += 1;
     undoFn = typeof undo === "function" ? undo : null;
-    undoToast.current = { id: seq, message };
+    actionFn = action && typeof action.run === "function" ? action.run : null;
+    undoToast.current = { id: seq, message, canUndo: Boolean(undoFn), actionLabel: actionFn ? String(action.label || "") : "", wrap: Boolean(wrap) };
     held = false;
     arm(duration);
     return seq;
@@ -36,12 +40,19 @@ export function showUndoToast({ message, undo, duration = UNDO_MS }) {
 export function dismissUndoToast() {
     clearTimer();
     undoFn = null;
+    actionFn = null;
     held = false;
     undoToast.current = null;
 }
 
 export async function runUndo() {
     const fn = undoFn;
+    dismissUndoToast();
+    if (fn) await fn();
+}
+
+export async function runToastAction() {
+    const fn = actionFn;
     dismissUndoToast();
     if (fn) await fn();
 }
