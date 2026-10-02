@@ -5,7 +5,6 @@ import settings from './Settings'
 import users from './Users'
 import mainChat from './MainChats'
 import brandSettingTab from './brandSettings'
-import ToursData from './Tours';
 import taskSelection from './TaskSelection';
 import everything from './Everything';
 import goals from './Goals';
@@ -39,7 +38,6 @@ export default createStore({
         users,
         mainChat,
         brandSettingTab,
-        ToursData,
         taskSelection,
         everything,
         goals

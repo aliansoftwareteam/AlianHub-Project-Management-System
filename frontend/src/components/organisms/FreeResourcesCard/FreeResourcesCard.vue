@@ -2,7 +2,7 @@
     <div class="dc-body frc">
         <div class="dc-metric">
             <span class="dc-num">{{ formatMinutes(totalFreeMinutes) }}</span>
-            <span class="dc-sub">{{ $t('Dash.free_headline', { n: freeRows.length }) }}</span>
+            <span class="dc-sub">{{ $t('Dash.free_headline', { n: freeRows.length }, freeRows.length) }}</span>
         </div>
 
         <div class="frc__rows">

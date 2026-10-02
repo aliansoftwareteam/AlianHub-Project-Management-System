@@ -13,17 +13,17 @@
             :disabled="working"
             :title="$t('List.ai_generate_rows_hint')"
             @click.stop="ask"
-        >{{ $t('List.ai_generate_rows', { n: count }) }}</button>
+        >{{ $t('List.ai_generate_rows', { n: count }, count) }}</button>
         <ConfirmModal
             :id="`ai-column-${column.id}`"
             :modelValue="confirming"
-            :title="$t('List.ai_generate_rows', { n: count })"
+            :title="$t('List.ai_generate_rows', { n: count }, count)"
             :acceptButtonText="$t('List.ai_generate')"
             @accept="run"
             @close="confirming = false"
         >
             <template #body>
-                <p class="aich__confirm">{{ $t('List.ai_generate_rows_confirm', { n: count }) }}</p>
+                <p class="aich__confirm">{{ $t('List.ai_generate_rows_confirm', { n: count }, count) }}</p>
             </template>
         </ConfirmModal>
     </span>

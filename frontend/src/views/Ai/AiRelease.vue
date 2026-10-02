@@ -31,7 +31,7 @@
                         <div class="rel-stat">
                             <div class="ah-label">{{ $t('Pipeline.stat_agents') }}</div>
                             <div class="rel-stat__n">{{ counts.agents }}</div>
-                            <div class="ah-small">{{ $t('Pipeline.stat_agents_sub', { n: counts.projects }) }}</div>
+                            <div class="ah-small">{{ $t('Pipeline.stat_agents_sub', { n: counts.projects }, counts.projects) }}</div>
                         </div>
                         <div class="rel-stat">
                             <div class="ah-label">{{ $t('Pipeline.stat_ci') }}</div>

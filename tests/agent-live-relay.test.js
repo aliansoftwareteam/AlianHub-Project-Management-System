@@ -75,6 +75,12 @@ describe('the live agents signal', () => {
         expect(theirs).not.toHaveBeenCalled();
     });
 
+    it('tells of a change to a project\'s limits for agents, to that company alone', async () => {
+        await relay(change({ kind: 'limits' }));
+        expect(mine).toHaveBeenCalledWith(EVENT, { kind: 'limits' });
+        expect(theirs).not.toHaveBeenCalled();
+    });
+
     it('says nothing for spend, revisions, schedules and alerts', async () => {
         await relay(change({ kind: 'agent', agentId: 'a1', spendMonth: { usd: 3 }, paused: false }));
         await relay(change({ kind: 'agent', agentId: 'a1', revision: 4 }));

@@ -3,6 +3,7 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const access = require('../../Agents/access');
 const permissions = require('../../Agents/permissions');
 const intentPreview = require('../../Agents/intentPreview');
+const changeLabels = require('../../Agents/changeLabels');
 const standingApprovals = require('../../Agents/standingApprovals');
 const logger = require('../../../Config/loggerConfig');
 
@@ -37,7 +38,7 @@ const toRow = (caller, previews, batches = new Map()) => (proposal) => ({
     why: proposal.why || '',
     changes: (Array.isArray(proposal.changes) ? proposal.changes : []).map((change, at) => {
         const preview = (previews.get(String(proposal._id)) || [])[at];
-        return { action: change.action, params: change.params || {}, label: change.label || change.action, reversible: Boolean(change.reversible), ...(preview ? { preview } : {}) };
+        return { action: change.action, params: change.params || {}, label: change.label || change.action, reversible: Boolean(change.reversible), ...(preview ? { preview } : {}), ...changeLabels.markOf(change) };
     }),
     ...(batches.has(String(proposal._id)) ? { batch: batches.get(String(proposal._id)) } : {}),
     cost: proposal.cost || null,

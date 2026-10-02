@@ -76,7 +76,7 @@ export function describeRepeat(rule, { t, locale } = {}) {
     } else {
         text = t("TaskPanel.repeat_summary_daily", { n }, n);
     }
-    if (rule.maxRuns) return t("TaskPanel.repeat_summary_times", { rule: text, n: rule.maxRuns });
+    if (rule.maxRuns) return t("TaskPanel.repeat_summary_times", { rule: text, n: rule.maxRuns }, rule.maxRuns);
     if (rule.until) return t("TaskPanel.repeat_summary_until", { rule: text, date: new Date(rule.until).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" }) });
     return text;
 }

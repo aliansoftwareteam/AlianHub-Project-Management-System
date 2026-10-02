@@ -481,6 +481,19 @@ const NEW_COMPANY_PLAN = () => ({
     totalData: { storage: 0, trackers: 0, users: 1 },
 });
 
+const WORKSPACE_NOT_PREPARED = "The server could not set up the workspace's storage and starting settings.";
+const WORKSPACE_NOT_FINISHED = "The server started the workspace but could not finish setting it up.";
+
+// Only the operator's preset route fills the ready-made companies, so a fresh install has none waiting.
+const prepareCompanyNow = async () => {
+    const reserved = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+        type: SCHEMA_TYPE.PRECOMPANIES,
+        data: { isAvailable: false, pickupCount: 1 }
+    }, 'save');
+    await exports.setCompany(String(reserved._id));
+    return reserved;
+};
+
 exports.createCompanyV2 = async (req, res) => {
     try {
         if (!req.uid) return res.status(401).json({ status: false, statusText: "Unauthorized" });
@@ -521,16 +534,8 @@ exports.createCompanyV2 = async (req, res) => {
                 }]
             }
             MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, obj, 'findOneAndUpdate')
+            .then((readyCompany) => (readyCompany && readyCompany._id ? readyCompany : prepareCompanyNow()))
             .then((compnayData) => {
-                if (!(compnayData && compnayData._id)) {
-                    logger.error(`Predefine comapny not found.`);
-                    res.json({
-                        status: false,
-                        statusText: "Predefine comapny not found."
-                    })
-                    return;
-                }
-    
                 emitListener(bodyData?.eventId, {step: 1});
                 const companyMongoId = compnayData._id;
                 const companyId = JSON.parse(JSON.stringify(compnayData._id));
@@ -610,18 +615,18 @@ exports.createCompanyV2 = async (req, res) => {
                     exports.sendMailAfterCompanyCreation(allSettledRes, companyId, req);
                 }).catch((error) => {
                     logger.error(`Company Creation Error All allSettledWithRetry (${companyId}) Error: ${error}.`);
-                    emitListener(bodyData?.eventId, {step: "STOP", error: error?.message || error});
+                    emitListener(bodyData?.eventId, {step: "STOP", error: WORKSPACE_NOT_FINISHED});
                     res.json({
                         status: false,
-                        statusText: "Error" + error?.message
+                        statusText: WORKSPACE_NOT_FINISHED
                     });
                 });
             }).catch((error) => {
                 logger.error(`ERROR in get tmp company data: ${error?.message || error}`);
-                emitListener(bodyData?.eventId, {step: "STOP", error: error?.message || error});
+                emitListener(bodyData?.eventId, {step: "STOP", error: WORKSPACE_NOT_PREPARED});
                 res.json({
                     status: false,
-                    statusText: "Something went to wrong. Please contact to Admin.",
+                    statusText: WORKSPACE_NOT_PREPARED,
                     error: error?.message || error
                 });
             })
@@ -630,7 +635,7 @@ exports.createCompanyV2 = async (req, res) => {
         logger.error(`ERROR in create compnay v2 function: ${error?.message || error}`);
         res.json({
             status: false,
-            statusText: "Something went to wrong. Please contact to Admin.",
+            statusText: "Something went wrong on the server.",
             error: error?.message || error
         });
     }

@@ -23,7 +23,7 @@
                 <article v-for="d in visible" :key="d._id" class="dash__tile" @click="open(d)">
                     <div class="dash__tile-head">
                         <button type="button" class="dash__tile-title dash__tile-open" :title="d.title" @click.stop="open(d)">{{ d.title }}</button>
-                        <span class="dash__tile-count">{{ $t('Dash.n_cards', { n: d.cardCount }) }}</span>
+                        <span class="dash__tile-count">{{ $t('Dash.n_cards', { n: d.cardCount }, d.cardCount) }}</span>
                         <div class="dash__pop-anchor" @click.stop>
                             <button type="button" class="dash__tile-menu" :aria-expanded="menuFor === d._id" :title="$t('Dash.more')" @click="menuFor = menuFor === d._id ? '' : d._id">
                                 <ShellIcon name="dots" :size="14" />
