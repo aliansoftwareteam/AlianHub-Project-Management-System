@@ -1,3 +1,4 @@
+/* eslint-env browser */
 const { test, expect } = require('../support/test');
 const { createProject, createTask } = require('../support/fixtures');
 const { signInThroughForm, skipFirstRun, taskPanel } = require('../support/pages');
