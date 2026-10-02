@@ -15,7 +15,7 @@ const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const str = (v, max = 500) => String(v === undefined || v === null ? '' : v).slice(0, max);
 const ID = Object.freeze({ type: 'string', pattern: '^[a-fA-F0-9]{24}$' });
 const ITEM = Object.freeze({ ...ID, description: 'An item id from queue.list' });
-const REASON = Object.freeze({ reason: { type: 'string', maxLength: 500, description: 'Why, in a line; it is kept in the audit log' } });
+const REASON = Object.freeze({ reason: { type: 'string', maxLength: 500, description: 'Why, in one line. It is kept in the record of changes.' } });
 const input = (properties, required) => ({ type: 'object', additionalProperties: false, properties, required });
 
 const WHY = Object.freeze({
@@ -70,9 +70,9 @@ const TOOLS = [
     {
         name: 'queue.list',
         action: 'queue.list',
-        description: 'Work waiting for an agent, in the projects whose project manager is switched on: tasks a person handed over, and what the daily look found that needs judgement '
-            + '(a task with no owner or no estimate, a new task nobody sorted, a person with too much planned). It lists only items about tasks you can open, and leaves out the ones another agent holds. '
-            + 'Take one with queue.claim before you work on it.',
+        description: 'Shows work waiting for an agent, in projects where the project manager is switched on: tasks a person handed over, and things the daily check found that need a decision '
+            + '(a task with no owner or no estimate, a new task nobody sorted, a person with too much planned). It shows only items about tasks the person can open, and leaves out items another agent holds. '
+            + 'Take one with queue.claim before you work on it. Changes nothing.',
         input: input({ projectId: { ...ID, description: 'Only this project' }, limit: { type: 'integer', minimum: 1, maximum: workQueue.LISTED_MAX } }, []),
         visibility: 'filtered',
         strict: true,
@@ -91,8 +91,8 @@ const TOOLS = [
         visibility: 'filtered',
         strict: true,
         target: itemTarget,
-        description: `Take one item from queue.list, so no other agent works on it. It is yours for ${workQueue.CLAIM_MINUTES} minutes; claim it again to keep it longer. `
-            + 'A claim gives you no extra rights: make the change with the usual tools, which are checked and approved as always. The person can take the item back at any time.',
+        description: `Takes one item from queue.list, so no other agent works on it. It is yours for ${workQueue.CLAIM_MINUTES} minutes; claim it again to keep it longer. `
+            + 'Taking an item gives you no extra rights: make the change with the usual tools, which are checked and approved as always. The person can take the item back at any time.',
         input: input({ itemId: ITEM, ...REASON }, ['itemId']),
         prepare: named('queue.claim'),
         params: (args) => ({ itemId: str(args.itemId, 40), projectId: str(args.projectId, 40) }),
@@ -103,7 +103,7 @@ const TOOLS = [
         visibility: 'filtered',
         strict: true,
         target: itemTarget,
-        description: 'Give back an item you hold. With finished true it leaves the queue: you made the change, or filed it for a person to approve. Without it the item is free for another agent.',
+        description: 'Gives back an item you hold. With finished true it leaves the queue: you made the change, or sent it to a person to approve. Without it the item is free for another agent.',
         input: input({ itemId: ITEM, finished: { type: 'boolean', description: 'True when your part is done' }, ...REASON }, ['itemId']),
         prepare: named('queue.release'),
         params: (args) => ({ itemId: str(args.itemId, 40), projectId: str(args.projectId, 40), finished: args.finished === true }),

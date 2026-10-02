@@ -218,14 +218,14 @@ describe('a plan asks for nothing its agent could not ask for one at a time', ()
 
     it('refuses first tasks from a connection that may not create a task with its details', async () => {
         const plan = tasksOnly();
-        await refusedFor(as(INSIDER, { token: { grants: [] } }), plan, /^permission_denied: .*may not use/);
+        await refusedFor(as(INSIDER, { token: { grants: [] } }), plan, /^permission_denied: .*is not allowed to use/);
         delete process.env.MCP_TOOLS_MANAGE;
-        await refusedFor(as(INSIDER), plan, /^permission_denied: .*may not use/);
+        await refusedFor(as(INSIDER), plan, /^permission_denied: .*is not allowed to use/);
     });
 
     it('refuses what the skills of the connection leave out', async () => {
-        await refusedFor(as(INSIDER, { allowedActions: [TOOL] }), tasksOnly(), /^permission_denied: .*may not use/);
-        await refusedFor(as(OWNER, { allowedActions: [TOOL, TASK] }), { projectId: P_OPEN, rules: [reviewNotice({ conditions: [] })] }, /^permission_denied: .*may not use/);
+        await refusedFor(as(INSIDER, { allowedActions: [TOOL] }), tasksOnly(), /^permission_denied: .*is not allowed to use/);
+        await refusedFor(as(OWNER, { allowedActions: [TOOL, TASK] }), { projectId: P_OPEN, rules: [reviewNotice({ conditions: [] })] }, /^permission_denied: .*is not allowed to use/);
         await filed(tasksOnly(), as(INSIDER, { allowedActions: [TOOL, TASK] }));
     });
 
@@ -240,7 +240,7 @@ describe('a plan asks for nothing its agent could not ask for one at a time', ()
 
     it('refuses a first task that closes itself where the project has people close its tasks', async () => {
         await projectPolicy.save(CID, P_OPEN, { done: 'never' }, OWNER);
-        await refusedFor(as(INSIDER), tasksOnly([{ name: 'Already done', status: 'Done' }]), /people close its tasks/);
+        await refusedFor(as(INSIDER), tasksOnly([{ name: 'Already done', status: 'Done' }]), /only people close tasks/);
         await filed(tasksOnly([{ name: 'Still open', status: 'In Progress' }]), as(INSIDER));
     });
 
@@ -249,8 +249,8 @@ describe('a plan asks for nothing its agent could not ask for one at a time', ()
             expect(await rpc(as(OWNER), TOOL, { projectId: P_OPEN, ...plan })).toMatchObject({ ok: false, error: expect.stringMatching(error) });
         };
         await answer({ rules: [reviewNotice()] }, /^rules\[0\]: .*In Review/);
-        await answer({ tasks: [{ name: 'Brief', list: 'Nowhere' }] }, /^tasks\[0\] \(Brief\): "Nowhere" is not a list of this plan or of the project/);
-        await answer({ tasks: [{ name: 'Brief', status: 'Nowhere' }] }, /^tasks\[0\] \(Brief\): "Nowhere" is not a status of this plan or of the project/);
+        await answer({ tasks: [{ name: 'Brief', list: 'Nowhere' }] }, /^tasks\[0\] \(Brief\): "Nowhere" is not a list in this plan or in the project/);
+        await answer({ tasks: [{ name: 'Brief', status: 'Nowhere' }] }, /^tasks\[0\] \(Brief\): "Nowhere" is not a status in this plan or in the project/);
         expect(await rpc(as(OUTSIDER), TOOL, { projectId: P_OPEN, tasks: [{ name: 'Brief', list: 'Private list' }] })).toMatchObject({ ok: false, error: expect.stringMatching(/^tasks\[0\] \(Brief\): "Private list" is not a list/) });
         expect(await rpc(as(INSIDER), TOOL, { projectId: P_PRIVATE, tasks: [{ name: 'Brief', assigneeId: OUTSIDER }] })).toMatchObject({ ok: false, error: expect.stringMatching(/^tasks\[0\] \(Brief\): /) });
         expect(waiting()).toHaveLength(0);
@@ -309,7 +309,7 @@ describe('approving makes each automation and each task as its own action, after
         const id = await filed(tasksOnly([TASKS[2]]), as(INSIDER));
         const out = await approve(id, GUEST);
         expect(partOf(out, 'lists').ok).toBe(true);
-        expect(partOf(out, 'tasks')).toMatchObject({ ok: false, items: [{ name: 'Collect the logins', made: false, error: expect.stringMatching(/approver may not/) }] });
+        expect(partOf(out, 'tasks')).toMatchObject({ ok: false, items: [{ name: 'Collect the logins', made: false, error: expect.stringMatching(/person approving may not/) }] });
         expect(taskNamed('Collect the logins')).toBeUndefined();
     });
 
@@ -328,7 +328,7 @@ describe('approving makes each automation and each task as its own action, after
         await projectPolicy.save(CID, P_OPEN, { done: 'never' }, OWNER);
         const out = await approve(id);
         expect(partOf(out, 'tasks').items).toEqual([
-            { name: 'Already done', made: false, error: expect.stringMatching(/people close its tasks/) },
+            { name: 'Already done', made: false, error: expect.stringMatching(/only people close tasks/) },
             { name: 'Collect the logins', made: true, taskId: expect.any(String), auditId: expect.any(String) },
         ]);
         expect(taskNamed('Already done')).toBeUndefined();
@@ -342,8 +342,8 @@ describe('approving makes each automation and each task as its own action, after
         });
         const out = await approve(String(saved._id));
         expect(partOf(out, 'lists').ok).toBe(true);
-        expect(partOf(out, 'rules').items[0]).toMatchObject({ made: false, error: expect.stringMatching(/not in this agent's skills/) });
-        expect(partOf(out, 'tasks').items[0]).toMatchObject({ made: false, error: expect.stringMatching(/not in this agent's skills/) });
+        expect(partOf(out, 'rules').items[0]).toMatchObject({ made: false, error: expect.stringMatching(/is not switched on for this connection/) });
+        expect(partOf(out, 'tasks').items[0]).toMatchObject({ made: false, error: expect.stringMatching(/is not switched on for this connection/) });
         expect(liveRules()).toHaveLength(0);
         expect(taskNamed('Brief')).toBeUndefined();
     });

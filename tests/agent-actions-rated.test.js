@@ -74,12 +74,12 @@ describe('the never-list stays absent, unrated and refused', () => {
     it.each([...literal, 'billing.refund'])('%s is refused by the policy even at L3 with a safe rating handed in', (key) => {
         const out = policy.decide({ agent: { autonomy: 3, allowedActions: [] }, action: key, rating: safe });
         expect(out.decision).toBe('refuse');
-        expect(out.reason).toBe(`${key} is on the never-list`);
+        expect(out.reason).toBe(`An agent is never allowed to do this (${key}). The person has to do it in AlianHub.`);
     });
 
     it('status.set("Done") is refused through task.status.set', () => {
         const out = policy.decide({ agent: { autonomy: 3 }, action: 'task.status.set', params: { status: { statusType: 'close', name: 'Done' } }, rating: actions.rating('task.status.set') });
-        expect(out).toMatchObject({ decision: 'refuse', reason: 'Agents cannot perform task.status.set("Done")' });
+        expect(out).toMatchObject({ decision: 'refuse', reason: 'You cannot set a task to "Done". Use In progress or In review, and a person closes the task.' });
     });
 });
 
@@ -113,7 +113,7 @@ describe('perform() honours a policy refusal', () => {
 
     it('audits the policy reason and throws RefusedError without touching the registry or an executor', async () => {
         const actor = { kind: 'agent', userId: 'u1', agentId: 'a1' };
-        const decision = { decision: 'refuse', reason: 'project p9 is outside this agent\'s projects', rating: safe };
+        const decision = { decision: 'refuse', reason: 'This connection is limited to some projects, and project p9 is not one of them. Ask the person to widen it in AlianHub.', rating: safe };
         await expect(actions.perform({ companyId: 'c1', actor, action: 'task.comment', params: { taskId: 't1', body: 'x' }, decision }))
             .rejects.toMatchObject({ name: 'RefusedError', status: 403, message: decision.reason, auditId: 'ref-1' });
         expect(audit.recordRefusal).toHaveBeenCalledWith('c1', actor, expect.objectContaining({ action: 'task.comment', reason: decision.reason, entityId: 't1' }));
@@ -123,9 +123,9 @@ describe('perform() honours a policy refusal', () => {
     it('an act decision changes nothing — the registry still has the final say', async () => {
         const actor = { kind: 'agent', userId: 'u1', agentId: 'a1' };
         await expect(actions.perform({ companyId: 'c1', actor, action: 'task.comment', params: { taskId: 't1' }, allowedActions: ['task.get'], decision: { decision: 'act', reason: 'x' } }))
-            .rejects.toMatchObject({ name: 'RefusedError', message: 'Agents cannot perform task.comment (not in this agent\'s skills)' });
+            .rejects.toMatchObject({ name: 'RefusedError', message: 'task.comment is not switched on for this connection. Ask the person to allow it in AlianHub.' });
         await expect(actions.perform({ companyId: 'c1', actor, action: 'project.delete', params: {}, decision: { decision: 'act', reason: 'x' } }))
-            .rejects.toMatchObject({ name: 'RefusedError', message: 'Agents cannot perform project.delete (never_listed)' });
+            .rejects.toMatchObject({ name: 'RefusedError', message: 'An agent is never allowed to do this (never_listed). The person has to do it in AlianHub.' });
     });
 });
 
@@ -156,11 +156,11 @@ describe('the skills that ship as data, run through the policy', () => {
 
     it.each(skills)('%s is refused outside its agent\'s projects', (key, seed) => {
         verdict(seed, { agent: agent({ projectIds: ['p2'] }) })
-            .forEach((out) => expect(out).toMatchObject({ decision: 'refuse', reason: "project p1 is outside this agent's projects" }));
+            .forEach((out) => expect(out).toMatchObject({ decision: 'refuse', reason: "This connection is limited to some projects, and project p1 is not one of them. Ask the person to widen it in AlianHub." }));
     });
 
     it.each(skills)('%s writes nowhere when its agent has no project scope', (key, seed) => {
         verdict(seed, { agent: agent({ projectIds: [] }) })
-            .forEach((out) => expect(out).toMatchObject({ decision: 'refuse', reason: `${out.action} writes, and this agent has no project scope` }));
+            .forEach((out) => expect(out).toMatchObject({ decision: 'refuse', reason: `${out.action} changes something, and this connection is not tied to a project. Ask the person which project to work in.` }));
     });
 });

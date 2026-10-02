@@ -119,12 +119,12 @@ describe('an L2 run is reviewed per change by the policy', () => {
         const out = await runs.executeSkill(C, run, a, TASK, d);
         expect(out).toMatchObject({ status: 'done', refusals: 1, outcome: '1 change(s) applied, 1 refused' });
         expect(d.actions.perform).toHaveBeenCalledTimes(2);
-        expect(d.actions.perform.mock.calls[0][0].decision).toMatchObject({ decision: 'refuse', reason: 'task.comment is outside this agent\'s allowed actions' });
+        expect(d.actions.perform.mock.calls[0][0].decision).toMatchObject({ decision: 'refuse', reason: 'This connection is not allowed to use task.comment. Ask the person to allow it in AlianHub.' });
         const row = runRow(run._id);
         expect(row.refusals).toBe(1);
-        expect(row.actions.find((x) => x.ok === false)).toMatchObject({ action: 'task.comment', auditId: 'ref-task.comment', refused: 'task.comment is outside this agent\'s allowed actions' });
+        expect(row.actions.find((x) => x.ok === false)).toMatchObject({ action: 'task.comment', auditId: 'ref-task.comment', refused: 'This connection is not allowed to use task.comment. Ask the person to allow it in AlianHub.' });
         expect(decisionsOf(run._id)).toEqual([
-            { action: 'task.comment', decision: 'refuse', reason: 'task.comment is outside this agent\'s allowed actions', rating: rating('task.comment') },
+            { action: 'task.comment', decision: 'refuse', reason: 'This connection is not allowed to use task.comment. Ask the person to allow it in AlianHub.', rating: rating('task.comment') },
             { action: 'subtask.create', decision: 'act', reason: 'subtask.create is a reversible task-scoped write with no money in it', rating: rating('subtask.create') },
         ]);
         expect(memory.record).not.toHaveBeenCalled();
@@ -138,7 +138,7 @@ describe('an L2 run is reviewed per change by the policy', () => {
         const out = await runs.executeSkill(C, run, a, TASK, d);
         expect(out).toMatchObject({ status: 'failed', refusals: 2, outcome: '0 change(s) applied, 2 refused' });
         expect(d.proposals.create).not.toHaveBeenCalled();
-        decisionsOf(run._id).forEach((x) => expect(x).toMatchObject({ decision: 'refuse', reason: 'project p1 is outside this agent\'s projects' }));
+        decisionsOf(run._id).forEach((x) => expect(x).toMatchObject({ decision: 'refuse', reason: 'This connection is limited to some projects, and project p1 is not one of them. Ask the person to widen it in AlianHub.' }));
     });
 
     it('a never-list change is refused, the rest applies, and the refusal carries the never-list reason', async () => {
@@ -147,7 +147,7 @@ describe('an L2 run is reviewed per change by the policy', () => {
         const run = await runs.create(C, { agent: agent(), taskId: TASK._id, projectId: 'p1', skill: 'plan' });
         const out = await runs.executeSkill(C, run, agent(), TASK, d);
         expect(out).toMatchObject({ status: 'done', refusals: 1 });
-        expect(decisionsOf(run._id)[0]).toEqual({ action: 'task.delete', decision: 'refuse', reason: 'task.delete is on the never-list', rating: null });
+        expect(decisionsOf(run._id)[0]).toEqual({ action: 'task.delete', decision: 'refuse', reason: 'An agent is never allowed to do this (task.delete). The person has to do it in AlianHub.', rating: null });
     });
 
     it('L3 goes through the same review', async () => {

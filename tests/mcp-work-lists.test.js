@@ -61,8 +61,8 @@ const F_ARCHIVED = '6f0000000000000000000e03';
 const F_PRIVATE = '6f0000000000000000000e04';
 const L_TWIN = '6f0000000000000000000b09';
 const L_NESTED = '6f0000000000000000000b0a';
-const NO_PROJECT = 'not_visible: the project is not one the person behind this token can open';
-const NO_LIST = 'not_visible: the sprint is not one the person behind this token can open in that project';
+const NO_PROJECT = 'not_visible: that project was not found, or the person cannot open it. Ask the person which project they mean.';
+const NO_LIST = 'not_visible: that list was not found in that project, or the person cannot open it. Ask the person which list they mean.';
 const EDIT_KEYS = ['project_sprint_name_edit', 'sprint_type_change', 'project_sprint_create'];
 
 const list = (id) => stored(SCHEMA_TYPE.SPRINTS, id);
@@ -132,7 +132,7 @@ describe('lists.list', () => {
 
     it('answers a private project and someone else\'s personal list as it answers a missing id', async () => {
         const missing = await rpc(ctx(OWNER), 'lists.list', { projectId: MISSING });
-        expect(missing).toEqual({ error: 'project not found' });
+        expect(missing).toEqual({ error: 'That project was not found. Ask the person which project they mean.' });
         for (const uid of [OUTSIDER, GUEST]) expect(await rpc(ctx(uid), 'lists.list', { projectId: P_PRIVATE })).toEqual(missing);
         for (const uid of [OWNER, ADMIN, OUTSIDER, GUEST]) expect(await rpc(ctx(uid), 'lists.list', { projectId: P_PERSONAL })).toEqual(missing);
         expect((await rpc(ctx(INSIDER), 'lists.list', { projectId: P_PERSONAL })).lists.map((row) => row.sprintId)).toEqual([L_PERSONAL]);
@@ -140,7 +140,7 @@ describe('lists.list', () => {
     });
 
     it('stays inside the projects a token was narrowed to', async () => {
-        expect(await rpc(narrowed(INSIDER, [P_OPEN]), 'lists.list', { projectId: P_PRIVATE })).toEqual({ error: 'project not found' });
+        expect(await rpc(narrowed(INSIDER, [P_OPEN]), 'lists.list', { projectId: P_PRIVATE })).toEqual({ error: 'That project was not found. Ask the person which project they mean.' });
         expect((await rpc(narrowed(INSIDER, [P_OPEN]), 'lists.list', { projectId: P_OPEN })).lists.length).toBe(4);
     });
 });
@@ -194,7 +194,7 @@ describe('list.create', () => {
         const [row] = audits('list.create', 'applied');
         expect(await undoStateOf(CID, row, { userId: OWNER }, { undoHours: 24, run: null })).toMatchObject({ undoable: true });
         mockDb.seed(SCHEMA_TYPE.TASKS, { TaskName: 'Late arrival', ProjectID: P_OPEN, sprintId: result.sprintId, deletedStatusKey: 0 });
-        await expect(inverses.list(CID, row.meta.undo, { userId: OWNER })).rejects.toThrow(/holds tasks now/);
+        await expect(inverses.list(CID, row.meta.undo, { userId: OWNER })).rejects.toThrow(/has tasks in it now/);
         expect(list(result.sprintId).deletedStatusKey).toBe(0);
         mockDb.store[SCHEMA_TYPE.TASKS].pop();
         await inverses.list(CID, row.meta.undo, { userId: OWNER });
@@ -242,7 +242,7 @@ describe('list.rename', () => {
         expect(await rpc(ctx(OUTSIDER), 'list.rename', { projectId: P_OPEN, sprintId: L_OPEN, name: 'x' })).toMatchObject({ refused: true, reason: expect.stringMatching(/permission_denied: project\.project_sprint_name_edit/) });
         expect(everythingNow()).toBe(before);
         list(L_TWIN).deletedStatusKey = 2;
-        expect(await rpc(ctx(OWNER), 'list.rename', { projectId: P_OPEN, sprintId: L_TWIN, name: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/archived list/) });
+        expect(await rpc(ctx(OWNER), 'list.rename', { projectId: P_OPEN, sprintId: L_TWIN, name: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/This list is archived/) });
         expect(list(L_TWIN).name).toBe('Twin list');
     });
 });
@@ -310,8 +310,8 @@ describe('the actions, reached without an MCP token', () => {
         await expect(perform(OUTSIDER, 'list.rename', { projectId: P_OPEN, sprintId: L_SECRET, name: 'x' })).rejects.toThrow(/list was not found/);
         await expect(perform(OUTSIDER, 'list.move', { projectId: P_OPEN, sprintId: L_SECRET, folderId: F_TOP })).rejects.toThrow(/list was not found/);
         await expect(perform(OUTSIDER, 'list.rename', { projectId: P_OPEN, sprintId: L_PRIVATE, name: 'x' })).rejects.toThrow(/list was not found/);
-        await expect(perform(OUTSIDER, 'list.create', { projectId: P_PRIVATE, name: 'x' })).rejects.toThrow(/project not found/);
-        await expect(perform(OWNER, 'list.create', { projectId: P_PERSONAL, name: 'x' })).rejects.toThrow(/project not found/);
+        await expect(perform(OUTSIDER, 'list.create', { projectId: P_PRIVATE, name: 'x' })).rejects.toThrow(/project was not found/);
+        await expect(perform(OWNER, 'list.create', { projectId: P_PERSONAL, name: 'x' })).rejects.toThrow(/project was not found/);
         await expect(perform(OUTSIDER, 'list.rename', { projectId: P_PRIVATE, sprintId: L_PRIVATE, name: 'x' })).rejects.toThrow(/not found/);
         expect(everythingNow()).toBe(before);
     });
@@ -323,9 +323,9 @@ describe('scopes and outside clients', () => {
 
     it('needs the write scope for a write and the read scope for the read', async () => {
         const before = everythingNow();
-        expect(await rpc(readOnly(OWNER), 'list.create', { projectId: P_OPEN, name: 'x' })).toMatchObject({ isError: true, error: 'This token is read-only.' });
-        expect(await rpc(outside(OWNER, ['projects:read']), 'list.rename', rename)).toMatchObject({ isError: true, error: 'This token lacks the tasks:write scope.' });
-        expect(await rpc(outside(OWNER, ['tasks:write']), 'lists.list', { projectId: P_OPEN })).toMatchObject({ isError: true, error: 'This token lacks the projects:read scope.' });
+        expect(await rpc(readOnly(OWNER), 'list.create', { projectId: P_OPEN, name: 'x' })).toMatchObject({ isError: true, error: 'This connection can only read. Ask the person to connect you again and allow changes.' });
+        expect(await rpc(outside(OWNER, ['projects:read']), 'list.rename', rename)).toMatchObject({ isError: true, error: 'This connection was not given the tasks:write permission. Ask the person to connect you again and allow it.' });
+        expect(await rpc(outside(OWNER, ['tasks:write']), 'lists.list', { projectId: P_OPEN })).toMatchObject({ isError: true, error: 'This connection was not given the projects:read permission. Ask the person to connect you again and allow it.' });
         expect(everythingNow()).toBe(before);
         expect(await rpc(outside(OUTSIDER, ['tasks:write']), 'list.rename', rename)).toMatchObject({ ok: true });
     });

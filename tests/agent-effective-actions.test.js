@@ -91,8 +91,8 @@ describe('effectiveActions(agent, skill)', () => {
         const out = narrowChanges({ allowedActions: ['task.comment', 'task.link'] }, codeSkills.getSkill('brief.parse'), changes);
         expect(out.changes.map((c) => c.action)).toEqual(['task.comment']);
         expect(out.dropped).toEqual([
-            { text: 'Create one', reason: 'subtask.create is outside this agent\'s allowed actions' },
-            { text: 'Link', reason: 'task.link is not an action this skill declares' },
+            { text: 'Create one', reason: 'This agent is not allowed to use subtask.create.' },
+            { text: 'Link', reason: 'task.link is not part of this skill.' },
         ]);
     });
 });
@@ -104,7 +104,7 @@ describe('the engine narrows every generic skill through effectiveActions', () =
         const result = await orchestrator.run({ skillSlug: 'brief.parse', task: TASK, companyId: C, budget: { maxTokens: 4000 }, agent: { allowedActions: ['task.get', 'task.comment'] } });
         expect(result.status).toBe('success');
         expect(result.changes.map((c) => c.action)).toEqual(['task.comment']);
-        expect(result.dropped).toEqual([expect.objectContaining({ reason: 'subtask.create is outside this agent\'s allowed actions' })]);
+        expect(result.dropped).toEqual([expect.objectContaining({ reason: 'This agent is not allowed to use subtask.create.' })]);
     });
 });
 

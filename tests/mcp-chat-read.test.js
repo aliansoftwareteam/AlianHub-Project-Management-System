@@ -69,8 +69,8 @@ const C_SECRET = '6f0000000000000000000c22';
 const C_GONE = '6f0000000000000000000c23';
 const C_DIRECT = '6f0000000000000000000c24';
 const T_DM = '6f0000000000000000000d21';
-const NO_CHANNEL = { error: 'channel not found' };
-const NO_TASK = { error: 'task not found' };
+const NO_CHANNEL = { error: 'That channel was not found. Check chat.channels.list.' };
+const NO_TASK = { error: 'That task was not found. Ask the person which task they mean.' };
 const TEXT_MAX = 2000;
 const PEOPLE = [['an owner', OWNER], ['an admin', ADMIN], ['a member on the private work', INSIDER], ['a member outside it', OUTSIDER], ['a guest', GUEST]];
 const SEES_PRIVATE = [OWNER, ADMIN, INSIDER];
@@ -172,7 +172,7 @@ describe('the tools exist with the read tools', () => {
             BOTH.forEach((name) => expect(names).not.toContain(name));
             mockDb.calls.length = 0;
             for (const answer of [await channels(caller), await inChannel(caller, C_OPEN), await inTask(caller, T_OPEN)]) {
-                expect(answer).toMatchObject({ isError: true, error: 'This token lacks the chat:read scope.' });
+                expect(answer).toMatchObject({ isError: true, error: 'This connection was not given the chat:read permission. Ask the person to connect you again and allow it.' });
                 expect(JSON.stringify(answer)).not.toMatch(/scratch|Not for this connection/);
             }
             expect(mockDb.calls).toHaveLength(0);

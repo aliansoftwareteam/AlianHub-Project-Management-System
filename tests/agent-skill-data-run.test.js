@@ -121,7 +121,7 @@ describe('a data skill runs through the engine like a code skill', () => {
         expect(out.status).toBe('waiting_approval');
         const proposal = proposalsCreate.mock.calls[0][1];
         expect(proposal.changes.map((c) => c.action)).toEqual(['task.comment']);
-        expect(proposal.why).toContain("subtask.create is outside this agent's allowed actions");
+        expect(proposal.why).toContain("This agent is not allowed to use subtask.create.");
     });
 
     it('a disabled data skill sharing a code skill’s key lets the code skill run', async () => {
