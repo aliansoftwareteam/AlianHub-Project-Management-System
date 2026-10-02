@@ -251,7 +251,4 @@ const addTasks = async ({ projectId, plan, made, who, ...context }) => {
 const MAKERS = Object.freeze({ rules: addRules, tasks: addTasks });
 const namesOf = (plan, part) => (part === 'rules' ? listOf(plan.rules).map((rule, at) => ruleNameAt(at)) : listOf(plan.tasks).map((task) => task.name));
 
-module.exports = {
-    RULE, TASK, RULES_MAX, TASKS_MAX, PARTS: Object.freeze(Object.keys(MAKERS)), REFUSED, MAKERS,
-    ruleOf, taskOf, partsOf, isAsked, problemIn, needsIn, actionsIn, filingProblem, namesOf, fieldsOf,
-};
+module.exports = { RULES_MAX, TASKS_MAX, MAKERS, ruleOf, taskOf, partsOf, isAsked, problemIn, needsIn, actionsIn, filingProblem, namesOf };
