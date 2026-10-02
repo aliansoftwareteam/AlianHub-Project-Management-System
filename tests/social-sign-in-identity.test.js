@@ -373,6 +373,21 @@ describe.each(Object.keys(PROVIDERS))('%s signup takes identity from the provide
         expect(row.linkId).toBeFalsy();
     });
 
+    it('makes the account without the company, and leaves an owner invitation waiting, when the new owner cannot be recorded', async () => {
+        const row = invitationFor(NEW_EMAIL, { roleType: 1, userId: '' });
+        const stored = mockDb.crud.getMockImplementation();
+        mockDb.crud.mockImplementation(async (db, query, method) => {
+            if (query.type === SCHEMA_TYPE.COMPANIES && method === 'findOneAndUpdate') throw new Error('the database refused the company row');
+            return stored(db, query, method);
+        });
+
+        const res = await register(token(9315, { email: NEW_EMAIL }), fromInvitation(row, { linkId: LINK })).finally(() => mockDb.crud.mockImplementation(stored));
+
+        expect(res.statusCode).toBe(200);
+        expect(res.body.data.AssignCompany).toEqual([]);
+        expect(row).toMatchObject({ status: 1, linkId: LINK, userId: '' });
+    });
+
     it.each([
         ['a wrong link', { linkId: 'b2'.repeat(32) }],
         ['an empty link', { linkId: '' }],
