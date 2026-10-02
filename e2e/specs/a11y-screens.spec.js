@@ -15,7 +15,6 @@ const THEMES = ['light', 'dark'];
 const ALLOWED = [
     { screen: 'Settings, Company', rule: 'list', target: /^ul$/, reason: 'the workspace list also holds the create tile and spinner components as direct children' },
     { screen: 'Settings, General', rule: 'target-size', target: /^\.hasValue$/, reason: 'native colour swatch of the milestone status form is smaller than 24px' },
-    { screen: 'Gantt', rule: 'color-contrast', target: /^\.v-toast__text$/, reason: 'the toast library colours its text per type and the Gantt opens with one' },
     { screen: 'Calendar', rule: 'color-contrast', target: /^a\[aria-label="(Saturday|Sunday)"\]$|\.cv__daynum$/, reason: 'the project calendar is a legacy screen that keeps light-theme colours (docs/ACCESSIBILITY.md known gaps)' },
 ];
 
@@ -131,6 +130,7 @@ test.describe('accessibility: everyday screens in light and dark, desktop and 39
             await page.goto(url);
             await page.getByRole('button', { name: 'Add View', exact: true }).click({ timeout: 10000 });
             await page.getByRole('button', { name: new RegExp(`^${view}`) }).click({ timeout: 10000 });
+            await expect(page.locator('.v-toast__item')).toHaveCount(0, { timeout: 20000 });
             await auditScreen(page, async () => {
                 await page.goto(url);
                 await openView(page, view);
