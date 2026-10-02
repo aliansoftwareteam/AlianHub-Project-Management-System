@@ -412,7 +412,7 @@
 
                     <div v-if="step === 'done' && hasOutcome" class="aipg-card aipg-outcome" data-test="outcome">
                         <p class="aipg-outcome-line">
-                            <span class="aipg-chip aipg-chip-app">⚡ {{ $t('AiProject.runs_queued', { n: outcome.runsQueued }) }}</span>
+                            <span class="aipg-chip aipg-chip-app">⚡ {{ $t('AiProject.runs_queued', { n: outcome.runsQueued }, outcome.runsQueued) }}</span>
                         </p>
                         <div v-if="outcome.runsRefused.length" class="aipg-outcome-refused" data-test="runs-refused">
                             <label class="aipg-field-label-sm">{{ $t('AiProject.runs_refused_title') }}</label>

@@ -26,7 +26,7 @@
                             <span class="org__name">{{ row.person.name }}</span>
                             <span class="ah-small">{{ row.person.subtitle }}</span>
                         </span>
-                        <span v-if="row.reports" class="ah-chip ah-chip--mono">{{ $t('Org.reports_count', { count: row.reports }) }}</span>
+                        <span v-if="row.reports" class="ah-chip ah-chip--mono">{{ $t('Org.reports_count', { count: row.reports }, row.reports) }}</span>
                     </div>
                 </div>
             </section>

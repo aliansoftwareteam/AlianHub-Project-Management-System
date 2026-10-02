@@ -1173,6 +1173,7 @@ const schema = {
     //   hand / <connection>       the one queue item `ref` a connected agent holds
     //   read:<taskId> / <reader>  the task's change stamp `seen` when that agent last read it
     //   turn / <taskId>           the agent `by` that is changing the task until `until`
+    //   direct:<projectId> / <connection>  the tasks that connection `changed` there on its own lately, each { id, at }
     agentWorkMarks: {
         scope: { type: String, required: true },
         key: { type: String, required: true },
@@ -1181,6 +1182,7 @@ const schema = {
         at: { type: Date, required: false },
         until: { type: Date, required: false },
         seen: { type: Date, required: false },
+        changed: { type: Array, default: undefined, required: false },
         rev: { type: Number, default: 0, required: false },
     },
     // Agents as teammates — managed by Modules/Agents.
@@ -3626,7 +3628,7 @@ const schema = {
             type: Object,
             required: false
         },
-        // { atOnce, paused, pausedBy, pausedAt, updatedBy, updatedAt }; absent means the defaults (Modules/Agents/projectLimits.js).
+        // { atOnce, directTasks, paused, pausedBy, pausedAt, updatedBy, updatedAt }; absent means the defaults (Modules/Agents/projectLimits.js).
         agentLimits: {
             type: Object,
             required: false

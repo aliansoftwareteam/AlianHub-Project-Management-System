@@ -53,7 +53,7 @@ onMounted(() => {
 }
 .empty-say__sentence { color: var(--ink); overflow-wrap: anywhere; }
 .empty-say__act {
-    display: inline-flex; align-items: center; min-height: var(--hit-min, 24px); padding: 0 var(--sp-2, 4px);
+    display: inline-flex; align-items: center; min-height: var(--hit-min); padding: 0 var(--sp-2, 4px);
     border: 0; border-radius: var(--r-chip); background: transparent; color: var(--brand); font: inherit; font-weight: 600; cursor: pointer;
 }
 .empty-say__act:hover { text-decoration: underline; }

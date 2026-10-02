@@ -20,6 +20,24 @@
             </div>
             <p :id="ids.atOnceAbout" class="pal__hint">{{ $t('AgentLimits.at_once_about') }}</p>
 
+            <template v-if="directCounts.length">
+                <div class="pal__row">
+                    <label class="pal__label" :for="ids.directTasks">{{ $t('AgentLimits.direct_tasks_label') }}</label>
+                    <select
+                        :id="ids.directTasks"
+                        v-model.number="draft.directTasks"
+                        class="pal__select"
+                        data-test="direct-tasks"
+                        :disabled="!canEdit || busy"
+                        :aria-describedby="ids.directTasksAbout"
+                        @change="save('directTasks')"
+                    >
+                        <option v-for="count in directCounts" :key="count" :value="count">{{ count }}</option>
+                    </select>
+                </div>
+                <p :id="ids.directTasksAbout" class="pal__hint">{{ $t('AgentLimits.direct_tasks_about', { minutes: directMinutes }) }}</p>
+            </template>
+
             <p v-if="saved.paused" class="pal__note" role="status" data-test="paused-note">{{ $t('AgentLimits.paused_note') }}</p>
             <div v-if="canEdit" class="pal__row">
                 <button v-if="saved.paused" type="button" class="pal__button" data-test="resume" :disabled="busy" @click="setPaused(false)">
@@ -53,18 +71,25 @@ const { t } = useI18n();
 const $toast = useToast();
 
 const uid = `pal-${Math.random().toString(36).slice(2, 8)}`;
-const ids = { heading: `${uid}-heading`, atOnce: `${uid}-at-once`, atOnceAbout: `${uid}-at-once-about` };
+const ids = {
+    heading: `${uid}-heading`, atOnce: `${uid}-at-once`, atOnceAbout: `${uid}-at-once-about`,
+    directTasks: `${uid}-direct-tasks`, directTasksAbout: `${uid}-direct-tasks-about`
+};
 
-const draft = reactive({ atOnce: 0, paused: false });
-const saved = reactive({ atOnce: 0, paused: false });
+const draft = reactive({ atOnce: 0, paused: false, directTasks: 0 });
+const saved = reactive({ atOnce: 0, paused: false, directTasks: 0 });
 const range = reactive({ min: 1, max: 1 });
+const directRange = reactive({ min: 1, max: 0 });
+const directMinutes = ref(0);
 const canEdit = ref(false);
 const loading = ref(false);
 const loaded = ref(false);
 const busy = ref(false);
 const error = ref("");
 
-const counts = computed(() => Array.from({ length: Math.max(0, range.max - range.min + 1) }, (_, index) => range.min + index));
+const numbersIn = (span) => Array.from({ length: Math.max(0, span.max - span.min + 1) }, (_, index) => span.min + index);
+const counts = computed(() => numbersIn(range));
+const directCounts = computed(() => numbersIn(directRange));
 
 const urlOf = (pid) => `${env.AGENT_PROJECT_LIMITS}/${encodeURIComponent(pid)}`;
 const reasonOf = (e, fallback) => e?.response?.data?.statusText || e?.response?.data?.message || t(fallback);
@@ -73,6 +98,8 @@ function take(data) {
     Object.assign(saved, data.limits);
     Object.assign(draft, data.limits);
     Object.assign(range, data.atOnceRange);
+    Object.assign(directRange, data.directTasksRange || { min: 1, max: 0 });
+    directMinutes.value = data.directTasksMinutes || 0;
     canEdit.value = data.canEdit === true;
 }
 
