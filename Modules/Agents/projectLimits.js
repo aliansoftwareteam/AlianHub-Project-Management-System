@@ -2,11 +2,13 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 
-// How many agents may work in a project at once, and whether agents are paused there. Both only hold an agent
-// back: a limit delays a claim, a pause refuses claims and agent changes. Neither touches what people do.
+// How many agents may work in a project at once, how many tasks a connected agent changes there on its own before
+// its changes wait (./directChanges), and whether agents are paused there. Each only holds an agent back: a limit
+// delays a claim, the count files a change for approval, a pause refuses claims and agent changes. None touches what people do.
 
 const AT_ONCE = Object.freeze({ MIN: 1, MAX: 20 });
-const DEFAULTS = Object.freeze({ atOnce: 3, paused: false });
+const DIRECT_TASKS = Object.freeze({ MIN: 1, MAX: 100 });
+const DEFAULTS = Object.freeze({ atOnce: 3, paused: false, directTasks: 10 });
 
 const REASON = Object.freeze({
     PAUSED: 'agents are paused in this project, so no agent takes work or changes anything here until a person resumes them',
@@ -15,11 +17,15 @@ const REASON = Object.freeze({
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const isId = (value) => OBJECT_ID.test(String(value || ''));
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
-const inRange = (value) => Number.isInteger(value) && value >= AT_ONCE.MIN && value <= AT_ONCE.MAX;
+const within = (range, value) => Number.isInteger(value) && value >= range.MIN && value <= range.MAX;
 
 const clean = (kept) => {
     const given = kept && typeof kept === 'object' ? kept : {};
-    return { atOnce: inRange(given.atOnce) ? given.atOnce : DEFAULTS.atOnce, paused: given.paused === true };
+    return {
+        atOnce: within(AT_ONCE, given.atOnce) ? given.atOnce : DEFAULTS.atOnce,
+        paused: given.paused === true,
+        directTasks: within(DIRECT_TASKS, given.directTasks) ? given.directTasks : DEFAULTS.directTasks,
+    };
 };
 
 const stored = async (companyId, projectId) => {
@@ -46,9 +52,10 @@ const pausedAmong = async (companyId, projectIds) => {
 
 const validated = (given) => {
     const sent = given && typeof given === 'object' ? given : {};
-    const named = ['atOnce', 'paused'].filter((key) => sent[key] !== undefined);
-    if (!named.length) return { error: 'Send atOnce, paused or both.' };
-    if (sent.atOnce !== undefined && !inRange(sent.atOnce)) return { error: `atOnce must be a whole number from ${AT_ONCE.MIN} to ${AT_ONCE.MAX}.` };
+    const named = ['atOnce', 'paused', 'directTasks'].filter((key) => sent[key] !== undefined);
+    if (!named.length) return { error: 'Send atOnce, paused or directTasks.' };
+    if (sent.atOnce !== undefined && !within(AT_ONCE, sent.atOnce)) return { error: `atOnce must be a whole number from ${AT_ONCE.MIN} to ${AT_ONCE.MAX}.` };
+    if (sent.directTasks !== undefined && !within(DIRECT_TASKS, sent.directTasks)) return { error: `directTasks must be a whole number from ${DIRECT_TASKS.MIN} to ${DIRECT_TASKS.MAX}.` };
     if (sent.paused !== undefined && typeof sent.paused !== 'boolean') return { error: 'paused must be true or false.' };
     return { values: Object.fromEntries(named.map((key) => [key, sent[key]])) };
 };
@@ -71,4 +78,4 @@ const save = async (companyId, projectId, given, updatedBy) => {
     return { from, to, project, agentLimits, pausedNow };
 };
 
-module.exports = { AT_ONCE, DEFAULTS, REASON, read, pausedAmong, save };
+module.exports = { AT_ONCE, DIRECT_TASKS, DEFAULTS, REASON, read, pausedAmong, save };

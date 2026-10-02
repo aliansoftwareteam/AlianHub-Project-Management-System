@@ -12350,6 +12350,8 @@ export default {
         saved: "Saved.",
         at_once_label: "Agents at work at once",
         at_once_about: "When this many are at work, the next agent waits and gets work when one finishes.",
+        direct_tasks_label: "Tasks a connected agent changes on its own",
+        direct_tasks_about: "A connected agent changes up to this many different tasks in {minutes} minutes without asking. Its change to one more task waits for a person's approval. New tasks and docs count too.",
         pause: "Pause all agents",
         pause_about: "Agents stop taking work and changing things in this project right away. People carry on as usual.",
         paused_note: "Agents are paused in this project. They take no work and change nothing here until someone resumes them.",
