@@ -112,7 +112,7 @@ import Cookies from "js-cookie";
 import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
-import { apiRequestWithoutCompnay, useAuth } from "@/services";
+import { apiRequestWithoutCompnay, getAuth, useAuth } from "@/services";
 import * as env from "@/config/env";
 import { connectAiWelcomePath } from "@/router/ai/connect";
 
@@ -224,8 +224,10 @@ const create = (withSample) => {
         localStorage.setItem("selectedCompany", newCompanyId || "");
         localStorage.removeItem("isLogging");
         Cookies.remove("refferCode");
+        // The session was issued before this workspace existed: without a new one its first requests are refused.
+        const sessionRenewed = getAuth(userId.value).catch(() => null);
         setTimeout(() => {
-            router.push(connectAiWelcomePath(newCompanyId)).then(() => window.location.reload());
+            sessionRenewed.then(() => router.push(connectAiWelcomePath(newCompanyId))).then(() => window.location.reload());
         }, 600);
     });
     source.onmessage = (event) => {

@@ -2,14 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
 
-const { apiRequestWithoutCompnay, push } = vi.hoisted(() => ({
+const { apiRequestWithoutCompnay, getAuth, push } = vi.hoisted(() => ({
     apiRequestWithoutCompnay: vi.fn(),
+    getAuth: vi.fn(),
     push: vi.fn(() => new Promise(() => {})),
 }));
 
 const t = (key, params) => (params ? `${key} ${JSON.stringify(params)}` : key);
 
-vi.mock('@/services', () => ({ apiRequestWithoutCompnay, useAuth: () => ({ logOut: vi.fn() }) }));
+vi.mock('@/services', () => ({ apiRequestWithoutCompnay, getAuth, useAuth: () => ({ logOut: vi.fn() }) }));
 vi.mock('@/composable', () => ({
     useCustomComposable: () => ({ makeUniqueId: () => 'abc', debounce: (fn) => fn }),
     useGetterFunctions: () => ({ getUser: () => ({}) }),
@@ -51,6 +52,10 @@ const openLastStep = async () => {
 const button = (wrapper, label) => wrapper.findAll('button').find((b) => b.text() === label);
 const skip = (wrapper) => button(wrapper, 'Auth.skip_blank').trigger('click');
 const onLastStep = (wrapper) => wrapper.text().includes('Auth.focus_title');
+const afterTheReadyPause = async () => {
+    vi.advanceTimersByTime(600);
+    await flushPromises();
+};
 
 beforeEach(() => {
     vi.useFakeTimers();
@@ -59,6 +64,8 @@ beforeEach(() => {
     localStorage.clear();
     localStorage.setItem('userId', 'user-1');
     push.mockClear();
+    getAuth.mockReset();
+    getAuth.mockResolvedValue({ status: true });
     reply = () => new Promise(() => {});
     apiRequestWithoutCompnay.mockReset();
     apiRequestWithoutCompnay.mockImplementation((method) => (method === 'get' ? Promise.resolve({ data: { Employee_Email: 'sia@example.test' } }) : reply()));
@@ -86,12 +93,40 @@ describe('the last sign-up step while the workspace is being made', () => {
         const wrapper = await openLastStep();
         await skip(wrapper);
         await flushPromises();
-        vi.advanceTimersByTime(600);
+        await afterTheReadyPause();
 
         expect(push).toHaveBeenCalledWith(connectAiWelcomePath('c9'));
         expect(localStorage.getItem('selectedCompany')).toBe('c9');
         expect(streams[0].closed).toBe(true);
         expect(wrapper.text()).toContain('Auth.workspace_ready');
+    });
+
+    it('renews the session before it opens the workspace, so the first screen is not refused and retried', async () => {
+        let renewed;
+        getAuth.mockImplementation(() => new Promise((resolve) => { renewed = resolve; }));
+        reply = () => Promise.resolve({ data: { status: true, companyId: 'c9' } });
+        const wrapper = await openLastStep();
+        await skip(wrapper);
+        await flushPromises();
+        await afterTheReadyPause();
+
+        expect(getAuth).toHaveBeenCalledWith('user-1');
+        expect(push).not.toHaveBeenCalled();
+
+        renewed({ status: true });
+        await flushPromises();
+        expect(push).toHaveBeenCalledWith(connectAiWelcomePath('c9'));
+    });
+
+    it('still opens the workspace when the session cannot be renewed here', async () => {
+        getAuth.mockRejectedValue({ status: false });
+        reply = () => Promise.resolve({ data: { status: true, companyId: 'c9' } });
+        const wrapper = await openLastStep();
+        await skip(wrapper);
+        await flushPromises();
+        await afterTheReadyPause();
+
+        expect(push).toHaveBeenCalledWith(connectAiWelcomePath('c9'));
     });
 
     it('opens the workspace once when the progress message and the reply both say it is made', async () => {
@@ -103,7 +138,7 @@ describe('the last sign-up step while the workspace is being made', () => {
         streams[0].say({ step: 100, companyId: 'c9' });
         answer({ data: { status: true, companyId: 'c9' } });
         await flushPromises();
-        vi.advanceTimersByTime(600);
+        await afterTheReadyPause();
 
         expect(push).toHaveBeenCalledTimes(1);
         expect(push).toHaveBeenCalledWith(connectAiWelcomePath('c9'));
@@ -123,7 +158,7 @@ describe('the last sign-up step while the workspace is being made', () => {
 
         answer({ data: { status: true, companyId: 'c9' } });
         await flushPromises();
-        vi.advanceTimersByTime(600);
+        await afterTheReadyPause();
         expect(push).toHaveBeenCalledWith(connectAiWelcomePath('c9'));
     });
 });
