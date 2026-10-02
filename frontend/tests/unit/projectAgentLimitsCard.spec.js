@@ -1,6 +1,7 @@
 /* Task 047, T-5: how many agents work in a project at once, and "Pause all", on the project's detail screen. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
+import { ref } from 'vue';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -11,6 +12,7 @@ vi.mock('vue-toast-notification', () => ({ useToast: () => toast }));
 vi.mock('vue-i18n', async (importOriginal) => ({ ...(await importOriginal()), useI18n: () => ({ t: (key) => key }) }));
 
 import ProjectAgentLimitsCard from '@/views/Projects/ProjectDetail/ProjectAgentLimitsCard.vue';
+import { GATHER_MS } from '@/views/Projects/liveProjects';
 import en from '@/locales/en';
 
 const URL = '/api/v2/agents/project-limits/p1';
@@ -108,6 +110,41 @@ describe('ProjectAgentLimitsCard', () => {
         await flushPromises();
         expect(apiRequest).toHaveBeenLastCalledWith('get', '/api/v2/agents/project-limits/p2', undefined);
         expect(select(wrapper).exists()).toBe(true);
+    });
+
+    it('follows a pause made in another tab or by another person, and stops listening when it closes', async () => {
+        const listeners = {};
+        const socket = { on: vi.fn((event, handler) => { listeners[event] = handler; }), off: vi.fn((event, handler) => { if (listeners[event] === handler) delete listeners[event]; }) };
+        let data = answer();
+        apiRequest.mockImplementation(() => ok(data));
+        vi.useFakeTimers();
+        try {
+            const wrapper = mount(ProjectAgentLimitsCard, { props: { projectId: 'p1' }, global: { mocks: { $t: (key) => key }, provide: { $socket: ref(socket) } } });
+            await flushPromises();
+            expect(wrapper.find('[data-test="paused-note"]').exists()).toBe(false);
+
+            listeners.projectChanged({ kind: 'changed', companyId: 'c1', projectId: 'p2' });
+            await vi.advanceTimersByTimeAsync(GATHER_MS);
+            await flushPromises();
+            expect(apiRequest).toHaveBeenCalledTimes(1);
+
+            data = answer({ limits: { atOnce: 2, paused: true } });
+            listeners.projectChanged({ kind: 'changed', companyId: 'c1', projectId: 'p1' });
+            listeners.projectChanged({ kind: 'changed', companyId: 'c1', projectId: 'p1' });
+            await vi.advanceTimersByTimeAsync(GATHER_MS);
+            await flushPromises();
+            expect(apiRequest).toHaveBeenCalledTimes(2);
+            expect(apiRequest).toHaveBeenLastCalledWith('get', URL, undefined);
+            expect(wrapper.find('[data-test="paused-note"]').exists()).toBe(true);
+            expect(resumeButton(wrapper).exists()).toBe(true);
+            expect(select(wrapper).element.value).toBe('2');
+            expect(wrapper.find('[data-test="loading"]').exists()).toBe(false);
+
+            wrapper.unmount();
+            expect(listeners.projectChanged).toBeUndefined();
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('labels the select, and every string it shows is in the English locale', async () => {
