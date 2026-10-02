@@ -160,7 +160,7 @@ import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption
 }
 .taskStatusRight ul li{
     list-style: none;
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
     border-radius: 3px;
     padding: 0px 11px 0px 23px;
     margin-bottom: 10px;
@@ -192,7 +192,7 @@ div#expand_subtask .drop-down-menu {
 }
 input.form-control.edit-input {
     margin: 1px 8px 1px 0px;
-    background-color: #f1f1f1;
+    background-color: var(--fill);
     border: 0;
 }
 .project__setting-ignoredrag{

@@ -23,7 +23,7 @@ img.screenShotDisplay__innerImageTimelog {
    width: 100%;
    border-radius: 10px;
    box-sizing: border-box;
-   background: #F4F5F7;
+   background: var(--fill);
    min-width: 158px;
    width: 100%;
 }
@@ -43,6 +43,6 @@ img.screenShotDisplay__timedispalyImg--profileImage {
 }
 
 .isSelectedImage {
-   border: 1px solid #2F3990;
+   border: 1px solid var(--brand);
    padding: 8px;
 }

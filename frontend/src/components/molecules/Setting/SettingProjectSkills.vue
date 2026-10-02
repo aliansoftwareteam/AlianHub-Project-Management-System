@@ -186,7 +186,7 @@ async function setActive(skill, active) {
 <style scoped>
 @import './style.css';
 .skills__hint {
-    color: #818181;
+    color: var(--ink-2);
     margin: 0 0 12px 0;
 }
 .vs-con-input-label .vs-con-input {

@@ -19,7 +19,7 @@
             <p class="turnOff">{{ $t('Templates.Turn') }} {{theModel && theModel.length>0 && theModel.filter((x) => x.appStatus).length === theModel.length ? $t('Templates.off') : $t('Templates.on')}} {{ $t('Templates.all_apps') }}</p>
         </div>
         <div class="d-flex align-items-center justify-content-between enable-app-data style-scroll flex-wrap">
-            <label class="cat action" :class="{'border-radius-7-px enable-cataction-desktop': clientWidth > 767 , 'border-radius-8-px enable-cataction-mobile': clientWidth <= 767}" v-for="(appData,key) in theModel" v-bind:key="key"  :style="[{'border': appData.appStatus ? '1.5px solid #3845B3' :'' }]">
+            <label class="cat action" :class="{'border-radius-7-px enable-cataction-desktop': clientWidth > 767 , 'border-radius-8-px enable-cataction-mobile': clientWidth <= 767}" v-for="(appData,key) in theModel" v-bind:key="key"  :style="[{'border': appData.appStatus ? '1.5px solid var(--brand)' :'' }]">
                 <input type="checkbox" value="Priority" v-model.trim="appData.appStatus" :checked="appData.appStatus" />
                 <div class="Image_other d-flex align-items-center justify-content-between" @click="manageApps(appData)">
                     <div class="d-flex align-items-center">

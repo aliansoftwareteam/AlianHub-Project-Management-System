@@ -56,7 +56,7 @@
 
 .preview_image_name {
     text-align: start;
-    color: white;
+    color: var(--rail-ink-strong);
     font-size: 1.4rem;
     z-index: 1;
     margin-top: 5px;
@@ -71,13 +71,13 @@
     text-wrap: nowrap;
     cursor: default;
 
-    background: #2b2b2b52;
+    background: color-mix(in srgb, var(--rail) 32%, transparent);
     border-radius: 5px;
     padding: 5px 15px 5px 0px;
 }
 .preview_image_zoom {
     text-align: center;
-    color: white;
+    color: var(--rail-ink-strong);
     font-size: 1.1rem;
     z-index: 1;
     border-radius: 5px;
@@ -94,7 +94,7 @@
     cursor: default;
     min-width: 45px;
     align-items: center;
-    background: #2b2b2b52;
+    background: color-mix(in srgb, var(--rail) 32%, transparent);
     padding: 5px 5px;
     text-align: center;
 }
@@ -104,13 +104,13 @@
     border-radius: 0;
     border: 0;
     padding: 0px 10px;
-    background: #2b2b2b52;
-    color: white;
+    background: color-mix(in srgb, var(--rail) 32%, transparent);
+    color: var(--rail-ink-strong);
     min-width: 30px;
     font-size: 1.4rem;
 }
 .zoomBtn:hover {
-    background: #2b2b2b;
+    background: var(--rail);
 }
 
 .preview {
@@ -141,8 +141,8 @@ audio.preview {
 }
 
 .no_preview_available {
-    color: white;
-    background: #040404b3;
+    color: var(--rail-ink-strong);
+    background: color-mix(in srgb, var(--rail) 70%, transparent);
     padding: 20px 30px;
     text-transform: capitalize;
     border-radius: 5px;

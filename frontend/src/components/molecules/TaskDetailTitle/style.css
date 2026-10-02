@@ -34,7 +34,7 @@
     white-space: nowrap;
     font-family: var(--font-ui);
     font-weight: 700;
-    color: #000000;
+    color: var(--ink);
     font-size: 18px;
     line-height: 27px;
     padding-left: 9px;
@@ -42,7 +42,7 @@
 }
 
 .input-border-color{
-    border: 2px solid #2f3990;
+    border: 2px solid var(--brand);
     border-radius: 5px;
     height: 28px;
     padding: 4px;

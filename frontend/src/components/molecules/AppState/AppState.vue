@@ -93,7 +93,7 @@ const secondary = () => emit('secondary');
 .ah-state__mark {
     width: 30px; height: 30px; border-radius: 8px;
     display: inline-grid; place-items: center;
-    background: rgba(0, 0, 0, .06); color: var(--ink-2);
+    background: var(--fill); color: var(--ink-2);
 }
 .ah-state__mark--offline, .ah-state__mark--unreachable { background: var(--danger-bg); color: var(--danger-ink); }
 .ah-state__mark--forbidden, .ah-state__mark--denied { background: var(--warn-bg); color: var(--warn-ink); }
