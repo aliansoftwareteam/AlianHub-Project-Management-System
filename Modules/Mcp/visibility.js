@@ -99,6 +99,12 @@ const forCaller = async (ctx) => {
 
 const refuse = (reason) => Object.assign(new Error(`${NOT_VISIBLE}: ${reason}`), { notVisible: true });
 
+/* Whether the task and the project a read is addressed by are inside `vis`. A task that is deleted or not there is not. */
+const opensNamed = async (companyId, vis, { taskId, projectId } = {}) => {
+    if (taskId !== undefined && !vis.allowsTask(await storedTask(companyId, taskId))) return false;
+    return projectId === undefined || vis.allowsProject(projectId);
+};
+
 const storedTask = (companyId, taskId) => (isId(taskId)
     ? MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: toOid(taskId), deletedStatusKey: { $ne: 1 } }, TASK_ACCESS_FIELDS] }, 'findOne')
     : null);
@@ -133,4 +139,4 @@ const assertWritable = async (companyId, vis, { taskId, relatedTaskId, projectId
     }
 };
 
-module.exports = { forCaller, assertWritable, NOT_VISIBLE, TASK_ACCESS_FIELDS };
+module.exports = { forCaller, assertWritable, opensNamed, NOT_VISIBLE, TASK_ACCESS_FIELDS };

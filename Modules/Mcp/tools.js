@@ -396,11 +396,14 @@ const call = async (ctx, name, args = {}) => {
         const refused = scopeRefusal(ctx, tool, false);
         if (refused) throw Object.assign(new Error(refused), { code: -32004 });
         refuseBadArguments(tool, args);
+        let vis;
+        const seen = async () => { vis = vis || await visibility.forCaller(ctx); return vis; };
+        const params = tool.readParams ? tool.readParams(args) : { taskId: args.taskId };
         if (!tool.authorizesPerProject) await actions.authorizeRead({
-            companyId: ctx.companyId, actor: ctx.actor, action: tool.action,
-            params: tool.readParams ? tool.readParams(args) : { taskId: args.taskId }, ip: ctx.ip, allowedActions: ctx.allowedActions,
+            companyId: ctx.companyId, actor: ctx.actor, action: tool.action, params, ip: ctx.ip, allowedActions: ctx.allowedActions,
+            opens: filtered ? async () => visibility.opensNamed(ctx.companyId, await seen(), params) : null,
         });
-        return tool.run(ctx, args, filtered ? await visibility.forCaller(ctx) : undefined);
+        return tool.run(ctx, args, filtered ? await seen() : undefined);
     }
 
     admitWrite(ctx, tool, args);

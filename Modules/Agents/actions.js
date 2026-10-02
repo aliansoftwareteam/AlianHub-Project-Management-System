@@ -549,11 +549,12 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
 };
 
 /* Reads still go through the registry so a refusal is logged the same way. */
-const authorizeRead = async ({ companyId, actor, action, params = {}, ip = '', allowedActions }) => {
+const authorizeRead = async ({ companyId, actor, action, params = {}, ip = '', allowedActions, opens = null }) => {
     await liveStep(companyId, actor, { action, params, ip });
     const check = registry.evaluate(action, params, { allowedActions });
     if (!check.allowed) throw await refusal(companyId, actor, { action, params, reason: check.reason, ip });
-    const holder = await permissions.holderMay(companyId, actor, action, params);
+    // `opens` says whether the caller can open what `params` names. What it cannot open is judged as an id that names nothing is.
+    const holder = await permissions.holderMay(companyId, actor, action, params, { byWorkspaceRules: Boolean(opens) && !(await opens()) });
     if (!holder.allowed) throw await refusal(companyId, actor, { action, params, reason: holder.reason, ip });
     return true;
 };

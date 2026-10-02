@@ -25,14 +25,15 @@ const projectOf = async (companyId, params = {}) => {
 
 const denied = (key, why) => ({ allowed: false, reason: `${REASON}: ${key} ${why}`, permission: key });
 
-/* Does the person behind `actor` hold every catalogue entry `action` needs? */
-const holderMay = async (companyId, actor, action, params = {}) => {
+/* Does the person behind `actor` hold every catalogue entry `action` needs? With `byWorkspaceRules` the entries are
+ * judged by the workspace's rules, whatever project `params` names. */
+const holderMay = async (companyId, actor, action, params = {}, { byWorkspaceRules = false } = {}) => {
     const required = registry.permissionsFor(action, params);
     if (!required.length) return { allowed: true, reason: '', permission: null };
     const uid = String((actor && actor.userId) || '');
     if (!OBJECT_ID.test(uid)) return denied(required[0].key, 'cannot be checked — no person is behind this agent');
     try {
-        const projectId = await projectOf(companyId, params);
+        const projectId = byWorkspaceRules ? null : await projectOf(companyId, params);
         const holds = async (key, write) => {
             const value = await evaluatePermission(companyId, uid, key, { projectId });
             return write ? isWritable(value) : isReadable(value);
