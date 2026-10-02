@@ -28,6 +28,7 @@ import { apiRequestWithoutCompnay } from '@/services'
 import * as env from '@/config/env';
 import Cookies from 'js-cookie'
 import { readSetupStatus, isKnownInstalled } from './setupStatus';
+import { opensWithoutWorkspace } from './withoutWorkspace';
 
 
 const routes = [
@@ -163,7 +164,7 @@ router.beforeEach(async(to, _, next) => {
 			return;
 		} else if(user !== null && requiresAuth === false) {
 			// IF USER IS LOGGED IN AND REQUESTS NO AUTH REQUIRED PAGE
-			if(to.meta.title === 'Support'){
+			if(to.meta.title === 'Support' || opensWithoutWorkspace(to)){
 				next();
 			}else if(!user?.AssignCompany?.length){
 				next({name: "Create_Company", query: query});

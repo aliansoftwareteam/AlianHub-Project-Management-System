@@ -2888,6 +2888,8 @@ const schema = {
     companies: {
         // { by, anchor } — set only by scripts/seed-scale.js, which writes to and drops no company without it.
         scaleSeed: { type: Object, required: false },
+        // The id of the migration that wrote this row for a workspace opened without one; its down() deletes no row without it.
+        rowRepairedBy: { type: String, required: false },
         // { allowedModes: ['workspace','personal','local'], requireCheckBeforeDone, connectedPaused, connectedPausedBy, connectedPausedAt }
         agentPolicy: {
             type: Object,

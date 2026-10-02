@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ref } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
 
 const COMPANY_ID = '6f0000000000000000000c01';
@@ -122,6 +123,43 @@ describe('Invitation page for an invitee who may already have an account', () =>
         expect(reload).toHaveBeenCalled();
     });
 
+    it('tells the app which workspace is open before it goes there, so a person with no workspace is not sent to name one', async () => {
+        signedInAs(INVITED);
+        const openCompany = ref('');
+        let openWhenLeaving;
+        mocks.replace.mockImplementation(async () => { openWhenLeaving = openCompany.value; });
+        const wrapper = mount(Invitation, {
+            global: {
+                provide: { $axios: previewSays(), addSubscription: vi.fn(), $companyId: openCompany },
+                stubs: { 'router-link': { props: ['to'], template: '<a :data-to="JSON.stringify(to)"><slot /></a>' } },
+            },
+        });
+        await flushPromises();
+
+        await buttonNamed(wrapper, 'Auth.invite_accept').trigger('click');
+        await flushPromises();
+
+        expect(openWhenLeaving).toBe(COMPANY_ID);
+    });
+
+    it('leaves the app on the workspace it has open when the person already has one: the app changes workspace itself', async () => {
+        signedInAs(INVITED);
+        const openCompany = ref('own-company');
+        const wrapper = mount(Invitation, {
+            global: {
+                provide: { $axios: previewSays(), addSubscription: vi.fn(), $companyId: openCompany },
+                stubs: { 'router-link': { props: ['to'], template: '<a :data-to="JSON.stringify(to)"><slot /></a>' } },
+            },
+        });
+        await flushPromises();
+
+        await buttonNamed(wrapper, 'Auth.invite_accept').trigger('click');
+        await flushPromises();
+
+        expect(openCompany.value).toBe('own-company');
+        expect(mocks.replace).toHaveBeenCalledWith(`/${COMPANY_ID}/welcome/connect-ai`);
+    });
+
     it('says plainly when signed in as another account, offers to switch, and never accepts', async () => {
         signedInAs('someone.else@example.test');
         const wrapper = await mountPage(previewSays());
@@ -151,6 +189,22 @@ describe('Invitation page for an invitee who may already have an account', () =>
         expect(wrapper.find('.auth__banner').text()).toBe('Auth.invite_accept_failed');
         expect(mocks.replace).not.toHaveBeenCalled();
         expect(localStorage.getItem('selectedCompany')).toBeNull();
+    });
+
+    it('says to try again, not to ask for a new link, when the server could not save the acceptance', async () => {
+        signedInAs(INVITED);
+        mocks.apiRequestWithoutCompnay.mockImplementation(async (type) => {
+            if (type === 'get') return { status: 200, data: { _id: USER_ID, Employee_Email: INVITED } };
+            throw Object.assign(new Error('Request failed with status code 500'), { response: { status: 500, data: { status: false } } });
+        });
+        const wrapper = await mountPage(previewSays());
+
+        await buttonNamed(wrapper, 'Auth.invite_accept').trigger('click');
+        await flushPromises();
+
+        expect(wrapper.find('.auth__banner').text()).toBe('Auth.server_error');
+        expect(buttonNamed(wrapper, 'Auth.invite_accept').attributes('disabled')).toBeUndefined();
+        expect(mocks.replace).not.toHaveBeenCalled();
     });
 });
 

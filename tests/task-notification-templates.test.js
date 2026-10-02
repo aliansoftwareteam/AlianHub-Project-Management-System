@@ -78,27 +78,27 @@ describe('names are escaped before they reach the message', () => {
         expect(out).toContain('<b>Ana</b> added 2h');
     });
 
-    it.failing('escapes the sprint name when a sprint is created', () => {
+    it('escapes the sprint name when a sprint is created', () => {
         expect(T.createSprint({ sprintName: ATTACK, ProjectName: 'P' })).not.toContain('<img');
     });
 
-    it.failing('escapes both sprint names when a sprint is renamed', () => {
+    it('escapes both sprint names when a sprint is renamed', () => {
         expect(T.EditSprint({ ProjectName: 'P', previousSprint: ATTACK, sprintName: ATTACK })).not.toContain('<img');
     });
 
-    it.failing('escapes the folder name when a folder is created', () => {
+    it('escapes the folder name when a folder is created', () => {
         expect(T.createFolder({ sprintFolderName: ATTACK, ProjectName: 'P' })).not.toContain('<img');
     });
 
-    it.failing('escapes the sub task name when one is created', () => {
+    it('escapes the sub task name when one is created', () => {
         expect(T.createSubTask({ ProjectName: 'P', newSubTaskName: ATTACK })).not.toContain('<img');
     });
 
-    it.failing('escapes the task name in a description message', () => {
+    it('escapes the task name in a description message', () => {
         expect(T.taskDescriptionAdd({ ProjectName: 'P', TaskName: ATTACK, textSimple: 'x' })).not.toContain('<img');
     });
 
-    it.failing('escapes the milestone name when one is created', () => {
+    it('escapes the milestone name when one is created', () => {
         expect(T.projectMileStone({ ProjectName: 'P', milestoneName: ATTACK })).not.toContain('<img');
     });
 });

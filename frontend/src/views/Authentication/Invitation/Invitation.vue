@@ -124,6 +124,7 @@ const router = useRouter();
 const $toast = useToast();
 const axios = inject("$axios");
 const addSubscription = inject("addSubscription");
+const openCompany = inject("$companyId", null);
 const { getters } = useStore();
 const { debouncerWithPromise } = useCustomComposable();
 const { logOut } = useAuth();
@@ -271,11 +272,15 @@ const acceptInvitation = async () => {
         // The session's workspaces are fixed when its token is issued; a fresh one includes the one just joined.
         await getAuth(localStorage.getItem("userId"));
         localStorage.setItem("selectedCompany", companyIdRoute.value);
+        // A person who had no workspace: the app holds no company, would look the new address up in the empty list it
+        // loaded before this one was joined, and send them to name a workspace. Told which one is open, it does not.
+        if (openCompany && !openCompany.value) openCompany.value = companyIdRoute.value;
         await router.replace(connectAiWelcomePath(companyIdRoute.value));
         window.location.reload();
     } catch (error) {
         console.error(error);
-        banner.value = t("Auth.invite_accept_failed");
+        // A refusal means the invitation is gone; a server failure left it waiting, and the same button works again.
+        banner.value = error?.response?.status >= 500 ? t("Auth.server_error") : t("Auth.invite_accept_failed");
         busy.value = false;
     }
 };

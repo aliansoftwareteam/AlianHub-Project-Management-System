@@ -173,12 +173,12 @@ describe('sanitizeDocHtml: images and embeds', () => {
         expect(sanitizeDocHtml('a<iframe></iframe>b')).toBe('ab');
     });
 
-    it.failing('keeps the bare allowfullscreen attribute on a video embed (it is dropped, so there is no full-screen button)', () => {
+    it('keeps the bare allowfullscreen attribute on a video embed (it is dropped, so there is no full-screen button)', () => {
         const out = sanitizeDocHtml('<iframe src="https://www.youtube.com/embed/abc123" allowfullscreen></iframe>');
         expect(out).toContain('allowfullscreen');
     });
 
-    it.failing('exports SAFE_EMBED_SRC (the module assigns it, then replaces its exports)', () => {
+    it('exports SAFE_EMBED_SRC (the module assigns it, then replaces its exports)', () => {
         expect(rules.SAFE_EMBED_SRC).toBeInstanceOf(RegExp);
     });
 });

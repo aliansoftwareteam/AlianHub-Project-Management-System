@@ -38,7 +38,7 @@ describe('normaliseSettings', () => {
         expect(out.userIds).toEqual(['a', '7', 'b']);
     });
 
-    it.failing('drops a null member instead of keeping the text "null" as a recipient', () => {
+    it('drops a null member instead of keeping the text "null" as a recipient', () => {
         expect(settings.normaliseSettings({ userIds: ['a', null, undefined] }).userIds).toEqual(['a']);
     });
 
