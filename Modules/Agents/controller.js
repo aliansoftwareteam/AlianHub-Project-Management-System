@@ -484,6 +484,8 @@ exports.startRun = async (req, res) => {
             // never executed and never finished — "running" forever in every counter.
             return fail(res, 'This agent needs a task to run on. Assign the agent to a task, @mention it in a task comment, or run it on a task from the agent\'s page.');
         }
+        const paused = await runs.pausedIn(companyId, task.ProjectID);
+        if (paused) return fail(res, paused, 409);
         const { run, deduplicated } = await runs.start(companyId, { agent, taskId, projectId: task && task.ProjectID, skill: runs.skillSlugOf(agent, skill), trigger: TRIGGERS.includes(trigger) ? trigger : 'manual', startedBy: actor.userId, viaAccount: isAgent(actor) ? actor.viaAccount : agent.account, note, spendCapUsd, notifyMe: Boolean(notifyMe), idempotencyKey });
         const plain = typeof run.toObject === 'function' ? run.toObject() : { ...run };
         if (deduplicated) return res.send({ status: true, statusText: 'Run already started.', data: { ...plain, deduplicated: true } });

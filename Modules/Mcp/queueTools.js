@@ -59,7 +59,7 @@ const named = (action) => async (ctx, args, vis) => {
     const params = { itemId: String(item.row._id), projectId: String(item.row.projectId) };
     const rule = await projectPolicy.ask({ companyId: ctx.companyId, actor: ctx.actor, action, params });
     if (rule.decision !== projectPolicy.DECISION.ACT) {
-        throw await actions.refusal(ctx.companyId, ctx.actor, { action, params, reason: `${rule.reason}, ${HELD}`, ip: ctx.ip, taint: ctx.taint });
+        throw await actions.refusal(ctx.companyId, ctx.actor, { action, params, reason: rule.paused ? rule.reason : `${rule.reason}, ${HELD}`, ip: ctx.ip, taint: ctx.taint });
     }
     return { args: { ...args, ...params, taskId: String(item.row.taskId) } };
 };

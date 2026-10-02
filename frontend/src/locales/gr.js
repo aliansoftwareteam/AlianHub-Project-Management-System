@@ -11865,7 +11865,26 @@ export default {
         "mark_label": "{name} is working on this, since {time}",
         "mark_label_no_time": "{name} is working on this",
         "filter": "Agent working",
-        "filter_hint": "Show only the tasks an agent is working on now"
+        "filter_hint": "Show only the tasks an agent is working on now",
+        "at_work": "{n} agent at work | {n} agents at work",
+        "at_work_open": "Show the tasks agents are working on now",
+        "paused": "Agents paused"
+    },
+    "AgentLimits": {
+        "title": "Agents working at the same time",
+        "lead": "How many AI agents may work in this project at once, and a way to stop them all. Neither changes what people can do.",
+        "loading": "Loading…",
+        "load_failed": "These settings could not be loaded.",
+        "save_failed": "The change was not saved.",
+        "saved": "Saved.",
+        "at_once_label": "Agents at work at once",
+        "at_once_about": "When this many are at work, the next agent waits and gets work when one finishes.",
+        "pause": "Pause all agents",
+        "pause_about": "Agents stop taking work and changing things in this project right away. People carry on as usual.",
+        "paused_note": "Agents are paused in this project. They take no work and change nothing here until someone resumes them.",
+        "resume": "Resume agents",
+        "resume_about": "Agents can take work and make changes here again.",
+        "read_only": "Only an owner or an admin can change these."
     },
     "ProjectManager": {
         "title": "Project manager",

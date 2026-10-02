@@ -11,6 +11,8 @@ const { DeterministicError } = require('../../Automations/engine/tools');
 const { toolNameOf, byline } = require('../actingAgent');
 const { userAgentAccount } = require('../actor');
 const connectedAgents = require('../connectedAgents');
+const { connectionOf } = require('../workMarks');
+const places = require('./places');
 const { parseOwnAiMentionIds } = require('../../Comments/helpers/parseMentions');
 const { RULE } = require('./rules');
 const findings = require('./findings');
@@ -38,6 +40,8 @@ const REFUSAL = Object.freeze({
     TAKEN: 'Another agent holds that item. Pick another one.',
     NOT_HELD: 'You do not hold that item. Your claim may have run out, or a person took the item back.',
     NOT_YOUR_AI: 'You can hand a task only to your own connected AI.',
+    ONE_AT_A_TIME: 'You already hold an item. Finish it or give it back with queue.release, then take the next one.',
+    PROJECT_FULL: 'This project already has as many agents at work as it allows. Wait, then ask again: an item is handed out when one of them finishes.',
 });
 
 const isId = (value) => OBJECT_ID.test(String(value || ''));
@@ -56,12 +60,6 @@ const announce = (companyId) => socketEmitter.emit('update', {
 
 const waiting = Object.freeze({ status: STATUS.OPEN, rule: { $in: QUEUE_RULES }, proposalId: null, leftQueue: null });
 
-/* One connection acting for one person: a personal token, or an outside client's grant. */
-const connectionOf = (actor) => {
-    if (actor && actor.grantId) return `grant:${actor.grantId}`;
-    return actor && actor.tokenId ? `token:${actor.tokenId}` : '';
-};
-
 const nameOf = async (actor) => byline(toolNameOf(actor), actor.personName || ((await userAgentAccount(actor.userId)) || {}).name || 'Member');
 
 /* A task handed to one person's AI is work for that person's connections only. */
@@ -75,9 +73,15 @@ const isMember = async (companyId, uid) => {
     return roleType !== null && roleType !== undefined && roleType !== ROLE_GUEST;
 };
 
-const projectsOn = (companyId, ids) => find(companyId, SCHEMA_TYPE.PROJECTS, [
-    { 'agentManager.on': true, deletedStatusKey: { $ne: 1 }, ...(ids ? { _id: { $in: ids.filter(isId).map(oid) } } : {}) }, { ProjectName: 1 }, { limit: PROJECTS_READ },
+const projectsOn = (companyId, ids, more = {}) => find(companyId, SCHEMA_TYPE.PROJECTS, [
+    { 'agentManager.on': true, deletedStatusKey: { $ne: 1 }, ...(ids ? { _id: { $in: ids.filter(isId).map(oid) } } : {}), ...more }, { ProjectName: 1 }, { limit: PROJECTS_READ },
 ]);
+
+const NOT_PAUSED = Object.freeze({ 'agentLimits.paused': { $ne: true } });
+
+const claimStands = (companyId, now) => async (itemId, connection) => isId(itemId) && (await find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [
+    { ...waiting, _id: oid(itemId), 'claim.by': connection, 'claim.until': { $gt: now } }, { _id: 1 },
+])).length > 0;
 
 /* The rows a person may read, each with its task: every task a row names or counts must be one they can open,
  * by the rule the task list uses, and one the connection's own filter (`allowsTask`) lets through. */
@@ -107,9 +111,10 @@ const heldBy = async (companyId, row, now) => {
 
 const byUrgency = (a, b) => QUEUE_RULES.indexOf(a.row.rule) - QUEUE_RULES.indexOf(b.row.rule) || new Date(a.row.openedAt) - new Date(b.row.openedAt);
 
-/* What a connection may take or already holds, the most urgent first. Nothing is counted beside the list. */
+/* What a connection may take or already holds, the most urgent first. Nothing is counted beside the list, and a
+ * project where agents are paused hands out nothing. */
 const itemsFor = async ({ companyId, uid, connection, projectId, allowsProject = () => true, allowsTask, limit, now = new Date() }) => {
-    const projects = (await projectsOn(companyId, projectId ? [projectId] : null)).filter((project) => allowsProject(String(project._id)));
+    const projects = (await projectsOn(companyId, projectId ? [projectId] : null, NOT_PAUSED)).filter((project) => allowsProject(String(project._id)));
     if (!projects.length) return [];
     const names = new Map(projects.map((project) => [String(project._id), project.ProjectName || '']));
     const rows = await find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [
@@ -140,7 +145,9 @@ const itemFor = async ({ companyId, uid, itemId, allowsProject = () => true, all
 const entity = (item) => ({ entityId: item.row.taskId, entityName: item.task.TaskName || '' });
 
 const executors = {
-    /* Exactly one of two callers wins: the write matches only a row nobody holds, or one the caller holds already. */
+    /* Exactly one of two callers wins: the write matches only a row nobody holds, or one the caller holds already.
+     * A new claim then needs the connection's one hand and a place in the project, each by a write only one caller
+     * wins; the caller that gets neither gives the claim back. */
     async 'queue.claim'({ companyId, actor, params }) {
         const connection = connectionOf(actor);
         if (!connection) throw new DeterministicError(REFUSAL.NOT_CONNECTED);
@@ -155,6 +162,12 @@ const executors = {
             ...waiting, _id: item.row._id, $or: [{ claim: null }, { 'claim.until': { $lte: now } }, { 'claim.by': connection }],
         }, { $set: { claim } });
         if (!taken) throw new DeterministicError(REFUSAL.TAKEN);
+        const renews = Boolean(held && held.by === connection);
+        const place = renews ? { held: '' } : await places.takeFor({ companyId, projectId: item.row.projectId, connection, itemId: item.row._id, now, holds: claimStands(companyId, now) });
+        if (place.held) {
+            await change(companyId, { _id: item.row._id, 'claim.by': connection }, { $unset: { claim: '' } });
+            throw new DeterministicError(place.held === 'one_at_a_time' ? REFUSAL.ONE_AT_A_TIME : REFUSAL.PROJECT_FULL);
+        }
         announce(companyId);
         return {
             result: { itemId: String(item.row._id), claimedUntil: claim.until.toISOString(), minutes: CLAIM_MINUTES },
@@ -174,6 +187,7 @@ const executors = {
         const set = finished ? { leftQueue: left, ...(handedOver ? { status: STATUS.CLOSED, closedAt: now } : {}) } : null;
         const released = await change(companyId, { _id: item.row._id, 'claim.by': connection }, { $unset: { claim: '' }, ...(set ? { $set: set } : {}) });
         if (!released) throw new DeterministicError(REFUSAL.NOT_HELD);
+        await places.giveBack(companyId, item.row._id, connection);
         announce(companyId);
         return {
             result: { itemId: String(item.row._id), released: true, finished },
@@ -187,6 +201,7 @@ const inverses = {
         const restored = u.was === 'claimed'
             ? await change(companyId, { _id: oid(u.itemId), 'claim.by': u.by }, { $unset: { claim: '' } })
             : await change(companyId, { _id: oid(u.itemId), 'leftQueue.why': LEFT.FINISHED }, { $set: { status: STATUS.OPEN }, $unset: { leftQueue: '', closedAt: '' } });
+        if (restored && u.was === 'claimed') await places.giveBack(companyId, u.itemId, u.by);
         if (restored) announce(companyId);
         return { itemId: u.itemId, restored: Boolean(restored) };
     },
@@ -326,6 +341,7 @@ const takeBack = async (companyId, uid, itemId, now = new Date()) => {
     await change(companyId, { _id: row._id, status: STATUS.OPEN }, {
         $unset: { claim: '' }, $set: { leftQueue: left, ...(row.rule === HANDED_OVER ? { status: STATUS.CLOSED, closedAt: now } : {}) },
     });
+    await places.giveBack(companyId, row._id);
     announce(companyId);
     return { taskId: row.taskId, projectId: String(row.projectId) };
 };
@@ -340,6 +356,15 @@ const closeFinished = async (companyId, projectId, now = new Date()) => {
     await Promise.all(rows.filter((row) => open.has(String(row.taskId))).map((row) => standing(companyId, row, now)));
 };
 
+/* Pausing a project takes every item there out of the agents' hands at once, so no task still reads as being worked on. */
+const dropClaimsIn = async (companyId, projectId) => {
+    const dropped = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PROJECT_FINDINGS, data: [{ projectId: { $in: idForms([String(projectId)]) }, claim: { $ne: null } }, { $unset: { claim: '' } }],
+    }, 'updateMany');
+    announce(companyId);
+    return Number((dropped && dropped.modifiedCount) || 0);
+};
+
 module.exports = {
-    CLAIM_MINUTES, QUEUE_RULES, LEFT, REFUSAL, LISTED_MAX, connectionOf, liveClaim, itemsFor, itemFor, executors, inverses, claimsOf, heldTasks, aboutTask, handOver, pickableOn, handOverFromComment, takeBack, closeFinished,
+    CLAIM_MINUTES, QUEUE_RULES, LEFT, REFUSAL, LISTED_MAX, connectionOf, liveClaim, itemsFor, itemFor, executors, inverses, claimsOf, heldTasks, aboutTask, handOver, pickableOn, handOverFromComment, takeBack, closeFinished, dropClaimsIn,
 };
