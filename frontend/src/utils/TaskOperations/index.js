@@ -2,7 +2,7 @@ import * as env from '@/config/env';
 import { apiRequest } from "../../services";
 import Store from '@/store/index'
 import Swal from '@/utils/lazySwal';
-import { instantEdit } from '@/utils/instantTaskEdit';
+import { instantEdit, tellViews } from '@/utils/instantTaskEdit';
 
 const actorOf = (userData) => ({
     "Employee_Name": userData.Employee_Name,
@@ -16,6 +16,12 @@ const patchTask = (body, statusText) => apiRequest("patch", env.V2_TASKS, body).
 }, (error) => {
     throw {status: false, error};
 });
+
+/* A write shown before it is sent: in the store's row, and in each view that keeps its own copy of the task. */
+const showInViews = (pid, sprintId, data, updatedFields) => {
+    Store.commit('projectData/mutateUpdateFirebaseTasks', {snap: null, op: "modified", pid, sprintId, data, updatedFields});
+    tellViews(data._id, updatedFields);
+};
 
 class Task {
     create({ data, user, projectData ,indexObj = {}, groupBy}) {
@@ -101,7 +107,7 @@ class Task {
         return new Promise((resolve,reject) => {
             try {
                 const {sprintId,ProjectID} = task;
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:ProjectID, sprintId, data: {...task,...firebaseObj},updatedFields:{...firebaseObj}});
+                showInViews(ProjectID, sprintId, {...task,...firebaseObj}, {...firebaseObj});
                 apiRequest("patch", env.V2_TASKS, {
                     action: "updateStartDate",
                     commonDateFormatString,
@@ -233,7 +239,7 @@ class Task {
         return new Promise((resolve,reject) => {
             try {
                 const {sprintId,ProjectID} = taskData;
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:ProjectID, sprintId, data: {...taskData, ...firebaseObj},updatedFields:{...firebaseObj}});
+                showInViews(ProjectID, sprintId, {...taskData, ...firebaseObj}, {...firebaseObj});
                 apiRequest("patch", env.V2_TASKS, {
                     action: "updateTaskTotalEstimate",
                     firebaseObj,
@@ -268,7 +274,7 @@ class Task {
         return new Promise((resolve,reject) => {
             try {
                 const {sprintId,ProjectID} = taskData;
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:ProjectID, sprintId, data: {...taskData, ...firebaseObj},updatedFields:{...firebaseObj}});
+                showInViews(ProjectID, sprintId, {...taskData, ...firebaseObj}, {...firebaseObj});
                 apiRequest("patch", env.V2_TASKS, {
                     action: "updatePoints",
                     firebaseObj,
@@ -303,7 +309,7 @@ class Task {
             try {
                 const {sprintId,ProjectID} = taskData;
                 // Optimistic store update so the Gantt (and every other open view) moves immediately.
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:ProjectID, sprintId, data: {...taskData, ...firebaseObj},updatedFields:{...firebaseObj}});
+                showInViews(ProjectID, sprintId, {...taskData, ...firebaseObj}, {...firebaseObj});
                 apiRequest("patch", env.V2_TASKS, {
                     action: "updateDates",
                     firebaseObj,
@@ -390,15 +396,7 @@ class Task {
 
                 const { sprintId, ProjectID } = taskData;
 
-                // Optimistic UI: mirror what updateAssignee does for AssigneeUserId
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {
-                    snap: null,
-                    op: "modified",
-                    pid: ProjectID,
-                    sprintId,
-                    data: { ...taskData, Task_Leader: newLeaderId },
-                    updatedFields: { ...firebaseObj }
-                });
+                showInViews(ProjectID, sprintId, { ...taskData, Task_Leader: newLeaderId }, { ...firebaseObj });
 
                 apiRequest("patch", env.V2_TASKS, {
                     action: "updateTaskLeader",
@@ -433,15 +431,9 @@ class Task {
     updateWatcher({companyId, projectId, sprintId, taskId, userId, add,userData,employeeName, watchers: watchersArr}) {
         return new Promise((resolve,reject) => {
             try {
-                let watchers = watchersArr;
-                if(add){
-                    watchers.push(userId);
-                    watchers = Array.from(new Set(watchers));
-                }else{
-                    watchers = watchers.filter((id) => id!== userId);
-                }
-                
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:projectId, sprintId, data: {_id: taskId, watchers: watchers},updatedFields:{watchers}});
+                const held = watchersArr || [];
+                const watchers = add ? Array.from(new Set([...held, userId])) : held.filter((id) => id !== userId);
+                showInViews(projectId, sprintId, {_id: taskId, watchers}, {watchers});
                 apiRequest("patch", env.V2_TASKS, {action: "updateWatcher", companyId, projectId, sprintId, taskId, userId, add,userData,employeeName})
                 .then((response) => {
                     if (response.data.status) {
@@ -471,7 +463,7 @@ class Task {
                 }else{
                     tags = tags.filter((id) => id!== tagId);
                 }
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:projectId, sprintId, data: {_id: taskId, tagsArray: tags},updatedFields:{tagsArray: tags}});
+                showInViews(projectId, sprintId, {_id: taskId, tagsArray: tags}, {tagsArray: tags});
                 apiRequest("patch", env.V2_TASKS, {action: "updateTags", companyId, projectId, sprintId, taskId, tagId, operation})
                 .then((response) => {
                     if (response.data.status) {
@@ -489,23 +481,16 @@ class Task {
         })
     }
 
-    /* -------------- UPDATE CHECKLISTS -----------------*/
-    // This function handles all MongoDB update queries
+    /* `localUpdateArray` is the checklist as it will be once saved; without it nothing is shown before the answer. */
     updateChecklistsv2({data, projectId,taskId,historyObj,sprintId,companyId,ops,taskData,localUpdateArray}){
-        return new Promise((resolve, reject) => {
-            Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:projectId, sprintId, data: {_id: taskId, checklistArray: localUpdateArray},updatedFields:{checklistArray: localUpdateArray}});
-            apiRequest("patch", env.V2_TASKS, {action: "updateChecklists", companyId, projectId, sprintId, taskId, data, operation:ops,historyObj,taskData})
-            .then((response) => {
-                if (response.data.status) {
-                    resolve({status: true, statusText: "Checklist updated successfully"});
-                } else {
-                    reject({status: false, error: response.data.error})
-                }
-            })
-            .catch((error) => {
-                reject({status: false, error: error})
-            })
-        })
+        const send = () => patchTask({action: "updateChecklists", companyId, projectId, sprintId, taskId, data, operation:ops,historyObj,taskData}, "Checklist updated successfully");
+        if (!Array.isArray(localUpdateArray)) return send();
+        return instantEdit({
+            task: {...taskData, _id: taskId, ProjectID: projectId, sprintId},
+            fields: {checklistArray: localUpdateArray},
+            failure: "Toast.Checklist_not_saved",
+            send
+        });
     }
 
     /* -------------- UPDATE ATTACHMENTS -----------------*/
@@ -524,7 +509,7 @@ class Task {
                 }
                 
                 const {ProjectID} = taskData;
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:ProjectID, sprintId, data: {...taskData, attachments},updatedFields:{attachments}});
+                showInViews(ProjectID, sprintId, {...taskData, attachments}, {attachments});
                 apiRequest("patch", env.V2_TASKS, {action: "updateAttachments", companyId, sprintId, taskId, taskData, id, operation, data, userData,projectData})
                 .then((response) => {
                     if (response.data.status) {
@@ -549,6 +534,7 @@ class Task {
                 apiRequest("patch", env.V2_TASKS, {action: "updateDescription", companyId, projectData, sprintId, task, userData, text})
                 .then((response) => {
                     if (response.data.status) {
+                        if (task._id && text?.blocks) tellViews(task._id, {descriptionBlock: text.blocks, rawDescription: text.text});
                         resolve({status: true, statusText: "Task description updated successfully"});
                     } else {
                         reject({status: false, error: response.data.error})
@@ -878,7 +864,7 @@ class Task {
         return new Promise((resolve, reject) => {
             try {
                 const {sprintId,ProjectID} = taskData;
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:ProjectID, sprintId, data: {...taskData, ...firebaseObj},updatedFields:{...firebaseObj}});
+                showInViews(ProjectID, sprintId, {...taskData, ...firebaseObj}, {...firebaseObj});
                 apiRequest("patch", env.V2_TASKS, {
                     action: "updateTaskType",
                     newStatus:firebaseObj,

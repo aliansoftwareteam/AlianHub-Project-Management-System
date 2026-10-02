@@ -112,6 +112,29 @@ describe('"+ Add a checklist" in a task', () => {
     });
 });
 
+describe('an item added under a ticked checklist', () => {
+    it('unticks the checklist only after the item itself is stored', async () => {
+        const wrapper = open([ROW('a', { isChecked: true })]);
+        await flushPromises();
+        await wrapper.get('#list_a img[alt="Add"]').trigger('click');
+        const box = wrapper.findComponent({ name: 'InputTextarea' });
+        box.vm.$emit('update:modelValue', 'New item');
+        box.vm.$emit('enter');
+        await flushPromises();
+        expect(saves.map((save) => save.args.ops)).toEqual(['checklistadd']);
+
+        await wrapper.setProps({ data: saves[0].args.localUpdateArray });
+        await flushPromises();
+        expect(saves.map((save) => save.args.ops)).toEqual(['checklistadd']);
+
+        saves[0].resolve({ status: true });
+        await flushPromises();
+        expect(saves.map((save) => save.args.ops)).toEqual(['checklistadd', 'checklistchecked']);
+        expect(saves[1].args.data.map((row) => [row.id, row.isChecked])).toEqual([['a', false], ['new-1', false]]);
+        wrapper.unmount();
+    });
+});
+
 describe('deleting a checklist in a task', () => {
     it('sends the rows that are left, so the views drop the deleted one at once', async () => {
         const wrapper = open([ROW('a'), ROW('a1', { parentId: 'a' }), ROW('b')]);

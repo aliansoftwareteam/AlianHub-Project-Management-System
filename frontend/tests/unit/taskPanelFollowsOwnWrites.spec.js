@@ -170,3 +170,123 @@ describe('a checklist written in the task panel, with no live event coming back'
         wrapper.unmount();
     });
 });
+
+describe('the other parts of the task panel, with no live event coming back', () => {
+    const USER = { id: 'u1', Employee_Name: 'Olivia Owner', companyOwnerId: 'u1' };
+    const PROJECT = { _id: 'proj-1', CompanyId: 'company-1', ProjectName: 'Website' };
+
+    it('drops a tag that was taken off', async () => {
+        const wrapper = await openPanel({ tagsArray: ['tag-1', 'tag-2'] });
+        taskClass.updateTags({ ...PLACE, tagsArray: shown(wrapper).tagsArray, tagId: 'tag-1', operation: 'remove' }).catch(() => {});
+        await flushPromises();
+        expect(shown(wrapper).tagsArray).toEqual(['tag-2']);
+        wrapper.unmount();
+    });
+
+    it('shows a new start date', async () => {
+        const wrapper = await openPanel({ startDate: null });
+        taskClass.updateStartDate({ firebaseObj: { startDate: '2026-10-05T00:00:00.000Z' }, project: PROJECT, task: shown(wrapper), obj: {}, userData: USER }).catch(() => {});
+        await flushPromises();
+        expect(shown(wrapper).startDate).toBe('2026-10-05T00:00:00.000Z');
+        wrapper.unmount();
+    });
+
+    it('shows a new estimate and new story points', async () => {
+        const wrapper = await openPanel({ totalEstimatedTime: 0, storyPoints: 1 });
+        taskClass.updateTotalEstimatedTime({ firebaseObj: { totalEstimatedTime: 90 }, projectData: PROJECT, taskData: shown(wrapper), obj: {}, userData: USER }).catch(() => {});
+        taskClass.updatePoints({ firebaseObj: { storyPoints: 5 }, projectData: PROJECT, taskData: shown(wrapper), userData: USER }).catch(() => {});
+        await flushPromises();
+        expect(shown(wrapper)).toMatchObject({ totalEstimatedTime: 90, storyPoints: 5 });
+        wrapper.unmount();
+    });
+
+    it('shows a new task leader', async () => {
+        const wrapper = await openPanel({ Task_Leader: 'u1' });
+        taskClass.updateTaskLeader({ firebaseObj: { Task_Leader: 'u2' }, projectData: PROJECT, taskData: shown(wrapper), employeeName: 'Max', userData: USER }).catch(() => {});
+        await flushPromises();
+        expect(shown(wrapper).Task_Leader).toBe('u2');
+        wrapper.unmount();
+    });
+
+    it('counts a watcher once when added and not at all when removed', async () => {
+        const wrapper = await openPanel({ watchers: ['u2'] });
+        const watch = (add) => taskClass.updateWatcher({ ...PLACE, userId: 'u1', add, userData: USER, employeeName: 'Olivia Owner', watchers: shown(wrapper).watchers }).catch(() => {});
+        watch(true);
+        await flushPromises();
+        expect(shown(wrapper).watchers).toEqual(['u2', 'u1']);
+        watch(false);
+        await flushPromises();
+        expect(shown(wrapper).watchers).toEqual(['u2']);
+        wrapper.unmount();
+    });
+
+    it('keeps a saved description when the tab is left and opened again', async () => {
+        const wrapper = await openPanel({ descriptionBlock: { blocks: [] }, rawDescription: '' });
+        const blocks = { blocks: [{ type: 'paragraph', data: { text: 'Brief' } }] };
+        const saved = taskClass.updateDescription({ companyId: 'company-1', task: shown(wrapper), text: { blocks, text: 'Brief' } });
+        await flushPromises();
+        expect(shown(wrapper).rawDescription).toBe('');
+        http.writes[0].resolve({ data: { status: true } });
+        await saved;
+        expect(shown(wrapper)).toMatchObject({ descriptionBlock: blocks, rawDescription: 'Brief' });
+        wrapper.unmount();
+    });
+
+    it('counts a subtask as done in the tab as soon as it is ticked', async () => {
+        const sub = { _id: 'sub-1', TaskName: 'Draft', ProjectID: 'proj-1', sprintId: 'sprint-1', ParentTaskId: 'task-1', isParentTask: false, deletedStatusKey: 0, statusKey: 'st-open', statusType: 'open', status: { key: 'st-open', type: 'open' } };
+        payload.subtasks = [sub];
+        const wrapper = await openPanel();
+        const tab = () => wrapper.findAll('[role="tab"]').find((button) => button.text().startsWith(en.TaskPanel.subtasks));
+        expect(tab().text()).toContain('0/1');
+        taskClass.updateStatus({
+            newStatus: { status: { text: 'Done', key: 'st-done', type: 'close', value: 'done' }, statusType: 'close', statusKey: 'st-done' },
+            prevStatus: {}, projectData: PROJECT, task: sub, userData: USER
+        }).catch(() => {});
+        await flushPromises();
+        expect(tab().text()).toContain('1/1');
+        payload.subtasks = [];
+        wrapper.unmount();
+    });
+
+    it('reads its relations again when one is added or removed in the tab', async () => {
+        const { apiRequest } = await import('@/services');
+        const wrapper = await openPanel();
+        await wrapper.findAll('[role="tab"]').find((button) => button.text().startsWith(en.TaskPanel.relations_tab)).trigger('click');
+        const reads = () => apiRequest.mock.calls.filter(([method, url, body]) => method === 'post' && url === '/api/v2/tasks/relations' && body.action === 'list').length;
+        const before = reads();
+        wrapper.findComponent({ name: 'LinkedTasks' }).vm.$emit('changed');
+        await flushPromises();
+        expect(reads()).toBe(before + 1);
+        wrapper.unmount();
+    });
+});
+
+describe('a task panel left open while the tab was out of view', () => {
+    it('joins its room again on the connection the tab comes back with', async () => {
+        const joins = vi.fn(() => Promise.resolve());
+        const connection = () => ({ id: 's', on: vi.fn(), off: vi.fn(), emit: vi.fn() });
+        const first = connection();
+        const second = connection();
+        const socket = ref(first);
+        const live = createStore({
+            getters: {
+                'settings/companyUserDetail': () => ({ roleType: 1 }), 'settings/companyOwnerDetail': () => ({}), 'projectData/gettaskDetailData': () => null,
+                'settings/companyUsers': () => [], 'settings/projectRules': () => ({ 'task.task_status': true }), 'settings/selectedCompany': () => ({})
+            },
+            actions: { 'projectData/getTaskDetailSnapShot': joins },
+            mutations: { 'projectData/setTaskDetailData': () => {}, 'projectData/setTaskdetailPayloadId': () => {}, 'projectData/mutateUpdateFirebaseTasks': () => {} }
+        });
+        payload.tasks = [task()];
+        const wrapper = mount(TaskDetailPanel, {
+            props: PLACE,
+            global: { plugins: [live], mocks: { $t: i18n.global.t }, provide: { $userId: ref('u1'), $clientWidth: ref(1280), $socket: socket } }
+        });
+        await flushPromises();
+        expect(joins).toHaveBeenCalledTimes(1);
+        socket.value = second;
+        await flushPromises();
+        expect(joins).toHaveBeenCalledTimes(2);
+        expect(second.on.mock.calls.map(([event]) => event)).toEqual(expect.arrayContaining(['commentInsert', 'taskDetail_agentSession']));
+        wrapper.unmount();
+    });
+});
