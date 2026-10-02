@@ -10,6 +10,7 @@ const performanceRead = require('../Agents/performanceRead');
 const scopes = require('./scopes');
 const { heldForApproval } = require('./taintHold');
 const projectPolicy = require('../Agents/projectPolicy');
+const taskReads = require('../Agents/taskReads');
 const visibility = require('./visibility');
 const v2 = require('./v2Flag');
 const cursor = require('./cursor');
@@ -121,8 +122,11 @@ const TOOLS = [
         input: { type: 'object', properties: { taskId: { type: 'string' } }, required: ['taskId'] },
         visibility: 'filtered',
         run: async (ctx, args, vis) => {
-            const brief = await buildBrief(ctx, str(args.taskId, 40), vis);
+            const taskId = str(args.taskId, 40);
+            const stamp = oid(taskId) ? await taskReads.stampOf(ctx.companyId, taskId) : null;
+            const brief = await buildBrief(ctx, taskId, vis);
             if (!brief || brief.error) return brief;
+            if (stamp) await taskReads.saw(ctx.companyId, ctx.actor, taskId, stamp);
             const named = v2.enabled() ? await briefWithNames(ctx, brief) : brief;
             const out = await (managesTasks(ctx) ? manageTools.planBrief(ctx, named) : named);
             const declined = await declinedNotes(ctx, brief.project && brief.project.id);

@@ -86,7 +86,9 @@ const rules = (ctx, has, changes) => [
     has('task.from_message') && '- To turn a chat message or a comment into a task, use `task.from_message`. The task keeps the message\'s text and a link back to it.',
     setupRule(has),
     has('queue.list') && has('queue.claim') && has('queue.release')
-        && '- `queue.list` shows work waiting for an agent. Take one item with `queue.claim` before you work on it, and give it back with `queue.release` when you are done or cannot go on.',
+        && '- `queue.list` shows work waiting for an agent. Take one item with `queue.claim` before you work on it, and give it back with `queue.release` when you are done or cannot go on. '
+            + 'You hold one item at a time. When you are told to wait, the project has enough agents at work: ask again later.',
+    changes && has('task.get') && '- When a change is refused as "changed since you read it", read the task again with `task.get` and check that your change still fits before you try again.',
 ].filter(Boolean);
 
 const limits = (changes) => [

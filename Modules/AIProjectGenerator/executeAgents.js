@@ -147,7 +147,7 @@ const queueRuns = async ({ companyId, uid, projectId, pairs, agents }) => {
             continue;
         }
         // eslint-disable-next-line no-await-in-loop
-        const check = await runs.canStart(agent, { trigger: 'assignment', companyId });
+        const check = await runs.canStart(agent, { trigger: 'assignment', companyId, projectId });
         if (!check.ok) { runsRefused.push({ taskId, reason: check.reason }); continue; }
         // eslint-disable-next-line no-await-in-loop
         const { run, deduplicated } = await runs.start(companyId, {

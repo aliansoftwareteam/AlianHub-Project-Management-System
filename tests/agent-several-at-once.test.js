@@ -31,6 +31,7 @@ jest.mock('../common-storage/common-server.js', () => mockStub());
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
 jest.mock('../Modules/Knowledge/ingest/events', () => ({ publishCommentChanged: jest.fn(), publish: jest.fn() }));
 jest.mock('../Modules/Agents/triggers', () => ({ fromComment: jest.fn(async () => null) }));
+jest.mock('../Modules/Agents/engine/graph', () => ({ runGraph: jest.fn(async () => ({ status: 'abandoned' })) }));
 jest.mock('../Config/jwt', () => ({ verifyCompanyMembership: jest.fn(async () => true) }));
 jest.mock('../Modules/ApiTokens/controller', () => ({ verifyToken: jest.fn(), logTokenActivity: jest.fn() }));
 
@@ -96,7 +97,8 @@ const release = (caller, itemId, finished) => rpc(caller, 'queue.release', { ite
 const listed = async (caller) => (await rpc(caller, 'queue.list', {})).items;
 const read = (caller, taskId) => rpc(caller, 'task.get', { taskId });
 const comment = (caller, taskId, body = 'Looks ready') => rpc(caller, 'task.comment', { taskId, body });
-const changedByAPerson = (taskId, at = new Date()) => { taskRow(taskId).updatedAt = at; };
+/* The fake keeps no timestamps of its own, so a later change is written as the next second on the task's stamp. */
+const changedByAPerson = (taskId) => { taskRow(taskId).updatedAt = new Date(new Date(taskRow(taskId).updatedAt).getTime() + 1000); };
 const refusals = (reason) => rows(SCHEMA_TYPE.AUDIT_LOGS).filter((row) => row.action === 'agent.action_refused' && String(row.meta.reason || '').includes(reason));
 
 const through = async (handlers, req) => {
@@ -261,7 +263,7 @@ describe('changed since you read it', () => {
         await read(agent(1), taskId);
         await read(agent(2), taskId);
         expect(await comment(agent(2), taskId, 'From the second agent')).toMatchObject({ ok: true });
-        changedByAPerson(taskId, new Date(Date.now() + 1));
+        changedByAPerson(taskId);
         await taskReads.saw(CID, agent(2).actor, taskId);
         expect(await comment(agent(1), taskId)).toMatchObject({ refused: true, reason: taskReads.REFUSAL.CHANGED });
         expect(await comment(agent(2), taskId, 'Again')).toMatchObject({ ok: true });
@@ -270,7 +272,7 @@ describe('changed since you read it', () => {
     it('an in-product agent is held the same way from the moment its run read the task', async () => {
         const [{ taskId }] = await items(1);
         const change = { companyId: CID, action: 'task.comment', params: { taskId, body: 'Reviewed' }, actor: inProduct() };
-        await taskReads.saw(CID, inProduct(), taskId, taskRow(taskId).updatedAt);
+        await runs.executeSkill(CID, { _id: inProduct().runId }, { _id: inProduct().agentId }, { ...taskRow(taskId) }, { actor: inProduct() });
         expect((await actions.perform(change)).auditId).toBeTruthy();
         changedByAPerson(taskId);
         await expect(actions.perform(change)).rejects.toMatchObject({ name: 'RefusedError', message: taskReads.REFUSAL.CHANGED });
