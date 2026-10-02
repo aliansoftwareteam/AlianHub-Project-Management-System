@@ -42,8 +42,8 @@ const AUDITED_REFUSALS = [REASON.WINDOW_PASSED, REASON.NOT_VISIBLE, REASON.TARGE
 const LIST_KINDS = Object.freeze(['list', 'listName', 'listFolder']);
 /* A goal belongs to no project: whoever can edit the goal may undo a change to it. */
 const GOAL_KINDS = Object.freeze(['goalValue', 'goalSource']);
-/* A field, a view or a whole setup is the project's own: seeing the project is seeing it, and the route that takes it back asks the rest. */
-const SETUP_KINDS = Object.freeze(['fields', 'view', 'setup']);
+/* A field, a view, a whole setup or the project an agent asked for is the project's own: seeing the project is seeing it, and the route that takes it back asks the rest. */
+const SETUP_KINDS = Object.freeze(['fields', 'view', 'setup', 'project']);
 /* A rule is taken back by the Automations page's own delete, which asks whether the person undoing may. */
 const AUTOMATION_KIND = 'automation';
 const work = () => require('./workRequests');
@@ -220,6 +220,7 @@ const inverses = {
     },
     ...require('./manager/workQueue').inverses,
     ...require('./projectSetup').inverses,
+    ...require('./projectCreate').inverses,
     ...require('./automationRequests').inverses,
 };
 

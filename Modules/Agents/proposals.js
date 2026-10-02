@@ -179,8 +179,8 @@ const skillSourcesOfRuns = async (companyId, rows) => {
 
 /* projectIds, when given, is the caller's visible set, hiddenTaskIds the tasks in it they cannot read,
  * and privateWork what is someone else's alone; the counts follow the same scope. */
-const list = async (companyId, { status, bucket, agentId, limit = 100, projectIds, hiddenTaskIds, privateWork } = {}) => {
-    const scoped = access.proposalScopeClause({ projectIds, hiddenTaskIds, privateWork });
+const list = async (companyId, { status, bucket, agentId, limit = 100, projectIds, hiddenTaskIds, privateWork, askedBy } = {}) => {
+    const scoped = access.proposalScopeClause({ projectIds, hiddenTaskIds, privateWork, askedBy });
     const match = { ...scoped };
     if (status) match.status = String(status);
     if (agentId) match.agentId = String(agentId);

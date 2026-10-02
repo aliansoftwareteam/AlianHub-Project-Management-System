@@ -50,6 +50,7 @@ const projectPolicy = require('../Modules/Agents/projectPolicy');
 const intentPreview = require('../Modules/Agents/intentPreview');
 const queue = require('../Modules/Inbox/helpers/approvalQueue');
 const fieldCtrl = require('../Modules/CustomField/controller');
+const socketEmitter = require('../event/socketEventEmitter');
 const tools = require('../Modules/Mcp/tools');
 const scopes = require('../Modules/Mcp/scopes');
 const server = require('../Modules/Mcp/server');
@@ -247,7 +248,7 @@ describe('approving makes the project as the web app would, as the person who ap
         const projectId = String(project._id);
         expect(project).toMatchObject({ ProjectName: NAME, ProjectCode: 'WR', CompanyId: CID, projectCreatedBy: INSIDER, AssigneeUserId: [INSIDER], LeadUserId: [], isPrivateSpace: true, isGlobalPermission: true });
         expect(Number(project.deletedStatusKey || 0)).toBe(0);
-        expect(result).toMatchObject({ projectId, name: NAME, code: 'WR', made: 5, notMade: [] });
+        expect(result).toMatchObject({ projectId, name: NAME, code: 'WR', made: 6, notMade: [] });
         expect(result.parts.map((part) => [part.part, part.ok])).toEqual([['description', true], ['statuses', true], ['lists', true], ['fields', true], ['views', true]]);
 
         expect(project.descriptionBlock.blocks).toEqual([{ type: 'paragraph', data: { text: 'Everything for the new site.' } }]);
@@ -258,6 +259,7 @@ describe('approving makes the project as the web app would, as the person who ap
         expect(partOf(result, 'views').items).toEqual([expect.objectContaining({ name: 'Review board', kind: 'board', made: true, leftOut: [] })]);
 
         expect(audits(TOOL, 'applied')[0]).toMatchObject({ entityType: 'project', entityId: projectId, meta: { onBehalfOf: INSIDER, undo: { kind: 'project', projectId } } });
+        expect(socketEmitter.emit).toHaveBeenCalledWith('insert', expect.objectContaining({ module: 'project', companyId: CID, data: expect.objectContaining({ ProjectName: NAME }) }));
     });
 
     it('creates a project asked for by its name alone', async () => {
@@ -283,6 +285,13 @@ describe('approving makes the project as the web app would, as the person who ap
         expect(waiting()).toHaveLength(1);
     });
 
+    it('refuses the approval when the token that asked has since been kept to some projects', async () => {
+        const id = await filed(as(INSIDER));
+        stored(SCHEMA_TYPE.API_TOKENS, tokenOf(INSIDER)).projectIds = [P_OPEN];
+        expect(await approve(id)).toMatchObject({ status: 403, error: expect.stringMatching(/outside the token's project list/) });
+        expect(projectsNamed()).toHaveLength(0);
+    });
+
     it('asks the person behind the token again, and makes nothing when they may no longer create a project', async () => {
         const id = await filed(as(OUTSIDER));
         setRule('project_create', false, [3]);
@@ -300,7 +309,7 @@ describe('approving makes the project as the web app would, as the person who ap
         expect(result.made).toBe(0);
         expect(result.parts.map((part) => [part.part, part.ok])).toEqual([['description', false], ['statuses', false], ['lists', false], ['fields', false], ['views', false]]);
         expect(result.notMade.map((entry) => entry.part)).toEqual(['description', 'statuses', 'lists', 'lists', 'fields', 'views']);
-        expect(result.notMade[0].error).toMatch(/not on this project/);
+        expect(result.notMade[0].error).toMatch(/is not on it yet/);
         expect(listsOf(made()._id)).toEqual(['List']);
     });
 
@@ -326,6 +335,7 @@ describe('undo moves the project to the trash', () => {
         expect(out.results[0]).toMatchObject({ ok: true, result: { projectId, removed: true, kept: [] } });
         expect(projectsNamed()).toHaveLength(1);
         expect(Number(made().deletedStatusKey)).toBe(1);
+        expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'project', companyId: CID, updatedFields: { deletedStatusKey: 1 } }));
         expect(rows(SCHEMA_TYPE.SPRINTS).filter((row) => String(row.projectId) === projectId)).toHaveLength(3);
     });
 

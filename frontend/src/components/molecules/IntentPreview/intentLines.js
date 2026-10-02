@@ -57,6 +57,7 @@ const textsOf = (list) => (Array.isArray(list) ? list : []).map(textOf).filter(B
 const chosenText = (t, line, known, prefix) => textOf(line.field) || (known.includes(line.by) ? t(`IntentPreview.${prefix}_${line.by}`) : '');
 
 export const LINE_KINDS = {
+    members: (t, line) => (line.only === 'approver' ? { label: t('IntentPreview.line_members'), text: t('IntentPreview.members_only_approver') } : null),
     place: (t, line) => {
         const project = textOf(line.project);
         const list = textOf(line.list);
@@ -132,6 +133,7 @@ const HEADINGS = Object.freeze({
     fields: { kind: 'IntentPreview.new_fields', wants: 'IntentPreview.wants_fields' },
     view: { kind: 'IntentPreview.new_view', wants: 'IntentPreview.wants_view' },
     setup: { kind: 'IntentPreview.new_setup', wants: 'IntentPreview.wants_setup' },
+    project: { kind: 'IntentPreview.new_project', wants: 'IntentPreview.wants_project' },
     automation: AUTOMATION_HEADING,
 });
 

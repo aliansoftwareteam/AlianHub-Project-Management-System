@@ -71,12 +71,18 @@ const privateWorkFor = async (companyId, caller) => (caller.privileged ? private
 const readScopeOf = async (companyId, caller) => {
     const projectIds = await visibleProjectIdsFor(companyId, caller);
     const [hiddenTaskIds, privateScope] = await Promise.all([hiddenTaskIdsFor(companyId, caller, projectIds), privateWorkFor(companyId, caller)]);
-    return { projectIds, hiddenTaskIds, privateWork: privateScope };
+    return { projectIds, hiddenTaskIds, privateWork: privateScope, askedBy: String(caller.actor.userId || '') };
+};
+
+/* A change that names no project yet, a new project for one, is listed for the person whose agent asked for it, as canSeeProposal answers for one. */
+const inProjectsOrOwn = (projectIds, askedBy) => {
+    const inProjects = { projectId: { $in: idForms(projectIds.map(String)) } };
+    return OBJECT_ID.test(String(askedBy || '')) ? { $or: [inProjects, { projectId: null, requestedBy: String(askedBy) }] } : inProjects;
 };
 
 /* The clause every list of proposals is read through, whichever screen asks. */
-const proposalScopeClause = ({ projectIds, hiddenTaskIds, privateWork: privateScope } = {}) => ({
-    ...(Array.isArray(projectIds) ? { projectId: { $in: idForms(projectIds.map(String)) } } : {}),
+const proposalScopeClause = ({ projectIds, hiddenTaskIds, privateWork: privateScope, askedBy } = {}) => ({
+    ...(Array.isArray(projectIds) ? inProjectsOrOwn(projectIds, askedBy) : {}),
     ...(Array.isArray(hiddenTaskIds) && hiddenTaskIds.length ? { taskId: { $nin: hiddenTaskIds.map(String) } } : {}),
     ...(privateScope ? privateWork.proposalClause(privateScope) : {}),
 });

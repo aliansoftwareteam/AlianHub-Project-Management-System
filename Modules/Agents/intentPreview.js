@@ -6,12 +6,14 @@ const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
 const { isTaskFieldOf } = require('../CustomField/helpers/fieldValueInput');
 const setup = require('./setupRequests');
 const plans = require('./projectSetup');
+const projects = require('./projectCreate');
 const automation = require('./automationPreview');
 
 // What a waiting change will make, as the lines its card shows (frontend IntentPreview). It is built for one viewer:
 // a project, list, parent task, person or custom field is named only when that viewer may see it, and everything
 // else on a line is the proposal's own text, handed over as text. Fields, a view and a whole plan are the project's own,
 // so for a viewer who cannot open the project they have no preview at all, and neither has a rule (./automationPreview.js).
+// A project that is not there yet has no project to open: its card is the proposal's own text, for whoever is shown the proposal.
 // A kind of change with no entry in BUILDERS has none.
 
 const DESCRIPTION_MAX = 280;
@@ -104,9 +106,10 @@ const fieldsPreview = (change, { named }) => {
 };
 
 const PLAN = 'project.setup';
+const PLANS = Object.freeze([PLAN, projects.ACTION]);
 const planViews = (change) => listOf(paramsOf(change).views).slice(0, plans.VIEWS_MAX).map(objectOf);
 /* The looks a waiting change names: a view's own, or one for each view of a plan. */
-const looksOf = (change) => (change.action === PLAN ? planViews(change).map((view) => objectOf(view.look)) : [objectOf(paramsOf(change).look)]);
+const looksOf = (change) => (PLANS.includes(change.action) ? planViews(change).map((view) => objectOf(view.look)) : [objectOf(paramsOf(change).look)]);
 const namedFieldIds = (look) => [look.groupBy, look.sortBy, ...listOf(look.showFieldIds)].map(idOf).filter(Boolean);
 
 /* A built-in choice by its key, a custom field by its name, and nothing for a field the viewer's project does not have. */
@@ -167,25 +170,36 @@ const planViewLines = (view, projectId, context) => {
     ];
 };
 
-/* A whole plan on one card: the statuses and lists by name, each field with its type, and each view followed by what it shows. */
-const planPreview = (change, context) => {
+/* The parts of a plan: the statuses and lists by name, each field with its type, and each view followed by what it shows. */
+const planLines = (change, context) => {
     const params = paramsOf(change);
-    const place = placeLine(params, context.named);
+    return [
+        namesLine('newStatuses', params.statuses, plans.STATUSES_MAX, plans.STATUS_NAME_MAX),
+        namesLine('newLists', params.lists, plans.LISTS_MAX, TEXT_MAX),
+        ...listOf(params.definitions).slice(0, setup.FIELDS_MAX).map(fieldLine),
+        ...planViews(change).flatMap((view) => planViewLines(view, idOf(params.projectId), context)),
+    ];
+};
+
+const planPreview = (change, context) => {
+    const place = placeLine(paramsOf(change), context.named);
     if (!place) return null;
+    return { kind: 'setup', title: place.project, lines: [place, ...planLines(change, context)].filter(Boolean) };
+};
+
+/* A project that is not there yet: its name, who will be on it, what it is for, and the plan that comes with it. */
+const projectPreview = (change, context) => {
+    const params = paramsOf(change);
+    const title = textOf(params.name, projects.NAME_MAX);
+    if (!title) return null;
     return {
-        kind: 'setup',
-        title: place.project,
-        lines: [
-            place,
-            namesLine('newStatuses', params.statuses, plans.STATUSES_MAX, plans.STATUS_NAME_MAX),
-            namesLine('newLists', params.lists, plans.LISTS_MAX, TEXT_MAX),
-            ...listOf(params.definitions).slice(0, setup.FIELDS_MAX).map(fieldLine),
-            ...planViews(change).flatMap((view) => planViewLines(view, idOf(params.projectId), context)),
-        ].filter(Boolean),
+        kind: 'project',
+        title,
+        lines: [{ kind: 'members', only: 'approver' }, descriptionLine({ rawDescription: params.description }), ...planLines(change, context)].filter(Boolean),
     };
 };
 
-const SETUPS = Object.freeze({ 'fields.create': fieldsPreview, 'view.create': viewPreview, [PLAN]: planPreview, [automation.ACTION]: automation.preview });
+const SETUPS = Object.freeze({ 'fields.create': fieldsPreview, 'view.create': viewPreview, [PLAN]: planPreview, [projects.ACTION]: projectPreview, [automation.ACTION]: automation.preview });
 const BUILDERS = Object.freeze({ ...Object.fromEntries(Object.keys(CREATES).map((action) => [action, createPreview])), ...SETUPS });
 const builderOf = (change) => (change && Object.hasOwn(BUILDERS, change.action) ? BUILDERS[change.action] : null);
 const isSetup = (change) => Boolean(change) && Object.hasOwn(SETUPS, change.action);
