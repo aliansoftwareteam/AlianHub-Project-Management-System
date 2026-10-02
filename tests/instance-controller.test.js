@@ -654,7 +654,7 @@ describe('stats and companies', () => {
 
 describe('auditExport', () => {
     const asOwner = (over = {}) => ({ instanceAdmin: 'owner', uid: USER, aud: COMPANY, headers: { companyid: COMPANY }, query: {}, body: {}, ...over });
-    const lines = (res) => res.body.replace(/^﻿/, '').split('\r\n');
+    const lines = (res) => res.body.replace(/^\uFEFF/, '').split('\r\n');
 
     it('reads the history of the named company, newest first, capped at 50000 rows', async () => {
         MongoDbCrudOpration.mockResolvedValue([]);
