@@ -59,6 +59,10 @@ const ROUTES = Object.freeze({
     projectUpdate: { routes: () => require('../Project/routes'), method: 'put', path: '/api/v1/project/:id' },
     projectCreate: { routes: () => require('../createProject/routes'), method: 'post', path: '/api/v1/createproject' },
     statusInsert: { routes: () => require('../settings/templates/routes'), method: 'put', path: '/api/v1/setting/taskStatus' },
+    dashboardRead: { routes: () => require('../UserDashboard/routes'), method: 'get', path: '/api/v1/dashboards/:id' },
+    dashboardCreate: { routes: () => require('../UserDashboard/routes'), method: 'post', path: '/api/v1/dashboards' },
+    dashboardCards: { routes: () => require('../UserDashboard/routes'), method: 'put', path: '/api/v1/dashboards/:id/cards' },
+    dashboardDelete: { routes: () => require('../UserDashboard/routes'), method: 'delete', path: '/api/v1/dashboards/:id' },
 });
 
 const refuse = (message) => new tools.DeterministicError(message);

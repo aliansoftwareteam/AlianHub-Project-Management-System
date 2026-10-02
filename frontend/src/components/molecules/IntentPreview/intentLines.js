@@ -4,6 +4,7 @@
 
 import { AUTOMATION_HEADING, AUTOMATION_LINE_KINDS } from './automationLines';
 import { COMPUTED_LINE_KINDS } from './computedLines';
+import { DASHBOARD_HEADING, DASHBOARD_LINE_KINDS } from './dashboardLines';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const DATE_TIME = /^\d{4}-\d{2}-\d{2}T/;
@@ -180,6 +181,7 @@ export const LINE_KINDS = {
         return { label: t('IntentPreview.line_batch_tasks'), open, text: others ? t('IntentPreview.tasks_and_more', { n: others }) : '' };
     },
     ...AUTOMATION_LINE_KINDS,
+    ...DASHBOARD_LINE_KINDS,
 };
 
 const HEADINGS = Object.freeze({
@@ -191,6 +193,7 @@ const HEADINGS = Object.freeze({
     project: { kind: 'IntentPreview.new_project', wants: 'IntentPreview.wants_project' },
     batch: { kind: 'IntentPreview.batch_kind' },
     automation: AUTOMATION_HEADING,
+    dashboardCard: DASHBOARD_HEADING,
 });
 
 const isBatch = (preview) => Boolean(preview) && preview.kind === 'batch';

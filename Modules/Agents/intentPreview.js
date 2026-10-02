@@ -9,12 +9,14 @@ const computed = require('./computedFields');
 const plans = require('./projectSetup');
 const projects = require('./projectCreate');
 const automation = require('./automationPreview');
+const dashboards = require('./dashboardRequests');
 
 // What a waiting change will make, as the lines its card shows (frontend IntentPreview). It is built for one viewer:
 // a project, list, parent task, person or custom field is named only when that viewer may see it, and everything
 // else on a line is the proposal's own text, handed over as text. Fields, a view and a whole plan are the project's own,
 // so for a viewer who cannot open the project they have no preview at all, and neither has a rule (./automationPreview.js).
 // A project that is not there yet has no project to open: its card is the proposal's own text, for whoever is shown the proposal.
+// A card for a dashboard is previewed only for a viewer who can open that dashboard (./dashboardRequests.js).
 // A kind of change with no entry in BUILDERS has none.
 // A connected agent's batch is several changes on one card (forBatches): how many tasks, what changes on them, and the
 // first few tasks by name.
@@ -233,7 +235,7 @@ const projectPreview = (change, context) => {
     };
 };
 
-const SETUPS = Object.freeze({ 'fields.create': fieldsPreview, 'view.create': viewPreview, [PLAN]: planPreview, [projects.ACTION]: projectPreview, [automation.ACTION]: automation.preview });
+const SETUPS = Object.freeze({ 'fields.create': fieldsPreview, 'view.create': viewPreview, [PLAN]: planPreview, [projects.ACTION]: projectPreview, [automation.ACTION]: automation.preview, [dashboards.ACTION]: dashboards.preview });
 const BUILDERS = Object.freeze({ ...Object.fromEntries(Object.keys(CREATES).map((action) => [action, createPreview])), ...SETUPS });
 const builderOf = (change) => (change && Object.hasOwn(BUILDERS, change.action) ? BUILDERS[change.action] : null);
 const isSetup = (change) => Boolean(change) && Object.hasOwn(SETUPS, change.action);

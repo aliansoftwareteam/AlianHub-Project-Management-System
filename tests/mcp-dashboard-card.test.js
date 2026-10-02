@@ -53,7 +53,7 @@ const dashboards = require('../Modules/Agents/dashboardRequests');
 const server = require('../Modules/Mcp/server');
 
 const { CID, OWNER, INSIDER, OUTSIDER, GUEST, P_OPEN, TOKEN, MISSING, BEFORE, FLAGS, ctx, narrowed, outside, routeTable, asPerson, settle } = world;
-const { seed, rows, stored, setRule, rpcThrough, listedThrough } = world.create(mockDb);
+const { seed, rows, stored, audits, setRule, rpcThrough, listedThrough } = world.create(mockDb);
 const rpc = rpcThrough(server);
 const listed = listedThrough(server);
 const web = asPerson(routeTable(require('../Modules/UserDashboard/routes').init));
@@ -198,7 +198,7 @@ describe('approving adds the card the editor would add', () => {
         const out = await approve(await filed(as(INSIDER), BOARD));
         expect(out.error).toBeUndefined();
         const made = boardNamed('[AI bench] Board');
-        expect(out.applied[0]).toMatchObject({ action: TOOL, ok: true, result: { dashboardId: String(made._id), name: '[AI bench] Board', card: 'tasks_by_status', madeDashboard: true } });
+        expect(out.applied[0]).toMatchObject({ action: TOOL, ok: true, result: { dashboardId: String(made._id), card: 'tasks_by_status', madeDashboard: true } });
         ['userId', 'ownerId', 'visibility', 'projectId', 'sharedWith', 'isDeleted'].forEach((key) => expect(made[key]).toEqual(boardNamed('By hand')[key]));
         expect(made).toMatchObject({ ownerId: INSIDER, visibility: 'private' });
         expect(made.cards).toEqual([{ ...byHand, uid: expect.stringMatching(/^\d{9}$/) }]);
@@ -206,7 +206,8 @@ describe('approving adds the card the editor would add', () => {
 
     it('puts the card under the cards a dashboard already holds, on the span of time that was asked for', async () => {
         const out = await approve(await filed(as(INSIDER), { dashboardId: D_MINE, card: 'my_time', period: 'last_week' }));
-        expect(out.applied[0]).toMatchObject({ ok: true, result: { dashboardId: D_MINE, name: 'My board', madeDashboard: false } });
+        expect(out.applied[0]).toMatchObject({ ok: true, result: { dashboardId: D_MINE, madeDashboard: false } });
+        expect(JSON.stringify([out.applied, audits(TOOL)])).not.toMatch(/My board/);
         const { cards } = stored(SCHEMA_TYPE.USERDASHBOARD, D_MINE);
         expect(cards).toHaveLength(2);
         expect(cards[0]).toEqual(HELD_CARD);
