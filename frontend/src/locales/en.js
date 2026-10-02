@@ -12284,6 +12284,8 @@ export default {
     AgentChat: {
         replying: "The agent is replying…",
         could_not_reply: "The agent could not reply to this.",
+        asked_own_ai: "Asked {name}",
+        asked_own_ai_hint: "That AI gets the question when it next asks for work.",
         change_done: "DONE",
         change_proposed: "WAITING FOR APPROVAL",
         change_refused: "NOT ALLOWED",

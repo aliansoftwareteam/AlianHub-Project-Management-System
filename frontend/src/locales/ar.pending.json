@@ -477,6 +477,8 @@
     "AgentChange.undo_failed": "That could not be undone.",
     "AgentChange.undone": "Undone.",
     "AgentChange.undone_some": "{done} of {n} changes were undone.",
+    "AgentChat.asked_own_ai": "Asked {name}",
+    "AgentChat.asked_own_ai_hint": "That AI gets the question when it next asks for work.",
     "AgentChat.change_done": "DONE",
     "AgentChat.change_failed": "FAILED",
     "AgentChat.change_proposed": "WAITING FOR APPROVAL",

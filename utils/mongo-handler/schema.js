@@ -1167,7 +1167,7 @@ const schema = {
         closedAt: { type: Date, required: false },
         // The connected agent that holds the item in the work queue: { by, userId, name, at, until }. Absent, or past `until`, the item is free.
         claim: { type: Object, required: false },
-        // { why: 'taken_back' | 'finished', userId, name, at }: not handed to an agent again while the row stays open.
+        // { why: 'taken_back' | 'finished' | 'withdrawn', userId, name, at }: not handed to an agent again while the row stays open.
         leftQueue: { type: Object, required: false },
     },
     // What agents leave while they work (Modules/Agents/workMarks.js): one row per scope and key, taken by a conditional write.
@@ -4587,6 +4587,8 @@ const schema = {
         agentAsk: { type: Object, required: false },
         agentCitations: { type: Array, required: false },
         agentChanges: { type: Array, required: false },
+        // A chat message that asked its author's own connected AI (Modules/Agents/manager/chatQuestions.js): { ownerId, name, at }.
+        ownAiAsk: { type: Object, required: false },
         // The tool an importer brought the comment from (Modules/Importers); the author and the time are the file's word.
         importedFrom: { type: String, required: false },
         // The import job that saved the comment, and its time and author in the file, by which the same file imported

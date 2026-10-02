@@ -39,9 +39,16 @@ const startMentionedAgents = async (req, companyId, comment) => {
 };
 
 /* Only a signed-in person names their own connected AI: a comment written through a token or by an agent hands nothing over. */
+const namesOwnAi = (req, message) => !req.apiToken && !req.mcp && !req.agentRun && parseOwnAiMentionIds(message).length > 0;
+
 const handToOwnAi = async (req, companyId, comment) => {
-    if (req.apiToken || req.mcp || req.agentRun || !parseOwnAiMentionIds(comment.message).length) return;
+    if (!namesOwnAi(req, comment.message)) return;
     await require("../Agents/manager/workQueue").handOverFromComment(companyId, { authorId: comment.userId, taskId: comment.taskId, message: comment.message });
+};
+
+const askOwnAi = async (req, companyId, saved) => {
+    if (!namesOwnAi(req, saved.message)) return;
+    await require("../Agents/manager/chatQuestions").fromChatMessage(companyId, saved);
 };
 
 /* A summary kept for a task was made from its comments: it goes when one of them is deleted, and is marked as
@@ -103,6 +110,9 @@ exports.save = async (req, res) => {
             socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments_project', companyId });
         }
         const saved = response && response._id && (typeof response.toObject === "function" ? response.toObject() : response);
+        if (saved) {
+            await askOwnAi(req, companyId, saved).catch((err) => logger.error(`[mentions] own AI not asked: ${err.message}`));
+        }
         if (saved && !placement.parent) {
             bumpUnreadCounts(companyId, saved, mentionIds)
                 .catch((err) => logger.error(`[comments] unread counts not raised: ${err.message}`));

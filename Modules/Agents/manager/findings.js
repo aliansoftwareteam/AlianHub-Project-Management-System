@@ -11,6 +11,10 @@ const { RULE, MOST_URGENT_FIRST } = require('./rules');
 const STATUS = Object.freeze({ OPEN: 'open', HANDLED: 'handled', DECLINED: 'declined', CLOSED: 'closed' });
 // A task a person handed to an agent (./workQueue). It is kept as a row here so one list and one rule of who reads it serve both; no rule finds it.
 const HANDED_OVER = 'handed_over';
+// A question a person put to their own connected AI in chat (./chatQuestions). It names no task, so nothing here lists it for a person.
+const ASKED_IN_CHAT = 'asked_in_chat';
+const FOUND_BY_NO_RULE = Object.freeze([HANDED_OVER, ASKED_IN_CHAT]);
+const LEFT = Object.freeze({ TAKEN_BACK: 'taken_back', FINISHED: 'finished', WITHDRAWN: 'withdrawn' });
 const READ = 200;
 const SHOWN = 50;
 const DUPLICATE_KEY = 11000;
@@ -40,7 +44,7 @@ const described = (finding, now) => ({
 
 /* Every row the look has to weigh: the ones still standing, and any closed one whose cause is found again. */
 const standing = (companyId, projectId, keys) => find(companyId, [{
-    ...inProject(projectId), rule: { $ne: HANDED_OVER }, $or: [{ status: { $in: [STATUS.OPEN, STATUS.HANDLED, STATUS.DECLINED] } }, { key: { $in: keys } }],
+    ...inProject(projectId), rule: { $nin: FOUND_BY_NO_RULE }, $or: [{ status: { $in: [STATUS.OPEN, STATUS.HANDLED, STATUS.DECLINED] } }, { key: { $in: keys } }],
 }]);
 
 /* null when another server filed or reopened the same finding first. */
@@ -61,7 +65,7 @@ const settle = (companyId, row, status, now) => change(companyId, { _id: row._id
     $set: { status, ...(status === STATUS.CLOSED ? { closedAt: now } : {}) },
 });
 
-const openedSince = async (companyId, projectId, since) => (await find(companyId, [{ ...inProject(projectId), rule: { $ne: HANDED_OVER }, openedAt: { $gte: since } }, { _id: 1 }])).length;
+const openedSince = async (companyId, projectId, since) => (await find(companyId, [{ ...inProject(projectId), rule: { $nin: FOUND_BY_NO_RULE }, openedAt: { $gte: since } }, { _id: 1 }])).length;
 
 const byUrgency = (a, b) => MOST_URGENT_FIRST.indexOf(a.rule) - MOST_URGENT_FIRST.indexOf(b.rule) || new Date(b.openedAt) - new Date(a.openedAt);
 
@@ -70,7 +74,7 @@ const byUrgency = (a, b) => MOST_URGENT_FIRST.indexOf(a.rule) - MOST_URGENT_FIRS
 const visibleTo = async (companyId, uid, projectId) => {
     const roleType = await getRoleType(companyId, uid);
     if (roleType === null || roleType === undefined || roleType === ROLE_GUEST) return [];
-    const rows = await find(companyId, [{ ...inProject(projectId), status: STATUS.OPEN }, {}, { sort: { openedAt: -1 }, limit: READ }]);
+    const rows = await find(companyId, [{ ...inProject(projectId), status: STATUS.OPEN, rule: { $ne: ASKED_IN_CHAT } }, {}, { sort: { openedAt: -1 }, limit: READ }]);
     const readable = new Set(await readableTaskIds(companyId, uid, rows.flatMap((row) => row.taskIds || [])));
     const mine = rows.filter((row) => (row.taskIds || []).every((id) => readable.has(String(id)))).sort(byUrgency).slice(0, SHOWN);
     const holds = new Map();
@@ -87,4 +91,4 @@ const visibleTo = async (companyId, uid, projectId) => {
     }));
 };
 
-module.exports = { STATUS, HANDED_OVER, OFFER_NEEDS, SHOWN, standing, open, refresh, attach, settle, openedSince, visibleTo };
+module.exports = { STATUS, HANDED_OVER, ASKED_IN_CHAT, LEFT, OFFER_NEEDS, SHOWN, standing, open, refresh, attach, settle, openedSince, visibleTo };

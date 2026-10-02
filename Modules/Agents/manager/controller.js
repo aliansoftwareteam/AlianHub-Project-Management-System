@@ -10,6 +10,7 @@ const findings = require('./findings');
 const dailyLook = require('./dailyLook');
 const workQueue = require('./workQueue');
 const connectedAgents = require('../connectedAgents');
+const chatQuestions = require('./chatQuestions');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const EDIT_ACTION = 'project.agent_manager.edit';
@@ -116,14 +117,19 @@ const takeBackItem = async (req, res) => {
     } catch (e) { logger.error(`takeBackItem: ${e.message}`); return fail(res, 500, e.message); }
 };
 
-/* The connected AIs of the people the caller already sees as members; with a task, only the caller's own, and only where they may hand that task to it. */
+const text = (value) => (typeof value === 'string' ? value : '');
+
+/* The connected AIs of the people the caller already sees as members; with a task, only the caller's own, and only where they may hand that task to it;
+ * with a chat thread (projectId, sprintId and taskId, as a chat message carries them), only the caller's own, and only where they may ask it there. */
 const getConnectedAgents = async (req, res) => {
     try {
         const companyId = String(req.headers.companyid || '');
         if (!companyId || !req.uid) return fail(res, 401, 'Unauthorized.');
         if (req.apiToken) return fail(res, 403, 'Only a signed-in person can see the connected agents.');
-        const taskId = (req.query || {}).taskId;
-        const data = taskId === undefined ? await connectedAgents.listFor(companyId, req.uid) : await workQueue.pickableOn(companyId, req.uid, taskId);
+        const { taskId, projectId, sprintId } = req.query || {};
+        let data;
+        if (projectId !== undefined) data = await chatQuestions.offeredIn(companyId, req.uid, { projectId: text(projectId), sprintId: text(sprintId), taskId: text(taskId) });
+        else data = taskId === undefined ? await connectedAgents.listFor(companyId, req.uid) : await workQueue.pickableOn(companyId, req.uid, taskId);
         return res.json({ status: true, statusText: 'Connected agents fetched.', data });
     } catch (e) { logger.error(`getConnectedAgents: ${e.message}`); return fail(res, 500, e.message); }
 };

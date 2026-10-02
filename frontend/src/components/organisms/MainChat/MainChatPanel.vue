@@ -240,7 +240,7 @@ import { shellState } from '@/components/organisms/Shell/shellState';
 import CallIcon from '@/components/organisms/CallOverlay/CallIcon.vue';
 import { useCall } from '@/composable/useCall';
 import { useMainChatConversation } from './useMainChatConversation';
-import { fetchChatAgents } from '@/views/Ai/useRunnableAgents';
+import { fetchChatAgents, fetchOwnAiInChat } from '@/views/Ai/useRunnableAgents';
 
 const props = defineProps({
     // conversation target
@@ -319,11 +319,13 @@ const mentionableAgents = ref([]);
 async function loadMentionableAgents() {
     const taskId = effectiveTaskId.value;
     const key = conversationKey.value;
-    if (props.agentId || !canUseAi() || !projectId.value || !props.sprintId || !taskId) {
+    if (props.agentId || !projectId.value || !props.sprintId || !taskId) {
         mentionableAgents.value = [];
         return;
     }
-    const agents = await fetchChatAgents({ projectId: projectId.value, sprintId: props.sprintId, taskId });
+    const thread = { projectId: projectId.value, sprintId: props.sprintId, taskId };
+    // An in-product agent needs a model on the server; the person's own connected AI does not.
+    const agents = (await Promise.all([canUseAi() ? fetchChatAgents(thread) : [], fetchOwnAiInChat(thread)])).flat();
     if (key === conversationKey.value) mentionableAgents.value = agents;
 }
 watch([conversationKey, () => canUseAi()], loadMentionableAgents, { immediate: true });

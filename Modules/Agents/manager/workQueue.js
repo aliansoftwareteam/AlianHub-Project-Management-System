@@ -17,17 +17,21 @@ const places = require('./places');
 const { parseOwnAiMentionIds } = require('../../Comments/helpers/parseMentions');
 const { RULE } = require('./rules');
 const findings = require('./findings');
+const chatQuestions = require('./chatQuestions');
 
 // The work a connected agent pulls: the findings that need judgement and the tasks a person handed over, in
-// projects whose project manager is on. An item is a project_findings row, and a claim is a field on it, so
+// projects whose project manager is on, and the questions its own person asked it in chat (./chatQuestions),
+// wherever they were asked. An item is a project_findings row, and a claim is a field on it, so
 // taking one is a single conditional write. A claim marks who is working; it grants nothing, and whatever
 // the agent then changes goes through the usual tools and the project's policy.
 
 const CLAIM_MINUTES = 30;
 const MINUTE_MS = 60 * 1000;
-const { STATUS, HANDED_OVER, OFFER_NEEDS } = findings;
-const QUEUE_RULES = Object.freeze([HANDED_OVER, RULE.UNTRIAGED, RULE.OVERLOADED, RULE.NO_OWNER, RULE.NO_ESTIMATE]);
-const LEFT = Object.freeze({ TAKEN_BACK: 'taken_back', FINISHED: 'finished', WITHDRAWN: 'withdrawn' });
+const { STATUS, HANDED_OVER, ASKED_IN_CHAT, OFFER_NEEDS, LEFT } = findings;
+const TASK_RULES = Object.freeze([HANDED_OVER, RULE.UNTRIAGED, RULE.OVERLOADED, RULE.NO_OWNER, RULE.NO_ESTIMATE]);
+// A person is waiting for an answer, so a question comes before every task.
+const QUEUE_RULES = Object.freeze([ASKED_IN_CHAT, ...TASK_RULES]);
+const LEAVES_WHEN_FINISHED = Object.freeze([HANDED_OVER, ASKED_IN_CHAT]);
 const ROWS_READ = 200;
 const PROJECTS_READ = 200;
 const LISTED_MAX = 25;
@@ -60,6 +64,7 @@ const announce = (companyId) => socketEmitter.emit('update', {
 });
 
 const waiting = Object.freeze({ status: STATUS.OPEN, rule: { $in: QUEUE_RULES }, proposalId: null, leftQueue: null });
+const waitingAboutTasks = Object.freeze({ ...waiting, rule: { $in: TASK_RULES } });
 
 const nameOf = async (actor) => byline(toolNameOf(actor), actor.personName || ((await userAgentAccount(actor.userId)) || {}).name || 'Member');
 
@@ -105,46 +110,61 @@ const heldBy = async (companyId, row, now) => {
     const claim = liveClaim(row, now);
     if (!claim) return null;
     const ids = [...new Set((row.taskIds || []).map(String))];
-    if ((await readableTaskIds(companyId, claim.userId, ids)).length === ids.length) return claim;
+    if (!ids.length || (await readableTaskIds(companyId, claim.userId, ids)).length === ids.length) return claim;
     await change(companyId, { _id: row._id, 'claim.by': claim.by }, { $unset: { claim: '' } });
     return null;
 };
 
 const byUrgency = (a, b) => QUEUE_RULES.indexOf(a.row.rule) - QUEUE_RULES.indexOf(b.row.rule) || new Date(a.row.openedAt) - new Date(b.row.openedAt);
 
-/* What a connection may take or already holds, the most urgent first. Nothing is counted beside the list. A
- * project where agents are paused hands out nothing, and neither does a workspace whose connected agents are paused. */
-const itemsFor = async ({ companyId, uid, connection, projectId, allowsProject = () => true, allowsTask, limit, now = new Date() }) => {
-    if (await accounts.connectedPaused(companyId)) return [];
+const aboutTasksFor = async ({ companyId, uid, projectId, allowsProject, allowsTask }) => {
     const projects = (await projectsOn(companyId, projectId ? [projectId] : null, NOT_PAUSED)).filter((project) => allowsProject(String(project._id)));
     if (!projects.length) return [];
     const names = new Map(projects.map((project) => [String(project._id), project.ProjectName || '']));
     const rows = await find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [
-        { ...waiting, projectId: { $in: idForms([...names.keys()]) } }, {}, { sort: { openedAt: 1 }, limit: ROWS_READ },
+        { ...waitingAboutTasks, projectId: { $in: idForms([...names.keys()]) } }, {}, { sort: { openedAt: 1 }, limit: ROWS_READ },
     ]);
-    const mine = (await readableBy(companyId, uid, rows.filter((row) => offeredTo(row, uid)), allowsTask)).filter((item) => !isClosedTask(item.task)).sort(byUrgency);
+    return (await readableBy(companyId, uid, rows.filter((row) => offeredTo(row, uid)), allowsTask)).filter((item) => !isClosedTask(item.task))
+        .map((item) => ({ ...item, projectId: String(item.row.projectId), project: names.get(String(item.row.projectId)) || '' }));
+};
+
+/* What a connection may take or already holds, the most urgent first. Nothing is counted beside the list. A
+ * project where agents are paused hands out nothing, and neither does a workspace whose connected agents are paused.
+ * `reach` is the connection's own limits for chat, which sits in no task (./chatQuestions). */
+const itemsFor = async ({ companyId, uid, connection, projectId, allowsProject = () => true, allowsTask, reach = null, limit, now = new Date() }) => {
+    if (await accounts.connectedPaused(companyId)) return [];
+    const mine = (await Promise.all([
+        chatQuestions.waitingFor({ companyId, uid, projectId, reach, now }),
+        aboutTasksFor({ companyId, uid, projectId, allowsProject, allowsTask }),
+    ])).flat().sort(byUrgency);
     const most = Math.min(Math.max(Number(limit) || LISTED_DEFAULT, 1), LISTED_MAX);
     const listed = [];
     for (const item of mine) {
         if (listed.length >= most) break;
         // eslint-disable-next-line no-await-in-loop
         const claim = await heldBy(companyId, item.row, now);
-        if (!claim || claim.by === connection) listed.push({ ...item, claim, project: names.get(String(item.row.projectId)) || '' });
+        if (!claim || claim.by === connection) listed.push({ ...item, claim });
     }
     return listed;
 };
 
 /* One waiting item the person may read, in a project whose manager is on; null for every other id, a hidden one and a missing one alike.
- * `asAgent` is the person's connection asking: an item handed to someone else's AI is a missing one too. */
-const itemFor = async ({ companyId, uid, itemId, allowsProject = () => true, allowsTask, asAgent = false }) => {
+ * `asAgent` is the person's connection asking: an item handed to someone else's AI is a missing one too. A question
+ * asked in chat is an item for the AI it was asked of and for nobody else, the person who asked included. */
+const itemFor = async ({ companyId, uid, itemId, allowsProject = () => true, allowsTask, reach = null, asAgent = false, now = new Date() }) => {
     if (!isId(itemId)) return null;
     const [row] = await find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [{ ...waiting, _id: oid(itemId) }]);
+    if (row && row.rule === ASKED_IN_CHAT) return asAgent ? chatQuestions.readFor(companyId, uid, row, { reach, now }) : null;
     if (!row || (asAgent && !offeredTo(row, uid)) || !allowsProject(String(row.projectId)) || !(await projectsOn(companyId, [String(row.projectId)])).length) return null;
     const [item] = await readableBy(companyId, uid, [row], allowsTask);
-    return item && !isClosedTask(item.task) ? item : null;
+    return item && !isClosedTask(item.task) ? { ...item, projectId: String(row.projectId) } : null;
 };
 
-const entity = (item) => ({ entityId: item.row.taskId, entityName: item.task.TaskName || '' });
+const QUESTION_NAME = 'A question asked in chat';
+
+const entity = (item) => (item.question
+    ? { entityType: 'comment', entityId: item.question.messageId, entityName: QUESTION_NAME }
+    : { entityId: item.row.taskId, entityName: item.task.TaskName || '' });
 
 const executors = {
     /* Exactly one of two callers wins: the write matches only a row nobody holds, or one the caller holds already.
@@ -165,7 +185,7 @@ const executors = {
         }, { $set: { claim } });
         if (!taken) throw new DeterministicError(REFUSAL.TAKEN);
         const renews = Boolean(held && held.by === connection);
-        const place = renews ? { held: '' } : await places.takeFor({ companyId, projectId: item.row.projectId, connection, itemId: item.row._id, now, holds: claimStands(companyId, now) });
+        const place = renews ? { held: '' } : await places.takeFor({ companyId, projectId: item.projectId, connection, itemId: item.row._id, now, holds: claimStands(companyId, now) });
         if (place.held) {
             await change(companyId, { _id: item.row._id, 'claim.by': connection }, { $unset: { claim: '' } });
             throw new DeterministicError(place.held === 'one_at_a_time' ? REFUSAL.ONE_AT_A_TIME : REFUSAL.PROJECT_FULL);
@@ -184,9 +204,9 @@ const executors = {
         const claim = item ? liveClaim(item.row, now) : null;
         if (!claim || claim.by !== connection) throw new DeterministicError(REFUSAL.NOT_HELD);
         const finished = params.finished === true;
-        const handedOver = item.row.rule === HANDED_OVER;
+        const leaves = LEAVES_WHEN_FINISHED.includes(item.row.rule);
         const left = { why: LEFT.FINISHED, userId: String(actor.userId), name: claim.name, at: now };
-        const set = finished ? { leftQueue: left, ...(handedOver ? { status: STATUS.CLOSED, closedAt: now } : {}) } : null;
+        const set = finished ? { leftQueue: left, ...(leaves ? { status: STATUS.CLOSED, closedAt: now } : {}) } : null;
         const released = await change(companyId, { _id: item.row._id, 'claim.by': connection }, { $unset: { claim: '' }, ...(set ? { $set: set } : {}) });
         if (!released) throw new DeterministicError(REFUSAL.NOT_HELD);
         await places.giveBack(companyId, item.row._id, connection);
@@ -247,7 +267,7 @@ const heldTasks = async (companyId, uid, now = new Date()) => {
     const projects = await projectsOn(companyId);
     if (!projects.length) return [];
     const rows = await find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [
-        { ...waiting, projectId: { $in: idForms(projects.map((project) => String(project._id))) }, 'claim.until': { $gt: now } }, {}, { limit: ROWS_READ },
+        { ...waitingAboutTasks, projectId: { $in: idForms(projects.map((project) => String(project._id))) }, 'claim.until': { $gt: now } }, {}, { limit: ROWS_READ },
     ]);
     const held = await stillHolding(companyId, await readableBy(companyId, uid, rows.filter((row) => liveClaim(row, now))));
     const first = new Map();

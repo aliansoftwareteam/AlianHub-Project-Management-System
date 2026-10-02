@@ -49,6 +49,7 @@
                 </li>
             </ul>
             <div v-if="agentAskNote" class="mc-agent-note" :data-test="`agent-ask-${agentAskState}`">{{ agentAskNote }}</div>
+            <div v-if="askedOwnAi" class="mc-agent-note" data-test="own-ai-asked" :title="$t('AgentChat.asked_own_ai_hint')">{{ $t('AgentChat.asked_own_ai', { name: askedOwnAi }) }}</div>
 
             <div v-if="actionable" class="mc-msg-acts">
                 <button type="button" class="mc-act" @click="$emit('reply', message)">{{ $t('Chat.reply') }}</button>
@@ -150,6 +151,7 @@ import MainChatMessageBody from './MainChatMessageBody.vue';
 import MainChatThreadFooter from './MainChatThreadFooter.vue';
 import { isAgentComment } from '@/utils/commentSide';
 import { AI_MENTION_NAME, aiAuthorOf } from '@/utils/aiMention';
+import { mentionsOwnAi } from '@/utils/agentMention';
 
 const props = defineProps({
     message: { type: Object, required: true },
@@ -214,6 +216,12 @@ const agentAskNote = computed(() => {
     if (agentAskState.value === 'answering') return t('AgentChat.replying');
     if (agentAskState.value === 'failed') return t('AgentChat.could_not_reply');
     return '';
+});
+
+/* A message edited so that it no longer names the AI is no longer a question for it. */
+const askedOwnAi = computed(() => {
+    const { isDeleted, ownAiAsk, message } = props.message;
+    return (!isDeleted && ownAiAsk && mentionsOwnAi(message) && ownAiAsk.name) || '';
 });
 
 const isAi = computed(() => !!aiAuthorOf(props.message));
