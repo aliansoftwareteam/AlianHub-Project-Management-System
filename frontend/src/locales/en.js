@@ -10083,6 +10083,8 @@ export default {
         disabled_toast: "Daily reminder disabled",
     },
     Toast: {
+        offline_change_not_saved: "A change you made while offline was not saved.",
+        offline_change_not_saved_reason: "A change you made while offline was not saved: {reason}",
         Assignee_not_updated: "Assignee not updated",
         Skill_added_successfully: "Skill added successfully",
         Skill_deactivated_successfully: "Skill deactivated successfully",
