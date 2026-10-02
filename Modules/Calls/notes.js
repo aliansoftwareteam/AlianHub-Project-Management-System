@@ -129,21 +129,42 @@ exports.listNotes = async (req, res) => {
     }
 };
 
-const EDITABLE = ['title', 'summary', 'actionItems', 'status', 'recapPostedAt', 'transcript'];
+const TITLE_MAX = 200;
+const SUMMARY_MAX = 20000;
+const ACTION_ITEMS_MAX = 200;
+const STATUSES = ['ready', 'discarded'];
+const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
-/** PATCH /api/v2/calls/notes/:id  { summary?, actionItems?, status?, title?, recapPostedAt? } */
+/* What a participant may change, each with the shape it is stored in. The transcript is what was said on the
+ * call: it is written once, when the notes are saved, and no edit reaches it. */
+const EDITABLE = {
+    title: (value) => typeof value === 'string' && value.length <= TITLE_MAX,
+    summary: (value) => typeof value === 'string' && value.length <= SUMMARY_MAX,
+    actionItems: (value) => Array.isArray(value) && value.length <= ACTION_ITEMS_MAX && value.every(isPlainObject),
+    status: (value) => STATUSES.includes(value),
+};
+
+/** PATCH /api/v2/calls/notes/:id  { summary?, actionItems?, status?, title? } */
 exports.updateNotes = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
         if (!isObjectId(req.params.id)) return res.send({ status: false, statusText: 'Invalid id.' });
 
+        const body = isPlainObject(req.body) ? req.body : {};
+        if (body.transcript !== undefined) {
+            return res.status(400).send({ status: false, statusText: 'The transcript is what was said on the call and cannot be changed.' });
+        }
         const patch = {};
-        EDITABLE.forEach((key) => {
-            if (req.body && req.body[key] !== undefined) patch[key] = req.body[key];
-        });
+        for (const [key, fits] of Object.entries(EDITABLE)) {
+            if (body[key] === undefined) continue;
+            if (!fits(body[key])) return res.status(400).send({ status: false, statusText: `${key} is not valid.` });
+            patch[key] = body[key];
+        }
         if (patch.status === 'discarded') patch.deletedStatusKey = 1;
         if (!Object.keys(patch).length) return res.send({ status: false, statusText: 'Nothing to update.' });
+        patch.editedBy = String(req.uid);
+        patch.editedAt = new Date();
 
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.CALLS,

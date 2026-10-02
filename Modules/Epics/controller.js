@@ -9,6 +9,14 @@ const { isPrivileged } = require('../../Config/roleTypes');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const { isClosedTask } = require('../Tasks/helpers/taskSignals');
 const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
+const { namedPeopleRefusal } = require('../../Config/projectPeople');
+
+/* Why `ownerUserId` cannot own an epic of this project, or '' when it is empty or names someone who can. */
+const ownerRefusal = async (companyId, projectId, ownerUserId) => {
+    if (ownerUserId === undefined || ownerUserId === null || ownerUserId === '') return '';
+    if (typeof ownerUserId !== 'string') return 'ownerUserId must be a member id.';
+    return namedPeopleRefusal(companyId, projectId, [ownerUserId]);
+};
 
 /* Progress is counted from the tasks on every read (AHE-3853): the stored taskCount and
  * completedCount were kept by $inc in the assign flow alone, so a task completed, deleted or
@@ -75,6 +83,8 @@ exports.createEpic = async (req, res) => {
         if (!dateCheck.valid) {
             return res.send({ status: false, statusText: dateCheck.reason });
         }
+        const refusal = await ownerRefusal(companyId, projectId, ownerUserId);
+        if (refusal) return res.status(400).send({ status: false, statusText: refusal });
         const created = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.EPICS,
             data: {
@@ -151,7 +161,16 @@ exports.updateEpic = async (req, res) => {
             }
             update.priority = priority ? String(priority) : '';
         }
-        if (ownerUserId !== undefined) update.ownerUserId = ownerUserId ? String(ownerUserId) : '';
+        if (ownerUserId !== undefined) {
+            const epic = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.EPICS,
+                data: [{ _id: new mongoose.Types.ObjectId(id) }, { ProjectID: 1 }],
+            }, 'findOne');
+            if (!epic) return res.send({ status: false, statusText: 'Epic not found.' });
+            const refusal = await ownerRefusal(companyId, epic.ProjectID, ownerUserId);
+            if (refusal) return res.status(400).send({ status: false, statusText: refusal });
+            update.ownerUserId = ownerUserId ? String(ownerUserId) : '';
+        }
         if (startDate !== undefined || dueDate !== undefined) {
             const dateCheck = parseEpicDates({ startDate, dueDate });
             if (!dateCheck.valid) return res.send({ status: false, statusText: dateCheck.reason });
