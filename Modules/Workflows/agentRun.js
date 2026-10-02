@@ -80,7 +80,7 @@ const startFor = async (companyId, { workflowRunId, stepId, agentId, taskId, ski
     // so the step fails with the reason rather than spending its attempts on it.
     // `depth` is the workflow's own re-entry count, checked by the same guard a
     // rule-started run is checked by — one counter, not a second one.
-    const check = await runs.canStart(agent, { trigger: TRIGGER, companyId, depth });
+    const check = await runs.canStart(agent, { trigger: TRIGGER, companyId, depth, projectId: task.ProjectID });
     if (!check.ok) throw permanent(check.reason);
     const { run } = await runs.start(companyId, {
         agent,

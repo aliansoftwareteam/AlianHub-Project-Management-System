@@ -285,6 +285,11 @@ const projectFindingsSchema = new Schema(schema.projectFindings, {strict: true, 
 projectFindingsSchema.index({ projectId: 1, key: 1 }, { unique: true, name: 'project_cause' });
 projectFindingsSchema.index({ projectId: 1, status: 1, openedAt: -1 });
 
+const agentWorkMarksSchema = new Schema(schema.agentWorkMarks, {strict: true, timestamps: true});
+// Unique, so of two agents reaching for one place, one turn or one item at the same moment, the insert of exactly one lands.
+agentWorkMarksSchema.index({ scope: 1, key: 1 }, { unique: true, name: 'one_mark' });
+agentWorkMarksSchema.index({ ref: 1 });
+
 const agentsSchema = new Schema(schema.agents, {strict: true, timestamps: true});
 agentsSchema.index({ paused: 1 });
 agentsSchema.index({ ownerId: 1 });
@@ -580,6 +585,7 @@ module.exports = {
     workflowDefinitionsSchema,
     agentFindingsSchema,
     projectFindingsSchema,
+    agentWorkMarksSchema,
     agentsSchema,
     agentRunsSchema,
     agentRevisionsSchema,

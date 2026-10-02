@@ -68,7 +68,7 @@ const dispatch = (companyId, run, agent, task, { userId, note } = {}) => {
 };
 
 const launch = async (companyId, { agent, task, trigger, startedBy, note, depth }) => {
-    const check = await runs.canStart(agent, { trigger, companyId, depth });
+    const check = await runs.canStart(agent, { trigger, companyId, depth, projectId: task.ProjectID });
     if (!check.ok) return { agentId: String(agent._id), started: false, reason: check.reason };
     const { run, deduplicated } = await runs.start(companyId, {
         agent, taskId: String(task._id), projectId: task.ProjectID, skill: runs.skillSlugOf(agent), trigger,

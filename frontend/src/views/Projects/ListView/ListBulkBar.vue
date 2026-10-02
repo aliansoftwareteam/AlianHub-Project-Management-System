@@ -224,7 +224,7 @@ const aiOptions = computed(() => [
     { id: "summarise", label: t("List.ai_summarise"), action: summarise },
     ...aiFields.value.map((field) => ({
         id: field._id,
-        label: t("AiFields.bulk_fill", { field: field.fieldTitle, n: selection.count.value }),
+        label: t("AiFields.bulk_fill", { field: field.fieldTitle, n: selection.count.value }, selection.count.value),
         attrs: { "data-ai-field-fill": field._id },
         action: () => fillAiField(field)
     }))
@@ -375,7 +375,7 @@ async function run(action, payload) {
         if (report) $toast.warning(report);
         if (updatedIds.length) {
             const requests = undoRequests({ action, payload, before, updatedIds, project: props.project, priorities: priorities.value, nameOf });
-            showUndo(t("List.bulk_done", { n: result.totals?.updated ?? updatedIds.length }), requests);
+            showUndo(t("List.bulk_done", { n: result.totals?.updated ?? updatedIds.length }, result.totals?.updated ?? updatedIds.length), requests);
         }
         selection.clear();
         if (RELOCATING.has(action)) refreshSprintCounts();
@@ -505,7 +505,7 @@ async function summarise() {
     const ids = [...selection.selectedTaskIds.value];
     const result = await summaries.generateMany(ids);
     if (result.failed && !result.done) $toast.error(t("List.ai_unavailable"));
-    else $toast.success(t("List.ai_summarised", { n: result.done }));
+    else $toast.success(t("List.ai_summarised", { n: result.done }, result.done));
 }
 
 // Pickers and menus close themselves on Esc; the selection stays.

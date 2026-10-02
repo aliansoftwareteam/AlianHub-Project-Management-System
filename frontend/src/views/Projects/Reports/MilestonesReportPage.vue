@@ -74,7 +74,7 @@ const fullDate = (ms) => {
 };
 
 const subLine = (row) => {
-    const parts = [row.projectName || t('Reports.untitled_project'), t('Reports.n_tasks', { n: row.tasks })];
+    const parts = [row.projectName || t('Reports.untitled_project'), t('Reports.n_tasks', { n: row.tasks }, row.tasks)];
     if (row.lastMove && row.lastMove.by) {
         parts.push(t('Reports.moved_by', { who: row.lastMove.by, when: fullDate(new Date(row.lastMove.at).getTime()) }));
     }
