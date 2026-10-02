@@ -2,6 +2,7 @@ const registry = require('../Agents/registry');
 const actions = require('../Agents/actions');
 const permissions = require('../Agents/permissions');
 const { toolLabel } = require('../Agents/changeLabels');
+const { joined } = require('../Agents/proposalText');
 const manageFlag = require('./manageFlag');
 
 const SOURCE = 'mcp';
@@ -102,7 +103,7 @@ const propose = async (ctx, tool, params, reason, held = '') => {
     const filed = await file(ctx, {
         taskId: params.taskId || null,
         projectId: params.projectId || null,
-        what: `${tool.name}: ${tool.description}`.slice(0, 300),
+        what: joined([tool.name, tool.description]),
         why: held ? `${reason} (${held})` : reason,
         changes,
     });
