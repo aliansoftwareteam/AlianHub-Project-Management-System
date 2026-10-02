@@ -14,7 +14,7 @@ Three things, in this order.
    |---|---|
    | `MCP_TOOLS_DATA=on` | `projects.list`, `project.get`, `sprints.list`, `statuses.list`, `comments.list`, `pages.search`, `page.get`, `timesheet.read`, `comment.create`, `timelog.create`, `screen.link`, `person.place` |
    | `MCP_TOOLS_MANAGE=on` | The task management tools and the doc writing tools below, for tokens created with the matching grant |
-   | `MCP_TOOLS_WORK=on` | `tags.list`, `task.tags.add`, `task.tags.remove`, `task.relations.list`, `task.relation.add`, `task.relation.remove`, `lists.list`, `list.create`, `list.rename`, `list.move`, `page.comments.list`, `page.comment.create`, `page.comment.reply`, `page.comment.assign`, `goals.list`, `goal.get`, `goal.target.set`, `goal.target.sources.add`, `goal.target.sources.remove`, `task.lists.list`, `task.lists.add`, `task.lists.remove`, `fields.create`, `view.create`, and `sprintId` on `tasks.search`, for every token that reads or writes; none of them needs a grant |
+   | `MCP_TOOLS_WORK=on` | `tags.list`, `task.tags.add`, `task.tags.remove`, `task.relations.list`, `task.relation.add`, `task.relation.remove`, `lists.list`, `list.create`, `list.rename`, `list.move`, `page.comments.list`, `page.comment.create`, `page.comment.reply`, `page.comment.assign`, `goals.list`, `goal.get`, `goal.target.set`, `goal.target.sources.add`, `goal.target.sources.remove`, `task.lists.list`, `task.lists.add`, `task.lists.remove`, `fields.create`, `view.create`, `automation.catalogue`, `automation.create`, and `sprintId` on `tasks.search`, for every token that reads or writes; none of them needs a grant |
    | `MCP_TOOLS_V2=on` | Names next to ids, paged lists, and a person's approval for any call that cannot be undone |
 
 2. **What the token was created with.** A token has scopes (read, write) and may have grants:
@@ -327,6 +327,25 @@ These need `MCP_TOOLS_WORK` and the write scope, and no grant. A field or a view
 ```
 
 Undo, from the Inbox or the agent audit log: a view an agent added is removed, and nothing else. Each field it made is switched off, as the field form's own switch does, only while it is still that project's alone and no task holds a value in it. A field that holds a value, or that someone has since put on another project, stays, and the undo names it and says why.
+
+
+### Automations
+
+These need `MCP_TOOLS_WORK`; `automation.catalogue` takes the read scope and `automation.create` the write scope, and neither needs a grant. A rule runs later with nobody watching, so a call never makes one: it is always filed for a person, whatever the project's policy says, and no "always do this" covers it. Only an owner or an admin can have a rule proposed for them, and only an owner or an admin can approve it, as on the Automations page.
+
+`automation.catalogue`: what a rule can be made of. No arguments. It answers the triggers that start from a task, the condition fields with their operators, and the steps an agent may propose with their settings: `set_status`, `set_priority`, `add_comment`, `create_subtask`, `assign` and `notify`.
+
+`automation.create`: propose one rule for one project. Arguments: `projectId`, `trigger` (a key from the catalogue), `conditions` (each with `field`, `op` and, where the operator takes one, `value`; all must hold), `actions` (each with `action` and its `config`), `enabled` (the rule is saved switched off unless this is `true`) and `reason`. Write a status, a person or a task type by its name; a name the project does not have is answered at once and nothing is filed.
+
+```json
+{ "name": "automation.create", "arguments": { "projectId": "<project id>", "trigger": "task.status_changed", "conditions": [{ "field": "statusRef", "op": "changedTo", "value": "Done" }], "actions": [{ "action": "notify", "config": { "recipients": ["task_assignees"], "message": "Done, thank you" } }] } }
+```
+
+What is refused, with the reason: a step that runs an agent; any step outside the six above, which is where a step that sends an email, calls a webhook or posts to Slack would be; a trigger that does not start from a task (a form, a schedule); and the switch that lets a rule react to changes made by automations and agents, which only a person sets. A rule made this way does not run on an agent's change.
+
+The Inbox shows the approver the project, what starts the rule, the rule in a sentence, each step, and whether it starts switched on. For an owner or an admin it also shows how many tasks of the last 30 days the rule matches, with up to three of them, counted the way the Automations page counts and only over what that person can open. Approving saves the rule through the Automations page's own create route as the person who approved: the rule is theirs, not the agent's and not the token's, and anything that page would refuse is refused.
+
+Undo, from the Inbox or the agent audit log: the rule is deleted, as the Automations page deletes it, whether it is on or off. A rule someone has edited since stays, and the undo says so; switch it off or delete it on the Automations page.
 
 ### Comments, links and time
 

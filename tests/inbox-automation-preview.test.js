@@ -64,7 +64,7 @@ describe('a waiting rule carries its preview', () => {
         const preview = await previewOf(OWNER, 'notice');
         expect(preview.kind).toBe('automation');
         expect(preview.title).toContain(NOTICE);
-        expect(kinds(preview)).toEqual(['place', 'ruleStart', 'rule', 'ruleStep', 'ruleStep', 'ruleState', 'ruleRuns']);
+        expect(kinds(preview)).toEqual(['place', 'ruleStart', 'rule', 'ruleStep', 'ruleStep', 'ruleReach', 'ruleState', 'ruleRuns']);
         expect(preview.lines[0]).toEqual({ kind: 'place', project: 'Open', list: '' });
         expect(line(preview, 'ruleStart')).toEqual({ kind: 'ruleStart', text: 'Task status changes' });
         expect(line(preview, 'rule').text).toMatch(/^When a task status changes to done, send "\[AI bench\] Done notice" to .+ and set the priority to LOW\.$/);
@@ -110,7 +110,7 @@ describe('how many past tasks it matches is counted for the person looking', () 
         close(T_SECRET);
         propose('for a member', draft());
         const preview = await previewOf(OUTSIDER, 'for a member');
-        expect(kinds(preview)).toEqual(['place', 'ruleStart', 'rule', 'ruleStep', 'ruleStep', 'ruleState']);
+        expect(kinds(preview)).toEqual(['place', 'ruleStart', 'rule', 'ruleStep', 'ruleStep', 'ruleReach', 'ruleState']);
         expect(JSON.stringify(preview)).not.toMatch(/Secret task|Second open task/);
     });
 
@@ -118,7 +118,7 @@ describe('how many past tasks it matches is counted for the person looking', () 
         close(T_ELSEWHERE);
         propose('hidden', draft({ projectId: P_PRIVATE }));
         expect(await previewOf(OUTSIDER, 'hidden')).toBeFalsy();
-        expect(kinds(await previewOf(INSIDER, 'hidden'))).toEqual(['place', 'ruleStart', 'rule', 'ruleStep', 'ruleStep', 'ruleState']);
+        expect(kinds(await previewOf(INSIDER, 'hidden'))).toEqual(['place', 'ruleStart', 'rule', 'ruleStep', 'ruleStep', 'ruleReach', 'ruleState']);
         propose('personal', draft({ projectId: P_PERSONAL }));
         expect(await previewOf(OWNER, 'personal')).toBeFalsy();
     });

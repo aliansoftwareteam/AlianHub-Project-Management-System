@@ -340,6 +340,7 @@ const undoApplied = async (p) => {
     busy.value = false;
     if (!result.ok) { errors[p.proposalId] = result.error; return; }
     delete errors[p.proposalId];
+    summary.value = result.left.length ? t('Inbox.queue_undo_left', { why: result.left[0] }) : '';
     emit('undone', { id: p.proposalId });
 };
 

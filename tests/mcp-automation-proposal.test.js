@@ -301,7 +301,17 @@ describe('approving saves the rule the Automations page would save, as the perso
         const id = await filed(as(ADMIN), doneNotice());
         setRole(ADMIN, 3);
         const out = await approve(id, OWNER);
-        expect(out.applied[0]).toMatchObject({ ok: false });
+        expect(out.applied[0]).toMatchObject({ ok: false, error: expect.stringMatching(/permission_denied/) });
+        expect(rules()).toHaveLength(0);
+    });
+
+    it('saves nothing for someone who is no longer an owner or an admin, whatever their role was given since', async () => {
+        const id = await filed(as(ADMIN), doneNotice());
+        setRole(ADMIN, 3);
+        const parent = mockDb.seed(SCHEMA_TYPE.RULES, { key: 'settings', name: 'Settings', isParent: true, roles: [] });
+        mockDb.seed(SCHEMA_TYPE.RULES, { key: 'settings_edit_company', name: 'settings_edit_company', isParent: false, parentId: String(parent._id), roles: [{ key: 3, permission: true }, { key: 0, permission: false }] });
+        const out = await approve(id, OWNER);
+        expect(out.applied[0]).toMatchObject({ ok: false, error: expect.stringMatching(/owners and admins/i) });
         expect(rules()).toHaveLength(0);
     });
 

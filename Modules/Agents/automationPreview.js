@@ -33,6 +33,7 @@ const preview = async (change, { named, companyId, uid }) => {
         { kind: 'ruleStart', text: trigger ? trigger.label : '' },
         { kind: 'rule', text: sentence },
         ...built.rule.steps.map((step, at) => ({ kind: 'ruleStep', n: at + 1, text: capital(actionSentence(step, built.people)).slice(0, SENTENCE_MAX) })),
+        { kind: 'ruleReach' },
         { kind: 'ruleState', on: draft.enabled },
         runs && { kind: 'ruleRuns', count: runs.count, days: runs.days },
         runs && runs.examples.length > 0 && { kind: 'ruleExamples', tasks: runs.examples },
