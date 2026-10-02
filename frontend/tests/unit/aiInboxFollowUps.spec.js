@@ -72,8 +72,11 @@ describe('a waiting batch on the AI Inbox page', () => {
         await open();
         expect(wrapper.findAll('.ai-change')).toHaveLength(0);
         expect(wrapper.findAll('[data-test="intent-preview"]')).toHaveLength(1);
-        const lines = wrapper.findAll('[data-test="intent-line"]').map((line) => [line.find('dt').text(), line.find('dd').text().replace(/\s+/g, ' ')]);
-        expect(lines).toEqual([['Status', 'To Do, on 20 tasks'], ['Tasks', 'Bulk 1Bulk 2Bulk 3Bulk 4Bulk 5 and 15 more']]);
+        const [status, tasks] = wrapper.findAll('[data-test="intent-line"]');
+        expect([status.find('dt').text(), status.find('dd').text()]).toEqual(['Status', 'To Do, on 20 tasks']);
+        expect(tasks.find('dt').text()).toBe('Tasks');
+        expect(tasks.findAll('[data-test="intent-open-task"]').map((button) => button.text())).toEqual(['Bulk 1', 'Bulk 2', 'Bulk 3', 'Bulk 4', 'Bulk 5']);
+        expect(tasks.find('[data-test="intent-more"]').text()).toBe('and 15 more');
         expect(wrapper.text()).not.toContain('via MCP');
     });
 

@@ -17,7 +17,8 @@ vi.mock('@/components/organisms/Header/helper', () => ({ useHelper: () => ({ ope
 vi.mock('@/components/organisms/Shell/shellState', () => ({ openPanel: vi.fn() }));
 
 import Inbox from '@/views/Inbox/Inbox.vue';
-import { dropProjects, madeProjectIds, showProjects, trashedProjectIds } from '@/composable/approvedProjects';
+import { dropProjects, showProjects } from '@/composable/approvedProjects';
+import { madeProjectIds, trashedProjectIds } from '@/composable/approvedProjectIds';
 
 const PROJECT = '64b000000000000000000001';
 const MUTATION = 'projectData/mutateProjects';

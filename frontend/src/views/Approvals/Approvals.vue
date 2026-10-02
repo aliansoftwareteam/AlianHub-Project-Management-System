@@ -149,8 +149,11 @@ import { formatHm } from '@/composable/useTimer';
 import { canApprove } from './approvalAccess';
 import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
 import { fetchPendingProposals, sendProposalDecision } from '@/composable/agentProposals';
+import { showProjects } from '@/composable/approvedProjects';
+import { madeProjectIds } from '@/composable/approvedProjectIds';
 import ProposalWhyDialog from './ProposalWhyDialog.vue';
 import { proposalTitle } from '@/views/Ai/plainLabels';
+import { changeLabel } from '@/views/Ai/agentActionLabels';
 
 /**
  * @typedef {Object} AgentProposal
@@ -165,7 +168,8 @@ import { proposalTitle } from '@/views/Ai/plainLabels';
 
 defineOptions({ name: 'ApprovalsQueue' });
 
-const { getters } = useStore();
+const store = useStore();
+const { getters } = store;
 const router = useRouter();
 const { t } = useI18n();
 const { getUser } = useGetterFunctions();
@@ -256,7 +260,7 @@ const toAgentProposal = (p) => {
     return {
         id: String(p._id), agentName: p.agentName || '', summary: proposalTitle(t, p), detail: p.why || '',
         reversible: changes.length > 0 && changes.every((c) => c && c.reversible), createdAt: p.createdAt,
-        changes: changes.filter(Boolean).map((c) => ({ label: c.label || c.action || '', reversible: Boolean(c.reversible) })),
+        changes: changes.filter(Boolean).map((c) => ({ label: changeLabel(t, c) || c.action || '', reversible: Boolean(c.reversible) })),
     };
 };
 const loadProposals = async () => {
@@ -305,6 +309,7 @@ const decide = async (card, action, reason) => {
     } else {
         const body = bodyOf(await sendProposalDecision(card.row.id, action === 'approve' ? 'approve' : 'decline', reason ? { reason } : {}));
         if (!body.status) throw new Error(body.statusText);
+        showProjects(store, madeProjectIds(body.data));
         agentProposals.value = agentProposals.value.filter((r) => r.id !== card.row.id);
     }
 };
