@@ -306,10 +306,12 @@ describe('approving saves the rule the Automations page would save, as the perso
     });
 
     it('saves nothing when the project lost what the rule names before it was approved', async () => {
-        const id = await filed(as(OWNER), doneNotice({ conditions: [{ field: 'statusRef', op: 'changedTo', value: 'In Progress' }] }));
-        stored(SCHEMA_TYPE.PROJECTS, P_OPEN).taskStatusData = stored(SCHEMA_TYPE.PROJECTS, P_OPEN).taskStatusData.filter((status) => status.name !== 'In Progress');
+        const project = stored(SCHEMA_TYPE.PROJECTS, P_OPEN);
+        project.taskStatusData = [...project.taskStatusData, { key: 4, name: 'Review', type: 'active' }];
+        const id = await filed(as(OWNER), doneNotice({ conditions: [{ field: 'statusRef', op: 'changedTo', value: 'Review' }] }));
+        project.taskStatusData = project.taskStatusData.filter((status) => status.name !== 'Review');
         const out = await approve(id);
-        expect(out.applied[0]).toMatchObject({ ok: false, error: expect.stringMatching(/In Progress/) });
+        expect(out.applied[0]).toMatchObject({ ok: false, error: expect.stringMatching(/Review/) });
         expect(rules()).toHaveLength(0);
     });
 

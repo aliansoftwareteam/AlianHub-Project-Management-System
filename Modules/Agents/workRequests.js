@@ -350,6 +350,7 @@ const executors = {
     },
 
     ...require('./setupRequests').executors,
+    ...require('./automationRequests').executors,
 };
 
 module.exports = {
