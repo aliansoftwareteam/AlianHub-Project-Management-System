@@ -4,11 +4,6 @@
  * it with `test.use({ expectedConsoleErrors: [...] })` instead of adding it here. */
 const ALLOWED = [
     {
-        text: /status of 503/,
-        url: /\/api\/v2\/workflows\/approvals/,
-        reason: 'The workflow engine is off in the harness, as on a default install. Every workflow route then answers 503 by design, and Home asks for pending approvals on each visit all the same.',
-    },
-    {
         text: /status of 403/,
         url: /\/api\/v2\/instance\/access/,
         reason: 'The settings shell asks whether the viewer may open the instance console. 403 is the answer for everyone but the instance owner, and the shell then leaves the section out.',
