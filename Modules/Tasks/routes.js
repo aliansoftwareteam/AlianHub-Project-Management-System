@@ -136,7 +136,7 @@ exports.init = (app) => {
         }
     });
 
-    app.patch('/api/v1/importTasks', taskWritePermission('PATCH /api/v1/importTasks'), agentsRefused('tasks.import'), async (req, res) => {
+    app.patch('/api/v1/importTasks', agentsRefused('tasks.import'), taskWritePermission('PATCH /api/v1/importTasks'), async (req, res) => {
         const payload = await prepareOrRefuse(req, res, TASK_ACTION_FIELDS.createMultipleTasks, 'createMultipleTasks');
         if (!payload) return;
         const projectData = payload.projectData || {};

@@ -8,6 +8,7 @@ const { wordsIn } = require('../../scripts/plain-words');
 const registry = require('../../Modules/Agents/registry');
 const groups = require('../../Modules/Agents/registryGroups');
 const { PTO_STATUS } = require('../../Modules/Pto/helpers/ptoRules');
+const routeWrites = require('../../Modules/Agents/routeWrites');
 
 const ROOT = path.join(__dirname, '..', '..');
 const SERVER_DIRS = ['Modules', 'Config', 'utils', 'middlewares', 'socket', 'event'];
@@ -103,6 +104,11 @@ describe('the keys the server writes to the audit log', () => {
         const unworded = Object.entries(TEMPLATES).flatMap(([template, keys]) => keys.filter((key) => !worded(key)).map((key) => `${key} (from ${template})`));
         expect(unworded).toEqual([]);
         expect(Object.values(TEMPLATES).filter((keys) => !keys.length)).toEqual([]);
+    });
+
+    it('have words for every name a route records an agent\'s write under', () => {
+        expect(routeWrites.ROUTE_ONLY.filter((key) => !(key in words.ACTIONS))).toEqual([]);
+        expect(routeWrites.ALSO_A_TOOL.filter((key) => !registryKeys.has(key))).toEqual([]);
     });
 
     it('leave nothing listed here that the server no longer holds', () => {
