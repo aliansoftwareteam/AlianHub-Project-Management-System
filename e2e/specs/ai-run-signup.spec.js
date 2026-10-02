@@ -1,26 +1,15 @@
-const { MongoClient, ObjectId } = require('mongodb');
 const { test, expect } = require('../support/test');
-const { createApiClient } = require('../support/api');
-const { PASSWORD, assertOk, uniqueSuffix } = require('../support/fixtures');
-const { resolveMongoUrl } = require('../support/env');
-const { skipFirstRun } = require('../support/pages');
+const { PASSWORD, registerVerifiedAccount, uniqueSuffix } = require('../support/fixtures');
+const { firstScreenSettled, skipFirstRun, watchApiAnswers } = require('../support/pages');
 
 // The suite's server has no ready-made company, so the workspace is set up while the person waits.
 test.describe.configure({ timeout: 60000 });
 
-/* Sign-up through the real pages: the account is made by the API (mail is not delivered in the suite, so the
- * address is marked verified the way tests/integration/invitation-signed-in-accept.int.test.js does), then the
- * person signs in, names a workspace and arrives on the last step. */
+/* Sign-up through the real pages: the account is made by the API, then the person signs in, names a workspace
+ * and arrives on the last step. */
 async function registerAccount(state, { firstName, lastName }) {
     const email = `signup.${uniqueSuffix()}@e2e.alianhub.test`;
-    const created = assertOk(await createApiClient({ baseURL: state.baseURL }).post('/api/v2/createUser', { firstName, lastName, email, password: PASSWORD }), `register ${email}`);
-    const client = new MongoClient(resolveMongoUrl(), { serverSelectionTimeoutMS: 5000 });
-    await client.connect();
-    try {
-        await client.db('global').collection('users').updateOne({ _id: new ObjectId(String(created.statusText._id)) }, { $set: { isEmailVerified: true } });
-    } finally {
-        await client.close();
-    }
+    await registerVerifiedAccount(state.baseURL, { firstName, lastName, email });
     return email;
 }
 
@@ -37,12 +26,15 @@ test.describe('sign-up', () => {
 
         await page.getByRole('textbox', { name: 'Name your workspace' }).fill(`Signup ${uniqueSuffix()}`);
         await page.getByRole('button', { name: 'Continue', exact: true }).click();
+        const answers = watchApiAnswers(page);
         await page.getByRole('button', { name: 'Skip — start blank' }).click();
 
         await expect(page.getByRole('status').filter({ hasText: /workspace/ })).toBeVisible();
         await expect(page).toHaveURL(/#\/[0-9a-f]{24}\/welcome\/connect-ai/, { timeout: 40000 });
         await expect(page.getByRole('heading', { level: 1, name: 'Connect your AI' })).toBeVisible();
         await expect(page.getByRole('navigation', { name: 'Primary' })).toHaveCount(0);
+        await firstScreenSettled(page);
+        expect(answers.refused).toEqual([]);
 
         await page.getByRole('button', { name: 'Skip for now' }).click();
         await expect(page).not.toHaveURL(/welcome/);
