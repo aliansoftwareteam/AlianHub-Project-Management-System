@@ -8,6 +8,9 @@ const NARROW = { width: 390, height: 844 };
 /* An entry skips what its selector matches (the element or anything inside it) on the screens it names, or on every screen.
  * Each one says why the element is exempt. A failure that is a product bug is fixed in the product, not listed here. */
 const NARROW_ALLOW = [];
+const NARROW_UNREACHABLE = {
+    'Add view menu': 'Under 766 px Projects.vue draws no view row, so there is no Add view button to open.',
+};
 const DARK_ALLOW = [];
 
 const WIDEST_FIRST = 3;
@@ -205,6 +208,7 @@ const darkAudit = ({ allow, lightest, nearBlack, darkBackground }) => {
     const skip = 'img, svg, canvas, video, picture, script, style, noscript, option, optgroup, [class*="avatar" i], [class*="initials" i]';
 
     const found = new Map();
+    let checked = 0;
     for (const el of document.body.querySelectorAll('*')) {
         if (el.closest(skip) || allow.some((selector) => el.closest(selector))) continue;
         if (!hasText(el)) continue;
@@ -212,6 +216,7 @@ const darkAudit = ({ allow, lightest, nearBlack, darkBackground }) => {
         if (!visible(el, style)) continue;
         const bg = background(el);
         if (!bg) continue;
+        checked += 1;
         const ink = over(rgba(style.color), bg);
         const bgLuminance = luminance(bg);
         let rule = '';
@@ -222,7 +227,7 @@ const darkAudit = ({ allow, lightest, nearBlack, darkBackground }) => {
         if (!found.has(key)) found.set(key, { rule, name: name(el), text: (el.value || el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 30), bg: hex(bg), ink: hex(ink), count: 0 });
         found.get(key).count += 1;
     }
-    return [...found.values()];
+    return { checked, found: [...found.values()] };
 };
 
 const forScreen = (list, screen) => list.filter((e) => !e.screens || e.screens.includes(screen)).map((e) => e.selector);
@@ -236,6 +241,7 @@ test.describe('390 px wide: nothing scrolls sideways', () => {
 
     for (const screen of SCREENS) {
         test(screen.name, async ({ page }) => {
+            test.skip(Boolean(NARROW_UNREACHABLE[screen.name]), NARROW_UNREACHABLE[screen.name]);
             await screen.open(page, c);
             const result = await page.evaluate(sidewaysScroll, { allow: forScreen(NARROW_ALLOW, screen.name) });
             if (result.scrollWidth <= result.width + 1 || result.allowed) return;
@@ -262,12 +268,13 @@ test.describe('dark mode: no white panels or black text on dark', () => {
         test(screen.name, async ({ page }) => {
             await screen.open(page, c);
             await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-            const found = await page.evaluate(darkAudit, {
+            const { checked, found } = await page.evaluate(darkAudit, {
                 allow: forScreen(DARK_ALLOW, screen.name),
                 lightest: LIGHTEST_BACKGROUND,
                 nearBlack: NEAR_BLACK_TEXT,
                 darkBackground: DARK_BACKGROUND,
             });
+            expect(checked, `${screen.name}: the audit found text with a known background to look at`).toBeGreaterThan(0);
             const lines = found.map((f) => `${f.rule}: ${f.name} "${f.text}" ink ${f.ink} on ${f.bg} (${f.count}x)`);
             expect(lines, `${screen.name} in dark mode`).toEqual([]);
         });
