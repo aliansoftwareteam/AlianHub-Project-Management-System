@@ -1,4 +1,5 @@
-/* Task 047, slice AI-1, job 7: one batch call takes fifty changes, and each of them is held to what a change of any batch is held to. */
+/* Task 047, slice AI-1, job 7: a batch that waits for a person as one proposal takes fifty changes, each held to what
+   a change of any batch is held to. A batch that does not wait that way keeps twenty-five. */
 process.env.STORAGE_TYPE = 'server';
 const mockDb = require('./fixtures/fakeMongo').create();
 
@@ -44,7 +45,7 @@ const projectPolicy = require('../Modules/Agents/projectPolicy');
 const projectLimits = require('../Modules/Agents/projectLimits');
 const taskReads = require('../Modules/Agents/taskReads');
 const queue = require('../Modules/Inbox/helpers/approvalQueue');
-const { BATCH_MAX } = require('../Modules/Mcp/manageTools');
+const { BATCH_MAX, BATCH_AT_ONCE_MAX } = require('../Modules/Mcp/manageTools');
 const server = require('../Modules/Mcp/server');
 const { agentWorkMarksSchema } = require('../utils/mongo-handler/createSchema');
 
@@ -118,11 +119,63 @@ describe('how many changes one batch call takes', () => {
         expect(rows(SCHEMA_TYPE.AUDIT_LOGS)).toHaveLength(0);
     });
 
+    it('takes forty for twenty tasks with two changes each, as one proposal', async () => {
+        const twenty = tasks.slice(0, 20);
+        const out = await batch(ctx(OWNER), [...twenty.map((task) => setStatus(task, 'To Do')), ...twenty.map((task, at) => rename(task, `Renamed ${at + 1}`))]);
+
+        expect(out).toMatchObject({ ok: false, pending: true, applied: 0, waiting: 40 });
+        expect(proposalRows()).toHaveLength(1);
+        expect(proposalRows()[0].changes).toHaveLength(40);
+        untouched();
+    });
+
     it('says so in the tool the agent lists, and asks for one batch for one request', async () => {
         const listed = (await server.handleRpc(ctx(OWNER), { jsonrpc: '2.0', id: 1, method: 'tools/list' })).result.tools.find((tool) => tool.name === 'tasks.batch');
-        expect(listed.description).toMatch(/^Runs up to 50 change tools in one call/);
+        expect(listed.description).toMatch(/^Runs several change tools in one call, in order: up to 25 when every step is on the same task, and up to 50 when the steps name more than one task\./);
         expect(listed.description).toMatch(/put every change in one batch, so the person approves once/);
         expect(listed.inputSchema.properties.operations.maxItems).toBe(BATCH_MAX);
+    });
+});
+
+describe('a batch that does not wait as one proposal', () => {
+    const NOT_WAITING = (given) => `tasks.batch: a batch takes more than 25 changes only when it names more than one task, because it then waits for a person's approval as one proposal. `
+        + `This one has ${given} and names one task or none, so its changes would not wait together. Nothing was run and nothing has changed. Send at most 25 of them in a call.`;
+    const onOne = (count) => Array.from({ length: count }, (unused, at) => rename(tasks[0], `Name ${at + 1}`));
+
+    it('runs twenty-five changes to one task at once, as before, and one undo takes them back', async () => {
+        expect(BATCH_AT_ONCE_MAX).toBe(25);
+        const out = await batch(ctx(OWNER), onOne(BATCH_AT_ONCE_MAX));
+
+        expect(out).toMatchObject({ ok: true, applied: BATCH_AT_ONCE_MAX, notApplied: 0, undoable: true });
+        expect(out.pending).toBeUndefined();
+        expect(nameOf(tasks[0])).toBe('Name 25');
+        expect(proposalRows()).toHaveLength(0);
+        expect(audits('tasks.batch')[0].meta.undo.auditIds).toHaveLength(BATCH_AT_ONCE_MAX);
+    });
+
+    it('refuses twenty-six changes to one task in plain words, before anything is read, and runs none of them', async () => {
+        const out = await batch(ctx(OWNER), onOne(BATCH_AT_ONCE_MAX + 1));
+
+        expect(out.rpcError).toEqual(expect.objectContaining({ code: -32602, message: NOT_WAITING(26) }));
+        untouched();
+        expect(proposalRows()).toHaveLength(0);
+        expect(rows(SCHEMA_TYPE.AUDIT_LOGS)).toHaveLength(0);
+    });
+
+    it('refuses them the same in a project that holds every change for a person, where each would wait as a proposal of its own', async () => {
+        project().agentPolicy = { connected: projectPolicy.CONNECTED.PROPOSE_ALL };
+        const two = await batch(ctx(OWNER), onOne(2));
+        expect(two.items.map((item) => item.pending)).toEqual([true, true]);
+        expect(proposalRows()).toHaveLength(2);
+
+        expect((await batch(ctx(OWNER), onOne(BATCH_MAX))).rpcError).toEqual(expect.objectContaining({ code: -32602, message: NOT_WAITING(50) }));
+        expect(proposalRows()).toHaveLength(2);
+        untouched();
+    });
+
+    it('refuses more than twenty-five where no operation is one a call could make, as it names no task', async () => {
+        const out = await batch(ctx(OWNER), Array.from({ length: BATCH_AT_ONCE_MAX + 1 }, () => ({ tool: 'tasks.search', arguments: {} })));
+        expect(out.rpcError).toEqual(expect.objectContaining({ code: -32602, message: NOT_WAITING(26) }));
     });
 });
 
@@ -192,13 +245,13 @@ describe('each of the fifty is held as a change of any batch is', () => {
         untouched();
     });
 
-    it('to "changed since you read it": fifty changes to one task read before a person changed it are each refused', async () => {
+    it('to "changed since you read it": twenty-five changes to one task read before a person changed it are each refused', async () => {
         const [task] = tasks;
         await rpc(ctx(OWNER), 'task.get', { taskId: String(task._id) });
         stored(task._id).updatedAt = new Date(new Date(stored(task._id).updatedAt).getTime() + 1000);
-        const out = await batch(ctx(OWNER), Array.from({ length: BATCH_MAX }, (unused, at) => rename(task, `Late ${at + 1}`)));
+        const out = await batch(ctx(OWNER), Array.from({ length: BATCH_AT_ONCE_MAX }, (unused, at) => rename(task, `Late ${at + 1}`)));
 
-        expect(out).toMatchObject({ ok: false, applied: 0, notApplied: BATCH_MAX, auditId: null });
+        expect(out).toMatchObject({ ok: false, applied: 0, notApplied: BATCH_AT_ONCE_MAX, auditId: null });
         out.items.forEach((item) => expect(item).toMatchObject({ refused: true, reason: taskReads.REFUSAL.CHANGED }));
         expect(nameOf(task)).toBe('Bulk 1');
         expect(proposalRows()).toHaveLength(0);

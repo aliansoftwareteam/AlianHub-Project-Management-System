@@ -536,7 +536,10 @@ const applyBatch = async (ctx, tool, args) => {
 
 /* A batch of one operation is that operation's own call, which waits or runs by the rule for a single change. */
 function runBatch(ctx, tool, args) {
-    return args.operations.length > 1 && tasksNamed(ctx, args.operations) > 1 ? fileBatch(ctx, tool, args) : applyBatch(ctx, tool, args);
+    const given = args.operations.length;
+    if (given > 1 && tasksNamed(ctx, args.operations) > 1) return fileBatch(ctx, tool, args);
+    if (given > manageTools.BATCH_AT_ONCE_MAX) throw Object.assign(new Error(`${tool.name}: ${manageTools.batchNotWaiting(given)}`), { code: -32602 });
+    return applyBatch(ctx, tool, args);
 }
 
 module.exports = { TOOLS, names: toolNames, manifest, usable, call, registered, actionOf, actionsOffered };

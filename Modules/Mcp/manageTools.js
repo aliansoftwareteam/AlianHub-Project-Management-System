@@ -30,13 +30,18 @@ const ROLE_NAMES = Object.freeze({ [ROLE_GUEST]: 'guest', [ROLE_OWNER]: 'owner',
 
 const { GRANT, DOCS_GRANT } = manageFlag;
 const HISTORY_TEXT_MAX = 600;
+/* A batch that names more than one task waits for a person as one proposal and takes BATCH_MAX. Any other batch is
+ * applied change by change with no approval of the whole, so it keeps the smaller size. */
 const BATCH_MAX = 50;
+const BATCH_AT_ONCE_MAX = 25;
 const batchTooLarge = (args) => {
     const given = args && Array.isArray(args.operations) ? args.operations.length : 0;
     return given > BATCH_MAX
         ? `a batch takes at most ${BATCH_MAX} changes, and this one has ${given}. Nothing was filed and nothing has changed. Send the first ${BATCH_MAX} as one batch and the rest as another, and tell the person each one waits for its own approval.`
         : '';
 };
+const batchNotWaiting = (given) => `a batch takes more than ${BATCH_AT_ONCE_MAX} changes only when it names more than one task, because it then waits for a person's approval as one proposal. `
+    + `This one has ${given} and names one task or none, so its changes would not wait together. Nothing was run and nothing has changed. Send at most ${BATCH_AT_ONCE_MAX} of them in a call.`;
 
 const isId = (v) => OBJECT_ID.test(String(v || ''));
 const idOf = (v) => (v === undefined || v === null ? '' : String(v));
@@ -273,7 +278,7 @@ const TOOLS = [
         strict: true,
         batch: true,
         target: () => ({}),
-        description: `Runs up to ${BATCH_MAX} change tools in one call, in order. When every step is on the same task, each is applied on its own and reports its own result, so one refusal does not stop or undo the others, and a person can undo the ones that applied together. When the steps name more than one task, nothing runs yet: the changes wait in AlianHub as one proposal that a person approves or declines whole. A link counts both of its tasks, and each new task, subtask or doc counts as a task of its own. Keep such a batch inside one project. `
+        description: `Runs several change tools in one call, in order: up to ${BATCH_AT_ONCE_MAX} when every step is on the same task, and up to ${BATCH_MAX} when the steps name more than one task. When every step is on the same task, each is applied on its own and reports its own result, so one refusal does not stop or undo the others, and a person can undo the ones that applied together. When the steps name more than one task, nothing runs yet: the changes wait in AlianHub as one proposal that a person approves or declines whole. A link counts both of its tasks, and each new task, subtask or doc counts as a task of its own. Keep such a batch inside one project. `
             + 'When one request changes many tasks, or changes several things on each of them, put every change in one batch, so the person approves once: do not split it into smaller batches.',
         tooLarge: batchTooLarge,
         input: input({
@@ -483,4 +488,4 @@ const grantOfAction = (action) => {
     return tool && tool.grant ? tool.grant : null;
 };
 
-module.exports = { TOOLS, VARIANTS, SCOPES, SEARCH_INPUT, BATCH_MAX, offered, variantOf, searchFilter, planBrief, grantOfAction };
+module.exports = { TOOLS, VARIANTS, SCOPES, SEARCH_INPUT, BATCH_MAX, BATCH_AT_ONCE_MAX, batchNotWaiting, offered, variantOf, searchFilter, planBrief, grantOfAction };

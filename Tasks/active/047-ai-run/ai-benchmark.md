@@ -74,7 +74,7 @@ Counts: of the 15, **10 should pass, 5 should pass with approval, none cannot pa
 | 1 | Create a task | 15 | should pass | One `task.create` carries the assignee, the date and the priority, and `person.me` answers "me" and "tomorrow". | `Modules/Mcp/manageTools.js:421`, `Modules/Mcp/contextTools.js:141` | |
 | 2 | Quick-create | 15 | should pass | The list is named in the sentence, and `task.create` is applied at once. | `Modules/Mcp/manageTools.js:421`, `Modules/Mcp/workTools.js:159` | |
 | 3 | Message to task | 15 | should pass | `chat.messages.list` gives the id of the newest message and `task.from_message` makes the task at once. The connection must hold the chat permission. | `Modules/Mcp/chatTools.js:141`, `Modules/Mcp/intentTools.js:200` | |
-| 7 | Bulk-edit twenty | 15 | should pass with approval | Twenty tasks with two changes each are 40 operations, a batch takes 50, and a batch that names more than one task waits as one proposal: one approval. | `tests/mcp-batch-size.test.js`, `tests/agent-proposal-cards.test.js` ("benchmark job 7"), `Modules/Mcp/manageTools.js:33` | |
+| 7 | Bulk-edit twenty | 15 | should pass with approval | Twenty tasks with two changes each are 40 operations, a batch that names more than one task takes 50, and it waits as one proposal: one approval. | `tests/mcp-batch-size.test.js`, `tests/agent-proposal-cards.test.js` ("benchmark job 7"), `Modules/Mcp/manageTools.js:35` | |
 | 8 | Group by a field | 15 | should pass with approval | No saved view groups by Stage, so `view.create` waits, and that is the one approval. | `Modules/Mcp/setupTools.js:287`, `Modules/Agents/registry/setup.js:11` | |
 | 9 | Filter and save a view | 15 | should pass with approval | `view.create` takes `mine` and `due: this_week`, and it waits as one proposal. | `Modules/Mcp/setupTools.js:123`, `Modules/Mcp/setupTools.js:287` | |
 | 10 | Everything list | 15 | should pass | `screen.link` opens the everything screen on "Me" and changes nothing. | `Modules/Mcp/screenTools.js:115`, `frontend/src/views/Everything/Everything.vue:357` | |
@@ -121,7 +121,7 @@ Tool names are the ones a connected agent sees. "Reads" are listed once, in the 
 
 **Job 7, bulk-edit twenty.** should pass with approval.
 - `person.place`, `tasks.search`, `members.list` (read).
-- `tasks.batch` with `task.update` (priority) and `task.assign` for each task: 40 operations. A batch takes at most 50 (`BATCH_MAX`, `Modules/Mcp/manageTools.js:33`), so one call.
+- `tasks.batch` with `task.update` (priority) and `task.assign` for each task: 40 operations. A batch that names more than one task takes at most 50 (`BATCH_MAX`, `Modules/Mcp/manageTools.js:35`), so one call.
 - The call names more than one task, so it runs nothing and waits as one proposal (`Modules/Mcp/tools.js:538`, `fileBatch` at line 509). One approval. See "Job 7: how many approvals".
 - It passes only if the agent sends all 40 in one batch. The tool's description asks for that; whether a model does it is for the measured run.
 
@@ -203,16 +203,18 @@ Jobs 6, 21 and 22 now read as likelier passes than the three reserves. The reser
 
 ## Job 7: how many approvals
 
-Read from the code on 2026-10-02 at a24135f, after #1427, and changed the same day: a batch now takes 50. `tests/agent-proposal-cards.test.js` ("benchmark job 7") and `tests/mcp-batch-size.test.js` run the same numbers.
+Read from the code on 2026-10-02 at a24135f, after #1427, and changed the same day: a batch that waits as one proposal now takes 50. `tests/agent-proposal-cards.test.js` ("benchmark job 7") and `tests/mcp-batch-size.test.js` run the same numbers.
 
 - **Two tools for each task.** `task.update` sets the priority; it does not take assignees (`EDITED` in `Modules/Mcp/manageTools.js`). `task.assign` sets the assignee. Twenty tasks with two fields each are 40 operations.
-- **One batch call takes 50.** `BATCH_MAX` in `Modules/Mcp/manageTools.js:33` is the `maxItems` of `tasks.batch`. It was 25. A call with 51 operations is refused before anything is read, in words that say to send the rest as a second batch, and nothing is filed.
+- **A batch that names more than one task takes 50.** `BATCH_MAX` in `Modules/Mcp/manageTools.js:35` is the `maxItems` of `tasks.batch`. It was 25. A call with 51 operations is refused before anything is read, in words that say to send the rest as a second batch, and nothing is filed.
+- **A batch on one task still takes 25.** It is applied at once, change by change, with no approval of the whole (`BATCH_AT_ONCE_MAX`, checked in `runBatch`, `Modules/Mcp/tools.js:538`). A call with 26 is refused in words that say why, and nothing runs. So nothing that runs without a person got bigger.
 - **A call that names more than one task runs nothing.** `runBatch` in `Modules/Mcp/tools.js` counts the tasks the operations name; above one it goes to `fileBatch`, which files every change of that call as one proposal, approved or declined whole. This holds on both project settings.
 - **So now: one batch call, one proposal, one approval.** The approval applies the 40 changes one by one; nothing changes before it, and one Undo takes all of them back.
-- **Each change is held as it was at 25.** Filing asks each operation what a call of its own is asked: what the person may open and may change, the project's rule, a pause. Approval asks the approver and the project again for each change. A batch on one task still runs at once, and each of its changes is refused when the task changed since the agent read it.
+- **Each change is held as it was at 25.** Filing asks each operation what a call of its own is asked: what the person may open and may change, the project's rule, a pause. Approval asks the approver and the project again for each change. A batch on one task still runs at once, up to 25, and each of its changes is refused when the task changed since the agent read it.
 - **The card shows all of it.** It counts the tasks and the changes, says each kind of change with how many tasks it is on, names the first five tasks and holds the rest behind "Show all", and spells out every change the lines above do not say in full.
-- **Why the cap and not a wider `task.update`.** The other way to one approval was a `task.update` that takes assignees, which makes the job 20 operations. Assigning is an action of its own, with its own permission, its own standing approval and its own Undo, and a `task.update` that also assigns would let a connection held to editing do it. So the cap was raised, and the two tools stay two.
+- **Why the cap and not a wider `task.update`.** The other way to one approval was a `task.update` that takes assignees, which makes the job 20 operations. Assigning is an action of its own, with its own permission, its own standing approval and its own Undo, and a `task.update` that also assigns would let a connection held to editing do it. So the cap was raised for a batch that waits, and the two tools stay two.
 - **The owner may want it back at 25, or at 40.** A bigger batch is a bigger change behind one click. It is one number, `BATCH_MAX`.
+- **In a project set to hold every change for a person, a batch on one task keeps 25 too.** Each of its changes waits there as a proposal of its own, not as one, so a larger batch would be that many cards to approve.
 - **Without a batch the count of tasks still stops it.** Twenty single calls apply the first 10 tasks at once and wait for each task after that (`Modules/Agents/directChanges.js`, `directTasks` 10 in 10 minutes).
 
 ## The three reserves
@@ -225,7 +227,7 @@ They are measured too. They count only if one of the fifteen fails.
 
 ## The biggest gaps
 
-1. **One sentence that needs two proposals.** Job 20 needs the sprint days and the moves. The pass rule allows one approval for a sentence, and the code counts one approval for each proposal. Jobs 7 and 13 were here too: a batch now takes 50, and one plan holds the view and the rollup field.
+1. **One sentence that needs two proposals.** Job 20 needs the sprint days and the moves. The pass rule allows one approval for a sentence, and the code counts one approval for each proposal. Jobs 7 and 13 were here too: a batch that names more than one task now takes 50, and one plan holds the view and the rollup field.
 2. **A move of a task always waits.** It cannot be undone, so it is never applied at once, on any project setting (`Modules/Agents/projectPolicy.js:167`, #1476). Jobs 5 and 20 both end in a move.
 3. **The third level of subtasks is refused.** It is a product rule (`Modules/Tasks/helpers/taskTreeRules.js:4`). Job 4 cannot pass until the job is rewritten.
 
@@ -360,7 +362,7 @@ New since the first sheet and tied to no job above: `project.setup` (#1420) and 
 **Rules that stop the agent, or that do less than the plan says**
 
 18. **Job 4.** The task tree stops at task, subtask, sub-subtask. Decided on 2026-10-02: the rule stays and the job is rewritten. The new sentence is not written yet.
-19. **Job 7.** Closed by #1427 for the wider-than-one-task rule: a batch that names more than one task waits as one proposal. Read again: the job is 40 changes and a batch took 25, so it ended in two approvals. A batch takes 50 now, so it is one. See "Job 7: how many approvals".
+19. **Job 7.** Closed by #1427 for the wider-than-one-task rule: a batch that names more than one task waits as one proposal. Read again: the job is 40 changes and a batch took 25, so it ended in two approvals. A batch that names more than one task takes 50 now, so it is one. See "Job 7: how many approvals".
 20. **Job 8.** A saved view shows to everyone on the project. The pass rule fails a run that changes something the sentence did not ask for. To settle: whether "show me" may save a view.
 21. **Job 17.** Checked. `timelog.stop` keeps the entry, with 0 minutes under half a minute. `timelog.create` reads its day in UTC, and `person.me` gives the person's own date for the agent to pass.
 22. **Jobs 5 and 20.** Changed by #1476: a connected agent's move of a task always waits, on every project setting. The five moves of job 20, sent as one batch, wait as one proposal.
