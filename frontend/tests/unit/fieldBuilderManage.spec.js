@@ -98,6 +98,7 @@ const usageUrl = (id) => `${env.CUSTOM_FIELDS_V2}/${id}/usage`;
 const deleteUrl = (id) => `${env.CUSTOM_FIELDS_V2}/${id}/delete`;
 const answers = (usage = { tasks: 0, readBy: [] }) => apiRequest.mockImplementation((method, url) => {
     if (url === env.CUSTOM_FIELD_FORMULA_SCOPE) return Promise.resolve({ status: 200, data: { data: { names: SCOPE } } });
+    if (url === env.CUSTOM_FIELD_FORMULA_VALIDATE) return Promise.resolve({ status: 200, data: { status: true, data: { preview: 1 } } });
     if (String(url).endsWith('/usage')) return Promise.resolve({ status: 200, data: { status: true, data: usage } });
     if (String(url).endsWith('/delete')) return Promise.resolve({ status: 200, data: { status: true, data: { tasks: usage.tasks } } });
     return Promise.resolve({ status: 200, data: { _id: 'f-new' } });
@@ -303,15 +304,15 @@ describe('what the builder says', () => {
     it('opens the rest of the fields a formula can read when "+ more" is pressed', async () => {
         await builder();
         await newField(en.Fields.type_formula);
-        expect(tokens()).toHaveLength(5);
+        expect(tokens()).toHaveLength(8);
         const more = wrapper.get('[data-formula-more]');
         expect(more.element.tagName).toBe('BUTTON');
         expect(more.attributes('aria-expanded')).toBe('false');
         await more.trigger('click');
-        expect(tokens()).toHaveLength(SCOPE.length);
+        expect(tokens()).toHaveLength(11);
         expect(wrapper.get('[data-formula-more]').attributes('aria-expanded')).toBe('true');
         await wrapper.get('[data-formula-more]').trigger('click');
-        expect(tokens()).toHaveLength(5);
+        expect(tokens()).toHaveLength(8);
     });
 
     it('labels the formula box and shows its example in the form the buttons insert', async () => {
@@ -331,13 +332,13 @@ describe('what the builder says', () => {
 describe('the name a formula uses for a field', () => {
     it('is the field\'s own name in both editors, and the task\'s own numbers keep theirs', async () => {
         expect(tokenOf({ fieldTitle: ' Story Points ' })).toBe('{Story Points}');
-        expect(tokensFrom(SCOPE).slice(0, 4)).toEqual(['{subtask_count}', '{estimate}', '{Cost}', '{Story Points}']);
+        expect(tokensFrom(SCOPE).slice(0, 6)).toEqual(['{subtask_count}', '{estimate}', '{remaining_hours}', '{logged_hours}', '{Cost}', '{Story Points}']);
         expect(BUILTIN_TOKENS).toContain('{subtask_count}');
         await builder();
         await wrapper.findAll('.fb__type').find((button) => button.text().startsWith(en.Fields.type_formula)).trigger('click');
         await flushPromises();
-        expect(wrapper.findAll('[data-formula-token]').map((button) => button.text()).slice(0, 4)).toEqual(['{subtask_count}', '{estimate}', '{Cost}', '{Story Points}']);
-        await wrapper.findAll('[data-formula-token]')[3].trigger('click');
+        expect(wrapper.findAll('[data-formula-token]').map((button) => button.text()).slice(0, 6)).toEqual(['{subtask_count}', '{estimate}', '{remaining_hours}', '{logged_hours}', '{Cost}', '{Story Points}']);
+        await wrapper.findAll('[data-formula-token]')[5].trigger('click');
         expect(wrapper.get('textarea.fb__expr').element.value).toBe('{Story Points}');
     });
 
@@ -349,5 +350,12 @@ describe('the name a formula uses for a field', () => {
         await flushPromises();
         const [{ sample }] = calls('post', env.CUSTOM_FIELD_FORMULA_VALIDATE).slice(-1);
         expect(sample).toMatchObject({ Cost: expect.any(Number), cost: expect.any(Number), story_points: expect.any(Number), 'Story Points': expect.any(Number) });
+    });
+
+    it('is listed the same way by the editor in the task panel', async () => {
+        const { default: FormulaComponent } = await import('@/plugins/customFieldView/component/atom/customFieldSidebar/customFieldSidebarComponent/formulaComponent.vue');
+        const panel = mount(FormulaComponent, { props: { componentDetail: { cfType: 'formula' }, customFieldObject: {} }, global: { plugins: [newStore([COST, VALUE])], stubs } });
+        expect(panel.get('[data-formula-tokens]').text()).toBe('{subtask_count}, {estimate}, {remaining_hours}, {logged_hours}, {Cost}, {Value}');
+        panel.unmount();
     });
 });
