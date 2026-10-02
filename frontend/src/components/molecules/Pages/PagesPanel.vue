@@ -221,7 +221,7 @@ function requestClose() {
 <style scoped>
 .pg {
     position: fixed; inset: 0; z-index: 1000;
-    background: rgba(0, 0, 0, .35);
+    background: var(--scrim);
     display: flex; align-items: center; justify-content: center;
     font-family: var(--font-ui);
 }

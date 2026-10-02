@@ -970,7 +970,7 @@ onBeforeUnmount(() => {
 
 .pd__share-back {
     position: absolute; inset: 0; z-index: 30;
-    background: rgba(0, 0, 0, .28);
+    background: var(--scrim);
     display: flex; align-items: flex-start; justify-content: center; padding-top: 90px;
 }
 .pd__share { width: 440px; max-width: calc(100% - 40px); box-shadow: var(--shadow-modal); }
