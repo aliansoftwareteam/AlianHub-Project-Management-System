@@ -251,6 +251,7 @@ test.describe('accessibility: keyboard in the task overlay', () => {
         await page.keyboard.press('Enter');
         await expect(complete).toHaveAttribute('aria-pressed', 'true');
         await expect(page.locator('.ah-detail__panel button.task-status-name')).toHaveText('Done');
+        await expect(complete).not.toHaveAttribute('aria-busy', 'true');
         await page.keyboard.press('Enter');
         await expect(complete).toHaveAttribute('aria-pressed', 'false');
 
