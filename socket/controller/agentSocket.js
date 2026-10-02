@@ -21,7 +21,7 @@ const runMoved = (companyId, run) => {
 
 const worthTelling = (companyId, data) => {
     if (data.kind === 'run') return runMoved(companyId, data.run);
-    if (data.kind === 'proposal' || data.kind === 'claim') return true;
+    if (data.kind === 'proposal' || data.kind === 'claim' || data.kind === 'policy') return true;
     if (data.kind === 'agent') return Boolean(data.pausedAll || data.deleted || data.paused || data.agent);
     return false;
 };

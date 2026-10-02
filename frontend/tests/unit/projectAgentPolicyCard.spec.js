@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
+import { ref } from 'vue';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -85,6 +86,31 @@ describe('ProjectAgentPolicyCard', () => {
     it('says so when the workspace switch decides the close', async () => {
         const wrapper = await mountCard(answer({ workspaceChecksBeforeDone: true, effective: { done: 'never', connected: 'single_task' } }));
         expect(wrapper.find('[data-test="workspace-wins"]').text()).toBe('AgentPolicy.workspace_wins');
+    });
+
+    it('follows the workspace switch when it is changed elsewhere, and stops listening when it closes', async () => {
+        const listeners = {};
+        const socket = { on: vi.fn((event, handler) => { listeners[event] = handler; }), off: vi.fn((event, handler) => { if (listeners[event] === handler) delete listeners[event]; }) };
+        let data = answer();
+        apiRequest.mockImplementation(() => ok(data));
+        const wrapper = mount(ProjectAgentPolicyCard, { props: { projectId: 'p1' }, global: { mocks: { $t: (key) => key }, provide: { $socket: ref(socket) } } });
+        await flushPromises();
+        expect(wrapper.find('[data-test="workspace-wins"]').exists()).toBe(false);
+
+        listeners.agentsChanged({ kind: 'run' });
+        await flushPromises();
+        expect(apiRequest).toHaveBeenCalledTimes(1);
+
+        data = answer({ workspaceChecksBeforeDone: true, effective: { done: 'never', connected: 'single_task' } });
+        listeners.agentsChanged({ kind: 'policy' });
+        await flushPromises();
+        expect(apiRequest).toHaveBeenCalledTimes(2);
+        expect(apiRequest).toHaveBeenLastCalledWith('get', URL, undefined);
+        expect(wrapper.find('[data-test="workspace-wins"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="loading"]').exists()).toBe(false);
+
+        wrapper.unmount();
+        expect(listeners.agentsChanged).toBeUndefined();
     });
 
     it('shows the reason when the settings cannot be read, and no choices', async () => {

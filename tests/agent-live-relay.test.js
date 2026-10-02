@@ -69,6 +69,12 @@ describe('the live agents signal', () => {
         expect(mine.mock.calls.map(([, payload]) => payload.kind)).toEqual(['proposal', 'agent', 'agent', 'agent']);
     });
 
+    it('tells of a change to the workspace\'s agent settings, to that company alone', async () => {
+        await relay(change({ kind: 'policy' }));
+        expect(mine).toHaveBeenCalledWith(EVENT, { kind: 'policy' });
+        expect(theirs).not.toHaveBeenCalled();
+    });
+
     it('says nothing for spend, revisions, schedules and alerts', async () => {
         await relay(change({ kind: 'agent', agentId: 'a1', spendMonth: { usd: 3 }, paused: false }));
         await relay(change({ kind: 'agent', agentId: 'a1', revision: 4 }));
