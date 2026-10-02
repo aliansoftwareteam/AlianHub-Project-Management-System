@@ -598,10 +598,10 @@ exports.putRoutingPolicy = async (req, res) => {
 /* What the AI Inbox page draws a proposal from, beside the proposal itself: for a person, the one card of a batch
  * and the card of each change that waits (the same the Inbox queue shows, naming only what that person may see, and
  * marking the parts of a plan that person may not approve), and which changes came with no words of their own. */
-const asCards = async (companyId, caller, listed) => {
+const asCards = async (companyId, caller, listed, locks) => {
     const intentPreview = require('./intentPreview');
     const cards = (build, rows) => (caller.human
-        ? build(companyId, caller.actor.userId, rows).catch((e) => { logger.error(`proposal cards: ${e.message}`); return new Map(); })
+        ? build(companyId, caller.actor.userId, rows, { locks }).catch((e) => { logger.error(`proposal cards: ${e.message}`); return new Map(); })
         : new Map());
     const [batches, previews] = await Promise.all([cards(intentPreview.forBatches, listed), cards(intentPreview.forProposals, listed.filter((p) => p.status === proposals.STATUS.PENDING))]);
     const { markOf } = require('./changeLabels');
@@ -624,8 +624,10 @@ exports.listProposals = async (req, res) => {
         const caller = await callerOf(req, companyId);
         const readScope = await readScopeOf(companyId, caller);
         // An agent reads what waits; whether a row is a person's to decide is said to a person.
-        const out = await proposals.list(companyId, { status: q.status === 'all' ? undefined : (q.status || 'pending'), bucket: q.bucket, agentId: q.agentId, limit: q.limit, ...readScope, viewer: caller.human ? caller : null });
-        return res.send({ status: true, statusText: 'Proposals fetched.', data: await asCards(companyId, caller, out.proposals), counts: out.counts });
+        // The rights behind a waiting plan are read once for this request, for its standing and for its card.
+        const locks = new Map();
+        const out = await proposals.list(companyId, { status: q.status === 'all' ? undefined : (q.status || 'pending'), bucket: q.bucket, agentId: q.agentId, limit: q.limit, ...readScope, viewer: caller.human ? caller : null, locks });
+        return res.send({ status: true, statusText: 'Proposals fetched.', data: await asCards(companyId, caller, out.proposals, locks), counts: out.counts });
     } catch (e) { logger.error(`listProposals: ${e.message}`); return fail(res, e.message, 500); }
 };
 

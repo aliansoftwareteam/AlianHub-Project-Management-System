@@ -47,7 +47,7 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { kindLabel, linesOf, titleOf } from './intentLines';
-import { broughtBack, canChoose, heldWith, hiddenParts, keptText, LOCKED_BY_RIGHTS, lockedParts, lockReason, pickNames, toggled } from './planPicks';
+import { broughtBack, canChoose, heldWith, hiddenParts, keptText, lockedParts, lockReason, pickNames, toggled } from './planPicks';
 
 defineOptions({ name: 'IntentPreview' });
 
@@ -73,11 +73,11 @@ const hidden = computed(() => hiddenParts(props.preview).length);
 
 const locked = computed(() => lockedParts(props.preview));
 const isLocked = (key) => choosing.value && locked.value.includes(key);
+const LOCK_NOTES = Object.freeze({ owner_admin: 'IntentPreview.pick_locked', own_rights: 'IntentPreview.pick_locked_rights', not_this_plan: 'IntentPreview.pick_locked_plan' });
 /* Who can approve a part this person may not, said on that part alone and not on the parts held out with it. */
 const lockNote = (key) => {
     const why = isLocked(key) ? lockReason(props.preview, key) : '';
-    if (!why) return '';
-    return t(why === LOCKED_BY_RIGHTS ? 'IntentPreview.pick_locked_rights' : 'IntentPreview.pick_locked');
+    return why ? t(LOCK_NOTES[why]) : '';
 };
 
 /* Several parts of one kind in a row are headed once, in the plural, where each has its own tick box. */

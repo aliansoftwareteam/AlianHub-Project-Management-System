@@ -169,6 +169,8 @@ const fieldsOfProject = async (companyId, projectId) => {
     return (rows || []).filter((definition) => isTaskFieldOf(definition, projectId));
 };
 
+/* A route of the web app that answers with this or more failed itself: the same request may pass later. */
+const SERVER_FAULT = 500;
 const heldField = (definition) => ({ name: definition.fieldTitle || '', type: definition.fieldType || '', fieldId: idOf(definition._id) });
 const fieldNamed = (fields, name) => (name ? fields.find((field) => sameName(field.name, name)) : undefined);
 
@@ -180,7 +182,7 @@ const saveField = async ({ companyId, who, projectId, draft, source }) => {
     const saved = answer.code === 200 && answer.body && answer.body._id;
     return saved
         ? { name: draft.name, type: draft.type, fieldId: idOf(answer.body._id), made: true }
-        : { name: draft.name, type: draft.type, made: false, error: reasonOf(answer, 'the field was not saved') };
+        : { name: draft.name, type: draft.type, made: false, error: reasonOf(answer, 'the field was not saved'), ...(answer.code >= SERVER_FAULT ? { tryAgain: true } : {}) };
 };
 
 /* One answer per field named: made, kept because the project already has a field of that name, or why it was not saved. */
@@ -463,7 +465,9 @@ const createView = async ({ companyId, who, projectId, name, kind = 'list', look
     if (!source) throw refuse(noSource(kind));
     const fitted = await settingsFor(companyId, project, lookOf(look));
     const answer = await answerOf('viewCreate', { companyId, who, params: { id: inProject }, body: { sourceViewId: viewIdOf(source), title: viewNameOf(name), settings: fitted.settings } });
-    if (answer.code !== 200 || !answer.body || answer.body.status !== true) throw refuse(reasonOf(answer, 'The view was not added. Try again, or tell the person.'));
+    if (answer.code !== 200 || !answer.body || answer.body.status !== true) {
+        throw Object.assign(refuse(reasonOf(answer, 'The view was not added. Try again, or tell the person.')), answer.code >= SERVER_FAULT ? { tryAgain: true } : {});
+    }
     const view = answer.body.data;
     return { project, projectId: inProject, viewId: viewIdOf(view), name: view.title, kind, keyName: view.keyName, leftOut: fitted.leftOut };
 };
