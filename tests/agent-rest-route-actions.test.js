@@ -716,6 +716,10 @@ const ALSO_BY_PEOPLE = {
         'changing a reminder': ['PATCH /api/v1/general-reminders/:id', { title: 'Renamed' }, { id: TEMPLATE }],
         'sending a reminder now': ['POST /api/v1/general-reminders/:id/run-now', {}, { id: TEMPLATE }],
         'sending every reminder that is due': ['POST /api/v1/general-reminders/run-due', {}],
+        'setting a reminder that names no task': ['POST /api/v1/reminders', { reminderText: 'Lunch', reminderAt: '2026-11-02T09:00:00.000Z' }],
+        'changing a task reminder': ['PATCH /api/v1/reminders/:id', { reminderText: 'Renamed' }, { id: TEMPLATE }],
+        'sending a task reminder now': ['POST /api/v1/reminders/:id/run-now', {}, { id: TEMPLATE }],
+        'sending every task reminder that is due': ['POST /api/v1/reminders/run-due', {}],
     },
     'timesheet.submit': {
         'submitting the timesheet of the person': ['POST /api/v2/timesheet-approval/submit', { weekStart: '2026-09-28' }],
@@ -1155,7 +1159,6 @@ const OUTSIDE_EVERY_PROJECT = {
     ],
     'keeps the person\'s own notes, marks, saved views and settings': [
         'PATCH /api/v1/clips/:id', 'POST /api/v1/clips', 'PATCH /api/v1/notes/:id', 'POST /api/v1/notes', 'PATCH /api/v2/calls/notes/:id',
-        'PATCH /api/v1/reminders/:id', 'POST /api/v1/reminders', 'POST /api/v1/reminders/:id/run-now', 'POST /api/v1/reminders/run-due',
         'POST /api/v1/advance/filter/create', 'PUT /api/v1/advance/filter/update', 'POST /api/v1/project/filter/create', 'PUT /api/v1/project/filter/update',
         'POST /api/v1/task/filter/create', 'PUT /api/v1/task/filter/update', 'POST /api/v2/tasks/everything/views', 'PATCH /api/v2/tasks/everything/views/:id',
         'POST /api/v1/reports/custom', 'POST /api/v1/reports/custom/:id/duplicate', 'POST /api/v1/reports/custom/from-template', 'PUT /api/v1/reports/custom/:id',
@@ -1276,7 +1279,7 @@ describe('every write route of the server, for a token created for an agent', ()
     const paramsOf = (route) => Object.fromEntries(namedIn(route).map((name) => [name, { projectId: P_OPEN, pid: P_OPEN, taskId: T_OPEN, tid: T_OPEN, sprintId: L_OPEN }[name] || TEMPLATE]));
     const askedRoutes = [...new Set(asked.map(([, route]) => route))];
     const outside = Object.values(OUTSIDE_EVERY_PROJECT).flat();
-    const heldForPeople = (answer) => answer !== REACHED && answer.code === 403 && /^Agents cannot perform /.test(String(answer.body && answer.body.statusText));
+    const heldForPeople = (answer) => answer !== REACHED && answer.code === 403 && /^(An agent is not allowed to do this|An agent is never allowed to do this|That action is not available to agents)/.test(String(answer.body && answer.body.statusText));
 
     it('is held for people, asks the project\'s rule, or is listed with why it changes nothing in a project', async () => {
         const unlisted = [];
@@ -1317,7 +1320,7 @@ describe('what stands in front of a route, in its order', () => {
 
         const answer = await through(route, agentToken(INSIDER), body, params);
 
-        expect([answer.code, answer.body.statusText]).toEqual([403, 'Agents cannot perform tasks.import']);
+        expect([answer.code, answer.body.statusText]).toEqual([403, 'That action is not available to agents (tasks.import).']);
         expect(audits('agent.action_refused').map((row) => row.meta.action)).toEqual(['tasks.import']);
     });
 });
@@ -1339,7 +1342,7 @@ describe('a removal, which no agent makes on any route', () => {
     it.each(REMOVALS.filter(namedByTheRoute))('%s is recorded under the name its own route gives it', async (route) => {
         const answer = await through(route, agentToken(OWNER), {}, ids(route));
 
-        expect(answer.body.statusText).toBe(`Agents cannot perform ${namedByTheRoute(route)}`);
+        expect(answer.body.statusText).toBe(`An agent is not allowed to do this (${namedByTheRoute(route)}). The person has to do it in AlianHub.`);
         expect(audits('agent.action_refused').map((row) => row.meta.action)).toEqual([namedByTheRoute(route)]);
     });
 
