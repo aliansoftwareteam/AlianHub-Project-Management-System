@@ -220,7 +220,7 @@ const routeGuard = (checksOf) => withActor(async (req, res, next, actor) => {
     }
     if (!writes) return next();
     for (const { action, params } of checks) {
-        const rule = await projectPolicy.ask({ companyId, actor, action, params });
+        const rule = await projectPolicy.ask({ companyId, actor, action, params, applying: true });
         if (rule.decision !== projectPolicy.DECISION.ACT) return refuse(req, res, actor, { action, reason: heldOnRoute(rule), params, entityId: params.taskId });
     }
     const [{ action, params }] = checks;

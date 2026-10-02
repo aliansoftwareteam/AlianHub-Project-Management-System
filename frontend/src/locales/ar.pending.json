@@ -426,6 +426,8 @@
     "AgentClients.status_revoked": "Revoked",
     "AgentLimits.at_once_about": "When this many are at work, the next agent waits and gets work when one finishes.",
     "AgentLimits.at_once_label": "Agents at work at once",
+    "AgentLimits.direct_tasks_about": "A connected agent changes up to this many different tasks in {minutes} minutes without asking. Its change to one more task waits for a person's approval. New tasks and docs count too.",
+    "AgentLimits.direct_tasks_label": "Tasks a connected agent changes on its own",
     "AgentLimits.lead": "How many AI agents may work in this project at once, and a way to stop them all. Neither changes what people can do.",
     "AgentLimits.load_failed": "These settings could not be loaded.",
     "AgentLimits.loading": "Loading…",

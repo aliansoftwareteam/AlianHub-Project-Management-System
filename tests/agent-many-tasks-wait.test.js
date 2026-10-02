@@ -94,7 +94,6 @@ const through = async (handlers, req) => {
     let passed = false;
     for (const handler of [].concat(handlers)) {
         passed = false;
-        // eslint-disable-next-line no-await-in-loop
         await handler(req, res, () => { passed = true; });
         if (!passed) break;
     }
@@ -159,7 +158,6 @@ describe('a connected agent that changes one task after another, in a project le
 
     it('several changes to one task count as one task', async () => {
         for (let turn = 0; turn < COUNT + 2; turn += 1) {
-            // eslint-disable-next-line no-await-in-loop
             expect(await rename(ctx(OWNER), tasks[0], `Turn ${turn}`)).toMatchObject({ ok: true });
         }
         expect((await renameEach(ctx(OWNER), tasks.slice(1, COUNT))).map((out) => out.ok)).toEqual(Array(COUNT - 1).fill(true));
@@ -203,7 +201,6 @@ describe('a connected agent that changes one task after another, in a project le
 
     it('counts a new task as a task of its own', async () => {
         for (let at = 0; at < COUNT; at += 1) {
-            // eslint-disable-next-line no-await-in-loop
             expect(await rpc(ctx(OWNER), 'task.create', { projectId: P_OPEN, title: `New ${at}` })).toMatchObject({ ok: true });
         }
         const out = await rpc(ctx(OWNER), 'task.create', { projectId: P_OPEN, title: 'One more' });
@@ -213,7 +210,6 @@ describe('a connected agent that changes one task after another, in a project le
 
     it('tells a connection that has no batch tool to tell the person', async () => {
         for (const task of tasks.slice(0, COUNT)) {
-            // eslint-disable-next-line no-await-in-loop
             expect(await comment(olderToken(OWNER), task)).toMatchObject({ ok: true });
         }
         const out = await comment(olderToken(OWNER), tasks[10]);
@@ -258,7 +254,6 @@ describe('what is held before the count is asked', () => {
         await renameEach(ctx(OWNER), tasks.slice(0, COUNT));
         project().agentLimits = { paused: true };
         for (const task of [tasks[10], tasks[0]]) {
-            // eslint-disable-next-line no-await-in-loop
             expect(await rename(ctx(OWNER), task, 'While paused')).toMatchObject({ refused: true, reason: projectLimits.REASON.PAUSED });
         }
         expect(proposalRows()).toHaveLength(0);
@@ -298,7 +293,6 @@ describe('who is not counted', () => {
 
     it('an in-product agent and a person are not counted or held', async () => {
         for (const task of tasks.slice(0, COUNT + 2)) {
-            // eslint-disable-next-line no-await-in-loop
             expect((await actions.perform({ companyId: CID, actor: inProduct(), action: 'task.comment', params: { taskId: String(task._id), body: 'Reviewed' } })).auditId).toBeTruthy();
         }
         expect(rows(SCHEMA_TYPE.COMMENTS)).toHaveLength(COUNT + 2);
@@ -316,7 +310,6 @@ describe('who is not counted', () => {
     it('asking is not counting: only a change that is being applied takes a place', async () => {
         const change = (task) => ({ companyId: CID, actor: ctx(OWNER).actor, action: 'task.edit', params: { taskId: String(task._id), fields: { TaskName: 'x' } } });
         for (const task of tasks) {
-            // eslint-disable-next-line no-await-in-loop
             expect(await projectPolicy.ask(change(task))).toMatchObject({ decision: DECISION.ACT });
         }
         expect(counts()).toHaveLength(0);
@@ -325,7 +318,6 @@ describe('who is not counted', () => {
     it('taking and giving back a queue item changes no task, so neither is counted or held', async () => {
         await renameEach(ctx(OWNER), tasks.slice(0, COUNT));
         for (const action of ['queue.claim', 'queue.release']) {
-            // eslint-disable-next-line no-await-in-loop
             expect(await projectPolicy.ask({ companyId: CID, actor: ctx(OWNER).actor, action, params: { itemId: '6f0000000000000000000b01', projectId: P_OPEN }, applying: true })).toMatchObject({ decision: DECISION.ACT });
         }
         expect(counts()[0].changed).toHaveLength(COUNT);
@@ -335,7 +327,6 @@ describe('who is not counted', () => {
 describe('an agent\'s token on the web app\'s own task route', () => {
     it('is counted with the same connection\'s tool calls, and refused past the count', async () => {
         for (const task of tasks.slice(0, COUNT)) {
-            // eslint-disable-next-line no-await-in-loop
             expect((await onTaskRoute(task, agentToken)).passed).toBe(true);
         }
         const refused = await onTaskRoute(tasks[10], agentToken);
@@ -369,7 +360,6 @@ describe('the project\'s own count', () => {
         expect(await projectLimits.read(CID, P_OPEN)).toEqual({ atOnce: 3, paused: false, directTasks: 10 });
         for (const directTasks of [0, 101, 2.5, '5', null]) {
             project().agentLimits = { directTasks };
-            // eslint-disable-next-line no-await-in-loop
             expect((await projectLimits.read(CID, P_OPEN)).directTasks).toBe(10);
         }
     });
@@ -398,7 +388,6 @@ describe('the project\'s own count', () => {
 
     it('refuses a count out of range, and a member', async () => {
         for (const directTasks of [0, 101, 2.5, '5']) {
-            // eslint-disable-next-line no-await-in-loop
             expect(await putLimits(OWNER, { directTasks })).toMatchObject({ code: 400 });
         }
         expect(await putLimits(MEMBER, { directTasks: 100 })).toMatchObject({ code: 403 });
