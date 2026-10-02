@@ -32,9 +32,13 @@ const FIELD_NOT_FOR_TASK_TYPE = 'This custom field is not used for this task typ
 const FIELD_NOT_FOUND = 'This custom field does not exist.';
 
 /* The value as it is stored, or a refusal: the field is not for this task's type, or the value does not fit the field's type. */
-/* A write made after someone else's change (an AI field filled again) names who that change was by and how deep in a
- * chain it was, so the event bus counts it as theirs; a person's write names neither and emits as it always has. */
-const originOnEvent = (eventOrigin) => (eventOrigin && eventOrigin.actor ? { actor: eventOrigin.actor, depth: Number(eventOrigin.depth) || 0 } : {});
+/* A write made after someone else's change (an AI field filled again) names who that change was by, how deep in a
+ * chain it was and the project list of a token that made it, so the event bus counts it as theirs; a person's write
+ * names none of them and emits as it always has. */
+const originOnEvent = (eventOrigin) => ({
+    ...(eventOrigin && eventOrigin.actor ? { actor: eventOrigin.actor, depth: Number(eventOrigin.depth) || 0 } : {}),
+    ...(eventOrigin && eventOrigin.narrowing ? { narrowing: eventOrigin.narrowing } : {}),
+});
 
 const fieldDetailToStore = async ({ companyId, taskId, customFieldId, storedTask, updateDetail, actorId }) => {
     const definition = await customFieldDefinitionOf(companyId, customFieldId);

@@ -1,6 +1,7 @@
 const { AsyncResource } = require('async_hooks');
 const socketEmitter = require('../../../event/socketEventEmitter');
 const { originOf } = require('../../../event/domainEventBus');
+const writerLimits = require('../../../event/writerLimits');
 const logger = require('../../../Config/loggerConfig');
 const { myCache } = require('../../../Config/config');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
@@ -84,13 +85,17 @@ const runOutsideAnyRequest = AsyncResource.bind(run);
 
 /* The refill runs outside the request, so whose edit it follows is read here, as the edit is made, and kept with the
  * wait: an agent's edit and its depth in a chain, which the refill's own event then states, so a rule that did not ask
- * for automated changes is not woken by it. A person's edit names nobody, and the refill's event names nobody. */
+ * for automated changes is not woken by it. A person's edit names nobody, and the refill's event names nobody. The
+ * project list of a token that made the edit is kept the same way (event/writerLimits). */
 const agentOrigin = (payload) => {
     const { actor, depth } = originOf(payload);
-    return actor.kind === 'agent' ? { actor, depth } : null;
+    const narrowing = writerLimits.ofThisRequest();
+    if (actor.kind !== 'agent') return narrowing ? { narrowing } : null;
+    return { actor, depth, ...(narrowing ? { narrowing } : {}) };
 };
 
-const deeper = (kept, origin) => (origin && (!kept || origin.depth >= kept.depth) ? origin : kept || null);
+const depthOf = (origin) => (origin && origin.actor ? origin.depth : -1);
+const deeper = (kept, origin) => (origin && (!kept || depthOf(origin) >= depthOf(kept)) ? origin : kept || null);
 
 /* Edits come in bursts (typing in the description saves many times), so one refill runs after the last. */
 function schedule(companyId, taskId, parts, origin) {

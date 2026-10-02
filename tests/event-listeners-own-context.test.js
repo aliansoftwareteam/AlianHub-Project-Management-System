@@ -141,6 +141,16 @@ describe('a listener on the event bus', () => {
         expect(envelope).toMatchObject({ type: 'task.priority_changed', companyId: C, traceId, actor: { kind: 'agent', userId: PERSON }, depth: 1, narrowing: TOKENS_LIMITS });
     });
 
+    it('is told the limits a later write names for the change it follows', async () => {
+        socketEmitter.emit('update', {
+            type: 'update', module: 'task', companyId: C, data: task({ Task_Priority: 'HIGH' }), updatedFields: { Task_Priority: 'HIGH' },
+            actor: { kind: 'agent', userId: PERSON }, depth: 3, narrowing: TOKENS_LIMITS,
+        });
+        await settle();
+
+        expect(heard.map(({ envelope }) => envelope)).toEqual([expect.objectContaining({ actor: { kind: 'agent', userId: PERSON }, depth: 3, narrowing: TOKENS_LIMITS })]);
+    });
+
     it('is told of no limits where the change came from a person or from a token held to no project', async () => {
         asThePerson(() => changePriority('HIGH'));
         await settle();

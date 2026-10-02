@@ -109,6 +109,10 @@ const originOf = (payload) => {
 /* Present only where the change came from a token held to some projects (./writerLimits). */
 const narrowingOf = (narrowing) => (narrowing ? { narrowing } : {});
 
+/* An event of a change made here and now reads the token's limits here; one that follows an earlier change (a
+ * listener publishing on, a field filled again) is handed the limits of that change. */
+const limitsOf = (narrowing) => (narrowing === undefined ? writerLimits.ofThisRequest() : narrowing);
+
 const buildEnvelope = ({ companyId, type, doc, changedFields, previous, actor, depth, traceId, narrowing }) => ({
     id: ulid(),
     companyId: String(companyId),
@@ -295,7 +299,7 @@ function onTaskEvent(emitType) {
             const key = `${companyId}:${String(doc._id)}:${emitType}`;
             const changedNow = normalizeChangedFields(payload?.updatedFields);
             const { actor, depth } = originOf(payload);
-            const narrowing = writerLimits.ofThisRequest();
+            const narrowing = limitsOf(payload.narrowing);
 
             const existing = pending.get(key);
             if (supersedesPending(existing, doc, changedNow)) {
@@ -330,10 +334,6 @@ function onTaskEvent(emitType) {
         }
     };
 }
-
-/* An event published where the change is made reads the token's limits there; one published by a listener passes on
- * the limits of the event it heard. */
-const limitsOf = (narrowing) => (narrowing === undefined ? writerLimits.ofThisRequest() : narrowing);
 
 function publishEntityEvent(input) {
     const envelope = buildEntityEnvelope({ ...input, narrowing: limitsOf(input.narrowing) });

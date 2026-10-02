@@ -63,6 +63,7 @@ const fill = require('../Modules/CustomField/aiFields/fill');
 const jobs = require('../Modules/CustomField/aiFields/jobs');
 const autoRefill = require('../Modules/CustomField/aiFields/autoRefill');
 const actingAgent = require('../Modules/Agents/actingAgent');
+const { runNarrowed } = require('../Config/tokenNarrowing');
 const controller = require('../Modules/CustomField/aiFields/controller');
 
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
@@ -452,6 +453,15 @@ describe('auto-refill', () => {
             expect(origins()).toEqual([{ actor: { userId: BOB, kind: 'agent' }, depth: 3 }]);
             expect(mockChat.mock.calls[0][0].spend.userId).toBe(ALICE);
             expect(storedTask(task._id).aiFieldFills[String(field._id)].by).toBe(ALICE);
+        });
+
+        it('keeps the project list of a token that made the edit', async () => {
+            const { task } = await filledTask();
+            const change = await renamed(task, 'Ship the signup page');
+            runNarrowed({ userId: BOB, projectIds: [PROJECT] }, () => actingAgent.runAs(helper(2), () => socketEmitter.emit('update', change)));
+            await autoRefill.flush();
+
+            expect(origins()).toEqual([{ actor: { userId: BOB, kind: 'agent' }, depth: 3, narrowing: { userId: BOB, projectIds: [PROJECT], chat: null } }]);
         });
 
         it('names nobody after a person\'s edit', async () => {
