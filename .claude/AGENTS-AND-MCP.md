@@ -38,9 +38,10 @@ A change that waits is a proposal (`Modules/Agents/proposals.js`). It says what,
 - It is filed with `proposals.create()`. Every change in it must pass `registry.evaluate()` first.
 - It shows in the Inbox. The card that says what will change is built by `Modules/Agents/intentPreview.js`.
 - A person approves, declines, or undoes it at `POST /api/v2/agents/proposals/:id/approve`, `/decline` and `/undo` (`Modules/Agents/routes.js`, `decide()` in `Modules/Agents/controller.js`).
-- A decision needs a signed-in person. `personDecides()` in `Modules/Agents/personDecides.js` refuses any token and any agent. A proposal that came over MCP cannot be edited at approval.
+- A decision needs a signed-in person. `personDecides()` in `Modules/Agents/personDecides.js` refuses any token and any agent. A proposal that came over MCP cannot be edited at approval. The one thing an approver may change is to leave parts of a setup plan out: the approval names the parts to keep by their place in the stored plan (`parts` in the request, `Modules/Agents/planChoice.js`), so it can take parts out and never add or reword one.
 - For a proposal that came over MCP, approval asks again (`Modules/Mcp/approval.js`): is the token still live, may the approver make this change, can the approver and the original person still open what it touches.
 - Approving runs each change through `perform()` with `approved: true`. Each one gets an audit row and an undo.
+- A change may hold parts that are actions of their own: the automations and first tasks of a setup plan. Its executor does not make them itself. It hands each to `perform()` again as `automation.create` or `task.add` (`Modules/Agents/planWork.js`), so a plan can ask for nothing its agent could not ask for one at a time. Filing checks the same things up front (`filingProblem()` there), and approval asks the token for the grants those actions need (`actionsOf()` in `Modules/Mcp/approval.js`).
 - A proposal can be undone for 15 minutes (`UNDO_WINDOW_MS` in `proposals.js`). A single audit row can be undone inside the company's undo window, 24 hours by default (`undoHours` in `Modules/Agents/budget.js`).
 - No MCP tool approves, declines, undoes or keeps a standing approval. `tests/agent-decision-routes.test.js` checks this.
 
@@ -84,7 +85,7 @@ For a new variable, describe it in `scripts/env-doc.meta.json` and run `node scr
 
 An executor is a function in the `executors` map of `Modules/Agents/actions.js`. The map is built by spreading the executors of several files: `taskRequests.js`, `pageRequests.js`, `workRequests.js`, `goalRequests.js` and `manager/workQueue.js`. Put a new executor in a `*Requests.js` file and spread it in. `workRequests.js` already spreads its own sub-files.
 
-An executor receives `{ companyId, actor, params, depth, approvedBy }` and returns `{ result, undo, entityType, entityId, entityName }`.
+An executor receives `{ companyId, actor, params, depth, approvedBy, within }` and returns `{ result, undo, entityType, entityId, entityName }`. `within` is what the call was held to (`allowedActions`, `ip`, `taint`), for an executor that runs a part of its change through `perform()` as an action of its own.
 
 The executor runs the web app's own handler as the person. It does not write to the database on its own. The handler holds the rules, the history, the events and the notices.
 

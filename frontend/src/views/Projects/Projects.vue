@@ -506,7 +506,7 @@ import ProjectEmptyState from './components/ProjectEmptyState.vue';
 import FolderEmptyState from './components/FolderEmptyState.vue';
 import { useProjectCalendar } from './composables/useProjectCalendar';
 import { useProjectRules } from './composables/useProjectRules';
-import { folderSprintList, folderWithoutLists, headerLocation, projectSprintList } from './folderSprints';
+import { folderSprintList, folderWithoutLists, headerLocation, movedListRoute, projectSprintList } from './folderSprints';
 import { folderPathLabel, isLiveFolder } from '@/utils/folderTree';
 import { useProjectNameEdit } from './composables/useProjectNameEdit';
 import { useProjectAssignee } from './composables/useProjectAssignee';
@@ -1121,6 +1121,12 @@ watch([projectData, route, () => getters['projectData/searchedTasks']], () => {
     }
 
     if (!project) return;
+
+    const moved = movedListRoute({ route, project });
+    if (moved) {
+        router.replace(moved);
+        return;
+    }
 
     try {
         if (route.name === 'Projects' || route.name === 'Project') {

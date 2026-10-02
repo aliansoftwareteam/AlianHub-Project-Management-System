@@ -284,7 +284,7 @@ describe('instance console as the owner', () => {
     });
 });
 
-const AUDIT_CSV_HEADER = 'time,actorType,actor,agent,run,event,entity,reason,cost_usd,undone_at';
+const AUDIT_CSV_HEADER = 'time,actorType,actor,agent,run,event,event_label,entity,reason,cost_usd,undone_at';
 
 describe('audit log', () => {
     it.each(['owner', 'admin'])('lists and exports for %s', async (role) => {

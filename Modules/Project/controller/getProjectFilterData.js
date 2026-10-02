@@ -41,11 +41,14 @@ exports.projectFilter = async (req, res) => {
         const privateQuery = preparePrivateQuery(uid, teamIds, everyPrivateProject);
         const publicQuery = preparePublicQuery(uid);
 
+        const joinsSprints = ['sprint', 'folder', 'projectFilter_folder', 'projectFilter_sprint'].includes(req.body.type);
+        const visibleSprints = joinsSprints && !isPrivileged(roleType) ? [{ $match: visibleSprintClause(await sprintIdentities(companyId, uid)) }] : [];
+
         let projectQuery;
         if (req.body.type === 'sprint') {
-            projectQuery = buildSprintQuery(req, privateQuery, publicQuery);
+            projectQuery = buildSprintQuery(req, privateQuery, publicQuery, visibleSprints);
         } else if (req.body.type === 'folder') {
-            projectQuery = buildFolderQuery(req, privateQuery, publicQuery);
+            projectQuery = buildFolderQuery(req, privateQuery, publicQuery, visibleSprints);
         } else if (req.body.type === 'projectName') {
             projectQuery = buildProjectNameQuery(req, privateQuery, publicQuery);
         } else if (req.body.type === 'projectFilter') {
@@ -53,9 +56,9 @@ exports.projectFilter = async (req, res) => {
         } else if (req.body.type === 'projectFilter_projectName') {
             projectQuery = buildProjectFilterProjectNameQuery(req, privateQuery, publicQuery,uid);
         } else if (req.body.type === 'projectFilter_folder') {
-            projectQuery = buildProjectFilterFolderQuery(req, privateQuery,publicQuery,uid);   
+            projectQuery = buildProjectFilterFolderQuery(req, privateQuery, publicQuery, uid, visibleSprints);
         } else if (req.body.type === 'projectFilter_sprint') {
-            projectQuery = buildProjectFilterSprintQuery(req, privateQuery, publicQuery,uid);
+            projectQuery = buildProjectFilterSprintQuery(req, privateQuery, publicQuery, uid, visibleSprints);
         } else if (req.body.type === 'showArchiveOnly') {
             projectQuery = buildArchivedProjectQuery(await archiveScope(companyId, uid, roleType));
         }
@@ -126,16 +129,14 @@ const archiveScope = async (companyId, uid, roleType) => {
     return { sprints: { ...projects, ...visibleSprintClause(await sprintIdentities(companyId, uid)) }, folders: projects };
 };
 
-const buildProjection = (fields, additionalField) => {
-    const projection = {};
-    if (fields) {
-        fields.split(',').forEach((field) => {
-            projection[field] = 1;
-        });
-    }
-    projection[additionalField] = 1;
-    return projection;
-};
+/* The projection a search takes from its caller: the fields the web app asks a search for. Mongo adds _id by itself. */
+const SEARCH_FIELDS = Object.freeze(['_id', 'ProjectName']);
+
+const buildProjection = (fields) => Object.fromEntries(String(typeof fields === 'string' ? fields : '').split(',')
+    .map((field) => field.trim())
+    .filter((field) => SEARCH_FIELDS.includes(field))
+    .concat('_id')
+    .map((field) => [field, 1]));
 
 const finalFilterQery = (query) =>{
     if (query[Object.keys(query)[0]].length) {      
@@ -180,7 +181,7 @@ const showArchivedQuery = (showArchived) => {
     }
 }
 
-const buildSprintQuery = (req, privateQuery, publicQuery) => [
+const buildSprintQuery = (req, privateQuery, publicQuery, visibleSprints) => [
     { $match: { $or: [privateQuery, publicQuery] } },
     {
         "$lookup": {
@@ -209,7 +210,8 @@ const buildSprintQuery = (req, privateQuery, publicQuery) => [
                     "$match": {
                         ...showArchivedQuery(req.body.showArchived)
                     }
-                }
+                },
+                ...visibleSprints
             ],
             "as": "sprintData"
         }
@@ -270,7 +272,7 @@ const buildSprintQuery = (req, privateQuery, publicQuery) => [
 ];
 
 
-const buildFolderQuery = (req, privateQuery, publicQuery) => [
+const buildFolderQuery = (req, privateQuery, publicQuery, visibleSprints) => [
     { $match: { $or: [privateQuery, publicQuery] } },
     {
         "$lookup": {
@@ -313,7 +315,8 @@ const buildFolderQuery = (req, privateQuery, publicQuery) => [
                             ]
                         }
                     }
-                }
+                },
+                ...visibleSprints
             ]
         }
     },
@@ -474,13 +477,7 @@ const buildProjectFilterQuery = (req, privateQuery, publicQuery,userId) => {
             
         }
     }
-    if (req.body.fields) {
-        qry.push({
-            "$project": {
-                ...buildProjection(req.body.fields),
-            }
-        })
-    }
+    qry.push({ "$project": buildProjection(req.body.fields) });
     return qry
 }
 
@@ -598,18 +595,12 @@ const buildProjectFilterProjectNameQuery = (req, privateQuery, publicQuery,userI
             
         }
     }
-    if (req.body.fields) {
-        qry.push({
-            "$project": {
-                ...buildProjection(req.body.fields),
-            }
-        })
-    }
+    qry.push({ "$project": buildProjection(req.body.fields) });
     return qry
 }
 
 
-const buildProjectFilterFolderQuery = (req, privateQuery, publicQuery,userId) => {
+const buildProjectFilterFolderQuery = (req, privateQuery, publicQuery, userId, visibleSprints) => {
     if (req.body.query[Object.keys(req.body.query)[0]].length) {
         let isClose = false;
         req.body.query[Object.keys(req.body.query)[0]].forEach((ele)=>{
@@ -676,7 +667,8 @@ const buildProjectFilterFolderQuery = (req, privateQuery, publicQuery,userId) =>
                                 ]
                             }
                         }
-                    }
+                    },
+                    ...visibleSprints
                 ]
             }
         },
@@ -777,19 +769,17 @@ const buildProjectFilterFolderQuery = (req, privateQuery, publicQuery,userId) =>
             
         }
     }
-    // if (req.body.fields) {
-        qry.push({
+    qry.push({
             "$project": {
                 ...buildProjection(req.body.fields),
                 "folders": { "$arrayElemAt": ["$folders", 0] },
                 "sprints": { "$arrayElemAt": ["$sprints", 0] }
             }
-        })
-    // }
+    })
     return qry
 }
 
-const buildProjectFilterSprintQuery = (req, privateQuery, publicQuery,userId) => {
+const buildProjectFilterSprintQuery = (req, privateQuery, publicQuery, userId, visibleSprints) => {
     if (req.body.query[Object.keys(req.body.query)[0]].length) {
         let isClose = false;
         req.body.query[Object.keys(req.body.query)[0]].forEach((ele)=>{
@@ -842,7 +832,8 @@ const buildProjectFilterSprintQuery = (req, privateQuery, publicQuery,userId) =>
                         "$match": {
                             ...showArchivedQuery(req.body.showArchived)
                         }
-                    }
+                    },
+                    ...visibleSprints
                 ],
                 "as": "sprintData"
             }
@@ -977,8 +968,7 @@ const buildProjectFilterSprintQuery = (req, privateQuery, publicQuery,userId) =>
             
         }
     }
-    // if (req.body.fields) {
-        qry.push({
+    qry.push({
             "$project": {
                 ...buildProjection(req.body.fields),
                 "sprints": 1,
@@ -990,8 +980,7 @@ const buildProjectFilterSprintQuery = (req, privateQuery, publicQuery,userId) =>
                     }
                 }
             }
-        })
-    // }
+    })
     return qry
 }
 

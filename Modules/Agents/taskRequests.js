@@ -565,4 +565,4 @@ const executors = {
     },
 };
 
-module.exports = { executors, setArchived, setStatus, whoOf, zoneOf, asRoute, liveTask, storedProject, LINK_KINDS, LINKS_MAX, PRIORITIES, ASSIGN_MODES, TITLE_MAX, DESCRIPTION_MAX, ESTIMATE_MAX_MINUTES, ASSIGNEES_MAX, SUBTASK_MOVES_WITH_PARENT, CANNOT_OPEN_PROJECT };
+module.exports = { executors, setArchived, setStatus, whoOf, zoneOf, asRoute, liveTask, storedProject, assignable, LINK_KINDS, LINKS_MAX, PRIORITIES, ASSIGN_MODES, TITLE_MAX, DESCRIPTION_MAX, ESTIMATE_MAX_MINUTES, ASSIGNEES_MAX, SUBTASK_MOVES_WITH_PARENT, CANNOT_OPEN_PROJECT };

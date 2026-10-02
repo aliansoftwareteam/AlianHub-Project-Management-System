@@ -5,7 +5,8 @@ const {
     removeRoom,
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
-const { onJoin, prefixOfOwnRoom, isCompanyMember, toCompanyRoom, COMPANY_ROOM } = require('../roomAccess');
+const { onJoin, prefixOfOwnRoom, isCompanyMember, readsWholeCompany, toCompanyRoom, COMPANY_ROOM } = require('../roomAccess');
+const { COMPANY_MEMBER_FIELDS, memberCompanyView } = require('../../Modules/Company/helpers/companyAccessRules');
 
 exports.companiesSocketHandler = ({ socket, namespace }) => {
     onJoin(socket, 'joinCompaniesRoom',
@@ -33,15 +34,22 @@ function setEventName(type) {
     }
 }
 
+const isMemberField = (path) => COMPANY_MEMBER_FIELDS.includes(String(path).split('.')[0]);
+
+const memberFieldsOf = (updatedFields) => Object.fromEntries(Object.entries(updatedFields || {}).filter(([path]) => isMemberField(path)));
+
+/* Each socket is sent what its person reads over HTTP: the row for an owner or admin, its member fields for everyone else. */
 const handleCompaniesChange = (changeData, includeUpdatedFields = false) => {
     const company = changeData && changeData.module === 'companies' && changeData.data && changeData.data.data;
     if (!company || !company._id) return undefined;
     const eventName = setEventName(changeData.type);
-    const emitData = {
-        fullDocument: company,
-        ...(includeUpdatedFields && { updatedFields: changeData.updatedFields }),
-    };
-    return toCompanyRoom(company._id, (room) => room.namespace.to(room.roomName).emit(eventName, emitData));
+    const whole = { fullDocument: company, ...(includeUpdatedFields && { updatedFields: changeData.updatedFields }) };
+    let limited = null;
+    return toCompanyRoom(company._id, async (room) => {
+        if (await readsWholeCompany(room.socket.identity)) return room.socket.emit(eventName, whole);
+        limited = limited || { fullDocument: memberCompanyView(company), ...(includeUpdatedFields && { updatedFields: memberFieldsOf(changeData.updatedFields) }) };
+        return room.socket.emit(eventName, limited);
+    });
 };
 
 socketEmitter.on('companies:update', changeData => handleCompaniesChange(changeData, true));

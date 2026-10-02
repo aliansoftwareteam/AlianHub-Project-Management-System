@@ -10,6 +10,9 @@ const plans = require('../Agents/projectSetup');
 const projects = require('../Agents/projectCreate');
 const copies = require('../Agents/projectDuplicate');
 const lists = require('../Agents/listSetup');
+const planWork = require('../Agents/planWork');
+const { TITLE_MAX } = require('../Agents/taskRequests');
+const { DRAFT: RULE_DRAFT } = require('./automationTools');
 const { LIST_NAME_MAX } = require('../Agents/workRequests');
 const manageFlag = require('./manageFlag');
 const { TASK_ACCESS_FIELDS } = require('./visibility');
@@ -150,19 +153,40 @@ const PLAN_VIEW = Object.freeze({
     required: ['name'],
 });
 
-/* A plan is refused at once where its person may not make one of its parts by hand, or a view has nothing to start
- * from, so nobody is asked to approve a part that cannot be made. A project the caller cannot open is left to the target check. */
+const PLAN_RULE = Object.freeze({ type: 'object', additionalProperties: false, properties: { ...RULE_DRAFT }, required: ['trigger', 'actions'] });
+
+const PLAN_TASK = Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+        name: { type: 'string', minLength: 1, maxLength: TITLE_MAX },
+        list: { type: 'string', minLength: 1, maxLength: RAW_TEXT_MAX, description: 'A list of this plan or of the project, by name; left out, the project\'s first list' },
+        status: { type: 'string', minLength: 1, maxLength: RAW_TEXT_MAX, description: 'A status of this plan or of the project, by name; left out, the opening status' },
+        assigneeId: { ...ID, description: 'One member who can open the project (see members.list)' },
+        dueDate: { ...DAY, description: 'The day it is due, as YYYY-MM-DD' },
+    },
+    required: ['name'],
+});
+
+/* A plan is refused at once where its person may not make one of its parts by hand, or could not ask for one of its
+ * automations or first tasks in a call of its own, and answered at once where a view has nothing to start from or a
+ * rule or a task names what is in neither the plan nor the project. So nobody is asked to approve a part that cannot
+ * be made. A project the caller cannot open is left to the target check. */
 const planToFile = async (ctx, args, vis) => {
     const project = await loadProject(ctx, vis, args.projectId);
     if (!project) return { args };
-    const plan = plans.planOf(args);
-    const refused = await plans.refusedParts(ctx.companyId, ctx.userId, String(project._id), plan);
-    if (refused.length) {
-        const reason = `${REFUSED}: ${refused.map((entry) => `${entry.part} (${entry.reason})`).join('; ')}`;
-        throw await actions.refusal(ctx.companyId, ctx.actor, { action: 'project.setup', params: { projectId: String(project._id) }, reason, ip: ctx.ip, taint: ctx.taint, entityType: 'project', entityId: String(project._id) });
-    }
+    const projectId = String(project._id);
+    const plan = plans.setupPlanOf(args);
+    const refuse = async (reason) => { throw await actions.refusal(ctx.companyId, ctx.actor, { action: 'project.setup', params: { projectId }, reason, ip: ctx.ip, taint: ctx.taint, entityType: 'project', entityId: projectId }); };
+    const refused = await plans.refusedParts(ctx.companyId, ctx.userId, projectId, plan);
+    if (refused.length) await refuse(`${REFUSED}: ${refused.map((entry) => `${entry.part} (${entry.reason})`).join('; ')}`);
     const kind = (plan.views || []).map((view) => view.kind).find((wanted) => !setup.sourceView(project, wanted));
-    return kind ? { answer: { ok: false, error: setup.noSource(kind) } } : { args };
+    if (kind) return { answer: { ok: false, error: setup.noSource(kind) } };
+    const stopped = await planWork.filingProblem({
+        companyId: ctx.companyId, actor: ctx.actor, uid: String(ctx.userId), allowedActions: ctx.allowedActions, mayManage: manageFlag.enabled() && manageFlag.mayUse(ctx, GRANT), project, plan,
+    });
+    if (stopped && stopped.refused) await refuse(stopped.refused);
+    return stopped ? { answer: { ok: false, error: stopped.error } } : { args };
 };
 
 const BY_ID_ONLY = Object.freeze(['assigneeIds', 'showFieldIds']);
@@ -295,22 +319,26 @@ const TOOLS = [
         filedUnder: GRANT,
         target: projectTarget,
         description: 'Set up a project that exists from one plan, in a single call: '
-            + `up to ${plans.STATUSES_MAX} statuses, ${plans.LISTS_MAX} lists, ${setup.FIELDS_MAX} custom fields and ${plans.VIEWS_MAX} saved views. Name only the parts you need. `
+            + `up to ${plans.STATUSES_MAX} statuses, ${plans.LISTS_MAX} lists, ${setup.FIELDS_MAX} custom fields, ${plans.VIEWS_MAX} saved views, ${planWork.RULES_MAX} automations (rules) and ${planWork.TASKS_MAX} first tasks (tasks). Name only the parts you need. `
             + 'A status is added as a working stage, before the statuses that close a task; one the company does not have yet can be added only when an owner or an admin sends and approves the plan. '
             + 'A status or a field the project already has by that name is kept, not made twice, so read statuses.list, lists.list and fields.list first. '
-            + 'It cannot make a project, an automation or a task. '
-            + `${WAITS} The person sees the whole plan as one preview and approves it once; the answer then says, part by part, what was made, what was kept and what could not be made.`,
+            + 'A rule is written as automation.create takes one, without the project (read automation.catalogue first). It may name a status of this plan, it always starts switched off, and only an owner or an admin can have one made and can approve it. '
+            + 'A first task has a name and, when wanted, a list and a status of this plan or of the project, one assignee and a due day. It is made as task.create makes a task with its details, so the plan is refused where this connection could not make that call. '
+            + 'They are made in this order: statuses and lists, fields, views, automations, tasks. It cannot make a project. '
+            + `${WAITS} The person sees the whole plan as one preview, can leave any single part out, and approves it once; the answer then says, part by part, what was made, what was kept and what could not be made.`,
         input: input({
             projectId: ID,
             statuses: NAMES(plans.STATUSES_MAX, plans.STATUS_NAME_MAX, 'Statuses to add, by name'),
             lists: NAMES(plans.LISTS_MAX, LIST_NAME_MAX, 'Lists to create, by name'),
             fields: { type: 'array', minItems: 1, maxItems: setup.FIELDS_MAX, items: FIELD },
             views: { type: 'array', minItems: 1, maxItems: plans.VIEWS_MAX, items: PLAN_VIEW },
+            rules: { type: 'array', minItems: 1, maxItems: planWork.RULES_MAX, items: PLAN_RULE, description: 'Automations to add, each made of a trigger, optional conditions and steps' },
+            tasks: { type: 'array', minItems: 1, maxItems: planWork.TASKS_MAX, items: PLAN_TASK, description: 'First tasks to create' },
             ...REASON,
         }, ['projectId']),
-        check: (args) => plans.planProblem(args),
+        check: (args) => plans.setupProblem(args),
         prepare: planToFile,
-        params: (args) => ({ projectId: str(args.projectId, 40), ...plans.planOf(args) }),
+        params: (args) => ({ projectId: str(args.projectId, 40), ...plans.setupPlanOf(args) }),
     },
     {
         name: projects.ACTION,

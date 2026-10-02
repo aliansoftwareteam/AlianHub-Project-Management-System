@@ -39,6 +39,8 @@ const hours = require('../Modules/TimeSheet/controller/hoursBySource');
 const billable = require('../Modules/TimeSheet/controller/billableSummary');
 const billing = require('../Modules/TimeSheet/controller/billing');
 const taskEntries = require('../Modules/TimeSheet/controller/taskEntries');
+const payroll = require('../Modules/TimeSheet/controller/timesheetExport');
+const week = require('../Modules/TimeSheet/controller/weekTimesheet');
 const variance = require('../Modules/VarianceReport/controller');
 const estimates = require('../Modules/EstimatedTime/controller');
 
@@ -64,6 +66,7 @@ const call = async (handler, { uid, body = {}, query = {}, params = {} }) => {
     res.status = (code) => { res.code = code; return res; };
     res.json = (payload) => { res.body = payload; return res; };
     res.send = res.json;
+    res.setHeader = () => res;
     mockReads.length = 0;
     await handler(verified({ headers: { companyid: C }, body, query, params, uid }), res);
     return res;
@@ -228,5 +231,66 @@ describe('what a member reads is unchanged', () => {
     it('their billable summary counts it', async () => {
         const res = await call(billable.getBillableSummary, { uid: MEMBER, body: { start: 1, end: 999 } });
         expect(res.body.data).toMatchObject({ totalMinutes: 90, scope: 'self' });
+    });
+});
+
+const MEMBER_ROWS = ['member in their personal list', 'member in their personal list, id stored as an ObjectId', 'member on the open project'];
+const DAY = { start: '1970-01-01', end: '1970-01-01' };
+
+describe('the payroll export holds the rows the user timesheet shows the caller', () => {
+    const exported = async (uid, body) => {
+        const res = await call(payroll.exportTimesheetCsv, { uid, body: { start: 1, end: 999, ...body } });
+        expect(res.code).toBe(200);
+        return { read: names(rowsRead()), csv: res.body };
+    };
+
+    it.each([
+        ['naming no one', {}],
+        ['naming someone else', { userArray: [OWNER] }],
+        ['naming everyone', { userArray: [OWNER, ADMIN, MEMBER] }],
+        ['naming a project', { projectArray: [P_OPEN], userArray: [OWNER] }],
+    ])('a member, %s, exports their own time', async (_label, body) => {
+        const { read, csv } = await exported(MEMBER, body);
+        expect(read).toEqual(body.projectArray ? ['member on the open project'] : MEMBER_ROWS);
+        expect(csv).not.toContain('owner on the open project');
+        expect(csv).not.toContain('owner in their personal list');
+    });
+
+    it.each(PRIVILEGED)('%s exports the company, short of what someone else logged in their personal list', async (_who, uid) => {
+        expect((await exported(uid, {})).read).toEqual(seenBy(uid));
+        expect((await exported(uid, { userArray: [MEMBER] })).read).toEqual(['member on the open project']);
+        expect((await exported(uid, { projectArray: [PL_MEMBER] })).read).toEqual([]);
+        expect((await exported(uid, { projectArray: [PL_MEMBER] })).csv).not.toContain('Personal');
+    });
+});
+
+describe('a week of time', () => {
+    const weekOf = async (uid, query) => {
+        const res = await call(week.getWeekTimesheet, { uid, query: { ...DAY, ...query } });
+        expect(res.code).toBe(200);
+        return { read: names(rowsRead()), body: JSON.stringify(res.body) };
+    };
+
+    it.each(PRIVILEGED)('read by %s for someone else leaves out their personal list', async (_who, uid) => {
+        const all = await weekOf(uid, { userId: MEMBER });
+        expect(all.read).toEqual(['member on the open project']);
+        expect(all.body).toContain('Shared work');
+        expect(all.body).not.toContain('Private errand');
+        expect(all.body).not.toContain(PL_MEMBER);
+
+        const named = await weekOf(uid, { userId: MEMBER, projectId: PL_MEMBER });
+        expect(named.read).toEqual([]);
+        expect(named.body).not.toContain('Private errand');
+    });
+
+    it('read by a member is their own, their personal list included, whoever they name', async () => {
+        const own = await weekOf(MEMBER, { userId: OWNER });
+        expect(own.read).toEqual(MEMBER_ROWS);
+        expect(own.body).toContain('Private errand');
+        expect((await weekOf(MEMBER, { projectId: PL_MEMBER })).read).toEqual(MEMBER_ROWS.slice(0, 2));
+    });
+
+    it('read by an owner for themselves holds their own personal list', async () => {
+        expect((await weekOf(OWNER, {})).read).toEqual(['owner in their personal list', 'owner on the open project']);
     });
 });

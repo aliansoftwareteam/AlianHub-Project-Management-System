@@ -134,7 +134,7 @@
             <div v-else class="tv2__empty">
                 <EmptyState
                     v-if="project?.deletedStatusKey !== 2"
-                    :title="$t(emptyTitleKey)"
+                    :title="$t(emptyTitleKey, emptyTitleParams)"
                     :message="$t(emptyMessageKey)"
                     :actionLabel="canCreate ? $t('EmptyState.no_tasks_action') : ''"
                     :sentence="canCreate && emptySentenceKey ? $t(emptySentenceKey) : ''"
@@ -211,7 +211,7 @@ const tagsOn = computed(() => checkApps('tags') && checkPermission('task.task_ta
 const companyId = inject('$companyId');
 const searchedTask = inject('searchedTask');
 const showArchiveVar = inject("showArchived");
-const { emptyTitleKey, emptyMessageKey, emptySentenceKey } = useTaskEmptyState(project);
+const { emptyTitleKey, emptyTitleParams, emptyMessageKey, emptySentenceKey } = useTaskEmptyState(project, () => props.sprints);
 
 const rowEdit = useListRowEdit(project, showArchiveVar);
 const aiColumnTasks = computed(() => loadedViewTasks(getters, project.value?._id, { table: true, searched: Boolean(searchedTask?.value) }));

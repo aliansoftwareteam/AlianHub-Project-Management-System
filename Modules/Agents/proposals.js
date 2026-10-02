@@ -244,6 +244,10 @@ const list = async (companyId, { status, bucket, agentId, limit = 100, projectId
     };
 };
 
+/* The audit rows of the parts a change made as actions of their own (./planWork.js), in the order they were made, so undoing the proposal undoes them too. */
+const partAudits = (result) => (Array.isArray(result && result.parts) ? result.parts : [])
+    .flatMap((part) => (Array.isArray(part && part.items) ? part.items : []).map((item) => item && item.auditId).filter(Boolean).map(String));
+
 const get = (companyId, id) => MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ _id: oid(id) }] }, 'findOne');
 
 const setStatus = async (companyId, id, set, { onlyIf } = {}) => {
@@ -261,24 +265,29 @@ const alreadyDecided = async (companyId, id) => {
     return { error: `Proposal is ${state}.`, status: 409 };
 };
 
-/* Approve (optionally with edited changes). `decider` is the human actor;
- * the changes execute AS the agent, on the human's decision, inside the
- * agent's allowedActions. */
-const approve = async (companyId, id, { decider, isPrivileged, changes: edited, ip }) => {
+/* Approve (optionally with edited changes, or with the parts of a plan to keep, ./planChoice.js). `decider` is the
+ * human actor; the changes execute AS the agent, on the human's decision, inside the agent's allowedActions. */
+const approve = async (companyId, id, { decider, isPrivileged, changes: edited, parts, ip }) => {
     const p = await get(companyId, id);
     if (!p) return { error: 'Proposal not found.', status: 404 };
     if (p.status !== STATUS.PENDING) return alreadyDecided(companyId, id);
+    const planChoice = require('./planChoice');
+    const chosen = planChoice.given(parts);
+    const editing = Array.isArray(edited) && edited.length > 0;
+    if (chosen && editing) return { error: planChoice.REFUSED.both, status: 400 };
+    const kept = chosen ? planChoice.narrow(p.changes, parts) : null;
+    if (kept && kept.error) return { error: kept.error, status: 400 };
     const fromMcp = p.source === SOURCE_MCP;
     if (fromMcp) {
-        const refusal = await require('../Mcp/approval').refusalFor(companyId, p, { decider, isPrivileged, edited });
+        const refusal = await require('../Mcp/approval').refusalFor(companyId, p, { decider, isPrivileged, edited, ...(kept ? { changes: kept.changes } : {}) });
         if (refusal) return refusal;
     }
     const needsAdmin = { error: 'This proposal needs an Owner or Admin.', status: 403 };
     if (p.gate === GATE_OWNER_ADMIN && !isPrivileged) return needsAdmin;
 
-    let changes = p.changes;
-    let status = STATUS.APPROVED;
-    if (Array.isArray(edited) && edited.length) {
+    let changes = kept ? kept.changes : p.changes;
+    let status = kept ? STATUS.EDITED : STATUS.APPROVED;
+    if (editing) {
         const check = validateChanges(edited);
         if (!check.valid) return { error: check.reason, status: 400 };
         // The gate kept at filing was read from the changes as filed; an edit is held to what it would run.
@@ -320,7 +329,7 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         try {
             // eslint-disable-next-line no-await-in-loop
             const out = await actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions, depth, approved: true, approvedBy: decider.userId, ...(marker ? { taint: marker } : {}) });
-            if (out.auditId) auditIds.push(out.auditId);
+            if (out.auditId) auditIds.push(out.auditId, ...partAudits(out.result));
             applied.push({ action: c.action, ok: true, result: out.result });
         } catch (e) {
             applied.push({ action: c.action, ok: false, error: e.message });
