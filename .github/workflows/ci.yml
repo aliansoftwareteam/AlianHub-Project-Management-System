@@ -129,11 +129,11 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-  e2e:
+  integration:
     needs: changes
     if: needs.changes.outputs.code == 'true' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/beta')
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     services:
       mongo:
         image: mongo:7
@@ -152,14 +152,35 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            frontend/package-lock.json
       - run: npm ci
-      - run: npm ci
+      - run: npm run test:integration
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-logs
+          path: e2e/.state/*.log
+          retention-days: 7
+          include-hidden-files: true
+          if-no-files-found: ignore
+
+  e2e-build:
+    name: e2e build
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/beta')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
         working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
       - run: npm run build
-        working-directory: frontend
         env:
           NODE_OPTIONS: --max-old-space-size=4096
           VUE_APP_ENVIRONMENT: ci
@@ -175,16 +196,73 @@ jobs:
           VUE_APP_IS_GOOGLE_LOGIN: "false"
           VUE_APP_IS_GITHUB_LOGIN: "false"
           VUE_APP_IS_GITLAB_LOGIN: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: e2e-frontend-dist
+          path: frontend/dist
+          retention-days: 1
+          if-no-files-found: error
+
+  # Each shard has its own database and its own server. More workers in one job would share one
+  # owner and one workspace, which is where tests start to disturb each other.
+  e2e-shard:
+    name: e2e shard (${{ matrix.shard }}/${{ strategy.job-total }})
+    needs: e2e-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      E2E_MONGODB_URL: mongodb://127.0.0.1:27017
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: e2e-frontend-dist
+          path: frontend/dist
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:integration
-      - run: npm run e2e
+      - run: npm run e2e -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-report
+          name: e2e-report-shard-${{ matrix.shard }}
           path: |
             e2e/report
             e2e/test-results
             e2e/.state/*.log
           retention-days: 7
+          include-hidden-files: true
           if-no-files-found: ignore
+
+  # The one check other tooling looks for. always() makes it run when a part failed, so it fails
+  # instead of being skipped: a skipped job satisfies a required check.
+  e2e:
+    needs: [changes, integration, e2e-build, e2e-shard]
+    if: always() && needs.changes.outputs.code == 'true' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/beta')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          INTEGRATION: ${{ needs.integration.result }}
+          BUILD: ${{ needs.e2e-build.result }}
+          SHARDS: ${{ needs.e2e-shard.result }}
+        run: |
+          echo "integration: $INTEGRATION, build: $BUILD, shards: $SHARDS"
+          [ "$INTEGRATION" = success ] && [ "$BUILD" = success ] && [ "$SHARDS" = success ]
