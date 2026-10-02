@@ -79,9 +79,9 @@
 
 <script setup>
 // PACKAGES
-import {defineProps, nextTick, onMounted, ref, watch, defineEmits} from "vue";
+import {defineProps, nextTick, onBeforeUnmount, onMounted, ref, watch, defineEmits} from "vue";
 import { useCustomComposable } from "@/composable";
-import { positionPanel } from "./panelPlacement";
+import { followPanelSize, positionPanel } from "./panelPlacement";
 
 // COMPOSABLES
 const {debounce, makeUniqueId} = useCustomComposable();
@@ -162,6 +162,9 @@ function stopMouseListener() {
     document.removeEventListener("mousemove", listener);
 }
 
+let stopFollowingPanel = () => {};
+onBeforeUnmount(() => stopFollowingPanel());
+
 watch(dropdownVisible, (val) => {
     if(val) {
         startClickListener();
@@ -169,6 +172,7 @@ watch(dropdownVisible, (val) => {
             startMouseListener();
         }
     } else {
+        stopFollowingPanel();
 
         stopClickListener();
         if(props.hover) {
@@ -235,6 +239,11 @@ function buttonClick(flag = false) {
 
             const rect = element.getBoundingClientRect();
             positionPanel(childNode, rect, { belowOffset: rect.top + 30 });
+            stopFollowingPanel();
+            stopFollowingPanel = followPanelSize(childNode, () => {
+                const current = element.getBoundingClientRect();
+                return { rect: current, options: { belowOffset: current.top + 30 } };
+            });
         })
     }
 
