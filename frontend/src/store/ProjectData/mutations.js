@@ -964,6 +964,10 @@ export const replaceFolders = (state, { projectId, folders }) => {
     state.folders = { ...state.folders, [projectId]: folders };
 }
 
+export const replaceSprints = (state, { projectId, sprints }) => {
+    state.sprints = { ...state.sprints, [projectId]: sprints };
+}
+
 export const mutateSearchedProjects = (state,payload) => {
     let searchedProjects = [];
     let searchData = payload.data;

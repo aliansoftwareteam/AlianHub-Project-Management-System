@@ -12,7 +12,7 @@ const { mayAttachKey, taskAttachmentKey, formUploadKey, clipKey } = require('../
 const { REPORT, scopeMode, countReported } = require('../../../common-storage/storedFileScope');
 const { tenantOf, TenantError } = require('../../../Config/tenant');
 const { canReadTask } = require('./taskReadAccess');
-const { loadSubtree } = require('./taskTree');
+const { loadSubtree, REFUSALS } = require('./taskTree');
 const { RichTextLimitError } = require('./cleanRichText');
 const { CANNOT_OPEN_PROJECT, peopleWhoOpen, cannotOpen } = require('../../../Config/projectPeople');
 const { openProject, isChatSpace, listOf, listRef, readableTaskIds, flatStatus, coveredByMapping, moveMappingInto } = require('./taskWritePlacement');
@@ -152,15 +152,16 @@ const holdsTaskType = (payload, stored) => {
  * ones. `destination` names the project a create, move or copy writes into, which the caller must be able to open;
  * `chat` is the flag that marks a conversation, whose container is a chat space instead. `list.id` is the list of that
  * project the write names, which must be one of its lists the caller may see, and `list.ref` the object the handler
- * stores on the task, rewritten from the stored list. `mapping` is the status and task type mapping of a move into
- * another project. `people` returns the user ids the write newly names, each of whom must hold a live seat in the
- * company and be able to open the project; `carries` are the lists of people a move or copy takes along. `landing`
+ * stores on the task, rewritten from the stored list. `parent` is the task a new row goes under, which the caller
+ * must be able to read. `mapping` is the status and task type mapping of a move into another project. `people`
+ * returns the user ids the write newly names, each of whom must hold a live seat in the company and be able to open
+ * the project; `carries` are the lists of people a move or copy takes along. `landing`
  * returns the user ids stored on a task the write creates in the destination, each of whom must be able to open that
  * project. `actor` are the params that receive the signed-in user. `strict` refuses a body key the action does not
  * take, for an action no existing client sends extra fields to.
  */
-const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, others = [], listed = null, project = [], taskIds = [], taskNames = [], projectNames = [], stored = false, status = null, held = null, destination = null, chat = null, list = null, mapping = null, attachments = null, people = null, carries = [], landing = null, strict = false, actor }) => Object.freeze({
-    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, others, listed, project, taskIds, taskNames, projectNames, stored, status, held, destination, chat, list, mapping, attachments, people, carries, landing, strict,
+const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, others = [], listed = null, project = [], taskIds = [], taskNames = [], projectNames = [], stored = false, status = null, held = null, destination = null, chat = null, list = null, parent = null, mapping = null, attachments = null, people = null, carries = [], landing = null, strict = false, actor }) => Object.freeze({
+    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, others, listed, project, taskIds, taskNames, projectNames, stored, status, held, destination, chat, list, parent, mapping, attachments, people, carries, landing, strict,
     actor: actor || (params.includes('userData') ? ['userData'] : []),
 });
 
@@ -202,12 +203,13 @@ const CREATE = spec({
     destination: ['data', 'ProjectID'],
     chat: ['data', 'mainChat'],
     list: { id: ['data', 'sprintId'], ref: null },
+    parent: ['data', 'ParentTaskId'],
 });
 
 const TASK_ACTION_FIELDS = Object.freeze({
     create: CREATE,
     createSubTaskWithAi: spec({ params: ['companyId', 'userId', 'subTitles', 'sprintObj', 'projectData', 'userData', 'parentTask', 'type'], owns: PLACEMENT_FIELDS, company: [...companyId, ...projectCompany], ids: [['parentTask', 'id'], ['parentTask', 'ProjectID']], others: [['parentTask', 'id']], destination: ['parentTask', 'ProjectID'], list: { id: ['sprintObj', 'id'], ref: null } }),
-    createMultipleTasks: spec({ params: ['tasks', 'userData', 'projectData', 'indexObj', 'statusArray', 'sprint', 'eventId'], owns: PLACEMENT_FIELDS, company: projectCompany, fieldNames: [['indexObj', 'indexName']], ids: PROJECT_DATA, objects: [['indexObj']], attachments: 'imported', people: PEOPLE.createMultipleTasks }),
+    createMultipleTasks: spec({ params: ['tasks', 'userData', 'projectData', 'indexObj', 'statusArray', 'sprint', 'eventId'], owns: PLACEMENT_FIELDS, company: projectCompany, fieldNames: [['indexObj', 'indexName']], ids: PROJECT_DATA, objects: [['indexObj']], attachments: 'imported', people: PEOPLE.createMultipleTasks, destination: PROJECT_DATA[0], list: { id: ['sprint', 'id'], ref: ['sprint'] } }),
 
     updateStatus: spec({ params: ['newStatus', 'prevStatus', 'projectData', 'task', 'isUpdateTask', ...HISTORY_USER], writes: { newStatus: STATUS_FIELDS }, status: ['newStatus'], company: projectCompany, ids: [...TASK, ['prevStatus', 'taskId']], task: TASK[0], project: PROJECT_DATA, taskIds: [...TASK, ['prevStatus', 'taskId']], taskNames: [['prevStatus', 'taskName']], projectNames: PROJECT_DATA_NAME, held: holdsField(['newStatus', 'statusKey'], 'statusKey') }),
     updatePriority: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'priorityObj', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['Task_Priority', 'Updated_At'] }, company: projectCompany, ids: [...TASK_DATA, ['priorityObj', 'taskId']], task: TASK_DATA[0], project: PROJECT_DATA, taskIds: [...TASK_DATA, ['priorityObj', 'taskId']], taskNames: [['priorityObj', 'taskName']], projectNames: PROJECT_DATA_NAME, held: holdsField(['firebaseObj', 'Task_Priority'], 'Task_Priority') }),
@@ -611,6 +613,13 @@ const destinationOf = async (req, company, taskSpec, payload) => {
     return project;
 };
 
+/* A parent the caller cannot read answers as one that does not exist. */
+const checkParent = async (req, company, taskSpec, payload) => {
+    const parentId = valueAt(payload, taskSpec.parent);
+    if (typeof parentId !== 'string' || !parentId) return;
+    if (!(await canReadTask(company, req.uid, await storedTaskOf(company, parentId)))) throw new TaskWriteRefusal(404, REFUSALS.PARENT_NOT_FOUND, 'PARENT_NOT_FOUND');
+};
+
 const MAPPING_REFUSED = 'A status or task type of this task has no place in the project it moves to.';
 
 /* A move into another project carries its status and type mapping; a move within a project carries none. */
@@ -725,6 +734,8 @@ const prepareTaskRequest = async (req, taskSpec, label) => {
         prepared.destination = await destinationOf(req, company, taskSpec, payload);
         if (taskSpec.landing && prepared.destination && await cannotOpen(company, String(prepared.destination._id), taskSpec.landing(payload))) refuse(400, CANNOT_OPEN_DESTINATION);
         if (prepared.destination && taskSpec.mapping && prepared.task) await checkMoveMapping(company, taskSpec, payload, prepared);
+        /* A conversation in a chat space has no project, and what it names as its parent is not a task. */
+        if (prepared.destination && taskSpec.parent) await checkParent(req, company, taskSpec, payload);
     }
     if (taskSpec.people) await checkPeople(company, taskSpec, prepared);
     await checkAttachmentKeys(taskSpec, prepared);

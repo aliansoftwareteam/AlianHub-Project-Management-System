@@ -248,7 +248,7 @@ describe('the table the rule reads', () => {
     });
 
     it('leaves no guard exported that no route mounts', () => {
-        const mounted = ['Modules/Tasks/routes.js', 'Modules/Agents/routes.js', 'Modules/Pages/routes.js', 'Modules/Goals/routes.js', 'Modules/Project/routes.js'].map((file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')).join('\n');
+        const mounted = ['Modules/Tasks/routes.js', 'Modules/Agents/routes.js', 'Modules/Pages/routes.js', 'Modules/Goals/routes.js', 'Modules/Project/routes.js', 'Modules/Comments/routes.js'].map((file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')).join('\n');
 
         Object.entries(guard).filter(([, value]) => typeof value === 'function').forEach(([name]) => {
             expect(mounted).toMatch(new RegExp(`\\b${name}\\b`));
@@ -283,14 +283,19 @@ describe('the paths no agent reaches', () => {
         ['who holds a tracker seat', 'POST', '/api/v1/manageTrackerUserPermission'],
         ['an invitation to the workspace', 'POST', '/api/v2/sendInvitationEmail'],
         ['a list of people to invite', 'POST', '/api/v1/importUser'],
+        ['the company\'s own record', 'PUT', '/api/v1/admin/company'],
     ])('refuses an agent %s, and lets a person and a person\'s own token through', async (_what, method, url) => {
         expect(await through(agentToken(OWNER), method, url)).toBe(403);
         expect(await through(scriptToken(OWNER), method, url)).toBe('passed');
         expect(await through(session(OWNER), method, url)).toBe('passed');
     });
 
-    it('lets an agent read a project\'s permission rules', async () => {
-        expect(await through(agentToken(OWNER), 'GET', '/api/v1/projectRules/6f0000000000000000000d01')).toBe('passed');
+    it.each([
+        ['a project\'s permission rules', 'GET', '/api/v1/projectRules/6f0000000000000000000d01'],
+        ['the company\'s own record', 'POST', '/api/v1/admin/company'],
+        ['the company\'s own record, searched', 'POST', '/api/v1/admin/company/find'],
+    ])('lets an agent read %s', async (_what, method, url) => {
+        expect(await through(agentToken(OWNER), method, url)).toBe('passed');
     });
 
     it('refuses an agent the renewal of a token, its own included', async () => {

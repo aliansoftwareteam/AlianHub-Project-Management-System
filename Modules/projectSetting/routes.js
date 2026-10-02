@@ -8,6 +8,8 @@ const { agentsRefused } = require('../Agents/guard');
 
 const editsProjectSettings = requireProjectAccess({ projectIds: (req) => req.body && req.body.projectId, permissions: () => [DETAILS] });
 const statusesByPeople = agentsRefused('project.setup');
+const taskTypesByPeople = agentsRefused('task_types.edit');
+const settingsByPeople = agentsRefused('project.settings');
 
 exports.init = (app) => {
      /**
@@ -55,7 +57,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v1/projectSetting/taskType', editsProjectSettings, ctrl.changeTaskType);
+    app.post('/api/v1/projectSetting/taskType', taskTypesByPeople, editsProjectSettings, ctrl.changeTaskType);
 
     /**
      * @swagger
@@ -112,8 +114,8 @@ exports.init = (app) => {
     // Per-project auto-archive rule (completed tasks archive after N days —
     // applied by the nightly cron in cron.js).
     app.get('/api/v1/projectSetting/autoArchive/:pid', requireProjectAccess({ mode: READ, projectIds: (req) => req.params.pid }), autoArchive.getAutoArchive);
-    app.post('/api/v1/projectSetting/autoArchive', editsProjectSettings, autoArchive.setAutoArchive);
+    app.post('/api/v1/projectSetting/autoArchive', settingsByPeople, editsProjectSettings, autoArchive.setAutoArchive);
 
     // Per-project story-point estimation scale (drives the points picker).
-    app.post('/api/v1/projectSetting/estimationScale', editsProjectSettings, estimationScale.setEstimationScale);
+    app.post('/api/v1/projectSetting/estimationScale', settingsByPeople, editsProjectSettings, estimationScale.setEstimationScale);
 }

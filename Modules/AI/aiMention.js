@@ -269,7 +269,7 @@ const acceptFromComment = async (req, companyId, saved) => {
     if (comment.aiAsk || isAiAuthored(comment) || comment.actorType === 'agent' || comment.isAgent === true) return null;
     if (!['text', 'link'].includes(comment.type) || !hasAnswerableThread(comment)) return null;
     const actor = await require('../Agents/actor').resolveActor(req);
-    if (actor.runId) return null;
+    if (actor.runId || actor.kind === 'agent') return null;
 
     const askerId = String(comment.userId || '');
     const question = questionOf(comment.message);

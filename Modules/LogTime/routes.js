@@ -31,6 +31,7 @@ const upload = multer({
     fileFilter: refuseBeforeWrite(captureRefusal),
 });
 const captureGuard = refuseUpload(captureRefusal);
+const { agentsRefused } = require('../Agents/guard');
 
 exports.init = (app) => {
     // V2 VERSION START
@@ -267,7 +268,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v2/deleteManualLogtime', onAVisibleTask, ctrlV2.deleteManualLogtime);
+    app.post('/api/v2/deleteManualLogtime', agentsRefused('timelog.delete'), onAVisibleTask, ctrlV2.deleteManualLogtime);
 
         /**
      * @swagger

@@ -180,24 +180,24 @@ describe('a proposal filed on a thread the approver cannot open is not theirs to
 });
 
 describe('a comment an approved agent proposal writes follows thread visibility for the approver', () => {
-    it('does not apply a comment on a private sprint the approving member is not on', async () => {
+    it('refuses a comment on a private sprint the approving member is not on, and leaves the proposal pending', async () => {
         const message = label('proposal into private sprint');
         const proposalId = await proposalToComment(privateSprint, message, open);
         const res = await member.api.post(`/api/v2/agents/proposals/${proposalId}/approve`);
 
-        expect(res.status).toBe(200);
-        expect(res.body.data.applied).toEqual([expect.objectContaining({ action: 'task.comment', ok: false })]);
+        expect(res.status).toBe(403);
         expect(await countByMessage(message)).toBe(0);
+        expect((await storedProposal(proposalId)).status).toBe('pending');
     });
 
-    it('does not apply a comment on a direct message the approving admin is not in', async () => {
+    it('refuses a comment on a direct message the approving admin is not in, and leaves the proposal pending', async () => {
         const message = label('proposal into dm');
         const proposalId = await proposalToComment(dm, message, open);
         const res = await admin.api.post(`/api/v2/agents/proposals/${proposalId}/approve`);
 
-        expect(res.status).toBe(200);
-        expect(res.body.data.applied).toEqual([expect.objectContaining({ action: 'task.comment', ok: false })]);
+        expect(res.status).toBe(403);
         expect(await countByMessage(message)).toBe(0);
+        expect((await storedProposal(proposalId)).status).toBe('pending');
     });
 
     it('still applies a comment on a task the approver can open', async () => {

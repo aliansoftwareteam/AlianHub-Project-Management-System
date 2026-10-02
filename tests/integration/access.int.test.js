@@ -1,5 +1,6 @@
 const { createApiClient } = require('../../e2e/support/api');
 const { emailFor, inviteMember, login, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
+const { COMPANY_MEMBER_FIELDS } = require('../../Modules/Company/helpers/companyAccessRules');
 
 const state = readState();
 const anon = createApiClient({ baseURL: state.baseURL });
@@ -279,6 +280,23 @@ describe('access — company reads are the caller\'s own companies', () => {
         const res = await guest.api.post('/api/v1/admin/company/find', { findQuery: [{ $match: {} }] });
         expect(res.status).toBe(200);
         expect(res.body.map((company) => String(company._id))).toEqual([state.companyId]);
+    });
+
+    it('gives a guest the company fields the apps read, and an admin the whole row', async () => {
+        const guest = await loginAs('guest');
+        const admin = await loginAs('admin');
+        const whole = (await admin.api.post('/api/v1/admin/company/find', { findQuery: [{ $match: {} }] })).body[0];
+        const adminOnly = Object.keys(whole).filter((field) => !COMPANY_MEMBER_FIELDS.includes(field));
+        expect(adminOnly.length).toBeGreaterThan(0);
+
+        const found = await guest.api.post('/api/v1/admin/company/find', { findQuery: [{ $match: {} }, { $project: Object.fromEntries(['Cst_CompanyName', ...adminOnly].map((field) => [field, 1])) }] });
+        const listed = await guest.api.post('/api/v1/admin/company', { companyIds: [state.companyId] });
+        for (const res of [found, listed]) {
+            expect(res.status).toBe(200);
+            expect(res.body[0].Cst_CompanyName).toBe(whole.Cst_CompanyName);
+            expect(Object.keys(res.body[0]).filter((field) => adminOnly.includes(field))).toEqual([]);
+        }
+        expect(listed.body[0].planFeature).toEqual(whole.planFeature);
     });
 
     it('refuses a guest joining another collection through the aggregate route', async () => {

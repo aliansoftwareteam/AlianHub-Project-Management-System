@@ -4,7 +4,7 @@ const store = require('../store');
 const flag = require('../flag');
 const { waitUntil } = require('./waiting');
 const { num, deterministic, descendantsOf, skipAll } = require('./graph');
-const { nonMembersOf, NOT_A_MEMBER } = require('../../../Config/companyMembers');
+const { nonMembersOf, guestsOf, NOT_A_MEMBER, NOT_A_GUEST } = require('../../../Config/companyMembers');
 
 // A person is a step.
 //
@@ -51,12 +51,16 @@ const granted = (request, escalated) => ({
     escalated,
 });
 
-/* A saved workflow was checked when it was saved; the people it names may have left since. */
+/* A saved workflow was checked when it was saved; the people it names may have left, or become guests, since. */
 const refuseOutsiders = async (companyId, step, named) => {
     const people = Object.entries(named).filter(([, userId]) => userId);
-    const outside = new Set(await nonMembersOf(companyId, people.map(([, userId]) => userId)));
+    const ids = people.map(([, userId]) => userId);
+    const outside = new Set(await nonMembersOf(companyId, ids));
     const field = people.find(([, userId]) => outside.has(String(userId)));
     if (field) throw deterministic(`step ${step.stepId} ${field[0]}: ${NOT_A_MEMBER}`);
+    const guests = new Set(await guestsOf(companyId, ids));
+    const guest = people.find(([, userId]) => guests.has(String(userId)));
+    if (guest) throw deterministic(`step ${step.stepId} ${guest[0]}: ${NOT_A_GUEST}`);
 };
 
 const execute = async ({ companyId, run, step }) => {

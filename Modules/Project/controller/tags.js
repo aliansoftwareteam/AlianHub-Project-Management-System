@@ -4,6 +4,17 @@ const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueri
 const { removeCache } = require('../../../utils/commonFunctions');
 const logger = require('../../../Config/loggerConfig');
 const { recordTagDefinitionChange } = require('../helpers/projectItemHistory');
+const { isItemId, badRequest } = require('../../Company/helpers/callerQueryRules');
+
+const TAG_KEYS = ['tagName', 'tagColor'];
+
+/* A tag write names its tag by id and sets text: neither reaches the update as an operator object. */
+const tagRefusal = ({ items, operation, key }) => {
+    if (operation !== 'update' && operation !== 'delete') return null;
+    if (!items || !isItemId(items.id)) return `Item 'id' parameter is required.`;
+    if (operation === 'update' && TAG_KEYS.includes(key) && typeof items[key] !== 'string') return `Item '${key}' must be text.`;
+    return null;
+};
 
 /**
  * Helper function for build update query object based on the specific key
@@ -37,18 +48,15 @@ exports.handleTags = async (req, res) => {
     try {
         const { id, items, operation, key } = req.body;
 
+        const refusal = tagRefusal(req.body);
+        if (refusal) return badRequest(res, refusal);
+
         let update = {};
         if (operation === 'push') {
             update = {
                 $push: { tagsArray: items }
             };
         } else if (operation === 'update') {
-            if(!items.id) {
-                return res.status(400).json({
-                    status: false,
-                    message: `Item 'id' parameter is required.`
-                });
-            }
             update = buildQuery(key, items)
         } else if (operation === 'delete') {
             update = {

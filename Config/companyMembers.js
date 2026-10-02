@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('./schemaType');
 const { ACTIVE_SEAT } = require('./seatStatus');
+const { ROLE_GUEST } = require('./roleTypes');
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -8,6 +9,7 @@ const TEAM_PREFIX = 'tId_';
 
 const NOT_A_MEMBER = 'Only active members of this company can be named here.';
 const NOT_A_TEAM = 'Only teams of this company can be named here.';
+const NOT_A_GUEST = 'A guest cannot be named here: a member of this company decides it.';
 
 const namedIds = (ids) => [...new Set((Array.isArray(ids) ? ids : [ids])
     .filter((value) => value !== undefined && value !== null && value !== '')
@@ -27,6 +29,17 @@ const nonMembersOf = async (companyId, ids) => {
         : [];
     const members = new Set((seats || []).map((seat) => String(seat.userId)));
     return wanted.filter((id) => !members.has(id));
+};
+
+/* The ids in `ids` whose live seat is a guest's, for a place only a member of the company may hold. */
+const guestsOf = async (companyId, ids) => {
+    const candidates = namedIds(ids).filter((id) => OBJECT_ID.test(id));
+    if (!candidates.length || !companyId) return [];
+    const seats = await MongoDbCrudOpration(String(companyId), {
+        type: SCHEMA_TYPE.COMPANY_USERS,
+        data: [{ ...ACTIVE_SEAT, userId: { $in: candidates }, roleType: ROLE_GUEST }, { userId: 1 }],
+    }, 'find');
+    return [...new Set((seats || []).map((seat) => String(seat.userId)))];
 };
 
 const allMembers = async (companyId, ids) => (await nonMembersOf(companyId, ids)).length === 0;
@@ -96,4 +109,4 @@ const heldIn = (doc, fields) => new Set(fields.flatMap((field) => {
     return isPlainObject(value) ? Object.keys(value) : [];
 }));
 
-module.exports = { NOT_A_MEMBER, NOT_A_TEAM, TEAM_PREFIX, namedIds, nonMembersOf, allMembers, foreignTeamsOf, outsiderRefusal, namedInUpdate, heldIn };
+module.exports = { NOT_A_MEMBER, NOT_A_TEAM, NOT_A_GUEST, TEAM_PREFIX, namedIds, nonMembersOf, guestsOf, allMembers, foreignTeamsOf, outsiderRefusal, namedInUpdate, heldIn };
