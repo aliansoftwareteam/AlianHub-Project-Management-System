@@ -49,7 +49,7 @@ describe('"Always do this" on a row of the approval queue', () => {
         expect(panel.exists()).toBe(true);
         expect(panel.attributes('role')).toBe('group');
         expect(panel.text()).toContain('Claude, for Priya');
-        expect(panel.text()).toContain('Comment on a task');
+        expect(panel.text()).toContain(en.AgentActions.task_comment);
         expect(panel.text()).toContain('90 days');
         expect(panel.text()).toContain('this project');
         expect(sendProposalDecision).not.toHaveBeenCalled();

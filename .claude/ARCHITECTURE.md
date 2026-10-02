@@ -66,6 +66,9 @@ Each company has its own MongoDB database (`${MONGODB_URL}/<companyId>`); users,
 ### Errors
 A handler answers `{ status: false, statusText }` with HTTP 200 (`Config/respond.js` `fail` adds `statusCode` for callers that want it). Anything thrown or passed to `next(err)` reaches `errorHandler`, which logs the stack under the request id and answers `{ status: false, statusText, requestId }`. Process-level `uncaughtException`/`unhandledRejection` go through winston too.
 
+### Agents and MCP
+An AI agent, a person's own app over MCP or one AlianHub runs, acts as a person through one road: tool call, registry entry, one project rule (`Modules/Agents/projectPolicy.js` `ask()`), then act, propose or refuse. A proposal is approved by a signed-in person, every change leaves an audit row, and it can be undone. See [AGENTS-AND-MCP.md](AGENTS-AND-MCP.md).
+
 ### Cache Invalidation Pattern
 In-memory cache (node-cache) is invalidated after mutations:
 ```javascript

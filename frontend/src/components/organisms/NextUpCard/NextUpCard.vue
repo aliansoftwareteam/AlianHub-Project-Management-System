@@ -127,23 +127,23 @@ onMounted(load);
 
 <style scoped>
 .nu { height: 100%; width: 100%; padding: 8px 10px; overflow: auto; }
-.nu-msg { color: #9aa0b4; font-size: 12px; padding: 10px 0; }
+.nu-msg { color: var(--ink-2); font-size: 12px; padding: 10px 0; }
 .nu-list { display: flex; flex-direction: column; }
-.nu-row { display: flex; align-items: center; gap: 8px; padding: 7px 4px; border-bottom: 1px solid #f4f5f9; cursor: pointer; }
-.nu-row:hover { background: #f9fafc; }
-.nu-rank { flex: none; width: 18px; height: 18px; border-radius: 50%; background: #eef2f7; color: #6b7280; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.nu-row { display: flex; align-items: center; gap: 8px; padding: 7px 4px; border-bottom: 1px solid var(--hairline); cursor: pointer; }
+.nu-row:hover { background: var(--surface-hover); }
+.nu-rank { flex: none; width: 18px; height: 18px; border-radius: 50%; background: var(--fill); color: var(--ink-2); font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 .nu-main { flex: 1; min-width: 0; }
 .nu-title { display: flex; align-items: center; gap: 5px; overflow: hidden; }
 .nu-key { color: #0e7490; font-size: 11px; flex: none; }
-.nu-name { font-size: 12.5px; color: #2f3546; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nu-name { font-size: 12.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nu-meta { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
-.nu-proj { font-size: 10.5px; color: #9aa0b4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
+.nu-proj { font-size: 10.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
 .nu-pri { font-size: 10px; padding: 0 6px; border-radius: 8px; text-transform: capitalize; }
-.nu-pri-0 { background: #fee2e2; color: #b91c1c; }
-.nu-pri-1 { background: #ffedd5; color: #c2410c; }
+.nu-pri-0 { background: var(--danger-bg); color: var(--danger-ink); }
+.nu-pri-1 { background: var(--warn-bg); color: var(--warn-ink); }
 .nu-pri-2 { background: #e0f2fe; color: #0369a1; }
-.nu-pri-3 { background: #f3f4f6; color: #6b7280; }
-.nu-due { flex: none; font-size: 11px; color: #3a3f52; white-space: nowrap; }
-.nu-due-over { color: #dc2626; font-weight: 600; }
-.nu-due-none { color: #c2c7d2; }
+.nu-pri-3 { background: var(--fill); color: var(--ink-2); }
+.nu-due { flex: none; font-size: 11px; color: var(--ink); white-space: nowrap; }
+.nu-due-over { color: var(--danger); font-weight: 600; }
+.nu-due-none { color: var(--ink-2); }
 </style>
