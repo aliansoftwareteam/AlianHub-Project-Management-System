@@ -14,7 +14,7 @@ jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...args) => mockCrud(...args) }));
 jest.mock('../Modules/Auth/controller', () => ({ addAndRemoveUserInMongodbNotificationCount: jest.fn(async () => {}) }));
 jest.mock('../utils/data', () => ({ importUserNotifications: jest.fn(async () => {}) }));
-jest.mock('../Modules/Users/controller', () => ({ updateUserFun: (db, query, method) => mockCrud(db, query, method) }));
+jest.mock('../Modules/Users/controller', () => ({ updateUserFun: async (db, query, method) => ({ message: 'user updated', data: await mockCrud(db, query, method) }) }));
 jest.mock('../Modules/settings/Members/controller', () => ({
     updateMemberFunction: async (companyId, data, method) => ({ data: (await mockCrud(companyId, { type: 'company_users', data }, method)) || {} }),
 }));
