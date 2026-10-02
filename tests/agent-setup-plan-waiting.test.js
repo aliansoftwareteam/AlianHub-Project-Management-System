@@ -53,6 +53,8 @@ const approverRights = require('../Modules/Agents/approverRights');
 const planFollowUp = require('../Modules/Agents/planFollowUp');
 const planShown = require('../Modules/Agents/planShown');
 const workRequests = require('../Modules/Agents/workRequests');
+const setupRequests = require('../Modules/Agents/setupRequests');
+const plans = require('../Modules/Agents/projectSetup');
 const access = require('../Modules/Agents/access');
 const queue = require('../Modules/Inbox/helpers/approvalQueue');
 const matcher = require('../Modules/Automations/engine/matcher');
@@ -126,6 +128,14 @@ const keptAsRowsOnce = (params) => String(mockDb.seed(SCHEMA_TYPE.AGENT_PROPOSAL
     agentId: AGENT, agentName: 'Planner', runId: null, taskId: null, projectId: P_OPEN, what: 'Set the project up', why: '', status: 'pending', gate: null, priority: 'normal', auditIds: [],
     changes: [{ action: TOOL, params, label: 'Set up', reversible: true }], createdAt: new Date(),
 })._id);
+/* A plan as one kept before a status new to the company was held back at filing: asked for by `uid`'s connection, with that status in it. */
+const filedBefore = async (uid, plan, statuses) => {
+    const id = await filed(plan, uid);
+    proposal(id).changes[0].params.statuses = [...(plan.statuses || []), ...statuses];
+    return id;
+};
+const viewNamed = (title) => project().ProjectRequiredComponent.find((entry) => entry.title === title);
+const fieldIdOf = (title) => String(rows(SCHEMA_TYPE.CUSTOM_FIELDS).find((field) => field.fieldTitle === title)._id);
 const previewOf = async (id, uid = OWNER) => (await intentPreview.forProposals(CID, uid, [proposal(id)])).get(String(id))[0];
 const picksOf = (preview) => preview.lines.flatMap((line) => [...(line.picks || []), ...(line.pick ? [line.pick] : [])]);
 const standing = async (id, uid) => approverRights.standingOf(CID, await access.personOf(CID, uid), proposal(id));
@@ -371,15 +381,22 @@ describe('a part that was tried and not made', () => {
         expect(listsNamed('Backlog')).toHaveLength(0);
     });
 
-    it('is no longer offered once the approval that left it is undone, while what waits for someone else stays', async () => {
-        const id = await filed({ ...NEW_STATUS, lists: ['Backlog', 'Later'] });
-        failOnce();
-        const out = await approve(id, INSIDER, KEEPS_WHAT_A_MEMBER_MAY);
-        expect(out.left).toEqual({ waiting: [expect.any(String)], retry: [expect.any(String)] });
-        const undone = await proposals.undoApproval(CID, id, { decider: human(INSIDER), isPrivileged: false, ip: '' });
-        expect(undone.error).toBeUndefined();
-        expect(proposal(out.left.retry[0])).toMatchObject({ status: 'declined', decidedBy: 'system' });
-        expect(proposal(out.left.waiting[0]).status).toBe('pending');
+    it('is not offered again where trying again cannot change the answer, and the plan keeps why it was not made', async () => {
+        const id = keptAsRowsOnce({ projectId: P_OPEN, lists: ['Backlog'], tasks: [{ name: 'Second brief', list: 'Nowhere' }] });
+        const out = await approve(id, OWNER);
+        expect(out.applied[0].result.notMade).toEqual([{ part: 'tasks', name: 'Second brief', error: 'The list "Nowhere" was not found in this project.' }]);
+        expect(out.left).toBeUndefined();
+        expect(waiting()).toHaveLength(0);
+        expect(listsNamed('Backlog')).toHaveLength(1);
+        expect(proposal(id).notMade).toEqual([{ part: 'tasks', name: 'Second brief', error: 'The list "Nowhere" was not found in this project.' }]);
+        const done = await send(LIST, { uid: OWNER }, { query: { status: 'all' } });
+        expect(done.body.data.find((entry) => String(entry._id) === id).notMade).toHaveLength(1);
+    });
+
+    it('keeps nothing of that kind on a plan every part of which was made', async () => {
+        const id = await filed({ projectId: P_OPEN, lists: ['Backlog'] });
+        await approve(id);
+        expect(proposal(id).notMade).toBeUndefined();
     });
 
     it('is offered again where every part of the plan failed', async () => {
@@ -406,15 +423,180 @@ describe('a part that was tried and not made', () => {
     });
 
     it('reads what was not made from what the plan answered, part by part', () => {
-        const params = { projectId: P_OPEN, lists: ['Backlog', 'Later'], definitions: [BUDGET], tasks: [{ name: 'Brief' }] };
+        const params = { projectId: P_OPEN, lists: ['Backlog', 'Later', 'Soon'], definitions: [BUDGET], views: [{ name: 'Mine' }], tasks: [{ name: 'Brief' }] };
         const outcome = { ok: true, result: { parts: [
             { part: 'description', ok: false, error: BUSY, items: [] },
-            { part: 'lists', ok: false, items: [{ name: 'Backlog', made: true }, { name: 'Later', made: false, error: BUSY }] },
-            { part: 'fields', ok: false, error: BUSY, items: [] },
+            { part: 'lists', ok: false, items: [{ name: 'Backlog', made: true }, { name: 'Later', made: false, error: BUSY, tryAgain: true }, { name: 'Soon', made: false, error: 'That name is taken.' }] },
+            { part: 'fields', ok: false, error: BUSY, tryAgain: true, items: [] },
+            { part: 'views', ok: false, error: 'views needs 1 to 5 views', items: [] },
             { part: 'tasks', ok: false, items: [{ name: 'Brief', made: false, error: 'permission_denied: task.task_create is not allowed' }] },
         ] } };
         expect(planFollowUp.failedIn(outcome, params)).toEqual([{ key: 'lists:1', error: BUSY }, { key: 'fields:0', error: BUSY }]);
         expect(planFollowUp.failedIn({ ok: false, error: BUSY }, params)).toEqual([]);
+    });
+});
+
+describe('undoing an approval that left parts to be made later', () => {
+    const undo = (id, uid) => proposals.undoApproval(CID, id, { decider: human(uid), isPrivileged: privileged(uid), ip: '' });
+    const failOnce = () => {
+        const real = workRequests.createList;
+        return jest.spyOn(workRequests, 'createList').mockImplementationOnce(async () => { throw new Error(BUSY); }).mockImplementation(real);
+    };
+
+    it('takes back the rows it left, those waiting for someone else and those to be tried again', async () => {
+        const id = await filed({ ...NEW_STATUS, lists: ['Backlog', 'Later'] });
+        failOnce();
+        const out = await approve(id, INSIDER, KEEPS_WHAT_A_MEMBER_MAY);
+        expect(out.left).toEqual({ waiting: [expect.any(String)], retry: [expect.any(String)] });
+        expect((await undo(id, INSIDER)).error).toBeUndefined();
+        for (const left of [...out.left.waiting, ...out.left.retry]) expect(proposal(left)).toMatchObject({ status: 'declined', decidedBy: 'system' });
+        expect(waiting()).toHaveLength(0);
+        expect(await approve(out.left.waiting[0], ADMIN)).toMatchObject({ status: 409 });
+    });
+
+    it('leaves no plan that names what the undo removed', async () => {
+        const id = await filed({ projectId: P_OPEN, statuses: ['In Review'], lists: ['Backlog'], rules: [reviewNotice()] });
+        const out = await approve(id, INSIDER, { 0: { statuses: [0], lists: [0], rules: [] } });
+        await undo(id, INSIDER);
+        expect(statusNames()).not.toContain('In Review');
+        expect(proposal(out.left.waiting[0]).status).toBe('declined');
+        expect(liveRules()).toHaveLength(0);
+    });
+
+    it('takes back what a second try made, too', async () => {
+        const id = await filed({ projectId: P_OPEN, lists: ['Backlog', 'Later'], fields: [BUDGET] });
+        failOnce();
+        const [again] = (await approve(id, OWNER)).left.retry;
+        expect((await approve(again, OWNER)).error).toBeUndefined();
+        expect([listsNamed('Backlog').length, listsNamed('Later').length, liveFields()]).toEqual([1, 1, ['Budget']]);
+        const undone = await undo(id, OWNER);
+        expect(undone.error).toBeUndefined();
+        expect([listsNamed('Backlog').length, listsNamed('Later').length, liveFields()]).toEqual([0, 0, []]);
+        expect(proposal(again).status).toBe('undone');
+        expect(undone.results.every((result) => result.ok)).toBe(true);
+    });
+
+    it('leaves what someone else approved from it as it is', async () => {
+        const id = await filed(NEW_STATUS);
+        const [left] = (await approve(id, INSIDER, KEEPS_WHAT_A_MEMBER_MAY)).left.waiting;
+        await approve(left, ADMIN);
+        await undo(id, INSIDER);
+        expect(proposal(left).status).toBe('approved');
+        expect(statusNames()).toContain('Blocked');
+    });
+});
+
+describe('a view that shows a field of the same plan', () => {
+    const MONEY = { projectId: P_OPEN, fields: [BUDGET], views: [{ name: 'Money', kind: 'list', showFields: ['Budget'] }] };
+    const shown = (title) => JSON.stringify(viewNamed(title).settings || viewNamed(title));
+
+    it('waits with the field by its id once the field is made, and is then made showing it', async () => {
+        const id = await filed(MONEY);
+        ['view_list', 'project_details'].forEach((key) => setRule(key, false, [3]));
+        const out = await approve(id, INSIDER, { 0: { fields: [0], views: [] } });
+        expect(liveFields()).toEqual(['Budget']);
+        const [left] = out.left.waiting;
+        expect(paramsOf(left)).toEqual({ projectId: P_OPEN, views: [{ name: 'Money', kind: 'list', look: { showFieldIds: [fieldIdOf('Budget')] } }] });
+
+        const done = await approve(left, ADMIN);
+        expect(done.error).toBeUndefined();
+        expect(done.applied[0]).toMatchObject({ ok: true, result: { notMade: [], parts: [{ part: 'views', ok: true, items: [{ name: 'Money', made: true, leftOut: [] }] }] } });
+        expect(shown('Money')).toContain(fieldIdOf('Budget'));
+        expect(waiting()).toHaveLength(0);
+    });
+
+    it('is tried again with the field by its id, and is made showing it', async () => {
+        const real = setupRequests.createView;
+        jest.spyOn(setupRequests, 'createView').mockImplementationOnce(async () => { throw new Error(BUSY); }).mockImplementation(real);
+        const out = await approve(await filed(MONEY), OWNER);
+        const [again] = out.left.retry;
+        expect(paramsOf(again)).toEqual({ projectId: P_OPEN, views: [{ name: 'Money', kind: 'list', look: { showFieldIds: [fieldIdOf('Budget')] } }] });
+        const done = await approve(again, OWNER);
+        expect(done.applied[0]).toMatchObject({ ok: true, result: { notMade: [] } });
+        expect(shown('Money')).toContain(fieldIdOf('Budget'));
+    });
+
+    it('keeps the field by its name where both wait together', async () => {
+        const id = await filed({ ...MONEY, lists: ['Backlog'] });
+        ['view_list', 'project_details', 'project_custom_field', 'task_custom_field'].forEach((key) => setRule(key, false, [3]));
+        const out = await approve(id, INSIDER, { 0: { lists: [0], fields: [], views: [] } });
+        expect(paramsOf(out.left.waiting[0])).toEqual({ projectId: P_OPEN, definitions: [BUDGET], views: [{ name: 'Money', kind: 'list', look: {}, showFields: ['Budget'] }] });
+        expect((await approve(out.left.waiting[0], ADMIN)).applied[0]).toMatchObject({ ok: true, result: { notMade: [] } });
+    });
+});
+
+describe('a status new to the company in a plan asked for by someone who cannot add one', () => {
+    const NOT_THIS_PLAN = /cannot be added through this plan/;
+
+    it('is marked on every card as a part this plan cannot make, and the plan stays open for the rest', async () => {
+        const id = await filedBefore(INSIDER, { projectId: P_OPEN, statuses: ['In Review'], lists: ['Backlog'] }, ['Blocked']);
+        for (const uid of [INSIDER, ADMIN, OWNER]) {
+            expect(await previewOf(id, uid)).toMatchObject({ locked: ['statuses:1'], lockedWhy: { 'statuses:1': 'not_this_plan' } });
+            expect(await standing(id, uid)).toMatchObject({ locked: false });
+        }
+    });
+
+    it('is not kept waiting by a member who approves the rest', async () => {
+        const id = await filedBefore(INSIDER, { projectId: P_OPEN, statuses: ['In Review'], lists: ['Backlog'], tasks: [{ name: 'Collect the logins' }] }, ['Blocked']);
+        proposal(id).changes[0].params.tasks.push({ name: 'Wait for the client', status: 'Blocked' });
+        const out = await approve(id, INSIDER, { 0: { statuses: [0], lists: [0], tasks: [0] } });
+        expect(out.error).toBeUndefined();
+        expect(out.left).toBeUndefined();
+        expect(waiting()).toHaveLength(0);
+        expect(statusNames()).toContain('In Review');
+        expect(listsNamed('Backlog')).toHaveLength(1);
+    });
+
+    it('is said plainly, with the rest made, where an owner or admin approves the plan whole', async () => {
+        const id = await filedBefore(INSIDER, { projectId: P_OPEN, lists: ['Later'] }, ['Parked']);
+        const out = await approve(id, ADMIN);
+        expect(out.error).toBeUndefined();
+        expect(listsNamed('Later')).toHaveLength(1);
+        expect(out.applied[0].result.notMade).toEqual([{ part: 'statuses', name: 'Parked', error: expect.stringMatching(NOT_THIS_PLAN) }]);
+        expect(out.applied[0].result.notMade[0].error).toMatch(/An owner or admin can add it in Settings, or ask their own AI/);
+        expect(out.left).toBeUndefined();
+        expect(statusNames()).not.toContain('Parked');
+        expect(waiting()).toHaveLength(0);
+    });
+
+    it('leaves a plan that holds nothing else for nobody to approve, and anyone who could decline it still can', async () => {
+        const id = await filedBefore(INSIDER, { projectId: P_OPEN, lists: ['Later'] }, ['Parked']);
+        delete proposal(id).changes[0].params.lists;
+        const before = everythingNow();
+        for (const uid of [INSIDER, ADMIN]) {
+            expect(await standing(id, uid)).toMatchObject({ locked: true, lockedWhy: 'not_this_plan', mayDecline: true });
+            expect(await approve(id, uid)).toMatchObject({ status: 403, why: 'not_this_plan', error: expect.stringMatching(/cannot be made through it/) });
+        }
+        expect(everythingNow()).toBe(before);
+        expect(proposal(id).status).toBe('pending');
+    });
+
+    it('still waits for an owner or admin where the person who asked is one', async () => {
+        const id = await filed(NEW_STATUS, ADMIN);
+        expect(await previewOf(id, INSIDER)).toMatchObject({ lockedWhy: { 'statuses:1': 'owner_admin' } });
+        expect((await previewOf(id, OWNER)).locked).toBeUndefined();
+    });
+});
+
+describe('what a list of waiting plans reads', () => {
+    it('reads the rights behind a plan once for each reader, for the queue and for the AI Inbox list', async () => {
+        await filed(WITH_LISTS);
+        const asked = jest.spyOn(plans, 'whyNot');
+        const partsAsked = () => asked.mock.calls.map((call) => call[3]).sort();
+        await queue.readQueue(CID, INSIDER);
+        expect(partsAsked()).toEqual(['fields', 'lists']);
+        asked.mockClear();
+        await send(LIST, { uid: INSIDER }, { query: { status: 'pending' } });
+        expect(partsAsked()).toEqual(['fields', 'lists']);
+    });
+
+    it('builds a card for each row it returns and for no other', async () => {
+        await filed(WITH_LISTS);
+        await filed({ projectId: P_OPEN, lists: ['Later on'] });
+        const built = jest.spyOn(intentPreview, 'forProposals');
+        const page = await send(LIST, { uid: OWNER }, { query: { status: 'pending', limit: '1' } });
+        expect(page.body.data).toHaveLength(1);
+        expect(built.mock.calls.map((call) => call[2].length)).toEqual([1]);
     });
 });
 

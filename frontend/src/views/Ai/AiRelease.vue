@@ -164,6 +164,7 @@ import AiModelNotice from '@/components/molecules/AiUnavailable/AiModelNotice.vu
 import { computed, inject, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import moment from "moment";
+import { dayClockText } from "@/utils/clockText";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
@@ -201,7 +202,7 @@ const notesDraft = computed(() => (staging.value.proposals || []).find((p) => (p
 const stagingAge = computed(() => (staging.value.last?.decidedAt ? moment(staging.value.last.decidedAt).fromNow(true) : t("Pipeline.none")));
 const stagingWho = computed(() => (staging.value.last ? t("Pipeline.staging_by", { agent: staging.value.last.agentName }) : t("Pipeline.staging_never")));
 const stagingLine = computed(() => (staging.value.last
-    ? `${moment(staging.value.last.decidedAt).format("D MMM HH:mm")} · ${staging.value.last.status}`
+    ? `${dayClockText(staging.value.last.decidedAt)} · ${staging.value.last.status}`
     : t("Pipeline.env_none")));
 const productionLine = computed(() => (changelog.value?.currentVersion
     ? t("Pipeline.env_prod_meta", { version: changelog.value.currentVersion })

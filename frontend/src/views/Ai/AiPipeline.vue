@@ -116,7 +116,7 @@ import AiModelNotice from '@/components/molecules/AiUnavailable/AiModelNotice.vu
 import { computed, inject, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import moment from "moment";
+import { dayClockText } from "@/utils/clockText";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { openTask } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
@@ -145,7 +145,7 @@ const loadError = ref("");
 const hasIntegrationsRoute = computed(() => router.hasRoute("IntegrationsHub"));
 const task = computed(() => tasks.value.find((row) => row._id === taskId.value) || tasks.value[0] || {});
 
-const at = (value) => (value ? moment(value).format("D MMM HH:mm") : "");
+const at = dayClockText;
 const auditAction = (row) => String(row?.meta?.action || "");
 const auditFor = (keys) => (auditVisible.value ? auditRows.value : [])
     .filter((row) => keys.some((key) => auditAction(row).startsWith(key)))

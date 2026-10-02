@@ -27,11 +27,12 @@ export const hiddenParts = (preview) => {
     return [...new Set([...blank, ...namedIn(preview)])].filter((key) => !shown.includes(key));
 };
 
-/* Why a part is one this person may not approve: an owner or an admin approves it, or their own role may not make it. */
-export const LOCKED_BY_RIGHTS = 'own_rights';
+/* Why a part is one this person may not approve: an owner or an admin approves it, their own role may not make
+ * it, or the plan cannot make it for anyone. */
+const LOCK_REASONS = Object.freeze(['owner_admin', 'own_rights', 'not_this_plan']);
 export const lockReason = (preview, key) => {
     if (!Array.isArray(preview?.locked) || !preview.locked.includes(key)) return '';
-    return preview.lockedWhy?.[key] === LOCKED_BY_RIGHTS ? LOCKED_BY_RIGHTS : 'owner_admin';
+    return LOCK_REASONS.includes(preview.lockedWhy?.[key]) ? preview.lockedWhy[key] : LOCK_REASONS[0];
 };
 
 /* For each part this person may not approve: the parts that cannot be made without it. */

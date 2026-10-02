@@ -45,12 +45,15 @@ const withNewStatuses = async (companyId, uid, refused, held, statuses) => {
 
 /* What stops a plan for a project that exists from being filed for this caller: { refused } where its person may
  * not make one of its parts by hand, or could not ask for one of its automations or first tasks in a call of its
- * own; { error } where a view has nothing to start from or a rule or a task names what is in neither the plan nor
- * the project; null where nothing does. `mayManage` says whether the caller holds what the task tools need. */
+ * own; { error } where the field form would not save a rollup or a formula of it, a view has nothing to start from,
+ * or a rule or a task names what is in neither the plan nor the project; null where nothing does. `mayManage` says
+ * whether the caller holds what the task tools need. */
 const setupStopped = async ({ companyId, actor, uid, allowedActions, mayManage, project, params }) => {
     const plan = plans.setupPlanOf(params);
     const refused = await withNewStatuses(companyId, uid, await plans.refusedParts(companyId, uid, String(project._id), plan), planWork.statusNamesOf(project), plan.statuses);
     if (refused.length) return { refused: partsRefused(refused) };
+    const unsaved = await setup.draftsMisfit({ companyId, projectId: String(project._id), definitions: plan.definitions });
+    if (unsaved) return { error: unsaved };
     const kind = (plan.views || []).map((view) => view.kind).find((wanted) => !setup.sourceView(project, wanted));
     if (kind) return { error: setup.noSource(kind) };
     return planWork.filingProblem({ companyId, actor, uid: String(uid), allowedActions, mayManage, project, plan });

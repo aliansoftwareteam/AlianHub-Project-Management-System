@@ -296,7 +296,7 @@ exports.updateTaskIndexWhenLoad = async (req,res) => {
  * @param {Object} TaskUpdate - Task Object In which Index is to be updated
  * @param {String} CompanyId - Company Id In which Task Is Created
  * @param {Object} Rep - Response Of Task Object Which is Get from Typsense
- * @returns {Promise<String>} A Promise that resolves with the status true if index update succesfully.
+ * @returns {Promise<String>} A Promise that resolves with the status true if the index was updated successfully.
  *                            Rejects with an error message if any issues occur during the Update Process.
  */
 exports.update0Index = (taskUpdate,companyId,rep) => {
@@ -346,7 +346,7 @@ exports.update0Index = (taskUpdate,companyId,rep) => {
  * @param {String} CompanyId - Company Id In which Task Is Created
  * @param {Object} Rep - Response Of Task Object Which is Get from Typsense
  * @param {Object} TypsenseTask - We need to update the new task index from the task object referenced by this task index.
- * @returns {Promise<String>} A Promise that resolves with the status true if index update succesfully.
+ * @returns {Promise<String>} A Promise that resolves with the status true if the index was updated successfully.
  *                            Rejects with an error message if any issues occur during the Update Process.
  */
 exports.updateIndex = (taskUpdate,companyId,rep,typsenseTask) => {

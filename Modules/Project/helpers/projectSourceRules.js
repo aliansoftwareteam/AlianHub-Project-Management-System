@@ -22,6 +22,8 @@ const NUMERIC_RUN = /\d{15,}/;
 // Post-cleaning shape of an Upwork reference: the "~" is stripped, so what's left
 // is the bare id — all digits (which matches the bidding DB) or hex.
 const UPWORK_ID = /^[0-9a-f]{15,}$/i;
+const SCHEME_AND_HOST = /^.*?:\/\/+[^/]*/;
+const BARE_HOST = /^[^/]*(?:upwork|fiverr)\.com[^/]*/i;
 
 /** Slug for a submitted source, or null when it isn't one of the three. */
 const normaliseSource = (value) => {
@@ -40,12 +42,14 @@ const sourceOrDefault = (value) => normaliseSource(value) || DEFAULT_SOURCE;
  * Dropping the "~" is what makes the mapping work: Upwork's URL reference is
  * "~" + the same id the bidding DB stores, so once the prefix is gone an
  * all-digit reference equals `proposals.proposalId` directly.
+ *
+ * An address is read from its path alone, so one with no path holds no id.
  */
 const cleanProposalId = (raw) => {
     let value = String(raw === undefined || raw === null ? '' : raw).trim().replace(/^["']|["']$/g, '');
     if (value.includes('://') || /upwork\.com|fiverr\.com/i.test(value)) {
-        const withoutQuery = value.split(/[?#]/)[0];
-        const segments = withoutQuery.split('/').filter(Boolean);
+        const address = value.split(/[?#]/)[0];
+        const segments = address.replace(address.includes('://') ? SCHEME_AND_HOST : BARE_HOST, '').split('/').filter(Boolean);
         value = segments.length ? segments[segments.length - 1] : '';
     }
     return value.replace(/\/+$/, '').replace(/^~+/, '').trim().slice(0, MAX_PROPOSAL_ID);

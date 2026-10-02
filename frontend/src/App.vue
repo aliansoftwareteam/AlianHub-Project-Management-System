@@ -102,6 +102,7 @@ import { initOffline } from '@/offline';
 import * as env from '@/config/env';
 import {tabSyncHelper} from '@/utils/tabSyncs.js';
 import { adoptAccountPrefs } from '@/views/Settings/Language/localePrefs';
+import { followClockPrefs } from '@/utils/clockText';
 import { CommandPalette, QuickCreateTask, TaskTemplateDialogHost, AiFieldFillDialog } from '@/config/shellParts';
 const AiOffPage = defineAsyncComponent(() => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiOffPage.vue'));
 import { aiAvailability, loadAiAvailability, trackAiPlan } from '@/composable/aiAvailability';
@@ -145,6 +146,10 @@ watch(() => [logged.value, currentCompany.value?._id], ([isLogged, cid]) => {
 }, { immediate: true });
 
 watch(() => currentCompany.value?.planFeature, trackAiPlan, { immediate: true, deep: true });
+
+watch(() => [currentUser.value?.Time_Format, getters['settings/companyDateFormat']?.dateFormat], ([timeFormat, dateFormat]) => {
+    followClockPrefs({ timeFormat, dateFormat });
+}, { immediate: true });
 
 watch(() => currentUser.value, (val) => {
     if(val?.isVesionUpdate){

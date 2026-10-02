@@ -115,7 +115,7 @@
 <script setup>
 import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import moment from "moment";
+import { recentClockText } from "@/utils/clockText";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import ProvenanceBadge from "@/components/molecules/Provenance/ProvenanceBadge.vue";
 import TaskTagCell from "@/components/molecules/TagList/TaskTagCell.vue";
@@ -166,9 +166,7 @@ const statusStyle = computed(() => (status.value.bgColor ? statusChipStyle(statu
 
 /* A kept value can be days old: the time alone for one made today, the day with it otherwise. */
 const madeAt = (entry) => {
-    if (!entry.updatedAt) return "--:--";
-    const made = moment(entry.updatedAt);
-    return made.format(made.isSame(moment(), "day") ? "HH:mm" : "D MMM, HH:mm");
+    return recentClockText(entry.updatedAt) || "--:--";
 };
 
 const summary = computed(() => summaries.get(props.data._id));

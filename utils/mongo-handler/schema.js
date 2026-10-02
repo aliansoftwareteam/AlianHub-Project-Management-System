@@ -1523,6 +1523,8 @@ const schema = {
         // Set where those parts were tried and not made: the person who approved, who alone may try them once more, and why they were not made.
         retryBy: { type: String, required: false },
         retryWhy: { type: String, required: false },
+        // [{ part, name, error }] — what an approved change answered that it did not make, kept so the finished proposal says why
+        notMade: { type: Array, default: undefined, required: false },
     },
     // "Always do this": one kind of change, by one connection, in one project — managed by Modules/Agents/standingApprovals.js.
     agentStandingApprovals: {

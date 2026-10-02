@@ -287,8 +287,8 @@ const whoOf = (p) => {
     return person ? t('Inbox.queue_for', { agent: p.agentName, person }) : p.agentName;
 };
 
-const LOCKED_CHIPS = Object.freeze({ own_rights: 'Inbox.queue_locked_rights', first_approver: 'Inbox.queue_locked_retry' });
-const LOCKED_NOTES = Object.freeze({ own_rights: 'Ai.rights_locked', first_approver: 'Inbox.queue_retry_locked' });
+const LOCKED_CHIPS = Object.freeze({ own_rights: 'Inbox.queue_locked_rights', first_approver: 'Inbox.queue_locked_retry', not_this_plan: 'Inbox.queue_locked_plan' });
+const LOCKED_NOTES = Object.freeze({ own_rights: 'Ai.rights_locked', first_approver: 'Inbox.queue_retry_locked', not_this_plan: 'Inbox.queue_plan_locked' });
 // A row that is not the reader's to approve can still be theirs to decline: one their own agent asked for.
 const mayDecline = (p) => !p.locked || p.mayDecline === true;
 const selectable = computed(() => props.proposals.filter((p) => !p.locked));

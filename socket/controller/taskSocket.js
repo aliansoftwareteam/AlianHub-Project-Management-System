@@ -63,6 +63,7 @@ const relayTaskChange = async (changeData, includeUpdatedFields) => {
     const emitData = {
         fullDocument: changeData.data,
         ...(includeUpdatedFields && { updatedFields: changeData.updatedFields }),
+        ...(changeData.leftBecause && { leftBecause: changeData.leftBecause }),
     };
     // A room of an added list was joined on that list alone, so every socket is judged on the task's home.
     for (const room of roomsOf(changeData)) {

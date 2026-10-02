@@ -3080,6 +3080,8 @@ export default {
         status_declined: "declined",
         status_undone: "reverted",
         applied_with_failures: "Approved, but {n} change(s) could not be carried out: {error}",
+        not_made_title: "Not made",
+        not_made_line: "{name}: {why}",
         slack_post_title: "Slack message",
         slack_post_outside: "leaves the workspace",
         slack_post_channel: "Channel",
@@ -8202,7 +8204,7 @@ export default {
         remove_request: "Remove Request",
         resend_invitation: "Resend Invitation",
         cancel_invitation: "Cancel Invitation",
-        Invitation_mail_sent_sucessfully: "Invitation mail sent sucessfully",
+        Invitation_mail_sent_sucessfully: "Invitation mail sent successfully",
         confirm_change_user_designation:
             "Are you sure you want to change this user's designation to",
         confirm_change_user_role:
@@ -9352,6 +9354,8 @@ export default {
         queue_locked: "Needs an owner or admin",
         queue_locked_rights: "Needs someone who may make this change",
         queue_locked_retry: "Waits for the person who approved the plan",
+        queue_locked_plan: "Cannot be made through this plan",
+        queue_plan_locked: "Nothing in this plan can be made through it. Decline it. An owner or admin can add the status in Settings, or ask their own AI.",
         queue_retry_locked: "Only the person who approved this plan can try these parts again.",
         queue_retry_note: "This was not made the first time, so you can try it once more. Why it was not made: {why}",
         queue_left_waiting: "What you may not approve stays waiting for someone who may.",
@@ -9604,11 +9608,14 @@ export default {
         line_batch_tasks: "Tasks",
         tasks_and_more: "and {n} more",
         tasks_not_shown: "{n} task you cannot open | {n} tasks you cannot open",
+        tasks_show_all: "Show all {n} tasks",
+        tasks_show_fewer: "Show fewer",
         pick_hint: "Untick anything you do not want. Only what is ticked is made.",
         pick_also_out: "{names} is left out too: it needs “{name}”. | {names} are left out too: they need “{name}”.",
         pick_also_kept: "{names} is kept too: “{name}” needs it. | {names} are kept too: “{name}” needs them.",
         pick_locked: "An owner or admin approves this part",
         pick_locked_rights: "Someone whose role may make this approves this part",
+        pick_locked_plan: "This cannot be made through this plan. An owner or admin can add the status in Settings, or ask their own AI.",
         pick_hidden: "{n} part of this plan has nothing to show, so it is left out. | {n} parts of this plan have nothing to show, so they are left out.",
         pick_also_back: "{names} is back too: it was left out with “{name}”. | {names} are back too: they were left out with “{name}”.",
         pick_named: "“{name}”",
@@ -10083,7 +10090,7 @@ export default {
             "Are you sure want to convert this task into a List?",
         important: "Important",
         you_will_lose:
-            "You will lose all threaded comments. This action cant be undone",
+            "You will lose all threaded comments. This action can't be undone",
         convert_to_list: "Convert to list",
     },
     Billing: {
@@ -10102,7 +10109,7 @@ export default {
         update_payment_method: "Update Payment Method",
         add_payment_method: "Add Payment Method",
         ending_in: "ending in",
-        payment_method_update: "Payment method update succesfully.",
+        payment_method_update: "Payment method updated successfully.",
         waiting_msg:
             "Your recent payment method update will take effect with your next bill and will be used for all future payments..",
         error_updating:
@@ -10486,6 +10493,10 @@ export default {
         Task_restored_successfully: "Task restored successfully",
         Task_archived_successfully: "Task archived successfully",
         Task_deleted_successfully: "Task deleted successfully",
+        Task_was_moved: "This task was moved to another list.",
+        Task_became_subtask: "This task is now a subtask of another task.",
+        Subtask_became_task: "This subtask is now a task of its own.",
+        Task_became_list: "This task was turned into a list.",
         Tag_Deleted_successfully: "Tag Deleted successfully",
         Log_time_added_successfully: "Log time added successfully..",
         Filter_saved_successfully: "Filter saved successfully.",
@@ -10494,16 +10505,16 @@ export default {
         checklist_created_successfully: "Checklist created successfully",
         Please_select_checklist: "Please select checklist.",
         already_exists: "EXIST_VALUE is already exists",
-        Converted_sucessfully: "Converted sucessfully",
+        Converted_sucessfully: "Converted successfully",
         create_task_limit_in_sprint_upgrade_task_message:
             "Upgrade your plan. You have reached the limit for creating tasks in the SELECTED_SPRINT_DATA list.",
         Please_Select_Task_Type: "Please Select Task Type",
         Please_Select_Task: "Please Select Task",
-        Task_moved_sucessfully: "Task moved sucessfully",
+        Task_moved_sucessfully: "Task moved successfully",
         Task_not_moved: "Task not moved",
-        Task_duplicate_sucessfully: "Task duplicate sucessfully",
+        Task_duplicate_sucessfully: "Task duplicated successfully",
         Task_not_duplicated: "Task not duplicated",
-        Convert_in_to_task_sucessfully: "Convert in to task sucessfully",
+        Convert_in_to_task_sucessfully: "Converted to a task successfully",
         Company_name_already_exists: "Company name already exists",
         Company_has_been_created_Successfully:
             "Company has been created Successfully.",
@@ -10572,9 +10583,9 @@ export default {
         Please_try_again: "Please try again",
         Task_name_copied: "Task name copied",
         Status_already_exists: "Status already exists",
-        Status_added_sucessfully: "Status added sucessfully",
+        Status_added_sucessfully: "Status added successfully",
         Task_Type_already_exists: "Task Type already exists",
-        Task_Type_added_sucessfully: "Task Type added sucessfully",
+        Task_Type_added_sucessfully: "Task Type added successfully",
         Image_size_must_be_less_than_ImageDimensions_pixels:
             "Image size must be less than ImageDimensions pixels.",
         Data_deleted_successfully: "Data deleted successfully.",
@@ -10626,8 +10637,8 @@ export default {
         Checklist_not_saved: "The checklist was not saved. Try again.",
         Start_date_updated_successfully: "Start date updated successfully",
         Start_date_not_updated: "Start date not updated",
-        Task_converted_sucessfully: "Task converted sucessfully",
-        Task_merged_sucessfully: "Task merged sucessfully",
+        Task_converted_sucessfully: "Task converted successfully",
+        Task_merged_sucessfully: "Task merged successfully",
         Can_not_create_template_name_Custom:
             "Can not create template name Custom",
         Template_name_updated_successfully:
@@ -10663,9 +10674,9 @@ export default {
             "Only product owner can create a company",
         Company_name_must_be_unique: "Company name must be unique.",
         Subscription_cancel_succesfully_Please_allow_2_to_3_minutes_for_the_changes_to_take_effect_everywhere:
-            "Subscription cancel succesfully. Please allow 2 to 3 minutes for the changes to take effect everywhere.",
+            "Subscription cancelled successfully. Please allow 2 to 3 minutes for the changes to take effect everywhere.",
         Subscription_reactivate_succesfully_Please_allow_2_to_3_minutes_for_the_changes_to_take_effect_everywhere:
-            "Subscription reactivate succesfully.  Please allow 2 to 3 minutes for the changes to take effect everywhere.",
+            "Subscription reactivated successfully. Please allow 2 to 3 minutes for the changes to take effect everywhere.",
         View_name_is_required: "View name is required",
         name_should_be_at_least_3_characters_long:
             "name should be at least 3 characters long",
@@ -10693,7 +10704,7 @@ export default {
         Start_and_Due_date_updated_successfully:
             "Start and Due date updated successfully",
         Start_and_Due_date_not_updated: "Start and Due date not updated",
-        Attchments_deleted_successfully: "Attchments deleted successfully",
+        Attchments_deleted_successfully: "Attachments deleted successfully",
         Designation_is_required: "Designation is required",
         Designation_already_exists: "Designation already exists",
         Designation_added_successfully: "Designation added successfully",
@@ -10785,7 +10796,7 @@ export default {
         Import_users_successfully: "Users imported successfully",
         date_range: "Please select a date range before applying.",
         Task_total_estimate_update_succesfull:
-            "Task toal estimate update successfully.",
+            "Task total estimate updated successfully.",
     },
     SecurityAndPermission: {
         project: "Project",
