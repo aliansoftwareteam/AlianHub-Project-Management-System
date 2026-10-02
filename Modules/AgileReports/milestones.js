@@ -76,6 +76,7 @@ exports.getMilestones = async (req, res) => {
                     ProjectID: { $in: projectIds },
                     deletedStatusKey: { $in: [0, 2, undefined] },
                     isParentTask: true,
+                    mainChat: { $ne: true },
                     ...(await hiddenSprintFilter(companyId, req.uid, projectIds)),
                 }, '_id ProjectID DueDate statusType'],
             }, 'find').catch(() => []),

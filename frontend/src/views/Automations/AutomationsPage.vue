@@ -558,9 +558,14 @@ const applyAiDraft = ({ rule, sentence: drafted }) => {
 const onRuleEdit = async () => {
     backtest.value = null;
     sentenceFailed.value = false;
+    const shown = sentence.value;
     const body = (await apiRequest('post', env.AUTOMATIONS_COMPILE, { rule: currentRule() }))?.data;
     if (!body?.status) return;
+    // The person wrote in the sentence box while this was on its way: their sentence is read next, not replaced.
+    if (sentence.value !== shown) return;
     takeFeedback(body.data);
+    // Text that appears under the caret is typed into: the box is left alone while the person is in it.
+    if (sentenceInput.value && document.activeElement === sentenceInput.value) return;
     sentence.value = body.data.sentence;
     settledSentence = body.data.sentence;
 };

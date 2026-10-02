@@ -28,18 +28,18 @@ const TOOLS = [
         strict: true,
         filedUnder: GRANT,
         target: () => WRITE_TARGET,
-        description: `Ask for one card on a dashboard: ${Object.keys(dashboards.CARDS).join(', ')}. `
-            + 'Name dashboardId, a dashboard the person owns, or newDashboard, the name of a new dashboard that will be private to them. '
-            + `A card that covers a span of time (${withPeriod.join(', ')}) takes a period: ${Object.keys(dashboards.PERIODS).join(', ')}; left out, it starts on the span the dashboard editor gives it. `
-            + 'A card shows each viewer only the work they may see. A card that first asks for a project, a list or a question (burndown, velocity, ask a question) is added in AlianHub, as is sharing a dashboard. '
-            + 'Nothing is made by the call: it answers that the card is waiting, and the person approves it in AlianHub, where they see the dashboard and the card by name. Only they can approve it, and they can undo it afterwards. '
-            + 'A token kept to some projects cannot use it.',
+        description: `Asks for one card on a dashboard: ${Object.keys(dashboards.CARDS).join(', ')}. `
+            + 'Give dashboardId (a dashboard the person owns) or newDashboard (the name of a new dashboard that will be private to them). '
+            + `A card that covers a span of time (${withPeriod.join(', ')}) takes a period: ${Object.keys(dashboards.PERIODS).join(', ')}. If left out, it uses the span the dashboard editor gives it. `
+            + 'A card shows each viewer only the work they may see. A card that needs a project, a list or a question first (burndown, velocity, ask a question) has to be added in AlianHub, and so does sharing a dashboard. '
+            + 'Nothing is made by this call: it answers that the card is waiting, and the person approves it in AlianHub, where they see the dashboard and the card by name. Only they can approve it, and they can undo it afterwards. '
+            + 'A connection limited to some projects cannot use this.',
         input: input({
-            dashboardId: { ...ID, description: 'A dashboard the person owns; in its place, newDashboard' },
-            newDashboard: { type: 'string', minLength: 1, maxLength: dashboards.NAME_MAX, description: 'The name of a new, private dashboard to make with the card on it' },
+            dashboardId: { ...ID, description: 'A dashboard the person owns. Use newDashboard instead for a new one.' },
+            newDashboard: { type: 'string', minLength: 1, maxLength: dashboards.NAME_MAX, description: 'The name of a new, private dashboard to create with the card on it' },
             card: { type: 'string', enum: Object.keys(dashboards.CARDS) },
             period: { type: 'string', enum: Object.keys(dashboards.PERIODS) },
-            reason: { type: 'string', maxLength: REASON_MAX, description: 'Why, in a line; it is kept in the audit log' },
+            reason: { type: 'string', maxLength: REASON_MAX, description: 'Why, in one line. It is kept in the record of changes.' },
         }, ['card']),
         check: (args) => dashboards.problemIn(args),
         prepare: cardToFile,

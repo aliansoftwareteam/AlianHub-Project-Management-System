@@ -474,7 +474,9 @@ export const mutateUpdateFirebaseTableTasks = (state, payload) => {
                     const taskIndex = state.tableTasks[pid][sprintId].tasks.findIndex((x) => x.id === data.ParentTaskId);
                     if(taskIndex !== -1) {
                         const subTaskIndex = state.tableTasks[pid][sprintId].tasks[taskIndex].subtaskArray.findIndex((x) => x.id === data.id);
-                        state.tableTasks[pid][sprintId].tasks[taskIndex].subtaskArray.splice(subTaskIndex, 1);
+                        if(subTaskIndex !== -1) {
+                            state.tableTasks[pid][sprintId].tasks[taskIndex].subtaskArray.splice(subTaskIndex, 1);
+                        }
                     }
                 } else {
                     const taskIndex = state.tableTasks[pid][sprintId].tasks.findIndex((x) => x.id === data.id);
@@ -684,8 +686,8 @@ export const mutateTypesenseTableTasks = (state, payload) => {
     const {pid, sprintId, data, nextPage, total = 0, op } = payload;
     const keys = Object.keys(state.tableTasks);
     const projectFound = keys.includes(pid);
-    /* An event, unlike a page the Table asked for, can be about a task this list does not show (any more). */
-    if(op && data && !shownInList(data, pid, sprintId)) {
+    /* An event, unlike a page the Table asked for, can be about a task this list does not show (any more), or a deleted one. */
+    if(op && data && (op === "removed" || !shownInList(data, pid, sprintId))) {
         const held = projectFound ? state.tableTasks[pid][sprintId]?.tasks : null;
         const at = held ? held.findIndex((x) => x._id === data._id) : -1;
         if(at !== -1) held.splice(at, 1);
@@ -815,7 +817,7 @@ export const mutateSprints = (state,payload) => {
                 state.sprints[pId].push(data);
             }
         }else{
-            state.sprints = {[pId]:[data]}
+            state.sprints = {...state.sprints, [pId]:[data]}
         }
     }else if(op === "modified"){
         const sprintIndex = state.sprints[pId] && state.sprints[pId].length > 0 && state.sprints[pId]?.findIndex((x) => x._id === data._id);
@@ -945,7 +947,7 @@ export const mutateFolders = (state,payload) => {
                 state.folders[pId].push(data);
             }
         }else{
-            state.folders = {[pId]:[data]}
+            state.folders = {...state.folders, [pId]:[data]}
         }
     }else if(op === "modified"){
         const sprintIndex = state.folders[pId] && state.folders[pId].length > 0 && state.folders[pId]?.findIndex((x) => x._id === data._id);
@@ -953,7 +955,7 @@ export const mutateFolders = (state,payload) => {
             state.folders[pId][sprintIndex] = {...data};
         }
     }else if(op === "removed"){
-        const sprintIndex = state.folders[pId] && state.folders[pId].length > 0 && state.folders[pId]?.findIndex((x) => x._id === data._id);
+        const sprintIndex = state.folders[pId]?.findIndex((x) => x._id === data._id) ?? -1;
         if(sprintIndex !== -1) {
             state.folders[pId].splice(sprintIndex, 1);
         }

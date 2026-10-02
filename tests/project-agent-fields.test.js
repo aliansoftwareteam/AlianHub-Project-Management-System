@@ -136,9 +136,21 @@ describe('the project update leaves the settings for agents alone', () => {
         expect(project()).toMatchObject({ ProjectName: 'Open', ...STORED });
     });
 
-    it.each([['an owner', session(OWNER)], ['a member', session(MEMBER)], ['an agent\'s token', agentToken(OWNER)], ['an owner\'s API token', personalToken(OWNER)]])('%s still renames the project', async (_who, caller) => {
+    it.each([['an owner', session(OWNER)], ['a member', session(MEMBER)], ['an owner\'s API token', personalToken(OWNER)]])('%s still renames the project', async (_who, caller) => {
         expect((await send(UPDATE, caller, { updateObject: { ProjectName: 'Renamed' } })).code).toBe(200);
         expect(project()).toMatchObject({ ProjectName: 'Renamed', ...STORED });
+    });
+
+    it('an agent\'s token renames the project once the project lets agents change it, and those settings stay as they were', async () => {
+        const rename = () => send(UPDATE, agentToken(OWNER), { updateObject: { ProjectName: 'Renamed' } });
+
+        expect((await rename()).code).toBe(403);
+        expect(project()).toMatchObject({ ProjectName: 'Open', ...STORED });
+
+        const open = { agentPolicy: { done: 'never', connected: 'single_task' }, agentLimits: { atOnce: 1, paused: false } };
+        Object.assign(project(), JSON.parse(JSON.stringify(open)));
+        expect((await rename()).code).toBe(200);
+        expect(project()).toMatchObject({ ProjectName: 'Renamed', ...STORED, ...open });
     });
 });
 

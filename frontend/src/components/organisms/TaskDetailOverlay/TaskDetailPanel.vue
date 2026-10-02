@@ -197,7 +197,7 @@
                         :sections="filesSections"
                     />
                     <div v-else-if="activeTab === 'relations' && task._id" class="ah-detail__relations">
-                        <LinkedTasks ref="linkedTasksRef" :task="task" />
+                        <LinkedTasks ref="linkedTasksRef" :task="task" @changed="fetchRelations" />
                         <p class="ah-detail__relations-note ah-small">{{ $t('TaskPanel.relations_note') }}</p>
                     </div>
                 </div>
@@ -596,6 +596,9 @@ function projectSlice() {
 /* The panel shows its own copy of the task, which the store's row does not reach. */
 const stopFollowingEdits = onInstantEdit((taskId, fields) => {
     if (String(taskId) === String(props.taskId)) task.value = { ...task.value, ...fields };
+    else if (subTasks.value.some((sub) => String(sub._id) === String(taskId))) {
+        subTasks.value = subTasks.value.map((sub) => (String(sub._id) === String(taskId) ? { ...sub, ...fields } : sub));
+    }
 });
 
 /* The actor's own socket room does not echo taskUpdate back, so push the change
@@ -1125,14 +1128,25 @@ function onAgentSession(session) {
     scheduleSessionPoll();
 }
 
+function listenLive() {
+    if (socket?.value?.on) {
+        socket.value.on("taskDetail_agentSession", onAgentSession);
+        socket.value.on("commentInsert", onCommentInsert);
+    }
+    dispatch("projectData/getTaskDetailSnapShot", { taskId: props.taskId }).catch((error) => console.error(error));
+}
+
+/* A tab that comes back into view gets a new connection (App.vue); the room and the listeners of the old one went with it. */
+watch(() => socket?.value, (next, previous) => {
+    if (next && previous && next !== previous) listenLive();
+});
+
 onMounted(async () => {
     loadTask();
     loadAgentRun();
     loadAgentSessions();
-    if (socket?.value?.on) socket.value.on("taskDetail_agentSession", onAgentSession);
+    listenLive();
     document.addEventListener("visibilitychange", visibilityHandler);
-    if (socket?.value?.on) socket.value.on("commentInsert", onCommentInsert);
-    dispatch("projectData/getTaskDetailSnapShot", { taskId: props.taskId }).catch((error) => console.error(error));
 });
 
 onBeforeUnmount(() => {

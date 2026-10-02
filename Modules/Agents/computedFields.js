@@ -27,19 +27,19 @@ const partOf = (field, type, nameOf) => {
 
 const problemOf = (draft) => {
     if (draft.type === FORMULA) {
-        if (!draft.expression) return 'is a formula, which needs an expression';
+        if (!draft.expression) return 'is a formula, so it needs an expression';
         const check = validateFormulaDefinition({ definitions: [], fieldTitle: draft.name, expression: draft.expression });
-        return check.valid ? '' : `has a formula that cannot be read: ${check.reason}`;
+        return check.valid ? '' : `has a formula that cannot be understood: ${check.reason}`;
     }
     if (draft.type !== ROLLUP) return '';
-    if (!draft.function) return `is a rollup, which needs a function: one of ${ROLLUP_FUNCTIONS.join(', ')}`;
-    return draft.source || draft.function === COUNT ? '' : `needs source: the name of the number field its ${draft.function} is taken of`;
+    if (!draft.function) return `is a rollup, so it needs a function: one of ${ROLLUP_FUNCTIONS.join(', ')}`;
+    return draft.source || draft.function === COUNT ? '' : `needs a source: the name of the number field its ${draft.function} is worked out from`;
 };
 
 /* '' where a rollup can read `found`, the field its source names among the project's fields and the call's own. */
 const sourceProblem = (draft, found) => {
     if (draft.type !== ROLLUP || !draft.source) return '';
-    if (!found) return `rolls up "${draft.source}", which is not a field of this call or of the project`;
+    if (!found) return `rolls up "${draft.source}", which is not a field in this request or in the project`;
     return SOURCE_TYPES.includes(found.type) ? '' : `rolls up "${found.name}", which is not a number field`;
 };
 
@@ -47,7 +47,7 @@ const sourceProblem = (draft, found) => {
 const formulaMisfit = async (companyId, draft) => {
     if (draft.type !== FORMULA) return '';
     const guard = await require('../CustomField/controller').guardFormulaDefinition(companyId, { fieldType: FORMULA, fieldTitle: draft.name, formulaExpression: draft.expression });
-    return guard.valid ? '' : `has a formula that cannot be saved: ${guard.reason}`;
+    return guard.valid ? '' : `has a formula that cannot be used: ${guard.reason}`;
 };
 
 const settingsOf = (draft, sourceId = '') => {

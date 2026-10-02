@@ -345,8 +345,9 @@ watch(selected, (p) => {
     editable.value = p ? (p.changes || []).map((c) => ({ ...c })) : [];
 });
 
-const reload = async () => {
-    loading.value = true;
+/* "Loading" is for the first read of a view. After a decision the rows that are left stay on screen while the list is read again. */
+const reload = async ({ inPlace = false } = {}) => {
+    if (!inPlace) loading.value = true;
     loadError.value = "";
     try {
         await loadProposals(view.value);
@@ -390,7 +391,7 @@ const onReassignApproval = async ({ approval, toUserId, reason }) => {
 const afterDecision = async (message) => {
     const id = selected.value._id;
     selected.value = null;
-    await Promise.all([reload(), loadSummary().catch(() => {})]);
+    await Promise.all([reload({ inPlace: true }), loadSummary().catch(() => {})]);
     if (message) $toast.success(message, { position: "top-right" });
     return id;
 };
@@ -444,7 +445,7 @@ const onUndo = async () => {
     if (!id) return;
     try {
         dropProjects(store, trashedProjectIds(await decide(id, "undo", {})));
-        await Promise.all([reload(), loadSummary().catch(() => {})]);
+        await Promise.all([reload({ inPlace: true }), loadSummary().catch(() => {})]);
         $toast.success(t("Ai.undone"), { position: "top-right" });
     } catch (e) {
         $toast.error(e.message, { position: "top-right" });

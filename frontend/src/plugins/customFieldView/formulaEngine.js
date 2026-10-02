@@ -91,12 +91,13 @@ export function withRollupSources(defs, allDefs = defs) {
     });
 }
 
-/* While part of the tree is not loaded, the number the server stored is the whole one. */
+/* While part of the tree is not loaded, the number the server stored is the whole one. A task with no subtasks is
+ * a whole tree: its sum and its count are 0, as the server stores them. */
 function computeRollup(fieldDef, task, allTasks, defs) {
     const srcId = fieldDef && fieldDef.rollupSourceFieldId;
     const fn = ROLLUP_FUNCTIONS.includes(fieldDef && fieldDef.rollupFunction) ? fieldDef.rollupFunction : 'sum';
     const { rows, complete } = descendantsOf(task, allTasks);
-    if (!rows.length || !complete) return storedValue(fieldDef, task);
+    if (!complete) return storedValue(fieldDef, task);
 
     const source = srcId ? fieldDef.rollupSource || (Array.isArray(defs) ? defs : []).find((def) => String(def?._id) === String(srcId)) : null;
     const holders = source ? rows.filter((row) => fieldAppliesToTask(source, row)) : rows;
@@ -120,8 +121,15 @@ export function computeCustomFieldValue(fieldDef, task, allTasks, defs) {
     return '';
 }
 
-// Asks the server to re-evaluate every formula/rollup field on these tasks and
-// store the result. Call it after a custom-field value changes.
+const COMPUTED_TYPES = ['formula', 'rollup'];
+
+/* A task made before a formula or a rollup existed holds no entry for it until one of its inputs changes. */
+export function neverComputed(task, defs) {
+    const held = (task && task.customField) || {};
+    return (defs || []).some((def) => def && COMPUTED_TYPES.includes(def.fieldType) && held[String(def._id)] === undefined);
+}
+
+// The server works every formula and rollup out again at each task write; this asks for it outright.
 export function recomputeCustomFields({ taskIds, projectId, scope }) {
     const ids = (Array.isArray(taskIds) ? taskIds : [taskIds]).filter(Boolean).map(String);
     if (!ids.length) return Promise.resolve(null);

@@ -82,6 +82,51 @@ describe('webhook debounce', () => {
     });
 });
 
+describe('a formula or a rollup worked out again', () => {
+    beforeEach(() => {
+        jest.useFakeTimers();
+        dispatcher.start();
+    });
+
+    afterEach(async () => {
+        await jest.advanceTimersByTimeAsync(10000);
+        jest.useRealTimers();
+    });
+
+    const emitComputed = () => mockEmitter.emit('task:update', {
+        data: taskDoc('URGENT'),
+        updatedFields: { 'customField.6f00000000000000000000f1': { fieldValue: 4, fieldType: 'rollup', computedAt: new Date() } },
+        source: 'computed',
+    });
+
+    it('is not sent as a task update', async () => {
+        emitComputed();
+        await jest.advanceTimersByTimeAsync(2000);
+        expect(safeFetch).not.toHaveBeenCalled();
+    });
+
+    it('does not ride along with a person\'s change in the same window', async () => {
+        emitUpdate('HIGH');
+        emitComputed();
+        await jest.advanceTimersByTimeAsync(2000);
+        expect(deliveries().map((body) => body.changedFields)).toEqual([['Task_Priority']]);
+    });
+
+    it('a conversation, which is kept among the tasks, is never sent', async () => {
+        mockDb.seed(SCHEMA_TYPE.TASKS, { ...taskDoc('LOW'), _id: OTHER_TASK, mainChat: true });
+        emitFor('task:update', { ...taskDoc('LOW'), _id: OTHER_TASK, mainChat: true }, { TaskName: 'A and B' });
+        emitFor('task:insert', { ...taskDoc('LOW'), _id: OTHER_TASK, mainChat: true }, undefined);
+        await jest.advanceTimersByTimeAsync(2000);
+        expect(safeFetch).not.toHaveBeenCalled();
+    });
+
+    it('is no more sent when the value went with its deleted field', async () => {
+        mockEmitter.emit('task:update', { data: taskDoc('URGENT'), updatedFields: { 'customField.6f00000000000000000000f1': null }, source: 'field_removed' });
+        await jest.advanceTimersByTimeAsync(2000);
+        expect(safeFetch).not.toHaveBeenCalled();
+    });
+});
+
 describe('webhook debounce window is fixed, not sliding', () => {
     beforeEach(() => {
         jest.useFakeTimers();

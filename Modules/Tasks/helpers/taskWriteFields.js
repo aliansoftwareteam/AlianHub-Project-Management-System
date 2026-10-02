@@ -111,7 +111,17 @@ const newlyNamed = (value, held) => {
     return namedIds(value).filter((id) => !already.has(id));
 };
 
-const peopleOnNewTask = (data) => (isPlainObject(data) ? [...namedIds(data.AssigneeUserId || []), ...namedIds(data.watchers || []), ...namedIds(data.Task_Leader || [])] : []);
+const peopleOnChecklist = (rows) => (Array.isArray(rows) ? rows : [rows]).flatMap((row) => (isPlainObject(row) ? namedIds(row.AssigneeUserId || []) : []));
+
+const peopleOnNewTask = (data) => (isPlainObject(data) ? [...namedIds(data.AssigneeUserId || []), ...namedIds(data.watchers || []), ...namedIds(data.Task_Leader || []), ...peopleOnChecklist(data.checklistArray || [])] : []);
+
+/* Both operations that name one person on a row push them when the history says 'add'; the others carry whole rows. */
+const peopleAddedToChecklist = (payload, stored) => {
+    const held = peopleOnChecklist(stored.checklistArray || []);
+    const history = isPlainObject(payload.historyObj) ? payload.historyObj : {};
+    if (['checklistassignee', 'assigneeremove'].includes(payload.operation)) return history.type === 'add' ? newlyNamed(history.assigneeId, held) : [];
+    return ['taskchecklistcreate', 'checklistadd', 'checklistchecked'].includes(payload.operation) ? newlyNamed(peopleOnChecklist(payload.data), held) : [];
+};
 
 const PEOPLE = Object.freeze({
     create: (payload) => peopleOnNewTask(payload.data),
@@ -120,6 +130,8 @@ const PEOPLE = Object.freeze({
     updateTaskLeader: (payload, stored) => newlyNamed(valueAt(payload, ['firebaseObj', 'Task_Leader']), stored.Task_Leader),
     updateWatcher: (payload, stored) => (payload.add ? newlyNamed(payload.userId, stored.watchers) : []),
     updateQueueList: (payload, stored) => (payload.actionType === 'add' ? newlyNamed(payload.userId, stored.queueListArray) : []),
+    updateChecklists: peopleAddedToChecklist,
+    AddAiChecklist: (payload, stored) => newlyNamed(peopleOnChecklist(payload.checklistArray), peopleOnChecklist(stored.checklistArray || [])),
     carried: (payload, stored) => [...newlyNamed(payload.assignee, stored.AssigneeUserId), ...newlyNamed(payload.watcher, stored.watchers)],
     bulkUpdateAssignee: (payload) => (payload.type === 'assigneRemove' ? [] : namedIds(payload.employeeId)),
     bulkDuplicate: (payload) => [...namedIds(payload.assignee || []), ...namedIds(payload.watcher || [])],
@@ -232,8 +244,8 @@ const TASK_ACTION_FIELDS = Object.freeze({
 
     updateWatcher: spec({ params: ['companyId', 'projectId', 'sprintId', 'taskId', 'userId', 'add', 'employeeName', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ['userId']], task: TASK_ID[0], project: PROJECT_ID, people: PEOPLE.updateWatcher }),
     updateTags: spec({ params: ['companyId', 'projectId', 'sprintId', 'taskId', 'tagId', 'operation', ...HISTORY_USER], company: companyId, ids: TASK_ID, scalars: [['tagId']], task: TASK_ID[0], project: PROJECT_ID, stored: true }),
-    updateChecklists: spec({ params: ['companyId', 'projectId', 'sprintId', 'taskId', 'operation', 'data', 'historyObj', 'taskData', ...HISTORY_USER], company: companyId, ids: TASK_ID, task: TASK_ID[0], project: PROJECT_ID }),
-    AddAiChecklist: spec({ params: ['companyId', 'taskId', 'checklistArray', 'sprintId', 'projectId', ...HISTORY_USER], company: companyId, ids: TASK_ID, task: TASK_ID[0], project: PROJECT_ID }),
+    updateChecklists: spec({ params: ['companyId', 'projectId', 'sprintId', 'taskId', 'operation', 'data', 'historyObj', 'taskData', ...HISTORY_USER], company: companyId, ids: TASK_ID, task: TASK_ID[0], project: PROJECT_ID, people: PEOPLE.updateChecklists }),
+    AddAiChecklist: spec({ params: ['companyId', 'taskId', 'checklistArray', 'sprintId', 'projectId', ...HISTORY_USER], company: companyId, ids: TASK_ID, task: TASK_ID[0], project: PROJECT_ID, people: PEOPLE.AddAiChecklist }),
     updateAttachments: spec({ params: ['companyId', 'sprintId', 'taskId', 'taskData', 'id', 'operation', 'data', 'projectData', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ...TASK_DATA], scalars: [['data', 'id']], task: TASK_ID[0], project: [['projectData', 'id']], taskNames: TASK_NAME, projectNames: PROJECT_DATA_NAME, stored: true, attachments: 'added' }),
     updateDescription: spec({ params: ['companyId', 'projectData', 'sprintId', 'task', 'text', ...HISTORY_USER], company: companyId, ids: TASK, task: TASK[0] }),
     updateTaskCustomField: spec({ params: ['companyId', 'taskId', 'updateDetail', 'customFieldId', ...HISTORY_USER], company: companyId, fieldNames: [['customFieldId']], ids: TASK_ID, task: TASK_ID[0], stored: true }),
@@ -601,19 +613,25 @@ const checkConversation = async (req, company, taskSpec, payload, spaceId) => {
     if (!startsOwnConversation(req.uid, valueAt(payload, taskSpec.chat.slice(0, -1)))) refuse(400, 'A conversation is started by one of the people in it.');
 };
 
+const CONVERSATION_IN_PROJECT = 'A conversation is started in a chat space, not in a project.';
+
 /* Where a create, move or copy lands: a project the caller can open and, when the action names one, a list
- * of that project they may see. A conversation lands in a chat space, which has neither. */
+ * of that project they may see. A conversation lands in a chat space, which has neither, and nowhere else:
+ * kept among a project's tasks it would be a row of that project only the people in it could see. */
 const destinationOf = async (req, company, taskSpec, payload) => {
     const projectId = valueAt(payload, taskSpec.destination);
     if (typeof projectId !== 'string' || !projectId) refuse(400, `${nameOf(taskSpec.destination)} is required.`);
+    const marked = taskSpec.chat ? valueAt(payload, taskSpec.chat) : false;
     const project = await openProject(company, req.uid, projectId);
     if (!project) {
-        if (taskSpec.chat && valueAt(payload, taskSpec.chat) === true && await isChatSpace(company, projectId)) {
+        if (marked === true && await isChatSpace(company, projectId)) {
             await checkConversation(req, company, taskSpec, payload, projectId);
             return null;
         }
         throw projectNotFound();
     }
+    /* Any value the schema would store as true, not `true` alone. */
+    if (marked) refuse(400, CONVERSATION_IN_PROJECT);
     if (taskSpec.list) {
         const list = await listOf(company, req.uid, projectId, valueAt(payload, taskSpec.list.id));
         if (!list) throw listNotFound();

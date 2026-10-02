@@ -7,14 +7,16 @@ const { taskMongo } = require('../Tasks/helpers/task_class_Mongo');
 const logger = require('../../Config/loggerConfig');
 const socketEmitter = require('../../event/socketEventEmitter');
 const rules = require('./recurrenceRules');
+const { keptOnProject } = require('../../Config/projectPeople');
 
 const COMPANY_CONCURRENCY = 5;
 const LOG_PREFIX = '[recurringTasks]';
 
 const computeNextRun = rules.computeNextRun;
 
-// Clone the stored template into a fresh task `data` payload for taskMongo.create.
-function buildInstanceData(def, companyId) {
+/* The stored template as the `data` of taskMongo.create. The people it names were checked when the repeat was set
+ * and may have left the project or the company since, so each run keeps the ones who can open the project now. */
+async function buildInstanceData(def, companyId) {
     const t = Object.assign({}, def.templateSnapshot || {});
     const projectId = (def.projectSnapshot && def.projectSnapshot._id) || def.ProjectID;
     return Object.assign(t, {
@@ -22,6 +24,7 @@ function buildInstanceData(def, companyId) {
         TaskKey: '-',
         ProjectID: projectId,
         CompanyId: companyId,
+        AssigneeUserId: await keptOnProject(companyId, String(projectId))(t.AssigneeUserId || []),
         sprintId: def.sprintId,
         sprintArray: def.sprintArray || t.sprintArray,
         deletedStatusKey: 0,
@@ -68,7 +71,7 @@ async function instantiateOne(companyId, def, occurrenceDate) {
         }
         return { created: false, skipped: true, rolled: false };
     }
-    const data = buildInstanceData(def, companyId);
+    const data = await buildInstanceData(def, companyId);
     const indexObj = { indexName: 'groupByStatusIndex', searchKey: 'statusKey', searchValue: String(data.statusKey || 1) };
     const result = await taskMongo.create({
         data,

@@ -95,8 +95,9 @@
                                 <div class="d-flex align-items-center" v-if="item.name.value === 'Task_Priority'">
                                     <span v-for="(option, i) in item.displayData" :key="i">
                                         <span v-if="i < numberOfItem" class="d-flex align-items-center">
-                                            <WasabiIamgeCompp v-if="option.statusImage" :data="{url: option.statusImage}" :style="{ margin:  clientWidth > 767 ? '0px 5px' : '0px 8px 0 13px', maxWidth: '14px'}" />
-                                            <span class="mr-5-px" :class="{'ml-5-px': !option.statusImage, 'font-size-12' : clientWidth > 767 , 'font-size-14' : clientWidth <= 767 }">{{ option.name }}</span>
+                                            <img v-if="bundledPriorityIcon(option)" :src="bundledPriorityIcon(option)" alt="" :style="{ margin:  clientWidth > 767 ? '0px 5px' : '0px 8px 0 13px', maxWidth: '14px'}" />
+                                            <WasabiIamgeCompp v-else-if="storedOptionImage(option)" :data="{url: option.statusImage}" :style="{ margin:  clientWidth > 767 ? '0px 5px' : '0px 8px 0 13px', maxWidth: '14px'}" />
+                                            <span class="mr-5-px" :class="{'ml-5-px': !hasOptionImage(option), 'font-size-12' : clientWidth > 767 , 'font-size-14' : clientWidth <= 767 }">{{ option.name }}</span>
                                         </span>
                                     </span>
                                     <span v-if="item.displayData.length > numberOfItem" class="mr-5-px span-count" :class="{'font-size-12' : clientWidth > 767 , 'font-size-14' : clientWidth <= 767 }">+{{ item.displayData.length - numberOfItem}}</span>
@@ -192,8 +193,9 @@
                                             <div v-for="(option, i) in priorities.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1)" :key="i" class="dropdown-item checkbox-dropdown" :class="{'border-radius-6-px' : clientWidth > 767 , 'border-radius-8-px' : clientWidth <= 767}">
                                                 <label :for="'proority'+i" class="cursor-pointer d-flex align-items-center lebel-items font-size-14">
                                                     <CheckboxComponent :id="'proority'+i" :value="option.value" v-model="item.values" @change="handleChecked(item)" classes="filer-checkbox"/>
-                                                    <WasabiIamgeCompp v-if="option.statusImage" :data="{url: option.statusImage}" :style="{ margin:  clientWidth > 767 ? '0px 5px' : '0px 8px 0 13px', maxWidth: '14px'}" />
-                                                    <span :class="{'ml-5-px': !option.statusImage, 'font-size-14' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767}">{{ option.name }}</span>
+                                                    <img v-if="bundledPriorityIcon(option)" :src="bundledPriorityIcon(option)" alt="" :style="{ margin:  clientWidth > 767 ? '0px 5px' : '0px 8px 0 13px', maxWidth: '14px'}" />
+                                                    <WasabiIamgeCompp v-else-if="storedOptionImage(option)" :data="{url: option.statusImage}" :style="{ margin:  clientWidth > 767 ? '0px 5px' : '0px 8px 0 13px', maxWidth: '14px'}" />
+                                                    <span :class="{'ml-5-px': !hasOptionImage(option), 'font-size-14' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767}">{{ option.name }}</span>
                                                 </label>
                                             </div>
                                         </div>
@@ -359,6 +361,7 @@ import { comparisonsFor, needsValue } from "@/views/Projects/composables/customF
 import { useI18n } from "vue-i18n";
 import { useGetterFunctions } from "@/composable";
 import { tagChipColors } from "@/utils/statusChipColors";
+import { bundledPriorityIcon, isBundledPriorityImage } from "@/composable/commonFunction";
 
 // Emites
 defineEmits(["delete"])
@@ -367,6 +370,8 @@ defineEmits(["delete"])
 const selectArrow = require('@/assets/images/svg/filter_select_dropdown.svg');
 const selectArrowMobile = require('@/assets/images/svg/drop_down_mobile.svg');
 const { getUser } = useGetterFunctions();
+const storedOptionImage = (option) => (isBundledPriorityImage(option?.statusImage) ? '' : option.statusImage);
+const hasOptionImage = (option) => Boolean(bundledPriorityIcon(option) || storedOptionImage(option));
 // Props
 const props = defineProps({
     inputs: {

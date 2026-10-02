@@ -177,7 +177,7 @@ describe('a project is never made before a person has seen it', () => {
         const actor = as(INSIDER).actor;
         expect(await projectPolicy.ask({ companyId: CID, actor, action: TOOL, params: { name: NAME } })).toMatchObject({ decision: 'propose' });
         const call = (given) => actions.perform({ companyId: CID, actor: as(OWNER).actor, action: TOOL, params: given, reason: 'direct' });
-        await expect(call({ name: NAME })).rejects.toThrow(/must be proposed/);
+        await expect(call({ name: NAME })).rejects.toThrow(/needs a person's approval first/);
         await expect(call({ name: NAME, __proposal: true })).rejects.toThrow(/waits for a person's approval/);
         expect(projectsNamed()).toHaveLength(0);
     });
@@ -189,7 +189,7 @@ describe('who may ask for a project', () => {
         const before = everythingNow();
         const out = await rpc(as(OUTSIDER), TOOL, PLAN);
         expect(out).toMatchObject({ refused: true });
-        expect(out.reason).toMatch(/^permission_denied: the person behind this token may not create a project by hand/);
+        expect(out.reason).toMatch(/^permission_denied: the person you act for is not allowed to create a project themselves/);
         expect(audits(TOOL).map((row) => row.meta.ran)).toEqual([false]);
         expect(everythingNow()).toBe(before);
         expect(waiting()).toHaveLength(0);
@@ -213,8 +213,8 @@ describe('who may ask for a project', () => {
 
     it('refuses a token kept to some projects, and a token that only reads', async () => {
         const kept = { ...as(INSIDER), projectIds: narrowed(INSIDER, [P_OPEN]).projectIds };
-        expect(await rpc(kept, TOOL, { name: NAME })).toMatchObject({ refused: true, reason: expect.stringMatching(/^not_visible: .*kept to some projects/) });
-        expect(await rpc(readOnly(OWNER), TOOL, { name: NAME })).toMatchObject({ isError: true, error: 'This token is read-only.' });
+        expect(await rpc(kept, TOOL, { name: NAME })).toMatchObject({ refused: true, reason: expect.stringMatching(/^not_visible: .*limited to some projects/) });
+        expect(await rpc(readOnly(OWNER), TOOL, { name: NAME })).toMatchObject({ isError: true, error: 'This connection can only read. Ask the person to connect you again and allow changes.' });
         expect(waiting()).toHaveLength(0);
     });
 
@@ -361,7 +361,7 @@ describe('undo moves the project to the trash', () => {
         const first = await filed(as(INSIDER));
         await approve(first);
         mockDb.seed(SCHEMA_TYPE.TASKS, { TaskName: 'Draft the brief', ProjectID: String(made()._id), CompanyId: CID, statusKey: 1, deletedStatusKey: 0 });
-        expect((await undo(first)).results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/"Website relaunch" holds a task now, so it stays/) });
+        expect((await undo(first)).results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/The project "Website relaunch" has a task now, so it was kept/) });
         expect(Number(made().deletedStatusKey || 0)).toBe(0);
         expect(audits(TOOL, 'applied')[0].meta.undoneAt).toBeFalsy();
 
@@ -369,7 +369,7 @@ describe('undo moves the project to the trash', () => {
         await approve(second);
         const [hiring] = projectsNamed('Hiring');
         mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Role notes', ProjectID: String(hiring._id), createdBy: INSIDER, deletedStatusKey: 0 });
-        expect((await undo(second)).results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/holds a doc now/) });
+        expect((await undo(second)).results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/has a doc now/) });
         expect(Number(projectsNamed('Hiring')[0].deletedStatusKey || 0)).toBe(0);
     });
 
@@ -379,7 +379,7 @@ describe('undo moves the project to the trash', () => {
         setRule('project_delete', false, [3]);
         setRule('project_close', false, [3]);
         const out = await undo(id);
-        expect(out.results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/may not delete/) });
+        expect(out.results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/not allowed to delete/) });
         expect(Number(made().deletedStatusKey || 0)).toBe(0);
     });
 });

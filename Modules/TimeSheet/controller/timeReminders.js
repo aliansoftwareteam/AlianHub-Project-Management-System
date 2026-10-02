@@ -8,6 +8,7 @@ const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const { isPrivileged } = require('../../../Config/roleTypes');
 const { ACTIVE_SEAT } = require('../../../Config/seatStatus');
 const { companyWorkingDays } = require('../../Company/helpers/companyWeek');
+const { activeMemberIds } = require('../../notification/activeMembers');
 
 // TIME-06 — time-entry reminders. A daily nudge (prod cron) to members who
 // haven't logged time today; the /send-reminders endpoint runs the same path
@@ -154,7 +155,7 @@ exports.updateReminderSettings = async (req, res) => {
             if (!Array.isArray(body.userIds)) {
                 return res.status(400).send({ status: false, statusText: 'userIds must be an array.' });
             }
-            patch.userIds = body.userIds;
+            patch.userIds = await activeMemberIds(companyId, body.userIds.filter((id) => typeof id === 'string'));
         }
         if (Object.keys(patch).length === 0) {
             return res.status(400).send({ status: false, statusText: 'No supported fields in body.' });

@@ -31,10 +31,10 @@ const VISITS_READ = 30;
 const EARLIER_MAX = 4;
 const PLACE_KINDS = Object.freeze(['task', 'sprint', 'project']);
 
-const NO_MESSAGE = Object.freeze({ ok: false, error: 'message not found' });
-const NO_TEXT = Object.freeze({ ok: false, error: 'that message has no text to make a task from' });
+const NO_MESSAGE = Object.freeze({ ok: false, error: 'That message was not found. Check the id.' });
+const NO_TEXT = Object.freeze({ ok: false, error: 'That message has no text to make a task from.' });
 const NEEDS_PLACE = Object.freeze({ ok: false, error: 'That message is not in a project. Ask the person which project and list the task goes in, then name them as projectId and sprintId.' });
-const NEEDS_CHAT = Object.freeze({ ok: false, error: `That message is in a chat channel, and this connection does not hold the ${CHAT_SCOPE} scope, so it was not read. A comment on a task can be made into a task without it.` });
+const NEEDS_CHAT = Object.freeze({ ok: false, error: `That message is in a chat channel, and this connection is not allowed to read chat (it needs ${CHAT_SCOPE}), so it was not read. Ask the person to allow chat for this connection. A comment on a task can be made into a task without it.` });
 const LINK_LABEL = 'The message this task came from';
 
 const isId = (v) => OBJECT_ID.test(String(v || ''));
@@ -182,9 +182,9 @@ const TOOLS = [
     {
         name: PLACE,
         action: PLACE,
-        description: 'Where the person is working: the project, list or task they last opened in AlianHub, how long ago, and a few places before it. '
+        description: 'Shows where the person is working: the project, list or task they last opened in AlianHub, how long ago, and a few places before it. '
             + 'Use it when they say "here" or "this list", or name no place. It answers only for places the person can still open, and it does not know which chat they have open. '
-            + `When the place is more than ${FRESH_MINUTES} minutes old, or there is none, ask the person where they mean. Never guess.`,
+            + `When the place is more than ${FRESH_MINUTES} minutes old, or there is none, ask the person where they mean. Never guess. Changes nothing.`,
         input: { type: 'object', additionalProperties: false, properties: {} },
         strict: true,
         visibility: 'filtered',
@@ -203,8 +203,8 @@ const TOOLS = [
         grant: CREATE.grant,
         strict: true,
         target: CREATE.target,
-        description: 'Make a task from a comment on a task the person can read, or from a message in a chat channel they can read. '
-            + `A channel message is read only by a connection that also holds the ${CHAT_SCOPE} scope, and a direct message never. `
+        description: 'Makes a task from a comment on a task the person can read, or from a message in a chat channel they can read. '
+            + `A channel message is read only when this connection is also allowed to read chat (${CHAT_SCOPE}), and a direct message is never read. `
             + 'The task\'s description is the text of the message, with a link back to it, and its title is the first line unless you give one. '
             + 'Left out, the place is the list the message\'s channel belongs to, or the list of the task the comment is on; a channel that belongs to no list needs a project named. '
             + 'It takes the details a new task takes: assignees, priority, dates, status, task type and estimate. '

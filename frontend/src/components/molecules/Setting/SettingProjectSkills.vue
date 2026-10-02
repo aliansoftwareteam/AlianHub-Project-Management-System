@@ -31,7 +31,7 @@
                             </button>
                         </div>
                     </form>
-                    <div class="addExtentionWrapper d-flex flex-wrap">
+                    <div class="addExtentionWrapper d-flex flex-wrap" role="group" tabindex="0" :aria-label="$t('Settings.project_skills')">
                         <div v-for="skill in skills" :key="skill.key">
                             <div class="con-vs-chip vs-chip-null" :class="{'skills__chip-inactive': skill.active === false}">
                                 <span class="text-chip vs-chip--text">

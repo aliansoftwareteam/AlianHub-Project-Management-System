@@ -10,6 +10,7 @@ const { tenantOf, namedCompanyIds, TenantError } = require("../../../Config/tena
 const { OBJECT_ID_PATTERN, ownCompanyIds, allowedCompanyIds, scopeCompanyPipeline, memberCompanyView, companyUpdateKind, seatFilter } = require("../helpers/companyAccessRules");
 const { isPrivileged, ROLE_OWNER } = require("../../../Config/permissionGuard");
 const { checkCompanyDetails } = require("../helpers/companyDetails");
+const { isSignedInSession } = require("../../Agents/personDecides");
 
 const findSeat = (companyId, uid, kind) => MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.COMPANY_USERS,
@@ -32,8 +33,11 @@ const companyWrite = (companyId, body, kind, uid) => {
     return [{ _id: companyId }, { $set: body.updateObject }, { returnDocument: 'after' }];
 };
 
-/* The companies the caller holds a live seat in, split by whether they are an owner or admin there. */
-const loadOwnCompanies = async (uid) => {
+/* The companies the caller holds a live seat in, split by whether they are an owner or admin there. Plan and billing
+ * records and key handles are read by a signed-in owner or admin: a token of any kind and an agent read the member
+ * fields of every company, whoever they act for. */
+const loadOwnCompanies = async (req) => {
+    const uid = req.uid;
     const user = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
         type: SCHEMA_TYPE.USERS,
         data: [{ _id: new mongoose.Types.ObjectId(String(uid)) }, { AssignCompany: 1 }]
@@ -41,10 +45,10 @@ const loadOwnCompanies = async (uid) => {
     const listed = ownCompanyIds(user);
     const seated = await Promise.all(listed.map((companyId) => findSeat(companyId, uid).catch(() => null)));
     const own = listed.filter((companyId, index) => Boolean(seated[index]));
-    return { own, limited: listed.filter((companyId, index) => seated[index] && !isPrivileged(seated[index].roleType)) };
+    return { own, limited: isSignedInSession(req) ? listed.filter((companyId, index) => seated[index] && !isPrivileged(seated[index].roleType)) : own };
 };
 
-const isInstanceAdminRequest = async (req) => !req.apiToken && isInstanceOwner(req.uid);
+const isInstanceAdminRequest = async (req) => isSignedInSession(req) && isInstanceOwner(req.uid);
 const hasSession = (req) => OBJECT_ID_PATTERN.test(String(req.uid || ''));
 
 exports.updateCompany = async(req,res) => {
@@ -114,7 +118,7 @@ exports.getCompany = async (req,res) => {
         if (req.body.fetchAllCompany) {
             return res.status(403).json({ status: false, message: 'Only the instance owner can list every company.' });
         }
-        const { own, limited } = await loadOwnCompanies(req.uid);
+        const { own, limited } = await loadOwnCompanies(req);
         const companies = await exports.getCompanyDataFun(allowedCompanyIds(req.body.companyIds, own));
         return res.json(companies.map((company) => (limited.includes(String(company._id)) ? memberCompanyView(company) : company)));
     } catch (error) {
@@ -218,7 +222,7 @@ exports.getCompanyByAggregate = async(req,res) => {
         let pipeline = [query];
         if (!(await isInstanceAdminRequest(req))) {
             const toObjectIds = (ids) => ids.map((id) => new mongoose.Types.ObjectId(id));
-            const { own, limited } = await loadOwnCompanies(req.uid);
+            const { own, limited } = await loadOwnCompanies(req);
             const scoped = scopeCompanyPipeline(query, toObjectIds(own), toObjectIds(limited));
             if (!scoped.ok) return res.status(403).json({ status: false, message: scoped.error });
             pipeline = scoped.pipeline;

@@ -178,6 +178,21 @@ describe('a reason in a sentence', () => {
         expect(plain('Agents cannot perform (unknown action)')).toBe(en.AuditReasons.agents_cannot);
     });
 
+    it('words the same refusals as the server writes them now', () => {
+        expect(plain('not_visible: that task was not found, or the person cannot open its comments. Ask the person which task they mean.')).toBe(en.AuditReasons.not_visible_thread);
+        expect(plain('not_visible: that task was not found, or the person cannot open it. Ask the person which task they mean.')).toBe(en.AuditReasons.not_visible_task);
+        expect(plain('not_visible: that project was not found, or the person cannot open it. Ask the person which project they mean.')).toBe(en.AuditReasons.not_visible_project);
+        expect(plain('not_visible: that list was not found in that project, or the person cannot open it. Ask the person which list they mean.')).toBe(en.AuditReasons.not_visible_list);
+        expect(plain('An agent is never allowed to do this (never_listed). The person has to do it in AlianHub.')).toBe(en.AuditReasons.agents_never);
+        expect(plain('An agent is never allowed to do this (project.delete). The person has to do it in AlianHub.')).toBe(en.AuditReasons.agents_never);
+        expect(plain('An agent is not allowed to do this (sprint.start). The person has to do it in AlianHub.')).toBe(en.AuditReasons.agents_cannot);
+        expect(plain('That action is not available to agents (none named).')).toBe(en.AuditReasons.agents_cannot);
+        expect(plain('task.archive is not switched on for this connection. Ask the person to allow it in AlianHub.')).toBe(en.AuditReasons.agents_not_in_skills);
+        expect(plain('page.create needs a person\'s approval first, so it has to be sent as a proposal.')).toBe(en.AuditReasons.agents_must_propose);
+        expect(plain('You cannot set a task to "Done". Use In progress or In review, and a person closes the task.')).toBe(t('AuditReasons.agents_cannot_status', { status: 'Done' }));
+        expect(plain('task.update cannot change TaskKey, ProjectID. Leave that out.')).toBe(en.AuditReasons.agents_cannot_fields);
+    });
+
     it('words a step that was refused, and a change made under a standing approval', () => {
         expect(plain('step credential refused: credential_expired (step s1 of run r1)')).toBe(en.AuditReasons.step_credential_refused);
         expect(plain('external agent step refused: grant_not_live (session s1: the grant was revoked or has expired)')).toBe(en.AuditReasons.external_grant_not_live);

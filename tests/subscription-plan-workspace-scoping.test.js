@@ -12,7 +12,7 @@ const { WORKSPACE, MEMBER, OWNER, serveModule, seedSeats, tokenFor } = require('
 let plan;
 const READS = [
     { method: 'GET', path: () => '/api/v1/subscription' },
-    { method: 'POST', path: () => '/api/v1/subscription/find', body: () => ({ query: [{ $match: {} }] }) },
+    { method: 'POST', path: () => '/api/v1/subscription/find', body: () => ({}) },
     { method: 'GET', path: () => `/api/v1/subscription/${plan._id}` },
 ];
 const ROUTES = [...READS, { method: 'PUT', path: () => '/api/v1/subscription', body: () => ({ query: [{ _id: String(plan._id) }, { $set: { name: 'Renamed' } }] }) }];

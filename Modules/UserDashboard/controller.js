@@ -25,6 +25,7 @@ const { ownOrNotPersonal, othersPersonalListIds } = require('../PersonalList/own
 const { companyWideMatch, toObjectIds } = require('../Tasks/helpers/taskQueryGuard');
 const { taskListProjectIds } = require('../Tasks/helpers/taskListProjects');
 const { forgetCards } = require('../AI/askCardStore');
+const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
 
 // Parse a client-built advanced-filter match from the request body.
 function bodyTaskMatch(body) {
@@ -3250,6 +3251,10 @@ exports.updateSharedDashboard = async (req, res) => {
         }
         if (Array.isArray(body.sharedWith)) {
             set.sharedWith = body.sharedWith.map(String).filter((v) => mongoose.Types.ObjectId.isValid(v)).slice(0, 200);
+            const held = new Set((doc.sharedWith || []).map(String));
+            if ((await nonMembersOf(companyId, set.sharedWith.filter((id) => !held.has(id)))).length) {
+                return res.status(400).json({ status: false, message: NOT_A_MEMBER });
+            }
         }
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.USERDASHBOARD,

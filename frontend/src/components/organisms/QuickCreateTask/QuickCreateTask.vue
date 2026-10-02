@@ -108,7 +108,7 @@
 </template>
 
 <script setup>
-import { computed, inject, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -119,7 +119,6 @@ import taskClass from "@/utils/TaskOperations";
 import { useGetterFunctions } from "@/composable";
 import { taskPlanPermission } from "@/composable/commonFunction";
 import { useFocusTrap } from "@/composable/useFocusTrap";
-import { bindShortcut } from "@/composable/shortcuts";
 import { useOtherProjectRules } from "@/composable/otherProjectRules";
 import { usePersonalList } from "@/components/molecules/Home/usePersonalList";
 import { openTask } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
@@ -135,7 +134,6 @@ import {
     defaultStatus,
     hasPriorityApp,
     listsOf,
-    openQuickCreate,
     pickDefaultProject,
     pickDefaultSprint,
     quickCreate,
@@ -491,17 +489,7 @@ function onKey(e) {
     submit(intent);
 }
 
-let unbindShortcut = () => {};
-onMounted(() => {
-    unbindShortcut = bindShortcut("create-task", () => {
-        if (quickCreate.open) return false;
-        openQuickCreate();
-    });
-});
-onBeforeUnmount(() => {
-    unbindShortcut();
-    clearTimeout(doneTimer);
-});
+onBeforeUnmount(() => clearTimeout(doneTimer));
 </script>
 
 <style scoped>

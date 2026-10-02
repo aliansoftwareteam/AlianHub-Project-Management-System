@@ -28,4 +28,7 @@ const allowsProject = (uid, projectId) => {
     return !list || list.includes(String(projectId || '').toLowerCase());
 };
 
-module.exports = { isNarrowed, runNarrowed, narrowingFor, allowsProject };
+/* The same asked of the token itself, for a handler that holds it and may be reached outside that list. */
+const tokenAllowsProject = (token, projectId) => !isNarrowed(token) || listOf(token).includes(String(projectId || '').toLowerCase());
+
+module.exports = { isNarrowed, runNarrowed, narrowingFor, allowsProject, tokenAllowsProject };

@@ -13,6 +13,7 @@ const { idForms } = require("../../utils/mongo-handler/objectIdKeys");
 const { evaluatePermission, isWritable } = require("../../Config/permissionGuard");
 const { visibleTask, TASK_NOT_FOUND } = require("../AI/taskAccess");
 const { actingUser } = require("../Sprints/helpers/actingUser");
+const { namedPeopleRefusal } = require("../../Config/projectPeople");
 
 /* The same grant that decides who may plan another person's time decides who may read it. */
 const ESTIMATE_SCOPE_PERMISSIONS = [SHEET_PERMISSION.workload, SHEET_PERMISSION.project];
@@ -64,6 +65,11 @@ exports.updateEstimatedTime = async(req,res) => {
         } catch (error) {
             if (!(error instanceof EstimateWriteRefused)) throw error;
             return res.status(error.statusCode).json({ status: false, statusText: error.statusCode === 403 ? "Forbidden" : "Bad Request", message: error.message });
+        }
+
+        if (write.plan.userId !== String(req.uid)) {
+            const refusal = await namedPeopleRefusal(companyId, write.plan.projectId, [write.plan.userId]);
+            if (refusal) return res.status(400).json({ status: false, statusText: "Bad Request", message: refusal });
         }
 
         const previous = await previousPlanOf(companyId, write.data[0]).catch(() => null);

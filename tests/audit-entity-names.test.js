@@ -129,7 +129,30 @@ describe('the audit export says what each row is in words', () => {
         expect(labels['agent.project_policy_changed']).toBe(EVENTS['agent.project_policy_changed']);
         expect(labels['task.comment']).toBe(registry.get('task.comment').label);
         expect(labels['sprint.start']).toBe(ACTIONS['sprint.start']);
-        expect(lines.map((cells) => cells[7])).toEqual(expect.arrayContaining([PROJECT, TASK]));
+        expect(lines.map((cells) => cells[7])).toEqual(expect.arrayContaining(['Project 01', 'Fix login']));
+    });
+
+    it('names what each row is about as the list does, for the person exporting', async () => {
+        [row(), row({ entityType: 'project', entityId: PROJECT }), row({ entityType: 'sprint', entityId: LIST }), row({ entityType: 'agent', entityId: AGENT }), row({ entityType: 'member', entityId: SEAT })]
+            .forEach((r) => mockDb.seed(SCHEMA_TYPE.AUDIT_LOGS, r));
+        const [, ...lines] = await exportCsv();
+        expect(lines.map((cells) => cells[7]).sort()).toEqual(['Backlog', 'Fix login', 'Mina Member', 'Planner', 'Project 01']);
+        expect(readableTaskIds).toHaveBeenCalledWith(CID, OWNER, [TASK]);
+    });
+
+    it('keeps the id of what the person exporting cannot open, and a name the row was written with', async () => {
+        [row({ entityId: HIDDEN_TASK }), row({ entityType: 'project', entityId: HIDDEN_PROJECT }), row({ entityType: 'sprint', entityId: HIDDEN_LIST }), row({ entityName: 'Named when written' })]
+            .forEach((r) => mockDb.seed(SCHEMA_TYPE.AUDIT_LOGS, r));
+        const [, ...lines] = await exportCsv();
+        expect(lines.map((cells) => cells[7]).sort()).toEqual([HIDDEN_TASK, HIDDEN_PROJECT, HIDDEN_LIST, 'Named when written'].sort());
+        expect(JSON.stringify(lines)).not.toMatch(/Board minutes|Layoffs/);
+    });
+
+    it('still exports the rows when a name cannot be read', async () => {
+        mockDb.seed(SCHEMA_TYPE.AUDIT_LOGS, row());
+        readableTaskIds.mockRejectedValueOnce(new Error('down'));
+        const [, cells] = await exportCsv();
+        expect(cells[7]).toBe(TASK);
     });
 
     it('leaves the label empty for a key it has no words for', async () => {

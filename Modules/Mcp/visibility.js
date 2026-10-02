@@ -122,22 +122,22 @@ const assertWritable = async (companyId, vis, { taskId, relatedTaskId, projectId
         const page = isId(pageId)
             ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PAGES, data: [{ _id: toOid(pageId), deletedStatusKey: { $ne: 1 } }, { ProjectID: 1, visibility: 1, createdBy: 1, sharedWith: 1 }] }, 'findOne')
             : null;
-        if (!page || !vis.allowsPage(page)) throw refuse('the page is not one the person behind this token can open');
+        if (!page || !vis.allowsPage(page)) throw refuse('that doc was not found, or the person cannot open it. Ask the person which doc they mean.');
     }
-    if (companyWide && !vis.allowsPage({ visibility: 'project' })) throw refuse('a token kept to some projects cannot write outside them');
+    if (companyWide && !vis.allowsPage({ visibility: 'project' })) throw refuse('this connection is limited to some projects, so it cannot make changes outside them. Ask the person to widen it in AlianHub.');
     for (const id of [taskId, relatedTaskId]) {
-        if (id !== undefined && !vis.allowsTask(await storedTask(companyId, id))) throw refuse('the task is not one the person behind this token can open');
+        if (id !== undefined && !vis.allowsTask(await storedTask(companyId, id))) throw refuse('that task was not found, or the person cannot open it. Ask the person which task they mean.');
     }
     // Someone who reads company-wide is allowed every id that is not closed to them, a missing one included, so the project is read.
     if (projectId !== undefined && !(vis.allowsProject(projectId) && await liveProject(companyId, projectId))) {
-        throw refuse('the project is not one the person behind this token can open');
+        throw refuse('that project was not found, or the person cannot open it. Ask the person which project they mean.');
     }
     if (sprintId) {
         const sprint = isId(sprintId)
             ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: toOid(sprintId) }, { projectId: 1 }] }, 'findOne')
             : null;
         if (!sprint || String(sprint.projectId) !== String(projectId) || !vis.allowsSprint(sprintId)) {
-            throw refuse('the sprint is not one the person behind this token can open in that project');
+            throw refuse('that list was not found in that project, or the person cannot open it. Ask the person which list they mean.');
         }
     }
 };

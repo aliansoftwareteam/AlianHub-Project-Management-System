@@ -31,6 +31,12 @@ const logFailure = (what, companyId, error) => {
     logger.error(`invitation ${what} (company ${companyId}): ${error && error.message ? error.message : error}`);
 };
 
+// The seat schema requires both as numbers. The Members page sends the designation empty when the person has none,
+// so that reads as none; a role that is not a number is refused before a seat is counted or written.
+const isNumber = (value) => (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '')) && Number.isFinite(Number(value));
+const designationOf = (value) => (isNumber(value) ? Number(value) : 0);
+const missingField = (body, key) => body[key] === undefined || body[key] === null || (key === 'role' && !isNumber(body[key]));
+
 exports.MAIL_FAILED = MAIL_FAILED;
 exports.joinLinkFor = joinLinkFor;
 
@@ -131,7 +137,7 @@ exports.sendInvitationEmailFun = (bodyData) => {
             let valid = "";
     
             keys.forEach((key) => {
-                if(bodyData[key] === undefined || bodyData[key] === null) {
+                if(missingField(bodyData, key)) {
                     valid += `${key}, `
                 }
             })
@@ -143,7 +149,8 @@ exports.sendInvitationEmailFun = (bodyData) => {
                 return
             }
     
-            let {email, companyId, companyName, role, designation,isResend} = bodyData;
+            let {email, companyId, companyName, role, isResend} = bodyData;
+            const designation = designationOf(bodyData.designation);
     
             email = email.toLowerCase();
     
@@ -354,7 +361,7 @@ exports.sendInvitationEmail = (req,res) => {
         let valid = "";
 
         keys.forEach((key) => {
-            if(req.body[key] === undefined || req.body[key] === null) {
+            if(missingField(req.body, key)) {
                 valid += `${key}, `
             }
         })
@@ -366,7 +373,8 @@ exports.sendInvitationEmail = (req,res) => {
             return
         }
 
-        let {email, companyName, role, designation,isResend} = req.body;
+        let {email, companyName, role, isResend} = req.body;
+        const designation = designationOf(req.body.designation);
         const companyId = sessionCompanyId;
 
         email = email.toLowerCase();

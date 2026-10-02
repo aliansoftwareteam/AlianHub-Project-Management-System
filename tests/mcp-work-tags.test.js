@@ -52,7 +52,7 @@ const listed = listedThrough(server);
 const web = asPerson(routeTable(require('../Modules/Tasks/routes').init));
 
 const NAMES = ['tags.list', 'task.tags.add', 'task.tags.remove'];
-const NOT_OPEN = 'not_visible: the task is not one the person behind this token can open';
+const NOT_OPEN = 'not_visible: that task was not found, or the person cannot open it. Ask the person which task they mean.';
 const tagsOn = (taskId) => stored(SCHEMA_TYPE.TASKS, taskId).tagsArray || [];
 const tasksNow = () => JSON.stringify(mockDb.store[SCHEMA_TYPE.TASKS]);
 const inProduct = (uid) => ({ kind: 'agent', userId: uid, agentName: 'Workspace agent' });
@@ -94,7 +94,7 @@ describe('tags.list', () => {
 
     it('answers a private project only for the people who can open it, and otherwise as it answers a missing id', async () => {
         const missing = await rpc(ctx(OWNER), 'tags.list', { projectId: MISSING });
-        expect(missing).toEqual({ error: 'project not found' });
+        expect(missing).toEqual({ error: 'That project was not found. Ask the person which project they mean.' });
         for (const uid of [OWNER, ADMIN, INSIDER]) {
             expect((await rpc(ctx(uid), 'tags.list', { projectId: P_PRIVATE })).tags).toEqual([{ tagId: 'tag_secret', name: 'Secret', color: '#00ff00' }]);
         }
@@ -103,13 +103,13 @@ describe('tags.list', () => {
 
     it('answers someone else\'s personal list as a missing id, for an owner too', async () => {
         expect((await rpc(ctx(INSIDER), 'tags.list', { projectId: P_PERSONAL })).tags).toHaveLength(PRIVATE_TAGS.length);
-        for (const uid of [OWNER, ADMIN, OUTSIDER, GUEST]) expect(await rpc(ctx(uid), 'tags.list', { projectId: P_PERSONAL })).toEqual({ error: 'project not found' });
+        for (const uid of [OWNER, ADMIN, OUTSIDER, GUEST]) expect(await rpc(ctx(uid), 'tags.list', { projectId: P_PERSONAL })).toEqual({ error: 'That project was not found. Ask the person which project they mean.' });
     });
 
     it('stays inside the projects a token was narrowed to', async () => {
         expect((await rpc(narrowed(INSIDER, [P_PRIVATE]), 'tags.list', { projectId: P_PRIVATE })).tags).toHaveLength(1);
-        expect(await rpc(narrowed(INSIDER, [P_PRIVATE]), 'tags.list', { projectId: P_OPEN })).toEqual({ error: 'project not found' });
-        expect(await rpc(narrowed(OWNER, [P_OPEN]), 'tags.list', { projectId: P_PRIVATE })).toEqual({ error: 'project not found' });
+        expect(await rpc(narrowed(INSIDER, [P_PRIVATE]), 'tags.list', { projectId: P_OPEN })).toEqual({ error: 'That project was not found. Ask the person which project they mean.' });
+        expect(await rpc(narrowed(OWNER, [P_OPEN]), 'tags.list', { projectId: P_PRIVATE })).toEqual({ error: 'That project was not found. Ask the person which project they mean.' });
     });
 
     it('is refused to a person without the task list permission, and takes no argument it does not publish', async () => {
@@ -180,7 +180,7 @@ describe('task.tags.add and task.tags.remove', () => {
 
     it('takes only a tag the task\'s own project defines', async () => {
         const before = tasksNow();
-        expect(await rpc(ctx(OWNER), 'task.tags.add', { taskId: T_OPEN, tag: 'tag_secret' })).toMatchObject({ isError: true, error: expect.stringMatching(/not one this task's project has/) });
+        expect(await rpc(ctx(OWNER), 'task.tags.add', { taskId: T_OPEN, tag: 'tag_secret' })).toMatchObject({ isError: true, error: expect.stringMatching(/does not belong to this task's project/) });
         expect(await rpc(ctx(OWNER), 'task.tags.add', { taskId: T_OPEN, tag: 'Nothing' })).toMatchObject({ isError: true });
         expect((await rpc(ctx(OWNER), 'task.tags.add', { taskId: T_OPEN, tag: '' })).rpcError).toMatchObject({ code: -32602 });
         expect(tasksNow()).toBe(before);
@@ -188,17 +188,17 @@ describe('task.tags.add and task.tags.remove', () => {
 
     it('needs the write scope: a read-only token and an OAuth token without it are refused', async () => {
         const before = tasksNow();
-        expect(await rpc(readOnly(OWNER), 'task.tags.add', { taskId: T_OPEN, tag: 'Bug' })).toMatchObject({ isError: true, error: 'This token is read-only.' });
-        expect(await rpc(outside(OWNER, ['tasks:read', 'projects:read']), 'task.tags.add', { taskId: T_OPEN, tag: 'Bug' })).toMatchObject({ isError: true, error: 'This token lacks the tasks:write scope.' });
-        expect(await rpc(outside(OWNER, ['tasks:write']), 'tags.list', { projectId: P_OPEN })).toMatchObject({ isError: true, error: 'This token lacks the projects:read scope.' });
+        expect(await rpc(readOnly(OWNER), 'task.tags.add', { taskId: T_OPEN, tag: 'Bug' })).toMatchObject({ isError: true, error: 'This connection can only read. Ask the person to connect you again and allow changes.' });
+        expect(await rpc(outside(OWNER, ['tasks:read', 'projects:read']), 'task.tags.add', { taskId: T_OPEN, tag: 'Bug' })).toMatchObject({ isError: true, error: 'This connection was not given the tasks:write permission. Ask the person to connect you again and allow it.' });
+        expect(await rpc(outside(OWNER, ['tasks:write']), 'tags.list', { projectId: P_OPEN })).toMatchObject({ isError: true, error: 'This connection was not given the projects:read permission. Ask the person to connect you again and allow it.' });
         expect(tasksNow()).toBe(before);
     });
 
     it('stays inside the actions an agent was given', async () => {
         const before = tasksNow();
         const limited = ctx(OWNER, { allowedActions: ['tasks.search', 'task.tags.remove'] });
-        expect(await rpc(limited, 'task.tags.add', { taskId: T_OPEN, tag: 'Bug' })).toMatchObject({ refused: true, reason: expect.stringMatching(/not in this agent's skills/) });
-        expect(await rpc(limited, 'tags.list', { projectId: P_OPEN })).toMatchObject({ refused: true, reason: expect.stringMatching(/not in this agent's skills/) });
+        expect(await rpc(limited, 'task.tags.add', { taskId: T_OPEN, tag: 'Bug' })).toMatchObject({ refused: true, reason: expect.stringMatching(/is not switched on for this connection/) });
+        expect(await rpc(limited, 'tags.list', { projectId: P_OPEN })).toMatchObject({ refused: true, reason: expect.stringMatching(/is not switched on for this connection/) });
         expect(tasksNow()).toBe(before);
         expect(await rpc(limited, 'task.tags.remove', { taskId: T_OPEN, tag: 'Bug' })).toMatchObject({ ok: true, result: { changed: false } });
     });

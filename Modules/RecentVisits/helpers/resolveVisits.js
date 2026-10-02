@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { pageReachFilter } = require('../../Pages/helpers/pageRules');
+const { withoutConversationsOfOthers } = require('../../Comments/helpers/conversationReaders');
 
 const VISIT_TYPES = ['task', 'project', 'sprint', 'doc'];
 const LIST_LIMIT = 15;
@@ -55,7 +56,7 @@ const resolveVisits = async (companyId, uid, visits, { visible, sprintClause = {
 
     const [tasks, sprints, docs, landing] = await Promise.all([
         idsOf('task').length
-            ? read(companyId, SCHEMA_TYPE.TASKS, { _id: { $in: idsOf('task') }, ProjectID: { $in: inProjects }, deletedStatusKey: { $ne: 1 }, ...sprintClause }, TASK_FIELDS)
+            ? read(companyId, SCHEMA_TYPE.TASKS, { _id: { $in: idsOf('task') }, ProjectID: { $in: inProjects }, deletedStatusKey: { $ne: 1 }, ...sprintClause, ...withoutConversationsOfOthers(uid) }, TASK_FIELDS)
             : [],
         idsOf('sprint').length
             ? read(companyId, SCHEMA_TYPE.SPRINTS, { _id: { $in: idsOf('sprint') }, projectId: { $in: inProjects }, ...NOT_DELETED }, 'name projectId folderId')

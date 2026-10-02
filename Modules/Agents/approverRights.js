@@ -16,6 +16,7 @@ const REFUSAL = Object.freeze({
     OWNER_ADMIN: 'This proposal needs an Owner or Admin.',
     NO_RIGHT: `You cannot approve this: you do not hold the right to make this change yourself. ${KEEPS_WAITING}`,
     CANNOT_OPEN: `You cannot approve this: you cannot open what this change touches. ${KEEPS_WAITING}`,
+    NOT_THEIRS: `You cannot approve this: it was asked for someone else, and only they can. ${KEEPS_WAITING}`,
     DECLINE: 'You can decline a proposal you could approve, or one your own agent asked for.',
 });
 
@@ -24,16 +25,20 @@ const held = (error, why) => ({ error, status: 403, reason: NOT_PERMITTED, why }
 const needsOwnerOrAdmin = (proposal, changes) => proposal.gate === access.GATE_OWNER_ADMIN
     || changes.some((change) => { const entry = registry.get(change && change.action); return Boolean(entry) && entry.gate === access.GATE_OWNER_ADMIN; });
 
-/* A connected agent's change runs as the person behind the connection, so the approver is asked what Mcp/approval
- * asks of them; any other runs on the approver's own rights, so they are asked what perform() will ask. */
+/* Why the approver may not approve one change, in the words the approve route answers, or ''. A connected agent's
+ * change runs as the person behind the connection, so the approver is asked what Mcp/approval asks of them, by the
+ * same function; any other runs on the approver's own rights, so they are asked what perform() will ask. */
 const changeRefusal = async (companyId, userId, proposal, change) => {
-    const person = { kind: 'human', userId: String(userId) };
-    const params = (change && change.params) || {};
-    if (proposal.source !== SOURCE_MCP) return require('./actions').personRefusal(companyId, person, change.action, params);
-    const own = await permissions.holderMay(companyId, person, change.action, params);
-    if (!own.allowed) return own.reason;
-    const approval = require('../Mcp/approval');
-    return (await approval.reachable(companyId, { userId: person.userId, projectIds: [] }, approval.targetOf(params, change.action))) ? '' : 'not_visible';
+    if (proposal.source === SOURCE_MCP) {
+        const approval = require('../Mcp/approval');
+        const stopped = await approval.approverRefusal(companyId, userId, proposal, change || {});
+        if (!stopped) return '';
+        if (stopped.lacks === approval.LACKS.STANDING) return REFUSAL.NOT_THEIRS;
+        return stopped.lacks === approval.LACKS.RIGHT ? REFUSAL.NO_RIGHT : REFUSAL.CANNOT_OPEN;
+    }
+    const reason = await require('./actions').personRefusal(companyId, { kind: 'human', userId: String(userId) }, change.action, (change && change.params) || {});
+    if (!reason) return '';
+    return reason.startsWith(permissions.REASON) ? REFUSAL.NO_RIGHT : REFUSAL.CANNOT_OPEN;
 };
 
 /* null when the person may approve `changes` of the proposal; otherwise the refusal the approve route answers. */
@@ -43,7 +48,7 @@ const approveRefusal = async (companyId, { userId, privileged }, proposal, chang
     for (const change of list) {
         // eslint-disable-next-line no-await-in-loop
         const lacking = await changeRefusal(companyId, userId, proposal, change);
-        if (lacking) return held(lacking.startsWith(permissions.REASON) ? REFUSAL.NO_RIGHT : REFUSAL.CANNOT_OPEN, WHY.OWN_RIGHTS);
+        if (lacking) return held(lacking, WHY.OWN_RIGHTS);
     }
     return null;
 };
@@ -52,16 +57,24 @@ const OPEN = Object.freeze({ locked: false, lockedWhy: '', mayDecline: true });
 /* A row whose standing could not be read is shown as not the reader's to decide; the routes still answer for it. */
 const UNREAD = Object.freeze({ locked: true, lockedWhy: WHY.OWN_RIGHTS, mayDecline: false });
 
+/* Whether a change of the proposal is one only the person it was asked for approves, which no role answers for. */
+const asksWhoeverApproves = (proposal) => proposal.source === SOURCE_MCP
+    && (Array.isArray(proposal.changes) ? proposal.changes : []).some((change) => require('../Mcp/approval').approvedByRequesterAlone(change));
+
 /* What a list shows of a waiting proposal for the person reading it. An owner or an admin holds every right, so
- * nothing is read for them: what can still stop their approval is a task or a list that is gone, which the approve
- * route answers. */
+ * their rights are not read: what can still stop their approval is a task or a list that is gone, which the approve
+ * route answers, and a change asked for someone else, which is read here. They may decline either way. A plan is
+ * a person's to approve while it holds a part they may approve (./planLocks.js). */
 const standingOf = async (companyId, caller, proposal) => {
     if (!access.decidesProposals(caller)) return { locked: true, lockedWhy: WHY.SEAT, mayDecline: false };
-    if (caller.privileged) return OPEN;
+    const privileged = Boolean(caller.privileged);
+    if (privileged && !asksWhoeverApproves(proposal)) return OPEN;
     const uid = String(caller.actor.userId);
-    const refusal = await approveRefusal(companyId, { userId: uid, privileged: false }, proposal);
+    const person = { userId: uid, privileged };
+    const open = await require('./planLocks').withoutLocked(companyId, person, proposal.changes);
+    const refusal = open ? await approveRefusal(companyId, person, proposal, open) : held(REFUSAL.OWNER_ADMIN, WHY.OWNER_ADMIN);
     if (!refusal) return OPEN;
-    return { locked: true, lockedWhy: refusal.why, mayDecline: await access.isOwnProposal(companyId, uid, proposal) };
+    return { locked: true, lockedWhy: refusal.why, mayDecline: privileged || await access.isOwnProposal(companyId, uid, proposal) };
 };
 
 const READ_AT_ONCE = 20;

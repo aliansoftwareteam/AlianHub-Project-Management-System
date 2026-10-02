@@ -199,7 +199,7 @@
             <ConfirmationSidebar
                 v-model="showSidebar"
                 :title="archive ? $t('Projects.archive_task') : $t('Projects.delete_task')"
-                :message="archive ? $t('conformationmsg.archive') : $t('conformationmsg.delete')"
+                :message="$t(taskRemovalMessageKey(props.data, archive))"
                 :confirmationString="archive ? $t('Projects.confirm_word_archive') : $t('Projects.confirm_word_delete')"
                 :acceptButtonClass="archive ? 'btn-primary': 'btn-danger'"
                 :acceptButton="`${archive ? $t('Projects.archive') : $t('Projects.delete')}`"
@@ -236,6 +236,7 @@
     import CreateTagPopup from "@/components/molecules/TagList/CreateTagPopup.vue";
     import { taskTagChips } from "@/components/molecules/TagList/helper.js";
     import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
+    import { taskRemovalMessageKey } from "@/utils/taskRemovalWords";
     import TaskMenuSidebars from '@/views/Projects/components/taskMenu/TaskMenuSidebars.vue';
     import TaskMenuPopup from '@/views/Projects/components/taskMenu/TaskMenuPopup.vue';
     import { taskMenuItems } from '@/views/Projects/composables/taskMenu';

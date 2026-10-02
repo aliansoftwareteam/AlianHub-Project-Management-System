@@ -93,13 +93,30 @@ describe('private sprint members', () => {
 });
 
 describe('chat channels', () => {
+    const newList = (projectId, name) => owner.api.post('/api/v1/sprint', {
+        companyId: state.companyId, projectId, sprintName: name, userData: userData(), mainChat: true, private: true,
+        AssigneeUserId: [owner.uid, OUTSIDER],
+    });
+
     it('refuses a channel that names another company\'s user and stores nothing', async () => {
+        const chats = await owner.api.get('/api/v1/main-chats');
+        const spaces = Array.isArray(chats.body) ? chats.body : (chats.body && chats.body.data) || [];
+        const channelSpace = spaces.find((space) => space.default !== true);
+        expect(channelSpace).toBeTruthy();
+
         const name = `SPM channel ${uniqueSuffix()}`;
-        const res = await owner.api.post('/api/v1/sprint', {
-            companyId: state.companyId, projectId: project._id, sprintName: name, userData: userData(), mainChat: true, private: true,
-            AssigneeUserId: [owner.uid, OUTSIDER],
-        });
+        const res = await newList(String(channelSpace._id), name);
         expect([res.status, res.body.status]).toEqual([400, false]);
         expect(await db().collection('sprints').countDocuments({ name })).toBe(0);
+    });
+
+    // Whether a new list is a channel is read from where it is made: in a project it is a list, and a list is made without people.
+    it('makes a plain list in a project, with nobody named on it', async () => {
+        const name = `SPM list ${uniqueSuffix()}`;
+        const res = await newList(project._id, name);
+        expect([res.status, res.body.status]).toEqual([200, true]);
+        const stored = await db().collection('sprints').findOne({ name });
+        expect(stored.AssigneeUserId || []).toEqual([]);
+        expect(JSON.stringify(stored)).not.toContain(OUTSIDER);
     });
 });

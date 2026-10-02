@@ -32,9 +32,9 @@ const CARDS = Object.freeze({
 });
 const PERIODS = Object.freeze({ auto: 0, today: 1, this_week: 3, last_week: 4, this_month: 5, last_month: 6, last_30_days: 8 });
 
-const NOT_FOUND = 'that dashboard was not found';
-const NOT_OWNER = 'only the owner of a dashboard changes it, and this one belongs to someone else';
-const FULL = `that dashboard already holds ${CARDS_MAX} cards, the most one can`;
+const NOT_FOUND = 'That dashboard was not found.';
+const NOT_OWNER = 'Only the owner of a dashboard can change it, and this one belongs to someone else.';
+const FULL = `That dashboard already has ${CARDS_MAX} cards, which is the most it can have.`;
 const NOT_THEIRS = 'A dashboard is changed by its owner alone, so only the person this card was asked for can approve it.';
 
 const refuse = (message) => new tools.DeterministicError(message);
@@ -60,10 +60,10 @@ const draftOf = (given) => {
 const problemIn = (given) => {
     const asked = objectOf(given);
     const draft = draftOf(asked);
-    if (Boolean(draft.dashboardId) === Boolean(draft.newDashboard)) return 'name dashboardId, a dashboard that is there, or newDashboard, the name of a new one: one of the two';
-    if (!draft.card) return `card must be one of ${Object.keys(CARDS).join(', ')}`;
-    if (asked.period !== undefined && !draft.period) return `period must be one of ${Object.keys(PERIODS).join(', ')}`;
-    return draft.period && CARDS[draft.card].period === null ? `a ${draft.card} card covers no span of time, so it takes no period` : '';
+    if (Boolean(draft.dashboardId) === Boolean(draft.newDashboard)) return 'Give either dashboardId (an existing dashboard) or newDashboard (the name of a new one), not both and not neither.';
+    if (!draft.card) return `The card must be one of ${Object.keys(CARDS).join(', ')}.`;
+    if (asked.period !== undefined && !draft.period) return `The period must be one of ${Object.keys(PERIODS).join(', ')}.`;
+    return draft.period && CARDS[draft.card].period === null ? `A ${draft.card} card does not cover a span of time, so leave the period out.` : '';
 };
 
 const answered = (answer) => (answer.code === 200 && answer.body && answer.body.status === true ? answer.body.data : null);
@@ -119,7 +119,7 @@ const addToNew = async ({ companyId, who, draft }) => {
     const card = cardDoc(draft, []);
     const answer = await setup.answerOf('dashboardCreate', { companyId, who, body: { title: draft.newDashboard, visibility: PRIVATE, cards: [card] } });
     const made = answered(answer);
-    if (!made || !made._id) throw refuse(setup.reasonOf(answer, 'the dashboard was not created'));
+    if (!made || !made._id) throw refuse(setup.reasonOf(answer, 'The dashboard was not created. Try again, or tell the person.'));
     return { dashboardId: idOf(made._id), named: '', cardUid: card.uid, madeDashboard: true };
 };
 
@@ -130,7 +130,7 @@ const addToHeld = async ({ companyId, who, draft }) => {
     if (cards.length >= CARDS_MAX) throw refuse(FULL);
     const card = cardDoc(draft, cards);
     const answer = await setup.answerOf('dashboardCards', { companyId, who, params: { id: draft.dashboardId }, body: { cards: [...cards, card] } });
-    if (!answered(answer)) throw refuse(setup.reasonOf(answer, 'the card was not added'));
+    if (!answered(answer)) throw refuse(setup.reasonOf(answer, 'The card was not added. Try again, or tell the person.'));
     return { dashboardId: draft.dashboardId, named: nameForLog(held.dashboard), cardUid: card.uid, madeDashboard: false };
 };
 
@@ -146,7 +146,7 @@ const withdraw = async ({ companyId, who, made }) => {
     const answer = whole
         ? await setup.answerOf('dashboardDelete', { companyId, who, params: { id: made.dashboardId } })
         : await setup.answerOf('dashboardCards', { companyId, who, params: { id: made.dashboardId }, body: { cards: kept } });
-    if (!answered(answer)) throw refuse(setup.reasonOf(answer, 'the card was not removed'));
+    if (!answered(answer)) throw refuse(setup.reasonOf(answer, 'The card was not removed. Try again, or tell the person.'));
     return { dashboardId: made.dashboardId, removed: true, dashboardRemoved: whole };
 };
 

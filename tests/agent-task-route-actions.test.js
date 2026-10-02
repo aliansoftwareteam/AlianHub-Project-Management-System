@@ -127,7 +127,7 @@ describe('what a token created for an agent changes through the task route', () 
         const answer = await send(PATCH, agentToken(uid), BODIES[name](T_OPEN));
 
         expect(answer.code).toBe(403);
-        expect(answer.body.statusText).toMatch(/^Agents cannot perform /);
+        expect(answer.body.statusText).toMatch(/^(An agent is not allowed to do this|An agent is never allowed to do this|That action is not available to agents|You cannot set a task to)/);
         expect(reached()).toBe(false);
         expect(snapshot()).toBe(before);
         expect(audits('agent.action_refused')).toHaveLength(1);
@@ -175,6 +175,19 @@ describe('what a token created for an agent changes through the task route', () 
         const answer = await send(PATCH, agentToken(uid), BODIES.updatePriority(taskId));
 
         expect(answer.code).toBe(404);
+        expect(reached()).toBe(false);
+    });
+
+    it.each([
+        ['nothing', {}],
+        ['a pause', { agentLimits: { paused: true } }],
+        ['proposing every change', { agentPolicy: { connected: 'propose_all' } }],
+    ])('answers a task its person cannot open as a task that does not exist, where its project holds agents to %s', async (label, held) => {
+        Object.assign(rows(SCHEMA_TYPE.PROJECTS).find((project) => String(project._id) === P_PRIVATE), held);
+        const answered = async (taskId) => { const { code, body } = await send(PATCH, agentToken(OUTSIDER), BODIES.updatePriority(taskId)); return { code, body: { ...body, auditId: undefined } }; };
+
+        expect(await answered(T_PRIVATE)).toEqual(await answered('6f0000000000000000000dff'));
+        expect(rows(SCHEMA_TYPE.AGENT_WORK_MARKS).filter((mark) => String(mark.scope).includes(P_PRIVATE))).toEqual([]);
         expect(reached()).toBe(false);
     });
 
@@ -248,7 +261,7 @@ describe('the table the rule reads', () => {
     });
 
     it('leaves no guard exported that no route mounts', () => {
-        const mounted = ['Modules/Tasks/routes.js', 'Modules/Agents/routes.js', 'Modules/Pages/routes.js', 'Modules/Goals/routes.js', 'Modules/Project/routes.js', 'Modules/Comments/routes.js'].map((file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')).join('\n');
+        const mounted = ['Modules/Tasks/routes.js', 'Modules/Agents/routes.js', 'Modules/Pages/routes.js', 'Modules/Goals/routes.js', 'Modules/Project/routes.js', 'Modules/Comments/routes.js', 'Modules/Reminders/routes.js', 'Modules/Sprints/routes.js'].map((file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')).join('\n');
 
         Object.entries(guard).filter(([, value]) => typeof value === 'function').forEach(([name]) => {
             expect(mounted).toMatch(new RegExp(`\\b${name}\\b`));

@@ -103,7 +103,10 @@ describe('PAG-03 import history belongs to the session user', () => {
 });
 
 describe('PAG-04 settings and rules imports are gated', () => {
-    const template = () => ({ TemplateName: `[QA pages] tmpl ${uniqueSuffix()}`, TemplateId: `pagtmpl${uniqueSuffix()}`, category: 'category' });
+    const template = () => ({
+        TemplateName: `[QA pages] tmpl ${uniqueSuffix()}`, AssigneeUserId: [], LeadUserId: [], ProjectCurrency: { code: 'USD', name: 'US Dollar', symbol: '$' },
+        ProjectRequiredDefaultComponent: 'ProjectListView', TemplateRequiredComponent: [], TemplateTaskType: [], apps: [], projectStatusData: [], taskStatusData: [],
+    });
 
     it.each(['member', 'guest'])('refuses a template import from a %s', async (role) => {
         const session = await as(role);
@@ -127,6 +130,7 @@ describe('PAG-04 settings and rules imports are gated', () => {
         const admin = await as('admin');
         const res = await admin.api.post('/api/v1/importTemplate', { companyId: state.companyId, templates: [template()] });
         expect(refused(res)).toBe(false);
+        for (const stored of res.body.data || []) await admin.api.delete(`/api/v1/project/template/custom/${stored._id}`);
     });
 });
 
