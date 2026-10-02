@@ -2,33 +2,33 @@
     <div v-if="modelValue" class="aimport__overlay" @click.self="$emit('update:modelValue', false)">
         <div class="aimport__card">
             <div class="d-flex align-items-center justify-content-between aimport__head">
-                <span class="font-size-16 font-weight-700">{{ $t('Projects.import_asana') }}</span>
-                <span class="cursor-pointer font-size-16 aimport__close" @click="$emit('update:modelValue', false)">&#10005;</span>
+                <span class="import-asana-modal-font-size-16 import-asana-modal-font-weight-700">{{ $t('Projects.import_asana') }}</span>
+                <span class="cursor-pointer import-asana-modal-font-size-16 aimport__close" @click="$emit('update:modelValue', false)">&#10005;</span>
             </div>
 
-            <div class="font-size-12 gray81 aimport__hint">{{ $t('Projects.import_asana_hint') }}</div>
+            <div class="import-asana-modal-font-size-12 import-asana-modal-gray81 aimport__hint">{{ $t('Projects.import_asana_hint') }}</div>
 
-            <span class="font-size-12 aimport__sample" @click="downloadSample">&#8595; {{ $t('Projects.download_sample') }}</span>
+            <span class="import-asana-modal-font-size-12 aimport__sample" @click="downloadSample">&#8595; {{ $t('Projects.download_sample') }}</span>
 
-            <input ref="fileEl" type="file" accept=".json,application/json" class="font-size-13 aimport__file" @change="parseFile" />
+            <input ref="fileEl" type="file" accept=".json,application/json" class="import-asana-modal-font-size-13 aimport__file" @change="parseFile" />
 
-            <div v-if="asana" class="font-size-13 aimport__preview">
+            <div v-if="asana" class="import-asana-modal-font-size-13 aimport__preview">
                 {{ $t('Projects.import_asana_found', { tasks: taskCount }) }}
             </div>
 
             <div class="d-flex align-items-center aimport__controls" v-if="asana && taskCount">
-                <span class="font-size-13 font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
-                <select v-model="selectedSprintId" class="aimport__select font-size-13">
+                <span class="import-asana-modal-font-size-13 import-asana-modal-font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
+                <select v-model="selectedSprintId" class="aimport__select import-asana-modal-font-size-13">
                     <option v-for="sprint in sprintOptions" :key="'as-'+sprint.id" :value="sprint.id">
                         {{ listLabel(sprint) }}
                     </option>
                 </select>
-                <button class="btn-primary font-size-13 ml-10px" :disabled="isImporting || !selectedSprintId" @click="startImport">
+                <button class="btn-primary import-asana-modal-font-size-13 ml-10px" :disabled="isImporting || !selectedSprintId" @click="startImport">
                     {{ isImporting ? $t('Projects.importing') : $t('Projects.start_import') }}
                 </button>
             </div>
 
-            <div v-if="resultText" class="font-size-13 aimport__result">{{ resultText }}</div>
+            <div v-if="resultText" class="import-asana-modal-font-size-13 aimport__result">{{ resultText }}</div>
         </div>
     </div>
 </template>
@@ -187,4 +187,25 @@ function startImport() {
 .aimport__controls { margin-top: 4px; }
 .aimport__select { border: 1px solid #e0e0e0; border-radius: 6px; padding: 6px 8px; background: #fff; min-width: 200px; }
 .aimport__result { margin-top: 12px; padding: 8px 10px; background: #f7f9fc; border-radius: 6px; }
+</style>
+
+<style scoped>
+.import-asana-modal-gray81 {
+    color: var(--ink-2);
+}
+.import-asana-modal-font-weight-500 {
+    font-weight: 500 !important;
+}
+.import-asana-modal-font-weight-700 {
+    font-weight: 700 !important;
+}
+.import-asana-modal-font-size-12 {
+    font-size: 12px;
+}
+.import-asana-modal-font-size-13 {
+    font-size: 13px;
+}
+.import-asana-modal-font-size-16 {
+    font-size: 16px;
+}
 </style>

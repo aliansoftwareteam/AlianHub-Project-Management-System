@@ -40,7 +40,7 @@
                                 <img v-else class="profile-sm-square mobile-projectlist-icon" :src="projectData.projectIcon.data" alt=""/>
                             </template>
                             <div class="list-text-wrapper">
-                                <span class="text-ellipsis font-weight-bold black list-view-header-title ml-12px" @dblclick="$emit('startEditName')" :title="projectData.ProjectName">
+                                <span class="text-ellipsis project-actions-bar-font-weight-bold black list-view-header-title ml-12px" @dblclick="$emit('startEditName')" :title="projectData.ProjectName">
                                     {{ projectData?.ProjectName }}
                                 </span>
                             </div>
@@ -53,7 +53,7 @@
                     </template>
                     <template #options>
                         <div id="projectoptionslist_driver">
-                            <div v-if="projectData?.isPrivateSpace && clientWidth <= 767" class="d-flex align-items-center hover-bg-lighter-gray-dropdown hover-purple cursor-pointer text-nowrap drop-down-item gray81 p-7px bg-gray91 border-radius-8-px border-bottom mb-20px">
+                            <div v-if="projectData?.isPrivateSpace && clientWidth <= 767" class="d-flex align-items-center project-actions-bar-hover-bg-lighter-gray-dropdown project-actions-bar-hover-purple cursor-pointer text-nowrap drop-down-item gray81 p-7px project-actions-bar-bg-gray91 border-radius-8-px border-bottom mb-20px">
                                 <Assignee
                                     class="assignee-data ml-15px"
                                     :users="projectData.AssigneeUserId"
@@ -77,7 +77,7 @@
                                             </div>
                                             <span class="sprint-watcher-count" aria-hidden="true">{{ watcherCount }}</span>
                                         </div>
-                                        <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.watchers') }}</span>
+                                        <span :class="{'project-actions-bar-font-size-16': clientWidth <= 767 }" class="project-actions-bar-font-weight-400 gray4b">{{ $t('Projects.watchers') }}</span>
                                     </div>
                                 </DropDownOption>
                                 <DropDownOption @click="$emit('openSidebar', 'filesLinks')">
@@ -85,7 +85,7 @@
                                         <div class="d-flex align-items-center">
                                             <img :src="fileLink" alt="" class="mr-20px"/>
                                         </div>
-                                        <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.files_links') }}</span>
+                                        <span :class="{'project-actions-bar-font-size-16': clientWidth <= 767 }" class="project-actions-bar-font-weight-400 gray4b">{{ $t('Projects.files_links') }}</span>
                                     </div>
                                 </DropDownOption>
                                 <DropDownOption @click="$emit('openSidebar', 'audio')" class="border-bottom pb-20px">
@@ -93,7 +93,7 @@
                                         <div class="d-flex align-items-center">
                                             <img :src="audioLinkMobile" alt="" class="mr-20px"/>
                                         </div>
-                                        <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.audio_files') }}</span>
+                                        <span :class="{'project-actions-bar-font-size-16': clientWidth <= 767 }" class="project-actions-bar-font-weight-400 gray4b">{{ $t('Projects.audio_files') }}</span>
                                     </div>
                                 </DropDownOption>
                             </template>
@@ -102,7 +102,7 @@
                                     <div class="d-flex align-items-center mr-20px">
                                         <ShellIcon name="automations" :size="18" />
                                     </div>
-                                    <span class="font-size-16 font-weight-400 gray4b">{{ $t('Projects.automate') }}</span>
+                                    <span class="project-actions-bar-font-size-16 project-actions-bar-font-weight-400 gray4b">{{ $t('Projects.automate') }}</span>
                                 </div>
                             </DropDownOption>
                             <DropDownOption @click="$emit('openPermissionSidebar')" v-if="checkPermission('settings.settings_security_permissions') !== null">
@@ -110,7 +110,7 @@
                                     <div class="d-flex align-items-center">
                                         <span class="ah-mask-icon pab-lock mr-20px" :style="maskOf(lockIcon)" aria-hidden="true"></span>
                                     </div>
-                                    <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.project_permissions') }}</span>
+                                    <span :class="{'project-actions-bar-font-size-16': clientWidth <= 767 }" class="project-actions-bar-font-weight-400 gray4b">{{ $t('Projects.project_permissions') }}</span>
                                 </div>
                             </DropDownOption>
                             <DropDownOption @click="$emit('startEditName')" v-if="checkPermission('project.project_name_edit',projectData.isGlobalPermission) === true">
@@ -118,7 +118,7 @@
                                     <div class="d-flex align-items-center">
                                         <img :src="listIcon" alt="" class="mr-20px">
                                     </div>
-                                    <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.rename') }}</span>
+                                    <span :class="{'project-actions-bar-font-size-16': clientWidth <= 767 }" class="project-actions-bar-font-weight-400 gray4b">{{ $t('Projects.rename') }}</span>
                                 </div>
                             </DropDownOption>
                             <DropDownOption @click="$emit('openColorAvatar')" v-if="checkPermission('project.project_create',projectData.isGlobalPermission) === true">
@@ -126,7 +126,7 @@
                                     <div class="d-flex align-items-center">
                                         <img :src="colorPalletIcon" alt="" class="mr-20px">
                                     </div>
-                                    <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.color_avatar') }}</span>
+                                    <span :class="{'project-actions-bar-font-size-16': clientWidth <= 767 }" class="project-actions-bar-font-weight-400 gray4b">{{ $t('Projects.color_avatar') }}</span>
                                 </div>
                             </DropDownOption>
                             <DropDownOption v-if="canDuplicate" data-test="duplicate-project" @click="duplicating = true">
@@ -146,7 +146,7 @@
                                     <div class="d-flex align-items-center">
                                         <img :src="cancelIcon" alt="" class="mr-20px">
                                     </div>
-                                    <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.close_project') }}</span>
+                                    <span :class="{'project-actions-bar-font-size-16': clientWidth <= 767 }" class="project-actions-bar-font-weight-400 gray4b">{{ $t('Projects.close_project') }}</span>
                                 </div>
                             </DropDownOption>
                             <DropDownOption v-if="checkPermission('project.project_delete',projectData.isGlobalPermission) === true" @click="$emit('archiveProject', 2)">
@@ -154,7 +154,7 @@
                                     <div class="d-flex align-items-center">
                                         <img :src="deleteIcon" alt="" class="mr-20px">
                                     </div>
-                                    <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.delete') }}</span>
+                                    <span :class="{'project-actions-bar-font-size-16': clientWidth <= 767 }" class="project-actions-bar-font-weight-400 gray4b">{{ $t('Projects.delete') }}</span>
                                 </div>
                             </DropDownOption>
                         </div>
@@ -226,4 +226,25 @@ const deleteIcon = require('@/assets/images/svg/Delete_Icon.svg');
 .pab-duplicate { display: flex; align-items: center; gap: 20px; font-size: 12px; font-weight: 400; color: var(--ink-2); }
 .pab-duplicate--phone { height: 50px; font-size: 16px; color: var(--ink); }
 .pab-lock { width: 15px; height: 20px; color: var(--ink-2); }
+</style>
+
+<style scoped>
+.project-actions-bar-hover-purple:hover {
+    color: var(--brand) !important;
+}
+.project-actions-bar-bg-gray91 {
+    background-color: var(--fill);
+}
+.project-actions-bar-hover-bg-lighter-gray-dropdown:hover {
+    background-color: var(--surface-hover) !important;
+}
+.project-actions-bar-font-weight-bold {
+    font-weight: bold;
+}
+.project-actions-bar-font-weight-400 {
+    font-weight: 400 !important;
+}
+.project-actions-bar-font-size-16 {
+    font-size: 16px;
+}
 </style>

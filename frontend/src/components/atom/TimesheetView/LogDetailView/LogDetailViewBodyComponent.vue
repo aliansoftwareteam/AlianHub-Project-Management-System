@@ -8,8 +8,8 @@
                 <div class="d-flex timelogtracker justify-content-between  logDetail-head" >
                     <div class="d-flex align-items-center" v-if="!isUser">
                         <div>
-                            <div><span class="font-size-16 font-weight-500 data__task-name">{{data.taskName}}</span> | <span class="font-size-13 font-weight-400 GunPowder">{{data.taskKey}}</span></div>
-                            <div><span class="font-size-14 font-weight-400 GunPowder data__project-key">{{data.projectKey}}</span> | <span class="font-size-13 font-weight-400 GunPowder">{{data.projectName}}</span></div>
+                            <div><span class="log-detail-view-body-component-font-size-16 log-detail-view-body-component-font-weight-500 data__task-name">{{data.taskName}}</span> | <span class="log-detail-view-body-component-font-size-13 log-detail-view-body-component-font-weight-400 log-detail-view-body-component-GunPowder">{{data.taskKey}}</span></div>
+                            <div><span class="log-detail-view-body-component-font-size-14 log-detail-view-body-component-font-weight-400 log-detail-view-body-component-GunPowder data__project-key">{{data.projectKey}}</span> | <span class="log-detail-view-body-component-font-size-13 log-detail-view-body-component-font-weight-400 log-detail-view-body-component-GunPowder">{{data.projectName}}</span></div>
                         </div>
                     </div>
                     <div class="d-flex align-items-center w-65" v-else>
@@ -27,7 +27,7 @@
                         />
                         <img alt="" v-else src="@/assets/images/default_user.png" class="timesheet_user_profile"
                             :title="data.name"/>
-                            <div class="text-ellipsis cursor-default"><span class="font-size-16 font-weight-500 text-ellipsis pr-10px data__task-name" :title="data.name">{{data.name}}</span></div>
+                            <div class="text-ellipsis cursor-default"><span class="log-detail-view-body-component-font-size-16 log-detail-view-body-component-font-weight-500 text-ellipsis pr-10px data__task-name" :title="data.name">{{data.name}}</span></div>
                     </div>
                     <div class="d-flex align-items-center justify-content-end w-35">
                         <span class="timelogHours black font-ui">
@@ -72,7 +72,7 @@
         </div>
         <div class="norecords__found" v-if="dataObj && dataObj.length == 0">
             <div class="norecords__wrapper">
-                <p class="red">{{ $t('UserTimesheet.no_records_found') }}</p>
+                <p class="log-detail-view-body-component-red">{{ $t('UserTimesheet.no_records_found') }}</p>
             </div>
         </div>
     </div>
@@ -133,3 +133,27 @@ margin-bottom: 20px;
 .default-image-sidebar{cursor: default !important;}
 </style>
 <style src="./style.css"></style>
+
+<style scoped>
+.log-detail-view-body-component-red {
+    color: var(--danger-ink);
+}
+.log-detail-view-body-component-GunPowder {
+    color: var(--ink-2);
+}
+.log-detail-view-body-component-font-weight-400 {
+    font-weight: 400 !important;
+}
+.log-detail-view-body-component-font-weight-500 {
+    font-weight: 500 !important;
+}
+.log-detail-view-body-component-font-size-13 {
+    font-size: 13px;
+}
+.log-detail-view-body-component-font-size-14 {
+    font-size: 14px;
+}
+.log-detail-view-body-component-font-size-16 {
+    font-size: 16px;
+}
+</style>

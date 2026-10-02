@@ -2,8 +2,8 @@
     <div v-if="modelValue" class="epics__overlay" @click.self="$emit('update:modelValue', false)">
         <div class="epics__card">
             <div class="d-flex align-items-center justify-content-between epics__head">
-                <span class="font-size-16 font-weight-700">{{ $t('Projects.epics') }}</span>
-                <span class="cursor-pointer font-size-16 epics__close" @click="$emit('update:modelValue', false)">&#10005;</span>
+                <span class="epics-panel-font-size-16 epics-panel-font-weight-700">{{ $t('Projects.epics') }}</span>
+                <span class="cursor-pointer epics-panel-font-size-16 epics__close" @click="$emit('update:modelValue', false)">&#10005;</span>
             </div>
 
             <!-- Create a new epic: name + priority + optional dates -->
@@ -11,36 +11,36 @@
                 <input
                     v-model="newEpicName"
                     type="text"
-                    class="epics__input font-size-13"
+                    class="epics__input epics-panel-font-size-13"
                     :placeholder="$t('Projects.epic_name_placeholder')"
                     @keydown.enter="createEpic"
                 />
                 <div class="d-flex align-items-center epics__create-meta">
-                    <select v-model="newEpicPriority" class="epics__select font-size-12" :title="$t('Projects.epic_priority')">
+                    <select v-model="newEpicPriority" class="epics__select epics-panel-font-size-12" :title="$t('Projects.epic_priority')">
                         <option value="low">{{ $t('Projects.priority_low') }}</option>
                         <option value="medium">{{ $t('Projects.priority_medium') }}</option>
                         <option value="high">{{ $t('Projects.priority_high') }}</option>
                     </select>
-                    <input v-model="newEpicStartDate" type="date" class="epics__date font-size-12" :title="$t('Projects.epic_start_date')" />
-                    <input v-model="newEpicDueDate" type="date" class="epics__date font-size-12" :title="$t('Projects.epic_due_date')" />
-                    <button class="btn-primary font-size-13" :disabled="isSaving" @click="createEpic">{{ $t('Projects.add_epic') }}</button>
+                    <input v-model="newEpicStartDate" type="date" class="epics__date epics-panel-font-size-12" :title="$t('Projects.epic_start_date')" />
+                    <input v-model="newEpicDueDate" type="date" class="epics__date epics-panel-font-size-12" :title="$t('Projects.epic_due_date')" />
+                    <button class="btn-primary epics-panel-font-size-13" :disabled="isSaving" @click="createEpic">{{ $t('Projects.add_epic') }}</button>
                 </div>
             </div>
 
-            <div v-if="isLoading" class="gray81 font-size-12 epics__empty">{{ $t('Projects.searching') }}</div>
-            <div v-else-if="!epics.length" class="gray81 font-size-12 epics__empty">{{ $t('Projects.no_epics') }}</div>
+            <div v-if="isLoading" class="epics-panel-gray81 epics-panel-font-size-12 epics__empty">{{ $t('Projects.searching') }}</div>
+            <div v-else-if="!epics.length" class="epics-panel-gray81 epics-panel-font-size-12 epics__empty">{{ $t('Projects.no_epics') }}</div>
             <div v-else>
                 <div v-for="epic in epics" :key="'epic-'+epic._id" class="epics__row">
                     <div class="d-flex align-items-center justify-content-between">
                         <div class="d-flex align-items-center epics__row-main">
                             <span class="epics__dot" :style="{background: epic.color || '#7b68ee'}"></span>
-                            <span class="font-size-13 font-weight-600 epics__name">{{ epic.name }}</span>
-                            <span v-if="epic.priority" class="epics__badge font-size-10" :class="'epics__badge--'+epic.priority">{{ priorityLabel(epic.priority) }}</span>
+                            <span class="epics-panel-font-size-13 epics-panel-font-weight-600 epics__name">{{ epic.name }}</span>
+                            <span v-if="epic.priority" class="epics__badge epics-panel-font-size-10" :class="'epics__badge--'+epic.priority">{{ priorityLabel(epic.priority) }}</span>
                         </div>
                         <div class="d-flex align-items-center epics__row-actions">
                             <select
                                 :value="epic.status || 'open'"
-                                class="epics__status-select font-size-11"
+                                class="epics__status-select epics-panel-font-size-11"
                                 :class="'epics__status-select--'+(epic.status || 'open')"
                                 @change="updateEpicStatus(epic, $event.target.value)"
                             >
@@ -48,14 +48,14 @@
                                 <option value="in_progress">{{ $t('Projects.epic_status_in_progress') }}</option>
                                 <option value="done">{{ $t('Projects.epic_status_done') }}</option>
                             </select>
-                            <span class="font-size-11 gray81 epics__count">{{ progressOf(epic) }}% · {{ epic.completedCount || 0 }}/{{ epic.taskCount || 0 }}</span>
+                            <span class="epics-panel-font-size-11 epics-panel-gray81 epics__count">{{ progressOf(epic) }}% · {{ epic.completedCount || 0 }}/{{ epic.taskCount || 0 }}</span>
                             <span class="cursor-pointer epics__delete" :title="$t('Projects.delete')" @click="deleteEpic(epic)">&#10005;</span>
                         </div>
                     </div>
                     <div class="epics__bar">
                         <div class="epics__bar-fill" :style="{width: progressOf(epic) + '%', background: epic.color || '#7b68ee'}"></div>
                     </div>
-                    <div class="d-flex align-items-center flex-wrap epics__meta font-size-11 gray81">
+                    <div class="d-flex align-items-center flex-wrap epics__meta epics-panel-font-size-11 epics-panel-gray81">
                         <span class="epics__meta-item">{{ $t('Projects.epic_owner') }}: {{ ownerName(epic) }}</span>
                         <span v-if="epic.startDate" class="epics__meta-item">{{ $t('Projects.epic_start_date') }}: {{ formatDate(epic.startDate) }}</span>
                         <span v-if="epic.dueDate" class="epics__meta-item">{{ $t('Projects.epic_due_date') }}: {{ formatDate(epic.dueDate) }}</span>
@@ -267,4 +267,31 @@ function deleteEpic(epic) {
 .epics__bar-fill { height: 100%; border-radius: 3px; transition: width 0.2s; }
 .epics__meta { gap: 14px; margin-top: 6px; }
 .epics__meta-item { white-space: nowrap; }
+</style>
+
+<style scoped>
+.epics-panel-gray81 {
+    color: var(--ink-2);
+}
+.epics-panel-font-weight-600 {
+    font-weight: 600 !important;
+}
+.epics-panel-font-weight-700 {
+    font-weight: 700 !important;
+}
+.epics-panel-font-size-10 {
+    font-size: 10px;
+}
+.epics-panel-font-size-11 {
+    font-size: 11px;
+}
+.epics-panel-font-size-12 {
+    font-size: 12px;
+}
+.epics-panel-font-size-13 {
+    font-size: 13px;
+}
+.epics-panel-font-size-16 {
+    font-size: 16px;
+}
 </style>

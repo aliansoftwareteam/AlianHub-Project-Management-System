@@ -1,11 +1,11 @@
 <template>
     <!-- <div> -->
-        <div v-if="showUsersList" class="position-fi overflow-y-auto bg-white style-scroll border-radius-5-px z-index-6 show__userlist">
+        <div v-if="showUsersList" class="position-fi overflow-y-auto comment-input-bg-white comment-input-style-scroll border-radius-5-px z-index-6 show__userlist">
             <ul :id="listboxId" role="listbox" :aria-label="$t('Comments.mention_suggestions')" class="d-flex flex-column m-0 p-0">
                 <template v-if="mentionOptions.length">
                     <li
                         class="d-flex align-items-center cursor-pointer p5px-p10px"
-                        :class="{'bg-blue white': selectedUserIndex === index}"
+                        :class="{'comment-input-bg-blue comment-input-white': selectedUserIndex === index}"
                         v-for="(data, index) in filteredUsers"
                         :id="optionId(index)"
                         :key="index"
@@ -28,11 +28,11 @@
                         <span>{{data.name}}</span>
                     </li>
                     <li v-if="filteredAgents.length" role="group" :aria-label="$t('Comments.mention_agents')" class="d-flex flex-column">
-                        <span class="p5px-p10px font-size-12 gray" aria-hidden="true">{{ $t('Comments.mention_agents') }}</span>
+                        <span class="p5px-p10px comment-input-font-size-12 comment-input-gray" aria-hidden="true">{{ $t('Comments.mention_agents') }}</span>
                         <ul class="d-flex flex-column m-0 p-0">
                             <li
                                 class="d-flex align-items-center cursor-pointer p5px-p10px"
-                                :class="{'bg-blue white': selectedUserIndex === filteredUsers.length + index}"
+                                :class="{'comment-input-bg-blue comment-input-white': selectedUserIndex === filteredUsers.length + index}"
                                 v-for="(agent, index) in filteredAgents"
                                 :id="optionId(filteredUsers.length + index)"
                                 :key="agent.key"
@@ -52,7 +52,7 @@
                         v-if="showAiOption"
                         :id="optionId(aiIndex)"
                         class="d-flex align-items-center cursor-pointer p5px-p10px"
-                        :class="{'bg-blue white': selectedUserIndex === aiIndex}"
+                        :class="{'comment-input-bg-blue comment-input-white': selectedUserIndex === aiIndex}"
                         role="option"
                         data-test="mention-ai"
                         :aria-selected="selectedUserIndex === aiIndex"
@@ -61,7 +61,7 @@
                     >
                         <span class="ah-avatar ah-avatar--sm ah-avatar--agent mr-10px" aria-hidden="true">{{ aiOption.name }}</span>
                         <span>{{ $t('AiMention.option') }}</span>
-                        <span class="ml-10px font-size-12 comment-input__ai-hint">{{ $t('AiMention.option_hint') }}</span>
+                        <span class="ml-10px comment-input-font-size-12 comment-input__ai-hint">{{ $t('AiMention.option_hint') }}</span>
                     </li>
                 </template>
                 <template v-else>
@@ -72,11 +72,11 @@
             </ul>
         </div>
         <div class="d-flex flex-column w-100">
-            <div v-if="reply && Object.keys(reply).length" class="d-flex align-items-center justify-content-between overflow-y-auto bg-white style-scroll border-top-radius-5-px reply-box bg-gainsboro">
+            <div v-if="reply && Object.keys(reply).length" class="d-flex align-items-center justify-content-between overflow-y-auto comment-input-bg-white comment-input-style-scroll border-top-radius-5-px reply-box comment-input-bg-gainsboro">
                 <div class="d-flex align-items-center emp__profile-wrapper">
                     <UserProfile decorative
                         :showDot="false"
-                        class="profile-image mr-5px emplyoee__profile-img"
+                        class="comment-input-profile-image mr-5px emplyoee__profile-img"
                         :data="{
                             id: reply.userId,
                             title: getUser(reply.userId).Employee_Name,
@@ -97,7 +97,7 @@
             <textarea
                 v-show="!recording"
                 type="text"
-                class="write-message style-scroll"
+                class="write-message comment-input-style-scroll"
                 id="message-box"
                 ref="messageBox"
                 role="combobox"
@@ -430,4 +430,51 @@ function handlePaste(e) {
 
 <style>
 @import './style.css';
+</style>
+
+<style scoped>
+.comment-input-white {
+    color: var(--on-brand) !important;
+}
+.comment-input-gray {
+    color: var(--ink-2);
+}
+.comment-input-bg-white {
+    background-color: var(--surface);
+}
+.comment-input-bg-blue {
+    background-color: var(--brand);
+}
+.comment-input-bg-gainsboro {
+    background-color: var(--fill);
+}
+.comment-input-font-size-12 {
+    font-size: 12px;
+}
+.comment-input-profile-image {
+    object-fit: fill;
+    height: 25px;
+    width: 25px;
+    border-radius: 50%;
+    background-color: var(--surface);
+    border: 1px solid var(--hairline);
+}
+@media (max-width: 767px) {
+    .comment-input-profile-image {
+        border-radius: 50% !important;
+    }
+}
+.comment-input-style-scroll::-webkit-scrollbar-track {
+    background-color: var(--canvas);
+}
+.comment-input-style-scroll::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+    background-color: var(--canvas);
+    border-radius: 8px;
+}
+.comment-input-style-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--ink-3);
+    border-radius: 8px;
+}
 </style>

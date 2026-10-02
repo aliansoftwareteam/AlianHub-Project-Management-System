@@ -83,8 +83,8 @@
                             :multiSelect="false"
                         />
                         <span
-                            class="black text-ellipsis task-created-by ml-5px"
-                            :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}"
+                            class="task-detail-right-side-black text-ellipsis task-created-by ml-5px"
+                            :class="{'task-detail-right-side-font-size-13 task-detail-right-side-font-weight-400' : clientWidth > 767, 'task-detail-right-side-font-size-16' : clientWidth <=767}"
                             :title="taskLeaderData?.Employee_Name || 'N/A'">
                             {{ taskLeaderData?.Employee_Name || 'N/A' }}
                         </span>
@@ -101,8 +101,8 @@
                             :thumbnail="'30x30'"
                         />
                         <span
-                            class="black text-ellipsis task-created-by"
-                            :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}"
+                            class="task-detail-right-side-black text-ellipsis task-created-by"
+                            :class="{'task-detail-right-side-font-size-13 task-detail-right-side-font-weight-400' : clientWidth > 767, 'task-detail-right-side-font-size-16' : clientWidth <=767}"
                             :title="taskLeaderData?.Employee_Name || 'N/A'">
                             {{ taskLeaderData?.Employee_Name || 'N/A' }}
                         </span>
@@ -233,17 +233,17 @@
                 @close="cancelEstimateReason"
             >
                 <template #header>
-                    <h3 class="m-0 font-size-16 font-weight-600 black">{{ $t('TaskPanel.estimate_reason_title') }}</h3>
+                    <h3 class="m-0 task-detail-right-side-font-size-16 task-detail-right-side-font-weight-600 task-detail-right-side-black">{{ $t('TaskPanel.estimate_reason_title') }}</h3>
                 </template>
                 <template #body>
                     <textarea
                         v-model.trim="estimateReasonText"
-                        class="w-100 border border-radius-6-px font-size-14"
+                        class="w-100 border border-radius-6-px task-detail-right-side-font-size-14"
                         style="min-height:90px; resize:vertical; outline:none; padding:8px;"
                         :placeholder="$t('TaskPanel.estimate_reason_ph')"
                         @input="estimateReasonError = false"
                     ></textarea>
-                    <span v-if="estimateReasonError" class="red font-size-12">{{ $t('TaskPanel.estimate_reason_required') }}</span>
+                    <span v-if="estimateReasonError" class="task-detail-right-side-red task-detail-right-side-font-size-12">{{ $t('TaskPanel.estimate_reason_required') }}</span>
                 </template>
             </Modal>
             <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
@@ -959,4 +959,31 @@ const applyAiEstimate = async () => {
 }
 </script>
 <style scoped src='./style.css'>
+</style>
+
+<style scoped>
+.task-detail-right-side-black {
+    color: var(--ink);
+}
+.task-detail-right-side-red {
+    color: var(--danger-ink);
+}
+.task-detail-right-side-font-weight-400 {
+    font-weight: 400 !important;
+}
+.task-detail-right-side-font-weight-600 {
+    font-weight: 600 !important;
+}
+.task-detail-right-side-font-size-12 {
+    font-size: 12px;
+}
+.task-detail-right-side-font-size-13 {
+    font-size: 13px;
+}
+.task-detail-right-side-font-size-14 {
+    font-size: 14px;
+}
+.task-detail-right-side-font-size-16 {
+    font-size: 16px;
+}
 </style>

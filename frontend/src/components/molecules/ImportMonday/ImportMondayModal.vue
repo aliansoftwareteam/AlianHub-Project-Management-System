@@ -2,26 +2,26 @@
     <div v-if="modelValue" class="mimport__overlay" @click.self="$emit('update:modelValue', false)">
         <div class="mimport__card">
             <div class="d-flex align-items-center justify-content-between mimport__head">
-                <span class="font-size-16 font-weight-700">{{ $t('Projects.import_monday') }}</span>
-                <span class="cursor-pointer font-size-16 mimport__close" @click="$emit('update:modelValue', false)">&#10005;</span>
+                <span class="import-monday-modal-font-size-16 import-monday-modal-font-weight-700">{{ $t('Projects.import_monday') }}</span>
+                <span class="cursor-pointer import-monday-modal-font-size-16 mimport__close" @click="$emit('update:modelValue', false)">&#10005;</span>
             </div>
 
-            <div class="font-size-12 gray81 mimport__hint">{{ $t('Projects.import_monday_hint') }}</div>
+            <div class="import-monday-modal-font-size-12 import-monday-modal-gray81 mimport__hint">{{ $t('Projects.import_monday_hint') }}</div>
 
-            <span class="font-size-12 mimport__sample" @click="downloadSample">&#8595; {{ $t('Projects.download_sample') }}</span>
+            <span class="import-monday-modal-font-size-12 mimport__sample" @click="downloadSample">&#8595; {{ $t('Projects.download_sample') }}</span>
 
-            <input ref="fileEl" type="file" accept=".csv,.xlsx" class="font-size-13 mimport__file" @change="parseFile" />
+            <input ref="fileEl" type="file" accept=".csv,.xlsx" class="import-monday-modal-font-size-13 mimport__file" @change="parseFile" />
 
-            <div v-if="rows.length" class="font-size-13 mimport__preview">
+            <div v-if="rows.length" class="import-monday-modal-font-size-13 mimport__preview">
                 {{ $t('Projects.import_rows_found', { count: rows.length }, rows.length) }}
             </div>
 
             <!-- Column mapping (defaults auto-detected; editable) -->
             <div v-if="rows.length" class="mimport__map">
-                <div class="font-size-13 font-weight-600 mb-5px">{{ $t('Projects.map_columns') }}</div>
+                <div class="import-monday-modal-font-size-13 import-monday-modal-font-weight-600 mb-5px">{{ $t('Projects.map_columns') }}</div>
                 <div v-for="field in mapFields" :key="field.key" class="d-flex align-items-center mimport__map-row">
-                    <span class="font-size-13 mimport__map-label">{{ $t(field.label) }}<span v-if="field.required" class="red"> *</span></span>
-                    <select v-model="mapping[field.key]" class="mimport__select font-size-13">
+                    <span class="import-monday-modal-font-size-13 mimport__map-label">{{ $t(field.label) }}<span v-if="field.required" class="import-monday-modal-red"> *</span></span>
+                    <select v-model="mapping[field.key]" class="mimport__select import-monday-modal-font-size-13">
                         <option value="">{{ $t('Projects.col_none') }}</option>
                         <option v-for="h in headers" :key="field.key + h" :value="h">{{ h }}</option>
                     </select>
@@ -29,18 +29,18 @@
             </div>
 
             <div class="d-flex align-items-center mimport__controls" v-if="rows.length">
-                <span class="font-size-13 font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
-                <select v-model="selectedSprintId" class="mimport__select font-size-13">
+                <span class="import-monday-modal-font-size-13 import-monday-modal-font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
+                <select v-model="selectedSprintId" class="mimport__select import-monday-modal-font-size-13">
                     <option v-for="sprint in sprintOptions" :key="'mon-'+sprint.id" :value="sprint.id">
                         {{ listLabel(sprint) }}
                     </option>
                 </select>
-                <button class="btn-primary font-size-13 ml-10px" :disabled="isImporting || !selectedSprintId || !mapping.taskName" @click="startImport">
+                <button class="btn-primary import-monday-modal-font-size-13 ml-10px" :disabled="isImporting || !selectedSprintId || !mapping.taskName" @click="startImport">
                     {{ isImporting ? $t('Projects.importing') : $t('Projects.start_import') }}
                 </button>
             </div>
 
-            <div v-if="resultText" class="font-size-13 mimport__result">{{ resultText }}</div>
+            <div v-if="resultText" class="import-monday-modal-font-size-13 mimport__result">{{ resultText }}</div>
         </div>
     </div>
 </template>
@@ -221,4 +221,31 @@ function startImport() {
 .mimport__controls { margin-top: 4px; }
 .mimport__select { border: 1px solid #e0e0e0; border-radius: 6px; padding: 6px 8px; background: #fff; min-width: 200px; }
 .mimport__result { margin-top: 12px; padding: 8px 10px; background: #f7f9fc; border-radius: 6px; }
+</style>
+
+<style scoped>
+.import-monday-modal-red {
+    color: var(--danger-ink);
+}
+.import-monday-modal-gray81 {
+    color: var(--ink-2);
+}
+.import-monday-modal-font-weight-500 {
+    font-weight: 500 !important;
+}
+.import-monday-modal-font-weight-600 {
+    font-weight: 600 !important;
+}
+.import-monday-modal-font-weight-700 {
+    font-weight: 700 !important;
+}
+.import-monday-modal-font-size-12 {
+    font-size: 12px;
+}
+.import-monday-modal-font-size-13 {
+    font-size: 13px;
+}
+.import-monday-modal-font-size-16 {
+    font-size: 16px;
+}
 </style>

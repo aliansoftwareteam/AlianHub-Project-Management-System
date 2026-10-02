@@ -5,9 +5,9 @@
                 <DropDown v-if="!isEdit" mode="dialog" themed head-dismisses :aria-label="$t('Filters.save_this_filters')" :bodyClass="{'save-thisfilters-dropdown' : true}" z-index="999">
                     <template #head>
                         <div class="d-flex align-items-center justify-content-between mobile__field-actions" v-if="clientWidth <=767">
-                            <a href="#" class="mr-10px tf-muted" @click.stop.prevent="$refs.saveFilterRef.click(), inputName='', isInvalid=false" :class="{'font-size-16' : clientWidth <=767 }">{{$t('Projects.cancel')}}</a>
-                            <span :class="{'font-size-20 font-weight-500' : clientWidth <=767 }">{{$t('Filters.save_this_filters')}}</span>
-                            <button class="btn-primary p-0 bg-transparent tf-link" type="button" @click.stop.prevent="$emit('save', inputName), resetField()" :class="{ 'font-size-18 font-weight-700' : clientWidth <= 767}">{{$t('Projects.save')}}</button>
+                            <a href="#" class="mr-10px tf-muted" @click.stop.prevent="$refs.saveFilterRef.click(), inputName='', isInvalid=false" :class="{'fields-actions-font-size-16' : clientWidth <=767 }">{{$t('Projects.cancel')}}</a>
+                            <span :class="{'fields-actions-font-size-20 fields-actions-font-weight-500' : clientWidth <=767 }">{{$t('Filters.save_this_filters')}}</span>
+                            <button class="btn-primary p-0 bg-transparent tf-link" type="button" @click.stop.prevent="$emit('save', inputName), resetField()" :class="{ 'fields-actions-font-size-18 fields-actions-font-weight-700' : clientWidth <= 767}">{{$t('Projects.save')}}</button>
                         </div>
                     </template>
                     <template #button>
@@ -15,7 +15,7 @@
                     </template>
                     <template #options>
                         <div :style="{width : clientWidth <=767 ? '100%' : ' 254px'}" class="savedfilter-input-wrapper" >
-                            <h5 class="font-weight-500 font-size-15"  v-if="clientWidth > 767">{{$t('Filters.save_this_filters')}}</h5>
+                            <h5 class="fields-actions-font-weight-500 fields-actions-font-size-15"  v-if="clientWidth > 767">{{$t('Filters.save_this_filters')}}</h5>
                             <div class="hr__bottom"  v-if="clientWidth > 767"></div>
                             <div class="savefilter-inputserach-wrapper">
                                 <InputText
@@ -43,9 +43,9 @@
                 <DropDown mode="listbox" themed head-dismisses :bodyClass="{'update-searchfilter-dropdown' : true}" z-index="999">
                     <template #head>
                         <div class="d-flex align-items-center justify-content-between mobile__field-actions" v-if="clientWidth <=767" >
-                            <a href="#" class="mr-10px tf-muted" @click.stop.prevent="$refs.saveFilterRef.click(), inputName='', isInvalid=false" :class="{'font-size-16' : clientWidth <=767 }">{{$t('Projects.cancel')}}</a>
-                            <h3 :class="{'font-size-20 font-weight-500' : clientWidth <=767 }">{{$t('Filters.my_filter')}}</h3>
-                            <button class="btn-primary p-0 bg-transparent tf-link" type="button" @click.stop.prevent="$emit('save', inputName), resetField()" :class="{ 'font-size-18 font-weight-700' : clientWidth <= 767}">{{ $t('Projects.save') }}</button>
+                            <a href="#" class="mr-10px tf-muted" @click.stop.prevent="$refs.saveFilterRef.click(), inputName='', isInvalid=false" :class="{'fields-actions-font-size-16' : clientWidth <=767 }">{{$t('Projects.cancel')}}</a>
+                            <h3 :class="{'fields-actions-font-size-20 fields-actions-font-weight-500' : clientWidth <=767 }">{{$t('Filters.my_filter')}}</h3>
+                            <button class="btn-primary p-0 bg-transparent tf-link" type="button" @click.stop.prevent="$emit('save', inputName), resetField()" :class="{ 'fields-actions-font-size-18 fields-actions-font-weight-700' : clientWidth <= 767}">{{ $t('Projects.save') }}</button>
                         </div>
                     </template>
                     <template #button>
@@ -62,7 +62,7 @@
                                 autocomplete="off"
                             />
                             </div>
-                            <div class="mt-10px border-top-lightwhite" v-if="clientWidth > 767">
+                            <div class="mt-10px fields-actions-border-top-lightwhite" v-if="clientWidth > 767">
                                 <h5 class="filter-list-title p0x-10px">{{ $t('Filters.my_filter') }}</h5>
                             </div>
                         </div>
@@ -71,7 +71,7 @@
                         <div :style="{width : clientWidth <=767 ? '100%' : ' 225px'}" class="saved-filters">
                             <div class="saved-filterdropdownlist-wrapper">
                                 <DropDownOption v-for="(item, index) in filteredOptions" :key="index" class="dropdown-item justify-content-between saved-filters-dropdown" :class="{'edit-input-mobile' : clientWidth <=767 && item.isEdit }" @click="!item.isEdit && $emit('apply', {item: item, type: 'saved'})">
-                                    <span class="saved-serach-title w-100 font-size-14 tf-muted" v-if="!item.isEdit">{{ $t(`${ item.name }`)}}</span>
+                                    <span class="saved-serach-title w-100 fields-actions-font-size-14 tf-muted" v-if="!item.isEdit">{{ $t(`${ item.name }`)}}</span>
                                     <InputText v-if="item.isEdit" type="text" @enter="updateFilter(item)" v-model.trim="filterName" :isDirectFocus="true" autocomplete="off" :class="[{'border-red': isInvalid}]" :style="{maxWidth: clientWidth >767 ? '80%':'100%'}"/>
                                     <div v-if="item.isEdit" class="edit-delete-erapper">
                                         <img src="@/assets/images/svg/greencheck2.svg" alt="Edit" class="m0px-10px greencheck__img"  @click.stop="updateFilter(item)">
@@ -208,5 +208,32 @@ const resetField = () => {
 }
 .greencheck__img{
     width: 15px;
+}
+</style>
+
+<style scoped>
+.fields-actions-border-top-lightwhite {
+    border-top: 1px solid var(--hairline);
+}
+.fields-actions-font-weight-500 {
+    font-weight: 500 !important;
+}
+.fields-actions-font-weight-700 {
+    font-weight: 700 !important;
+}
+.fields-actions-font-size-14 {
+    font-size: 14px;
+}
+.fields-actions-font-size-15 {
+    font-size: 15px;
+}
+.fields-actions-font-size-16 {
+    font-size: 16px;
+}
+.fields-actions-font-size-18 {
+    font-size: 18px !important;
+}
+.fields-actions-font-size-20 {
+    font-size: 20px !important;
 }
 </style>

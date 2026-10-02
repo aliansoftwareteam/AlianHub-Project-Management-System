@@ -8,14 +8,14 @@
             <div class="clip__card">
                 <!-- HEAD -->
                 <div class="d-flex align-items-center justify-content-between clip__head">
-                    <span class="font-size-16 font-weight-700">{{ $t('ClipRecorder.record_clip') }}</span>
+                    <span class="clip-recorder-font-size-16 clip-recorder-font-weight-700">{{ $t('ClipRecorder.record_clip') }}</span>
                     <div class="d-flex align-items-center clip__head-actions">
-                        <span class="cursor-pointer font-size-16 clip__close" :title="$t('ClipRecorder.close')" @click="requestClose">&#10005;</span>
+                        <span class="cursor-pointer clip-recorder-font-size-16 clip__close" :title="$t('ClipRecorder.close')" @click="requestClose">&#10005;</span>
                     </div>
                 </div>
 
                 <!-- UNSUPPORTED -->
-                <div v-if="!isMediaSupported" class="font-size-13 clip__msg clip__msg--err">
+                <div v-if="!isMediaSupported" class="clip-recorder-font-size-13 clip__msg clip__msg--err">
                     {{ $t('ClipRecorder.unsupported') }}
                 </div>
 
@@ -38,12 +38,12 @@
                         <button type="button" class="clip__start" @click="startRecording">{{ $t('ClipRecorder.start') }}</button>
                     </div>
 
-                    <div v-if="!isDisplaySupported && phase === 'idle'" class="font-size-12 gray81 clip__hint">
+                    <div v-if="!isDisplaySupported && phase === 'idle'" class="clip-recorder-font-size-12 clip-recorder-gray81 clip__hint">
                         {{ $t('ClipRecorder.screen_https_hint') }}
                     </div>
 
                     <!-- ERROR (permission / runtime) -->
-                    <div v-if="errorMessage" class="font-size-13 clip__msg clip__msg--err">
+                    <div v-if="errorMessage" class="clip-recorder-font-size-13 clip__msg clip__msg--err">
                         {{ errorMessage }}
                     </div>
 
@@ -55,11 +55,11 @@
 
                     <!-- TITLE (preview only — name the clip before saving) -->
                     <div v-if="phase === 'preview'" class="clip__title-row">
-                        <label class="font-size-12 gray81 clip__title-label">{{ $t('ClipRecorder.title_label') }}</label>
+                        <label class="clip-recorder-font-size-12 clip-recorder-gray81 clip__title-label">{{ $t('ClipRecorder.title_label') }}</label>
                         <input
                             v-model="title"
                             type="text"
-                            class="clip__title-input font-size-13"
+                            class="clip__title-input clip-recorder-font-size-13"
                             :placeholder="$t('ClipRecorder.title_placeholder')"
                             :maxlength="120"
                             :disabled="isSaving"
@@ -69,8 +69,8 @@
                     <!-- CONTROLS — idle keeps its Start inline with the mode row above,
                          so this is the preview step's actions only. -->
                     <div v-if="phase === 'preview'" class="d-flex justify-content-end clip__actions">
-                        <button type="button" class="clip__btn-ghost font-size-13 mr-10px" :disabled="isSaving" @click="reRecord">{{ $t('ClipRecorder.re_record') }}</button>
-                        <button type="button" class="btn-primary font-size-13" :disabled="isSaving" @click="saveClip">{{ isSaving ? $t('ClipRecorder.saving') : $t('ClipRecorder.save') }}</button>
+                        <button type="button" class="clip__btn-ghost clip-recorder-font-size-13 mr-10px" :disabled="isSaving" @click="reRecord">{{ $t('ClipRecorder.re_record') }}</button>
+                        <button type="button" class="btn-primary clip-recorder-font-size-13" :disabled="isSaving" @click="saveClip">{{ isSaving ? $t('ClipRecorder.saving') : $t('ClipRecorder.save') }}</button>
                     </div>
                 </template>
             </div>
@@ -80,7 +80,7 @@
              can keep working. Stop returns to the modal for preview + save. -->
         <div v-else class="clip__mini">
             <span class="clip__dot"></span>
-            <span class="clip__mini-timer font-size-13 font-weight-600">{{ formattedElapsed }}</span>
+            <span class="clip__mini-timer clip-recorder-font-size-13 clip-recorder-font-weight-600">{{ formattedElapsed }}</span>
             <button type="button" class="clip__mini-stop" @click="stopRecording">{{ $t('ClipRecorder.stop') }}</button>
         </div>
     </template>
@@ -644,5 +644,26 @@ onBeforeUnmount(() => {
     0% { opacity: 1; }
     50% { opacity: 0.3; }
     100% { opacity: 1; }
+}
+</style>
+
+<style scoped>
+.clip-recorder-gray81 {
+    color: var(--ink-2);
+}
+.clip-recorder-font-weight-600 {
+    font-weight: 600 !important;
+}
+.clip-recorder-font-weight-700 {
+    font-weight: 700 !important;
+}
+.clip-recorder-font-size-12 {
+    font-size: 12px;
+}
+.clip-recorder-font-size-13 {
+    font-size: 13px;
+}
+.clip-recorder-font-size-16 {
+    font-size: 16px;
 }
 </style>
