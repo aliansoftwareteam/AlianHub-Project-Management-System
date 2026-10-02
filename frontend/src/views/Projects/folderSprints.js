@@ -92,6 +92,10 @@ export function archivedListsOf(project) {
     ];
 }
 
+/* The page's own copy of a project keeps only the live lists at its top level (helper.js, filterSprints), so the
+   archived ones are read from the stored projects. */
+export const archivedListsIn = (projects, projectId) => archivedListsOf((projects || []).find((project) => project?._id === projectId));
+
 const LIST_ROUTE = /^Project(Folder)?Sprint(Task)?$/;
 
 /* The id of the folder a list sits in, '' at the top level of the project, null when the project does not hold it. */

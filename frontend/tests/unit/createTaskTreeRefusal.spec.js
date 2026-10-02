@@ -32,13 +32,15 @@ const project = {
     sprintsObj: { 'sprint-1': { id: 'sprint-1', name: 'Sprint 1', tasks: 2 } }
 };
 
-function mountRow() {
+const mutateSprints = vi.fn();
+
+function mountRow({ held = project, sprint = { id: 'sprint-1', name: 'Sprint 1' } } = {}) {
     return mount(CreateTask, {
-        props: { sprint: { id: 'sprint-1', name: 'Sprint 1' }, taskId: 'parent-1', considerWidth: false },
+        props: { sprint, taskId: 'parent-1', considerWidth: false },
         global: {
-            plugins: [createStore({ getters: { 'settings/companyOwnerDetail': () => ({ userId: 'owner-1' }) }, mutations: { 'projectData/mutateSprints': () => {} } })],
+            plugins: [createStore({ getters: { 'settings/companyOwnerDetail': () => ({ userId: 'owner-1' }) }, mutations: { 'projectData/mutateSprints': mutateSprints } })],
             mocks: { $t: (key) => key, $route: { query: {} } },
-            provide: { selectedProject: ref(project), $userId: ref('u1'), $companyId: ref('company-1'), $clientWidth: ref(1280) }
+            provide: { selectedProject: ref(held), $userId: ref('u1'), $companyId: ref('company-1'), $clientWidth: ref(1280) }
         },
         attachTo: document.body
     });
@@ -98,6 +100,44 @@ describe('creating a subtask the server refuses', () => {
         expect(toast.error).not.toHaveBeenCalled();
         expect(input.element.value).toBe('');
         expect(wrapper.emitted('submit')).toHaveLength(1);
+        wrapper.unmount();
+    });
+});
+
+describe('creating a subtask when the project\'s lists were never loaded', () => {
+    const bare = Object.fromEntries(Object.entries(project).filter(([key]) => key !== 'sprintsObj'));
+    const inFolder = { id: 'sprint-9', name: 'In a folder', folderId: 'folder-1', folderName: 'Design' };
+
+    beforeEach(() => {
+        create.mockReset();
+        create.mockResolvedValue({ status: true, id: 'new-1' });
+        mutateSprints.mockReset();
+        toast.success.mockReset();
+    });
+
+    it.each([
+        ['a project with no lists held', bare, undefined],
+        ['a project that holds other lists', { ...project, sprintsObj: {} }, undefined],
+        ['a list in a folder the project does not hold', { ...bare, sprintsfolders: {} }, inFolder],
+    ])('hands the new subtask to the panel: %s', async (label, held, sprint) => {
+        const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const wrapper = mountRow({ held, sprint });
+        await typeAndSave(wrapper, 'Check the copy');
+        expect(logged).not.toHaveBeenCalled();
+        expect(wrapper.emitted('submit')).toHaveLength(1);
+        expect(wrapper.emitted('submit')[0][0].data).toMatchObject({ _id: 'new-1', TaskName: 'Check the copy' });
+        expect(toast.success).toHaveBeenCalledTimes(1);
+        expect(mutateSprints).not.toHaveBeenCalled();
+        logged.mockRestore();
+        wrapper.unmount();
+    });
+
+    it('still adds one to the count of a list the project holds', async () => {
+        const wrapper = mountRow();
+        await typeAndSave(wrapper, 'Check the copy');
+        expect(mutateSprints).toHaveBeenCalledTimes(1);
+        expect(mutateSprints.mock.calls[0][1]).toEqual({ op: 'modified', data: { id: 'sprint-1', name: 'Sprint 1', tasks: 3 } });
+        expect(project.sprintsObj['sprint-1'].tasks).toBe(2);
         wrapper.unmount();
     });
 });

@@ -52,6 +52,15 @@ export function listSourceTasks({ searched, searchedTasks, storeTasks, sprintId 
     return (searchedTasks || []).filter((task) => inList(task, sprintId));
 }
 
+const ARCHIVED_LIST = 2;
+
+/* A list archived whole is named above the views with its own count and Restore; in the archive view it is drawn
+   as a group only for the tasks it shows, the ones archived before it. */
+export function archiveViewLists(sprints, { archiveView, rowsOf }) {
+    if (!archiveView) return sprints;
+    return sprints.filter((sprint) => Number(sprint?.deletedStatusKey) !== ARCHIVED_LIST || rowsOf(sprint) > 0);
+}
+
 const isVisible = (task, showArchived) => (showArchived ? task.deletedStatusKey === 2 : !task.deletedStatusKey);
 
 const timeOf = (value) => {

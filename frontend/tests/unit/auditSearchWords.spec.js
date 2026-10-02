@@ -60,6 +60,54 @@ describe('searching the audit log', () => {
         expect(lastQuery().has('qEvents')).toBe(false);
     });
 
+    it('searches by itself a moment after the typing stops, and at once on Enter', async () => {
+        vi.useFakeTimers();
+        try {
+            const wrapper = mount(AuditLog, { global: { mocks: { $t: t } } });
+            await flushPromises();
+            expect(apiRequest).toHaveBeenCalledTimes(1);
+
+            await wrapper.find('.al__search-input').setValue('comm');
+            await vi.advanceTimersByTimeAsync(200);
+            await wrapper.find('.al__search-input').setValue('comment');
+            await vi.advanceTimersByTimeAsync(299);
+            expect(apiRequest).toHaveBeenCalledTimes(1);
+            await vi.advanceTimersByTimeAsync(1);
+            expect(apiRequest).toHaveBeenCalledTimes(2);
+            expect(lastQuery().get('q')).toBe('comment');
+            expect(lastQuery().get('page')).toBe('1');
+
+            await wrapper.find('.al__search-input').setValue('member');
+            await wrapper.find('.al__search-input').trigger('keyup.enter');
+            expect(apiRequest).toHaveBeenCalledTimes(3);
+            expect(lastQuery().get('q')).toBe('member');
+            await vi.advanceTimersByTimeAsync(1000);
+            expect(apiRequest).toHaveBeenCalledTimes(3);
+            wrapper.unmount();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('shows the rows of the last search asked for, whichever answer comes last', async () => {
+        const answer = (action) => ({ data: { status: true, data: [{ _id: action, action, createdAt: '2026-10-02T10:00:00.000Z' }], metadata: { total: 1, page: 1, totalPages: 1 } } });
+        const wrapper = mount(AuditLog, { global: { mocks: { $t: t } } });
+        await flushPromises();
+        let first;
+        apiRequest.mockReturnValueOnce(new Promise((resolve) => { first = resolve; }));
+        apiRequest.mockResolvedValueOnce(answer('second.search'));
+        await wrapper.find('.al__search-input').setValue('one');
+        await wrapper.find('.al__search-input').trigger('keyup.enter');
+        await wrapper.find('.al__search-input').setValue('two');
+        await wrapper.find('.al__search-input').trigger('keyup.enter');
+        await flushPromises();
+        first(answer('first.search'));
+        await flushPromises();
+        expect(wrapper.text()).toContain('second.search');
+        expect(wrapper.text()).not.toContain('first.search');
+        wrapper.unmount();
+    });
+
     it('sends no keys with an empty search', async () => {
         mount(AuditLog, { global: { mocks: { $t: t } } });
         await flushPromises();

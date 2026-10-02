@@ -171,7 +171,8 @@
 .ah-summary__text--muted { color: var(--ink-2); }
 
 /* ---------- tabs ---------- */
-.ah-detail__tabs { display: flex; gap: 2px; font-size: var(--fs-md, 12.5px); border-bottom: 1px solid var(--hairline); overflow-x: auto; }
+/* A row that scrolls sideways has no minimum height of its own, so in the scrolling column it must be told not to shrink. */
+.ah-detail__tabs { display: flex; flex: none; gap: 2px; font-size: var(--fs-md, 12.5px); border-bottom: 1px solid var(--hairline); overflow-x: auto; }
 .ah-detail__tab {
     padding: 6px 10px; border: 0; background: transparent; color: var(--ink-2); cursor: pointer;
     border-bottom: 2px solid transparent; margin-bottom: -1px; font: inherit; white-space: nowrap;

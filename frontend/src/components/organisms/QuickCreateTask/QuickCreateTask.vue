@@ -22,10 +22,11 @@
                     autocomplete="off"
                     :aria-label="$t('QuickCreate.name_label')"
                     :placeholder="$t('QuickCreate.name_placeholder')"
-                    :aria-invalid="error ? 'true' : 'false'"
-                    :aria-describedby="error ? ids.error : undefined"
-                    @input="error = ''"
+                    :aria-invalid="nameError ? 'true' : 'false'"
+                    :aria-describedby="nameError ? ids.nameError : undefined"
+                    @input="nameError = ''; error = ''"
                 />
+                <p v-if="nameError" :id="ids.nameError" class="qct__error" role="alert">{{ nameError }}</p>
 
                 <div class="qct__where">
                     <label class="qct__field">
@@ -80,7 +81,7 @@
                     </label>
                 </div>
 
-                <p v-if="error" :id="ids.error" class="qct__error" role="alert">{{ error }}</p>
+                <p v-if="error" class="qct__error" role="alert">{{ error }}</p>
 
                 <div class="qct__foot">
                     <label class="qct__another">
@@ -159,7 +160,7 @@ const userId = inject("$userId");
 const personalList = usePersonalList({ companyId, userId });
 
 const uid = `qct-${Math.random().toString(36).slice(2, 8)}`;
-const ids = { heading: `${uid}-heading`, error: `${uid}-error` };
+const ids = { heading: `${uid}-heading`, nameError: `${uid}-name-error` };
 
 const dialogEl = ref(null);
 const nameEl = ref(null);
@@ -174,6 +175,7 @@ const priority = ref("MEDIUM");
 const keepOpen = ref(false);
 const busy = ref(false);
 const error = ref("");
+const nameError = ref("");
 const preparing = ref(false);
 const created = ref(null);
 const personalSprint = ref(null);
@@ -338,6 +340,7 @@ const focusTitle = () => nextTick(() => nameEl.value?.focus());
 watch(() => quickCreate.open, (on) => {
     if (!on) return;
     error.value = "";
+    nameError.value = "";
     name.value = quickCreate.name || readDraft();
     due.value = "";
     visitedPlace.value = null;
@@ -411,11 +414,13 @@ async function submit(intent) {
     if (busy.value || !intent) return;
     const title = name.value.trim();
     if (title.length < 3) {
-        error.value = t("QuickCreate.name_too_short");
+        nameError.value = t("QuickCreate.name_too_short");
+        error.value = "";
         focusTitle();
         return;
     }
     busy.value = true;
+    nameError.value = "";
     error.value = "";
     try {
         await prepared;

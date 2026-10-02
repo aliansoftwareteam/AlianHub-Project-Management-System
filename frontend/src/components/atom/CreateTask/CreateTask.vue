@@ -399,14 +399,10 @@ function saveTask() {
                     taskClass.create({data: obj, user: userData, projectData, indexObj, groupBy: props.groupBy})
                     .then((data) => {
                         if(data.status){
-                            let sprint = {};
-                            if(props.sprint.folderId) {
-                                sprint = project.value?.sprintsfolders?.[props.sprint.folderId]?.sprintsObj?.[props.sprint.id];
-                            }else{
-                                sprint = project.value?.sprintsObj[props.sprint.id];
-                            }
-                            sprint.tasks = sprint.tasks + 1;
-                            commit("projectData/mutateSprints",{op:'modified',data:{...sprint}});
+                            /* A task opened from outside its project (Settings, a link) can sit in a list this project copy never loaded. */
+                            const holder = props.sprint.folderId ? project.value?.sprintsfolders?.[props.sprint.folderId] : project.value;
+                            const heldList = holder?.sprintsObj?.[props.sprint.id];
+                            if (heldList) commit("projectData/mutateSprints", {op: 'modified', data: {...heldList, tasks: (Number(heldList.tasks) || 0) + 1}});
                             $toast.success(t('Toast.task_created_successfully'), {position: "top-right"});
                             emits('submit', {data: {...obj, _id: data.id}})
                         }else if(data.isUpgrade){
