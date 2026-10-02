@@ -51,19 +51,21 @@ afterEach(() => {
 });
 
 describe('the mailed invitation link, once the invitation is accepted', () => {
-    it('renews a signed-in person\'s session before it opens the workspace, so the first screen is not refused and retried', async () => {
+    it('renews a signed-in person\'s session before it selects and opens the workspace, so the first screen is not refused and retried', async () => {
         let renewed;
         getAuth.mockImplementation(() => new Promise((resolve) => { renewed = resolve; }));
         const wrapper = await openLink({ signedInAs: 'user-1' });
-
-        expect(wrapper.text()).toContain('Auth.invite_accepted_title');
-        expect(localStorage.getItem('selectedCompany')).toBe('c9');
         await afterThePause();
+
         expect(getAuth).toHaveBeenCalledWith('user-1');
+        expect(localStorage.getItem('selectedCompany')).toBeNull();
         expect(replace).not.toHaveBeenCalled();
 
         renewed({ status: true });
         await flushPromises();
+        expect(wrapper.text()).toContain('Auth.invite_accepted_title');
+        expect(localStorage.getItem('selectedCompany')).toBe('c9');
+        await afterThePause();
         expect(replace).toHaveBeenCalledWith({ name: 'Log-in' });
         expect(reload).toHaveBeenCalledTimes(1);
     });
@@ -78,7 +80,9 @@ describe('the mailed invitation link, once the invitation is accepted', () => {
     });
 
     it('asks for no session when nobody is signed in: signing in gives a fresh one', async () => {
-        await openLink({ signedInAs: '' });
+        const wrapper = await openLink({ signedInAs: '' });
+        expect(wrapper.text()).toContain('Auth.invite_accepted_title');
+        expect(localStorage.getItem('selectedCompany')).toBe('c9');
         await afterThePause();
 
         expect(getAuth).not.toHaveBeenCalled();

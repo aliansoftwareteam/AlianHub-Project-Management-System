@@ -50,12 +50,14 @@ onMounted(async () => {
             stage.value = "invalid";
             return;
         }
+        // A signed-in person goes straight in, on a session issued before they were in this workspace: it is
+        // renewed before the workspace is selected, so nothing asks for the workspace with the old one.
+        const signedInUserId = userId.value || localStorage.getItem("userId") || "";
+        if (signedInUserId) await getAuth(signedInUserId).catch(() => null);
         localStorage.setItem("selectedCompany", result.data.companyId);
         stage.value = "accepted";
-        // A signed-in person goes straight in, and their session was issued before they were in this workspace.
-        const sessionRenewed = userId.value !== "" ? getAuth(userId.value).catch(() => null) : Promise.resolve();
         setTimeout(() => {
-            sessionRenewed.then(() => router.replace({ name: "Log-in" })).then(() => { if (userId.value !== "") window.location.reload(); });
+            router.replace({ name: "Log-in" }).then(() => { if (signedInUserId) window.location.reload(); });
         }, 1200);
     } catch (error) {
         console.error("ERROR in validate invitation: ", error);
