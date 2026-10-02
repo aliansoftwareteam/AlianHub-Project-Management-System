@@ -3603,7 +3603,7 @@
     "Docs.no_mine": "You have not created a doc yet.",
     "Docs.no_owner": "none",
     "Docs.no_project_docs": "No docs in this project yet.",
-    "Docs.no_project_docs_hint": "Briefs, decisions and notes written for this project are kept here. Use New doc above to start one.",
+    "Docs.no_project_docs_hint": "Briefs, decisions and notes written for this project are kept here.",
     "Docs.no_recent_hint": "Start a doc for the brief, the decision or the notes — then link the tasks that carry it out.",
     "Docs.no_recent_title": "Nothing written yet",
     "Docs.no_review_due": "Every wiki page is within its review window.",

@@ -1846,7 +1846,7 @@ export default {
         share_limit: "A doc can be shared with at most {n} people.",
         share_failed: "Could not change who this doc is shared with.",
         no_project_docs: "No docs in this project yet.",
-        no_project_docs_hint: "Briefs, decisions and notes written for this project are kept here. Use New doc above to start one.",
+        no_project_docs_hint: "Briefs, decisions and notes written for this project are kept here.",
         no_agent_drafts_title: "No agent drafts waiting",
         no_agent_drafts_hint: "When an agent writes a page — release notes, a summary, a report — it lands here for your review.",
         no_review_due: "Every wiki page is within its review window.",
