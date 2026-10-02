@@ -1,10 +1,10 @@
 <template>
     <div class="project-item-wrapper project-Subitem-wrapper position-re">
         <div
-            class="hover-bg-light-purple-v1 project-item border-radius-5-px cursor-pointer ml-016"
+            class="sub-item-hover-bg-light-purple-v1 project-item border-radius-5-px cursor-pointer ml-016"
             :class="[{
-                'bg-light-purple-v1' : (folder && $route.params.folderId === data.folderId && !$route.params.sprintId) || (!folder && $route.params.sprintId === (data.id ? data.id : data._id)),
-                'bg-light-purple-v2' : (folder && $route.params.folderId === data.folderId && $route.params.sprintId),
+                'sub-item-bg-light-purple-v1' : (folder && $route.params.folderId === data.folderId && !$route.params.sprintId) || (!folder && $route.params.sprintId === (data.id ? data.id : data._id)),
+                'sub-item-bg-light-purple-v2' : (folder && $route.params.folderId === data.folderId && $route.params.sprintId),
             }]"
         >
             <div class="position-ab drop__arrow-div">
@@ -27,7 +27,7 @@
             </div>
             <div class="item-right">
                 <template v-if="!isOpened">
-                    <span v-if="!folder && !isShowArchived" class="gray sptint-total" :class="{'font-size-13': clientWidth > 767, 'font-size-16': clientWidth <= 767}">{{showArchived ? (data.archiveTaskCount || 0) : ((data.tasks < 0 ? 0 : data.tasks) || 0)}}</span>
+                    <span v-if="!folder && !isShowArchived" class="sub-item-gray sptint-total" :class="{'sub-item-font-size-13': clientWidth > 767, 'font-size-16': clientWidth <= 767}">{{showArchived ? (data.archiveTaskCount || 0) : ((data.tasks < 0 ? 0 : data.tasks) || 0)}}</span>
                     <div class="count-block secondary-count-block child-count-block ml-6px" v-if="folder && data?.sprintsObj && Object.keys(data?.sprintsObj).length && showCounts({project, key: 'folder', sprints: Object.values(data?.sprintsObj), showArchived}).count" :style="({project, key: 'folder', sprints: Object.values(data?.sprintsObj), showArchived}).styles ">
                         {{showCounts({project, key: 'folder', sprints: Object.values(data?.sprintsObj), showArchived}).count > 99 ? "+99" : showCounts({project, key: 'folder', sprints: Object.values(data?.sprintsObj), showArchived}).count}}
                     </div>
@@ -88,7 +88,7 @@
                             </div>
                         </DropDownOption>
                         <DropDownOption v-if="(folder ? checkPermission('project.folder_delete',project.isGlobalPermission) === true : checkPermission('project.sprint_delete',project.isGlobalPermission) === true) && checkPermission('project.project_list',project.isGlobalPermission) === true" @click="showSidebar = true, archive = false">
-                            <div class="d-flex align-items-center project-mobile-desc mobile-deleteIcon red">
+                            <div class="d-flex align-items-center project-mobile-desc mobile-deleteIcon sub-item-red">
                                 <img :src="deleteIcon" alt="deleteIcon" class="mr-10px">
                                 {{$t('Projects.delete')}}
                             </div>
@@ -542,6 +542,27 @@ function markFavourite() {
 
 }
 </script>
+
+<style scoped>
+.sub-item-font-size-13 {
+    font-size: 13px;
+}
+.sub-item-bg-light-purple-v1 {
+    background-color: var(--brand-tint);
+}
+.sub-item-bg-light-purple-v2 {
+    background-color: var(--brand-tint);
+}
+.sub-item-gray {
+    color: var(--ink-2);
+}
+.sub-item-red {
+    color: var(--danger-ink);
+}
+.sub-item-hover-bg-light-purple-v1:hover {
+    background-color: var(--surface-hover) !important;
+}
+</style>
 
 <style>
 .list-spinner .spinner {

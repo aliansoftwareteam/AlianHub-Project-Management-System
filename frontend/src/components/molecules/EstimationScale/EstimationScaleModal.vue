@@ -2,19 +2,19 @@
     <div v-if="modelValue" class="esc__overlay" @click.self="$emit('update:modelValue', false)">
         <div class="esc__card">
             <div class="d-flex align-items-center justify-content-between esc__head">
-                <span class="font-size-16 font-weight-700">{{ $t('Projects.estimation_scale_title') }}</span>
-                <span class="cursor-pointer font-size-16 esc__close" @click="$emit('update:modelValue', false)">&#10005;</span>
+                <span class="estimation-scale-modal-font-size-16 estimation-scale-modal-font-weight-700">{{ $t('Projects.estimation_scale_title') }}</span>
+                <span class="cursor-pointer estimation-scale-modal-font-size-16 esc__close" @click="$emit('update:modelValue', false)">&#10005;</span>
             </div>
-            <div class="font-size-12 gray81 esc__hint">{{ $t('Projects.estimation_scale_hint') }}</div>
-            <select v-model="scale" class="esc__select font-size-13">
+            <div class="estimation-scale-modal-font-size-12 estimation-scale-modal-gray81 esc__hint">{{ $t('Projects.estimation_scale_hint') }}</div>
+            <select v-model="scale" class="esc__select estimation-scale-modal-font-size-13">
                 <option value="fibonacci">{{ $t('Projects.estimation_scale_fibonacci') }}</option>
                 <option value="linear">{{ $t('Projects.estimation_scale_linear') }}</option>
                 <option value="tshirt">{{ $t('Projects.estimation_scale_tshirt') }}</option>
                 <option value="hours">{{ $t('Projects.estimation_scale_hours') }}</option>
             </select>
             <div class="d-flex justify-content-end esc__actions">
-                <button class="btn_btn esc__ghost-btn font-size-13 mr-10px" @click="$emit('update:modelValue', false)">{{ $t('Projects.cancel') }}</button>
-                <button class="btn-primary font-size-13" :disabled="isSaving" @click="save">{{ isSaving ? $t('Projects.estimation_scale_saving') : $t('Projects.save') }}</button>
+                <button class="btn_btn esc__ghost-btn estimation-scale-modal-font-size-13 mr-10px" @click="$emit('update:modelValue', false)">{{ $t('Projects.cancel') }}</button>
+                <button class="btn-primary estimation-scale-modal-font-size-13" :disabled="isSaving" @click="save">{{ isSaving ? $t('Projects.estimation_scale_saving') : $t('Projects.save') }}</button>
             </div>
         </div>
     </div>
@@ -69,6 +69,24 @@ function save() {
     }).finally(() => { isSaving.value = false; });
 }
 </script>
+
+<style scoped>
+.estimation-scale-modal-font-size-12 {
+    font-size: 12px;
+}
+.estimation-scale-modal-font-size-13 {
+    font-size: 13px;
+}
+.estimation-scale-modal-font-size-16 {
+    font-size: 16px;
+}
+.estimation-scale-modal-font-weight-700 {
+    font-weight: 700 !important;
+}
+.estimation-scale-modal-gray81 {
+    color: var(--ink-2);
+}
+</style>
 
 <style scoped>
 .esc__overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 1000; display: flex; align-items: center; justify-content: center; }

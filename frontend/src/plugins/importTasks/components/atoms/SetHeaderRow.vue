@@ -1,12 +1,12 @@
 <template>
     <div>
         <div
-            class="d-flex flex-row align-items-center text-center bordergray ml-30px mt-30px mr-30px justify-content-between border-radius-8-px bg-lightgray">
+            class="d-flex flex-row align-items-center text-center set-header-row-bordergray ml-30px mt-30px mr-30px justify-content-between border-radius-8-px set-header-row-bg-lightgray">
             <p class="pl-15px">{{ $t('importCsvAndSetHeader.header_row_question') }}</p>
 
-            <button v-if="!isSelecting" @click="startSelecting" class="btn-primary mr-15px">{{
+            <button v-if="!isSelecting" @click="startSelecting" class="set-header-row-btn-primary mr-15px">{{
                 $t('importCsvAndSetHeader.select_another_button') }}</button>
-            <button v-if="isSelecting" @click="confirmSelection" class="btn-primary mr-15px">{{
+            <button v-if="isSelecting" @click="confirmSelection" class="set-header-row-btn-primary mr-15px">{{
                 $t('importCsvAndSetHeader.confirm_row_btt') }}</button>
         </div>
         <div class="p-30px">
@@ -14,7 +14,7 @@
                 <thead>
                     <tr>
                         <span class="p-8px text-center position-ab left-0px"></span>
-                        <th class="p-8px bg-lightgray font-weight-700 bordergray text-center"
+                        <th class="p-8px set-header-row-bg-lightgray set-header-row-font-weight-700 set-header-row-bordergray text-center"
                             v-for="(header, colIndex) in staticHeaders" :key="'header' + colIndex">
                             {{ header }}
                         </th>
@@ -30,11 +30,11 @@
                                 @change="selectHeaderRow(getOriginalRowIndex(row))" />
                             <!-- Arrow indicator for the currently selected header row -->
                             <span v-if="!isSelecting && getOriginalRowIndex(row) === selectedHeaderRow"
-                                class="blue font-size-21">
+                                class="set-header-row-blue set-header-row-font-size-21">
                                 <img :src=rightArrow alt="left arrow" class="w-25">
                             </span>
                         </span>
-                        <td class="text-center p-8px bordergray" v-for="(value, colIndex) in row.slice(0, 5)"
+                        <td class="text-center p-8px set-header-row-bordergray" v-for="(value, colIndex) in row.slice(0, 5)"
                             :key="'cell-' + colIndex">
                             <span class="d-inline-block flex-break-word mw-290px">
                                 {{ value }}
@@ -131,3 +131,30 @@ const separateHeaderRow = () => {
 };
 
 </script>
+
+<style scoped>
+.set-header-row-font-size-21 {
+    font-size: 21px;
+}
+.set-header-row-font-weight-700 {
+    font-weight: 700 !important;
+}
+.set-header-row-bg-lightgray {
+    background-color: var(--fill);
+}
+.set-header-row-blue {
+    color: var(--brand) !important;
+}
+.set-header-row-bordergray {
+    border: 1px solid var(--border);
+}
+.set-header-row-btn-primary {
+    cursor: pointer;
+    background: var(--brand);
+    border-radius: 4px;
+    color: var(--on-brand);
+    border: none;
+    height: 30px;
+    font-family: var(--font-ui);
+}
+</style>

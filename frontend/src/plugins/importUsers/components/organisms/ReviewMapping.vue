@@ -3,7 +3,7 @@
         <div>
             <div class="d-flex justify-content-between">
                 <h3>{{ $t('userSelection.title') }}</h3>
-                <div v-if="userLimitReached" class="border-radius-5-px border-primary blue p-5px d-flex">
+                <div v-if="userLimitReached" class="border-radius-5-px review-mapping-border-primary review-mapping-blue p-5px d-flex">
                     <img :src=warning alt="warning icon" class="w-15 mr-5px">
                     <p class="m-0">
                         {{ $t(userLimitErrorMessage) }}
@@ -13,13 +13,13 @@
             <p>{{ $t('userSelection.description') }}</p>
             <div class="mb-5px mt-5px d-flex" v-if="tableData.some(row => isEmailMatched(row))">
                 <img :src=gray_warning alt="warning icon" class="w-20 mr-10px ml-10px">
-                <p class="gray m-0">
+                <p class="review-mapping-gray m-0">
                     {{ $t('userSelection.duplicate_email_error') }}
                 </p>
             </div>
             <div class="mb-10px mt-5px d-flex" v-if="tableData.some(row => !isValidEmail(row[userEmailIndex]))">
                 <img :src=red_warning alt="warning icon" class="w-20 mr-10px ml-10px">
-                <p class="red m-0">
+                <p class="review-mapping-red m-0">
                     {{ $t('userSelection.invalid_fields') }}
                 </p>
             </div>
@@ -30,11 +30,11 @@
                 <thead class="position-sti sticky-header z-index-1">
                     <tr class="header-top-border">
                         <th v-for="(header, index) in staticHeaders" :key="index"
-                            class="p-8px bg-colorlightgray font-weight-700 bordergray text-center">
+                            class="p-8px review-mapping-bg-colorlightgray review-mapping-font-weight-700 review-mapping-bordergray text-center">
                             {{ header }}
                         </th>
                         <th
-                            class="p-8px bg-colorlightgray font-weight-700 bordergray text-center d-flex justify-content-center gap-5px">
+                            class="p-8px review-mapping-bg-colorlightgray review-mapping-font-weight-700 review-mapping-bordergray text-center d-flex justify-content-center gap-5px">
                             {{ $t('valueMapping.user_dropdown_text') }}
                             <CheckboxComponent :id="'select-all-check'" v-model="selectAllChecked"
                                 @click="handleSelectAll(false)" :customClass="'bg-white'" />
@@ -47,7 +47,7 @@
                         <td v-for="(col, colIndex) in row" :key="'col' + colIndex"
                             :title="tableData[rowIndex][colIndex]" :class="{
                                 'invalid-email': staticHeaders[colIndex] === 'User Email' && !isValidEmail(col) || staticHeaders[colIndex] === 'Role' && isRoleValid(row),
-                            }" class="p-5px bordergray">
+                            }" class="p-5px review-mapping-bordergray">
                             <input v-if="staticHeaders[colIndex] === 'User Email'"
                                 v-model="tableData[rowIndex][colIndex]" class="p-5px border-0 text-center w-100" :class="{
                                     'highlight-gray': isEmailMatched(row),
@@ -59,22 +59,22 @@
                                         <button
                                             type="button"
                                             v-bind="triggerAttrs"
-                                            class="bg-white border-0 cursor-pointer font-size-14 dark-gray w-100 drop-down-icon"
+                                            class="review-mapping-bg-white border-0 cursor-pointer review-mapping-font-size-14 review-mapping-dark-gray w-100 drop-down-icon"
                                             :style="{ backgroundImage: `url(${dropDownSvg})` }" :class="{
                                                 'highlight-gray': isEmailMatched(row),
                                                 'invalid-email': isRoleValid(row)
                                             }" :disabled="isEmailMatched(row)" ref="expand_collapse_role">
                                             <div class="d-flex justify-content-center align-items-center m-5px">
-                                                <p class="m-0 color94">
+                                                <p class="m-0 review-mapping-color94">
                                                     {{ col || "Select a Role" }}
                                                 </p>
                                             </div>
                                         </button>
                                     </template>
                                     <template #options>
-                                        <div class="d-flex align-items-center hover-bg-lighter-gray-dropdown hover-purple cursor-pointer text-nowrap drop-down-item gray81 p-7px border-radius-4-px">
+                                        <div class="d-flex align-items-center review-mapping-hover-bg-lighter-gray-dropdown review-mapping-hover-purple cursor-pointer text-nowrap drop-down-item review-mapping-gray81 p-7px border-radius-4-px">
                                             <input type="text" :placeholder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" v-model="search[colIndex]"
-                                                class="p6px-8px border-gray-blue border-radius-4-px font-size-14" />
+                                                class="p6px-8px review-mapping-border-gray-blue border-radius-4-px review-mapping-font-size-14" />
                                         </div>
                                         <DropDownOption v-for="(sysRole, sysIndex) in filteredRoles(colIndex)"
                                             :key="sysIndex" :item="sysRole" :selected="sysRole === col"
@@ -90,21 +90,21 @@
                                         <button
                                             type="button"
                                             v-bind="triggerAttrs"
-                                            class="bg-white border-0 cursor-pointer font-size-14 dark-gray w-100 drop-down-icon"
+                                            class="review-mapping-bg-white border-0 cursor-pointer review-mapping-font-size-14 review-mapping-dark-gray w-100 drop-down-icon"
                                             :style="{ backgroundImage: `url(${dropDownSvg})` }" :class="{
                                                 'highlight-gray': isEmailMatched(row),
                                             }" :disabled="isEmailMatched(row)" ref="expand_collapse_designation">
                                             <div class="d-flex justify-content-center align-items-center m-5px">
-                                                <p class="m-0 color94">
+                                                <p class="m-0 review-mapping-color94">
                                                     {{ col || "Select a Designation" }}
                                                 </p>
                                             </div>
                                         </button>
                                     </template>
                                     <template #options>
-                                        <div class="d-flex align-items-center hover-bg-lighter-gray-dropdown hover-purple cursor-pointer text-nowrap drop-down-item gray81 p-7px border-radius-4-px">
+                                        <div class="d-flex align-items-center review-mapping-hover-bg-lighter-gray-dropdown review-mapping-hover-purple cursor-pointer text-nowrap drop-down-item review-mapping-gray81 p-7px border-radius-4-px">
                                             <input type="text" :placeholder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" v-model="search[colIndex]"
-                                                class="p6px-8px border-gray-blue border-radius-4-px font-size-14" />
+                                                class="p6px-8px review-mapping-border-gray-blue border-radius-4-px review-mapping-font-size-14" />
                                         </div>
                                         <DropDownOption
                                             v-for="(sysDesignation, sysIndex) in filteredDesignations(colIndex)"
@@ -116,7 +116,7 @@
                                 </DropDown>
                             </div>
                         </td>
-                        <td class="p-5px bordergray text-webkit-center">
+                        <td class="p-5px review-mapping-bordergray text-webkit-center">
                             <CheckboxComponent :id="'checkbox' + rowIndex" v-model="mappedData[rowIndex].isChecked"
                                 :value="true" :disabled="shouldDisableCheckbox(row, rowIndex)" />
                         </td>
@@ -459,6 +459,54 @@ defineExpose({
 });
 
 </script>
+
+<style scoped>
+.review-mapping-font-size-14 {
+    font-size: 14px;
+}
+.review-mapping-font-weight-700 {
+    font-weight: 700 !important;
+}
+.review-mapping-bg-white {
+    background-color: var(--surface);
+}
+.review-mapping-bg-colorlightgray {
+    background-color: var(--fill);
+}
+.review-mapping-gray81 {
+    color: var(--ink-2);
+}
+.review-mapping-color94 {
+    color: var(--ink-2);
+}
+.review-mapping-gray {
+    color: var(--ink-2);
+}
+.review-mapping-dark-gray {
+    color: var(--ink);
+}
+.review-mapping-red {
+    color: var(--danger-ink);
+}
+.review-mapping-blue {
+    color: var(--brand) !important;
+}
+.review-mapping-hover-purple:hover {
+    color: var(--brand) !important;
+}
+.review-mapping-hover-bg-lighter-gray-dropdown:hover {
+    background-color: var(--surface-hover) !important;
+}
+.review-mapping-bordergray {
+    border: 1px solid var(--border);
+}
+.review-mapping-border-primary {
+    border: 1px solid var(--brand) !important;
+}
+.review-mapping-border-gray-blue {
+    border: 1px solid var(--hairline);
+}
+</style>
 
 <style scoped>
 .sticky-header {
