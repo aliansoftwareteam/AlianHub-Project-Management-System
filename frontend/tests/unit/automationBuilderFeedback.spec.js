@@ -92,6 +92,29 @@ describe('a new automation starts in the project it was opened from', () => {
     });
 });
 
+describe('a sentence typed while the builder is still opening', () => {
+    it('is kept and read, not replaced by the wording of the empty rule', async () => {
+        const waiting = [];
+        const typed = 'When a task is created, post a comment saying "Hi"';
+        const read = { trigger: { event: 'task.created' }, steps: [{ id: 's1', type: 'action', action: 'add_comment', config: { body: 'Hi' } }], conditions: {}, scope: { allProjects: true, projectIds: [] } };
+        compileAnswer = (body) => (body.sentence
+            ? ok({ sentence: body.sentence, rule: read, errors: [], issues: [], parseErrors: [], ambiguities: [], grammar: {} })
+            : new Promise((resolve) => { waiting.push(() => resolve({ data: { status: true, data: { sentence: 'When a task is created, set the status to .', errors: [], issues: [], parseErrors: [], ambiguities: [], grammar: {} } } })); }));
+        const wrapper = await open();
+        await startNew(wrapper);
+        const sentence = wrapper.find('.au__sentence-input');
+        await sentence.setValue(typed);
+        waiting.splice(0).forEach((land) => land());
+        await flushPromises();
+        expect(sentence.element.value).toBe(typed);
+
+        await sentence.trigger('keyup', { key: 'Enter' });
+        await flushPromises();
+        expect(compiles().at(-1).sentence).toBe(typed);
+        expect(wrapper.findAll('.au__compiled select').some((select) => select.element.value === 'add_comment')).toBe(true);
+    });
+});
+
 describe('what a rule still lacks', () => {
     it('is not shown before the person has touched the field', async () => {
         const wrapper = await open();
