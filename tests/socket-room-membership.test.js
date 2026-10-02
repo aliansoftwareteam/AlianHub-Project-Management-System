@@ -36,7 +36,6 @@ const COMMENT_EVENTS = ['commentInsert', 'commentUpdate'];
 const OWN_EVENTS = ['userIdNoticationUpdate', 'generalReminderUpdate'];
 const PINGS = {
     goals: 'goalsChanged',
-    folders: 'foldersChanged',
     customFields: 'customFieldsChanged',
     viewTemplates: 'viewTemplatesChanged',
     projectSnapshots: 'projectTemplatesChanged',

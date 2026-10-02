@@ -213,6 +213,11 @@ const projectSubject = (projectId) => `project:${projectId}`;
 const mayReceiveProject = (identity, change, projectId) => sameCompany(identity, change) && isId(projectId)
     && stillAllowed(identity, projectSubject(projectId), async () => (await canReadProject(identity.companyId, identity.uid, String(projectId))).allowed);
 
+/* The rule GET /api/v1/project/sprintFolder/:id lists by: a private list is its people's, their teams', the
+ * owners' and the admins'. `list` is the stored row, or how it was shared before a change. */
+const seesList = async (identity, list) => (await isPrivilegedHere(identity))
+    || canSeeSprint(list, await sprintIdentities(identity.companyId, identity.uid));
+
 /* A change to who may open a project is told to the people it lets in, so the answers kept from before it are dropped. */
 const forgetProjectVerdicts = (companyId, projectId) => {
     const company = `${companyId}:`;
@@ -271,6 +276,7 @@ module.exports = {
     mayReceiveComments,
     mayReceiveList,
     mayReceiveProject,
+    seesList,
     forgetProjectVerdicts,
     mayReceiveCompany,
     toSeated,

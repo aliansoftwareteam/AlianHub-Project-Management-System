@@ -520,21 +520,21 @@ describe('renaming a folder', () => {
     });
 });
 
-describe('folder writes say that the company\'s folders changed', () => {
+describe('folder writes say which folder changed', () => {
     const announced = () => socketEmitter.emit.mock.calls.filter(([, payload]) => payload && payload.module === 'folders');
 
-    it('once per write, naming neither the project nor the folder', async () => {
+    it('once per write, with its id and the company and nothing else of it', async () => {
         const parent = folderIn();
         const folder = folderIn({ name: 'Icons' });
 
-        await add({});
-        expect(announced()).toEqual([['insert', { type: 'insert', companyId: C, module: 'folders' }]]);
+        const made = await add({});
+        expect(announced()).toEqual([['insert', { type: 'insert', companyId: C, module: 'folders', data: { _id: String(made.body.data._id) } }]]);
 
         socketEmitter.emit.mockClear();
         await run(PATCH, { id: folder, body: { type: 'editFolderName', projectId: project, folderName: 'Glyphs' } });
         await move(folder, parent);
         await setStatus(folder, 2);
-        expect(announced()).toEqual([1, 2, 3].map(() => ['update', { type: 'update', companyId: C, module: 'folders' }]));
+        expect(announced()).toEqual([1, 2, 3].map(() => ['update', { type: 'update', companyId: C, module: 'folders', data: { _id: folder } }]));
     });
 
     it('nothing for a write that is refused or finds no folder', async () => {
