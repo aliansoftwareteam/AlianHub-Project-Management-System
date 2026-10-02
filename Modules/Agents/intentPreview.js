@@ -27,7 +27,8 @@ const dashboards = require('./dashboardRequests');
 // A card for a dashboard is previewed only for a viewer who can open that dashboard (./dashboardRequests.js).
 // A kind of change with no entry in BUILDERS has none.
 // A connected agent's batch is several changes on one card (forBatches): how many tasks, what changes on them, the
-// first few tasks by name, and a line for each change whose value the lines above do not already say.
+// first few tasks by name with the rest behind "show all", and a line for each change whose value the lines above
+// do not already say.
 
 const DESCRIPTION_MAX = 280;
 const TEXT_MAX = 250;
@@ -442,9 +443,10 @@ const setFieldNames = async (companyId, changes, tasks) => {
 };
 
 /* For each batch among the proposals, by proposal id: its one card. A task is named, and can be opened from the
- * card, only when the viewer can read it; the rest are a count. A person, a place and a field are named as the
- * viewer may see them (../Mcp/names.js), and a text is the proposal's own. With `bareChanges`, a screen that shows
- * a change through its card alone gets the same card for one change that has none of its own. */
+ * card, only when the viewer can read it; the rest are a count. `others` counts every task past the first few, and
+ * `rest` holds those of them the viewer can read. A person, a place and a field are named as the viewer may see
+ * them (../Mcp/names.js), and a text is the proposal's own. With `bareChanges`, a screen that shows a change
+ * through its card alone gets the same card for one change that has none of its own. */
 const forBatches = async (companyId, uid, proposals, { bareChanges = false } = {}) => {
     const batches = (Array.isArray(proposals) ? proposals : []).filter((proposal) => isBatch(proposal) || (bareChanges && isBareChange(proposal)));
     if (!batches.length) return new Map();
@@ -465,13 +467,15 @@ const forBatches = async (companyId, uid, proposals, { bareChanges = false } = {
     return new Map(batches.map((proposal) => {
         const changes = changesOf(proposal);
         const ids = taskIdsOf(changes);
-        const shown = ids.map((id) => tasks.get(id)).filter((row) => row && row.name).slice(0, BATCH_NAMES);
+        const readable = ids.map((id) => tasks.get(id)).filter((row) => row && row.name);
+        const shown = readable.slice(0, BATCH_NAMES);
+        const rest = readable.slice(BATCH_NAMES);
         const { summary, spelledOut } = changeLinesOf(changes, context);
         return [String(proposal._id), {
             kind: 'batch',
             tasks: ids.length,
             changes: changes.length,
-            lines: [...summary, ids.length > 0 && { kind: 'batchTasks', tasks: shown, others: ids.length - shown.length }, ...spelledOut].filter(Boolean),
+            lines: [...summary, ids.length > 0 && { kind: 'batchTasks', tasks: shown, others: ids.length - shown.length, ...(rest.length ? { rest } : {}) }, ...spelledOut].filter(Boolean),
         }];
     }));
 };
